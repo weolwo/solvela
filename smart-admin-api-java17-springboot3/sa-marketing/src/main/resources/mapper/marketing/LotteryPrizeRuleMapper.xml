@@ -6,11 +6,10 @@
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
-            <result column="prize_level" property="prizeLevel" />
-            <result column="prize_name" property="prizeName" />
+            <result column="issue_no" property="issueNo" />
+            <result column="pattern_mode" property="patternMode" />
+            <result column="prize_details" property="prizeDetails" />
             <result column="win_count" property="winCount" />
-            <result column="prize_code" property="prizeCode" />
-            <result column="prize_value" property="prizeValue" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
             <result column="update_by" property="updateBy" />
@@ -21,11 +20,10 @@
                 id, 
                 tenant_id, 
                 lottery_code, 
-                prize_level, 
-                prize_name, 
+                issue_no, 
+                pattern_mode, 
+                prize_details, 
                 win_count, 
-                prize_code, 
-                prize_value, 
                 create_by, 
                 create_time, 
                 update_by, 

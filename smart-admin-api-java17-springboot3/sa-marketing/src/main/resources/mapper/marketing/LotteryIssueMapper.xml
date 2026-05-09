@@ -7,6 +7,7 @@
             <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
+            <result column="start_offset" property="startOffset" />
             <result column="sold_count" property="soldCount" />
             <result column="sell_start_time" property="sellStartTime" />
             <result column="sell_end_time" property="sellEndTime" />
@@ -25,6 +26,7 @@
                 tenant_id, 
                 lottery_code, 
                 issue_no, 
+                start_offset, 
                 sold_count, 
                 sell_start_time, 
                 sell_end_time, 

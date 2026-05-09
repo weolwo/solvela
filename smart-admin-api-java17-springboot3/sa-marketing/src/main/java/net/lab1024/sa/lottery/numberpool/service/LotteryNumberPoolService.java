@@ -15,6 +15,7 @@ import net.lab1024.sa.lottery.numberpool.domain.form.LotteryNumberPoolAddForm;
 import net.lab1024.sa.lottery.numberpool.domain.form.LotteryNumberPoolQueryForm;
 import net.lab1024.sa.lottery.numberpool.domain.form.LotteryNumberPoolUpdateForm;
 import net.lab1024.sa.lottery.numberpool.domain.vo.LotteryNumberPoolVO;
+import net.lab1024.sa.lottery.numberpool.manager.LotteryNumberPoolManager;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ import java.util.List;
 public class LotteryNumberPoolService {
 
     private final LotteryNumberPoolDao lotteryNumberPoolDao;
+    private final LotteryNumberPoolManager lotteryNumberPoolManager;
     private final JdbcTemplate jdbcTemplate;
 
     /**
@@ -100,7 +102,7 @@ public class LotteryNumberPoolService {
         for (int i = 0; i < lotteryNumbers.size(); i++) {
             csvData.append(config.getLotteryCode()).append(",")
                     .append(lotteryNumbers.get(i)).append(",")
-                    .append(i).append("\n");
+                    .append(i+1).append("\n");
         }
 
         InputStream inputStream = new ByteArrayInputStream(csvData.toString().getBytes(StandardCharsets.UTF_8));
@@ -124,5 +126,12 @@ public class LotteryNumberPoolService {
             }
             return null;
         });
+    }
+
+    public List<LotteryNumberPool> queryNumbersBySeqNo(Integer minSeqNo,Integer maxSeqNo){
+        return lotteryNumberPoolManager.lambdaQuery()
+                .gt(LotteryNumberPool::getSequenceNo,minSeqNo)
+                .le(LotteryNumberPool::getSequenceNo,maxSeqNo)
+                .list();
     }
 }

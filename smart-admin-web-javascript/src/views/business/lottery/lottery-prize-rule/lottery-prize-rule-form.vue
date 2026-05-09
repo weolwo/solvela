@@ -8,29 +8,20 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
       <a-form-item label="彩票编码" name="lotteryCode">
         <a-input style="width: 100%" v-model:value="form.lotteryCode" placeholder="彩票编码" />
       </a-form-item>
-      <a-form-item label="奖励等级" name="prizeLevel">
-        <a-input-number style="width: 100%" v-model:value="form.prizeLevel" placeholder="奖励等级" />
+      <a-form-item label="期号" name="issueNo">
+        <a-input style="width: 100%" v-model:value="form.issueNo" placeholder="期号" />
       </a-form-item>
-      <a-form-item label="奖励名称" name="prizeName">
-        <a-input style="width: 100%" v-model:value="form.prizeName" placeholder="如: 终极大奖" />
+      <a-form-item label="匹配模式" name="patternMode">
+        <a-input-number style="width: 100%" v-model:value="form.patternMode" placeholder="匹配模式，0,前匹配，1后匹配" />
       </a-form-item>
       <a-form-item label="开奖个数" name="winCount">
         <a-input-number style="width: 100%" v-model:value="form.winCount" placeholder="开奖个数" />
-      </a-form-item>
-      <a-form-item label="奖品编码" name="prizeCode">
-        <a-input style="width: 100%" v-model:value="form.prizeCode" placeholder="奖品编码" />
-      </a-form-item>
-      <a-form-item label="奖励价值" name="prizeValue">
-        <a-input-number style="width: 100%" v-model:value="form.prizeValue" placeholder="奖励价值" />
       </a-form-item>
     </a-form>
 
@@ -87,11 +78,10 @@
     id: undefined, //id
     tenantId: undefined, //租户id
     lotteryCode: undefined, //彩票编码
-    prizeLevel: undefined, //奖励等级
-    prizeName: undefined, //如: 终极大奖
+    issueNo: undefined, //期号
+    patternMode: undefined, //匹配模式，0,前匹配，1后匹配
+    prizeDetails: undefined, //奖励明细
     winCount: undefined, //开奖个数
-    prizeCode: undefined, //奖品编码
-    prizeValue: undefined, //奖励价值
   };
 
   let form = reactive({ ...formDefault });
@@ -100,11 +90,10 @@
     id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户id 必填' }],
     lotteryCode: [{ required: true, message: '彩票编码 必填' }],
-    prizeLevel: [{ required: true, message: '奖励等级 必填' }],
-    prizeName: [{ required: true, message: '如: 终极大奖 必填' }],
+    issueNo: [{ required: true, message: '期号 必填' }],
+    patternMode: [{ required: true, message: '匹配模式，0,前匹配，1后匹配 必填' }],
+    prizeDetails: [{ required: true, message: '奖励明细 必填' }],
     winCount: [{ required: true, message: '开奖个数 必填' }],
-    prizeCode: [{ required: true, message: '奖品编码 必填' }],
-    prizeValue: [{ required: true, message: '奖励价值 必填' }],
   };
 
   // 点击确定，验证表单

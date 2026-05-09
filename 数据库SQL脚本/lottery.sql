@@ -27,13 +27,12 @@ CREATE TABLE `t_lottery_issue`
     `tenant_id`       varchar(16) NOT NULL DEFAULT '0' comment '租户id',
     `lottery_code`    varchar(32) NOT NULL COMMENT '彩票编码',
     `issue_no`        varchar(32) NOT NULL COMMENT '期号',
+    `start_offset`         int NOT NULL COMMENT '开始偏移量',
     `sold_count`      int         NOT NULL DEFAULT 0 COMMENT '已售/已派发数量',
-
     -- 【时间与开奖控制】
     `sell_start_time` datetime    NOT NULL COMMENT '开始售卖',
     `sell_end_time`   datetime    NOT NULL COMMENT '结束时间',
     `open_time`       datetime             DEFAULT NULL COMMENT '开奖时间',
-
     `can_repeat`      tinyint     NOT NULL DEFAULT 0 COMMENT '是否可重复开奖：0否，1是',
     `winning_number`  json                 DEFAULT NULL COMMENT '开奖号码',
     `status`          tinyint     NOT NULL DEFAULT '0' COMMENT '状态: 0-待开奖, 1-售卖中, 2-已开奖',
@@ -50,20 +49,16 @@ CREATE TABLE `t_lottery_prize_rule`
     `id`           bigint         NOT NULL AUTO_INCREMENT comment 'id',
     `tenant_id`    varchar(16)    NOT NULL DEFAULT '0' comment '租户id',
     `lottery_code` varchar(32)    NOT NULL COMMENT '彩票编码',
-
-    `prize_level`  int            NOT NULL COMMENT '奖励等级',
-    `prize_name`   varchar(64)    NOT NULL COMMENT '如: 终极大奖',
+    `issue_no`     varchar(32)    NOT NULL COMMENT '期号',
+    `pattern_mode`         int NOT NULL COMMENT '匹配模式，0,前匹配，1后匹配',
+    `prize_details` json          NOT NULL COMMENT '奖励明细',
     `win_count`    int            NOT NULL DEFAULT 1 COMMENT '开奖个数',
-
-    -- 【关联底层财务与资产】
-    `prize_code`   varchar(64)    NOT NULL COMMENT '奖品编码',
-    `prize_value`  decimal(18, 4) NOT NULL COMMENT '奖励价值',
     `create_by`     varchar(32)          DEFAULT NULL comment '创建人',
     `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
     `update_by`     varchar(32)          DEFAULT NULL comment '更新人',
     `update_time`   datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lottery_level` (`lottery_code`, `prize_level`)
+    UNIQUE KEY `uk_lottery_level` (`lottery_code`, `issue_no`)
 ) COMMENT ='彩票奖励配置';
 
 DROP TABLE IF EXISTS `t_lottery_record`;

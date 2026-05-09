@@ -10,7 +10,7 @@ import lombok.Data;
  * 期号配置 新建表单
  *
  * @Author weolwo
- * @Date 2026-04-19 11:23:43
+ * @Date 2026-05-09 16:54:51
  * @Copyright weolwo
  */
 
@@ -29,6 +29,14 @@ public class LotteryIssueAddForm {
     @NotBlank(message = "期号 不能为空")
     private String issueNo;
 
+    @Schema(description = "开始偏移量", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "开始偏移量 不能为空")
+    private Integer startOffset;
+
+    @Schema(description = "已售/已派发数量", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "已售/已派发数量 不能为空")
+    private Integer soldCount;
+
     @Schema(description = "开始售卖", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "开始售卖 不能为空")
     private LocalDateTime sellStartTime;
@@ -40,14 +48,14 @@ public class LotteryIssueAddForm {
     @Schema(description = "开奖时间")
     private LocalDateTime openTime;
 
-    @Schema(description = "是否可重复开奖：0否，1是", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "是否可重复开奖：0否，1是 不能为空")
+    @Schema(description = "是否可重复开奖：0否，1是")
     private Integer canRepeat;
 
     @Schema(description = "开奖号码")
     private String winningNumber;
 
-    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖")
+    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "状态: 0-待开奖, 1-售卖中, 2-已开奖 不能为空")
     private Integer status;
 
     @Schema(description = "创建人")

@@ -8,7 +8,7 @@ import lombok.Data;
  * 期号配置 列表VO
  *
  * @Author weolwo
- * @Date 2026-04-19 11:23:43
+ * @Date 2026-05-09 16:54:51
  * @Copyright weolwo
  */
 
@@ -27,6 +27,9 @@ public class LotteryIssueVO {
 
     @Schema(description = "期号")
     private String issueNo;
+
+    @Schema(description = "开始偏移量")
+    private Integer startOffset;
 
     @Schema(description = "已售/已派发数量")
     private Integer soldCount;

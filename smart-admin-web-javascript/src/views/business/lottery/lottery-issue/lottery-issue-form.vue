@@ -2,23 +2,26 @@
   * 期号配置
   *
   * @Author:    weolwo
-  * @Date:      2026-04-19 11:23:43
+  * @Date:      2026-05-09 16:54:51
   * @Copyright  weolwo
 -->
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
       <a-form-item label="彩票编码" name="lotteryCode">
-        <a-input style="width: 100%" v-model:value="form.lotteryCode" placeholder="彩票编码" />
+        <SmartEnumSelect width="100%" v-model:value="form.lotteryCode" enum-name="" placeholder="彩票编码" />
       </a-form-item>
       <a-form-item label="期号" name="issueNo">
         <a-input style="width: 100%" v-model:value="form.issueNo" placeholder="期号" />
+      </a-form-item>
+      <a-form-item label="开始偏移量" name="startOffset">
+        <a-input-number style="width: 100%" v-model:value="form.startOffset" placeholder="开始偏移量" />
+      </a-form-item>
+      <a-form-item label="已售/已派发数量" name="soldCount">
+        <a-input-number style="width: 100%" v-model:value="form.soldCount" placeholder="已售/已派发数量" />
       </a-form-item>
       <a-form-item label="开始售卖" name="sellStartTime">
         <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.sellStartTime" style="width: 100%" placeholder="开始售卖" />
@@ -52,6 +55,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { lotteryIssueApi } from '/@/api/business/lottery/lottery-issue/lottery-issue-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
 
   // ------------------------ 事件 ------------------------
 
@@ -91,6 +95,8 @@
     tenantId: undefined, //租户id
     lotteryCode: undefined, //彩票编码
     issueNo: undefined, //期号
+    startOffset: undefined, //开始偏移量
+    soldCount: undefined, //已售/已派发数量
     sellStartTime: undefined, //开始售卖
     sellEndTime: undefined, //结束时间
     openTime: undefined, //开奖时间
@@ -102,12 +108,15 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
+    id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户id 必填' }],
     lotteryCode: [{ required: true, message: '彩票编码 必填' }],
     issueNo: [{ required: true, message: '期号 必填' }],
+    startOffset: [{ required: true, message: '开始偏移量 必填' }],
+    soldCount: [{ required: true, message: '已售/已派发数量 必填' }],
     sellStartTime: [{ required: true, message: '开始售卖 必填' }],
     sellEndTime: [{ required: true, message: '结束时间 必填' }],
-    canRepeat: [{ required: true, message: '是否可重复开奖：0否，1是 必填' }],
+    status: [{ required: true, message: '状态: 0-待开奖, 1-售卖中, 2-已开奖 必填' }],
   };
 
   // 点击确定，验证表单

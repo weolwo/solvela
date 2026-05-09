@@ -9,7 +9,7 @@ import lombok.Data;
  * 期号配置 更新表单
  *
  * @Author weolwo
- * @Date 2026-04-19 11:23:43
+ * @Date 2026-05-09 16:54:51
  * @Copyright weolwo
  */
 
@@ -31,14 +31,14 @@ public class LotteryIssueUpdateForm {
     @Schema(description = "开奖时间")
     private LocalDateTime openTime;
 
-    @Schema(description = "是否可重复开奖：0否，1是", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "是否可重复开奖：0否，1是 不能为空")
+    @Schema(description = "是否可重复开奖：0否，1是")
     private Integer canRepeat;
 
     @Schema(description = "开奖号码")
     private String winningNumber;
 
-    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖")
+    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "状态: 0-待开奖, 1-售卖中, 2-已开奖 不能为空")
     private Integer status;
 
     @Schema(description = "更新人")

@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -38,29 +37,24 @@ public class LotteryPrizeRule {
     private String lotteryCode;
 
     /**
-     * 奖励等级
+     * 期号
      */
-    private Integer prizeLevel;
+    private String issueNo;
 
     /**
-     * 如: 终极大奖
+     * 匹配模式，0,前匹配，1后匹配
      */
-    private String prizeName;
+    private Integer patternMode;
+
+    /**
+     * 奖励明细
+     */
+    private String prizeDetails;
 
     /**
      * 开奖个数
      */
     private Integer winCount;
-
-    /**
-     * 奖品编码
-     */
-    private String prizeCode;
-
-    /**
-     * 奖励价值
-     */
-    private BigDecimal prizeValue;
 
     /**
      * 创建人

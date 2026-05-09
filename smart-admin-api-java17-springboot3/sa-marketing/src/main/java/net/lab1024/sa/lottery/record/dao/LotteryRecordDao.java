@@ -1,6 +1,8 @@
 package net.lab1024.sa.lottery.record.dao;
 
         import java.util.List;
+
+        import net.lab1024.sa.base.common.dao.CustomizedBaseMapper;
         import net.lab1024.sa.lottery.record.domain.entity.LotteryRecord;
         import net.lab1024.sa.lottery.record.domain.form.LotteryRecordQueryForm;
         import net.lab1024.sa.lottery.record.domain.vo.LotteryRecordVO;
@@ -18,7 +20,7 @@ import java.util.List;
  * @Copyright weolwo
  */
 @Mapper
-public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
+public interface LotteryRecordDao extends CustomizedBaseMapper<LotteryRecord> {
 
     /**
      * 分页查询

@@ -134,28 +134,23 @@
       ellipsis: true,
     },
     {
-      title: '奖励等级',
-      dataIndex: 'prizeLevel',
+      title: '期号',
+      dataIndex: 'issueNo',
       ellipsis: true,
     },
     {
-      title: '奖励名称',
-      dataIndex: 'prizeName',
+      title: '匹配模式',
+      dataIndex: 'patternMode',
+      ellipsis: true,
+    },
+    {
+      title: '奖励明细',
+      dataIndex: 'prizeDetails',
       ellipsis: true,
     },
     {
       title: '开奖个数',
       dataIndex: 'winCount',
-      ellipsis: true,
-    },
-    {
-      title: '奖品编码',
-      dataIndex: 'prizeCode',
-      ellipsis: true,
-    },
-    {
-      title: '奖励价值',
-      dataIndex: 'prizeValue',
       ellipsis: true,
     },
     {

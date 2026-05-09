@@ -2,7 +2,7 @@
   * 期号配置
   *
   * @Author:    weolwo
-  * @Date:      2026-04-19 11:23:43
+  * @Date:      2026-05-09 16:54:51
   * @Copyright  weolwo
 -->
 <template>
@@ -18,7 +18,7 @@
       <a-form-item label="期号" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.issueNo" placeholder="期号" />
       </a-form-item>
-      <a-form-item label="状态" class="smart-query-form-item">
+      <a-form-item label="状态: 0-待开奖, 1-售卖中, 2-已开奖" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态: 0-待开奖, 1-售卖中, 2-已开奖" />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
@@ -139,6 +139,11 @@
     {
       title: '期号',
       dataIndex: 'issueNo',
+      ellipsis: true,
+    },
+    {
+      title: '开始偏移量',
+      dataIndex: 'startOffset',
       ellipsis: true,
     },
     {

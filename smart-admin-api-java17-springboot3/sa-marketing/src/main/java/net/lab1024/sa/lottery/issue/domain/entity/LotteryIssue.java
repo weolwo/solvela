@@ -12,7 +12,7 @@ import lombok.Data;
  * 期号配置 实体类
  *
  * @Author weolwo
- * @Date 2026-04-19 11:23:43
+ * @Date 2026-05-09 16:54:51
  * @Copyright weolwo
  */
 
@@ -40,6 +40,11 @@ public class LotteryIssue {
      * 期号
      */
     private String issueNo;
+
+    /**
+     * 开始偏移量
+     */
+    private Integer startOffset;
 
     /**
      * 已售/已派发数量
