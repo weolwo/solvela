@@ -12,6 +12,7 @@
             <result column="prize_code" property="prizeCode" />
             <result column="prize_level" property="prizeLevel" />
             <result column="prize_value" property="prizeValue" />
+            <result column="approve_mode" property="approveMode" />
             <result column="sort_weight" property="sortWeight" />
             <result column="ext" property="ext" />
             <result column="status" property="status" />
@@ -31,6 +32,7 @@
                 prize_code, 
                 prize_level, 
                 prize_value, 
+                approve_mode, 
                 sort_weight, 
                 ext, 
                 status, 
@@ -53,6 +55,15 @@
                         </if>
                         <if test="queryForm.prizeLevel != null">
                             AND prize_level = #{queryForm.prizeLevel}
+                        </if>
+                        <if test="queryForm.prizeName != null">
+                            AND prize_name = #{queryForm.prizeName}
+                        </if>
+                        <if test="queryForm.approveMode != null">
+                            AND approve_mode = #{queryForm.approveMode}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
                         </if>
         </where>
     </sql>

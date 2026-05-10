@@ -44,6 +44,9 @@ public class PrizeConfigVO {
     @Schema(description = "奖励价值")
     private BigDecimal prizeValue;
 
+    @Schema(description = "审批模式：0-自动免审, 1-人工审批")
+    private Integer approveMode;
+
     @Schema(description = "排序权重")
     private Integer sortWeight;
 

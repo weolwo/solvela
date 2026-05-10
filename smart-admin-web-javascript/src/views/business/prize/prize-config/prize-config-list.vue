@@ -21,6 +21,15 @@
       <a-form-item label="奖品级别" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.prizeLevel" placeholder="奖品级别" />
       </a-form-item>
+      <a-form-item label="奖品名称" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.prizeName" placeholder="奖品名称" />
+      </a-form-item>
+      <a-form-item label="审批模式" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
+      </a-form-item>
+      <a-form-item label="状态" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-停用, 1-启用" />
+      </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
           <template #icon>
@@ -138,7 +147,7 @@
       ellipsis: true,
     },
     {
-      title: '资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM',
+      title: '资产类型',
       dataIndex: 'prizeType',
       ellipsis: true,
     },
@@ -163,17 +172,22 @@
       ellipsis: true,
     },
     {
+      title: '审批模式',
+      dataIndex: 'approveMode',
+      ellipsis: true,
+    },
+    {
       title: '排序权重',
       dataIndex: 'sortWeight',
       ellipsis: true,
     },
     {
-      title: '扩展信息：如奖品图片URL、跳转链接等',
+      title: '扩展信息',
       dataIndex: 'ext',
       ellipsis: true,
     },
     {
-      title: '状态：0-停用, 1-启用',
+      title: '状态',
       dataIndex: 'status',
       ellipsis: true,
     },
@@ -212,6 +226,9 @@
     activityCode: undefined, //活动编码
     prizeCode: undefined, //奖品编码
     prizeLevel: undefined, //奖品级别
+    prizeName: undefined, //奖品名称
+    approveMode: undefined, //审批模式：0-自动免审, 1-人工审批
+    status: undefined, //状态：0-停用, 1-启用
     pageNum: 1,
     pageSize: 10,
   };

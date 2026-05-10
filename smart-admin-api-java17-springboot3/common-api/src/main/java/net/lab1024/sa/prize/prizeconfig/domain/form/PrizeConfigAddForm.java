@@ -2,7 +2,9 @@ package net.lab1024.sa.prize.prizeconfig.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -43,10 +45,20 @@ public class PrizeConfigAddForm {
     @Schema(description = "奖励价值")
     private BigDecimal prizeValue;
 
+    @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "审批模式：0-自动免审, 1-人工审批 不能为空")
+    private Integer approveMode;
+
     @Schema(description = "排序权重")
     private Integer sortWeight;
 
     @Schema(description = "扩展信息：如奖品图片URL、跳转链接等")
     private String ext;
+
+    @Schema(description = "创建人")
+    private String createBy;
+
+    @Schema(description = "创建时间")
+    private LocalDateTime createTime;
 
 }

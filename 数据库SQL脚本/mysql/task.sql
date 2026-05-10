@@ -104,6 +104,7 @@ CREATE TABLE `t_prize_config`
     prize_code            varchar(64)    NOT null COMMENT '奖品编码',
     `prize_level`         int                     DEFAULT '0' COMMENT '奖品级别',
     `prize_value`         decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '奖励价值',
+    `approve_mode`        tinyint      NOT NULL DEFAULT 0 COMMENT '审批模式：0-自动免审, 1-人工审批',
     `sort_weight`         int            NOT NULL DEFAULT '0' COMMENT '排序权重',
     `ext`                 json                    DEFAULT NULL COMMENT '扩展信息：如奖品图片URL、跳转链接等',
     `status`              tinyint        NULL     DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
@@ -208,12 +209,18 @@ CREATE TABLE `t_prize_log`
     `prize_code`          varchar(64)  NOT NULL COMMENT '奖品编码',
     `promotion_config_id` bigint       NOT NULL COMMENT '优惠配置ID',
     `activity_code`       varchar(32)  NOT NULL COMMENT '活动编码',
-    `prize_level`         int                   DEFAULT '0' COMMENT '奖品级别',
+    `prize_level`         int                   DEFAULT 0 COMMENT '奖品级别',
     `prize_name`          varchar(128) NOT NULL COMMENT '奖品名称',
     `prize_type`          varchar(32)  NOT NULL COMMENT '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL',
     `prize_value`         varchar(128) NOT NULL COMMENT '奖励体值(积分数/券ID)',
     `fail_reason`         varchar(128) NOT NULL COMMENT '异常原因',
-
+-- ================= 【新增】风控与审批字段 =================
+    `approve_mode`        tinyint      NOT NULL DEFAULT 0 COMMENT '审批模式：0-自动免审, 1-人工审批',
+    `approve_status`      tinyint      NOT NULL DEFAULT 0 COMMENT '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回',
+    `approve_by`          varchar(64)           DEFAULT NULL COMMENT '审批人',
+    `approve_time`        datetime              DEFAULT NULL COMMENT '审批时间',
+    `valid_until`        datetime              DEFAULT NULL COMMENT '过期时间',
+    -- =========================================================
     `status`              tinyint      NULL     DEFAULT 0 COMMENT '执行状态：0-等待, 1-成功, 2-失败',
     `external_biz_no`     varchar(128)          DEFAULT NULL COMMENT '外部单号',
     `remark`              varchar(255)          DEFAULT NULL COMMENT '异常原因',

@@ -20,7 +20,7 @@
       <a-form-item label="优惠配置ID" name="promotionConfigId">
         <a-input-number style="width: 100%" v-model:value="form.promotionConfigId" placeholder="优惠配置ID" />
       </a-form-item>
-      <a-form-item label="资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM" name="prizeType">
+      <a-form-item label="资产类型" name="prizeType">
         <a-input style="width: 100%" v-model:value="form.prizeType" placeholder="资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM" />
       </a-form-item>
       <a-form-item label="奖品名称" name="prizeName">
@@ -35,10 +35,13 @@
       <a-form-item label="奖励价值" name="prizeValue">
         <a-input-number style="width: 100%" v-model:value="form.prizeValue" placeholder="奖励价值" />
       </a-form-item>
+      <a-form-item label="审批模式" name="approveMode">
+        <a-input-number style="width: 100%" v-model:value="form.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
+      </a-form-item>
       <a-form-item label="排序权重" name="sortWeight">
         <a-input-number style="width: 100%" v-model:value="form.sortWeight" placeholder="排序权重" />
       </a-form-item>
-      <a-form-item label="状态：0-停用, 1-启用" name="status">
+      <a-form-item label="状态" name="status">
         <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态：0-停用, 1-启用" />
       </a-form-item>
     </a-form>
@@ -103,6 +106,7 @@
     prizeCode: undefined, //奖品编码
     prizeLevel: undefined, //奖品级别
     prizeValue: undefined, //奖励价值
+    approveMode: undefined, //审批模式：0-自动免审, 1-人工审批
     sortWeight: undefined, //排序权重
     ext: undefined, //扩展信息：如奖品图片URL、跳转链接等
     status: undefined, //状态：0-停用, 1-启用
@@ -115,6 +119,7 @@
     tenantId: [{ required: true, message: '租户ID 必填' }],
     activityCode: [{ required: true, message: '活动编码 必填' }],
     prizeCode: [{ required: true, message: '奖品编码 必填' }],
+    approveMode: [{ required: true, message: '审批模式：0-自动免审, 1-人工审批 必填' }],
   };
 
   // 点击确定，验证表单

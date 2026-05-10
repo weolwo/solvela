@@ -1,7 +1,9 @@
 package net.lab1024.sa.prize.prizelog.service;
 
-import java.util.List;
-
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.prize.prizelog.dao.PrizeLogDao;
@@ -10,12 +12,10 @@ import net.lab1024.sa.prize.prizelog.domain.form.PrizeLogAddForm;
 import net.lab1024.sa.prize.prizelog.domain.form.PrizeLogQueryForm;
 import net.lab1024.sa.prize.prizelog.domain.form.PrizeLogUpdateForm;
 import net.lab1024.sa.prize.prizelog.domain.vo.PrizeLogVO;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 /**
  * 奖励记录表 Service
@@ -58,6 +58,10 @@ public class PrizeLogService {
         return ResponseDTO.ok();
     }
 
+    public int save(PrizeLog prizeLog){
+       return prizeLogDao.insert(prizeLog);
+    }
+
     /**
      * 批量删除
      */
@@ -81,15 +85,4 @@ public class PrizeLogService {
         prizeLogDao.deleteById(id);
         return ResponseDTO.ok();
     }
-
-    /**
-     * 统一批量派发奖励入口
-     * @param list
-     * @return
-     */
-    public ResponseDTO sendPrize(List<PrizeLog> list){
-
-        return ResponseDTO.ok();
-    }
-
 }

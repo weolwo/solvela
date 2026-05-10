@@ -14,6 +14,11 @@
             <result column="prize_type" property="prizeType" />
             <result column="prize_value" property="prizeValue" />
             <result column="fail_reason" property="failReason" />
+            <result column="approve_mode" property="approveMode" />
+            <result column="approve_status" property="approveStatus" />
+            <result column="approve_by" property="approveBy" />
+            <result column="approve_time" property="approveTime" />
+            <result column="valid_until" property="validUntil" />
             <result column="status" property="status" />
             <result column="external_biz_no" property="externalBizNo" />
             <result column="remark" property="remark" />
@@ -35,6 +40,11 @@
                 prize_type, 
                 prize_value, 
                 fail_reason, 
+                approve_mode, 
+                approve_status, 
+                approve_by, 
+                approve_time, 
+                valid_until, 
                 status, 
                 external_biz_no, 
                 remark, 
@@ -63,6 +73,18 @@
                         </if>
                         <if test="queryForm.createTimeEnd != null">
                             AND create_time &lt;= #{queryForm.createTimeEnd}
+                        </if>
+                        <if test="queryForm.approveStatus != null">
+                            AND approve_status = #{queryForm.approveStatus}
+                        </if>
+                        <if test="queryForm.approveMode != null">
+                            AND approve_mode = #{queryForm.approveMode}
+                        </if>
+                        <if test="queryForm.validUntilBegin != null">
+                            AND valid_until &gt;= #{queryForm.validUntilBegin}
+                        </if>
+                        <if test="queryForm.validUntilEnd != null">
+                            AND valid_until &lt;= #{queryForm.validUntilEnd}
                         </if>
         </where>
     </sql>

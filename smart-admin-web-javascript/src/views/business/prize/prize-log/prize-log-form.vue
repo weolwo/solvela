@@ -41,7 +41,22 @@
       <a-form-item label="异常原因" name="failReason">
         <a-input style="width: 100%" v-model:value="form.failReason" placeholder="异常原因" />
       </a-form-item>
-      <a-form-item label="执行状态：0-等待, 1-成功, 2-失败" name="status">
+      <a-form-item label="审批模式" name="approveMode">
+        <a-input-number style="width: 100%" v-model:value="form.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
+      </a-form-item>
+      <a-form-item label="审批状态" name="approveStatus">
+        <a-input-number style="width: 100%" v-model:value="form.approveStatus" placeholder="审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回" />
+      </a-form-item>
+      <a-form-item label="审批人" name="approveBy">
+        <a-input style="width: 100%" v-model:value="form.approveBy" placeholder="审批人" />
+      </a-form-item>
+      <a-form-item label="审批时间" name="approveTime">
+        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.approveTime" style="width: 100%" placeholder="审批时间" />
+      </a-form-item>
+      <a-form-item label="过期时间" name="validUntil">
+        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validUntil" style="width: 100%" placeholder="过期时间" />
+      </a-form-item>
+      <a-form-item label="执行状态" name="status">
         <a-input-number style="width: 100%" v-model:value="form.status" placeholder="执行状态：0-等待, 1-成功, 2-失败" />
       </a-form-item>
       <a-form-item label="外部单号" name="externalBizNo">
@@ -64,10 +79,10 @@
   import { reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
-  import { SmartLoading } from '/src/components/framework/smart-loading';
+  import { SmartLoading } from '/@/components/framework/smart-loading';
   import { prizeLogApi } from '/@/api/business/prize/prize-log/prize-log-api';
-  import { smartSentry } from '/src/lib/smart-sentry';
-  import SmartEnumSelect from '/src/components/framework/smart-enum-select/index.vue';
+  import { smartSentry } from '/@/lib/smart-sentry';
+  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
 
   // ------------------------ 事件 ------------------------
 
@@ -114,6 +129,11 @@
     prizeType: undefined, //奖励类型：SCORE, BALANCE, COUPON, PHYSICAL
     prizeValue: undefined, //奖励体值(积分数/券ID)
     failReason: undefined, //异常原因
+    approveMode: undefined, //审批模式：0-自动免审, 1-人工审批
+    approveStatus: undefined, //审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回
+    approveBy: undefined, //审批人
+    approveTime: undefined, //审批时间
+    validUntil: undefined, //过期时间
     status: undefined, //执行状态：0-等待, 1-成功, 2-失败
     externalBizNo: undefined, //外部单号
     remark: undefined, //异常原因
@@ -130,6 +150,8 @@
     prizeName: [{ required: true, message: '奖品名称 必填' }],
     prizeType: [{ required: true, message: '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL 必填' }],
     prizeValue: [{ required: true, message: '奖励体值(积分数/券ID) 必填' }],
+    approveMode: [{ required: true, message: '审批模式：0-自动免审, 1-人工审批 必填' }],
+    approveStatus: [{ required: true, message: '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 必填' }],
   };
 
   // 点击确定，验证表单

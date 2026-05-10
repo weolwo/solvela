@@ -1,12 +1,9 @@
 package net.lab1024.sa.prize.prizelog.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
-import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 /**
  * 奖励记录表 实体类
@@ -75,6 +72,31 @@ public class PrizeLog {
      * 异常原因
      */
     private String failReason;
+
+    /**
+     * 审批模式：0-自动免审, 1-人工审批
+     */
+    private Integer approveMode;
+
+    /**
+     * 审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回
+     */
+    private Integer approveStatus;
+
+    /**
+     * 审批人
+     */
+    private String approveBy;
+
+    /**
+     * 审批时间
+     */
+    private LocalDateTime approveTime;
+
+    /**
+     * 过期时间
+     */
+    private LocalDateTime validUntil;
 
     /**
      * 执行状态：0-等待, 1-成功, 2-失败

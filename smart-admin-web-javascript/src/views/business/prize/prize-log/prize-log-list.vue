@@ -24,6 +24,15 @@
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
       </a-form-item>
+      <a-form-item label="审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.approveStatus" placeholder="审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回" />
+      </a-form-item>
+      <a-form-item label="审批模式：0-自动免审, 1-人工审批" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
+      </a-form-item>
+      <a-form-item label="过期时间" class="smart-query-form-item">
+        <a-range-picker v-model:value="queryForm.validUntil" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeValidUntil" />
+      </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
           <template #icon>
@@ -110,12 +119,12 @@
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
   import { message, Modal } from 'ant-design-vue';
-  import { SmartLoading } from '/src/components/framework/smart-loading';
+  import { SmartLoading } from '/@/components/framework/smart-loading';
   import { prizeLogApi } from '/@/api/business/prize/prize-log/prize-log-api';
-  import { PAGE_SIZE_OPTIONS } from '/src/constants/common-const';
-  import { smartSentry } from '/src/lib/smart-sentry';
-  import TableOperator from '/src/components/support/table-operator/index.vue';
-  import { defaultTimeRanges } from '/src/lib/default-time-ranges';
+  import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
+  import { smartSentry } from '/@/lib/smart-sentry';
+  import TableOperator from '/@/components/support/table-operator/index.vue';
+  import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import PrizeLogForm from './prize-log-form.vue';
 
   // ---------------------------- 表格列 ----------------------------
@@ -162,7 +171,7 @@
       ellipsis: true,
     },
     {
-      title: '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL',
+      title: '奖励类型',
       dataIndex: 'prizeType',
       ellipsis: true,
     },
@@ -177,7 +186,32 @@
       ellipsis: true,
     },
     {
-      title: '执行状态：0-等待, 1-成功, 2-失败',
+      title: '审批模式',
+      dataIndex: 'approveMode',
+      ellipsis: true,
+    },
+    {
+      title: '审批状态',
+      dataIndex: 'approveStatus',
+      ellipsis: true,
+    },
+    {
+      title: '审批人',
+      dataIndex: 'approveBy',
+      ellipsis: true,
+    },
+    {
+      title: '审批时间',
+      dataIndex: 'approveTime',
+      ellipsis: true,
+    },
+    {
+      title: '过期时间',
+      dataIndex: 'validUntil',
+      ellipsis: true,
+    },
+    {
+      title: '执行状态',
       dataIndex: 'status',
       ellipsis: true,
     },
@@ -229,6 +263,11 @@
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束
+    approveStatus: undefined, //审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回
+    approveMode: undefined, //审批模式：0-自动免审, 1-人工审批
+    validUntil: [], //过期时间
+    validUntilBegin: undefined, //过期时间 开始
+    validUntilEnd: undefined, //过期时间 结束
     pageNum: 1,
     pageSize: 10,
   };
@@ -272,6 +311,11 @@
   function onChangeCreateTime(dates, dateStrings) {
     queryForm.createTimeBegin = dateStrings[0];
     queryForm.createTimeEnd = dateStrings[1];
+  }
+
+  function onChangeValidUntil(dates, dateStrings) {
+    queryForm.validUntilBegin = dateStrings[0];
+    queryForm.validUntilEnd = dateStrings[1];
   }
 
   onMounted(queryData);

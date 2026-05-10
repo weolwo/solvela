@@ -1,7 +1,9 @@
 package net.lab1024.sa.prize.prizeconfig.service;
 
-import java.util.List;
-
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.prize.prizeconfig.dao.PrizeConfigDao;
@@ -10,12 +12,11 @@ import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
 import net.lab1024.sa.prize.prizeconfig.domain.vo.PrizeConfigVO;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import net.lab1024.sa.prize.prizeconfig.manager.PrizeConfigManager;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 /**
  * 奖品配置表 Service
@@ -29,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class PrizeConfigService {
 
     private final PrizeConfigDao prizeConfigDao;
+    private final PrizeConfigManager prizeConfigManager;
 
     /**
      * 分页查询
@@ -56,6 +58,10 @@ public class PrizeConfigService {
         PrizeConfig prizeConfig = SmartBeanUtil.copy(updateForm, PrizeConfig.class);
         prizeConfigDao.updateById(prizeConfig);
         return ResponseDTO.ok();
+    }
+
+    public PrizeConfig getByPrizeCode(String prizeCode){
+        return prizeConfigManager.lambdaQuery().eq(PrizeConfig::getPrizeCode,prizeCode).one();
     }
 
     /**

@@ -49,6 +49,21 @@ public class PrizeLogVO {
     @Schema(description = "异常原因")
     private String failReason;
 
+    @Schema(description = "审批模式：0-自动免审, 1-人工审批")
+    private Integer approveMode;
+
+    @Schema(description = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回")
+    private Integer approveStatus;
+
+    @Schema(description = "审批人")
+    private String approveBy;
+
+    @Schema(description = "审批时间")
+    private LocalDateTime approveTime;
+
+    @Schema(description = "过期时间")
+    private LocalDateTime validUntil;
+
     @Schema(description = "执行状态：0-等待, 1-成功, 2-失败")
     private Integer status;
 

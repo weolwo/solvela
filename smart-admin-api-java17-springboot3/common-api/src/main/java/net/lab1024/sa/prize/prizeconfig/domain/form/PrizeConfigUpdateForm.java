@@ -3,6 +3,7 @@ package net.lab1024.sa.prize.prizeconfig.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -35,6 +36,10 @@ public class PrizeConfigUpdateForm {
     @Schema(description = "奖励价值")
     private BigDecimal prizeValue;
 
+    @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "审批模式：0-自动免审, 1-人工审批 不能为空")
+    private Integer approveMode;
+
     @Schema(description = "排序权重")
     private Integer sortWeight;
 
@@ -43,5 +48,11 @@ public class PrizeConfigUpdateForm {
 
     @Schema(description = "状态：0-停用, 1-启用")
     private Integer status;
+
+    @Schema(description = "更新人")
+    private String updateBy;
+
+    @Schema(description = "更新时间")
+    private LocalDateTime updateTime;
 
 }

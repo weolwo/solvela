@@ -12,28 +12,27 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
-import net.lab1024.sa.util.DateUtils;
-import net.lab1024.sa.enums.PatternModeEnum;
-import net.lab1024.sa.enums.TicketStatusEnum;
+import net.lab1024.sa.enums.*;
 import net.lab1024.sa.lottery.issue.dao.LotteryIssueDao;
 import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueAddForm;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueQueryForm;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueUpdateForm;
 import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueVO;
-import net.lab1024.sa.lottery.prizerule.domain.vo.PrizeDetailItem;
-import net.lab1024.sa.enums.IssueStatusEnum;
 import net.lab1024.sa.lottery.issue.manager.LotteryIssueManager;
 import net.lab1024.sa.lottery.prizerule.domain.entity.LotteryPrizeRule;
+import net.lab1024.sa.lottery.prizerule.domain.vo.PrizeDetailItem;
 import net.lab1024.sa.lottery.prizerule.service.LotteryPrizeRuleService;
 import net.lab1024.sa.lottery.record.domain.entity.LotteryRecord;
 import net.lab1024.sa.lottery.record.domain.form.LotteryRecordQueryForm;
 import net.lab1024.sa.lottery.record.service.LotteryRecordService;
+import net.lab1024.sa.domain.event.UserPrizeEvent;
+import net.lab1024.sa.util.DateUtils;
+import net.lab1024.sa.util.SnowFlake;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -169,7 +168,7 @@ public class LotteryIssueService {
         queryForm.setPageSize(1000L);
         String winningNumber = lotteryIssue.getWinningNumber();
         Set<Long> wonIds = new HashSet<>();
-
+        List<UserPrizeEvent> eventCollector = new ArrayList<>();
         for (PrizeDetailItem item : prizeDetailItems) {
             queryForm.setPageNum(0L); // 重置游标
             queryForm.setCreateTimeBegin(item.getStartTime());
@@ -212,12 +211,33 @@ public class LotteryIssueService {
                         batchWinRecords.add(record); // 加入待落库列表
                         wonIds.add(record.getId()); // 加入全局去重 Set
                         currentRuleWinTotal++; // 名额计数器 +1
+                        // B. 构建事件并加入临时收集器
+                        UserPrizeEvent event = UserPrizeEvent.builder()
+                                .eventId(SnowFlake.getIdStr()) // 建议引入工具类生成唯一ID
+                                .sourceBizId(record.getId().toString())
+                                .eventType(EventTypeEnum.LOTTERY_DRAW.name())
+                                .memberName(record.getMemberName())
+                                .prizeType(PrizeTypeEnum.BALANCE.name())
+                                .prizeCode(item.getPrizeCode())
+                                .prizeValue(item.getPrizeValue().toString())
+                                .prizeLevel(item.getPrizeLevel())
+                                .prizeName(item.getPrizeName())
+                                .tenantId(record.getTenantId())
+                                .eventTime(LocalDateTime.now())
+                                .build();
+
+                        eventCollector.add(event);
                     }
                 }
                 // 只把中奖的记录更新到数据库！未中奖的不管它。
                 if (!batchWinRecords.isEmpty()) {
                     // 你需要有这个批量更新的方法
                     lotteryRecordService.updateBatchById(batchWinRecords);
+                }
+                // 【内存保护】：如果收集器里的事件太多（比如超过 1000 个），先发一批
+                // 这样既能享受批量的好处，又不会撑爆内存
+                if (eventCollector.size() >= 1000) {
+                    publishEvents(eventCollector);
                 }
                 // 如果名额满了，没必要再翻下一页了，直接结束这个奖项的捞取！(数据库减负)
                 if (currentRuleWinTotal >= winCount) {
@@ -228,8 +248,20 @@ public class LotteryIssueService {
             }
         }
         lotteryRecordService.updateStatus(lotteryIssue.getLotteryCode(),lotteryIssue.getIssueNo(),TicketStatusEnum.FAILURE_MATCH.getCode());
-        // 异步派奖
-       // eventPublisher.publishEvent();
+        // 异步派奖 发送剩下的事件
+        publishEvents(eventCollector);
         return ResponseDTO.ok();
+    }
+    private void publishEvents(List<UserPrizeEvent> events) {
+        if (events.isEmpty()) return;
+
+        // 挨个发布到 Spring Event 总线
+        // 即使在这里循环发布，由于它们是同一个事务后的监听，性能也比在算奖深层循环里好得多
+        for (UserPrizeEvent event : events) {
+            eventPublisher.publishEvent(event);
+        }
+
+        // 发送完立即清空，释放内存
+        events.clear();
     }
 }

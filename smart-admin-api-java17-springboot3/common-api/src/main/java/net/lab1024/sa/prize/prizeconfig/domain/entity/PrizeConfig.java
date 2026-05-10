@@ -68,6 +68,11 @@ public class PrizeConfig {
     private BigDecimal prizeValue;
 
     /**
+     * 审批模式：0-自动免审, 1-人工审批
+     */
+    private Integer approveMode;
+
+    /**
      * 排序权重
      */
     private Integer sortWeight;
