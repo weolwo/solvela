@@ -1,20 +1,21 @@
 package net.lab1024.sa.task.record.service;
 
-import java.util.List;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.task.record.dao.TaskRecordDao;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.record.domain.form.TaskRecordAddForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordQueryForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordUpdateForm;
 import net.lab1024.sa.task.record.domain.vo.TaskRecordVO;
-import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import net.lab1024.sa.base.common.util.SmartPageUtil;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 /**
  * 任务记录表 Service

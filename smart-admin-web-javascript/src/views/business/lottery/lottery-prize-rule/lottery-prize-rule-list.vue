@@ -139,18 +139,8 @@
       ellipsis: true,
     },
     {
-      title: '匹配模式',
-      dataIndex: 'patternMode',
-      ellipsis: true,
-    },
-    {
       title: '奖励明细',
       dataIndex: 'prizeDetails',
-      ellipsis: true,
-    },
-    {
-      title: '开奖个数',
-      dataIndex: 'winCount',
       ellipsis: true,
     },
     {

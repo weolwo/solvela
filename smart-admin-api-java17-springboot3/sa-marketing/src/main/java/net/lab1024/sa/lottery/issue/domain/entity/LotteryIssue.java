@@ -62,6 +62,16 @@ public class LotteryIssue {
     private LocalDateTime sellEndTime;
 
     /**
+     * 开始售卖
+     */
+    private LocalDateTime openStartTime;
+
+    /**
+     * 结束时间
+     */
+    private LocalDateTime openEndTime;
+
+    /**
      * 开奖时间
      */
     private LocalDateTime openTime;
@@ -77,7 +87,7 @@ public class LotteryIssue {
     private String winningNumber;
 
     /**
-     * 状态: 0-待开奖, 1-售卖中, 2-已开奖
+     * 状态: 0-待开奖, 1-部分开奖, 2-已开奖
      */
     private Integer status;
 

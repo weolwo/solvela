@@ -1,11 +1,11 @@
 package net.lab1024.sa.lottery.issue.manager;
 
-import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;
-import net.lab1024.sa.lottery.issue.dao.LotteryIssueDao;
-
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.lottery.issue.dao.LotteryIssueDao;
+import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;
+import org.springframework.stereotype.Service;
+
 /**
  * 期号配置  Manager
  *
@@ -16,6 +16,4 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Service
 public class LotteryIssueManager extends ServiceImpl<LotteryIssueDao, LotteryIssue> {
-
-
 }

@@ -88,5 +88,30 @@
         ORDER BY create_time DESC
     </select>
 
+    <update id="updateBatchById">
+        UPDATE `t_lottery_record`
+        <trim prefix="SET" suffixOverrides=",">
+            <trim prefix="`win_status` = CASE `id`" suffix="END,">
+                <foreach collection="list" item="item">
+                    <if test="item.winStatus != null">
+                        WHEN #{item.id} THEN #{item.winStatus}
+                    </if>
+                </foreach>
+            </trim>
 
+            <trim prefix="`prize_level` = CASE `id`" suffix="END,">
+                <foreach collection="list" item="item">
+                    <if test="item.prizeLevel != null">
+                        WHEN #{item.id} THEN #{item.prizeLevel}
+                    </if>
+                </foreach>
+            </trim>
+
+            `update_time` = NOW()
+        </trim>
+        WHERE `id` IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            #{item.id}
+        </foreach>
+    </update>
 </mapper>

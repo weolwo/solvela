@@ -29,17 +29,9 @@ public class LotteryPrizeRuleAddForm {
     @NotBlank(message = "期号 不能为空")
     private String issueNo;
 
-    @Schema(description = "匹配模式，0,前匹配，1后匹配", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "匹配模式，0,前匹配，1后匹配 不能为空")
-    private Integer patternMode;
-
     @Schema(description = "奖励明细", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "奖励明细 不能为空")
     private String prizeDetails;
-
-    @Schema(description = "开奖个数", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "开奖个数 不能为空")
-    private Integer winCount;
 
     @Schema(description = "创建人")
     private String createBy;

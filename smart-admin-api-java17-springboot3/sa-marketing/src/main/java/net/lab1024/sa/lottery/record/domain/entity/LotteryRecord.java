@@ -67,7 +67,7 @@ public class LotteryRecord {
     private LocalDateTime obtainTime;
 
     /**
-     * 中奖状态: 0-未开奖, 1-未中奖, 已开奖
+     * 中奖状态: 0-未开奖, 1-未中奖, 2已开奖
      */
     private Integer winStatus;
 

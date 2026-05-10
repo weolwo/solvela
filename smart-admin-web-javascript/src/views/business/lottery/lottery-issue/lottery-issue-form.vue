@@ -36,7 +36,7 @@
         <a-input-number style="width: 100%" v-model:value="form.canRepeat" placeholder="是否可重复开奖：0否，1是" />
       </a-form-item>
       <a-form-item label="状态" name="status">
-        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态: 0-待开奖, 1-售卖中, 2-已开奖" />
+        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态: 0-待开奖, 1-部分开奖, 2-已开奖" />
       </a-form-item>
     </a-form>
 
@@ -102,7 +102,7 @@
     openTime: undefined, //开奖时间
     canRepeat: undefined, //是否可重复开奖：0否，1是
     winningNumber: undefined, //开奖号码
-    status: undefined, //状态: 0-待开奖, 1-售卖中, 2-已开奖
+    status: undefined, //状态: 0-待开奖, 1-部分开奖, 2-已开奖
   };
 
   let form = reactive({ ...formDefault });
@@ -116,7 +116,7 @@
     soldCount: [{ required: true, message: '已售/已派发数量 必填' }],
     sellStartTime: [{ required: true, message: '开始售卖 必填' }],
     sellEndTime: [{ required: true, message: '结束时间 必填' }],
-    status: [{ required: true, message: '状态: 0-待开奖, 1-售卖中, 2-已开奖 必填' }],
+    status: [{ required: true, message: '状态: 0-待开奖, 1-部分开奖, 2-已开奖 必填' }],
   };
 
   // 点击确定，验证表单

@@ -7,9 +7,7 @@
             <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
-            <result column="pattern_mode" property="patternMode" />
             <result column="prize_details" property="prizeDetails" />
-            <result column="win_count" property="winCount" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
             <result column="update_by" property="updateBy" />
@@ -20,10 +18,8 @@
                 id, 
                 tenant_id, 
                 lottery_code, 
-                issue_no, 
-                pattern_mode, 
-                prize_details, 
-                win_count, 
+                issue_no,
+                prize_details,
                 create_by, 
                 create_time, 
                 update_by, 

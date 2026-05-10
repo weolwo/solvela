@@ -12,8 +12,8 @@ public enum LuaScriptEnum {
             if (stock == nil or stock < num) then
                 return -1 -- 库存不足
             else
-                redis.call('decrby', KEYS[1], num)
-                return 1  -- 扣减成功
+              local remain =  redis.call('decrby', KEYS[1], num)
+              return remain  -- 扣减成功,返回剩余
             end
             """, Long.class));
 

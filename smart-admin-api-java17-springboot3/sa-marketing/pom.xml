@@ -20,7 +20,7 @@
     <dependencies>
         <dependency>
             <groupId>net.lab1024</groupId>
-            <artifactId>sa-base</artifactId>
+            <artifactId>common-api</artifactId>
             <version>3.0.0</version>
         </dependency>
         <dependency>

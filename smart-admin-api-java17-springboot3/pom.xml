@@ -14,6 +14,7 @@
         <module>sa-base</module>
 		<module>sa-admin</module>
         <module>sa-marketing</module>
+        <module>common-api</module>
     </modules>
 
     <properties>

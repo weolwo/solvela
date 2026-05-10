@@ -37,8 +37,8 @@ public class LotteryIssueUpdateForm {
     @Schema(description = "开奖号码")
     private String winningNumber;
 
-    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "状态: 0-待开奖, 1-售卖中, 2-已开奖 不能为空")
+    @Schema(description = "状态: 0-待开奖, 1-部分开奖, 2-已开奖", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "状态: 0-待开奖, 1-部分开奖, 2-已开奖")
     private Integer status;
 
     @Schema(description = "更新人")

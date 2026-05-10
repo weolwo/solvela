@@ -17,12 +17,6 @@
       <a-form-item label="期号" name="issueNo">
         <a-input style="width: 100%" v-model:value="form.issueNo" placeholder="期号" />
       </a-form-item>
-      <a-form-item label="匹配模式" name="patternMode">
-        <a-input-number style="width: 100%" v-model:value="form.patternMode" placeholder="匹配模式，0,前匹配，1后匹配" />
-      </a-form-item>
-      <a-form-item label="开奖个数" name="winCount">
-        <a-input-number style="width: 100%" v-model:value="form.winCount" placeholder="开奖个数" />
-      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -79,9 +73,7 @@
     tenantId: undefined, //租户id
     lotteryCode: undefined, //彩票编码
     issueNo: undefined, //期号
-    patternMode: undefined, //匹配模式，0,前匹配，1后匹配
     prizeDetails: undefined, //奖励明细
-    winCount: undefined, //开奖个数
   };
 
   let form = reactive({ ...formDefault });
@@ -91,9 +83,7 @@
     tenantId: [{ required: true, message: '租户id 必填' }],
     lotteryCode: [{ required: true, message: '彩票编码 必填' }],
     issueNo: [{ required: true, message: '期号 必填' }],
-    patternMode: [{ required: true, message: '匹配模式，0,前匹配，1后匹配 必填' }],
     prizeDetails: [{ required: true, message: '奖励明细 必填' }],
-    winCount: [{ required: true, message: '开奖个数 必填' }],
   };
 
   // 点击确定，验证表单

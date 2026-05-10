@@ -39,4 +39,11 @@ public interface LotteryRecordDao extends CustomizedBaseMapper<LotteryRecord> {
      */
     List<LotteryRecordVO> queryList(@Param("queryForm") LotteryRecordQueryForm queryForm);
 
+    /**
+     * 批量更新记录的中奖状态和等级
+     * @param list 待更新的记录列表
+     * @return 影响行数
+     */
+   int updateBatchById(@Param("list") List<LotteryRecord> list);
+
 }

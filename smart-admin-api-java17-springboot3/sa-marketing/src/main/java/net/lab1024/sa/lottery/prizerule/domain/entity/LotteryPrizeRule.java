@@ -41,20 +41,12 @@ public class LotteryPrizeRule {
      */
     private String issueNo;
 
-    /**
-     * 匹配模式，0,前匹配，1后匹配
-     */
-    private Integer patternMode;
 
     /**
      * 奖励明细
      */
     private String prizeDetails;
 
-    /**
-     * 开奖个数
-     */
-    private Integer winCount;
 
     /**
      * 创建人

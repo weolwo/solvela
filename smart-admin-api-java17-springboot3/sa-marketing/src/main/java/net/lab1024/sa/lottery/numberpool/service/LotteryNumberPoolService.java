@@ -1,7 +1,6 @@
 package net.lab1024.sa.lottery.numberpool.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.mysql.cj.jdbc.JdbcConnection;
 import com.mysql.cj.jdbc.JdbcStatement;
 import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
@@ -102,7 +101,7 @@ public class LotteryNumberPoolService {
         for (int i = 0; i < lotteryNumbers.size(); i++) {
             csvData.append(config.getLotteryCode()).append(",")
                     .append(lotteryNumbers.get(i)).append(",")
-                    .append(i+1).append("\n");
+                    .append(i + 1).append("\n");
         }
 
         InputStream inputStream = new ByteArrayInputStream(csvData.toString().getBytes(StandardCharsets.UTF_8));
@@ -128,10 +127,39 @@ public class LotteryNumberPoolService {
         });
     }
 
-    public List<LotteryNumberPool> queryNumbersBySeqNo(Integer minSeqNo,Integer maxSeqNo){
-        return lotteryNumberPoolManager.lambdaQuery()
-                .gt(LotteryNumberPool::getSequenceNo,minSeqNo)
-                .le(LotteryNumberPool::getSequenceNo,maxSeqNo)
-                .list();
+    public List<LotteryNumberPool> queryNumbersBySeqNo(String lotteryCode, Integer totalNum, int soldCount, int applyNum, int startOffset) {
+
+        // 1. 计算真实的起始点（取模，防止溢出）
+        int realMinSeq = (startOffset + soldCount) % totalNum == 0 ? totalNum : (startOffset + soldCount) % totalNum;
+        int realMaxSeq = realMinSeq + applyNum;
+
+        // 2. 判断是否触发了“跨界环绕”
+        if (realMaxSeq <= totalNum) {
+            // 【常规情况】：没有跨界，正常截取一段
+            // 比如从 5000 取到 5005
+            return lotteryNumberPoolManager.lambdaQuery()
+                    .eq(LotteryNumberPool::getLotteryCode, lotteryCode)
+                    .gt(LotteryNumberPool::getSequenceNo, realMinSeq)
+                    .le(LotteryNumberPool::getSequenceNo, realMaxSeq)
+                    .list();
+        } else {
+            // 【跨界情况】：游标走到池子尽头了，需要折返回开头取剩下的！
+            // 比如池子一共 10 万，从 99998 开始取 5 个。
+            // 第一段：尾部剩下的 (99998 ~ 100000] -> 取到 2 个
+            // 第二段：折返到头部 (0 ~ 3] -> 取到 3 个
+
+            int wrapCount = realMaxSeq - totalNum; // 折返后需要取的数量
+
+            return lotteryNumberPoolManager.lambdaQuery()
+                    .eq(LotteryNumberPool::getLotteryCode, lotteryCode)
+                    .and(wrapper -> wrapper
+                            // 条件1：取尾部
+                            .gt(LotteryNumberPool::getSequenceNo, realMinSeq)
+                            .or()
+                            // 条件2：取头部
+                            .le(LotteryNumberPool::getSequenceNo, wrapCount)
+                    )
+                    .list();
+        }
     }
 }

@@ -1,20 +1,21 @@
 package net.lab1024.sa.task.prizemapping.service;
 
-import java.util.List;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.task.prizemapping.dao.TaskPrizeMappingDao;
 import net.lab1024.sa.task.prizemapping.domain.entity.TaskPrizeMapping;
 import net.lab1024.sa.task.prizemapping.domain.form.TaskPrizeMappingAddForm;
 import net.lab1024.sa.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
 import net.lab1024.sa.task.prizemapping.domain.form.TaskPrizeMappingUpdateForm;
 import net.lab1024.sa.task.prizemapping.domain.vo.TaskPrizeMappingVO;
-import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import net.lab1024.sa.base.common.util.SmartPageUtil;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 /**
  * 任务阶段与奖励映射表 Service

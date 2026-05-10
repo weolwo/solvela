@@ -6,6 +6,7 @@ import lombok.EqualsAndHashCode;
 import net.lab1024.sa.base.common.domain.PageParam;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * 用户号码记录 分页查询表单
@@ -32,10 +33,10 @@ public class LotteryRecordQueryForm extends PageParam {
     private String ticketNumber;
 
     @Schema(description = "创建时间")
-    private LocalDate createTimeBegin;
+    private LocalDateTime createTimeBegin;
 
     @Schema(description = "创建时间")
-    private LocalDate createTimeEnd;
+    private LocalDateTime createTimeEnd;
 
     @Schema(description  = "中奖状态: 0-未开奖, 1-未中奖, 已开奖 错误")
     private Integer winStatus;
