@@ -70,7 +70,7 @@ public class AdminHelpDocController extends SupportBaseController {
 
     @Operation(summary = "【管理】帮助文档-获取详情 @author 卓大")
     @GetMapping("/helpDoc/getDetail/{helpDocId}")
-    @SaCheckPermission("support:helpDoc:add")
+    @SaCheckPermission("support:helpDoc:addProposal")
     public ResponseDTO<HelpDocDetailVO> getDetail(@PathVariable Long helpDocId) {
         return ResponseDTO.ok(helpDocService.getDetail(helpDocId));
     }

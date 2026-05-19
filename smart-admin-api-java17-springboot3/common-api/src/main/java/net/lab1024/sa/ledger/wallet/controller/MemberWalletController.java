@@ -41,7 +41,7 @@ public class MemberWalletController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid MemberWalletAddForm addForm) {
         return Service.add(addForm);
     }

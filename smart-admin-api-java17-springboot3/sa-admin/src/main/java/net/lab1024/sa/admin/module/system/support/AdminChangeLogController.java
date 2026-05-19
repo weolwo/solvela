@@ -31,7 +31,7 @@ public class AdminChangeLogController extends SupportBaseController {
 
     @Operation(summary = "添加 @author 卓大")
     @PostMapping("/changeLog/add")
-    @SaCheckPermission("support:changeLog:add")
+    @SaCheckPermission("support:changeLog:addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid ChangeLogAddForm addForm) {
         return changeLogService.add(addForm);
     }

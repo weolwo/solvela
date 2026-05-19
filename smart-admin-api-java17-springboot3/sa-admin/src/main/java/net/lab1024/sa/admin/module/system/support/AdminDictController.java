@@ -59,7 +59,7 @@ public class AdminDictController extends SupportBaseController {
 
     @Operation(summary = "添加 @author 1024创新实验室-主任-卓大")
     @PostMapping("/dict/add")
-    @SaCheckPermission("support:dict:add")
+    @SaCheckPermission("support:dict:addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid DictAddForm addForm) {
         return dictService.add(addForm);
     }
@@ -110,7 +110,7 @@ public class AdminDictController extends SupportBaseController {
 
     @Operation(summary = "字典数据 添加 @author 1024创新实验室-主任-卓大")
     @PostMapping("/dict/dictData/add")
-    @SaCheckPermission("support:dictData:add")
+    @SaCheckPermission("support:dictData:addProposal")
     public ResponseDTO<String> addDictData(@RequestBody @Valid DictDataAddForm addForm) {
         return dictService.addDictData(addForm);
     }

@@ -48,7 +48,7 @@ public class GoodsController {
 
     @Operation(summary = "添加商品 @author 胡克")
     @PostMapping("/goods/add")
-    @SaCheckPermission("goods:add")
+    @SaCheckPermission("goods:addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid GoodsAddForm addForm) {
         return goodsService.add(addForm);
     }

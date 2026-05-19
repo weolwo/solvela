@@ -45,7 +45,7 @@ public class EmployeeController {
 
     @Operation(summary = "添加员工(返回添加员工的密码) @author 卓大")
     @PostMapping("/employee/add")
-    @SaCheckPermission("system:employee:add")
+    @SaCheckPermission("system:employee:addProposal")
     public ResponseDTO<String> addEmployee(@Valid @RequestBody EmployeeAddForm employeeAddForm) {
         return employeeService.addEmployee(employeeAddForm);
     }

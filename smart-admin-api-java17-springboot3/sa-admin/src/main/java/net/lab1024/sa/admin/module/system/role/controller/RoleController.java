@@ -33,7 +33,7 @@ public class RoleController {
 
     @Operation(summary = "添加角色 @author 卓大")
     @PostMapping("/role/add")
-    @SaCheckPermission("system:role:add")
+    @SaCheckPermission("system:role:addProposal")
     public ResponseDTO<String> addRole(@Valid @RequestBody RoleAddForm roleAddForm) {
         return roleService.addRole(roleAddForm);
     }

@@ -41,7 +41,7 @@ public class PrizeConfigController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid PrizeConfigAddForm addForm) {
         return Service.add(addForm);
     }

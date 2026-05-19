@@ -40,7 +40,7 @@ public class DepartmentController {
 
     @Operation(summary = "添加部门 @author 卓大")
     @PostMapping("/department/add")
-    @SaCheckPermission("system:department:add")
+    @SaCheckPermission("system:department:addProposal")
     public ResponseDTO<String> addDepartment(@Valid @RequestBody DepartmentAddForm createDTO) {
         return departmentService.addDepartment(createDTO);
     }

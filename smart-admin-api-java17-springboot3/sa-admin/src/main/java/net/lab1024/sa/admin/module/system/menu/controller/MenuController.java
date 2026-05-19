@@ -36,7 +36,7 @@ public class MenuController {
 
     @Operation(summary = "添加菜单 @author 卓大")
     @PostMapping("/menu/add")
-    @SaCheckPermission("system:menu:add")
+    @SaCheckPermission("system:menu:addProposal")
     public ResponseDTO<String> addMenu(@RequestBody @Valid MenuAddForm menuAddForm) {
         menuAddForm.setCreateUserId(SmartRequestUtil.getRequestUserId());
         return menuService.addMenu(menuAddForm);

@@ -41,7 +41,7 @@ public class PoolPrizeMappingController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid PoolPrizeMappingAddForm addForm) {
         return Service.add(addForm);
     }

@@ -61,7 +61,7 @@ public class RoleEmployeeController {
 
     @Operation(summary = "角色成员列表中批量添加员工 @author 卓大")
     @PostMapping("/role/employee/batchAddRoleEmployee")
-    @SaCheckPermission("system:role:employee:add")
+    @SaCheckPermission("system:role:employee:addProposal")
     public ResponseDTO<String> addEmployeeList(@Valid @RequestBody RoleEmployeeUpdateForm addForm) {
         return roleEmployeeService.batchAddRoleEmployee(addForm);
     }

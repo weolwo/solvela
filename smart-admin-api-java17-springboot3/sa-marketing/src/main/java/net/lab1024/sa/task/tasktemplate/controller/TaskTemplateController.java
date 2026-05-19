@@ -41,7 +41,7 @@ public class TaskTemplateController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid TaskTemplateAddForm addForm) {
         return Service.add(addForm);
     }

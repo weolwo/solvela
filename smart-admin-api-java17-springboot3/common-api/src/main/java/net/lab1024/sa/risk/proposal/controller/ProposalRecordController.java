@@ -41,7 +41,7 @@ public class ProposalRecordController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid ProposalRecordAddForm addForm) {
         return Service.add(addForm);
     }

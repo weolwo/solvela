@@ -50,7 +50,6 @@ public class PrizeLogService {
 
     /**
      * 更新
-     *
      */
     public ResponseDTO<String> update(PrizeLogUpdateForm updateForm) {
         PrizeLog prizeLog = SmartBeanUtil.copy(updateForm, PrizeLog.class);
@@ -58,15 +57,23 @@ public class PrizeLogService {
         return ResponseDTO.ok();
     }
 
-    public int save(PrizeLog prizeLog){
-       return prizeLogDao.insert(prizeLog);
+    public ResponseDTO<String> updateById(PrizeLog prizeLog) {
+        int updated = prizeLogDao.updateById(prizeLog);
+        if (updated > 0) {
+            return ResponseDTO.ok();
+        }
+        return ResponseDTO.userErrorParam();
+    }
+
+    public int save(PrizeLog prizeLog) {
+        return prizeLogDao.insert(prizeLog);
     }
 
     /**
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (CollectionUtils.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
 
@@ -78,7 +85,7 @@ public class PrizeLogService {
      * 单个删除
      */
     public ResponseDTO<String> delete(Long id) {
-        if (null == id){
+        if (null == id) {
             return ResponseDTO.ok();
         }
 

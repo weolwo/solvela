@@ -54,7 +54,7 @@ public class InvoiceController {
 
     @Operation(summary = "新建发票信息 @author 善逸")
     @PostMapping("/oa/invoice/create")
-    @SaCheckPermission("oa:invoice:add")
+    @SaCheckPermission("oa:invoice:addProposal")
     public ResponseDTO<String> createInvoice(@RequestBody @Valid InvoiceAddForm createVO) {
         RequestUser requestUser = SmartRequestUtil.getRequestUser();
         createVO.setCreateUserId(requestUser.getUserId());

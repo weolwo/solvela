@@ -41,7 +41,7 @@ public class LotteryConfigController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid LotteryConfigAddForm addForm) throws Exception {
         return Service.add(addForm);
     }

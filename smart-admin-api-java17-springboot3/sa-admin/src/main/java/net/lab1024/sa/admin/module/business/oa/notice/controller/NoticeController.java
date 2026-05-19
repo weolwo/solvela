@@ -84,7 +84,7 @@ public class NoticeController {
     @Operation(summary = "【管理】通知公告-添加 @author 卓大")
     @PostMapping("/oa/notice/add")
     @RepeatSubmit
-    @SaCheckPermission("oa:notice:add")
+    @SaCheckPermission("oa:notice:addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid NoticeAddForm addForm) {
         addForm.setCreateUserId(SmartRequestUtil.getRequestUserId());
         return noticeService.add(addForm);

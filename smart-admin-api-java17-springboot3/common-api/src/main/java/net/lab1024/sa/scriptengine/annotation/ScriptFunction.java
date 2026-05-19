@@ -1,4 +1,4 @@
-package net.lab1024.sa.base.module.support.scriptengine.annotation;
+package net.lab1024.sa.scriptengine.annotation;
 
 import java.lang.annotation.*;
 

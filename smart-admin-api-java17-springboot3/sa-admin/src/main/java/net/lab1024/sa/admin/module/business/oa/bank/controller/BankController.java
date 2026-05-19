@@ -58,7 +58,7 @@ public class BankController {
 
     @Operation(summary = "新建银行信息 @author 善逸")
     @PostMapping("/oa/bank/create")
-    @SaCheckPermission("oa:bank:add")
+    @SaCheckPermission("oa:bank:addProposal")
     public ResponseDTO<String> createBank(@RequestBody @Valid BankCreateForm createVO) {
         RequestUser requestUser = SmartRequestUtil.getRequestUser();
         createVO.setCreateUserId(requestUser.getUserId());

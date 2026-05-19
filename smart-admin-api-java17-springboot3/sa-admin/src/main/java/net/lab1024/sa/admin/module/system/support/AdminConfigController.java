@@ -43,7 +43,7 @@ public class AdminConfigController extends SupportBaseController {
 
     @Operation(summary = "添加配置参数 @author 卓大")
     @PostMapping("/config/add")
-    @SaCheckPermission("support:config:add")
+    @SaCheckPermission("support:config:addProposal")
     public ResponseDTO<String> addConfig(@RequestBody @Valid ConfigAddForm configAddForm) {
         return configService.add(configAddForm);
     }

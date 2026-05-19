@@ -35,7 +35,7 @@ public class CategoryController {
 
     @Operation(summary = "添加类目 @author 胡克")
     @PostMapping("/category/add")
-    @SaCheckPermission("category:add")
+    @SaCheckPermission("category:addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid CategoryAddForm addForm) {
         return categoryService.add(addForm);
     }

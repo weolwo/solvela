@@ -1,7 +1,9 @@
 package net.lab1024.sa.risk.promotionconfig.service;
 
-import java.util.List;
-
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.risk.promotionconfig.dao.PromotionConfigDao;
@@ -10,12 +12,10 @@ import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigAddForm;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
 import net.lab1024.sa.risk.promotionconfig.domain.vo.PromotionConfigVO;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 /**
  * 优惠配置表 Service
@@ -37,6 +37,10 @@ public class PromotionConfigService {
         Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
         List<PromotionConfigVO> list = promotionConfigDao.queryPage(page, queryForm);
         return SmartPageUtil.convert2PageResult(page, list);
+    }
+
+    public PromotionConfig getById(Long id) {
+        return promotionConfigDao.selectById(id);
     }
 
     /**
