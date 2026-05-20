@@ -3,6 +3,7 @@ package net.lab1024.sa.ledger.handler;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.AssetStrategy;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.ledger.logistic.dao.PhysicalDeliveryDao;
 import net.lab1024.sa.ledger.logistic.domain.entity.PhysicalDelivery;
@@ -18,7 +19,7 @@ public class PhysicalAssetHandler implements IAssetHandler {
     private PhysicalDeliveryDao deliveryDao;
 
     @Override
-    public boolean dispatch(ProposalRecord proposal) {
+    public ResponseDTO dispatch(ProposalRecord proposal) {
         PhysicalDelivery delivery = new PhysicalDelivery();
         delivery.setTenantId(proposal.getTenantId());
         delivery.setMemberName(proposal.getMemberName());
@@ -29,10 +30,10 @@ public class PhysicalAssetHandler implements IAssetHandler {
 
         try {
             deliveryDao.insert(delivery);
-            return true;
+            return ResponseDTO.ok();
         } catch (DuplicateKeyException e) {
             log.warn("【防重拦截】该提案已生成物流单: {}", proposal.getId());
-            return true;
+            return ResponseDTO.ok();
         }
     }
 }

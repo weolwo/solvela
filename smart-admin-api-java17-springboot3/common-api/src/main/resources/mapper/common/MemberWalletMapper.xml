@@ -49,6 +49,10 @@
                         </if>
         </where>
     </sql>
+    <update id="addCashBalanceWithVersion">
+        UPDATE t_member_wallet SET cash_balance = cash_balance + #{amount}, version = version + 1
+                    WHERE id = #{id} AND version = #{version}
+    </update>
 
     <select id="queryPage" resultMap="MemberWalletVO">
         SELECT
@@ -65,8 +69,13 @@
         <include refid="query_conditions"/>
         ORDER BY create_time DESC
     </select>
+    <select id="getMemberByMemberName" resultType="net.lab1024.sa.ledger.wallet.domain.entity.MemberWallet">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_member_wallet where member_name== #{memberName}
+    </select>
 
-                <delete id="batchDelete">
+    <delete id="batchDelete">
                     delete from t_member_wallet
                     where id in
                     <foreach collection="idList" open="(" close=")" separator="," item="item">

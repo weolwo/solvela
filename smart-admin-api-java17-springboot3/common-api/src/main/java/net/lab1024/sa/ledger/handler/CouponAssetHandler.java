@@ -3,6 +3,7 @@ package net.lab1024.sa.ledger.handler;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.AssetStrategy;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.ledger.coupon.dao.MemberCouponDao;
 import net.lab1024.sa.ledger.coupon.domain.entity.MemberCoupon;
@@ -18,7 +19,7 @@ public class CouponAssetHandler implements IAssetHandler{
     private MemberCouponDao memberCouponDao;
 
     @Override
-    public boolean dispatch(ProposalRecord proposal) {
+    public ResponseDTO dispatch(ProposalRecord proposal) {
         // 你的 DDL 设计得极好：source_type 和 source_biz_id 完美溯源
         MemberCoupon coupon = new MemberCoupon();
         coupon.setTenantId(proposal.getTenantId());
@@ -34,10 +35,10 @@ public class CouponAssetHandler implements IAssetHandler{
 
         try {
             memberCouponDao.insert(coupon);
-            return true;
+            return ResponseDTO.ok();
         } catch (DuplicateKeyException e) {
             log.warn("【防重拦截】该提案已发过券: {}", proposal.getId());
-            return true; // 幂等，视为成功
+            return ResponseDTO.ok(); // 幂等，视为成功
         }
     }
 }
