@@ -27,6 +27,9 @@ public interface ErrorCode {
      */
     String LEVEL_UNEXPECTED = "unexpected";
 
+    //业务等级
+    String LEVEL_BIZ = "biz";
+
     /**
      * 错误码
      */

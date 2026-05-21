@@ -1,63 +1,47 @@
 package net.lab1024.sa.ledger.handler;
 
-import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.AssetStrategy;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.ledger.wallet.service.MemberWalletService;
 import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-
-import java.util.concurrent.TimeUnit;
-
-/**
- * 现金/余额派发核心底层执行器
- */
-@AllArgsConstructor
+//门面（处理 DTO 与异常转换）
 @Slf4j
+@AllArgsConstructor
 @Service
 @AssetStrategy(PrizeTypeEnum.BALANCE)
-public class WalletAssetHandler implements IAssetHandler {
+public class WalletAssetHandler extends AbstractAssetHandler {
 
     private final MemberWalletService memberWalletService;
-    @Resource
-    private RedissonClient redissonClient;
 
     @Override
-    public ResponseDTO dispatch(ProposalRecord proposal) {
-        // 1. 定义锁的粒度：精确到具体的某个人
-        String lockKey = "lock:wallet_update:" + proposal.getMemberName();
-        RLock lock = redissonClient.getLock(lockKey);
-
-        try {
-            // 2. 尝试加锁 (最多等待 3 秒，锁的租期由 Watchdog 自动续期)
-            boolean isLocked = lock.tryLock(3, TimeUnit.SECONDS);
-            if (!isLocked) {
-                log.warn("【并发拦截】未获取到资产操作锁，提案ID: {}", proposal.getId());
-                // 被锁挡住了，说明前面有个请求正在处理。这里可以直接报错让上层重试，
-                // 或者直接返回操作频繁。
-                return ResponseDTO.userErrorParam("系统繁忙，请稍后再试");
-            }
-
-            // ==========================================
-            // 3. 【绝杀技巧】调用带有 @Transactional 的内部方法
-            // ==========================================
-            return memberWalletService.doDispatch(proposal);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return ResponseDTO.userErrorParam("操作被中断");
-        } finally {
-            // 4. 释放锁
-            if (lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
-        }
+    protected String getLockKey(ProposalRecord proposal) {
+        return "lock:wallet_update:" + proposal.getMemberName();
     }
 
+    @Override
+    protected ResponseDTO executeWithLock(ProposalRecord proposal) {
+        try {
+            // 纯净的 Service 调用
+            memberWalletService.executeWalletCharge(proposal);
 
+            log.info(">>>> [动账成功] 提案ID: {}", proposal.getId());
+            return ResponseDTO.ok();
+
+        } catch (BusinessException e) {
+            // 【分层精髓】：在这里拦截领域层的 BizException，并包装成 Web 层的 ResponseDTO
+            log.error("【账务风控拦截】提案ID: {}, 错误: {}", proposal.getId(), e.getMessage());
+            return ResponseDTO.userErrorParam(e.getMessage());
+
+        } catch (DuplicateKeyException e) {
+            // 依然在这里做幂等兜底
+            log.warn("【动账防重拦截】该提案已存在资金流水, 提案ID: {}", proposal.getId());
+            return ResponseDTO.ok();
+        }
+    }
 }

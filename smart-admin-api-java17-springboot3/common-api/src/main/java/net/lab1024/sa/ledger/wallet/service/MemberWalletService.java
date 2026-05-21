@@ -3,8 +3,10 @@ package net.lab1024.sa.ledger.wallet.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.lab1024.sa.base.common.code.BizErrorCode;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.enums.PrizeTypeEnum;
@@ -24,10 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 /**
- * 会员钱包表 Service
+ * （只抛异常，绝不返回 DTO）
+ * Service 回归纯粹的“资源协调者”身份
  *
  * @Author weolwo
  * @Date 2026-04-18 23:56:48
@@ -68,81 +70,50 @@ public class MemberWalletService {
         return ResponseDTO.ok();
     }
 
-    @Transactional(rollbackFor = Exception.class) // 必须保证改余额和写流水的强一致性
-    public ResponseDTO doDispatch(ProposalRecord proposal) {
-        log.info(">>>> [底层账务引擎] 开始执行余额动账, 提案ID: {}, 会员: {}, 金额: {}",
-                proposal.getId(), proposal.getMemberName(), proposal.getPromotionValue());
-
+    /**
+     * 【资深写法】返回 void，失败直接抛出 BizException，让外层去捕获并转为 DTO
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void executeWalletCharge(ProposalRecord proposal) {
         BigDecimal amount = proposal.getPromotionValue();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.error("【账务风控拦截】动账金额非法(<=0), 提案ID: {}", proposal.getId());
-            return ResponseDTO.userErrorParam("入账金额必须大于0");
+            throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
 
-        try {
-            // ==========================================
-            // 1. 查询钱包状态 (附带容错自愈机制)
-            // ==========================================
-            MemberWallet wallet = memberWalletDao.getMemberByMemberName(proposal.getMemberName());
-            if (wallet == null) {
-                log.info("【账务系统自愈】用户钱包不存在，执行初始化，会员: {}", proposal.getMemberName());
-                wallet = initMemberWallet(proposal.getMemberName(), proposal.getTenantId());
-            }
-
-            if (wallet.getStatus() != 1) { // 假设 status: 1-正常, 0-冻结
-                log.error("【账务风控拦截】用户钱包已被冻结，拒绝入账！提案ID: {}", proposal.getId());
-                return ResponseDTO.userErrorParam("用户账户异常，无法入账");
-            }
-
-            // 2. 内存计算期末余额 (用于写流水)
-            BigDecimal balanceBefore = Optional.ofNullable(wallet.getCashBalance()).orElse(BigDecimal.ZERO);
-            BigDecimal balanceAfter = balanceBefore.add(amount);
-
-            // ==========================================
-            // 3. 【铁律 2】乐观锁更新钱包余额 (防 Lost Update)
-            // 对应SQL: UPDATE t_member_wallet SET cash_balance = cash_balance + #{amount}, version = version + 1
-            //         WHERE id = #{id} AND version = #{version}
-            // ==========================================
-            int updateRows = memberWalletDao.addCashBalanceWithVersion(wallet.getId(), amount, wallet.getVersion());
-
-            if (updateRows == 0) {
-                // 如果返回 0，说明在你查出来到更新的这几毫秒内，别的线程改了这个钱包。
-                // 抛出异常触发事务回滚，让上层 Engine 捕获或依赖框架的 @Retryable 进行重试！
-                log.warn("【动账并发冲突】钱包版本号已变更，触发乐观锁重试. 提案ID: {}", proposal.getId());
-                throw new RuntimeException("账户余额变动中，请重试");
-            }
-
-            // ==========================================
-            // 4. 【铁律 3】写入核心资金流水账单
-            // ==========================================
-            MemberAssetTransaction txn = new MemberAssetTransaction();
-            txn.setTenantId(proposal.getTenantId());
-            txn.setMemberName(proposal.getMemberName());
-            txn.setAssetType(PrizeTypeEnum.BALANCE.name());
-            txn.setTransactionType(1); // 1-收入
-            txn.setChangeAmount(amount);
-            txn.setBalanceAfter(balanceAfter); // 留下不可磨灭的财务对账证据
-            txn.setBizType("PROPOSAL_REWARD"); // 业务来源分类
-            txn.setBizRefId(proposal.getId().toString()); // 极度关键：溯源单号
-            txn.setRemark(proposal.getRemark() != null ? proposal.getRemark() : "营销活动余额派发");
-
-            memberAssetTransactionDao.insert(txn);
-
-            log.info(">>>> [动账成功] 提案ID: {}, 充值: {}, 最新余额: {}", proposal.getId(), amount, balanceAfter);
-            return ResponseDTO.ok();
-
-        } catch (DuplicateKeyException e) {
-            // ==========================================
-            // 5. 【铁律 4】终极幂等拦截
-            // 依靠 t_member_asset_transaction 的 uk_t_biz_mbr_ast_txn_ref 兜底
-            // ==========================================
-            log.warn("【动账防重拦截】该提案已存在资金流水，自动视为成功. 提案ID: {}", proposal.getId());
-            return ResponseDTO.ok();
-
-        } catch (Exception e) {
-            log.error("【账务系统致命异常】执行余额动账失败, 提案ID: {}", proposal.getId(), e);
-            throw e; // 抛给 AssetDispatchEngine，让其把提案状态改成 70(彻底失败)
+        // 1. 查钱包与自愈
+        MemberWallet wallet = memberWalletDao.getMemberByMemberName(proposal.getMemberName());
+        if (wallet == null) {
+            wallet = initMemberWallet(proposal.getMemberName(), proposal.getTenantId());
         }
+
+        // 2. 状态校验 (调用充血模型)
+        wallet.checkAvailable();
+        BigDecimal balanceAfter = wallet.calculateAfterBalance(amount);
+
+        // 3. 乐观锁更新
+        int updateRows = memberWalletDao.addCashBalanceWithVersion(wallet.getId(), amount, wallet.getVersion());
+        if (updateRows == 0) {
+            // 抛出专用的并发异常，外层可以根据这个做特定处理
+            throw new BusinessException(BizErrorCode.ACCOUNT_BALANCE_CHANGED);
+        }
+
+        // 4. 写流水 (省略构建过程，直接看核心)
+        MemberAssetTransaction txn = buildTransaction(proposal, amount, balanceAfter);
+        memberAssetTransactionDao.insert(txn);
+    }
+
+    private MemberAssetTransaction buildTransaction(ProposalRecord proposal, BigDecimal amount, BigDecimal balanceAfter) {
+        MemberAssetTransaction txn = new MemberAssetTransaction();
+        txn.setTenantId(proposal.getTenantId());
+        txn.setMemberName(proposal.getMemberName());
+        txn.setAssetType(PrizeTypeEnum.BALANCE.name());
+        txn.setTransactionType(1); // 1-收入
+        txn.setChangeAmount(amount);
+        txn.setBalanceAfter(balanceAfter); // 留下不可磨灭的财务对账证据
+        txn.setBizType("PROPOSAL_REWARD"); // 业务来源分类
+        txn.setBizRefId(proposal.getId().toString()); // 极度关键：溯源单号
+        txn.setRemark(proposal.getRemark() != null ? proposal.getRemark() : "营销活动余额派发");
+        return txn;
     }
 
 

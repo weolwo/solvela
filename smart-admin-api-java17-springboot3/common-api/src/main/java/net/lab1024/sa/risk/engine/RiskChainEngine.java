@@ -1,8 +1,8 @@
 package net.lab1024.sa.risk.engine;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -10,17 +10,10 @@ import java.util.List;
 
 @Slf4j
 @Service
-public class RiskChainEngine {
+public class RiskChainEngine implements SmartInitializingSingleton {
 
     @Resource
     private List<IRiskFilter> filters;
-
-    @PostConstruct
-    public void init() {
-        // 项目启动时，根据 getOrder() 对拦截器进行升序排序
-        filters.sort(Comparator.comparingInt(IRiskFilter::getOrder));
-        log.info("【风控引擎】已加载 {} 个风控规则节点", filters.size());
-    }
 
     public RiskResult execute(RiskContext context) {
         String bizId = context.getRequest().getSourceBizId();
@@ -36,5 +29,12 @@ public class RiskChainEngine {
         }
 
         return RiskResult.pass();
+    }
+
+    @Override
+    public void afterSingletonsInstantiated() {
+        // 项目启动时，根据 getOrder() 对拦截器进行升序排序
+        filters.sort(Comparator.comparingInt(IRiskFilter::getOrder));
+        log.info("【风控引擎】已加载 {} 个风控规则节点", filters.size());
     }
 }

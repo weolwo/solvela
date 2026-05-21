@@ -1,16 +1,16 @@
 package net.lab1024.sa.ledger.wallet.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import net.lab1024.sa.base.common.code.UserErrorCode;
+import net.lab1024.sa.base.common.exception.BusinessException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import lombok.Data;
 
 /**
- * 会员钱包表 实体类
+ * 让实体类“活”起来（充血模型）
+ * 把计算和状态校验还给 MemberWallet 自己，Service 不要越俎代庖
  *
  * @Author weolwo
  * @Date 2026-04-18 23:56:48
@@ -79,4 +79,21 @@ public class MemberWallet {
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
+
+    /**
+     * 实体自带业务校验逻辑
+     */
+    public void checkAvailable() {
+        if (this.status != 1) { // 最好用枚举 StatusEnum.NORMAL.getCode()
+            throw new BusinessException(UserErrorCode.ACCOUNT_FROZEN);
+        }
+    }
+
+    /**
+     * 实体自带计算逻辑
+     */
+    public BigDecimal calculateAfterBalance(BigDecimal addAmount) {
+        BigDecimal current = this.cashBalance == null ? BigDecimal.ZERO : this.cashBalance;
+        return current.add(addAmount);
+    }
 }

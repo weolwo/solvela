@@ -40,6 +40,8 @@ public enum UserErrorCode implements ErrorCode {
     LOGIN_ACTIVE_TIMEOUT(30012, "长时间未操作系统，需要重新登录"),
 
     STATUS_ERROR(30013, "状态异常"),
+
+    ACCOUNT_FROZEN(30014, "用户账户异常，已被冻结"),
     ;
 
     private final int code;

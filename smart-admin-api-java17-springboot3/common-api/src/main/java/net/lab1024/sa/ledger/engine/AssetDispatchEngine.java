@@ -2,6 +2,7 @@ package net.lab1024.sa.ledger.engine;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.ledger.handler.IAssetHandler;
 import net.lab1024.sa.ledger.strategy.AssetStrategyFactory;
 import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
@@ -36,10 +37,10 @@ public class AssetDispatchEngine {
             IAssetHandler handler = strategyFactory.getHandler(config.getPrizeType());
 
             // 3. 极简下发：只管抛给下层，拿到成功/失败的结果
-            boolean isSuccess = handler.dispatch(proposal);
+            ResponseDTO responseDTO = handler.dispatch(proposal);
 
             // 4. 闭环：根据结果更新最终提案状态
-            if (isSuccess) {
+            if (responseDTO.getOk()) {
                 // proposalRecordDao.updateStatusAndRemark(proposal.getId(), 50, "资产下发成功");
                 // TODO: 可以在这里触发 t_promotion_config 的 used_amount/used_quota 的真实扣减
             } else {

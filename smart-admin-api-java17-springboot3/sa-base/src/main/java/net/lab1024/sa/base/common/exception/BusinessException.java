@@ -1,5 +1,6 @@
 package net.lab1024.sa.base.common.exception;
 
+import lombok.Data;
 import net.lab1024.sa.base.common.code.ErrorCode;
 
 /**
@@ -11,7 +12,12 @@ import net.lab1024.sa.base.common.code.ErrorCode;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
+@Data
 public class BusinessException extends RuntimeException {
+
+    private String code;
+
+    private String message;
 
     public BusinessException() {
     }
@@ -24,6 +30,10 @@ public class BusinessException extends RuntimeException {
         super(message);
     }
 
+    public BusinessException(String code,String message) {
+        super(message);
+        this.code=code;
+    }
     public BusinessException(String message, Throwable cause) {
         super(message, cause);
     }
