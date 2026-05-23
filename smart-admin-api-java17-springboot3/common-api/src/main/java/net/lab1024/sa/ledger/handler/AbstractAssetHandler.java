@@ -10,7 +10,10 @@ import jakarta.annotation.Resource;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 资产派发-带分布式锁的模板基类
+ * AbstractLockedAssetHandler：是个没感情的保安，只管加锁放行。
+ * WalletAssetHandler：是个翻译官（Facade），负责把 Service 的异常翻译成 ResponseDTO 返回给上一层的分发引擎。
+ * MemberWalletService：是个纯粹的数据库协调者，只管开事务和抛异常。
+ * MemberWallet (Entity)：是个有血有肉的领域专家，知道自己有没有被冻结，知道自己加完钱是多少。
  */
 @Slf4j
 public abstract class AbstractAssetHandler implements IAssetHandler {
