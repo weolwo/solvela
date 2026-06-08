@@ -33,12 +33,13 @@ CREATE TABLE `t_prize_pool_item`
     `user_max_count` int            NOT NULL DEFAULT '-1' COMMENT '单人限领次数: -1不限, 1表示每人最多中一次',
     `total_stock`    int            NOT NULL DEFAULT '-1' COMMENT '总库存',
     `used_stock`     int            NOT NULL DEFAULT '0' COMMENT '已用库存',
+    `version`        int                     DEFAULT 0 COMMENT '乐观锁版本号',
     `white_list`     json                    DEFAULT NULL COMMENT '白名单：指定用户必中',
 
-    `create_by`     varchar(32)          DEFAULT NULL comment '创建人',
-    `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`     varchar(32)          DEFAULT NULL comment '更新人',
-    `update_time`   datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
+    `create_by`      varchar(32)             DEFAULT NULL comment '创建人',
+    `create_time`    datetime                DEFAULT CURRENT_TIMESTAMP comment '创建时间',
+    `update_by`      varchar(32)             DEFAULT NULL comment '更新人',
+    `update_time`    datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_activity` (`activity_code`)
 ) COMMENT ='奖池奖项';
@@ -59,10 +60,10 @@ CREATE TABLE `t_prize_pool_config`
     `draw_mode`       tinyint        NULL     DEFAULT 1 COMMENT '抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)',
     `script_id`       varchar(64)             DEFAULT NULL COMMENT '进入该奖池的前置脚本',
     `status`          tinyint        NOT NULL DEFAULT 1 comment '0关闭，1开启',
-    `create_by`     varchar(32)          DEFAULT NULL comment '创建人',
-    `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`     varchar(32)          DEFAULT NULL comment '更新人',
-    `update_time`   datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
+    `create_by`       varchar(32)             DEFAULT NULL comment '创建人',
+    `create_time`     datetime                DEFAULT CURRENT_TIMESTAMP comment '创建时间',
+    `update_by`       varchar(32)             DEFAULT NULL comment '更新人',
+    `update_time`     datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pool_code` (`pool_code`)
 ) COMMENT ='奖池配置';
@@ -78,10 +79,10 @@ CREATE TABLE `t_pool_prize_mapping`
     `probability`   decimal(8, 4) NOT NULL DEFAULT 0.0000 COMMENT '中奖概率(万分位)',
     `sort_weight`   int           NOT NULL DEFAULT 0 COMMENT '序号',
 
-    `create_by`     varchar(32)          DEFAULT NULL comment '创建人',
-    `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`     varchar(32)          DEFAULT NULL comment '更新人',
-    `update_time`   datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
+    `create_by`     varchar(32)            DEFAULT NULL comment '创建人',
+    `create_time`   datetime               DEFAULT CURRENT_TIMESTAMP comment '创建时间',
+    `update_by`     varchar(32)            DEFAULT NULL comment '更新人',
+    `update_time`   datetime               DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pool_prize` (`pool_code`, `prize_item_id`)
 ) COMMENT ='奖池奖项映射';
@@ -99,7 +100,7 @@ CREATE TABLE `t_draw_prize_log`
 
     `prize_item_id` bigint      NOT NULL COMMENT '奖项ID',
     `prize_code`    varchar(32) NOT NULL COMMENT '奖品code',
-    `status`  tinyint     NULL     DEFAULT 0 COMMENT '状态: 0-未中奖, 1-已中奖, 2-库存不足, 3-异常',
+    `status`        tinyint     NULL     DEFAULT 0 COMMENT '状态: 0-未中奖, 1-已中奖, 2-库存不足, 3-异常',
     `remark`        varchar(64) NULL COMMENT '备注',
 
     `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',

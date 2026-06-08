@@ -1,13 +1,10 @@
 package net.lab1024.sa.draw.poolitem.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import lombok.Data;
 
 /**
  * 奖池奖项库 实体类
@@ -71,6 +68,14 @@ public class PrizePoolItem {
      * 跨奖池累计已出数量
      */
     private Integer usedStock;
+
+    /**
+     * 版本号
+     * 乐观锁插件生效的前提是，你调用的必须是 MyBatis-Plus 提供的
+     * baseMapper.updateById(entity) 或 baseMapper.update(entity, wrapper) 方法。
+     */
+    @Version
+    private Integer version;
 
     /**
      * 活动级白名单：指定用户必中
