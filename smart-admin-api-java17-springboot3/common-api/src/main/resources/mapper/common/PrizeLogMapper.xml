@@ -7,14 +7,12 @@
             <result column="tenant_id" property="tenantId" />
             <result column="member_name" property="memberName" />
             <result column="prize_code" property="prizeCode" />
-            <result column="promotion_config_id" property="promotionConfigId" />
             <result column="activity_code" property="activityCode" />
             <result column="prize_level" property="prizeLevel" />
             <result column="prize_name" property="prizeName" />
             <result column="prize_type" property="prizeType" />
             <result column="prize_value" property="prizeValue" />
             <result column="fail_reason" property="failReason" />
-            <result column="approve_mode" property="approveMode" />
             <result column="approve_status" property="approveStatus" />
             <result column="approve_by" property="approveBy" />
             <result column="approve_time" property="approveTime" />
@@ -33,14 +31,12 @@
                 tenant_id, 
                 member_name, 
                 prize_code, 
-                promotion_config_id, 
                 activity_code, 
                 prize_level, 
                 prize_name, 
                 prize_type, 
                 prize_value, 
                 fail_reason, 
-                approve_mode, 
                 approve_status, 
                 approve_by, 
                 approve_time, 
@@ -76,9 +72,6 @@
                         </if>
                         <if test="queryForm.approveStatus != null">
                             AND approve_status = #{queryForm.approveStatus}
-                        </if>
-                        <if test="queryForm.approveMode != null">
-                            AND approve_mode = #{queryForm.approveMode}
                         </if>
                         <if test="queryForm.validUntilBegin != null">
                             AND valid_until &gt;= #{queryForm.validUntilBegin}

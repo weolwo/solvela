@@ -20,9 +20,6 @@
       <a-form-item label="奖品编码" name="prizeCode">
         <a-input style="width: 100%" v-model:value="form.prizeCode" placeholder="奖品编码" />
       </a-form-item>
-      <a-form-item label="优惠配置ID" name="promotionConfigId">
-        <a-input-number style="width: 100%" v-model:value="form.promotionConfigId" placeholder="优惠配置ID" />
-      </a-form-item>
       <a-form-item label="活动编码" name="activityCode">
         <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="活动编码" />
       </a-form-item>
@@ -40,9 +37,6 @@
       </a-form-item>
       <a-form-item label="异常原因" name="failReason">
         <a-input style="width: 100%" v-model:value="form.failReason" placeholder="异常原因" />
-      </a-form-item>
-      <a-form-item label="审批模式" name="approveMode">
-        <a-input-number style="width: 100%" v-model:value="form.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
       </a-form-item>
       <a-form-item label="审批状态" name="approveStatus">
         <a-input-number style="width: 100%" v-model:value="form.approveStatus" placeholder="审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回" />
@@ -122,14 +116,12 @@
     tenantId: undefined, //租户ID
     memberName: undefined, //会员名
     prizeCode: undefined, //奖品编码
-    promotionConfigId: undefined, //优惠配置ID
     activityCode: undefined, //活动编码
     prizeLevel: undefined, //奖品级别
     prizeName: undefined, //奖品名称
     prizeType: undefined, //奖励类型：SCORE, BALANCE, COUPON, PHYSICAL
     prizeValue: undefined, //奖励体值(积分数/券ID)
     failReason: undefined, //异常原因
-    approveMode: undefined, //审批模式：0-自动免审, 1-人工审批
     approveStatus: undefined, //审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回
     approveBy: undefined, //审批人
     approveTime: undefined, //审批时间
@@ -145,12 +137,10 @@
     tenantId: [{ required: true, message: '租户ID 必填' }],
     memberName: [{ required: true, message: '会员名 必填' }],
     prizeCode: [{ required: true, message: '奖品编码 必填' }],
-    promotionConfigId: [{ required: true, message: '优惠配置ID 必填' }],
     activityCode: [{ required: true, message: '活动编码 必填' }],
     prizeName: [{ required: true, message: '奖品名称 必填' }],
     prizeType: [{ required: true, message: '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL 必填' }],
     prizeValue: [{ required: true, message: '奖励体值(积分数/券ID) 必填' }],
-    approveMode: [{ required: true, message: '审批模式：0-自动免审, 1-人工审批 必填' }],
     approveStatus: [{ required: true, message: '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 必填' }],
   };
 

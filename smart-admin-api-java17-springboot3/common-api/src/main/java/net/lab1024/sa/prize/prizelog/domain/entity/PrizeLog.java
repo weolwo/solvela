@@ -39,11 +39,6 @@ public class PrizeLog {
     private String prizeCode;
 
     /**
-     * 优惠配置ID
-     */
-    private Long promotionConfigId;
-
-    /**
      * 活动编码
      */
     private String activityCode;
@@ -72,11 +67,6 @@ public class PrizeLog {
      * 异常原因
      */
     private String failReason;
-
-    /**
-     * 审批模式：0-自动免审, 1-人工审批
-     */
-    private Integer approveMode;
 
     /**
      * 审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回

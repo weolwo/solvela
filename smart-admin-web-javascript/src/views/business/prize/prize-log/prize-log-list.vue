@@ -27,9 +27,6 @@
       <a-form-item label="审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.approveStatus" placeholder="审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回" />
       </a-form-item>
-      <a-form-item label="审批模式：0-自动免审, 1-人工审批" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
-      </a-form-item>
       <a-form-item label="过期时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.validUntil" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeValidUntil" />
       </a-form-item>
@@ -151,11 +148,6 @@
       ellipsis: true,
     },
     {
-      title: '优惠配置ID',
-      dataIndex: 'promotionConfigId',
-      ellipsis: true,
-    },
-    {
       title: '活动编码',
       dataIndex: 'activityCode',
       ellipsis: true,
@@ -183,11 +175,6 @@
     {
       title: '异常原因',
       dataIndex: 'failReason',
-      ellipsis: true,
-    },
-    {
-      title: '审批模式',
-      dataIndex: 'approveMode',
       ellipsis: true,
     },
     {
@@ -264,7 +251,6 @@
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束
     approveStatus: undefined, //审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回
-    approveMode: undefined, //审批模式：0-自动免审, 1-人工审批
     validUntil: [], //过期时间
     validUntilBegin: undefined, //过期时间 开始
     validUntilEnd: undefined, //过期时间 结束

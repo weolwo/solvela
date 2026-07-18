@@ -6,6 +6,8 @@ import net.lab1024.sa.anno.PrizeStrategy;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.enums.EventTypeEnum;
 import net.lab1024.sa.enums.PrizeTypeEnum;
+import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
+import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
 import net.lab1024.sa.prize.prizelog.domain.entity.PrizeLog;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import net.lab1024.sa.risk.proposal.service.ProposalRecordService;
@@ -23,6 +25,7 @@ import java.math.BigDecimal;
 public class BalanceHandler implements IPrizeHandler {
 
     private final ProposalRecordService proposalRecordService;
+    private final PrizeConfigService prizeConfigService;
 
 
     @Override
@@ -39,8 +42,12 @@ public class BalanceHandler implements IPrizeHandler {
 
             // 2. 构建资金入账请求 (把营销单号传给财务底层，做跨域幂等)
             ProposalRecordAddForm req = new ProposalRecordAddForm();
+            PrizeConfig prizeConfig = prizeConfigService.getByPrizeCode(prizeLog.getPrizeCode());
+            if (prizeConfig == null) {
+                return ResponseDTO.userErrorParam("奖品配置不存在");
+            }
             req.setMemberName(prizeLog.getMemberName());
-            req.setPromotionConfigId(prizeLog.getPromotionConfigId());
+            req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
             req.setPromotionValue(amount);
             req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name()); // 业务分类：彩票奖励
             req.setSourceBizId(prizeLog.getExternalBizNo()); // 极度关键：原彩票记录ID

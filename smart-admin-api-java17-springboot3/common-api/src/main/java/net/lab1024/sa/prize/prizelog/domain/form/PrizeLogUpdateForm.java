@@ -23,10 +23,6 @@ public class PrizeLogUpdateForm {
     @Schema(description = "异常原因")
     private String failReason;
 
-    @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "审批模式：0-自动免审, 1-人工审批 不能为空")
-    private Integer approveMode;
-
     @Schema(description = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 不能为空")
     private Integer approveStatus;

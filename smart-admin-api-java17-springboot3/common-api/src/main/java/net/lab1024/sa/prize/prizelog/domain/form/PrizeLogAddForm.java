@@ -29,10 +29,6 @@ public class PrizeLogAddForm {
     @NotBlank(message = "奖品编码 不能为空")
     private String prizeCode;
 
-    @Schema(description = "优惠配置ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "优惠配置ID 不能为空")
-    private Long promotionConfigId;
-
     @Schema(description = "活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "活动编码 不能为空")
     private String activityCode;
@@ -54,10 +50,6 @@ public class PrizeLogAddForm {
 
     @Schema(description = "异常原因")
     private String failReason;
-
-    @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "审批模式：0-自动免审, 1-人工审批 不能为空")
-    private Integer approveMode;
 
     @Schema(description = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 不能为空")

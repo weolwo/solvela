@@ -207,7 +207,6 @@ CREATE TABLE `t_prize_log`
     `tenant_id`           varchar(16)  NOT NULL default '0' COMMENT '租户ID',
     `member_name`         varchar(64)  NOT NULL COMMENT '会员名',
     `prize_code`          varchar(64)  NOT NULL COMMENT '奖品编码',
-    `promotion_config_id` bigint       NOT NULL COMMENT '优惠配置ID',
     `activity_code`       varchar(32)  NOT NULL COMMENT '活动编码',
     `prize_level`         int                   DEFAULT 0 COMMENT '奖品级别',
     `prize_name`          varchar(128) NOT NULL COMMENT '奖品名称',
@@ -215,7 +214,6 @@ CREATE TABLE `t_prize_log`
     `prize_value`         varchar(128) NOT NULL COMMENT '奖励体值(积分数/券ID)',
     `fail_reason`         varchar(128) NOT NULL COMMENT '异常原因',
 -- ================= 【新增】风控与审批字段 =================
-    `approve_mode`        tinyint      NOT NULL DEFAULT 0 COMMENT '审批模式：0-自动免审, 1-人工审批',
     `approve_status`      tinyint      NOT NULL DEFAULT 0 COMMENT '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回',
     `approve_by`          varchar(64)           DEFAULT NULL COMMENT '审批人',
     `approve_time`        datetime              DEFAULT NULL COMMENT '审批时间',

@@ -116,10 +116,8 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         log.setPrizeCode(config.getPrizeCode());
         log.setPrizeName(config.getPrizeName());
         log.setPrizeType(config.getPrizeType());
-        log.setPromotionConfigId(config.getPromotionConfigId());
 
         // --- 3. 初始状态与时效 ---
-        log.setApproveMode(config.getApproveMode());
         log.setApproveStatus(config.getApproveMode() == 1 ? 1 : 0); // 1-待审, 0-无需
         log.setStatus(0); // 0-等待执行
 
