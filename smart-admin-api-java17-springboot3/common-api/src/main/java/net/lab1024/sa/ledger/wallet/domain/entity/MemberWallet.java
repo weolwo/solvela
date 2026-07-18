@@ -38,14 +38,14 @@ public class MemberWallet {
     private String memberName;
 
     /**
-     * 积分余额
+     * 资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典
      */
-    private BigDecimal scoreBalance;
+    private String assetType;
 
     /**
-     * 现金余额
+     * 余额
      */
-    private BigDecimal cashBalance;
+    private BigDecimal balance;
 
     /**
      * 状态：0-冻结, 1-正常
@@ -93,7 +93,7 @@ public class MemberWallet {
      * 实体自带计算逻辑
      */
     public BigDecimal calculateAfterBalance(BigDecimal addAmount) {
-        BigDecimal current = this.cashBalance == null ? BigDecimal.ZERO : this.cashBalance;
+        BigDecimal current = this.balance == null ? BigDecimal.ZERO : this.balance;
         return current.add(addAmount);
     }
 }

@@ -21,11 +21,11 @@ public class MemberWalletUpdateForm {
     @NotNull(message = "id 不能为空")
     private Long id;
 
-    @Schema(description = "积分余额")
-    private BigDecimal scoreBalance;
+    @Schema(description = "资产类型：SCORE-积分, BALANCE-现金")
+    private String assetType;
 
-    @Schema(description = "现金余额")
-    private BigDecimal cashBalance;
+    @Schema(description = "余额")
+    private BigDecimal balance;
 
     @Schema(description = "状态：0-冻结, 1-正常")
     private Integer status;

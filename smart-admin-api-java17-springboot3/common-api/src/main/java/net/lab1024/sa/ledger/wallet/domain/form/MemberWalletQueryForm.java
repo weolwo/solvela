@@ -24,6 +24,9 @@ public class MemberWalletQueryForm extends PageParam {
     @Schema(description = "会员名")
     private String memberName;
 
+    @Schema(description = "资产类型：SCORE-积分, BALANCE-现金")
+    private String assetType;
+
     @Schema(description = "状态：0-冻结, 1-正常")
     private Integer status;
 

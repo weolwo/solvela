@@ -241,8 +241,8 @@ CREATE TABLE `t_member_wallet`
     `id`            bigint         NOT NULL AUTO_INCREMENT comment 'id',
     `tenant_id`     varchar(16)    NOT NULL default '0' COMMENT '租户ID',
     `member_name`   varchar(64)    NOT NULL COMMENT '会员名',
-    `score_balance` decimal(18, 4) NULL     DEFAULT '0.0000' COMMENT '积分余额',
-    `cash_balance`  decimal(18, 4) NULL     DEFAULT '0.0000' COMMENT '现金余额',
+    `asset_type`    varchar(32)    NOT NULL COMMENT '资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典',
+    `balance`       decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '余额',
     `status`        tinyint        NULL     DEFAULT '1' COMMENT '状态：0-冻结, 1-正常',
     `version`       int            NOT NULL DEFAULT '0' COMMENT '乐观锁版本号',
 
@@ -251,8 +251,8 @@ CREATE TABLE `t_member_wallet`
     `update_by`     varchar(64)             DEFAULT NULL COMMENT '更新人',
     `update_time`   datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_t_biz_mbr_mbr` (`member_name`)
-) COMMENT ='会员钱包表';
+    UNIQUE KEY `uk_member_asset` (`member_name`, `asset_type`)
+) COMMENT ='会员钱包表（一行一种资产，扩展新资产只需新增 asset_type 取值，无需加字段）';
 
 DROP TABLE IF EXISTS `t_member_asset_transaction`;
 CREATE TABLE `t_member_asset_transaction`

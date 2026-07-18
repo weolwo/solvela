@@ -39,12 +39,13 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
     List<MemberWalletVO> queryList(@Param("queryForm") MemberWalletQueryForm queryForm);
 
     /**
-     * 更加会员名查询钱包
+     * 根据会员名 + 资产类型查询钱包账户（一行一种资产）
      *
-     * @param queryForm 查询表单
-     * @return 列表数据
+     * @param memberName 会员名
+     * @param assetType  资产类型 PrizeTypeEnum
+     * @return 钱包账户
      */
-    MemberWallet getMemberByMemberName(String memberName);
+    MemberWallet getByMemberNameAndAssetType(@Param("memberName") String memberName, @Param("assetType") String assetType);
 
     // ----- 物理删除 -----
 
@@ -59,11 +60,11 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
     void batchDelete(@Param("idList") List<Long> idList);
 
     /**
-     * 更新余额
+     * 增加余额（乐观锁），资产类型由所在行决定，任何资产通用
      * @param id
      * @param amount
      * @param version
      * @return
      */
-    int addCashBalanceWithVersion(@Param("id") Long id, @Param("amount")BigDecimal amount, @Param("version")Integer version);
+    int addBalanceWithVersion(@Param("id") Long id, @Param("amount")BigDecimal amount, @Param("version")Integer version);
 }

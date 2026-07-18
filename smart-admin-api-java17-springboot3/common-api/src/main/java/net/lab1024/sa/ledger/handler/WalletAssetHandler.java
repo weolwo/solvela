@@ -21,14 +21,15 @@ public class WalletAssetHandler extends AbstractAssetHandler {
 
     @Override
     protected String getLockKey(ProposalRecord proposal) {
-        return "lock:wallet_update:" + proposal.getMemberName();
+        // 钱包一行一种资产，锁细化到 会员+资产类型，不同资产互不阻塞
+        return "lock:wallet_update:" + proposal.getMemberName() + ":" + PrizeTypeEnum.BALANCE.name();
     }
 
     @Override
     protected ResponseDTO executeWithLock(ProposalRecord proposal) {
         try {
-            // 纯净的 Service 调用
-            memberWalletService.executeWalletCharge(proposal);
+            // 纯净的 Service 调用：本 Handler 负责的资产类型为 BALANCE（现金）
+            memberWalletService.executeWalletCharge(proposal, PrizeTypeEnum.BALANCE);
 
             log.info(">>>> [动账成功] 提案ID: {}", proposal.getId());
             return ResponseDTO.ok();

@@ -25,11 +25,12 @@ public class MemberWalletAddForm {
     @NotBlank(message = "会员名 不能为空")
     private String memberName;
 
-    @Schema(description = "积分余额")
-    private BigDecimal scoreBalance;
+    @Schema(description = "资产类型：SCORE-积分, BALANCE-现金", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "资产类型 不能为空")
+    private String assetType;
 
-    @Schema(description = "现金余额")
-    private BigDecimal cashBalance;
+    @Schema(description = "余额")
+    private BigDecimal balance;
 
     @Schema(description = "乐观锁版本号")
     private Integer version;

@@ -15,6 +15,9 @@
       <a-form-item label="会员名" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.memberName" placeholder="会员名" />
       </a-form-item>
+      <a-form-item label="资产类型" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.assetType" :options="ASSET_TYPE_OPTIONS" placeholder="资产类型" allowClear />
+      </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-冻结, 1-正常" />
       </a-form-item>
@@ -75,6 +78,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'assetType'">
+          <a-tag :color="text === 'BALANCE' ? 'green' : 'blue'">{{ ASSET_TYPE_MAP[text] || text }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -115,6 +121,11 @@
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import MemberWalletForm from './member-wallet-form.vue';
 
+  // ---------------------------- 资产类型（取值对齐后端 PrizeTypeEnum，与流水表同一字典） ----------------------------
+
+  const ASSET_TYPE_MAP = { SCORE: '积分', BALANCE: '现金' };
+  const ASSET_TYPE_OPTIONS = Object.keys(ASSET_TYPE_MAP).map((value) => ({ value, label: ASSET_TYPE_MAP[value] }));
+
   // ---------------------------- 表格列 ----------------------------
 
   const columns = ref([
@@ -134,13 +145,13 @@
       ellipsis: true,
     },
     {
-      title: '积分余额',
-      dataIndex: 'scoreBalance',
+      title: '资产类型',
+      dataIndex: 'assetType',
       ellipsis: true,
     },
     {
-      title: '现金余额',
-      dataIndex: 'cashBalance',
+      title: '余额',
+      dataIndex: 'balance',
       ellipsis: true,
     },
     {
@@ -181,6 +192,7 @@
   const queryFormState = {
     tenantId: undefined, //租户ID
     memberName: undefined, //会员名
+    assetType: undefined, //资产类型：SCORE-积分, BALANCE-现金
     status: undefined, //状态：0-冻结, 1-正常
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始

@@ -17,11 +17,11 @@
       <a-form-item label="会员名" name="memberName">
         <a-input style="width: 100%" v-model:value="form.memberName" placeholder="会员名" />
       </a-form-item>
-      <a-form-item label="积分余额" name="scoreBalance">
-        <a-input-number style="width: 100%" v-model:value="form.scoreBalance" placeholder="积分余额" />
+      <a-form-item label="资产类型" name="assetType">
+        <a-select style="width: 100%" v-model:value="form.assetType" :options="ASSET_TYPE_OPTIONS" placeholder="资产类型" :disabled="!!form.id" />
       </a-form-item>
-      <a-form-item label="现金余额" name="cashBalance">
-        <a-input-number style="width: 100%" v-model:value="form.cashBalance" placeholder="现金余额" />
+      <a-form-item label="余额" name="balance">
+        <a-input-number style="width: 100%" v-model:value="form.balance" placeholder="余额" />
       </a-form-item>
     </a-form>
 
@@ -75,12 +75,18 @@
   // 组件ref
   const formRef = ref();
 
+  // 资产类型（取值对齐后端 PrizeTypeEnum，与流水表同一字典）
+  const ASSET_TYPE_OPTIONS = [
+    { value: 'SCORE', label: '积分' },
+    { value: 'BALANCE', label: '现金' },
+  ];
+
   const formDefault = {
     id: undefined, //id
     tenantId: undefined, //租户ID
     memberName: undefined, //会员名
-    scoreBalance: undefined, //积分余额
-    cashBalance: undefined, //现金余额
+    assetType: undefined, //资产类型：SCORE-积分, BALANCE-现金
+    balance: undefined, //余额
   };
 
   let form = reactive({ ...formDefault });
@@ -89,6 +95,7 @@
     id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户ID 必填' }],
     memberName: [{ required: true, message: '会员名 必填' }],
+    assetType: [{ required: true, message: '资产类型 必填' }],
   };
 
   // 点击确定，验证表单

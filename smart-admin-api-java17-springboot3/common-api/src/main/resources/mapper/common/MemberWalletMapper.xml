@@ -6,8 +6,8 @@
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
             <result column="member_name" property="memberName" />
-            <result column="score_balance" property="scoreBalance" />
-            <result column="cash_balance" property="cashBalance" />
+            <result column="asset_type" property="assetType" />
+            <result column="balance" property="balance" />
             <result column="status" property="status" />
             <result column="version" property="version" />
             <result column="create_by" property="createBy" />
@@ -17,16 +17,16 @@
     </resultMap>
 
     <sql id="base_columns">
-                id, 
-                tenant_id, 
-                member_name, 
-                score_balance, 
-                cash_balance, 
-                status, 
-                version, 
-                create_by, 
-                create_time, 
-                update_by, 
+                id,
+                tenant_id,
+                member_name,
+                asset_type,
+                balance,
+                status,
+                version,
+                create_by,
+                create_time,
+                update_by,
                 update_time
     </sql>
 
@@ -37,6 +37,9 @@
                         </if>
                         <if test="queryForm.memberName != null">
                             AND member_name = #{queryForm.memberName}
+                        </if>
+                        <if test="queryForm.assetType != null">
+                            AND asset_type = #{queryForm.assetType}
                         </if>
                         <if test="queryForm.status != null">
                             AND status = #{queryForm.status}
@@ -49,8 +52,8 @@
                         </if>
         </where>
     </sql>
-    <update id="addCashBalanceWithVersion">
-        UPDATE t_member_wallet SET cash_balance = cash_balance + #{amount}, version = version + 1
+    <update id="addBalanceWithVersion">
+        UPDATE t_member_wallet SET balance = balance + #{amount}, version = version + 1
                     WHERE id = #{id} AND version = #{version}
     </update>
 
@@ -69,10 +72,11 @@
         <include refid="query_conditions"/>
         ORDER BY create_time DESC
     </select>
-    <select id="getMemberByMemberName" resultType="net.lab1024.sa.ledger.wallet.domain.entity.MemberWallet">
+    <select id="getByMemberNameAndAssetType" resultType="net.lab1024.sa.ledger.wallet.domain.entity.MemberWallet">
         SELECT
         <include refid="base_columns"/>
-        FROM t_member_wallet where member_name== #{memberName}
+        FROM t_member_wallet
+        WHERE member_name = #{memberName} AND asset_type = #{assetType}
     </select>
 
     <delete id="batchDelete">

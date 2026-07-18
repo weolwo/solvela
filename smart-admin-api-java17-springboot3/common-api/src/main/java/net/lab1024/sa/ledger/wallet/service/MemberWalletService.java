@@ -72,18 +72,19 @@ public class MemberWalletService {
 
     /**
      * 【资深写法】返回 void，失败直接抛出 BizException，让外层去捕获并转为 DTO
+     * 钱包一行一种资产：动哪种资产由调用方(各 AssetHandler)传入，新增资产类型无需改本方法
      */
     @Transactional(rollbackFor = Exception.class)
-    public void executeWalletCharge(ProposalRecord proposal) {
+    public void executeWalletCharge(ProposalRecord proposal, PrizeTypeEnum assetType) {
         BigDecimal amount = proposal.getPromotionValue();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
 
         // 1. 查钱包与自愈
-        MemberWallet wallet = memberWalletDao.getMemberByMemberName(proposal.getMemberName());
+        MemberWallet wallet = memberWalletDao.getByMemberNameAndAssetType(proposal.getMemberName(), assetType.name());
         if (wallet == null) {
-            wallet = initMemberWallet(proposal.getMemberName(), proposal.getTenantId());
+            wallet = initMemberWallet(proposal.getMemberName(), proposal.getTenantId(), assetType);
         }
 
         // 2. 状态校验 (调用充血模型)
@@ -91,22 +92,22 @@ public class MemberWalletService {
         BigDecimal balanceAfter = wallet.calculateAfterBalance(amount);
 
         // 3. 乐观锁更新
-        int updateRows = memberWalletDao.addCashBalanceWithVersion(wallet.getId(), amount, wallet.getVersion());
+        int updateRows = memberWalletDao.addBalanceWithVersion(wallet.getId(), amount, wallet.getVersion());
         if (updateRows == 0) {
             // 抛出专用的并发异常，外层可以根据这个做特定处理
             throw new BusinessException(BizErrorCode.ACCOUNT_BALANCE_CHANGED);
         }
 
         // 4. 写流水 (省略构建过程，直接看核心)
-        MemberAssetTransaction txn = buildTransaction(proposal, amount, balanceAfter);
+        MemberAssetTransaction txn = buildTransaction(proposal, assetType, amount, balanceAfter);
         memberAssetTransactionDao.insert(txn);
     }
 
-    private MemberAssetTransaction buildTransaction(ProposalRecord proposal, BigDecimal amount, BigDecimal balanceAfter) {
+    private MemberAssetTransaction buildTransaction(ProposalRecord proposal, PrizeTypeEnum assetType, BigDecimal amount, BigDecimal balanceAfter) {
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setTenantId(proposal.getTenantId());
         txn.setMemberName(proposal.getMemberName());
-        txn.setAssetType(PrizeTypeEnum.BALANCE.name());
+        txn.setAssetType(assetType.name());
         txn.setTransactionType(1); // 1-收入
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(balanceAfter); // 留下不可磨灭的财务对账证据
@@ -118,14 +119,14 @@ public class MemberWalletService {
 
 
     /**
-     * 辅助方法：用户钱包初始化兜底
+     * 辅助方法：用户钱包初始化兜底（按资产类型初始化对应账户行）
      */
-    private MemberWallet initMemberWallet(String memberName, String tenantId) {
+    private MemberWallet initMemberWallet(String memberName, String tenantId, PrizeTypeEnum assetType) {
         MemberWallet wallet = new MemberWallet();
         wallet.setTenantId(tenantId);
         wallet.setMemberName(memberName);
-        wallet.setScoreBalance(BigDecimal.ZERO);
-        wallet.setCashBalance(BigDecimal.ZERO);
+        wallet.setAssetType(assetType.name());
+        wallet.setBalance(BigDecimal.ZERO);
         wallet.setStatus(1); // 1-正常
         wallet.setVersion(0);
 
@@ -133,7 +134,7 @@ public class MemberWalletService {
             memberWalletDao.insert(wallet);
         } catch (DuplicateKeyException e) {
             // 防止高并发下同时初始化，如果报冲突，重新查一次即可
-            wallet = memberWalletDao.getMemberByMemberName(memberName);
+            wallet = memberWalletDao.getByMemberNameAndAssetType(memberName, assetType.name());
         }
         return wallet;
     }
