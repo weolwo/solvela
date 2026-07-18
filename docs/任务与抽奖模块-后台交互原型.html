@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>任务模块 & 抽奖(奖池转盘)模块 - 后台交互原型</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --primary:#1677ff;
+    --primary-active:#0958d9;
+    --primary-hover:#4096ff;
+    --primary-bg:#e6f2ff;
+    --success:#00b96b;
+    --success-bg:#e8fff3;
+    --warn:#faad14;
+    --warn-bg:#fffbe6;
+    --danger:#f5222d;
+    --danger-bg:#fff1f0;
+    --text:#1f2329;
+    --text-secondary:#646a73;
+    --text-tertiary:#8f959e;
+    --border:#e4e7eb;
+    --bg-page:#f2f3f5;
+    --bg-card:#ffffff;
+    --radius:8px;
+    --shadow:0 1px 2px rgba(0,0,0,.03), 0 2px 8px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg-page); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Helvetica,Arial,sans-serif;
+    font-size:13px;
+  }
+  a{color:var(--primary);text-decoration:none;}
+  /* ---------- layout ---------- */
+  .app{display:flex; min-height:100vh;}
+  .sidebar{
+    width:220px; background:#001529; flex-shrink:0; color:#fff;
+    padding:0 0 24px 0; position:sticky; top:0; height:100vh; overflow:auto;
+  }
+  .sidebar .logo{
+    height:56px; display:flex; align-items:center; gap:8px; padding:0 20px;
+    color:#fff; font-weight:600; font-size:15px; border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .sidebar .logo .dot{width:8px;height:8px;border-radius:2px;background:var(--primary);}
+  .nav-group{padding:16px 0 4px;}
+  .nav-group-title{padding:0 20px; font-size:11px; color:rgba(255,255,255,.35); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;}
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:10px 20px; cursor:pointer; color:rgba(255,255,255,.75);
+    font-size:13.5px; transition:.15s; border-right:3px solid transparent;
+  }
+  .nav-item:hover{background:rgba(255,255,255,.06); color:#fff;}
+  .nav-item.active{background:var(--primary); color:#fff; border-right:3px solid #fff;}
+  .nav-item .ico{width:16px; text-align:center;}
+  .main{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .topbar{
+    height:56px; background:#fff; border-bottom:1px solid var(--border); display:flex; align-items:center;
+    padding:0 24px; justify-content:space-between; position:sticky; top:0; z-index:20;
+  }
+  .breadcrumb{color:var(--text-secondary); font-size:13px;}
+  .breadcrumb b{color:var(--text); font-weight:600;}
+  .topbar-right{display:flex; align-items:center; gap:14px; color:var(--text-secondary); font-size:12px;}
+  .badge-proto{background:var(--primary-bg); color:var(--primary); padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600;}
+  .content{padding:20px 24px 60px; flex:1;}
+  .view{display:none;}
+  .view.active{display:block; animation:fadein .2s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+  .page-header{margin-bottom:16px;}
+  .page-title{font-size:18px; font-weight:600; margin:0 0 4px;}
+  .page-desc{color:var(--text-secondary); font-size:12.5px; margin:0;}
+
+  /* ---------- card / panel ---------- */
+  .card{background:var(--bg-card); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px;}
+  .card-title{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+  .card-title .num{width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .grid-4{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+  .row{display:flex; gap:16px;}
+  .col{flex:1; min-width:0;}
+
+  /* ---------- form controls ---------- */
+  label.f-label{display:block; font-size:12.5px; color:var(--text-secondary); margin-bottom:6px;}
+  .req::after{content:" *"; color:var(--danger);}
+  input[type=text], input[type=number], input[type=datetime-local], select, textarea{
+    width:100%; padding:7px 11px; border:1px solid var(--border); border-radius:6px; font-size:13px;
+    background:#fff; color:var(--text); font-family:inherit;
+  }
+  input:focus, select:focus, textarea:focus{outline:none; border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-bg);}
+  textarea{resize:vertical; min-height:60px;}
+  .field{margin-bottom:14px;}
+  .hint{font-size:11.5px; color:var(--text-tertiary); margin-top:4px;}
+  .inline-unit{display:flex; align-items:center; gap:8px;}
+  .inline-unit input{flex:1;}
+  .inline-unit .unit{color:var(--text-secondary); font-size:12.5px; white-space:nowrap;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; padding:6.5px 15px; border-radius:6px; border:1px solid var(--border);
+    background:#fff; color:var(--text); font-size:13px; cursor:pointer; transition:.15s; font-family:inherit;
+  }
+  .btn:hover{border-color:var(--primary); color:var(--primary);}
+  .btn-primary{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .btn-primary:hover{background:var(--primary-hover); border-color:var(--primary-hover); color:#fff;}
+  .btn-danger-text{border:none; background:none; color:var(--danger); padding:4px 6px;}
+  .btn-danger-text:hover{color:#cf1322;}
+  .btn-link{border:none; background:none; color:var(--primary); padding:4px 6px;}
+  .btn-sm{padding:4px 10px; font-size:12px;}
+  .btn[disabled]{opacity:.45; cursor:not-allowed;}
+  .btn[disabled]:hover{border-color:var(--border); color:var(--text);}
+
+  .chip-group{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{
+    padding:6px 14px; border:1px solid var(--border); border-radius:20px; font-size:12.5px; cursor:pointer; color:var(--text-secondary); background:#fff;
+    transition:.15s;
+  }
+  .chip.selected{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .chip:hover:not(.selected){border-color:var(--primary); color:var(--primary);}
+
+  .tag{display:inline-block; padding:1px 8px; border-radius:4px; font-size:11.5px; font-weight:500;}
+  .tag-blue{background:var(--primary-bg); color:var(--primary);}
+  .tag-green{background:var(--success-bg); color:var(--success);}
+  .tag-orange{background:var(--warn-bg); color:#d48806;}
+  .tag-red{background:var(--danger-bg); color:var(--danger);}
+  .tag-gray{background:#f2f3f5; color:var(--text-secondary);}
+
+  /* ---------- stepper ---------- */
+  .stepper{display:flex; align-items:center; margin-bottom:20px; background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 30px;}
+  .step{display:flex; align-items:center; gap:10px; color:var(--text-tertiary); flex:1;}
+  .step .circle{width:26px;height:26px;border-radius:50%;border:2px solid var(--border); display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600; flex-shrink:0; color:var(--text-tertiary); background:#fff;}
+  .step .label{font-size:13px; white-space:nowrap;}
+  .step.done .circle{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .step.done .label{color:var(--text);}
+  .step.active .circle{border-color:var(--primary); color:var(--primary);}
+  .step.active .label{color:var(--primary); font-weight:600;}
+  .step-line{flex:1; height:1px; background:var(--border); margin:0 6px;}
+
+  .step-panel{display:none;}
+  .step-panel.active{display:block;}
+  .wizard-footer{display:flex; justify-content:space-between; margin-top:20px; background:#fff; padding:16px 20px; border-radius:var(--radius); box-shadow:var(--shadow);}
+
+  /* ---------- ladder builder ---------- */
+  .ladder-item{border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:12px; position:relative; background:#fafbfc;}
+  .ladder-item .stage-badge{position:absolute; left:-1px; top:-1px; background:var(--primary); color:#fff; font-size:11px; padding:3px 10px; border-radius:8px 0 8px 0; font-weight:600;}
+  .ladder-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-left:56px;}
+  .ladder-actions{display:flex; gap:4px;}
+  .mode-radio{display:flex; gap:6px; margin-bottom:10px;}
+  .mode-radio label{
+    border:1px solid var(--border); padding:5px 12px; border-radius:6px; font-size:12px; cursor:pointer; color:var(--text-secondary);
+  }
+  .mode-radio input{display:none;}
+  .mode-radio input:checked + span{color:var(--primary);}
+  .mode-radio label:has(input:checked){border-color:var(--primary); background:var(--primary-bg); color:var(--primary);}
+  .formula-box{font-family:'SFMono-Regular',Consolas,Menlo,monospace; font-size:12.5px; background:#1f2329; color:#a6e3a1; padding:10px; border-radius:6px; min-height:44px;}
+
+  /* ---------- phone mock ---------- */
+  .phone{
+    width:260px; height:530px; border:8px solid #1f2329; border-radius:34px; margin:0 auto; overflow:hidden; position:relative;
+    background:linear-gradient(180deg,#fef3e0,#fff);
+  }
+  .phone .notch{position:absolute; top:0; left:50%; transform:translateX(-50%); width:120px; height:18px; background:#1f2329; border-radius:0 0 12px 12px; z-index:5;}
+  .phone-screen{padding:28px 14px 14px; height:100%; overflow:auto;}
+  .task-card-mock{background:#fff; border-radius:12px; padding:12px; box-shadow:0 2px 10px rgba(0,0,0,.06); display:flex; gap:10px; margin-bottom:10px;}
+  .task-card-mock .icon{width:40px;height:40px;border-radius:10px;background:var(--primary-bg); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;}
+  .task-card-mock .body{flex:1; min-width:0;}
+  .task-card-mock .t{font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px;}
+  .task-card-mock .sub{font-size:11px; color:var(--text-tertiary); margin:3px 0 6px;}
+  .progress-bar{height:6px; background:#eee; border-radius:4px; overflow:hidden;}
+  .progress-bar > span{display:block; height:100%; background:linear-gradient(90deg,#4096ff,#1677ff); border-radius:4px;}
+  .task-card-mock .btn-claim{
+    margin-top:8px; font-size:11px; padding:3px 12px; border-radius:14px; border:none; color:#fff; background:var(--primary); float:right; cursor:pointer;
+  }
+  .state-toggle{display:flex; gap:6px; justify-content:center; margin-bottom:14px;}
+
+  /* ---------- C端活动大类包裹面板 ---------- */
+  .activity-panel{border-radius:14px; padding:9px 9px 4px; margin-bottom:12px; background:linear-gradient(135deg,#ff9a3d,#ff5e62); box-shadow:0 3px 10px rgba(255,94,98,.25);}
+  .activity-banner{display:flex; justify-content:space-between; align-items:baseline; color:#fff; padding:3px 5px 9px;}
+  .activity-banner .a-title{font-size:12.5px; font-weight:700;}
+  .activity-banner .a-sub{font-size:9.5px; opacity:.85;}
+  .activity-panel .task-card-mock{margin-bottom:8px; box-shadow:none;}
+  .task-activity-cell .t-name{font-weight:600;}
+  .task-activity-cell .t-activity{font-size:11px; color:var(--text-tertiary); margin-top:3px;}
+  /* 第2步上传的自定义图标在C端预览中的呈现（mock URL 无法真实加载，用渐变缩略块模拟，与上传态视觉一致） */
+  .icon-img{width:100%; height:100%; border-radius:10px; background:linear-gradient(135deg,#4096ff,#9254de); display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff;}
+
+  /* ---------- wheel ---------- */
+  .wheel-wrap{display:flex; gap:28px; align-items:flex-start;}
+  .wheel{width:230px; height:230px; border-radius:50%; flex-shrink:0; position:relative; box-shadow:0 0 0 8px #fff, 0 0 0 10px var(--border);}
+  .wheel-center{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:76px; height:76px; background:#fff; border-radius:50%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 0 8px rgba(0,0,0,.15); text-align:center;
+  }
+  .wheel-center .pct{font-size:16px; font-weight:700;}
+  .wheel-center .pct.over{color:var(--danger);}
+  .wheel-center .pct.ok{color:var(--success);}
+  .wheel-center .lbl{font-size:9px; color:var(--text-tertiary);}
+  .prize-row{display:grid; grid-template-columns:16px 1.4fr 1.3fr 90px 1fr 32px; gap:10px; align-items:center; padding:8px 4px; border-bottom:1px solid #f0f0f0; font-size:12.5px;}
+  .prize-row.head{color:var(--text-tertiary); font-size:11.5px; border-bottom:1px solid var(--border);}
+  .swatch{width:12px;height:12px;border-radius:3px;}
+  .prob-input-wrap{display:flex; align-items:center; gap:6px;}
+  .prob-input-wrap input[type=range]{flex:1; accent-color:var(--primary);}
+  .prob-input-wrap input[type=number]{width:60px; padding:3px 6px;}
+  .stock-mini{font-size:11px; color:var(--text-tertiary);}
+  .stock-mini .bar{height:4px; background:#eee; border-radius:3px; overflow:hidden; margin-top:2px;}
+  .stock-mini .bar>span{display:block; height:100%; background:var(--warn);}
+  .alert{padding:10px 14px; border-radius:6px; font-size:12.5px; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+  .alert-warn{background:var(--warn-bg); color:#ad6800; border:1px solid #ffe58f;}
+  .alert-ok{background:var(--success-bg); color:#08800c; border:1px solid #b7eb8f;}
+  .alert-danger{background:var(--danger-bg); color:var(--danger); border:1px solid #ffccc7;}
+
+  /* ---------- table ---------- */
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:left; color:var(--text-secondary); font-weight:500; padding:10px 12px; border-bottom:1px solid var(--border); background:#fafbfc; white-space:nowrap;}
+  td{padding:10px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle;}
+  tr.row-hover:hover{background:#f7f9fc;}
+  .mono{font-family:'SFMono-Regular',Consolas,Menlo,monospace; font-size:11.5px; color:var(--text-secondary);}
+
+  .tabs{display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:14px;}
+  .tab-item{padding:9px 16px; cursor:pointer; font-size:13px; color:var(--text-secondary); border-bottom:2px solid transparent; margin-bottom:-1px;}
+  .tab-item.active{color:var(--primary); border-bottom-color:var(--primary); font-weight:600;}
+  .tab-item .count{color:var(--text-tertiary); font-size:11px;}
+
+  .stat-card{background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 20px;}
+  .stat-card .lbl{font-size:12px; color:var(--text-secondary); display:flex; justify-content:space-between;}
+  .stat-card .val{font-size:24px; font-weight:700; margin:6px 0 2px;}
+  .stat-card .delta{font-size:11.5px;}
+  .delta.up{color:var(--success);} .delta.down{color:var(--danger);}
+
+  /* ---------- drawer ---------- */
+  .mask{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:100;}
+  .mask.show{display:block;}
+  .drawer{position:fixed; top:0; right:-460px; width:440px; height:100%; background:#fff; z-index:101; box-shadow:-4px 0 16px rgba(0,0,0,.12); transition:right .25s ease; display:flex; flex-direction:column;}
+  .drawer.show{right:0;}
+  .drawer-head{padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;}
+  .drawer-head h3{margin:0; font-size:15px;}
+  .drawer-close{cursor:pointer; font-size:18px; color:var(--text-tertiary); border:none; background:none;}
+  .drawer-body{padding:18px 20px; overflow:auto; flex:1;}
+  .json-block{background:#1f2329; color:#e6e6e6; padding:14px; border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:11.5px; line-height:1.7; white-space:pre-wrap; word-break:break-all;}
+  .json-block .k{color:#79c0ff;} .json-block .s{color:#a6e3a1;} .json-block .n{color:#f2c97d;}
+
+  .toast{position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-20px); background:#1f2329; color:#fff; padding:10px 22px; border-radius:6px; font-size:13px; z-index:200; opacity:0; transition:.25s; pointer-events:none; display:flex; align-items:center; gap:8px;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .switch{position:relative; width:38px; height:20px; display:inline-block;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch .track{position:absolute; inset:0; background:#ccc; border-radius:20px; cursor:pointer; transition:.2s;}
+  .switch .track:before{content:""; position:absolute; width:16px; height:16px; left:2px; top:2px; background:#fff; border-radius:50%; transition:.2s;}
+  .switch input:checked + .track{background:var(--primary);}
+  .switch input:checked + .track:before{transform:translateX(18px);}
+
+  .empty-note{border:1px dashed var(--border); border-radius:6px; padding:14px; font-size:12px; color:var(--text-tertiary); background:#fafbfc;}
+
+  /* ---------- image_upload 控件（原型模拟，无真实上传请求） ---------- */
+  .upload-box{border:1.5px dashed var(--border); border-radius:8px; padding:18px 12px; text-align:center; cursor:pointer; transition:.15s; background:#fafbfc; color:var(--text-tertiary);}
+  .upload-box:hover{border-color:var(--primary); color:var(--primary); background:var(--primary-bg);}
+  .upload-box .up-ico{font-size:20px; display:block; margin-bottom:4px;}
+  .upload-box .up-txt{font-size:12px;}
+  .upload-done{display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:#fff;}
+  .upload-done .thumb{width:44px; height:44px; border-radius:6px; background:linear-gradient(135deg,#4096ff,#9254de); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px;}
+  .upload-done .fname{flex:1; min-width:0; font-size:11.5px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:Consolas,Menlo,monospace;}
+  .rule-info{cursor:pointer; font-size:12px; margin-left:auto; flex-shrink:0;}
+  .rule-info:hover{transform:scale(1.15);}
+  .kv-list{font-size:12.5px;}
+  .kv-list .kv-row{display:flex; padding:7px 0; border-bottom:1px dashed #eee;}
+  .kv-list .kv-row .k{width:110px; color:var(--text-secondary); flex-shrink:0;}
+  .kv-list .kv-row .v{font-weight:500;}
+  .section-note{background:var(--primary-bg); border-radius:6px; padding:10px 14px; font-size:12px; color:var(--primary-active); margin-bottom:14px;}
+  canvas{max-width:100%;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <div class="sidebar">
+    <div class="logo"><span class="dot"></span> SmartAdmin · 营销中台</div>
+    <div class="nav-group">
+      <div class="nav-group-title">任务模块</div>
+      <div class="nav-item active" data-view="v-task-wizard"><span class="ico">🧩</span>任务配置向导</div>
+      <div class="nav-item" data-view="v-tpl-designer"><span class="ico">🧬</span>任务模板设计器 ui_schema</div>
+      <div class="nav-item" data-view="v-task-monitor"><span class="ico">📊</span>任务记录监控台</div>
+      <div class="nav-item" data-view="v-task-dashboard"><span class="ico">📈</span>任务数据看板</div>
+      <div class="nav-item" data-view="v-dispatch-log"><span class="ico">🎁</span>奖励派发记录</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">抽奖模块 · 奖池转盘</div>
+      <div class="nav-item" data-view="v-wheel"><span class="ico">🎡</span>奖池转盘配置器</div>
+      <div class="nav-item" data-view="v-draw-dashboard"><span class="ico">📈</span>抽奖数据看板</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">说明</div>
+      <div class="nav-item" data-view="v-readme"><span class="ico">📝</span>设计说明 / 待办</div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <div class="topbar">
+      <div class="breadcrumb" id="breadcrumb">任务模块 <span style="margin:0 6px;">/</span> <b>任务配置向导</b></div>
+      <div class="topbar-right">
+        <span class="badge-proto">可点击原型 · 数据为模拟数据</span>
+        <span>hi alaric</span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============================================================ -->
+      <!-- VIEW 1: 任务配置向导 -->
+      <!-- ============================================================ -->
+      <div class="view active" id="v-task-wizard">
+        <div class="page-header">
+          <h2 class="page-title">任务配置向导</h2>
+          <p class="page-desc">对应表：t_task_template / t_task_config / t_task_prize_mapping。用「向导式」替换原来一整张裸表单，按 task_type 动态展开达标规则，并把阶梯奖励做成可视化搭建器。</p>
+        </div>
+
+        <div class="stepper" id="stepper"></div>
+
+        <!-- STEP 1 -->
+        <div class="step-panel active" data-step="1">
+          <div class="row">
+            <div class="col" style="flex:2;">
+              <div class="card">
+                <div class="card-title"><span class="num">1</span>选择任务模板</div>
+                <div class="grid-2" id="templateGrid"></div>
+              </div>
+              <div class="card">
+                <div class="card-title"><span class="num">2</span>基础信息</div>
+                <div class="field">
+                  <label class="f-label req">所属活动大类 activity_code</label>
+                  <select id="f-activityCode" onchange="onActivityChange()">
+                    <option value="NEWBIE_CAMP">🌱 新人成长营（NEWBIE_CAMP）</option>
+                    <option value="NATIONAL_DAY_2026">🎁 国庆狂欢挑战（NATIONAL_DAY_2026）</option>
+                    <option value="D11_MAIN_2026">🛒 双十一主会场（D11_MAIN_2026）</option>
+                  </select>
+                  <div class="hint">对应 t_task_config.activity_code。原子任务必须归属一个活动大类，C端按大类聚合包裹展示（见第5步预览）。</div>
+                </div>
+                <div class="row">
+                  <div class="col field">
+                    <label class="f-label req">任务名称</label>
+                    <input type="text" id="f-taskName" value="新人首单签到礼" />
+                  </div>
+                  <div class="col field">
+                    <label class="f-label req">触发事件 trigger_event</label>
+                    <select id="f-triggerEvent">
+                      <option value="DAILY_SIGN">DAILY_SIGN（签到）</option>
+                      <option value="ORDER_PAID">ORDER_PAID（支付成功）</option>
+                      <option value="MEMBER_REGISTER">MEMBER_REGISTER（注册）</option>
+                      <option value="PAGE_VIEW">PAGE_VIEW（浏览页面）</option>
+                      <option value="CUSTOM">CUSTOM（自定义埋点）</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="f-label">任务分组 task_group</label>
+                  <div class="chip-group" id="chip-taskGroup">
+                    <div class="chip selected" data-v="NEWBIE">新手 NEWBIE</div>
+                    <div class="chip" data-v="DAILY">日常 DAILY</div>
+                    <div class="chip" data-v="PROMO">大促 PROMO</div>
+                    <div class="chip" data-v="VIP">会员专属 VIP</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col" style="flex:1;">
+              <div class="card">
+                <div class="card-title">💡 设计说明</div>
+                <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.7;">
+                  原表单把 <b>task_type</b>（SIMPLE/COUNT/AMOUNT）当普通文本输入，运营容易填错，且后面「达标规则」也是裸 JSON 输入框。<br/><br/>
+                  改成先选模板 → 模板自带 task_type → 第二步的规则表单据此自动切换控件类型，运营不需要理解底层字段。<br/><br/>
+                  <b>活动大类包裹原子任务</b>：架构上以「活动 Activity」为大类统筹底层多个原子任务。通过选择所属活动（activity_code），系统在C端会自动将该原子任务<b>聚合并展示在对应的大类UI下</b>，运营无需单独为聚合页做配置。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="step-panel" data-step="2">
+          <div class="row">
+            <div class="col" style="flex:2;">
+              <div class="card">
+                <div class="card-title"><span class="num">1</span>达标规则（由所选模板 ui_schema 动态生成 <span id="typeBadge" class="tag tag-blue">SIMPLE</span>）</div>
+                <div class="section-note" id="wizardRuleNote"></div>
+                <div id="wizardRuleForm"></div>
+
+                <div class="field" style="margin-top:6px;">
+                  <label class="f-label">参与频次 limit_type</label>
+                  <div class="chip-group" id="chip-limitType">
+                    <div class="chip selected" data-v="ONCE">终身一次 ONCE</div>
+                    <div class="chip" data-v="DAILY">每日重复 DAILY</div>
+                    <div class="chip" data-v="WEEKLY">每周重复 WEEKLY</div>
+                    <div class="chip" data-v="UNLIMITED">无限制 UNLIMITED</div>
+                  </div>
+                </div>
+                <div class="field" id="limitCountWrap" style="display:none; max-width:220px;">
+                  <label class="f-label">限制次数 limit_count</label>
+                  <input type="number" id="f-limitCount" value="1" min="1" />
+                </div>
+              </div>
+            </div>
+            <div class="col" style="flex:1;">
+              <div class="card">
+                <div class="card-title">💡 设计说明</div>
+                <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.7;">
+                  本步骤表单<b>不再写死</b>：完全由第1步所选模板的 <span class="mono">ui_schema.params</span> 动态渲染，与「任务模板设计器」共用同一渲染引擎。<br/><br/>
+                  以后新增任务玩法 = 开发在设计器里配一条模板 + Java 侧写一个判定脚本（rule_script），本向导交互自动就绪、前端零改动；运营填的参数保存时统一拼装成 <span class="mono">rule_config</span> JSON 提交。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="step-panel" data-step="3">
+          <div class="row">
+            <div class="col" style="flex:2;">
+              <div class="card">
+                <div class="card-title"><span class="num">1</span>奖励阶梯搭建（t_task_prize_mapping）</div>
+                <div class="section-note">支持配置多级阶梯（如签到3天/7天/30天分别给不同奖励）。每一级可选择固定值 / 按比例 / 公式三种发奖方式，对应 prize_mode 字段。</div>
+                <div id="ladderList"></div>
+                <button class="btn" onclick="addLadder()">+ 新增阶梯</button>
+              </div>
+            </div>
+            <div class="col" style="flex:1;">
+              <div class="card">
+                <div class="card-title">📋 奖励预算小结</div>
+                <div class="kv-list">
+                  <div class="kv-row"><div class="k">已配置阶梯</div><div class="v" id="sumStageCount">1 级</div></div>
+                  <div class="kv-row"><div class="k">单用户最高可得</div><div class="v" id="sumMaxValue">100 积分</div></div>
+                  <div class="kv-row"><div class="k">关联优惠配置预算</div><div class="v">¥ 50,000（mock）</div></div>
+                </div>
+                <div class="alert alert-ok" style="margin-top:10px;">✅ 未超出 single_max_amount 单次兜底限制</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4 -->
+        <div class="step-panel" data-step="4">
+          <div class="row">
+            <div class="col" style="flex:2;">
+              <div class="card">
+                <div class="card-title"><span class="num">1</span>目标人群 target_audience</div>
+                <div class="grid-3" id="audienceCards"></div>
+              </div>
+              <div class="card">
+                <div class="card-title"><span class="num">2</span>生效时间与展示</div>
+                <div class="row">
+                  <div class="col field"><label class="f-label">开始时间</label><input type="datetime-local" value="2026-07-20T00:00" /></div>
+                  <div class="col field"><label class="f-label">结束时间</label><input type="datetime-local" value="2026-08-20T23:59" /></div>
+                </div>
+                <div class="field" style="display:flex; align-items:center; gap:10px;">
+                  <label class="switch"><input type="checkbox" id="f-longTerm"/><span class="track"></span></label>
+                  <span style="font-size:12.5px;">长期有效（不限结束时间）</span>
+                </div>
+                <div class="row">
+                  <div class="col field">
+                    <label class="f-label">排序权重 sort_weight</label>
+                    <input type="range" min="0" max="100" value="60" id="f-sortWeight" oninput="document.getElementById('sortWeightVal').innerText=this.value">
+                    <div class="hint">当前值：<span id="sortWeightVal">60</span>（越大越靠前）</div>
+                  </div>
+                  <div class="col field">
+                    <label class="f-label">跳转地址 action_url</label>
+                    <div class="inline-unit">
+                      <input type="text" value="/pages/sign/index" />
+                      <button class="btn btn-sm" onclick="checkUrl(this)">校验</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="f-label">角标文案 ui_config.badge</label>
+                  <input type="text" value="新人专享" />
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-title"><span class="num">3</span>C端展示与规则说明</div>
+                <div class="field">
+                  <label class="f-label">任务副标题 task_desc</label>
+                  <input type="text" id="f-taskDesc" value="完成签到即可获得奖励" />
+                  <div class="hint">展示在 C 端任务名称下方，一句话吸引用户</div>
+                </div>
+                <div class="field">
+                  <label class="f-label">详细规则说明 rule_desc</label>
+                  <textarea id="f-ruleDesc" rows="4">1、活动期间每日可签到1次，连续签到7天即可领取奖励；
+2、同一设备/同一账号限领1次，作弊行为将取消领奖资格；
+3、奖励发放后可在「我的-资产」中查看。</textarea>
+                  <div class="hint">用户点击任务卡片弹出的详细活动规则说明（如：同一设备限领1次等）</div>
+                </div>
+              </div>
+            </div>
+            <div class="col" style="flex:1;">
+              <div class="card">
+                <div class="card-title">📈 人群覆盖预估</div>
+                <p style="font-size:26px; font-weight:700; margin:4px 0;" id="audienceCoverage">12,345 <span style="font-size:12px;font-weight:400;color:var(--text-tertiary);">人</span></p>
+                <div class="hint">基于当前会员画像的模拟估算，实际以任务生效后统计为准。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 5 -->
+        <div class="step-panel" data-step="5">
+          <div class="row">
+            <div class="col" style="flex:1;">
+              <div class="card">
+                <div class="card-title">📋 配置汇总（只读）</div>
+                <div class="kv-list" id="summaryList"></div>
+              </div>
+            </div>
+            <div class="col" style="flex:1;">
+              <div class="card">
+                <div class="card-title">📱 C端实时预览</div>
+                <div class="state-toggle">
+                  <div class="chip selected" data-state="待领取" onclick="setPreviewState(this)">待领取</div>
+                  <div class="chip" data-state="进行中" onclick="setPreviewState(this)">进行中</div>
+                  <div class="chip" data-state="待发奖" onclick="setPreviewState(this)">已完成待领奖</div>
+                  <div class="chip" data-state="已过期" onclick="setPreviewState(this)">已过期</div>
+                </div>
+                <div class="phone">
+                  <div class="notch"></div>
+                  <div class="phone-screen">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:10px;">🎯 任务中心</div>
+                    <!-- 活动大类包裹面板：原子任务卡片作为子元素嵌套其中 -->
+                    <div class="activity-panel" id="prevActivityPanel">
+                      <div class="activity-banner">
+                        <span class="a-title"><span id="prevActivityIcon">🌱</span> <span id="prevActivityName">新人成长营</span></span>
+                        <span class="a-sub" id="prevActivitySub">完成任务赢豪礼</span>
+                      </div>
+                      <div class="task-card-mock">
+                        <div class="icon" id="prevIcon">📅</div>
+                        <div class="body">
+                          <div class="t"><span id="prevName">新人首单签到礼</span> <span class="tag tag-blue" id="prevGroupTag">新手</span><span class="rule-info" id="prevRuleIcon" onclick="showRuleDesc()" title="查看活动规则">ℹ️</span></div>
+                          <div class="sub" id="prevDesc">完成签到即可获得奖励</div>
+                          <div class="progress-bar"><span id="prevProgressBar" style="width:0%"></span></div>
+                          <button class="btn-claim" id="prevBtn">去完成</button>
+                        </div>
+                      </div>
+                      <div class="task-card-mock" style="opacity:.75;">
+                        <div class="icon">👥</div>
+                        <div class="body">
+                          <div class="t">邀请好友注册 <span class="tag tag-gray">日常</span></div>
+                          <div class="sub">已邀请 1/3 人（同活动下的其他原子任务）</div>
+                          <div class="progress-bar"><span style="width:33%"></span></div>
+                          <button class="btn-claim" style="background:var(--text-tertiary);">进行中</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="hint" style="text-align:center;">↑ C端按 activity_code 自动聚合：大类包裹小类</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <button class="btn" id="prevBtnWizard" onclick="stepGo(-1)" disabled>上一步</button>
+          <div style="display:flex; gap:10px;">
+            <button class="btn" onclick="toast('已保存草稿 ✅')">保存草稿</button>
+            <button class="btn btn-primary" id="nextBtnWizard" onclick="stepGo(1)">下一步</button>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ============================================================ -->
+      <!-- VIEW 1.5: 任务模板设计器 (ui_schema 驱动) -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-tpl-designer">
+        <style>
+          .schema-editor{width:100%; min-height:400px; font-family:Consolas,Menlo,monospace; font-size:12px; line-height:1.65; background:#1f2329; color:#e6edf3; border:none; border-radius:6px; padding:14px; resize:vertical;}
+          .schema-editor:focus{outline:none; box-shadow:0 0 0 2px var(--primary-bg);}
+          .widget-doc{font-size:11.5px; color:var(--text-secondary); line-height:2;}
+          .widget-doc code{background:#f2f3f5; padding:1px 6px; border-radius:4px; font-size:11px; color:#c7254e;}
+          .checkin-grid{display:flex; gap:5px; margin:8px 0 4px;}
+          .checkin-day{width:24px;height:24px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-tertiary); flex-shrink:0;}
+          .checkin-day.done{background:var(--primary);color:#fff;}
+          .checkin-day.today{border:2px dashed var(--primary); color:var(--primary); background:#fff;}
+        </style>
+        <div class="page-header">
+          <h2 class="page-title">任务模板设计器 · ui_schema 驱动 <span class="tag tag-orange" style="vertical-align:middle;">仅技术/开发角色可见</span></h2>
+          <p class="page-desc">对应字段：t_task_template.ui_schema + rule_script。本页面通过菜单权限只对开发开放；运营只使用「任务配置向导」，看到的是 ui_schema 渲染出的参数表单，永远接触不到 rule_script。左侧编辑 schema，右侧两个渲染器实时消费同一份定义：① 管理端「达标规则」动态表单（即向导第2步）② C端任务卡片。</p>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="f-label">从预置模板加载（不同模板 = 不同交互形态）</label>
+          <div class="chip-group" id="tplPresetChips"></div>
+        </div>
+        <div class="row">
+          <div class="col" style="flex:1.1; min-width:340px;">
+            <div class="card">
+              <div class="card-title">📝 ui_schema 定义（可直接编辑）</div>
+              <textarea class="schema-editor" id="schemaEditor" spellcheck="false"></textarea>
+              <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn btn-primary" onclick="applySchema()">应用 Schema →</button>
+                <button class="btn" onclick="toast('已保存到 t_task_template.ui_schema（mock）')">保存模板</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">⚙️ rule_script（QLExpress · 后端判定逻辑）<span class="tag tag-red" style="margin-left:6px;">运营不可见</span></div>
+              <div class="json-block" id="ruleScriptBox" contenteditable="true" spellcheck="false" style="min-height:90px;"></div>
+              <div class="hint" style="margin-top:8px;">与 ui_schema 是同一模板的两个独立字段：ui_schema 管「配置界面长什么样」，rule_script 管「后端如何判定达标」。运营在向导里填的参数（rule_config）会作为变量注入本脚本，如 <span class="mono">targetDays</span>、<span class="mono">excludeRefund</span>。脚本仅在本设计器中由开发维护。</div>
+            </div>
+            <div class="card">
+              <div class="card-title">📖 Schema 规范速查</div>
+              <div class="widget-doc">
+                <b>params[]</b> — 管理端动态表单：<code>widget</code> 支持 number / text / select / radio / switch / slider / image_upload；<code>visibleWhen</code> 做字段联动显隐；辅以 <code>unit / min / max / default / required / help</code>。<br/>
+                <b>image_upload</b> — 多端异构图片：一个 key 即一张图，按「用途_端」命名（如 <code>icon_app</code> / <code>banner_mp</code>），值为图片 URL 随 rule_config 一起保存；哪个模板需要哪些端的图，只改模板 schema，前端零改动。配合 <code>visibleWhen</code> 可由开关字段控制是否展示上传项（见「每日签到」模板的 <code>customImage</code> 联动示例）。<br/>
+                <b>render</b> — C端渲染：<code>cardType</code> = simple｜progress｜amount｜checkin-grid（自定义交互按组件名注册，schema 只引用、不实现）；<code>progressText</code> 支持 {current} / {target} 及任意参数占位符；<code>buttonText</code> 按任务状态 0~3 配按钮文案。<br/>
+                <b>taskType</b> — 决定后端累计逻辑（SIMPLE / COUNT / AMOUNT），params 收集的值最终拼装为 rule_config，供 rule_script（QLExpress）作为变量读取。
+              </div>
+            </div>
+          </div>
+          <div class="col" style="flex:1; min-width:300px;">
+            <div class="card">
+              <div class="card-title">🖥️ 渲染器① 管理端达标规则表单</div>
+              <div class="hint" style="margin-bottom:10px;">任务配置向导第2步将由此 schema 动态生成，新增模板不需要改前端代码。</div>
+              <div id="dynFormWrap"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">📦 提交时生成的 rule_config</div>
+              <div class="json-block" id="ruleConfigOut"></div>
+            </div>
+          </div>
+          <div class="col" style="flex:0 0 292px;">
+            <div class="card">
+              <div class="card-title">📱 渲染器② C端任务卡片</div>
+              <div class="phone" style="width:250px;height:430px;">
+                <div class="notch"></div>
+                <div class="phone-screen">
+                  <div style="font-size:13px;font-weight:700;margin-bottom:10px;">🎯 任务中心</div>
+                  <div id="cendCard"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- VIEW 2: 任务记录监控台 -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-task-monitor">
+        <div class="page-header">
+          <h2 class="page-title">任务记录监控台</h2>
+          <p class="page-desc">对应表：t_task_record。原型把裸表格升级为「状态看板 + 进度可视化 + 快照审计」，方便运营排查发奖问题。</p>
+        </div>
+
+        <div class="grid-4" style="margin-bottom:16px;">
+          <div class="stat-card"><div class="lbl">进行中 <span>🏃</span></div><div class="val">128</div><div class="delta up">↑ 12% 较昨日</div></div>
+          <div class="stat-card"><div class="lbl">今日已完成 <span>✅</span></div><div class="val">342</div><div class="delta up">↑ 8% 较昨日</div></div>
+          <div class="stat-card"><div class="lbl">待发奖 <span>🎁</span></div><div class="val" style="color:var(--warn);">12</div><div class="delta down">需关注</div></div>
+          <div class="stat-card"><div class="lbl">已过期未领 <span>⏰</span></div><div class="val" style="color:var(--danger);">56</div><div class="delta down">↑ 3% 较昨日</div></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <div class="tabs" id="recordTabs" style="flex:1;">
+              <div class="tab-item active" data-status="all">全部 <span class="count">(538)</span></div>
+              <div class="tab-item" data-status="0">进行中 <span class="count">(128)</span></div>
+              <div class="tab-item" data-status="1">已完成 <span class="count">(342)</span></div>
+              <div class="tab-item" data-status="2">已发奖 <span class="count">(12)</span></div>
+              <div class="tab-item" data-status="3">已过期 <span class="count">(56)</span></div>
+            </div>
+            <select id="recordActivityFilter" style="width:190px;" onchange="renderRecords()">
+              <option value="all">全部活动</option>
+              <option value="新人成长营">🌱 新人成长营</option>
+              <option value="国庆狂欢挑战">🎁 国庆狂欢挑战</option>
+              <option value="双十一主会场">🛒 双十一主会场</option>
+            </select>
+          </div>
+          <table>
+            <thead>
+              <tr><th>会员</th><th>任务名称</th><th>分组</th><th>当前进度</th><th>状态</th><th>达标时间</th><th>操作</th></tr>
+            </thead>
+            <tbody id="recordTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- ============================================================ -->
+      <!-- VIEW 2.5: 任务数据看板 -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-task-dashboard">
+        <div class="page-header">
+          <h2 class="page-title">任务数据看板</h2>
+          <p class="page-desc">对应表：t_task_record + t_prize_log 聚合统计。观察任务健康度：接取 → 完成 → 发奖 的转化与发放成本，判断任务是否值得续期/调整。</p>
+        </div>
+
+        <div class="grid-4" style="margin-bottom:16px;">
+          <div class="stat-card"><div class="lbl">今日任务完成 <span>✅</span></div><div class="val">342</div><div class="delta up">↑ 8% 较昨日</div></div>
+          <div class="stat-card"><div class="lbl">今日发奖次数 <span>🎁</span></div><div class="val">318</div><div class="delta up">↑ 6% 较昨日</div></div>
+          <div class="stat-card"><div class="lbl">今日发放积分 <span>💰</span></div><div class="val">36,400</div><div class="delta up">预算已消耗 12.1%</div></div>
+          <div class="stat-card"><div class="lbl">派发失败 <span>⚠️</span></div><div class="val" style="color:var(--danger);">3</div><div class="delta down">前往「奖励派发记录」处理</div></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">近7日 完成 / 发奖 趋势</div>
+            <canvas id="taskTrendChart" height="180"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">各任务完成占比</div>
+            <canvas id="taskPieChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">分任务转化明细</div>
+          <table>
+            <thead><tr><th>任务</th><th>类型</th><th>接取数</th><th>完成数</th><th>完成率</th><th>发奖数</th><th>发放积分</th></tr></thead>
+            <tbody id="taskStatTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- VIEW 2.6: 奖励派发记录 -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-dispatch-log">
+        <div class="page-header">
+          <h2 class="page-title">奖励派发记录</h2>
+          <p class="page-desc">对应表：t_prize_log。任务/抽奖达标后统一走<b>公共派发链路</b>：达标事件 → 生成派发单 → 风控校验 → 资产入账（ledger）。本页用于排查发奖问题与人工干预（重试/审批）。</p>
+        </div>
+
+        <div class="card">
+          <div class="tabs" id="dispatchTabs">
+            <div class="tab-item active" data-status="all">全部 <span class="count">(5)</span></div>
+            <div class="tab-item" data-status="SUCCESS">成功</div>
+            <div class="tab-item" data-status="RETRYING">重试中</div>
+            <div class="tab-item" data-status="FAILED">失败</div>
+            <div class="tab-item" data-status="AUDIT">待审核</div>
+          </div>
+          <table>
+            <thead><tr><th>trace_id</th><th>会员</th><th>来源</th><th>奖励内容</th><th>prize_mode</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody id="dispatchTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- ============================================================ -->
+      <!-- VIEW 3: 奖池转盘配置器 -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-wheel">
+        <div class="page-header">
+          <h2 class="page-title">奖池转盘可视化配置器</h2>
+          <p class="page-desc">对应表：t_prize_pool_config / t_prize_pool_item / t_pool_prize_mapping。原型把「奖池奖项映射」从裸表格升级成转盘可视化编辑，实时校验概率总和，并提供模拟抽奖验证工具。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span class="num">1</span>奖池基础配置</div>
+          <div class="row">
+            <div class="col field"><label class="f-label req">奖池名称 pool_name</label><input type="text" value="七夕大转盘" /></div>
+            <div class="col field"><label class="f-label req">奖池编码 pool_code</label><input type="text" value="QIXI_POOL_2026" /></div>
+          </div>
+          <div class="row">
+            <div class="col field">
+              <label class="f-label">消耗资产类型 cost_asset_type</label>
+              <select id="f-costAssetType" onchange="onDrawModeChange()">
+                <option value="CREDIT">CREDIT（积分）</option>
+                <option value="TICKET">TICKET（抽奖券）</option>
+                <option value="NONE">NONE（无消耗）</option>
+              </select>
+            </div>
+            <div class="col field"><label class="f-label">消耗数值 cost_value（单价）</label><input type="number" value="10" /></div>
+            <div class="col field">
+              <label class="f-label">重置周期 reset_period</label>
+              <select><option>DAY 每日</option><option>WEEK 每周</option><option>ACTIVITY 活动期间</option></select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="f-label">抽奖算法 draw_mode</label>
+            <div class="chip-group">
+              <div class="chip selected" id="mode-prob" onclick="setDrawMode('prob',this)">按概率 probability</div>
+              <div class="chip" id="mode-stock" onclick="setDrawMode('stock',this)">按库存比例 stock_ratio</div>
+            </div>
+            <div class="hint" id="drawModeHint">按概率模式：每个奖项概率可手动设置，需保证总和 = 100%。</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><span class="num">2</span>转盘 · 概率总览</div>
+            <div class="wheel-wrap">
+              <div class="wheel" id="wheelViz">
+                <div class="wheel-center">
+                  <div class="pct" id="wheelPct">100%</div>
+                  <div class="lbl">已分配概率</div>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div id="wheelAlert"></div>
+                <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                  <button class="btn btn-sm" onclick="averageRemaining()">一键平均分配剩余概率</button>
+                  <button class="btn btn-sm" onclick="addPrizeRow()">+ 从奖项库添加</button>
+                  <label class="switch" style="margin-left:auto;"><input type="checkbox" id="f-guarantee"/><span class="track"></span></label>
+                </div>
+                <div class="hint">↑ 保底奖项（必中）开关：为该奖池指定一个 white_list 兜底奖项</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><span class="num">3</span>🎲 模拟抽奖测试</div>
+            <p class="hint">按当前概率配置跑一次蒙特卡洛模拟，验证实际中出分布是否符合预期，避免上线后才发现概率配置错误。</p>
+            <div class="row">
+              <div class="col field" style="max-width:160px;"><label class="f-label">模拟次数</label><input type="number" id="simCount" value="1000" /></div>
+              <div class="col" style="display:flex; align-items:flex-end; padding-bottom:14px;">
+                <button class="btn btn-primary" onclick="runSimulation()">▶ 开始模拟</button>
+              </div>
+            </div>
+            <div id="simResult"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span class="num">4</span>奖池奖项映射明细（t_pool_prize_mapping）</div>
+          <div class="prize-row head">
+            <div></div><div>奖项</div><div>概率 probability</div><div>库存 stock</div><div>单人限领</div><div></div>
+          </div>
+          <div id="prizeRows"></div>
+        </div>
+      </div>
+
+
+      <!-- ============================================================ -->
+      <!-- VIEW 4: 抽奖数据看板 -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-draw-dashboard">
+        <div class="page-header">
+          <h2 class="page-title">抽奖数据看板</h2>
+          <p class="page-desc">对应表：t_draw_prize_log。用于运营实时观察中奖率、库存消耗和异常记录，而不是只能翻分页表格。</p>
+        </div>
+
+        <div class="row" style="margin-bottom:16px;">
+          <div class="col field" style="max-width:220px;"><label class="f-label">活动</label><select><option>七夕大转盘 QIXI_POOL_2026</option></select></div>
+          <div class="col field" style="max-width:220px;"><label class="f-label">日期范围</label><select><option>近7天</option><option>近30天</option></select></div>
+        </div>
+
+        <div class="grid-4" style="margin-bottom:16px;">
+          <div class="stat-card"><div class="lbl">总抽奖次数</div><div class="val">28,410</div><div class="delta up">↑ 15.2%</div></div>
+          <div class="stat-card"><div class="lbl">中奖人数</div><div class="val">6,932</div><div class="delta up">↑ 9.4%</div></div>
+          <div class="stat-card"><div class="lbl">中奖率</div><div class="val">24.4%</div><div class="delta down">↓ 1.1%</div></div>
+          <div class="stat-card"><div class="lbl">库存预警奖项</div><div class="val" style="color:var(--danger);">2</div><div class="delta down">需及时补货/下线</div></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">近7日抽奖趋势</div>
+            <canvas id="trendChart" height="180"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">奖项中出分布</div>
+            <canvas id="pieChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">异常 / 待处理记录</div>
+          <table>
+            <thead><tr><th>trace_id</th><th>会员</th><th>奖项</th><th>状态</th><th>备注</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody id="anomalyTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- VIEW 5: 说明 -->
+      <!-- ============================================================ -->
+      <div class="view" id="v-readme">
+        <div class="page-header">
+          <h2 class="page-title">这份原型解决了什么问题</h2>
+        </div>
+        <div class="card" style="max-width:820px;">
+          <div class="kv-list">
+            <div class="kv-row"><div class="k" style="width:170px;">现状</div><div class="v">管理后台代码生成器已跑出 draw/lottery/task 全部表的裸 CRUD 页面（一个字段一个 input），能用但不体现业务逻辑，运营用起来容易配错（如概率总和不校验、JSON规则手填、阶梯奖励无结构）。</div></div>
+            <div class="kv-row"><div class="k" style="width:170px;">本次范围</div><div class="v">按你的选择，本次只做「奖池转盘抽奖」+「任务」两个模块的<b>后台管理交互</b>设计，暂不涉及 C端 用户页面，也不含「彩票期号」抽奖玩法。</div></div>
+            <div class="kv-row"><div class="k" style="width:170px;">四个核心交互点</div><div class="v">① 任务配置从裸表单→向导式，按 task_type 动态切换规则控件；② 阶梯奖励从 JSON 输入→可视化搭建器，支持 FIXED/RATIO/FORMULA 三种模式；③ 奖池概率从裸数字输入→转盘可视化+实时求和校验+模拟抽奖验证；④ 记录类表格（任务记录/抽奖流水）从纯分页表→状态看板+快照审计+异常处理。</div></div>
+            <div class="kv-row"><div class="k" style="width:170px;">任务模块本期补全</div><div class="v">① 向导第2步达标规则表单<b>不再写死</b>，与模板设计器共用同一 ui_schema 渲染引擎（现场可演示：设计器里加/改模板 → 向导交互自动就绪）；② 新增「任务数据看板」：完成/发奖趋势、各任务占比、分任务转化明细；③ 新增「奖励派发记录」：公共派发链路可视化（达标 → 派发单 → 风控 → 资产入账），支持失败重试、风控拦截转提案提示。</div></div>
+            <div class="kv-row"><div class="k" style="width:170px;">尚未覆盖，值得后续再设计</div><div class="v">t_proposal_record 的一审/二审审批工作台（风控拦截、批量审批）；彩票期号玩法（t_lottery_*）单独一套开奖交互；C端用户页面本身。</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="mask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head"><h3 id="drawerTitle">任务记录快照</h3><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   通用工具
+   ============================================================ */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ============================================================
+   导航切换
+   ============================================================ */
+const navTitles = {
+  'v-task-wizard': '任务模块 / 任务配置向导',
+  'v-tpl-designer': '任务模块 / 任务模板设计器(ui_schema)',
+  'v-task-monitor': '任务模块 / 任务记录监控台',
+  'v-task-dashboard': '任务模块 / 任务数据看板',
+  'v-dispatch-log': '任务模块 / 奖励派发记录',
+  'v-wheel': '抽奖模块 / 奖池转盘配置器',
+  'v-draw-dashboard': '抽奖模块 / 抽奖数据看板',
+  'v-readme': '设计说明 / 待办',
+};
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+    item.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById(item.dataset.view).classList.add('active');
+    const parts = navTitles[item.dataset.view].split(' / ');
+    document.getElementById('breadcrumb').innerHTML = parts[0] + ' <span style="margin:0 6px;">/</span> <b>'+parts[1]+'</b>';
+    if(item.dataset.view === 'v-draw-dashboard') setTimeout(initCharts, 50);
+    if(item.dataset.view === 'v-task-dashboard') setTimeout(initTaskCharts, 50);
+  });
+});
+
+/* ============================================================
+   VIEW1: 任务配置向导
+   ============================================================ */
+/* ---------- ui_schema 预置模板：向导与模板设计器共用同一份数据源(即 t_task_template 表数据) ---------- */
+const tplPresets = {
+  '每日签到 (checkin-grid)': {
+    version: 1,
+    taskType: 'COUNT',
+    desc: '连续/累计签到达标，支持补签联动配置',
+    params: [
+      { key:'targetDays', label:'连续签到目标', widget:'number', unit:'天', default:7, min:1, required:true },
+      { key:'allowRepair', label:'允许补签', widget:'switch', default:true },
+      { key:'repairCost', label:'补签消耗积分', widget:'number', unit:'积分', default:20, min:0,
+        visibleWhen:{ field:'allowRepair', eq:true }, help:'关闭「允许补签」后此项自动隐藏（联动示例）' },
+      { key:'customImage', label:'自定义任务图片', widget:'switch', default:false,
+        help:'开启后才显示下方图片上传项：schema 用 visibleWhen 控制 image_upload 是否展示' },
+      { key:'icon_app', label:'App端任务图标 (120x120)', widget:'image_upload', required:false,
+        visibleWhen:{ field:'customImage', eq:true } },
+      { key:'banner_mp', label:'小程序横幅 Banner (750x300)', widget:'image_upload', required:true,
+        visibleWhen:{ field:'customImage', eq:true } }
+    ],
+    render: {
+      icon:'📅', cardType:'checkin-grid', targetField:'targetDays',
+      progressText:'已连续签到 {current}/{target} 天',
+      buttonText:{ '0':'今日签到', '1':'领取奖励', '2':'明日再来', '3':'已过期' }
+    }
+  },
+  '邀请好友 (progress)': {
+    version: 1,
+    taskType: 'COUNT',
+    desc: '累计邀请好友注册次数达标',
+    params: [
+      { key:'targetCount', label:'邀请人数目标', widget:'slider', min:1, max:20, default:3, unit:'人' },
+      { key:'validRule', label:'有效邀请判定', widget:'select', default:'REAL_NAME',
+        options:[ {value:'REGISTER',label:'注册即算'}, {value:'REAL_NAME',label:'注册且实名'}, {value:'FIRST_ORDER',label:'注册且完成首单'} ] },
+      { key:'icon_app', label:'App端任务图标 (120x120)', widget:'image_upload', required:false,
+        help:'多端异构图片由模板 schema 按 key 区分端与用途，C端各端各取所需' },
+      { key:'banner_mp', label:'小程序横幅 Banner (750x300)', widget:'image_upload', required:true }
+    ],
+    render: {
+      icon:'👥', cardType:'progress', targetField:'targetCount',
+      progressText:'已邀请 {current}/{target} 人',
+      buttonText:{ '0':'去邀请', '1':'领取奖励', '2':'已领取', '3':'已过期' }
+    }
+  },
+  '累计消费 (amount)': {
+    version: 1,
+    taskType: 'AMOUNT',
+    desc: '统计周期内订单实付金额累计达标',
+    params: [
+      { key:'targetAmount', label:'累计消费目标', widget:'number', unit:'元', default:199, min:1, required:true },
+      { key:'caliber', label:'统计口径', widget:'radio', default:'PAID',
+        options:[ {value:'PAID',label:'实付金额'}, {value:'ORIGIN',label:'原价金额'} ] },
+      { key:'excludeRefund', label:'剔除退款订单', widget:'switch', default:true }
+    ],
+    render: {
+      icon:'💰', cardType:'amount', targetField:'targetAmount',
+      progressText:'已消费 ¥{current} / ¥{target}',
+      buttonText:{ '0':'去逛逛', '1':'领取奖励', '2':'已领取', '3':'已过期' }
+    }
+  },
+  '浏览页面 (simple)': {
+    version: 1,
+    taskType: 'SIMPLE',
+    desc: '完成一次页面浏览并满足停留时长',
+    params: [
+      { key:'pageUrl', label:'目标页面路径', widget:'text', default:'/pages/activity/qixi', required:true },
+      { key:'staySeconds', label:'停留时长要求', widget:'slider', min:0, max:60, default:10, unit:'秒' }
+    ],
+    render: {
+      icon:'👁️', cardType:'simple',
+      progressText:'浏览活动页并停留 {staySeconds} 秒',
+      buttonText:{ '0':'去浏览', '1':'领取奖励', '2':'已领取', '3':'已过期' }
+    }
+  }
+};
+
+/* rule_script 与 ui_schema 分离存储：同属一个模板，但前者仅技术可见 */
+const tplRuleScripts = {
+  '每日签到 (checkin-grid)': `// 事件: DAILY_SIGN\nif (event.type != 'DAILY_SIGN') return false;\n// 连续性判定: 昨日未签且未补签则重置进度\nif (!ctx.signedYesterday && !ctx.repaired) { record.currentMetric = 0; }\nrecord.currentMetric = record.currentMetric + 1;\nreturn record.currentMetric >= targetDays;`,
+  '邀请好友 (progress)': `// 事件: MEMBER_REGISTER (被邀请人触发)\nif (event.type != 'MEMBER_REGISTER') return false;\n// 有效性判定由 validRule 参数驱动\nif (validRule == 'REAL_NAME' && !event.member.realNameVerified) return false;\nif (validRule == 'FIRST_ORDER' && !event.member.hasFirstOrder) return false;\nrecord.currentMetric = record.currentMetric + 1;\nreturn record.currentMetric >= targetCount;`,
+  '累计消费 (amount)': `// 事件: ORDER_PAID\nif (event.type != 'ORDER_PAID') return false;\nif (excludeRefund && event.order.refunded) return false;\namount = caliber == 'PAID' ? event.order.paidAmount : event.order.originAmount;\nrecord.currentMetric = record.currentMetric + amount;\nreturn record.currentMetric >= targetAmount;`,
+  '浏览页面 (simple)': `// 事件: PAGE_VIEW\nif (event.type != 'PAGE_VIEW') return false;\nif (event.page.url != pageUrl) return false;\nreturn event.page.staySeconds >= staySeconds;`
+};
+
+/* ---------- 通用 ui_schema 表单渲染引擎（管理端）：向导第2步与设计器渲染器①共用 ---------- */
+const schemaForms = {};
+function initSchemaForm(ns, schema, wrapId, onChange){
+  const values = {};
+  (schema.params||[]).forEach(p=>{ values[p.key] = p.default; });
+  schemaForms[ns] = { schema, values, wrapId, onChange };
+  renderSchemaForm(ns);
+  if(onChange) onChange();
+}
+function optionList(p){
+  return (p.options||[]).map(o=> typeof o==='string' ? {value:o,label:o} : o);
+}
+function schemaParamVisible(p, values){
+  if(!p.visibleWhen) return true;
+  return values[p.visibleWhen.field] === p.visibleWhen.eq;
+}
+function updateSchemaValue(ns, key, val, type){
+  const f = schemaForms[ns];
+  if(type==='number') val = parseFloat(val)||0;
+  if(type==='bool') val = !!val;
+  f.values[key] = val;
+  renderSchemaForm(ns);
+  if(f.onChange) f.onChange();
+}
+function renderSchemaForm(ns){
+  const f = schemaForms[ns];
+  const wrap = document.getElementById(f.wrapId);
+  const params = f.schema.params||[];
+  if(!params.length){
+    wrap.innerHTML = '<div class="empty-note">该模板无需配置参数（完成即达标），判定逻辑由模板内置 rule_script 决定，运营不可见。</div>';
+    return;
+  }
+  let html = '';
+  params.forEach(p=>{
+    if(!schemaParamVisible(p, f.values)) return;
+    const req = p.required ? ' req' : '';
+    const v = f.values[p.key];
+    let control = '';
+    switch(p.widget){
+      case 'number':
+        control = `<div class="inline-unit"><input type="number" value="${v}" ${p.min!=null?`min="${p.min}"`:''} ${p.max!=null?`max="${p.max}"`:''} onchange="updateSchemaValue('${ns}','${p.key}', this.value, 'number')"/>${p.unit?`<span class="unit">${p.unit}</span>`:''}</div>`;
+        break;
+      case 'text':
+        control = `<input type="text" value="${v??''}" onchange="updateSchemaValue('${ns}','${p.key}', this.value)"/>`;
+        break;
+      case 'select':
+        control = `<select onchange="updateSchemaValue('${ns}','${p.key}', this.value)">` +
+          optionList(p).map(o=>`<option value="${o.value}" ${o.value===v?'selected':''}>${o.label}</option>`).join('') + `</select>`;
+        break;
+      case 'radio':
+        control = `<div class="chip-group">` + optionList(p).map(o=>
+          `<div class="chip ${o.value===v?'selected':''}" onclick="updateSchemaValue('${ns}','${p.key}', '${o.value}')">${o.label}</div>`).join('') + `</div>`;
+        break;
+      case 'switch':
+        control = `<label class="switch"><input type="checkbox" ${v?'checked':''} onchange="updateSchemaValue('${ns}','${p.key}', this.checked, 'bool')"/><span class="track"></span></label>`;
+        break;
+      case 'slider':
+        control = `<div class="inline-unit"><input type="range" min="${p.min??0}" max="${p.max??100}" value="${v}" style="accent-color:var(--primary);" oninput="updateSchemaValue('${ns}','${p.key}', this.value, 'number')"/><span class="unit">${v} ${p.unit||''}</span></div>`;
+        break;
+      case 'image_upload':
+        control = v
+          ? `<div class="upload-done"><div class="thumb">🖼️</div><div class="fname">${v}</div><button class="btn-link" style="flex-shrink:0;" onclick="mockUploadImage('${ns}','${p.key}')">替换</button><button class="btn-danger-text" style="flex-shrink:0;" onclick="updateSchemaValue('${ns}','${p.key}', '')">删除</button></div>`
+          : `<div class="upload-box" onclick="mockUploadImage('${ns}','${p.key}')"><span class="up-ico">🖼️</span><span class="up-txt">点击上传（原型模拟，不发起真实请求）</span></div>`;
+        break;
+      default:
+        control = `<div class="empty-note">未知控件类型 widget: ${p.widget}（降级提示，不阻塞其他字段）</div>`;
+    }
+    html += `<div class="field"><label class="f-label${req}">${p.label} <span class="mono" style="font-size:10px;">${p.key}</span></label>${control}${p.help?`<div class="hint">${p.help}</div>`:''}</div>`;
+  });
+  wrap.innerHTML = html;
+}
+/* image_upload 模拟上传：仅生成 mock URL 写入表单值，走与其他控件相同的数据流 */
+function mockUploadImage(ns, key){
+  updateSchemaValue(ns, key, 'https://cdn.example.com/task/' + key + '_' + Date.now().toString(36) + '.png');
+  toast('✅ 已上传（模拟），URL 已写入 ' + key);
+}
+
+/* 向导第1步的模板卡片直接由 tplPresets 派生：新增模板 = 加一条数据，交互自动就绪 */
+const templates = Object.keys(tplPresets).map(name=>({
+  presetName: name,
+  name: name.split(' (')[0],
+  type: tplPresets[name].taskType,
+  desc: tplPresets[name].desc || '',
+  icon: (tplPresets[name].render && tplPresets[name].render.icon) || '🎯',
+}));
+let selectedTemplateIdx = 0;
+const templateGrid = document.getElementById('templateGrid');
+templates.forEach((t,idx)=>{
+  const el = document.createElement('div');
+  el.className = 'chip'+(idx===0?' selected':'');
+  el.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;text-align:left;';
+  el.innerHTML = `<span style="font-size:22px;">${t.icon}</span><div><div style="font-weight:600;font-size:13px;">${t.name}</div><div style="font-size:11px;color:var(--text-tertiary);">${t.desc}</div></div>`;
+  el.onclick = ()=>{
+    document.querySelectorAll('#templateGrid .chip').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedTemplateIdx = idx;
+    applyTemplateType();
+  };
+  templateGrid.appendChild(el);
+});
+
+const taskTypeNotes = {
+  SIMPLE:'SIMPLE 单次节点型：完成一次指定动作即达标，无需数值累计。',
+  COUNT:'COUNT 计次型：统计周期内累计次数达到目标即达标。',
+  AMOUNT:'AMOUNT 计额型：统计周期内累计金额达到阈值即达标。',
+};
+function applyTemplateType(){
+  const t = templates[selectedTemplateIdx];
+  document.getElementById('typeBadge').innerText = t.type;
+  document.getElementById('wizardRuleNote').innerHTML =
+    (taskTypeNotes[t.type]||'') + ' 以下参数表单由该模板的 <b>ui_schema</b> 动态生成，新增模板无需改前端代码。';
+  initSchemaForm('wizard', tplPresets[t.presetName], 'wizardRuleForm', null);
+}
+applyTemplateType();
+
+// chip 单选组
+function bindChipGroup(id){
+  document.querySelectorAll('#'+id+' .chip').forEach(c=>{
+    c.onclick = ()=>{
+      document.querySelectorAll('#'+id+' .chip').forEach(x=>x.classList.remove('selected'));
+      c.classList.add('selected');
+      if(id==='chip-limitType') onLimitTypeChange();
+    };
+  });
+}
+bindChipGroup('chip-taskGroup');
+bindChipGroup('chip-limitType');
+function onLimitTypeChange(){
+  const v = document.querySelector('#chip-limitType .chip.selected').dataset.v;
+  document.getElementById('limitCountWrap').style.display = (v==='ONCE')?'none':'block';
+}
+
+// STEP 3 阶梯
+let ladders = [{level:1, prizeMode:'FIXED'}];
+function renderLadders(){
+  const list = document.getElementById('ladderList');
+  list.innerHTML = '';
+  const type = templates[selectedTemplateIdx].type;
+  ladders.forEach((l, idx)=>{
+    const condLabel = type==='COUNT' ? `完成 <input type="number" value="${(idx+1)*3}" style="width:70px;display:inline-block;" /> 次`
+                     : type==='AMOUNT' ? `累计满 <input type="number" value="${(idx+1)*100}" style="width:80px;display:inline-block;" /> 元`
+                     : `完成即达标（无需数值）`;
+    const div = document.createElement('div');
+    div.className = 'ladder-item';
+    div.innerHTML = `
+      <div class="stage-badge">阶段 ${l.level}</div>
+      <div class="ladder-head">
+        <div class="field" style="margin:0;flex:1;"><label class="f-label" style="margin-bottom:4px;">达标条件 stage_condition</label>${condLabel}</div>
+        <div class="ladder-actions">
+          <button class="btn-link" onclick="dupLadder(${idx})">复制</button>
+          <button class="btn-danger-text" onclick="delLadder(${idx})" ${ladders.length<=1?'disabled':''}>删除</button>
+        </div>
+      </div>
+      <div style="padding-left:56px;">
+        <div class="row">
+          <div class="col field" style="max-width:260px;">
+            <label class="f-label">奖励 prize_code</label>
+            <select><option>积分 · 100分</option><option>优惠券 · 满100减20</option><option>现金红包 · 随机</option><option>实物 · 限量周边</option></select>
+          </div>
+        </div>
+        <label class="f-label">计算模式 prize_mode</label>
+        <div class="mode-radio">
+          <label><input type="radio" name="mode-${idx}" ${l.prizeMode==='FIXED'?'checked':''} onchange="setLadderMode(${idx},'FIXED')"><span>固定 FIXED</span></label>
+          <label><input type="radio" name="mode-${idx}" ${l.prizeMode==='RATIO'?'checked':''} onchange="setLadderMode(${idx},'RATIO')"><span>比例 RATIO</span></label>
+          <label><input type="radio" name="mode-${idx}" ${l.prizeMode==='FORMULA'?'checked':''} onchange="setLadderMode(${idx},'FORMULA')"><span>公式 FORMULA</span></label>
+        </div>
+        <div id="modeField-${idx}"></div>
+      </div>
+    `;
+    list.appendChild(div);
+    renderLadderModeField(idx);
+  });
+  document.getElementById('sumStageCount').innerText = ladders.length + ' 级';
+}
+function renderLadderModeField(idx){
+  const wrap = document.getElementById('modeField-'+idx);
+  const mode = ladders[idx].prizeMode;
+  if(mode==='FIXED'){
+    wrap.innerHTML = `<div class="inline-unit" style="max-width:220px;"><input type="number" value="100" /><span class="unit">积分（固定发放）</span></div>`;
+  } else if(mode==='RATIO'){
+    wrap.innerHTML = `<div class="inline-unit" style="max-width:220px;"><input type="number" value="5" /><span class="unit">%</span></div><div class="hint">预计发放 = 订单金额 × 比例，例如订单 100 元 → 发放 5 积分</div>`;
+  } else {
+    wrap.innerHTML = `<div class="formula-box" contenteditable="true">amount * 0.05 &gt; 100 ? 100 : amount * 0.05</div><div class="hint">支持变量：amount（金额）、count（次数）、memberLevel（会员等级）</div>`;
+  }
+}
+function setLadderMode(idx, mode){ ladders[idx].prizeMode = mode; renderLadderModeField(idx); }
+function addLadder(){ ladders.push({level:ladders.length+1, prizeMode:'FIXED'}); renderLadders(); }
+function dupLadder(idx){ const c = {...ladders[idx], level:ladders.length+1}; ladders.push(c); renderLadders(); }
+function delLadder(idx){ if(ladders.length<=1) return; ladders.splice(idx,1); ladders.forEach((l,i)=>l.level=i+1); renderLadders(); }
+renderLadders();
+
+// STEP 4 audience
+const audiences = [
+  {v:'ALL', label:'全部会员', desc:'不限身份，所有登录用户可见', cov:'12,345'},
+  {v:'NEW_MEMBER', label:'新会员', desc:'注册未满30天', cov:'3,201'},
+  {v:'OLD_MEMBER', label:'老会员', desc:'注册超过30天', cov:'9,144'},
+];
+const audienceCards = document.getElementById('audienceCards');
+audiences.forEach((a,idx)=>{
+  const el = document.createElement('div');
+  el.className = 'chip'+(idx===0?' selected':'');
+  el.style.cssText='padding:14px;border-radius:8px;text-align:left;';
+  el.innerHTML = `<div style="font-weight:600;font-size:13px;">${a.label}</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">${a.desc}</div>`;
+  el.onclick = ()=>{
+    document.querySelectorAll('#audienceCards .chip').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('audienceCoverage').innerHTML = a.cov + ' <span style="font-size:12px;font-weight:400;color:var(--text-tertiary);">人</span>';
+  };
+  audienceCards.appendChild(el);
+});
+function checkUrl(btn){ btn.innerText='✓ 有效'; btn.style.color='var(--success)'; btn.style.borderColor='var(--success)'; setTimeout(()=>{btn.innerText='校验';btn.style.color='';btn.style.borderColor='';},1500); }
+
+// STEP 5 preview state
+const previewStates = {
+  '待领取': {btn:'去完成', color:'var(--primary)', progress:'0%', desc:'完成签到即可获得奖励'},
+  '进行中': {btn:'进行中', color:'var(--text-tertiary)', progress:'40%', desc:'已完成 2/5 次'},
+  '待发奖': {btn:'领取奖励', color:'var(--success)', progress:'100%', desc:'已达标，点击领取奖励'},
+  '已过期': {btn:'已过期', color:'#ccc', progress:'60%', desc:'活动已结束，未完成'},
+};
+function setPreviewState(el){
+  document.querySelectorAll('.state-toggle .chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  const s = previewStates[el.dataset.state];
+  const btn = document.getElementById('prevBtn');
+  btn.innerText = s.btn; btn.style.background = s.color;
+  document.getElementById('prevProgressBar').style.width = s.progress;
+  // 待领取态副标题使用第4步配置的 task_desc，进行中等状态展示进度文案
+  const taskDesc = document.getElementById('f-taskDesc').value;
+  document.getElementById('prevDesc').innerText = (el.dataset.state==='待领取' && taskDesc) ? taskDesc : s.desc;
+}
+
+/* C端点击 ℹ️ 查看规则：弹出第4步配置的 rule_desc（复用右侧抽屉模拟 C端弹层） */
+function showRuleDesc(){
+  const txt = document.getElementById('f-ruleDesc').value;
+  document.getElementById('drawerTitle').innerText = '活动规则（C端弹层模拟）';
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="f-label" style="margin-bottom:6px;">rule_desc（第4步「C端展示与规则说明」中配置，C端点击 ℹ️ 弹出）</div>
+    <div style="font-size:12.5px; line-height:1.9; white-space:pre-wrap; background:#fafbfc; border:1px solid var(--border); border-radius:8px; padding:14px;">${txt}</div>`;
+  document.getElementById('mask').classList.add('show');
+  document.getElementById('drawer').classList.add('show');
+}
+
+/* 活动大类（activity_code）元数据：对应 t_task_config.activity_code 关联的活动配置，grad/shadow 驱动预览面板皮肤 */
+const activityMeta = {
+  NEWBIE_CAMP:      {icon:'🌱', name:'新人成长营',   sub:'完成任务赢豪礼',       grad:'linear-gradient(135deg,#34d399,#059669)', shadow:'0 3px 10px rgba(5,150,105,.25)'},
+  NATIONAL_DAY_2026:{icon:'🎁', name:'国庆狂欢挑战', sub:'狂欢7天 · 天天有奖',   grad:'linear-gradient(135deg,#ff9a3d,#ff5e62)', shadow:'0 3px 10px rgba(255,94,98,.25)'},
+  D11_MAIN_2026:    {icon:'🛒', name:'双十一主会场', sub:'边逛边赚 · 上不封顶', grad:'linear-gradient(135deg,#f472b6,#9333ea)', shadow:'0 3px 10px rgba(147,51,234,.25)'},
+};
+function onActivityChange(){
+  const a = activityMeta[document.getElementById('f-activityCode').value];
+  document.getElementById('prevActivityIcon').innerText = a.icon;
+  document.getElementById('prevActivityName').innerText = a.name;
+  document.getElementById('prevActivitySub').innerText = a.sub;
+  // 活动大类联动面板皮肤：不同活动不同渐变主题
+  const panel = document.getElementById('prevActivityPanel');
+  panel.style.background = a.grad;
+  panel.style.boxShadow = a.shadow;
+}
+function renderSummary(){
+  const t = templates[selectedTemplateIdx];
+  const activityCode = document.getElementById('f-activityCode').value;
+  const a = activityMeta[activityCode];
+  const group = document.querySelector('#chip-taskGroup .chip.selected').innerText;
+  const audienceEl = document.querySelector('#audienceCards .chip.selected');
+  const audience = audienceEl ? audienceEl.querySelector('div').innerText : '全部会员';
+  document.getElementById('summaryList').innerHTML = `
+    <div class="kv-row"><div class="k">所属活动大类</div><div class="v">${a.icon} ${a.name} <span class="mono">${activityCode}</span></div></div>
+    <div class="kv-row"><div class="k">任务名称</div><div class="v">${document.getElementById('f-taskName').value}</div></div>
+    <div class="kv-row"><div class="k">任务副标题</div><div class="v">${document.getElementById('f-taskDesc').value || '<span class="tag tag-gray">未填写</span>'}</div></div>
+    <div class="kv-row"><div class="k">模板/类型</div><div class="v">${t.name} · ${t.type}</div></div>
+    <div class="kv-row"><div class="k">触发事件</div><div class="v">${document.getElementById('f-triggerEvent').value}</div></div>
+    <div class="kv-row"><div class="k">任务分组</div><div class="v">${group}</div></div>
+    <div class="kv-row"><div class="k">阶梯数</div><div class="v">${ladders.length} 级</div></div>
+    <div class="kv-row"><div class="k">目标人群</div><div class="v">${audience}</div></div>
+    <div class="kv-row"><div class="k">状态</div><div class="v"><span class="tag tag-orange">待生效（提交后）</span></div></div>
+  `;
+  document.getElementById('prevName').innerText = document.getElementById('f-taskName').value;
+  // 图标同步：第2步 ui_schema 表单里若已上传 icon 类 image_upload（如 icon_app），预览替换默认 emoji；无值降级 emoji
+  const wizardForm = schemaForms['wizard'];
+  const iconParam = ((wizardForm && wizardForm.schema.params) || []).find(p => p.widget === 'image_upload' && p.key.startsWith('icon') && schemaParamVisible(p, wizardForm.values));
+  const iconUrl = iconParam ? wizardForm.values[iconParam.key] : null;
+  const prevIconEl = document.getElementById('prevIcon');
+  if (iconUrl) {
+    prevIconEl.innerHTML = `<div class="icon-img" title="${iconUrl}">🖼️</div>`;
+  } else {
+    prevIconEl.innerText = t.icon;
+  }
+  document.getElementById('prevGroupTag').innerText = group.split(' ')[0];
+  // 副标题联动第4步 task_desc（当前预览态为「待领取」时直接展示）
+  const taskDesc = document.getElementById('f-taskDesc').value;
+  if(taskDesc && document.querySelector('.state-toggle .chip.selected')?.dataset.state === '待领取'){
+    document.getElementById('prevDesc').innerText = taskDesc;
+  }
+  onActivityChange(); // 同步C端预览的活动大类包裹面板
+}
+
+// stepper
+const stepLabels = ['模板与基础信息','达标规则','奖励阶梯','受众与时间','预览发布'];
+let currentStep = 1;
+function renderStepper(){
+  const wrap = document.getElementById('stepper');
+  wrap.innerHTML = '';
+  stepLabels.forEach((label, i)=>{
+    const n = i+1;
+    const cls = n<currentStep?'done':(n===currentStep?'active':'');
+    const circle = n<currentStep ? '✓' : n;
+    wrap.innerHTML += `<div class="step ${cls}"><div class="circle">${circle}</div><div class="label">${label}</div></div>` + (n<stepLabels.length?'<div class="step-line"></div>':'');
+  });
+}
+function stepGo(dir){
+  const next = currentStep + dir;
+  if(next<1 || next>stepLabels.length) return;
+  document.querySelector('.step-panel[data-step="'+currentStep+'"]').classList.remove('active');
+  currentStep = next;
+  document.querySelector('.step-panel[data-step="'+currentStep+'"]').classList.add('active');
+  renderStepper();
+  document.getElementById('prevBtnWizard').disabled = currentStep===1;
+  document.getElementById('nextBtnWizard').style.display = currentStep===stepLabels.length ? 'none' : 'inline-flex';
+  if(currentStep===5) renderSummary();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+renderStepper();
+
+/* ============================================================
+   VIEW2: 任务记录监控台
+   ============================================================ */
+const statusMeta = {
+  0:{label:'进行中', cls:'tag-blue'},
+  1:{label:'已完成', cls:'tag-orange'},
+  2:{label:'已发奖', cls:'tag-green'},
+  3:{label:'已过期', cls:'tag-red'},
+};
+const activityIcons = {'新人成长营':'🌱', '国庆狂欢挑战':'🎁', '双十一主会场':'🛒'};
+const records = [
+  {member:'user_8823', task:'新人首单签到礼', activity:'新人成长营', group:'新手', cur:2, target:5, status:0, time:'-'},
+  {member:'user_1092', task:'累计消费满199', activity:'双十一主会场', group:'大促', cur:199, target:199, status:1, time:'2026-07-17 20:11'},
+  {member:'user_5521', task:'邀请好友注册', activity:'国庆狂欢挑战', group:'日常', cur:3, target:3, status:2, time:'2026-07-16 09:02'},
+  {member:'user_3390', task:'每日签到', activity:'国庆狂欢挑战', group:'日常', cur:5, target:7, status:0, time:'-'},
+  {member:'user_7788', task:'新人首单签到礼', activity:'新人成长营', group:'新手', cur:1, target:5, status:3, time:'-'},
+  {member:'user_4410', task:'累计消费满199', activity:'双十一主会场', group:'大促', cur:199, target:199, status:1, time:'2026-07-17 18:40'},
+  {member:'user_6602', task:'邀请好友注册', activity:'国庆狂欢挑战', group:'日常', cur:3, target:3, status:2, time:'2026-07-15 14:20'},
+  {member:'user_2201', task:'每日签到', activity:'国庆狂欢挑战', group:'日常', cur:7, target:7, status:1, time:'2026-07-17 08:00'},
+];
+let recordStatusFilter = 'all';
+function renderRecords(filter){
+  if(filter !== undefined) recordStatusFilter = filter;
+  const activityFilter = document.getElementById('recordActivityFilter').value;
+  const tbody = document.getElementById('recordTbody');
+  tbody.innerHTML = '';
+  records.forEach((r,idx)=>{
+    if(recordStatusFilter!=='all' && String(r.status)!==recordStatusFilter) return;
+    if(activityFilter!=='all' && r.activity!==activityFilter) return;
+    const pct = Math.min(100, Math.round(r.cur/r.target*100));
+    const meta = statusMeta[r.status];
+    const canReissue = r.status===1;
+    const tr = document.createElement('tr');
+    tr.className = 'row-hover';
+    tr.innerHTML = `
+      <td>${r.member}</td>
+      <td class="task-activity-cell"><div class="t-name">${r.task}</div><div class="t-activity">${activityIcons[r.activity]||''} ${r.activity}</div></td>
+      <td><span class="tag tag-gray">${r.group}</span></td>
+      <td style="width:160px;"><div class="progress-bar"><span style="width:${pct}%"></span></div><div class="hint">${r.cur}/${r.target}</div></td>
+      <td><span class="tag ${meta.cls}">${meta.label}</span></td>
+      <td class="mono">${r.time}</td>
+      <td>
+        <button class="btn-link" onclick='openSnapshot(${idx})'>查看快照</button>
+        <button class="btn-link" ${canReissue?'':'disabled style="color:#ccc;"'} onclick="toast('已提交人工补发申请，等待审批（走 t_proposal_record 一审/二审）')">人工补发</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+document.querySelectorAll('#recordTabs .tab-item').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('#recordTabs .tab-item').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    renderRecords(tab.dataset.status);
+  };
+});
+renderRecords('all');
+
+function openSnapshot(idx){
+  const r = records[idx];
+  document.getElementById('drawerTitle').innerText = '任务记录快照';
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="kv-list" style="margin-bottom:16px;">
+      <div class="kv-row"><div class="k">会员</div><div class="v">${r.member}</div></div>
+      <div class="kv-row"><div class="k">任务</div><div class="v">${r.task}</div></div>
+      <div class="kv-row"><div class="k">状态</div><div class="v"><span class="tag ${statusMeta[r.status].cls}">${statusMeta[r.status].label}</span></div></div>
+    </div>
+    <div class="f-label" style="margin-bottom:6px;">rule_snapshot（接取任务时的规则快照，防止运营中途改配置影响已发放用户）</div>
+    <div class="json-block">{
+  <span class="k">"limit_type"</span>: <span class="s">"DAILY"</span>,
+  <span class="k">"target"</span>: <span class="n">${r.target}</span>,
+  <span class="k">"trigger_event"</span>: <span class="s">"DAILY_SIGN"</span>
+}</div>
+    <div class="f-label" style="margin:14px 0 6px;">prize_snapshot（接取任务时的奖励快照）</div>
+    <div class="json-block">{
+  <span class="k">"stage_level"</span>: <span class="n">1</span>,
+  <span class="k">"prize_mode"</span>: <span class="s">"FIXED"</span>,
+  <span class="k">"prize_code"</span>: <span class="s">"SCORE_100"</span>,
+  <span class="k">"prize_value"</span>: <span class="n">100</span>
+}</div>
+  `;
+  document.getElementById('mask').classList.add('show');
+  document.getElementById('drawer').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('mask').classList.remove('show');
+  document.getElementById('drawer').classList.remove('show');
+}
+
+/* ============================================================
+   VIEW3: 奖池转盘配置器
+   ============================================================ */
+const wheelColors = ['#1677ff','#00b96b','#faad14','#f5222d','#722ed1','#13c2c2','#eb2f96','#fa8c16'];
+let prizes = [
+  {name:'一等奖 · iPhone 16', prob:0.5, total:5, used:2, maxUser:1},
+  {name:'二等奖 · 200元现金红包', prob:4.5, total:200, used:88, maxUser:1},
+  {name:'三等奖 · 50积分', prob:25, total:-1, used:0, maxUser:-1},
+  {name:'谢谢参与', prob:70, total:-1, used:0, maxUser:-1},
+];
+let drawMode = 'prob';
+function setDrawMode(mode, el){
+  drawMode = mode;
+  document.getElementById('mode-prob').classList.toggle('selected', mode==='prob');
+  document.getElementById('mode-stock').classList.toggle('selected', mode==='stock');
+  document.getElementById('drawModeHint').innerText = mode==='prob'
+    ? '按概率模式：每个奖项概率可手动设置，需保证总和 = 100%。'
+    : '按库存比例模式：概率由「剩余库存 / 总剩余库存」自动换算，无需手动分配，下方概率列变为只读展示。';
+  renderPrizeRows();
+}
+function onDrawModeChange(){}
+
+function renderWheel(){
+  const total = prizes.reduce((s,p)=>s+Number(p.prob||0),0);
+  let acc = 0;
+  const stops = [];
+  prizes.forEach((p,i)=>{
+    const size = drawMode==='stock' ? (p.prob) : p.prob;
+    const start = total>0 ? acc/Math.max(total,100)*360 : 0;
+    acc += size;
+    const end = total>0 ? acc/Math.max(total,100)*360 : 0;
+    stops.push(`${wheelColors[i%wheelColors.length]} ${start}deg ${end}deg`);
+  });
+  if(total < 100){
+    const start = total/100*360;
+    stops.push(`#eceff1 ${start}deg 360deg`);
+  }
+  document.getElementById('wheelViz').style.background = `conic-gradient(${stops.join(',')})`;
+  const pctEl = document.getElementById('wheelPct');
+  pctEl.innerText = total.toFixed(2)+'%';
+  pctEl.className = 'pct ' + (total>100?'over':(Math.abs(total-100)<0.001?'ok':''));
+
+  const alertEl = document.getElementById('wheelAlert');
+  if(total>100){
+    alertEl.innerHTML = `<div class="alert alert-danger">⚠️ 概率总和 ${total.toFixed(2)}% 已超出 100%，请调整后才能保存</div>`;
+  } else if(total<100){
+    alertEl.innerHTML = `<div class="alert alert-warn">还有 ${(100-total).toFixed(2)}% 概率未分配（灰色区域），未分配部分默认判定为「不中奖」</div>`;
+  } else {
+    alertEl.innerHTML = `<div class="alert alert-ok">✅ 概率总和 = 100%，配置可保存</div>`;
+  }
+}
+
+function renderPrizeRows(){
+  const wrap = document.getElementById('prizeRows');
+  wrap.innerHTML = '';
+  prizes.forEach((p,idx)=>{
+    const stockPct = p.total>0 ? Math.round(p.used/p.total*100) : 0;
+    const row = document.createElement('div');
+    row.className = 'prize-row';
+    row.innerHTML = `
+      <div class="swatch" style="background:${wheelColors[idx%wheelColors.length]}"></div>
+      <div>${p.name}</div>
+      <div class="prob-input-wrap">
+        <input type="range" min="0" max="100" step="0.1" value="${p.prob}" ${drawMode==='stock'?'disabled':''} oninput="updateProb(${idx}, this.value)">
+        <input type="number" min="0" max="100" step="0.1" value="${p.prob}" ${drawMode==='stock'?'disabled':''} onchange="updateProb(${idx}, this.value)">
+      </div>
+      <div class="stock-mini">
+        ${p.total>0 ? `${p.used}/${p.total}<div class="bar"><span style="width:${stockPct}%"></span></div>` : '不限库存'}
+      </div>
+      <div>${p.maxUser>0 ? p.maxUser+' 次' : '不限'}</div>
+      <div><button class="btn-danger-text" onclick="delPrize(${idx})">✕</button></div>
+    `;
+    wrap.appendChild(row);
+  });
+  renderWheel();
+}
+function updateProb(idx, v){ prizes[idx].prob = parseFloat(v)||0; renderPrizeRows(); }
+function delPrize(idx){ prizes.splice(idx,1); renderPrizeRows(); }
+function addPrizeRow(){
+  prizes.push({name:'新奖项 · 10积分', prob:0, total:-1, used:0, maxUser:-1});
+  renderPrizeRows();
+  toast('已添加，请设置概率');
+}
+function averageRemaining(){
+  const total = prizes.reduce((s,p)=>s+Number(p.prob||0),0);
+  const remain = Math.max(0, 100-total);
+  const zeroItems = prizes.filter(p=>true);
+  const each = remain / prizes.length;
+  prizes.forEach(p=> p.prob = +(Number(p.prob) + each).toFixed(2));
+  renderPrizeRows();
+  toast('已将剩余概率平均分配到所有奖项');
+}
+renderPrizeRows();
+
+function runSimulation(){
+  const n = parseInt(document.getElementById('simCount').value)||1000;
+  const total = prizes.reduce((s,p)=>s+Number(p.prob||0),0) || 100;
+  const counts = prizes.map(()=>0);
+  let noWin = 0;
+  for(let i=0;i<n;i++){
+    const r = Math.random()*Math.max(total,100);
+    let acc = 0; let hit=-1;
+    for(let j=0;j<prizes.length;j++){ acc+=Number(prizes[j].prob); if(r<acc){hit=j;break;} }
+    if(hit>=0) counts[hit]++; else noWin++;
+  }
+  let rows = prizes.map((p,i)=>{
+    const actual = (counts[i]/n*100).toFixed(2);
+    return `<tr><td><span class="swatch" style="display:inline-block;background:${wheelColors[i%wheelColors.length]}"></span> ${p.name}</td><td>理论 ${p.prob.toFixed(2)}%</td><td>实际 ${actual}% (${counts[i]}次)</td></tr>`;
+  }).join('');
+  if(total<100){
+    rows += `<tr><td>未分配(不中奖)</td><td>理论 ${(100-total).toFixed(2)}%</td><td>实际 ${(noWin/n*100).toFixed(2)}% (${noWin}次)</td></tr>`;
+  }
+  document.getElementById('simResult').innerHTML = `
+    <table style="margin-top:10px;"><thead><tr><th>奖项</th><th>理论概率</th><th>模拟实际</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="hint" style="margin-top:8px;">模拟 ${n} 次抽奖，样本量越大实际值越接近理论概率。</div>
+  `;
+}
+
+/* ============================================================
+   VIEW4: 抽奖数据看板
+   ============================================================ */
+const anomalies = [
+  {trace:'TR20260717001', member:'user_9081', prize:'一等奖 · iPhone 16', status:'库存不足', color:'tag-red', remark:'并发抢奖导致超发拦截', time:'2026-07-17 21:03'},
+  {trace:'TR20260717002', member:'user_2231', prize:'二等奖 · 200元红包', status:'异常', color:'tag-orange', remark:'资产发放接口超时', time:'2026-07-17 19:22'},
+];
+function renderAnomalies(){
+  document.getElementById('anomalyTbody').innerHTML = anomalies.map(a=>`
+    <tr class="row-hover">
+      <td class="mono">${a.trace}</td><td>${a.member}</td><td>${a.prize}</td>
+      <td><span class="tag ${a.color}">${a.status}</span></td><td>${a.remark}</td><td class="mono">${a.time}</td>
+      <td><button class="btn-link" onclick="markHandled(this)">标记已处理</button></td>
+    </tr>
+  `).join('');
+}
+function markHandled(btn){
+  const tr = btn.closest('tr');
+  tr.style.opacity = .4;
+  btn.outerHTML = '<span class="tag tag-green">已处理</span>';
+}
+renderAnomalies();
+
+let chartsInited = false;
+function initCharts(){
+  if(chartsInited) return; chartsInited = true;
+  new Chart(document.getElementById('trendChart'), {
+    type:'line',
+    data:{ labels:['07-11','07-12','07-13','07-14','07-15','07-16','07-17'],
+      datasets:[
+        {label:'抽奖次数', data:[3200,3450,3100,4200,4600,4300,5560], borderColor:'#1677ff', backgroundColor:'rgba(22,119,255,.1)', tension:.35, fill:true},
+        {label:'中奖人数', data:[780,820,760,1010,1120,1050,1392], borderColor:'#00b96b', backgroundColor:'rgba(0,185,107,.08)', tension:.35, fill:true},
+      ]},
+    options:{plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}}, scales:{y:{beginAtZero:true}}}
+  });
+  new Chart(document.getElementById('pieChart'), {
+    type:'doughnut',
+    data:{ labels:prizes.map(p=>p.name),
+      datasets:[{data:prizes.map(p=>p.prob), backgroundColor:wheelColors}]},
+    options:{plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}}}
+  });
+}
+
+/* ============================================================
+   VIEW 2.5: 任务数据看板
+   ============================================================ */
+const taskStats = [
+  {name:'每日签到', type:'COUNT', taken:4120, done:3480, prized:3465, credits:173250},
+  {name:'邀请好友注册', type:'COUNT', taken:980, done:214, prized:210, credits:42000},
+  {name:'累计消费满199', type:'AMOUNT', taken:2210, done:890, prized:882, credits:88200},
+  {name:'浏览活动页', type:'SIMPLE', taken:5310, done:4890, prized:4890, credits:48900},
+];
+function renderTaskStats(){
+  document.getElementById('taskStatTbody').innerHTML = taskStats.map(t=>{
+    const rate = Math.round(t.done/t.taken*100);
+    return `<tr class="row-hover">
+      <td>${t.name}</td>
+      <td><span class="tag tag-blue">${t.type}</span></td>
+      <td>${t.taken.toLocaleString()}</td>
+      <td>${t.done.toLocaleString()}</td>
+      <td style="width:150px;"><div class="progress-bar"><span style="width:${rate}%"></span></div><div class="hint">${rate}%</div></td>
+      <td>${t.prized.toLocaleString()}</td>
+      <td class="mono">${t.credits.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+renderTaskStats();
+
+let taskChartsInited = false;
+function initTaskCharts(){
+  if(taskChartsInited) return; taskChartsInited = true;
+  new Chart(document.getElementById('taskTrendChart'), {
+    type:'line',
+    data:{ labels:['07-12','07-13','07-14','07-15','07-16','07-17','07-18'],
+      datasets:[
+        {label:'任务完成数', data:[286,301,278,320,365,330,342], borderColor:'#1677ff', backgroundColor:'rgba(22,119,255,.1)', tension:.35, fill:true},
+        {label:'发奖次数', data:[270,290,265,301,349,312,318], borderColor:'#00b96b', backgroundColor:'rgba(0,185,107,.08)', tension:.35, fill:true},
+      ]},
+    options:{plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}}, scales:{y:{beginAtZero:true}}}
+  });
+  new Chart(document.getElementById('taskPieChart'), {
+    type:'doughnut',
+    data:{ labels:taskStats.map(t=>t.name),
+      datasets:[{data:taskStats.map(t=>t.done), backgroundColor:['#1677ff','#00b96b','#faad14','#722ed1']}]},
+    options:{plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}}}
+  });
+}
+
+/* ============================================================
+   VIEW 2.6: 奖励派发记录（公共派发链路）
+   ============================================================ */
+const dispatchStatusMeta = {
+  SUCCESS:{label:'成功', cls:'tag-green'},
+  RETRYING:{label:'重试中', cls:'tag-orange'},
+  FAILED:{label:'失败', cls:'tag-red'},
+  AUDIT:{label:'待审核', cls:'tag-blue'},
+};
+const dispatchLogs = [
+  {trace:'PD20260718001', member:'user_2201', source:'任务 · 每日签到', prize:'积分 ×100', mode:'FIXED', status:'SUCCESS', time:'2026-07-18 08:00:12'},
+  {trace:'PD20260718002', member:'user_1092', source:'任务 · 累计消费满199', prize:'现金红包 ¥66', mode:'RATIO', status:'AUDIT', time:'2026-07-18 09:12:44', remark:'金额超阈值触发风控，转人工提案一审/二审'},
+  {trace:'PD20260718003', member:'user_5521', source:'任务 · 邀请好友注册', prize:'现金红包 ¥8.88', mode:'FIXED', status:'RETRYING', time:'2026-07-18 10:02:01', remark:'资产入账接口超时，第2次重试'},
+  {trace:'PD20260717045', member:'user_9081', source:'抽奖 · 七夕大转盘', prize:'iPhone 16', mode:'FIXED', status:'FAILED', time:'2026-07-17 21:03:40', remark:'并发抢奖库存不足拦截'},
+  {trace:'PD20260717032', member:'user_3390', source:'任务 · 每日签到', prize:'积分 ×100', mode:'FIXED', status:'SUCCESS', time:'2026-07-17 08:11:03'},
+];
+function renderDispatch(filter){
+  const tbody = document.getElementById('dispatchTbody');
+  tbody.innerHTML = '';
+  dispatchLogs.forEach((d, i)=>{
+    if(filter!=='all' && d.status!==filter) return;
+    const meta = dispatchStatusMeta[d.status];
+    const canRetry = d.status==='FAILED' || d.status==='RETRYING';
+    const tr = document.createElement('tr');
+    tr.className = 'row-hover';
+    tr.innerHTML = `
+      <td class="mono">${d.trace}</td>
+      <td>${d.member}</td>
+      <td>${d.source}</td>
+      <td>${d.prize}</td>
+      <td><span class="tag tag-gray">${d.mode}</span></td>
+      <td><span class="tag ${meta.cls}">${meta.label}</span></td>
+      <td class="mono">${d.time}</td>
+      <td>
+        <button class="btn-link" onclick="openDispatchDetail(${i})">详情</button>
+        ${canRetry ? `<button class="btn-link" onclick="toast('已重新入队派发（走公共派发链路重试）')">手动重试</button>` : ''}
+        ${d.status==='AUDIT' ? `<button class="btn-link" onclick="toast('审批工作台（t_proposal_record 一审/二审）规划中，本期不做')">查看提案</button>` : ''}
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+document.querySelectorAll('#dispatchTabs .tab-item').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('#dispatchTabs .tab-item').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    renderDispatch(tab.dataset.status);
+  };
+});
+renderDispatch('all');
+
+function openDispatchDetail(i){
+  const d = dispatchLogs[i];
+  const meta = dispatchStatusMeta[d.status];
+  const riskRow = d.status==='AUDIT'
+    ? '<div class="kv-row"><div class="k">③ 风控校验</div><div class="v"><span class="tag tag-orange">拦截 → 转人工提案</span></div></div>'
+    : '<div class="kv-row"><div class="k">③ 风控校验</div><div class="v"><span class="tag tag-green">通过</span></div></div>';
+  let ledgerCell;
+  if(d.status==='SUCCESS') ledgerCell = '<span class="tag tag-green">入账成功</span>';
+  else if(d.status==='FAILED') ledgerCell = '<span class="tag tag-red">失败</span> <span class="hint">'+(d.remark||'')+'</span>';
+  else if(d.status==='RETRYING') ledgerCell = '<span class="tag tag-orange">重试中</span> <span class="hint">'+(d.remark||'')+'</span>';
+  else ledgerCell = '<span class="tag tag-gray">等待审批通过后入账</span>';
+  document.getElementById('drawerTitle').innerText = '派发单详情';
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="kv-list" style="margin-bottom:16px;">
+      <div class="kv-row"><div class="k">trace_id</div><div class="v mono">${d.trace}</div></div>
+      <div class="kv-row"><div class="k">会员</div><div class="v">${d.member}</div></div>
+      <div class="kv-row"><div class="k">来源</div><div class="v">${d.source}</div></div>
+      <div class="kv-row"><div class="k">奖励</div><div class="v">${d.prize}（${d.mode}）</div></div>
+      <div class="kv-row"><div class="k">当前状态</div><div class="v"><span class="tag ${meta.cls}">${meta.label}</span></div></div>
+    </div>
+    <div class="f-label" style="margin-bottom:6px;">公共派发链路（任务/抽奖达标后统一走这条链路，新增玩法无需重写派发）</div>
+    <div class="kv-list">
+      <div class="kv-row"><div class="k">① 达标事件</div><div class="v"><span class="tag tag-green">已接收</span></div></div>
+      <div class="kv-row"><div class="k">② 生成派发单</div><div class="v"><span class="tag tag-green">已生成</span> <span class="hint mono">${d.time}</span></div></div>
+      ${riskRow}
+      <div class="kv-row"><div class="k">④ 资产入账 ledger</div><div class="v">${ledgerCell}</div></div>
+    </div>
+    <div class="f-label" style="margin:14px 0 6px;">prize_snapshot（派发时奖励快照，配置后改不影响已生成派发单）</div>
+    <div class="json-block">{
+  <span class="k">"prize_mode"</span>: <span class="s">"${d.mode}"</span>,
+  <span class="k">"prize_desc"</span>: <span class="s">"${d.prize}"</span>,
+  <span class="k">"source"</span>: <span class="s">"${d.source}"</span>
+}</div>`;
+  document.getElementById('mask').classList.add('show');
+  document.getElementById('drawer').classList.add('show');
+}
+
+/* ============================================================
+   VIEW 1.5: 任务模板设计器 (ui_schema)
+   ============================================================ */
+/* 预置模板数据(tplPresets / tplRuleScripts)与表单渲染引擎已上移至「任务配置向导」脚本区，两个视图共用同一份 */
+
+const presetChipWrap = document.getElementById('tplPresetChips');
+Object.keys(tplPresets).forEach((name, idx)=>{
+  const c = document.createElement('div');
+  c.className = 'chip' + (idx===0?' selected':'');
+  c.innerText = name;
+  c.onclick = ()=>{
+    document.querySelectorAll('#tplPresetChips .chip').forEach(x=>x.classList.remove('selected'));
+    c.classList.add('selected');
+    loadTplPreset(name);
+  };
+  presetChipWrap.appendChild(c);
+});
+
+function designerOnChange(){ renderRuleConfigOut(); renderCendCard(); }
+function loadTplPreset(name){
+  const schema = JSON.parse(JSON.stringify(tplPresets[name]));
+  document.getElementById('schemaEditor').value = JSON.stringify(schema, null, 2);
+  document.getElementById('ruleScriptBox').innerText = tplRuleScripts[name] || '// 该模板暂无脚本';
+  initSchemaForm('designer', schema, 'dynFormWrap', designerOnChange);
+}
+function applySchema(){
+  try{
+    const schema = JSON.parse(document.getElementById('schemaEditor').value);
+    initSchemaForm('designer', schema, 'dynFormWrap', designerOnChange);
+    toast('✅ Schema 已应用，两个渲染器已刷新');
+  }catch(e){
+    toast('❌ JSON 解析失败：' + e.message);
+  }
+}
+
+/* 渲染器①（管理端动态表单）由公共引擎 renderSchemaForm('designer') 驱动，无需单独实现 */
+
+/* rule_config 输出 */
+function renderRuleConfigOut(){
+  const f = schemaForms['designer'];
+  const out = { taskType: f.schema.taskType, ...f.values };
+  const json = JSON.stringify(out, null, 2)
+    .replace(/"([^"]+)":/g, '<span class="k">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
+    .replace(/: (\d+\.?\d*|true|false)/g, ': <span class="n">$1</span>');
+  document.getElementById('ruleConfigOut').innerHTML = json;
+}
+
+/* 渲染器②：C端任务卡片 */
+function interpolate(text, values, current, target){
+  if(!text) return '';
+  let s = text.replaceAll('{current}', current).replaceAll('{target}', target);
+  Object.keys(values).forEach(k=>{ s = s.replaceAll('{'+k+'}', values[k]); });
+  return s;
+}
+function renderCendCard(){
+  const f = schemaForms['designer'];
+  const r = f.schema.render || {};
+  const target = r.targetField ? (Number(f.values[r.targetField])||1) : 1;
+  const current = Math.min(target, Math.max(1, Math.round(target*0.43)));
+  const pct = Math.round(current/target*100);
+  const desc = interpolate(r.progressText, f.values, current, target);
+  const btn = (r.buttonText&&r.buttonText['0']) || '去完成';
+  let body = '';
+  if(r.cardType==='checkin-grid'){
+    let days = '';
+    for(let i=1;i<=Math.min(target,7);i++){
+      const cls = i<=current ? 'done' : (i===current+1 ? 'today' : '');
+      days += `<div class="checkin-day ${cls}">${i<=current?'✓':i}</div>`;
+    }
+    body = `<div class="sub">${desc}</div><div class="checkin-grid">${days}</div>`;
+  } else if(r.cardType==='progress' || r.cardType==='amount'){
+    body = `<div class="sub">${desc}</div><div class="progress-bar"><span style="width:${pct}%"></span></div>`;
+  } else {
+    body = `<div class="sub">${desc}</div>`;
+  }
+  document.getElementById('cendCard').innerHTML = `
+    <div class="task-card-mock">
+      <div class="icon">${r.icon||'🎯'}</div>
+      <div class="body">
+        <div class="t">${document.querySelector('#tplPresetChips .chip.selected')?.innerText.split(' (')[0]||'任务'} <span class="tag tag-blue">${f.schema.taskType||''}</span></div>
+        ${body}
+        <button class="btn-claim">${btn}</button>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:10px;">cardType = <b>${r.cardType||'simple'}</b>，切换预置模板可对比四种交互形态。自定义形态（如组队、膨胀红包）按组件名注册到 C端渲染器即可，schema 只引用名称。</div>
+  `;
+}
+
+loadTplPreset(Object.keys(tplPresets)[0]);
+</script>
+</body>
+</html>
