@@ -1,11 +1,10 @@
 package net.lab1024.sa.task.tasktemplate.manager;
 
-import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
-import net.lab1024.sa.task.tasktemplate.dao.TaskTemplateDao;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.task.tasktemplate.dao.TaskTemplateDao;
+import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
+import org.springframework.stereotype.Service;
 /**
  * 任务模板表  Manager
  *

@@ -3,7 +3,7 @@ package net.lab1024.sa.lottery.numberpool.manager;
 import net.lab1024.sa.lottery.numberpool.dao.LotteryNumberPoolDao;
 import net.lab1024.sa.lottery.numberpool.domain.entity.LotteryNumberPool;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 /**

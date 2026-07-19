@@ -3,7 +3,7 @@ package net.lab1024.sa.draw.drawlog.manager;
 import net.lab1024.sa.draw.drawlog.domain.entity.DrawPrizeLog;
 import net.lab1024.sa.draw.drawlog.dao.DrawPrizeLogDao;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 /**

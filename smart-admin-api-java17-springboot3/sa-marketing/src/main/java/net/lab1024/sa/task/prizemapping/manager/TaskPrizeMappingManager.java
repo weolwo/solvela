@@ -1,11 +1,10 @@
 package net.lab1024.sa.task.prizemapping.manager;
 
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.task.prizemapping.dao.TaskPrizeMappingDao;
 import net.lab1024.sa.task.prizemapping.domain.entity.TaskPrizeMapping;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
 /**
  * 任务阶段与奖励映射表  Manager
  *

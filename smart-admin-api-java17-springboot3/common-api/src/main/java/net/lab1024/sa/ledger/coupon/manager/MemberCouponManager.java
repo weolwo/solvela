@@ -3,7 +3,7 @@ package net.lab1024.sa.ledger.coupon.manager;
 import net.lab1024.sa.ledger.coupon.domain.entity.MemberCoupon;
 import net.lab1024.sa.ledger.coupon.dao.MemberCouponDao;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 /**

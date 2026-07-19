@@ -3,7 +3,7 @@ package net.lab1024.sa.draw.prizemapping.manager;
 import net.lab1024.sa.draw.prizemapping.domain.entity.PoolPrizeMapping;
 import net.lab1024.sa.draw.prizemapping.dao.PoolPrizeMappingDao;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 /**

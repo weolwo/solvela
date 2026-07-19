@@ -108,6 +108,12 @@
             <artifactId>mybatis-plus-jsqlparser</artifactId>
         </dependency>
 
+        <!-- MP 3.5.13+ 起 starter 不再传递 extension（ServiceImpl/IService/分页插件所在模块），需显式引入 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-extension</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>p6spy</groupId>
             <artifactId>p6spy</artifactId>
@@ -247,12 +253,6 @@
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>qlexpress4</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>transmittable-thread-local</artifactId>
-            <version>${transmittable-thread-local.version}</version>
-            <scope>compile</scope>
         </dependency>
     </dependencies>
 

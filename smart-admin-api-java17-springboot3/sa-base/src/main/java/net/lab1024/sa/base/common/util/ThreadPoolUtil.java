@@ -1,13 +1,15 @@
 package net.lab1024.sa.base.common.util;
 
-import com.alibaba.ttl.TtlCallable;
-import com.alibaba.ttl.TtlRunnable;
+import org.slf4j.MDC;
 
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 线程池工具类 (已修复并集成 TTL与优雅停机)
+ * 线程池工具类 (MDC 上下文透传 + 优雅停机)
+ * 主子线程上下文（traceId 等）通过提交时快照 MDC、子线程执行前恢复/执行后还原的方式透传，
+ * 不依赖 TTL；ScopedValue 无法穿透线程池复用线程，不适用本场景
  *
  * @author Chopper (Refactored)
  */
@@ -61,17 +63,54 @@ public class ThreadPoolUtil {
     }
 
     /**
-     * 执行方法 (集成 TTL)
+     * 执行方法 (透传 MDC 上下文)
      */
     public static void execute(Runnable runnable) {
-        threadPool.execute(TtlRunnable.get(runnable));
+        threadPool.execute(wrap(runnable));
     }
 
     /**
-     * 提交返回值 (集成 TTL)
+     * 提交返回值 (透传 MDC 上下文)
      */
     public static <T> Future<T> submit(Callable<T> callable) {
-        return threadPool.submit(TtlCallable.get(callable));
+        return threadPool.submit(wrap(callable));
+    }
+
+    /**
+     * 提交时快照主线程 MDC，子线程执行前恢复、执行后还原，防止线程复用导致上下文串台
+     */
+    private static Runnable wrap(Runnable task) {
+        Map<String, String> parentContext = MDC.getCopyOfContextMap();
+        return () -> {
+            Map<String, String> backup = MDC.getCopyOfContextMap();
+            restoreContext(parentContext);
+            try {
+                task.run();
+            } finally {
+                restoreContext(backup);
+            }
+        };
+    }
+
+    private static <T> Callable<T> wrap(Callable<T> task) {
+        Map<String, String> parentContext = MDC.getCopyOfContextMap();
+        return () -> {
+            Map<String, String> backup = MDC.getCopyOfContextMap();
+            restoreContext(parentContext);
+            try {
+                return task.call();
+            } finally {
+                restoreContext(backup);
+            }
+        };
+    }
+
+    private static void restoreContext(Map<String, String> contextMap) {
+        if (contextMap == null) {
+            MDC.clear();
+        } else {
+            MDC.setContextMap(contextMap);
+        }
     }
 
     public static ThreadPoolExecutor getPool() {

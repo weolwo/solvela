@@ -1,11 +1,10 @@
 package net.lab1024.sa.task.taskconfig.manager;
 
-import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
-import net.lab1024.sa.task.taskconfig.dao.TaskConfigDao;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.task.taskconfig.dao.TaskConfigDao;
+import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
+import org.springframework.stereotype.Service;
 /**
  * 任务配置表  Manager
  *

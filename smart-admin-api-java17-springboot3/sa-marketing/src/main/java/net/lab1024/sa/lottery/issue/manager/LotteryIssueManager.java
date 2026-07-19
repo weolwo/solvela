@@ -1,6 +1,6 @@
 package net.lab1024.sa.lottery.issue.manager;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.lottery.issue.dao.LotteryIssueDao;
 import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;

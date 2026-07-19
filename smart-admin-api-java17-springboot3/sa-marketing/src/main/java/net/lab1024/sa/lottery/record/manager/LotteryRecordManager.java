@@ -3,7 +3,7 @@ package net.lab1024.sa.lottery.record.manager;
 import net.lab1024.sa.lottery.record.dao.LotteryRecordDao;
 import net.lab1024.sa.lottery.record.domain.entity.LotteryRecord;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 /**
