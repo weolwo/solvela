@@ -205,7 +205,7 @@
           <a-flex justify="end" class="mt-4">
             <a-space>
               <a-button @click="onSaveDraft">保存草稿</a-button>
-              <a-button type="primary" @click="onSubmit">正式提交</a-button>
+              <a-button type="primary" :loading="submitLoading" @click="onSubmit">正式提交</a-button>
             </a-space>
           </a-flex>
         </a-card>
@@ -223,6 +223,8 @@
 <script setup>
   import { computed, reactive, ref, watch } from 'vue';
   import { message } from 'ant-design-vue';
+  import { taskApi } from '/@/api/business/task/task-api';
+  import { smartSentry } from '/@/lib/smart-sentry';
   import SchemaFormRenderer from './SchemaFormRenderer.vue';
   import PrizeLadderBuilder from './PrizeLadderBuilder.vue';
   import {
@@ -391,14 +393,24 @@
     };
   }
 
+  const submitLoading = ref(false);
+
   async function onSubmit() {
+    // 校验失败与接口失败分开处理：校验不过不进入 loading
     try {
       await formRef.value.validate();
-      const submitData = buildSubmitData();
-      console.log('【任务配置向导 · 正式提交】主子表 DTO：', submitData);
-      message.success('已按主子表 DTO 规范组装提交数据，请在控制台查看');
     } catch (e) {
       message.error('表单校验未通过，请检查各步骤必填项');
+      return;
+    }
+    submitLoading.value = true;
+    try {
+      await taskApi.submitTaskConfig(buildSubmitData());
+      message.success('任务配置提交成功');
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      submitLoading.value = false;
     }
   }
 

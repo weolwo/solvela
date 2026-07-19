@@ -122,7 +122,7 @@
               <!-- 阻断保存：不仅 disable，还提供 tooltip 解释原因 -->
               <a-tooltip :title="schemaParse.ok ? '' : '请先修复 ui_schema 的 JSON 错误'">
                 <!-- disabled 按钮不触发鼠标事件，必须包一层 span 让 tooltip 能弹出 -->
-                <span><a-button type="primary" :disabled="!schemaParse.ok" @click="onSave">保存模板</a-button></span>
+                <span><a-button type="primary" :disabled="!schemaParse.ok" :loading="saveLoading" @click="onSave">保存模板</a-button></span>
               </a-tooltip>
             </a-space>
           </a-flex>
@@ -165,6 +165,8 @@
 <script setup>
   import { computed, reactive, ref, watch } from 'vue';
   import { message } from 'ant-design-vue';
+  import { taskApi } from '/@/api/business/task/task-api';
+  import { smartSentry } from '/@/lib/smart-sentry';
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
   import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
   import SchemaFormRenderer from '../task-wizard/SchemaFormRenderer.vue';
@@ -280,18 +282,29 @@
 
   // ---------------------------- 提交保存 ----------------------------
 
+  const saveLoading = ref(false);
+
   async function onSave() {
+    // 校验失败与接口失败分开处理：校验不过不进入 loading
     try {
       await formRef.value.validate();
+    } catch (e) {
+      message.error('基础信息校验未通过，请检查必填项');
+      return;
+    }
+    saveLoading.value = true;
+    try {
       const templateDto = {
         ...designer.base,
         uiSchema: schemaParse.value.schema,
         ruleScript: designer.ruleScript,
       };
-      console.log('【任务模板设计器 · 保存模板】DTO：', templateDto);
-      message.success('模板已保存，数据格式符合后端契约');
+      await taskApi.saveTaskTemplate(templateDto);
+      message.success('模板保存成功');
     } catch (e) {
-      message.error('基础信息校验未通过，请检查必填项');
+      smartSentry.captureError(e);
+    } finally {
+      saveLoading.value = false;
     }
   }
 
