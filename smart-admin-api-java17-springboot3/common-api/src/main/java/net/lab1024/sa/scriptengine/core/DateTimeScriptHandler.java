@@ -1,7 +1,7 @@
 package net.lab1024.sa.scriptengine.core;
 
-import net.lab1024.sa.base.module.support.scriptengine.annotation.ScriptFunction;
 import net.lab1024.sa.base.module.support.scriptengine.annotation.ScriptFunctionGroup;
+import net.lab1024.sa.scriptengine.annotation.ScriptFunction;
 import net.lab1024.sa.scriptengine.spi.ScriptEngineFunctionHandler;
 import org.springframework.stereotype.Component;
 

@@ -28,7 +28,7 @@ public class ErrorCodeRegister {
         register(UserErrorCode.class, 30001, 40000);
 
         //业务错误码
-        register(BizErrorCode.class, 50001, 60000);
+        register(BizErrorCode.class, 50000, 60000);
 
     }
 
