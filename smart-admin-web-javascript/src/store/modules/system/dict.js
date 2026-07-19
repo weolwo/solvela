@@ -4,8 +4,7 @@ import _ from 'lodash';
 import { dictApi } from '/@/api/support/dict-api';
 import { smartSentry } from '/@/lib/smart-sentry';
 
-export const useDictStore = defineStore({
-  id: 'dict',
+export const useDictStore = defineStore('dict', {
   state: () => ({
     // 字典code集合
     dictList: [],

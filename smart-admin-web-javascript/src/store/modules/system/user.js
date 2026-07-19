@@ -17,8 +17,7 @@ import { smartSentry } from '/@/lib/smart-sentry';
 import { localRead, localSave, localRemove } from '/@/utils/local-util';
 
 
-export const useUserStore = defineStore({
-  id: 'userStore',
+export const useUserStore = defineStore('userStore', {
   state: () => ({
     token: '',
     //员工id

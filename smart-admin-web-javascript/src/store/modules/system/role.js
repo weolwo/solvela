@@ -10,8 +10,7 @@
 import _ from 'lodash';
 import { defineStore } from 'pinia';
 
-export const useRoleStore = defineStore({
-  id: 'role',
+export const useRoleStore = defineStore('role', {
   state: () => ({
     checkedData: [],
     treeMap: new Map(),

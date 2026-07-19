@@ -11,7 +11,7 @@ import { resolve } from 'path';
 import vue from '@vitejs/plugin-vue';
 import { loadEnv } from 'vite';
 import tailwindcss from '@tailwindcss/vite'; // [!新增] 1. 引入 tailwindcss v4 插件
-import customVariables from '/@/theme/custom-variables';
+import customVariables from './src/theme/custom-variables';
 
 const pathResolve = (dir) => {
   return resolve(__dirname, '.', dir);
