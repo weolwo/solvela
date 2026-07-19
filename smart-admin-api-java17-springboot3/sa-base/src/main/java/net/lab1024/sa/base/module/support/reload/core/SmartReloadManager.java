@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.module.support.reload.core;
 
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +10,9 @@ import net.lab1024.sa.base.module.support.reload.core.thread.SmartReloadRunnable
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ReflectionUtils;
 
@@ -41,6 +43,11 @@ public class SmartReloadManager implements BeanPostProcessor {
     @Value("${reload.interval-seconds}")
     private Integer intervalSeconds;
 
+    /**
+     * 本类是 BeanPostProcessor（容器最早期创建），直接注入业务 Bean 会把 DAO/数据源整条依赖链提前实例化，
+     * 导致这些 Bean 错过 AOP 等后处理并刷 BeanPostProcessorChecker 警告；@Lazy 注入代理，首次调用时才真正解析
+     */
+    @Lazy
     @Resource
     private AbstractSmartReloadCommand reloadCommand;
 
@@ -49,7 +56,10 @@ public class SmartReloadManager implements BeanPostProcessor {
     private ScheduledThreadPoolExecutor threadPoolExecutor;
 
 
-    @PostConstruct
+    /**
+     * 定时器等应用完全就绪后再启动（此时通过 @Lazy 代理解析 reloadCommand，走完整的 Bean 后处理流程）
+     */
+    @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (threadPoolExecutor != null) {
             return;

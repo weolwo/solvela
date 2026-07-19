@@ -70,4 +70,6 @@
 
     <logger name="org.springframework" level="WARN"/>
     <logger name="com.baomidou.mybatisplus" level="WARN"/>
+    <!-- MP 3.5.17 起对「XML 覆盖内置方法」打 WARN；生成器 XML 有意用物理删除覆盖 deleteById，此告警为预期行为的噪音 -->
+    <logger name="com.baomidou.mybatisplus.core.injector" level="ERROR"/>
 </configuration>
