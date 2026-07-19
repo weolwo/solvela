@@ -5,6 +5,7 @@ import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigAddForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigQueryForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigUpdateForm;
+import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
 import net.lab1024.sa.task.taskconfig.domain.vo.TaskConfigVO;
 import net.lab1024.sa.task.taskconfig.service.TaskConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +45,13 @@ public class TaskConfigController {
     @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid TaskConfigAddForm addForm) {
         return Service.add(addForm);
+    }
+
+    @Operation(summary = "任务配置向导提交（主子表：taskConfig + prizeMappingList）")
+    @PostMapping("/wizard/submit")
+    @SaCheckPermission(":wizard:submit")
+    public ResponseDTO<String> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
+        return Service.wizardSubmit(submitForm);
     }
 
     @Operation(summary = "更新")

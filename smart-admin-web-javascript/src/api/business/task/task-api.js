@@ -8,16 +8,16 @@ import { postRequest } from '/src/lib/axios';
 
 export const taskApi = {
   /**
-   * 提交任务配置向导（主子表：taskConfig + prizeMappingList）  @author  alaric
+   * 提交任务配置向导（主子表事务：taskConfig + prizeMappingList，归属后端 taskconfig 模块）  @author  alaric
    */
   submitTaskConfig: (param) => {
-    return postRequest('/task/config/submit', param);
+    return postRequest('/taskConfig/wizard/submit', param);
   },
 
   /**
-   * 保存任务模板设计器（uiSchema + ruleScript）  @author  alaric
+   * 保存任务模板设计器（uiSchema + ruleScript，归属后端 tasktemplate 模块）  @author  alaric
    */
   saveTaskTemplate: (param) => {
-    return postRequest('/task/template/save', param);
+    return postRequest('/taskTemplate/save', param);
   },
 };

@@ -47,6 +47,11 @@ public class TaskTemplate {
     private String taskType;
 
     /**
+     * 默认触发事件：模板建议值，向导中可覆盖
+     */
+    private String triggerEvent;
+
+    /**
      * 前端渲染规则
      */
     private String uiSchema;

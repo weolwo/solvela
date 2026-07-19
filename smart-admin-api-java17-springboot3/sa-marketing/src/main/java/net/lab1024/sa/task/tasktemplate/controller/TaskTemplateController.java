@@ -4,6 +4,7 @@ import net.lab1024.sa.base.common.domain.ValidateList;
 import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateAddForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateQueryForm;
+import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateSaveForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateUpdateForm;
 import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateVO;
 import net.lab1024.sa.task.tasktemplate.service.TaskTemplateService;
@@ -44,6 +45,13 @@ public class TaskTemplateController {
     @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid TaskTemplateAddForm addForm) {
         return Service.add(addForm);
+    }
+
+    @Operation(summary = "模板设计器保存（按 templateCode upsert）")
+    @PostMapping("/save")
+    @SaCheckPermission(":save")
+    public ResponseDTO<String> save(@RequestBody @Valid TaskTemplateSaveForm saveForm) {
+        return Service.save(saveForm);
     }
 
     @Operation(summary = "更新")

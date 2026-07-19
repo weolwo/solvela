@@ -4,7 +4,7 @@ package net.lab1024.sa.task.prizemapping.dao;
         import net.lab1024.sa.task.prizemapping.domain.entity.TaskPrizeMapping;
         import net.lab1024.sa.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
         import net.lab1024.sa.task.prizemapping.domain.vo.TaskPrizeMappingVO;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import net.lab1024.sa.base.common.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -17,7 +17,7 @@ import org.apache.ibatis.annotations.Param;
  * @Copyright weolwo
  */
 @Mapper
-public interface TaskPrizeMappingDao extends BaseMapper<TaskPrizeMapping> {
+public interface TaskPrizeMappingDao extends CustomizedBaseMapper<TaskPrizeMapping> {
 
     /**
      * 分页查询

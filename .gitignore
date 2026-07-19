@@ -24,3 +24,5 @@ target/
 **/.vscode
 
 /smart-admin-web-javascript/vite.config.js.timestamp-1773844624521-f3557f7bf2395.mjs
+/.claude/
+/.agents/

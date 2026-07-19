@@ -8,6 +8,7 @@
             <result column="template_code" property="templateCode" />
             <result column="template_name" property="templateName" />
             <result column="task_type" property="taskType" />
+            <result column="trigger_event" property="triggerEvent" />
             <result column="ui_schema" property="uiSchema" />
             <result column="rule_script" property="ruleScript" />
             <result column="create_by" property="createBy" />
@@ -21,8 +22,9 @@
                 tenant_id, 
                 template_code, 
                 template_name, 
-                task_type, 
-                ui_schema, 
+                task_type,
+                trigger_event,
+                ui_schema,
                 rule_script, 
                 create_by, 
                 create_time, 

@@ -31,6 +31,9 @@ public class TaskTemplateAddForm {
     @NotBlank(message = "流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型) 不能为空")
     private String taskType;
 
+    @Schema(description = "默认触发事件：模板建议值，向导中可覆盖")
+    private String triggerEvent;
+
     @Schema(description = "前端渲染规则", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "前端渲染规则 不能为空")
     private String uiSchema;
