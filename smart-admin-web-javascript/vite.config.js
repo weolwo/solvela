@@ -10,6 +10,7 @@
 import { resolve } from 'path';
 import vue from '@vitejs/plugin-vue';
 import { loadEnv } from 'vite';
+import tailwindcss from '@tailwindcss/vite'; // [!新增] 1. 引入 tailwindcss v4 插件
 import customVariables from '/@/theme/custom-variables';
 
 const pathResolve = (dir) => {
@@ -53,7 +54,8 @@ export default ({ mode }) => {
         },
       },
     },
-    plugins: [vue()],
+    // [!修改] 2. 将 tailwindcss() 注册到 plugins 数组中
+    plugins: [vue(), tailwindcss()],
     optimizeDeps: {
       include: ['ant-design-vue/es/locale/zh_CN', 'dayjs/locale/zh-cn', 'ant-design-vue/es/locale/en_US'],
       exclude: ['vue-demi'],

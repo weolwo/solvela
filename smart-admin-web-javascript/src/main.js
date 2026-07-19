@@ -27,6 +27,7 @@ import { buildRoutes, router } from '/@/router';
 import { store } from '/@/store';
 import { useUserStore } from '/@/store/modules/system/user';
 import 'ant-design-vue/dist/reset.css';
+import '/@/theme/tailwind.css'
 import '/@/theme/index.less';
 import { localRead } from '/@/utils/local-util';
 import LocalStorageKeyConst from '/@/constants/local-storage-key-const';

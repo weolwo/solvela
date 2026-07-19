@@ -9,25 +9,28 @@
   *
 -->
 <template>
-  <a-card class="user-header">
+  <!-- 引入 Tailwind CSS v4 后，布局可以直接使用 mb-1.5 代替 margin-bottom: 5px -->
+  <a-card class="w-full mb-1.5 p-0" :body-style="{ padding: 0 }">
     <a-page-header :title="welcomeSentence">
       <template #subTitle>
-        <a-typography-text type="secondary" style="margin-left: 20px">所属部门： {{ departmentName }}</a-typography-text>
+        <a-typography-text type="secondary" class="ml-5">所属部门： {{ departmentName }}</a-typography-text>
       </template>
-      <a-row class="content">
-        <span class="left-content">
-          <p class="last-login-info"><AlertOutlined />{{ lastLoginInfo }}</p>
-          <a class="sentence" href="#" target="_blank"> <smile-outlined spin /> {{ heartSentence }} </a>
+      <a-row class="flex justify-between">
+        <span class="w-[calc(100%-420px)]">
+          <p class="m-0 mt-0.5 p-0 text-xs text-[#333] break-all"><AlertOutlined />{{ lastLoginInfo }}</p>
+          <a class="block m-0 mt-1.5 pt-1 text-xs text-[#acacac] break-all hover:cursor-pointer hover:underline" href="#" target="_blank">
+            <smile-outlined spin /> {{ heartSentence }}
+          </a>
         </span>
       </a-row>
     </a-page-header>
   </a-card>
 </template>
+
 <script setup>
   import { computed } from 'vue';
   import { useUserStore } from '/@/store/modules/system/user';
   import uaparser from 'ua-parser-js';
-  import { Solar, Lunar } from 'lunar-javascript';
   import _ from 'lodash';
   import heartSentenceArray from './heart-sentence';
 
@@ -84,76 +87,8 @@
     return info;
   });
 
-  //日期、节日、节气
-  const dayInfo = computed(() => {
-    //阳历
-    let solar = Solar.fromDate(new Date());
-    let day = solar.toString();
-    let week = solar.getWeekInChinese();
-    //阴历
-    let lunar = Lunar.fromDate(new Date());
-    let lunarMonth = lunar.getMonthInChinese();
-    let lunarDay = lunar.getDayInChinese();
-    //节气
-    let jieqi = lunar.getJieQi();
-    let next = lunar.getNextJieQi();
-    let nextJieqi = next.getName() + ' ' + next.getSolar().toYmd();
-
-    return `${day} 星期${week}，农历${lunarMonth}月${lunarDay}（当前${jieqi}，${nextJieqi} ）`;
-  });
-
   // 毒鸡汤
   const heartSentence = computed(() => {
     return heartSentenceArray[_.random(0, heartSentenceArray.length - 1)];
   });
 </script>
-<style scoped lang="less">
-  .user-header {
-    width: 100%;
-    margin-bottom: 5px;
-    padding: 0;
-
-    :deep(.ant-card-body) {
-      padding: 0;
-    }
-
-    .left-content {
-      width: calc(100% - 420px);
-
-      h3 {
-        color: rgba(0, 0, 0, 0.75);
-      }
-    }
-
-    .content {
-      display: flex;
-      justify-content: space-between;
-
-      .weather {
-        width: 400px;
-      }
-    }
-
-    .last-login-info {
-      font-size: 13px;
-      color: #333;
-      overflow-wrap: break-word;
-      padding: 0;
-      margin: 1px 0 0 0;
-    }
-
-    .sentence {
-      display: block;
-      font-size: 12px;
-      color: #acacac;
-      overflow-wrap: break-word;
-      padding: 5px 0 0 0;
-      margin: 6px 0 0 0;
-    }
-
-    .sentence:hover {
-      cursor: pointer;
-      text-decoration: underline;
-    }
-  }
-</style>
