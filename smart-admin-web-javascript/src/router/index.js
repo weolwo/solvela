@@ -28,14 +28,13 @@ export const router = createRouter({
 });
 
 // ----------------------- 路由加载前 -----------------------
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, from) => {
   // 进度条开启
   nProgress.start();
 
   // 公共页面，任何时候都可以跳转
   if (to.path === PAGE_PATH_404) {
-    next();
-    return;
+    return true;
   }
 
   // 验证登录
@@ -43,23 +42,19 @@ router.beforeEach(async (to, from, next) => {
   if (!token) {
     useUserStore().logout();
     if (to.path === PAGE_PATH_LOGIN) {
-      next();
-    } else {
-      next({ path: PAGE_PATH_LOGIN });
+      return true;
     }
-    return;
+    return { path: PAGE_PATH_LOGIN };
   }
 
   // 登录页，则跳转到首页
   if (to.path === PAGE_PATH_LOGIN) {
-    next({ path: HOME_PAGE_PATH });
-    return;
+    return { path: HOME_PAGE_PATH };
   }
 
   // 首页（ 需要登录 ，但不需要验证权限）
   if (to.path === HOME_PAGE_NAME) {
-    next();
-    return;
+    return true;
   }
 
   // 下载路由对应的 页面组件，并修改组件的Name，如果修改过，则不需要修改
@@ -84,7 +79,7 @@ router.beforeEach(async (to, from, next) => {
     });
   }
 
-  next();
+  return true;
 });
 
 // ----------------------- 路由加载后 -----------------------
