@@ -30,4 +30,8 @@ export default {
   NOTICE_READ: `${KEY_PREFIX}notice_read`,
   // 待办
   TO_BE_DONE: `${KEY_PREFIX}to_be_done`,
+  // 任务模板设计器 本地草稿（防浏览器崩溃/误关丢失未保存的 schema 与脚本）
+  TASK_TEMPLATE_DRAFT: `${KEY_PREFIX}task_template_draft`,
+  // 任务配置向导 本地草稿（含填写进度，防中途丢失）
+  TASK_WIZARD_DRAFT: `${KEY_PREFIX}task_wizard_draft`,
 };

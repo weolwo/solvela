@@ -116,6 +116,7 @@
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
+  import { useRoute } from 'vue-router';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { taskConfigApi } from '/@/api/business/task/task-config/task-config-api';
@@ -254,6 +255,7 @@
   };
   // 查询表单form
   const queryForm = reactive({ ...queryFormState });
+  const route = useRoute();
   // 表格加载loading
   const tableLoading = ref(false);
   // 表格数据
@@ -289,7 +291,17 @@
     }
   }
 
-  onMounted(queryData);
+  // 支持从任务配置向导成功页跳转而来：按 query 回填查询条件，直接定位刚创建的任务
+  onMounted(() => {
+    const { taskName, activityCode } = route.query;
+    if (taskName) {
+      queryForm.taskName = taskName;
+    }
+    if (activityCode) {
+      queryForm.activityCode = activityCode;
+    }
+    queryData();
+  });
 
   // ---------------------------- 添加/修改 ----------------------------
   const formRef = ref();

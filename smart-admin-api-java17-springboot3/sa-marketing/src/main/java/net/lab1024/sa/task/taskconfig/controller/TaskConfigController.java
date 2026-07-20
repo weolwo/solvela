@@ -50,7 +50,7 @@ public class TaskConfigController {
     @Operation(summary = "任务配置向导提交（主子表：taskConfig + prizeMappingList）")
     @PostMapping("/wizard/submit")
     @SaCheckPermission(":wizard:submit")
-    public ResponseDTO<String> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
+    public ResponseDTO<Long> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
         return Service.wizardSubmit(submitForm);
     }
 

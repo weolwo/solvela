@@ -101,6 +101,7 @@
 
   //直接关闭
   function closeTag(item, closeAll) {
+    let targetRoute = null;
     // 关闭单个tag
     if (item && !closeAll) {
       let goName = HOME_PAGE_NAME;
@@ -119,13 +120,25 @@
         }
       }
       // router.push({ name: goName, query: Object.assign({ _keepAlive: 1 }, goQuery) });
-      router.push({ name: goName, query: goQuery });
+      targetRoute = { name: goName, query: goQuery };
     } else if (!item && closeAll) {
       // 关闭所有tag
-      router.push({ name: HOME_PAGE_NAME });
+      targetRoute = { name: HOME_PAGE_NAME };
     }
     // 关闭其他tag不做处理 直接调用closeTagNav
-    useUserStore().closeTagNav(item ? item.menuName : null, closeAll);
+    if (!targetRoute) {
+      useUserStore().closeTagNav(item ? item.menuName : null, closeAll);
+      return;
+    }
+    // 页面有未保存内容时导航会被守卫拦截，此时不能摘掉tag，否则会出现「页面还在、标签却没了」
+    router
+      .push(targetRoute)
+      .then((failure) => {
+        if (!failure) {
+          useUserStore().closeTagNav(item ? item.menuName : null, closeAll);
+        }
+      })
+      .catch(() => {});
   }
 
   const { useToken } = theme;

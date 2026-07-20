@@ -50,7 +50,7 @@ public class TaskTemplateController {
     @Operation(summary = "模板设计器保存（按 templateCode upsert）")
     @PostMapping("/save")
     @SaCheckPermission(":save")
-    public ResponseDTO<String> save(@RequestBody @Valid TaskTemplateSaveForm saveForm) {
+    public ResponseDTO<Boolean> save(@RequestBody @Valid TaskTemplateSaveForm saveForm) {
         return Service.save(saveForm);
     }
 

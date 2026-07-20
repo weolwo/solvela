@@ -45,8 +45,10 @@ public class TaskTemplateService {
 
     /**
      * 任务模板设计器保存：按 templateCode upsert，保存前做 ui_schema 结构校验
+     *
+     * @return true-新建模板，false-覆盖更新了已存在的模板（前端据此区分提示，防止误覆盖线上模板）
      */
-    public ResponseDTO<String> save(TaskTemplateSaveForm saveForm) {
+    public ResponseDTO<Boolean> save(TaskTemplateSaveForm saveForm) {
         String schemaError = checkUiSchema(saveForm.getUiSchema());
         if (schemaError != null) {
             return ResponseDTO.userErrorParam(schemaError);
@@ -56,13 +58,14 @@ public class TaskTemplateService {
         taskTemplate.setUiSchema(JsonUtils.toJson(saveForm.getUiSchema()));
 
         TaskTemplate existed = getByTemplateCode(saveForm.getTemplateCode());
-        if (existed == null) {
+        boolean createFlag = existed == null;
+        if (createFlag) {
             taskTemplateDao.insert(taskTemplate);
         } else {
             taskTemplate.setId(existed.getId());
             taskTemplateDao.updateById(taskTemplate);
         }
-        return ResponseDTO.ok();
+        return ResponseDTO.ok(createFlag);
     }
 
     /**

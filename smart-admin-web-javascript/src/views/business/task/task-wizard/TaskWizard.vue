@@ -7,7 +7,43 @@
 -->
 <template>
   <a-card :bordered="false">
-    <a-steps :current="currentStep" :items="WIZARD_STEP_ITEMS" size="small" class="mb-6" />
+    <!-- ==================== 提交成功页：替代整个向导，同时天然杜绝重复提交 ==================== -->
+    <a-result v-if="submitResult.submitted" status="success" title="任务配置提交成功">
+      <template #subTitle>
+        任务「{{ submitResult.taskName }}」已创建，归属活动：{{ submitResult.activityLabel }}
+      </template>
+      <template #extra>
+        <a-space direction="vertical" align="center" :size="12">
+          <a-space>
+            <a-button type="primary" @click="goTaskList">返回任务列表</a-button>
+            <a-button @click="createNextTask">在同一活动下再建一个</a-button>
+          </a-space>
+          <a-button type="link" @click="viewCreatedTask">查看刚创建的任务</a-button>
+        </a-space>
+      </template>
+    </a-result>
+
+    <template v-else>
+    <!-- 草稿恢复提示：浏览器崩溃/强制关闭等未走离开拦截的情况下兜底 -->
+    <a-alert v-if="pendingDraft" type="warning" show-icon class="mb-4">
+      <template #message>
+        发现上次未提交的配置草稿（暂存于 {{ pendingDraft.savedAt }}，任务名称
+        {{ pendingDraft.wizardForm?.base?.taskName || '未填写' }}）
+      </template>
+      <template #action>
+        <a-space>
+          <a-button size="small" type="primary" @click="restoreDraft">恢复草稿</a-button>
+          <a-button size="small" @click="discardDraft">丢弃</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
+    <a-flex justify="space-between" align="center" class="mb-6">
+      <a-steps :current="currentStep" :items="WIZARD_STEP_ITEMS" size="small" class="flex-1" />
+      <a-typography-text v-if="draftSavedAt" type="secondary" class="ml-4 text-xs whitespace-nowrap">
+        草稿已暂存 {{ draftSavedAt }}
+      </a-typography-text>
+    </a-flex>
 
     <a-form ref="formRef" :model="wizardForm" layout="vertical">
       <!-- ==================== 第1步：模板与基础信息 ==================== -->
@@ -222,12 +258,17 @@
       <a-button :disabled="currentStep === WIZARD_STEP.BASE" @click="prevStep">上一步</a-button>
       <a-button v-if="currentStep < WIZARD_STEP.SUMMARY" type="primary" @click="nextStep">下一步</a-button>
     </a-flex>
+    </template>
   </a-card>
 </template>
 
 <script setup>
-  import { computed, reactive, ref, watch } from 'vue';
-  import { message } from 'ant-design-vue';
+  import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+  import { onBeforeRouteLeave, useRouter } from 'vue-router';
+  import dayjs from 'dayjs';
+  import { message, Modal } from 'ant-design-vue';
+  import { localRead, localRemove, localSave } from '/@/utils/local-util';
+  import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import SmartRichEditor from '/@/components/framework/wangeditor/index.vue';
@@ -236,6 +277,7 @@
   import {
     WIZARD_STEP,
     WIZARD_STEP_ITEMS,
+    TASK_CONFIG_LIST_PATH,
     ACTIVITY_OPTIONS,
     TRIGGER_EVENT_OPTIONS,
     TASK_GROUP_OPTIONS,
@@ -256,6 +298,7 @@
 
   const currentStep = ref(WIZARD_STEP.BASE);
   const formRef = ref();
+  const router = useRouter();
 
   // ---------------------------- 模板选择与 ruleParams 初始化 ----------------------------
 
@@ -401,6 +444,14 @@
 
   const submitLoading = ref(false);
 
+  // 提交结果：submitted 为 true 时展示成功页，向导表单整体隐藏，从根源杜绝重复提交
+  const submitResult = reactive({
+    submitted: false,
+    taskConfigId: null,
+    taskName: '',
+    activityLabel: '',
+  });
+
   async function onSubmit() {
     // 校验失败与接口失败分开处理：校验不过不进入 loading
     try {
@@ -411,13 +462,164 @@
     }
     submitLoading.value = true;
     try {
-      await taskApi.submitTaskConfig(buildSubmitData());
-      message.success('任务配置提交成功');
+      const res = await taskApi.submitTaskConfig(buildSubmitData());
+      // 成功页展示与跳转定位所需信息，需在表单重置前留存
+      submitResult.taskConfigId = res.data;
+      submitResult.taskName = wizardForm.base.taskName;
+      submitResult.activityLabel = summary.value.activityLabel;
+      submitResult.submitted = true;
+      // 已入库，清掉本地草稿避免下次进来又提示恢复
+      clearTimeout(draftTimer);
+      clearDraft();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
       submitLoading.value = false;
     }
+  }
+
+  // ---------------------------- 未保存内容保护 ----------------------------
+
+  // 初始空表单快照：与之不同即视为运营已填了东西
+  const INITIAL_SNAPSHOT = JSON.stringify(buildDefaultWizardForm());
+  const currentSnapshot = computed(() => JSON.stringify(wizardForm));
+  // 已提交成功的内容已入库，不再视为待保存
+  const isDirty = computed(() => !submitResult.submitted && currentSnapshot.value !== INITIAL_SNAPSHOT);
+
+  onBeforeRouteLeave(() => {
+    if (!isDirty.value) {
+      return true;
+    }
+    return new Promise((resolve) => {
+      Modal.confirm({
+        title: '有未提交的配置',
+        content: '向导中已填写的内容尚未提交，离开本页将全部丢失。',
+        okText: '仍然离开',
+        okType: 'danger',
+        cancelText: '留在本页',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  });
+
+  function handleBeforeUnload(event) {
+    if (!isDirty.value) {
+      return;
+    }
+    event.preventDefault();
+    event.returnValue = '';
+  }
+
+  // ---------------------------- 本地草稿：连同填写进度一起保留 ----------------------------
+
+  const DRAFT_DEBOUNCE_MS = 2000;
+  const pendingDraft = ref(null);
+  const draftSavedAt = ref('');
+  let draftTimer = null;
+
+  function writeDraft() {
+    const draft = {
+      wizardForm: JSON.parse(currentSnapshot.value),
+      // 向导特有：记录填到第几步，恢复后直接回到当时的位置
+      currentStep: currentStep.value,
+      savedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    };
+    localSave(LocalStorageKeyConst.TASK_WIZARD_DRAFT, JSON.stringify(draft));
+    draftSavedAt.value = dayjs(draft.savedAt).format('HH:mm:ss');
+  }
+
+  function clearDraft() {
+    localRemove(LocalStorageKeyConst.TASK_WIZARD_DRAFT);
+    draftSavedAt.value = '';
+  }
+
+  watch(currentSnapshot, () => {
+    // 历史草稿待决策期间冻结暂存，避免把待恢复内容覆盖掉；已提交成功的也不再暂存
+    if (pendingDraft.value || submitResult.submitted) {
+      return;
+    }
+    clearTimeout(draftTimer);
+    // 表单被清回初始空态，说明运营主动放弃了这次配置，草稿一并清掉
+    if (!isDirty.value) {
+      clearDraft();
+      return;
+    }
+    draftTimer = setTimeout(writeDraft, DRAFT_DEBOUNCE_MS);
+  });
+
+  async function restoreDraft() {
+    const draft = pendingDraft.value;
+    const { ruleParams, ...rest } = draft.wizardForm;
+    Object.assign(wizardForm, rest);
+    currentStep.value = draft.currentStep ?? WIZARD_STEP.BASE;
+    pendingDraft.value = null;
+    // templateCode 赋值会触发 watch 用模板默认值重建 ruleParams，必须等它跑完再回填草稿参数
+    await nextTick();
+    wizardForm.ruleParams = ruleParams;
+    message.success('草稿已恢复，可继续配置');
+  }
+
+  function discardDraft() {
+    clearDraft();
+    pendingDraft.value = null;
+    message.success('草稿已丢弃');
+  }
+
+  onMounted(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    const raw = localRead(LocalStorageKeyConst.TASK_WIZARD_DRAFT);
+    if (!raw) {
+      return;
+    }
+    try {
+      pendingDraft.value = JSON.parse(raw);
+    } catch (e) {
+      clearDraft();
+    }
+  });
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    clearTimeout(draftTimer);
+  });
+
+  // ---------------------------- 成功页三个出口 ----------------------------
+
+  function goTaskList() {
+    router.push(TASK_CONFIG_LIST_PATH);
+  }
+
+  /**
+   * 列表页按任务名称回填查询条件，直接定位刚创建的那条
+   */
+  function viewCreatedTask() {
+    router.push({ path: TASK_CONFIG_LIST_PATH, query: { taskName: submitResult.taskName } });
+  }
+
+  /**
+   * 同一活动下再建一个：保留活动级配置（活动/生效时间/人群），重置任务级配置
+   * 对应运营「一个活动大类下批量配 N 个原子任务」的实际作业模式
+   */
+  async function createNextTask() {
+    const keep = {
+      activityCode: wizardForm.base.activityCode,
+      timeRange: [...wizardForm.audience.timeRange],
+      longTerm: wizardForm.audience.longTerm,
+      targetAudience: wizardForm.audience.targetAudience,
+    };
+    Object.assign(wizardForm, buildDefaultWizardForm());
+    wizardForm.base.activityCode = keep.activityCode;
+    wizardForm.audience.timeRange = keep.timeRange;
+    wizardForm.audience.longTerm = keep.longTerm;
+    wizardForm.audience.targetAudience = keep.targetAudience;
+
+    submitResult.submitted = false;
+    currentStep.value = WIZARD_STEP.BASE;
+    // 表单在成功页期间被卸载，需等重新挂载后再清校验状态
+    await nextTick();
+    formRef.value?.clearValidate();
+    message.success('已保留活动与生效时间，请配置下一个任务');
   }
 
   function onSaveDraft() {

@@ -8,6 +8,19 @@
 -->
 <template>
   <a-card :bordered="false">
+    <!-- 草稿恢复提示：浏览器崩溃/强制关闭等未走离开拦截的情况下兜底 -->
+    <a-alert v-if="pendingDraft" type="warning" show-icon class="mb-4">
+      <template #message>
+        发现上次未提交的草稿（暂存于 {{ pendingDraft.savedAt }}，模板编码 {{ pendingDraft.base?.templateCode }}）
+      </template>
+      <template #action>
+        <a-space>
+          <a-button size="small" type="primary" @click="restoreDraft">恢复草稿</a-button>
+          <a-button size="small" @click="discardDraft">丢弃</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
     <a-row :gutter="16">
       <!-- ==================== 左侧：模板规则与代码编辑 ==================== -->
       <a-col :span="14">
@@ -116,7 +129,16 @@
             </a-collapse-panel>
           </a-collapse>
 
-          <a-flex justify="end" class="mt-4">
+          <a-flex justify="space-between" align="center" class="mt-4">
+            <!-- 保存状态：服务端保存状态 + 本地草稿时间，改完不用猜存没存 -->
+            <a-space :size="12">
+              <a-badge v-if="isDirty" status="warning" text="有未保存改动" />
+              <a-badge v-else-if="lastSavedAt" status="success" :text="`已保存 · ${lastSavedAt}`" />
+              <a-typography-text v-else type="secondary">尚未保存</a-typography-text>
+              <a-typography-text v-if="draftSavedAt" type="secondary" class="text-xs">
+                本地草稿 {{ draftSavedAt }}
+              </a-typography-text>
+            </a-space>
             <a-space>
               <a-button @click="onSaveDraft">暂存草稿</a-button>
               <!-- 阻断保存：不仅 disable，还提供 tooltip 解释原因 -->
@@ -163,8 +185,12 @@
 </template>
 
 <script setup>
-  import { computed, reactive, ref, watch } from 'vue';
-  import { message } from 'ant-design-vue';
+  import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+  import { onBeforeRouteLeave } from 'vue-router';
+  import dayjs from 'dayjs';
+  import { message, Modal } from 'ant-design-vue';
+  import { localRead, localRemove, localSave } from '/@/utils/local-util';
+  import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
@@ -232,6 +258,21 @@
   });
 
   const formRef = ref();
+
+  // ---------------------------- 未保存改动追踪 ----------------------------
+
+  // 模板内容快照：只含真正会入库的内容，previewValues 是预览交互态不参与比对
+  const currentSnapshot = computed(() =>
+    JSON.stringify({
+      base: designer.base,
+      ruleScript: designer.ruleScript,
+      uiSchemaText: designer.uiSchemaText,
+    })
+  );
+  const savedSnapshot = ref(currentSnapshot.value);
+  const lastSavedAt = ref('');
+  const isDirty = computed(() => currentSnapshot.value !== savedSnapshot.value);
+
   const FORM_RULES = {
     templateCode: [{ required: true, message: '请输入模板编码' }],
     templateName: [{ required: true, message: '请输入模板名称' }],
@@ -299,8 +340,14 @@
         uiSchema: schemaParse.value.schema,
         ruleScript: designer.ruleScript,
       };
-      await taskApi.saveTaskTemplate(templateDto);
-      message.success('模板保存成功');
+      const res = await taskApi.saveTaskTemplate(templateDto);
+      // 保存成功后重置脏标记基准，并清掉本地草稿（内容已在服务端）
+      savedSnapshot.value = currentSnapshot.value;
+      clearTimeout(draftTimer);
+      clearDraft();
+      lastSavedAt.value = dayjs().format('HH:mm:ss');
+      // 区分新建与覆盖：填了已存在的 templateCode 时明确告知，避免误覆盖线上模板而不自知
+      message.success(res.data ? '模板已创建' : '模板已更新（覆盖了同编码的原有配置）');
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -308,8 +355,107 @@
     }
   }
 
-  function onSaveDraft() {
-    console.log('【任务模板设计器 · 暂存草稿】当前快照：', JSON.parse(JSON.stringify(designer)));
-    message.success('草稿已暂存（mock，快照见控制台）');
+  // ---------------------------- 未保存改动保护 ----------------------------
+
+  // 站内路由跳转拦截
+  onBeforeRouteLeave(() => {
+    if (!isDirty.value) {
+      return true;
+    }
+    return new Promise((resolve) => {
+      Modal.confirm({
+        title: '有未保存的改动',
+        content: 'ui_schema / rule_script 的修改尚未保存，离开本页将丢失这些内容。',
+        okText: '仍然离开',
+        okType: 'danger',
+        cancelText: '留在本页',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  });
+
+  // 关闭标签页/刷新拦截（浏览器原生确认框）
+  function handleBeforeUnload(event) {
+    if (!isDirty.value) {
+      return;
+    }
+    event.preventDefault();
+    event.returnValue = '';
   }
+
+  // ---------------------------- 本地草稿：防浏览器崩溃/强制关闭丢失内容 ----------------------------
+
+  const DRAFT_DEBOUNCE_MS = 2000;
+  // 检测到的历史草稿，等待用户决定恢复还是丢弃
+  const pendingDraft = ref(null);
+  const draftSavedAt = ref('');
+  let draftTimer = null;
+
+  function writeDraft() {
+    const draft = {
+      base: { ...designer.base },
+      ruleScript: designer.ruleScript,
+      uiSchemaText: designer.uiSchemaText,
+      savedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    };
+    localSave(LocalStorageKeyConst.TASK_TEMPLATE_DRAFT, JSON.stringify(draft));
+    draftSavedAt.value = dayjs(draft.savedAt).format('HH:mm:ss');
+  }
+
+  function clearDraft() {
+    localRemove(LocalStorageKeyConst.TASK_TEMPLATE_DRAFT);
+    draftSavedAt.value = '';
+  }
+
+  // 内容变化即自动暂存，不依赖使用者记得手动点
+  watch(currentSnapshot, () => {
+    // 历史草稿待用户决定期间冻结自动暂存，否则随手一改就会把待恢复的内容覆盖掉
+    if (pendingDraft.value) {
+      return;
+    }
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(writeDraft, DRAFT_DEBOUNCE_MS);
+  });
+
+  function onSaveDraft() {
+    clearTimeout(draftTimer);
+    writeDraft();
+    message.success(`草稿已暂存到本地 · ${draftSavedAt.value}`);
+  }
+
+  function restoreDraft() {
+    const draft = pendingDraft.value;
+    Object.assign(designer.base, draft.base);
+    designer.ruleScript = draft.ruleScript;
+    designer.uiSchemaText = draft.uiSchemaText;
+    pendingDraft.value = null;
+    message.success('草稿已恢复，确认无误后请点「保存模板」提交到服务端');
+  }
+
+  function discardDraft() {
+    clearDraft();
+    pendingDraft.value = null;
+    message.success('草稿已丢弃');
+  }
+
+  onMounted(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    // 检测上次遗留的草稿（浏览器崩溃、强制关闭等未走离开拦截的情况）
+    const raw = localRead(LocalStorageKeyConst.TASK_TEMPLATE_DRAFT);
+    if (!raw) {
+      return;
+    }
+    try {
+      pendingDraft.value = JSON.parse(raw);
+    } catch (e) {
+      clearDraft();
+    }
+  });
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    clearTimeout(draftTimer);
+  });
+
 </script>

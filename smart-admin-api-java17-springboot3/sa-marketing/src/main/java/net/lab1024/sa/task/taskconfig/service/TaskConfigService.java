@@ -61,7 +61,7 @@ public class TaskConfigService {
      * 前端表单只是第一道防线，服务端按模板 ui_schema 反向校验参数完整性
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> wizardSubmit(TaskConfigWizardSubmitForm form) {
+    public ResponseDTO<Long> wizardSubmit(TaskConfigWizardSubmitForm form) {
         TaskConfigWizardConfigForm configForm = form.getTaskConfig();
 
         // 1. 模板必须存在
@@ -97,6 +97,7 @@ public class TaskConfigService {
         // 5. 子表批量落库（insertBatch 由 CustomizedBaseMapper 提供）
         List<TaskPrizeMapping> mappingList = form.getPrizeMappingList().stream().map(item -> {
             TaskPrizeMapping mapping = new TaskPrizeMapping();
+            mapping.setTenantId("0");
             mapping.setTaskConfigId(taskConfig.getId());
             mapping.setStageLevel(item.getStageLevel());
             mapping.setStageCondition(JsonUtils.toJson(Map.of("target", item.getStageCondition())));
@@ -107,7 +108,8 @@ public class TaskConfigService {
         }).collect(Collectors.toList());
         taskPrizeMappingDao.insertBatch(mappingList);
 
-        return ResponseDTO.ok();
+        // 返回主表ID，前端成功页据此定位刚创建的任务
+        return ResponseDTO.ok(taskConfig.getId());
     }
 
     /**
