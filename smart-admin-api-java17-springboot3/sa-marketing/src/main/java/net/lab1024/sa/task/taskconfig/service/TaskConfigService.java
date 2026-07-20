@@ -15,6 +15,7 @@ import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigAddForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigQueryForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigUpdateForm;
+import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardConfigForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
 import net.lab1024.sa.task.taskconfig.domain.vo.TaskConfigVO;
 import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
@@ -61,15 +62,17 @@ public class TaskConfigService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO<String> wizardSubmit(TaskConfigWizardSubmitForm form) {
+        TaskConfigWizardConfigForm configForm = form.getTaskConfig();
+
         // 1. 模板必须存在
-        TaskTemplate template = taskTemplateService.getByTemplateCode(form.getTemplateCode());
+        TaskTemplate template = taskTemplateService.getByTemplateCode(configForm.getTemplateCode());
         if (template == null) {
-            return ResponseDTO.userErrorParam("任务模板不存在：" + form.getTemplateCode());
+            return ResponseDTO.userErrorParam("任务模板不存在：" + configForm.getTemplateCode());
         }
 
         // 2. 按模板 ui_schema 校验参数（必填、visibleWhen 可见性、image 参数归属）
-        Map<String, Object> ruleConfig = new HashMap<>(form.getRuleConfig());
-        Map<String, Object> uiConfig = form.getUiConfig() == null ? new HashMap<>() : new HashMap<>(form.getUiConfig());
+        Map<String, Object> ruleConfig = new HashMap<>(configForm.getRuleConfig());
+        Map<String, Object> uiConfig = configForm.getUiConfig() == null ? new HashMap<>() : new HashMap<>(configForm.getUiConfig());
         String paramError = checkParamBySchema(template.getUiSchema(), ruleConfig, uiConfig);
         if (paramError != null) {
             return ResponseDTO.userErrorParam(paramError);
@@ -77,15 +80,15 @@ public class TaskConfigService {
 
         // 3. taskType 以模板为准，服务端强制覆写，防止前端伪造；副标题/规则说明并入 ui_config 存储
         ruleConfig.put("taskType", template.getTaskType());
-        if (StringUtils.isNotBlank(form.getTaskDesc())) {
-            uiConfig.put("taskDesc", form.getTaskDesc());
+        if (StringUtils.isNotBlank(configForm.getTaskDesc())) {
+            uiConfig.put("taskDesc", configForm.getTaskDesc());
         }
-        if (StringUtils.isNotBlank(form.getRuleDesc())) {
-            uiConfig.put("ruleDesc", form.getRuleDesc());
+        if (StringUtils.isNotBlank(configForm.getRuleDesc())) {
+            uiConfig.put("ruleDesc", configForm.getRuleDesc());
         }
 
         // 4. 主表落库
-        TaskConfig taskConfig = SmartBeanUtil.copy(form, TaskConfig.class);
+        TaskConfig taskConfig = SmartBeanUtil.copy(configForm, TaskConfig.class);
         taskConfig.setRuleConfig(JsonUtils.toJson(ruleConfig));
         taskConfig.setUiConfig(JsonUtils.toJson(uiConfig));
         taskConfig.setStatus(STATUS_PENDING);

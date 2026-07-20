@@ -63,7 +63,7 @@ DROP TABLE IF EXISTS `t_lottery_record`;
 CREATE TABLE `t_lottery_record`
 (
     `id`            bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16)  NOT NULL DEFAULT '0'comment '租户id',
+    `tenant_id`     varchar(16)  NOT NULL DEFAULT '0' comment '租户id',
     `lottery_code`  varchar(32)  NOT NULL COMMENT '彩票编码',
     `issue_no`      varchar(32)  NOT NULL COMMENT '归属期号',
     `ticket_number` varchar(32)  NOT NULL COMMENT '彩票号码',

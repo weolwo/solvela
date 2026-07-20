@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS `t_task_template`;
 CREATE TABLE `t_task_template`
 (
     `id`            bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16)  NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`     varchar(16)  NOT NULL DEFAULT '0' COMMENT '租户ID',
     `template_code` varchar(64)  NOT NULL COMMENT '模板编码',
     `template_name` varchar(128) NOT NULL COMMENT '模板名称',
     `task_type`     varchar(32)  NOT NULL COMMENT '流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)',
@@ -25,8 +25,8 @@ DROP TABLE IF EXISTS `t_task_config`;
 CREATE TABLE `t_task_config`
 (
     `id`              bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `activity_code`   varchar(16)  NOT NULL default '0' COMMENT '活动编码',
-    `tenant_id`       varchar(16)  NOT NULL default '0' COMMENT '租户ID',
+    `activity_code`   varchar(16)  NOT NULL COMMENT '活动编码',
+    `tenant_id`       varchar(16)  NOT NULL DEFAULT '0' COMMENT '租户ID',
     `task_name`       varchar(128) NOT NULL COMMENT '任务名称',
     `template_code`   varchar(64)  NOT NULL COMMENT '模板Code',
     `trigger_event`   varchar(64)  NOT NULL COMMENT '触发事件：ORDER_PAID(支付), MEMBER_REGISTER(注册), DAILY_SIGN(签到), PAGE_VIEW(浏览), CUSTOM(自定义)',
@@ -58,7 +58,7 @@ DROP TABLE IF EXISTS `t_promotion_config`;
 CREATE TABLE `t_promotion_config`
 (
     `id`                      bigint         NOT NULL AUTO_INCREMENT COMMENT '配置ID',
-    `tenant_id`               varchar(16)    NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`               varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
     `promo_name`              varchar(128)   NOT NULL COMMENT '优惠配置名称',
     `prize_type`              varchar(32)    NOT NULL COMMENT '资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)',
 
@@ -97,7 +97,7 @@ DROP TABLE IF EXISTS `t_prize_config`;
 CREATE TABLE `t_prize_config`
 (
     `id`                  bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`           varchar(16)    NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`           varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
     `activity_code`       varchar(32)    NOT NULL COMMENT '活动编码',
     `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
     `prize_type`          varchar(32)    NOT NULL COMMENT '资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM',
@@ -120,7 +120,7 @@ DROP TABLE IF EXISTS `t_task_prize_mapping`;
 CREATE TABLE `t_task_prize_mapping`
 (
     `id`              bigint      NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`       varchar(16) NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`       varchar(16) NOT NULL DEFAULT '0' COMMENT '租户ID',
     `task_config_id`  bigint      NOT NULL COMMENT '任务配置ID',
     -- 达标条件
     `stage_condition` json        NOT NULL COMMENT '阶段达标条件：如 {"min": 10, "max": 99} 或 {"action": "share"}',
@@ -148,7 +148,7 @@ DROP TABLE IF EXISTS `t_task_record`;
 CREATE TABLE `t_task_record`
 (
     `id`               bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`        varchar(16)    NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`        varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`      varchar(64)    NOT NULL COMMENT '会员名',
     `task_config_id`   bigint         NOT NULL COMMENT '任务配置ID',
     `activity_code`    varchar(32)    NOT NULL COMMENT '活动编码',
@@ -177,7 +177,7 @@ DROP TABLE IF EXISTS `t_proposal_record`;
 CREATE TABLE `t_proposal_record`
 (
     `id`                  bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`           varchar(16)    NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`           varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`         varchar(64)    NOT NULL COMMENT '会员名',
     `source_type`         varchar(32)    NOT NULL COMMENT '来源：TASK(任务), DRAW(抽奖), MANUAL(人工)',
     `source_biz_id`       varchar(64)    NOT NULL COMMENT '来源单号(task_record_id 或 draw_log_trace_id)',
@@ -205,7 +205,7 @@ DROP TABLE IF EXISTS `t_prize_log`;
 CREATE TABLE `t_prize_log`
 (
     `id`                  bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`           varchar(16)  NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`           varchar(16)  NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`         varchar(64)  NOT NULL COMMENT '会员名',
     `prize_code`          varchar(64)  NOT NULL COMMENT '奖品编码',
     `activity_code`       varchar(32)  NOT NULL COMMENT '活动编码',
@@ -240,7 +240,7 @@ DROP TABLE IF EXISTS `t_member_wallet`;
 CREATE TABLE `t_member_wallet`
 (
     `id`            bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16)    NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`     varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`   varchar(64)    NOT NULL COMMENT '会员名',
     `asset_type`    varchar(32)    NOT NULL COMMENT '资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典',
     `balance`       decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '余额',
@@ -259,7 +259,7 @@ DROP TABLE IF EXISTS `t_member_asset_transaction`;
 CREATE TABLE `t_member_asset_transaction`
 (
     `id`               bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`        varchar(16)    NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`        varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`      varchar(64)    NOT NULL COMMENT '会员名',
     `asset_type`       varchar(32)    NOT NULL COMMENT '资产类型：SCORE, BALANCE',
     `transaction_type` tinyint        NOT NULL COMMENT '资金流向：1-收入, 2-支出',
@@ -282,7 +282,7 @@ DROP TABLE IF EXISTS `t_member_coupon`;
 CREATE TABLE `t_member_coupon`
 (
     `id`               bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`        varchar(16)  NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`        varchar(16)  NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`      varchar(64)  NOT NULL COMMENT '会员名',
     `coupon_code`      varchar(64)  NOT NULL COMMENT '券模编码',
     `coupon_type`      varchar(16)  NOT NULL COMMENT '券类型',
@@ -311,7 +311,7 @@ DROP TABLE IF EXISTS `t_physical_delivery`;
 CREATE TABLE `t_physical_delivery`
 (
     `id`                bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`         varchar(16)  NOT NULL default '0' COMMENT '租户ID',
+    `tenant_id`         varchar(16)  NOT NULL DEFAULT '0' COMMENT '租户ID',
     `member_name`       varchar(64)  NOT NULL COMMENT '会员名',
     `proposal_id`       bigint       NOT NULL COMMENT '发奖提案ID',
     `source_type`       varchar(64)  NOT NULL COMMENT '来源类型',

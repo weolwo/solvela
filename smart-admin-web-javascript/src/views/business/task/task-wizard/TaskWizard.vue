@@ -168,9 +168,9 @@
           <a-form-item
             label="详细规则说明 rule_desc"
             :name="['display', 'ruleDesc']"
-            extra="用户点击任务卡片弹出的详细活动规则说明（如：同一设备限领1次等）"
+            extra="用户点击任务卡片弹出的详细活动规则说明（如：同一设备限领1次等），支持富文本排版，内容以 HTML 存储"
           >
-            <a-textarea v-model:value="wizardForm.display.ruleDesc" :rows="4" :maxlength="500" show-count />
+            <SmartRichEditor v-model="wizardForm.display.ruleDesc" />
           </a-form-item>
         </a-card>
       </div>
@@ -194,6 +194,11 @@
             <a-descriptions-item label="生效时间">{{ summary.timeText }}</a-descriptions-item>
             <a-descriptions-item label="奖励阶梯">共 {{ wizardForm.prizeLadders.length }} 级</a-descriptions-item>
             <a-descriptions-item label="参与频次">{{ summary.limitLabel }}</a-descriptions-item>
+            <a-descriptions-item label="详细规则说明" :span="2">
+              <!-- 富文本内容由本后台运营录入，此处仅回显自己刚填写的内容 -->
+              <div v-if="wizardForm.display.ruleDesc" class="max-h-40 overflow-auto" v-html="wizardForm.display.ruleDesc"></div>
+              <span v-else>-</span>
+            </a-descriptions-item>
             <a-descriptions-item label="规则参数 rule_config" :span="2">
               <JsonViewer :value="summary.ruleConfigPreview" :expand-depth="2" copyable boxed sort class="w-full" />
             </a-descriptions-item>
@@ -225,6 +230,7 @@
   import { message } from 'ant-design-vue';
   import { taskApi } from '/@/api/business/task/task-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import SmartRichEditor from '/@/components/framework/wangeditor/index.vue';
   import SchemaFormRenderer from './SchemaFormRenderer.vue';
   import PrizeLadderBuilder from './PrizeLadderBuilder.vue';
   import {
