@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>抽奖配置工作台 (进阶工业版) - 1024 SmartAdmin</title>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
+    <script>
+        dayjs.extend(window.dayjs_plugin_customParseFormat);
+        dayjs.extend(window.dayjs_plugin_weekday);
+        dayjs.extend(window.dayjs_plugin_localeData);
+        dayjs.extend(window.dayjs_plugin_weekOfYear);
+        dayjs.extend(window.dayjs_plugin_weekYear);
+        dayjs.extend(window.dayjs_plugin_advancedFormat);
+        dayjs.extend(window.dayjs_plugin_quarterOfYear);
+    </script>
+
+    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.2.6/dist/reset.css" />
+    <script src="https://unpkg.com/ant-design-vue@4.2.6/dist/antd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f0f2f5; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+        .ant-card { border-radius: 8px; }
+        /* 让进度条更像柱状图 */
+        .sim-progress .ant-progress-inner { background-color: #e5e7eb; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 全局作用域 & 防篡改锁演示 -->
+    <a-card class="mb-4 shadow-sm" :body-style="{ padding: '16px 24px' }">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <span class="text-lg font-bold">🎯 抽奖引擎工作台 (工业版)</span>
+                <a-divider type="vertical"></a-divider>
+                <span class="text-gray-500 text-sm">当前活动：</span>
+                <a-select v-model:value="currentActivity" style="width: 200px">
+                    <a-select-option value="ACT_618">618 年中狂欢抽奖</a-select-option>
+                </a-select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-sm font-medium text-gray-600">🛡️ 活动状态模拟 (防篡改锁)：</span>
+                <a-switch v-model:checked="isOnline" checked-children="已上线" un-checked-children="未上线"></a-switch>
+            </div>
+        </div>
+    </a-card>
+
+    <a-card class="shadow-sm">
+        <a-tabs v-model:activeKey="activeTab">
+
+            <!-- Tab 1: 奖项物资库 -->
+            <a-tab-pane key="1" tab="📦 奖项物资库">
+                <a-alert v-if="isOnline" message="安全锁生效中：当前活动已上线，仅允许追加库存，不允许下调或删除奖项。" type="warning" show-icon class="mb-4"></a-alert>
+                <a-table :dataSource="prizeItems" :columns="prizeColumns" :pagination="false" size="middle" bordered>
+                    <template #bodyCell="{ column, record }">
+                        <template v-if="column.dataIndex === 'totalStock'">
+                            <a-tag v-if="record.totalStock === -1" color="blue">∞ 不限量</a-tag>
+                            <div v-else class="flex items-center space-x-2">
+                                <span class="w-12 text-right">{{ record.usedStock }} /</span>
+                                <!-- 防篡改：上线后只能改大，不能改小 -->
+                                <a-input-number
+                                        v-model:value="record.totalStock"
+                                        :min="isOnline ? record.originalStock : 0"
+                                        size="small"
+                                        style="width: 80px">
+                                </a-input-number>
+                            </div>
+                        </template>
+                    </template>
+                </a-table>
+            </a-tab-pane>
+
+            <!-- Tab 2: 奖池与概率引擎 -->
+            <!-- 脏状态红点：通过 :tab 的 slot 自定义 -->
+            <a-tab-pane key="2">
+                <template #tab>
+                    <a-badge :dot="isDirty" :offset="[5, 0]">
+                        <span>🎲 奖池与概率配置</span>
+                    </a-badge>
+                </template>
+
+                <a-row :gutter="16">
+                    <a-col :span="4">
+                        <div class="font-bold mb-2">分发奖池</div>
+                        <a-menu :selectedKeys="['POOL_DEFAULT']" mode="inline" class="border-r-0 rounded shadow-sm">
+                            <a-menu-item key="POOL_DEFAULT">🎁 免费普惠池</a-menu-item>
+                        </a-menu>
+                    </a-col>
+
+                    <a-col :span="20">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold">转盘坑位映射</span>
+                            <!-- 防篡改：上线后不允许从奖池踢出奖项 -->
+                            <a-button type="dashed" size="small" :disabled="isOnline">从物资库引入奖项</a-button>
+                        </div>
+
+                        <a-table :dataSource="poolMappings" :columns="mappingColumns" :pagination="false" size="small" bordered>
+                            <template #bodyCell="{ column, record }">
+                                <!-- 自动配平开关 -->
+                                <template v-if="column.dataIndex === 'isFallback'">
+                                    <a-tooltip :title="record.isFallback ? '当前为兜底奖项，自动吃掉剩余概率' : '设为兜底奖项'">
+                                        <a-switch
+                                                :checked="record.isFallback"
+                                                @change="(val) => setFallback(record.key, val)"
+                                                checked-children="兜底"
+                                                un-checked-children="固定">
+                                        </a-switch>
+                                    </a-tooltip>
+                                </template>
+
+                                <!-- 概率输入 -->
+                                <template v-else-if="column.dataIndex === 'probability'">
+                                    <!-- 如果是兜底，输入框禁用，只读显示 -->
+                                    <a-input-number
+                                            v-model:value="record.probability"
+                                            :min="0" :max="100"
+                                            :step="0.0001"
+                                            :disabled="record.isFallback"
+                                            addon-after="%"
+                                            style="width: 150px"
+                                            :class="record.isFallback ? 'bg-blue-50' : ''"
+                                    ></a-input-number>
+                                    <span v-if="record.isFallback" class="ml-2 text-xs text-blue-500">(自动配平)</span>
+                                </template>
+
+                                <template v-else-if="column.dataIndex === 'action'">
+                                    <a-button type="link" danger size="small" :disabled="isOnline">移除</a-button>
+                                </template>
+                            </template>
+                        </a-table>
+
+                        <!-- 底部操作栏 -->
+                        <div class="mt-4 p-4 border rounded bg-white shadow-sm flex items-center justify-between">
+                            <div class="flex-1 mr-8">
+                                <div class="mb-1 text-sm font-bold flex justify-between">
+                                    <span>总概率累加验证：{{ totalProbability.toFixed(4) }}%</span>
+                                    <span v-if="probabilityStatus === 'over'" class="text-red-500">❌ 概率超载，请调低固定奖项概率</span>
+                                    <span v-else-if="probabilityStatus === 'under'" class="text-orange-500">⚠️ 概率不足，未达到 100%</span>
+                                    <span v-else class="text-green-500">✅ 验证通过，闭环完整</span>
+                                </div>
+                                <a-progress :percent="probabilityStatus === 'over' ? 100 : totalProbability" :status="probabilityStatus === 'over' ? 'exception' : (probabilityStatus === 'ok' ? 'success' : 'normal')" :stroke-width="12"></a-progress>
+                            </div>
+                            <div class="flex space-x-3">
+                                <a-button @click="openSimulator" style="background-color: #f3e8ff; border-color: #d8b4fe; color: #7e22ce;">
+                                    🎲 沙盘模拟器
+                                </a-button>
+                                <a-button type="primary" :disabled="probabilityStatus !== 'ok'" @click="saveConfig">
+                                    {{ isDirty ? '* 保存配置' : '保存配置' }}
+                                </a-button>
+                            </div>
+                        </div>
+                    </a-col>
+                </a-row>
+            </a-tab-pane>
+        </a-tabs>
+    </a-card>
+
+    <!-- 沙盘模拟器弹窗 -->
+    <a-modal v-model:open="showSimulatorModal" title="🎲 抽奖沙盘模拟器" width="600px" :footer="null">
+        <!-- 模拟是「执行」不是「确认」，放在内容区而非 footer 的 ok 位，可反复调参重跑 -->
+        <div class="mb-4 flex items-center justify-between">
+            <div>
+                <span>模拟抽奖次数：</span>
+                <a-radio-group v-model:value="simulateTimes">
+                    <a-radio-button :value="1000">1千次</a-radio-button>
+                    <a-radio-button :value="10000">1万次</a-radio-button>
+                    <a-radio-button :value="100000">10万次</a-radio-button>
+                </a-radio-group>
+            </div>
+            <a-button type="primary" @click="runSimulation">{{ simulationFinished ? '重新模拟' : '开始模拟' }}</a-button>
+        </div>
+
+        <div v-if="simulationFinished" class="bg-gray-50 p-4 rounded border">
+            <!-- 超发预警：库存与概率脱钩是超发事故的根源，此处按 剩余库存 直接对比模拟发放量 -->
+            <a-alert v-if="hasOverflow" type="error" show-icon class="mb-3"
+                     :message="`按此概率模拟 ${simulateTimes} 次，有 ${overflowCount} 个奖项会超发，实际投放时将提前抽空、后续用户中奖却无货`">
+            </a-alert>
+            <a-alert v-else type="success" show-icon class="mb-3"
+                     message="库存充足：当前概率下，所有限量奖项的预计发放量均未超过剩余库存">
+            </a-alert>
+
+            <h4 class="font-bold mb-3">预计消耗物资结果：</h4>
+            <div v-for="res in simulationResults" :key="res.name" class="mb-3">
+                <div class="flex justify-between text-sm mb-1">
+                    <span>
+                        {{ res.name }}
+                        <a-tag v-if="res.overflow" color="red" class="ml-1">库存超发</a-tag>
+                    </span>
+                    <span :class="res.overflow ? 'font-bold text-red-500' : 'font-bold text-blue-600'">
+                        {{ res.count }} 次 ({{ res.actualRatio }}%)
+                    </span>
+                </div>
+                <a-progress class="sim-progress" :percent="(res.count / maxSimulateCount) * 100" :show-info="false"
+                            :stroke-color="res.overflow ? '#ef4444' : '#8b5cf6'"></a-progress>
+                <!-- 库存对比：不限量的不提示，限量的给出「预计发出 / 剩余库存」，超发标红并给出缺口 -->
+                <div v-if="!res.unlimited" class="text-xs mt-1"
+                     :class="res.overflow ? 'text-red-500' : 'text-gray-400'">
+                    预计发出 {{ res.count }} / 剩余库存 {{ res.remainStock }}
+                    <span v-if="res.overflow">，缺口 {{ res.shortage }} 个</span>
+                </div>
+                <div v-else class="text-xs mt-1 text-gray-400">不限量，无超发风险</div>
+            </div>
+        </div>
+        <div v-else class="text-center text-gray-400 py-8">
+            点击上方「开始模拟」按钮，一键验证概率模型是否符合预期。
+        </div>
+    </a-modal>
+</div>
+
+<script>
+    const { createApp, ref, computed, watch, onMounted } = Vue;
+    const app = createApp({
+        setup() {
+            const currentActivity = ref('ACT_618');
+            const activeTab = ref('2');
+            const isOnline = ref(false); // 盾牌开关：模拟活动上线
+            const isDirty = ref(false);  // 脏状态红点
+            const originalConfigStr = ref('');
+
+            // Tab 1 数据
+            const prizeColumns = [
+                { title: '奖项名称', dataIndex: 'name' },
+                { title: '价值(元)', dataIndex: 'value' },
+                { title: '库存管理 (已发/总量)', dataIndex: 'totalStock' },
+            ];
+            const prizeItems = ref([
+                { key: '1', name: 'iPhone 15 Pro', value: 7999, originalStock: 5, totalStock: 5, usedStock: 2 },
+                { key: '2', name: '100 积分', value: 1, originalStock: 10000, totalStock: 10000, usedStock: 4500 },
+                { key: '3', name: '谢谢参与', value: 0, originalStock: -1, totalStock: -1, usedStock: 0 },
+            ]);
+
+            // Tab 2 数据
+            const mappingColumns = [
+                { title: '奖项名称', dataIndex: 'name' },
+                { title: '价值', dataIndex: 'value' },
+                { title: '兜底模式', dataIndex: 'isFallback', width: 100 },
+                { title: '中奖概率', dataIndex: 'probability', width: 220 },
+                { title: '操作', dataIndex: 'action', width: 80 }
+            ];
+            const poolMappings = ref([
+                { key: '1', name: 'iPhone 15 Pro', value: 7999, probability: 0.05, isFallback: false },
+                { key: '2', name: '100 积分', value: 1, probability: 10.95, isFallback: false },
+                { key: '3', name: '谢谢参与', value: 0, probability: 89.00, isFallback: true },
+            ]);
+
+            originalConfigStr.value = JSON.stringify(poolMappings.value);
+
+            // ================= 1. 自动配平逻辑 =================
+            const setFallback = (key, val) => {
+                if (val) {
+                    // 保证全局只有一个兜底
+                    poolMappings.value.forEach(item => item.isFallback = (item.key === key));
+                } else {
+                    // 取消兜底
+                    let item = poolMappings.value.find(i => i.key === key);
+                    if(item) item.isFallback = false;
+                }
+            };
+
+            // 监听变动，自动计算兜底项的剩余概率
+            watch(poolMappings, (newVal) => {
+                let sumNormal = 0;
+                let fallbackItem = null;
+
+                newVal.forEach(item => {
+                    if (item.isFallback) { fallbackItem = item; }
+                    else { sumNormal += (item.probability || 0); }
+                });
+
+                if (fallbackItem) {
+                    let remain = 100 - sumNormal;
+                    // 解决 JS 浮点数精度问题
+                    fallbackItem.probability = remain >= 0 ? Number(remain.toFixed(4)) : 0;
+                }
+
+                // ================= 4. 脏状态检测 =================
+                isDirty.value = JSON.stringify(newVal) !== originalConfigStr.value;
+            }, { deep: true });
+
+            const totalProbability = computed(() => {
+                return poolMappings.value.reduce((sum, item) => sum + (item.probability || 0), 0);
+            });
+
+            // 浮点累加误差容差：奖项超过 3 个时 0.1+0.2+... 这类累加会得到 99.99999999999999，
+            // 用 === 100 严格比较会出现「界面显示 100.0000% 验证通过、保存按钮却是灰的」的死局
+            const PROBABILITY_EPSILON = 0.0001;
+            const probabilityStatus = computed(() => {
+                const diff = totalProbability.value - 100;
+                if (diff > PROBABILITY_EPSILON) return 'over';
+                if (diff < -PROBABILITY_EPSILON) return 'under';
+                return 'ok';
+            });
+
+            const saveConfig = () => {
+                originalConfigStr.value = JSON.stringify(poolMappings.value);
+                isDirty.value = false;
+                antd.message.success('配置保存成功！');
+            };
+
+            // ================= 3. 沙盘模拟器逻辑 =================
+            const showSimulatorModal = ref(false);
+            const simulateTimes = ref(100000);
+            const simulationFinished = ref(false);
+            const simulationResults = ref([]);
+            const maxSimulateCount = ref(0); // 用于计算进度条的相对长度
+
+            // 超发汇总：驱动结果区顶部的整体预警条
+            const overflowCount = computed(() => simulationResults.value.filter(r => r.overflow).length);
+            const hasOverflow = computed(() => overflowCount.value > 0);
+
+            // 每次打开都从干净状态开始：否则改完概率再打开，先看到的是上一轮基于旧概率的结果，会误导判断
+            const openSimulator = () => {
+                simulationFinished.value = false;
+                simulationResults.value = [];
+                showSimulatorModal.value = true;
+            };
+
+            const runSimulation = () => {
+                if (probabilityStatus.value !== 'ok') {
+                    antd.message.error('总概率必须等于100%才能模拟！');
+                    return;
+                }
+                // 构造概率区间 [0, 0.05), [0.05, 11), [11, 100)
+                let ranges = [];
+                let currentAcc = 0;
+                poolMappings.value.forEach(item => {
+                    ranges.push({ ...item, min: currentAcc, max: currentAcc + item.probability });
+                    currentAcc += item.probability;
+                });
+
+                // 初始化结果字典（用 key 计数，避免同名奖项串数据）
+                let counter = {};
+                poolMappings.value.forEach(item => counter[item.key] = 0);
+
+                // 核心模拟引擎 (Math.random)
+                for(let i=0; i<simulateTimes.value; i++) {
+                    let rand = Math.random() * 100;
+                    let hit = ranges.find(r => rand >= r.min && rand < r.max);
+                    if (hit) { counter[hit.key]++; }
+                }
+
+                // 格式化输出结果，并按 key 回查物资库剩余库存，判断是否会超发
+                let resArray = [];
+                let maxCount = 0;
+                poolMappings.value.forEach(item => {
+                    let cnt = counter[item.key];
+                    if(cnt > maxCount) maxCount = cnt;
+
+                    // 剩余库存 = 总量 - 已发；-1 视为不限量
+                    let stockItem = prizeItems.value.find(p => p.key === item.key);
+                    let unlimited = !stockItem || stockItem.totalStock === -1;
+                    let remainStock = unlimited ? Infinity : (stockItem.totalStock - stockItem.usedStock);
+                    let overflow = !unlimited && cnt > remainStock;
+
+                    resArray.push({
+                        name: item.name,
+                        count: cnt,
+                        actualRatio: ((cnt / simulateTimes.value) * 100).toFixed(4),
+                        unlimited,
+                        remainStock,
+                        overflow,
+                        // 超发缺口：预计发出比剩余库存多多少
+                        shortage: overflow ? cnt - remainStock : 0
+                    });
+                });
+
+                simulationResults.value = resArray;
+                maxSimulateCount.value = maxCount;
+                simulationFinished.value = true;
+                antd.message.success(`已完成 ${simulateTimes.value} 次抽奖模拟！`);
+            };
+
+            return {
+                currentActivity, activeTab, isOnline, isDirty,
+                prizeColumns, prizeItems,
+                mappingColumns, poolMappings,
+                totalProbability, probabilityStatus, setFallback, saveConfig,
+                showSimulatorModal, openSimulator, simulateTimes, simulationFinished, simulationResults, maxSimulateCount, runSimulation,
+                overflowCount, hasOverflow
+            };
+        }
+    });
+
+    app.use(antd);
+    app.mount('#app');
+</script>
+</body>
+</html>
