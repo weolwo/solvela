@@ -6,9 +6,6 @@
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
             <result column="activity_code" property="activityCode" />
-            <result column="item_name" property="itemName" />
-            <result column="item_value" property="itemValue" />
-            <result column="item_image" property="itemImage" />
             <result column="prize_code" property="prizeCode" />
             <result column="user_max_count" property="userMaxCount" />
             <result column="total_stock" property="totalStock" />
@@ -24,9 +21,6 @@
                 id, 
                 tenant_id, 
                 activity_code, 
-                item_name, 
-                item_value, 
-                item_image, 
                 prize_code, 
                 user_max_count, 
                 total_stock, 
@@ -45,9 +39,6 @@
                         </if>
                         <if test="queryForm.activityCode != null">
                             AND activity_code = #{queryForm.activityCode}
-                        </if>
-                        <if test="queryForm.itemName != null">
-                            AND item_name = #{queryForm.itemName}
                         </if>
         </where>
     </sql>

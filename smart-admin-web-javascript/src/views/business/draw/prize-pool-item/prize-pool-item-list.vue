@@ -15,9 +15,6 @@
       <a-form-item label="活动编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.activityCode" placeholder="活动编码" />
       </a-form-item>
-      <a-form-item label="奖项名称" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.itemName" placeholder="奖项名称" />
-      </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
           <template #icon>
@@ -130,21 +127,6 @@
       ellipsis: true,
     },
     {
-      title: '奖项名称',
-      dataIndex: 'itemName',
-      ellipsis: true,
-    },
-    {
-      title: '奖项价值',
-      dataIndex: 'itemValue',
-      ellipsis: true,
-    },
-    {
-      title: 'UI图标URL',
-      dataIndex: 'itemImage',
-      ellipsis: true,
-    },
-    {
       title: '奖品编码',
       dataIndex: 'prizeCode',
       ellipsis: true,
@@ -202,7 +184,6 @@
   const queryFormState = {
     tenantId: undefined, //租户id
     activityCode: undefined, //活动编码
-    itemName: undefined, //奖项名称
     pageNum: 1,
     pageSize: 10,
   };

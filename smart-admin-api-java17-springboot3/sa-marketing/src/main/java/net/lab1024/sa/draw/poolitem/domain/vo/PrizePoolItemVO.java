@@ -1,7 +1,6 @@
 package net.lab1024.sa.draw.poolitem.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -25,15 +24,6 @@ public class PrizePoolItemVO {
 
     @Schema(description = "归属活动编码")
     private String activityCode;
-
-    @Schema(description = "奖项展示名称(如: 豪华茅台)")
-    private String itemName;
-
-    @Schema(description = "奖项价值")
-    private BigDecimal itemValue;
-
-    @Schema(description = "奖项UI图标URL")
-    private String itemImage;
 
     @Schema(description = "关联(t_prize_config)")
     private String prizeCode;

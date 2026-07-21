@@ -17,15 +17,6 @@
       <a-form-item label="活动编码" name="activityCode">
         <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="归属活动编码" />
       </a-form-item>
-      <a-form-item label="奖项名称" name="itemName">
-        <a-input style="width: 100%" v-model:value="form.itemName" placeholder="奖项展示名称(如: 豪华茅台)" />
-      </a-form-item>
-      <a-form-item label="奖项价值" name="itemValue">
-        <a-input-number style="width: 100%" v-model:value="form.itemValue" placeholder="奖项价值" />
-      </a-form-item>
-      <a-form-item label="UI图标URL" name="itemImage">
-        <a-input style="width: 100%" v-model:value="form.itemImage" placeholder="奖项UI图标URL" />
-      </a-form-item>
       <a-form-item label="奖品Id" name="prizeCode">
         <SmartEnumSelect width="100%" v-model:value="form.prizeCode" enum-name="" placeholder="关联(t_prize_config)" />
       </a-form-item>
@@ -97,9 +88,6 @@
     id: undefined, //id
     tenantId: undefined, //租户id
     activityCode: undefined, //归属活动编码
-    itemName: undefined, //奖项展示名称(如: 豪华茅台)
-    itemValue: undefined, //奖项价值
-    itemImage: undefined, //奖项UI图标URL
     prizeCode: undefined, //关联(t_prize_config)
     userMaxCount: undefined, //单人限领次数: -1不限, 1表示每人最多中一次
     totalStock: undefined, //本次活动总共出几个？-1不限
@@ -112,7 +100,6 @@
   const rules = {
     tenantId: [{ required: true, message: '租户id 必填' }],
     activityCode: [{ required: true, message: '归属活动编码 必填' }],
-    itemName: [{ required: true, message: '奖项展示名称(如: 豪华茅台) 必填' }],
     prizeCode: [{ required: true, message: '关联(t_prize_config) 必填' }],
     userMaxCount: [{ required: true, message: '单人限领次数: -1不限, 1表示每人最多中一次 必填' }],
     totalStock: [{ required: true, message: '本次活动总共出几个？-1不限 必填' }],

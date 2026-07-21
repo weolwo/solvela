@@ -23,7 +23,4 @@ public class PrizePoolItemQueryForm extends PageParam {
     @Schema(description = "活动编码")
     private String activityCode;
 
-    @Schema(description = "奖项名称")
-    private String itemName;
-
 }

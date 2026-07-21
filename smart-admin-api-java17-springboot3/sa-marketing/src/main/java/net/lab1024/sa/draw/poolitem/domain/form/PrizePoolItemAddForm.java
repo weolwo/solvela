@@ -3,7 +3,6 @@ package net.lab1024.sa.draw.poolitem.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -25,16 +24,6 @@ public class PrizePoolItemAddForm {
     @Schema(description = "归属活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "归属活动编码 不能为空")
     private String activityCode;
-
-    @Schema(description = "奖项展示名称(如: 豪华茅台)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "奖项展示名称(如: 豪华茅台) 不能为空")
-    private String itemName;
-
-    @Schema(description = "奖项价值")
-    private BigDecimal itemValue;
-
-    @Schema(description = "奖项UI图标URL")
-    private String itemImage;
 
     @Schema(description = "关联(t_prize_config)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "关联(t_prize_config) 不能为空")

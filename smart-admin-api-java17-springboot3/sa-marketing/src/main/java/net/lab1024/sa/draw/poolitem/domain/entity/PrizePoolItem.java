@@ -3,7 +3,6 @@ package net.lab1024.sa.draw.poolitem.domain.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -33,21 +32,6 @@ public class PrizePoolItem {
      * 归属活动编码
      */
     private String activityCode;
-
-    /**
-     * 奖项展示名称(如: 豪华茅台)
-     */
-    private String itemName;
-
-    /**
-     * 奖项价值
-     */
-    private BigDecimal itemValue;
-
-    /**
-     * 奖项UI图标URL
-     */
-    private String itemImage;
 
     /**
      * 关联(t_prize_config)
