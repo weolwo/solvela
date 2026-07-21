@@ -12,13 +12,7 @@
 -->
 <template>
   <div>
-    <a-alert
-      v-if="isOnline"
-      type="warning"
-      show-icon
-      class="mb-4"
-      message="活动已上线：仅允许追加库存，禁止缩减库存、切换不限量或移除奖项。"
-    />
+    <a-alert v-if="isOnline" type="warning" show-icon class="mb-4" message="活动已上线：仅允许追加库存，禁止缩减库存、切换不限量或移除奖项。" />
 
     <div class="mb-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
@@ -68,13 +62,7 @@
             <a-tag v-if="record.totalStock === UNLIMITED" color="blue">∞ 不限量</a-tag>
             <div v-else class="flex items-center gap-1 text-sm">
               <span class="text-gray-400">已发 {{ record.usedStock }} /</span>
-              <a-input-number
-                v-model:value="record.totalStock"
-                :min="stockMin(record)"
-                :precision="0"
-                size="small"
-                class="w-24"
-              />
+              <a-input-number v-model:value="record.totalStock" :min="stockMin(record)" :precision="0" size="small" class="w-24" />
             </div>
           </div>
         </template>
@@ -92,6 +80,18 @@
             <a-tag v-if="record.userMaxCount === UNLIMITED" color="blue">不限</a-tag>
             <a-input-number v-else v-model:value="record.userMaxCount" :min="1" :precision="0" size="small" class="w-20" />
           </div>
+        </template>
+
+        <!-- 高级策略：白名单（对齐 t_prize_pool_item.white_list） -->
+        <template v-else-if="column.dataIndex === 'whiteList'">
+          <a-button
+            type="link"
+            size="small"
+            :class="record.whiteList?.length ? 'font-medium text-purple-600!' : 'text-gray-400!'"
+            @click="openWhiteList(record)"
+          >
+            配置白名单<span v-if="record.whiteList?.length"> ({{ record.whiteList.length }})</span>
+          </a-button>
         </template>
 
         <!-- 操作 -->
@@ -149,13 +149,34 @@
           <span class="text-sm text-gray-500">已选 {{ drawerSelectedKeys.length }} 项</span>
           <a-space>
             <a-button @click="drawerOpen = false">取消</a-button>
-            <a-button type="primary" :disabled="drawerSelectedKeys.length === 0" @click="confirmImport">
-              确认引入
-            </a-button>
+            <a-button type="primary" :disabled="drawerSelectedKeys.length === 0" @click="confirmImport"> 确认引入 </a-button>
           </a-space>
         </div>
       </template>
     </a-drawer>
+
+    <!-- 白名单配置 -->
+    <a-modal
+      v-model:open="whiteListModalOpen"
+      :title="`🛡️ 白名单配置 - ${currentRecord?.prizeName || ''}`"
+      :width="560"
+      ok-text="保存名单"
+      cancel-text="取消"
+      @ok="confirmWhiteList"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        class="mb-3"
+        message="名单内的用户在抽奖时，只要该奖项仍有库存，将无视概率 100% 必中此奖。多个 UserID 请用逗号或换行隔开。"
+      />
+      <a-textarea
+        v-model:value="whiteListText"
+        :rows="8"
+        placeholder="每行一个 UserID，也可用逗号分隔，例如：&#10;vip_10086&#10;test_user_01, test_user_02"
+      />
+      <div class="mt-2 text-xs text-gray-400">保存时会自动按换行/中英文逗号切分、去空格、去重。</div>
+    </a-modal>
   </div>
 </template>
 
@@ -202,6 +223,7 @@
     { title: '价值', dataIndex: 'prizeValue', width: 110 },
     { title: '总库存（已发/总量）', dataIndex: 'totalStock', width: 230 },
     { title: '单人限领', dataIndex: 'userMaxCount', width: 180 },
+    { title: '高级策略', dataIndex: 'whiteList', width: 140 },
     { title: '操作', dataIndex: 'action', width: 80 },
   ];
 
@@ -209,9 +231,39 @@
   // 只读字段(prizeName/prizeType/prizeValue)是引入时从资产库带过来的快照，本组件不提供编辑
 
   const mainList = ref([
-    { key: 'PRIZE_IPHONE15', prizeCode: 'PRIZE_IPHONE15', prizeName: 'iPhone 15 Pro', prizeType: 'PHYSICAL', prizeValue: 7999, totalStock: 5, userMaxCount: 1, usedStock: 2 },
-    { key: 'PRIZE_SCORE_100', prizeCode: 'PRIZE_SCORE_100', prizeName: '100 积分', prizeType: 'SCORE', prizeValue: 1, totalStock: 10000, userMaxCount: 5, usedStock: 4500 },
-    { key: 'PRIZE_THANKS', prizeCode: 'PRIZE_THANKS', prizeName: '谢谢参与', prizeType: 'SCORE', prizeValue: 0, totalStock: UNLIMITED, userMaxCount: UNLIMITED, usedStock: 0 },
+    {
+      key: 'PRIZE_IPHONE15',
+      prizeCode: 'PRIZE_IPHONE15',
+      prizeName: 'iPhone 15 Pro',
+      prizeType: 'PHYSICAL',
+      prizeValue: 7999,
+      totalStock: 5,
+      userMaxCount: 1,
+      usedStock: 2,
+      whiteList: ['vip_10086', 'test_user_01'],
+    },
+    {
+      key: 'PRIZE_SCORE_100',
+      prizeCode: 'PRIZE_SCORE_100',
+      prizeName: '100 积分',
+      prizeType: 'SCORE',
+      prizeValue: 1,
+      totalStock: 10000,
+      userMaxCount: 5,
+      usedStock: 4500,
+      whiteList: [],
+    },
+    {
+      key: 'PRIZE_THANKS',
+      prizeCode: 'PRIZE_THANKS',
+      prizeName: '谢谢参与',
+      prizeType: 'SCORE',
+      prizeValue: 0,
+      totalStock: UNLIMITED,
+      userMaxCount: UNLIMITED,
+      usedStock: 0,
+      whiteList: [],
+    },
   ]);
 
   // 已保存基线：用于 isDirty 比对 + isOnline 时的库存下限锁定
@@ -227,11 +279,7 @@
 
   const isDirty = computed(() => !isEqual(mainList.value, savedSnapshot.value));
 
-  watch(
-    mainList,
-    () => emit('change', { dirty: isDirty.value, count: mainList.value.length }),
-    { deep: true }
-  );
+  watch(mainList, () => emit('change', { dirty: isDirty.value, count: mainList.value.length }), { deep: true });
 
   // ---------------------------- 金额（decimal.js，杜绝浮点精度丢失） ----------------------------
 
@@ -339,11 +387,42 @@
       totalStock: DEFAULT_STOCK,
       userMaxCount: DEFAULT_USER_MAX,
       usedStock: 0,
+      // 新引入奖项默认无白名单
+      whiteList: [],
     }));
     mainList.value.push(...rows);
     message.success(`已引入 ${rows.length} 个奖项`);
     drawerOpen.value = false;
     drawerSelectedKeys.value = [];
+  }
+
+  // ---------------------------- 白名单配置（t_prize_pool_item.white_list） ----------------------------
+  // 白名单是「必中」策略，属运营手段，上线后仍允许调整（与概率同理），故不受 isOnline 结构锁限制
+
+  const whiteListModalOpen = ref(false);
+  const whiteListText = ref('');
+  // 指向 mainList 中的行对象引用，保存时直接改其 whiteList 即可触发响应式与 isDirty
+  const currentRecord = ref(null);
+
+  function openWhiteList(record) {
+    currentRecord.value = record;
+    whiteListText.value = (record.whiteList || []).join('\n');
+    whiteListModalOpen.value = true;
+  }
+
+  function confirmWhiteList() {
+    // 清洗：按换行 / 英文逗号 / 中文逗号切分 -> 去首尾空格 -> 去空项 -> Set 去重
+    const idList = (whiteListText.value || '')
+      .split(/[\r\n,，]+/)
+      .map((item) => item.trim())
+      .filter((item) => item !== '');
+    const uniqueIdList = [...new Set(idList)];
+
+    if (currentRecord.value) {
+      currentRecord.value.whiteList = uniqueIdList;
+    }
+    whiteListModalOpen.value = false;
+    message.success(`已解析并保存 ${uniqueIdList.length} 个不重复的 UserID`);
   }
 
   // ---------------------------- 对外暴露：供工作台父组件统一取数/保存 ----------------------------
