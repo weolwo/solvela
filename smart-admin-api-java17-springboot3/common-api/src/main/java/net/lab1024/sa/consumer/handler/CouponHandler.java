@@ -33,6 +33,11 @@ public class CouponHandler implements IPrizeHandler {
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
 
+    /**
+     * 一次中奖发放一张券
+     */
+    private static final int QUANTITY_PER_PRIZE = 1;
+
     @Override
     public ResponseDTO dispatch(PrizeLog prizeLog) {
         log.info(">>>> [优惠券派发策略] 开始发券，提案LogId: {}", prizeLog.getId());
@@ -58,7 +63,13 @@ public class CouponHandler implements IPrizeHandler {
         ProposalRecordAddForm req = new ProposalRecordAddForm();
         req.setMemberName(prizeLog.getMemberName());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
-        req.setPromotionValue(amount);
+        req.setAssetType(PrizeTypeEnum.COUPON.name());
+        // 券是实例类资产：光有面额发不出来，必须指明发哪张券模。
+        // 由营销侧主动传给账务域，账务域不再反查 prize_log（依赖方向从「账务->营销」翻转为「营销->账务」）。
+        // 当前值仍是 prize_code —— 券模表尚未建立，等建好后这里改传券模ID，账务侧代码一行都不用动。
+        req.setAssetRef(prizeConfig.getPrizeCode());
+        req.setAmount(amount);
+        req.setQuantity(QUANTITY_PER_PRIZE);
         req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name());
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放优惠券");

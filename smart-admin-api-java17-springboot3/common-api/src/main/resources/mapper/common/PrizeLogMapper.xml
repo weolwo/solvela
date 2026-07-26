@@ -125,4 +125,15 @@
           and status = 0
     </update>
 
+    <!-- 发奖审批流转，条件更新防止两个运营同时点通过导致重复派发 -->
+    <update id="updateApproveStatus">
+        update t_prize_log
+        set approve_status = #{toApproveStatus},
+            approve_by = #{approveBy},
+            approve_time = now(),
+            update_time = now()
+        where id = #{id}
+          and approve_status = #{fromApproveStatus}
+    </update>
+
 </mapper>

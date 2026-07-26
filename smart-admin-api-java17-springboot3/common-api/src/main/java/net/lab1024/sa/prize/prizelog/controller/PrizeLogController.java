@@ -6,6 +6,8 @@ import net.lab1024.sa.prize.prizelog.domain.form.PrizeLogAddForm;
 import net.lab1024.sa.prize.prizelog.domain.form.PrizeLogQueryForm;
 import net.lab1024.sa.prize.prizelog.domain.form.PrizeLogUpdateForm;
 import net.lab1024.sa.prize.prizelog.domain.vo.PrizeLogVO;
+import net.lab1024.sa.base.common.util.SmartRequestUtil;
+import net.lab1024.sa.consumer.handler.PrizeDispatchHandler;
 import net.lab1024.sa.prize.prizelog.service.PrizeLogService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +33,22 @@ import lombok.RequiredArgsConstructor;
 public class PrizeLogController {
 
     private final PrizeLogService Service;
+
+    private final PrizeDispatchHandler prizeDispatchHandler;
+
+    @Operation(summary = "发奖审批通过（approve_mode=1 的奖品唯一出口，通过后立即派发）")
+    @GetMapping("/approve/{id}")
+    @SaCheckPermission(":approve")
+    public ResponseDTO<String> approveDispatch(@PathVariable Long id) {
+        return prizeDispatchHandler.approveDispatch(id, SmartRequestUtil.getRequestUser().getUserName());
+    }
+
+    @Operation(summary = "发奖审批驳回")
+    @GetMapping("/reject/{id}")
+    @SaCheckPermission(":approve")
+    public ResponseDTO<String> rejectDispatch(@PathVariable Long id, @RequestParam(required = false) String reason) {
+        return prizeDispatchHandler.rejectDispatch(id, SmartRequestUtil.getRequestUser().getUserName(), reason);
+    }
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")

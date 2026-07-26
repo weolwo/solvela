@@ -27,6 +27,11 @@ public class BalanceHandler implements IPrizeHandler {
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
 
+    /**
+     * 一次中奖发放一份
+     */
+    private static final int QUANTITY_PER_PRIZE = 1;
+
 
     @Override
     public ResponseDTO dispatch(PrizeLog prizeLog) {
@@ -48,7 +53,10 @@ public class BalanceHandler implements IPrizeHandler {
             }
             req.setMemberName(prizeLog.getMemberName());
             req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
-            req.setPromotionValue(amount);
+            // 现金是值类资产：金额即全部信息，assetRef 留空
+            req.setAssetType(PrizeTypeEnum.BALANCE.name());
+            req.setAmount(amount);
+            req.setQuantity(QUANTITY_PER_PRIZE);
             req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name()); // 业务分类：彩票奖励
             req.setSourceBizId(prizeLog.getExternalBizNo()); // 极度关键：原彩票记录ID
             req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放");

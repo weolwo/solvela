@@ -177,15 +177,23 @@ CREATE TABLE `t_task_record`
 DROP TABLE IF EXISTS `t_proposal_record`;
 CREATE TABLE `t_proposal_record`
 (
-    `id`                  bigint         NOT NULL AUTO_INCREMENT comment 'id',
+    `id`                  bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
     `tenant_id`           varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
+    `trade_no`            varchar(32)    NOT NULL COMMENT '提案单号，服务端生成，对外唯一标识',
     `member_name`         varchar(64)    NOT NULL COMMENT '会员名',
-    `source_type`         varchar(32)    NOT NULL COMMENT '来源：TASK(任务), DRAW(抽奖), MANUAL(人工)',
-    `source_biz_id`       varchar(64)    NOT NULL COMMENT '来源单号(task_record_id 或 draw_log_trace_id)',
+    -- 发什么（账务域词汇，不含任何上游业务概念）
+    `asset_type`          varchar(16)    NOT NULL COMMENT 'SCORE/BALANCE/COUPON/PHYSICAL',
+    `asset_ref`           varchar(64)             DEFAULT NULL COMMENT '资产引用：券模/SKU，值类资产为空',
+    `amount`              decimal(13, 4) NOT NULL COMMENT '发放金额/积分数',
+    `quantity`            int            NOT NULL DEFAULT 1 COMMENT '发放数量，扣 used_quota 用',
+    -- 从哪来（只认单号，不认上游的业务语义）
+    `source_type`         varchar(32)    NOT NULL COMMENT '来源：TASK, DRAW, MANUAL',
+    `source_biz_id`       varchar(64)    NOT NULL COMMENT '来源单号',
+    -- 预算与风控归属
     `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
-    `promotion_value`     decimal(13, 4) NOT NULL COMMENT '优惠金额',
-    `status`              int            NULL     DEFAULT 0 COMMENT '状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截',
-    `remark`              varchar(255)            DEFAULT NULL COMMENT '执行失败/风控拦截原因',
+    `status`              int            NOT NULL DEFAULT 0 COMMENT '0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截',
+    `remark`              varchar(255)            DEFAULT NULL COMMENT '执行失败/风控拦截原因，或调用方传入的场景说明',
+    -- 审批字段不变 ...
     `first_reviewer`      varchar(64)             DEFAULT NULL COMMENT '一审人',
     `first_review_time`   datetime                DEFAULT NULL COMMENT '一审时间',
     `second_reviewer`     varchar(64)             DEFAULT NULL COMMENT '二审人',
@@ -197,9 +205,10 @@ CREATE TABLE `t_proposal_record`
     `update_by`           varchar(64)             DEFAULT NULL COMMENT '更新人',
     `update_time`         datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_t_prm_prop_tsk_stg` (`source_type`, `source_biz_id`),
-    KEY `idx_prop_sts` (`promotion_config_id`, `status`),
-    KEY `idx_prop_name` (`member_name`, `create_time`)
+    UNIQUE KEY `uk_trade_no` (`trade_no`),
+    UNIQUE KEY `uk_prop_source` (`source_type`, `asset_type`, `source_biz_id`),
+    KEY `idx_prop_cfg_sts` (`promotion_config_id`, `status`),
+    KEY `idx_prop_member` (`member_name`, `create_time`)
 ) COMMENT ='提案表';
 
 DROP TABLE IF EXISTS `t_prize_log`;
@@ -319,9 +328,10 @@ CREATE TABLE `t_physical_delivery`
     `proposal_id`       bigint       NOT NULL COMMENT '发奖提案ID',
     `source_type`       varchar(64)  NOT NULL COMMENT '来源类型',
 
-    `receiver_name`     varchar(64)  NOT NULL COMMENT '收件人姓名',
-    `receiver_phone`    varchar(32)  NOT NULL COMMENT '收件人电话',
-    `receiver_address`  varchar(255) NOT NULL COMMENT '收件详细地址',
+    -- 中奖时用户还没填地址，履约单先落、收件信息后补（详见 v3.37.0.sql）
+    `receiver_name`     varchar(64)  NULL DEFAULT NULL COMMENT '收件人姓名：中奖时未知，由用户后续补填',
+    `receiver_phone`    varchar(32)  NULL DEFAULT NULL COMMENT '收件人电话：中奖时未知，由用户后续补填',
+    `receiver_address`  varchar(255) NULL DEFAULT NULL COMMENT '收件详细地址：中奖时未知，由用户后续补填',
     `logistics_company` varchar(64)           DEFAULT NULL COMMENT '物流公司',
     `logistics_no`      varchar(128)          DEFAULT NULL COMMENT '物流单号',
     `status`            tinyint      NULL     DEFAULT 0 COMMENT '状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回',

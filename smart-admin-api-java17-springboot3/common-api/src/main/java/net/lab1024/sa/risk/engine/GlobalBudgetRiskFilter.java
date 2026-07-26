@@ -22,7 +22,7 @@ public class GlobalBudgetRiskFilter implements IRiskFilter {
     @Override
     public RiskResult doFilter(RiskContext context) {
         PromotionConfig config = context.getConfig();
-        BigDecimal applyAmount = context.getRequest().getPromotionValue();
+        BigDecimal applyAmount = context.getRequest().getAmount();
 
         // 如果配置了 -1 (不限预算)，直接放行
         if (config.getTotalAmount().compareTo(BigDecimal.valueOf(-1)) == 0) {

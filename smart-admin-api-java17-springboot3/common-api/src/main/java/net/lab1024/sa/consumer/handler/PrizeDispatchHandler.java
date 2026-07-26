@@ -11,11 +11,13 @@ import net.lab1024.sa.enums.ApproveModeEnum;
 import net.lab1024.sa.enums.EventCategoryEnum;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
+import net.lab1024.sa.prize.prizelog.dao.PrizeLogDao;
 import net.lab1024.sa.prize.prizelog.domain.entity.PrizeLog;
 import net.lab1024.sa.prize.prizelog.service.PrizeLogService;
 import net.lab1024.sa.scriptengine.annotation.ScriptFunction;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -31,6 +33,8 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
     private PrizeConfigService prizeConfigService;
     @Resource
     private PrizeStrategyFactory strategyFactory;
+    @Resource
+    private PrizeLogDao prizeLogDao;
 
     /**
      * 对齐 t_prize_log.fail_reason 的列长度
@@ -67,6 +71,54 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
 
         // 5. 自动免审通道，全速放行！
         doDispatch(prizeLog);
+    }
+
+    /**
+     * 发奖审批状态（对齐 t_prize_log.approve_status）
+     */
+    private static final int APPROVE_PENDING = 1;
+    private static final int APPROVE_PASSED = 2;
+    private static final int APPROVE_REJECTED = 3;
+
+    /**
+     * 运营审批通过发奖：这是 approve_mode=1 的奖品唯一的出口
+     *
+     * 注意本系统有**两层审批**，语义不同、可叠加：
+     * ① 本层（t_prize_config.approve_mode）——「这个奖该不该发给这个人」，运营视角，通过后才生成提案；
+     * ② 提案层（t_promotion_config.review_level）——「这笔钱该不该出」，财务视角，见 ProposalRecordService.approve。
+     * 两层都配了审批，就需要运营和财务各批一次。
+     *
+     * 条件更新做并发闸门：两个运营同时点通过，只有一个能推进状态，另一个会被告知已处理。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> approveDispatch(Long prizeLogId, String approveBy) {
+        PrizeLog prizeLog = prizeLogDao.selectById(prizeLogId);
+        if (prizeLog == null) {
+            return ResponseDTO.userErrorParam("发奖记录不存在");
+        }
+        int rows = prizeLogDao.updateApproveStatus(prizeLogId, APPROVE_PENDING, APPROVE_PASSED, approveBy);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("该发奖记录已被处理，请刷新后重试");
+        }
+        log.info("【发奖审批通过】LogId: {}, 审批人: {}", prizeLogId, approveBy);
+        // 状态已在内存里同步，避免 doDispatch 里回写时把审批结果覆盖掉
+        prizeLog.setApproveStatus(APPROVE_PASSED);
+        prizeLog.setApproveBy(approveBy);
+        doDispatch(prizeLog);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 运营审批驳回：不再派发，记录留痕
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> rejectDispatch(Long prizeLogId, String approveBy, String reason) {
+        int rows = prizeLogDao.updateApproveStatus(prizeLogId, APPROVE_PENDING, APPROVE_REJECTED, approveBy);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("该发奖记录已被处理，请刷新后重试");
+        }
+        log.info("【发奖审批驳回】LogId: {}, 审批人: {}, 理由: {}", prizeLogId, approveBy, reason);
+        return ResponseDTO.ok();
     }
 
     /**

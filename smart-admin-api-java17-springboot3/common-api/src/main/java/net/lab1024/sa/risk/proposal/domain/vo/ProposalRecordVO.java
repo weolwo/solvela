@@ -23,8 +23,23 @@ public class ProposalRecordVO {
     @Schema(description = "租户ID")
     private String tenantId;
 
+    @Schema(description = "提案单号，服务端生成，对外唯一标识")
+    private String tradeNo;
+
     @Schema(description = "会员名")
     private String memberName;
+
+    @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL")
+    private String assetType;
+
+    @Schema(description = "资产引用：券模/SKU，值类资产为空")
+    private String assetRef;
+
+    @Schema(description = "发放金额/积分数")
+    private BigDecimal amount;
+
+    @Schema(description = "发放数量，扣 used_quota 用")
+    private Integer quantity;
 
     @Schema(description = "来源：TASK(任务), DRAW(抽奖), MANUAL(人工)")
     private String sourceType;
@@ -34,9 +49,6 @@ public class ProposalRecordVO {
 
     @Schema(description = "优惠配置ID")
     private Long promotionConfigId;
-
-    @Schema(description = "优惠金额")
-    private BigDecimal promotionValue;
 
     @Schema(description = "状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截")
     private Integer status;

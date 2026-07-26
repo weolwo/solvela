@@ -1,6 +1,8 @@
 package net.lab1024.sa.base.common.util;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.function.Predicate;
 
 /**
@@ -73,5 +75,32 @@ public class SmartCodeUtil {
      */
     public static boolean isValidBizCode(String code) {
         return code != null && code.matches(BIZ_CODE_REGEX);
+    }
+
+    /**
+     * 单号随机段长度。前缀(≤4) + 日期(8) + 随机(16) = 28，控制在 varchar(32) 内
+     */
+    private static final int TRADE_NO_RANDOM_LENGTH = 16;
+
+    private static final DateTimeFormatter TRADE_NO_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    /**
+     * 生成对外业务单号：前缀 + yyyyMMdd + 16位随机
+     *
+     * 与 {@link #generateBizCode()} 的定位不同：
+     * 业务编码是「配置的身份」，运营手输手选，所以要短；
+     * 单号是「一次交易的凭证」，客服/财务对账要用，所以带日期前缀便于人工定位与分库分表，
+     * 且不需要人来输入，可以长一些换取更低的碰撞概率。
+     *
+     * @param prefix 业务前缀，如 PRP(提案)，建议不超过 4 个字符
+     */
+    public static String generateTradeNo(String prefix) {
+        StringBuilder builder = new StringBuilder(32);
+        builder.append(prefix == null ? "" : prefix);
+        builder.append(LocalDate.now().format(TRADE_NO_DATE));
+        for (int i = 0; i < TRADE_NO_RANDOM_LENGTH; i++) {
+            builder.append(ALPHABET[RANDOM.nextInt(ALPHABET.length)]);
+        }
+        return builder.toString();
     }
 }

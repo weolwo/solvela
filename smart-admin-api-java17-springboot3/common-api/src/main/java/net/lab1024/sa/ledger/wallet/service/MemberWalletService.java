@@ -76,7 +76,7 @@ public class MemberWalletService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void executeWalletCharge(ProposalRecord proposal, PrizeTypeEnum assetType) {
-        BigDecimal amount = proposal.getPromotionValue();
+        BigDecimal amount = proposal.getAmount();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }

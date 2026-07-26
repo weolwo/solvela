@@ -36,6 +36,11 @@ public class PhysicalPrizeHandler implements IPrizeHandler {
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
 
+    /**
+     * 一次中奖发放一件
+     */
+    private static final int QUANTITY_PER_PRIZE = 1;
+
     @Override
     public ResponseDTO dispatch(PrizeLog prizeLog) {
         log.info(">>>> [实物派发策略] 开始生成实物提案，LogId: {}", prizeLog.getId());
@@ -61,7 +66,12 @@ public class PhysicalPrizeHandler implements IPrizeHandler {
         ProposalRecordAddForm req = new ProposalRecordAddForm();
         req.setMemberName(prizeLog.getMemberName());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
-        req.setPromotionValue(amount);
+        req.setAssetType(PrizeTypeEnum.PHYSICAL.name());
+        // 实物是实例类资产：必须指明发哪个 SKU。当前用 prize_code 占位，
+        // 等实物与 t_goods 的映射建立后改传商品 SKU
+        req.setAssetRef(prizeConfig.getPrizeCode());
+        req.setAmount(amount);
+        req.setQuantity(QUANTITY_PER_PRIZE);
         req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name());
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放实物：" + prizeLog.getPrizeName());

@@ -33,6 +33,11 @@ public class ScoreHandler implements IPrizeHandler {
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
 
+    /**
+     * 一次中奖发放一份。奖品配置目前没有数量维度，将来支持「一次发N份」时改从配置读
+     */
+    private static final int QUANTITY_PER_PRIZE = 1;
+
     @Override
     public ResponseDTO dispatch(PrizeLog prizeLog) {
         log.info(">>>> [积分派发策略] 开始派发积分，提案LogId: {}", prizeLog.getId());
@@ -65,7 +70,10 @@ public class ScoreHandler implements IPrizeHandler {
         ProposalRecordAddForm req = new ProposalRecordAddForm();
         req.setMemberName(prizeLog.getMemberName());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
-        req.setPromotionValue(amount);
+        // 积分是值类资产：金额即全部信息，assetRef 留空
+        req.setAssetType(PrizeTypeEnum.SCORE.name());
+        req.setAmount(amount);
+        req.setQuantity(QUANTITY_PER_PRIZE);
         req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name());
         // 跨域幂等键：抽奖侧的 traceId，配合提案表唯一索引防重
         req.setSourceBizId(prizeLog.getExternalBizNo());

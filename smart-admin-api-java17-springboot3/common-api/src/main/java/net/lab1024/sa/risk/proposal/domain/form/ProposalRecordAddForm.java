@@ -18,13 +18,31 @@ import lombok.Data;
 @Data
 public class ProposalRecordAddForm {
 
-    @Schema(description = "租户ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户ID 不能为空")
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
+
+    // 单号由提案域自己发（saveProposal 里生成），调用方不该也不能指定 —— 它是本域对外的凭证。
+    // 这里若保留 @NotBlank，将来任何 Controller 暴露提案创建接口都会被误挡在门外
+    @Schema(description = "提案单号，服务端生成，调用方无需传入", accessMode = Schema.AccessMode.READ_ONLY)
+    private String tradeNo;
 
     @Schema(description = "会员名", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "会员名 不能为空")
     private String memberName;
+
+    @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "SCORE/BALANCE/COUPON/PHYSICAL 不能为空")
+    private String assetType;
+
+    @Schema(description = "资产引用：券模/SKU，值类资产为空")
+    private String assetRef;
+
+    @Schema(description = "发放金额/积分数", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "发放金额/积分数 不能为空")
+    private BigDecimal amount;
+
+    @Schema(description = "发放数量，扣 used_quota 用；不传按 1 计")
+    private Integer quantity;
 
     @Schema(description = "来源：TASK(任务), DRAW(抽奖), MANUAL(人工)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "来源：TASK(任务), DRAW(抽奖), MANUAL(人工) 不能为空")
@@ -37,10 +55,6 @@ public class ProposalRecordAddForm {
     @Schema(description = "优惠配置ID", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "优惠配置ID 不能为空")
     private Long promotionConfigId;
-
-    @Schema(description = "优惠金额", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "优惠金额 不能为空")
-    private BigDecimal promotionValue;
 
     @Schema(description = "状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截")
     private Integer status;

@@ -5,11 +5,15 @@
     <resultMap id="ProposalRecordVO" type="net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO">
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
+            <result column="trade_no" property="tradeNo" />
             <result column="member_name" property="memberName" />
+            <result column="asset_type" property="assetType" />
+            <result column="asset_ref" property="assetRef" />
+            <result column="amount" property="amount" />
+            <result column="quantity" property="quantity" />
             <result column="source_type" property="sourceType" />
             <result column="source_biz_id" property="sourceBizId" />
             <result column="promotion_config_id" property="promotionConfigId" />
-            <result column="promotion_value" property="promotionValue" />
             <result column="status" property="status" />
             <result column="remark" property="remark" />
             <result column="first_reviewer" property="firstReviewer" />
@@ -26,11 +30,15 @@
     <sql id="base_columns">
                 id, 
                 tenant_id, 
+                trade_no, 
                 member_name, 
+                asset_type, 
+                asset_ref, 
+                amount, 
+                quantity, 
                 source_type, 
                 source_biz_id, 
                 promotion_config_id, 
-                promotion_value, 
                 status, 
                 remark, 
                 first_reviewer, 
@@ -79,6 +87,12 @@
                         <if test="queryForm.firstReviewer != null">
                             AND first_reviewer = #{queryForm.firstReviewer}
                         </if>
+                        <if test="queryForm.tradeNo != null">
+                            AND trade_no = #{queryForm.tradeNo}
+                        </if>
+                        <if test="queryForm.assetType != null">
+                            AND asset_type = #{queryForm.assetType}
+                        </if>
         </where>
     </sql>
 
@@ -109,7 +123,6 @@
                     delete from t_proposal_record
                         where id = #{id}
                 </delete>
-
     <!-- 条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态 -->
     <update id="updateStatus">
         update t_proposal_record
@@ -127,4 +140,21 @@
         where id = #{id}
     </update>
 
+    <!--
+      审批流转。reviewerField 只允许取 first_reviewer / second_reviewer 两个字面量，
+      由 Service 侧用枚举收敛后传入，不接受外部输入，避免 ${} 拼接引入注入风险。
+    -->
+    <update id="updateReview">
+        update t_proposal_record
+        set status = #{toStatus},
+            ${reviewerField} = #{reviewer},
+            <choose>
+                <when test="reviewerField == 'first_reviewer'">first_review_time = now(),</when>
+                <otherwise>second_review_time = now(),</otherwise>
+            </choose>
+            review_comment = #{comment},
+            update_time = now()
+        where id = #{id}
+          and status = #{fromStatus}
+    </update>
 </mapper>

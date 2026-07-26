@@ -33,17 +33,42 @@ public class ProposalRecord {
     private String tenantId;
 
     /**
+     * 提案单号，服务端生成，对外唯一标识
+     */
+    private String tradeNo;
+
+    /**
      * 会员名
      */
     private String memberName;
 
     /**
-     * 来源：TASK(任务), DRAW(抽奖), MANUAL(人工)
+     * SCORE/BALANCE/COUPON/PHYSICAL
+     */
+    private String assetType;
+
+    /**
+     * 资产引用：券模/SKU，值类资产为空
+     */
+    private String assetRef;
+
+    /**
+     * 发放金额/积分数
+     */
+    private BigDecimal amount;
+
+    /**
+     * 发放数量，扣 used_quota 用
+     */
+    private Integer quantity;
+
+    /**
+     * 来源：TASK, DRAW, MANUAL
      */
     private String sourceType;
 
     /**
-     * 来源单号(task_record_id 或 draw_log_trace_id)
+     * 来源单号
      */
     private String sourceBizId;
 
@@ -53,17 +78,12 @@ public class ProposalRecord {
     private Long promotionConfigId;
 
     /**
-     * 优惠金额
-     */
-    private BigDecimal promotionValue;
-
-    /**
-     * 状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截
+     * 0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截
      */
     private Integer status;
 
     /**
-     * 执行失败/风控拦截原因
+     * 执行失败/风控拦截原因，或调用方传入的场景说明
      */
     private String remark;
 

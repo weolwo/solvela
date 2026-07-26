@@ -41,7 +41,7 @@ public class AssetDispatchEngine {
     /**
      * 一条提案占用一个发放名额（used_quota）。数量型资产（券/实物）靠它卡总量
      */
-    private static final int QUOTA_PER_PROPOSAL = 1;
+    private static final int DEFAULT_QUANTITY = 1;
 
     /**
      * 提案状态：对齐 t_proposal_record.status 注释，避免散落魔法值
@@ -68,9 +68,12 @@ public class AssetDispatchEngine {
      * 核心执行入口 (支持异步调用)
      */
     public void execute(ProposalRecord proposal, PromotionConfig config) {
-        log.info(">>>> [资产分发引擎] 开始执行提案, 提案ID: {}, 资产类型: {}", proposal.getId(), config.getPrizeType());
+        log.info(">>>> [资产分发引擎] 开始执行提案, 提案ID: {}, 单号: {}, 资产类型: {}",
+                proposal.getId(), proposal.getTradeNo(), proposal.getAssetType());
 
-        BigDecimal amount = proposal.getPromotionValue() == null ? BigDecimal.ZERO : proposal.getPromotionValue();
+        BigDecimal amount = proposal.getAmount() == null ? BigDecimal.ZERO : proposal.getAmount();
+        // 数量参与 used_quota 扣减：券/实物靠它卡总量，值类资产恒为 1
+        int quantity = proposal.getQuantity() == null ? DEFAULT_QUANTITY : proposal.getQuantity();
         // 记录预算是否真的扣成功：异常兜底时只有扣过才允许回滚，否则会把没占用的预算凭空还回去
         boolean budgetDeducted = false;
 
@@ -85,15 +88,18 @@ public class AssetDispatchEngine {
             // 2. 预算硬限流：把「够不够」压进 UPDATE 的 WHERE，一条 SQL 完成校验+扣减。
             //    风控链上的 GlobalBudgetRiskFilter 是「先读后判」的弱校验，高并发下读到的余量早已过期，
             //    真正防超发的是这里的条件更新。必须在动账之前扣，扣不动就别发。
-            if (promotionConfigDao.deductBudget(config.getId(), amount, QUOTA_PER_PROPOSAL) == 0) {
-                log.warn("【预算不足】提案ID: {}, 优惠配置: {}, 申请额: {}", proposal.getId(), config.getId(), amount);
+            if (promotionConfigDao.deductBudget(config.getId(), amount, quantity) == 0) {
+                log.warn("【预算不足】提案ID: {}, 优惠配置: {}, 申请额: {}, 数量: {}",
+                        proposal.getId(), config.getId(), amount, quantity);
                 markFailed(proposal, "预算或发放数量已耗尽");
                 return;
             }
             budgetDeducted = true;
 
-            // 3. 获取具体资产类型的执行策略 (如: SCORE, BALANCE, COUPON, PHYSICAL)
-            IAssetHandler handler = strategyFactory.getHandler(config.getPrizeType());
+            // 3. 按**提案自带的**资产类型选执行策略。
+            //    以前是读 config.getPrizeType()，等于「为了知道发什么，先得加载预算配置」——
+            //    路由和预算是两件事，不该耦合。提案自带 assetType 后引擎自洽了。
+            IAssetHandler handler = strategyFactory.getHandler(proposal.getAssetType());
 
             // 4. 极简下发：只管抛给下层，拿到成功/失败的结果
             ResponseDTO responseDTO = handler.dispatch(proposal);
@@ -104,14 +110,14 @@ public class AssetDispatchEngine {
                 syncPrizeLog(proposal, PRIZE_LOG_SUCCESS, null);
             } else {
                 // 没发出去就得把预算还回去，否则预算只减不加，跑一段时间水位就虚高到发不出奖
-                releaseBudgetQuietly(config, amount);
+                releaseBudgetQuietly(config, amount, quantity);
                 markFailed(proposal, "资产下发失败：" + responseDTO.getMsg());
             }
 
         } catch (Exception e) {
             log.error("【引擎致命异常】资产执行发生未知错误, 提案ID: {}", proposal.getId(), e);
             if (budgetDeducted) {
-                releaseBudgetQuietly(config, amount);
+                releaseBudgetQuietly(config, amount, quantity);
             }
             // 状态已经是 40(执行中)，不落终态就会永远卡住，必须兜底改成 70 让它可被排查/重试
             markFailed(proposal, "系统执行异常: " + e.getMessage());
@@ -152,11 +158,13 @@ public class AssetDispatchEngine {
     /**
      * 预算回滚：本身失败也不能再往外抛，否则会盖掉真正的失败原因、还会让状态停在 40
      */
-    private void releaseBudgetQuietly(PromotionConfig config, BigDecimal amount) {
+    private void releaseBudgetQuietly(PromotionConfig config, BigDecimal amount, int quantity) {
         try {
-            promotionConfigDao.releaseBudget(config.getId(), amount, QUOTA_PER_PROPOSAL);
+            // 必须按实际扣掉的数量还，扣 3 还 1 会让 used_quota 只增不减
+            promotionConfigDao.releaseBudget(config.getId(), amount, quantity);
         } catch (Exception e) {
-            log.error("【预算回滚失败】优惠配置: {}, 金额: {}，预算水位将虚高，请人工核对", config.getId(), amount, e);
+            log.error("【预算回滚失败】优惠配置: {}, 金额: {}, 数量: {}，预算水位将虚高，请人工核对",
+                    config.getId(), amount, quantity, e);
         }
     }
 }

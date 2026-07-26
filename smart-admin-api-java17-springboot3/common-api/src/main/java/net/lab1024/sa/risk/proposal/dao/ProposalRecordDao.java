@@ -1,13 +1,13 @@
 package net.lab1024.sa.risk.proposal.dao;
 
-        import java.util.List;
-        import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
-        import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordQueryForm;
-        import net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
+import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordQueryForm;
+import net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
 import java.util.List;
 
 /**
@@ -43,6 +43,22 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * 无条件写入终态与备注（成功/失败的收尾，不参与并发竞争）
      */
     int updateStatusAndRemark(@Param("id") Long id, @Param("status") Integer status, @Param("remark") String remark);
+
+    /**
+     * 审批流转：只有当前状态等于 fromStatus 才更新，同时记录审批人与意见
+     *
+     * 条件更新即并发闸门 —— 两个审批人同时点「通过」，只有一个能拿到 rows=1，
+     * 另一个拿到 0 会被告知「已被处理」，避免重复审批导致重复发放。
+     *
+     * @param reviewerField 写入哪个审批人字段：first_reviewer / second_reviewer
+     * @return 更新行数，0 表示状态已被别人推进
+     */
+    int updateReview(@Param("id") Long id,
+                     @Param("fromStatus") Integer fromStatus,
+                     @Param("toStatus") Integer toStatus,
+                     @Param("reviewerField") String reviewerField,
+                     @Param("reviewer") String reviewer,
+                     @Param("comment") String comment);
 
     /**
      * 列表查询 (无分页)

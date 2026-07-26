@@ -17,7 +17,7 @@ public class BasicLimitRiskFilter implements IRiskFilter {
     @Override
     public RiskResult doFilter(RiskContext context) {
         PromotionConfig config = context.getConfig();
-        BigDecimal applyAmount = context.getRequest().getPromotionValue();
+        BigDecimal applyAmount = context.getRequest().getAmount();
 
         // 校验：单次最大金额兜底 (t_promotion_config.single_max_amount)
         if (config.getSingleMaxAmount().compareTo(BigDecimal.ZERO) > 0

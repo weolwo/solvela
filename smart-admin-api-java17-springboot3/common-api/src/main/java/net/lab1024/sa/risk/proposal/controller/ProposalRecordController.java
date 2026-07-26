@@ -1,22 +1,21 @@
 package net.lab1024.sa.risk.proposal.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.ValidateList;
-import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
+import net.lab1024.sa.base.common.util.SmartRequestUtil;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordQueryForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordUpdateForm;
 import net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO;
 import net.lab1024.sa.risk.proposal.service.ProposalRecordService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+
 /**
  * 提案表 Controller
  *
@@ -37,6 +36,20 @@ public class ProposalRecordController {
     @SaCheckPermission(":query")
     public ResponseDTO<PageResult<ProposalRecordVO>> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "提案审批通过（财务视角；一审通过后按 review_level 决定进二审还是直接放行下发）")
+    @GetMapping("/approve/{id}")
+    @SaCheckPermission(":approve")
+    public ResponseDTO<String> approve(@PathVariable Long id, @RequestParam(required = false) String comment) {
+        return Service.approve(id, SmartRequestUtil.getRequestUser().getUserName(), comment);
+    }
+
+    @Operation(summary = "提案审批驳回")
+    @GetMapping("/reject/{id}")
+    @SaCheckPermission(":approve")
+    public ResponseDTO<String> reject(@PathVariable Long id, @RequestParam(required = false) String comment) {
+        return Service.reject(id, SmartRequestUtil.getRequestUser().getUserName(), comment);
     }
 
     @Operation(summary = "添加")

@@ -24,21 +24,30 @@
       <a-form-item label="优惠配置ID" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.promotionConfigId" placeholder="优惠配置ID" />
       </a-form-item>
-      <a-form-item label="状态" class="smart-query-form-item">
+      <a-form-item
+        label="状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截"
+        class="smart-query-form-item"
+      >
         <a-input
           style="width: 200px"
           v-model:value="queryForm.status"
           placeholder="状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截"
         />
       </a-form-item>
-      <a-form-item label="来源" class="smart-query-form-item">
+      <a-form-item label="来源：TASK(任务), DRAW(抽奖), MANUAL(人工)" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.sourceType" placeholder="来源：TASK(任务), DRAW(抽奖), MANUAL(人工)" />
       </a-form-item>
-      <a-form-item label="来源单号" class="smart-query-form-item">
+      <a-form-item label="来源单号(taskRecordId 或 drawLogTraceId)" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.sourceBizId" placeholder="来源单号(taskRecordId 或 drawLogTraceId)" />
       </a-form-item>
       <a-form-item label="一审人" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.firstReviewer" placeholder="一审人" />
+      </a-form-item>
+      <a-form-item label="提案单号，服务端生成，对外唯一标识" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.tradeNo" placeholder="提案单号，服务端生成，对外唯一标识" />
+      </a-form-item>
+      <a-form-item label="SCORE/BALANCE/COUPON/PHYSICAL" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.assetType" placeholder="SCORE/BALANCE/COUPON/PHYSICAL" />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -148,8 +157,33 @@
       ellipsis: true,
     },
     {
+      title: '提案单号，服务端生成，对外唯一标识',
+      dataIndex: 'tradeNo',
+      ellipsis: true,
+    },
+    {
       title: '会员名',
       dataIndex: 'memberName',
+      ellipsis: true,
+    },
+    {
+      title: 'SCORE/BALANCE/COUPON/PHYSICAL',
+      dataIndex: 'assetType',
+      ellipsis: true,
+    },
+    {
+      title: '资产引用：券模/SKU，值类资产为空',
+      dataIndex: 'assetRef',
+      ellipsis: true,
+    },
+    {
+      title: '发放金额/积分数',
+      dataIndex: 'amount',
+      ellipsis: true,
+    },
+    {
+      title: '发放数量，扣 used_quota 用',
+      dataIndex: 'quantity',
       ellipsis: true,
     },
     {
@@ -165,11 +199,6 @@
     {
       title: '优惠配置ID',
       dataIndex: 'promotionConfigId',
-      ellipsis: true,
-    },
-    {
-      title: '优惠金额',
-      dataIndex: 'promotionValue',
       ellipsis: true,
     },
     {
@@ -251,6 +280,8 @@
     sourceType: undefined, //来源：TASK(任务), DRAW(抽奖), MANUAL(人工)
     sourceBizId: undefined, //来源单号(taskRecordId 或 drawLogTraceId)
     firstReviewer: undefined, //一审人
+    tradeNo: undefined, //提案单号，服务端生成，对外唯一标识
+    assetType: undefined, //SCORE/BALANCE/COUPON/PHYSICAL
     pageNum: 1,
     pageSize: 10,
   };

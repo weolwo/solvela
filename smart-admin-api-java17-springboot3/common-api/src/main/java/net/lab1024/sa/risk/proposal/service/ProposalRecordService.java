@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.ledger.engine.AssetDispatchEngine;
 import net.lab1024.sa.risk.engine.RiskChainEngine;
@@ -50,6 +51,16 @@ public class ProposalRecordService {
 
     private final AssetDispatchEngine assetDispatchEngine;
 
+    /**
+     * 提案单号前缀
+     */
+    private static final String TRADE_NO_PREFIX = "PRP";
+
+    /**
+     * 调用方未指定发放数量时的默认值
+     */
+    private static final int DEFAULT_QUANTITY = 1;
+
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO addProposal(ProposalRecordAddForm req) {
         log.info(">>>> [风控提案域] 收到提案申请，来源: {}, 单号: {}", req.getSourceType(), req.getSourceBizId());
@@ -77,7 +88,7 @@ public class ProposalRecordService {
         // ==========================================
         // 3. 计算提案的初始审批状态
         // ==========================================
-        int targetStatus = calculateInitStatus(req.getPromotionValue(), config);
+        int targetStatus = calculateInitStatus(req.getAmount(), config);
 
         // ==========================================
         // 4. 落地正式提案记录 (依赖 uk_t_prm_prop_tsk_stg 防重)
@@ -101,6 +112,96 @@ public class ProposalRecordService {
             // 流程驻留在此，等待财务人员在后台调用 approve() 接口
         }
 
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 提案状态字典（对齐 t_proposal_record.status）
+     */
+    private static final int STATUS_FIRST_REVIEW = 10;
+    private static final int STATUS_SECOND_REVIEW = 11;
+    private static final int STATUS_REJECTED = 20;
+    private static final int STATUS_PENDING_EXECUTE = 30;
+
+    /**
+     * 审批人字段名，收敛在此，不接受外部传入（Mapper 里用 ${} 拼接）
+     */
+    private static final String FIELD_FIRST_REVIEWER = "first_reviewer";
+    private static final String FIELD_SECOND_REVIEWER = "second_reviewer";
+
+    /**
+     * 需要双层审批
+     */
+    private static final int REVIEW_LEVEL_DOUBLE = 2;
+
+    /**
+     * 审批通过：一审通过后按 review_level 决定进二审还是直接放行下发
+     *
+     * 并发安全靠条件更新：两个审批人同时点通过，只有一个拿到 rows=1，另一个被告知已处理，
+     * 避免重复审批引发重复发放。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> approve(Long id, String reviewer, String comment) {
+        ProposalRecord proposal = proposalRecordDao.selectById(id);
+        if (proposal == null) {
+            return ResponseDTO.userErrorParam("提案不存在");
+        }
+        PromotionConfig config = promotionConfigService.getById(proposal.getPromotionConfigId());
+        if (config == null) {
+            return ResponseDTO.userErrorParam("优惠配置不存在，无法审批");
+        }
+
+        Integer current = proposal.getStatus();
+        int rows;
+        int targetStatus;
+        if (STATUS_FIRST_REVIEW == current) {
+            // 一审通过：双层审批则转二审，否则直接待执行
+            targetStatus = config.getReviewLevel() == REVIEW_LEVEL_DOUBLE ? STATUS_SECOND_REVIEW : STATUS_PENDING_EXECUTE;
+            rows = proposalRecordDao.updateReview(id, STATUS_FIRST_REVIEW, targetStatus,
+                    FIELD_FIRST_REVIEWER, reviewer, comment);
+        } else if (STATUS_SECOND_REVIEW == current) {
+            targetStatus = STATUS_PENDING_EXECUTE;
+            rows = proposalRecordDao.updateReview(id, STATUS_SECOND_REVIEW, targetStatus,
+                    FIELD_SECOND_REVIEWER, reviewer, comment);
+        } else {
+            return ResponseDTO.userErrorParam("当前状态不可审批：" + current);
+        }
+
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("该提案已被处理，请刷新后重试");
+        }
+
+        // 审批到「待执行」才触发下发，且同样放在事务提交后 —— 理由与 addProposal 一致：
+        // 下发失败不能把审批记录一起回滚掉
+        if (targetStatus == STATUS_PENDING_EXECUTE) {
+            proposal.setStatus(STATUS_PENDING_EXECUTE);
+            dispatchAfterCommit(proposal, config);
+        }
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 审批驳回：一审/二审均可驳回，驳回后不再下发
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> reject(Long id, String reviewer, String comment) {
+        ProposalRecord proposal = proposalRecordDao.selectById(id);
+        if (proposal == null) {
+            return ResponseDTO.userErrorParam("提案不存在");
+        }
+        Integer current = proposal.getStatus();
+        String reviewerField;
+        if (STATUS_FIRST_REVIEW == current) {
+            reviewerField = FIELD_FIRST_REVIEWER;
+        } else if (STATUS_SECOND_REVIEW == current) {
+            reviewerField = FIELD_SECOND_REVIEWER;
+        } else {
+            return ResponseDTO.userErrorParam("当前状态不可驳回：" + current);
+        }
+        int rows = proposalRecordDao.updateReview(id, current, STATUS_REJECTED, reviewerField, reviewer, comment);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("该提案已被处理，请刷新后重试");
+        }
         return ResponseDTO.ok();
     }
 
@@ -152,11 +253,20 @@ public class ProposalRecordService {
      */
     private ProposalRecord saveProposal(ProposalRecordAddForm req, PromotionConfig config, int status, String remark) {
         ProposalRecord record = new ProposalRecord();
+        // 单号由提案域自己生成，不采信调用方传值：它是本域对外的凭证，交易号的唯一性必须由发号方保证
+        record.setTradeNo(SmartCodeUtil.generateTradeNo(TRADE_NO_PREFIX));
         record.setMemberName(req.getMemberName());
+
+        // 发什么：assetType 决定下发走哪个策略，assetRef 指向具体资产（值类资产为空）
+        record.setAssetType(req.getAssetType());
+        record.setAssetRef(req.getAssetRef());
+        record.setAmount(req.getAmount());
+        // 数量参与 used_quota 扣减，调用方不传按 1 计
+        record.setQuantity(req.getQuantity() == null ? DEFAULT_QUANTITY : req.getQuantity());
+
         record.setSourceType(req.getSourceType());
         record.setSourceBizId(req.getSourceBizId());
         record.setPromotionConfigId(config.getId());
-        record.setPromotionValue(req.getPromotionValue());
 
         record.setStatus(status);
         record.setRemark(remark);

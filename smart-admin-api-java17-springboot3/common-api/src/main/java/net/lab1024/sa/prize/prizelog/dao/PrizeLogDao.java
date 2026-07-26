@@ -43,6 +43,18 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
                                     @Param("failReason") String failReason);
 
     /**
+     * 发奖审批流转：只有当前审批状态等于 fromApproveStatus 才更新
+     *
+     * 条件更新即并发闸门，防止两个运营同时点通过导致重复派发。
+     *
+     * @return 更新行数，0 表示已被别人处理
+     */
+    int updateApproveStatus(@Param("id") Long id,
+                            @Param("fromApproveStatus") Integer fromApproveStatus,
+                            @Param("toApproveStatus") Integer toApproveStatus,
+                            @Param("approveBy") String approveBy);
+
+    /**
      * 列表查询 (无分页)
      *
      * @param queryForm 查询表单

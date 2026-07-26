@@ -1,10 +1,11 @@
 package net.lab1024.sa.risk.proposal.domain.form;
 
-import net.lab1024.sa.base.common.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDate;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import net.lab1024.sa.base.common.domain.PageParam;
+
+import java.time.LocalDate;
 
 /**
  * 提案表 分页查询表单
@@ -50,5 +51,11 @@ public class ProposalRecordQueryForm extends PageParam {
 
     @Schema(description = "一审人")
     private String firstReviewer;
+
+    @Schema(description = "提案单号，服务端生成，对外唯一标识")
+    private String tradeNo;
+
+    @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL")
+    private String assetType;
 
 }
