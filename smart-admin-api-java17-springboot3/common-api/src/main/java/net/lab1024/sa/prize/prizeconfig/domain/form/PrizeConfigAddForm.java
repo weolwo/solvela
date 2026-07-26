@@ -28,10 +28,12 @@ public class PrizeConfigAddForm {
     @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "活动" + SmartCodeUtil.BIZ_CODE_MESSAGE)
     private String activityCode;
 
-    @Schema(description = "优惠配置ID")
+    @Schema(description = "优惠配置ID，关联 t_promotion_config，承载预算与风控", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "优惠配置 不能为空")
     private Long promotionConfigId;
 
-    @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM")
+    @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "资产类型 不能为空")
     private String prizeType;
 
     @Schema(description = "奖品名称")

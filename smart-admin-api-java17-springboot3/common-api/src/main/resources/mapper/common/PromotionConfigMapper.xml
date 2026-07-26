@@ -118,4 +118,27 @@
                         where id = #{id}
                 </delete>
 
+    <!--
+      预算原子预扣：判断与扣减放在同一条 UPDATE 里，靠行锁保证并发下不会超发。
+      -1 表示不限制，条件直接为真。
+    -->
+    <update id="deductBudget">
+        update t_promotion_config
+        set used_amount = used_amount + #{amount},
+            used_quota  = used_quota + #{quota},
+            update_time = now()
+        where id = #{id}
+          and (total_amount = -1 or total_amount - used_amount &gt;= #{amount})
+          and (total_quota  = -1 or total_quota  - used_quota  &gt;= #{quota})
+    </update>
+
+    <!-- 预扣回滚：CASE WHEN 兜底，避免并发下被扣成负数 -->
+    <update id="releaseBudget">
+        update t_promotion_config
+        set used_amount = case when used_amount &gt;= #{amount} then used_amount - #{amount} else 0 end,
+            used_quota  = case when used_quota  &gt;= #{quota}  then used_quota  - #{quota}  else 0 end,
+            update_time = now()
+        where id = #{id}
+    </update>
+
 </mapper>

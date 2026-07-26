@@ -5,6 +5,7 @@ import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigAddForm;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
+import net.lab1024.sa.risk.promotionconfig.domain.vo.PromotionConfigOptionVO;
 import net.lab1024.sa.risk.promotionconfig.domain.vo.PromotionConfigVO;
 import net.lab1024.sa.risk.promotionconfig.service.PromotionConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 /**
  * 优惠配置表 Controller
  *
@@ -37,6 +40,13 @@ public class PromotionConfigController {
     @SaCheckPermission(":query")
     public ResponseDTO<PageResult<PromotionConfigVO>> queryPage(@RequestBody @Valid PromotionConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "优惠配置下拉列表（全量启用中，前端按 prizeType 分组做级联）")
+    @GetMapping("/optionList")
+    @SaCheckPermission(":query")
+    public ResponseDTO<List<PromotionConfigOptionVO>> queryOptionList() {
+        return Service.queryOptionList();
     }
 
     @Operation(summary = "添加")

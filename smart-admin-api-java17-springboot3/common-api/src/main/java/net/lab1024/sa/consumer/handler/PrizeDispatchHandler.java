@@ -17,6 +17,7 @@ import net.lab1024.sa.scriptengine.annotation.ScriptFunction;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 
 @Slf4j
@@ -84,30 +85,58 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             // Result result = handler.dispatch(prizeLog);
             ResponseDTO result = handler.dispatch(prizeLog); // 假设返回 boolean 演示
 
-            // C. 根据执行结果修改内存状态
-            if (result.getOk()) {
-                prizeLog.setStatus(1); // 1-成功
-                log.info("【发货成功】LogId: {}", prizeLog.getId());
-            } else {
+            // C. 只有「当场就失败」才由这里落终态。
+            //    成功路径刻意不写 status=1：资产下发已被挪到提案事务提交之后（方案A），
+            //    此刻真实结果还没出来，这里若抢先写 1，会把 AssetDispatchEngine 随后回写的真实状态覆盖掉，
+            //    表现为「发奖记录显示成功、用户其实没收到」（预算耗尽那批就是这么被写成成功的）。
+            //    成功路径的终态由 AssetDispatchEngine.updateStatusByExternalBizNo 回写；
+            //    若提案进了人工审批池，则合理地停在 0-等待执行。
+            if (!result.getOk()) {
                 prizeLog.setStatus(2); // 2-失败
                 prizeLog.setFailReason(SmartStringUtil.truncate(result.getMsg(), FAIL_REASON_MAX_LENGTH));
                 log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), result.getMsg());
+                updateQuietly(prizeLog);
+            } else if (isNoDeliveryNeeded(prizeLog)) {
+                // 0 值奖品（谢谢参与这类占位奖）压根不会生成提案，引擎不会跑，
+                // 状态没人回写就会永远悬在 0-等待执行。它本就是当场的终态，这里直接落成功
+                prizeLog.setStatus(1);
+                updateQuietly(prizeLog);
+                log.info("【无需发放】LogId: {}, 奖品价值为0，直接判成功", prizeLog.getId());
+            } else {
+                log.info("【发货已受理】LogId: {}, 最终状态由资产分发引擎回写", prizeLog.getId());
             }
         } catch (Exception e) {
             // 捕获不可预知的异常（如网络超时、空指针），防止影响整个应用的稳定性
             log.error("【发奖异常】执行策略时发生严重错误，LogId: {}", prizeLog.getId(), e);
             prizeLog.setStatus(2); // 2-失败
             // 必须截断：异常 message 动辄几百字，直接塞 varchar(128) 会抛 Data too long，
-            // 而这句就在 finally 前面，一抛异常连状态都刷不进去，最终表现为「状态永远停在 0」——已踩过
+            // 一抛异常连状态都刷不进去，最终表现为「状态永远停在 0」——已踩过
             prizeLog.setFailReason(SmartStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH));
-        } finally {
-            // D. 【绝杀闭环】不管成功、失败还是抛错，最后一定要把最终状态刷进数据库！
-            // 这一步自身再失败就彻底没痕迹了，所以单独兜一层
-            try {
-                prizeLogService.updateById(prizeLog);
-            } catch (Exception e) {
-                log.error("【发奖状态回写失败】LogId: {}, 状态将停留在旧值，请人工核对", prizeLog.getId(), e);
-            }
+            updateQuietly(prizeLog);
+        }
+    }
+
+    /**
+     * 是否属于「无需实际发放」的奖品：价值为 0（如谢谢参与）。
+     * 判定放在这里而不是各 handler 里，是因为审批通过也会重入 doDispatch，两条入口都得覆盖
+     */
+    private boolean isNoDeliveryNeeded(PrizeLog prizeLog) {
+        try {
+            return new BigDecimal(prizeLog.getPrizeValue()).compareTo(BigDecimal.ZERO) <= 0;
+        } catch (RuntimeException e) {
+            // 价值解析不了就当成需要正常发放，交给下游 handler 去报错，别在这里吞掉问题
+            return false;
+        }
+    }
+
+    /**
+     * 状态回写自身再失败就彻底没痕迹了，单独兜一层，只落日志不外抛
+     */
+    private void updateQuietly(PrizeLog prizeLog) {
+        try {
+            prizeLogService.updateById(prizeLog);
+        } catch (Exception e) {
+            log.error("【发奖状态回写失败】LogId: {}, 状态将停留在旧值，请人工核对", prizeLog.getId(), e);
         }
     }
 

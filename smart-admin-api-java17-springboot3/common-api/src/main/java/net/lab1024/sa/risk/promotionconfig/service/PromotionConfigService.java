@@ -1,5 +1,6 @@
 package net.lab1024.sa.risk.promotionconfig.service;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
@@ -11,11 +12,13 @@ import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigAddForm;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
 import net.lab1024.sa.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
+import net.lab1024.sa.risk.promotionconfig.domain.vo.PromotionConfigOptionVO;
 import net.lab1024.sa.risk.promotionconfig.domain.vo.PromotionConfigVO;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 优惠配置表 Service
@@ -41,6 +44,37 @@ public class PromotionConfigService {
 
     public PromotionConfig getById(Long id) {
         return promotionConfigDao.selectById(id);
+    }
+
+    /**
+     * 优惠配置状态：1-启用
+     */
+    private static final Integer STATUS_ENABLED = 1;
+
+    /**
+     * 下拉选项：返回启用中的全部优惠配置，按资产类型排序
+     *
+     * 刻意不做服务端按类型过滤：配置总量本来就不大，前端一次拉全量、按 prizeType 分组缓存，
+     * 运营切换奖品类型时本地过滤即可，省掉来回打接口。
+     */
+    public ResponseDTO<List<PromotionConfigOptionVO>> queryOptionList() {
+        List<PromotionConfig> list = promotionConfigDao.selectList(
+                Wrappers.<PromotionConfig>lambdaQuery()
+                        .eq(PromotionConfig::getStatus, STATUS_ENABLED)
+                        .orderByAsc(PromotionConfig::getPrizeType)
+                        .orderByAsc(PromotionConfig::getId));
+        List<PromotionConfigOptionVO> optionList = list.stream()
+                .map(item -> new PromotionConfigOptionVO(
+                        item.getId(),
+                        item.getPromoName(),
+                        item.getPrizeType(),
+                        item.getTotalAmount(),
+                        item.getUsedAmount(),
+                        item.getTotalQuota(),
+                        item.getUsedQuota(),
+                        item.getReviewLevel()))
+                .collect(Collectors.toList());
+        return ResponseDTO.ok(optionList);
     }
 
     /**

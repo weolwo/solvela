@@ -21,11 +21,31 @@
           placeholder="请选择归属活动"
         />
       </a-form-item>
-      <a-form-item label="优惠配置ID" name="promotionConfigId">
-        <a-input-number style="width: 100%" v-model:value="form.promotionConfigId" placeholder="优惠配置ID" />
-      </a-form-item>
+      <!-- 资产类型决定下面能选哪些优惠配置，必须放在优惠配置之前选 -->
       <a-form-item label="资产类型" name="prizeType">
-        <a-input style="width: 100%" v-model:value="form.prizeType" placeholder="资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM" />
+        <a-select
+          style="width: 100%"
+          v-model:value="form.prizeType"
+          :options="PRIZE_TYPE_OPTIONS"
+          placeholder="请选择资产类型"
+          @change="onPrizeTypeChange"
+        />
+      </a-form-item>
+      <!-- 优惠配置：预算与风控的载体。全量拉回后按 prizeType 本地过滤，避免切一次类型打一次接口 -->
+      <a-form-item label="优惠配置" name="promotionConfigId">
+        <a-select
+          style="width: 100%"
+          v-model:value="form.promotionConfigId"
+          :options="promotionOptions"
+          :loading="promotionLoading"
+          :disabled="!form.prizeType"
+          show-search
+          option-filter-prop="label"
+          :placeholder="form.prizeType ? '请选择优惠配置' : '请先选择资产类型'"
+        />
+        <div v-if="form.prizeType && promotionOptions.length === 0 && !promotionLoading" class="mt-1 text-xs text-orange-500">
+          该资产类型下还没有启用中的优惠配置，请先到「优惠配置」页创建，否则发奖时会被判「资产配置异常」
+        </div>
       </a-form-item>
       <a-form-item label="奖品名称" name="prizeName">
         <a-input style="width: 100%" v-model:value="form.prizeName" placeholder="奖品名称" />
@@ -72,14 +92,16 @@
   </a-modal>
 </template>
 <script setup>
-  import { reactive, ref, nextTick } from 'vue';
+  import { computed, reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
+  import { PRIZE_TYPE_OPTIONS } from '/@/constants/business/prize/prize-config/prize-config-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -95,6 +117,7 @@
       Object.assign(form, rowData);
     }
     loadActivityOptions();
+    loadPromotionOptions();
     // 使用字典时把下面这注释修改成自己的字典字段 有多个字典字段就复制多份同理修改 不然打开表单时不显示字典初始值
     // if (form.status && form.status.length > 0) {
     //   form.status = form.status.map((e) => e.valueCode);
@@ -133,12 +156,62 @@
 
   const rules = {
     activityCode: [{ required: true, message: '归属活动 必选' }],
+    prizeType: [{ required: true, message: '资产类型 必选' }],
+    // 不选优惠配置的话，发奖时 addProposal 第一步就会判「资产配置异常」，必须卡死
+    promotionConfigId: [{ required: true, message: '优惠配置 必选' }],
     prizeCode: [
       { required: true, message: '奖品编码 必填' },
       { pattern: regular.bizCode, message: regular.bizCodeDesc },
     ],
     approveMode: [{ required: true, message: '审批模式：0-自动免审, 1-人工审批 必填' }],
   };
+
+  // ------------------------ 优惠配置级联下拉 ------------------------
+
+  // 全量优惠配置（启用中），只拉一次，按 prizeType 本地过滤
+  const promotionAllList = ref([]);
+  const promotionLoading = ref(false);
+
+  const promotionOptions = computed(() => {
+    if (!form.prizeType) {
+      return [];
+    }
+    return promotionAllList.value
+      .filter((item) => item.prizeType === form.prizeType)
+      .map((item) => ({
+        value: item.id,
+        // 标题里直接带预算水位与审批档位，运营选的时候就能看出这个池子还发不发得出来
+        label: `${item.promoName}｜预算 ${budgetText(item)}｜数量 ${quotaText(item)}｜${reviewText(item.reviewLevel)}`,
+      }));
+  });
+
+  const UNLIMITED = -1;
+  const budgetText = (item) =>
+    Number(item.totalAmount) === UNLIMITED ? '不限' : `${Number(item.usedAmount)}/${Number(item.totalAmount)}`;
+  const quotaText = (item) => (item.totalQuota === UNLIMITED ? '不限' : `${item.usedQuota}/${item.totalQuota}`);
+  const reviewText = (level) => (level === 0 ? '免审' : level === 1 ? '单层审批' : '双层审批');
+
+  async function loadPromotionOptions() {
+    promotionLoading.value = true;
+    try {
+      const res = await promotionConfigApi.optionList();
+      promotionAllList.value = res.data || [];
+    } catch (err) {
+      smartSentry.captureError(err);
+    } finally {
+      promotionLoading.value = false;
+    }
+  }
+
+  // 换了资产类型，原来选中的优惠配置多半已经不属于新类型了，直接清掉避免带着脏值提交
+  function onPrizeTypeChange() {
+    const stillValid = promotionAllList.value.some(
+      (item) => item.id === form.promotionConfigId && item.prizeType === form.prizeType
+    );
+    if (!stillValid) {
+      form.promotionConfigId = undefined;
+    }
+  }
 
   // ------------------------ 归属活动下拉 ------------------------
 

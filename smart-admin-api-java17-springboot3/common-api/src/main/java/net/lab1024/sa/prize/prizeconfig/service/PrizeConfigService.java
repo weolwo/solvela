@@ -14,7 +14,10 @@ import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
 import net.lab1024.sa.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import net.lab1024.sa.prize.prizeconfig.manager.PrizeConfigManager;
+import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
+import net.lab1024.sa.risk.promotionconfig.service.PromotionConfigService;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,6 +35,7 @@ public class PrizeConfigService {
 
     private final PrizeConfigDao prizeConfigDao;
     private final PrizeConfigManager prizeConfigManager;
+    private final PromotionConfigService promotionConfigService;
 
     /**
      * 奖品状态：1-启用
@@ -81,6 +85,27 @@ public class PrizeConfigService {
     }
 
     /**
+     * 校验优惠配置与奖品的资产类型是否一致
+     *
+     * 为什么必须服务端重算：AssetDispatchEngine 是按**优惠配置的 prizeType** 选发货策略的，
+     * 一旦挂错（比如积分奖品指向了优惠券的配置），用户实际会收到一张券。
+     * 前端级联下拉只是防呆，绕过页面直接 POST 就穿了，这里必须堵死。
+     *
+     * @return null 表示通过
+     */
+    private String checkPromotionConfigMatch(Long promotionConfigId, String prizeType) {
+        PromotionConfig promotionConfig = promotionConfigService.getById(promotionConfigId);
+        if (promotionConfig == null) {
+            return "优惠配置不存在：" + promotionConfigId;
+        }
+        if (!StringUtils.equals(promotionConfig.getPrizeType(), prizeType)) {
+            return "优惠配置「" + promotionConfig.getPromoName() + "」的资产类型是 "
+                    + promotionConfig.getPrizeType() + "，与奖品的 " + prizeType + " 不一致";
+        }
+        return null;
+    }
+
+    /**
      * 添加
      * 奖品编码允许手工输入，故服务端必须重校验格式与唯一性
      */
@@ -90,6 +115,10 @@ public class PrizeConfigService {
         }
         if (existsByPrizeCode(addForm.getPrizeCode())) {
             return ResponseDTO.userErrorParam("奖品编码已存在：" + addForm.getPrizeCode());
+        }
+        String matchError = checkPromotionConfigMatch(addForm.getPromotionConfigId(), addForm.getPrizeType());
+        if (matchError != null) {
+            return ResponseDTO.userErrorParam(matchError);
         }
         PrizeConfig prizeConfig = SmartBeanUtil.copy(addForm, PrizeConfig.class);
         prizeConfigDao.insert(prizeConfig);
@@ -101,6 +130,13 @@ public class PrizeConfigService {
      *
      */
     public ResponseDTO<String> update(PrizeConfigUpdateForm updateForm) {
+        // 编辑同样要校验：改类型不改配置（或反过来）都会造成错配
+        if (updateForm.getPromotionConfigId() != null && StringUtils.isNotBlank(updateForm.getPrizeType())) {
+            String matchError = checkPromotionConfigMatch(updateForm.getPromotionConfigId(), updateForm.getPrizeType());
+            if (matchError != null) {
+                return ResponseDTO.userErrorParam(matchError);
+            }
+        }
         PrizeConfig prizeConfig = SmartBeanUtil.copy(updateForm, PrizeConfig.class);
         prizeConfigDao.updateById(prizeConfig);
         return ResponseDTO.ok();

@@ -16,6 +16,13 @@ export const promotionConfigApi = {
   },
 
   /**
+   * 优惠配置下拉列表（全量启用中，前端按 prizeType 分组做级联）  @author  alaric
+   */
+  optionList: () => {
+    return getRequest('/promotionConfig/optionList');
+  },
+
+  /**
    * 增加  @author  weolwo
    */
   add: (param) => {

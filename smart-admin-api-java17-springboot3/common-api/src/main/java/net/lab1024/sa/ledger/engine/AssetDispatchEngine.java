@@ -6,10 +6,14 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.ledger.handler.IAssetHandler;
 import net.lab1024.sa.ledger.strategy.AssetStrategyFactory;
+import net.lab1024.sa.prize.prizelog.dao.PrizeLogDao;
+import net.lab1024.sa.risk.promotionconfig.dao.PromotionConfigDao;
 import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
 import net.lab1024.sa.risk.proposal.dao.ProposalRecordDao;
 import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
 
 /**
  * 资产分发引擎：把「待执行」的提案真正下发到各资产域
@@ -28,7 +32,16 @@ public class AssetDispatchEngine {
 
     private final ProposalRecordDao proposalRecordDao;
 
+    private final PromotionConfigDao promotionConfigDao;
+
+    private final PrizeLogDao prizeLogDao;
+
     private final AssetStrategyFactory strategyFactory; // 资产策略工厂
+
+    /**
+     * 一条提案占用一个发放名额（used_quota）。数量型资产（券/实物）靠它卡总量
+     */
+    private static final int QUOTA_PER_PROPOSAL = 1;
 
     /**
      * 提案状态：对齐 t_proposal_record.status 注释，避免散落魔法值
@@ -45,10 +58,21 @@ public class AssetDispatchEngine {
     private static final int REMARK_MAX_LENGTH = 255;
 
     /**
+     * 发奖记录状态（对齐 t_prize_log.status）与其 fail_reason 列长度
+     */
+    private static final int PRIZE_LOG_SUCCESS = 1;
+    private static final int PRIZE_LOG_FAILED = 2;
+    private static final int FAIL_REASON_MAX_LENGTH = 128;
+
+    /**
      * 核心执行入口 (支持异步调用)
      */
     public void execute(ProposalRecord proposal, PromotionConfig config) {
         log.info(">>>> [资产分发引擎] 开始执行提案, 提案ID: {}, 资产类型: {}", proposal.getId(), config.getPrizeType());
+
+        BigDecimal amount = proposal.getPromotionValue() == null ? BigDecimal.ZERO : proposal.getPromotionValue();
+        // 记录预算是否真的扣成功：异常兜底时只有扣过才允许回滚，否则会把没占用的预算凭空还回去
+        boolean budgetDeducted = false;
 
         try {
             // 1. 推进状态：30(待执行) -> 40(执行中)。条件更新即并发闸门，抢不到说明别人已在执行或已完结
@@ -58,29 +82,81 @@ public class AssetDispatchEngine {
                 return;
             }
 
-            // 2. 获取具体资产类型的执行策略 (如: SCORE, BALANCE, COUPON, PHYSICAL)
+            // 2. 预算硬限流：把「够不够」压进 UPDATE 的 WHERE，一条 SQL 完成校验+扣减。
+            //    风控链上的 GlobalBudgetRiskFilter 是「先读后判」的弱校验，高并发下读到的余量早已过期，
+            //    真正防超发的是这里的条件更新。必须在动账之前扣，扣不动就别发。
+            if (promotionConfigDao.deductBudget(config.getId(), amount, QUOTA_PER_PROPOSAL) == 0) {
+                log.warn("【预算不足】提案ID: {}, 优惠配置: {}, 申请额: {}", proposal.getId(), config.getId(), amount);
+                markFailed(proposal, "预算或发放数量已耗尽");
+                return;
+            }
+            budgetDeducted = true;
+
+            // 3. 获取具体资产类型的执行策略 (如: SCORE, BALANCE, COUPON, PHYSICAL)
             IAssetHandler handler = strategyFactory.getHandler(config.getPrizeType());
 
-            // 3. 极简下发：只管抛给下层，拿到成功/失败的结果
+            // 4. 极简下发：只管抛给下层，拿到成功/失败的结果
             ResponseDTO responseDTO = handler.dispatch(proposal);
 
-            // 4. 闭环：根据结果落终态。失败原因写进 remark，运营/研发能直接从提案列表看出卡在哪
+            // 5. 闭环：根据结果落终态。失败原因写进 remark，运营/研发能直接从提案列表看出卡在哪
             if (responseDTO.getOk()) {
                 proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_SUCCESS, "资产下发成功");
+                syncPrizeLog(proposal, PRIZE_LOG_SUCCESS, null);
             } else {
-                proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_FAILED,
-                        SmartStringUtil.truncate("资产下发失败：" + responseDTO.getMsg(), REMARK_MAX_LENGTH));
+                // 没发出去就得把预算还回去，否则预算只减不加，跑一段时间水位就虚高到发不出奖
+                releaseBudgetQuietly(config, amount);
+                markFailed(proposal, "资产下发失败：" + responseDTO.getMsg());
             }
 
         } catch (Exception e) {
             log.error("【引擎致命异常】资产执行发生未知错误, 提案ID: {}", proposal.getId(), e);
-            // 状态已经是 40(执行中)，不落终态就会永远卡住，必须兜底改成 70 让它可被排查/重试
-            try {
-                proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_FAILED,
-                        SmartStringUtil.truncate("系统执行异常: " + e.getMessage(), REMARK_MAX_LENGTH));
-            } catch (Exception ex) {
-                log.error("【引擎状态回写失败】提案ID: {} 将停留在 40(执行中)，请人工核对", proposal.getId(), ex);
+            if (budgetDeducted) {
+                releaseBudgetQuietly(config, amount);
             }
+            // 状态已经是 40(执行中)，不落终态就会永远卡住，必须兜底改成 70 让它可被排查/重试
+            markFailed(proposal, "系统执行异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 落失败终态：提案 -> 70，同时把发奖记录也标成失败
+     * 两处回写各自兜异常，任何一处挂了都不能影响另一处，否则又会出现「一半状态是对的」
+     */
+    private void markFailed(ProposalRecord proposal, String reason) {
+        String remark = SmartStringUtil.truncate(reason, REMARK_MAX_LENGTH);
+        try {
+            proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_FAILED, remark);
+        } catch (Exception e) {
+            log.error("【引擎状态回写失败】提案ID: {} 将停留在 40(执行中)，请人工核对", proposal.getId(), e);
+        }
+        syncPrizeLog(proposal, PRIZE_LOG_FAILED, remark);
+    }
+
+    /**
+     * 把派发结果同步回 t_prize_log
+     *
+     * 分层上略有妥协：ledger 的引擎去改 prize 域的流水。但方案A 把下发挪到事务提交之后以后，
+     * 结果已经无法沿调用栈回到 PrizeDispatchHandler，而运营看的恰恰是发奖记录 ——
+     * 不回写就会出现「记录显示成功、用户没收到」。两者靠 external_biz_no == source_biz_id 这条既定契约关联。
+     */
+    private void syncPrizeLog(ProposalRecord proposal, int status, String failReason) {
+        try {
+            prizeLogDao.updateStatusByExternalBizNo(proposal.getSourceBizId(), status,
+                    SmartStringUtil.truncate(failReason, FAIL_REASON_MAX_LENGTH));
+        } catch (Exception e) {
+            log.error("【发奖记录回写失败】业务单号: {}, 发奖记录状态可能与提案不一致，请人工核对",
+                    proposal.getSourceBizId(), e);
+        }
+    }
+
+    /**
+     * 预算回滚：本身失败也不能再往外抛，否则会盖掉真正的失败原因、还会让状态停在 40
+     */
+    private void releaseBudgetQuietly(PromotionConfig config, BigDecimal amount) {
+        try {
+            promotionConfigDao.releaseBudget(config.getId(), amount, QUOTA_PER_PROPOSAL);
+        } catch (Exception e) {
+            log.error("【预算回滚失败】优惠配置: {}, 金额: {}，预算水位将虚高，请人工核对", config.getId(), amount, e);
         }
     }
 }
