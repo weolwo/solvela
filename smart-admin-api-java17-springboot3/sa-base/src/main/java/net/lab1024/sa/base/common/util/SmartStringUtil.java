@@ -323,5 +323,23 @@ public class SmartStringUtil extends StrUtil {
         }
     }
 
+    /**
+     * 按数据库列长度安全截断
+     *
+     * 专治「把异常堆栈往 varchar(128) 里塞」这类问题：MySQL 严格模式下会直接抛
+     * Data truncation: Data too long for column 'xxx'，
+     * 而这类写入往往发生在异常处理分支或 finally 里，一旦再抛异常，原本要记录的失败原因就彻底丢了，
+     * 排查时只看到状态停在中间态、却找不到任何线索。
+     *
+     * @param text      原文，可为 null
+     * @param maxLength 列的最大长度
+     * @return 不超过 maxLength 的字符串；入参为 null 时原样返回 null
+     */
+    public static String truncate(String text, int maxLength) {
+        if (text == null || maxLength <= 0 || text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength);
+    }
 
 }

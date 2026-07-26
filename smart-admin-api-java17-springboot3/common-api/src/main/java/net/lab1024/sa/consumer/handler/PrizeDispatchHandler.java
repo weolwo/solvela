@@ -4,6 +4,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.EventRoute;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.consumer.strategy.PrizeStrategyFactory;
 import net.lab1024.sa.domain.event.UserPrizeEvent;
 import net.lab1024.sa.enums.ApproveModeEnum;
@@ -29,6 +30,11 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
     private PrizeConfigService prizeConfigService;
     @Resource
     private PrizeStrategyFactory strategyFactory;
+
+    /**
+     * 对齐 t_prize_log.fail_reason 的列长度
+     */
+    private static final int FAIL_REASON_MAX_LENGTH = 128;
 
     @Override
     public void handle(UserPrizeEvent event) {
@@ -84,17 +90,24 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
                 log.info("【发货成功】LogId: {}", prizeLog.getId());
             } else {
                 prizeLog.setStatus(2); // 2-失败
-                prizeLog.setFailReason("下游业务系统返回失败");
-                log.warn("【发货失败】LogId: {}", prizeLog.getId());
+                prizeLog.setFailReason(SmartStringUtil.truncate(result.getMsg(), FAIL_REASON_MAX_LENGTH));
+                log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), result.getMsg());
             }
         } catch (Exception e) {
             // 捕获不可预知的异常（如网络超时、空指针），防止影响整个应用的稳定性
             log.error("【发奖异常】执行策略时发生严重错误，LogId: {}", prizeLog.getId(), e);
             prizeLog.setStatus(2); // 2-失败
-            prizeLog.setFailReason(e.getMessage());
+            // 必须截断：异常 message 动辄几百字，直接塞 varchar(128) 会抛 Data too long，
+            // 而这句就在 finally 前面，一抛异常连状态都刷不进去，最终表现为「状态永远停在 0」——已踩过
+            prizeLog.setFailReason(SmartStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH));
         } finally {
             // D. 【绝杀闭环】不管成功、失败还是抛错，最后一定要把最终状态刷进数据库！
-            prizeLogService.updateById(prizeLog);
+            // 这一步自身再失败就彻底没痕迹了，所以单独兜一层
+            try {
+                prizeLogService.updateById(prizeLog);
+            } catch (Exception e) {
+                log.error("【发奖状态回写失败】LogId: {}, 状态将停留在旧值，请人工核对", prizeLog.getId(), e);
+            }
         }
     }
 

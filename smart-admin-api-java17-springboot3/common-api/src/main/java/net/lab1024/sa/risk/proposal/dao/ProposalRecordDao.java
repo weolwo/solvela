@@ -30,6 +30,21 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
     List<ProposalRecordVO> queryPage(Page<?> page, @Param("queryForm") ProposalRecordQueryForm queryForm);
 
     /**
+     * 条件流转提案状态：只有当前状态等于 fromStatus 才会更新
+     *
+     * 这是资产下发的并发闸门：多个线程/重投事件同时进来，只有抢到状态跃迁的那一个拿到 rows=1，
+     * 其余拿到 0 直接退出，避免同一提案被重复执行。
+     *
+     * @return 更新行数，0 表示状态已被别人推进或提案已完结
+     */
+    int updateStatus(@Param("id") Long id, @Param("fromStatus") Integer fromStatus, @Param("toStatus") Integer toStatus);
+
+    /**
+     * 无条件写入终态与备注（成功/失败的收尾，不参与并发竞争）
+     */
+    int updateStatusAndRemark(@Param("id") Long id, @Param("status") Integer status, @Param("remark") String remark);
+
+    /**
      * 列表查询 (无分页)
      *
      * @param queryForm 查询表单

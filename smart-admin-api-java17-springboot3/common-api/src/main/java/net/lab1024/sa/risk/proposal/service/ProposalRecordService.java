@@ -7,6 +7,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.ledger.engine.AssetDispatchEngine;
 import net.lab1024.sa.risk.engine.RiskChainEngine;
 import net.lab1024.sa.risk.engine.RiskContext;
 import net.lab1024.sa.risk.engine.RiskResult;
@@ -22,6 +23,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -44,6 +47,8 @@ public class ProposalRecordService {
 
     // 风控责任链引擎 (负责卡频率、卡预算等)
     private final RiskChainEngine riskChainEngine;
+
+    private final AssetDispatchEngine assetDispatchEngine;
 
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO addProposal(ProposalRecordAddForm req) {
@@ -89,18 +94,39 @@ public class ProposalRecordService {
         // 5. 【分流】判断是否需要立即加钱
         // ==========================================
         if (targetStatus == 30) {
-            log.info("【提案免审】金额未触发审批阈值，立即调起底层资产服务发钱! 提案ID: {}", proposal.getId());
-
-            // 调用底层的账务微服务/类去真实动账 (同步或发MQ异步皆可)
-            // 动账成功后，这个引擎内部会把提案状态改成 50(成功)
-            //assetDispatchEngine.execute(proposal, config);
-
+            log.info("【提案免审】金额未触发审批阈值，提交后立即调起底层资产服务发钱! 提案ID: {}", proposal.getId());
+            dispatchAfterCommit(proposal, config);
         } else {
             log.info("【提案挂起】金额触发审批阈值，进入人工审核池。提案ID: {}, 状态: {}", proposal.getId(), targetStatus);
             // 流程驻留在此，等待财务人员在后台调用 approve() 接口
         }
 
         return ResponseDTO.ok();
+    }
+
+    /**
+     * 把资产下发挪到提案事务**提交之后**再执行（方案A：提案与下发解耦）
+     *
+     * 为什么必须这么做：下发若跑在本事务内，资产层任何一次插入失败都会把事务标成 rollback-only，
+     * 于是「提案记录」连同引擎写下的 status=70 失败痕迹一起被回滚 —— 压测时 51 条发券失败，
+     * 提案表里一条记录都查不到，只能靠翻日志定位。提交后再发，提案一定留得下，
+     * 失败也能稳稳落在 70，运营和研发都能从提案列表直接看到卡在哪。
+     *
+     * 语义上也更顺：提案是「决定发」，下发是「真的发」，本就该是两个阶段。
+     */
+    private void dispatchAfterCommit(ProposalRecord proposal, PromotionConfig config) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // 理论上 addProposal 带 @Transactional 不会走到这里；兜底为直接执行，避免静默不发
+            assetDispatchEngine.execute(proposal, config);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // 此处已无事务上下文，引擎内部每次状态更新都是独立自动提交，天然不受回滚影响
+                assetDispatchEngine.execute(proposal, config);
+            }
+        });
     }
 
     /**

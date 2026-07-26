@@ -110,4 +110,21 @@
                         where id = #{id}
                 </delete>
 
+    <!-- 条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态 -->
+    <update id="updateStatus">
+        update t_proposal_record
+        set status = #{toStatus},
+            update_time = now()
+        where id = #{id}
+          and status = #{fromStatus}
+    </update>
+
+    <update id="updateStatusAndRemark">
+        update t_proposal_record
+        set status = #{status},
+            remark = #{remark},
+            update_time = now()
+        where id = #{id}
+    </update>
+
 </mapper>
