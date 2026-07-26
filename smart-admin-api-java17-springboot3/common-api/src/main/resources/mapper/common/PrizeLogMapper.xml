@@ -119,8 +119,7 @@
     <update id="updateStatusByExternalBizNo">
         update t_prize_log
         set status = #{status},
-            fail_reason = #{failReason},
-            update_time = now()
+            fail_reason = #{failReason}
         where external_biz_no = #{externalBizNo}
           and status = 0
     </update>
@@ -130,8 +129,7 @@
         update t_prize_log
         set approve_status = #{toApproveStatus},
             approve_by = #{approveBy},
-            approve_time = now(),
-            update_time = now()
+            approve_time = now()
         where id = #{id}
           and approve_status = #{fromApproveStatus}
     </update>

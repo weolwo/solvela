@@ -74,7 +74,6 @@ public class DrawPrizeLog {
     /**
      * 创建时间
      */
-    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
 }

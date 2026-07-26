@@ -123,11 +123,18 @@
                     delete from t_proposal_record
                         where id = #{id}
                 </delete>
-    <!-- 条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态 -->
+    <!--
+      条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态。
+
+      注意本文件所有 update 都刻意不写 update_time：DDL 已有 ON UPDATE CURRENT_TIMESTAMP，
+      显式再写一遍是冗余。真正要留意的是**时区**——now() 与 ON UPDATE CURRENT_TIMESTAMP 都按
+      MySQL 的 session 时区求值，而 create_time 走 MyBatis-Plus 的 Java 自动填充（JVM 时区）。
+      两者不一致时会出现「更新时间早于创建时间」，靠连接串的
+      connectionTimeZone + forceConnectionTimeZoneToSession 统一（见 sa-base.yaml）。
+    -->
     <update id="updateStatus">
         update t_proposal_record
-        set status = #{toStatus},
-            update_time = now()
+        set status = #{toStatus}
         where id = #{id}
           and status = #{fromStatus}
     </update>
@@ -135,8 +142,7 @@
     <update id="updateStatusAndRemark">
         update t_proposal_record
         set status = #{status},
-            remark = #{remark},
-            update_time = now()
+            remark = #{remark}
         where id = #{id}
     </update>
 
@@ -152,8 +158,7 @@
                 <when test="reviewerField == 'first_reviewer'">first_review_time = now(),</when>
                 <otherwise>second_review_time = now(),</otherwise>
             </choose>
-            review_comment = #{comment},
-            update_time = now()
+            review_comment = #{comment}
         where id = #{id}
           and status = #{fromStatus}
     </update>
