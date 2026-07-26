@@ -98,11 +98,11 @@ CREATE TABLE `t_prize_config`
 (
     `id`                  bigint         NOT NULL AUTO_INCREMENT comment 'id',
     `tenant_id`           varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户ID',
-    `activity_code`       varchar(32)    NOT NULL COMMENT '活动编码',
+    `activity_code`       varchar(32)    NOT NULL COMMENT '归属活动编码：10位大写字母+数字',
     `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
     `prize_type`          varchar(32)    NOT NULL COMMENT '资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM',
     `prize_name`          varchar(128)   NOT NULL COMMENT '奖品名称',
-    prize_code            varchar(64)    NOT null COMMENT '奖品编码',
+     prize_code            varchar(64)    NOT null COMMENT '奖品编码：10位大写字母+数字，全局唯一',
     `prize_level`         int                     DEFAULT '0' COMMENT '奖品级别',
     `prize_value`         decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '奖励价值',
     `approve_mode`        tinyint      NOT NULL DEFAULT 0 COMMENT '审批模式：0-自动免审, 1-人工审批',
@@ -113,7 +113,8 @@ CREATE TABLE `t_prize_config`
     `create_time`         datetime                DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_by`           varchar(64)             DEFAULT NULL COMMENT '更新人',
     `update_time`         datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_prize_code` (`prize_code`)
 ) COMMENT ='奖品配置表';
 
 DROP TABLE IF EXISTS `t_task_prize_mapping`;
@@ -213,7 +214,7 @@ CREATE TABLE `t_prize_log`
     `prize_name`          varchar(128) NOT NULL COMMENT '奖品名称',
     `prize_type`          varchar(32)  NOT NULL COMMENT '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL',
     `prize_value`         varchar(128) NOT NULL COMMENT '奖励体值(积分数/券ID)',
-    `fail_reason`         varchar(128) NOT NULL COMMENT '异常原因',
+    `fail_reason`         varchar(128) NULL     DEFAULT NULL COMMENT '异常原因：发奖失败时才有值',
 -- ================= 【新增】风控与审批字段 =================
     `approve_status`      tinyint      NOT NULL DEFAULT 0 COMMENT '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回',
     `approve_by`          varchar(64)           DEFAULT NULL COMMENT '审批人',
@@ -229,6 +230,8 @@ CREATE TABLE `t_prize_log`
     `update_by`           varchar(64)           DEFAULT NULL COMMENT '更新人',
     `update_time`         datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
+    -- 跨系统防重：PrizeDispatchHandler 靠捕获 DuplicateKeyException 拦重复派发，缺了这个索引防重就是空转
+    UNIQUE KEY `uk_external_biz` (`external_biz_no`),
     KEY `idx_prize_log_` (`member_name`, `activity_code`)
 ) COMMENT ='奖励记录表';
 

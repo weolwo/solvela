@@ -12,8 +12,10 @@ import net.lab1024.sa.activity.manager.ActivityConfigManager;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -40,6 +42,18 @@ public class ActivityConfigService {
     }
 
     /**
+     * 按活动类型查询活动列表（DRAW/TASK/LOTTERY）：供各业务工作台顶部的活动下拉切换
+     * activityType 为空时不加类型条件，返回全部活动
+     */
+    public List<ActivityConfigVO> queryOptionList(String activityType) {
+        List<ActivityConfig> list = activityConfigManager.lambdaQuery()
+                .eq(StringUtils.isNotBlank(activityType), ActivityConfig::getActivityType, activityType)
+                .orderByDesc(ActivityConfig::getId)
+                .list();
+        return SmartBeanUtil.copyList(list, ActivityConfigVO.class);
+    }
+
+    /**
      * 分页查询
      */
     public PageResult<ActivityConfigVO> queryPage(ActivityConfigQueryForm queryForm) {
@@ -49,9 +63,23 @@ public class ActivityConfigService {
     }
 
     /**
+     * 生成一个未被占用的活动编码（10 位大写字母+数字），供前端「生成」按钮调用
+     */
+    public ResponseDTO<String> generateActivityCode() {
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(code -> getByActivityCode(code) != null));
+    }
+
+    /**
      * 添加
+     * 活动编码允许手工输入，故服务端必须重校验格式与唯一性（表上虽有唯一索引，但直接抛 SQL 异常对运营不友好）
      */
     public ResponseDTO<String> add(ActivityConfigAddForm addForm) {
+        if (!SmartCodeUtil.isValidBizCode(addForm.getActivityCode())) {
+            return ResponseDTO.userErrorParam("活动" + SmartCodeUtil.BIZ_CODE_MESSAGE);
+        }
+        if (getByActivityCode(addForm.getActivityCode()) != null) {
+            return ResponseDTO.userErrorParam("活动编码已存在：" + addForm.getActivityCode());
+        }
         ActivityConfig activityConfig = SmartBeanUtil.copy(addForm, ActivityConfig.class);
         activityConfigDao.insert(activityConfig);
         return ResponseDTO.ok();

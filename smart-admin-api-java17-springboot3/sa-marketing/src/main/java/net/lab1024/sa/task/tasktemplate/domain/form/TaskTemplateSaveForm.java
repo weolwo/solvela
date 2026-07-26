@@ -3,7 +3,9 @@ package net.lab1024.sa.task.tasktemplate.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 
 import java.util.Map;
 
@@ -16,8 +18,9 @@ import java.util.Map;
 @Data
 public class TaskTemplateSaveForm {
 
-    @Schema(description = "模板编码，upsert 唯一键", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "模板编码：10 位大写字母+数字，全局唯一，upsert 唯一键", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "模板编码 不能为空")
+    @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "模板" + SmartCodeUtil.BIZ_CODE_MESSAGE)
     private String templateCode;
 
     @Schema(description = "模板名称", requiredMode = Schema.RequiredMode.REQUIRED)

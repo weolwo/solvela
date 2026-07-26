@@ -8,14 +8,21 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
-      <a-form-item label="租户id" name="tenantId">
-        <SmartEnumSelect width="100%" v-model:value="form.tenantId" enum-name="" placeholder="租户id" />
-      </a-form-item>
+      <!-- 活动编码：10位大写字母+数字，可手输也可一键生成；创建后即被奖品/奖池/流水引用，编辑时锁死 -->
       <a-form-item label="活动编码" name="activityCode">
-        <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="活动编码" />
+        <a-input-group compact>
+          <a-input
+            style="width: calc(100% - 96px)"
+            v-model:value="form.activityCode"
+            :disabled="!!form.id"
+            :maxlength="10"
+            placeholder="如 H88JHKJFNE，或点右侧生成"
+            @change="onCodeInput"
+          />
+          <a-tooltip :title="form.id ? '活动编码创建后不可修改' : '随机生成一个未被占用的编码'">
+            <a-button style="width: 96px" :disabled="!!form.id" :loading="codeGenerating" @click="generateCode">生成</a-button>
+          </a-tooltip>
+        </a-input-group>
       </a-form-item>
       <a-form-item label="活动名称" name="activityName">
         <a-input style="width: 100%" v-model:value="form.activityName" placeholder="活动名称" />
@@ -52,7 +59,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
+  import { regular } from '/@/constants/regular-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -88,8 +95,6 @@
   const formRef = ref();
 
   const formDefault = {
-    id: undefined, //id
-    tenantId: undefined, //租户id
     activityCode: undefined, //活动编码
     activityName: undefined, //活动名称
     activityType: undefined, //活动类型
@@ -102,13 +107,38 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: 'id 必填' }],
-    tenantId: [{ required: true, message: '租户id 必填' }],
-    activityCode: [{ required: true, message: '活动编码 必填' }],
+    activityCode: [
+      { required: true, message: '活动编码 必填' },
+      { pattern: regular.bizCode, message: regular.bizCodeDesc },
+    ],
     activityName: [{ required: true, message: '活动名称 必填' }],
     startTime: [{ required: true, message: '活动开始时间 必填' }],
     endTime: [{ required: true, message: '活动结束时间 必填' }],
   };
+
+  // ------------------------ 活动编码 ------------------------
+
+  const codeGenerating = ref(false);
+
+  // 手输时统一转大写，省得运营因为小写被规则拦下来
+  function onCodeInput() {
+    if (form.activityCode) {
+      form.activityCode = form.activityCode.toUpperCase();
+    }
+  }
+
+  async function generateCode() {
+    codeGenerating.value = true;
+    try {
+      const res = await activityConfigApi.generateCode();
+      form.activityCode = res.data;
+      formRef.value.clearValidate('activityCode');
+    } catch (err) {
+      smartSentry.captureError(err);
+    } finally {
+      codeGenerating.value = false;
+    }
+  }
 
   // 点击确定，验证表单
   async function onSubmit() {

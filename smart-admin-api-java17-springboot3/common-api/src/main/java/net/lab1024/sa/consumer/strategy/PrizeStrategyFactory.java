@@ -39,12 +39,30 @@ public class PrizeStrategyFactory implements ApplicationContextAware {
 
     /**
      * 获取策略路由
+     *
+     * 注意：strategyMap 以 PrizeTypeEnum 为键，而入参是字符串。
+     * Map.get(Object) 不做类型检查，直接拿 String 去查会编译通过但恒为 null，
+     * 表现为「所有奖品都不支持」。与 GlobalEventDispatcher 曾踩过的是同一个坑，必须先转枚举。
      */
     public IPrizeHandler getHandler(String prizeType) {
-        IPrizeHandler handler = strategyMap.get(prizeType);
+        PrizeTypeEnum type = resolveType(prizeType);
+        IPrizeHandler handler = type == null ? null : strategyMap.get(type);
         if (handler == null) {
-            throw new IllegalArgumentException("不支持的奖品类型: " + prizeType);
+            throw new IllegalArgumentException("不支持的奖品类型: " + prizeType
+                    + "，已注册策略: " + strategyMap.keySet());
         }
         return handler;
+    }
+
+    private PrizeTypeEnum resolveType(String prizeType) {
+        if (prizeType == null || prizeType.isBlank()) {
+            return null;
+        }
+        try {
+            return PrizeTypeEnum.valueOf(prizeType);
+        } catch (IllegalArgumentException e) {
+            log.warn("【策略工厂】无法识别的奖品类型: {}", prizeType);
+            return null;
+        }
     }
 }

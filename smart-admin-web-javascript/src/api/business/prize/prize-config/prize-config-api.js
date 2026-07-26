@@ -16,6 +16,20 @@ export const prizeConfigApi = {
   },
 
   /**
+   * 生成奖品编码（10位大写字母+数字，服务端已判重）  @author  alaric
+   */
+  generateCode: () => {
+    return getRequest('/prizeConfig/generateCode');
+  },
+
+  /**
+   * 活动下启用中的奖品列表（抽奖工作台「从资产大库引入奖项」用）  @author  alaric
+   */
+  optionList: (activityCode) => {
+    return getRequest('/prizeConfig/optionList', { activityCode });
+  },
+
+  /**
    * 增加  @author  weolwo
    */
   add: (param) => {

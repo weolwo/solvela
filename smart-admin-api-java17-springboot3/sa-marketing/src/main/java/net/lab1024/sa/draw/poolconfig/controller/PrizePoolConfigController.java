@@ -6,6 +6,7 @@ import net.lab1024.sa.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigUpdateForm;
+import net.lab1024.sa.draw.poolconfig.domain.vo.DrawWorkbenchVO;
 import net.lab1024.sa.draw.poolconfig.domain.vo.PrizePoolConfigVO;
 import net.lab1024.sa.draw.poolconfig.service.PrizePoolConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,6 +46,20 @@ public class PrizePoolConfigController {
     @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid PrizePoolConfigAddForm addForm) {
         return Service.add(addForm);
+    }
+
+    @Operation(summary = "生成奖池编码（10位大写字母+数字，已判重）")
+    @GetMapping("/generateCode")
+    @SaCheckPermission(":workbench:save")
+    public ResponseDTO<String> generatePoolCode() {
+        return Service.generatePoolCode();
+    }
+
+    @Operation(summary = "抽奖工作台聚合回显（与聚合保存入参同构）")
+    @GetMapping("/workbench/detail")
+    @SaCheckPermission(":query")
+    public ResponseDTO<DrawWorkbenchVO> workbenchDetail(@RequestParam String activityCode) {
+        return Service.workbenchDetail(activityCode);
     }
 
     @Operation(summary = "抽奖工作台聚合保存（物资 + 多奖池 + 坑位映射，主子表事务）")

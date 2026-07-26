@@ -39,12 +39,30 @@ public class AssetStrategyFactory implements ApplicationContextAware {
 
     /**
      * 获取策略路由
+     *
+     * 注意：strategyMap 以 PrizeTypeEnum 为键，入参却是字符串。
+     * Map.get(Object) 不做类型检查，拿 String 查枚举键的 map 编译通过但恒为 null，
+     * 表现为「所有资产类型都不支持」。与 GlobalEventDispatcher、PrizeStrategyFactory 是同一个坑。
      */
     public IAssetHandler getHandler(String prizeType) {
-        IAssetHandler handler = strategyMap.get(prizeType);
+        PrizeTypeEnum type = resolveType(prizeType);
+        IAssetHandler handler = type == null ? null : strategyMap.get(type);
         if (handler == null) {
-            throw new IllegalArgumentException("不支持的奖品类型: " + prizeType);
+            throw new IllegalArgumentException("不支持的奖品类型: " + prizeType
+                    + "，已注册策略: " + strategyMap.keySet());
         }
         return handler;
+    }
+
+    private PrizeTypeEnum resolveType(String prizeType) {
+        if (prizeType == null || prizeType.isBlank()) {
+            return null;
+        }
+        try {
+            return PrizeTypeEnum.valueOf(prizeType);
+        } catch (IllegalArgumentException e) {
+            log.warn("【资产策略工厂】无法识别的资产类型: {}", prizeType);
+            return null;
+        }
     }
 }

@@ -6,6 +6,7 @@ import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateAddForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateQueryForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateSaveForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateUpdateForm;
+import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateOptionVO;
 import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateVO;
 import net.lab1024.sa.task.tasktemplate.service.TaskTemplateService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 /**
  * 任务模板表 Controller
  *
@@ -38,6 +41,20 @@ public class TaskTemplateController {
     @SaCheckPermission(":query")
     public ResponseDTO<PageResult<TaskTemplateVO>> queryPage(@RequestBody @Valid TaskTemplateQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "生成模板编码（10位大写字母+数字，已判重）")
+    @GetMapping("/generateCode")
+    @SaCheckPermission(":save")
+    public ResponseDTO<String> generateTemplateCode() {
+        return Service.generateTemplateCode();
+    }
+
+    @Operation(summary = "任务向导用模板列表（ui_schema 以 JSON 对象下发）")
+    @GetMapping("/optionList")
+    @SaCheckPermission(":query")
+    public ResponseDTO<List<TaskTemplateOptionVO>> queryOptionList() {
+        return Service.queryOptionList();
     }
 
     @Operation(summary = "添加")

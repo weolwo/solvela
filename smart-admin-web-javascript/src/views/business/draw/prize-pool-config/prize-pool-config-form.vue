@@ -14,11 +14,34 @@
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
-      <a-form-item label="活动编码" name="activityCode">
-        <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="活动编码" />
+      <!-- 活动编码是随机码，让人手打不现实，改为从活动列表选 -->
+      <a-form-item label="归属活动" name="activityCode">
+        <a-select
+          style="width: 100%"
+          v-model:value="form.activityCode"
+          :options="activityOptions"
+          :loading="activityLoading"
+          :disabled="!!form.id"
+          show-search
+          option-filter-prop="label"
+          placeholder="请选择归属活动"
+        />
       </a-form-item>
+      <!-- 奖池编码：10位大写字母+数字，规则与活动/奖品编码一致；被坑位映射与抽奖流水引用，编辑时锁死 -->
       <a-form-item label="奖池编码" name="poolCode">
-        <a-input style="width: 100%" v-model:value="form.poolCode" placeholder="奖池唯一编码 (如: VIP_POOL)" />
+        <a-input-group compact>
+          <a-input
+            style="width: calc(100% - 96px)"
+            v-model:value="form.poolCode"
+            :disabled="!!form.id"
+            :maxlength="10"
+            placeholder="如 H88JHKJFNE，或点右侧生成"
+            @change="onCodeInput"
+          />
+          <a-tooltip :title="form.id ? '奖池编码创建后不可修改' : '随机生成一个未被占用的编码'">
+            <a-button style="width: 96px" :disabled="!!form.id" :loading="codeGenerating" @click="generateCode">生成</a-button>
+          </a-tooltip>
+        </a-input-group>
       </a-form-item>
       <a-form-item label="奖池名称" name="poolName">
         <a-input style="width: 100%" v-model:value="form.poolName" placeholder="奖池名称" />
@@ -57,7 +80,10 @@
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { prizePoolConfigApi } from '/@/api/business/draw/prize-pool-config/prize-pool-config-api';
+  import { drawWorkbenchApi } from '/@/api/business/draw/draw-workbench-api';
+  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import { regular } from '/@/constants/regular-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -72,6 +98,7 @@
     if (rowData && !_.isEmpty(rowData)) {
       Object.assign(form, rowData);
     }
+    loadActivityOptions();
     // 使用字典时把下面这注释修改成自己的字典字段 有多个字典字段就复制多份同理修改 不然打开表单时不显示字典初始值
     // if (form.status && form.status.length > 0) {
     //   form.status = form.status.map((e) => e.valueCode);
@@ -110,13 +137,60 @@
 
   const rules = {
     tenantId: [{ required: true, message: '租户id 必填' }],
-    activityCode: [{ required: true, message: '活动编码 必填' }],
-    poolCode: [{ required: true, message: '奖池唯一编码 (如: VIP_POOL) 必填' }],
+    activityCode: [{ required: true, message: '归属活动 必选' }],
+    poolCode: [
+      { required: true, message: '奖池编码 必填' },
+      { pattern: regular.bizCode, message: regular.bizCodeDesc },
+    ],
     poolName: [{ required: true, message: '奖池名称 必填' }],
     costAssetType: [{ required: true, message: '消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗) 必填' }],
     costValue: [{ required: true, message: '消耗数值(单价) 必填' }],
     resetPeriod: [{ required: true, message: '重置周期，天，周，月，活动期间 必填' }],
   };
+
+  // ------------------------ 归属活动下拉 ------------------------
+
+  const activityOptions = ref([]);
+  const activityLoading = ref(false);
+
+  async function loadActivityOptions() {
+    activityLoading.value = true;
+    try {
+      const res = await activityConfigApi.optionList('DRAW');
+      activityOptions.value = (res.data || []).map((item) => ({
+        value: item.activityCode,
+        label: `${item.activityName}（${item.activityCode}）`,
+      }));
+    } catch (err) {
+      smartSentry.captureError(err);
+    } finally {
+      activityLoading.value = false;
+    }
+  }
+
+  // ------------------------ 奖池编码 ------------------------
+
+  const codeGenerating = ref(false);
+
+  // 手输时统一转大写，省得运营因为小写被规则拦下来
+  function onCodeInput() {
+    if (form.poolCode) {
+      form.poolCode = form.poolCode.toUpperCase();
+    }
+  }
+
+  async function generateCode() {
+    codeGenerating.value = true;
+    try {
+      const res = await drawWorkbenchApi.generatePoolCode();
+      form.poolCode = res.data;
+      formRef.value.clearValidate('poolCode');
+    } catch (err) {
+      smartSentry.captureError(err);
+    } finally {
+      codeGenerating.value = false;
+    }
+  }
 
   // 点击确定，验证表单
   async function onSubmit() {

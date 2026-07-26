@@ -24,6 +24,9 @@ export const regular = {
   isPdfReg: new RegExp(/\.(pdf|PDF)/),
   isElseFileReg: new RegExp(/\.(doc|docx|xls|xlsx|txt|ppt|pptx|pps|ppxs)/),
   isIdentityCard: /^[1-9]\d{5}[1-9]\d{3}((0\d)|(1[0-2]))(([0|1|2]\d)|3[0-1])\d{3}([0-9]|X|x)$/, // 验证身份证号
+  // 业务编码（活动编码/奖品编码）：10位大写字母+数字，与后端 SmartCodeUtil.BIZ_CODE_REGEX 同源
+  bizCode: /^[A-Z0-9]{10}$/,
+  bizCodeDesc: '编码必须是 10 位大写字母或数字的组合，如 H88JHKJFNE',
   isChinese: /^[\u4e00-\u9fa5]+$/gi, // 验证是否汉字
 
 };

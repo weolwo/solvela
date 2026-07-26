@@ -16,6 +16,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 /**
  * 活动配置 Controller
  *
@@ -36,6 +38,20 @@ public class ActivityConfigController {
     @SaCheckPermission(":query")
     public ResponseDTO<PageResult<ActivityConfigVO>> queryPage(@RequestBody @Valid ActivityConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "活动下拉列表（按活动类型 DRAW/TASK/LOTTERY 过滤，不传则全部）")
+    @GetMapping("/optionList")
+    @SaCheckPermission(":query")
+    public ResponseDTO<List<ActivityConfigVO>> queryOptionList(@RequestParam(required = false) String activityType) {
+        return ResponseDTO.ok(Service.queryOptionList(activityType));
+    }
+
+    @Operation(summary = "生成活动编码（10位大写字母+数字，已判重）")
+    @GetMapping("/generateCode")
+    @SaCheckPermission(":addProposal")
+    public ResponseDTO<String> generateActivityCode() {
+        return Service.generateActivityCode();
     }
 
     @Operation(summary = "添加")

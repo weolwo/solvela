@@ -48,9 +48,13 @@
     <a-form ref="formRef" :model="wizardForm" layout="vertical">
       <!-- ==================== 第1步：模板与基础信息 ==================== -->
       <div v-show="currentStep === WIZARD_STEP.BASE">
-        <a-card size="small" title="选择任务模板" class="mb-4">
+        <a-card size="small" title="选择任务模板" class="mb-4" :loading="templateLoading">
+          <a-empty
+            v-if="!templateLoading && taskTemplates.length === 0"
+            description="还没有任何任务模板，请先到「任务模板设计器」配置一个"
+          />
           <a-row :gutter="[12, 12]">
-            <a-col :span="12" v-for="tpl in TASK_TEMPLATES" :key="tpl.templateCode">
+            <a-col :span="12" v-for="tpl in taskTemplates" :key="tpl.templateCode">
               <a-card
                 size="small"
                 hoverable
@@ -67,7 +71,7 @@
                       <a-tag color="blue">{{ tpl.taskType }}</a-tag>
                     </a-space>
                   </template>
-                  <template #description>{{ tpl.desc }}</template>
+                  <template #description>{{ tpl.description }}</template>
                 </a-card-meta>
               </a-card>
             </a-col>
@@ -83,8 +87,11 @@
           >
             <a-select
               v-model:value="wizardForm.base.activityCode"
-              :options="ACTIVITY_OPTIONS"
+              :options="activityOptions"
+              :loading="activityLoading"
               placeholder="请选择所属活动"
+              show-search
+              option-filter-prop="label"
               allow-clear
             />
           </a-form-item>
@@ -270,6 +277,7 @@
   import { localRead, localRemove, localSave } from '/@/utils/local-util';
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
+  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import SmartRichEditor from '/@/components/framework/wangeditor/index.vue';
   import SchemaFormRenderer from './SchemaFormRenderer.vue';
@@ -278,14 +286,12 @@
     WIZARD_STEP,
     WIZARD_STEP_ITEMS,
     TASK_CONFIG_LIST_PATH,
-    ACTIVITY_OPTIONS,
     TRIGGER_EVENT_OPTIONS,
     TASK_GROUP_OPTIONS,
     LIMIT_TYPE_ENUM,
     LIMIT_TYPE_OPTIONS,
     TARGET_AUDIENCE_OPTIONS,
     STAGE_CONDITION_UNIT,
-    TASK_TEMPLATES,
     isSchemaParamVisible,
     splitSchemaValues,
     buildDefaultRuleParams,
@@ -300,9 +306,50 @@
   const formRef = ref();
   const router = useRouter();
 
+  // ---------------------------- 活动大类与模板：均由服务端下发 ----------------------------
+
+  // 只拉任务类活动（对齐 t_activity_config.activity_type）
+  const ACTIVITY_TYPE_TASK = 'TASK';
+
+  const activityOptions = ref([]);
+  const activityLoading = ref(false);
+  const taskTemplates = ref([]);
+  const templateLoading = ref(false);
+
+  async function loadActivityOptions() {
+    activityLoading.value = true;
+    try {
+      const res = await activityConfigApi.optionList(ACTIVITY_TYPE_TASK);
+      activityOptions.value = (res.data || []).map((item) => ({
+        value: item.activityCode,
+        label: `${item.activityName}（${item.activityCode}）`,
+      }));
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      activityLoading.value = false;
+    }
+  }
+
+  async function loadTaskTemplates() {
+    templateLoading.value = true;
+    try {
+      const res = await taskApi.queryTemplateOptionList();
+      taskTemplates.value = res.data || [];
+      // 默认选中第一个模板；已有选中（如恢复草稿）时不覆盖
+      if (!wizardForm.base.templateCode && taskTemplates.value.length > 0) {
+        wizardForm.base.templateCode = taskTemplates.value[0].templateCode;
+      }
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      templateLoading.value = false;
+    }
+  }
+
   // ---------------------------- 模板选择与 ruleParams 初始化 ----------------------------
 
-  const selectedTemplate = computed(() => TASK_TEMPLATES.find((t) => t.templateCode === wizardForm.base.templateCode));
+  const selectedTemplate = computed(() => taskTemplates.value.find((t) => t.templateCode === wizardForm.base.templateCode));
 
   const schemaParams = computed(() => selectedTemplate.value?.uiSchema?.params || []);
 
@@ -319,6 +366,10 @@
   watch(
     () => wizardForm.base.templateCode,
     () => {
+      // 模板列表还没回来时先不动 ruleParams：否则恢复草稿时会因为 selectedTemplate 暂时为空而把参数值冲成 {}
+      if (!selectedTemplate.value) {
+        return;
+      }
       wizardForm.ruleParams = buildDefaultRuleParams(selectedTemplate.value);
     }
   );
@@ -382,7 +433,7 @@
   }
 
   const summary = computed(() => ({
-    activityLabel: optionLabel(ACTIVITY_OPTIONS, wizardForm.base.activityCode),
+    activityLabel: optionLabel(activityOptions.value, wizardForm.base.activityCode),
     templateName: selectedTemplate.value?.templateName || '-',
     taskType: selectedTemplate.value?.taskType || '-',
     taskGroupLabel: optionLabel(TASK_GROUP_OPTIONS, wizardForm.base.taskGroup),
@@ -567,6 +618,10 @@
   }
 
   onMounted(() => {
+    // 活动大类与模板都来自服务端，两者互不依赖，并行拉取
+    loadActivityOptions();
+    loadTaskTemplates();
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     const raw = localRead(LocalStorageKeyConst.TASK_WIZARD_DRAFT);
     if (!raw) {

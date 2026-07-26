@@ -29,6 +29,10 @@
     </div>
 
     <a-table :data-source="mainList" :columns="columns" :pagination="false" row-key="key" size="middle" bordered>
+      <template #emptyText>
+        <div class="py-6 text-gray-400">本活动尚未配置奖项，请点击右上角「从资产大库引入奖项」</div>
+      </template>
+
       <template #bodyCell="{ column, record }">
         <!-- 只读：奖品编码 -->
         <template v-if="column.dataIndex === 'prizeCode'">
@@ -105,7 +109,7 @@
       </template>
     </a-table>
 
-    <!-- 底部：预算汇总 + 保存 -->
+    <!-- 底部：预算汇总。落库统一走顶部「保存并发布」，此处不做半截保存，避免主子表配置被拆成两次事务 -->
     <div class="mt-4 flex items-center justify-between rounded border bg-gray-50 px-4 py-3">
       <div class="text-sm text-gray-600">
         限量奖项预计最大投入：
@@ -114,7 +118,7 @@
           （另有 {{ budgetSummary.unlimitedCount }} 个不限量奖项未计入）
         </span>
       </div>
-      <a-button type="primary" :disabled="!isDirty" @click="save">保存物资配置</a-button>
+      <span class="text-xs text-gray-400">物资与奖池概率一起提交，请点击右上角「保存并发布抽奖活动」</span>
     </div>
 
     <!-- 资产选择器抽屉 -->
@@ -127,8 +131,13 @@
         row-key="prizeCode"
         size="small"
         bordered
+        :loading="assetLoading"
         :row-selection="rowSelection"
       >
+        <template #emptyText>
+          <div class="py-6 text-gray-400">本活动的资产大库为空，请先到「奖品配置」为该活动创建启用中的奖品</div>
+        </template>
+
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'prizeCode'">
             <span class="font-mono text-xs text-gray-500">{{ record.prizeCode }}</span>
@@ -186,6 +195,8 @@
   import { PlusOutlined } from '@ant-design/icons-vue';
   import { cloneDeep, isEqual } from 'lodash';
   import Decimal from 'decimal.js';
+  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
+  import { smartSentry } from '/@/lib/smart-sentry';
 
   // ---------------------------- Props / Emits ----------------------------
 
@@ -194,6 +205,11 @@
     isOnline: {
       type: Boolean,
       default: false,
+    },
+    // 当前活动编码：资产大库按活动维度隔离（t_prize_config.activity_code）
+    activityCode: {
+      type: String,
+      default: '',
     },
   });
 
@@ -230,44 +246,10 @@
   // ---------------------------- 主表数据（本地可写） ----------------------------
   // 只读字段(prizeName/prizeType/prizeValue)是引入时从资产库带过来的快照，本组件不提供编辑
 
-  const mainList = ref([
-    {
-      key: 'PRIZE_IPHONE15',
-      prizeCode: 'PRIZE_IPHONE15',
-      prizeName: 'iPhone 15 Pro',
-      prizeType: 'PHYSICAL',
-      prizeValue: 7999,
-      totalStock: 5,
-      userMaxCount: 1,
-      usedStock: 2,
-      whiteList: ['vip_10086', 'test_user_01'],
-    },
-    {
-      key: 'PRIZE_SCORE_100',
-      prizeCode: 'PRIZE_SCORE_100',
-      prizeName: '100 积分',
-      prizeType: 'SCORE',
-      prizeValue: 1,
-      totalStock: 10000,
-      userMaxCount: 5,
-      usedStock: 4500,
-      whiteList: [],
-    },
-    {
-      key: 'PRIZE_THANKS',
-      prizeCode: 'PRIZE_THANKS',
-      prizeName: '谢谢参与',
-      prizeType: 'SCORE',
-      prizeValue: 0,
-      totalStock: UNLIMITED,
-      userMaxCount: UNLIMITED,
-      usedStock: 0,
-      whiteList: [],
-    },
-  ]);
+  const mainList = ref([]);
 
   // 已保存基线：用于 isDirty 比对 + isOnline 时的库存下限锁定
-  const savedSnapshot = ref(cloneDeep(mainList.value));
+  const savedSnapshot = ref([]);
   // 上线时的原始库存映射（追加 only 的下限来源）
   const originalStockMap = computed(() => {
     const map = {};
@@ -325,27 +307,33 @@
     }
   }
 
-  function save() {
-    savedSnapshot.value = cloneDeep(mainList.value);
-    message.success('物资配置已保存');
-  }
-
   // ---------------------------- 资产大库抽屉 ----------------------------
 
   const drawerOpen = ref(false);
   const drawerSelectedKeys = ref([]);
+  const assetLoading = ref(false);
 
-  // Mock 资产大库（t_prize_config）
-  const assetLibrary = ref([
-    { prizeCode: 'PRIZE_IPHONE15', prizeName: 'iPhone 15 Pro', prizeType: 'PHYSICAL', prizeValue: 7999 },
-    { prizeCode: 'PRIZE_SCORE_100', prizeName: '100 积分', prizeType: 'SCORE', prizeValue: 1 },
-    { prizeCode: 'PRIZE_THANKS', prizeName: '谢谢参与', prizeType: 'SCORE', prizeValue: 0 },
-    { prizeCode: 'PRIZE_CASH_5', prizeName: '5 元现金红包', prizeType: 'BALANCE', prizeValue: 5 },
-    { prizeCode: 'PRIZE_COUPON_20', prizeName: '满100减20优惠券', prizeType: 'COUPON', prizeValue: 20 },
-    { prizeCode: 'PRIZE_AIRPODS', prizeName: 'AirPods Pro 2', prizeType: 'PHYSICAL', prizeValue: 1899 },
-    { prizeCode: 'PRIZE_SCORE_500', prizeName: '500 积分', prizeType: 'SCORE', prizeValue: 5 },
-    { prizeCode: 'PRIZE_CASH_88', prizeName: '88 元现金红包', prizeType: 'BALANCE', prizeValue: 88 },
-  ]);
+  // 资产大库（t_prize_config），按当前活动加载
+  const assetLibrary = ref([]);
+
+  async function loadAssetLibrary() {
+    if (!props.activityCode) {
+      assetLibrary.value = [];
+      return;
+    }
+    assetLoading.value = true;
+    try {
+      const res = await prizeConfigApi.optionList(props.activityCode);
+      assetLibrary.value = res.data || [];
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      assetLoading.value = false;
+    }
+  }
+
+  // 切活动即换资产大库
+  watch(() => props.activityCode, loadAssetLibrary, { immediate: true });
 
   const assetColumns = [
     { title: '奖品编码', dataIndex: 'prizeCode' },
@@ -371,6 +359,7 @@
   function openDrawer() {
     drawerSelectedKeys.value = [];
     drawerOpen.value = true;
+    loadAssetLibrary();
   }
 
   function confirmImport() {
@@ -383,7 +372,7 @@
       prizeCode: asset.prizeCode,
       prizeName: asset.prizeName,
       prizeType: asset.prizeType,
-      prizeValue: asset.prizeValue,
+      prizeValue: Number(asset.prizeValue ?? 0),
       totalStock: DEFAULT_STOCK,
       userMaxCount: DEFAULT_USER_MAX,
       usedStock: 0,
@@ -428,6 +417,25 @@
   // ---------------------------- 对外暴露：供工作台父组件统一取数/保存 ----------------------------
 
   defineExpose({
+    /**
+     * 回显：把后端 workbench/detail 的 prizeItemList 填回表格，并把基线重置为服务端状态
+     * usedStock 是服务端权威值，本组件只读展示，提交时也不回传
+     * prizeValue 后端是 BigDecimal、统一序列化为字符串（JsonConfig），此处归一化为 number
+     */
+    setData: (itemList) => {
+      mainList.value = (itemList || []).map((item) => ({
+        key: item.prizeCode,
+        prizeCode: item.prizeCode,
+        prizeName: item.prizeName,
+        prizeType: item.prizeType,
+        prizeValue: Number(item.prizeValue ?? 0),
+        totalStock: item.totalStock,
+        userMaxCount: item.userMaxCount,
+        usedStock: item.usedStock ?? 0,
+        whiteList: item.whiteList || [],
+      }));
+      savedSnapshot.value = cloneDeep(mainList.value);
+    },
     getData: () => cloneDeep(mainList.value),
     isDirty: () => isDirty.value,
   });

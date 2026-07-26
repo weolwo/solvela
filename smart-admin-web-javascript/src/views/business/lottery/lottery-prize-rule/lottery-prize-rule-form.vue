@@ -44,7 +44,7 @@
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { lotteryPrizeRuleApi } from '/@/api/business/marketing/lottery-prize-rule/lottery-prize-rule-api';
+  import { lotteryPrizeRuleApi } from '/@/api/business/lottery/lottery-prize-rule/lottery-prize-rule-api';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   // ------------------------ 事件 ------------------------

@@ -79,6 +79,24 @@ public class DrawStockService {
         return value == null ? null : Integer.parseInt(value.toString());
     }
 
+    /**
+     * 运行期回源预热：只在 key 不存在时写入（SET NX），并返回实际生效的剩余库存
+     *
+     * 与 {@link #warmStock} 的无条件 SET 区别很关键：缓存冷启动 + 高并发时，
+     * 若多个线程都读到 null 而各自无条件 SET，后一次 SET 会把中间发生的扣减覆盖掉，直接导致超发。
+     * 配置态保存要的是「以 DB 为准强制刷新」，运行态回源要的是「补空洞但绝不覆盖」，语义必须分开。
+     */
+    public int warmStockIfAbsent(String activityCode, PrizePoolItem item) {
+        int remain = UNLIMITED == item.getTotalStock()
+                ? UNLIMITED
+                : Math.max(0, item.getTotalStock() - (item.getUsedStock() == null ? 0 : item.getUsedStock()));
+        var bucket = redissonClient.getBucket(DrawCacheKey.stock(activityCode, item.getId()), StringCodec.INSTANCE);
+        bucket.setIfAbsent(String.valueOf(remain));
+        // 抢输的线程要以别人写入（或已被扣减）的值为准，不能返回自己算的那个
+        Object current = bucket.get();
+        return current == null ? remain : Integer.parseInt(current.toString());
+    }
+
     public StockDeductResult deduct(String activityCode, long prizeItemId, String memberName, int userMaxCount) {
         Long code = redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,

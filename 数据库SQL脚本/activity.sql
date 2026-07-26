@@ -4,9 +4,9 @@ CREATE TABLE `t_activity_config`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT comment 'id',
     `tenant_id`     varchar(16) NOT NULL DEFAULT '0' comment '租户id',
-    `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
+    `activity_code` varchar(32) NOT NULL COMMENT '活动编码：10位大写字母+数字，全局唯一',
     `activity_name` varchar(64) NOT NULL COMMENT '活动名称',
-    `activity_type` varchar(32) NOT NULL COMMENT '活动类型',
+    `activity_type` varchar(32) NOT NULL COMMENT '活动类型 DRAW，TASK,LOTTERY',
     `status`        tinyint     NOT NULL DEFAULT 0 COMMENT '状态：0-未开始, 1-上线, 2-下线',
     `start_time`    datetime    NOT NULL COMMENT '活动开始时间',
     `end_time`      datetime    NOT NULL COMMENT '活动结束时间',
@@ -48,7 +48,7 @@ CREATE TABLE `t_prize_pool_config`
     `id`              bigint         NOT NULL AUTO_INCREMENT comment 'id',
     `tenant_id`       varchar(16)    NOT NULL DEFAULT '0' comment '租户id',
     `activity_code`   varchar(32)    NOT NULL COMMENT '活动编码',
-    `pool_code`       varchar(32)    NOT NULL COMMENT '奖池唯一编码 (如: VIP_POOL)',
+    `pool_code`       varchar(32)    NOT NULL COMMENT '奖池编码：10位大写字母+数字，全局唯一 (如: H88JHKJFNE)',
     `pool_name`       varchar(128)   NOT NULL COMMENT '奖池名称',
     -- 建议改名如下，看起来会更有“门票”和“资产”的感觉
     `cost_asset_type` varchar(32)    NOT NULL DEFAULT 'CREDIT' COMMENT '消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)',

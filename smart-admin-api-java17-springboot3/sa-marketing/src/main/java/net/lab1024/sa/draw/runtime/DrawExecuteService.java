@@ -221,7 +221,7 @@ public class DrawExecuteService {
      * traceId 作为 sourceBizId，配合 t_prize_log 唯一索引做跨系统防重
      */
     private void publishPrizeEvent(DrawExecuteForm form, String traceId, String prizeCode) {
-        PrizeConfig prizeConfig = prizeConfigService.getByPrizeCode(prizeCode);
+        PrizeConfig prizeConfig = prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), prizeCode);
         if (prizeConfig == null) {
             log.error("[抽奖派发] 奖品配置不存在，跳过派发: {}", prizeCode);
             return;
@@ -311,17 +311,15 @@ public class DrawExecuteService {
     }
 
     /**
-     * 库存快照：优先读 Redis；未预热则按 DB 计算并回填
+     * 库存快照：优先读 Redis；未预热则按 DB 回填
+     * 回填必须走 SET NX 版本，否则缓存冷启动遇上高并发会把已发生的扣减覆盖掉（超发）
      */
     private int resolveRemainStock(String activityCode, PrizePoolItem item) {
         Integer cached = drawStockService.getRemainStock(activityCode, item.getId());
         if (cached != null) {
             return cached;
         }
-        drawStockService.warmStock(activityCode, List.of(item));
-        return UNLIMITED == item.getTotalStock()
-                ? UNLIMITED
-                : Math.max(0, item.getTotalStock() - (item.getUsedStock() == null ? 0 : item.getUsedStock()));
+        return drawStockService.warmStockIfAbsent(activityCode, item);
     }
 
     private Set<String> parseWhiteList(String whiteListJson) {

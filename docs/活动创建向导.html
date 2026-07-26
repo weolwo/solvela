@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>营销活动总控台 - 1024 SmartAdmin</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
+
+    <script>
+        dayjs.extend(window.dayjs_plugin_customParseFormat);
+        dayjs.extend(window.dayjs_plugin_advancedFormat);
+    </script>
+
+    <!-- Ant Design Vue -->
+    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.2.6/dist/reset.css" />
+    <script src="https://unpkg.com/ant-design-vue@4.2.6/dist/antd.min.js"></script>
+
+    <style>
+        body { background-color: #f0f2f5; color: #1f2329; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 0; padding: 0;}
+        [v-cloak] { display: none !important; }
+
+        /* 顶部导航 */
+        .top-nav { height: 60px; background: #001529; color: #fff; display: flex; align-items: center; padding: 0 24px; justify-content: space-between; position: sticky; top: 0; z-index: 50;}
+        .nav-logo { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .nav-logo .dot { width: 8px; height: 8px; background: #1677ff; border-radius: 2px; }
+
+        /* 大类型单选卡片 (Tailwind + 自定义) */
+        .type-card { border: 2px solid #e4e7eb; border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; background: #fff;}
+        .type-card:hover { border-color: #91caff; box-shadow: 0 4px 12px rgba(22,119,255,0.1); }
+        .type-card.active { border-color: #1677ff; background: #e6f2ff; }
+        .type-card.active::after { content: '✓'; position: absolute; top: -1px; right: -1px; background: #1677ff; color: #fff; font-size: 12px; font-weight: bold; padding: 2px 8px; border-bottom-left-radius: 8px; }
+
+        /* 进场动画 */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(10px); }
+
+        /* iframe 容器模拟 */
+        .workspace-shell { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e4e7eb; overflow: hidden; height: calc(100vh - 150px); display: flex; flex-direction: column;}
+        .shell-header { padding: 12px 20px; border-bottom: 1px solid #e4e7eb; background: #fafbfc; display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+<div id="app" v-cloak class="min-h-screen flex flex-col">
+    <!-- 全局顶栏 -->
+    <div class="top-nav">
+        <div class="nav-logo">
+            <span class="dot"></span> SmartAdmin · 营销总控台
+        </div>
+        <div class="flex items-center gap-4 text-sm text-gray-300">
+            <span>当前环境: 生产环境 (V3)</span>
+            <span class="bg-blue-600/30 text-blue-400 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/50">管理员: Alaric</span>
+        </div>
+    </div>
+
+    <!-- 视图路由切换区域 -->
+    <div class="flex-1 p-6 relative">
+        <transition name="fade" mode="out-in">
+            <!-- ================= VIEW 1: 活动大盘 ================= -->
+            <div v-if="currentView === 'dashboard'" key="dashboard">
+                <div class="mb-5 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 m-0">🎯 活动管理大盘</h2>
+                        <p class="text-slate-500 text-sm mt-1 mb-0">活动容器总览。在此处创建活动外壳后，进入各子引擎配置具体玩法规则。</p>
+                    </div>
+                    <a-button type="primary" size="large" @click="openCreateModal" class="font-bold tracking-wide shadow-md shadow-blue-500/20">
+                        ➕ 创设新活动
+                    </a-button>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-4 gap-4 mb-5">
+                    <a-card :bordered="false" size="small" class="shadow-sm rounded-lg border-l-4 border-l-blue-500">
+                        <div class="text-slate-500 text-xs mb-1">运行中活动</div>
+                        <div class="text-2xl font-bold">12</div>
+                    </a-card>
+                    <a-card :bordered="false" size="small" class="shadow-sm rounded-lg border-l-4 border-l-orange-500">
+                        <div class="text-slate-500 text-xs mb-1">抽奖类 (DRAW)</div>
+                        <div class="text-2xl font-bold">5</div>
+                    </a-card>
+                    <a-card :bordered="false" size="small" class="shadow-sm rounded-lg border-l-4 border-l-purple-500">
+                        <div class="text-slate-500 text-xs mb-1">任务类 (TASK)</div>
+                        <div class="text-2xl font-bold">4</div>
+                    </a-card>
+                    <a-card :bordered="false" size="small" class="shadow-sm rounded-lg border-l-4 border-l-green-500">
+                        <div class="text-slate-500 text-xs mb-1">彩票类 (LOTTERY)</div>
+                        <div class="text-2xl font-bold">3</div>
+                    </a-card>
+                </div>
+
+                <!-- 列表 -->
+                <a-card :bordered="false" class="shadow-sm rounded-xl">
+                    <div class="flex gap-4 mb-4">
+                        <a-input-search placeholder="搜索活动名称或编码" style="width: 250px" />
+                        <a-select v-model:value="filterType" style="width: 150px">
+                            <a-select-option value="ALL">全部玩法</a-select-option>
+                            <a-select-option value="DRAW">奖池抽奖</a-select-option>
+                            <a-select-option value="TASK">任务驱动</a-select-option>
+                            <a-select-option value="LOTTERY">FPE彩票</a-select-option>
+                        </a-select>
+                    </div>
+                    <a-table :data-source="filteredActivities" :columns="columns" :pagination="{ pageSize: 8 }" size="middle">
+                        <template #bodyCell="{ column, record }">
+                            <template v-if="column.dataIndex === 'activityCode'">
+                                <span class="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">{{ record.activityCode }}</span>
+                            </template>
+                            <template v-else-if="column.dataIndex === 'activityType'">
+                                <a-tag v-if="record.activityType === 'DRAW'" color="orange">🎡 奖池抽奖</a-tag>
+                                <a-tag v-else-if="record.activityType === 'TASK'" color="purple">🎯 任务驱动</a-tag>
+                                <a-tag v-else-if="record.activityType === 'LOTTERY'" color="cyan">🎟️ FPE彩票</a-tag>
+                            </template>
+                            <template v-else-if="column.dataIndex === 'status'">
+                                <a-badge :status="record.status === 1 ? 'processing' : 'default'" :text="record.status === 1 ? '已上线' : '未开始'" />
+                            </template>
+                            <template v-else-if="column.dataIndex === 'action'">
+                                <a-button type="primary" size="small" ghost @click="enterWorkspace(record)">去配置玩法 👉</a-button>
+                            </template>
+                        </template>
+                    </a-table>
+                </a-card>
+            </div>
+
+            <!-- ================= VIEW 2: 模拟专业配置台 (外壳) ================= -->
+            <div v-else-if="currentView === 'workspace'" key="workspace" class="h-full">
+                <!-- 返回面包屑 -->
+                <div class="mb-4 flex items-center gap-2">
+                    <a-button type="link" class="p-0 text-slate-500 hover:text-blue-600" @click="currentView = 'dashboard'">
+                        ← 返回大盘
+                    </a-button>
+                    <span class="text-slate-300">/</span>
+                    <span class="text-sm font-bold">{{ activeActivity.activityName }} ({{ activeActivity.activityCode }})</span>
+                </div>
+
+                <!-- 工作台容器 -->
+                <div class="workspace-shell">
+                    <div class="shell-header">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl">{{ getTypeIcon(activeActivity.activityType) }}</span>
+                            <div>
+                                <div class="font-bold text-sm">{{ getTypeName(activeActivity.activityType) }} 工作台</div>
+                                <div class="text-[11px] text-slate-400 font-mono">路由锚点: {{ getRoutePath(activeActivity.activityType) }}?activityCode={{ activeActivity.activityCode }}</div>
+                            </div>
+                        </div>
+                        <a-tag color="blue" class="m-0 border-blue-200 bg-blue-50">✨ 活动上下文已贯穿</a-tag>
+                    </div>
+                    <div class="flex-1 bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden">
+                        <!-- 装饰背景 -->
+                        <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#000 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+                        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center z-10 max-w-md w-full">
+                            <div class="text-5xl mb-4">{{ getTypeIcon(activeActivity.activityType) }}</div>
+                            <h3 class="text-lg font-bold mb-2">已成功挂载专业工作台</h3>
+                            <p class="text-sm text-slate-500 mb-6">
+                                实际项目中，这里将直接渲染你编写的 <br/>
+                                <code class="bg-slate-100 text-pink-600 px-1 rounded text-xs">{{ getComponentName(activeActivity.activityType) }}.vue</code>
+                            </p>
+                            <a-button type="primary" block @click="message.success('配置已保存 (模拟)')">保存 {{ activeActivity.activityName }} 配置</a-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+    </div>
+
+    <!-- ================= 弹窗: 新建活动向导 ================= -->
+    <a-modal
+            v-model:open="isModalVisible"
+            title="✨ 创设营销活动"
+            :confirm-loading="submitLoading"
+            @ok="handleCreateSubmit"
+            @cancel="isModalVisible = false"
+            width="600px"
+            destroy-on-close
+    >
+        <div class="mt-4 mb-2">
+            <a-form ref="formRef" :model="formData" :rules="formRules" layout="vertical">
+                <a-form-item label="活动名称 (外显)" name="activityName">
+                    <a-input v-model:value="formData.activityName" placeholder="例如：618年中狂欢大促" size="large" />
+                </a-form-item>
+
+                <a-form-item label="活动起止时间" name="timeRange">
+                    <a-range-picker v-model:value="formData.timeRange" show-time value-format="YYYY-MM-DD HH:mm:ss" class="w-full" size="large" />
+                </a-form-item>
+
+                <a-form-item label="核心玩法引擎 (保存后不可更改)" name="activityType">
+                    <div class="flex gap-3">
+                        <div
+                                class="type-card flex-1 p-4 flex flex-col items-center"
+                                :class="{'active': formData.activityType === 'DRAW'}"
+                                @click="formData.activityType = 'DRAW'"
+                        >
+                            <span class="text-3xl mb-2">🎡</span>
+                            <span class="font-bold text-sm">奖池抽奖</span>
+                            <span class="text-[10px] text-slate-400 mt-1">转盘/九宫格/盲盒</span>
+                        </div>
+                        <div
+                                class="type-card flex-1 p-4 flex flex-col items-center"
+                                :class="{'active': formData.activityType === 'TASK'}"
+                                @click="formData.activityType = 'TASK'"
+                        >
+                            <span class="text-3xl mb-2">🎯</span>
+                            <span class="font-bold text-sm">任务驱动</span>
+                            <span class="text-[10px] text-slate-400 mt-1">签到/浏览/分享</span>
+                        </div>
+                        <div
+                                class="type-card flex-1 p-4 flex flex-col items-center"
+                                :class="{'active': formData.activityType === 'LOTTERY'}"
+                                @click="formData.activityType = 'LOTTERY'"
+                        >
+                            <span class="text-3xl mb-2">🎟️</span>
+                            <span class="font-bold text-sm">FPE彩票</span>
+                            <span class="text-[10px] text-slate-400 mt-1">加密发号/周期开奖</span>
+                        </div>
+                    </div>
+                </a-form-item>
+            </a-form>
+        </div>
+    </a-modal>
+</div>
+
+<script>
+    const { createApp, ref, reactive, computed } = Vue;
+    const { message } = antd;
+
+    const App = {
+        setup() {
+            // ---- 视图控制 ----
+            const currentView = ref('dashboard'); // 'dashboard' | 'workspace'
+            const activeActivity = ref(null);
+
+            // ---- 列表数据 ----
+            const filterType = ref('ALL');
+            const columns = [
+                { title: '活动编码', dataIndex: 'activityCode', width: '20%' },
+                { title: '活动名称', dataIndex: 'activityName', width: '25%' },
+                { title: '玩法', dataIndex: 'activityType', width: '15%' },
+                { title: '状态', dataIndex: 'status', width: '15%' },
+                { title: '操作', dataIndex: 'action', align: 'center', width: '25%' },
+            ];
+            const activities = ref([
+                { activityCode: 'ACT_618_MAIN', activityName: '618任务大乱斗', activityType: 'TASK', status: 1 },
+                { activityCode: 'ACT_SUMMER_02', activityName: '仲夏转盘抽奖', activityType: 'DRAW', status: 0 },
+                { activityCode: 'ACT_LOT_001', activityName: '锦鲤福彩发号', activityType: 'LOTTERY', status: 1 }
+            ]);
+
+            const filteredActivities = computed(() => {
+                if (filterType.value === 'ALL') return activities.value;
+                return activities.value.filter(a => a.activityType === filterType.value);
+            });
+
+            // ---- 表单逻辑 ----
+            const isModalVisible = ref(false);
+            const submitLoading = ref(false);
+            const formRef = ref();
+
+            const formData = reactive({
+                activityName: '',
+                timeRange: [],
+                activityType: 'DRAW'
+            });
+
+            const formRules = {
+                activityName: [{ required: true, message: '请输入活动名称' }],
+                timeRange: [{ required: true, message: '请选择起止时间', type: 'array' }],
+                activityType: [{ required: true, message: '请选择玩法类型' }]
+            };
+
+            const openCreateModal = () => {
+                Object.assign(formData, { activityName: '', timeRange: [], activityType: 'DRAW' });
+                isModalVisible.value = true;
+            };
+
+            const handleCreateSubmit = async () => {
+                try {
+                    await formRef.value.validate();
+                    submitLoading.value = true;
+
+                    // 模拟网络请求
+                    setTimeout(() => {
+                        const newCode = `ACT_${dayjs().format('YYYYMMDDHHmmss')}`;
+                        const newAct = {
+                            activityCode: newCode,
+                            activityName: formData.activityName,
+                            activityType: formData.activityType,
+                            status: 0
+                        };
+                        activities.value.unshift(newAct);
+
+                        submitLoading.value = false;
+                        isModalVisible.value = false;
+                        message.success('活动创建成功，即将进入工作台...');
+
+                        // 直接路由到该活动的工作台
+                        enterWorkspace(newAct);
+                    }, 600);
+                } catch (error) {
+                    console.log('Validate failed', error);
+                }
+            };
+
+            // ---- 进入专业工作台 ----
+            const enterWorkspace = (record) => {
+                activeActivity.value = record;
+                currentView.value = 'workspace';
+            };
+
+            // ---- 辅助函数 ----
+            const getTypeIcon = (type) => {
+                const map = { 'TASK': '🎯', 'DRAW': '🎡', 'LOTTERY': '🎟️' };
+                return map[type] || '✨';
+            };
+            const getTypeName = (type) => {
+                const map = { 'TASK': '任务驱动', 'DRAW': '奖池抽奖', 'LOTTERY': 'FPE彩票' };
+                return map[type] || '未知';
+            };
+            const getRoutePath = (type) => {
+                const map = {
+                    'TASK': '/business/task/task-wizard',
+                    'DRAW': '/business/draw/draw-workbench',
+                    'LOTTERY': '/business/lottery/lottery-config'
+                };
+                return map[type] || '/';
+            };
+            const getComponentName = (type) => {
+                const map = {
+                    'TASK': 'TaskWizard',
+                    'DRAW': 'DrawWorkbench',
+                    'LOTTERY': 'LotteryDesigner'
+                };
+                return map[type] || 'UnknownComponent';
+            };
+
+            return {
+                currentView, activeActivity,
+                filterType, columns, filteredActivities,
+                isModalVisible, submitLoading, formRef, formData, formRules,
+                openCreateModal, handleCreateSubmit, enterWorkspace,
+                getTypeIcon, getTypeName, getRoutePath, getComponentName, message
+            };
+        }
+    };
+
+    createApp(App).use(antd).mount('#app');
+</script>
+</body>
+</html>

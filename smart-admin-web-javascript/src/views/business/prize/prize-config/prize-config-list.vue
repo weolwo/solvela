@@ -9,9 +9,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="活动编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.activityCode" placeholder="活动编码" />
       </a-form-item>
@@ -129,11 +126,6 @@
     {
       title: 'id',
       dataIndex: 'id',
-      ellipsis: true,
-    },
-    {
-      title: '租户ID',
-      dataIndex: 'tenantId',
       ellipsis: true,
     },
     {

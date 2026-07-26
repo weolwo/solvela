@@ -3,8 +3,10 @@ package net.lab1024.sa.activity.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 import lombok.Data;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 
 /**
  * 活动配置 新建表单
@@ -17,12 +19,12 @@ import lombok.Data;
 @Data
 public class ActivityConfigAddForm {
 
-    @Schema(description = "租户id", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户id 不能为空")
+    @Schema(description = "租户id，不传落库取默认值 '0'")
     private String tenantId;
 
-    @Schema(description = "活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "活动编码：10 位大写字母+数字，全局唯一", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "活动编码 不能为空")
+    @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "活动" + SmartCodeUtil.BIZ_CODE_MESSAGE)
     private String activityCode;
 
     @Schema(description = "活动名称", requiredMode = Schema.RequiredMode.REQUIRED)

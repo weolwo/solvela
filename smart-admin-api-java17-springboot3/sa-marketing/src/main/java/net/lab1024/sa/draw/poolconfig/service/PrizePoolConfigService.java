@@ -2,12 +2,14 @@ package net.lab1024.sa.draw.poolconfig.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.activity.domain.entity.ActivityConfig;
 import net.lab1024.sa.activity.service.ActivityConfigService;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.draw.poolconfig.dao.PrizePoolConfigDao;
 import net.lab1024.sa.draw.poolconfig.domain.entity.PrizePoolConfig;
@@ -18,6 +20,10 @@ import net.lab1024.sa.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigUpdateForm;
+import net.lab1024.sa.draw.poolconfig.domain.vo.DrawWorkbenchItemVO;
+import net.lab1024.sa.draw.poolconfig.domain.vo.DrawWorkbenchMappingVO;
+import net.lab1024.sa.draw.poolconfig.domain.vo.DrawWorkbenchPoolVO;
+import net.lab1024.sa.draw.poolconfig.domain.vo.DrawWorkbenchVO;
 import net.lab1024.sa.draw.poolconfig.domain.vo.PrizePoolConfigVO;
 import net.lab1024.sa.draw.poolconfig.manager.PrizePoolConfigManager;
 import net.lab1024.sa.draw.poolitem.dao.PrizePoolItemDao;
@@ -27,8 +33,10 @@ import net.lab1024.sa.draw.prizemapping.dao.PoolPrizeMappingDao;
 import net.lab1024.sa.draw.prizemapping.domain.entity.PoolPrizeMapping;
 import net.lab1024.sa.draw.prizemapping.manager.PoolPrizeMappingManager;
 import net.lab1024.sa.draw.runtime.DrawStockService;
+import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +57,7 @@ import java.util.stream.Collectors;
  * @Date 2026-04-19 09:42:12
  * @Copyright weolwo
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class PrizePoolConfigService {
@@ -81,6 +90,105 @@ public class PrizePoolConfigService {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     /**
+     * 坑位兜底标记：1-兜底（库存不足时降级命中），每池最多一个
+     */
+    private static final Integer FALLBACK_YES = 1;
+
+    private static final Integer FALLBACK_NO = 0;
+
+    /**
+     * 生成一个未被占用的奖池编码（10 位大写字母+数字），供工作台「新建奖池」调用
+     */
+    public ResponseDTO<String> generatePoolCode() {
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(this::existsByPoolCode));
+    }
+
+    /**
+     * 奖池编码是否已被占用（全局唯一，不分活动，对齐 uk_pool_code）
+     */
+    public boolean existsByPoolCode(String poolCode) {
+        return prizePoolConfigManager.lambdaQuery().eq(PrizePoolConfig::getPoolCode, poolCode).exists();
+    }
+
+    /**
+     * 抽奖工作台聚合回显：与 workbenchSave 的入参同构，前端拿到即可直接填回两个 Tab
+     * 空配置（活动刚建、还没配过奖池）返回空列表而非报错，前端据此进入「从零配置」态
+     */
+    public ResponseDTO<DrawWorkbenchVO> workbenchDetail(String activityCode) {
+        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
+        if (activity == null) {
+            return ResponseDTO.userErrorParam("活动不存在：" + activityCode);
+        }
+        boolean online = ACTIVITY_STATUS_ONLINE.equals(activity.getStatus());
+
+        // Tab1 物资：SKU 化后名称/价值等展示信息需回查资产大库补齐
+        List<PrizePoolItem> dbItems = prizePoolItemManager.lambdaQuery()
+                .eq(PrizePoolItem::getActivityCode, activityCode)
+                .orderByAsc(PrizePoolItem::getId).list();
+        Map<String, PrizeConfig> prizeConfigMap = prizeConfigService.queryListByActivityCode(activityCode).stream()
+                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
+        List<DrawWorkbenchItemVO> itemVOList = dbItems.stream().map(item -> {
+            PrizeConfig prize = prizeConfigMap.get(item.getPrizeCode());
+            return new DrawWorkbenchItemVO(
+                    item.getPrizeCode(),
+                    prize == null ? item.getPrizeCode() : prize.getPrizeName(),
+                    prize == null ? null : prize.getPrizeType(),
+                    prize == null ? BigDecimal.ZERO : prize.getPrizeValue(),
+                    item.getTotalStock(),
+                    item.getUserMaxCount(),
+                    item.getUsedStock(),
+                    parseWhiteList(item.getWhiteList()));
+        }).collect(Collectors.toList());
+
+        // Tab2 奖池：存储层用 prize_item_id 关联，对外统一翻译回 prizeCode
+        List<PrizePoolConfig> dbPools = prizePoolConfigManager.lambdaQuery()
+                .eq(PrizePoolConfig::getActivityCode, activityCode)
+                .orderByAsc(PrizePoolConfig::getId).list();
+        Map<Long, String> itemIdToCodeMap = dbItems.stream()
+                .collect(Collectors.toMap(PrizePoolItem::getId, PrizePoolItem::getPrizeCode));
+        List<String> poolCodeList = dbPools.stream().map(PrizePoolConfig::getPoolCode).collect(Collectors.toList());
+        Map<String, List<PoolPrizeMapping>> mappingGroup = poolCodeList.isEmpty()
+                ? Map.of()
+                : poolPrizeMappingManager.lambdaQuery()
+                        .in(PoolPrizeMapping::getPoolCode, poolCodeList)
+                        .orderByAsc(PoolPrizeMapping::getSortWeight).list().stream()
+                        .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode));
+
+        List<DrawWorkbenchPoolVO> poolVOList = dbPools.stream().map(pool -> {
+            List<DrawWorkbenchMappingVO> mappingVOList = mappingGroup.getOrDefault(pool.getPoolCode(), List.of())
+                    .stream()
+                    // 物资被删导致的悬空坑位直接过滤，避免前端渲染出无法编辑的幽灵行
+                    .filter(mapping -> itemIdToCodeMap.containsKey(mapping.getPrizeItemId()))
+                    .map(mapping -> new DrawWorkbenchMappingVO(
+                            itemIdToCodeMap.get(mapping.getPrizeItemId()),
+                            mapping.getProbability(),
+                            FALLBACK_YES.equals(mapping.getIsFallback())))
+                    .collect(Collectors.toList());
+            return new DrawWorkbenchPoolVO(pool.getPoolCode(), pool.getPoolName(), mappingVOList);
+        }).collect(Collectors.toList());
+
+        return ResponseDTO.ok(new DrawWorkbenchVO(activity.getActivityCode(), activity.getActivityName(),
+                activity.getStatus(), online, itemVOList, poolVOList));
+    }
+
+    /**
+     * white_list 列存的是 JSON 数组字符串。JsonUtils.parseList 遇到脏数据会抛异常，
+     * 单个奖项的脏名单不该让整个工作台打不开，故此处兜住并降级为空名单
+     */
+    private List<String> parseWhiteList(String whiteListJson) {
+        if (StringUtils.isBlank(whiteListJson)) {
+            return List.of();
+        }
+        try {
+            List<String> whiteList = JsonUtils.parseList(whiteListJson, String.class);
+            return whiteList == null ? List.of() : whiteList;
+        } catch (RuntimeException e) {
+            log.warn("[抽奖工作台回显] 白名单 JSON 解析失败，已降级为空名单: {}", whiteListJson, e);
+            return List.of();
+        }
+    }
+
+    /**
      * 抽奖工作台聚合保存：物资(t_prize_pool_item) + 奖池(t_prize_pool_config) + 坑位映射(t_pool_prize_mapping)
      * 同一事务落库。前端的概率闭环/上线锁只是 UI 防呆，此处全部服务端重算
      */
@@ -99,14 +207,18 @@ public class PrizePoolConfigService {
             if (!itemCodes.add(item.getPrizeCode())) {
                 return ResponseDTO.userErrorParam("奖品编码重复：" + item.getPrizeCode());
             }
-            if (prizeConfigService.getByPrizeCode(item.getPrizeCode()) == null) {
-                return ResponseDTO.userErrorParam("奖品不存在于资产大库：" + item.getPrizeCode());
+            if (prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), item.getPrizeCode()) == null) {
+                return ResponseDTO.userErrorParam("奖品不存在于本活动的资产大库：" + item.getPrizeCode());
             }
         }
 
         // 3. 逐池校验：概率闭环（BigDecimal + 容差）、池编码唯一、坑位引用的奖品必须在物资列表内
         Set<String> poolCodes = new HashSet<>();
         for (DrawWorkbenchPoolForm pool : form.getPoolList()) {
+            // 奖池编码由前端生成/手输，服务端重校验格式（对齐活动编码、奖品编码的统一约定）
+            if (!SmartCodeUtil.isValidBizCode(pool.getPoolCode())) {
+                return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」" + SmartCodeUtil.BIZ_CODE_MESSAGE);
+            }
             if (!poolCodes.add(pool.getPoolCode())) {
                 return ResponseDTO.userErrorParam("奖池编码重复：" + pool.getPoolCode());
             }
@@ -187,6 +299,10 @@ public class PrizePoolConfigService {
         for (DrawWorkbenchPoolForm pool : form.getPoolList()) {
             PrizePoolConfig existed = dbPoolMap.get(pool.getPoolCode());
             if (existed == null) {
+                // uk_pool_code 是全局唯一：手输的编码可能撞上别的活动的奖池，提前给出人话提示而不是抛 SQL 异常
+                if (existsByPoolCode(pool.getPoolCode())) {
+                    return ResponseDTO.userErrorParam("奖池编码已被其他活动占用：" + pool.getPoolCode());
+                }
                 PrizePoolConfig entity = new PrizePoolConfig();
                 entity.setActivityCode(form.getActivityCode());
                 entity.setPoolCode(pool.getPoolCode());
@@ -216,10 +332,11 @@ public class PrizePoolConfigService {
             for (int i = 0; i < pool.getPrizeMappingList().size(); i++) {
                 DrawWorkbenchMappingForm mapping = pool.getPrizeMappingList().get(i);
                 PoolPrizeMapping entity = new PoolPrizeMapping();
+                entity.setTenantId("0");
                 entity.setPoolCode(pool.getPoolCode());
                 entity.setPrizeItemId(dbItemMap.get(mapping.getPrizeCode()).getId());
                 entity.setProbability(mapping.getProbability());
-                entity.setIsFallback(Boolean.TRUE.equals(mapping.getIsFallback()) ? 1 : 0);
+                entity.setIsFallback(Boolean.TRUE.equals(mapping.getIsFallback()) ? FALLBACK_YES : FALLBACK_NO);
                 entity.setSortWeight(i);
                 mappingList.add(entity);
             }
@@ -301,8 +418,12 @@ public class PrizePoolConfigService {
 
     /**
      * 添加
+     * 奖池编码允许手工输入，故服务端必须重校验唯一性（格式由 AddForm 的 @Pattern 拦）
      */
     public ResponseDTO<String> add(PrizePoolConfigAddForm addForm) {
+        if (existsByPoolCode(addForm.getPoolCode())) {
+            return ResponseDTO.userErrorParam("奖池编码已存在：" + addForm.getPoolCode());
+        }
         PrizePoolConfig prizePoolConfig = SmartBeanUtil.copy(addForm, PrizePoolConfig.class);
         prizePoolConfigDao.insert(prizePoolConfig);
         return ResponseDTO.ok();

@@ -9,9 +9,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="会员名" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.memberName" placeholder="会员名" />
       </a-form-item>
@@ -168,7 +165,7 @@
       ellipsis: true,
     },
     {
-      title: '奖励体值(积分数/券ID)',
+      title: '奖励价值',
       dataIndex: 'prizeValue',
       ellipsis: true,
     },
@@ -203,12 +200,12 @@
       ellipsis: true,
     },
     {
-      title: '外部单号',
+      title: '单号',
       dataIndex: 'externalBizNo',
       ellipsis: true,
     },
     {
-      title: '异常原因',
+      title: '备注',
       dataIndex: 'remark',
       ellipsis: true,
     },

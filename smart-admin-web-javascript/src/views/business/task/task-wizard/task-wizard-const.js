@@ -53,14 +53,6 @@ export const TASK_TYPE_OPTIONS = [
   { value: TASK_TYPE_ENUM.AMOUNT, label: 'AMOUNT 计额型' },
 ];
 
-// ---------------------------- 活动大类（t_task_config.activity_code，实际应由活动接口下发） ----------------------------
-
-export const ACTIVITY_OPTIONS = [
-  { value: 'NEWBIE_CAMP', label: '🌱 新人成长营（NEWBIE_CAMP）' },
-  { value: 'NATIONAL_DAY_2026', label: '🎁 国庆狂欢挑战（NATIONAL_DAY_2026）' },
-  { value: 'D11_MAIN_2026', label: '🛒 双十一主会场（D11_MAIN_2026）' },
-];
-
 // ---------------------------- 触发事件 ----------------------------
 
 export const TRIGGER_EVENT_OPTIONS = [
@@ -186,88 +178,6 @@ export function splitSchemaValues(params, values) {
   return { ruleValues, uiValues };
 }
 
-// ---------------------------- 任务模板（t_task_template mock，实际应由模板接口下发） ----------------------------
-// uiSchema.params 驱动第2步动态表单；widget=image_upload 的参数值提交时归入 uiConfig，其余归入 ruleConfig
-
-export const TASK_TEMPLATES = [
-  {
-    templateCode: 'DAILY_SIGN_TPL',
-    templateName: '每日签到',
-    taskType: TASK_TYPE_ENUM.COUNT,
-    icon: '📅',
-    desc: '连续/累计签到达标，支持补签联动配置',
-    uiSchema: {
-      version: 1,
-      params: [
-        { key: 'targetDays', label: '连续签到目标', widget: WIDGET_TYPE.NUMBER, unit: '天', default: 7, min: 1, required: true },
-        { key: 'allowRepair', label: '允许补签', widget: WIDGET_TYPE.SWITCH, default: true },
-        { key: 'repairCost', label: '补签消耗积分', widget: WIDGET_TYPE.NUMBER, unit: '积分', default: 20, min: 0,
-          visibleWhen: { field: 'allowRepair', eq: true }, help: '关闭「允许补签」后此项自动隐藏' },
-        { key: 'customImage', label: '自定义任务图片', widget: WIDGET_TYPE.SWITCH, default: false,
-          help: '开启后才显示下方图片上传项' },
-        { key: 'icon_app', label: 'App端任务图标 (120x120)', widget: WIDGET_TYPE.IMAGE_UPLOAD, required: false,
-          visibleWhen: { field: 'customImage', eq: true } },
-        { key: 'banner_mp', label: '小程序横幅 Banner (750x300)', widget: WIDGET_TYPE.IMAGE_UPLOAD, required: true,
-          visibleWhen: { field: 'customImage', eq: true } },
-      ],
-    },
-  },
-  {
-    templateCode: 'INVITE_TPL',
-    templateName: '邀请好友',
-    taskType: TASK_TYPE_ENUM.COUNT,
-    icon: '👥',
-    desc: '累计邀请好友注册次数达标',
-    uiSchema: {
-      version: 1,
-      params: [
-        { key: 'targetCount', label: '邀请人数目标', widget: WIDGET_TYPE.SLIDER, min: 1, max: 20, default: 3, unit: '人' },
-        { key: 'validRule', label: '有效邀请判定', widget: WIDGET_TYPE.SELECT, default: 'REAL_NAME',
-          options: [
-            { value: 'REGISTER', label: '注册即算' },
-            { value: 'REAL_NAME', label: '注册且实名' },
-            { value: 'FIRST_ORDER', label: '注册且完成首单' },
-          ] },
-        { key: 'icon_app', label: 'App端任务图标 (120x120)', widget: WIDGET_TYPE.IMAGE_UPLOAD, required: false },
-        { key: 'banner_mp', label: '小程序横幅 Banner (750x300)', widget: WIDGET_TYPE.IMAGE_UPLOAD, required: true },
-      ],
-    },
-  },
-  {
-    templateCode: 'CONSUME_TPL',
-    templateName: '累计消费',
-    taskType: TASK_TYPE_ENUM.AMOUNT,
-    icon: '💰',
-    desc: '统计周期内订单实付金额累计达标',
-    uiSchema: {
-      version: 1,
-      params: [
-        { key: 'targetAmount', label: '累计消费目标', widget: WIDGET_TYPE.NUMBER, unit: '元', default: 199, min: 1, required: true },
-        { key: 'caliber', label: '统计口径', widget: WIDGET_TYPE.RADIO, default: 'PAID',
-          options: [
-            { value: 'PAID', label: '实付金额' },
-            { value: 'ORIGIN', label: '原价金额' },
-          ] },
-        { key: 'excludeRefund', label: '剔除退款订单', widget: WIDGET_TYPE.SWITCH, default: true },
-      ],
-    },
-  },
-  {
-    templateCode: 'BROWSE_TPL',
-    templateName: '浏览页面',
-    taskType: TASK_TYPE_ENUM.SIMPLE,
-    icon: '👁️',
-    desc: '完成一次页面浏览并满足停留时长',
-    uiSchema: {
-      version: 1,
-      params: [
-        { key: 'pageUrl', label: '目标页面路径', widget: WIDGET_TYPE.TEXT, default: '/pages/activity/qixi', required: true },
-        { key: 'staySeconds', label: '停留时长要求', widget: WIDGET_TYPE.SLIDER, min: 0, max: 60, default: 10, unit: '秒' },
-      ],
-    },
-  },
-];
-
 // ---------------------------- 各步骤默认值初始化 ----------------------------
 
 /**
@@ -288,18 +198,18 @@ export function buildDefaultRuleParams(template) {
  * limit -> limitType/limitCount，prizeLadders -> prizeMappingList，audience/display -> 主表展示字段
  */
 export function buildDefaultWizardForm() {
-  const defaultTemplate = TASK_TEMPLATES[0];
   return {
     // 第1步：模板与基础信息
+    // 模板由 /taskTemplate/optionList 异步下发，此处留空，向导拉到列表后自动选中第一个
     base: {
-      templateCode: defaultTemplate.templateCode,
+      templateCode: undefined,
       activityCode: undefined,
       taskName: '',
       triggerEvent: undefined,
       taskGroup: TASK_GROUP_ENUM.NEWBIE,
     },
-    // 第2步：ui_schema 参数值（key -> value）
-    ruleParams: buildDefaultRuleParams(defaultTemplate),
+    // 第2步：ui_schema 参数值（key -> value），随模板选中后按 schema 默认值重建
+    ruleParams: {},
     // 第2步：参与频次
     limit: {
       limitType: LIMIT_TYPE_ENUM.ONCE,

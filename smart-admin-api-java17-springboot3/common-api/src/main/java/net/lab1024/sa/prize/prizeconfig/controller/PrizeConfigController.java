@@ -17,6 +17,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 /**
  * 奖品配置表 Controller
  *
@@ -37,6 +39,20 @@ public class PrizeConfigController {
     @SaCheckPermission(":query")
     public ResponseDTO<PageResult<PrizeConfigVO>> queryPage(@RequestBody @Valid PrizeConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "查询活动下启用中的奖品（抽奖工作台资产大库抽屉用）")
+    @GetMapping("/optionList")
+    @SaCheckPermission(":query")
+    public ResponseDTO<List<PrizeConfigVO>> queryEnabledList(@RequestParam String activityCode) {
+        return ResponseDTO.ok(Service.queryEnabledList(activityCode));
+    }
+
+    @Operation(summary = "生成奖品编码（10位大写字母+数字，已判重）")
+    @GetMapping("/generateCode")
+    @SaCheckPermission(":addProposal")
+    public ResponseDTO<String> generatePrizeCode() {
+        return Service.generatePrizeCode();
     }
 
     @Operation(summary = "添加")

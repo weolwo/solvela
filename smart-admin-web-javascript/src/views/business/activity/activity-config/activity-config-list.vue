@@ -9,9 +9,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户id" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户id" />
-      </a-form-item>
       <a-form-item label="活动编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.activityCode" placeholder="活动编码" />
       </a-form-item>
@@ -118,16 +115,6 @@
   // ---------------------------- 表格列 ----------------------------
 
   const columns = ref([
-    {
-      title: 'id',
-      dataIndex: 'id',
-      ellipsis: true,
-    },
-    {
-      title: '租户id',
-      dataIndex: 'tenantId',
-      ellipsis: true,
-    },
     {
       title: '活动编码',
       dataIndex: 'activityCode',

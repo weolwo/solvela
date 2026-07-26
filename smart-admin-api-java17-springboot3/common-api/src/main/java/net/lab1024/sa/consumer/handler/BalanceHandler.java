@@ -54,9 +54,13 @@ public class BalanceHandler implements IPrizeHandler {
             req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放");
 
             // 3. 调用底层的资金账户服务进行加钱
-            proposalRecordService.addProposal(req);
-
-            return ResponseDTO.ok();
+            // 提案被风控拦截 / 资产配置异常时返回的是非 ok，必须如实上抛：
+            // 之前这里丢弃了返回值直接 return ok，会把根本没入账的记录标成「发货成功」
+            ResponseDTO result = proposalRecordService.addProposal(req);
+            if (!result.getOk()) {
+                log.warn("【发奖提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), result.getMsg());
+            }
+            return result;
         } catch (NumberFormatException e) {
             log.error("【发奖异常】金额格式错误: {}", prizeLog.getPrizeValue());
             return ResponseDTO.userErrorParam("金额格式错误");

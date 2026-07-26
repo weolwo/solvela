@@ -68,6 +68,10 @@
 
       <!-- ==================== 右侧：当前奖池的概率映射 ==================== -->
       <a-col :span="19">
+        <!-- 新活动尚未建池：右侧整体让位给引导，避免出现「0% 未闭环」这种无主体的报错态 -->
+        <a-empty v-if="!activePool" class="py-16" description="本活动尚未创建奖池，请点击左侧「新建奖池」开始配置" />
+
+        <template v-else>
         <div class="mb-2 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="font-semibold">转盘坑位映射</span>
@@ -165,23 +169,33 @@
           </div>
           <div class="flex gap-3">
             <a-button class="border-purple-300 bg-purple-50 text-purple-700" @click="openSimulator">🎲 沙盘模拟器</a-button>
-            <a-tooltip :title="allPoolsValid ? '' : '存在未闭环的奖池，无法保存'">
-              <span>
-                <a-button type="primary" :disabled="!allPoolsValid || !isDirty" @click="save">保存配置</a-button>
-              </span>
-            </a-tooltip>
           </div>
         </div>
+        </template>
       </a-col>
     </a-row>
 
-    <!-- 新建奖池 -->
+    <!-- 新建奖池：编码打开弹窗时已自动生成，也可手输或重新生成，规则与活动/奖品编码一致 -->
     <a-modal v-model:open="createModalOpen" title="新建奖池" ok-text="创建" cancel-text="取消" @ok="confirmCreatePool">
       <a-form layout="vertical">
         <a-form-item label="奖池名称" required>
           <a-input v-model:value="newPoolName" placeholder="如：新人专享池" :maxlength="32" @press-enter="confirmCreatePool" />
         </a-form-item>
-        <a-alert type="info" show-icon message="奖池编码自动生成；创建后请引入奖项并把总概率配满 100%。" />
+        <a-form-item label="奖池编码" required>
+          <a-input-group compact>
+            <a-input
+              v-model:value="newPoolCode"
+              style="width: calc(100% - 96px)"
+              :maxlength="10"
+              placeholder="10位大写字母+数字"
+              @change="onPoolCodeInput"
+            />
+            <a-tooltip title="重新随机生成一个未被占用的编码">
+              <a-button style="width: 96px" :loading="codeGenerating" @click="generatePoolCode">重新生成</a-button>
+            </a-tooltip>
+          </a-input-group>
+        </a-form-item>
+        <a-alert type="info" show-icon message="奖池编码全局唯一且创建后不可修改；创建后请引入奖项并把总概率配满 100%。" />
       </a-form>
     </a-modal>
 
@@ -274,6 +288,9 @@
   import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
   import { cloneDeep, isEqual } from 'lodash';
   import Decimal from 'decimal.js';
+  import { drawWorkbenchApi } from '/@/api/business/draw/draw-workbench-api';
+  import { smartSentry } from '/@/lib/smart-sentry';
+  import { regular } from '/@/constants/regular-const';
 
   // ---------------------------- Props / Emits ----------------------------
 
@@ -285,13 +302,7 @@
     // 物资库（来自 Tab1，按 prizeCode 关联，本组件只读）
     prizeItems: {
       type: Array,
-      default: () => [
-        { prizeCode: 'PRIZE_IPHONE15', prizeName: 'iPhone 15 Pro', prizeValue: 7999, totalStock: 5, usedStock: 2 },
-        { prizeCode: 'PRIZE_SCORE_100', prizeName: '100 积分', prizeValue: 1, totalStock: 10000, usedStock: 4500 },
-        { prizeCode: 'PRIZE_THANKS', prizeName: '谢谢参与', prizeValue: 0, totalStock: -1, usedStock: 0 },
-        { prizeCode: 'PRIZE_AIRPODS', prizeName: 'AirPods Pro 2', prizeValue: 1899, totalStock: 20, usedStock: 3 },
-        { prizeCode: 'PRIZE_CASH_88', prizeName: '88 元现金红包', prizeValue: 88, totalStock: 500, usedStock: 120 },
-      ],
+      default: () => [],
     },
   });
 
@@ -323,33 +334,14 @@
 
   // ---------------------------- 多奖池数据 ----------------------------
 
-  const poolList = ref([
-    {
-      poolCode: 'POOL_FREE',
-      poolName: '免费普惠池',
-      prizeMappingList: [
-        { prizeCode: 'PRIZE_IPHONE15', probability: 0.05, isFallback: false },
-        { prizeCode: 'PRIZE_SCORE_100', probability: 10.95, isFallback: false },
-        { prizeCode: 'PRIZE_THANKS', probability: 89, isFallback: true },
-      ],
-    },
-    {
-      poolCode: 'POOL_PAID',
-      poolName: '付费尊享池',
-      prizeMappingList: [
-        { prizeCode: 'PRIZE_AIRPODS', probability: 1, isFallback: false },
-        { prizeCode: 'PRIZE_CASH_88', probability: 4, isFallback: false },
-        { prizeCode: 'PRIZE_SCORE_100', probability: 95, isFallback: true },
-      ],
-    },
-  ]);
+  const poolList = ref([]);
 
-  const activePoolKey = ref('POOL_FREE');
+  const activePoolKey = ref('');
   const activePool = computed(() => poolList.value.find((pool) => pool.poolCode === activePoolKey.value));
   // 表格绑定的是 poolList 内部的源数组引用，编辑即改 poolList，触发 deep watch 配平
   const activeMappings = computed(() => activePool.value?.prizeMappingList || []);
 
-  const savedSnapshot = ref(cloneDeep(poolList.value));
+  const savedSnapshot = ref([]);
   const isDirty = computed(() => !isEqual(poolList.value, savedSnapshot.value));
 
   watch(poolList, () => emit('change', { dirty: isDirty.value, poolCount: poolList.value.length }), { deep: true });
@@ -455,19 +447,38 @@
     }
   }
 
-  function save() {
-    savedSnapshot.value = cloneDeep(poolList.value);
-    message.success('全部奖池配置已保存');
-  }
-
   // ---------------------------- 奖池增删 ----------------------------
 
   const createModalOpen = ref(false);
   const newPoolName = ref('');
+  const newPoolCode = ref('');
+  const codeGenerating = ref(false);
 
   function openCreatePool() {
     newPoolName.value = '';
+    newPoolCode.value = '';
     createModalOpen.value = true;
+    // 打开即预填一个编码，运营不想操心编码时可以直接过
+    generatePoolCode();
+  }
+
+  // 手输时统一转大写，省得运营因为小写被规则拦下来
+  function onPoolCodeInput() {
+    if (newPoolCode.value) {
+      newPoolCode.value = newPoolCode.value.toUpperCase();
+    }
+  }
+
+  async function generatePoolCode() {
+    codeGenerating.value = true;
+    try {
+      const res = await drawWorkbenchApi.generatePoolCode();
+      newPoolCode.value = res.data;
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      codeGenerating.value = false;
+    }
   }
 
   function confirmCreatePool() {
@@ -476,8 +487,16 @@
       message.error('请输入奖池名称');
       return;
     }
-    // 自动生成唯一 poolCode
-    const poolCode = `POOL_${Date.now().toString(36).toUpperCase()}`;
+    const poolCode = (newPoolCode.value || '').trim();
+    if (!regular.bizCode.test(poolCode)) {
+      message.error(regular.bizCodeDesc);
+      return;
+    }
+    // 本地重名拦截；跨活动的占用由服务端保存时判（uk_pool_code 是全局唯一）
+    if (poolList.value.some((pool) => pool.poolCode === poolCode)) {
+      message.error('该奖池编码在本活动内已存在');
+      return;
+    }
     poolList.value.push({ poolCode, poolName: name, prizeMappingList: [] });
     activePoolKey.value = poolCode;
     createModalOpen.value = false;
@@ -612,6 +631,27 @@
   // ---------------------------- 对外暴露 ----------------------------
 
   defineExpose({
+    /**
+     * 回显：填回后端 workbench/detail 的 poolList
+     * 后端 BigDecimal 统一序列化为字符串（JsonConfig），此处归一化为 number，
+     * 否则概率输入框拿到字符串、且首次自动配平会把配置误判成「有未保存改动」
+     */
+    setData: (list) => {
+      poolList.value = (list || []).map((pool) => ({
+        poolCode: pool.poolCode,
+        poolName: pool.poolName,
+        prizeMappingList: (pool.prizeMappingList || []).map((mapping) => ({
+          prizeCode: mapping.prizeCode,
+          probability: Number(mapping.probability ?? 0),
+          isFallback: Boolean(mapping.isFallback),
+        })),
+      }));
+      // 先配平再取基线：服务端数据本已闭环，配平是幂等的，但必须赶在快照之前跑完
+      poolList.value.forEach((pool) => balancePool(pool));
+      activePoolKey.value = poolList.value.length > 0 ? poolList.value[0].poolCode : '';
+      savedSnapshot.value = cloneDeep(poolList.value);
+      resetSimulation();
+    },
     // 返回完整的多奖池数组
     getData: () => cloneDeep(poolList.value),
     isDirty: () => isDirty.value,

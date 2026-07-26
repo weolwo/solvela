@@ -2,7 +2,9 @@ package net.lab1024.sa.task.tasktemplate.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 
 /**
  * 任务模板表 新建表单
@@ -15,12 +17,12 @@ import lombok.Data;
 @Data
 public class TaskTemplateAddForm {
 
-    @Schema(description = "租户ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户ID 不能为空")
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
 
-    @Schema(description = "模板编码", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "模板编码：10 位大写字母+数字，全局唯一", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "模板编码 不能为空")
+    @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "模板" + SmartCodeUtil.BIZ_CODE_MESSAGE)
     private String templateCode;
 
     @Schema(description = "模板名称", requiredMode = Schema.RequiredMode.REQUIRED)

@@ -16,6 +16,20 @@ export const activityConfigApi = {
   },
 
   /**
+   * 生成活动编码（10位大写字母+数字，服务端已判重）  @author  alaric
+   */
+  generateCode: () => {
+    return getRequest('/activityConfig/generateCode');
+  },
+
+  /**
+   * 活动下拉列表：activityType 可传 DRAW/TASK/LOTTERY 过滤，不传则全部  @author  alaric
+   */
+  optionList: (activityType) => {
+    return getRequest('/activityConfig/optionList', { activityType });
+  },
+
+  /**
    * 增加  @author  weolwo
    */
   add: (param) => {

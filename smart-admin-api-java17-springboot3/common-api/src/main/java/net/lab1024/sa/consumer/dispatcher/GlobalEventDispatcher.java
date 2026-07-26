@@ -76,7 +76,11 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void dispatch(BaseBizEvent event) {
-        RouteTarget target = routeTable.get(event.getCategory());
+        // BaseBizEvent.category 是 String，而路由表以 EventCategoryEnum 为键。
+        // Map.get(Object) 不做类型检查，直接拿 String 去查枚举键的 map 编译能过但恒为 null，
+        // 曾导致整条派发链路静默失效（事件照发、下游一条不落），故此处必须显式转成枚举再查。
+        EventCategoryEnum category = resolveCategory(event.getCategory());
+        RouteTarget target = category == null ? null : routeTable.get(category);
         if (target == null) {
             log.warn("【事件分发】未找到分类 [{}] 的处理器", event.getCategory());
             return;
@@ -86,6 +90,21 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
             target.method.invoke(target.bean, event);
         } catch (Exception e) {
             log.error("【事件分发】处理异常: {}", event.getCategory(), e);
+        }
+    }
+
+    /**
+     * 事件里的分类是字符串，转成路由表的枚举键；非法值只告警不抛，避免一个脏事件打断监听器
+     */
+    private EventCategoryEnum resolveCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return null;
+        }
+        try {
+            return EventCategoryEnum.valueOf(category);
+        } catch (IllegalArgumentException e) {
+            log.warn("【事件分发】无法识别的事件分类: {}", category);
+            return null;
         }
     }
 }

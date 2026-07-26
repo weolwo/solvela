@@ -29,8 +29,20 @@
             <a-form ref="formRef" :model="designer" layout="vertical">
               <a-row :gutter="16">
                 <a-col :span="12">
+                  <!-- 模板编码：10位大写字母+数字，同时也是 upsert 唯一键；填已存在的编码即覆盖该模板 -->
                   <a-form-item label="模板编码 template_code" :name="['base', 'templateCode']" :rules="FORM_RULES.templateCode">
-                    <a-input v-model:value="designer.base.templateCode" placeholder="如 DAILY_SIGN_TPL" :maxlength="64" />
+                    <a-input-group compact>
+                      <a-input
+                        v-model:value="designer.base.templateCode"
+                        style="width: calc(100% - 96px)"
+                        :maxlength="10"
+                        placeholder="如 H88JHKJFNE，或点右侧生成"
+                        @change="onTemplateCodeInput"
+                      />
+                      <a-tooltip title="随机生成一个未被占用的编码（等同于新建一个模板）">
+                        <a-button style="width: 96px" :loading="codeGenerating" @click="generateTemplateCode">生成</a-button>
+                      </a-tooltip>
+                    </a-input-group>
                   </a-form-item>
                 </a-col>
                 <a-col :span="12">
@@ -196,10 +208,10 @@
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
   import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
   import SchemaFormRenderer from '../task-wizard/SchemaFormRenderer.vue';
+  import { regular } from '/@/constants/regular-const';
   import {
     TASK_TYPE_OPTIONS,
     TRIGGER_EVENT_OPTIONS,
-    TASK_TEMPLATES,
     buildDefaultRuleParams,
     splitSchemaValues,
   } from '../task-wizard/task-wizard-const';
@@ -234,8 +246,31 @@
 
   // ---------------------------- 默认值与单一状态源 ----------------------------
 
-  const DEFAULT_TEMPLATE = TASK_TEMPLATES[0];
-  const DEFAULT_UI_SCHEMA_TEXT = JSON.stringify(DEFAULT_TEMPLATE.uiSchema, null, 2);
+  // 新建模板的起手骨架。icon / desc 会被任务向导的模板卡片读走，是 ui_schema 的约定字段
+  const DEFAULT_UI_SCHEMA = {
+    version: 1,
+    icon: '📅',
+    desc: '连续/累计签到达标，支持补签联动配置',
+    params: [
+      { key: 'targetDays', label: '连续签到目标', widget: 'number', unit: '天', default: 7, min: 1, required: true },
+      { key: 'allowRepair', label: '允许补签', widget: 'switch', default: true },
+      {
+        key: 'repairCost',
+        label: '补签消耗积分',
+        widget: 'number',
+        unit: '积分',
+        default: 20,
+        min: 0,
+        visibleWhen: { field: 'allowRepair', eq: true },
+        help: '关闭「允许补签」后此项自动隐藏',
+      },
+    ],
+  };
+  const DEFAULT_TEMPLATE = {
+    templateName: '每日签到',
+    taskType: TASK_TYPE_OPTIONS[1].value,
+  };
+  const DEFAULT_UI_SCHEMA_TEXT = JSON.stringify(DEFAULT_UI_SCHEMA, null, 2);
   const DEFAULT_RULE_SCRIPT = [
     '// 事件: DAILY_SIGN；向导 rule_config 中的参数（如 targetDays、allowRepair）作为变量注入',
     "if (event.type != 'DAILY_SIGN') return false;",
@@ -247,7 +282,8 @@
 
   const designer = reactive({
     base: {
-      templateCode: DEFAULT_TEMPLATE.templateCode,
+      // 编码留空，onMounted 拉一个服务端生成的；也可手输已有编码来覆盖那个模板
+      templateCode: '',
       templateName: DEFAULT_TEMPLATE.templateName,
       taskType: DEFAULT_TEMPLATE.taskType,
       triggerEvent: undefined,
@@ -273,8 +309,44 @@
   const lastSavedAt = ref('');
   const isDirty = computed(() => currentSnapshot.value !== savedSnapshot.value);
 
+  // ---------------------------- 模板编码 ----------------------------
+
+  const codeGenerating = ref(false);
+
+  // 手输时统一转大写，省得因为小写被规则拦下来
+  function onTemplateCodeInput() {
+    if (designer.base.templateCode) {
+      designer.base.templateCode = designer.base.templateCode.toUpperCase();
+    }
+  }
+
+  async function generateTemplateCode() {
+    codeGenerating.value = true;
+    try {
+      const res = await taskApi.generateTemplateCode();
+      designer.base.templateCode = res.data;
+      formRef.value?.clearValidate(['base', 'templateCode']);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      codeGenerating.value = false;
+    }
+  }
+
+  /**
+   * 进页面时预填一个编码，并把它并入基线
+   * 不重置基线的话，人还没动一个字页面就是脏的、离开还要被拦一次
+   */
+  async function prefillTemplateCode() {
+    await generateTemplateCode();
+    savedSnapshot.value = currentSnapshot.value;
+  }
+
   const FORM_RULES = {
-    templateCode: [{ required: true, message: '请输入模板编码' }],
+    templateCode: [
+      { required: true, message: '请输入模板编码' },
+      { pattern: regular.bizCode, message: regular.bizCodeDesc },
+    ],
     templateName: [{ required: true, message: '请输入模板名称' }],
     taskType: [{ required: true, message: '请选择任务类型' }],
   };
@@ -440,6 +512,8 @@
   }
 
   onMounted(() => {
+    prefillTemplateCode();
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     // 检测上次遗留的草稿（浏览器崩溃、强制关闭等未走离开拦截的情况）
     const raw = localRead(LocalStorageKeyConst.TASK_TEMPLATE_DRAFT);

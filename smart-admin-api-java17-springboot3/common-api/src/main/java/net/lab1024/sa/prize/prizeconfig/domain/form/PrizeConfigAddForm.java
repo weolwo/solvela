@@ -3,9 +3,11 @@ package net.lab1024.sa.prize.prizeconfig.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
+import net.lab1024.sa.base.common.util.SmartCodeUtil;
 
 /**
  * 奖品配置表 新建表单
@@ -18,12 +20,12 @@ import lombok.Data;
 @Data
 public class PrizeConfigAddForm {
 
-    @Schema(description = "租户ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户ID 不能为空")
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
 
-    @Schema(description = "活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "归属活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "活动编码 不能为空")
+    @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "活动" + SmartCodeUtil.BIZ_CODE_MESSAGE)
     private String activityCode;
 
     @Schema(description = "优惠配置ID")
@@ -35,8 +37,9 @@ public class PrizeConfigAddForm {
     @Schema(description = "奖品名称")
     private String prizeName;
 
-    @Schema(description = "奖品编码", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "奖品编码：10 位大写字母+数字，全局唯一", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "奖品编码 不能为空")
+    @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "奖品" + SmartCodeUtil.BIZ_CODE_MESSAGE)
     private String prizeCode;
 
     @Schema(description = "奖品级别")
