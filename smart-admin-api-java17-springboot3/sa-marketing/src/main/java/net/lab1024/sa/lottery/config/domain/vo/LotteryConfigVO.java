@@ -1,7 +1,6 @@
 package net.lab1024.sa.lottery.config.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -40,12 +39,6 @@ public class LotteryConfigVO {
 
     @Schema(description = "号池总数 (如: 1,000,000)")
     private Integer totalCount;
-
-    @Schema(description = "入场成本类型 (SCORE, FREE)")
-    private String costAssetType;
-
-    @Schema(description = "入场成本-数值")
-    private BigDecimal costValue;
 
     @Schema(description = "状态：0-下线, 1-上线")
     private Integer status;

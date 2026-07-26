@@ -28,28 +28,22 @@ public class LotteryIssueVO {
     @Schema(description = "期号")
     private String issueNo;
 
-    @Schema(description = "开始偏移量")
-    private Integer startOffset;
-
     @Schema(description = "已售/已派发数量")
     private Integer soldCount;
 
-    @Schema(description = "开始售卖")
-    private LocalDateTime sellStartTime;
+    @Schema(description = "售卖开始时间")
+    private LocalDateTime saleStartTime;
 
-    @Schema(description = "结束时间")
-    private LocalDateTime sellEndTime;
+    @Schema(description = "售卖结束时间")
+    private LocalDateTime saleEndTime;
 
     @Schema(description = "开奖时间")
-    private LocalDateTime openTime;
-
-    @Schema(description = "是否可重复开奖：0否，1是")
-    private Integer canRepeat;
+    private LocalDateTime settleTime;
 
     @Schema(description = "开奖号码")
     private String winningNumber;
 
-    @Schema(description = "状态: 0-待开奖, 1-部分开奖, 2-已开奖")
+    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖")
     private Integer status;
 
     @Schema(description = "创建人")

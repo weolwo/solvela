@@ -7,12 +7,10 @@
             <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
-            <result column="start_offset" property="startOffset" />
             <result column="sold_count" property="soldCount" />
-            <result column="sell_start_time" property="sellStartTime" />
-            <result column="sell_end_time" property="sellEndTime" />
-            <result column="open_time" property="openTime" />
-            <result column="can_repeat" property="canRepeat" />
+            <result column="sale_start_time" property="saleStartTime" />
+            <result column="sale_end_time" property="saleEndTime" />
+            <result column="settle_time" property="settleTime" />
             <result column="winning_number" property="winningNumber" />
             <result column="status" property="status" />
             <result column="create_by" property="createBy" />
@@ -26,12 +24,10 @@
                 tenant_id, 
                 lottery_code, 
                 issue_no, 
-                start_offset, 
                 sold_count, 
-                sell_start_time, 
-                sell_end_time, 
-                open_time, 
-                can_repeat, 
+                sale_start_time, 
+                sale_end_time, 
+                settle_time, 
                 winning_number, 
                 status, 
                 create_by, 

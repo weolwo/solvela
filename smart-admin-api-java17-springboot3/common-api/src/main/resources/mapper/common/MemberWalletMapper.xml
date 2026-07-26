@@ -56,6 +56,11 @@
         UPDATE t_member_wallet SET balance = balance + #{amount}, version = version + 1
                     WHERE id = #{id} AND version = #{version}
     </update>
+    <!-- 扣减：乐观锁 + 余额充足双重条件，杜绝扣成负数 -->
+    <update id="deductBalanceWithVersion">
+        UPDATE t_member_wallet SET balance = balance - #{amount}, version = version + 1
+                    WHERE id = #{id} AND version = #{version} AND balance &gt;= #{amount}
+    </update>
 
     <select id="queryPage" resultMap="MemberWalletVO">
         SELECT

@@ -4,7 +4,7 @@ package net.lab1024.sa.draw.prizemapping.dao;
         import net.lab1024.sa.draw.prizemapping.domain.entity.PoolPrizeMapping;
         import net.lab1024.sa.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
         import net.lab1024.sa.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import net.lab1024.sa.base.common.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -18,7 +18,7 @@ import java.util.List;
  * @Copyright weolwo
  */
 @Mapper
-public interface PoolPrizeMappingDao extends BaseMapper<PoolPrizeMapping> {
+public interface PoolPrizeMappingDao extends CustomizedBaseMapper<PoolPrizeMapping> {
 
     /**
      * 分页查询

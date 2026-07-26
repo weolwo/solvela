@@ -21,7 +21,7 @@ import lombok.Data;
 public class LotteryIssue {
 
     /**
-     * id
+     * 主键id
      */
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -42,44 +42,24 @@ public class LotteryIssue {
     private String issueNo;
 
     /**
-     * 开始偏移量
-     */
-    private Integer startOffset;
-
-    /**
      * 已售/已派发数量
      */
     private Integer soldCount;
 
     /**
-     * 开始售卖
+     * 售卖开始时间
      */
-    private LocalDateTime sellStartTime;
+    private LocalDateTime saleStartTime;
 
     /**
-     * 结束时间
+     * 售卖结束时间
      */
-    private LocalDateTime sellEndTime;
-
-    /**
-     * 开始售卖
-     */
-    private LocalDateTime openStartTime;
-
-    /**
-     * 结束时间
-     */
-    private LocalDateTime openEndTime;
+    private LocalDateTime saleEndTime;
 
     /**
      * 开奖时间
      */
-    private LocalDateTime openTime;
-
-    /**
-     * 是否可重复开奖：0否，1是
-     */
-    private Integer canRepeat;
+    private LocalDateTime settleTime;
 
     /**
      * 开奖号码

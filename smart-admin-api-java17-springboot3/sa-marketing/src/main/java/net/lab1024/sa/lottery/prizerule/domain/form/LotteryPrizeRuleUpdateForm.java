@@ -21,9 +21,21 @@ public class LotteryPrizeRuleUpdateForm {
     @NotNull(message = "id 不能为空")
     private Long id;
 
-    @Schema(description = "奖励明细", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "奖励明细 不能为空")
-    private String prizeDetails;
+    @Schema(description = "奖品奖级", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "奖品奖级 不能为空")
+    private Integer prizeLevel;
+
+    @Schema(description = "匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配 不能为空")
+    private String matchRule;
+
+    @Schema(description = "匹配长度", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "匹配长度 不能为空")
+    private Integer matchLength;
+
+    @Schema(description = "奖品编码", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "奖品编码 不能为空")
+    private String prizeCode;
 
     @Schema(description = "更新人")
     private String updateBy;

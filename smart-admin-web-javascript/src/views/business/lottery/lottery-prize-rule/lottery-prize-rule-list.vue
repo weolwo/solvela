@@ -15,9 +15,6 @@
       <a-form-item label="彩票编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.lotteryCode" placeholder="彩票编码" />
       </a-form-item>
-      <a-form-item label="奖励等级" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.prizeLevel" placeholder="奖励等级" />
-      </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
       </a-form-item>
@@ -134,13 +131,23 @@
       ellipsis: true,
     },
     {
-      title: '期号',
-      dataIndex: 'issueNo',
+      title: '奖品奖级',
+      dataIndex: 'prizeLevel',
       ellipsis: true,
     },
     {
-      title: '奖励明细',
-      dataIndex: 'prizeDetails',
+      title: '匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配',
+      dataIndex: 'matchRule',
+      ellipsis: true,
+    },
+    {
+      title: '匹配长度',
+      dataIndex: 'matchLength',
+      ellipsis: true,
+    },
+    {
+      title: '奖品编码',
+      dataIndex: 'prizeCode',
       ellipsis: true,
     },
     {
@@ -176,7 +183,6 @@
   const queryFormState = {
     tenantId: undefined, //租户id
     lotteryCode: undefined, //彩票编码
-    prizeLevel: undefined, //奖励等级
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束

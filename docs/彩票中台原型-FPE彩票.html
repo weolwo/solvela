@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V-Final FPE 彩票中台 (零Bug丝滑版)</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.x/dist/reset.css" />
+  <script src="https://unpkg.com/ant-design-vue@4.x/dist/antd.min.js"></script>
+
+  <style>
+    body { background-color: #f1f5f9; color: #334155; }
+    [v-cloak] { display: none; }
+
+    .section-title { font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 1rem; }
+    .section-title::before { content: ''; display: block; width: 4px; height: 16px; border-radius: 2px; }
+    .title-blue::before { background-color: #3b82f6; }
+    .title-green::before { background-color: #10b981; }
+    .title-red::before { background-color: #ef4444; }
+
+    .geek-terminal { background-color: #1e1e1e; color: #4ade80; font-family: 'Courier New', Courier, monospace; }
+
+    .rule-card { transition: all 0.2s ease; border: 1px solid #e2e8f0; }
+    .rule-card.active { border-color: #3b82f6; background-color: #f8fafc; box-shadow: 0 4px 12px rgba(59,130,246,0.08); }
+    .rule-card:hover:not(.active) { border-color: #cbd5e1; }
+    .drag-over { border-color: #10b981 !important; background-color: #ecfdf5 !important; transform: scale(1.01); z-index: 10; box-shadow: 0 0 10px rgba(16,185,129,0.15); }
+
+    .asset-meat { cursor: grab; transition: all 0.2s; border: 1px solid #e2e8f0; }
+    .asset-meat:active { cursor: grabbing; transform: scale(0.99); }
+    .asset-meat:hover { border-color: #94a3b8; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .asset-meat.disabled { cursor: not-allowed; opacity: 0.6; }
+
+    .expand-enter-active, .expand-leave-active { transition: all 0.25s ease-in-out; overflow: hidden; }
+    .expand-enter-from, .expand-leave-to { opacity: 0; transform: translateY(-5px); max-height: 0; }
+    .expand-enter-to, .expand-leave-from { opacity: 1; transform: translateY(0); max-height: 250px; }
+
+    .ant-table-row-selected > td { background-color: #eff6ff !important; border-color: #bfdbfe !important; }
+    .clickable-row { cursor: pointer; transition: background-color 0.2s; }
+    .clickable-row:hover > td { background-color: #f8fafc; }
+  </style>
+</head>
+<body>
+  <div id="app" v-cloak class="min-h-screen p-4">
+    <a-card :bordered="false" class="mb-4 shadow-sm" :body-style="{ padding: '12px 20px' }">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <span class="text-lg font-bold text-slate-800 tracking-wide">✨ FPE 营销中台</span>
+          <a-divider type="vertical"></a-divider>
+          <span class="text-sm text-slate-500">当前玩法</span>
+          <a-select v-model:value="lotteryCode" class="w-52" :options="lotteryOptions"></a-select>
+        </div>
+        <div class="flex items-center gap-5">
+          <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-md border" :class="isOnline ? 'border-red-200 bg-red-50' : 'border-slate-200'">
+            <span class="text-sm font-bold" :class="isOnline ? 'text-red-600' : 'text-slate-600'">
+              <span v-if="isOnline">🔒 售卖中 (策略锁定)</span>
+              <span v-else>🔓 未上线 (允许编辑)</span>
+            </span>
+            <a-switch v-model:checked="isOnline" size="small"></a-switch>
+          </div>
+          <a-button type="primary" :loading="saving" @click="saveConfig">💾 提交全局配置</a-button>
+        </div>
+      </div>
+    </a-card>
+
+    <a-card :bordered="false" class="shadow-sm">
+      <a-tabs v-model:activeKey="activeTab" class="px-2">
+
+        <a-tab-pane key="global" force-render>
+          <template #tab><span class="font-semibold px-2">⚙️ 引擎配置与奖级映射</span></template>
+          <div class="py-2">
+            <div class="bg-white p-5 rounded-lg border border-slate-200 mb-6 shadow-sm">
+              <h3 class="section-title title-blue">发号引擎基础定义</h3>
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form layout="vertical">
+                    <a-row :gutter="12">
+                      <a-col :span="12">
+                        <a-form-item label="玩法名称 (外显)" required class="mb-3">
+                          <a-input v-model:value="config.lotteryName" :disabled="isOnline"></a-input>
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="12">
+                        <a-form-item label="单期发售上限 (物理防资损)" required class="mb-3">
+                          <a-input-number v-model:value="config.totalCount" :min="1" class="w-full font-bold text-red-500" :disabled="isOnline"></a-input-number>
+                        </a-form-item>
+                      </a-col>
+                    </a-row>
+                    <a-row :gutter="12">
+                      <a-col :span="12">
+                        <a-form-item label="字符集" required class="mb-0">
+                          <a-select v-model:value="config.charset" :disabled="isOnline">
+                            <a-select-option value="0-9">纯数字</a-select-option>
+                            <a-select-option value="A-Z">大写字母</a-select-option>
+                          </a-select>
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="12">
+                        <a-form-item label="号码长度" required class="mb-0">
+                          <a-input-number v-model:value="config.length" :min="3" :max="9" class="w-full" :disabled="isOnline"></a-input-number>
+                        </a-form-item>
+                      </a-col>
+                    </a-row>
+                  </a-form>
+                </a-col>
+                <a-col :span="12">
+                  <div class="geek-terminal rounded-lg p-4 h-full flex flex-col justify-center">
+                    <div class="text-green-500 font-bold mb-3 text-sm"># FPE 算号推演模拟台</div>
+                    <div class="flex items-center gap-3 text-sm">
+                      <span class="text-slate-300">输入游标:</span>
+                      <a-input-number v-model:value="demoSequence" :min="1" :max="config.totalCount" class="w-28" size="small"></a-input-number>
+                    </div>
+                    <div class="mt-4 border-t border-green-800 pt-3 flex items-center">
+                      <span class="text-slate-300 text-sm">🎟️ 密文票号:</span>
+                      <span class="ml-3 font-mono text-xl text-white tracking-widest font-bold">{{ fpeDemoOutput }}</span>
+                    </div>
+                  </div>
+                </a-col>
+              </a-row>
+            </div>
+            <div class="flex gap-6 items-start">
+              <div class="w-7/12 flex flex-col gap-3">
+                <div class="flex justify-between items-center mb-1">
+                  <h3 class="section-title title-green m-0">奖级规则设定区</h3>
+                  <div class="flex gap-2">
+                    <a-button type="dashed" size="small" @click="sortRules" :disabled="isOnline">🔄 按等级整理</a-button>
+                    <a-button type="primary" size="small" @click="addNewRule" :disabled="isOnline" class="bg-green-600 border-green-600 font-bold">➕ 新增奖级 (置顶)</a-button>
+                  </div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 max-h-[600px] overflow-y-auto flex flex-col gap-3 shadow-inner">
+                  <div v-if="prizeRules.length === 0" class="py-8 text-center text-slate-400 text-sm">暂无奖级配置，请点击上方新增</div>
+                  <div
+                    v-for="(rule, index) in prizeRules" :key="rule.id"
+                    class="rule-card bg-white rounded-md p-4 cursor-pointer relative"
+                    :class="{ 'active': activeRuleId === rule.id, 'drag-over': rule.isDragOver }"
+                    @click="activeRuleId = rule.id"
+                    @dragover.prevent="onDragOver($event, rule)"
+                    @dragleave="onDragLeave(rule)"
+                    @drop="onDrop($event, rule)"
+                  >
+                    <div class="flex justify-between items-center mb-3">
+                      <a-tag color="purple" class="font-bold text-sm px-2 m-0">奖级 {{ rule.level }}</a-tag>
+                      <a-button type="link" danger size="small" class="p-0 h-auto text-xs" @click.stop="removeRule(rule.id)" v-if="!isOnline">移除</a-button>
+                    </div>
+                    <div class="flex gap-4 mb-3 items-center">
+                      <div class="w-1/2 flex items-center gap-2">
+                        <span class="text-xs text-slate-500 whitespace-nowrap">匹配模式</span>
+                        <a-select v-model:value="rule.matchType" size="small" class="flex-1" :disabled="isOnline">
+                          <a-select-option value="EXACT">精准匹配 (全号)</a-select-option>
+                          <a-select-option value="TAIL">尾号</a-select-option>
+                          <a-select-option value="HEAD">首号</a-select-option>
+                        </a-select>
+                      </div>
+                      <div class="w-1/2 flex items-center gap-2">
+                        <span class="text-xs text-slate-500 whitespace-nowrap">匹配长度</span>
+                        <a-input-number v-model:value="rule.matchLength" :min="1" :max="config.length" size="small" class="flex-1" :disabled="rule.matchType === 'EXACT' || isOnline"></a-input-number>
+                      </div>
+                    </div>
+                    <div class="rounded-md p-2 flex items-center transition-all duration-200 border text-sm"
+                         :class="rule.prizeCode ? 'border-blue-300 bg-blue-50/60' : 'border-dashed border-slate-300 bg-slate-50'">
+                      <div v-if="rule.prizeCode" class="flex items-center gap-3 w-full">
+                        <span class="text-2xl drop-shadow-sm">{{ getPrizeIcon(rule.prizeCode) }}</span>
+                        <div class="flex-1 truncate leading-tight">
+                          <div class="font-bold text-blue-900 text-sm">{{ getPrizeNameOnly(rule.prizeCode) }}</div>
+                          <div class="text-xs text-blue-500 font-mono mt-0.5">{{ rule.prizeCode }}</div>
+                        </div>
+                        <a-button type="text" danger size="small" @click.stop="rule.prizeCode = ''" :disabled="isOnline">解绑</a-button>
+                      </div>
+                      <div v-else class="text-slate-400 flex-1 text-center py-3 text-sm">
+                        <span v-if="rule.isDragOver" class="text-green-500 font-bold">✨ 松开绑定奖品</span>
+                        <span v-else>📥 拖拽资产入内，或点击右侧【指派】</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="w-5/12 flex flex-col gap-3">
+                <h3 class="section-title title-green m-0">中台资产池 (拖拽源)</h3>
+                <div class="bg-white border border-slate-200 rounded-lg p-3 max-h-[600px] overflow-y-auto flex flex-col gap-2.5 shadow-sm">
+                  <div
+                    v-for="asset in mockAssetList" :key="asset.code"
+                    class="asset-meat bg-slate-50 p-2.5 rounded-md flex items-center justify-start gap-3"
+                    :class="{'disabled': isOnline}"
+                    :draggable="!isOnline"
+                    @dragstart="onDragStart($event, asset)"
+                    @dragend="onDragEnd"
+                  >
+                    <div class="w-[68px] shrink-0">
+                      <a-button v-if="activeRulePrizeCode === asset.code" type="primary" size="small" class="bg-green-500 border-green-500 w-full font-bold px-0" shape="round">✅ 已绑</a-button>
+                      <a-button v-else size="small" class="w-full text-blue-600 border-blue-200 font-bold px-0 bg-white" shape="round" :disabled="!activeRuleId || isOnline" @click="bindAssetToActiveRule(asset.code)">指派 👈</a-button>
+                    </div>
+                    <div class="flex items-center gap-2 overflow-hidden">
+                      <div class="text-2xl bg-white p-1.5 rounded shadow-sm border border-slate-100 shrink-0 leading-none">{{ asset.icon }}</div>
+                      <div class="truncate leading-tight">
+                        <div class="font-bold text-slate-800 text-sm truncate">{{ asset.name }}</div>
+                        <div class="text-[11px] text-slate-400 font-mono mt-0.5">库存: {{ asset.stock }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </a-tab-pane>
+
+        <a-tab-pane key="issues" force-render>
+          <template #tab><span class="font-semibold px-2 text-indigo-700">📅 生命周期与开奖大盘</span></template>
+          <div class="py-2 flex gap-5 items-start">
+            <div class="w-8/12 flex flex-col">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="section-title title-blue m-0">活动期数与发售列表</h3>
+                <span class="text-xs text-slate-400">💡 提示：点击行任意位置即可选中，在右侧面板开奖</span>
+                <a-button type="primary" @click="toggleIssueCreator" :disabled="isCreatingIssue">➕ 创设新期数</a-button>
+              </div>
+              <transition name="expand">
+                <div v-if="isCreatingIssue" class="bg-blue-50/50 border border-blue-200 rounded-lg p-4 mb-4 shadow-sm">
+                  <a-form layout="vertical">
+                    <a-row :gutter="16">
+                      <a-col :span="6">
+                        <a-form-item label="期号标识 (Nonce)" class="mb-0" required>
+                          <a-input v-model:value="newIssueForm.issueNo" placeholder="唯一盐值"></a-input>
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="7">
+                        <a-form-item label="售卖周期 (起止)" class="mb-0" required>
+                          <a-range-picker v-model:value="newIssueForm.saleTimeRange" valueFormat="YYYY-MM-DD HH:mm:ss" show-time class="w-full" format="MM-DD HH:mm" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="7">
+                        <a-form-item label="计划开奖时间" class="mb-0" required>
+                          <a-date-picker v-model:value="newIssueForm.drawTime" valueFormat="YYYY-MM-DD HH:mm:ss" show-time class="w-full" placeholder="计划开奖时间" format="MM-DD HH:mm" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="4" class="flex items-end pb-0">
+                        <div class="flex gap-2 w-full">
+                          <a-button @click="isCreatingIssue = false" class="flex-1 px-0">取消</a-button>
+                          <a-button type="primary" @click="submitNewIssue" class="flex-1 px-0">保存</a-button>
+                        </div>
+                      </a-col>
+                    </a-row>
+                  </a-form>
+                </div>
+              </transition>
+              <div class="bg-white border border-slate-200 rounded shadow-sm">
+                <a-table
+                  :data-source="issueList"
+                  :columns="issueColumns"
+                  :pagination="{ pageSize: 8 }"
+                  row-key="id"
+                  size="small"
+                  :row-selection="rowSelection"
+                  :customRow="customRowConfig"
+                  :rowClassName="() => 'clickable-row'"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.dataIndex === 'issueNo'">
+                      <span class="font-mono font-bold text-slate-800">{{ record.issueNo }}</span>
+                    </template>
+                    <template v-else-if="column.dataIndex === 'times'">
+                      <div v-if="record._isEditing" class="flex flex-col gap-1 w-[210px]" @click.stop>
+                        <a-range-picker v-model:value="record._editSaleTimeRange" valueFormat="YYYY-MM-DD HH:mm:ss" show-time size="small" :placeholder="['发售', '截止']" format="MM-DD HH:mm"/>
+                        <a-date-picker v-model:value="record._editDrawTime" valueFormat="YYYY-MM-DD HH:mm:ss" show-time size="small" placeholder="计划开奖时间" class="w-full" format="MM-DD HH:mm"/>
+                      </div>
+                      <div v-else class="text-[11px] text-slate-600 space-y-0.5">
+                        <div class="truncate"><span class="text-slate-400">售卖:</span>
+                          {{ record.saleStartTime ? dayjs(record.saleStartTime).format('MM-DD HH:mm') : '-' }} ~
+                          {{ record.saleEndTime ? dayjs(record.saleEndTime).format('MM-DD HH:mm') : '-' }}
+                        </div>
+                        <div><span class="text-slate-400">开奖:</span>
+                          {{ record.drawTime ? dayjs(record.drawTime).format('MM-DD HH:mm') : '-' }}
+                        </div>
+                      </div>
+                    </template>
+                    <template v-else-if="column.dataIndex === 'progress'">
+                      <div class="flex flex-col gap-1 items-start">
+                        <a-tag :color="getStatusColor(record.status)" class="m-0 text-[10px] py-0 leading-tight">{{ getStatusText(record.status) }}</a-tag>
+                        <span class="text-xs font-bold" :class="record.soldCount >= config.totalCount ? 'text-red-500' : 'text-blue-600'">
+                          {{ record.soldCount.toLocaleString() }} / {{ (config.totalCount/1000) }}k
+                        </span>
+                      </div>
+                    </template>
+                    <template v-else-if="column.dataIndex === 'result'">
+                      <div v-if="record.status === 2" class="flex flex-col">
+                        <span class="font-mono text-red-600 font-bold text-base tracking-widest">{{ record.winningNumber }}</span>
+                        <span class="text-slate-400 text-[10px] mt-0.5">开于: {{ record.actualDrawTime }}</span>
+                      </div>
+                      <span v-else class="text-xs text-slate-400">- 待开奖 -</span>
+                    </template>
+                    <template v-else-if="column.dataIndex === 'action'">
+                      <div v-if="record._isEditing" class="flex gap-1 justify-center" @click.stop>
+                        <a-button type="primary" size="small" class="text-[11px] px-2 h-6" @click="saveEdit(record)">保存</a-button>
+                        <a-button size="small" class="text-[11px] px-2 h-6" @click="cancelEdit(record)">取消</a-button>
+                      </div>
+                      <div v-else-if="record.status === 0" class="flex gap-1 justify-center" @click.stop>
+                        <a-button type="link" size="small" class="text-[11px] p-0" @click="startEdit(record)">编辑</a-button>
+                        <a-divider type="vertical" class="mx-1" />
+                        <a-button type="link" danger size="small" class="p-0 text-[11px]" @click="deleteIssue(record.id)" :disabled="record.soldCount > 0">移除</a-button>
+                      </div>
+                      <span v-else class="text-xs text-slate-300">-</span>
+                    </template>
+                  </template>
+                </a-table>
+              </div>
+            </div>
+            <div class="w-4/12 flex flex-col">
+              <h3 class="section-title title-red m-0 mb-4">开奖执行操作台</h3>
+              <div class="flex-1 rounded-xl border border-red-200 bg-red-50/40 p-5 shadow-sm sticky top-4">
+                <div v-if="activeIssue" class="space-y-4">
+                  <div class="bg-white p-4 rounded-lg border border-red-100 flex flex-col gap-1 shadow-sm">
+                    <div class="text-xs text-slate-400">目前锁定操作期号：</div>
+                    <div class="font-mono font-bold text-slate-800 text-lg">{{ activeIssue.issueNo }}</div>
+                  </div>
+                  <div v-if="activeIssue.status === 2" class="rounded-lg bg-green-50 p-6 text-center border border-green-200 shadow-sm">
+                    <div class="text-3xl mb-2">✅</div>
+                    <div class="text-sm font-bold text-green-700">该期已顺利完成核销</div>
+                    <div class="text-xs text-green-600 mt-1">开奖结果与时间已在左侧表格直显</div>
+                  </div>
+                  <div v-else class="rounded-lg bg-white p-5 shadow-sm border-t-4 border-red-500">
+                    <a-form layout="vertical">
+                      <a-form-item required class="mb-3">
+                        <template #label><span class="text-sm font-bold text-slate-700">录入最终开奖号码</span></template>
+                        <a-input v-model:value="manualWinningNum" size="large" class="font-mono tracking-[0.3em] text-center text-2xl h-12 text-red-600 font-bold" :maxLength="config.length" placeholder="等待录入"></a-input>
+                        <div class="text-[11px] mt-1 font-bold" :class="isDrawValid ? 'text-green-500' : 'text-red-500'">
+                          <span v-if="isDrawValid">✅ 格式合法，可进行核销对账</span>
+                          <span v-else>❌ 必须严格填满 {{ config.length }} 位号码</span>
+                        </div>
+                      </a-form-item>
+                      <div class="flex gap-3 mt-4 flex-col">
+                        <a-button block @click="generateRandomWinningNum">🎲 系统随机摇号</a-button>
+                        <a-popconfirm :title="`正在为【${activeIssue.issueNo}】开奖，操作不可逆！`" ok-text="确认执行" cancel-text="取消" @confirm="executeDraw" placement="top">
+                          <a-button type="primary" danger block size="large" class="font-bold tracking-widest" :disabled="!isDrawValid">🚀 执 行 开 奖</a-button>
+                        </a-popconfirm>
+                      </div>
+                    </a-form>
+                  </div>
+                </div>
+                <div v-else class="py-16 text-center text-slate-400 text-sm">👈 请在左侧列表中单选需要操作的期数</div>
+              </div>
+            </div>
+          </div>
+        </a-tab-pane>
+      </a-tabs>
+    </a-card>
+  </div>
+
+  <script>
+    const { createApp, ref, computed } = Vue;
+    const { message } = antd;
+
+    const App = {
+      setup() {
+        const lotteryCode = ref('L_5DIGIT_001');
+        const lotteryOptions = [{ value: 'L_5DIGIT_001', label: '618仲夏夜幸运号' }];
+        const saving = ref(false);
+        const isOnline = ref(true);
+        const activeTab = ref('issues');
+
+        function saveConfig() {
+          saving.value = true;
+          setTimeout(() => { saving.value = false; message.success('保存成功！'); }, 600);
+        }
+
+        const config = ref({ lotteryName: '618仲夏夜幸运号', charset: '0-9', length: 5, totalCount: 100000 });
+        const demoSequence = ref(12304);
+        const fpeDemoOutput = computed(() => {
+          let hash = (demoSequence.value * 2654435761) % Math.pow(10, config.value.length);
+          return hash.toString().padStart(config.value.length, '0');
+        });
+
+        const mockAssetList = ref([
+          { code: 'ASSET_IPHONE', icon: '📱', name: 'iPhone 15 Pro', stock: 10 },
+          { code: 'ASSET_JD_CARD', icon: '💳', name: '500元京东卡', stock: 500 },
+          { code: 'SCORE_8888', icon: '💰', name: '8888 积分', stock: '充足' },
+          { code: 'SCORE_100', icon: '☀️', name: '100 积分', stock: '充足' },
+          { code: 'COUPON_10', icon: '🎟️', name: '通兑券', stock: 5000 }
+        ]);
+
+        function getPrizeIcon(code) { return (mockAssetList.value.find(a => a.code === code) || {}).icon || '🎁'; }
+        function getPrizeNameOnly(code) { return (mockAssetList.value.find(a => a.code === code) || {}).name || code; }
+
+        const prizeRules = ref([
+          { id: 'uuid-1', level: 1, matchType: 'EXACT', matchLength: 5, prizeCode: 'ASSET_IPHONE', isDragOver: false },
+          { id: 'uuid-2', level: 2, matchType: 'TAIL', matchLength: 3, prizeCode: 'SCORE_8888', isDragOver: false }
+        ]);
+
+        const activeRuleId = ref('uuid-2');
+        const activeRulePrizeCode = computed(() => (prizeRules.value.find(r => r.id === activeRuleId.value) || {}).prizeCode || '');
+
+        function addNewRule() {
+          if(isOnline.value) return;
+          const nextLevel = prizeRules.value.length > 0 ? Math.max(...prizeRules.value.map(r => r.level)) + 1 : 1;
+          const newId = 'uuid-' + Date.now();
+          prizeRules.value.unshift({ id: newId, level: nextLevel, matchType: 'TAIL', matchLength: 1, prizeCode: '', isDragOver: false });
+          activeRuleId.value = newId;
+        }
+
+        function sortRules() { prizeRules.value.sort((a, b) => a.level - b.level); }
+        function removeRule(id) {
+          if(isOnline.value) return;
+          prizeRules.value = prizeRules.value.filter(r => r.id !== id);
+          prizeRules.value.sort((a, b) => a.level - b.level).forEach((r, idx) => r.level = idx + 1);
+          if (activeRuleId.value === id && prizeRules.value.length > 0) activeRuleId.value = prizeRules.value[0].id;
+        }
+
+        function bindAssetToActiveRule(code) {
+          if(isOnline.value) return;
+          const rule = prizeRules.value.find(r => r.id === activeRuleId.value);
+          if (rule) { rule.prizeCode = code; message.success(`绑定成功`); }
+        }
+
+        const draggedAssetCode = ref(null);
+        function onDragStart(event, asset) { if(isOnline.value) return event.preventDefault(); draggedAssetCode.value = asset.code; event.dataTransfer.setData('text/plain', asset.code); event.dataTransfer.effectAllowed = 'copy'; }
+        function onDragOver(event, rule) { if(isOnline.value) return; rule.isDragOver = true; event.dataTransfer.dropEffect = 'copy'; }
+        function onDragLeave(rule) { rule.isDragOver = false; }
+        function onDrop(event, rule) {
+          rule.isDragOver = false;
+          if(isOnline.value) return;
+          const code = event.dataTransfer.getData('text/plain');
+          if (code) { rule.prizeCode = code; activeRuleId.value = rule.id; message.success(`绑定成功`); }
+        }
+        function onDragEnd() { draggedAssetCode.value = null; prizeRules.value.forEach(r => r.isDragOver = false); }
+
+        const issueList = ref([
+          {
+            id: 'iss-1', issueNo: '2026_MID_01',
+            saleStartTime: '2026-07-20 00:00:00', saleEndTime: '2026-07-25 23:59:59', drawTime: '2026-07-26 20:00:00',
+            soldCount: 45000, status: 2, winningNumber: '89102', actualDrawTime: '07-26 20:05',
+            _isEditing: false
+          },
+          {
+            id: 'iss-2', issueNo: '2026_MID_02',
+            saleStartTime: '2026-07-26 00:00:00', saleEndTime: '2026-07-31 23:59:59', drawTime: '2026-08-01 20:00:00',
+            soldCount: 12304, status: 0, winningNumber: null, actualDrawTime: null,
+            _isEditing: false
+          }
+        ]);
+
+        const issueColumns = [
+          { title: '期号', dataIndex: 'issueNo', width: '18%' },
+          { title: '发售与开奖时间', dataIndex: 'times', width: '33%' },
+          { title: '售卖进度', dataIndex: 'progress', width: '15%' },
+          { title: '开奖号码 (结果)', dataIndex: 'result', width: '20%' },
+          { title: '操作', dataIndex: 'action', align: 'center', width: '14%' }
+        ];
+
+        function getStatusText(status) { return status === 0 ? '售卖中' : (status === 1 ? '对账中' : '已核销'); }
+        function getStatusColor(status) { return status === 0 ? 'blue' : (status === 1 ? 'orange' : 'default'); }
+
+        const isCreatingIssue = ref(false);
+        const newIssueForm = ref({ issueNo: '', saleTimeRange: [], drawTime: '' });
+
+        function toggleIssueCreator() {
+          isCreatingIssue.value = true;
+          newIssueForm.value = { issueNo: `2026_MID_0${issueList.value.length + 1}`, saleTimeRange: [], drawTime: '' };
+        }
+
+        function submitNewIssue() {
+          if (!newIssueForm.value.issueNo || !newIssueForm.value.saleTimeRange || newIssueForm.value.saleTimeRange.length !== 2 || !newIssueForm.value.drawTime) {
+            return message.error('请完整填写期号和时间节点');
+          }
+          const newId = 'iss-' + Date.now();
+          issueList.value.unshift({
+            id: newId,
+            issueNo: newIssueForm.value.issueNo,
+            saleStartTime: newIssueForm.value.saleTimeRange[0],
+            saleEndTime: newIssueForm.value.saleTimeRange[1],
+            drawTime: newIssueForm.value.drawTime,
+            soldCount: 0, status: 0, winningNumber: null, actualDrawTime: null, _isEditing: false
+          });
+          message.success('期数创设成功');
+          isCreatingIssue.value = false;
+          selectedIssueKeys.value = [newId];
+        }
+
+        function startEdit(record) {
+          record._editSaleTimeRange = (record.saleStartTime && record.saleEndTime)
+            ? [record.saleStartTime, record.saleEndTime]
+            : [];
+          record._editDrawTime = record.drawTime || '';
+          record._isEditing = true;
+        }
+
+        function cancelEdit(record) {
+          record._isEditing = false;
+        }
+
+        function saveEdit(record) {
+          if (!record._editSaleTimeRange || record._editSaleTimeRange.length !== 2 || !record._editDrawTime) {
+            return message.error('时间不能清空！');
+          }
+          record.saleStartTime = record._editSaleTimeRange[0];
+          record.saleEndTime = record._editSaleTimeRange[1];
+          record.drawTime = record._editDrawTime;
+          record._isEditing = false;
+          message.success('时间节点已更新落库');
+        }
+
+        function deleteIssue(id) {
+          issueList.value = issueList.value.filter(i => i.id !== id);
+          message.success('已移除');
+          if (selectedIssueKeys.value[0] === id) selectedIssueKeys.value = [];
+        }
+
+        const selectedIssueKeys = ref(['iss-2']);
+        const activeIssue = computed(() => issueList.value.find(i => i.id === selectedIssueKeys.value[0]));
+
+        const rowSelection = computed(() => ({
+          type: 'checkbox',
+          selectedRowKeys: selectedIssueKeys.value,
+          onChange: (keys) => {
+            if(keys.length > 0) {
+              selectedIssueKeys.value = [keys[keys.length - 1]];
+            } else {
+              selectedIssueKeys.value = [];
+            }
+            manualWinningNum.value = '';
+          }
+        }));
+
+        const customRowConfig = (record) => {
+          return {
+            onClick: () => {
+              if (!record._isEditing) {
+                selectedIssueKeys.value = [record.id];
+                manualWinningNum.value = '';
+              }
+            }
+          };
+        };
+
+        const manualWinningNum = ref('');
+        const isDrawValid = computed(() => manualWinningNum.value && manualWinningNum.value.length === config.value.length);
+
+        function generateRandomWinningNum() {
+          const chars = config.value.charset === '0-9' ? '0123456789' : '0123456789ABCDEF';
+          let res = '';
+          for(let i=0; i<config.value.length; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+          manualWinningNum.value = res;
+        }
+
+        function executeDraw() {
+          if (!isDrawValid.value) return;
+          if(activeIssue.value) {
+            activeIssue.value.status = 2;
+            activeIssue.value.winningNumber = manualWinningNum.value;
+            activeIssue.value.actualDrawTime = dayjs().format('MM-DD HH:mm');
+            message.success(`【${activeIssue.value.issueNo}】核销成功！`);
+          }
+        }
+
+        return {
+          dayjs,
+          lotteryCode, lotteryOptions, saving, isOnline, activeTab, saveConfig, config, demoSequence, fpeDemoOutput,
+          mockAssetList, getPrizeIcon, getPrizeNameOnly, prizeRules, activeRuleId, activeRulePrizeCode,
+          addNewRule, sortRules, removeRule, bindAssetToActiveRule, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+          issueList, issueColumns, getStatusText, getStatusColor,
+          isCreatingIssue, newIssueForm, toggleIssueCreator, submitNewIssue, deleteIssue,
+          startEdit, cancelEdit, saveEdit, customRowConfig,
+          selectedIssueKeys, activeIssue, rowSelection, manualWinningNum, generateRandomWinningNum, isDrawValid, executeDraw
+        };
+      }
+    };
+    createApp(App).use(antd).mount('#app');
+  </script>
+</body>
+</html>

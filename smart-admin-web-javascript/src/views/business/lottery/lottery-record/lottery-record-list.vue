@@ -54,7 +54,6 @@
   <a-card size="small" :bordered="false" :hoverable="true">
     <!---------- 表格操作行 begin ----------->
     <a-row class="smart-table-btn-block">
-      <div class="smart-table-operate-block"></div>
       <div class="smart-table-setting-block">
         <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
       </div>
@@ -71,13 +70,7 @@
       bordered
       :loading="tableLoading"
       :pagination="false"
-    >
-      <template #bodyCell="{ text, record, column }">
-        <template v-if="column.dataIndex === 'action'">
-          <div class="smart-table-operate"></div>
-        </template>
-      </template>
-    </a-table>
+    />
     <!---------- 表格 end ----------->
 
     <div class="smart-query-table-page">
@@ -95,6 +88,8 @@
         :show-total="(total) => `共${total}条`"
       />
     </div>
+
+    <LotteryRecordForm ref="formRef" @reloadList="queryData" />
   </a-card>
 </template>
 <script setup>
@@ -105,6 +100,7 @@
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
+  import LotteryRecordForm from './lottery-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
   // ---------------------------- 表格列 ----------------------------
@@ -131,6 +127,11 @@
       ellipsis: true,
     },
     {
+      title: 'FPE算号基数',
+      dataIndex: 'sequenceNo',
+      ellipsis: true,
+    },
+    {
       title: '彩票号码',
       dataIndex: 'ticketNumber',
       ellipsis: true,
@@ -138,16 +139,6 @@
     {
       title: '会员名',
       dataIndex: 'memberName',
-      ellipsis: true,
-    },
-    {
-      title: '获取来源',
-      dataIndex: 'sourceType',
-      ellipsis: true,
-    },
-    {
-      title: '溯源单号',
-      dataIndex: 'sourceBizId',
       ellipsis: true,
     },
     {

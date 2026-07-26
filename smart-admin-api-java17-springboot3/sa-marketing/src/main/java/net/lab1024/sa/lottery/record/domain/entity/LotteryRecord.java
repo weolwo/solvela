@@ -21,7 +21,7 @@ import lombok.Data;
 public class LotteryRecord {
 
     /**
-     * id
+     * 主键id
      */
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -37,9 +37,14 @@ public class LotteryRecord {
     private String lotteryCode;
 
     /**
-     * 归属期号
+     * 期号
      */
     private String issueNo;
+
+    /**
+     * FPE算号基数
+     */
+    private Integer sequenceNo;
 
     /**
      * 彩票号码
@@ -47,27 +52,17 @@ public class LotteryRecord {
     private String ticketNumber;
 
     /**
-     * 会员名
+     * 会员唯一标识
      */
     private String memberName;
 
     /**
-     * 获取来源: EXCHANGE, TASK_REWARD
-     */
-    private String sourceType;
-
-    /**
-     * 溯源单号
-     */
-    private String sourceBizId;
-
-    /**
-     * 领取时间
+     * 领号时间
      */
     private LocalDateTime obtainTime;
 
     /**
-     * 中奖状态: 0-未开奖, 1-未中奖, 2已开奖
+     * 中奖状态: 0-未开奖, 1-未中奖, 2-已中奖
      */
     private Integer winStatus;
 
@@ -77,7 +72,7 @@ public class LotteryRecord {
     private Integer prizeLevel;
 
     /**
-     * 签名
+     * 防篡改签名
      */
     private String securitySign;
 

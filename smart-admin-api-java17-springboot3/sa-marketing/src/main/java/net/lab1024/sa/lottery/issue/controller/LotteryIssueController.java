@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
  * 期号配置 Controller
  *
  * @Author weolwo
- * @Date 2026-04-19 11:23:43
+ * @Date 2026-05-09 16:54:51
  * @Copyright weolwo
  */
 @RequiredArgsConstructor
@@ -41,7 +41,7 @@ public class LotteryIssueController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission(":add")
     public ResponseDTO<String> add(@RequestBody @Valid LotteryIssueAddForm addForm) {
         return Service.add(addForm);
     }

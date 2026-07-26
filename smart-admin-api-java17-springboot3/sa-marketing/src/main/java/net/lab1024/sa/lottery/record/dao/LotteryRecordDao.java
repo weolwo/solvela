@@ -1,8 +1,6 @@
 package net.lab1024.sa.lottery.record.dao;
 
         import java.util.List;
-
-        import net.lab1024.sa.base.common.dao.CustomizedBaseMapper;
         import net.lab1024.sa.lottery.record.domain.entity.LotteryRecord;
         import net.lab1024.sa.lottery.record.domain.form.LotteryRecordQueryForm;
         import net.lab1024.sa.lottery.record.domain.vo.LotteryRecordVO;
@@ -20,7 +18,7 @@ import java.util.List;
  * @Copyright weolwo
  */
 @Mapper
-public interface LotteryRecordDao extends CustomizedBaseMapper<LotteryRecord> {
+public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
 
     /**
      * 分页查询
@@ -38,12 +36,5 @@ public interface LotteryRecordDao extends CustomizedBaseMapper<LotteryRecord> {
      * @return 列表数据
      */
     List<LotteryRecordVO> queryList(@Param("queryForm") LotteryRecordQueryForm queryForm);
-
-    /**
-     * 批量更新记录的中奖状态和等级
-     * @param list 待更新的记录列表
-     * @return 影响行数
-     */
-   int updateBatchById(@Param("list") List<LotteryRecord> list);
 
 }

@@ -24,6 +24,9 @@ public class LotteryRecordUpdateForm {
     @NotNull(message = "中奖状态: 0-未开奖, 1-未中奖, 已开奖 不能为空")
     private Integer winStatus;
 
+    @Schema(description = "奖励等级")
+    private Integer prizeLevel;
+
     @Schema(description = "更新人")
     private String updateBy;
 

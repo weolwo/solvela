@@ -3,7 +3,6 @@ package net.lab1024.sa.lottery.config.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -19,7 +18,7 @@ import lombok.Data;
 public class LotteryConfigAddForm {
 
     @Schema(description = "租户id", requiredMode = Schema.RequiredMode.REQUIRED)
-   // @NotBlank(message = "租户id 不能为空")
+    @NotBlank(message = "租户id 不能为空")
     private String tenantId;
 
     @Schema(description = "活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -45,14 +44,6 @@ public class LotteryConfigAddForm {
     @Schema(description = "号池总数 (如: 1,000,000)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "号池总数 (如: 1,000,000) 不能为空")
     private Integer totalCount;
-
-    @Schema(description = "入场成本类型 (SCORE, FREE)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "入场成本类型 (SCORE, FREE) 不能为空")
-    private String costAssetType;
-
-    @Schema(description = "入场成本-数值", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "入场成本-数值 不能为空")
-    private BigDecimal costValue;
 
     @Schema(description = "状态：0-下线, 1-上线")
     private Integer status;

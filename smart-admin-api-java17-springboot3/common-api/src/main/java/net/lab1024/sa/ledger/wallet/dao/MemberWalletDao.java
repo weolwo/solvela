@@ -67,4 +67,9 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
      * @return
      */
     int addBalanceWithVersion(@Param("id") Long id, @Param("amount")BigDecimal amount, @Param("version")Integer version);
+
+    /**
+     * 扣减余额（乐观锁 + 余额充足双重条件），返回0表示并发冲突或余额不足
+     */
+    int deductBalanceWithVersion(@Param("id") Long id, @Param("amount")BigDecimal amount, @Param("version")Integer version);
 }

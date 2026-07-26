@@ -71,4 +71,11 @@
                         where id = #{id}
                 </delete>
 
+    <!-- 已发库存+1（防超发第二道防线）：不限量(-1)或未发满才更新，返回0=DB层面无库存 -->
+    <update id="increaseUsedStock">
+        UPDATE t_prize_pool_item
+        SET used_stock = used_stock + 1, version = version + 1
+        WHERE id = #{id} AND (total_stock = -1 OR used_stock &lt; total_stock)
+    </update>
+
 </mapper>

@@ -21,7 +21,7 @@ import lombok.Data;
 public class LotteryPrizeRule {
 
     /**
-     * id
+     * 主键id
      */
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -37,16 +37,24 @@ public class LotteryPrizeRule {
     private String lotteryCode;
 
     /**
-     * 期号
+     * 奖品奖级
      */
-    private String issueNo;
-
+    private Integer prizeLevel;
 
     /**
-     * 奖励明细
+     * 匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配
      */
-    private String prizeDetails;
+    private String matchRule;
 
+    /**
+     * 匹配长度
+     */
+    private Integer matchLength;
+
+    /**
+     * 奖品编码
+     */
+    private String prizeCode;
 
     /**
      * 创建人

@@ -8,14 +8,26 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
+      <a-form-item label="id" name="id">
+        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
+      </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
       <a-form-item label="彩票编码" name="lotteryCode">
         <a-input style="width: 100%" v-model:value="form.lotteryCode" placeholder="彩票编码" />
       </a-form-item>
-      <a-form-item label="期号" name="issueNo">
-        <a-input style="width: 100%" v-model:value="form.issueNo" placeholder="期号" />
+      <a-form-item label="奖品奖级" name="prizeLevel">
+        <a-input-number style="width: 100%" v-model:value="form.prizeLevel" placeholder="奖品奖级" />
+      </a-form-item>
+      <a-form-item label="匹配规则" name="matchRule">
+        <a-input style="width: 100%" v-model:value="form.matchRule" placeholder="匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配" />
+      </a-form-item>
+      <a-form-item label="匹配长度" name="matchLength">
+        <a-input-number style="width: 100%" v-model:value="form.matchLength" placeholder="匹配长度" />
+      </a-form-item>
+      <a-form-item label="奖品编码" name="prizeCode">
+        <a-input style="width: 100%" v-model:value="form.prizeCode" placeholder="奖品编码" />
       </a-form-item>
     </a-form>
 
@@ -32,7 +44,7 @@
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { lotteryPrizeRuleApi } from '/@/api/business/lottery/lottery-prize-rule/lottery-prize-rule-api';
+  import { lotteryPrizeRuleApi } from '/@/api/business/marketing/lottery-prize-rule/lottery-prize-rule-api';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   // ------------------------ 事件 ------------------------
@@ -72,8 +84,10 @@
     id: undefined, //id
     tenantId: undefined, //租户id
     lotteryCode: undefined, //彩票编码
-    issueNo: undefined, //期号
-    prizeDetails: undefined, //奖励明细
+    prizeLevel: undefined, //奖品奖级
+    matchRule: undefined, //匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配
+    matchLength: undefined, //匹配长度
+    prizeCode: undefined, //奖品编码
   };
 
   let form = reactive({ ...formDefault });
@@ -82,8 +96,10 @@
     id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户id 必填' }],
     lotteryCode: [{ required: true, message: '彩票编码 必填' }],
-    issueNo: [{ required: true, message: '期号 必填' }],
-    prizeDetails: [{ required: true, message: '奖励明细 必填' }],
+    prizeLevel: [{ required: true, message: '奖品奖级 必填' }],
+    matchRule: [{ required: true, message: '匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配 必填' }],
+    matchLength: [{ required: true, message: '匹配长度 必填' }],
+    prizeCode: [{ required: true, message: '奖品编码 必填' }],
   };
 
   // 点击确定，验证表单

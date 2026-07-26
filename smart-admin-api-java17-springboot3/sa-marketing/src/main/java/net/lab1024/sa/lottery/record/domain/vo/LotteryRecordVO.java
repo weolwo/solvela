@@ -28,17 +28,14 @@ public class LotteryRecordVO {
     @Schema(description = "归属期号")
     private String issueNo;
 
+    @Schema(description = "FPE算号基数")
+    private Integer sequenceNo;
+
     @Schema(description = "彩票号码")
     private String ticketNumber;
 
     @Schema(description = "会员名")
     private String memberName;
-
-    @Schema(description = "获取来源: EXCHANGE, TASK_REWARD")
-    private String sourceType;
-
-    @Schema(description = "溯源单号")
-    private String sourceBizId;
 
     @Schema(description = "领取时间")
     private LocalDateTime obtainTime;

@@ -1,22 +1,20 @@
 package net.lab1024.sa.lottery.config.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.ValidateList;
-import net.lab1024.sa.lottery.config.domain.entity.LotteryConfig;
 import net.lab1024.sa.lottery.config.domain.form.LotteryConfigAddForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryConfigQueryForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryConfigUpdateForm;
 import net.lab1024.sa.lottery.config.domain.vo.LotteryConfigVO;
 import net.lab1024.sa.lottery.config.service.LotteryConfigService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+
 /**
  * 彩票配置 Controller
  *
@@ -41,8 +39,8 @@ public class LotteryConfigController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
-    public ResponseDTO<String> add(@RequestBody @Valid LotteryConfigAddForm addForm) throws Exception {
+    @SaCheckPermission(":add")
+    public ResponseDTO<String> add(@RequestBody @Valid LotteryConfigAddForm addForm) {
         return Service.add(addForm);
     }
 

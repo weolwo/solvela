@@ -8,6 +8,7 @@ import net.lab1024.sa.activity.domain.form.ActivityConfigAddForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigQueryForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigUpdateForm;
 import net.lab1024.sa.activity.domain.vo.ActivityConfigVO;
+import net.lab1024.sa.activity.manager.ActivityConfigManager;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
@@ -29,6 +30,14 @@ import java.util.List;
 public class ActivityConfigService {
 
     private final ActivityConfigDao activityConfigDao;
+    private final ActivityConfigManager activityConfigManager;
+
+    /**
+     * 按活动编码查询（奖池工作台保存时判定活动是否上线等场景使用）
+     */
+    public ActivityConfig getByActivityCode(String activityCode) {
+        return activityConfigManager.lambdaQuery().eq(ActivityConfig::getActivityCode, activityCode).one();
+    }
 
     /**
      * 分页查询

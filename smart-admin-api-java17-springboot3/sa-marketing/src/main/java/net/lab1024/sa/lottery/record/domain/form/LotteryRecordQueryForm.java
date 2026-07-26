@@ -4,9 +4,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import net.lab1024.sa.base.common.domain.PageParam;
+import net.lab1024.sa.base.common.swagger.SchemaEnum;
+import net.lab1024.sa.base.common.validator.enumeration.CheckEnum;
+import net.lab1024.sa.enums.TicketStatusEnum;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 /**
  * 用户号码记录 分页查询表单
@@ -33,12 +35,13 @@ public class LotteryRecordQueryForm extends PageParam {
     private String ticketNumber;
 
     @Schema(description = "创建时间")
-    private LocalDateTime createTimeBegin;
+    private LocalDate createTimeBegin;
 
     @Schema(description = "创建时间")
-    private LocalDateTime createTimeEnd;
+    private LocalDate createTimeEnd;
 
-    @Schema(description  = "中奖状态: 0-未开奖, 1-未中奖, 已开奖 错误")
+    @SchemaEnum(value = TicketStatusEnum.class, desc = "中奖状态: 0-未开奖, 1-未中奖, 已开奖")
+    @CheckEnum(value = TicketStatusEnum.class, message = "中奖状态: 0-未开奖, 1-未中奖, 已开奖 错误")
     private Integer winStatus;
 
     @Schema(description = "会员名")

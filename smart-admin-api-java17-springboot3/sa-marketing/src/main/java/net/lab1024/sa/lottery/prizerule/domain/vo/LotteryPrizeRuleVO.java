@@ -25,11 +25,17 @@ public class LotteryPrizeRuleVO {
     @Schema(description = "彩票编码")
     private String lotteryCode;
 
-    @Schema(description = "期号")
-    private String issueNo;
+    @Schema(description = "奖品奖级")
+    private Integer prizeLevel;
 
-    @Schema(description = "奖励明细")
-    private String prizeDetails;
+    @Schema(description = "匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配")
+    private String matchRule;
+
+    @Schema(description = "匹配长度")
+    private Integer matchLength;
+
+    @Schema(description = "奖品编码")
+    private String prizeCode;
 
     @Schema(description = "创建人")
     private String createBy;

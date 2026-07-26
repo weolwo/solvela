@@ -21,6 +21,11 @@ import java.util.List;
 public interface PrizePoolItemDao extends BaseMapper<PrizePoolItem> {
 
     /**
+     * 已发库存 +1（条件更新：不限量或未发满才生效，返回0表示DB层面无库存——防超发第二道防线）
+     */
+    int increaseUsedStock(@Param("id") Long id);
+
+    /**
      * 分页查询
      *
      * @param page 分页参数

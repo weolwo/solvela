@@ -9,6 +9,7 @@ public enum BizErrorCode implements ErrorCode {
 
     AMOUNT_MUST_BE_GREATER_THAN_ZERO(50000, "入账金额必须大于0"),
     ACCOUNT_BALANCE_CHANGED(50001, "账户余额变动中，请重试"),
+    BALANCE_NOT_ENOUGH(50002, "余额不足"),
 
     ;
 

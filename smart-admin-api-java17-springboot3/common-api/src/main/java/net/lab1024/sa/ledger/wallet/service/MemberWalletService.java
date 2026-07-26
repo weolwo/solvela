@@ -103,6 +103,74 @@ public class MemberWalletService {
         memberAssetTransactionDao.insert(txn);
     }
 
+    /**
+     * 通用扣减（抽奖门票/积分消耗等场景）：乐观锁 + 余额充足双重条件，失败抛业务异常
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void executeWalletDeduct(String memberName, PrizeTypeEnum assetType, BigDecimal amount,
+                                    String bizType, String bizRefId, String remark) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
+        }
+        MemberWallet wallet = memberWalletDao.getByMemberNameAndAssetType(memberName, assetType.name());
+        if (wallet == null || wallet.getBalance() == null || wallet.getBalance().compareTo(amount) < 0) {
+            throw new BusinessException(BizErrorCode.BALANCE_NOT_ENOUGH);
+        }
+        wallet.checkAvailable();
+
+        int updateRows = memberWalletDao.deductBalanceWithVersion(wallet.getId(), amount, wallet.getVersion());
+        if (updateRows == 0) {
+            // 并发冲突或余额刚好被消耗，统一提示重试
+            throw new BusinessException(BizErrorCode.ACCOUNT_BALANCE_CHANGED);
+        }
+
+        MemberAssetTransaction txn = new MemberAssetTransaction();
+        txn.setTenantId(wallet.getTenantId());
+        txn.setMemberName(memberName);
+        txn.setAssetType(assetType.name());
+        txn.setTransactionType(2); // 2-支出
+        txn.setChangeAmount(amount);
+        txn.setBalanceAfter(wallet.getBalance().subtract(amount));
+        txn.setBizType(bizType);
+        txn.setBizRefId(bizRefId);
+        txn.setRemark(remark);
+        memberAssetTransactionDao.insert(txn);
+    }
+
+    /**
+     * 通用退还/入账（抽奖无货退门票等补偿场景）：钱包不存在时自愈初始化
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void executeWalletRefund(String memberName, PrizeTypeEnum assetType, BigDecimal amount,
+                                    String bizType, String bizRefId, String remark) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
+        }
+        MemberWallet wallet = memberWalletDao.getByMemberNameAndAssetType(memberName, assetType.name());
+        if (wallet == null) {
+            wallet = initMemberWallet(memberName, null, assetType);
+        }
+        wallet.checkAvailable();
+        BigDecimal balanceAfter = wallet.calculateAfterBalance(amount);
+
+        int updateRows = memberWalletDao.addBalanceWithVersion(wallet.getId(), amount, wallet.getVersion());
+        if (updateRows == 0) {
+            throw new BusinessException(BizErrorCode.ACCOUNT_BALANCE_CHANGED);
+        }
+
+        MemberAssetTransaction txn = new MemberAssetTransaction();
+        txn.setTenantId(wallet.getTenantId());
+        txn.setMemberName(memberName);
+        txn.setAssetType(assetType.name());
+        txn.setTransactionType(1); // 1-收入
+        txn.setChangeAmount(amount);
+        txn.setBalanceAfter(balanceAfter);
+        txn.setBizType(bizType);
+        txn.setBizRefId(bizRefId);
+        txn.setRemark(remark);
+        memberAssetTransactionDao.insert(txn);
+    }
+
     private MemberAssetTransaction buildTransaction(ProposalRecord proposal, PrizeTypeEnum assetType, BigDecimal amount, BigDecimal balanceAfter) {
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setTenantId(proposal.getTenantId());

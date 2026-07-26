@@ -66,6 +66,8 @@
   import { nextTick, onMounted, ref } from 'vue';
   import { message } from 'ant-design-vue';
   import { CloudUploadOutlined } from '@ant-design/icons-vue';
+  import { drawWorkbenchApi } from '/@/api/business/draw/draw-workbench-api';
+  import { smartSentry } from '/@/lib/smart-sentry';
   import PrizeItemLibrary from './components/PrizeItemLibrary.vue';
   import PoolProbabilityEngine from './components/PoolProbabilityEngine.vue';
 
@@ -125,23 +127,16 @@
 
     saving.value = true;
     try {
-      const prizeItemList = tab1Ref.value ? tab1Ref.value.getData() : [];
-      const prizeMappingList = tab2Ref.value ? tab2Ref.value.getData() : [];
-
-      // 组装主子表超级 JSON（对齐后端：活动 + 物资库(t_prize_pool_item) + 奖池映射(t_pool_prize_mapping)）
+      // 多池契约：Tab2 V2 的 getData() 返回完整 poolList 数组
       const submitData = {
         activityCode: currentActivity.value,
-        publishAsOnline: isOnline.value,
-        prizeItemList,
-        poolConfig: {
-          poolCode: 'POOL_FREE',
-          prizeMappingList,
-        },
+        prizeItemList: tab1Ref.value ? tab1Ref.value.getData() : [],
+        poolList: tab2Ref.value ? tab2Ref.value.getData() : [],
       };
-
-      console.log('【抽奖活动 · 保存并发布】超级 JSON：', submitData);
-      message.success('已组装保存数据，请在控制台查看');
-      // 真实接入时：await drawApi.savePool(submitData)
+      await drawWorkbenchApi.save(submitData);
+      message.success('抽奖配置已保存');
+    } catch (e) {
+      smartSentry.captureError(e);
     } finally {
       saving.value = false;
     }

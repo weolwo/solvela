@@ -7,6 +7,9 @@ import net.lab1024.sa.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
 import net.lab1024.sa.draw.drawlog.domain.form.DrawPrizeLogUpdateForm;
 import net.lab1024.sa.draw.drawlog.domain.vo.DrawPrizeLogVO;
 import net.lab1024.sa.draw.drawlog.service.DrawPrizeLogService;
+import net.lab1024.sa.draw.runtime.DrawExecuteService;
+import net.lab1024.sa.draw.runtime.domain.DrawExecuteForm;
+import net.lab1024.sa.draw.runtime.domain.DrawExecuteVO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
@@ -31,6 +34,14 @@ import lombok.RequiredArgsConstructor;
 public class DrawPrizeLogController {
 
     private final DrawPrizeLogService Service;
+    private final DrawExecuteService drawExecuteService;
+
+    @Operation(summary = "执行抽奖（引擎判定 + Lua预扣 + DB兜底 + 落流水）")
+    @PostMapping("/execute")
+    @SaCheckPermission(":execute")
+    public ResponseDTO<DrawExecuteVO> execute(@RequestBody @Valid DrawExecuteForm executeForm) {
+        return drawExecuteService.execute(executeForm);
+    }
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")

@@ -48,6 +48,11 @@ public class PoolPrizeMapping {
     private BigDecimal probability;
 
     /**
+     * 是否兜底奖项：1-兜底(库存不足时降级命中)，每池最多一个
+     */
+    private Integer isFallback;
+
+    /**
      * 序号
      */
     private Integer sortWeight;

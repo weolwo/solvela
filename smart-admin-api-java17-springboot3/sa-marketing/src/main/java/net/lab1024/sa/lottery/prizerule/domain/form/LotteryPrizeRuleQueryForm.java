@@ -24,9 +24,6 @@ public class LotteryPrizeRuleQueryForm extends PageParam {
     @Schema(description = "彩票编码")
     private String lotteryCode;
 
-    @Schema(description = "奖励等级")
-    private String prizeLevel;
-
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;
 

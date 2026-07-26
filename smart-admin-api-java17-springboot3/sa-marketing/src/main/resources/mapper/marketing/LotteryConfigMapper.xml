@@ -11,8 +11,6 @@
             <result column="number_charset" property="numberCharset" />
             <result column="number_length" property="numberLength" />
             <result column="total_count" property="totalCount" />
-            <result column="cost_asset_type" property="costAssetType" />
-            <result column="cost_value" property="costValue" />
             <result column="status" property="status" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
@@ -29,8 +27,6 @@
                 number_charset, 
                 number_length, 
                 total_count, 
-                cost_asset_type, 
-                cost_value, 
                 status, 
                 create_by, 
                 create_time, 

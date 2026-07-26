@@ -8,6 +8,7 @@
             <result column="pool_code" property="poolCode" />
             <result column="prize_item_id" property="prizeItemId" />
             <result column="probability" property="probability" />
+            <result column="is_fallback" property="isFallback" />
             <result column="sort_weight" property="sortWeight" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
@@ -20,7 +21,9 @@
                 tenant_id, 
                 pool_code, 
                 prize_item_id, 
-                probability, 
+                probability,
+
+                is_fallback,
                 sort_weight, 
                 create_by, 
                 create_time, 

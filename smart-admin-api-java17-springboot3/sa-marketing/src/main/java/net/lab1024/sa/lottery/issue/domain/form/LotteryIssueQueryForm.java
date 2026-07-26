@@ -27,7 +27,7 @@ public class LotteryIssueQueryForm extends PageParam {
     @Schema(description = "期号")
     private String issueNo;
 
-    @Schema(description = "状态: 0-待开奖, 1-部分开奖, 2-已开奖")
+    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖")
     private Integer status;
 
     @Schema(description = "创建时间")

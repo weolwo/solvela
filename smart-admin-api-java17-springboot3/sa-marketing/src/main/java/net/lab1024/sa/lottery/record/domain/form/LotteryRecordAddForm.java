@@ -29,18 +29,16 @@ public class LotteryRecordAddForm {
     @NotBlank(message = "归属期号 不能为空")
     private String issueNo;
 
+    @Schema(description = "FPE算号基数", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "FPE算号基数 不能为空")
+    private Integer sequenceNo;
+
     @Schema(description = "彩票号码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "彩票号码 不能为空")
     private String ticketNumber;
 
     @Schema(description = "会员名")
     private String memberName;
-
-    @Schema(description = "获取来源: EXCHANGE, TASK_REWARD")
-    private String sourceType;
-
-    @Schema(description = "溯源单号")
-    private String sourceBizId;
 
     @Schema(description = "领取时间")
     private LocalDateTime obtainTime;

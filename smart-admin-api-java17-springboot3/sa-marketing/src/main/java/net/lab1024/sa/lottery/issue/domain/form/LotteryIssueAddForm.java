@@ -29,33 +29,26 @@ public class LotteryIssueAddForm {
     @NotBlank(message = "期号 不能为空")
     private String issueNo;
 
-    @Schema(description = "开始偏移量", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "开始偏移量 不能为空")
-    private Integer startOffset;
-
     @Schema(description = "已售/已派发数量", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "已售/已派发数量 不能为空")
     private Integer soldCount;
 
-    @Schema(description = "开始售卖", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "开始售卖 不能为空")
-    private LocalDateTime sellStartTime;
+    @Schema(description = "售卖开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "售卖开始时间 不能为空")
+    private LocalDateTime saleStartTime;
 
-    @Schema(description = "结束时间", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "结束时间 不能为空")
-    private LocalDateTime sellEndTime;
+    @Schema(description = "售卖结束时间", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "售卖结束时间 不能为空")
+    private LocalDateTime saleEndTime;
 
     @Schema(description = "开奖时间")
-    private LocalDateTime openTime;
-
-    @Schema(description = "是否可重复开奖：0否，1是")
-    private Integer canRepeat;
+    private LocalDateTime settleTime;
 
     @Schema(description = "开奖号码")
     private String winningNumber;
 
-    @Schema(description = "状态: 0-待开奖, 1-部分开奖, 2-已开奖", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "状态:状态: 0-待开奖, 1-部分开奖, 2-已开奖")
+    @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "状态: 0-待开奖, 1-售卖中, 2-已开奖 不能为空")
     private Integer status;
 
     @Schema(description = "创建人")

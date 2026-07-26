@@ -19,7 +19,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.issueNo" placeholder="期号" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态: 0-待开奖, 1-部分开奖, 2-已开奖" />
+        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态: 0-待开奖, 1-售卖中, 2-已开奖" />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
@@ -142,33 +142,23 @@
       ellipsis: true,
     },
     {
-      title: '开始偏移量',
-      dataIndex: 'startOffset',
-      ellipsis: true,
-    },
-    {
       title: '已售/已派发数量',
       dataIndex: 'soldCount',
       ellipsis: true,
     },
     {
-      title: '开始售卖',
-      dataIndex: 'sellStartTime',
+      title: '售卖开始时间',
+      dataIndex: 'saleStartTime',
       ellipsis: true,
     },
     {
-      title: '结束时间',
-      dataIndex: 'sellEndTime',
+      title: '售卖结束时间',
+      dataIndex: 'saleEndTime',
       ellipsis: true,
     },
     {
       title: '开奖时间',
-      dataIndex: 'openTime',
-      ellipsis: true,
-    },
-    {
-      title: '是否可重复开奖',
-      dataIndex: 'canRepeat',
+      dataIndex: 'settleTime',
       ellipsis: true,
     },
     {
@@ -177,7 +167,7 @@
       ellipsis: true,
     },
     {
-      title: '状态',
+      title: '状态: 0-待开奖, 1-售卖中, 2-已开奖',
       dataIndex: 'status',
       ellipsis: true,
     },
@@ -215,7 +205,7 @@
     tenantId: undefined, //租户id
     lotteryCode: undefined, //彩票编码
     issueNo: undefined, //期号
-    status: undefined, //状态: 0-待开奖, 1-部分开奖, 2-已开奖
+    status: undefined, //状态: 0-待开奖, 1-售卖中, 2-已开奖
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束

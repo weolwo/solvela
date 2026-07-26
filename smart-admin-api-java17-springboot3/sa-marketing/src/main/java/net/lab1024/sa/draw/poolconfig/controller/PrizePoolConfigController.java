@@ -2,6 +2,7 @@ package net.lab1024.sa.draw.poolconfig.controller;
 
 import net.lab1024.sa.base.common.domain.ValidateList;
 import net.lab1024.sa.draw.poolconfig.domain.entity.PrizePoolConfig;
+import net.lab1024.sa.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigUpdateForm;
@@ -44,6 +45,13 @@ public class PrizePoolConfigController {
     @SaCheckPermission(":addProposal")
     public ResponseDTO<String> add(@RequestBody @Valid PrizePoolConfigAddForm addForm) {
         return Service.add(addForm);
+    }
+
+    @Operation(summary = "抽奖工作台聚合保存（物资 + 多奖池 + 坑位映射，主子表事务）")
+    @PostMapping("/workbench/save")
+    @SaCheckPermission(":workbench:save")
+    public ResponseDTO<String> workbenchSave(@RequestBody @Valid DrawWorkbenchSaveForm saveForm) {
+        return Service.workbenchSave(saveForm);
     }
 
     @Operation(summary = "更新")

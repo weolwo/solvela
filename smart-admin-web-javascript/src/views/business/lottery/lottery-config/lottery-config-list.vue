@@ -165,16 +165,6 @@
       ellipsis: true,
     },
     {
-      title: '入场成本类型 (SCORE, FREE)',
-      dataIndex: 'costAssetType',
-      ellipsis: true,
-    },
-    {
-      title: '入场成本-数值',
-      dataIndex: 'costValue',
-      ellipsis: true,
-    },
-    {
       title: '状态：0-下线, 1-上线',
       dataIndex: 'status',
       ellipsis: true,

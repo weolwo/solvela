@@ -90,6 +90,11 @@ public class QueryFormVariableService extends CodeGenerateBaseVariableService {
                     if (codeField == null) {
                         continue;
                     }
+                    // 枚举类名未配置时降级为普通字段，避免拼出 import xxx.constant.null 和 null.class 导致生成代码无法编译
+                    if (SmartStringUtil.isEmpty(codeField.getEnumName())) {
+                        finalFieldMap.put("javaType", codeField.getJavaType());
+                        break;
+                    }
 
                     packageList.add("import net.lab1024.sa.base.common.swagger.SchemaEnum;");
                     packageList.add("import net.lab1024.sa.base.common.validator.enumeration.CheckEnum;");

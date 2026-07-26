@@ -7,10 +7,9 @@
             <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
+            <result column="sequence_no" property="sequenceNo" />
             <result column="ticket_number" property="ticketNumber" />
             <result column="member_name" property="memberName" />
-            <result column="source_type" property="sourceType" />
-            <result column="source_biz_id" property="sourceBizId" />
             <result column="obtain_time" property="obtainTime" />
             <result column="win_status" property="winStatus" />
             <result column="prize_level" property="prizeLevel" />
@@ -26,10 +25,9 @@
                 tenant_id, 
                 lottery_code, 
                 issue_no, 
+                sequence_no, 
                 ticket_number, 
                 member_name, 
-                source_type, 
-                source_biz_id, 
                 obtain_time, 
                 win_status, 
                 prize_level, 
@@ -88,30 +86,5 @@
         ORDER BY create_time DESC
     </select>
 
-    <update id="updateBatchById">
-        UPDATE `t_lottery_record`
-        <trim prefix="SET" suffixOverrides=",">
-            <trim prefix="`win_status` = CASE `id`" suffix="END,">
-                <foreach collection="list" item="item">
-                    <if test="item.winStatus != null">
-                        WHEN #{item.id} THEN #{item.winStatus}
-                    </if>
-                </foreach>
-            </trim>
 
-            <trim prefix="`prize_level` = CASE `id`" suffix="END,">
-                <foreach collection="list" item="item">
-                    <if test="item.prizeLevel != null">
-                        WHEN #{item.id} THEN #{item.prizeLevel}
-                    </if>
-                </foreach>
-            </trim>
-
-            `update_time` = NOW()
-        </trim>
-        WHERE `id` IN
-        <foreach collection="list" item="item" open="(" separator="," close=")">
-            #{item.id}
-        </foreach>
-    </update>
 </mapper>

@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -22,7 +21,7 @@ import lombok.Data;
 public class LotteryConfig {
 
     /**
-     * id
+     * 主键id
      */
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -48,7 +47,7 @@ public class LotteryConfig {
     private String lotteryName;
 
     /**
-     * 字符集：0-9, A-Z
+     * 发号字符集
      */
     private String numberCharset;
 
@@ -58,19 +57,9 @@ public class LotteryConfig {
     private Integer numberLength;
 
     /**
-     * 号池总数 (如: 1,000,000)
+     * 单期发行总数上限
      */
     private Integer totalCount;
-
-    /**
-     * 入场成本类型 (SCORE, FREE)
-     */
-    private String costAssetType;
-
-    /**
-     * 入场成本-数值
-     */
-    private BigDecimal costValue;
 
     /**
      * 状态：0-下线, 1-上线

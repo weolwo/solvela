@@ -8,12 +8,12 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <!--      <a-form-item label="id" name="id">
+      <a-form-item label="id" name="id">
         <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
       </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <SmartEnumSelect width="100%" v-model:value="form.tenantId" enum-name="" placeholder="租户id" />
-      </a-form-item>-->
+      </a-form-item>
       <a-form-item label="活动编码" name="activityCode">
         <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="活动编码" />
       </a-form-item>
@@ -29,18 +29,12 @@
       <a-form-item label="号码长度" name="numberLength">
         <a-input-number style="width: 100%" v-model:value="form.numberLength" placeholder="号码长度" />
       </a-form-item>
-      <a-form-item label="号池总数" name="totalCount">
+      <a-form-item label="号池总数 (如: 1,000,000)" name="totalCount">
         <a-input-number style="width: 100%" v-model:value="form.totalCount" placeholder="号池总数 (如: 1,000,000)" />
       </a-form-item>
-      <a-form-item label="入场成本类型" name="costAssetType">
-        <a-input style="width: 100%" v-model:value="form.costAssetType" placeholder="入场成本类型 (SCORE, FREE)" />
-      </a-form-item>
-      <a-form-item label="入场成本-数值" name="costValue">
-        <a-input-number style="width: 100%" v-model:value="form.costValue" placeholder="入场成本-数值" />
-      </a-form-item>
-      <!--      <a-form-item label="状态" name="status">
+      <a-form-item label="状态" name="status">
         <SmartEnumSelect width="100%" v-model:value="form.status" enum-name="" placeholder="状态：0-下线, 1-上线" />
-      </a-form-item>-->
+      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -102,8 +96,6 @@
     numberCharset: undefined, //字符集：0-9, A-Z
     numberLength: undefined, //号码长度
     totalCount: undefined, //号池总数 (如: 1,000,000)
-    costAssetType: undefined, //入场成本类型 (SCORE, FREE)
-    costValue: undefined, //入场成本-数值
     status: undefined, //状态：0-下线, 1-上线
   };
 
@@ -118,8 +110,6 @@
     numberCharset: [{ required: true, message: '字符集：0-9, A-Z 必填' }],
     numberLength: [{ required: true, message: '号码长度 必填' }],
     totalCount: [{ required: true, message: '号池总数 (如: 1,000,000) 必填' }],
-    costAssetType: [{ required: true, message: '入场成本类型 (SCORE, FREE) 必填' }],
-    costValue: [{ required: true, message: '入场成本-数值 必填' }],
   };
 
   // 点击确定，验证表单

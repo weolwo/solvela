@@ -38,7 +38,7 @@ public class LotteryRecordController {
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission(":add")
     public ResponseDTO<String> add(@RequestBody @Valid LotteryRecordAddForm addForm) {
         return Service.add(addForm);
     }
