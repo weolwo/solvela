@@ -2,7 +2,6 @@ package net.lab1024.sa.lottery.numberpool.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
@@ -14,7 +13,6 @@ import lombok.Data;
  */
 
 @Data
-@TableName("t_lottery_number_pool")
 public class LotteryNumberPool {
 
     /**

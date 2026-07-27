@@ -1,11 +1,10 @@
 package net.lab1024.sa.lottery.numberpool.manager;
 
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.lottery.numberpool.dao.LotteryNumberPoolDao;
 import net.lab1024.sa.lottery.numberpool.domain.entity.LotteryNumberPool;
 
-import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
-import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
 /**
  * 彩票号码池  Manager
  *
@@ -14,7 +13,6 @@ import lombok.RequiredArgsConstructor;
  * @Copyright weolwo
  */
 @RequiredArgsConstructor
-@Service
 public class LotteryNumberPoolManager extends ServiceImpl<LotteryNumberPoolDao, LotteryNumberPool> {
 
 

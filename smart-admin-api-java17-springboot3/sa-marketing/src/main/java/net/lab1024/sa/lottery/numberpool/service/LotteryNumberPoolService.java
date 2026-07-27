@@ -17,7 +17,6 @@ import net.lab1024.sa.lottery.numberpool.domain.vo.LotteryNumberPoolVO;
 import net.lab1024.sa.lottery.numberpool.manager.LotteryNumberPoolManager;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -34,7 +33,6 @@ import java.util.List;
  * @Copyright weolwo
  */
 @RequiredArgsConstructor
-@Service
 public class LotteryNumberPoolService {
 
     private final LotteryNumberPoolDao lotteryNumberPoolDao;

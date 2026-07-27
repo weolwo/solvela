@@ -5,7 +5,6 @@ import net.lab1024.sa.base.common.dao.CustomizedBaseMapper;
 import net.lab1024.sa.lottery.numberpool.domain.entity.LotteryNumberPool;
 import net.lab1024.sa.lottery.numberpool.domain.form.LotteryNumberPoolQueryForm;
 import net.lab1024.sa.lottery.numberpool.domain.vo.LotteryNumberPoolVO;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -17,7 +16,6 @@ import java.util.List;
  * @Date 2026-04-19 11:31:09
  * @Copyright weolwo
  */
-@Mapper
 public interface LotteryNumberPoolDao extends CustomizedBaseMapper<LotteryNumberPool> {
 
     /**
