@@ -37,6 +37,20 @@ export const lotteryWorkbenchApi = {
   },
 
   /**
+   * 上线：允许开始发号。服务端会校验必须已配奖级规则  @author  alaric
+   */
+  online: (lotteryCode) => {
+    return getRequest(`/lotteryConfig/online/${lotteryCode}`);
+  },
+
+  /**
+   * 下线：停止发号。已发出的号码不受影响，期号照常可以开奖  @author  alaric
+   */
+  offline: (lotteryCode) => {
+    return getRequest(`/lotteryConfig/offline/${lotteryCode}`);
+  },
+
+  /**
    * FPE 算号推演。
    * lotteryCode 必传：密钥由 lotteryCode + 期号派生，缺了它算出的号码与线上对不上  @author  alaric
    */

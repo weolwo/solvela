@@ -55,9 +55,28 @@
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-gray-600">🛡️ 状态</span>
-            <a-tooltip title="由彩票配置的上线状态决定，不能在此处手动拨动">
-              <a-tag :color="statusTag.color">{{ statusTag.label }}</a-tag>
-            </a-tooltip>
+            <a-tag :color="statusTag.color">{{ statusTag.label }}</a-tag>
+
+            <!-- 上下线是显式动作，不与「保存配置」混在一起：
+                 保存只改配置，上线是「开始对外发号」这件事本身，语义不同 -->
+            <a-popconfirm
+              v-if="configured && currentStatus !== LOTTERY_STATUS_ENUM.ONLINE.value"
+              title="上线后即可对外发号。请确认奖级规则已配置正确。"
+              ok-text="确认上线"
+              cancel-text="再想想"
+              @confirm="switchOnline(true)"
+            >
+              <a-button size="small" type="primary" ghost :loading="statusChanging">上线</a-button>
+            </a-popconfirm>
+            <a-popconfirm
+              v-else-if="configured"
+              title="下线后立即停止发号。已发出的号码不受影响，期号照常可以开奖。"
+              ok-text="确认下线"
+              cancel-text="再想想"
+              @confirm="switchOnline(false)"
+            >
+              <a-button size="small" danger ghost :loading="statusChanging">下线</a-button>
+            </a-popconfirm>
           </div>
           <a-popconfirm
             title="确认保存本玩法的配置？"
@@ -146,6 +165,7 @@
   const dirty = ref(false);
   const currentStatus = ref(null);
   const configured = ref(false);
+  const statusChanging = ref(false);
 
   const statusTag = computed(() => {
     if (!configured.value) {
@@ -159,6 +179,24 @@
 
   function onPanelChange() {
     dirty.value = true;
+  }
+
+  // ---------------------------- 上下线 ----------------------------
+
+  async function switchOnline(toOnline) {
+    statusChanging.value = true;
+    try {
+      const api = toOnline ? lotteryWorkbenchApi.online : lotteryWorkbenchApi.offline;
+      await api(loadedLottery.value);
+      message.success(toOnline ? '已上线，现在可以对外发号' : '已下线，已停止发号');
+      // 状态以服务端为准重新拉一次：上线会触发结构锁，面板里的禁用态要跟着变
+      await loadLotteries(currentActivity.value);
+      await loadDetail(currentActivity.value, loadedLottery.value);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      statusChanging.value = false;
+    }
   }
 
   // ---------------------------- 加载 ----------------------------

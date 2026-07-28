@@ -194,10 +194,43 @@
               </div>
             </div>
 
-            <div v-if="selectedIssue.status === 2" class="rounded-lg bg-green-50 p-6 text-center border border-green-200 shadow-sm">
-              <div class="text-3xl mb-2">✅</div>
-              <div class="text-sm font-bold text-green-700">该期已完成核销</div>
-              <div class="text-xs text-green-600 mt-1">开奖结果与时间已在左侧表格直显</div>
+            <div v-if="selectedIssue.status === 2" class="rounded-lg bg-green-50 p-5 border border-green-200 shadow-sm">
+              <div class="text-center">
+                <div class="text-3xl mb-1">✅</div>
+                <div class="text-sm font-bold text-green-700">该期已完成核销</div>
+                <div class="font-mono text-xl text-red-600 font-bold tracking-widest mt-2">
+                  {{ selectedIssue.winningNumber }}
+                </div>
+              </div>
+
+              <div v-if="summary" class="mt-4 bg-white rounded-md p-3 border border-green-100 text-xs space-y-1">
+                <div class="flex justify-between"><span class="text-slate-500">号码总数</span><span class="font-bold">{{ summary.total }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">中奖</span><span class="font-bold text-red-600">{{ summary.win }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">未中奖</span><span class="font-bold">{{ summary.lose }}</span></div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500">待派奖</span>
+                  <span class="font-bold" :class="Number(summary.waitDispatch) > 0 ? 'text-orange-500' : 'text-green-600'">
+                    {{ summary.waitDispatch }}
+                  </span>
+                </div>
+                <div class="flex justify-between"><span class="text-slate-500">已投递</span><span class="font-bold text-green-600">{{ summary.dispatched }}</span></div>
+              </div>
+
+              <a-popconfirm
+                title="将把本期中奖记录分批投递进派奖链路，可重复触发（已投递的会自动跳过）"
+                ok-text="开始派奖"
+                cancel-text="取消"
+                @confirm="doDispatch"
+              >
+                <a-button type="primary" block class="mt-3" :loading="dispatching" :disabled="!summary || Number(summary.waitDispatch) === 0">
+                  🎁 {{ summary && Number(summary.waitDispatch) > 0 ? `派奖（待投递 ${summary.waitDispatch} 条）` : '已全部投递' }}
+                </a-button>
+              </a-popconfirm>
+
+              <div class="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                派奖只负责投递到公共派发链路。<b>实际到账情况请到「派发记录」查看</b> ——
+                需人工审批的奖品会停在待审批，不会自动发放。
+              </div>
             </div>
 
             <div v-else class="rounded-lg bg-white p-5 shadow-sm border-t-4 border-red-500">
@@ -208,27 +241,53 @@
                 class="font-mono tracking-[0.3em] text-center text-2xl h-12 text-red-600 font-bold"
                 :maxlength="numberLength"
                 placeholder="等待录入"
+                :disabled="selectedIssue.status === 1"
               />
               <div class="text-[11px] mt-1 font-bold" :class="drawValid ? 'text-green-500' : 'text-red-500'">
-                <span v-if="drawValid">✅ 格式合法</span>
+                <span v-if="drawValid">✅ 格式合法，可进行核销对账</span>
                 <span v-else>❌ 必须是 {{ numberLength }} 位纯数字</span>
               </div>
 
-              <a-alert type="info" show-icon class="mt-4">
-                <template #message>
-                  <span class="text-xs">开奖执行将在下一阶段接入</span>
-                </template>
+              <a-alert v-if="selectedIssue.status === 1" type="warning" show-icon class="mt-3">
+                <template #message><span class="text-xs">该期正在核销中</span></template>
                 <template #description>
                   <span class="text-[11px] leading-relaxed">
-                    核销要按奖级升序逐级认领、分批更新十万级记录，并联动派奖链路，
-                    与期号管理不是一个量级的改动，单独作为一个阶段做，避免半成品按钮上线。
+                    开奖号码已定案为 <b class="font-mono">{{ selectedIssue.winningNumber }}</b>，不会再变。
+                    若上次核销中断，点下方按钮会<b>接着跑</b>，不会重复认领。
                   </span>
                 </template>
               </a-alert>
 
-              <a-button type="primary" danger block size="large" class="font-bold tracking-widest mt-4" disabled>
-                🚀 执 行 开 奖
-              </a-button>
+              <div class="flex gap-3 mt-4 flex-col">
+                <a-button block :loading="rolling" :disabled="selectedIssue.status === 1" @click="rollNumber">
+                  🎲 系统随机摇号
+                </a-button>
+                <a-popconfirm
+                  :title="`正在为【${selectedIssue.issueNo}】开奖，操作不可逆！`"
+                  ok-text="确认执行"
+                  cancel-text="取消"
+                  :disabled="!canSettle"
+                  placement="top"
+                  @confirm="doSettle"
+                >
+                  <a-button
+                    type="primary"
+                    danger
+                    block
+                    size="large"
+                    class="font-bold tracking-widest"
+                    :loading="settling"
+                    :disabled="!canSettle"
+                  >
+                    {{ selectedIssue.status === 1 ? '🔄 继 续 核 销' : '🚀 执 行 开 奖' }}
+                  </a-button>
+                </a-popconfirm>
+              </div>
+
+              <div class="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                摇号由服务端 SecureRandom 生成，前端不参与 —— 开奖号码是资损敏感数据。<br />
+                核销按奖级升序逐级认领，一张票只中最高的那一级。
+              </div>
             </div>
           </div>
         </div>
@@ -256,6 +315,10 @@
   const creating = ref(false);
   const selectedId = ref(null);
   const winningNumber = ref('');
+  const rolling = ref(false);
+  const settling = ref(false);
+  const dispatching = ref(false);
+  const summary = ref(null);
 
   const createForm = ref({ issueNo: '', saleRange: [], planDrawTime: '' });
 
@@ -272,6 +335,12 @@
   const drawValid = computed(
     () => winningNumber.value.length === props.numberLength && /^\d+$/.test(winningNumber.value)
   );
+
+  /**
+   * 核销中的期号号码已定案，不需要再录入即可续跑；
+   * 待开奖的期号必须先录入合法号码
+   */
+  const canSettle = computed(() => selectedIssue.value?.status === 1 || drawValid.value);
 
   function fmt(value) {
     return value ? String(value).replace('T', ' ').slice(5, 16) : '';
@@ -291,8 +360,69 @@
       if (record._editing) return;
       selectedId.value = record.id;
       winningNumber.value = '';
+      loadSummary(record);
     },
   });
+
+  /**
+   * 已开奖的期号才拉核销统计，其余情况清空 —— 免得切换期号时显示上一期的数字
+   */
+  async function loadSummary(record) {
+    summary.value = null;
+    if (!record || record.status !== 2) return;
+    try {
+      const res = await lotteryIssueApi.settleSummary(record.id);
+      summary.value = res.data;
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
+  }
+
+  // ---------------------------- 开奖 ----------------------------
+
+  async function rollNumber() {
+    rolling.value = true;
+    try {
+      const res = await lotteryIssueApi.randomNumber(selectedId.value);
+      winningNumber.value = res.data;
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      rolling.value = false;
+    }
+  }
+
+  async function doSettle() {
+    settling.value = true;
+    try {
+      // 核销中续跑时号码已定案，传空让服务端用它自己记的那个 —— 避免「中途换号」
+      const res = await lotteryIssueApi.settle(selectedId.value,
+        selectedIssue.value.status === 1 ? '' : winningNumber.value);
+      const r = res.data;
+      message.success(`开奖完成：中奖 ${r.winCount} 张、未中奖 ${r.loseCount} 张`);
+      await loadList();
+      const current = issueList.value.find((i) => i.id === selectedId.value);
+      await loadSummary(current);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      settling.value = false;
+    }
+  }
+
+  async function doDispatch() {
+    dispatching.value = true;
+    try {
+      const res = await lotteryIssueApi.dispatch(selectedId.value);
+      message.success(`已投递 ${res.data} 条中奖记录到派发链路`);
+      const current = issueList.value.find((i) => i.id === selectedId.value);
+      await loadSummary(current);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      dispatching.value = false;
+    }
+  }
 
   // ---------------------------- 加载 ----------------------------
 
@@ -312,6 +442,7 @@
       // 选中项在换玩法后可能已不存在，清掉避免右侧面板显示上一个玩法的期号
       if (!issueList.value.some((i) => i.id === selectedId.value)) {
         selectedId.value = null;
+        summary.value = null;
       }
     } catch (e) {
       smartSentry.captureError(e);
