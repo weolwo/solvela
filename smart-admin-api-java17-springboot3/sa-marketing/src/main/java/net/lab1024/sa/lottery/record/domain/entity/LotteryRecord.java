@@ -72,6 +72,16 @@ public class LotteryRecord {
     private Integer prizeLevel;
 
     /**
+     * 中奖奖品编码：核销时从规则表快照，防规则被改后历史中奖结果漂移（v3.40 新增）
+     */
+    private String prizeCode;
+
+    /**
+     * 派发状态：0-待派发/无需派发, 1-已投递, 2-投递失败（v3.40 新增）
+     */
+    private Integer dispatchStatus;
+
+    /**
      * 防篡改签名
      */
     private String securitySign;

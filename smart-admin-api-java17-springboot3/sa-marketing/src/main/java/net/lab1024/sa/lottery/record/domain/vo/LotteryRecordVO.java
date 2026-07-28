@@ -46,6 +46,12 @@ public class LotteryRecordVO {
     @Schema(description = "奖励等级")
     private Integer prizeLevel;
 
+    @Schema(description = "中奖奖品编码：核销时快照，防规则变更后漂移")
+    private String prizeCode;
+
+    @Schema(description = "派发状态：0-待派发/无需派发, 1-已投递, 2-投递失败")
+    private Integer dispatchStatus;
+
     @Schema(description = "签名")
     private String securitySign;
 

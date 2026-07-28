@@ -37,6 +37,15 @@ public interface LotteryConfigDao extends BaseMapper<LotteryConfig> {
      */
     List<LotteryConfigVO> queryList(@Param("queryForm") LotteryConfigQueryForm queryForm);
 
+    /**
+     * 状态条件流转，做并发闸门用。
+     * 把「当前状态必须是 from」压进 WHERE，两个人同时点第二次会拿到 rows=0，
+     * 而不是两次都「成功」。与提案域审批、开奖闸门是同一套做法。
+     *
+     * @return 影响行数，0 表示状态已被别人改过
+     */
+    int updateStatus(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
+
             // ----- 物理删除 -----
                 /**
                  * 单个物理删除

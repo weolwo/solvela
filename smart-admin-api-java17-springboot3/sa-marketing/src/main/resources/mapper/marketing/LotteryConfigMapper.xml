@@ -88,4 +88,12 @@
                         where id = #{id}
                 </delete>
 
+    <!-- 状态条件流转：WHERE status = #{from} 是并发闸门，不是多余条件 -->
+    <update id="updateStatus">
+        UPDATE t_lottery_config
+        SET status = #{to}
+        WHERE id = #{id}
+          AND status = #{from}
+    </update>
+
 </mapper>

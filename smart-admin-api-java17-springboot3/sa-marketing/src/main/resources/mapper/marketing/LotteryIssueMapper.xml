@@ -107,4 +107,26 @@
           AND i.sold_count &lt; c.total_count
     </update>
 
+    <!-- 抢开奖闸门：WHERE status 是并发保护，不是多余条件 -->
+    <update id="startSettle">
+        UPDATE t_lottery_issue
+        SET status = #{to},
+            winning_number = #{winningNumber}
+        WHERE id = #{id}
+          AND status = #{from}
+    </update>
+
+    <!--
+        核销完成。settle_time 用 NOW() 显式赋值：
+        该列没有 ON UPDATE CURRENT_TIMESTAMP 兜底，不写就永远是 NULL。
+        用 NOW() 而非 Java 时间，保证全系统仍只有数据库一个时钟（铁律 9）。
+    -->
+    <update id="finishSettle">
+        UPDATE t_lottery_issue
+        SET status = #{to},
+            settle_time = NOW()
+        WHERE id = #{id}
+          AND status = #{from}
+    </update>
+
 </mapper>

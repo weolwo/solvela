@@ -54,4 +54,54 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
                                         @Param("issueNo") String issueNo,
                                         @Param("memberName") String memberName);
 
+    /**
+     * 按一条奖级规则认领中奖记录（开奖核销的核心动作）。
+     *
+     * <b>{@code win_status = 0} 这个守卫就是「奖级互斥」的实现</b>：
+     * 一张中了一等奖（全号）的票必然也满足二等奖（尾3），
+     * 只要按 prizeLevel 升序依次调用本方法，高奖级先把票认走并改掉 win_status，
+     * 低奖级的 UPDATE 就再也匹配不到它。等价于 Java 侧 TicketMatcher 的「命中即止」。
+     *
+     * prize_code 在此刻快照进记录，之后运营改规则也不会让历史中奖结果漂移。
+     *
+     * @param limit 单批上限。十万级记录一次性 UPDATE 会撑爆 undo log 与锁，必须分批
+     * @return 本批认领到的行数，0 表示这条规则已经没有可认领的票了
+     */
+    int claimByRule(@Param("lotteryCode") String lotteryCode,
+                    @Param("issueNo") String issueNo,
+                    @Param("matchRule") String matchRule,
+                    @Param("matchLength") Integer matchLength,
+                    @Param("winningNumber") String winningNumber,
+                    @Param("prizeLevel") Integer prizeLevel,
+                    @Param("prizeCode") String prizeCode,
+                    @Param("limit") int limit);
+
+    /**
+     * 全部奖级认领完毕后，剩下的一律判未中奖。
+     * prize_level 落 99 而不是留空，让 C 端「我的号码」能直接 ORDER BY prize_level ASC
+     */
+    int markNoWin(@Param("lotteryCode") String lotteryCode,
+                  @Param("issueNo") String issueNo,
+                  @Param("limit") int limit);
+
+    /**
+     * 待派奖的中奖记录（分页）。
+     * 走 idx_dispatch(issue_no, dispatch_status)
+     */
+    List<LotteryRecord> selectPendingDispatch(@Param("lotteryCode") String lotteryCode,
+                                              @Param("issueNo") String issueNo,
+                                              @Param("limit") int limit);
+
+    /**
+     * 批量标记已投递。用条件更新（AND dispatch_status = 0）避免重复投递被记两次
+     */
+    int markDispatched(@Param("idList") List<Long> idList);
+
+    /**
+     * 核销进度统计，供接口返回与验收核对
+     */
+    java.util.Map<String, Object> settleSummary(@Param("lotteryCode") String lotteryCode,
+                                                @Param("issueNo") String issueNo);
+
+
 }

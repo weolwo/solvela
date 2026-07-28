@@ -74,6 +74,20 @@ public class LotteryConfigController {
         return Service.workbenchSave(form);
     }
 
+    @Operation(summary = "上线：允许开始发号。上线前必须已配置奖级规则")
+    @GetMapping("/online/{lotteryCode}")
+    @SaCheckPermission(":update")
+    public ResponseDTO<String> online(@PathVariable String lotteryCode) {
+        return Service.online(lotteryCode);
+    }
+
+    @Operation(summary = "下线：停止发号。已发出的号码不受影响，期号照常可以开奖")
+    @GetMapping("/offline/{lotteryCode}")
+    @SaCheckPermission(":update")
+    public ResponseDTO<String> offline(@PathVariable String lotteryCode) {
+        return Service.offline(lotteryCode);
+    }
+
     @Operation(summary = "FPE 算号推演：用固定演示期号算样例号码，与线上发号同一段代码")
     @PostMapping("/fpe/preview")
     @SaCheckPermission(":query")

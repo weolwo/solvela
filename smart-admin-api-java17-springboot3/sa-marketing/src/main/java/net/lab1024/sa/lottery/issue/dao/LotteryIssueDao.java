@@ -56,6 +56,27 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      */
     int increaseSoldCount(@Param("id") Long id);
 
+    /**
+     * 抢开奖闸门：状态 0->1 并定案开奖号码，一条 SQL 完成。
+     *
+     * WHERE status = #{from} 是并发闸门 —— 两个运营同时点开奖，
+     * 第二个人拿到 rows=0 直接退出，不会重复核销。
+     * 开奖号码在这一刻定案且不再变，所以中断重跑的结果必然一致。
+     *
+     * @return 影响行数，0 表示没抢到（状态已被别人改过）
+     */
+    int startSettle(@Param("id") Long id, @Param("from") Integer from,
+                    @Param("to") Integer to, @Param("winningNumber") String winningNumber);
+
+    /**
+     * 核销完成：1->2，并显式写 settle_time。
+     *
+     * ⚠️ settle_time 没有 ON UPDATE CURRENT_TIMESTAMP 兜底，
+     * 必须在这里显式赋值 —— 这是铁律 9「时间只由数据库产生」的例外分支
+     * （同 t_proposal_record.approve_time）。用 NOW() 而不是 Java 时间，仍然只有数据库一个时钟。
+     */
+    int finishSettle(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
+
 
             // ----- 物理删除 -----
                 /**

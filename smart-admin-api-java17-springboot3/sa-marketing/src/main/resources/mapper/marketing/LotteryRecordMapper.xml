@@ -13,6 +13,8 @@
             <result column="obtain_time" property="obtainTime" />
             <result column="win_status" property="winStatus" />
             <result column="prize_level" property="prizeLevel" />
+            <result column="prize_code" property="prizeCode" />
+            <result column="dispatch_status" property="dispatchStatus" />
             <result column="security_sign" property="securitySign" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
@@ -31,6 +33,8 @@
                 obtain_time, 
                 win_status, 
                 prize_level, 
+                prize_code, 
+                dispatch_status, 
                 security_sign, 
                 create_by, 
                 create_time, 
@@ -112,6 +116,90 @@
           AND issue_no = #{issueNo}
         </if>
         ORDER BY prize_level ASC, id DESC
+    </select>
+
+    <!--
+        按一条奖级规则认领中奖记录。
+
+        ⚠️ win_status = 0 是「奖级互斥」的实现，不是可有可无的条件：
+        按 prizeLevel 升序依次执行，高奖级先把票认走并改掉 win_status，
+        低奖级就再也匹配不到它。这等价于 Java 侧 TicketMatcher 的「命中即止」，
+        两边必须保持一致 —— 改任何一边都要同步另一边。
+
+        ⚠️ 匹配一律用字符串比较（RIGHT/LEFT/=），绝不能转成数字：
+        号码带前导零，09102 与 9102 不是一回事。
+
+        LIMIT 分批：十万级记录一次性 UPDATE 会撑爆 undo log 与锁等待。
+    -->
+    <update id="claimByRule">
+        UPDATE t_lottery_record
+        SET win_status = 2,
+            prize_level = #{prizeLevel},
+            prize_code = #{prizeCode}
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+          AND win_status = 0
+        <choose>
+            <when test="matchRule == 'EXACT'">
+                AND ticket_number = #{winningNumber}
+            </when>
+            <when test="matchRule == 'TAIL'">
+                AND RIGHT(ticket_number, #{matchLength}) = RIGHT(#{winningNumber}, #{matchLength})
+            </when>
+            <when test="matchRule == 'HEAD'">
+                AND LEFT(ticket_number, #{matchLength}) = LEFT(#{winningNumber}, #{matchLength})
+            </when>
+            <otherwise>
+                <!-- 非法规则一条都不认领，而不是不加条件把全表认走 -->
+                AND 1 = 0
+            </otherwise>
+        </choose>
+        LIMIT #{limit}
+    </update>
+
+    <!-- 全部奖级认领完后，剩下的判未中奖。prize_level 落 99 见 LotteryConst.PRIZE_LEVEL_NONE -->
+    <update id="markNoWin">
+        UPDATE t_lottery_record
+        SET win_status = 1,
+            prize_level = 99
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+          AND win_status = 0
+        LIMIT #{limit}
+    </update>
+
+    <select id="selectPendingDispatch" resultType="net.lab1024.sa.lottery.record.domain.entity.LotteryRecord">
+        SELECT *
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+          AND win_status = 2
+          AND dispatch_status = 0
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <!-- AND dispatch_status = 0：避免并发下重复标记，也让返回行数能真实反映本次投递量 -->
+    <update id="markDispatched">
+        UPDATE t_lottery_record
+        SET dispatch_status = 1
+        WHERE dispatch_status = 0
+          AND id IN
+        <foreach collection="idList" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="settleSummary" resultType="java.util.Map">
+        SELECT COUNT(*)                                        AS total,
+               SUM(win_status = 0)                             AS pending,
+               SUM(win_status = 1)                             AS lose,
+               SUM(win_status = 2)                             AS win,
+               SUM(win_status = 2 AND dispatch_status = 0)     AS waitDispatch,
+               SUM(win_status = 2 AND dispatch_status = 1)     AS dispatched
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
     </select>
 
 </mapper>

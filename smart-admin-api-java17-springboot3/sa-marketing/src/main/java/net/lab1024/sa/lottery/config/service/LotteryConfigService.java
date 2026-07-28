@@ -360,6 +360,58 @@ public class LotteryConfigService {
         return null;
     }
 
+    // ==================== 上下线 ====================
+
+    /**
+     * 上线：允许开始发号。
+     *
+     * 上线前必须已配置奖级规则 —— 否则号码发出去了、开奖时却无奖可发，
+     * 而那时号码已经在用户手里，配置补救的代价远高于此刻拦一下。
+     *
+     * 用条件更新做并发闸门（WHERE status = 0）：两个运营同时点，第二次 rows=0，
+     * 不会出现「都以为自己上线成功」的假象。
+     */
+    public ResponseDTO<String> online(String lotteryCode) {
+        LotteryConfig config = getByLotteryCode(lotteryCode);
+        if (config == null) {
+            return ResponseDTO.userErrorParam("彩票玩法不存在：" + lotteryCode);
+        }
+        if (STATUS_ONLINE.equals(config.getStatus())) {
+            return ResponseDTO.userErrorParam("该玩法已经是上线状态");
+        }
+        boolean hasRule = lotteryPrizeRuleManager.lambdaQuery()
+                .eq(LotteryPrizeRule::getLotteryCode, lotteryCode).exists();
+        if (!hasRule) {
+            return ResponseDTO.userErrorParam("尚未配置任何奖级规则，上线后号码发出去了却无奖可发。请先在「引擎配置与奖级映射」配置奖级");
+        }
+        int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_OFFLINE, STATUS_ONLINE);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("上线失败：状态已被其他人变更，请刷新后重试");
+        }
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 下线：停止发号。已发出的号码不受影响，期号照常可以开奖。
+     *
+     * 下线不做「已发过号就不许下线」的限制 —— 恰恰相反，出问题时能立刻止血地停止发号，
+     * 是运营最需要的能力。下线只影响后续领号，不动任何已有数据。
+     */
+    public ResponseDTO<String> offline(String lotteryCode) {
+        LotteryConfig config = getByLotteryCode(lotteryCode);
+        if (config == null) {
+            return ResponseDTO.userErrorParam("彩票玩法不存在：" + lotteryCode);
+        }
+        if (STATUS_OFFLINE.equals(config.getStatus())) {
+            return ResponseDTO.userErrorParam("该玩法已经是下线状态");
+        }
+        int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_ONLINE, STATUS_OFFLINE);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("下线失败：状态已被其他人变更，请刷新后重试");
+        }
+        return ResponseDTO.ok();
+    }
+
     // ==================== FPE 推演台 ====================
 
     /**
