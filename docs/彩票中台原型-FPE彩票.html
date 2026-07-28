@@ -52,7 +52,18 @@
   </style>
 </head>
 <body>
-  <div id="app" v-cloak class="min-h-screen p-4">
+  <div id="app" v-cloak class="min-h-screen p-4"></div>
+
+  <!--
+    模板放进 x-template，而不是直接写在 #app 里（in-DOM 模板）。
+    原因：<script> 的内容浏览器按纯文本存储、不做 HTML 解析，驼峰写法能原样保留。
+    in-DOM 模板做不到——属性名会被强制小写，其中
+      · prop（:customRow / valueFormat）还能靠 kebab 写法绕过，Vue 会把 custom-row camelize 回去；
+      · 插槽名（#bodyCell）无解，Vue 不会把 bodycell 还原成 bodyCell，
+        表现就是自定义列全渲染成空白，而且不报任何错。
+    所以这里一次性换成 x-template，把整类问题堵死，不再逐个属性打地鼠。
+  -->
+  <script type="text/x-template" id="app-template">
     <a-card :bordered="false" class="mb-4 shadow-sm" :body-style="{ padding: '12px 20px' }">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-4">
@@ -75,7 +86,7 @@
     </a-card>
 
     <a-card :bordered="false" class="shadow-sm">
-      <a-tabs v-model:activeKey="activeTab" class="px-2">
+      <a-tabs v-model:active-key="activeTab" class="px-2">
 
         <a-tab-pane key="global" force-render>
           <template #tab><span class="font-semibold px-2">⚙️ 引擎配置与奖级映射</span></template>
@@ -234,12 +245,12 @@
                       </a-col>
                       <a-col :span="7">
                         <a-form-item label="售卖周期 (起止)" class="mb-0" required>
-                          <a-range-picker v-model:value="newIssueForm.saleTimeRange" valueFormat="YYYY-MM-DD HH:mm:ss" show-time class="w-full" format="MM-DD HH:mm" />
+                          <a-range-picker v-model:value="newIssueForm.saleTimeRange" value-format="YYYY-MM-DD HH:mm:ss" show-time class="w-full" format="MM-DD HH:mm" />
                         </a-form-item>
                       </a-col>
                       <a-col :span="7">
                         <a-form-item label="计划开奖时间" class="mb-0" required>
-                          <a-date-picker v-model:value="newIssueForm.drawTime" valueFormat="YYYY-MM-DD HH:mm:ss" show-time class="w-full" placeholder="计划开奖时间" format="MM-DD HH:mm" />
+                          <a-date-picker v-model:value="newIssueForm.drawTime" value-format="YYYY-MM-DD HH:mm:ss" show-time class="w-full" placeholder="计划开奖时间" format="MM-DD HH:mm" />
                         </a-form-item>
                       </a-col>
                       <a-col :span="4" class="flex items-end pb-0">
@@ -260,8 +271,8 @@
                   row-key="id"
                   size="small"
                   :row-selection="rowSelection"
-                  :customRow="customRowConfig"
-                  :rowClassName="() => 'clickable-row'"
+                  :custom-row="customRowConfig"
+                  :row-class-name="() => 'clickable-row'"
                 >
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.dataIndex === 'issueNo'">
@@ -269,8 +280,8 @@
                     </template>
                     <template v-else-if="column.dataIndex === 'times'">
                       <div v-if="record._isEditing" class="flex flex-col gap-1 w-[210px]" @click.stop>
-                        <a-range-picker v-model:value="record._editSaleTimeRange" valueFormat="YYYY-MM-DD HH:mm:ss" show-time size="small" :placeholder="['发售', '截止']" format="MM-DD HH:mm"/>
-                        <a-date-picker v-model:value="record._editDrawTime" valueFormat="YYYY-MM-DD HH:mm:ss" show-time size="small" placeholder="计划开奖时间" class="w-full" format="MM-DD HH:mm"/>
+                        <a-range-picker v-model:value="record._editSaleTimeRange" value-format="YYYY-MM-DD HH:mm:ss" show-time size="small" :placeholder="['发售', '截止']" format="MM-DD HH:mm"/>
+                        <a-date-picker v-model:value="record._editDrawTime" value-format="YYYY-MM-DD HH:mm:ss" show-time size="small" placeholder="计划开奖时间" class="w-full" format="MM-DD HH:mm"/>
                       </div>
                       <div v-else class="text-[11px] text-slate-600 space-y-0.5">
                         <div class="truncate"><span class="text-slate-400">售卖:</span>
@@ -330,7 +341,7 @@
                     <a-form layout="vertical">
                       <a-form-item required class="mb-3">
                         <template #label><span class="text-sm font-bold text-slate-700">录入最终开奖号码</span></template>
-                        <a-input v-model:value="manualWinningNum" size="large" class="font-mono tracking-[0.3em] text-center text-2xl h-12 text-red-600 font-bold" :maxLength="config.length" placeholder="等待录入"></a-input>
+                        <a-input v-model:value="manualWinningNum" size="large" class="font-mono tracking-[0.3em] text-center text-2xl h-12 text-red-600 font-bold" :maxlength="config.length" placeholder="等待录入"></a-input>
                         <div class="text-[11px] mt-1 font-bold" :class="isDrawValid ? 'text-green-500' : 'text-red-500'">
                           <span v-if="isDrawValid">✅ 格式合法，可进行核销对账</span>
                           <span v-else>❌ 必须严格填满 {{ config.length }} 位号码</span>
@@ -352,13 +363,14 @@
         </a-tab-pane>
       </a-tabs>
     </a-card>
-  </div>
+  </script>
 
   <script>
     const { createApp, ref, computed } = Vue;
     const { message } = antd;
 
     const App = {
+      template: '#app-template',
       setup() {
         const lotteryCode = ref('L_5DIGIT_001');
         const lotteryOptions = [{ value: 'L_5DIGIT_001', label: '618仲夏夜幸运号' }];
@@ -446,12 +458,14 @@
           }
         ]);
 
+        // 每列都要有 key：times / progress / result / action 是纯展示列，dataIndex 在数据里并不存在，
+        // 缺 key 时 antd 只能回退用 dataIndex 当身份，列一多就会出现 duplicate key 警告与渲染错位
         const issueColumns = [
-          { title: '期号', dataIndex: 'issueNo', width: '18%' },
-          { title: '发售与开奖时间', dataIndex: 'times', width: '33%' },
-          { title: '售卖进度', dataIndex: 'progress', width: '15%' },
-          { title: '开奖号码 (结果)', dataIndex: 'result', width: '20%' },
-          { title: '操作', dataIndex: 'action', align: 'center', width: '14%' }
+          { title: '期号', key: 'issueNo', dataIndex: 'issueNo', width: '18%' },
+          { title: '发售与开奖时间', key: 'times', dataIndex: 'times', width: '33%' },
+          { title: '售卖进度', key: 'progress', dataIndex: 'progress', width: '15%' },
+          { title: '开奖号码 (结果)', key: 'result', dataIndex: 'result', width: '20%' },
+          { title: '操作', key: 'action', dataIndex: 'action', align: 'center', width: '14%' }
         ];
 
         function getStatusText(status) { return status === 0 ? '售卖中' : (status === 1 ? '对账中' : '已核销'); }

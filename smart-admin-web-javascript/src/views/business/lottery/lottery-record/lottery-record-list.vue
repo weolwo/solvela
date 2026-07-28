@@ -88,19 +88,14 @@
         :show-total="(total) => `共${total}条`"
       />
     </div>
-
-    <LotteryRecordForm ref="formRef" @reloadList="queryData" />
   </a-card>
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
-  import { message, Modal } from 'ant-design-vue';
-  import { SmartLoading } from '/@/components/framework/smart-loading';
   import { lotteryRecordApi } from '/@/api/business/lottery/lottery-record/lottery-record-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
-  import LotteryRecordForm from './lottery-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
   // ---------------------------- 表格列 ----------------------------
