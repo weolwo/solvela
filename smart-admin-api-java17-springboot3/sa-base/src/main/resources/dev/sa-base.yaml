@@ -184,5 +184,21 @@ smart:
 script:
   # 核心引擎开关！(可选值: qlexpress, aviator, groovy)
   engine: qlexpress
+
+# 彩票中台
+lottery:
+  fpe:
+    # FPE 发号主密钥。派生规则：key = HMAC-SHA256(master-secret, lotteryCode + "|" + issueNo)
+    #
+    # ⚠️⚠️ 一旦有任何期号发过号，本值就不可再变更 ⚠️⚠️
+    # 号码是「连续游标经 FPE 加密」得来的，密钥变了等于换了一套加密映射：
+    #   · 已发出的号码再也反解不回游标，客服验真、对账自证清白全部失效；
+    #   · 新发的号码可能与历史号码重复，而 uk_issue_ticket 只会让用户领号直接报错。
+    # 换密钥的唯一安全时机是「该彩票编码下一期号码都还没发过」。
+    #
+    # 生产环境请改为环境变量注入，不要把真实密钥提交进仓库：
+    #   master-secret: ${LOTTERY_FPE_MASTER_SECRET}
+    master-secret: dev-lottery-fpe-master-secret-2026
+
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml

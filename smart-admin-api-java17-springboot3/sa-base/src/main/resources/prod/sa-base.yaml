@@ -183,3 +183,16 @@ smart:
     db-refresh-enabled: true
     # 数据库配置检测-执行间隔 默认120秒 可选
     db-refresh-interval: 60
+# 彩票中台 —— 部署本环境前必须放开下面的配置
+#
+# FPE 发号主密钥，派生规则 key = HMAC-SHA256(master-secret, lotteryCode + "|" + issueNo)。
+# 刻意留成注释而不是写 ${LOTTERY_FPE_MASTER_SECRET} 占位：占位符在环境变量缺失时会让应用直接启不来，
+# 而彩票只是众多模块之一，不该由它决定整个后台能不能起。
+# 未配置时的表现是「领号/开奖接口报『FPE 主密钥未配置』」，指向明确，不会静默出错。
+#
+# ⚠️ 一旦有期号发过号，本值不可再变更：号码是游标经 FPE 加密得来的，
+#    换密钥会让已发号码反解失效，且新号码可能与历史号码重复。
+#
+# lottery:
+#   fpe:
+#     master-secret: ${LOTTERY_FPE_MASTER_SECRET}
