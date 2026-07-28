@@ -86,5 +86,32 @@
         ORDER BY create_time DESC
     </select>
 
+    <!--
+        某期已发出的最大游标，供 Redis 游标冷启动回源。
+        走 uk_issue_ticket(lottery_code, issue_no, ticket_number) 的前缀，索引可用。
+        ⚠️ 是 MAX 不是 COUNT：发号失败会留下空洞（游标消耗了但记录没落库），
+        COUNT 在有空洞时偏低，回填后必然重发已发过的号码。
+    -->
+    <select id="selectMaxSequenceNo" resultType="java.lang.Long">
+        SELECT MAX(sequence_no)
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+    </select>
+
+    <!--
+        我的号码。prize_level 未中奖/未开奖恒为 99（v3.40 起 NOT NULL DEFAULT 99），
+        所以这里可以直接 ORDER BY prize_level ASC —— 若它是 NULL，MySQL 会把 NULL 排到最前面、正好排反。
+    -->
+    <select id="selectMyTickets" resultType="net.lab1024.sa.lottery.record.domain.entity.LotteryRecord">
+        SELECT *
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND member_name = #{memberName}
+        <if test="issueNo != null and issueNo != ''">
+          AND issue_no = #{issueNo}
+        </if>
+        ORDER BY prize_level ASC, id DESC
+    </select>
 
 </mapper>

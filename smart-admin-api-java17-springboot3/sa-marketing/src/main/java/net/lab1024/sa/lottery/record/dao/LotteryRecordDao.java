@@ -37,4 +37,21 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
      */
     List<LotteryRecordVO> queryList(@Param("queryForm") LotteryRecordQueryForm queryForm);
 
+    /**
+     * 某期已发出的最大游标，供 Redis 冷启动回源用。
+     *
+     * ⚠️ 必须取 MAX 而不是 COUNT：发号过程中失败会留下空洞（游标消耗了但记录没落库），
+     * 此时 COUNT 小于真实游标，回填后会重发已发过的号码、直接撞 uk_issue_ticket。
+     *
+     * @return 无记录时返回 null（由调用方兜底成 0）
+     */
+    Long selectMaxSequenceNo(@Param("lotteryCode") String lotteryCode, @Param("issueNo") String issueNo);
+
+    /**
+     * 我的号码：按奖级升序（一等奖在前、未中奖的 99 沉底），同奖级按最新领取在前
+     */
+    List<LotteryRecord> selectMyTickets(@Param("lotteryCode") String lotteryCode,
+                                        @Param("issueNo") String issueNo,
+                                        @Param("memberName") String memberName);
+
 }

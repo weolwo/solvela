@@ -57,7 +57,13 @@ public class LotteryIssue {
     private LocalDateTime saleEndTime;
 
     /**
-     * 开奖时间
+     * 计划开奖时间：对外承诺的开奖时刻，可编辑（v3.40 新增）
+     */
+    private LocalDateTime planDrawTime;
+
+    /**
+     * 实际开奖时间：由开奖流程写入，只读。
+     * 该列没有 ON UPDATE CURRENT_TIMESTAMP 兜底，必须在开奖 SQL 里显式赋值（铁律 9 的例外分支）
      */
     private LocalDateTime settleTime;
 

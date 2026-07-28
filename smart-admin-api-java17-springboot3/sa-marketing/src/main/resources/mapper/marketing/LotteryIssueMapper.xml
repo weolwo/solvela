@@ -87,4 +87,22 @@
                         where id = #{id}
                 </delete>
 
+    <select id="selectDbNow" resultType="java.time.LocalDateTime">
+        SELECT NOW()
+    </select>
+
+    <!--
+        已发数 +1。total_count 挂在 t_lottery_config 上（一个活动可以有多个玩法，
+        每个玩法自己的发行规格），所以这里 join 过去取，不在期号表里冗余存一份 ——
+        冗余就意味着两处可改、迟早不一致。
+        WHERE sold_count < total_count 是防超发的 DB 兜底闸门。
+    -->
+    <update id="increaseSoldCount">
+        UPDATE t_lottery_issue i
+        JOIN t_lottery_config c ON c.lottery_code = i.lottery_code
+        SET i.sold_count = i.sold_count + 1
+        WHERE i.id = #{id}
+          AND i.sold_count &lt; c.total_count
+    </update>
+
 </mapper>
