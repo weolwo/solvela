@@ -73,6 +73,9 @@
                         <if test="queryForm.approveStatus != null">
                             AND approve_status = #{queryForm.approveStatus}
                         </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
                         <if test="queryForm.validUntilBegin != null">
                             AND valid_until &gt;= #{queryForm.validUntilBegin}
                         </if>

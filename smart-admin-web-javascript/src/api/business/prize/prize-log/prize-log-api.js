@@ -16,30 +16,22 @@ export const prizeLogApi = {
   },
 
   /**
-   * 增加  @author  weolwo
+   * 审批通过：approve_mode=1 奖品的唯一出口，通过后立即走完整派发链路。
+   * 服务端用条件更新（WHERE approve_status=1）做并发闸门，两人同时点第二次会拿到「已被处理」  @author  alaric
    */
-  add: (param) => {
-    return postRequest('/prizeLog/add', param);
+  approve: (id) => {
+    return getRequest(`/prizeLog/approve/${id}`);
   },
 
   /**
-   * 修改  @author  weolwo
+   * 审批驳回：不再派发，记录留痕  @author  alaric
    */
-  update: (param) => {
-    return postRequest('/prizeLog/update', param);
+  reject: (id, reason) => {
+    return getRequest(`/prizeLog/reject/${id}`, { reason });
   },
 
-  /**
-   * 删除  @author  weolwo
-   */
-  delete: (id) => {
-    return getRequest(`/prizeLog/delete/${id}`);
-  },
-
-  /**
-   * 批量删除  @author  weolwo
-   */
-  batchDelete: (idList) => {
-    return postRequest('/prizeLog/batchDelete', idList);
-  },
+  // ⚠️ 刻意不封装 add / update / delete：
+  // t_prize_log 是「实际发了什么奖」的审计流水，由派发链路写入。
+  // 手工增改会让流水与真实发放脱节 —— 而运营看的、对账依据的正是这张表。
+  // 需要人工干预的场景只有审批（上面两个），以及必要时的人工订正（走 DBA 流程并留痕）。
 };

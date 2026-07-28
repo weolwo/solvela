@@ -39,6 +39,9 @@ public class PrizeLogQueryForm extends PageParam {
     @Schema(description = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回")
     private Integer approveStatus;
 
+    @Schema(description = "执行状态：0-等待, 1-成功, 2-失败")
+    private Integer status;
+
     @Schema(description = "过期时间")
     private LocalDate validUntilBegin;
 
