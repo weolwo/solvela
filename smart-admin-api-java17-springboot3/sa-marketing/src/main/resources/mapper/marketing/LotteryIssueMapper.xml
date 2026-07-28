@@ -10,6 +10,7 @@
             <result column="sold_count" property="soldCount" />
             <result column="sale_start_time" property="saleStartTime" />
             <result column="sale_end_time" property="saleEndTime" />
+            <result column="plan_draw_time" property="planDrawTime" />
             <result column="settle_time" property="settleTime" />
             <result column="winning_number" property="winningNumber" />
             <result column="status" property="status" />
@@ -27,6 +28,7 @@
                 sold_count, 
                 sale_start_time, 
                 sale_end_time, 
+                plan_draw_time, 
                 settle_time, 
                 winning_number, 
                 status, 

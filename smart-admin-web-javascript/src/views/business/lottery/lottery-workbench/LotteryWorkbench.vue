@@ -96,7 +96,12 @@
 
           <a-tab-pane key="issue" force-render>
             <template #tab><span class="font-semibold px-2 text-indigo-700">📅 生命周期与开奖大盘</span></template>
-            <a-empty description="期号管理与开奖操作台将在下一阶段接入" class="py-16" />
+            <IssueConsole
+              ref="issueRef"
+              :lottery-code="loadedLottery"
+              :number-length="loadedNumberLength"
+              :total-count="loadedTotalCount"
+            />
           </a-tab-pane>
         </a-tabs>
       </a-spin>
@@ -114,9 +119,16 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import { LOTTERY_STATUS_ENUM } from '/@/constants/business/lottery/lottery-const';
   import EngineConfigPanel from './components/EngineConfigPanel.vue';
+  import IssueConsole from './components/IssueConsole.vue';
 
   const activeTab = ref('engine');
   const engineRef = ref();
+  const issueRef = ref();
+
+  // Tab2 需要玩法的发号规格来渲染售卖进度与开奖号码格式。
+  // 从 detail 的返回里取，而不是让 Tab2 自己再拉一次接口 —— 两处各拉一次迟早不一致
+  const loadedNumberLength = ref(5);
+  const loadedTotalCount = ref(0);
 
   // currentXxx 是下拉的 v-model（会被 antd 立即改写），loadedXxx 是「真正加载进面板的那个」。
   // 分开存是为了在用户取消切换时能把下拉还原回去，否则下拉显示的和面板里的对不上。
@@ -194,6 +206,8 @@
       engineRef.value?.setData(vo);
       configured.value = !!vo.configured;
       currentStatus.value = vo.status ?? null;
+      loadedNumberLength.value = vo.numberLength || 5;
+      loadedTotalCount.value = vo.totalCount || 0;
       // setData 会触发子组件内部的赋值，但那不算运营的改动，回到干净态
       dirty.value = false;
     } catch (e) {

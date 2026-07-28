@@ -37,7 +37,10 @@ public class LotteryIssueVO {
     @Schema(description = "售卖结束时间")
     private LocalDateTime saleEndTime;
 
-    @Schema(description = "开奖时间")
+    @Schema(description = "计划开奖时间：对外承诺的开奖时刻，可编辑")
+    private LocalDateTime planDrawTime;
+
+    @Schema(description = "实际开奖时间：由开奖流程写入，只读")
     private LocalDateTime settleTime;
 
     @Schema(description = "开奖号码")
