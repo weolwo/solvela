@@ -31,8 +31,12 @@
       </template>
     </a-alert>
 
-    <!-- 新增表单：行内展开，不弹窗 —— 奖品只有 4 个要填的字段，弹窗的开销大过收益 -->
+    <!-- 新增/编辑表单：行内展开，不弹窗 —— 奖品只有 4 个要填的字段，弹窗的开销大过收益 -->
     <a-card v-if="adding" size="small" class="mb-3 border-blue-200 bg-blue-50/40">
+      <div class="text-xs font-bold text-slate-600 mb-2">
+        {{ editingIndex === -1 ? '➕ 新增奖品' : '✏️ 编辑奖品' }}
+        <span v-if="draft.prizeCode" class="font-mono text-slate-400 font-normal ml-1">{{ draft.prizeCode }}</span>
+      </div>
       <a-form ref="formRef" :model="draft" :rules="rules" layout="vertical" size="small">
         <a-form-item label="奖品名称" name="prizeName" class="mb-2">
           <a-input v-model:value="draft.prizeName" placeholder="如：iPhone 15 Pro" :maxlength="64" />
@@ -73,7 +77,9 @@
 
         <div class="flex justify-end gap-2 mt-2">
           <a-button size="small" @click="cancelAdd">取消</a-button>
-          <a-button size="small" type="primary" :loading="saving" @click="confirmAdd">确认添加</a-button>
+          <a-button size="small" type="primary" :loading="saving" @click="confirmAdd">
+            {{ editingIndex === -1 ? '确认添加' : '保存修改' }}
+          </a-button>
         </div>
       </a-form>
     </a-card>
@@ -90,6 +96,7 @@
         v-for="(p, idx) in prizeList"
         :key="p.prizeCode"
         class="flex items-center gap-2 px-3 py-2 mb-2 bg-white border border-slate-200 rounded hover:border-blue-300"
+        :class="{ 'border-blue-400 bg-blue-50/30': editingIndex === idx }"
       >
         <span class="text-lg">{{ typeIcon(p.prizeType) }}</span>
         <div class="flex-1 min-w-0">
@@ -99,7 +106,8 @@
             <a-tag v-if="p.approveMode === 1" color="orange" class="ml-1 scale-90">需审批</a-tag>
           </div>
         </div>
-        <!-- 已落库的奖品不允许在这里删：它可能已被奖池/奖级引用，删除要走「奖品配置」的完整校验 -->
+        <a-button type="link" size="small" class="px-1" @click="startEdit(idx)">编辑</a-button>
+        <!-- 已落库的奖品不在这里删：它可能已被奖池/奖级引用，删除要走「奖品配置」的完整校验 -->
         <a-button v-if="!activityCode" type="link" size="small" danger class="px-1" @click="removeDraft(idx)">移除</a-button>
       </div>
     </div>
@@ -135,7 +143,11 @@
   const saving = ref(false);
   const formRef = ref();
 
+  /** -1 = 新增；>=0 = 正在编辑 prizeList 里的第几条 */
+  const editingIndex = ref(-1);
+
   const draft = reactive({
+    id: undefined,
     prizeCode: '',
     prizeName: '',
     prizeType: undefined,
@@ -188,6 +200,7 @@
 
   async function startAdd() {
     Object.assign(draft, {
+      id: undefined,
       prizeCode: '',
       prizeName: '',
       prizeType: undefined,
@@ -195,6 +208,7 @@
       promotionConfigId: undefined,
       approveMode: 0,
     });
+    editingIndex.value = -1;
     adding.value = true;
     // 编码不让运营手打：它是随机码，手打没有意义还容易撞车（铁律 8）
     try {
@@ -205,8 +219,30 @@
     }
   }
 
+  /**
+   * 编辑已有奖品。编码保持不变 —— 它是奖池坑位、彩票奖级的引用键，
+   * 改一次编码那些引用全断（同活动编码、模板编码的既定约定，铁律 8）。
+   */
+  function startEdit(idx) {
+    const item = prizeList.value[idx];
+    Object.assign(draft, {
+      id: item.id,
+      prizeCode: item.prizeCode,
+      prizeName: item.prizeName,
+      prizeType: item.prizeType,
+      // 回显的价值可能是字符串（JsonConfig 把 BigDecimal 全局序列化成字符串），
+      // a-input-number 收到字符串会表现异常，这里统一归一成数字
+      prizeValue: item.prizeValue === undefined || item.prizeValue === null ? undefined : Number(item.prizeValue),
+      promotionConfigId: item.promotionConfigId,
+      approveMode: item.approveMode ?? 0,
+    });
+    editingIndex.value = idx;
+    adding.value = true;
+  }
+
   function cancelAdd() {
     adding.value = false;
+    editingIndex.value = -1;
   }
 
   async function confirmAdd() {
@@ -218,9 +254,13 @@
     const item = { ...draft };
 
     if (!props.activityCode) {
-      // 草稿态：本地攒着，随活动一起提交
-      prizeList.value.push(item);
-      adding.value = false;
+      // 草稿态：本地改，随活动一起提交
+      if (editingIndex.value === -1) {
+        prizeList.value.push(item);
+      } else {
+        prizeList.value[editingIndex.value] = item;
+      }
+      cancelAdd();
       emit('change', prizeList.value);
       return;
     }
@@ -228,9 +268,25 @@
     // 直连态：活动已存在，直接落库
     saving.value = true;
     try {
-      await prizeConfigApi.add({ ...item, activityCode: props.activityCode, status: 1 });
-      message.success('奖品已创建');
-      adding.value = false;
+      if (editingIndex.value === -1) {
+        await prizeConfigApi.add({ ...item, activityCode: props.activityCode, status: 1 });
+        message.success('奖品已创建');
+      } else {
+        // UpdateForm 里没有 activityCode / prizeCode —— 归属活动与编码创建后不可改，
+        // 传了也会被忽略，不如不传，免得让人误以为这里能改
+        await prizeConfigApi.update({
+          id: item.id,
+          prizeName: item.prizeName,
+          prizeType: item.prizeType,
+          prizeValue: item.prizeValue,
+          promotionConfigId: item.promotionConfigId,
+          approveMode: item.approveMode,
+          prizeLevel: item.prizeLevel,
+          sortWeight: item.sortWeight,
+        });
+        message.success('奖品已更新');
+      }
+      cancelAdd();
       await loadExisting();
     } catch (e) {
       smartSentry.captureError(e);
@@ -252,12 +308,18 @@
     }
     try {
       const res = await prizeConfigApi.optionList(props.activityCode);
+      // id 与 promotionConfigId 必须带上：编辑时要用它们回填与提交，丢了就只能新增不能改
       prizeList.value = (res.data || []).map((p) => ({
+        id: p.id,
         prizeCode: p.prizeCode,
         prizeName: p.prizeName,
         prizeType: p.prizeType,
-        prizeValue: p.prizeValue,
+        // 服务端把 BigDecimal 全局序列化成字符串（"7999.0000"），前端统一归一成数字
+        prizeValue: p.prizeValue === null || p.prizeValue === undefined ? undefined : Number(p.prizeValue),
+        promotionConfigId: p.promotionConfigId,
         approveMode: p.approveMode,
+        prizeLevel: p.prizeLevel,
+        sortWeight: p.sortWeight,
       }));
       emit('change', prizeList.value);
     } catch (e) {

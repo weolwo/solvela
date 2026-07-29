@@ -45,8 +45,9 @@
            右侧存在的理由：新建活动的资产大库必然为空，而抽奖/彩票第二步都要从资产大库引入奖项 ——
            不在这里做掉，运营进到第二步只能跳出向导去「奖品配置」建完再回来。 -->
       <div v-if="step === STEP.BASE" class="p-6">
+        <!-- 左右平分：奖品那一侧要放列表、行内表单和滚动区，给窄了操作很挤 -->
         <a-row :gutter="24">
-          <a-col :xs="24" :lg="14">
+          <a-col :xs="24" :lg="12">
         <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
           <a-form-item label="活动名称" name="activityName">
             <a-input v-model:value="form.activityName" size="large" placeholder="例如：618 年中狂欢大促" :maxlength="64" />
@@ -98,7 +99,7 @@
         </a-form>
           </a-col>
 
-          <a-col :xs="24" :lg="10">
+          <a-col :xs="24" :lg="12">
             <div class="bg-slate-50 rounded-lg border border-slate-200 p-4 h-full">
               <PrizeQuickPanel ref="prizePanelRef" :activity-code="''" @change="onPrizeChange" />
             </div>

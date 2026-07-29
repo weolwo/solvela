@@ -98,10 +98,15 @@
 
         <template v-else-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
-            <a-button v-if="hasGameplay(record.activityType) && configuredMap[record.activityCode] === false" type="link" @click="resumeWizard(record)">
-              继续配置
+            <!--
+              玩法类活动一律给入口：「编辑」只改活动外壳（名称/时间），进不去玩法配置。
+              没有这个按钮时，一个已配置好的抽奖活动在列表里根本没有任何办法回到它的奖池配置。
+              未配置时文案用「继续配置」，把待办感做出来。
+            -->
+            <a-button v-if="hasGameplay(record.activityType)" type="link" @click="resumeWizard(record)">
+              {{ configuredMap[record.activityCode] === false ? '继续配置' : '配置玩法' }}
             </a-button>
-            <a-button v-if="!hasGameplay(record.activityType)" type="link" @click="openUpgrade(record)">升级玩法</a-button>
+            <a-button v-else type="link" @click="openUpgrade(record)">升级玩法</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
             <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
