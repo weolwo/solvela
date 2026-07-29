@@ -27,11 +27,25 @@
       <a-form-item label="活动名称" name="activityName">
         <a-input style="width: 100%" v-model:value="form.activityName" placeholder="活动名称" />
       </a-form-item>
+      <!--
+        活动类型必须是枚举下拉，不能是自由文本框：
+        三个工作台的活动下拉是 optionList?activityType=DRAW 精确匹配的，
+        手打成 draw / 抽奖 之类，这个活动就在所有工作台里凭空消失，而且不报任何错。
+        编辑态一并禁用 —— 类型创建后不可改（改了下游配置全变孤儿数据），
+        服务端 UpdateForm 里压根没有这个字段，这里放开也存不进去。
+      -->
       <a-form-item label="活动类型" name="activityType">
-        <a-input style="width: 100%" v-model:value="form.activityType" placeholder="活动类型" />
+        <a-select
+          style="width: 100%"
+          v-model:value="form.activityType"
+          :disabled="!!form.id"
+          placeholder="请选择活动类型"
+          :options="activityTypeOptions"
+        />
+        <div v-if="form.id" class="text-xs text-slate-400 mt-1">活动类型创建后不可修改；基础活动可在列表点「升级玩法」。</div>
       </a-form-item>
       <a-form-item label="状态" name="status">
-        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态：0-未开始, 1-上线, 2-下线" />
+        <a-select style="width: 100%" v-model:value="form.status" placeholder="请选择状态" :options="activityStatusOptions" />
       </a-form-item>
       <a-form-item label="活动开始时间" name="startTime">
         <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.startTime" style="width: 100%" placeholder="活动开始时间" />
@@ -60,6 +74,11 @@
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
+  import { ACTIVITY_STATUS_LIST, ACTIVITY_TYPE_LIST } from '/@/constants/business/activity/activity-config/activity-config-const';
+
+  // 取值对齐后端 ActivityTypeEnum / t_activity_config.status，唯一真源在常量文件（铁律 3）
+  const activityTypeOptions = ACTIVITY_TYPE_LIST.map((t) => ({ value: t.value, label: `${t.icon} ${t.desc}` }));
+  const activityStatusOptions = ACTIVITY_STATUS_LIST.map((s) => ({ value: s.value, label: s.desc }));
 
   // ------------------------ 事件 ------------------------
 
