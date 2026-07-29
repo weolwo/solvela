@@ -11,11 +11,10 @@
 
     <artifactId>sa-marketing</artifactId>
 
-    <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
+    <!-- 编译等级与编码跟随父 pom（java.version=25，compiler-plugin 显式 source/target=25）。
+         此处原先声明 maven.compiler.source/target=17，但父 pom 的 compiler-plugin 里是硬编码的 25，
+         插件显式配置优先于属性 —— 那三行从来没生效过，只会让人误以为本模块限制在 17。
+         抽奖引擎用到的 switch 模式匹配需要 21+，实际正是靠 25 才编得过。 -->
 
     <dependencies>
         <dependency>
@@ -26,6 +25,13 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+        </dependency>
+        <!-- 本模块有单测（draw/lottery 引擎共 45 个），必须自己声明；
+             此前是靠 common-api → sa-base 的 compile 作用域传递白嫖来的 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

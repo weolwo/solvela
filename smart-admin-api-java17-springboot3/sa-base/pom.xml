@@ -62,9 +62,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- 测试依赖必须锁在 test 作用域，否则 JUnit/Mockito/AssertJ 会被打进生产 jar。
+             各模块若需要写单测，自行引入同一条（test 作用域），不要依赖本模块传递。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
