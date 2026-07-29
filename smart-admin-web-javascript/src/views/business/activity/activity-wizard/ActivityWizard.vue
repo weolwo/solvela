@@ -40,8 +40,13 @@
 
       <a-divider class="my-0" />
 
-      <!-- ==================== 第一步：创建活动 ==================== -->
-      <div v-if="step === STEP.BASE" class="p-6 max-w-3xl mx-auto">
+      <!-- ==================== 第一步：创建活动 ====================
+           左右布局：左侧活动本体，右侧就地建奖品。
+           右侧存在的理由：新建活动的资产大库必然为空，而抽奖/彩票第二步都要从资产大库引入奖项 ——
+           不在这里做掉，运营进到第二步只能跳出向导去「奖品配置」建完再回来。 -->
+      <div v-if="step === STEP.BASE" class="p-6">
+        <a-row :gutter="24">
+          <a-col :xs="24" :lg="14">
         <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
           <a-form-item label="活动名称" name="activityName">
             <a-input v-model:value="form.activityName" size="large" placeholder="例如：618 年中狂欢大促" :maxlength="64" />
@@ -91,11 +96,19 @@
             </div>
           </a-form-item>
         </a-form>
+          </a-col>
+
+          <a-col :xs="24" :lg="10">
+            <div class="bg-slate-50 rounded-lg border border-slate-200 p-4 h-full">
+              <PrizeQuickPanel ref="prizePanelRef" :activity-code="''" @change="onPrizeChange" />
+            </div>
+          </a-col>
+        </a-row>
 
         <div class="flex justify-end gap-2 mt-6">
           <a-button size="large" @click="backToList">取消</a-button>
           <a-button type="primary" size="large" :loading="submitting" @click="submitBase">
-            {{ isBasic ? '创建活动' : '创建并配置玩法' }}
+            {{ submitLabel }}
           </a-button>
         </div>
       </div>
@@ -109,6 +122,13 @@
           <span class="font-mono text-xs text-slate-500">{{ created.activityCode }}</span>
           <a-tag color="default" class="m-0 ml-auto">未开始 · 结构锁未启用</a-tag>
         </div>
+
+        <!-- 配到一半发现少个奖品时，就地补一个，不用跳出向导 -->
+        <a-collapse v-model:activeKey="prizePanelKey" class="mb-4" ghost>
+          <a-collapse-panel key="prize" header="🎁 活动奖品（配置玩法时需要从这里引入）">
+            <PrizeQuickPanel :activity-code="created.activityCode" />
+          </a-collapse-panel>
+        </a-collapse>
 
         <!-- 动态挂载对应玩法组件；活动已锁定，保存按钮在组件自己手里 -->
         <component
@@ -162,6 +182,7 @@
   import DrawWorkbench from '/@/views/business/draw/draw-workbench/DrawWorkbench.vue';
   import TaskWizard from '/@/views/business/task/task-wizard/TaskWizard.vue';
   import LotteryWorkbench from '/@/views/business/lottery/lottery-workbench/LotteryWorkbench.vue';
+  import PrizeQuickPanel from './components/PrizeQuickPanel.vue';
 
   // ⚠️ 路由 path 以 t_menu 实际记录为准，不要照搬组件目录：
   // 活动配置列表的菜单 path 是 /activity/activity-config/list（component 才是 /business/... 开头的目录）
@@ -192,6 +213,24 @@
 
   // 已落库的活动信息，第二步与完成页都读它（而不是继续读 form，避免「再建一个」时被清空）
   const created = reactive({ activityCode: '', activityName: '', activityType: '' });
+
+  // 第一步右侧攒下的奖品（草稿态），随活动一起提交
+  const prizePanelRef = ref();
+  const draftPrizeList = ref([]);
+  // 第二步的奖品面板默认收起：那一步的主角是玩法配置，奖品只是「发现少了再补」
+  const prizePanelKey = ref([]);
+
+  function onPrizeChange(list) {
+    draftPrizeList.value = list;
+  }
+
+  const submitLabel = computed(() => {
+    const n = draftPrizeList.value.length;
+    if (isBasic.value) {
+      return n ? `创建活动（含 ${n} 个奖品）` : '创建活动';
+    }
+    return n ? `创建并配置玩法（含 ${n} 个奖品）` : '创建并配置玩法';
+  });
 
   const isBasic = computed(() => !hasGameplay(created.activityType || form.activityType));
   const typeMeta = computed(() => activityTypeMeta(created.activityType || form.activityType));
@@ -231,15 +270,21 @@
     }
     submitting.value = true;
     try {
-      await activityConfigApi.add({
+      /*
+       * 走聚合接口而不是先 add 活动再循环 add 奖品：
+       * 奖品的 activityCode 必填，活动必须先存在；若前端串行发起，中途任一奖品失败就会留下
+       * 「活动建好了、奖品只建了一半」的残局，而运营看到的只是一个失败提示。
+       * 聚合到一个事务后，界面上的成败与库里的状态永远一致。
+       */
+      await activityConfigApi.wizardCreate({
         activityCode: form.activityCode,
         activityName: form.activityName,
         activityType: form.activityType,
-        status: 0,
         startTime: form.timeRange[0],
         endTime: form.timeRange[1],
+        prizeList: draftPrizeList.value,
       });
-      message.success('活动已创建');
+      message.success(draftPrizeList.value.length ? `活动已创建，同时建了 ${draftPrizeList.value.length} 个奖品` : '活动已创建');
       // 落库成功后把活动信息定格下来，后续步骤只读它
       created.activityCode = form.activityCode;
       created.activityName = form.activityName;
@@ -296,9 +341,12 @@
       step.value = STEP.GAMEPLAY;
       return;
     }
-    // 新建：把上一次的残留状态清干净再开始
+    // 新建：把上一次的残留状态清干净再开始。
+    // 草稿奖品也必须清 —— 否则「再建一个」会把上个活动的奖品原样带进新活动，
+    // 而奖品编码全局唯一，第二次提交必然撞码，报错信息还会指向一个运营没印象的编码。
     Object.assign(form, { activityName: '', timeRange: [], activityCode: '', activityType: 'BASIC' });
     Object.assign(created, { activityCode: '', activityName: '', activityType: '' });
+    draftPrizeList.value = [];
     step.value = STEP.BASE;
     genCode();
   }

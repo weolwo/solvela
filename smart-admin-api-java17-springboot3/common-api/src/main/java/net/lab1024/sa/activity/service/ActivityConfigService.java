@@ -8,6 +8,7 @@ import net.lab1024.sa.activity.domain.form.ActivityConfigAddForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigQueryForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigUpdateForm;
 import net.lab1024.sa.activity.domain.form.ActivityTypeUpgradeForm;
+import net.lab1024.sa.activity.domain.form.ActivityWizardCreateForm;
 import net.lab1024.sa.activity.domain.vo.ActivityConfigVO;
 import net.lab1024.sa.activity.domain.vo.ActivityDeleteCheckVO;
 import net.lab1024.sa.activity.domain.vo.ActivityRefItem;
@@ -19,18 +20,24 @@ import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.enums.ActivityTypeEnum;
+import net.lab1024.sa.base.common.exception.BusinessException;
+import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import net.lab1024.sa.prize.prizeconfig.manager.PrizeConfigManager;
+import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -54,6 +61,7 @@ public class ActivityConfigService {
     private final ActivityConfigDao activityConfigDao;
     private final ActivityConfigManager activityConfigManager;
     private final PrizeConfigManager prizeConfigManager;
+    private final PrizeConfigService prizeConfigService;
 
     /**
      * 各玩法的下游引用查询实现，由 sa-marketing 注册（依赖倒置，见 ActivityRefProvider 类注释）。
@@ -237,6 +245,70 @@ public class ActivityConfigService {
         }
         ActivityConfig activityConfig = SmartBeanUtil.copy(addForm, ActivityConfig.class);
         activityConfigDao.insert(activityConfig);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 活动创建向导第一步：建活动 + 随手建的若干奖品，一次事务落库。
+     *
+     * <p><b>为什么必须聚合成一个接口</b>：奖品的 activityCode 是必填，
+     * 也就是活动必须先存在奖品才建得出来。若由前端串行发起，中途任一奖品失败就会留下
+     * 「活动建好了、奖品只建了一半」的残局，而运营看到的只是一个失败提示 ——
+     * 他不会知道库里已经躺了一个半成品活动。
+     *
+     * <p><b>为什么把校验全部前置到插入之前</b>：这里刻意不采用「边插边校验、失败就
+     * setRollbackOnly」的写法。那样外层提交会抛 UnexpectedRollbackException，
+     * 把本该给运营看的人话提示变成一个 500 —— 本项目在提案域已经踩过这个坑
+     * （交接文档「事务边界隐患已被证实」一节）。
+     * 先验完再插，插入阶段就只剩真正的 DB 异常，那种异常抛出去正好由 @Transactional 回滚。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> wizardCreate(ActivityWizardCreateForm form) {
+        // ---------- 1. 活动校验 ----------
+        if (!SmartCodeUtil.isValidBizCode(form.getActivityCode())) {
+            return ResponseDTO.userErrorParam("活动" + SmartCodeUtil.BIZ_CODE_MESSAGE);
+        }
+        if (getByActivityCode(form.getActivityCode()) != null) {
+            return ResponseDTO.userErrorParam("活动编码已存在：" + form.getActivityCode());
+        }
+
+        // ---------- 2. 奖品全量预校验（插入前一次验完） ----------
+        List<ActivityWizardCreateForm.WizardPrizeForm> prizeList =
+                form.getPrizeList() == null ? List.of() : form.getPrizeList();
+        Set<String> batchCodes = new HashSet<>();
+        for (ActivityWizardCreateForm.WizardPrizeForm prize : prizeList) {
+            if (!SmartCodeUtil.isValidBizCode(prize.getPrizeCode())) {
+                return ResponseDTO.userErrorParam("奖品「" + prize.getPrizeName() + "」的" + SmartCodeUtil.BIZ_CODE_MESSAGE);
+            }
+            // 本次提交内重复：唯一索引只能挡住与库里已有的冲突，挡不住同一批次里的两条
+            if (!batchCodes.add(prize.getPrizeCode())) {
+                return ResponseDTO.userErrorParam("本次提交的奖品编码重复：" + prize.getPrizeCode());
+            }
+            if (prizeConfigService.existsByPrizeCode(prize.getPrizeCode())) {
+                return ResponseDTO.userErrorParam("奖品编码已存在：" + prize.getPrizeCode());
+            }
+            String matchError = prizeConfigService.checkPromotionConfigMatch(prize.getPromotionConfigId(), prize.getPrizeType());
+            if (matchError != null) {
+                return ResponseDTO.userErrorParam("奖品「" + prize.getPrizeName() + "」" + matchError);
+            }
+        }
+
+        // ---------- 3. 落库 ----------
+        ActivityConfig activityConfig = SmartBeanUtil.copy(form, ActivityConfig.class);
+        activityConfig.setStatus(STATUS_NOT_START);
+        activityConfigDao.insert(activityConfig);
+
+        for (ActivityWizardCreateForm.WizardPrizeForm prize : prizeList) {
+            PrizeConfigAddForm addForm = SmartBeanUtil.copy(prize, PrizeConfigAddForm.class);
+            addForm.setActivityCode(form.getActivityCode());
+            ResponseDTO<String> res = prizeConfigService.add(addForm);
+            if (!res.getOk()) {
+                // 预校验已覆盖全部可预期的失败，走到这里说明是并发抢占编码之类的意外。
+                // 抛异常而不是 return：只有异常才能让 @Transactional 干净回滚，
+                // 否则活动会连同半截奖品一起提交。
+                throw new BusinessException("奖品「" + prize.getPrizeName() + "」创建失败：" + res.getMsg());
+            }
+        }
         return ResponseDTO.ok();
     }
 

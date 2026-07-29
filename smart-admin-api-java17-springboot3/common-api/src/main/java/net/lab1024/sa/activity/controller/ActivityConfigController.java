@@ -4,6 +4,7 @@ import net.lab1024.sa.activity.domain.form.ActivityConfigAddForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigQueryForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigUpdateForm;
 import net.lab1024.sa.activity.domain.form.ActivityTypeUpgradeForm;
+import net.lab1024.sa.activity.domain.form.ActivityWizardCreateForm;
 import net.lab1024.sa.activity.domain.vo.ActivityConfigVO;
 import net.lab1024.sa.activity.domain.vo.ActivityDeleteCheckVO;
 import net.lab1024.sa.activity.service.ActivityConfigService;
@@ -84,6 +85,13 @@ public class ActivityConfigController {
     @SaCheckPermission("activityConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid ActivityConfigAddForm addForm) {
         return activityConfigService.add(addForm);
+    }
+
+    @Operation(summary = "创建向导第一步：建活动 + 随手建的若干奖品，一次事务落库")
+    @PostMapping("/wizard/create")
+    @SaCheckPermission("activityConfig:add")
+    public ResponseDTO<String> wizardCreate(@RequestBody @Valid ActivityWizardCreateForm form) {
+        return activityConfigService.wizardCreate(form);
     }
 
     @Operation(summary = "更新（不含活动类型，类型创建后不可改）")

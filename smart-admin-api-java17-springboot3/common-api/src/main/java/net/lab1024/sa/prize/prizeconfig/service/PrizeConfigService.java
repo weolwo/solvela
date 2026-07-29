@@ -91,9 +91,14 @@ public class PrizeConfigService {
      * 一旦挂错（比如积分奖品指向了优惠券的配置），用户实际会收到一张券。
      * 前端级联下拉只是防呆，绕过页面直接 POST 就穿了，这里必须堵死。
      *
+     * 放开为 public 供活动创建向导的聚合接口在<b>落库前</b>做全量预校验 ——
+     * 那里必须先把所有奖品验一遍再开始插入，否则一旦插到一半才发现类型不匹配，
+     * 就只能靠 setRollbackOnly 回滚，而那会让外层提交抛 UnexpectedRollbackException、
+     * 把本来给运营看的人话提示变成一个 500（本项目在提案域踩过这个坑）。
+     *
      * @return null 表示通过
      */
-    private String checkPromotionConfigMatch(Long promotionConfigId, String prizeType) {
+    public String checkPromotionConfigMatch(Long promotionConfigId, String prizeType) {
         PromotionConfig promotionConfig = promotionConfigService.getById(promotionConfigId);
         if (promotionConfig == null) {
             return "优惠配置不存在：" + promotionConfigId;
