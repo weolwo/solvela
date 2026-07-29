@@ -16,17 +16,20 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-4">
           <span class="text-lg font-bold">🎯 抽奖配置工作台</span>
-          <a-divider type="vertical" />
-          <span class="text-sm text-gray-500">当前活动</span>
-          <a-select
-            v-model:value="currentActivity"
-            class="w-64"
-            :options="activityOptions"
-            :loading="activityLoading"
-            placeholder="请选择抽奖活动"
-            show-search
-            option-filter-prop="label"
-          />
+          <!-- 内嵌模式下活动由外壳锁定，不再出现下拉：两个地方都能切活动就是双控冲突 -->
+          <template v-if="!embedded">
+            <a-divider type="vertical" />
+            <span class="text-sm text-gray-500">当前活动</span>
+            <a-select
+              v-model:value="currentActivity"
+              class="w-64"
+              :options="activityOptions"
+              :loading="activityLoading"
+              placeholder="请选择抽奖活动"
+              show-search
+              option-filter-prop="label"
+            />
+          </template>
         </div>
 
         <div class="flex items-center gap-4">
@@ -86,6 +89,27 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import PrizeItemLibrary from './components/PrizeItemLibrary.vue';
   import PoolProbabilityEngine from './components/PoolProbabilityEngine.vue';
+
+  // ---------------------------- 内嵌契约 ----------------------------
+
+  /*
+   * 本组件有两种用法，行为必须严格区分：
+   *
+   * ① 独立入口（embedded=false，默认）：从菜单进入，顶部自带活动下拉，行为与改造前完全一致。
+   * ② 内嵌于活动创建向导（embedded=true）：活动由外壳经 activityCode 锁定，隐藏活动下拉。
+   *
+   * ⚠️ 保存按钮在两种模式下都保留在本组件手里，不上交外壳。
+   * 外壳无法替本组件决定「什么时候算配置完成」—— 它不知道概率闭环校验、也拿不到两个 Tab 的数据。
+   * 内嵌时保存成功后额外 emit('saved')，由外壳决定要不要推进到完成页。
+   */
+  const props = defineProps({
+    /** 内嵌模式下由外壳传入并锁定的活动编码 */
+    activityCode: { type: String, default: '' },
+    /** 是否内嵌在活动创建向导里 */
+    embedded: { type: Boolean, default: false },
+  });
+
+  const emit = defineEmits(['saved']);
 
   // ---------------------------- 常量 ----------------------------
 
@@ -191,7 +215,30 @@
   // 切活动即整体换血：物资库、奖池、上线态全部重新取服务端数据
   watch(currentActivity, loadDetail);
 
-  onMounted(loadActivityOptions);
+  /*
+   * 内嵌模式：活动来自 props，必须同时处理 onMounted 与 watch 两条路径。
+   *
+   * 只写 onMounted 是不够的 —— 外壳用 <component :is> 挂载本组件时，
+   * 从「活动 A 的向导」切到「活动 B 的向导」如果没有触发组件重新挂载，onMounted 不会再跑，
+   * 表现是「换了活动但页面还是上一个活动的配置」。
+   * （彩票 P4 验收时踩过同族的坑：导航到同一 hash 路由不会触发组件重新挂载。）
+   */
+  watch(
+    () => props.activityCode,
+    (code) => {
+      if (props.embedded && code) {
+        currentActivity.value = code;
+      }
+    },
+    { immediate: true }
+  );
+
+  onMounted(() => {
+    // 内嵌时活动已由 props 锁定，不需要下拉数据，也不该去拉全量活动列表
+    if (!props.embedded) {
+      loadActivityOptions();
+    }
+  });
 
   // ---------------------------- 统一保存收口 ----------------------------
 
@@ -221,6 +268,8 @@
       message.success('抽奖配置已保存');
       // 重新回显：拿回服务端权威的 usedStock 等运行态数据，同时把脏标记复位
       await loadDetail();
+      // 内嵌时告诉外壳「这一步配完了」，由它决定推进到完成页；独立入口下没人监听，无副作用
+      emit('saved', { activityCode: currentActivity.value });
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -230,6 +279,14 @@
 
   // ---------------------------- 离开拦截 ----------------------------
 
+  /*
+   * 内嵌时这个守卫<b>照常保留</b>，不要因为「外壳也有守卫」就关掉它。
+   *
+   * onBeforeRouteLeave 注册在子组件里同样对所在路由生效，所以内嵌于向导时，
+   * 离开向导路由会触发本守卫 —— 而它才是唯一知道「两个 Tab 有没有未保存改动」的地方。
+   * 对应地，外壳<b>不该</b>再为第二步加一层守卫（外壳第一步提交即落库，此后自身无脏状态），
+   * 这样全程只弹一次确认框，而不是内外各弹一次。
+   */
   onBeforeRouteLeave(() => {
     if (!isDirty.value) {
       return true;

@@ -7,8 +7,10 @@
 -->
 <template>
   <a-card :bordered="false">
-    <!-- ==================== 提交成功页：替代整个向导，同时天然杜绝重复提交 ==================== -->
-    <a-result v-if="submitResult.submitted" status="success" title="任务配置提交成功">
+    <!-- ==================== 提交成功页：替代整个向导，同时天然杜绝重复提交 ====================
+         内嵌于活动创建向导时不展示本页：外壳有自己的完成页，两个成功页叠在一起会让运营
+         以为流程结束了两次。此时改由 emit('saved') 通知外壳推进步骤。 -->
+    <a-result v-if="submitResult.submitted && !embedded" status="success" title="任务配置提交成功">
       <template #subTitle>
         任务「{{ submitResult.taskName }}」已创建，归属活动：{{ submitResult.activityLabel }}
       </template>
@@ -79,20 +81,22 @@
         </a-card>
 
         <a-card size="small" title="基础信息">
+          <!-- 内嵌时活动由外壳锁定：置灰而不是隐藏，让运营看得见这个任务归在哪个活动下 -->
           <a-form-item
             label="所属活动大类 activity_code"
             :name="['base', 'activityCode']"
             :rules="FORM_RULES.activityCode"
-            extra="原子任务必须归属一个活动大类，C端按大类聚合展示"
+            :extra="embedded ? '由活动创建向导锁定，不可更改' : '原子任务必须归属一个活动大类，C端按大类聚合展示'"
           >
             <a-select
               v-model:value="wizardForm.base.activityCode"
               :options="activityOptions"
               :loading="activityLoading"
+              :disabled="embedded"
               placeholder="请选择所属活动"
               show-search
               option-filter-prop="label"
-              allow-clear
+              :allow-clear="!embedded"
             />
           </a-form-item>
           <a-row :gutter="16">
@@ -297,6 +301,24 @@
     buildDefaultRuleParams,
     buildDefaultWizardForm,
   } from './task-wizard-const';
+
+  // ---------------------------- 内嵌契约 ----------------------------
+
+  /*
+   * 两种用法：
+   * ① 独立入口（默认）：从菜单进入，活动可选，提交后展示自带的成功页与三个出口。
+   * ② 内嵌于活动创建向导：活动由外壳锁定并置灰，成功页被抑制，改为 emit('saved') 让外壳推进。
+   *
+   * ⚠️ 本组件的提交是「走完 5 步一次性提交」——后端 TaskConfigService.wizardSubmit 是单个
+   * @Transactional，主表与奖励子表一次性落库，中途没有可保存的半成品。
+   * 所以外壳<b>不能</b>持有本组件的保存按钮：那个「中途 save」根本不存在。
+   */
+  const props = defineProps({
+    activityCode: { type: String, default: '' },
+    embedded: { type: Boolean, default: false },
+  });
+
+  const emit = defineEmits(['saved']);
 
   // ---------------------------- 单一状态源：向导全部表单输入（初始值统一由常量文件工厂构建） ----------------------------
 
@@ -522,6 +544,8 @@
       // 已入库，清掉本地草稿避免下次进来又提示恢复
       clearTimeout(draftTimer);
       clearDraft();
+      // 内嵌时成功页被抑制，改由外壳推进到它自己的完成页
+      emit('saved', { activityCode: wizardForm.base.activityCode, taskConfigId: res.data });
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -617,12 +641,35 @@
     message.success('草稿已丢弃');
   }
 
+  /*
+   * 内嵌模式：活动由外壳锁定，写进表单的单一状态源里（铁律 4），
+   * 而不是在提交时另找一个地方取值 —— 那样校验、摘要、草稿三处都会看到不一致的活动。
+   *
+   * onMounted 与 watch 两条路径都要处理：外壳从活动 A 切到活动 B 时若组件没有重新挂载，
+   * 只写 onMounted 会让任务错误地挂到上一个活动下（这个错落库后很难发现）。
+   */
+  watch(
+    () => props.activityCode,
+    (code) => {
+      if (props.embedded && code) {
+        wizardForm.base.activityCode = code;
+      }
+    },
+    { immediate: true }
+  );
+
   onMounted(() => {
     // 活动大类与模板都来自服务端，两者互不依赖，并行拉取
     loadActivityOptions();
     loadTaskTemplates();
 
     window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 内嵌时不走草稿恢复：草稿是「上次没配完的任务」，与本次向导正在建的活动多半不是一回事，
+    // 弹出来只会让运营把无关配置恢复到新活动下
+    if (props.embedded) {
+      return;
+    }
     const raw = localRead(LocalStorageKeyConst.TASK_WIZARD_DRAFT);
     if (!raw) {
       return;

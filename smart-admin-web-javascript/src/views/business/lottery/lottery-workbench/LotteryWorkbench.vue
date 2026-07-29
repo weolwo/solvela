@@ -25,17 +25,24 @@
           <span class="text-lg font-bold">✨ 彩票配置工作台</span>
           <a-divider type="vertical" />
 
-          <span class="text-sm text-gray-500">当前活动</span>
-          <a-select
-            v-model:value="currentActivity"
-            class="w-60"
-            :options="activityOptions"
-            :loading="activityLoading"
-            placeholder="请选择彩票活动"
-            show-search
-            option-filter-prop="label"
-            @change="onSwitchActivity"
-          />
+          <!--
+            内嵌模式下活动由外壳锁定，隐藏活动下拉。
+            但「玩法」下拉必须保留 —— 一个彩票活动下可以有多个玩法（5位/10万、7位/1000万…），
+            锁的是活动这一层，不是玩法这一层。
+          -->
+          <template v-if="!embedded">
+            <span class="text-sm text-gray-500">当前活动</span>
+            <a-select
+              v-model:value="currentActivity"
+              class="w-60"
+              :options="activityOptions"
+              :loading="activityLoading"
+              placeholder="请选择彩票活动"
+              show-search
+              option-filter-prop="label"
+              @change="onSwitchActivity"
+            />
+          </template>
 
           <span class="text-sm text-gray-500 ml-2">当前玩法</span>
           <a-select
@@ -96,7 +103,8 @@
 
     <!-- 主体 -->
     <a-card :bordered="false" class="shadow-sm">
-      <a-empty v-if="!currentActivity && !activityLoading" class="py-16">
+      <!-- 内嵌时活动一定有值（外壳传入），这个空态只属于独立入口 -->
+      <a-empty v-if="!embedded && !currentActivity && !activityLoading" class="py-16">
         <template #description>
           <span class="text-sm text-slate-400">
             {{ activityOptions.length ? '请先在上方选择一个彩票活动' : '暂无彩票类活动，请先到「活动配置」新建一个 LOTTERY 活动' }}
@@ -129,7 +137,7 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, ref } from 'vue';
+  import { computed, onMounted, ref, watch } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import { onBeforeRouteLeave } from 'vue-router';
   import { CloudUploadOutlined } from '@ant-design/icons-vue';
@@ -139,6 +147,22 @@
   import { LOTTERY_STATUS_ENUM } from '/@/constants/business/lottery/lottery-const';
   import EngineConfigPanel from './components/EngineConfigPanel.vue';
   import IssueConsole from './components/IssueConsole.vue';
+
+  // ---------------------------- 内嵌契约 ----------------------------
+
+  /*
+   * 两种用法（与 DrawWorkbench 同构）：
+   * ① 独立入口（默认）：顶部自带活动下拉，行为与改造前完全一致。
+   * ② 内嵌于活动创建向导：活动由外壳锁定，隐藏活动下拉；玩法下拉保留（一个活动可有多个玩法）。
+   *
+   * 保存按钮不上交外壳，内嵌时保存成功后额外 emit('saved')。
+   */
+  const props = defineProps({
+    activityCode: { type: String, default: '' },
+    embedded: { type: Boolean, default: false },
+  });
+
+  const emit = defineEmits(['saved']);
 
   const activeTab = ref('engine');
   const engineRef = ref();
@@ -346,6 +370,8 @@
       currentLottery.value = param.lotteryCode;
       loadedLottery.value = param.lotteryCode;
       await loadDetail(currentActivity.value, param.lotteryCode);
+      // 内嵌时告诉外壳「这一步配完了」；独立入口下没人监听，无副作用
+      emit('saved', { activityCode: currentActivity.value, lotteryCode: param.lotteryCode });
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -369,19 +395,48 @@
     });
   });
 
+  /**
+   * 打开一个活动：拉它的玩法列表，选中第一个并回显。
+   * 独立入口的「只有一个活动就自动打开」与内嵌模式的「外壳指定活动」走的是同一段逻辑。
+   */
+  async function openActivity(activityCode) {
+    currentActivity.value = activityCode;
+    loadedActivity.value = activityCode;
+    await loadLotteries(activityCode);
+    const firstLottery = lotteryOptions.value[0];
+    currentLottery.value = firstLottery?.value;
+    loadedLottery.value = firstLottery?.value;
+    currentStatus.value = firstLottery?.status ?? null;
+    await loadDetail(activityCode, firstLottery?.value);
+  }
+
+  /*
+   * 内嵌模式：活动来自 props，onMounted 与 watch 两条路径都要处理。
+   * 只写 onMounted 的话，外壳从活动 A 切到活动 B 若没触发组件重新挂载，页面会停在上一个活动
+   * （彩票 P4 验收踩过同族的坑：导航到同一 hash 路由不会重新挂载）。
+   */
+  watch(
+    () => props.activityCode,
+    (code) => {
+      if (props.embedded && code && code !== loadedActivity.value) {
+        openActivity(code);
+      }
+    }
+  );
+
   onMounted(async () => {
+    if (props.embedded) {
+      // 内嵌时活动已定，不拉全量活动列表
+      if (props.activityCode) {
+        await openActivity(props.activityCode);
+      }
+      return;
+    }
     await loadActivities();
     // 只有一个活动时直接打开，省掉一次点击；多个时让运营自己选，避免默认选错还没察觉
     const firstActivity = activityOptions.value[0];
     if (activityOptions.value.length === 1 && firstActivity) {
-      currentActivity.value = firstActivity.value;
-      loadedActivity.value = firstActivity.value;
-      await loadLotteries(firstActivity.value);
-      const firstLottery = lotteryOptions.value[0];
-      currentLottery.value = firstLottery?.value;
-      loadedLottery.value = firstLottery?.value;
-      currentStatus.value = firstLottery?.status ?? null;
-      await loadDetail(firstActivity.value, firstLottery?.value);
+      await openActivity(firstActivity.value);
     }
   });
 </script>
