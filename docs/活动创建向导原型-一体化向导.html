@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活动创建向导 原型 - 1024 SmartAdmin</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
+    <script>
+        dayjs.extend(window.dayjs_plugin_customParseFormat);
+        dayjs.extend(window.dayjs_plugin_advancedFormat);
+        dayjs.extend(window.dayjs_plugin_weekday);
+        dayjs.extend(window.dayjs_plugin_localeData);
+        dayjs.extend(window.dayjs_plugin_weekOfYear);
+        dayjs.extend(window.dayjs_plugin_weekYear);
+        dayjs.extend(window.dayjs_plugin_quarterOfYear);
+    </script>
+
+    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.2.6/dist/reset.css" />
+    <script src="https://unpkg.com/ant-design-vue@4.2.6/dist/antd.min.js"></script>
+
+    <style>
+        body { background-color:#f0f2f5; color:#1f2329; margin:0; padding:0;
+               font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial; }
+        [v-cloak] { display:none !important; }
+
+        .top-nav { height:56px; background:#001529; color:#fff; display:flex; align-items:center;
+                   padding:0 24px; justify-content:space-between; position:sticky; top:0; z-index:50; }
+        .nav-logo { font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+        .nav-logo .dot { width:8px; height:8px; background:#1677ff; border-radius:2px; }
+
+        /* 玩法类型卡片 */
+        .type-card { border:2px solid #e4e7eb; border-radius:8px; cursor:pointer; transition:all .2s;
+                     position:relative; overflow:hidden; background:#fff; }
+        .type-card:hover { border-color:#91caff; box-shadow:0 4px 12px rgba(22,119,255,.1); }
+        .type-card.active { border-color:#1677ff; background:#e6f2ff; }
+        .type-card.active::after { content:'✓'; position:absolute; top:-1px; right:-1px; background:#1677ff;
+                     color:#fff; font-size:12px; font-weight:bold; padding:2px 8px; border-bottom-left-radius:8px; }
+        .type-card.basic.active { border-color:#52c41a; background:#f6ffed; }
+        .type-card.basic.active::after { background:#52c41a; }
+        .type-card.disabled { opacity:.45; cursor:not-allowed; }
+        .type-card.disabled:hover { border-color:#e4e7eb; box-shadow:none; }
+
+        /* 玩法挂载点 */
+        .mount-shell { border:1px dashed #b7cdf0; border-radius:10px; background:#fafcff; min-height:340px;
+                       display:flex; flex-direction:column; }
+        .mount-head { padding:10px 16px; border-bottom:1px dashed #d6e4f7; display:flex;
+                      justify-content:space-between; align-items:center; background:#f2f7ff; border-radius:10px 10px 0 0; }
+        .mount-body { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+
+        .fade-enter-active,.fade-leave-active { transition:opacity .25s ease, transform .25s ease; }
+        .fade-enter-from,.fade-leave-to { opacity:0; transform:translateY(8px); }
+
+        .note { background:#fffbe6; border:1px solid #ffe58f; border-radius:6px; padding:8px 12px;
+                font-size:12px; color:#874d00; }
+    </style>
+</head>
+<body>
+<div id="app" v-cloak></div>
+
+<!--
+  铁律 6：整个模板放进 x-template。
+  浏览器对 <script> 内容按纯文本存储、不做 HTML 解析，驼峰原样保留 ——
+  #bodyCell 这类插槽名不会被小写成 #bodycell（Vue 不会 camelize 插槽名，
+  一旦被小写，antd 查 slots.bodyCell 永远匹配不上，表现是表格自定义列整片空白且不报错）。
+-->
+<script type="text/x-template" id="app-template">
+<div class="min-h-screen flex flex-col">
+    <div class="top-nav">
+        <div class="nav-logo"><span class="dot"></span> SmartAdmin · 营销中台</div>
+        <div class="text-xs text-gray-400">原型演示 · 数据均为模拟</div>
+    </div>
+
+    <div class="flex-1 p-6">
+        <transition name="fade" mode="out-in">
+
+            <!-- ==================== 活动配置页 ==================== -->
+            <div v-if="view === 'list'" key="list">
+                <div class="mb-5 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 m-0">活动配置</h2>
+                        <p class="text-slate-500 text-sm mt-1 mb-0">
+                            活动是容器，玩法是内容。创建活动后按类型进入对应玩法的配置流程。
+                        </p>
+                    </div>
+                    <a-button type="primary" size="large" @click="openWizard">＋ 创建活动向导</a-button>
+                </div>
+
+                <a-card :bordered="false" class="shadow-sm rounded-xl">
+                    <div class="flex gap-3 mb-4">
+                        <a-input-search placeholder="搜索活动名称或编码" style="width:240px" />
+                        <a-select v-model:value="filterType" style="width:160px">
+                            <a-select-option value="ALL">全部类型</a-select-option>
+                            <a-select-option v-for="t in typeList" :key="t.value" :value="t.value">
+                                {{ t.icon }} {{ t.desc }}
+                            </a-select-option>
+                        </a-select>
+                    </div>
+
+                    <a-table :data-source="filteredList" :columns="columns"
+                             :pagination="false" size="middle" row-key="activityCode">
+                        <template #bodyCell="{ column, record }">
+                            <template v-if="column.dataIndex === 'activityCode'">
+                                <span class="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                                    {{ record.activityCode }}
+                                </span>
+                            </template>
+
+                            <template v-else-if="column.dataIndex === 'activityType'">
+                                <a-tag :color="typeMap[record.activityType].color" class="m-0">
+                                    {{ typeMap[record.activityType].icon }} {{ typeMap[record.activityType].desc }}
+                                </a-tag>
+                            </template>
+
+                            <template v-else-if="column.dataIndex === 'status'">
+                                <a-badge :status="record.status === 1 ? 'processing' : 'default'"
+                                         :text="record.status === 1 ? '已上线' : '未开始'" />
+                            </template>
+
+                            <!-- 配置完备度：BASIC 与玩法类语义不同，这一列是本次设计的关键 -->
+                            <template v-else-if="column.dataIndex === 'configured'">
+                                <span v-if="record.activityType === 'BASIC'" class="text-slate-400 text-xs">
+                                    基础活动，无需配置玩法
+                                </span>
+                                <a-tag v-else-if="record.configured" color="success" class="m-0">已配置</a-tag>
+                                <a-tag v-else color="warning" class="m-0">未配置玩法</a-tag>
+                            </template>
+
+                            <template v-else-if="column.dataIndex === 'action'">
+                                <a-space>
+                                    <!-- 玩法类且没配完 → 继续配置，回到向导第二步 -->
+                                    <a-button v-if="record.activityType !== 'BASIC' && !record.configured"
+                                              type="primary" size="small" @click="resumeWizard(record)">
+                                        继续配置
+                                    </a-button>
+                                    <a-button v-else-if="record.activityType !== 'BASIC'"
+                                              type="link" size="small" class="px-0" @click="msg('跳转到对应玩法工作台')">
+                                        查看玩法
+                                    </a-button>
+                                    <!-- BASIC 独有：升级为玩法类 -->
+                                    <a-button v-if="record.activityType === 'BASIC'"
+                                              type="link" size="small" class="px-0" @click="openUpgrade(record)">
+                                        升级玩法
+                                    </a-button>
+                                    <a-popconfirm :title="deleteTip(record)" ok-text="仍要删除" cancel-text="取消"
+                                                  :disabled="!canDelete(record)" @confirm="msg('已删除（模拟）')">
+                                        <a-button type="link" size="small" danger class="px-0"
+                                                  :disabled="!canDelete(record)"
+                                                  @click="!canDelete(record) && msg(deleteTip(record), 'warning')">
+                                            删除
+                                        </a-button>
+                                    </a-popconfirm>
+                                </a-space>
+                            </template>
+                        </template>
+                    </a-table>
+
+                    <div class="note mt-4">
+                        <b>这一列是本次设计的要点</b>：「未配置玩法」只表示<b>该配而没配</b>（向导中途退出），
+                        不再混入「本来就不用配」—— 后者是 BASIC 基础活动，恒为无需配置。
+                        两种情况分开，向导第二步该显示什么、列表该标什么才有依据。
+                    </div>
+                </a-card>
+            </div>
+
+            <!-- ==================== 向导 ==================== -->
+            <div v-else key="wizard">
+                <div class="mb-4 flex items-center gap-2">
+                    <a-button type="link" class="p-0 text-slate-500" @click="leaveWizard">← 返回活动配置</a-button>
+                    <span class="text-slate-300">/</span>
+                    <span class="text-sm font-bold">创建活动向导</span>
+                </div>
+
+                <a-card :bordered="false" class="shadow-sm rounded-xl">
+                    <!-- 步骤条按类型动态伸缩：BASIC 两步，玩法类三步 -->
+                    <div class="px-6 pt-2 pb-6">
+                        <a-steps :current="step" size="small" :items="stepItems" />
+                    </div>
+
+                    <a-divider class="my-0" />
+
+                    <!-- ---------- 第一步：创建活动 ---------- -->
+                    <div v-if="step === 0" class="p-6 max-w-3xl mx-auto">
+                        <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+                            <a-form-item label="活动名称" name="activityName">
+                                <a-input v-model:value="form.activityName" size="large"
+                                         placeholder="例如：618 年中狂欢大促" />
+                            </a-form-item>
+
+                            <a-form-item label="活动起止时间" name="timeRange">
+                                <a-range-picker v-model:value="form.timeRange" show-time
+                                                :placeholder="['开始时间', '结束时间']"
+                                                value-format="YYYY-MM-DD HH:mm:ss" class="w-full" size="large" />
+                            </a-form-item>
+
+                            <a-form-item label="活动编码" name="activityCode">
+                                <div class="flex gap-2">
+                                    <a-input v-model:value="form.activityCode" size="large"
+                                             placeholder="10 位大写字母 + 数字" class="font-mono" />
+                                    <a-button size="large" @click="genCode">重新生成</a-button>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">
+                                    进入向导即预填一个可用编码，可手工改写；创建后不可修改。
+                                </div>
+                            </a-form-item>
+
+                            <a-form-item label="玩法类型" name="activityType">
+                                <div class="grid grid-cols-4 gap-3">
+                                    <div v-for="t in typeList" :key="t.value"
+                                         class="type-card p-4 flex flex-col items-center text-center"
+                                         :class="{ active: form.activityType === t.value, basic: t.value === 'BASIC' }"
+                                         @click="form.activityType = t.value">
+                                        <span class="text-3xl mb-2">{{ t.icon }}</span>
+                                        <span class="font-bold text-sm">{{ t.desc }}</span>
+                                        <span class="text-[10px] text-slate-400 mt-1 leading-tight">{{ t.hint }}</span>
+                                    </div>
+                                </div>
+                                <div class="text-xs mt-2"
+                                     :class="form.activityType === 'BASIC' ? 'text-green-600' : 'text-slate-400'">
+                                    <template v-if="form.activityType === 'BASIC'">
+                                        基础活动只有活动外壳，可挂奖品、作为预算与统计的归集维度。
+                                        创建后<b>可随时升级</b>为任一玩法类型。
+                                    </template>
+                                    <template v-else>
+                                        创建后类型即冻结（已配的玩法配置会因改类型变成孤儿数据）。
+                                        不确定就先建<b>基础活动</b>，之后再升级。
+                                    </template>
+                                </div>
+                            </a-form-item>
+                        </a-form>
+
+                        <div class="flex justify-end gap-2 mt-6">
+                            <a-button size="large" @click="leaveWizard">取消</a-button>
+                            <a-button type="primary" size="large" :loading="saving" @click="submitStep1">
+                                {{ isBasic ? '创建活动' : '创建并配置玩法' }}
+                            </a-button>
+                        </div>
+                    </div>
+
+                    <!-- ---------- 第二步：配置玩法（BASIC 不经过） ---------- -->
+                    <div v-else-if="step === 1 && !isBasic" class="p-6">
+                        <!-- 活动摘要条：第一步已落库，此处只读回显 -->
+                        <div class="flex items-center gap-4 mb-4 px-4 py-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <a-tag :color="typeMap[form.activityType].color" class="m-0">
+                                {{ typeMap[form.activityType].icon }} {{ typeMap[form.activityType].desc }}
+                            </a-tag>
+                            <span class="font-bold text-sm">{{ form.activityName }}</span>
+                            <span class="font-mono text-xs text-slate-500">{{ form.activityCode }}</span>
+                            <a-tag color="default" class="m-0 ml-auto">未开始 · 结构锁未启用</a-tag>
+                        </div>
+
+                        <div class="mount-shell">
+                            <div class="mount-head">
+                                <div class="text-xs text-slate-500">
+                                    挂载点 · 渲染
+                                    <code class="text-pink-600 bg-white px-1 rounded">
+                                        {{ typeMap[form.activityType].component }}.vue
+                                    </code>
+                                    <span class="text-slate-400">
+                                        （传入 activityCode="{{ form.activityCode }}" · embedded=true）
+                                    </span>
+                                </div>
+                                <a-tag color="blue" class="m-0">组件内部流程由它自己负责</a-tag>
+                            </div>
+                            <div class="mount-body">
+                                <div class="text-center">
+                                    <div class="text-5xl mb-3">{{ typeMap[form.activityType].icon }}</div>
+                                    <div class="font-bold mb-1">{{ typeMap[form.activityType].desc }}配置</div>
+                                    <div class="text-sm text-slate-500 max-w-md">
+                                        {{ typeMap[form.activityType].inner }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="note mt-4">
+                            <b>内嵌模式下该组件的三处行为被改写</b>：隐藏它自己的活动下拉（活动已定，
+                            再出现一个下拉就是双控冲突）、关闭它自己的路由离开拦截（否则和外壳的拦截叠加会弹两次）、
+                            抑制它自己的成功页（交给外壳的完成页）。
+                            <code>embedded=false</code> 时行为与现在<b>完全一致</b>，独立菜单入口不受影响。
+                        </div>
+
+                        <div class="flex justify-between mt-6">
+                            <a-button size="large" @click="msg('活动已创建，可稍后从列表点「继续配置」回来', 'info'); view = 'list'">
+                                稍后再配
+                            </a-button>
+                            <a-button type="primary" size="large" @click="step = 2">保存玩法配置</a-button>
+                        </div>
+                    </div>
+
+                    <!-- ---------- 完成页 ---------- -->
+                    <div v-else class="p-6">
+                        <a-result status="success"
+                                  :title="isBasic ? '基础活动创建成功' : '活动与玩法配置已完成'"
+                                  :sub-title="`${form.activityName}（${form.activityCode}）`">
+                            <template #extra>
+                                <a-space>
+                                    <a-button type="primary" size="large" @click="msg('活动已上线（模拟）'); view = 'list'">
+                                        立即上线
+                                    </a-button>
+                                    <a-button size="large" @click="openWizard">再建一个</a-button>
+                                    <a-button size="large" @click="view = 'list'">回活动列表</a-button>
+                                </a-space>
+                            </template>
+                            <div v-if="isBasic" class="note text-center">
+                                基础活动尚未挂载任何玩法。之后想加抽奖/任务/彩票，
+                                可在列表点「升级玩法」—— 它没有玩法下游，升级不会产生孤儿数据。
+                            </div>
+                        </a-result>
+                    </div>
+                </a-card>
+            </div>
+        </transition>
+    </div>
+
+    <!-- ==================== 升级玩法弹窗 ==================== -->
+    <a-modal v-model:open="upgradeVisible" title="升级玩法类型" width="560px"
+             ok-text="升级并配置" cancel-text="取消" @ok="doUpgrade">
+        <div class="py-2">
+            <div class="mb-4 px-3 py-2 bg-slate-50 rounded border border-slate-200 text-sm">
+                <span class="font-bold">{{ upgradeTarget.activityName }}</span>
+                <span class="font-mono text-xs text-slate-500 ml-2">{{ upgradeTarget.activityCode }}</span>
+            </div>
+            <div class="text-sm mb-3">选择要升级到的玩法类型：</div>
+            <div class="grid grid-cols-3 gap-3">
+                <div v-for="t in playableTypes" :key="t.value"
+                     class="type-card p-3 flex flex-col items-center text-center"
+                     :class="{ active: upgradeType === t.value }"
+                     @click="upgradeType = t.value">
+                    <span class="text-2xl mb-1">{{ t.icon }}</span>
+                    <span class="font-bold text-xs">{{ t.desc }}</span>
+                </div>
+            </div>
+            <div class="note mt-4">
+                仅 <b>基础活动</b> 可升级，且服务端会二次校验下游玩法表为空。
+                <b>玩法类活动之间不可互转、也不可降级回基础活动</b> —— 那会遗弃已配好的玩法配置。
+            </div>
+        </div>
+    </a-modal>
+</div>
+</script>
+
+<script>
+    const { createApp, ref, reactive, computed } = Vue;
+    const { message } = antd;
+
+    // 唯一真源：路由 / 组件 / 图标 / 文案都收在这里（铁律 3：消除魔法值）
+    // component === null 就是「无第二步」的判据，不要在向导里另写 if (type === 'BASIC')
+    const ACTIVITY_TYPE_ENUM = {
+        BASIC:   { value:'BASIC',   desc:'基础活动', icon:'📋', color:'default', component:null,
+                   hint:'仅活动外壳，不挂玩法', inner:'' },
+        DRAW:    { value:'DRAW',    desc:'奖池抽奖', icon:'🎡', color:'orange', component:'DrawWorkbench',
+                   hint:'转盘/九宫格/盲盒',
+                   inner:'Tab1 奖品物资库（库存、单人限领、白名单） + Tab2 概率引擎（多奖池、兜底配平、沙盘模拟）' },
+        TASK:    { value:'TASK',    desc:'任务驱动', icon:'🎯', color:'purple', component:'TaskWizard',
+                   hint:'签到/浏览/分享',
+                   inner:'该组件自带 5 步向导（选模板 → 配规则 → 配奖励 → 配人群 → 确认），内层步骤条由它自己渲染' },
+        LOTTERY: { value:'LOTTERY', desc:'FPE彩票', icon:'🎟️', color:'cyan', component:'LotteryWorkbench',
+                   hint:'加密发号/周期开奖',
+                   inner:'Tab1 引擎配置（号码长度、发行量、奖级规则、上下线） + Tab2 期号大盘（创设、摇号、开奖派奖）' },
+    };
+
+    const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const genBizCode = () => Array.from({ length: 10 },
+        () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+
+    const App = {
+        template: '#app-template',
+        setup() {
+            const view = ref('list');
+            const step = ref(0);
+            const saving = ref(false);
+            const formRef = ref();
+
+            const typeMap = ACTIVITY_TYPE_ENUM;
+            const typeList = Object.values(ACTIVITY_TYPE_ENUM);
+            const playableTypes = typeList.filter(t => t.component !== null);
+
+            // ---------- 列表 ----------
+            const filterType = ref('ALL');
+            const columns = [
+                { title:'活动编码', dataIndex:'activityCode', width:'16%' },
+                { title:'活动名称', dataIndex:'activityName', width:'22%' },
+                { title:'玩法类型', dataIndex:'activityType', width:'14%' },
+                { title:'状态',    dataIndex:'status',       width:'12%' },
+                { title:'配置完备度', dataIndex:'configured', width:'18%' },
+                { title:'操作',    dataIndex:'action', align:'center', width:'18%' },
+            ];
+            const list = ref([
+                { activityCode:'12278CBYW7', activityName:'618 年中狂欢抽奖', activityType:'DRAW',
+                  status:1, configured:true,  refs:'3 个奖池 / 12 项物资' },
+                { activityCode:'LTQ7M3XKD8', activityName:'锦鲤福彩发号',     activityType:'LOTTERY',
+                  status:0, configured:true,  refs:'2 个玩法 / 4 条奖级规则' },
+                { activityCode:'WLO9SMXDKD', activityName:'新人签到任务',     activityType:'TASK',
+                  status:1, configured:true,  refs:'1 个任务配置' },
+                { activityCode:'K3M8QP2VZX', activityName:'中秋礼盒预热',     activityType:'DRAW',
+                  status:0, configured:false, refs:'' },
+                { activityCode:'B7YN4TR9WC', activityName:'门店会员日',       activityType:'BASIC',
+                  status:1, configured:true,  refs:'5 个奖品' },
+            ]);
+            const filteredList = computed(() =>
+                filterType.value === 'ALL' ? list.value
+                                           : list.value.filter(a => a.activityType === filterType.value));
+
+            const canDelete = (r) => !r.refs;
+            const deleteTip = (r) => r.refs
+                ? `该活动下已配置 ${r.refs}，请先清理后再删除`
+                : '删除后不可恢复，确认删除？';
+
+            // ---------- 向导 ----------
+            const form = reactive({ activityName:'', timeRange:[], activityType:'DRAW', activityCode:'' });
+            const rules = {
+                activityName: [{ required:true, message:'请输入活动名称' }],
+                timeRange:    [{ required:true, message:'请选择起止时间', type:'array' }],
+                activityCode: [{ required:true, message:'请输入或生成活动编码' },
+                               { pattern:/^[A-Z0-9]{10}$/, message:'必须是 10 位大写字母 + 数字' }],
+            };
+
+            const isBasic = computed(() => typeMap[form.activityType].component === null);
+
+            // 步骤条随类型伸缩：BASIC 两步，玩法类三步
+            const stepItems = computed(() => isBasic.value
+                ? [{ title:'创建活动' }, { title:'完成' }]
+                : [{ title:'创建活动' }, { title:'配置玩法' }, { title:'完成' }]);
+
+            const genCode = () => { form.activityCode = genBizCode(); };
+
+            const openWizard = () => {
+                Object.assign(form, { activityName:'', timeRange:[], activityType:'DRAW', activityCode:genBizCode() });
+                step.value = 0;
+                view.value = 'wizard';
+            };
+
+            const resumeWizard = (record) => {
+                // 空壳活动恢复：直达第二步，第一步数据只读回显
+                Object.assign(form, {
+                    activityName: record.activityName,
+                    activityType: record.activityType,
+                    activityCode: record.activityCode,
+                    timeRange: [],
+                });
+                step.value = 1;
+                view.value = 'wizard';
+                message.info('已定位到「配置玩法」步骤');
+            };
+
+            const leaveWizard = () => { view.value = 'list'; step.value = 0; };
+
+            const submitStep1 = async () => {
+                try { await formRef.value.validate(); } catch { return; }
+                saving.value = true;
+                // 第一步提交即落库 —— 玩法配置的保存接口都要求活动已存在，不能攒到最后一起提交
+                setTimeout(() => {
+                    saving.value = false;
+                    if (!list.value.some(a => a.activityCode === form.activityCode)) {
+                        list.value.unshift({
+                            activityCode: form.activityCode,
+                            activityName: form.activityName,
+                            activityType: form.activityType,
+                            status: 0,
+                            configured: isBasic.value,
+                            refs: '',
+                        });
+                    }
+                    message.success('活动已创建');
+                    step.value = isBasic.value ? 1 : 1; // BASIC 的第 1 步即完成页
+                }, 400);
+            };
+
+            // ---------- 升级 ----------
+            const upgradeVisible = ref(false);
+            const upgradeTarget = ref({});
+            const upgradeType = ref('DRAW');
+            const openUpgrade = (record) => {
+                upgradeTarget.value = record;
+                upgradeType.value = 'DRAW';
+                upgradeVisible.value = true;
+            };
+            const doUpgrade = () => {
+                upgradeVisible.value = false;
+                const rec = list.value.find(a => a.activityCode === upgradeTarget.value.activityCode);
+                if (rec) { rec.activityType = upgradeType.value; rec.configured = false; }
+                message.success(`已升级为${typeMap[upgradeType.value].desc}，请继续配置玩法`);
+                resumeWizard({ ...upgradeTarget.value, activityType: upgradeType.value });
+            };
+
+            const msg = (t, type = 'success') => message[type](t);
+
+            return {
+                view, step, saving, formRef,
+                typeMap, typeList, playableTypes,
+                filterType, columns, list, filteredList, canDelete, deleteTip,
+                form, rules, isBasic, stepItems, genCode,
+                openWizard, resumeWizard, leaveWizard, submitStep1,
+                upgradeVisible, upgradeTarget, upgradeType, openUpgrade, doUpgrade,
+                msg,
+            };
+        },
+    };
+
+    createApp(App).use(antd).mount('#app');
+</script>
+</body>
+</html>
