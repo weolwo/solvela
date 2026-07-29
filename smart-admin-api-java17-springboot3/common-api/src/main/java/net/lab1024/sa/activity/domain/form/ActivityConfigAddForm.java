@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 import lombok.Data;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
+import net.lab1024.sa.base.common.validator.enumeration.CheckEnum;
+import net.lab1024.sa.enums.ActivityTypeEnum;
 
 /**
  * 活动配置 新建表单
@@ -31,7 +33,9 @@ public class ActivityConfigAddForm {
     @NotBlank(message = "活动名称 不能为空")
     private String activityName;
 
-    @Schema(description = "活动类型")
+    @Schema(description = "活动类型：BASIC-基础活动 / DRAW-奖池抽奖 / TASK-任务驱动 / LOTTERY-FPE彩票",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+    @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "活动类型非法")
     private String activityType;
 
     @Schema(description = "状态：0-未开始, 1-上线, 2-下线")

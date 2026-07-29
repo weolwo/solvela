@@ -3,7 +3,9 @@ package net.lab1024.sa.activity.controller;
 import net.lab1024.sa.activity.domain.form.ActivityConfigAddForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigQueryForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigUpdateForm;
+import net.lab1024.sa.activity.domain.form.ActivityTypeUpgradeForm;
 import net.lab1024.sa.activity.domain.vo.ActivityConfigVO;
+import net.lab1024.sa.activity.domain.vo.ActivityDeleteCheckVO;
 import net.lab1024.sa.activity.service.ActivityConfigService;
 import net.lab1024.sa.base.common.domain.ValidateList;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,8 +20,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
+
 /**
  * 活动配置 Controller
+ *
+ * 权限串统一为 activityConfig:xxx，与 t_menu 的功能点一一对应。
+ * 此前 add/generateCode 上挂的是 ":addProposal"（提案域的动作名被整段复制过来），
+ * 且冒号前为空 —— 实际权限串是 ":addProposal"，与任何功能点都对不上。
+ * 这类问题在开发期测不出来：管理员账号往往有全量权限，只有给运营配了受限角色才暴露。
  *
  * @Author weolwo
  * @Date 2026-04-18 19:31:49
@@ -31,54 +40,77 @@ import java.util.List;
 @RequestMapping("/activityConfig")
 public class ActivityConfigController {
 
-    private final ActivityConfigService Service;
+    private final ActivityConfigService activityConfigService;
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("activityConfig:query")
     public ResponseDTO<PageResult<ActivityConfigVO>> queryPage(@RequestBody @Valid ActivityConfigQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        return ResponseDTO.ok(activityConfigService.queryPage(queryForm));
     }
 
-    @Operation(summary = "活动下拉列表（按活动类型 DRAW/TASK/LOTTERY 过滤，不传则全部）")
+    @Operation(summary = "活动下拉列表（按类型过滤；includeInactive=true 时连已下线/已过期一并返回）")
     @GetMapping("/optionList")
-    @SaCheckPermission(":query")
-    public ResponseDTO<List<ActivityConfigVO>> queryOptionList(@RequestParam(required = false) String activityType) {
-        return ResponseDTO.ok(Service.queryOptionList(activityType));
+    @SaCheckPermission("activityConfig:query")
+    public ResponseDTO<List<ActivityConfigVO>> queryOptionList(
+            @RequestParam(required = false) String activityType,
+            @RequestParam(required = false, defaultValue = "false") Boolean includeInactive) {
+        return ResponseDTO.ok(activityConfigService.queryOptionList(activityType, includeInactive));
+    }
+
+    @Operation(summary = "批量查询「是否已配置玩法」，供活动列表页一次算完")
+    @PostMapping("/configuredStatus")
+    @SaCheckPermission("activityConfig:query")
+    public ResponseDTO<Map<String, Boolean>> queryConfiguredStatus(@RequestBody ValidateList<String> activityCodeList) {
+        return ResponseDTO.ok(activityConfigService.queryConfiguredStatus(activityCodeList));
+    }
+
+    @Operation(summary = "删除前检查：是否可删 + 下游引用明细")
+    @GetMapping("/checkDeletable/{id}")
+    @SaCheckPermission("activityConfig:query")
+    public ResponseDTO<ActivityDeleteCheckVO> checkDeletable(@PathVariable Long id) {
+        return ResponseDTO.ok(activityConfigService.checkDeletable(id));
     }
 
     @Operation(summary = "生成活动编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("activityConfig:add")
     public ResponseDTO<String> generateActivityCode() {
-        return Service.generateActivityCode();
+        return activityConfigService.generateActivityCode();
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("activityConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid ActivityConfigAddForm addForm) {
-        return Service.add(addForm);
+        return activityConfigService.add(addForm);
     }
 
-    @Operation(summary = "更新")
+    @Operation(summary = "更新（不含活动类型，类型创建后不可改）")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("activityConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid ActivityConfigUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return activityConfigService.update(updateForm);
+    }
+
+    @Operation(summary = "升级活动类型：仅 BASIC → DRAW/TASK/LOTTERY，且下游玩法表必须为空")
+    @PostMapping("/upgradeType")
+    @SaCheckPermission("activityConfig:update")
+    public ResponseDTO<String> upgradeType(@RequestBody @Valid ActivityTypeUpgradeForm upgradeForm) {
+        return activityConfigService.upgradeType(upgradeForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("activityConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+        return activityConfigService.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
+    @SaCheckPermission("activityConfig:delete")
+    public ResponseDTO<String> delete(@PathVariable Long id) {
+        return activityConfigService.delete(id);
     }
 }

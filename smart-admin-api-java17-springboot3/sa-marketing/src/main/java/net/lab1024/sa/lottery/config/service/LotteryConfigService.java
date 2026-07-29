@@ -10,6 +10,7 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.enums.ActivityTypeEnum;
 import net.lab1024.sa.lottery.config.dao.LotteryConfigDao;
 import net.lab1024.sa.lottery.config.domain.entity.LotteryConfig;
 import net.lab1024.sa.lottery.config.domain.form.FpePreviewForm;
@@ -77,9 +78,10 @@ public class LotteryConfigService {
     private static final Integer STATUS_OFFLINE = 0;
 
     /**
-     * 活动类型：彩票工作台只接受这一类活动
+     * 活动类型：彩票工作台只接受这一类活动。
+     * 取值统一走 ActivityTypeEnum，不再在本类里裸写 "LOTTERY" 字符串（铁律 3：消除魔法值）。
      */
-    private static final String ACTIVITY_TYPE_LOTTERY = "LOTTERY";
+    private static final String ACTIVITY_TYPE_LOTTERY = ActivityTypeEnum.LOTTERY.getValue();
 
     // ==================== 编码 ====================
 
@@ -379,16 +381,35 @@ public class LotteryConfigService {
         if (STATUS_ONLINE.equals(config.getStatus())) {
             return ResponseDTO.userErrorParam("该玩法已经是上线状态");
         }
-        boolean hasRule = lotteryPrizeRuleManager.lambdaQuery()
-                .eq(LotteryPrizeRule::getLotteryCode, lotteryCode).exists();
-        if (!hasRule) {
-            return ResponseDTO.userErrorParam("尚未配置任何奖级规则，上线后号码发出去了却无奖可发。请先在「引擎配置与奖级映射」配置奖级");
+        String notReady = checkOnlineReady(lotteryCode);
+        if (notReady != null) {
+            return ResponseDTO.userErrorParam(notReady);
         }
         int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_OFFLINE, STATUS_ONLINE);
         if (rows == 0) {
             return ResponseDTO.userErrorParam("上线失败：状态已被其他人变更，请刷新后重试");
         }
         return ResponseDTO.ok();
+    }
+
+    /**
+     * 上线前检查：返回 null 表示可以上线，非 null 是「还差什么」的人话说明。
+     *
+     * 抽成独立方法是为了让 {@link #online(String)} 与「活动是否已配置完备」的统计
+     * （LotteryActivityRefProvider）<b>共用同一份判据</b>。
+     * 若两处各写一套，迟早漂移 —— 本项目已经吃过这种亏（TicketMatcher 与结算 SQL 守卫是
+     * 同一规则的两种实现，SettleSemanticsTest 就是专门防它们漂移的）。
+     *
+     * 目前唯一的条件是「必须配了奖级规则」：否则号码发出去了、开奖时却无奖可发，
+     * 而那时号码已经在用户手里，配置补救的代价远高于此刻拦一下。
+     */
+    public String checkOnlineReady(String lotteryCode) {
+        boolean hasRule = lotteryPrizeRuleManager.lambdaQuery()
+                .eq(LotteryPrizeRule::getLotteryCode, lotteryCode).exists();
+        if (!hasRule) {
+            return "尚未配置任何奖级规则，上线后号码发出去了却无奖可发。请先在「引擎配置与奖级映射」配置奖级";
+        }
+        return null;
     }
 
     /**
