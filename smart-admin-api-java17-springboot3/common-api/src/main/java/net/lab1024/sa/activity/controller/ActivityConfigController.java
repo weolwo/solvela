@@ -3,6 +3,7 @@ package net.lab1024.sa.activity.controller;
 import net.lab1024.sa.activity.domain.form.ActivityConfigAddForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigQueryForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigUpdateForm;
+import net.lab1024.sa.activity.domain.form.ActivityStatusUpdateForm;
 import net.lab1024.sa.activity.domain.form.ActivityTypeUpgradeForm;
 import net.lab1024.sa.activity.domain.form.ActivityWizardCreateForm;
 import net.lab1024.sa.activity.domain.vo.ActivityConfigVO;
@@ -99,6 +100,13 @@ public class ActivityConfigController {
     @SaCheckPermission("activityConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid ActivityConfigUpdateForm updateForm) {
         return activityConfigService.update(updateForm);
+    }
+
+    @Operation(summary = "活动上下线（单个开关与批量操作共用）；上线前校验玩法完备度")
+    @PostMapping("/updateStatus")
+    @SaCheckPermission("activityConfig:update")
+    public ResponseDTO<String> updateStatus(@RequestBody @Valid ActivityStatusUpdateForm form) {
+        return activityConfigService.updateStatus(form);
     }
 
     @Operation(summary = "升级活动类型：仅 BASIC → DRAW/TASK/LOTTERY，且下游玩法表必须为空")

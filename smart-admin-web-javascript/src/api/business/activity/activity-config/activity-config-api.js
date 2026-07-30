@@ -56,6 +56,14 @@ export const activityConfigApi = {
   },
 
   /**
+   * 活动启用/禁用，单个开关与批量禁用共用  @author  alaric
+   * 入参 { idList: [], status: 1|2 }；启用时服务端会校验玩法完备度
+   */
+  updateStatus: (param) => {
+    return postRequest('/activityConfig/updateStatus', param);
+  },
+
+  /**
    * 创建向导第一步：建活动 + 随手建的若干奖品，服务端一次事务落库  @author  alaric
    *
    * 不要拆成「先 add 活动再循环 add 奖品」—— 奖品的 activityCode 必填，

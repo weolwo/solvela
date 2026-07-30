@@ -117,7 +117,7 @@
     activityCode: undefined, //活动编码
     activityName: undefined, //活动名称
     activityType: undefined, //活动类型
-    status: undefined, //状态：0-未开始, 1-上线, 2-下线
+    status: undefined, //状态：1-启用, 2-禁用（不传则落库取默认值，列表上显示为「禁用」）
     startTime: undefined, //活动开始时间
     endTime: undefined, //活动结束时间
     scriptId: undefined, //规则脚本id

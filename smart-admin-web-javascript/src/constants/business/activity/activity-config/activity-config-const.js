@@ -83,18 +83,28 @@ export function activityTypeMeta(type) {
 }
 
 /**
- * 活动状态：对齐 t_activity_config.status
+ * 活动状态：对齐 t_activity_config.status。
+ *
+ * ⚠️ **管理端只有「启用 / 禁用」两态**。
+ * 库里还存在历史值 0（原「未开始」），但「活动有没有开始」是<b>业务层按起止时间实时算的</b>，
+ * 不是运营在后台拨的开关 —— 管理端再保留一个 0 态，等于凭空多出第三种管理状态，
+ * 还会和业务层算出来的结果打架。
+ * 故 0 一律按「未启用」展示（开关关闭），运营打开即变 1，此后只在 1↔2 之间切换。
  */
 export const ACTIVITY_STATUS_ENUM = {
-  NOT_START: { value: 0, desc: '未开始', badge: 'default' },
-  ONLINE: { value: 1, desc: '已上线', badge: 'processing' },
-  OFFLINE: { value: 2, desc: '已下线', badge: 'default' },
+  ENABLED: { value: 1, desc: '启用', badge: 'processing' },
+  DISABLED: { value: 2, desc: '禁用', badge: 'default' },
 };
 
 export const ACTIVITY_STATUS_LIST = Object.values(ACTIVITY_STATUS_ENUM);
 
+/** 是否处于启用态。只有 1 算启用；0（历史未开始）与 2（禁用）都算未启用 */
+export function isActivityEnabled(status) {
+  return status === ACTIVITY_STATUS_ENUM.ENABLED.value;
+}
+
 export function activityStatusMeta(status) {
-  return ACTIVITY_STATUS_LIST.find((s) => s.value === status) || { value: status, desc: '未知', badge: 'default' };
+  return isActivityEnabled(status) ? ACTIVITY_STATUS_ENUM.ENABLED : ACTIVITY_STATUS_ENUM.DISABLED;
 }
 
 export default {

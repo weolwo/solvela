@@ -48,11 +48,14 @@
           创建活动向导
         </a-button>
         <a-button @click="showForm" size="small">新建（仅活动）</a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <!-- 只提供批量禁用，不提供批量启用：
+             禁用是「出问题了赶紧全停掉」的止血动作，越快越好；
+             而启用要逐个确认配置完备（服务端也会拦），批量放开只会让运营一次性启用一批半成品 -->
+        <a-button @click="confirmBatchDisable" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
-            <DeleteOutlined />
+            <StopOutlined />
           </template>
-          批量删除
+          批量禁用
         </a-button>
       </div>
       <div class="smart-table-setting-block">
@@ -80,8 +83,15 @@
           </a-tag>
         </template>
 
+        <!-- 状态直接用开关就地切换，不用再进编辑表单 -->
         <template v-else-if="column.dataIndex === 'status'">
-          <a-badge :status="activityStatusMeta(record.status).badge" :text="activityStatusMeta(record.status).desc" />
+          <a-switch
+            :checked="isActivityEnabled(record.status)"
+            :loading="statusLoadingId === record.id"
+            checked-children="启用"
+            un-checked-children="禁用"
+            @change="(checked) => onToggleStatus(record, checked)"
+          />
         </template>
 
         <!--
@@ -108,7 +118,10 @@
             </a-button>
             <a-button v-else type="link" @click="openUpgrade(record)">升级玩法</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
+            <!-- 不提供删除：活动的生命周期用「启用/禁用」表达。
+                 发奖流水按 activity_code 追溯（t_prize_log 上有 (member_name, activity_code) 索引），
+                 删掉活动等于把资损追溯链路断在源头。
+                 服务端 delete 接口与删除守卫仍保留，作为 API 层兜底。 -->
           </div>
         </template>
       </template>
@@ -172,10 +185,11 @@
   import ActivityConfigForm from './activity-config-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import {
+    ACTIVITY_STATUS_ENUM,
     PLAYABLE_TYPE_LIST,
-    activityStatusMeta,
     activityTypeMeta,
     hasGameplay,
+    isActivityEnabled,
   } from '/@/constants/business/activity/activity-config/activity-config-const';
 
   // ⚠️ 与 t_menu 里登记的 path 保持一致（v3.42.0.sql），写错不会报错、只会白屏
@@ -392,53 +406,36 @@
     }
   }
 
-  // ---------------------------- 单个删除 ----------------------------
+  // ---------------------------- 启用 / 禁用 ----------------------------
+
+  /** 正在提交状态变更的行 id，用来只给那一行的开关转圈，而不是整表 loading */
+  const statusLoadingId = ref(null);
 
   /**
-   * 删除前先问服务端能不能删，把「有 3 个奖池」这种理由在确认框里就摆出来，
-   * 而不是等运营点完确认才被拒。服务端 delete 里同样会再拦一次（铁律 2：前端只是防呆）。
+   * 单个开关切换。
+   *
+   * 不加二次确认：启用/禁用都是可逆的，而「出问题立刻停掉」正是运营最需要快的动作，
+   * 每次弹框会让止血变慢。真正不可逆的操作（删除）已经从这个页面拿掉了。
+   *
+   * ⚠️ 开关用的是 :checked 而非 v-model —— 服务端可能拒绝（如启用一个没配完的活动），
+   * 用 v-model 会让开关先自己跳过去、再被数据刷回来，出现一次视觉回弹。
+   * 用 :checked 则状态始终由服务端返回的数据决定。
    */
-  async function onDelete(data) {
-    let check;
+  async function onToggleStatus(record, checked) {
+    const target = checked ? ACTIVITY_STATUS_ENUM.ENABLED.value : ACTIVITY_STATUS_ENUM.DISABLED.value;
+    statusLoadingId.value = record.id;
     try {
-      const res = await activityConfigApi.checkDeletable(data.id);
-      check = res.data || {};
-    } catch (e) {
-      smartSentry.captureError(e);
-      return;
-    }
-    if (!check.deletable) {
-      Modal.warning({ title: '无法删除', content: check.reason || '该活动存在下游引用' });
-      return;
-    }
-    Modal.confirm({
-      title: '提示',
-      content: `确定要删除活动「${data.activityName}」吗？`,
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求删除
-  async function requestDelete(data) {
-    SmartLoading.show();
-    try {
-      await activityConfigApi.delete(data.id);
-      message.success('删除成功');
-      queryData();
+      await activityConfigApi.updateStatus({ idList: [record.id], status: target });
+      message.success(checked ? '已启用' : '已禁用');
+      await queryData();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
-      SmartLoading.hide();
+      statusLoadingId.value = null;
     }
   }
 
-  // ---------------------------- 批量删除 ----------------------------
+  // ---------------------------- 批量禁用 ----------------------------
 
   // 选择表格行
   const selectedRowKeyList = ref([]);
@@ -447,28 +444,34 @@
     selectedRowKeyList.value = selectedRowKeys;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  /**
+   * 批量禁用保留确认框：单个开关是一次点击一个、看得见结果，
+   * 批量则可能一次影响十几个活动，值得让运营停一下确认数量。
+   */
+  function confirmBatchDisable() {
     Modal.confirm({
-      title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      title: '批量禁用',
+      content: `确定要禁用选中的 ${selectedRowKeyList.value.length} 个活动吗？禁用后可随时再启用。`,
+      okText: '禁用',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchDisable();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  async function requestBatchDisable() {
     try {
       SmartLoading.show();
-      await activityConfigApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
-      queryData();
+      await activityConfigApi.updateStatus({
+        idList: selectedRowKeyList.value,
+        status: ACTIVITY_STATUS_ENUM.DISABLED.value,
+      });
+      message.success('已批量禁用');
+      selectedRowKeyList.value = [];
+      await queryData();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {

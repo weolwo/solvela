@@ -7,6 +7,7 @@ import net.lab1024.sa.activity.domain.entity.ActivityConfig;
 import net.lab1024.sa.activity.domain.form.ActivityConfigAddForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigQueryForm;
 import net.lab1024.sa.activity.domain.form.ActivityConfigUpdateForm;
+import net.lab1024.sa.activity.domain.form.ActivityStatusUpdateForm;
 import net.lab1024.sa.activity.domain.form.ActivityTypeUpgradeForm;
 import net.lab1024.sa.activity.domain.form.ActivityWizardCreateForm;
 import net.lab1024.sa.activity.domain.vo.ActivityConfigVO;
@@ -328,6 +329,50 @@ public class ActivityConfigService {
         activityConfig.setActivityType(null);
         activityConfig.setActivityCode(null);
         activityConfigDao.updateById(activityConfig);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 活动启用 / 禁用（单个开关与批量禁用共用）。
+     *
+     * <p><b>启用前会校验玩法完备度</b>：启用一个还没配奖池的抽奖活动，
+     * 用户点进去什么也抽不到 —— 而那时活动已经对外可见，补救的代价远高于此刻拦一下。
+     * 判据直接复用 {@link ActivityRefProvider#checkConfigured}，与列表页「配置完备度」列
+     * 是同一份逻辑，不另造一套（另造必然漂移，见方案 §1.5）。
+     *
+     * <p>BASIC 活动天然通过：它按定义不挂玩法，`checkConfigured` 返回 null。
+     *
+     * <p><b>禁用不做任何校验</b> —— 恰恰相反，出问题时能立刻止血地停掉活动是运营最需要的能力
+     * （对齐 `LotteryConfigService.offline()` 的既定取舍）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> updateStatus(ActivityStatusUpdateForm form) {
+        if (!STATUS_ONLINE.equals(form.getStatus()) && !STATUS_OFFLINE.equals(form.getStatus())) {
+            return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 2-禁用");
+        }
+        List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(form.getIdList());
+        if (CollectionUtils.isEmpty(activityList)) {
+            return ResponseDTO.userErrorParam("活动不存在");
+        }
+
+        // 启用：逐个校验完备度。任一不通过则整批拒绝并点名是哪个活动 ——
+        // 部分成功会让运营以为「都启用了」，而实际有几个没启，这种结果比整批失败更难排查
+        if (STATUS_ONLINE.equals(form.getStatus())) {
+            for (ActivityConfig activity : activityList) {
+                String notReady = checkConfigured(activity);
+                if (notReady != null) {
+                    return ResponseDTO.userErrorParam(
+                            "「" + activity.getActivityName() + "」" + notReady + "，请先配置完成再启用");
+                }
+            }
+        }
+
+        for (ActivityConfig activity : activityList) {
+            ActivityConfig update = new ActivityConfig();
+            update.setId(activity.getId());
+            update.setStatus(form.getStatus());
+            activityConfigDao.updateById(update);
+        }
         return ResponseDTO.ok();
     }
 
