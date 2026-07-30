@@ -74,7 +74,7 @@
         <a-tag v-if="pendingCount > 0" color="orange" class="ml-2">当前筛选下有 {{ pendingCount }} 条待审批</a-tag>
       </div>
       <div class="smart-table-setting-block">
-        <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
+        <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.BUSINESS.MARKETING.PRIZE_LOG" :refresh="queryData" />
       </div>
     </a-row>
 
@@ -172,6 +172,7 @@
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
+  import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import {
     APPROVE_STATUS_OPTIONS,

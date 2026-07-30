@@ -59,7 +59,7 @@
         </a-button>
       </div>
       <div class="smart-table-setting-block">
-        <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
+        <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.SUPPORT.CHANGE_LOG" :refresh="queryData" />
       </div>
     </a-row>
     <!---------- 表格操作行 end ----------->
@@ -124,6 +124,7 @@
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
+  import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import DictSelect from '/@/components/support/dict-select/index.vue';
   import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';

@@ -54,7 +54,7 @@
         </a-button>
       </div>
       <div class="smart-table-setting-block">
-        <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
+        <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.BUSINESS.MARKETING.LOTTERY_PRIZE_RULE" :refresh="queryData" />
       </div>
     </a-row>
     <!---------- 表格操作行 end ----------->
@@ -109,6 +109,7 @@
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
+  import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import LotteryPrizeRuleForm from './lottery-prize-rule-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 

@@ -91,7 +91,10 @@
   //构建用户的数据列
   async function buildUserTableColumns() {
 
+    // 没配 tableId 时不去后端取用户设置，但仍要套用默认隐藏规则 ——
+    // 否则这类页面会退化成「所有列全展开」，而那正是我们要修的问题
     if (!props.tableId) {
+      updateColumn([]);
       return;
     }
 
