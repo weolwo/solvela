@@ -15,7 +15,9 @@
     <template #title>{{ menuInfo.menuName }}</template>
     <template v-for="item in menuInfo.children" :key="item.menuId">
       <template v-if="item.visibleFlag && !item.disabledFlag">
-        <template v-if="!item.children">
+        <!-- 判空必须用 isEmpty：空数组是 truthy，用 !item.children 会渲染出空的 a-sub-menu，
+             触发 antd 的 useInjectMenu 报错。与 recursion-menu.vue 的顶层判断同口径。 -->
+        <template v-if="$lodash.isEmpty(item.children)">
           <a-menu-item :key="item.menuId" @click="turnToPage(item)">
             <template #icon>
               <component :is="$antIcons[item.icon]" />

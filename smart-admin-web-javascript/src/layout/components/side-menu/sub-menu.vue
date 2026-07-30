@@ -15,7 +15,11 @@
     <template #title>{{ menuInfo.menuName }}</template>
     <template v-for="item in menuInfo.children" :key="item.menuId">
       <template v-if="item.visibleFlag && !item.disabledFlag">
-        <template v-if="!item.children">
+        <!-- 判空必须用 isEmpty：空数组是 truthy，用 !item.children 会把 children:[] 当成「有子菜单」，
+             渲染出一个空的 a-sub-menu，而 antd 的 InternalSubMenuList 遇到空列表会抛
+             「Cannot destructure property 'prefixCls' of useInjectMenu(...)」。
+             与本目录 recursion-menu.vue 的顶层判断保持同一口径。 -->
+        <template v-if="$lodash.isEmpty(item.children)">
           <a-menu-item :key="item.menuId" @click="turnToPage(item)">
             <template #icon>
               <component :is="$antIcons[item.icon]" />
