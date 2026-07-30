@@ -6,7 +6,7 @@ CREATE TABLE `t_activity_config`
     `tenant_id`     varchar(16) NOT NULL DEFAULT '0' comment '租户id',
     `activity_code` varchar(32) NOT NULL COMMENT '活动编码：10位大写字母+数字，全局唯一',
     `activity_name` varchar(64) NOT NULL COMMENT '活动名称',
-    `activity_type` varchar(32) NOT NULL COMMENT '活动类型 DRAW，TASK,LOTTERY',
+    `activity_type` varchar(32) NOT NULL COMMENT '活动类型：BASIC-基础活动(仅外壳,不挂玩法) / DRAW-奖池抽奖 / TASK-任务驱动 / LOTTERY-FPE彩票',
     `status`        tinyint     NOT NULL DEFAULT 0 COMMENT '状态：0-未开始, 1-上线, 2-下线',
     `start_time`    datetime    NOT NULL COMMENT '活动开始时间',
     `end_time`      datetime    NOT NULL COMMENT '活动结束时间',
