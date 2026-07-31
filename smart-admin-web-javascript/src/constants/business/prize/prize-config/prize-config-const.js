@@ -55,6 +55,21 @@ export const PRIZE_TYPE_ALL_OPTIONS = Object.values(PRIZE_TYPE_ENUM).map((item) 
 }));
 
 /**
+ * 奖品状态：对齐 t_prize_config.status。
+ * 与活动的状态不同 —— 这里禁用是 0 而不是 2，别混用两套常量。
+ */
+export const PRIZE_STATUS_ENUM = {
+  ENABLED: { value: 1, desc: '启用' },
+  DISABLED: { value: 0, desc: '禁用' },
+};
+
+export const PRIZE_STATUS_OPTIONS = Object.values(PRIZE_STATUS_ENUM).map((s) => ({ value: s.value, label: s.desc }));
+
+export function isPrizeEnabled(status) {
+  return status === PRIZE_STATUS_ENUM.ENABLED.value;
+}
+
+/**
  * 审批模式：对齐 t_prize_config.approve_mode
  */
 export const APPROVE_MODE_OPTIONS = [
@@ -64,6 +79,8 @@ export const APPROVE_MODE_OPTIONS = [
 
 export default {
   PRIZE_TYPE_ENUM,
+  PRIZE_STATUS_ENUM,
+  PRIZE_STATUS_OPTIONS,
   PRIZE_TYPE_OPTIONS,
   PRIZE_TYPE_ALL_OPTIONS,
   APPROVE_MODE_OPTIONS,

@@ -5,6 +5,7 @@ import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
+import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
 import net.lab1024.sa.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,49 +37,56 @@ public class PrizeConfigController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("prizeConfig:query")
     public ResponseDTO<PageResult<PrizeConfigVO>> queryPage(@RequestBody @Valid PrizeConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "查询活动下启用中的奖品（抽奖工作台资产大库抽屉用）")
     @GetMapping("/optionList")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("prizeConfig:query")
     public ResponseDTO<List<PrizeConfigVO>> queryEnabledList(@RequestParam String activityCode) {
         return ResponseDTO.ok(Service.queryEnabledList(activityCode));
     }
 
     @Operation(summary = "生成奖品编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("prizeConfig:add")
     public ResponseDTO<String> generatePrizeCode() {
         return Service.generatePrizeCode();
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("prizeConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid PrizeConfigAddForm addForm) {
         return Service.add(addForm);
     }
 
+    @Operation(summary = "奖品启用/禁用（单个开关与批量禁用共用）")
+    @PostMapping("/updateStatus")
+    @SaCheckPermission("prizeConfig:update")
+    public ResponseDTO<String> updateStatus(@RequestBody @Valid PrizeStatusUpdateForm form) {
+        return Service.updateStatus(form);
+    }
+
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("prizeConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PrizeConfigUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("prizeConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("prizeConfig:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

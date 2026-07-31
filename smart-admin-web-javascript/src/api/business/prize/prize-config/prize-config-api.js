@@ -37,6 +37,14 @@ export const prizeConfigApi = {
   },
 
   /**
+   * 奖品启用/禁用，单个开关与批量禁用共用  @author  alaric
+   * 入参 { idList: [], status: 1|0 }
+   */
+  updateStatus: (param) => {
+    return postRequest('/prizeConfig/updateStatus', param);
+  },
+
+  /**
    * 修改  @author  weolwo
    */
   update: (param) => {

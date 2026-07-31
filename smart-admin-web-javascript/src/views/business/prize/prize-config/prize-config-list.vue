@@ -22,10 +22,10 @@
         <a-input style="width: 200px" v-model:value="queryForm.prizeName" placeholder="奖品名称" />
       </a-form-item>
       <a-form-item label="审批模式" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
+        <a-select style="width: 200px" v-model:value="queryForm.approveMode" :options="APPROVE_MODE_OPTIONS" placeholder="全部" allow-clear />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-停用, 1-启用" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="PRIZE_STATUS_OPTIONS" placeholder="全部" allow-clear />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -55,11 +55,13 @@
           </template>
           新建
         </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <!-- 只提供批量禁用：奖品可能已被奖池坑位/彩票奖级引用，删掉会让那些引用断链；
+             禁用则不再发放，历史流水不受影响 -->
+        <a-button @click="confirmBatchDisable" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
-            <DeleteOutlined />
+            <StopOutlined />
           </template>
-          批量删除
+          批量禁用
         </a-button>
       </div>
       <div class="smart-table-setting-block">
@@ -81,10 +83,47 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
-        <template v-if="column.dataIndex === 'action'">
+        <!-- 状态：开关就地切换 -->
+        <template v-if="column.dataIndex === 'status'">
+          <a-switch
+            :checked="isPrizeEnabled(record.status)"
+            :loading="statusLoadingId === record.id"
+            checked-children="启用"
+            un-checked-children="禁用"
+            @change="(checked) => onToggleStatus(record, checked)"
+          />
+        </template>
+
+        <!-- 审批模式：开关。开=人工审批（更保守的那一侧放在「开」，符合直觉） -->
+        <template v-else-if="column.dataIndex === 'approveMode'">
+          <a-switch
+            :checked="record.approveMode === 1"
+            :loading="approveLoadingId === record.id"
+            checked-children="人工审批"
+            un-checked-children="自动免审"
+            @change="(checked) => onToggleApproveMode(record, checked)"
+          />
+        </template>
+
+        <!-- 排序权重：行内编辑，点数字即改，失焦提交 -->
+        <template v-else-if="column.dataIndex === 'sortWeight'">
+          <a-input-number
+            :value="sortWeightDraft[record.id] ?? record.sortWeight"
+            :min="0"
+            :precision="0"
+            size="small"
+            style="width: 90px"
+            @change="(val) => (sortWeightDraft[record.id] = val)"
+            @blur="() => commitSortWeight(record)"
+            @keyup.enter="(e) => e.target.blur()"
+          />
+        </template>
+
+        <template v-else-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
+            <!-- 不提供删除：奖品可能已被奖池坑位、彩票奖级、发奖流水引用，
+                 删掉会让那些引用断链。需要停用就用状态开关。 -->
           </div>
         </template>
       </template>
@@ -120,6 +159,12 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import PrizeConfigForm from './prize-config-form.vue';
+  import {
+    APPROVE_MODE_OPTIONS,
+    PRIZE_STATUS_ENUM,
+    PRIZE_STATUS_OPTIONS,
+    isPrizeEnabled,
+  } from '/@/constants/business/prize/prize-config/prize-config-const';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -127,6 +172,7 @@
     {
       title: 'id',
       dataIndex: 'id',
+      showFlag: false, //默认隐藏：运维字段，运营不看
       ellipsis: true,
     },
     {
@@ -137,6 +183,7 @@
     {
       title: '优惠配置ID',
       dataIndex: 'promotionConfigId',
+      showFlag: false, //默认隐藏：运维字段，运营不看
       ellipsis: true,
     },
     {
@@ -271,70 +318,132 @@
     formRef.value.show(data);
   }
 
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
+  // ---------------------------- 启用 / 禁用 ----------------------------
 
-  //请求删除
-  async function requestDelete(data) {
-    SmartLoading.show();
+  /** 正在提交的行 id，只让那一行的控件转圈 */
+  const statusLoadingId = ref(null);
+  const approveLoadingId = ref(null);
+
+  async function onToggleStatus(record, checked) {
+    const target = checked ? PRIZE_STATUS_ENUM.ENABLED.value : PRIZE_STATUS_ENUM.DISABLED.value;
+    statusLoadingId.value = record.id;
     try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await prizeConfigApi.delete(data.id);
-      message.success('删除成功');
-      queryData();
+      await prizeConfigApi.updateStatus({ idList: [record.id], status: target });
+      message.success(checked ? '已启用' : '已禁用');
+      await queryData();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
-      SmartLoading.hide();
+      statusLoadingId.value = null;
     }
   }
 
-  // ---------------------------- 批量删除 ----------------------------
+  // ---------------------------- 审批模式 / 排序权重：行内改 ----------------------------
 
-  // 选择表格行
+  /**
+   * 这两个字段走通用的 update 接口，需要回传整行 ——
+   * PrizeConfigUpdateForm 的 approveMode 是 @NotNull，且服务端会重校验
+   * 「优惠配置的资产类型必须与奖品一致」，少传字段会被判成参数错误。
+   */
+  function buildUpdatePayload(record, patch) {
+    return {
+      id: record.id,
+      promotionConfigId: record.promotionConfigId,
+      prizeType: record.prizeType,
+      prizeName: record.prizeName,
+      prizeLevel: record.prizeLevel,
+      prizeValue: record.prizeValue,
+      approveMode: record.approveMode,
+      sortWeight: record.sortWeight,
+      ext: record.ext,
+      status: record.status,
+      ...patch,
+    };
+  }
+
+  async function onToggleApproveMode(record, checked) {
+    approveLoadingId.value = record.id;
+    try {
+      await prizeConfigApi.update(buildUpdatePayload(record, { approveMode: checked ? 1 : 0 }));
+      message.success(checked ? '已改为人工审批' : '已改为自动免审');
+      await queryData();
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      approveLoadingId.value = null;
+    }
+  }
+
+  /**
+   * 排序权重的本地编辑值，key 是行 id。
+   *
+   * ⚠️ 不从 blur 事件的 e.target.value 取值 —— 那是 DOM 上的字符串，
+   * 与 antd InputNumber 的内部状态是两回事，程序化赋值时两者会不一致，
+   * 表现是「界面显示改了、请求却没发出去」。改用 @change 维护本地草稿，
+   * blur 时只读草稿，不碰 DOM。
+   * （本项目已在 a-input-number 与 RangePicker 上踩过同族问题。）
+   */
+  const sortWeightDraft = reactive({});
+  /** 防重：回车会先 blur 再冒泡，不加锁会连发两次请求 */
+  const sortWeightSubmitting = new Set();
+
+  async function commitSortWeight(record) {
+    if (sortWeightSubmitting.has(record.id)) {
+      return;
+    }
+    const next = sortWeightDraft[record.id];
+    // 没动过、清空了、或与服务端值相同：都不发请求
+    if (next === undefined || next === null || Number.isNaN(next) || next === record.sortWeight) {
+      delete sortWeightDraft[record.id];
+      return;
+    }
+    sortWeightSubmitting.add(record.id);
+    try {
+      await prizeConfigApi.update(buildUpdatePayload(record, { sortWeight: next }));
+      message.success('排序权重已更新');
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      sortWeightSubmitting.delete(record.id);
+      // 无论成败都清掉草稿并以服务端数据为准，
+      // 避免界面停留在「改了但没存进去」的数字上
+      delete sortWeightDraft[record.id];
+      await queryData();
+    }
+  }
+
+  // ---------------------------- 批量禁用 ----------------------------
+
   const selectedRowKeyList = ref([]);
 
   function onSelectChange(selectedRowKeys) {
     selectedRowKeyList.value = selectedRowKeys;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  function confirmBatchDisable() {
     Modal.confirm({
-      title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      title: '批量禁用',
+      content: `确定要禁用选中的 ${selectedRowKeyList.value.length} 个奖品吗？禁用后不再发放，可随时再启用。`,
+      okText: '禁用',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchDisable();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  async function requestBatchDisable() {
     try {
       SmartLoading.show();
-      await prizeConfigApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
-      queryData();
+      await prizeConfigApi.updateStatus({
+        idList: selectedRowKeyList.value,
+        status: PRIZE_STATUS_ENUM.DISABLED.value,
+      });
+      message.success('已批量禁用');
+      selectedRowKeyList.value = [];
+      await queryData();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {

@@ -12,6 +12,7 @@ import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
+import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
 import net.lab1024.sa.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import net.lab1024.sa.prize.prizeconfig.manager.PrizeConfigManager;
 import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
@@ -41,6 +42,9 @@ public class PrizeConfigService {
      * 奖品状态：1-启用
      */
     private static final Integer STATUS_ENABLED = 1;
+
+    /** 状态：0-禁用 */
+    private static final Integer STATUS_DISABLED = 0;
 
     /**
      * 查询活动下的全部奖品（含停用）：抽奖工作台回显时按 prizeCode 补名称/价值等展示信息
@@ -127,6 +131,25 @@ public class PrizeConfigService {
         }
         PrizeConfig prizeConfig = SmartBeanUtil.copy(addForm, PrizeConfig.class);
         prizeConfigDao.insert(prizeConfig);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 奖品启用 / 禁用（单个开关与批量禁用共用）。
+     *
+     * <p>禁用不做任何校验 —— 出问题时能立刻停掉一个奖品是运营最需要的能力；
+     * 已被奖池/奖级引用的奖品禁用后不再发放，但历史流水不受影响。
+     */
+    public ResponseDTO<String> updateStatus(PrizeStatusUpdateForm form) {
+        if (!STATUS_ENABLED.equals(form.getStatus()) && !STATUS_DISABLED.equals(form.getStatus())) {
+            return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 0-禁用");
+        }
+        for (Long id : form.getIdList()) {
+            PrizeConfig update = new PrizeConfig();
+            update.setId(id);
+            update.setStatus(form.getStatus());
+            prizeConfigDao.updateById(update);
+        }
         return ResponseDTO.ok();
     }
 
