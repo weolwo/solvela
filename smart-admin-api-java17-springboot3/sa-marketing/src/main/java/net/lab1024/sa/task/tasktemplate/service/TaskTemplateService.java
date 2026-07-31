@@ -66,7 +66,7 @@ public class TaskTemplateService {
      * 生成一个未被占用的模板编码（10 位大写字母+数字），供模板设计器「生成」按钮调用
      */
     public ResponseDTO<String> generateTemplateCode() {
-        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(this::existsByTemplateCode));
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(SmartCodeUtil.BizCodePrefix.TASK_TEMPLATE, this::existsByTemplateCode));
     }
 
     /**

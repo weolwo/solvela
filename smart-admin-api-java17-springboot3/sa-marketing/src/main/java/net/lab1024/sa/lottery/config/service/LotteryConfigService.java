@@ -89,7 +89,7 @@ public class LotteryConfigService {
      * 生成一个未被占用的彩票编码（铁律 8：10 位大写字母+数字，全局唯一）
      */
     public ResponseDTO<String> generateCode() {
-        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(this::existsByLotteryCode));
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(SmartCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode));
     }
 
     public boolean existsByLotteryCode(String lotteryCode) {
@@ -158,7 +158,7 @@ public class LotteryConfigService {
             // 新建玩法态：活动信息已知，预填一个可用编码，运营可直接用也可重新生成
             return ResponseDTO.ok(new LotteryWorkbenchVO(
                     activity.getActivityCode(), activity.getActivityName(),
-                    SmartCodeUtil.generateUniqueBizCode(this::existsByLotteryCode),
+                    SmartCodeUtil.generateUniqueBizCode(SmartCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode),
                     null, null, null, null,
                     false, false, null, 0L, 0L, List.of()));
         }

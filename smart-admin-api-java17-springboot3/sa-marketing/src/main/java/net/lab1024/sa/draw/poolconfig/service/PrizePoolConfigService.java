@@ -100,7 +100,7 @@ public class PrizePoolConfigService {
      * 生成一个未被占用的奖池编码（10 位大写字母+数字），供工作台「新建奖池」调用
      */
     public ResponseDTO<String> generatePoolCode() {
-        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(this::existsByPoolCode));
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(SmartCodeUtil.BizCodePrefix.POOL, this::existsByPoolCode));
     }
 
     /**

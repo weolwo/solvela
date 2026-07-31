@@ -230,7 +230,7 @@ public class ActivityConfigService {
      * 生成一个未被占用的活动编码（10 位大写字母+数字），供前端「生成」按钮调用
      */
     public ResponseDTO<String> generateActivityCode() {
-        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(code -> getByActivityCode(code) != null));
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(SmartCodeUtil.BizCodePrefix.ACTIVITY, code -> getByActivityCode(code) != null));
     }
 
     /**

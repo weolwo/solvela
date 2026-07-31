@@ -78,7 +78,7 @@ public class PrizeConfigService {
      * 生成一个未被占用的奖品编码（10 位大写字母+数字），供前端「生成」按钮调用
      */
     public ResponseDTO<String> generatePrizeCode() {
-        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(this::existsByPrizeCode));
+        return ResponseDTO.ok(SmartCodeUtil.generateUniqueBizCode(SmartCodeUtil.BizCodePrefix.PRIZE, this::existsByPrizeCode));
     }
 
     /**
