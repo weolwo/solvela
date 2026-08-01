@@ -93,7 +93,7 @@ public class TaskRecordAdvanceService {
             return discardWithoutRecord(config, ctx, "没有支持 " + taskType.getValue() + " 的进度策略实现", logDiscard);
         }
 
-        String periodKey = TaskPeriodResolver.resolvePeriodKey(taskType, config.getLimitType(), ctx.eventTime());
+        String basePeriodKey = TaskPeriodResolver.resolvePeriodKey(taskType, config.getLimitType(), ctx.eventTime());
 
         // ========== ① 先插流水：幂等键先占住 ==========
         TaskRecordFlow flow = buildFlow(config, ctx);
@@ -106,8 +106,20 @@ public class TaskRecordAdvanceService {
             return new TaskAdvanceResult.Duplicated(ctx.eventBizId());
         }
 
-        // ========== ② 取或建任务记录 ==========
-        TaskRecord record = getOrCreateRecord(config, ctx, periodKey);
+        // ========== ①.5 人群过滤 ==========
+        String audienceReject = checkAudience(config, ctx);
+        if (audienceReject != null) {
+            return finishAsDiscard(flow, audienceReject, logDiscard);
+        }
+
+        // ========== ② 取或建任务记录（含 limit_count 轮次判定） ==========
+        RoundResolution round = resolveRound(config, ctx, basePeriodKey);
+        if (round.rejectReason() != null) {
+            return finishAsDiscard(flow, round.rejectReason(), logDiscard);
+        }
+        TaskRecord record = round.record() != null
+                ? round.record()
+                : getOrCreateRecord(config, ctx, round.periodKey());
         flow.setRecordId(record.getId());
 
         if (!Integer.valueOf(TaskConst.RECORD_STATUS_RUNNING).equals(record.getStatus())) {
@@ -199,6 +211,84 @@ public class TaskRecordAdvanceService {
         int maxStage = mappings.stream().map(TaskPrizeMapping::getStageLevel)
                 .filter(java.util.Objects::nonNull).mapToInt(Integer::intValue).max().orElse(0);
         return highestReached >= maxStage;
+    }
+
+    /**
+     * 人群过滤：任务配了目标人群时，上游必须告知会员属性。
+     *
+     * <p>🔴 <b>上游没告知时丢弃，而不是放行。</b>
+     * 放行等于「配了人群但对所有人生效」—— 运营看不出任何异常，
+     * 直到有人问「为什么老会员也领到新人礼」才发现，那时奖已经发出去了。
+     * 丢弃并写明原因，至少让它在事件流水里是可见的。
+     *
+     * @return null 表示通过；否则为丢弃原因
+     */
+    private String checkAudience(TaskConfig config, TaskEventContext ctx) {
+        String audience = config.getTargetAudience();
+        if (audience == null || audience.isBlank() || TaskConst.AUDIENCE_ALL.equals(audience)) {
+            return null;
+        }
+        boolean wantNew = TaskConst.AUDIENCE_NEW_MEMBER.equals(audience);
+        boolean wantOld = TaskConst.AUDIENCE_OLD_MEMBER.equals(audience);
+        if (!wantNew && !wantOld) {
+            // 取值非法当作没配，放行 —— 为一个配错的枚举把用户的进度卡住不划算，
+            // 但要留痕让人看得见（配置类问题一律 warn）
+            log.warn("[任务推进] 目标人群取值非法，按不过滤处理。taskConfigId={}, targetAudience={}",
+                    config.getId(), audience);
+            return null;
+        }
+        if (ctx.isNewMember() == null) {
+            return "任务限定了目标人群（" + audience + "），但上游未告知会员属性 isNewMember，无法判定，本次不计入";
+        }
+        if (wantNew && !ctx.isNewMember()) {
+            return "该任务仅限新会员参与";
+        }
+        if (wantOld && ctx.isNewMember()) {
+            return "该任务仅限老会员参与";
+        }
+        return null;
+    }
+
+    /**
+     * 轮次判定结果。
+     *
+     * @param periodKey    本次该用的周期键（含轮次后缀）
+     * @param record       已存在且仍可推进的记录；为 null 表示需要新建
+     * @param rejectReason 不为 null 表示本周期轮次已用尽，事件应丢弃
+     */
+    private record RoundResolution(String periodKey, TaskRecord record, String rejectReason) {
+    }
+
+    /**
+     * 按 {@code limit_count} 判定本次落在第几轮。
+     *
+     * <p>规则：本周期最新一轮还在进行中就继续用它；已完成则开下一轮，
+     * 直到轮次用满 {@code limit_count}。
+     *
+     * <p>只有 DAILY / WEEKLY 受轮次限制（见 {@link TaskPeriodResolver#supportsRoundLimit}）。
+     * 不受限时走原路径 —— 与改造前<b>完全等价</b>，存量任务行为不变。
+     */
+    private RoundResolution resolveRound(TaskConfig config, TaskEventContext ctx, String basePeriodKey) {
+        int limitCount = config.getLimitCount() == null ? 1 : config.getLimitCount();
+        if (!TaskPeriodResolver.supportsRoundLimit(config.getLimitType()) || limitCount <= 1) {
+            return new RoundResolution(basePeriodKey, null, null);
+        }
+
+        TaskRecord latest = taskRecordDao.selectLatestRoundByPeriod(
+                ctx.memberName(), config.getId(), basePeriodKey);
+        if (latest == null) {
+            return new RoundResolution(TaskPeriodResolver.withRound(basePeriodKey, 1), null, null);
+        }
+        if (Integer.valueOf(TaskConst.RECORD_STATUS_RUNNING).equals(latest.getStatus())) {
+            // 当前这一轮还没走完，继续推它
+            return new RoundResolution(latest.getPeriodKey(), latest, null);
+        }
+        int currentRound = TaskPeriodResolver.parseRound(latest.getPeriodKey());
+        if (currentRound >= limitCount) {
+            return new RoundResolution(null, null,
+                    "本周期参与次数已达上限（" + limitCount + " 次），下个周期才能继续");
+        }
+        return new RoundResolution(TaskPeriodResolver.withRound(basePeriodKey, currentRound + 1), null, null);
     }
 
     /**

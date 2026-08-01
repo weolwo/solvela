@@ -25,12 +25,28 @@ DELETE FROM t_task_prize_mapping WHERE task_config_id IN
     (SELECT id FROM (SELECT id FROM t_task_config WHERE task_name LIKE 'P0验收-%') t);
 DELETE FROM t_task_config   WHERE task_name LIKE 'P0验收-%';
 DELETE FROM t_task_template WHERE template_code IN ('TP0COUNT01', 'TP0LADDER1', 'TP0STREAK1');
+DELETE FROM t_task_event    WHERE event_code IN ('AUDIENCE_TEST', 'ROUND_TEST');
 DELETE FROM t_prize_config  WHERE prize_code IN ('PP0SCORE01', 'PP0SCORE02', 'PP0COUPON1');
 DELETE FROM t_activity_config WHERE activity_code = 'AP0TASKRUN';
 
 -- 顺带清掉①里那三行孤儿映射（它们指向的任务配置已不存在，留着只会让排查时看花眼）
 DELETE FROM t_task_prize_mapping
 WHERE task_config_id NOT IN (SELECT id FROM (SELECT id FROM t_task_config) t);
+
+
+-- -------------------------------------------------------------------------------------
+-- 〇之二、验收专用事件（人群过滤 / 参与轮次）
+--   单独注册两个事件而不是复用已有的，是为了让这两组用例与其它用例完全隔离 ——
+--   共用事件时，一个事件会同时命中多个任务，断言「被丢弃」时分不清是哪个任务丢的。
+-- -------------------------------------------------------------------------------------
+INSERT INTO t_task_event (event_code, event_name, metric_source, payload_schema,
+                          biz_id_required, is_high_frequency, discard_log_flag, remark, status)
+VALUES
+    ('AUDIENCE_TEST', '人群过滤验收', 'NONE', '{"fields":[]}', 0, 0, 1,
+     'P0 验收专用：同一个事件同时命中「限新会员」和「限老会员」两个任务，一次验两个分支', 1),
+    ('ROUND_TEST', '参与轮次验收', 'NONE', '{"fields":[]}', 1, 0, 1,
+     'P0 验收专用：每轮用不同 eventBizId，验 limit_count 轮次推进与用尽', 1)
+ON DUPLICATE KEY UPDATE event_name = VALUES(event_name), status = VALUES(status);
 
 
 -- -------------------------------------------------------------------------------------
@@ -122,6 +138,20 @@ VALUES
 -- 验不到开关本身（又一个「前提不成立就是空过」的场景，铁律 16）。
 ('AP0TASKRUN', 'P0验收-高频丢弃', 'TP0COUNT01', 'PAGE_VIEW', 'DAILY', 'ALL',
  'UNLIMITED', 1, '{"taskType":"AMOUNT","targetAmount":100,"minAmount":100}', 60, 1,
+ '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
+
+-- 人群过滤：两条任务订阅同一个事件、人群相反。
+-- 一次上报能同时验「该放行的放行、该拦的拦」，而不用发两次事件分别断言。
+('AP0TASKRUN', 'P0验收-限新会员', 'TP0COUNT01', 'AUDIENCE_TEST', 'NEWBIE', 'NEW_MEMBER',
+ 'UNLIMITED', 1, '{"taskType":"COUNT","targetCount":1}', 70, 1,
+ '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
+('AP0TASKRUN', 'P0验收-限老会员', 'TP0COUNT01', 'AUDIENCE_TEST', 'DAILY', 'OLD_MEMBER',
+ 'UNLIMITED', 1, '{"taskType":"COUNT","targetCount":1}', 80, 1,
+ '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
+
+-- 参与轮次：每日最多 2 轮，目标 1 次 —— 一个事件完成一轮，第 3 个事件应被判「本周期已达上限」
+('AP0TASKRUN', 'P0验收-每日两轮', 'TP0COUNT01', 'ROUND_TEST', 'DAILY', 'ALL',
+ 'DAILY', 2, '{"taskType":"COUNT","targetCount":1}', 90, 1,
  '2026-01-01 00:00:00', '2099-12-31 23:59:59');
 
 
@@ -156,6 +186,10 @@ FROM t_task_config WHERE task_name = 'P0验收-并发累加';
 INSERT INTO t_task_prize_mapping (task_config_id, stage_level, prize_code, prize_mode, stage_condition, prize_strategy)
 SELECT id, 1, 'PP0SCORE01', 'FIXED', '{"target": 100}', '{"value": 10}'
 FROM t_task_config WHERE task_name = 'P0验收-高频丢弃';
+
+INSERT INTO t_task_prize_mapping (task_config_id, stage_level, prize_code, prize_mode, stage_condition, prize_strategy)
+SELECT id, 1, 'PP0SCORE01', 'FIXED', '{"target": 1}', '{"value": 10}'
+FROM t_task_config WHERE task_name IN ('P0验收-限新会员', 'P0验收-限老会员', 'P0验收-每日两轮');
 
 
 -- -------------------------------------------------------------------------------------

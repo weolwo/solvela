@@ -16,6 +16,11 @@ import java.util.Map;
  * @param amount     计量值，AMOUNT 类任务用；其余类型忽略。可空
  * @param eventTime  事件<b>实际发生</b>的时间（不是被处理的时间）。
  *                   周期归属按它算 —— 迟到的事件应归属它发生的那一天，而不是被处理的那一天
+ * @param isNewMember 该会员是不是新会员，<b>由上游告知</b>。
+ *                    营销域不拥有会员数据（库里只有钱包/流水/券，全以 member_name 字符串为键，
+ *                    没有注册时间、没有会员档案），「新/老」的定义也本就属于会员域的业务概念，
+ *                    不该由任务引擎去猜。null = 上游没告知 —— 此时配了人群的任务会
+ *                    <b>丢弃事件并写明原因</b>，而不是假装过滤生效了
  * @param payload    事件原文，落进流水的 event_payload 供客诉复盘
  * @author alaric
  * @date 2026-08-01
@@ -26,6 +31,7 @@ public record TaskEventContext(
         String eventBizId,
         BigDecimal amount,
         LocalDateTime eventTime,
+        Boolean isNewMember,
         Map<String, Object> payload) {
 
     /**
@@ -54,13 +60,13 @@ public record TaskEventContext(
      * 换一个 eventBizId（服务端兜底后回填），其余不变
      */
     public TaskEventContext withEventBizId(String bizId) {
-        return new TaskEventContext(eventCode, memberName, bizId, amount, eventTime, payload);
+        return new TaskEventContext(eventCode, memberName, bizId, amount, eventTime, isNewMember, payload);
     }
 
     /**
      * 换一个金额（按事件注册表的 metric_source 从 payload 里取出来之后回填），其余不变
      */
     public TaskEventContext withAmount(BigDecimal newAmount) {
-        return new TaskEventContext(eventCode, memberName, eventBizId, newAmount, eventTime, payload);
+        return new TaskEventContext(eventCode, memberName, eventBizId, newAmount, eventTime, isNewMember, payload);
     }
 }

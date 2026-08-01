@@ -232,6 +232,7 @@ public class TaskEventService {
                 eventBizId,
                 resolveAmount(form, eventDef),
                 eventTime,
+                form.getIsNewMember(),
                 form.getPayload());
     }
 

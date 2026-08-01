@@ -147,12 +147,20 @@
           <a-form-item label="参与频次 limit_type" :name="['limit', 'limitType']">
             <a-radio-group v-model:value="wizardForm.limit.limitType" :options="LIMIT_TYPE_OPTIONS" option-type="button" />
           </a-form-item>
+          <!--
+            只在 DAILY / WEEKLY 下出现：
+            ONCE 语义就是终身一轮；UNLIMITED 是「轮次不限」，让它生效会变成「无限制+限1次=终身一次」，
+            与它自己的名字矛盾 —— 界面上不该让人填一个填了也不生效的值
+          -->
           <a-form-item
-            v-if="wizardForm.limit.limitType !== LIMIT_TYPE_ENUM.ONCE"
-            label="限制次数 limit_count"
+            v-if="isRoundLimitSupported"
+            label="周期内可完成轮数 limit_count"
             :name="['limit', 'limitCount']"
           >
             <a-input-number v-model:value="wizardForm.limit.limitCount" :min="1" />
+            <div class="text-xs text-gray-400! mt-1">
+              一个周期内最多可完成几轮任务、领几次奖。完成一轮后自动开下一轮，用满为止
+            </div>
           </a-form-item>
         </a-card>
       </div>
@@ -176,6 +184,11 @@
         <a-card size="small" title="受众与时间" class="mb-4">
           <a-form-item label="目标人群 target_audience" :name="['audience', 'targetAudience']">
             <a-radio-group v-model:value="wizardForm.audience.targetAudience" :options="TARGET_AUDIENCE_OPTIONS" option-type="button" />
+            <div v-if="wizardForm.audience.targetAudience !== TARGET_AUDIENCE_ENUM.ALL" class="text-xs text-orange-600! mt-1">
+              ⚠️ 选择非「全部会员」后，<b>上游上报事件时必须携带会员属性 isNewMember</b>，
+              否则该任务收到的事件会被丢弃（丢弃原因可在任务记录的「事件流水」里看到）。
+              请与埋点开发确认后再使用。
+            </div>
           </a-form-item>
           <a-row :gutter="16">
             <a-col :span="12">
@@ -302,6 +315,7 @@
     TASK_GROUP_OPTIONS,
     LIMIT_TYPE_ENUM,
     LIMIT_TYPE_OPTIONS,
+    TARGET_AUDIENCE_ENUM,
     TARGET_AUDIENCE_OPTIONS,
     STAGE_CONDITION_UNIT,
     isSchemaParamVisible,
@@ -381,6 +395,11 @@
   }
 
   const selectedEvent = computed(() => eventOptions.value.find((e) => e.value === wizardForm.base.triggerEvent));
+
+  // 只有 DAILY / WEEKLY 受 limit_count 轮次限制，与后端 TaskPeriodResolver.supportsRoundLimit 同一口径
+  const isRoundLimitSupported = computed(
+    () => wizardForm.limit.limitType === LIMIT_TYPE_ENUM.DAILY || wizardForm.limit.limitType === LIMIT_TYPE_ENUM.WEEKLY
+  );
 
   async function loadTaskTemplates() {
     templateLoading.value = true;

@@ -36,13 +36,10 @@ public final class TaskPeriodResolver {
 
     public static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    /**
-     * 参与频次（对齐 t_task_config.limit_type）
-     */
-    private static final String LIMIT_ONCE = "ONCE";
-    private static final String LIMIT_DAILY = "DAILY";
-    private static final String LIMIT_WEEKLY = "WEEKLY";
-    private static final String LIMIT_UNLIMITED = "UNLIMITED";
+    private static final String LIMIT_ONCE = TaskConst.LIMIT_ONCE;
+    private static final String LIMIT_DAILY = TaskConst.LIMIT_DAILY;
+    private static final String LIMIT_WEEKLY = TaskConst.LIMIT_WEEKLY;
+    private static final String LIMIT_UNLIMITED = TaskConst.LIMIT_UNLIMITED;
 
     /**
      * 无天然单号的事件，幂等键按事件日兜底的前缀
@@ -100,5 +97,52 @@ public final class TaskPeriodResolver {
      */
     public static String formatDay(LocalDateTime time) {
         return time.format(DAY_FORMAT);
+    }
+
+    // ==================== 轮次（limit_count） ====================
+
+    /**
+     * 给周期键追加轮次：第 1 轮返回裸键，第 2 轮起返回 {@code 基础键#N}。
+     *
+     * <p>🔴 第 1 轮不带后缀是为了<b>与存量记录兼容</b>：库里已有的记录全是裸键，
+     * 若第 1 轮也加 {@code #1}，那些记录会与新逻辑算出的键对不上，
+     * 表现是「老用户的进度突然从头开始」。
+     */
+    public static String withRound(String basePeriodKey, int round) {
+        return round <= 1 ? basePeriodKey : basePeriodKey + TaskConst.PERIOD_ROUND_SEPARATOR + round;
+    }
+
+    /**
+     * 从周期键里解出轮次：裸键是第 1 轮，{@code 20260801#3} 是第 3 轮。
+     *
+     * <p>解析不出来时返回 1（当作第一轮）—— 脏数据不该让用户卡在「轮次未知」而完全推不动。
+     */
+    public static int parseRound(String periodKey) {
+        if (periodKey == null) {
+            return 1;
+        }
+        int idx = periodKey.lastIndexOf(TaskConst.PERIOD_ROUND_SEPARATOR);
+        if (idx < 0) {
+            return 1;
+        }
+        try {
+            return Math.max(1, Integer.parseInt(periodKey.substring(idx + 1)));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    /**
+     * 该频次类型是否受 {@code limit_count} 轮次限制。
+     *
+     * <p>只有 DAILY / WEEKLY 受限：
+     * <ul>
+     *   <li>{@code ONCE} 语义就是终身一轮，界面上也不让填次数；</li>
+     *   <li>{@code UNLIMITED} 是「轮次不限」，若让 limit_count 生效，
+     *       「无限制 + 限制 1 次」会退化成「终身一次」，与它自己的名字矛盾。</li>
+     * </ul>
+     */
+    public static boolean supportsRoundLimit(String limitType) {
+        return LIMIT_DAILY.equals(limitType) || LIMIT_WEEKLY.equals(limitType);
     }
 }

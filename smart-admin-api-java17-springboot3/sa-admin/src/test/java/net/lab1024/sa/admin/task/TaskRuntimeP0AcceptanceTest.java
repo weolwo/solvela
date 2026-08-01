@@ -7,7 +7,9 @@ import net.lab1024.sa.task.record.dao.TaskRecordDao;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.recordflow.dao.TaskRecordFlowDao;
 import net.lab1024.sa.task.recordflow.domain.entity.TaskRecordFlow;
+import net.lab1024.sa.task.constant.TaskTypeEnum;
 import net.lab1024.sa.task.runtime.TaskEventService;
+import net.lab1024.sa.task.runtime.TaskPeriodResolver;
 import net.lab1024.sa.task.runtime.domain.TaskAdvanceResult;
 import net.lab1024.sa.task.runtime.domain.TaskEventContext;
 import net.lab1024.sa.task.runtime.domain.TaskEventReportForm;
@@ -41,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -85,6 +88,9 @@ class TaskRuntimeP0AcceptanceTest {
     private static final String TASK_AMOUNT = "P0验收-累计消费500";
     private static final String TASK_CONCURRENT = "P0验收-并发累加";
     private static final String TASK_HIGH_FREQ = "P0验收-高频丢弃";
+    private static final String TASK_NEW_ONLY = "P0验收-限新会员";
+    private static final String TASK_OLD_ONLY = "P0验收-限老会员";
+    private static final String TASK_ROUNDS = "P0验收-每日两轮";
 
     private static final LocalDateTime DAY_1 = LocalDateTime.of(2026, 4, 1, 10, 0);
     private static final LocalDateTime DAY_2 = LocalDateTime.of(2026, 4, 2, 10, 0);
@@ -114,7 +120,16 @@ class TaskRuntimeP0AcceptanceTest {
 
     private TaskEventContext event(String eventCode, String bizId, String amount, LocalDateTime time) {
         return new TaskEventContext(eventCode, member, bizId,
-                amount == null ? null : new BigDecimal(amount), time, Map.of("from", "P0AcceptanceTest"));
+                amount == null ? null : new BigDecimal(amount), time, null, Map.of("from", "P0AcceptanceTest"));
+    }
+
+    /** 该任务下本会员的全部记录（多轮时会有多条） */
+    private List<TaskRecord> recordsOf(Long taskConfigId) {
+        return taskRecordDao.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecord>()
+                        .eq(TaskRecord::getMemberName, member)
+                        .eq(TaskRecord::getTaskConfigId, taskConfigId)
+                        .orderByAsc(TaskRecord::getId));
     }
 
     private TaskRecord recordOf(Long taskConfigId) {
@@ -500,6 +515,153 @@ class TaskRuntimeP0AcceptanceTest {
 
         // 停用的事件不该出现在下拉里
         assertTrue(options.stream().allMatch(o -> taskEventDefService.getEnabledByCode(o.eventCode()) != null));
+    }
+
+    // ==================== 人群过滤（target_audience） ====================
+
+    /**
+     * 带会员属性的事件（人群过滤用）
+     */
+    private TaskEventContext audienceEvent(String bizId, Boolean isNewMember) {
+        return new TaskEventContext("AUDIENCE_TEST", member, bizId, null, DAY_1, isNewMember,
+                Map.of("from", "P0AcceptanceTest"));
+    }
+
+    private TaskAdvanceResult resultOf(List<TaskAdvanceResult> all, Long taskConfigId, List<TaskConfig> configs) {
+        int idx = -1;
+        for (int i = 0; i < configs.size(); i++) {
+            if (configs.get(i).getId().equals(taskConfigId)) {
+                idx = i;
+            }
+        }
+        return idx < 0 ? null : all.get(idx);
+    }
+
+    @Test
+    @DisplayName("人群过滤：isNewMember=true 时，限新会员的任务推进、限老会员的任务被拦")
+    void audienceNewMemberPassesAndOldMemberBlocked() {
+        TaskConfig newOnly = configOf(TASK_NEW_ONLY);
+        TaskConfig oldOnly = configOf(TASK_OLD_ONLY);
+        assertEquals("NEW_MEMBER", newOnly.getTargetAudience(), "前提确认");
+        assertEquals("OLD_MEMBER", oldOnly.getTargetAudience(), "前提确认");
+
+        taskEventService.handle(audienceEvent("aud-new", Boolean.TRUE));
+
+        assertNotNull(recordOf(newOnly.getId()), "新会员应能参与限新会员的任务");
+        assertNull(recordOf(oldOnly.getId()), "新会员不该参与限老会员的任务");
+
+        List<TaskRecordFlow> blocked = flowsOf(oldOnly.getId());
+        assertEquals(1, blocked.size(), "被人群拦下也要留痕");
+        assertEquals(TaskConst.FLOW_TYPE_DISCARD, blocked.get(0).getFlowType().intValue());
+        assertTrue(blocked.get(0).getDiscardReason().contains("老会员"),
+                "原因要说清是被哪个人群条件拦的：" + blocked.get(0).getDiscardReason());
+    }
+
+    @Test
+    @DisplayName("人群过滤：isNewMember=false 时正好相反 —— 证明拦的是条件，不是「一律拦」")
+    void audienceOldMemberPasses() {
+        TaskConfig newOnly = configOf(TASK_NEW_ONLY);
+        TaskConfig oldOnly = configOf(TASK_OLD_ONLY);
+
+        taskEventService.handle(audienceEvent("aud-old", Boolean.FALSE));
+
+        assertNotNull(recordOf(oldOnly.getId()), "老会员应能参与限老会员的任务");
+        assertNull(recordOf(newOnly.getId()), "老会员不该参与限新会员的任务");
+        assertTrue(flowsOf(newOnly.getId()).get(0).getDiscardReason().contains("新会员"));
+    }
+
+    @Test
+    @DisplayName("🔴 人群过滤：上游没告知会员属性时丢弃并写明原因，而不是默默放行")
+    void audienceMissingAttributeIsDiscardedNotSilentlyPassed() {
+        TaskConfig newOnly = configOf(TASK_NEW_ONLY);
+
+        taskEventService.handle(audienceEvent("aud-null", null));
+
+        assertNull(recordOf(newOnly.getId()),
+                "上游没给会员属性时放行 = 人群配置静默失效，那正是这次要消灭的东西");
+        List<TaskRecordFlow> flows = flowsOf(newOnly.getId());
+        assertEquals(1, flows.size());
+        String reason = flows.get(0).getDiscardReason();
+        assertTrue(reason.contains("isNewMember"), "原因要点名缺的是哪个字段，好让人去找上游：" + reason);
+    }
+
+    @Test
+    @DisplayName("人群过滤：目标人群为 ALL 的任务不受影响（不传属性也照常推进）")
+    void audienceAllIsUnaffected() {
+        TaskConfig config = configOf(TASK_COUNT);
+        assertEquals("ALL", config.getTargetAudience(), "前提确认");
+
+        taskEventService.handle(event("DAILY_SIGN", "aud-all", null, DAY_1));
+        assertNotNull(recordOf(config.getId()), "ALL 的任务不该被人群过滤影响");
+    }
+
+    // ==================== 参与轮次（limit_count） ====================
+
+    @Test
+    @DisplayName("参与轮次：每日 2 轮 -> 第1、2 个事件各完成一轮，第 3 个被判本周期已达上限")
+    void roundLimitAllowsConfiguredRoundsThenBlocks() {
+        TaskConfig config = configOf(TASK_ROUNDS);
+        assertEquals("DAILY", config.getLimitType(), "前提确认");
+        assertEquals(2, config.getLimitCount().intValue(), "前提确认：本用例要验的是 2 轮");
+
+        String basePeriod = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", DAY_1);
+
+        // 第 1 轮：周期键是裸键（不带 #1）—— 存量记录兼容的关键
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "r1", null, DAY_1, null, Map.of()));
+        List<TaskRecord> after1 = recordsOf(config.getId());
+        assertEquals(1, after1.size());
+        assertEquals(basePeriod, after1.get(0).getPeriodKey(),
+                "第 1 轮必须是裸周期键，加了 #1 会让存量记录全部失联");
+        assertTrue(after1.get(0).getStatus() >= TaskConst.RECORD_STATUS_COMPLETED, "目标为1，一个事件即达标");
+
+        // 第 2 轮：新记录，周期键带 #2
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "r2", null, DAY_1, null, Map.of()));
+        List<TaskRecord> after2 = recordsOf(config.getId());
+        assertEquals(2, after2.size(), "第 2 轮应新开一条记录");
+        assertTrue(after2.stream().anyMatch(r -> (basePeriod + "#2").equals(r.getPeriodKey())),
+                "第 2 轮的周期键应为 " + basePeriod + "#2，实际 "
+                        + after2.stream().map(TaskRecord::getPeriodKey).toList());
+
+        // 第 3 轮：超出上限
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "r3", null, DAY_1, null, Map.of()));
+        assertEquals(2, recordsOf(config.getId()).size(), "超出上限不该再开新记录");
+
+        TaskRecordFlow last = flowsOf(config.getId()).get(2);
+        assertEquals(TaskConst.FLOW_TYPE_DISCARD, last.getFlowType().intValue());
+        assertTrue(last.getDiscardReason().contains("上限"), last.getDiscardReason());
+    }
+
+    @Test
+    @DisplayName("参与轮次：下一个周期重新开始计轮，不受上一周期已用尽影响")
+    void roundLimitResetsNextPeriod() {
+        TaskConfig config = configOf(TASK_ROUNDS);
+
+        // DAY_1 用满 2 轮
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "d1r1", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "d1r2", null, DAY_1, null, Map.of()));
+        assertEquals(2, recordsOf(config.getId()).size(), "前提确认：第一天已用满 2 轮");
+
+        // DAY_2 应该能重新开始
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "d2r1", null, DAY_2, null, Map.of()));
+        List<TaskRecord> all = recordsOf(config.getId());
+        assertEquals(3, all.size(), "换一天应重新计轮");
+
+        String day2Base = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", DAY_2);
+        assertTrue(all.stream().anyMatch(r -> day2Base.equals(r.getPeriodKey())),
+                "第二天的第 1 轮同样是裸键：" + all.stream().map(TaskRecord::getPeriodKey).toList());
+    }
+
+    @Test
+    @DisplayName("参与轮次：limit_count=1 的任务行为与改造前完全一致（周期键仍是裸键）")
+    void roundLimitOneKeepsLegacyBehaviour() {
+        TaskConfig config = configOf(TASK_COUNT);
+        assertEquals(1, config.getLimitCount().intValue(), "前提确认");
+
+        taskEventService.handle(event("DAILY_SIGN", "legacy-1", null, DAY_1));
+        TaskRecord record = recordOf(config.getId());
+        assertNotNull(record);
+        assertFalse(record.getPeriodKey().contains("#"),
+                "limit_count<=1 时不该出现轮次后缀，实际 " + record.getPeriodKey());
     }
 
     // ==================== 模板契约校验（方案 §4.10） ====================

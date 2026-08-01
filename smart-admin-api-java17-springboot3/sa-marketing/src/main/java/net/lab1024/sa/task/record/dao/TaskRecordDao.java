@@ -58,6 +58,18 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
                                  @Param("periodKey") String periodKey);
 
     /**
+     * 取该「基础周期」下最新的一轮记录（limit_count 轮次用）。
+     *
+     * <p>匹配裸键与带轮次后缀的键：{@code 20260801} 与 {@code 20260801#2}、{@code #3}…
+     * 按 id 倒序取第一条 —— 轮次是依次创建的，id 最大的就是最新一轮。
+     *
+     * @return 该周期还没有任何记录时返回 null
+     */
+    TaskRecord selectLatestRoundByPeriod(@Param("memberName") String memberName,
+                                         @Param("taskConfigId") Long taskConfigId,
+                                         @Param("basePeriodKey") String basePeriodKey);
+
+    /**
      * 条件更新原子累加：COUNT / AMOUNT / SIMPLE 的推进方式。
      *
      * <p>把累加本身压进 UPDATE，一条 SQL 完成，靠行锁天然串行 —— <b>零冲突、零重试</b>，

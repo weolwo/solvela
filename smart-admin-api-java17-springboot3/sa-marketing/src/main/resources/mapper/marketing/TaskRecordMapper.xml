@@ -115,6 +115,24 @@
     </select>
 
     <!--
+      取该基础周期下最新的一轮（limit_count 轮次用）。
+      第 1 轮是裸键、第 2 轮起是「基础键#N」，所以两种形态都要匹配。
+      按 id 倒序：轮次依次创建，id 最大的就是最新一轮。
+    -->
+    <select id="selectLatestRoundByPeriod" resultType="net.lab1024.sa.task.record.domain.entity.TaskRecord">
+        SELECT id, tenant_id, member_name, task_config_id, activity_code, period_key,
+               valid_start_time, valid_end_time, current_metric, version, status,
+               progress_data, rule_snapshot, prize_snapshot, complete_time,
+               create_by, create_time, update_by, update_time
+        FROM t_task_record
+        WHERE member_name = #{memberName}
+          AND task_config_id = #{taskConfigId}
+          AND (period_key = #{basePeriodKey} OR period_key LIKE CONCAT(#{basePeriodKey}, '#%'))
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <!--
       条件更新原子累加（COUNT / AMOUNT / SIMPLE）。
       把累加压进 UPDATE，靠行锁天然串行 —— 不会有 Lost Update，也不需要版本号和重试。
       rows=0 的语义是「任务已不在进行中」，不是并发冲突。

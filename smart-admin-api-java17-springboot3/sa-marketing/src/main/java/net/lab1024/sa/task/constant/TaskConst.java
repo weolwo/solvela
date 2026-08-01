@@ -89,6 +89,57 @@ public final class TaskConst {
      */
     public static final String PERIOD_NONE = "NONE";
 
+    /**
+     * 周期键的轮次分隔符：{@code 20260801#2} 表示 8 月 1 日的第 2 轮。
+     *
+     * <p>🔴 <b>第 1 轮刻意不带后缀</b>（就是裸的 {@code 20260801}）——
+     * 存量记录全是裸键，加了后缀等于让它们全部失联，而 `limit_count` 绝大多数场景就是 1。
+     * 只有第 2 轮起才追加，这样「不用轮次」的任务与改造前<b>完全等价</b>。
+     */
+    public static final String PERIOD_ROUND_SEPARATOR = "#";
+
+    // ==================== t_task_config.target_audience ====================
+
+    /**
+     * 目标人群：全部会员（默认）
+     */
+    public static final String AUDIENCE_ALL = "ALL";
+
+    /**
+     * 目标人群：新会员
+     */
+    public static final String AUDIENCE_NEW_MEMBER = "NEW_MEMBER";
+
+    /**
+     * 目标人群：老会员
+     */
+    public static final String AUDIENCE_OLD_MEMBER = "OLD_MEMBER";
+
+    // ==================== t_task_config.limit_type ====================
+
+    /**
+     * 参与频次：终身一次
+     */
+    public static final String LIMIT_ONCE = "ONCE";
+
+    /**
+     * 参与频次：每日重复
+     */
+    public static final String LIMIT_DAILY = "DAILY";
+
+    /**
+     * 参与频次：每周重复
+     */
+    public static final String LIMIT_WEEKLY = "WEEKLY";
+
+    /**
+     * 参与频次：无限制。
+     *
+     * <p>⚠️ 「无限制」指<b>轮次不限</b>，此时 {@code limit_count} 不参与判定 ——
+     * 否则「无限制 + 限制 1 次」会变成「终身一次」，与它自己的名字矛盾。
+     */
+    public static final String LIMIT_UNLIMITED = "UNLIMITED";
+
     // ==================== rule_config 约定键 ====================
 
     /**
