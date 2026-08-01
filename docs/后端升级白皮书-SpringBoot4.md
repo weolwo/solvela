@@ -3,7 +3,8 @@
 > 分支：`upgrade/springboot4`（从 `task` 拉出）
 > 日期：2026-08-02
 > 范围：`smart-admin-api-java17-springboot3/` 全部四个模块（sa-base / common-api / sa-marketing / sa-admin）
-> 验证状态：全模块编译通过 · 单测 73/73 全绿 · **真实启动成功（10.076s）** · 登录/验证码/Swagger 接口实测 200
+> 验证状态：全模块编译通过 · 单测 73/73 全绿 · **真实启动成功（10.051s，日志无 ERROR）** · 登录/验证码/Swagger 接口实测 200
+> · sa-token 新 Redis DAO 读路径实测通 · ip2region 新旧数据布局逐字段核对 · 前端 `vite build` 通过
 
 ---
 
@@ -12,6 +13,11 @@
 升级分两步走：**先做依赖清理（可独立回滚），再做 Spring Boot 4 迁移**。
 迁移的主体工作量不在 Spring 本身，而在 **Jackson 2 → Jackson 3（`com.fasterxml` → `tools.jackson`）**，
 共改动 40 个源文件；真正卡住路的只有一个 —— **knife4j 没有 Boot 4 版本，只能换回官方 springdoc**。
+
+最值得记住的三条：**①** Jackson 3 的 mapper 不可变、受检异常变非受检，破坏性远超"改个包名"（§4.2）；
+**②** Redisson 4 不再把空密码当"没密码"，一行空的 `password:` 就能让启动失败（§4.3）；
+**③** 验证升级结果前，**先确认跑的是不是刚构建出来的那个包**（§4.4）——
+僵尸 JVM 锁着 jar 会让 `mvn clean` 静默失败，报错一模一样，极易误判成"这个升级做不通"。
 
 ---
 
@@ -358,16 +364,25 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 |---|---|
 | 全模块编译 | ✅ 通过 |
 | 单元测试 | ✅ 73/73（draw 引擎 9 · FPE 12 · TicketMatcher 12 · SequenceCursor 7 · Settle 5 · TaskPeriod 8 · TaskProgress 20） |
-| 真实启动 | ✅ `Started AdminApplication in 10.076 seconds` |
+| 真实启动 | ✅ `Started AdminApplication in 10.051 seconds`，启动日志无 ERROR |
 | `GET /login/getCaptcha` | ✅ 200，返回验证码 base64 |
 | `POST /login` | ✅ 200，请求体反序列化 + ResponseDTO 序列化正常（Jackson 3 全链路） |
 | `GET /swagger-ui/index.html` | ✅ 200 |
 | `GET /v3/api-docs` | ✅ 200 |
 | MyBatis-Plus / Redis / sa-token | ✅ 启动日志可见正常查询与连接 |
+| sa-token 新 Redis DAO | ✅ `SaTokenDao 注入成功: SaTokenDaoForRedisTemplate`；伪 token 打受保护接口正确返回"未登录"（证明读路径通） |
+| ip2region 3.3.7 读旧数据 | ✅ 启动日志 `ip2region.xdb 加载完成，数据格式版本:[2]`；三个 IP 解析结果逐字段核对正确 |
+| ip 地区归一化 | ✅ 两种字段布局分别实测，见 §4.5 对照表 |
+| 前端 `npx vite build` | ✅ 通过 |
+
+> 验证时 1024 端口被开发者 IDE 里的调试实例占用，测试实例改跑 11024 端口 —— 不要把 IDE 实例的响应当成本包的结果（这个坑见 §4.4）。
 
 ---
 
 ## 6. 遗留事项
+
+> 状态截至 2026-08-02。原「单独排期」的三项（ip2region / tika / sa-token Jackson 2）已全部完成，
+> 见 §3.7；数据格式差异已归一化，见 §4.5。
 
 ### 6.1 上线前必须做
 
@@ -380,29 +395,64 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
    现有代码（XSSFWorkbook/XSSFSheet/XSSFPictureData/XSSFRelation）与 fastexcel 常规读写都在 lite 覆盖范围内，
    但若碰到冷门 xlsx 特性会在运行期抛 `NoClassDefFoundError: org.openxmlformats.schemas.*`，
    届时把 `poi-ooxml-full` 加回来即可。
+   **这是本轮唯一没被自动化覆盖到的功能面**，其余都有单测或真实启动实测背书。
+3. **通知前端/测试：接口文档地址变了**。`/doc.html` 已不存在，改用 `/swagger-ui/index.html`。
+   如果有 CI 脚本、Nginx 规则、书签或对外文档指向 `/doc.html`，需要一并改。
 
-### 6.2 可选
+### 6.2 已评估并决定「不做」（记录理由，避免下次重复讨论）
 
-3. **ip2region 数据文件可随时更新，代码已不受格式影响**。解析逻辑现在按 xdb 文件头版本
-   自适应字段布局（见 §4.7），换成 v3 数据文件不需要改代码。
-   唯一的变化是新数据的地区名做过标准化、且多了国家代码字段（国家代码不进展示串）。
+4. **不改用第三方 IP 查询 API（如 ipdata）**。本地 ip2region 方案完全可用，且 API 方案在本项目是退步：
+   - **调用量对不上**：`SmartIpUtil.getRegion()` 挂在登录、**每条操作日志**、数据追踪三个切面上
+     （`OperateLogAspect` / `DataTracerService` / `LoginService`），每个后台写操作都会打一次，
+     免费额度 1500 次/天几个活跃运营就用光。
+   - **把外部网络调用塞进登录链路**，多一个延迟来源与故障点；本地查表是微秒级、零失败。
+   - **把用户 IP 送到第三方**，与本项目「满足《网络安全》《数据安全》、三级等保」的定位冲突，会是审计问题。
+   - 若将来确有需求（IPv6、更精确的境外数据），正确做法是**本地库做主路径 + API 只做兜底**，
+     并配套限流、缓存、密钥管理与降级策略 —— 那是独立需求，不应混进版本升级。
+5. **不升 tika 4.0**。目前只有 4.0.0-beta-1，beta 不进生产。已升到 3.x 线最新的 3.3.2。
+   - ⚠️ 复核时注意：`versions:display-property-updates` 报的是 `3.1.0 → 4.0.0-beta-1`，
+     **它会跳过 3.x 线直接指最高版本**，容易误判成"3.1.0 已经是终点"。要看完整版本列表。
+
+### 6.3 观察项（无需动作，定期回看）
+
+6. **Jackson 2 仍在 classpath 上**，来源是 `springdoc-openapi-starter-webmvc-ui` → `swagger-core-jakarta`。
+   属于**接口文档生成旁路，不碰任何业务数据**，无官方替代方案。
+   观察 springdoc / swagger-core 后续是否迁移到 Jackson 3，届时可彻底移除。
+7. **ip2region 数据文件可随时更新，代码已不受格式影响**。解析逻辑按 xdb 文件头版本
+   自适应字段布局（见 §4.5），换成 v3 数据文件不需要改代码。
+   新数据的地区名做过标准化、且多了国家代码字段（国家代码不进展示串）。
    当前 v2 数据文件工作正常，不换也没有故障风险。
+   - 注意：GitHub 的 v3.17.0 是**整个项目**的发版号，Java 构件 `org.lionsoul:ip2region`
+     版本号独立，Central 上最高就是 3.3.7，两个号不要对齐着看。
+8. **knife4j 若发布 Boot 4 版本**，可考虑换回（当前是被迫改用 springdoc，UI 有落差）。
 
-### 6.3 观察项
+### 6.4 可选的小清理
 
-4. **tika 4.0 待正式版**。目前只有 4.0.0-beta-1，已升到 3.x 线最新的 3.3.2。
-5. **Jackson 2 仍在 classpath 上**（来自 springdoc → swagger-core），属于文档生成旁路，不碰业务数据，
-   无官方替代方案，观察 springdoc 后续是否迁移到 Jackson 3。
+9. **前端 lint 是彻底卸掉的状态**。若要恢复，需要写 `eslint.config.js`（flat config，eslint 9 起不认 eslintrc）、
+   从 stylelint 配置里摘掉已废弃的 `stylelint-config-prettier`，并补上 `lint` 脚本 ——
+   不要只把包装回来，那样仍然跑不起来。
+10. `smart-admin-web-javascript/postcss.config.cjs` 的 `plugins` 是空对象（Tailwind v4 走 vite 插件），文件可删。
+11. `uuid` 依赖的唯一使用者是 `src/components/framework/text-ellipsis/index.vue`，而该组件全项目无人引用；
+    删组件即可连带卸掉 uuid，或把那行换成原生 `crypto.randomUUID()`。
+12. `smart-app/`（uni-app）那套 eslint 8 链同样闲置无脚本，本轮按要求未动。
 
 ## 7. 回滚方案
 
 本轮全部改动在 `upgrade/springboot4` 分支上，`task` 分支未受影响，直接切回即可。
 
-分支内共两个提交，**前端清理与后端升级是分开的**，可按需 revert 或 cherry-pick：
+分支内共 6 个提交，**前端清理与后端升级是分开的**，可按需 revert 或 cherry-pick：
 
-| 提交 | 内容 |
-|---|---|
-| `前端依赖瘦身：…` | 仅 `smart-admin-web-javascript/`，与后端无耦合，可单独摘到 `task` |
-| `后端升级 Spring Boot 4…` | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） |
+| # | 提交 | 内容 | 可否单独摘出 |
+|---|---|---|---|
+| 1 | 前端依赖瘦身 | 仅 `smart-admin-web-javascript/`，卸 v-viewer 与失效的 eslint/stylelint 链 | ✅ 与后端无耦合，可单独摘到 `task` |
+| 2 | 后端升级 Spring Boot 4 | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） | ❌ 本轮的地基 |
+| 3 | 白皮书版本号订正 | 纯文档 | ✅ |
+| 4 | 清掉 knife4j 全部残留 | 横幅 / MvcConfig / 白名单 / 四个 yaml | 依赖 #2 |
+| 5 | 收口遗留排期项 | ip2region 3.3.7、tika 3.3.2、sa-token Redis DAO 换官方、前端死注释 | 依赖 #2 |
+| 6 | ip2region 数据格式归一化 | `SmartIpUtil` 按 xdb 文件头版本自适应 | 依赖 #5 |
 
-> ⚠️ 数据面的注意：Redis 缓存值格式变了（见 §6.1），回滚后同样建议清一次 Redis，避免新旧格式互相污染。
+> ⚠️ **数据面的注意**：Redis 里的值格式变了（见 §6.1），**回滚后同样要清一次 Redis**，
+> 否则 Jackson 3 写入的值会让回滚后的 Jackson 2 反序列化失败 —— 这个方向的污染同样存在，别只防单向。
+
+> ⚠️ 回滚会一并退回 `ip_region` 的归一化（重新落 `中国|0|江苏省|南京市|0` 这种带占位符的值）。
+> 已归一化的历史数据不会自动还原，两种格式会在表里共存 —— 不影响功能，但做数据分析时要注意。
