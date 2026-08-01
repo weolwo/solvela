@@ -37,6 +37,11 @@ public class StringConst {
     public static final String SEPARATOR_SLASH = "/";
 
     /**
+     * 全局通用分隔符 竖线（ip 地区分段等）
+     */
+    public static final String VERTICAL_BAR = "|";
+
+    /**
      * 空字符串
      */
     public static final String EMPTY = "";

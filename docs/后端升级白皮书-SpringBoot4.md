@@ -192,7 +192,7 @@ spring:
 
 | 项 | 改动 | 验证 |
 |---|---|---|
-| `ip2region` 2.7.0 → 3.3.7 | 3.x 为支持 IPv6 改了加载 API：`loadContentFromFile` 返回值 `byte[]` → `LongByteArray`，`newWithBuffer` 必须显式传 IP 版本。`SmartIpUtil.init` 已改写 | **旧 xdb 数据文件（v2 格式）能被 3.3.7 直接读取**，实测三个 IP 解析正确；启动无报错 |
+| `ip2region` 2.7.0 → 3.3.7 | ① 3.x 为支持 IPv6 改了加载 API：`loadContentFromFile` 返回值 `byte[]` → `LongByteArray`，`newWithBuffer` 必须显式传 IP 版本；② 数据格式差异做了归一化，见 §4.5 | **旧 xdb 数据文件（v2 格式）能被 3.3.7 直接读取**，实测三个 IP 解析正确；启动日志打印 `数据格式版本:[2]` |
 | `tika-core` 3.1.0 → 3.3.2 | 纯版本推进，`SecurityFileService` 的 API 无变化 | 编译通过、启动正常 |
 | sa-token Redis DAO 换官方实现 | `sa-token-redis-jackson`（依赖 Jackson 2）→ `sa-token-redis-template`（只依赖 sa-token-core + spring-boot-starter-data-redis） | 启动日志 `SaTokenDao 注入成功: SaTokenDaoForRedisTemplate`；带伪 token 请求受保护接口，正确返回"未登录"（证明读路径通） |
 | 前端死注释清理 | 删掉 4 处 `// eslint-disable-*`（eslint 已卸载，注释无作用） | `npx vite build` 通过 |
@@ -275,7 +275,37 @@ Redisson 3 会把空串/空值当成"没有配密码"而跳过 AUTH，**Redisson
 **解决方案**：每次重启前先 `Get-CimInstance Win32_Process -Filter "Name='java.exe'"` 按命令行过滤掉残留进程。
 **排查口诀：验证升级结果时，先确认跑的是不是刚构建出来的那个包。**
 
-### 4.5 【工具链】maven-dependency-plugin 读不了 JDK 25 字节码
+### 4.5 【最容易埋雷】ip2region 的数据格式是「段数不变、位置错位」
+
+**现象**：ip2region 换数据文件时，新旧格式**都是 5 段**，既不会报错也不会长度异常：
+
+```
+v2 数据： 国家 | 区域 | 省份 | 城市 | ISP                例：中国|0|江苏省|南京市|0
+v3 数据： 国家 | 省份 | 城市 | ISP  | iso-alpha2-code    例：中国|江苏省|南京市|电信|CN
+```
+
+从 index 1 起整体错开一格。原代码是 `region.split("|")` 后原样落库，
+换数据文件会**静默把「省份」读成「区域」**，而且因为字符串看起来"还挺像那么回事"，
+不做逐字段比对根本发现不了。
+
+**解决方案**：不按位置硬编码，改为**在 `init()` 时读 xdb 文件头的 `version` 字段**
+（`Searcher.loadHeaderFromFile(path).version`，实测现有文件返回 2），
+按版本决定字段下标，并统一归一化为 `[国家, 省份, 城市, 运营商]`、剔除 `0` 占位符。
+
+顺带治好了一个老毛病：原来落库的是 `中国|0|江苏省|南京市|0` 这种带占位符的脏值，
+现在是 `中国|江苏省|南京市`。
+
+**实测佐证**（同一份 v2 数据，强行按 v3 布局解析，数据会真的丢）：
+
+| IP | 改造前（原样落库） | 改造后（按文件头识别） | 强行按 v3 布局 |
+|---|---|---|---|
+| 114.114.114.114 | `中国\|0\|江苏省\|南京市\|0` | `中国\|江苏省\|南京市` | `中国\|江苏省\|南京市` |
+| 8.8.8.8 | `美国\|0\|0\|0\|Level3` | `美国\|Level3` | `美国` ← ISP 丢了 |
+| 223.5.5.5 | `中国\|0\|浙江省\|杭州市\|阿里云` | `中国\|浙江省\|杭州市\|阿里云` | `中国\|浙江省\|杭州市` ← 阿里云丢了 |
+
+**收益**：以后换 xdb 数据文件，落库内容的**含义和形状保持不变**，历史数据与新数据可比。
+
+### 4.6 【工具链】maven-dependency-plugin 读不了 JDK 25 字节码
 
 **现象**：`mvn dependency:analyze` 报 `Unsupported class file major version 69`。
 
@@ -291,7 +321,7 @@ mvn org.apache.maven.plugins:maven-dependency-plugin:3.11.0:analyze -DignoreNonC
 starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全在误报名单里，
 必须逐条人工复核，不能照着告警删。
 
-### 4.6 【小坑集合】
+### 4.7 【小坑集合】
 
 | 现象 | 根因与修法 |
 |---|---|
@@ -351,13 +381,12 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
    但若碰到冷门 xlsx 特性会在运行期抛 `NoClassDefFoundError: org.openxmlformats.schemas.*`，
    届时把 `poi-ooxml-full` 加回来即可。
 
-### 6.2 可选，需要产品决策
+### 6.2 可选
 
-3. **ip2region 的数据文件要不要更新**。仓库里的 `ip2region.xdb` 是 2026-03 的 v2 格式版本，
-   项目 v3.17.0 已经更新了 IPv4/IPv6 数据，且 **v3.13.0 起给数据加了 `iso-3166-alpha2-code` 字段**。
-   换新数据文件会改变 `SmartIpUtil.getRegionList()` 的返回内容（多一个字段），
-   影响登录日志/操作日志的地区显示 —— 这是业务行为变化而非版本升级，需要产品确认后再动。
-   （当前 3.3.7 的库读旧数据文件完全正常，不换也没有故障风险。）
+3. **ip2region 数据文件可随时更新，代码已不受格式影响**。解析逻辑现在按 xdb 文件头版本
+   自适应字段布局（见 §4.7），换成 v3 数据文件不需要改代码。
+   唯一的变化是新数据的地区名做过标准化、且多了国家代码字段（国家代码不进展示串）。
+   当前 v2 数据文件工作正常，不换也没有故障风险。
 
 ### 6.3 观察项
 
