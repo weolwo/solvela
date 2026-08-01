@@ -76,6 +76,7 @@ export const TABLE_ID_CONST = {
       TASK_CONFIG: businessMarketingInitTableId + 31, //任务配置
       TASK_RECORD: businessMarketingInitTableId + 32, //任务记录
       TASK_TEMPLATE: businessMarketingInitTableId + 33, //任务模板
+      TASK_EVENT: businessMarketingInitTableId + 34, //任务事件注册表
       // 奖品
       PRIZE_CONFIG: businessMarketingInitTableId + 41, //奖品配置
       PRIZE_LOG: businessMarketingInitTableId + 42, //发奖记录

@@ -22,7 +22,7 @@
         <a-range-picker v-model:value="queryForm.validStartTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeValidStartTime" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="RECORD_STATUS_OPTIONS" placeholder="全部" allow-clear />
       </a-form-item>
       <a-form-item label="达标时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.completeTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCompleteTime" />
@@ -81,8 +81,13 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="RECORD_STATUS_COLOR[text] || 'default'">{{ RECORD_STATUS_LABEL[text] || text }}</a-tag>
+        </template>
+
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
+            <a-button @click="showFlow(record)" type="link">事件流水</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
             <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
@@ -109,6 +114,45 @@
 
     <TaskRecordForm ref="formRef" @reloadList="queryData" />
   </a-card>
+
+  <!---------- 事件流水抽屉：客诉自证入口 ----------->
+  <a-drawer :open="flowVisible" title="任务事件流水" :width="900" @close="flowVisible = false">
+    <a-alert type="info" show-icon class="mb-3">
+      <template #message>
+        这里是这条任务记录收到过的<b>全部事件</b>，含<b>被丢弃的</b>及其原因。
+        「用户下了 99 元的单为什么没进度」这类问题，答案就在丢弃原因里。
+      </template>
+    </a-alert>
+
+    <a-spin :spinning="flowLoading">
+      <a-empty v-if="!flowLoading && flowList.length === 0" description="该任务记录还没有任何事件流水" />
+      <a-timeline v-else class="mt-2">
+        <a-timeline-item v-for="item in flowList" :key="item.id" :color="item.flowType === 1 ? 'green' : 'red'">
+          <div class="flex items-center gap-2 flex-wrap">
+            <a-tag :color="item.flowType === 1 ? 'green' : 'red'">
+              {{ item.flowType === 1 ? '已推进' : '已丢弃' }}
+            </a-tag>
+            <b>{{ item.eventCode }}</b>
+            <span class="text-gray-500!">单号 {{ item.eventBizId }}</span>
+            <span class="text-gray-400! text-xs">{{ item.createTime }}</span>
+          </div>
+
+          <div v-if="item.flowType === 1" class="mt-1">
+            进度
+            <a-tag color="blue">+{{ item.deltaMetric }}</a-tag>
+            →
+            <a-tag color="blue">{{ item.afterMetric }}</a-tag>
+          </div>
+          <div v-else class="mt-1 text-red-600!">丢弃原因：{{ item.discardReason || '（未记录）' }}</div>
+
+          <a-button v-if="item.eventPayload" type="link" size="small" class="pl-0!" @click="togglePayload(item.id)">
+            {{ expandedPayloadId === item.id ? '收起事件原文' : '查看事件原文' }}
+          </a-button>
+          <pre v-if="expandedPayloadId === item.id" class="bg-gray-50 p-2 rounded text-xs overflow-x-auto">{{ item.eventPayload }}</pre>
+        </a-timeline-item>
+      </a-timeline>
+    </a-spin>
+  </a-drawer>
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
@@ -121,6 +165,19 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import TaskRecordForm from './task-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { taskEventApi } from '/@/api/business/task/task-event/task-event-api';
+
+  // ---------------------------- 任务记录状态（对齐 t_task_record.status） ----------------------------
+  // ⚠️ 阶梯任务下「第1档已发、第2档进行中」仍是 0-进行中：status 只表示最高档是否达标，
+  //    低档的发放情况记在 progress_data.dispatchedStages（展示用，非判据）
+  const RECORD_STATUS_LABEL = { 0: '进行中', 1: '已完成', 2: '已发奖', 3: '已过期' };
+  const RECORD_STATUS_COLOR = { 0: 'processing', 1: 'blue', 2: 'green', 3: 'default' };
+  const RECORD_STATUS_OPTIONS = [
+    { value: 0, label: '进行中' },
+    { value: 1, label: '已完成' },
+    { value: 2, label: '已发奖' },
+    { value: 3, label: '已过期' },
+  ];
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -151,7 +208,7 @@
       ellipsis: true,
     },
     {
-      title: '业务期数标识(防重用)：NONE, 日期(20260402)',
+      title: '周期',
       dataIndex: 'periodKey',
       ellipsis: true,
     },
@@ -166,12 +223,12 @@
       ellipsis: true,
     },
     {
-      title: '当前进度值：如已签到 3.0000 天',
+      title: '当前进度',
       dataIndex: 'currentMetric',
       ellipsis: true,
     },
     {
-      title: '状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期',
+      title: '状态',
       dataIndex: 'status',
       ellipsis: true,
     },
@@ -181,12 +238,12 @@
       ellipsis: true,
     },
     {
-      title: '接取任务时的规则快照',
+      title: '规则快照',
       dataIndex: 'ruleSnapshot',
       ellipsis: true,
     },
     {
-      title: '接取任务时的奖励快照',
+      title: '奖励快照',
       dataIndex: 'prizeSnapshot',
       ellipsis: true,
     },
@@ -219,7 +276,7 @@
       title: '操作',
       dataIndex: 'action',
       fixed: 'right',
-      width: 90,
+      width: 190,
     },
   ]);
 
@@ -326,6 +383,32 @@
     } finally {
       SmartLoading.hide();
     }
+  }
+
+  // ---------------------------- 事件流水（客诉自证） ----------------------------
+
+  const flowVisible = ref(false);
+  const flowLoading = ref(false);
+  const flowList = ref([]);
+  const expandedPayloadId = ref(null);
+
+  async function showFlow(record) {
+    flowVisible.value = true;
+    flowLoading.value = true;
+    flowList.value = [];
+    expandedPayloadId.value = null;
+    try {
+      const res = await taskEventApi.queryRecordFlow(record.id);
+      flowList.value = res.data || [];
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      flowLoading.value = false;
+    }
+  }
+
+  function togglePayload(id) {
+    expandedPayloadId.value = expandedPayloadId.value === id ? null : id;
   }
 
   // ---------------------------- 批量删除 ----------------------------

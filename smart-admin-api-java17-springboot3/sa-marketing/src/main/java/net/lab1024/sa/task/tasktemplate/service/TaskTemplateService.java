@@ -9,6 +9,7 @@ import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.task.constant.TaskTypeEnum;
 import net.lab1024.sa.task.tasktemplate.dao.TaskTemplateDao;
 import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateAddForm;
@@ -23,8 +24,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 任务模板表 Service
@@ -117,6 +120,10 @@ public class TaskTemplateService {
         if (schemaError != null) {
             return ResponseDTO.userErrorParam(schemaError);
         }
+        String contractError = checkTargetParamDeclared(saveForm.getTaskType(), saveForm.getUiSchema());
+        if (contractError != null) {
+            return ResponseDTO.userErrorParam(contractError);
+        }
 
         TaskTemplate taskTemplate = SmartBeanUtil.copy(saveForm, TaskTemplate.class);
         taskTemplate.setUiSchema(JsonUtils.toJson(saveForm.getUiSchema()));
@@ -165,6 +172,46 @@ public class TaskTemplateService {
     }
 
     /**
+     * 🔴 契约校验：ui_schema 必须声明该 task_type 用来判达标的目标参数。
+     *
+     * <p><b>为什么值得为它单开一道校验</b>：这是本模块最难查的一类错。
+     * 模板作者把参数键起成 {@code targetX}，运营照样能配出任务、事件照样进来、进度照样涨，
+     * 就是<b>永远不完成</b> —— 没有异常、没有失败流水、没有任何线索，
+     * 因为从每一层看它都在正常工作。把它提前成「保存模板时就报错」是唯一能堵住的地方。
+     *
+     * <p>校验的是 ui_schema 里<b>声明</b>了这个参数，而不是它有值 ——
+     * 有没有值是向导提交时的事（{@code TaskConfigService.wizardSubmit} 已按 required 反向校验）。
+     *
+     * @return null 表示通过
+     */
+    @SuppressWarnings("unchecked")
+    private String checkTargetParamDeclared(String taskTypeValue, Map<String, Object> uiSchema) {
+        TaskTypeEnum taskType = TaskTypeEnum.resolve(taskTypeValue);
+        if (taskType == null) {
+            return "任务类型非法：" + taskTypeValue + "，可选值 "
+                    + java.util.Arrays.stream(TaskTypeEnum.values()).map(TaskTypeEnum::getValue).toList();
+        }
+        List<String> requiredKeys = taskType.targetParamKeys();
+        if (requiredKeys.isEmpty()) {
+            return null;
+        }
+        Set<String> declared = new HashSet<>();
+        for (Object item : (List<Object>) uiSchema.get("params")) {
+            if (item instanceof Map<?, ?> param && param.get("key") instanceof String key) {
+                declared.add(key);
+            }
+        }
+        if (requiredKeys.stream().anyMatch(declared::contains)) {
+            return null;
+        }
+        // 报错要给出可直接照抄的键名，别让人去翻文档
+        return "任务类型 " + taskType.getValue() + "（" + taskType.getDesc()
+                + "）必须在 ui_schema 的 params 里声明目标参数「" + requiredKeys.get(0)
+                + "」，否则任务进度会一直涨但永远判不了达标（且不会报任何错）。"
+                + "当前已声明的参数：" + (declared.isEmpty() ? "无" : declared);
+    }
+
+    /**
      * 分页查询
      */
     public PageResult<TaskTemplateVO> queryPage(TaskTemplateQueryForm queryForm) {
@@ -181,6 +228,12 @@ public class TaskTemplateService {
         if (existsByTemplateCode(addForm.getTemplateCode())) {
             return ResponseDTO.userErrorParam("模板编码已存在：" + addForm.getTemplateCode());
         }
+        // 这两条 CRUD 接口收的是 ui_schema 字符串，是绕过设计器的另一条入口 ——
+        // 校验必须两边都做，否则「防不住绕过页面直接 POST」（铁律 2）
+        String error = checkRawUiSchema(addForm.getTaskType(), addForm.getUiSchema());
+        if (error != null) {
+            return ResponseDTO.userErrorParam(error);
+        }
         TaskTemplate taskTemplate = SmartBeanUtil.copy(addForm, TaskTemplate.class);
         taskTemplateDao.insert(taskTemplate);
         return ResponseDTO.ok();
@@ -191,9 +244,34 @@ public class TaskTemplateService {
      *
      */
     public ResponseDTO<String> update(TaskTemplateUpdateForm updateForm) {
+        String error = checkRawUiSchema(updateForm.getTaskType(), updateForm.getUiSchema());
+        if (error != null) {
+            return ResponseDTO.userErrorParam(error);
+        }
         TaskTemplate taskTemplate = SmartBeanUtil.copy(updateForm, TaskTemplate.class);
         taskTemplateDao.updateById(taskTemplate);
         return ResponseDTO.ok();
+    }
+
+    /**
+     * ui_schema 以字符串传入时的校验入口（生成器 CRUD 用）。
+     *
+     * <p>解析失败直接判非法：一个存不进去的 JSON 比一个「存进去了但解析不了」的好得多 ——
+     * 后者会在向导拉模板列表时被静默剔除，运营只会看到「我建的模板不见了」。
+     */
+    @SuppressWarnings("unchecked")
+    private String checkRawUiSchema(String taskType, String uiSchemaJson) {
+        Map<String, Object> uiSchema;
+        try {
+            uiSchema = JsonUtils.parseObject(uiSchemaJson, Map.class);
+        } catch (RuntimeException e) {
+            return "ui_schema 不是合法 JSON";
+        }
+        if (uiSchema == null) {
+            return "ui_schema 不是合法 JSON";
+        }
+        String schemaError = checkUiSchema(uiSchema);
+        return schemaError != null ? schemaError : checkTargetParamDeclared(taskType, uiSchema);
     }
 
     /**

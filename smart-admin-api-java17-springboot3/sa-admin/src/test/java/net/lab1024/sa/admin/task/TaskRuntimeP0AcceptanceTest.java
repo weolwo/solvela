@@ -15,6 +15,8 @@ import net.lab1024.sa.task.taskevent.domain.entity.TaskEvent;
 import net.lab1024.sa.task.taskevent.domain.vo.TaskEventOptionVO;
 import net.lab1024.sa.task.taskevent.service.TaskEventDefService;
 import net.lab1024.sa.task.taskconfig.dao.TaskConfigDao;
+import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateSaveForm;
+import net.lab1024.sa.task.tasktemplate.service.TaskTemplateService;
 import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -72,6 +74,8 @@ class TaskRuntimeP0AcceptanceTest {
     private TaskRecordFlowDao taskRecordFlowDao;
     @Autowired
     private TaskEventDefService taskEventDefService;
+    @Autowired
+    private TaskTemplateService taskTemplateService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -496,6 +500,71 @@ class TaskRuntimeP0AcceptanceTest {
 
         // 停用的事件不该出现在下拉里
         assertTrue(options.stream().allMatch(o -> taskEventDefService.getEnabledByCode(o.eventCode()) != null));
+    }
+
+    // ==================== 模板契约校验（方案 §4.10） ====================
+
+    private TaskTemplateSaveForm templateForm(String code, String taskType, List<Map<String, Object>> params) {
+        TaskTemplateSaveForm form = new TaskTemplateSaveForm();
+        form.setTemplateCode(code);
+        form.setTemplateName("契约校验用-" + code);
+        form.setTaskType(taskType);
+        form.setTriggerEvent("DAILY_SIGN");
+        form.setRuleScript("// 契约校验用例");
+        form.setUiSchema(Map.of("version", 1, "params", params));
+        return form;
+    }
+
+    private Map<String, Object> numberParam(String key) {
+        return Map.of("key", key, "label", key, "widget", "number");
+    }
+
+    @Test
+    @DisplayName("🔴 契约校验：COUNT 模板没声明 targetCount 必须存不进去（否则任务会永远不完成且零报错）")
+    void templateWithoutTargetParamIsRejected() {
+        ResponseDTO<Boolean> result = taskTemplateService.save(
+                templateForm("TCONTRACT1", "COUNT", List.of(numberParam("targetX"))));
+
+        assertFalse(result.getOk(), "起错参数名的模板必须在保存时就被拦下 —— "
+                + "放过去的话，运营能配任务、事件能进来、进度也涨，就是永远不完成，而且一条报错都没有");
+        assertTrue(result.getMsg().contains("targetCount"),
+                "报错要给出可直接照抄的键名：" + result.getMsg());
+        assertTrue(result.getMsg().contains("targetX"),
+                "报错要说清当前声明了什么，便于对照：" + result.getMsg());
+    }
+
+    @Test
+    @DisplayName("契约校验：AMOUNT 要的是 targetAmount，给 targetCount 不算数")
+    void amountTemplateRequiresTargetAmount() {
+        ResponseDTO<Boolean> wrong = taskTemplateService.save(
+                templateForm("TCONTRACT2", "AMOUNT", List.of(numberParam("targetCount"))));
+        assertFalse(wrong.getOk(), "AMOUNT 判达标读的是 targetAmount，声明 targetCount 一样读不到");
+        assertTrue(wrong.getMsg().contains("targetAmount"), wrong.getMsg());
+    }
+
+    @Test
+    @DisplayName("契约校验：兼容存量的 targetDays；SIMPLE 不强制声明目标参数")
+    void legacyKeyAndSimpleTypeAreAccepted() {
+        // 存量模板 FRWAYF2X6N 用的就是 targetDays，不兼容的话它一编辑就存不回去
+        ResponseDTO<Boolean> legacy = taskTemplateService.save(
+                templateForm("TCONTRACT3", "COUNT", List.of(numberParam("targetDays"))));
+        assertTrue(legacy.getOk(), "兼容形态 targetDays 应放行：" + legacy.getMsg());
+
+        // SIMPLE 目标恒为 1，强制声明反而是逼运营填一个永远是 1 的参数
+        ResponseDTO<Boolean> simple = taskTemplateService.save(
+                templateForm("TCONTRACT4", "SIMPLE", List.of(numberParam("someFlag"))));
+        assertTrue(simple.getOk(), "SIMPLE 不该强制声明目标参数：" + simple.getMsg());
+
+        jdbcTemplate.update("DELETE FROM t_task_template WHERE template_code IN ('TCONTRACT3','TCONTRACT4')");
+    }
+
+    @Test
+    @DisplayName("契约校验：非法 task_type 直接拒绝，并列出可选值")
+    void illegalTaskTypeIsRejected() {
+        ResponseDTO<Boolean> result = taskTemplateService.save(
+                templateForm("TCONTRACT5", "NOT_A_TYPE", List.of(numberParam("targetCount"))));
+        assertFalse(result.getOk());
+        assertTrue(result.getMsg().contains("STREAK"), "报错要列出可选值：" + result.getMsg());
     }
 
     @Test

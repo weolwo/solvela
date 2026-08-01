@@ -67,6 +67,33 @@ public enum TaskTypeEnum implements BaseEnum {
     private final boolean readModifyWrite;
 
     /**
+     * 该类型必须在 ui_schema 的 {@code params} 里声明的<b>目标参数键</b>（任一命中即可，
+     * 首个是契约主形态）。
+     *
+     * <p>🔴 <b>rule_config 的键名是第②层的契约，不是自由文本。</b>
+     * 模板作者随手起一个键名（{@code targetX}），策略层就读不到目标值 ——
+     * 表现是「任务能配、进度也涨，就是永远不完成」，<b>一条报错都没有</b>。
+     * 存量模板 {@code FRWAYF2X6N} 用的就是 {@code targetDays} 而非 {@code targetCount}，
+     * 正是这个坑的实例（见方案 §4.10）。
+     *
+     * <p>把它放在枚举上而不是校验代码里，是因为它属于「这个类型怎么算」的一部分：
+     * 加第五种类型时，编译器会在这个 switch 上逼你回答「它靠哪个参数判达标」。
+     *
+     * @return 空列表表示不作要求
+     */
+    public java.util.List<String> targetParamKeys() {
+        return switch (this) {
+            case AMOUNT -> java.util.List.of(TaskConst.RULE_KEY_TARGET_AMOUNT);
+            // 主形态 targetCount，兼容存量的 targetDays（名单只出不进，见 TaskConst 的说明）
+            case COUNT, STREAK -> java.util.List.of(
+                    TaskConst.RULE_KEY_TARGET_COUNT, TaskConst.RULE_KEY_TARGET_DAYS_LEGACY);
+            // SIMPLE 的目标恒为 1（SimpleTaskStrategy 在没配时兜底），不强制声明 ——
+            // 强制反而会逼运营为「完善资料」这种一次性任务填一个永远是 1 的参数
+            case SIMPLE -> java.util.List.of();
+        };
+    }
+
+    /**
      * 按 value 解析，非法值返回 null（由调用方决定是报错还是降级）。
      *
      * <p>刻意不接受大小写变体：task_type 是服务端从模板强制覆写进 rule_config 的
