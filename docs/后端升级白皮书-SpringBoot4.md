@@ -163,7 +163,19 @@ spring:
 
 以及删掉 `spring.data.redis.password` 那行空值（见 §4.3）。
 
-### 3.5 第三方 API
+### 3.5 knife4j 残留清理
+
+换掉 knife4j 后，散落在四处的耦合点一并摘除：
+
+| 位置 | 改动 |
+|---|---|
+| `WebServerListener` 启动横幅 | "knife4j地址: /doc.html" → "OpenAPI文档: /v3/api-docs"（原地址已 404） |
+| `MvcConfig.addResourceHandlers` | 删掉 `doc.html` 的静态资源映射（那是 knife4j 的 UI 入口页）；`/webjars/**` 保留，Swagger UI 要用 |
+| `SwaggerConfig.SWAGGER_WHITELIST` | 删掉 `/doc.html`（免登录白名单里的死条目） |
+| `SwaggerConfig` 注释 | 删掉 "如果使用knife4j则不需要" 这句已失效的说明 |
+| 四个 profile 的 yaml | 删掉整段 `knife4j:` 配置块（enable / basic 认证用户名密码） |
+
+### 3.6 第三方 API
 
 `RScript.ReturnType.INTEGER` → `RScript.ReturnType.LONG`（Redisson 4 枚举改名，返回类型仍是 `Long`），
 落在 `DrawStockService` 的两处扣减/回滚 Lua 调用上。
@@ -185,7 +197,9 @@ spring:
 用的都是 `org.springdoc.core.*` 的公共 API，**这部分一行没改就过了**。
 
 **代价（需要知悉）**：UI 从 knife4j 的 `/doc.html` 变成 Swagger UI 的 `/swagger-ui/index.html`。
-`WebServerListener` 的启动横幅里那行 "knife4j地址" 现在指向一个 404，属于遗留待清理项。
+
+knife4j 的残留已一并清理干净（见 §3.6），`/doc.html` 现在确实不存在了
+（实测返回全局异常处理的 `NoResourceFoundException`）。
 
 ### 4.2 【工作量大头】Jackson 3 的破坏性远超"改个包名"
 
@@ -299,18 +313,17 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 
 ## 6. 遗留事项（本次未做，建议排期）
 
-1. **`WebServerListener` 的启动横幅**还打印 "knife4j地址: /doc.html"，该地址现在是 404，需改成 Swagger UI 地址。
-2. **Excel 导入导出需要跑一次冒烟**。删掉 `poi-ooxml-full` 后 OOXML schema 走的是 `poi-ooxml-lite`，
+1. **Excel 导入导出需要跑一次冒烟**。删掉 `poi-ooxml-full` 后 OOXML schema 走的是 `poi-ooxml-lite`，
    现有代码（XSSFWorkbook/XSSFSheet/XSSFPictureData/XSSFRelation）与 fastexcel 常规读写都在 lite 覆盖范围内，
    但若碰到冷门 xlsx 特性会在运行期抛 `NoClassDefFoundError: org.openxmlformats.schemas.*`，
    届时把 `poi-ooxml-full` 加回来即可。
-3. **sa-token 的 Redis 序列化仍在 Jackson 2 上**（`sa-token-redis-jackson`）。
+2. **sa-token 的 Redis 序列化仍在 Jackson 2 上**（`sa-token-redis-jackson`）。
    这是 sa-token 自己的内部实现，不影响应用代码单一栈，但意味着 classpath 上 Jackson 2/3 并存。
    若 sa-token 后续发布 jackson3 版的 redis 模块，可以再收敛一次。
-4. **Redis 里的历史缓存值建议清一次**。`RedisConfig` 的默认类型信息（default typing）从
+3. **Redis 里的历史缓存值建议清一次**。`RedisConfig` 的默认类型信息（default typing）从
    Jackson 2 换成了 Jackson 3，两者写入的类型标记格式不保证互相兼容，老 key 反序列化可能失败。
-5. **ip2region 3.3.7** 与 **tika 4.0**（待正式版）单独排期。
-6. 前端 `src/router/index.js` 等 3 个文件里残留的 `// eslint-disable-*` 注释已成死注释（eslint 已卸载），可顺手清。
+4. **ip2region 3.3.7** 与 **tika 4.0**（待正式版）单独排期。
+5. 前端 `src/router/index.js` 等 3 个文件里残留的 `// eslint-disable-*` 注释已成死注释（eslint 已卸载），可顺手清。
 
 ---
 
@@ -325,4 +338,4 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 | `前端依赖瘦身：…` | 仅 `smart-admin-web-javascript/`，与后端无耦合，可单独摘到 `task` |
 | `后端升级 Spring Boot 4…` | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） |
 
-> ⚠️ 数据面的注意：Redis 缓存值格式变了（见 §6.4），回滚后同样建议清一次 Redis，避免新旧格式互相污染。
+> ⚠️ 数据面的注意：Redis 缓存值格式变了（见 §6.3），回滚后同样建议清一次 Redis，避免新旧格式互相污染。

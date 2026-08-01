@@ -128,13 +128,6 @@ springdoc:
     server-base-url:
   api-docs:
     enabled: true # 开关
-knife4j:
-  enable: true
-  basic:
-    enable: false
-    username: api # Basic认证用户名
-    password: 1024 # Basic认证密码
-
 # RestTemplate 请求配置 毫秒
 http:
   pool:

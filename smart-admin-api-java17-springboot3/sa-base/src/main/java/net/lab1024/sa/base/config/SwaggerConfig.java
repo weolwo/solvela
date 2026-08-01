@@ -60,7 +60,6 @@ public class SwaggerConfig {
             "/swagger-ui.html/**",
             "/v3/api-docs",
             "/v3/api-docs/**",
-            "/doc.html",
     };
 
     @Bean
@@ -120,7 +119,6 @@ public class SwaggerConfig {
 
     /**
      * 以下代码可以用于设置 /swagger-ui/index.html 的serverBaseUrl
-     * 如果使用knife4j则不需要
      * @param openAPI
      * @param securityParser
      * @param springDocConfigProperties
