@@ -46,6 +46,20 @@ export const LOTTERY_STATUS_ENUM = {
 };
 
 /**
+ * 购彩记录的中奖状态，对齐 t_lottery_record.win_status 与后端 TicketStatusEnum。
+ *
+ * ⚠️ 取值必须与后端一致：后端按该值做筛选校验，对不上会直接 400
+ * （交接文档记过：TicketStatusEnum 的字段名写错曾让「按中奖状态筛选购彩记录」恒返回 400）。
+ *
+ * 注意 prize_level 用 99 表示未中奖，与这里的 win_status 是两个维度，别混。
+ */
+export const WIN_STATUS_ENUM = {
+  WAIT: { value: 0, desc: '未开奖' },
+  FAILURE_MATCH: { value: 1, desc: '未中奖' },
+  SUCCESS_MATCH: { value: 2, desc: '已中奖' },
+};
+
+/**
  * 奖品类型对应的展示图标：资产池与奖级卡片共用，避免两处各写一份
  */
 export const PRIZE_TYPE_ICON = {
@@ -68,6 +82,7 @@ export default {
   MATCH_RULE_ENUM,
   MATCH_RULE_OPTIONS,
   LOTTERY_STATUS_ENUM,
+  WIN_STATUS_ENUM,
   PRIZE_TYPE_ICON,
   prizeIcon,
 };

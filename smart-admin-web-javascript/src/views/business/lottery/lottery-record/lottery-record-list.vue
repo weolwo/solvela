@@ -25,7 +25,7 @@
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
       </a-form-item>
       <a-form-item label="中奖状态" class="smart-query-form-item">
-        <SmartEnumSelect width="200px" v-model:value="queryForm.winStatus" enum-name="" placeholder="中奖状态: 0-未开奖, 1-未中奖, 已开奖" />
+        <SmartEnumSelect width="200px" v-model:value="queryForm.winStatus" enum-name="WIN_STATUS_ENUM" placeholder="请选择中奖状态" />
       </a-form-item>
       <a-form-item label="会员名" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.memberName" placeholder="会员名" />

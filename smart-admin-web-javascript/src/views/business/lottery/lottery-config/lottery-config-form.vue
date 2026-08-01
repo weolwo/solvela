@@ -33,7 +33,7 @@
         <a-input-number style="width: 100%" v-model:value="form.totalCount" placeholder="号池总数 (如: 1,000,000)" />
       </a-form-item>
       <a-form-item label="状态" name="status">
-        <SmartEnumSelect width="100%" v-model:value="form.status" enum-name="" placeholder="状态：0-下线, 1-上线" />
+        <SmartEnumSelect width="100%" v-model:value="form.status" enum-name="LOTTERY_STATUS_ENUM" placeholder="请选择状态" />
       </a-form-item>
     </a-form>
 
