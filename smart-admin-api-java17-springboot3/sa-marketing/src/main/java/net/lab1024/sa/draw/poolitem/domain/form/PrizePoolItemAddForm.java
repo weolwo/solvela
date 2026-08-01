@@ -17,8 +17,7 @@ import lombok.Data;
 @Data
 public class PrizePoolItemAddForm {
 
-    @Schema(description = "租户id", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户id 不能为空")
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
 
     @Schema(description = "归属活动编码", requiredMode = Schema.RequiredMode.REQUIRED)

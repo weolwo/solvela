@@ -11,9 +11,6 @@
       <a-form-item label="id" name="id">
         <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
       </a-form-item>
-      <a-form-item label="租户ID" name="tenantId">
-        <SmartEnumSelect width="100%" v-model:value="form.tenantId" enum-name="" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="会员名" name="memberName">
         <a-input style="width: 100%" v-model:value="form.memberName" placeholder="会员名" />
       </a-form-item>
@@ -107,7 +104,6 @@
 
   const formDefault = {
     id: undefined, //id
-    tenantId: undefined, //租户ID
     memberName: undefined, //会员名
     taskConfigId: undefined, //任务配置ID
     activityCode: undefined, //活动编码
@@ -130,7 +126,6 @@
 
   const rules = {
     id: [{ required: true, message: 'id 必填' }],
-    tenantId: [{ required: true, message: '租户ID 必填' }],
     memberName: [{ required: true, message: '会员名 必填' }],
     taskConfigId: [{ required: true, message: '任务配置ID 必填' }],
     activityCode: [{ required: true, message: '活动编码 必填' }],

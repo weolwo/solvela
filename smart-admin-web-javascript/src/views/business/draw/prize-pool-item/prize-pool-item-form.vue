@@ -11,9 +11,6 @@
       <a-form-item label="id" name="id">
         <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
       </a-form-item>
-      <a-form-item label="租户id" name="tenantId">
-        <SmartEnumSelect width="100%" v-model:value="form.tenantId" enum-name="" placeholder="租户id" />
-      </a-form-item>
       <a-form-item label="活动编码" name="activityCode">
         <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="归属活动编码" />
       </a-form-item>
@@ -86,7 +83,6 @@
 
   const formDefault = {
     id: undefined, //id
-    tenantId: undefined, //租户id
     activityCode: undefined, //归属活动编码
     prizeCode: undefined, //关联(t_prize_config)
     userMaxCount: undefined, //单人限领次数: -1不限, 1表示每人最多中一次
@@ -98,7 +94,6 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    tenantId: [{ required: true, message: '租户id 必填' }],
     activityCode: [{ required: true, message: '归属活动编码 必填' }],
     prizeCode: [{ required: true, message: '关联(t_prize_config) 必填' }],
     userMaxCount: [{ required: true, message: '单人限领次数: -1不限, 1表示每人最多中一次 必填' }],

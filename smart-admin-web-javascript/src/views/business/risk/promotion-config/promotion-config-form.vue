@@ -11,9 +11,6 @@
       <a-form-item label="配置ID" name="id">
         <a-input-number style="width: 100%" v-model:value="form.id" placeholder="配置ID" />
       </a-form-item>
-      <a-form-item label="租户ID" name="tenantId">
-        <SmartEnumSelect width="100%" v-model:value="form.tenantId" enum-name="" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="优惠配置名称" name="promoName">
         <a-input style="width: 100%" v-model:value="form.promoName" placeholder="优惠配置名称" />
       </a-form-item>
@@ -138,7 +135,6 @@
 
   const formDefault = {
     id: undefined, //配置ID
-    tenantId: undefined, //租户ID
     promoName: undefined, //优惠配置名称
     prizeType: undefined, //资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)
     totalQuota: undefined, //总库存(个数)：-1为不限制(适用于券/实物)
@@ -164,7 +160,6 @@
 
   const rules = {
     id: [{ required: true, message: '配置ID 必填' }],
-    tenantId: [{ required: true, message: '租户ID 必填' }],
     promoName: [{ required: true, message: '优惠配置名称 必填' }],
     prizeType: [{ required: true, message: '资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物) 必填' }],
     totalQuota: [{ required: true, message: '总库存(个数)：-1为不限制(适用于券/实物) 必填' }],

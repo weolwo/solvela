@@ -18,8 +18,7 @@ import lombok.Data;
 @Data
 public class PromotionConfigAddForm {
 
-    @Schema(description = "租户ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户ID 不能为空")
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
 
     @Schema(description = "优惠配置名称", requiredMode = Schema.RequiredMode.REQUIRED)

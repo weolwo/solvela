@@ -11,9 +11,6 @@
       <a-form-item label="id" name="id">
         <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
       </a-form-item>
-      <a-form-item label="租户id" name="tenantId">
-        <SmartEnumSelect width="100%" v-model:value="form.tenantId" enum-name="" placeholder="租户id" />
-      </a-form-item>
       <a-form-item label="活动编码" name="activityCode">
         <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="活动编码" />
       </a-form-item>
@@ -89,7 +86,6 @@
 
   const formDefault = {
     id: undefined, //id
-    tenantId: undefined, //租户id
     activityCode: undefined, //活动编码
     lotteryCode: undefined, //彩票编码
     lotteryName: undefined, //彩票名称
@@ -103,7 +99,6 @@
 
   const rules = {
     id: [{ required: true, message: 'id 必填' }],
-    tenantId: [{ required: true, message: '租户id 必填' }],
     activityCode: [{ required: true, message: '活动编码 必填' }],
     lotteryCode: [{ required: true, message: '彩票编码 必填' }],
     lotteryName: [{ required: true, message: '彩票名称 必填' }],

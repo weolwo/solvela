@@ -22,8 +22,7 @@ public class TaskRecordAddForm {
     @NotNull(message = "id 不能为空")
     private Long id;
 
-    @Schema(description = "租户ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户ID 不能为空")
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
 
     @Schema(description = "会员名", requiredMode = Schema.RequiredMode.REQUIRED)
