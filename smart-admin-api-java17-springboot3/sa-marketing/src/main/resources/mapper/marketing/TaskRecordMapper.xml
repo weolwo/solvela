@@ -101,4 +101,69 @@
                         where id = #{id}
                 </delete>
 
+    <!-- ==================== 运行态（v3.44.0，方案 §4.4） ==================== -->
+
+    <select id="selectByUniqueKey" resultType="net.lab1024.sa.task.record.domain.entity.TaskRecord">
+        SELECT id, tenant_id, member_name, task_config_id, activity_code, period_key,
+               valid_start_time, valid_end_time, current_metric, version, status,
+               progress_data, rule_snapshot, prize_snapshot, complete_time,
+               create_by, create_time, update_by, update_time
+        FROM t_task_record
+        WHERE member_name = #{memberName}
+          AND task_config_id = #{taskConfigId}
+          AND period_key = #{periodKey}
+    </select>
+
+    <!--
+      条件更新原子累加（COUNT / AMOUNT / SIMPLE）。
+      把累加压进 UPDATE，靠行锁天然串行 —— 不会有 Lost Update，也不需要版本号和重试。
+      rows=0 的语义是「任务已不在进行中」，不是并发冲突。
+    -->
+    <update id="advanceMetric">
+        UPDATE t_task_record
+        SET current_metric = current_metric + #{delta}
+        WHERE id = #{id} AND status = 0
+    </update>
+
+    <!--
+      乐观锁覆写（STREAK 专用）：断档要清零，必须先读后算，读-改-写无法避免。
+      rows=0 = 版本已变或状态已流转，由调用方有限次重试。
+    -->
+    <update id="overwriteMetric">
+        UPDATE t_task_record
+        SET current_metric = #{metric},
+            progress_data  = #{progressData},
+            version        = version + 1
+        WHERE id = #{id} AND status = 0 AND version = #{version}
+    </update>
+
+    <!--
+      达标闸门：0-进行中 -> 1-已完成。
+      complete_time 必须显式写 now()：这一列没有 ON UPDATE 兜底（铁律 9 的例外分支，
+      与 approve_time / first_review_time 同类）。
+    -->
+    <update id="markCompleted">
+        UPDATE t_task_record
+        SET status = 1, complete_time = now()
+        WHERE id = #{id} AND status = 0
+    </update>
+
+    <update id="markDispatched">
+        UPDATE t_task_record
+        SET status = 2
+        WHERE id = #{id} AND status = 1
+    </update>
+
+    <!-- 只更新展示用的 progress_data，不碰 current_metric / status -->
+    <update id="updateProgressData">
+        UPDATE t_task_record
+        SET progress_data = #{progressData}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 数据库时钟（铁律 9） -->
+    <select id="selectDbNow" resultType="java.time.LocalDateTime">
+        SELECT now()
+    </select>
+
 </mapper>

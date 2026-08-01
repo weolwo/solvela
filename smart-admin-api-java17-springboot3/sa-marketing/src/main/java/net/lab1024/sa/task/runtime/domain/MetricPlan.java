@@ -1,0 +1,48 @@
+package net.lab1024.sa.task.runtime.domain;
+
+import java.math.BigDecimal;
+
+/**
+ * 进度推进方案：策略只负责「算出该怎么推」，SQL 由 TaskRecordAdvanceService 统一执行。
+ *
+ * <p>这样分工有三个好处：
+ * ① 策略可纯函数单测，不需要数据库；
+ * ② 累加型与读-改-写型的差别<b>在类型上就是显式的</b>，不会有人不小心把 COUNT 写成读-改-写；
+ * ③ 更新 SQL 只有一处，并发语义不会各处漂移。
+ *
+ * <p>用 sealed + record，与 draw 模块的 {@code DrawResult} 同一写法，消费端用模式匹配穷尽。
+ *
+ * @author alaric
+ * @date 2026-08-01
+ */
+public sealed interface MetricPlan {
+
+    /**
+     * 条件更新原子累加：{@code SET current_metric = current_metric + delta}。
+     *
+     * <p>一条 SQL 完成，靠行锁天然串行 —— 无 Lost Update、无需版本号、无需重试。
+     * COUNT / AMOUNT / SIMPLE 都走这条。
+     */
+    record Accumulate(BigDecimal delta) implements MetricPlan {
+    }
+
+    /**
+     * 乐观锁覆写：{@code SET current_metric = ?, progress_data = ? WHERE version = ?}。
+     *
+     * <p>只有 STREAK 用 —— 断档要清零，必须先读 lastHitDate 才知道算多少，读-改-写无法避免。
+     * 冲突时由上层有限次重试。
+     *
+     * @param expectedVersion 读到的版本号，作为并发闸门
+     */
+    record Overwrite(BigDecimal metric, String progressData, Integer expectedVersion) implements MetricPlan {
+    }
+
+    /**
+     * 不推进：条件不满足（金额不够、同日重复、任务已完成…）。
+     *
+     * <p>reason 会原样落进 {@code t_task_record_flow.discard_reason} ——
+     * 它就是「用户下了 99 元的单为什么没进度」这类客诉的答案，<b>要写人话</b>。
+     */
+    record Skip(String reason) implements MetricPlan {
+    }
+}

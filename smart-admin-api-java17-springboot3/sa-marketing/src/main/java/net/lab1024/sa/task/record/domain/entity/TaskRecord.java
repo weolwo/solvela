@@ -68,7 +68,27 @@ public class TaskRecord {
     private BigDecimal currentMetric;
 
     /**
+     * 乐观锁版本号（v3.44.0 新增）。
+     *
+     * <p>⚠️ 这一列是给 STREAK 用的，不是给 COUNT/AMOUNT 用的。
+     * 累加型走 {@code TaskRecordDao.advanceMetric} 的条件更新（一条 SQL、零冲突、零重试）；
+     * 只有 STREAK 必须先读 lastHitDate 才知道是「清零再+1」还是「+1」，
+     * 读-改-写无法避免，才用版本号 + 有限次重试。
+     * 别因为有了这一列就把三个策略都改成读-改-写。
+     *
+     * <p>刻意<b>不加</b> {@code @Version} 注解：本项目的乐观锁一律把版本号压进自定义 SQL 的 WHERE
+     * （对齐 t_prize_pool_item / t_member_wallet 的写法），
+     * 加了注解会让 updateById 也隐式带上版本条件，与显式 SQL 两套语义并存。
+     */
+    private Integer version;
+
+    /**
      * 状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期
+     *
+     * <p>⚠️ 阶梯任务下，「第 1 档已发奖、第 2 档进行中」<b>没有</b>对应取值 ——
+     * 这是刻意的：status 只表示<b>最高档</b>是否达标，低档的发放情况记在
+     * progress_data.dispatchedStages（展示用，非判据）。发奖防重的唯一判据是
+     * t_prize_log.uk_external_biz。详见方案 §4.8。
      */
     private Integer status;
 
