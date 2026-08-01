@@ -34,35 +34,35 @@ public class MemberWalletController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("memberWallet:query")
     public ResponseDTO<PageResult<MemberWalletVO>> queryPage(@RequestBody @Valid MemberWalletQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("memberWallet:add")
     public ResponseDTO<String> add(@RequestBody @Valid MemberWalletAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("memberWallet:update")
     public ResponseDTO<String> update(@RequestBody @Valid MemberWalletUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("memberWallet:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("memberWallet:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

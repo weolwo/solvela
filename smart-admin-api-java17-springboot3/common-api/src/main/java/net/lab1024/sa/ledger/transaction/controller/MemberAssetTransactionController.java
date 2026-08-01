@@ -34,35 +34,35 @@ public class MemberAssetTransactionController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("memberAssetTransaction:query")
     public ResponseDTO<PageResult<MemberAssetTransactionVO>> queryPage(@RequestBody @Valid MemberAssetTransactionQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("memberAssetTransaction:add")
     public ResponseDTO<String> add(@RequestBody @Valid MemberAssetTransactionAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("memberAssetTransaction:update")
     public ResponseDTO<String> update(@RequestBody @Valid MemberAssetTransactionUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("memberAssetTransaction:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("memberAssetTransaction:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

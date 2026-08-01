@@ -31,21 +31,21 @@ public class LotteryRecordController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("lotteryRecord:query")
     public ResponseDTO<PageResult<LotteryRecordVO>> queryPage(@RequestBody @Valid LotteryRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission("lotteryRecord:add")
     public ResponseDTO<String> add(@RequestBody @Valid LotteryRecordAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("lotteryRecord:update")
     public ResponseDTO<String> update(@RequestBody @Valid LotteryRecordUpdateForm updateForm) {
         return Service.update(updateForm);
     }

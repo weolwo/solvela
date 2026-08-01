@@ -37,42 +37,42 @@ public class PromotionConfigController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("promotionConfig:query")
     public ResponseDTO<PageResult<PromotionConfigVO>> queryPage(@RequestBody @Valid PromotionConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "优惠配置下拉列表（全量启用中，前端按 prizeType 分组做级联）")
     @GetMapping("/optionList")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("promotionConfig:query")
     public ResponseDTO<List<PromotionConfigOptionVO>> queryOptionList() {
         return Service.queryOptionList();
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("promotionConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid PromotionConfigAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("promotionConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PromotionConfigUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("promotionConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("promotionConfig:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

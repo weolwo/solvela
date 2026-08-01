@@ -36,56 +36,56 @@ public class PrizePoolConfigController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("prizePoolConfig:query")
     public ResponseDTO<PageResult<PrizePoolConfigVO>> queryPage(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("prizePoolConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid PrizePoolConfigAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "生成奖池编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
-    @SaCheckPermission(":workbench:save")
+    @SaCheckPermission("prizePoolConfig:workbench:save")
     public ResponseDTO<String> generatePoolCode() {
         return Service.generatePoolCode();
     }
 
     @Operation(summary = "抽奖工作台聚合回显（与聚合保存入参同构）")
     @GetMapping("/workbench/detail")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("prizePoolConfig:query")
     public ResponseDTO<DrawWorkbenchVO> workbenchDetail(@RequestParam String activityCode) {
         return Service.workbenchDetail(activityCode);
     }
 
     @Operation(summary = "抽奖工作台聚合保存（物资 + 多奖池 + 坑位映射，主子表事务）")
     @PostMapping("/workbench/save")
-    @SaCheckPermission(":workbench:save")
+    @SaCheckPermission("prizePoolConfig:workbench:save")
     public ResponseDTO<String> workbenchSave(@RequestBody @Valid DrawWorkbenchSaveForm saveForm) {
         return Service.workbenchSave(saveForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("prizePoolConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PrizePoolConfigUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("prizePoolConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("prizePoolConfig:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

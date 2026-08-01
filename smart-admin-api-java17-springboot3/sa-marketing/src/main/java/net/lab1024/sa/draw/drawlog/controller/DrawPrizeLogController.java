@@ -38,42 +38,42 @@ public class DrawPrizeLogController {
 
     @Operation(summary = "执行抽奖（引擎判定 + Lua预扣 + DB兜底 + 落流水）")
     @PostMapping("/execute")
-    @SaCheckPermission(":execute")
+    @SaCheckPermission("drawPrizeLog:execute")
     public ResponseDTO<DrawExecuteVO> execute(@RequestBody @Valid DrawExecuteForm executeForm) {
         return drawExecuteService.execute(executeForm);
     }
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("drawPrizeLog:query")
     public ResponseDTO<PageResult<DrawPrizeLogVO>> queryPage(@RequestBody @Valid DrawPrizeLogQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("drawPrizeLog:add")
     public ResponseDTO<String> add(@RequestBody @Valid DrawPrizeLogAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("drawPrizeLog:update")
     public ResponseDTO<String> update(@RequestBody @Valid DrawPrizeLogUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("drawPrizeLog:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("drawPrizeLog:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

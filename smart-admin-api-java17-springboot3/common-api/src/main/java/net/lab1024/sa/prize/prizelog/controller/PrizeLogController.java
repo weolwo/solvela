@@ -38,49 +38,49 @@ public class PrizeLogController {
 
     @Operation(summary = "发奖审批通过（approve_mode=1 的奖品唯一出口，通过后立即派发）")
     @GetMapping("/approve/{id}")
-    @SaCheckPermission(":approve")
+    @SaCheckPermission("prizeLog:approve")
     public ResponseDTO<String> approveDispatch(@PathVariable Long id) {
         return prizeDispatchHandler.approveDispatch(id, SmartRequestUtil.getRequestUser().getUserName());
     }
 
     @Operation(summary = "发奖审批驳回")
     @GetMapping("/reject/{id}")
-    @SaCheckPermission(":approve")
+    @SaCheckPermission("prizeLog:approve")
     public ResponseDTO<String> rejectDispatch(@PathVariable Long id, @RequestParam(required = false) String reason) {
         return prizeDispatchHandler.rejectDispatch(id, SmartRequestUtil.getRequestUser().getUserName(), reason);
     }
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("prizeLog:query")
     public ResponseDTO<PageResult<PrizeLogVO>> queryPage(@RequestBody @Valid PrizeLogQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("prizeLog:add")
     public ResponseDTO<String> add(@RequestBody @Valid PrizeLogAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("prizeLog:update")
     public ResponseDTO<String> update(@RequestBody @Valid PrizeLogUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("prizeLog:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("prizeLog:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

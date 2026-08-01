@@ -30,14 +30,14 @@ public class LotterySettleController {
 
     @Operation(summary = "服务端摇号：SecureRandom 生成，前端不可信")
     @GetMapping("/randomNumber")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("lotteryIssue:query")
     public ResponseDTO<String> randomNumber(@RequestParam Long issueId) {
         return lotterySettleService.randomNumber(issueId);
     }
 
     @Operation(summary = "执行开奖核销：状态闸门 + 按奖级升序逐级认领。核销中重复调用会接着跑，不会重复认领")
     @PostMapping("/settle")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("lotteryIssue:update")
     public ResponseDTO<SettleResultVO> settle(@RequestParam Long issueId,
                                               @RequestParam(required = false) String winningNumber) {
         return lotterySettleService.settle(issueId, winningNumber);
@@ -45,14 +45,14 @@ public class LotterySettleController {
 
     @Operation(summary = "核销进度：中奖/未中奖/待派奖各多少")
     @GetMapping("/settleSummary")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("lotteryIssue:query")
     public ResponseDTO<Map<String, Object>> settleSummary(@RequestParam Long issueId) {
         return lotterySettleService.summary(issueId);
     }
 
     @Operation(summary = "触发派奖：把中奖记录分批投递进公共派发链路")
     @PostMapping("/dispatch")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("lotteryIssue:update")
     public ResponseDTO<Integer> dispatch(@RequestParam Long issueId) {
         return lotterySettleService.dispatch(issueId);
     }

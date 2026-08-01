@@ -33,49 +33,49 @@ public class ProposalRecordController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("proposalRecord:query")
     public ResponseDTO<PageResult<ProposalRecordVO>> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "提案审批通过（财务视角；一审通过后按 review_level 决定进二审还是直接放行下发）")
     @GetMapping("/approve/{id}")
-    @SaCheckPermission(":approve")
+    @SaCheckPermission("proposalRecord:approve")
     public ResponseDTO<String> approve(@PathVariable Long id, @RequestParam(required = false) String comment) {
         return Service.approve(id, SmartRequestUtil.getRequestUser().getUserName(), comment);
     }
 
     @Operation(summary = "提案审批驳回")
     @GetMapping("/reject/{id}")
-    @SaCheckPermission(":approve")
+    @SaCheckPermission("proposalRecord:approve")
     public ResponseDTO<String> reject(@PathVariable Long id, @RequestParam(required = false) String comment) {
         return Service.reject(id, SmartRequestUtil.getRequestUser().getUserName(), comment);
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("proposalRecord:add")
     public ResponseDTO<String> add(@RequestBody @Valid ProposalRecordAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("proposalRecord:update")
     public ResponseDTO<String> update(@RequestBody @Valid ProposalRecordUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("proposalRecord:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("proposalRecord:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

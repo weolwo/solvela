@@ -39,14 +39,14 @@ public class LotteryTicketController {
 
     @Operation(summary = "领号：为用户发一个彩票号码")
     @PostMapping("/obtain")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("lotteryTicket:query")
     public ResponseDTO<TicketObtainVO> obtain(@RequestBody @Valid TicketObtainForm form) {
         return ticketIssueService.obtain(form);
     }
 
     @Operation(summary = "我的号码：按奖级升序，未中奖(99)沉底")
     @GetMapping("/myTickets")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("lotteryTicket:query")
     public ResponseDTO<List<LotteryRecord>> myTickets(@RequestParam String lotteryCode,
                                                       @RequestParam(required = false) String issueNo,
                                                       @RequestParam String memberName) {
@@ -55,7 +55,7 @@ public class LotteryTicketController {
 
     @Operation(summary = "号码验真：反解游标 + 校验签名，供客服核对用户出示的号码")
     @GetMapping("/verify")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("lotteryTicket:query")
     public ResponseDTO<String> verify(@RequestParam String lotteryCode,
                                       @RequestParam String issueNo,
                                       @RequestParam String ticketNumber) {
