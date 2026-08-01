@@ -13,7 +13,9 @@ import Antd, { message } from 'ant-design-vue';
 import * as antIcons from '@ant-design/icons-vue';
 import lodash from 'lodash';
 import JsonViewer from 'vue3-json-viewer';
-import 'vue3-json-viewer/dist/index.css';
+// vue3-json-viewer 2.4.x 起 CSS 产物改名：dist/index.css -> dist/vue3-json-viewer.css
+// ⚠️ 别信它 package.json 里的 style 字段，那里写的 dist/style.css 文件根本不存在
+import 'vue3-json-viewer/dist/vue3-json-viewer.css';
 import App from './App.vue';
 import { smartSentry } from '/@/lib/smart-sentry';
 import { loginApi } from '/@/api/system/login-api';

@@ -11,10 +11,10 @@ import { resolve } from 'path';
 import vue from '@vitejs/plugin-vue';
 import { loadEnv } from 'vite';
 import tailwindcss from '@tailwindcss/vite'; // [!新增] 1. 引入 tailwindcss v4 插件
-import customVariables from './src/theme/custom-variables';
+import customVariables from './src/theme/custom-variables.js'; // ✅ 修改1：补充了文件后缀 .js
 
 const pathResolve = (dir) => {
-  return resolve(__dirname, '.', dir);
+  return resolve(import.meta.dirname, '.', dir); // ✅ 修改2：将 __dirname 替换为 import.meta.dirname
 };
 
 export default ({ mode }) => {
@@ -43,16 +43,23 @@ export default ({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 8081,
-      server: {
-        proxy: {
-          // 代理路径
-          '/': {
-            target: env.VITE_APP_API_URL, // 目标服务器地址
-            changeOrigin: true, // 是否修改请求头中的 Origin 字段
-            rewrite: (path) => path, // 重写路径
-          },
-        },
-      },
+      //
+      // 🔴 这里刻意没有 proxy，不要再"顺手补上"。
+      //
+      // 前端是通过 axios 的 baseURL 直连后端的（src/lib/axios.js:24 读 VITE_APP_API_URL，
+      // dev 环境即 http://127.0.0.1:1024），跨域由后端的 CORS 放行 —— 整条链路不经过 Vite 代理。
+      //
+      // 历史上这里有过一段写在 server.server.proxy 下的配置，因为嵌套层级不对
+      // Vite 根本不识别，等于没配 —— 而"没配"恰好是对的，所以一直相安无事。
+      // 2026-08-01 有人把它"修正"到正确层级后，dev server 立刻打不开了：
+      // 代理模式是 '/'，它匹配的是**所有请求**，包括首页 HTML、/@vite/client、
+      // 每一个源码模块请求，全被转发到 1024 端口，后端返回
+      //     NoResourceFoundException: No static resource .
+      // 表现就是"页面白屏 / 登录不了"，而根因跟登录、跟依赖升级都毫无关系。
+      //
+      // 真要加代理，必须给一个具体前缀（如 '/api'）并同步改 axios 的 baseURL，
+      // 绝不能用 '/' 这种全匹配模式。
+      //
     },
     // [!修改] 2. 将 tailwindcss() 注册到 plugins 数组中
     plugins: [vue(), tailwindcss()],
@@ -100,7 +107,6 @@ export default ({ mode }) => {
     },
     define: {
       __INTLIFY_PROD_DEVTOOLS__: false,
-      'process.env': process.env,
     },
   };
 };

@@ -7,8 +7,9 @@
  * @Email:     lab1024@163.com
  * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
  */
-import nProgress from 'nprogress';
-import 'nprogress/nprogress.css';
+// 顶部加载条：原来用 nprogress，因它停更十年且 1.x 挪了 CSS 路径（升级时把 dev server 打挂过），
+// 换成项目内的 20 行实现。只用到 start/done 两个 API，样式由 JS 注入、不引 CSS 文件
+import progressBar from '/@/lib/progress-bar';
 import { nextTick } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { routerArray } from './routers';
@@ -30,7 +31,7 @@ export const router = createRouter({
 // ----------------------- 路由加载前 -----------------------
 router.beforeEach(async (to, from) => {
   // 进度条开启
-  nProgress.start();
+  progressBar.start();
 
   // 公共页面，任何时候都可以跳转
   if (to.path === PAGE_PATH_404) {
@@ -84,7 +85,7 @@ router.beforeEach(async (to, from) => {
 
 // ----------------------- 路由加载后 -----------------------
 router.afterEach(() => {
-  nProgress.done();
+  progressBar.done();
 });
 
 // ----------------------- 构建router对象 -----------------------
