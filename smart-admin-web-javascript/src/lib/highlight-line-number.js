@@ -36,7 +36,6 @@ function documentReady(options) {
     let blocks = document.querySelectorAll('code.hljs,code.nohighlight');
 
     for (let i in blocks) {
-      // eslint-disable-next-line no-prototype-builtins
       if (blocks.hasOwnProperty(i)) {
         if (!isPluginDisabledForBlock(blocks[i])) {
           lineNumbersBlock(blocks[i], options);
@@ -150,7 +149,6 @@ function getStartFromOption(element, options) {
 function duplicateMultilineNodes(element) {
   let nodes = element.childNodes;
   for (let node in nodes) {
-    // eslint-disable-next-line no-prototype-builtins
     if (nodes.hasOwnProperty(node)) {
       let child = nodes[node];
       if (getLinesCount(child.textContent) > 0) {

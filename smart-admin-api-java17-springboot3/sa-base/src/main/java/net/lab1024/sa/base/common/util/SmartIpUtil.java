@@ -2,7 +2,9 @@ package net.lab1024.sa.base.common.util;
 
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.constant.StringConst;
+import org.lionsoul.ip2region.xdb.LongByteArray;
 import org.lionsoul.ip2region.xdb.Searcher;
+import org.lionsoul.ip2region.xdb.Version;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -34,8 +36,11 @@ public class SmartIpUtil {
     public static void init(String filePath) {
 
         try {
-            byte[] cBuff = Searcher.loadContentFromFile(filePath);
-            IP_SEARCHER = Searcher.newWithBuffer(cBuff);
+            // ip2region 3.x 为了支持 IPv6 改了加载 API：
+            // loadContentFromFile 的返回值从 byte[] 变成 LongByteArray（大文件不再受 int 长度限制），
+            // newWithBuffer 也必须显式传入 IP 版本。本项目的 ip2region.xdb 是 IPv4 库。
+            LongByteArray cBuff = Searcher.loadContentFromFile(filePath);
+            IP_SEARCHER = Searcher.newWithBuffer(Version.IPv4, cBuff);
 
         } catch (Throwable e) {
             log.error("初始化ip2region.xdb文件失败,报错信息:[{}]", e.getMessage(), e);

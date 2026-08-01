@@ -50,7 +50,7 @@
 
         <dependency>
             <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-redis-jackson</artifactId>
+            <artifactId>sa-token-redis-template</artifactId>
         </dependency>
         <!-- sa-token end -->
         <dependency>

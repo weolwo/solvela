@@ -34,6 +34,7 @@
 ### 1.2 常规版本推进（本轮顺带升到最新）
 
 `awssdk-s3` 2.48.3→2.50.2 · `commons-codec` 1.22.0→1.22.1 · `httpclient5` 5.6.2→5.6.3 · `jsoup` 1.22.2→1.23.1
+· `ip2region` 2.7.0→**3.3.7** · `tika-core` 3.1.0→**3.3.2**
 
 其余 20 余个依赖经 `versions:display-property-updates` 核对**已是最新**（hutool 5.8.47、guava 33.6.0-jre、
 commons-* 全系、poi 5.5.1、bcprov 1.85、velocity、freemarker、p6spy、reflections、qlexpress 等）。
@@ -42,8 +43,15 @@ commons-* 全系、poi 5.5.1、bcprov 1.85、velocity、freemarker、p6spy、ref
 
 | 组件 | 可升版本 | 不升原因 |
 |---|---|---|
-| tika-core | 4.0.0-**beta**-1 | beta 版，不进生产 |
-| ip2region | 3.3.7 | 大版本，`org.lionsoul` API 变更未验证，与本次升级无耦合，单独排期 |
+| tika-core | 4.0.0-**beta**-1 | 只有 beta，不进生产。**已升到 4.x 之前的最新稳定版 3.3.2** |
+
+> ⚠️ `versions:display-property-updates` 报的是 `tika 3.1.0 → 4.0.0-beta-1`，**它会跳过 3.x 线直接指到最高版本**，
+> 容易让人以为 3.1.0 已经是 3.x 的终点。实际 3.x 一路发到了 3.3.2。核对时要看完整版本列表，别只看插件那一行。
+
+> ⚠️ `ip2region` 的 GitHub release tag 是 **v3.17.0**，但那是**整个项目**的发版号
+> （涵盖 IPv4/IPv6 数据文件与 Go/Erlang/Nginx/Java 等各语言绑定）。
+> Java 的 Maven 构件 `org.lionsoul:ip2region` 版本号是**独立**的，Central 上最高只到 **3.3.7**
+> （实测 3.17.0 / 3.10.0 / 3.4.0 的 pom 均 404）。两个号不要对齐着看。
 
 ---
 
@@ -180,6 +188,24 @@ spring:
 `RScript.ReturnType.INTEGER` → `RScript.ReturnType.LONG`（Redisson 4 枚举改名，返回类型仍是 `Long`），
 落在 `DrawStockService` 的两处扣减/回滚 Lua 调用上。
 
+### 3.7 遗留项收口（第二轮）
+
+| 项 | 改动 | 验证 |
+|---|---|---|
+| `ip2region` 2.7.0 → 3.3.7 | 3.x 为支持 IPv6 改了加载 API：`loadContentFromFile` 返回值 `byte[]` → `LongByteArray`，`newWithBuffer` 必须显式传 IP 版本。`SmartIpUtil.init` 已改写 | **旧 xdb 数据文件（v2 格式）能被 3.3.7 直接读取**，实测三个 IP 解析正确；启动无报错 |
+| `tika-core` 3.1.0 → 3.3.2 | 纯版本推进，`SecurityFileService` 的 API 无变化 | 编译通过、启动正常 |
+| sa-token Redis DAO 换官方实现 | `sa-token-redis-jackson`（依赖 Jackson 2）→ `sa-token-redis-template`（只依赖 sa-token-core + spring-boot-starter-data-redis） | 启动日志 `SaTokenDao 注入成功: SaTokenDaoForRedisTemplate`；带伪 token 请求受保护接口，正确返回"未登录"（证明读路径通） |
+| 前端死注释清理 | 删掉 4 处 `// eslint-disable-*`（eslint 已卸载，注释无作用） | `npx vite build` 通过 |
+
+**关于 Jackson 2 是否还在 classpath 上**：换掉 sa-token 的 Jackson 2 依赖后，
+Jackson 2 **仍然存在**，但来源变成了 `springdoc-openapi-starter-webmvc-ui` → `swagger-core-jakarta`。
+这是 springdoc 官方链路，无可替代方案。区别在于：
+
+- 之前：Jackson 2 在**数据通路**上（sa-token 用它序列化 Redis 里的会话对象）；
+- 现在：Jackson 2 只在**接口文档生成**这条旁路上，不碰任何业务数据。
+
+后者无害，前者才是要消除的隐患。
+
 ---
 
 ## 4. 升级中的难点与解决方案
@@ -311,21 +337,33 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 
 ---
 
-## 6. 遗留事项（本次未做，建议排期）
+## 6. 遗留事项
 
-1. **Excel 导入导出需要跑一次冒烟**。删掉 `poi-ooxml-full` 后 OOXML schema 走的是 `poi-ooxml-lite`，
+### 6.1 上线前必须做
+
+1. **Redis 必须清一次**。两处格式都变了：
+   ① `RedisConfig` 的默认类型信息从 Jackson 2 换成 Jackson 3，类型标记格式不保证互通；
+   ② sa-token 的会话存储从 `sa-token-redis-jackson` 换成 `sa-token-redis-template`，
+   序列化方式从「Jackson 2 对象」变成「sa-token(jackson3) 序列化的字符串」。
+   **不清的话，老 key 反序列化会失败；清了则所有在线用户被登出**，请安排在低峰期。
+2. **Excel 导入导出跑一次冒烟**。删掉 `poi-ooxml-full` 后 OOXML schema 走的是 `poi-ooxml-lite`，
    现有代码（XSSFWorkbook/XSSFSheet/XSSFPictureData/XSSFRelation）与 fastexcel 常规读写都在 lite 覆盖范围内，
    但若碰到冷门 xlsx 特性会在运行期抛 `NoClassDefFoundError: org.openxmlformats.schemas.*`，
    届时把 `poi-ooxml-full` 加回来即可。
-2. **sa-token 的 Redis 序列化仍在 Jackson 2 上**（`sa-token-redis-jackson`）。
-   这是 sa-token 自己的内部实现，不影响应用代码单一栈，但意味着 classpath 上 Jackson 2/3 并存。
-   若 sa-token 后续发布 jackson3 版的 redis 模块，可以再收敛一次。
-3. **Redis 里的历史缓存值建议清一次**。`RedisConfig` 的默认类型信息（default typing）从
-   Jackson 2 换成了 Jackson 3，两者写入的类型标记格式不保证互相兼容，老 key 反序列化可能失败。
-4. **ip2region 3.3.7** 与 **tika 4.0**（待正式版）单独排期。
-5. 前端 `src/router/index.js` 等 3 个文件里残留的 `// eslint-disable-*` 注释已成死注释（eslint 已卸载），可顺手清。
 
----
+### 6.2 可选，需要产品决策
+
+3. **ip2region 的数据文件要不要更新**。仓库里的 `ip2region.xdb` 是 2026-03 的 v2 格式版本，
+   项目 v3.17.0 已经更新了 IPv4/IPv6 数据，且 **v3.13.0 起给数据加了 `iso-3166-alpha2-code` 字段**。
+   换新数据文件会改变 `SmartIpUtil.getRegionList()` 的返回内容（多一个字段），
+   影响登录日志/操作日志的地区显示 —— 这是业务行为变化而非版本升级，需要产品确认后再动。
+   （当前 3.3.7 的库读旧数据文件完全正常，不换也没有故障风险。）
+
+### 6.3 观察项
+
+4. **tika 4.0 待正式版**。目前只有 4.0.0-beta-1，已升到 3.x 线最新的 3.3.2。
+5. **Jackson 2 仍在 classpath 上**（来自 springdoc → swagger-core），属于文档生成旁路，不碰业务数据，
+   无官方替代方案，观察 springdoc 后续是否迁移到 Jackson 3。
 
 ## 7. 回滚方案
 
@@ -338,4 +376,4 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 | `前端依赖瘦身：…` | 仅 `smart-admin-web-javascript/`，与后端无耦合，可单独摘到 `task` |
 | `后端升级 Spring Boot 4…` | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） |
 
-> ⚠️ 数据面的注意：Redis 缓存值格式变了（见 §6.3），回滚后同样建议清一次 Redis，避免新旧格式互相污染。
+> ⚠️ 数据面的注意：Redis 缓存值格式变了（见 §6.1），回滚后同样建议清一次 Redis，避免新旧格式互相污染。

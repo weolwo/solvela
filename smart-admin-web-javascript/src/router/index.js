@@ -144,7 +144,6 @@ export function buildRoutes(menuRouterList) {
     } else {
       let componentPath = e.component && e.component.startsWith('/') ? e.component : '/' + e.component;
       let relativePath = `../views${componentPath}`;
-      // // eslint-disable-next-line no-prototype-builtins
       route.component = modules[relativePath];
     }
     routerList.push(route);

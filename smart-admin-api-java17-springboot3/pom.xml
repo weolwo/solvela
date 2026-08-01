@@ -42,13 +42,13 @@
         <velocity-engine-core.version>2.4.1</velocity-engine-core.version>
         <velocity-tools.version>3.1</velocity-tools.version>
         <sa-token.version>1.45.0</sa-token.version>
-        <ip2region.version>2.7.0</ip2region.version>
+        <ip2region.version>3.3.7</ip2region.version>
         <bcprov.version>1.85</bcprov.version>
         <redisson.version>4.6.1</redisson.version>
         <snakeyaml.version>2.6</snakeyaml.version>
         <freemarker.version>2.3.34</freemarker.version>
         <jsoup.version>1.23.1</jsoup.version>
-        <tika.version>3.1.0</tika.version>
+        <tika.version>3.3.2</tika.version>
         <httpcomponents.version>5.6.3</httpcomponents.version>
         <qlexpress.version>4.1.2</qlexpress.version>
         <!-- BOM import 只继承 dependencyManagement 不继承 properties，处理器路径需要显式版本 -->
@@ -194,10 +194,15 @@
                 <version>${sa-token.version}</version>
             </dependency>
 
-            <!-- Sa-Token 整合 Redis （使用 jackson 序列化方式） -->
+            <!-- Sa-Token 整合 Redis。
+                 原先用的 sa-token-redis-jackson 依赖 sa-token-jackson（Jackson 2），
+                 而 boot4 starter 里 sa-token 核心已改用 sa-token-jackson3 —— 同一个框架两套 JSON 栈。
+                 换成官方的 sa-token-redis-template：它只依赖 sa-token-core + spring-boot-starter-data-redis，
+                 对象经 SaTokenDaoByObjectFollowString 交给 sa-token 自己的 JSON 转换器（即 jackson3）序列化成字符串，
+                 Jackson 2 从此彻底退出 sa-token 的数据通路。 -->
             <dependency>
                 <groupId>cn.dev33</groupId>
-                <artifactId>sa-token-redis-jackson</artifactId>
+                <artifactId>sa-token-redis-template</artifactId>
                 <version>${sa-token.version}</version>
             </dependency>
 
