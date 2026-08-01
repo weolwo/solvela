@@ -22,8 +22,8 @@
 | 组件 | 升级前 | 升级后 | 性质 |
 |---|---|---|---|
 | Spring Boot | 3.5.16 | **4.1.0** | 大版本 |
-| Spring Framework | 6.2.19（传递） | **7.1.x**（传递） | 大版本 |
-| Jackson | 2.21.4（`com.fasterxml`） | **3.x（`tools.jackson`）** | 大版本、换包名 |
+| Spring Framework | 6.2.19（传递） | **7.0.8**（传递） | 大版本 |
+| Jackson | 2.21.4（`com.fasterxml`） | **3.1.4（`tools.jackson`）** | 大版本、换包名 |
 | Redisson | 3.50.0 | **4.6.1** | 大版本 |
 | spring-security-crypto | 6.5.1 | **7.1.0** | 大版本 |
 | MySQL Connector/J | 9.7.0 | **26.7.0** | Oracle 改用日历版本号 |
