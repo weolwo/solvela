@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.PrizeStrategy;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.enums.EventTypeEnum;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
@@ -35,6 +34,7 @@ public class PhysicalPrizeHandler implements IPrizeHandler {
 
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
+    private final ProposalSourceResolver proposalSourceResolver;
 
     /**
      * 一次中奖发放一件
@@ -70,9 +70,11 @@ public class PhysicalPrizeHandler implements IPrizeHandler {
         // 实物是实例类资产：必须指明发哪个 SKU。当前用 prize_code 占位，
         // 等实物与 t_goods 的映射建立后改传商品 SKU
         req.setAssetRef(prizeConfig.getPrizeCode());
+        // 与券同理：实物也是实例类资产，履约单要展示商品名，而账务侧不能回查营销域
+        req.setAssetName(prizeLog.getPrizeName());
         req.setAmount(amount);
         req.setQuantity(QUANTITY_PER_PRIZE);
-        req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name());
+        req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityCode()));
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放实物：" + prizeLog.getPrizeName());
 

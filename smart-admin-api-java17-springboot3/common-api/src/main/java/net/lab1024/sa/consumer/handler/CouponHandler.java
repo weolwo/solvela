@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.PrizeStrategy;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.enums.EventTypeEnum;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
@@ -32,6 +31,7 @@ public class CouponHandler implements IPrizeHandler {
 
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
+    private final ProposalSourceResolver proposalSourceResolver;
 
     /**
      * 一次中奖发放一张券
@@ -68,9 +68,13 @@ public class CouponHandler implements IPrizeHandler {
         // 由营销侧主动传给账务域，账务域不再反查 prize_log（依赖方向从「账务->营销」翻转为「营销->账务」）。
         // 当前值仍是 prize_code —— 券模表尚未建立，等建好后这里改传券模ID，账务侧代码一行都不用动。
         req.setAssetRef(prizeConfig.getPrizeCode());
+        // 展示名随提案下传：账务侧发券时要落 t_member_coupon.coupon_name，
+        // 而它不能回头查 prize_log（依赖方向单向）。不传的话那边只能退而用 remark，
+        // 结果就是发出去的券全叫「提案生成成功」。
+        req.setAssetName(prizeLog.getPrizeName());
         req.setAmount(amount);
         req.setQuantity(QUANTITY_PER_PRIZE);
-        req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name());
+        req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityCode()));
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放优惠券");
 

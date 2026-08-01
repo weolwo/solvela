@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.PrizeStrategy;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.enums.EventTypeEnum;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
@@ -26,6 +25,7 @@ public class BalanceHandler implements IPrizeHandler {
 
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
+    private final ProposalSourceResolver proposalSourceResolver;
 
     /**
      * 一次中奖发放一份
@@ -57,7 +57,7 @@ public class BalanceHandler implements IPrizeHandler {
             req.setAssetType(PrizeTypeEnum.BALANCE.name());
             req.setAmount(amount);
             req.setQuantity(QUANTITY_PER_PRIZE);
-            req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name()); // 业务分类：彩票奖励
+            req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityCode()));
             req.setSourceBizId(prizeLog.getExternalBizNo()); // 极度关键：原彩票记录ID
             req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放");
 

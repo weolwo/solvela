@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.anno.PrizeStrategy;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.enums.EventTypeEnum;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
@@ -32,6 +31,7 @@ public class ScoreHandler implements IPrizeHandler {
 
     private final ProposalRecordService proposalRecordService;
     private final PrizeConfigService prizeConfigService;
+    private final ProposalSourceResolver proposalSourceResolver;
 
     /**
      * 一次中奖发放一份。奖品配置目前没有数量维度，将来支持「一次发N份」时改从配置读
@@ -74,8 +74,7 @@ public class ScoreHandler implements IPrizeHandler {
         req.setAssetType(PrizeTypeEnum.SCORE.name());
         req.setAmount(amount);
         req.setQuantity(QUANTITY_PER_PRIZE);
-        req.setSourceType(EventTypeEnum.LOTTERY_DRAW.name());
-        // 跨域幂等键：抽奖侧的 traceId，配合提案表唯一索引防重
+        req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityCode()));
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放积分");
 

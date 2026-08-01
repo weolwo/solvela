@@ -56,7 +56,18 @@ public class CouponAssetHandler implements IAssetHandler{
         // 「Field 'xxx' doesn't have a default value」整条拒绝
         coupon.setCouponCode(assetRef);
         coupon.setCouponType(DEFAULT_COUPON_TYPE);
-        coupon.setCouponName(proposal.getRemark());
+        // 券名取提案自带的展示名（v3.45.0 起由营销侧下传），取不到才回退用券模编码。
+        //
+        // 🔴 这里原来写的是 proposal.getRemark() —— 而 remark 在 ProposalRecordService.saveProposal
+        //    里被固定写成「提案生成成功」，于是<b>发出去的券全都叫「提案生成成功」</b>，
+        //    是用户可见的错误文案。根因不是随手写错：依赖方向从「账务->营销」翻转之后
+        //    （见本类第 42~44 行），名称这条信息没有了搬运通道，remark 是当时唯一够得着的字段。
+        //    正解是让提案携带展示名，而不是让账务域回头去查营销域的表。
+        //
+        //    回退用 assetRef 而不是继续用 remark：编码至少是稳定且可追溯的，
+        //    而 remark 会被执行引擎改写成失败原因 —— 那会让重试后发出的券叫「预算已耗尽」。
+        coupon.setCouponName(StringUtils.isNotBlank(proposal.getAssetName())
+                ? proposal.getAssetName() : assetRef);
         LocalDateTime now = LocalDateTime.now();
         coupon.setValidStartTime(now);
         coupon.setValidEndTime(now.plusDays(DEFAULT_VALID_DAYS));

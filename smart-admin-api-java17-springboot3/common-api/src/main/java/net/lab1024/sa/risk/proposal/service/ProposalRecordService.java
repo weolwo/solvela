@@ -260,6 +260,8 @@ public class ProposalRecordService {
         // 发什么：assetType 决定下发走哪个策略，assetRef 指向具体资产（值类资产为空）
         record.setAssetType(req.getAssetType());
         record.setAssetRef(req.getAssetRef());
+        // 展示名随提案一起落库：账务侧发券/发货时要用，且不能回头查营销域（依赖方向是单向的）
+        record.setAssetName(req.getAssetName());
         record.setAmount(req.getAmount());
         // 数量参与 used_quota 扣减，调用方不传按 1 计
         record.setQuantity(req.getQuantity() == null ? DEFAULT_QUANTITY : req.getQuantity());

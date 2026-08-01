@@ -37,6 +37,9 @@ public class ProposalRecordAddForm {
     @Schema(description = "资产引用：券模/SKU，值类资产为空")
     private String assetRef;
 
+    @Schema(description = "资产展示名（券名/商品名）：账务侧发券/发货时直接用，不传则回退用 assetRef")
+    private String assetName;
+
     @Schema(description = "发放金额/积分数", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "发放金额/积分数 不能为空")
     private BigDecimal amount;

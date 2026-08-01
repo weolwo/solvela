@@ -53,6 +53,16 @@ public class ProposalRecord {
     private String assetRef;
 
     /**
+     * 资产展示名（券名/商品名），由营销侧传入（v3.45.0 新增）。
+     *
+     * <p>加这一列是为了在<b>不反查营销域</b>的前提下让账务侧拿到人话名称。
+     * 依赖方向是「营销 -> 账务」单向的，账务域不能回头查 t_prize_log；
+     * 而在补上这条搬运通道之前，{@code CouponAssetHandler} 退而用了 {@code remark}，
+     * 那是「提案生成成功」这种状态说明 —— 实测发出去的券全叫这个名字。
+     */
+    private String assetName;
+
+    /**
      * 发放金额/积分数
      */
     private BigDecimal amount;

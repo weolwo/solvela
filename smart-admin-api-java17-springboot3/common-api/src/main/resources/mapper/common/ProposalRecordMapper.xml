@@ -9,6 +9,7 @@
             <result column="member_name" property="memberName" />
             <result column="asset_type" property="assetType" />
             <result column="asset_ref" property="assetRef" />
+            <result column="asset_name" property="assetName" />
             <result column="amount" property="amount" />
             <result column="quantity" property="quantity" />
             <result column="source_type" property="sourceType" />
@@ -33,8 +34,9 @@
                 trade_no, 
                 member_name, 
                 asset_type, 
-                asset_ref, 
-                amount, 
+                asset_ref,
+                asset_name,
+                amount,
                 quantity, 
                 source_type, 
                 source_biz_id, 

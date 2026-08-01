@@ -184,10 +184,12 @@ CREATE TABLE `t_proposal_record`
     -- 发什么（账务域词汇，不含任何上游业务概念）
     `asset_type`          varchar(16)    NOT NULL COMMENT 'SCORE/BALANCE/COUPON/PHYSICAL',
     `asset_ref`           varchar(64)             DEFAULT NULL COMMENT '资产引用：券模/SKU，值类资产为空',
+    -- 展示名由营销侧下传：账务侧发券/发货要用，而它不能回头查 t_prize_log（依赖方向是营销->账务单向的）
+    `asset_name`          varchar(128)            DEFAULT NULL COMMENT '资产展示名（券名/商品名）：由营销侧传入，避免账务域反查营销域',
     `amount`              decimal(13, 4) NOT NULL COMMENT '发放金额/积分数',
     `quantity`            int            NOT NULL DEFAULT 1 COMMENT '发放数量，扣 used_quota 用',
-    -- 从哪来（只认单号，不认上游的业务语义）
-    `source_type`         varchar(32)    NOT NULL COMMENT '来源：TASK, DRAW, MANUAL',
+    -- 从哪来（只认单号，不认上游的业务语义）；取值由 ProposalSourceResolver 从活动类型推导
+    `source_type`         varchar(32)    NOT NULL COMMENT '来源：TASK(任务), DRAW(抽奖), LOTTERY(彩票), MANUAL(人工)',
     `source_biz_id`       varchar(64)    NOT NULL COMMENT '来源单号',
     -- 预算与风控归属
     `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
