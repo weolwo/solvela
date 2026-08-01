@@ -1,6 +1,7 @@
 package net.lab1024.sa.task.runtime;
 
 import net.lab1024.sa.task.constant.TaskConst;
+import net.lab1024.sa.task.constant.TaskDiscardCode;
 import net.lab1024.sa.task.constant.TaskTypeEnum;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.runtime.domain.MetricPlan;
@@ -116,13 +117,43 @@ class TaskProgressStrategyTest {
         MetricPlan.Skip skip = assertInstanceOf(MetricPlan.Skip.class, plan);
         assertTrue(skip.reason().contains("99"), "原因里要有实际金额：" + skip.reason());
         assertTrue(skip.reason().contains("100"), "原因里要有门槛值：" + skip.reason());
+        // 文本给人读、码给机器读，两个都得有 —— 只有码统计不出客诉，只有文本聚不了类
+        assertEquals(TaskDiscardCode.AMOUNT_BELOW_MIN, skip.code());
     }
 
     @Test
     @DisplayName("AMOUNT：零金额事件丢弃，不静默当 0 累加")
     void amountZeroIsDiscarded() {
-        assertInstanceOf(MetricPlan.Skip.class,
+        MetricPlan.Skip skip = assertInstanceOf(MetricPlan.Skip.class,
                 amount.plan(record("0", null), event(DAY_1, "0"), rule(Map.of("targetAmount", 500))));
+        assertEquals(TaskDiscardCode.AMOUNT_MISSING, skip.code());
+    }
+
+    @Test
+    @DisplayName("丢弃分类：三类「需要人介入」与「正常业务规则」必须分得开")
+    void discardCodeSeparatesActionableFromNormal() {
+        // 正常业务规则导致的丢弃，量再大也不用管
+        assertFalse(TaskDiscardCode.AMOUNT_BELOW_MIN.needsAttention());
+        assertFalse(TaskDiscardCode.AUDIENCE_MISMATCH.needsAttention());
+        assertFalse(TaskDiscardCode.ROUND_LIMIT_EXCEEDED.needsAttention());
+        assertFalse(TaskDiscardCode.RECORD_NOT_RUNNING.needsAttention());
+        assertFalse(TaskDiscardCode.STREAK_SAME_DAY.needsAttention());
+
+        // 这三类哪怕只有几条都该报警：分别是上游漏传、配置坏了、系统过载
+        assertTrue(TaskDiscardCode.AUDIENCE_UNKNOWN.needsAttention());
+        assertTrue(TaskDiscardCode.CONFIG_INVALID.needsAttention());
+        assertTrue(TaskDiscardCode.POOL_REJECTED.needsAttention());
+    }
+
+    @Test
+    @DisplayName("丢弃分类：resolve 只认精确值，且每个码都有人话描述（大屏直接拿来当分类名）")
+    void discardCodeResolveAndDesc() {
+        for (TaskDiscardCode code : TaskDiscardCode.values()) {
+            assertEquals(code, TaskDiscardCode.resolve(code.getValue()));
+            assertNotNull(code.getDesc());
+            assertFalse(code.getDesc().isBlank(), code.name() + " 缺少描述");
+        }
+        assertNull(TaskDiscardCode.resolve("NOT_A_CODE"));
     }
 
     // ==================== STREAK ====================
@@ -186,7 +217,8 @@ class TaskProgressStrategyTest {
         TaskRecord record = record("3", "{\"lastHitDate\":\"20260401\"}");
         MetricPlan plan = streak.plan(record, event(DAY_1, null), rule(Map.of("targetCount", 7)));
 
-        assertInstanceOf(MetricPlan.Skip.class, plan);
+        assertEquals(TaskDiscardCode.STREAK_SAME_DAY,
+                assertInstanceOf(MetricPlan.Skip.class, plan).code());
     }
 
     @Test

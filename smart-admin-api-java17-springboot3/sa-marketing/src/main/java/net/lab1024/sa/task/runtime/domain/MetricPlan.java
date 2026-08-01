@@ -1,5 +1,7 @@
 package net.lab1024.sa.task.runtime.domain;
 
+import net.lab1024.sa.task.constant.TaskDiscardCode;
+
 import java.math.BigDecimal;
 
 /**
@@ -40,9 +42,17 @@ public sealed interface MetricPlan {
     /**
      * 不推进：条件不满足（金额不够、同日重复、任务已完成…）。
      *
-     * <p>reason 会原样落进 {@code t_task_record_flow.discard_reason} ——
-     * 它就是「用户下了 99 元的单为什么没进度」这类客诉的答案，<b>要写人话</b>。
+     * <p><b>两个字段都要给，它们的读者不同</b>：
+     * <ul>
+     *   <li>{@code reason} 给人读，落 {@code discard_reason} ——
+     *       「用户下了 99 元的单为什么没进度」这类客诉的答案，<b>要写人话、要带具体数值</b>；</li>
+     *   <li>{@code code} 给机器读，落 {@code discard_code} ——
+     *       大屏按它聚类，取值封闭，改文案不会让统计图裂开。</li>
+     * </ul>
+     *
+     * <p>做成 record 的两个必填分量而不是「code 可选」，是为了让策略实现<b>无法忘记</b>分类 ——
+     * 忘了就编译不过，而不是等到大屏上多出一堆归不了类的丢弃。
      */
-    record Skip(String reason) implements MetricPlan {
+    record Skip(TaskDiscardCode code, String reason) implements MetricPlan {
     }
 }

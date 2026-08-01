@@ -1,5 +1,6 @@
 package net.lab1024.sa.task.runtime.strategy;
 
+import net.lab1024.sa.task.constant.TaskDiscardCode;
 import net.lab1024.sa.task.constant.TaskTypeEnum;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.runtime.TaskPeriodResolver;
@@ -53,7 +54,8 @@ public class StreakTaskStrategy implements TaskProgressStrategy {
             if (gapDays <= 0) {
                 // 同一天（或事件时间倒流）。正常情况下流水表的唯一索引已经挡在外层，
                 // 这里是防御性分支：即便幂等被绕过，也不能让同一天签两次算成连续两天。
-                return new MetricPlan.Skip("当日已计入连续进度（" + today + "），不重复累加");
+                return new MetricPlan.Skip(TaskDiscardCode.STREAK_SAME_DAY,
+                        "当日已计入连续进度（" + today + "），不重复累加");
             }
             // 允许断档 tolerance 次：间隔 1 天是「连上了」，间隔 tolerance+1 天仍在容忍范围内
             next = gapDays <= rule.tolerance() + 1L ? current.add(BigDecimal.ONE) : BigDecimal.ONE;

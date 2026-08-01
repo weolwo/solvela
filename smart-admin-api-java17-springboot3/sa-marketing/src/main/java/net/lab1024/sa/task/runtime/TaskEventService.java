@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.task.constant.TaskConst;
+import net.lab1024.sa.task.constant.TaskDiscardCode;
 import net.lab1024.sa.task.record.dao.TaskRecordDao;
 import net.lab1024.sa.task.recordflow.dao.TaskRecordFlowDao;
 import net.lab1024.sa.task.recordflow.domain.entity.TaskRecordFlow;
@@ -283,6 +284,7 @@ public class TaskEventService {
             flow.setEventCode(ctx.eventCode());
             flow.setEventBizId(ctx.eventBizId());
             flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
+            flow.setDiscardCode(TaskDiscardCode.POOL_REJECTED.getValue());
             flow.setDeltaMetric(BigDecimal.ZERO);
             flow.setAfterMetric(BigDecimal.ZERO);
             flow.setDiscardReason("任务事件线程池队列已满，事件被拒（拒绝策略 AbortPolicy），上游可重投");

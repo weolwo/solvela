@@ -13,6 +13,7 @@
         <result column="flow_type" property="flowType"/>
         <result column="delta_metric" property="deltaMetric"/>
         <result column="after_metric" property="afterMetric"/>
+        <result column="discard_code" property="discardCode"/>
         <result column="discard_reason" property="discardReason"/>
         <result column="event_payload" property="eventPayload"/>
         <result column="create_by" property="createBy"/>
@@ -23,7 +24,7 @@
 
     <sql id="base_columns">
         id, tenant_id, member_name, task_config_id, record_id, event_code, event_biz_id,
-        flow_type, delta_metric, after_metric, discard_reason, event_payload,
+        flow_type, delta_metric, after_metric, discard_code, discard_reason, event_payload,
         create_by, create_time, update_by, update_time
     </sql>
 

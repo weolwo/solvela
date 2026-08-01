@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.task.constant.TaskConst;
+import net.lab1024.sa.task.constant.TaskDiscardCode;
 import net.lab1024.sa.task.constant.TaskTypeEnum;
 import net.lab1024.sa.task.prizemapping.domain.entity.TaskPrizeMapping;
 import net.lab1024.sa.task.prizemapping.manager.TaskPrizeMappingManager;
@@ -85,12 +86,14 @@ public class TaskRecordAdvanceService {
         TaskTypeEnum taskType = rule.taskType();
         if (taskType == null) {
             // 配置异常直接落丢弃流水，不抛异常 —— 一个坏配置不该让整批事件处理中断
-            return discardWithoutRecord(config, ctx, "任务类型未配置或非法：rule_config.taskType="
-                    + rule.string(TaskConst.RULE_KEY_TASK_TYPE), logDiscard);
+            return discardWithoutRecord(config, ctx, TaskDiscardCode.CONFIG_INVALID,
+                    "任务类型未配置或非法：rule_config.taskType="
+                            + rule.string(TaskConst.RULE_KEY_TASK_TYPE), logDiscard);
         }
         TaskProgressStrategy strategy = strategyFactory.resolve(taskType);
         if (strategy == null) {
-            return discardWithoutRecord(config, ctx, "没有支持 " + taskType.getValue() + " 的进度策略实现", logDiscard);
+            return discardWithoutRecord(config, ctx, TaskDiscardCode.CONFIG_INVALID,
+                    "没有支持 " + taskType.getValue() + " 的进度策略实现", logDiscard);
         }
 
         String basePeriodKey = TaskPeriodResolver.resolvePeriodKey(taskType, config.getLimitType(), ctx.eventTime());
@@ -107,15 +110,15 @@ public class TaskRecordAdvanceService {
         }
 
         // ========== ①.5 人群过滤 ==========
-        String audienceReject = checkAudience(config, ctx);
-        if (audienceReject != null) {
-            return finishAsDiscard(flow, audienceReject, logDiscard);
+        AudienceCheck audience = checkAudience(config, ctx);
+        if (audience != null) {
+            return finishAsDiscard(flow, audience.code(), audience.reason(), logDiscard);
         }
 
         // ========== ② 取或建任务记录（含 limit_count 轮次判定） ==========
         RoundResolution round = resolveRound(config, ctx, basePeriodKey);
         if (round.rejectReason() != null) {
-            return finishAsDiscard(flow, round.rejectReason(), logDiscard);
+            return finishAsDiscard(flow, TaskDiscardCode.ROUND_LIMIT_EXCEEDED, round.rejectReason(), logDiscard);
         }
         TaskRecord record = round.record() != null
                 ? round.record()
@@ -123,7 +126,8 @@ public class TaskRecordAdvanceService {
         flow.setRecordId(record.getId());
 
         if (!Integer.valueOf(TaskConst.RECORD_STATUS_RUNNING).equals(record.getStatus())) {
-            return finishAsDiscard(flow, "任务记录已不在进行中（status=" + record.getStatus() + "）", logDiscard);
+            return finishAsDiscard(flow, TaskDiscardCode.RECORD_NOT_RUNNING,
+                    "任务记录已不在进行中（status=" + record.getStatus() + "）", logDiscard);
         }
 
         // ========== ③ 策略算出推进方案（纯函数，不碰库） ==========
@@ -134,14 +138,15 @@ public class TaskRecordAdvanceService {
         BigDecimal delta;
 
         switch (plan) {
-            case MetricPlan.Skip(String reason) -> {
-                return finishAsDiscard(flow, reason, logDiscard);
+            case MetricPlan.Skip(TaskDiscardCode code, String reason) -> {
+                return finishAsDiscard(flow, code, reason, logDiscard);
             }
             case MetricPlan.Accumulate(BigDecimal amount) -> {
                 int rows = taskRecordDao.advanceMetric(record.getId(), amount);
                 if (rows == 0) {
                     // rows=0 的语义是「记录已不可推进」（状态已流转），不是并发冲突，不需要重试
-                    return finishAsDiscard(flow, "任务记录已不可推进（并发达标或已过期）", logDiscard);
+                    return finishAsDiscard(flow, TaskDiscardCode.RECORD_NOT_RUNNING,
+                            "任务记录已不可推进（并发达标或已过期）", logDiscard);
                 }
                 delta = amount;
                 // 重读权威值：条件更新拿不到结果值，且必须以 DB 为准
@@ -223,7 +228,10 @@ public class TaskRecordAdvanceService {
      *
      * @return null 表示通过；否则为丢弃原因
      */
-    private String checkAudience(TaskConfig config, TaskEventContext ctx) {
+    private record AudienceCheck(TaskDiscardCode code, String reason) {
+    }
+
+    private AudienceCheck checkAudience(TaskConfig config, TaskEventContext ctx) {
         String audience = config.getTargetAudience();
         if (audience == null || audience.isBlank() || TaskConst.AUDIENCE_ALL.equals(audience)) {
             return null;
@@ -238,13 +246,14 @@ public class TaskRecordAdvanceService {
             return null;
         }
         if (ctx.isNewMember() == null) {
-            return "任务限定了目标人群（" + audience + "），但上游未告知会员属性 isNewMember，无法判定，本次不计入";
+            return new AudienceCheck(TaskDiscardCode.AUDIENCE_UNKNOWN,
+                    "任务限定了目标人群（" + audience + "），但上游未告知会员属性 isNewMember，无法判定，本次不计入");
         }
         if (wantNew && !ctx.isNewMember()) {
-            return "该任务仅限新会员参与";
+            return new AudienceCheck(TaskDiscardCode.AUDIENCE_MISMATCH, "该任务仅限新会员参与");
         }
         if (wantOld && ctx.isNewMember()) {
-            return "该任务仅限老会员参与";
+            return new AudienceCheck(TaskDiscardCode.AUDIENCE_MISMATCH, "该任务仅限老会员参与");
         }
         return null;
     }
@@ -400,7 +409,8 @@ public class TaskRecordAdvanceService {
      *
      * <p>丢弃原因就是「用户下了 99 元的单为什么没进度」这类客诉的答案，必须是人话。
      */
-    private TaskAdvanceResult finishAsDiscard(TaskRecordFlow flow, String reason, boolean logDiscard) {
+    private TaskAdvanceResult finishAsDiscard(TaskRecordFlow flow, TaskDiscardCode code,
+                                              String reason, boolean logDiscard) {
         if (!logDiscard) {
             // 高频事件关掉了丢弃留痕：把先前为占幂等键插入的那一行删掉。
             //
@@ -413,6 +423,7 @@ public class TaskRecordAdvanceService {
             return new TaskAdvanceResult.Discarded(reason);
         }
         flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
+        flow.setDiscardCode(code.getValue());
         flow.setDiscardReason(reason);
         taskRecordFlowDao.updateById(flow);
         return new TaskAdvanceResult.Discarded(reason);
@@ -424,7 +435,7 @@ public class TaskRecordAdvanceService {
      * <p>幂等键撞了说明这个坏配置已经被记过一次，不必重复记录。
      */
     private TaskAdvanceResult discardWithoutRecord(TaskConfig config, TaskEventContext ctx,
-                                                   String reason, boolean logDiscard) {
+                                                   TaskDiscardCode code, String reason, boolean logDiscard) {
         // 配置异常一律 warn：这类丢弃是「配错了」而不是「条件不满足」，即便关了流水也要看得见
         log.warn("[任务推进] 配置异常，事件丢弃。taskConfigId={}, reason={}", config.getId(), reason);
         if (!logDiscard) {
@@ -432,6 +443,7 @@ public class TaskRecordAdvanceService {
         }
         TaskRecordFlow flow = buildFlow(config, ctx);
         flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
+        flow.setDiscardCode(code.getValue());
         flow.setDiscardReason(reason);
         try {
             taskRecordFlowDao.insert(flow);

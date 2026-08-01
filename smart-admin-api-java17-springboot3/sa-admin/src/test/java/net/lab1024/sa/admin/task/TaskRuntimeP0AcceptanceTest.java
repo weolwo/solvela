@@ -3,6 +3,7 @@ package net.lab1024.sa.admin.task;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.prize.prizelog.domain.entity.PrizeLog;
 import net.lab1024.sa.task.constant.TaskConst;
+import net.lab1024.sa.task.constant.TaskDiscardCode;
 import net.lab1024.sa.task.record.dao.TaskRecordDao;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.recordflow.dao.TaskRecordFlowDao;
@@ -351,6 +352,8 @@ class TaskRuntimeP0AcceptanceTest {
         assertEquals(1, flows.size());
         TaskRecordFlow flow = flows.get(0);
         assertEquals(TaskConst.FLOW_TYPE_DISCARD, flow.getFlowType().intValue());
+        assertEquals(TaskDiscardCode.AMOUNT_BELOW_MIN.getValue(), flow.getDiscardCode(),
+                "分类码给大屏聚类用，与人话原因并存");
         assertNotNull(flow.getDiscardReason(), "丢弃原因不能为空 —— 它就是客诉的答案");
         assertTrue(flow.getDiscardReason().contains("99") && flow.getDiscardReason().contains("100"),
                 "原因要说清是哪两个数对不上：" + flow.getDiscardReason());
@@ -553,6 +556,7 @@ class TaskRuntimeP0AcceptanceTest {
         List<TaskRecordFlow> blocked = flowsOf(oldOnly.getId());
         assertEquals(1, blocked.size(), "被人群拦下也要留痕");
         assertEquals(TaskConst.FLOW_TYPE_DISCARD, blocked.get(0).getFlowType().intValue());
+        assertEquals(TaskDiscardCode.AUDIENCE_MISMATCH.getValue(), blocked.get(0).getDiscardCode());
         assertTrue(blocked.get(0).getDiscardReason().contains("老会员"),
                 "原因要说清是被哪个人群条件拦的：" + blocked.get(0).getDiscardReason());
     }
@@ -583,6 +587,9 @@ class TaskRuntimeP0AcceptanceTest {
         assertEquals(1, flows.size());
         String reason = flows.get(0).getDiscardReason();
         assertTrue(reason.contains("isNewMember"), "原因要点名缺的是哪个字段，好让人去找上游：" + reason);
+        // 这一类要能被大屏单独挑出来报警 —— 它是「去找上游修」而不是「正常业务规则」
+        assertEquals(TaskDiscardCode.AUDIENCE_UNKNOWN.getValue(), flows.get(0).getDiscardCode());
+        assertTrue(TaskDiscardCode.resolve(flows.get(0).getDiscardCode()).needsAttention());
     }
 
     @Test
@@ -628,6 +635,7 @@ class TaskRuntimeP0AcceptanceTest {
 
         TaskRecordFlow last = flowsOf(config.getId()).get(2);
         assertEquals(TaskConst.FLOW_TYPE_DISCARD, last.getFlowType().intValue());
+        assertEquals(TaskDiscardCode.ROUND_LIMIT_EXCEEDED.getValue(), last.getDiscardCode());
         assertTrue(last.getDiscardReason().contains("上限"), last.getDiscardReason());
     }
 
@@ -662,6 +670,18 @@ class TaskRuntimeP0AcceptanceTest {
         assertNotNull(record);
         assertFalse(record.getPeriodKey().contains("#"),
                 "limit_count<=1 时不该出现轮次后缀，实际 " + record.getPeriodKey());
+    }
+
+    @Test
+    @DisplayName("丢弃分类：推进成功的流水不该带 discard_code（写入侧串了会让统计凭空多出一类）")
+    void advancedFlowHasNoDiscardCode() {
+        TaskConfig config = configOf(TASK_COUNT);
+        taskEventService.handle(event("DAILY_SIGN", "code-clean-1", null, DAY_1));
+
+        List<TaskRecordFlow> flows = flowsOf(config.getId());
+        assertEquals(1, flows.size());
+        assertEquals(TaskConst.FLOW_TYPE_ADVANCE, flows.get(0).getFlowType().intValue());
+        assertNull(flows.get(0).getDiscardCode(), "推进流水带了分类码，说明写入侧串了");
     }
 
     // ==================== 模板契约校验（方案 §4.10） ====================

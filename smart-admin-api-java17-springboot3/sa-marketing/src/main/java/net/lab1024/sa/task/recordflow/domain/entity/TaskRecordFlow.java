@@ -79,6 +79,15 @@ public class TaskRecordFlow {
     private BigDecimal afterMetric;
 
     /**
+     * 丢弃原因分类（对齐 {@code TaskDiscardCode}）：flow_type=2 时必填。
+     *
+     * <p>与 {@link #discardReason} <b>并存且用途相反</b>：
+     * 这一列取值封闭、给大屏聚类用；{@code discardReason} 是带具体数值的自由文本、给人排查用。
+     * 只留文本会统计不了，只留码会查不了客诉。
+     */
+    private String discardCode;
+
+    /**
      * 丢弃原因：flow_type=2 时必填
      */
     private String discardReason;
