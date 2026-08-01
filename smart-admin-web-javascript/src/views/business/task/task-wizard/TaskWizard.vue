@@ -107,7 +107,15 @@
             </a-col>
             <a-col :span="12">
               <a-form-item label="触发事件 trigger_event" :name="['base', 'triggerEvent']" :rules="FORM_RULES.triggerEvent">
-                <a-select v-model:value="wizardForm.base.triggerEvent" :options="TRIGGER_EVENT_OPTIONS" placeholder="请选择触发事件" />
+                <a-select
+                  v-model:value="wizardForm.base.triggerEvent"
+                  :options="eventOptions"
+                  :loading="eventLoading"
+                  placeholder="请选择触发事件"
+                />
+                <div v-if="selectedEvent?.bizIdRequired" class="text-xs text-orange-600! mt-1">
+                  ⚠️ 该事件要求上游上报时必须携带业务单号（eventBizId），否则无法防重
+                </div>
               </a-form-item>
             </a-col>
           </a-row>
@@ -290,7 +298,7 @@
     WIZARD_STEP,
     WIZARD_STEP_ITEMS,
     TASK_CONFIG_LIST_PATH,
-    TRIGGER_EVENT_OPTIONS,
+    toEventOptions,
     TASK_GROUP_OPTIONS,
     LIMIT_TYPE_ENUM,
     LIMIT_TYPE_OPTIONS,
@@ -352,6 +360,27 @@
       activityLoading.value = false;
     }
   }
+
+  const eventOptions = ref([]);
+  const eventLoading = ref(false);
+
+  /**
+   * 触发事件来自服务端注册表 t_task_event，不再是前端写死的常量 ——
+   * 加事件只需加一行数据，前端零改动。
+   */
+  async function loadEventOptions() {
+    eventLoading.value = true;
+    try {
+      const res = await taskApi.queryEventOptionList();
+      eventOptions.value = toEventOptions(res.data);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      eventLoading.value = false;
+    }
+  }
+
+  const selectedEvent = computed(() => eventOptions.value.find((e) => e.value === wizardForm.base.triggerEvent));
 
   async function loadTaskTemplates() {
     templateLoading.value = true;
@@ -662,6 +691,7 @@
     // 活动大类与模板都来自服务端，两者互不依赖，并行拉取
     loadActivityOptions();
     loadTaskTemplates();
+    loadEventOptions();
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 

@@ -38,56 +38,56 @@ public class TaskTemplateController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("taskTemplate:query")
     public ResponseDTO<PageResult<TaskTemplateVO>> queryPage(@RequestBody @Valid TaskTemplateQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "生成模板编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
-    @SaCheckPermission(":save")
+    @SaCheckPermission("taskTemplate:save")
     public ResponseDTO<String> generateTemplateCode() {
         return Service.generateTemplateCode();
     }
 
     @Operation(summary = "任务向导用模板列表（ui_schema 以 JSON 对象下发）")
     @GetMapping("/optionList")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("taskTemplate:query")
     public ResponseDTO<List<TaskTemplateOptionVO>> queryOptionList() {
         return Service.queryOptionList();
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("taskTemplate:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskTemplateAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "模板设计器保存（按 templateCode upsert）")
     @PostMapping("/save")
-    @SaCheckPermission(":save")
+    @SaCheckPermission("taskTemplate:save")
     public ResponseDTO<Boolean> save(@RequestBody @Valid TaskTemplateSaveForm saveForm) {
         return Service.save(saveForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("taskTemplate:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskTemplateUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("taskTemplate:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("taskTemplate:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

@@ -66,7 +66,8 @@
                   <a-form-item label="默认触发事件 trigger_event" :name="['base', 'triggerEvent']">
                     <a-select
                       v-model:value="designer.base.triggerEvent"
-                      :options="TRIGGER_EVENT_OPTIONS"
+                      :options="eventOptions"
+                      :loading="eventLoading"
                       placeholder="模板建议的默认事件，向导中可覆盖"
                       allow-clear
                     />
@@ -211,7 +212,7 @@
   import { regular } from '/@/constants/regular-const';
   import {
     TASK_TYPE_OPTIONS,
-    TRIGGER_EVENT_OPTIONS,
+    toEventOptions,
     buildDefaultRuleParams,
     splitSchemaValues,
   } from '../task-wizard/task-wizard-const';
@@ -511,8 +512,25 @@
     message.success('草稿已丢弃');
   }
 
+  // 触发事件来自服务端注册表（与向导同一个接口），不再是前端写死的常量
+  const eventOptions = ref([]);
+  const eventLoading = ref(false);
+
+  async function loadEventOptions() {
+    eventLoading.value = true;
+    try {
+      const res = await taskApi.queryEventOptionList();
+      eventOptions.value = toEventOptions(res.data);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      eventLoading.value = false;
+    }
+  }
+
   onMounted(() => {
     prefillTemplateCode();
+    loadEventOptions();
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     // 检测上次遗留的草稿（浏览器崩溃、强制关闭等未走离开拦截的情况）

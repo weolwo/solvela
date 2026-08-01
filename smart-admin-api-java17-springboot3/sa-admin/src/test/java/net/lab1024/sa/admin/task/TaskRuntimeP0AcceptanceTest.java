@@ -1,5 +1,6 @@
 package net.lab1024.sa.admin.task;
 
+import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.prize.prizelog.domain.entity.PrizeLog;
 import net.lab1024.sa.task.constant.TaskConst;
 import net.lab1024.sa.task.record.dao.TaskRecordDao;
@@ -9,6 +10,10 @@ import net.lab1024.sa.task.recordflow.domain.entity.TaskRecordFlow;
 import net.lab1024.sa.task.runtime.TaskEventService;
 import net.lab1024.sa.task.runtime.domain.TaskAdvanceResult;
 import net.lab1024.sa.task.runtime.domain.TaskEventContext;
+import net.lab1024.sa.task.runtime.domain.TaskEventReportForm;
+import net.lab1024.sa.task.taskevent.domain.entity.TaskEvent;
+import net.lab1024.sa.task.taskevent.domain.vo.TaskEventOptionVO;
+import net.lab1024.sa.task.taskevent.service.TaskEventDefService;
 import net.lab1024.sa.task.taskconfig.dao.TaskConfigDao;
 import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +71,8 @@ class TaskRuntimeP0AcceptanceTest {
     @Autowired
     private TaskRecordFlowDao taskRecordFlowDao;
     @Autowired
+    private TaskEventDefService taskEventDefService;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private static final String TASK_COUNT = "P0验收-累计签到3天";
@@ -73,6 +80,7 @@ class TaskRuntimeP0AcceptanceTest {
     private static final String TASK_STREAK = "P0验收-连续签到3天";
     private static final String TASK_AMOUNT = "P0验收-累计消费500";
     private static final String TASK_CONCURRENT = "P0验收-并发累加";
+    private static final String TASK_HIGH_FREQ = "P0验收-高频丢弃";
 
     private static final LocalDateTime DAY_1 = LocalDateTime.of(2026, 4, 1, 10, 0);
     private static final LocalDateTime DAY_2 = LocalDateTime.of(2026, 4, 2, 10, 0);
@@ -377,6 +385,118 @@ class TaskRuntimeP0AcceptanceTest {
     }
 
     // ==================== 订阅判据（会「空过」的那个前提） ====================
+
+    // ==================== P1：事件注册表（方案 §2.2） ====================
+
+    @Test
+    @DisplayName("P1 注册表：未注册的事件被当场拒绝，而不是丢进线程池里慢慢发现")
+    void p1_unregisteredEventIsRejected() {
+        TaskEventReportForm form = new TaskEventReportForm();
+        form.setEventCode("NOT_REGISTERED_XYZ");
+        form.setMemberName(member);
+
+        ResponseDTO<String> result = taskEventService.report(form);
+        assertFalse(result.getOk(), "未注册的事件必须被拒 —— 上游拼错一个字母时，"
+                + "立刻收到失败远比「返回成功但任务永远不动」好排查");
+        assertTrue(result.getMsg().contains("NOT_REGISTERED_XYZ"), "错误信息要点出是哪个编码：" + result.getMsg());
+
+        // 同步入口也要自守，不能靠 report 把关
+        assertTrue(taskEventService.handle(
+                event("NOT_REGISTERED_XYZ", "biz-1", null, DAY_1)).isEmpty());
+    }
+
+    @Test
+    @DisplayName("🔴 P1 契约：biz_id_required=1 的事件缺 eventBizId 必须被拒（放过 = 一天只算一笔）")
+    void p1_bizIdRequiredIsEnforced() {
+        // 前提确认：ORDER_PAID 在注册表里确实要求带单号，否则本用例是空过
+        TaskEvent def = taskEventDefService.getEnabledByCode("ORDER_PAID");
+        assertNotNull(def, "前提不成立：ORDER_PAID 未注册，请先执行 v3.47.0.sql");
+        assertEquals(1, def.getBizIdRequired().intValue(), "前提不成立：ORDER_PAID 应要求带单号");
+
+        TaskEventReportForm without = new TaskEventReportForm();
+        without.setEventCode("ORDER_PAID");
+        without.setMemberName(member);
+        ResponseDTO<String> rejected = taskEventService.report(without);
+        assertFalse(rejected.getOk(), "订单类事件不带单号时服务端只能按事件日兜底，"
+                + "那意味着一天只算一笔 —— 必须拒绝而不是默默兜底");
+        assertTrue(rejected.getMsg().contains("eventBizId"), "错误信息要说清缺什么：" + rejected.getMsg());
+
+        // 带上单号就该放行 —— 证明拒绝的是「缺单号」，不是这个事件本身不可用
+        TaskEventReportForm with = new TaskEventReportForm();
+        with.setEventCode("ORDER_PAID");
+        with.setMemberName(member);
+        with.setEventBizId("order-p1-001");
+        assertTrue(taskEventService.report(with).getOk());
+    }
+
+    @Test
+    @DisplayName("P1 计量来源：未显式传 amount 时按 metric_source 从 payload 取")
+    void p1_metricSourceExtractsAmountFromPayload() throws InterruptedException {
+        TaskConfig config = configOf(TASK_AMOUNT);
+        TaskEvent def = taskEventDefService.getEnabledByCode("ORDER_AMOUNT");
+        assertEquals("payAmount", def.getMetricSource(), "前提确认：该事件的计量来源是 payload.payAmount");
+
+        TaskEventReportForm form = new TaskEventReportForm();
+        form.setEventCode("ORDER_AMOUNT");
+        form.setMemberName(member);
+        form.setEventBizId("order-metric-001");
+        // 刻意不设 amount，只给 payload
+        form.setPayload(Map.of("orderId", "order-metric-001", "payAmount", 200));
+        assertTrue(taskEventService.report(form).getOk());
+
+        // report 是异步的，轮询等落库
+        for (int i = 0; i < 40 && recordOf(config.getId()) == null; i++) {
+            TimeUnit.MILLISECONDS.sleep(250);
+        }
+        TaskRecord record = recordOf(config.getId());
+        assertNotNull(record, "事件应已被处理");
+        assertEquals(0, new BigDecimal("200").compareTo(record.getCurrentMetric()),
+                "金额应从 payload.payAmount 取到，实际 " + record.getCurrentMetric());
+    }
+
+    @Test
+    @DisplayName("P1 开关：discard_log_flag=0 的高频事件被丢弃时不写流水（否则一天就把表写爆）")
+    void p1_discardLogFlagSuppressesFlow() {
+        TaskConfig config = configOf(TASK_HIGH_FREQ);
+        TaskEvent def = taskEventDefService.getEnabledByCode("PAGE_VIEW");
+        assertNotNull(def, "前提不成立：PAGE_VIEW 未注册");
+        assertEquals(0, def.getDiscardLogFlag().intValue(), "前提不成立：PAGE_VIEW 应已关闭丢弃留痕");
+
+        // PAGE_VIEW 不带金额，而这条任务是 AMOUNT 规则 —— 必被丢弃
+        List<TaskAdvanceResult> results = taskEventService.handle(
+                event("PAGE_VIEW", "pv-001", null, DAY_1));
+        assertFalse(results.isEmpty(), "前提不成立：应有任务订阅 PAGE_VIEW，否则验的是「无人订阅」分支");
+        assertInstanceOf(TaskAdvanceResult.Discarded.class, results.get(0));
+
+        assertTrue(flowsOf(config.getId()).isEmpty(),
+                "关闭了丢弃留痕的事件不该留下流水行；留着的话高频事件一天就能把流水表写满");
+
+        // 对照组：开着留痕的事件，同样被丢弃时必须留痕 —— 证明上面的空不是因为压根没走到写流水
+        TaskConfig amountConfig = configOf(TASK_AMOUNT);
+        taskEventService.handle(event("ORDER_AMOUNT", "small-p1", "99", DAY_1));
+        assertEquals(1, flowsOf(amountConfig.getId()).size(),
+                "ORDER_AMOUNT 的 discard_log_flag=1，被丢弃时必须留痕");
+    }
+
+    @Test
+    @DisplayName("P1 下拉：新注册的事件无需改前端即可被选到")
+    void p1_optionListExposesNewlyRegisteredEvent() {
+        List<TaskEventOptionVO> options = taskEventDefService.optionList();
+        assertFalse(options.isEmpty());
+
+        // GOODS_SHARE 是本次新增的事件，只加了一行数据、没动任何前端常量
+        assertTrue(options.stream().anyMatch(o -> "GOODS_SHARE".equals(o.eventCode())),
+                "新增事件应出现在下拉里 —— 这正是「加事件只改数据」的判据");
+
+        // bizIdRequired 要如实下发，好让配置的人当场知道对接方必须传什么
+        TaskEventOptionVO orderPaid = options.stream()
+                .filter(o -> "ORDER_PAID".equals(o.eventCode())).findFirst().orElse(null);
+        assertNotNull(orderPaid);
+        assertTrue(orderPaid.bizIdRequired());
+
+        // 停用的事件不该出现在下拉里
+        assertTrue(options.stream().allMatch(o -> taskEventDefService.getEnabledByCode(o.eventCode()) != null));
+    }
 
     @Test
     @DisplayName("订阅判据：造数落的 status=1 必须能被订阅到 —— 判 status==2 的话所有任务永不触发")

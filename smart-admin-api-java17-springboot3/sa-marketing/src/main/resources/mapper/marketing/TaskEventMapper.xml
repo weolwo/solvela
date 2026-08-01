@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.lab1024.sa.task.taskevent.dao.TaskEventDao">
+
+    <resultMap id="TaskEventVO" type="net.lab1024.sa.task.taskevent.domain.vo.TaskEventVO">
+        <result column="id" property="id"/>
+        <result column="event_code" property="eventCode"/>
+        <result column="event_name" property="eventName"/>
+        <result column="metric_source" property="metricSource"/>
+        <result column="payload_schema" property="payloadSchema"/>
+        <result column="biz_id_required" property="bizIdRequired"/>
+        <result column="is_high_frequency" property="isHighFrequency"/>
+        <result column="discard_log_flag" property="discardLogFlag"/>
+        <result column="remark" property="remark"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="entity_columns">
+        id, tenant_id, event_code, event_name, metric_source, payload_schema,
+        biz_id_required, is_high_frequency, discard_log_flag, remark, status,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <select id="queryPage" resultMap="TaskEventVO">
+        SELECT id, event_code, event_name, metric_source, payload_schema,
+               biz_id_required, is_high_frequency, discard_log_flag, remark, status,
+               create_time, update_time
+        FROM t_task_event
+        <where>
+            <if test="queryForm.eventCode != null and queryForm.eventCode != ''">
+                AND event_code LIKE CONCAT('%', #{queryForm.eventCode}, '%')
+            </if>
+            <if test="queryForm.eventName != null and queryForm.eventName != ''">
+                AND event_name LIKE CONCAT('%', #{queryForm.eventName}, '%')
+            </if>
+            <if test="queryForm.status != null">
+                AND status = #{queryForm.status}
+            </if>
+        </where>
+        ORDER BY status DESC, id ASC
+    </select>
+
+    <select id="selectByEventCode" resultType="net.lab1024.sa.task.taskevent.domain.entity.TaskEvent">
+        SELECT
+        <include refid="entity_columns"/>
+        FROM t_task_event
+        WHERE event_code = #{eventCode}
+    </select>
+
+    <select id="selectEnabledList" resultType="net.lab1024.sa.task.taskevent.domain.entity.TaskEvent">
+        SELECT
+        <include refid="entity_columns"/>
+        FROM t_task_event
+        WHERE status = 1
+        ORDER BY id ASC
+    </select>
+
+</mapper>

@@ -18,6 +18,7 @@ import net.lab1024.sa.task.runtime.domain.TaskRuleConfig;
 import net.lab1024.sa.task.runtime.strategy.TaskProgressStrategy;
 import net.lab1024.sa.task.runtime.strategy.TaskProgressStrategyFactory;
 import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
+import net.lab1024.sa.task.taskevent.domain.entity.TaskEvent;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,17 +78,19 @@ public class TaskRecordAdvanceService {
      * @throws TaskConcurrentModifyException STREAK 乐观锁冲突，调用方应重试
      */
     @Transactional(rollbackFor = Exception.class)
-    public TaskAdvanceResult advance(TaskConfig config, TaskEventContext ctx) {
+    public TaskAdvanceResult advance(TaskConfig config, TaskEventContext ctx, TaskEvent eventDef) {
+        // 丢弃流水是客诉自证的关键，但高频事件每条不匹配都写一行会把流水表写爆，故由注册表开关控制
+        boolean logDiscard = eventDef == null || !Integer.valueOf(0).equals(eventDef.getDiscardLogFlag());
         TaskRuleConfig rule = TaskRuleConfig.parse(config.getRuleConfig());
         TaskTypeEnum taskType = rule.taskType();
         if (taskType == null) {
             // 配置异常直接落丢弃流水，不抛异常 —— 一个坏配置不该让整批事件处理中断
             return discardWithoutRecord(config, ctx, "任务类型未配置或非法：rule_config.taskType="
-                    + rule.string(TaskConst.RULE_KEY_TASK_TYPE));
+                    + rule.string(TaskConst.RULE_KEY_TASK_TYPE), logDiscard);
         }
         TaskProgressStrategy strategy = strategyFactory.resolve(taskType);
         if (strategy == null) {
-            return discardWithoutRecord(config, ctx, "没有支持 " + taskType.getValue() + " 的进度策略实现");
+            return discardWithoutRecord(config, ctx, "没有支持 " + taskType.getValue() + " 的进度策略实现", logDiscard);
         }
 
         String periodKey = TaskPeriodResolver.resolvePeriodKey(taskType, config.getLimitType(), ctx.eventTime());
@@ -108,7 +111,7 @@ public class TaskRecordAdvanceService {
         flow.setRecordId(record.getId());
 
         if (!Integer.valueOf(TaskConst.RECORD_STATUS_RUNNING).equals(record.getStatus())) {
-            return finishAsDiscard(flow, "任务记录已不在进行中（status=" + record.getStatus() + "）");
+            return finishAsDiscard(flow, "任务记录已不在进行中（status=" + record.getStatus() + "）", logDiscard);
         }
 
         // ========== ③ 策略算出推进方案（纯函数，不碰库） ==========
@@ -120,13 +123,13 @@ public class TaskRecordAdvanceService {
 
         switch (plan) {
             case MetricPlan.Skip(String reason) -> {
-                return finishAsDiscard(flow, reason);
+                return finishAsDiscard(flow, reason, logDiscard);
             }
             case MetricPlan.Accumulate(BigDecimal amount) -> {
                 int rows = taskRecordDao.advanceMetric(record.getId(), amount);
                 if (rows == 0) {
                     // rows=0 的语义是「记录已不可推进」（状态已流转），不是并发冲突，不需要重试
-                    return finishAsDiscard(flow, "任务记录已不可推进（并发达标或已过期）");
+                    return finishAsDiscard(flow, "任务记录已不可推进（并发达标或已过期）", logDiscard);
                 }
                 delta = amount;
                 // 重读权威值：条件更新拿不到结果值，且必须以 DB 为准
@@ -307,7 +310,18 @@ public class TaskRecordAdvanceService {
      *
      * <p>丢弃原因就是「用户下了 99 元的单为什么没进度」这类客诉的答案，必须是人话。
      */
-    private TaskAdvanceResult finishAsDiscard(TaskRecordFlow flow, String reason) {
+    private TaskAdvanceResult finishAsDiscard(TaskRecordFlow flow, String reason, boolean logDiscard) {
+        if (!logDiscard) {
+            // 高频事件关掉了丢弃留痕：把先前为占幂等键插入的那一行删掉。
+            //
+            // 删掉<b>不影响正确性</b>：被丢弃的事件没有产生任何副作用，重投时重新判定一次、
+            // 依旧被丢弃，结果一样。而留着它反而有害 —— 高频事件的不匹配量级远大于匹配量级，
+            // 一天就能把流水表写满。
+            taskRecordFlowDao.deleteById(flow.getId());
+            log.debug("[任务推进] 事件丢弃（该事件已关闭丢弃留痕）。taskConfigId={}, eventBizId={}, 原因={}",
+                    flow.getTaskConfigId(), flow.getEventBizId(), reason);
+            return new TaskAdvanceResult.Discarded(reason);
+        }
         flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
         flow.setDiscardReason(reason);
         taskRecordFlowDao.updateById(flow);
@@ -319,8 +333,13 @@ public class TaskRecordAdvanceService {
      *
      * <p>幂等键撞了说明这个坏配置已经被记过一次，不必重复记录。
      */
-    private TaskAdvanceResult discardWithoutRecord(TaskConfig config, TaskEventContext ctx, String reason) {
+    private TaskAdvanceResult discardWithoutRecord(TaskConfig config, TaskEventContext ctx,
+                                                   String reason, boolean logDiscard) {
+        // 配置异常一律 warn：这类丢弃是「配错了」而不是「条件不满足」，即便关了流水也要看得见
         log.warn("[任务推进] 配置异常，事件丢弃。taskConfigId={}, reason={}", config.getId(), reason);
+        if (!logDiscard) {
+            return new TaskAdvanceResult.Discarded(reason);
+        }
         TaskRecordFlow flow = buildFlow(config, ctx);
         flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
         flow.setDiscardReason(reason);

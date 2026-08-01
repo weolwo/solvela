@@ -56,4 +56,11 @@ public record TaskEventContext(
     public TaskEventContext withEventBizId(String bizId) {
         return new TaskEventContext(eventCode, memberName, bizId, amount, eventTime, payload);
     }
+
+    /**
+     * 换一个金额（按事件注册表的 metric_source 从 payload 里取出来之后回填），其余不变
+     */
+    public TaskEventContext withAmount(BigDecimal newAmount) {
+        return new TaskEventContext(eventCode, memberName, eventBizId, newAmount, eventTime, payload);
+    }
 }

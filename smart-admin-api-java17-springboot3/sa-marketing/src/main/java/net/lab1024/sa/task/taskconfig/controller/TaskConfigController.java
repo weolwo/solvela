@@ -35,42 +35,42 @@ public class TaskConfigController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("taskConfig:query")
     public ResponseDTO<PageResult<TaskConfigVO>> queryPage(@RequestBody @Valid TaskConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":addProposal")
+    @SaCheckPermission("taskConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskConfigAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "任务配置向导提交（主子表：taskConfig + prizeMappingList）")
     @PostMapping("/wizard/submit")
-    @SaCheckPermission(":wizard:submit")
+    @SaCheckPermission("taskConfig:wizard:submit")
     public ResponseDTO<Long> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
         return Service.wizardSubmit(submitForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("taskConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskConfigUpdateForm updateForm) {
         return Service.update(updateForm);
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("taskConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
         return Service.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission(":delete")
+    @SaCheckPermission("taskConfig:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
     }

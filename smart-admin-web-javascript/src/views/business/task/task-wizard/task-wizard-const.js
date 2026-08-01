@@ -55,13 +55,30 @@ export const TASK_TYPE_OPTIONS = [
 
 // ---------------------------- 触发事件 ----------------------------
 
-export const TRIGGER_EVENT_OPTIONS = [
-  { value: 'DAILY_SIGN', label: 'DAILY_SIGN（签到）' },
-  { value: 'ORDER_PAID', label: 'ORDER_PAID（支付成功）' },
-  { value: 'MEMBER_REGISTER', label: 'MEMBER_REGISTER（注册）' },
-  { value: 'PAGE_VIEW', label: 'PAGE_VIEW（浏览页面）' },
-  { value: 'CUSTOM', label: 'CUSTOM（自定义埋点）' },
-];
+/**
+ * ⚠️ 触发事件的写死常量已删除，改由服务端 t_task_event 注册表下发
+ * （`taskApi.queryEventOptionList()` → `GET /taskEvent/optionList`）。
+ *
+ * 为什么不留在这里：事件是**开放集合**，加一个「分享商品」要改前端常量、改 DDL 注释、
+ * 可能还要加后端枚举 —— 与「新增任务模板前端零改动」的目标正面冲突。
+ * 现在加事件 = 加一行数据 + 上游埋点，前端一行都不用动。
+ *
+ * 顺带说明：原常量里的 `CUSTOM（自定义埋点）` **刻意没有迁进注册表** ——
+ * 它是个占位符而不是真实事件，选中它的任务永远不会有上游触发，
+ * 留着只会让运营配出一个安静地不动的任务。
+ *
+ * 把服务端下发的选项转成 a-select 需要的 { value, label } 形态。
+ * @param {Array} list `/taskEvent/optionList` 的返回
+ */
+export function toEventOptions(list) {
+  return (list || []).map((item) => ({
+    value: item.eventCode,
+    // 编码同时显示：运营配任务时要把编码告诉上游开发，纯中文名反而对不上
+    label: `${item.eventName}（${item.eventCode}）`,
+    bizIdRequired: item.bizIdRequired,
+    metricSource: item.metricSource,
+  }));
+}
 
 // ---------------------------- 任务分组 ----------------------------
 

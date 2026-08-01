@@ -22,6 +22,20 @@ export const taskApi = {
   },
 
   /**
+   * 触发事件下拉（只返回启用中的）。
+   *
+   * 事件本质是开放集合，此前写死在前端常量里，加一个事件要改前端 + 改 DDL 注释 + 可能改后端枚举，
+   * 与「新增任务模板前端零改动」的目标正面冲突。现在改由 t_task_event 注册表下发：
+   * 加事件 = 加一行数据 + 上游埋点，前端一行都不用动。
+   *
+   * 返回项含 bizIdRequired，用来提示配置的人「这个事件要求上游必须传业务单号」。
+   * @author  alaric
+   */
+  queryEventOptionList: () => {
+    return getRequest('/taskEvent/optionList');
+  },
+
+  /**
    * 提交任务配置向导（主子表事务：taskConfig + prizeMappingList，归属后端 taskconfig 模块）  @author  alaric
    */
   submitTaskConfig: (param) => {

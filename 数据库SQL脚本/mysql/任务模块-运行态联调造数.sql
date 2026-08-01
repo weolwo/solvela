@@ -113,6 +113,15 @@ VALUES
 --    但两者的现象一模一样（进度偏小），混在一起测就分不清是哪个（铁律 16 的另一种形状）。
 ('AP0TASKRUN', 'P0验收-并发累加', 'TP0COUNT01', 'CONCURRENT_ADD', 'DAILY', 'ALL',
  'UNLIMITED', 1, '{"taskType":"AMOUNT","targetAmount":999999}', 50, 1,
+ '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
+
+-- P1 专用：订阅高频事件 PAGE_VIEW（其 discard_log_flag=0）。
+-- 规则是 AMOUNT 而 PAGE_VIEW 不带金额，所以每个事件都会被丢弃 ——
+-- 正好用来验证「关掉丢弃留痕的事件不写流水」：这条任务下应当<b>一条流水都没有</b>。
+-- 没有这条任务的话，PAGE_VIEW 压根匹配不到任何配置，走的是「无人订阅」分支，
+-- 验不到开关本身（又一个「前提不成立就是空过」的场景，铁律 16）。
+('AP0TASKRUN', 'P0验收-高频丢弃', 'TP0COUNT01', 'PAGE_VIEW', 'DAILY', 'ALL',
+ 'UNLIMITED', 1, '{"taskType":"AMOUNT","targetAmount":100,"minAmount":100}', 60, 1,
  '2026-01-01 00:00:00', '2099-12-31 23:59:59');
 
 
@@ -143,6 +152,10 @@ FROM t_task_config WHERE task_name = 'P0验收-累计消费500';
 INSERT INTO t_task_prize_mapping (task_config_id, stage_level, prize_code, prize_mode, stage_condition, prize_strategy)
 SELECT id, 1, 'PP0SCORE02', 'FIXED', '{"target": 999999}', '{"value": 30}'
 FROM t_task_config WHERE task_name = 'P0验收-并发累加';
+
+INSERT INTO t_task_prize_mapping (task_config_id, stage_level, prize_code, prize_mode, stage_condition, prize_strategy)
+SELECT id, 1, 'PP0SCORE01', 'FIXED', '{"target": 100}', '{"value": 10}'
+FROM t_task_config WHERE task_name = 'P0验收-高频丢弃';
 
 
 -- -------------------------------------------------------------------------------------

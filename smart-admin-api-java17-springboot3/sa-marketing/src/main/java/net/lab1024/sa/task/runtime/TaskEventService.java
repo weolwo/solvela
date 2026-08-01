@@ -13,6 +13,9 @@ import net.lab1024.sa.task.runtime.domain.TaskEventContext;
 import net.lab1024.sa.task.runtime.domain.TaskEventReportForm;
 import net.lab1024.sa.task.taskconfig.dao.TaskConfigDao;
 import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
+import net.lab1024.sa.task.taskevent.domain.entity.TaskEvent;
+import net.lab1024.sa.task.taskevent.service.TaskEventDefService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
@@ -50,6 +53,7 @@ public class TaskEventService {
     private final TaskRecordDao taskRecordDao;
     private final TaskRecordFlowDao taskRecordFlowDao;
     private final TaskRecordAdvanceService taskRecordAdvanceService;
+    private final TaskEventDefService taskEventDefService;
     private final AsyncTaskExecutor taskEventExecutor;
 
     /**
@@ -64,12 +68,14 @@ public class TaskEventService {
                             TaskRecordDao taskRecordDao,
                             TaskRecordFlowDao taskRecordFlowDao,
                             TaskRecordAdvanceService taskRecordAdvanceService,
+                            TaskEventDefService taskEventDefService,
                             @Qualifier(TaskEventExecutorConfig.TASK_EVENT_EXECUTOR)
                             AsyncTaskExecutor taskEventExecutor) {
         this.taskConfigDao = taskConfigDao;
         this.taskRecordDao = taskRecordDao;
         this.taskRecordFlowDao = taskRecordFlowDao;
         this.taskRecordAdvanceService = taskRecordAdvanceService;
+        this.taskEventDefService = taskEventDefService;
         this.taskEventExecutor = taskEventExecutor;
     }
 
@@ -93,7 +99,28 @@ public class TaskEventService {
      * 选了 AbortPolicy 就必须如实告诉上游「这条我没接住」，否则丢事件会变成静默的。
      */
     public ResponseDTO<String> report(TaskEventReportForm form) {
-        TaskEventContext ctx = normalize(form);
+        // ① 事件必须已注册且启用 —— 注册表是「哪些事件合法」的唯一真源。
+        //    不认识的事件当场拒绝，而不是丢进线程池里慢慢发现：上游拼错一个字母时，
+        //    立刻收到 400 远比「返回 200 但任务永远不动」好排查。
+        TaskEvent eventDef = taskEventDefService.getEnabledByCode(form.getEventCode());
+        if (eventDef == null) {
+            log.warn("[任务事件] 未注册或已停用的事件被拒。eventCode={}, member={}",
+                    form.getEventCode(), form.getMemberName());
+            return ResponseDTO.userErrorParam("未注册或已停用的事件编码：" + form.getEventCode());
+        }
+
+        // ② 幂等键契约：t_task_event.biz_id_required 把「上游必须带单号」从口头约定变成强制校验。
+        //    ⚠️ 这一步必须在 normalize 之前 —— normalize 会按事件日兜底填上 eventBizId，
+        //    之后就再也分不清「上游传了」还是「服务端兜底的」。
+        //    对订单类事件放过兜底 = 一天只算一笔，是资损级的错，不能只靠文档约定。
+        if (Integer.valueOf(1).equals(eventDef.getBizIdRequired()) && StringUtils.isBlank(form.getEventBizId())) {
+            log.warn("[任务事件] 缺少必需的幂等单号被拒。eventCode={}, member={}",
+                    form.getEventCode(), form.getMemberName());
+            return ResponseDTO.userErrorParam(
+                    "事件 " + form.getEventCode() + " 必须携带 eventBizId（上游业务单号），否则无法防重");
+        }
+
+        TaskEventContext ctx = normalize(form, eventDef);
         try {
             taskEventExecutor.execute(() -> handleSafely(ctx));
         } catch (TaskRejectedException e) {
@@ -111,12 +138,20 @@ public class TaskEventService {
      * @return 每个匹配到的任务配置各一条结果
      */
     public List<TaskAdvanceResult> handle(TaskEventContext ctx) {
+        // 这里再查一次注册表而不是复用 report() 查到的：handle 是对外公开的同步入口
+        // （单测与联调脚本直接用它），两个入口各自自守，谁都不能靠另一个把关。
+        TaskEvent eventDef = taskEventDefService.getEnabledByCode(ctx.eventCode());
+        if (eventDef == null) {
+            log.warn("[任务事件] 未注册或已停用的事件，整批丢弃。eventCode={}, member={}",
+                    ctx.eventCode(), ctx.memberName());
+            return List.of();
+        }
         List<TaskConfig> configs = findSubscribedConfigs(ctx);
         if (configs.isEmpty()) {
             log.debug("[任务事件] 没有任务订阅该事件。eventCode={}, member={}", ctx.eventCode(), ctx.memberName());
             return List.of();
         }
-        return configs.stream().map(config -> advanceWithRetry(config, ctx)).toList();
+        return configs.stream().map(config -> advanceWithRetry(config, ctx, eventDef)).toList();
     }
 
     /**
@@ -142,10 +177,10 @@ public class TaskEventService {
      * MySQL 默认 REPEATABLE READ 下，同一事务里重查看不到别的事务后提交的行，
      * 就地重试无论多少次都是同一个结果。
      */
-    private TaskAdvanceResult advanceWithRetry(TaskConfig config, TaskEventContext ctx) {
+    private TaskAdvanceResult advanceWithRetry(TaskConfig config, TaskEventContext ctx, TaskEvent eventDef) {
         for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
             try {
-                return taskRecordAdvanceService.advance(config, ctx);
+                return taskRecordAdvanceService.advance(config, ctx, eventDef);
             } catch (TaskConcurrentModifyException e) {
                 log.info("[任务推进] 并发冲突，第 {}/{} 次重试。taskConfigId={}, member={}, 原因={}",
                         attempt, MAX_RETRY_ATTEMPTS, config.getId(), ctx.memberName(), e.getMessage());
@@ -188,16 +223,49 @@ public class TaskEventService {
      * <p>事件时间缺省取<b>数据库时钟</b>而不是 {@code LocalDateTime.now()}（铁律 9）——
      * 周期归属由它决定，多实例部署时各节点 JVM 时钟漂移会让同一秒的事件落到不同的天。
      */
-    private TaskEventContext normalize(TaskEventReportForm form) {
+    private TaskEventContext normalize(TaskEventReportForm form, TaskEvent eventDef) {
         LocalDateTime eventTime = form.getEventTime() == null ? taskRecordDao.selectDbNow() : form.getEventTime();
         String eventBizId = TaskPeriodResolver.resolveEventBizId(form.getEventBizId(), eventTime);
         return new TaskEventContext(
                 form.getEventCode(),
                 form.getMemberName(),
                 eventBizId,
-                form.getAmount(),
+                resolveAmount(form, eventDef),
                 eventTime,
                 form.getPayload());
+    }
+
+    /**
+     * 取计量值：调用方显式传的 {@code amount} 优先；没传则按注册表的 {@code metric_source}
+     * 去 payload 里找。
+     *
+     * <p>这样上游可以只上报一份「订单支付」事件原文（含 payAmount），
+     * 由注册表决定从哪个字段取金额 —— <b>换计量口径是改一行数据，不是改上游代码</b>，
+     * 与「加事件只加一行数据」是同一个取向。
+     */
+    private BigDecimal resolveAmount(TaskEventReportForm form, TaskEvent eventDef) {
+        if (form.getAmount() != null) {
+            return form.getAmount();
+        }
+        String metricSource = eventDef.getMetricSource();
+        if (StringUtils.isBlank(metricSource)
+                || TaskEventDefService.METRIC_SOURCE_NONE.equals(metricSource)
+                || form.getPayload() == null) {
+            return null;
+        }
+        Object raw = form.getPayload().get(metricSource);
+        if (raw == null) {
+            return null;
+        }
+        try {
+            // 走 new BigDecimal(String) 而不是 valueOf(double)：后者会把 0.1 变成
+            // 0.1000000000000000055511151231257827，一路带进金额累计
+            return new BigDecimal(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            log.warn("[任务事件] metric_source 字段不是数字，本次不计量。eventCode={}, field={}, value={}",
+                    form.getEventCode(), metricSource, raw);
+            return null;
+        }
     }
 
     /**
