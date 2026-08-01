@@ -98,6 +98,9 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  // 生成器产物漏了这行：模板里用了 <SmartEnumSelect> 却没导入，
+  // 表现是控制台一直报 Failed to resolve component（组件不渲染，但页面其余部分正常）
+  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
 
   // ---------------------------- 表格列 ----------------------------
 
