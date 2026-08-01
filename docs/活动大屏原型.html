@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>营销中台 · 实时作战大屏</title>
+
+    <!-- 引入 Tailwind, Vue3, Dayjs, AntD, ECharts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.x/dist/reset.css" />
+    <script src="https://unpkg.com/ant-design-vue@4.x/dist/antd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.2.6/dist/reset.css" />
+    <script src="https://unpkg.com/ant-design-vue@4.2.6/dist/antd.min.js"></script>
+    <style>
+        /* 大屏暗黑主题底色 */
+        body { background-color: #0b1120; color: #e2e8f0; margin: 0; overflow-x: hidden; }
+        [v-cloak] { display: none; }
+
+        /* 定制滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* 面板基础样式 */
+        .panel-box { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 12px; backdrop-filter: blur(8px); }
+        .panel-title { font-size: 15px; font-weight: 600; color: #f8fafc; padding: 12px 16px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); display: flex; align-items: center; gap: 8px; }
+        .panel-title::before { content: ''; display: block; width: 4px; height: 14px; background: #38bdf8; border-radius: 2px; }
+
+        /* 活动卡片交互 */
+        .act-card { transition: all 0.2s ease; border: 1px solid transparent; cursor: pointer; }
+        .act-card:hover { background: rgba(51, 65, 85, 0.6); }
+        .act-card.active { background: rgba(14, 165, 233, 0.1); border-color: rgba(56, 189, 248, 0.4); border-left: 4px solid #38bdf8; }
+
+        /* 数字字体 */
+        .font-num { font-family: 'Courier New', Courier, monospace; font-weight: 900; }
+
+        /* 告警流光 */
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); } 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); } }
+        .alarm-pulse { animation: pulse-red 2s infinite; border-color: rgba(225, 29, 72, 0.5) !important; }
+    </style>
+</head>
+<body>
+<div id="app" v-cloak class="h-screen flex flex-col p-4 gap-4"></div>
+
+<script type="text/x-template" id="app-template">
+    <!-- 大屏 Header -->
+    <header class="flex justify-between items-end pb-2">
+        <div>
+            <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 m-0 tracking-widest">
+                MARKETING DASHBOARD 营销中台大屏
+            </h1>
+            <div class="text-sm text-slate-400 mt-1 flex items-center gap-4">
+                <span>📅 {{ currentTime }}</span>
+                <a-tag color="success" class="border-none bg-emerald-500/20 text-emerald-400">系统运行健康</a-tag>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- 核心交互：取消选中，回到全局大盘 -->
+            <a-button v-if="selectedAct" type="primary" danger ghost @click="clearSelection" class="border-rose-500 text-rose-400">
+                ✖ 退出单活动下钻 (返回全局大盘)
+            </a-button>
+            <span v-else class="text-slate-500 text-sm">💡 提示：点击左侧活动卡片即可下钻查看专属数据</span>
+        </div>
+    </header>
+
+    <!-- 顶部核心指标 KPI (根据全局/单活动动态切换) -->
+    <div class="grid grid-cols-4 gap-4 shrink-0">
+        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden">
+            <div class="text-slate-400 text-sm mb-1">{{ selectedAct ? '该活动' : '全局' }}预算消耗率</div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-num text-cyan-400">{{ kpi.budgetRate }}%</span>
+            </div>
+            <div class="absolute right-0 bottom-0 opacity-10 text-6xl">💰</div>
+        </div>
+        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden">
+            <div class="text-slate-400 text-sm mb-1">今日实际发出价值 (元)</div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-num text-emerald-400">¥{{ kpi.issuedValue.toLocaleString() }}</span>
+                <span class="text-xs text-emerald-500">+12% 同比</span>
+            </div>
+        </div>
+        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden" :class="{'alarm-pulse': kpi.discardCount > 500}">
+            <div class="text-slate-400 text-sm mb-1">今日风控/异常丢弃 (次)</div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-num text-rose-400">{{ kpi.discardCount.toLocaleString() }}</span>
+                <span v-if="kpi.discardCount > 500" class="text-xs bg-rose-500 text-white px-1 rounded">高危</span>
+            </div>
+        </div>
+        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden">
+            <div class="text-slate-400 text-sm mb-1">人工审批积压 (笔)</div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-num text-amber-400">{{ kpi.pendingApprove }}</span>
+                <span class="text-xs text-amber-500 text-slate-400">最长滞留 {{ kpi.maxWaitHours }}h</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主视图区 -->
+    <div class="flex-1 flex gap-4 min-h-0">
+
+        <!-- 左侧：活动列表 (支持灵活点击下钻) -->
+        <div class="w-1/4 panel-box flex flex-col">
+            <div class="panel-title justify-between">
+                <span>🔥 运行中活动榜单</span>
+                <a-badge status="processing" text="实时" />
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+                <div
+                        v-for="act in activityList" :key="act.code"
+                        class="act-card bg-slate-800/50 p-3 rounded-lg flex flex-col gap-2"
+                        :class="{ 'active': selectedAct && selectedAct.code === act.code }"
+                        @click="selectAct(act)"
+                >
+                    <div class="flex justify-between items-start">
+                        <span class="font-bold text-slate-200 text-sm">{{ act.name }}</span>
+                        <a-tag :color="getTypeColor(act.type)" class="m-0 border-none text-[10px]">{{ act.type }}</a-tag>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <span class="font-mono text-xs text-slate-500">{{ act.code }}</span>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-400">发出资产</div>
+                            <div class="font-num text-cyan-400 text-sm">¥{{ act.value.toLocaleString() }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间：ECharts 数据看板 -->
+        <div class="w-2/4 flex flex-col gap-4">
+            <!-- 趋势图 -->
+            <div class="h-1/2 panel-box flex flex-col">
+                <div class="panel-title">
+                    <span>📈 {{ selectedAct ? `【${selectedAct.name}】发奖价值趋势` : '大盘全局发奖价值趋势' }}</span>
+                </div>
+                <div class="flex-1 p-2" ref="trendChartRef"></div>
+            </div>
+            <!-- 转化漏斗图 (基于选择的活动动态变化) -->
+            <div class="h-1/2 panel-box flex flex-col">
+                <div class="panel-title">
+                    <span>🎯 {{ selectedAct ? '单活动漏斗/阶梯转化分析' : '全局流量转化漏斗' }}</span>
+                </div>
+                <div class="flex-1 p-2 flex">
+                    <!-- 占位提示：如果是彩票，显示不同的图 -->
+                    <div v-if="selectedAct && selectedAct.type === 'LOTTERY'" class="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                        <span class="text-4xl mb-3">🎟️</span>
+                        <span>彩票玩法特征：为您下钻展示【售出进度】与【待开奖占比】大盘</span>
+                        <div class="w-full mt-4 px-12"><a-progress :percent="85" stroke-color="#38bdf8" /></div>
+                    </div>
+                    <div v-else class="flex-1" ref="funnelChartRef"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：风控与异常告警流 -->
+        <div class="w-1/4 panel-box flex flex-col">
+            <div class="panel-title text-rose-400 before:bg-rose-500">
+                <span>🚨 实时异常与风控拦截记录</span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3">
+                <div class="space-y-3">
+                    <div v-for="(log, idx) in riskLogs" :key="idx" class="bg-slate-800/80 border-l-2 border-rose-500 p-2.5 rounded-r">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-rose-400">{{ log.reason }}</span>
+                            <span class="text-[10px] text-slate-500">{{ log.time }}</span>
+                        </div>
+                        <div class="text-xs text-slate-300">
+                            用户: <span class="font-mono text-cyan-300">{{ log.member }}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1 truncate">
+                            源事件: {{ log.eventBizId }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</script>
+
+<script>
+    const { createApp, ref, reactive, onMounted, onBeforeUnmount, nextTick } = Vue;
+
+    const App = {
+        template: '#app-template',
+        setup() {
+            const currentTime = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'));
+            let timer = null;
+
+            // 图表实例引用
+            const trendChartRef = ref(null);
+            const funnelChartRef = ref(null);
+            let trendChart = null;
+            let funnelChart = null;
+
+            // 当前选中的活动 (null 代表看全局)
+            const selectedAct = ref(null);
+
+            // 核心 KPI 数据
+            const kpi = reactive({ budgetRate: 68.5, issuedValue: 124500, discardCount: 142, pendingApprove: 53, maxWaitHours: 12 });
+
+            // 模拟活动列表
+            const activityList = ref([
+                { code: 'LTQ7M3XKD8', name: '618锦鲤福彩发号', type: 'LOTTERY', value: 45000 },
+                { code: 'WLO9SMXDKD', name: '新人7天签到挑战', type: 'TASK', value: 12400 },
+                { code: '12278CBYW7', name: '年中狂欢大转盘', type: 'DRAW', value: 67100 },
+                { code: 'B7YN4TR9WC', name: '会员专属礼包', type: 'BASIC', value: 0 }
+            ]);
+
+            // 模拟异常日志
+            const globalRiskLogs = [
+                { reason: '并发重试耗尽 (Lost Update)', member: 'user_9912', time: '刚刚', eventBizId: 'EVT_882910' },
+                { reason: '触发单日频率拦截', member: 'user_451x', time: '1分钟前', eventBizId: 'EVT_7721' },
+                { reason: '奖池库存击穿防线拦截', member: 'user_0091', time: '3分钟前', eventBizId: 'EVT_9918' },
+                { reason: '彩票逾期未开奖警告', member: 'SYSTEM', time: '5分钟前', eventBizId: 'ISSUE_20260801' }
+            ];
+            const riskLogs = ref([...globalRiskLogs]);
+
+            function getTypeColor(type) {
+                const map = { 'LOTTERY': 'cyan', 'TASK': 'purple', 'DRAW': 'orange', 'BASIC': 'default' };
+                return map[type] || 'default';
+            }
+
+            // ---------- 图表渲染逻辑 ----------
+            function initCharts() {
+                if(trendChartRef.value) {
+                    trendChart = echarts.init(trendChartRef.value);
+                    window.addEventListener('resize', () => trendChart.resize());
+                }
+                if(funnelChartRef.value) {
+                    funnelChart = echarts.init(funnelChartRef.value);
+                    window.addEventListener('resize', () => funnelChart.resize());
+                }
+                renderTrendChart(false);
+                renderFunnelChart(false);
+            }
+
+            function renderTrendChart(isSingle) {
+                if(!trendChart) return;
+                const option = {
+                    backgroundColor: 'transparent',
+                    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.9)', borderColor: '#334155', textStyle: { color: '#f8fafc' } },
+                    grid: { top: 30, right: 20, bottom: 20, left: 50 },
+                    xAxis: { type: 'category', data: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'], axisLine: { lineStyle: { color: '#475569' } } },
+                    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { color: '#94a3b8' } },
+                    series: [{
+                        data: isSingle ? [120, 300, 150, 400, 200, 600, 800] : [1200, 3000, 1500, 4500, 2800, 6400, 8200],
+                        type: 'line',
+                        smooth: true,
+                        symbol: 'none',
+                        lineStyle: { color: '#38bdf8', width: 3 },
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: 'rgba(56,189,248,0.5)' },
+                                { offset: 1, color: 'rgba(56,189,248,0)' }
+                            ])
+                        }
+                    }]
+                };
+                trendChart.setOption(option);
+            }
+
+            function renderFunnelChart(isSingle) {
+                if(!funnelChart) return;
+
+                let data = [];
+                if(isSingle && selectedAct.value.type === 'TASK') {
+                    data = [
+                        { value: 100, name: '接取任务 (1000人)' },
+                        { value: 60, name: '到达阶梯一 (600人)' },
+                        { value: 20, name: '到达阶梯二 (200人)' },
+                        { value: 5, name: '满级通关 (50人)' }
+                    ];
+                } else {
+                    data = [
+                        { value: 100, name: '触发动作 (Event)' },
+                        { value: 80, name: '风控通过 (Pass)' },
+                        { value: 50, name: '成功派奖 (Prize)' }
+                    ];
+                }
+
+                const option = {
+                    backgroundColor: 'transparent',
+                    tooltip: { trigger: 'item', formatter: '{b} : {c}%' },
+                    color: ['#38bdf8', '#818cf8', '#34d399', '#f472b6'],
+                    series: [
+                        {
+                            name: '转化漏斗', type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%',
+                            min: 0, max: 100, minSize: '0%', maxSize: '100%', sort: 'desc', gap: 2,
+                            label: { show: true, position: 'inside', formatter: '{b}', color: '#fff', fontSize: 12 },
+                            itemStyle: { borderColor: '#0f172a', borderWidth: 2 },
+                            data: data
+                        }
+                    ]
+                };
+                funnelChart.setOption(option);
+            }
+
+            // ---------- 核心交互：灵活点击下钻 ----------
+            function selectAct(act) {
+                selectedAct.value = act;
+
+                // 模拟数据切换
+                kpi.budgetRate = (Math.random() * 40 + 50).toFixed(1);
+                kpi.issuedValue = act.value;
+                kpi.discardCount = Math.floor(Math.random() * 50);
+                kpi.pendingApprove = Math.floor(Math.random() * 10);
+
+                // 模拟单个活动的异常日志过滤
+                riskLogs.value = globalRiskLogs.filter(log => Math.random() > 0.5);
+                if(riskLogs.value.length === 0) riskLogs.value = [{ reason: '暂无异常', member: '-', time: '刚刚', eventBizId: '-' }];
+
+                // 重新渲染图表
+                nextTick(() => {
+                    renderTrendChart(true);
+                    if(act.type !== 'LOTTERY') renderFunnelChart(true); // 彩票隐藏漏斗
+                });
+            }
+
+            function clearSelection() {
+                selectedAct.value = null;
+
+                // 恢复大盘数据
+                kpi.budgetRate = 68.5;
+                kpi.issuedValue = 124500;
+                kpi.discardCount = 142;
+                kpi.pendingApprove = 53;
+                riskLogs.value = [...globalRiskLogs];
+
+                nextTick(() => {
+                    renderTrendChart(false);
+                    renderFunnelChart(false);
+                });
+            }
+
+            onMounted(() => {
+                timer = setInterval(() => { currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss'); }, 1000);
+                initCharts();
+            });
+
+            onBeforeUnmount(() => {
+                clearInterval(timer);
+                if(trendChart) trendChart.dispose();
+                if(funnelChart) funnelChart.dispose();
+            });
+
+            return {
+                currentTime, kpi, activityList, selectedAct, riskLogs,
+                getTypeColor, selectAct, clearSelection,
+                trendChartRef, funnelChartRef
+            };
+        }
+    };
+
+    createApp(App).use(antd).mount('#app');
+</script>
+</body>
+</html>
