@@ -4,11 +4,13 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.DefaultTyping;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.module.support.cache.CacheService;
 import net.lab1024.sa.base.module.support.cache.CaffeineCacheServiceImpl;
@@ -23,7 +25,7 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.*;
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -55,29 +57,37 @@ public class RedisConfig {
         RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
         redisTemplate.setConnectionFactory(factory);
         // 设置值（value）的序列化采用jackson2JsonRedisSerializer
-        redisTemplate.setValueSerializer(jackson2JsonRedisSerializer());
-        redisTemplate.setHashValueSerializer(jackson2JsonRedisSerializer());
+        redisTemplate.setValueSerializer(jacksonJsonRedisSerializer());
+        redisTemplate.setHashValueSerializer(jacksonJsonRedisSerializer());
         // 设置键（key）的序列化采用StringRedisSerializer。
         redisTemplate.setKeySerializer(new StringRedisSerializer());
         redisTemplate.setHashKeySerializer(new StringRedisSerializer());
         redisTemplate.afterPropertiesSet();
         return redisTemplate;
     }
+    /**
+     * Jackson 3 的 ObjectMapper 是不可变的，所有 setXxx 都没了，配置一律在 builder 上做完再 build。
+     * java.time 支持已内置，不再需要手动 registerModule(new JavaTimeModule())。
+     * LaissezFaireSubTypeValidator 在 Jackson 3 里降级成了包级私有，换用 BasicPolymorphicTypeValidator。
+     * ⚠️ 这里放行的是任意 Object 子类型，与原先 LaissezFaire 的宽松程度一致 ——
+     * 存进 Redis 的值全部由本服务自己写入，不接受外部投递，所以维持原语义。
+     */
     @Bean
-    public Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer() {
-        ObjectMapper om = new ObjectMapper();
-        //告诉 Jackson：“别管字段是 private 还是 public，也别管有没有 getter/setter 方法，给我直接暴力反射，把对象里所有的属性全盘转化成 JSON！”
-        om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        // 默认把 LocalDateTime 变成时间戳的恶心设定关掉，引入时间模块，让时间在 Redis 里以 2026-03-14 18:00:00 这种人类友好的字符串形式存在。
-        om.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        om.registerModule(new JavaTimeModule());
-        //如果 Java 对象里某个字段是 null，存进 Redis 的时候就干脆别写这个字段了。这在海量数据的 Redis 里能省下巨量的内存空间。
-        om.setSerializationInclusion(JsonInclude.Include.NON_NULL); // 忽略空值
-        // om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
-        om.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
-        //忽略无效字段
-        om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        return new Jackson2JsonRedisSerializer<>(om, Object.class);
+    public JacksonJsonRedisSerializer<Object> jacksonJsonRedisSerializer() {
+        ObjectMapper om = JsonMapper.builder()
+                //告诉 Jackson：“别管字段是 private 还是 public，也别管有没有 getter/setter 方法，给我直接暴力反射，把对象里所有的属性全盘转化成 JSON！”
+                .changeDefaultVisibility(vc -> vc.withVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY))
+                // 默认把 LocalDateTime 变成时间戳的恶心设定关掉，让时间在 Redis 里以 2026-03-14 18:00:00 这种人类友好的字符串形式存在。
+                .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+                //如果 Java 对象里某个字段是 null，存进 Redis 的时候就干脆别写这个字段了。这在海量数据的 Redis 里能省下巨量的内存空间。
+                .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
+                .activateDefaultTyping(
+                        BasicPolymorphicTypeValidator.builder().allowIfSubType(Object.class).build(),
+                        DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY)
+                //忽略无效字段
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .build();
+        return new JacksonJsonRedisSerializer<>(om, Object.class);
     }
 
 
@@ -100,7 +110,7 @@ public class RedisConfig {
                 .computePrefixWith(name -> REDIS_CACHE_PREFIX + name + ":")
                 // 使用 FastJSON 序列化缓存值，支持复杂对象
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(jackson2JsonRedisSerializer()));
+                        .fromSerializer(jacksonJsonRedisSerializer()));
 
         // 返回自定义缓存管理器，支持 cacheName#ttl 格式与永久缓存（#-1）
         return new CustomRedisCacheManager(redisCacheWriter, defaultCacheConfig);

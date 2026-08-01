@@ -87,7 +87,7 @@ public class VOVariableService extends CodeGenerateBaseVariableService {
             //文件上传
             if (isFile(field.getColumnName(), form)) {
                 finalFieldMap.put("file", "\n    @JsonSerialize(using = FileKeyVoSerializer.class)");
-                packageList.add("import com.fasterxml.jackson.databind.annotation.JsonSerialize;");
+                packageList.add("import tools.jackson.databind.annotation.JsonSerialize;");
                 packageList.add("import net.lab1024.sa.base.common.json.serializer.FileKeyVoSerializer;");
             }
 

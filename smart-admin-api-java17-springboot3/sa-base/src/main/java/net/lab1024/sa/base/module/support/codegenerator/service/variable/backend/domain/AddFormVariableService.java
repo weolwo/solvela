@@ -104,14 +104,14 @@ public class AddFormVariableService extends CodeGenerateBaseVariableService {
             //字典
             if (SmartStringUtil.isNotEmpty(codeField.getDict())) {
                 finalFieldMap.put("dict", "\n    @JsonDeserialize(using = DictDataDeserializer.class)");
-                packageList.add("import com.fasterxml.jackson.databind.annotation.JsonDeserialize;");
+                packageList.add("import tools.jackson.databind.annotation.JsonDeserialize;");
                 packageList.add("import net.lab1024.sa.base.common.json.deserializer.DictDataDeserializer;");
             }
 
             //文件上传
             if (CodeFrontComponentEnum.FILE_UPLOAD.equalsValue(field.getFrontComponent())) {
                 finalFieldMap.put("file", "\n    @JsonDeserialize(using = FileKeyVoDeserializer.class)");
-                packageList.add("import com.fasterxml.jackson.databind.annotation.JsonDeserialize;");
+                packageList.add("import tools.jackson.databind.annotation.JsonDeserialize;");
                 packageList.add("import net.lab1024.sa.base.common.json.deserializer.FileKeyVoDeserializer;");
             }
 

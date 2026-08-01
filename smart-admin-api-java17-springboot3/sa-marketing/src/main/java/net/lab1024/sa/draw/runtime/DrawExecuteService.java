@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.JsonUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import net.lab1024.sa.draw.drawlog.dao.DrawPrizeLogDao;
 import net.lab1024.sa.draw.drawlog.domain.entity.DrawPrizeLog;
 import net.lab1024.sa.draw.engine.DrawEngine;

@@ -1,11 +1,9 @@
 package net.lab1024.sa.base.common.json.serializer.enumeration;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.BeanProperty;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.ser.ContextualSerializer;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.BeanProperty;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import net.lab1024.sa.base.common.constant.StringConst;
 import net.lab1024.sa.base.common.enumeration.BaseEnum;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
@@ -20,14 +18,14 @@ import java.util.stream.Collectors;
  * @author huke
  * @date 2024年6月29日
  */
-public class EnumSerializer extends JsonSerializer<Object> implements ContextualSerializer {
+public class EnumSerializer extends ValueSerializer<Object> {
 
     private Class<? extends BaseEnum> enumClazz;
 
     @Override
-    public void serialize(Object value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-        gen.writeObject(value);
-        String fieldName = gen.getOutputContext().getCurrentName() + "Desc";
+    public void serialize(Object value, JsonGenerator gen, SerializationContext serializers) {
+        gen.writePOJO(value);
+        String fieldName = gen.streamWriteContext().currentName() + "Desc";
         Object desc;
         // 多个枚举类 逗号分割
         if (value instanceof String && String.valueOf(value).contains(StringConst.SEPARATOR)) {
@@ -38,14 +36,14 @@ public class EnumSerializer extends JsonSerializer<Object> implements Contextual
             BaseEnum anEnum = SmartEnumUtil.getEnumByValue(value, enumClazz);
             desc = null != anEnum ? anEnum.getDesc() : null;
         }
-        gen.writeObjectField(fieldName, desc);
+        gen.writePOJOProperty(fieldName, desc);
     }
 
     @Override
-    public JsonSerializer<?> createContextual(SerializerProvider prov, BeanProperty property) throws JsonMappingException {
+    public ValueSerializer<?> createContextual(SerializationContext prov, BeanProperty property)  {
         EnumSerialize annotation = property.getAnnotation(EnumSerialize.class);
         if (null == annotation) {
-            return prov.findValueSerializer(property.getType(), property);
+            return prov.findValueSerializer(property.getType());
         }
         enumClazz = annotation.value();
         return this;

@@ -1,6 +1,6 @@
 package net.lab1024.sa.admin.module.business.goods.domain.form;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonDeserialize;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import net.lab1024.sa.admin.module.business.goods.constant.GoodsStatusEnum;

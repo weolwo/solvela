@@ -1,9 +1,11 @@
 package net.lab1024.sa.base.config;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.config.TlsConfig;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.util.TimeValue;
@@ -14,10 +16,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.client.RestClient;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -54,15 +57,19 @@ public class RestClientConfig {
 
         HttpComponentsClientHttpRequestFactory factory =
                 new HttpComponentsClientHttpRequestFactory();
-        factory.setConnectTimeout(connectTimeout);
-        factory.setConnectionRequestTimeout(connectTimeout);
-        factory.setReadTimeout(readTimeout);
+        // ⚠️ Spring Framework 7 从 HttpComponentsClientHttpRequestFactory 上删掉了 setConnectTimeout，
+        //    连接超时改由连接管理器的 ConnectionConfig 承担（见下方 cm.setDefaultConnectionConfig）。
+        factory.setConnectionRequestTimeout(Duration.ofMillis(connectTimeout));
+        factory.setReadTimeout(Duration.ofMillis(readTimeout));
 
         PoolingHttpClientConnectionManager cm =
                 new PoolingHttpClientConnectionManager();
 
         cm.setMaxTotal(this.maxTotal);
         cm.setDefaultTlsConfig(TlsConfig.DEFAULT);
+        cm.setDefaultConnectionConfig(ConnectionConfig.custom()
+                .setConnectTimeout(Timeout.ofMilliseconds(this.connectTimeout))
+                .build());
 
         HttpClient httpClient = HttpClients.custom()
                 .setConnectionManager(cm)
@@ -85,7 +92,13 @@ public class RestClientConfig {
         converters.add(stringConverter);
 
         // 2. 核心替换：使用 Spring 官方亲儿子 Jackson 转换器
-        MappingJackson2HttpMessageConverter jacksonConverter = new MappingJackson2HttpMessageConverter();
+        //    Spring Framework 7 起 MappingJackson2HttpMessageConverter 已移除，换成 Jackson 3 的 JacksonJsonHttpMessageConverter
+        //    🌟 核心保命配置：模仿 Fastjson 的“瞎子模式”（遇到不认识的字段不报错）
+        //    Jackson 3 的 mapper 不可变，配置在 builder 上做完再传进转换器构造器
+        JsonMapper objectMapper = JsonMapper.builder()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .build();
+        JacksonJsonHttpMessageConverter jacksonConverter = new JacksonJsonHttpMessageConverter(objectMapper);
 
         // 配置支持的 MediaType
         List<MediaType> mediaTypes = new ArrayList<>();
@@ -93,11 +106,6 @@ public class RestClientConfig {
         // ⚠️ 历史遗留坑：原代码强行用 Fastjson 解析 FORM_URLENCODED 表单，这里照搬以防报错
         mediaTypes.add(MediaType.APPLICATION_FORM_URLENCODED);
         jacksonConverter.setSupportedMediaTypes(mediaTypes);
-
-        // 🌟 核心保命配置：模仿 Fastjson 的“瞎子模式”（遇到不认识的字段不报错）
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        jacksonConverter.setObjectMapper(objectMapper);
 
         converters.add(jacksonConverter);
 

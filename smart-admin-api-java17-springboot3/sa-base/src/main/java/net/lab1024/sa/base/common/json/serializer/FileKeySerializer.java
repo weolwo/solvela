@@ -1,8 +1,8 @@
 package net.lab1024.sa.base.common.json.serializer;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.module.support.file.service.FileService;
@@ -19,14 +19,14 @@ import java.io.IOException;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
-public class FileKeySerializer extends JsonSerializer<String> {
+public class FileKeySerializer extends ValueSerializer<String> {
 
     @Resource
     private FileService fileService;
 
 
     @Override
-    public void serialize(String value, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException {
+    public void serialize(String value, JsonGenerator jsonGenerator, SerializationContext serializerProvider) {
         if (StringUtils.isEmpty(value)) {
             jsonGenerator.writeString(value);
             return;

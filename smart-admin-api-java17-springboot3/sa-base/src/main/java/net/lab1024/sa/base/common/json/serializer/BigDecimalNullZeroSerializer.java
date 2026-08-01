@@ -1,8 +1,8 @@
 package net.lab1024.sa.base.common.json.serializer;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -16,10 +16,10 @@ import java.math.BigDecimal;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
-public class BigDecimalNullZeroSerializer extends JsonSerializer<BigDecimal> {
+public class BigDecimalNullZeroSerializer extends ValueSerializer<BigDecimal> {
 
     @Override
-    public void serialize(BigDecimal value, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException {
+    public void serialize(BigDecimal value, JsonGenerator jsonGenerator, SerializationContext serializerProvider) {
         if (value == null) {
             jsonGenerator.writeNumber(BigDecimal.ZERO);
             return;

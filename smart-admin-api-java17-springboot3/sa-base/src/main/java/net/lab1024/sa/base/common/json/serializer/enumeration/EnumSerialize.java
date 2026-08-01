@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.common.json.serializer.enumeration;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotationsInside;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.annotation.JsonSerialize;
 import net.lab1024.sa.base.common.enumeration.BaseEnum;
 
 import java.lang.annotation.ElementType;

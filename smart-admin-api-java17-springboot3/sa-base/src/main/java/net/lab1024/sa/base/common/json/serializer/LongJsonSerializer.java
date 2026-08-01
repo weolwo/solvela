@@ -1,9 +1,8 @@
 package net.lab1024.sa.base.common.json.serializer;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 
 import java.io.IOException;
 
@@ -16,7 +15,7 @@ import java.io.IOException;
  * @Email lab1024@163.com
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a>
  */
-public class LongJsonSerializer extends JsonSerializer<Long> {
+public class LongJsonSerializer extends ValueSerializer<Long> {
 
     public static final LongJsonSerializer INSTANCE = new LongJsonSerializer();
 
@@ -29,7 +28,7 @@ public class LongJsonSerializer extends JsonSerializer<Long> {
 
 
     @Override
-    public void serialize(Long value, JsonGenerator gen, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+    public void serialize(Long value, JsonGenerator gen, SerializationContext serializerProvider) {
         if (null == value) {
             gen.writeNull();
             return;

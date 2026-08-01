@@ -5,7 +5,6 @@ import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
@@ -25,7 +24,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
 @ComponentScan(AdminApplication.COMPONENT_SCAN)
 @MapperScan(value = AdminApplication.COMPONENT_SCAN, annotationClass = Mapper.class)
-@SpringBootApplication(exclude = {UserDetailsServiceAutoConfiguration.class})
+// Spring Boot 4 把 UserDetailsServiceAutoConfiguration 挪进了独立的 spring-boot-security 模块，
+// 本项目只依赖 spring-security-crypto（没有 security starter），该自动配置根本不在 classpath 上，
+// 排除项已无意义 —— 而且 Boot 对 exclude 里不存在的类会直接启动失败，必须删掉。
+@SpringBootApplication
 public class AdminApplication {
 
     public static final String COMPONENT_SCAN = "net.lab1024.sa";

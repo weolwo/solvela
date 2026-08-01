@@ -1,9 +1,8 @@
 package net.lab1024.sa.base.common.json.deserializer;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
 
 import java.io.IOException;
 
@@ -16,11 +15,11 @@ import java.io.IOException;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
-public class LongJsonDeserializer extends JsonDeserializer<Long> {
+public class LongJsonDeserializer extends ValueDeserializer<Long> {
 
     @Override
-    public Long deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
-        String value = jsonParser.getText();
+    public Long deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) {
+        String value = jsonParser.getString();
         try {
             return value == null ? null : Long.parseLong(value);
         } catch (NumberFormatException e) {

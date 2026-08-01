@@ -101,7 +101,7 @@ public class DrawStockService {
         Long code = redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 DEDUCT_LUA,
-                RScript.ReturnType.INTEGER,
+                RScript.ReturnType.LONG,
                 List.of(DrawCacheKey.stock(activityCode, prizeItemId),
                         DrawCacheKey.userCount(activityCode, prizeItemId, memberName)),
                 String.valueOf(userMaxCount));
@@ -112,7 +112,7 @@ public class DrawStockService {
         redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 ROLLBACK_LUA,
-                RScript.ReturnType.INTEGER,
+                RScript.ReturnType.LONG,
                 List.of(DrawCacheKey.stock(activityCode, prizeItemId),
                         DrawCacheKey.userCount(activityCode, prizeItemId, memberName)));
     }

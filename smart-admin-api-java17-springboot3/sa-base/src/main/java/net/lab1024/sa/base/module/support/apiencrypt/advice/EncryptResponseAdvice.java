@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.module.support.apiencrypt.advice;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
@@ -52,7 +52,7 @@ public class EncryptResponseAdvice implements ResponseBodyAdvice<ResponseDTO<Obj
             String encrypt = apiEncryptService.encrypt(objectMapper.writeValueAsString(body.getData()));
             body.setData(encrypt);
             body.setDataType(DataTypeEnum.ENCRYPT.getValue());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException(e);
         }
         return body;

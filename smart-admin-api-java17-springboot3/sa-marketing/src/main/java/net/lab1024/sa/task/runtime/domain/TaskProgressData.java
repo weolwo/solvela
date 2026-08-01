@@ -1,6 +1,6 @@
 package net.lab1024.sa.task.runtime.domain;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.task.constant.TaskConst;
 

@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.apiencrypt.advice;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartStringUtil;

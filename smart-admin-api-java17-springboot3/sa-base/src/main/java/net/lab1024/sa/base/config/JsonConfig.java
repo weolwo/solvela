@@ -2,14 +2,15 @@ package net.lab1024.sa.base.config;
 
 import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.LocalDateTimeUtil;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import tools.jackson.databind.ser.std.ToStringSerializer;
+import tools.jackson.databind.ext.javatime.deser.LocalDateDeserializer;
+import tools.jackson.databind.ext.javatime.deser.LocalDateTimeDeserializer;
+import tools.jackson.databind.ext.javatime.ser.LocalDateSerializer;
+import tools.jackson.databind.ext.javatime.ser.LocalDateTimeSerializer;
+import tools.jackson.databind.module.SimpleModule;
 import net.lab1024.sa.base.common.json.serializer.LongJsonSerializer;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -32,17 +33,24 @@ import java.time.format.DateTimeParseException;
 @Configuration
 public class JsonConfig {
 
+    /**
+     * Spring Boot 4 起 HTTP 层的 JSON 换成了 Jackson 3（tools.jackson），
+     * 原来的 Jackson2ObjectMapperBuilderCustomizer 已不存在，改用 JsonMapperBuilderCustomizer。
+     * Jackson 3 的 builder 没有 serializerByType，统一走 SimpleModule 注册。
+     */
     @Bean
-    public Jackson2ObjectMapperBuilderCustomizer customizer() {
+    public JsonMapperBuilderCustomizer customizer() {
         return builder -> {
-            builder.deserializers(new LocalDateDeserializer(DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter()));
-            builder.deserializers(new LocalDateTimeDeserializer(DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter()));
-            builder.serializers(new LocalDateSerializer(DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter()));
-            builder.serializers(new LocalDateTimeSerializer(DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter()));
-            builder.serializerByType(Long.class, LongJsonSerializer.INSTANCE);
-            builder.serializerByType(Long.TYPE, LongJsonSerializer.INSTANCE);
-            builder.serializerByType(BigInteger.class, ToStringSerializer.instance);
-            builder.serializerByType(BigDecimal.class, ToStringSerializer.instance);
+            SimpleModule module = new SimpleModule();
+            module.addDeserializer(LocalDate.class, new LocalDateDeserializer(DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter()));
+            module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter()));
+            module.addSerializer(LocalDate.class, new LocalDateSerializer(DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter()));
+            module.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter()));
+            module.addSerializer(Long.class, LongJsonSerializer.INSTANCE);
+            module.addSerializer(Long.TYPE, LongJsonSerializer.INSTANCE);
+            module.addSerializer(BigInteger.class, ToStringSerializer.instance);
+            module.addSerializer(BigDecimal.class, ToStringSerializer.instance);
+            builder.addModule(module);
         };
     }
 

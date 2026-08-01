@@ -26,7 +26,10 @@ spring:
       database: 1
       host: 127.0.0.1
       port: 6379
-      password:
+      # ⚠️ 这里原本有一行空的 `password:`。Redisson 3 会把空串当成"没有密码"，
+      #    Redisson 4 不再做这个宽容处理，照样发 AUTH，对无密码的 Redis 直接报
+      #    `ERR Client sent AUTH, but no password is set` 而启动失败。
+      #    没有密码就不要留这个键；有密码时正常填即可。
       timeout: 10000ms
       lettuce:
         pool:
@@ -55,11 +58,16 @@ spring:
 
   # json序列化相关配置
   jackson:
-    serialization:
-      write-enums-using-to-string: true
-      write-dates-as-timestamps: false
+    # ⚠️ Jackson 3 把枚举/日期相关的开关从 Serialization/DeserializationFeature 拆到了
+    #    EnumFeature 与 DateTimeFeature，Spring Boot 4 对应挪到 spring.jackson.datatype.* 下。
+    #    还留在老位置会在启动时直接绑定失败（No enum constant ...），不是运行期才暴露。
+    datatype:
+      enum:
+        write-enums-using-to-string: true
+        read-enums-using-to-string: true
+      datetime:
+        write-dates-as-timestamps: false
     deserialization:
-      read-enums-using-to-string: true
       fail-on-unknown-properties: false
     default-property-inclusion: always
     date-format: yyyy-MM-dd HH:mm:ss

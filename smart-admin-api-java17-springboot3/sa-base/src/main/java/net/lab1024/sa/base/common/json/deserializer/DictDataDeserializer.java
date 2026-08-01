@@ -1,10 +1,9 @@
 package net.lab1024.sa.base.common.json.deserializer;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -21,13 +20,13 @@ import java.util.List;
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a>
  */
 @Slf4j
-public class DictDataDeserializer extends JsonDeserializer<String> {
+public class DictDataDeserializer extends ValueDeserializer<String> {
 
     @Override
-    public String deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
+    public String deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) {
         List<String> list = new ArrayList<>();
-        ObjectCodec objectCodec = jsonParser.getCodec();
-        JsonNode listOrObjectNode = objectCodec.readTree(jsonParser);
+        // Jackson 3 移除了 ObjectCodec / JsonParser.getCodec()，读树统一走 DeserializationContext
+        JsonNode listOrObjectNode = deserializationContext.readTree(jsonParser);
         String deserialize = "";
         try {
             if (listOrObjectNode.isArray()) {

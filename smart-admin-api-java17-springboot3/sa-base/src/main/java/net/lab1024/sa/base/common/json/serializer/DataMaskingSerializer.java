@@ -1,11 +1,9 @@
 package net.lab1024.sa.base.common.json.serializer;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.BeanProperty;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.ser.ContextualSerializer;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.BeanProperty;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import net.lab1024.sa.base.module.support.datamasking.DataMasking;
 import net.lab1024.sa.base.module.support.datamasking.DataMaskingTypeEnum;
 import net.lab1024.sa.base.module.support.datamasking.DataMaskingUtil;
@@ -55,7 +53,7 @@ import java.io.IOException;
 */
 //</editor-fold>
 
-public class DataMaskingSerializer extends JsonSerializer<Object> implements ContextualSerializer {
+public class DataMaskingSerializer extends ValueSerializer<Object> {
 
     private final DataMaskingTypeEnum type;
 
@@ -69,7 +67,7 @@ public class DataMaskingSerializer extends JsonSerializer<Object> implements Con
     }
 
     @Override
-    public void serialize(Object value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(Object value, JsonGenerator gen, SerializationContext serializers) {
         if (value == null) {
             gen.writeNull();
             return;
@@ -79,7 +77,7 @@ public class DataMaskingSerializer extends JsonSerializer<Object> implements Con
     }
 
     @Override
-    public JsonSerializer<?> createContextual(SerializerProvider prov, BeanProperty property) throws JsonMappingException {
+    public ValueSerializer<?> createContextual(SerializationContext prov, BeanProperty property)  {
         if (property != null) {
             DataMasking annotation = property.getAnnotation(DataMasking.class);
             if (annotation != null) {
@@ -87,7 +85,7 @@ public class DataMaskingSerializer extends JsonSerializer<Object> implements Con
                 return new DataMaskingSerializer(annotation.value());
             }
         }
-        return prov.findValueSerializer(property.getType(), property);
+        return prov.findValueSerializer(property.getType());
     }
 }
 //</editor-fold>

@@ -27,6 +27,12 @@
             <artifactId>sa-marketing</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!-- DataScopeSqlConfigService 扫描注解要用；此前是靠 sa-base 传递白嫖来的，
+             而 sa-base 自己一处没用，已从那边移除 -->
+        <dependency>
+            <groupId>org.reflections</groupId>
+            <artifactId>reflections</artifactId>
+        </dependency>
         <!-- AdminApplicationTest 需要；此前是靠 sa-base 的 compile 作用域传递白嫖来的 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

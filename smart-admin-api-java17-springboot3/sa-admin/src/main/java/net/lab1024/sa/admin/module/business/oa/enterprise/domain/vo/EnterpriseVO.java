@@ -1,6 +1,6 @@
 package net.lab1024.sa.admin.module.business.oa.enterprise.domain.vo;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.annotation.JsonSerialize;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import net.lab1024.sa.admin.module.business.oa.enterprise.constant.EnterpriseTypeEnum;

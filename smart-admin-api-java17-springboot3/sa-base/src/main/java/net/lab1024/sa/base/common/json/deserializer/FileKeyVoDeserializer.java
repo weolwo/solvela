@@ -1,11 +1,9 @@
 package net.lab1024.sa.base.common.json.deserializer;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 
@@ -25,21 +23,21 @@ import java.util.stream.Collectors;
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
 @Slf4j
-public class FileKeyVoDeserializer extends JsonDeserializer<String> {
+public class FileKeyVoDeserializer extends ValueDeserializer<String> {
 
     @Override
-    public String deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
+    public String deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) {
         List<FileVO> list = new ArrayList<>();
-        ObjectCodec objectCodec = jsonParser.getCodec();
-        JsonNode listOrObjectNode = objectCodec.readTree(jsonParser);
+        // Jackson 3 移除了 ObjectCodec / JsonParser.getCodec()，读树与树转对象统一走 DeserializationContext
+        JsonNode listOrObjectNode = deserializationContext.readTree(jsonParser);
         String deserialize = "";
         try {
             if (listOrObjectNode.isArray()) {
                 for (JsonNode node : listOrObjectNode) {
-                    list.add(objectCodec.treeToValue(node, FileVO.class));
+                    list.add(deserializationContext.readTreeAsValue(node, FileVO.class));
                 }
             } else {
-                list.add(objectCodec.treeToValue(listOrObjectNode, FileVO.class));
+                list.add(deserializationContext.readTreeAsValue(listOrObjectNode, FileVO.class));
             }
             deserialize = list.stream().map(FileVO::getFileKey).collect(Collectors.joining(","));
         } catch (Exception e) {
