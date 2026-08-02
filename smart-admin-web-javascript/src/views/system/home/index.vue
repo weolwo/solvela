@@ -26,6 +26,10 @@
         <a-col :span="12">
           <HomeNotice title="通知" :noticeTypeId="2" />
         </a-col>
+        <!--活动参与统计-->
+        <a-col :span="24">
+          <ParticipationChart />
+        </a-col>
       </a-row>
     </a-col>
     <!--右侧-->
@@ -53,6 +57,7 @@
   import OfficialAccountCard from './components/official-account-card.vue';
   import ToBeDoneCard from './components/to-be-done-card/home-to-be-done.vue';
   import ChangelogCard from './components/changelog-card.vue';
+  import ParticipationChart from './components/participation-chart.vue';
 </script>
 <style lang="less" scoped>
   @import './index.less';

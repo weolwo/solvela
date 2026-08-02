@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.lab1024.sa.stat.dao.MarketingStatDao">
+
+    <!--
+      ══ 口径（已与 docs/首页图表-口径确认清单.md 对齐，改这里必须同步那份文档）══
+
+      「参与」= 参与人数，按 member_name 去重（不是人次）。三种玩法各自的定义：
+
+        DRAW    t_draw_prize_log 全量。**库存不足(status=2)也算参与** ——
+                有「谢谢参与」兜底，用户确实参与了，所以不按 status 过滤。
+        LOTTERY t_lottery_record 全量。一个人一次买 5 注算 1 人（DISTINCT 天然解决）。
+        TASK    t_task_record_flow 且 flow_type = 1（1-进度推进/已生效，2-事件丢弃/未生效）。
+
+      活动范围：t_activity_config.status != 2（启用）。
+        ⚠️ 按**状态**筛，不看 start_time / end_time —— 这是产品确认过的口径。
+        方案 §2.3 提醒过「历史值 0 要按启用处理」，用 != 2 正好覆盖。
+
+      ⚠️ 只有 t_draw_prize_log 直接带 activity_code，另外两张要 JOIN 到活动：
+        t_lottery_record → (lottery_code) → t_lottery_config → activity_code
+        t_task_record_flow → (task_config_id) → t_task_config → activity_code
+
+      ⚠️ 两个已知偏差，前端图注必须写出来：
+        1) 任务侧参与量天然偏小：幂等命中走撞唯一索引后直接 return，**不写流水行**，
+           重复上报的那部分在表里根本不存在。
+        2) t_draw_prize_log 没有 update_time，时间维度只能按 create_time。
+
+      性能：当前最大表 556 行，直查即可（方案 §7）。
+        t_task_record_flow 走 idx_t_tsk_flw_stat(create_time, flow_type, discard_code)。
+    -->
+
+    <!-- 参与趋势：按天 × 玩法类型 -->
+    <select id="participationTrend" resultType="net.lab1024.sa.stat.domain.vo.ParticipationTrendVO">
+        SELECT DATE_FORMAT(t.create_time, '%Y-%m-%d') AS statDate,
+               t.activity_type                        AS activityType,
+               COUNT(DISTINCT t.member_name)          AS memberCount
+        FROM (
+            <include refid="participationUnion"/>
+        ) t
+        GROUP BY statDate, t.activity_type
+        ORDER BY statDate, t.activity_type
+    </select>
+
+    <!-- 各玩法类型参与人数 -->
+    <select id="participationByType" resultType="net.lab1024.sa.stat.domain.vo.ParticipationByTypeVO">
+        SELECT t.activity_type               AS activityType,
+               COUNT(DISTINCT t.member_name) AS memberCount
+        FROM (
+            <include refid="participationUnion"/>
+        ) t
+        GROUP BY t.activity_type
+        ORDER BY memberCount DESC
+    </select>
+
+    <!--
+      三种玩法的参与明细。
+      用 UNION ALL 而不是 UNION：去重交给外层的 COUNT(DISTINCT member_name)，
+      这里提前去重既没必要、又会丢掉 activity_type 维度。
+    -->
+    <sql id="participationUnion">
+        -- 抽奖：全量计入（含未中奖、库存不足）
+        SELECT d.member_name, d.create_time, 'DRAW' AS activity_type
+        FROM t_draw_prize_log d
+        JOIN t_activity_config a ON a.activity_code = d.activity_code
+        WHERE d.create_time &gt;= #{fromTime}
+          AND a.status != 2
+
+        UNION ALL
+
+        -- 彩票：一注一行，靠外层 DISTINCT 收敛成人数
+        SELECT r.member_name, r.create_time, 'LOTTERY' AS activity_type
+        FROM t_lottery_record r
+        JOIN t_lottery_config c ON c.lottery_code = r.lottery_code
+        JOIN t_activity_config a ON a.activity_code = c.activity_code
+        WHERE r.create_time &gt;= #{fromTime}
+          AND r.member_name IS NOT NULL
+          AND a.status != 2
+
+        UNION ALL
+
+        -- 任务：只算有效推进（flow_type = 1），被丢弃的事件不算参与
+        SELECT f.member_name, f.create_time, 'TASK' AS activity_type
+        FROM t_task_record_flow f
+        JOIN t_task_config tc ON tc.id = f.task_config_id
+        JOIN t_activity_config a ON a.activity_code = tc.activity_code
+        WHERE f.create_time &gt;= #{fromTime}
+          AND f.flow_type = 1
+          AND a.status != 2
+    </sql>
+
+</mapper>
