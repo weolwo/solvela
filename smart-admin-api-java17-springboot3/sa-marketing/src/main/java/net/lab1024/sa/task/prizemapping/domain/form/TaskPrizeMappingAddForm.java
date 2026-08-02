@@ -3,7 +3,6 @@ package net.lab1024.sa.task.prizemapping.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -47,11 +46,5 @@ public class TaskPrizeMappingAddForm {
 
     @Schema(description = "动态发奖策略JSON：如 {amount: 20} 或 {ratio: 0.05}")
     private String prizeStrategy;
-
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
 
 }

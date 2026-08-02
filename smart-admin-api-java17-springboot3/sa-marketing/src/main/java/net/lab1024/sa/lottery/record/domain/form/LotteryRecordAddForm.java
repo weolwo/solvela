@@ -54,10 +54,4 @@ public class LotteryRecordAddForm {
     @NotBlank(message = "签名 不能为空")
     private String securitySign;
 
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
 }

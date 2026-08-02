@@ -32,18 +32,6 @@
       <a-form-item label="动态发奖策略" name="prizeStrategy">
         <a-input-number style="width: 100%" v-model:value="form.prizeStrategy" placeholder="动态发奖策略" />
       </a-form-item>
-      <a-form-item label="创建人" name="createBy">
-        <a-input style="width: 100%" v-model:value="form.createBy" placeholder="创建人" />
-      </a-form-item>
-      <a-form-item label="创建时间" name="createTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.createTime" style="width: 100%" placeholder="创建时间" />
-      </a-form-item>
-      <a-form-item label="更新人" name="updateBy">
-        <a-input style="width: 100%" v-model:value="form.updateBy" placeholder="更新人" />
-      </a-form-item>
-      <a-form-item label="更新时间" name="updateTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.updateTime" style="width: 100%" placeholder="更新时间" />
-      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -104,10 +92,6 @@
     prizeCode: undefined, //奖励编码
     prizeMode: undefined, //计算类型：FIXED(固定), RATIO(比例), FORMULA(公式)
     prizeStrategy: undefined, //动态发奖策略JSON：如 {"amount": 20} 或 {"ratio": 0.05}
-    createBy: undefined, //创建人
-    createTime: undefined, //创建时间
-    updateBy: undefined, //更新人
-    updateTime: undefined, //更新时间
   };
 
   let form = reactive({ ...formDefault });

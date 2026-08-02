@@ -3,7 +3,6 @@ package net.lab1024.sa.task.tasktemplate.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -39,11 +38,5 @@ public class TaskTemplateUpdateForm {
     @Schema(description = "QLExpress脚本", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "QLExpress脚本 不能为空")
     private String ruleScript;
-
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
 
 }

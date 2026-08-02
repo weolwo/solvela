@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -40,11 +39,5 @@ public class PoolPrizeMappingUpdateForm {
     @Schema(description = "序号", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "序号 不能为空")
     private Integer sortWeight;
-
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
 
 }

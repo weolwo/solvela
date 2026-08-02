@@ -69,10 +69,4 @@ public class TaskConfigUpdateForm {
     @Schema(description = "结束时间")
     private LocalDateTime endTime;
 
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
-
 }

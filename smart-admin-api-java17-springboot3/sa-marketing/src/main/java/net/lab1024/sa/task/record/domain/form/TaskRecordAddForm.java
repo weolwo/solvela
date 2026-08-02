@@ -62,10 +62,4 @@ public class TaskRecordAddForm {
     @Schema(description = "接取任务时的奖励快照")
     private String prizeSnapshot;
 
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
 }

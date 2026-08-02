@@ -73,10 +73,4 @@ public class TaskConfigAddForm {
     @Schema(description = "结束时间")
     private LocalDateTime endTime;
 
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
 }

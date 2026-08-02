@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -51,11 +50,5 @@ public class MemberAssetTransactionAddForm {
 
     @Schema(description = "C端展示摘要")
     private String remark;
-
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
 
 }

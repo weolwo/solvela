@@ -3,7 +3,6 @@ package net.lab1024.sa.draw.poolitem.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -42,11 +41,5 @@ public class PrizePoolItemAddForm {
 
     @Schema(description = "活动级白名单：指定用户必中")
     private String whiteList;
-
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
 
 }

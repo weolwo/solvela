@@ -61,10 +61,4 @@ public class MemberCouponAddForm {
     @NotNull(message = "有效期结束 不能为空")
     private LocalDateTime validEndTime;
 
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
 }

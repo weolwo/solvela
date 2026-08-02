@@ -3,7 +3,6 @@ package net.lab1024.sa.ledger.wallet.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -33,11 +32,5 @@ public class MemberWalletAddForm {
 
     @Schema(description = "乐观锁版本号")
     private Integer version;
-
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
 
 }

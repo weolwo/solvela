@@ -3,7 +3,6 @@ package net.lab1024.sa.lottery.prizerule.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -36,11 +35,5 @@ public class LotteryPrizeRuleUpdateForm {
     @Schema(description = "奖品编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "奖品编码 不能为空")
     private String prizeCode;
-
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
 
 }

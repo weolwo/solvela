@@ -61,18 +61,6 @@
       <a-form-item label="结束时间" name="endTime">
         <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.endTime" style="width: 100%" placeholder="结束时间" />
       </a-form-item>
-      <a-form-item label="创建人" name="createBy">
-        <a-input style="width: 100%" v-model:value="form.createBy" placeholder="创建人" />
-      </a-form-item>
-      <a-form-item label="创建时间" name="createTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.createTime" style="width: 100%" placeholder="创建时间" />
-      </a-form-item>
-      <a-form-item label="更新人" name="updateBy">
-        <a-input style="width: 100%" v-model:value="form.updateBy" placeholder="更新人" />
-      </a-form-item>
-      <a-form-item label="更新时间" name="updateTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.updateTime" style="width: 100%" placeholder="更新时间" />
-      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -143,10 +131,6 @@
     status: undefined, //任务状态 1-待生效, 2-生效中, 3-已下线
     startTime: undefined, //开始时间
     endTime: undefined, //结束时间
-    createBy: undefined, //创建人
-    createTime: undefined, //创建时间
-    updateBy: undefined, //更新人
-    updateTime: undefined, //更新时间
   };
 
   let form = reactive({ ...formDefault });

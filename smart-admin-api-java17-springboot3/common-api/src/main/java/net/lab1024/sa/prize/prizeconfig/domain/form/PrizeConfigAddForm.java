@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import lombok.Data;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 
@@ -59,11 +58,5 @@ public class PrizeConfigAddForm {
 
     @Schema(description = "扩展信息：如奖品图片URL、跳转链接等")
     private String ext;
-
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
 
 }

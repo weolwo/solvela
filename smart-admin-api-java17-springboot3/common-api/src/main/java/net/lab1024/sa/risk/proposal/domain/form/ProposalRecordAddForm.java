@@ -80,10 +80,4 @@ public class ProposalRecordAddForm {
     @Schema(description = "审核意见/驳回理由")
     private String reviewComment;
 
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
 }

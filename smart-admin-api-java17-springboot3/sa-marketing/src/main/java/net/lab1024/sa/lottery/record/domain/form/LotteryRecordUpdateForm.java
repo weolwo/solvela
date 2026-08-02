@@ -2,7 +2,6 @@ package net.lab1024.sa.lottery.record.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -26,11 +25,5 @@ public class LotteryRecordUpdateForm {
 
     @Schema(description = "奖励等级")
     private Integer prizeLevel;
-
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
 
 }

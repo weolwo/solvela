@@ -45,10 +45,4 @@ public class PrizeLogUpdateForm {
     @Schema(description = "异常原因")
     private String remark;
 
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
-
 }

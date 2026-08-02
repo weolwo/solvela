@@ -41,10 +41,4 @@ public class ProposalRecordUpdateForm {
     @Schema(description = "审核意见/驳回理由")
     private String reviewComment;
 
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
-
 }

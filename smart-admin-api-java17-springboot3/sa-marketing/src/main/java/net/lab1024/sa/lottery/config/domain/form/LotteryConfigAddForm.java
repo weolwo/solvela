@@ -3,7 +3,6 @@ package net.lab1024.sa.lottery.config.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -46,11 +45,5 @@ public class LotteryConfigAddForm {
 
     @Schema(description = "状态：0-下线, 1-上线")
     private Integer status;
-
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
 
 }

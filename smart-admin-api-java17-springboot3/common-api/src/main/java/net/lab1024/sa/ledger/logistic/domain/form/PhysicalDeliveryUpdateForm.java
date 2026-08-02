@@ -3,7 +3,6 @@ package net.lab1024.sa.ledger.logistic.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
@@ -41,11 +40,5 @@ public class PhysicalDeliveryUpdateForm {
 
     @Schema(description = "状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回")
     private Integer status;
-
-    @Schema(description = "更新人")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    private LocalDateTime updateTime;
 
 }

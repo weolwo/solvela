@@ -26,12 +26,6 @@
       <a-form-item label="QLExpress脚本" name="ruleScript">
         <a-textarea style="width: 100%" v-model:value="form.ruleScript" placeholder="QLExpress脚本" />
       </a-form-item>
-      <a-form-item label="更新人" name="updateBy">
-        <a-input style="width: 100%" v-model:value="form.updateBy" placeholder="更新人" />
-      </a-form-item>
-      <a-form-item label="更新时间" name="updateTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.updateTime" style="width: 100%" placeholder="更新时间" />
-      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -91,8 +85,6 @@
     taskType: undefined, //流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)
     uiSchema: undefined, //前端渲染规则
     ruleScript: undefined, //QLExpress脚本
-    updateBy: undefined, //更新人
-    updateTime: undefined, //更新时间
   };
 
   let form = reactive({ ...formDefault });

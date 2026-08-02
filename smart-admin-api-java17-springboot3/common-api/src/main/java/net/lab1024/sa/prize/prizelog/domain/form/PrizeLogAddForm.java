@@ -73,10 +73,4 @@ public class PrizeLogAddForm {
     @Schema(description = "异常原因")
     private String remark;
 
-    @Schema(description = "创建人")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    private LocalDateTime createTime;
-
 }
