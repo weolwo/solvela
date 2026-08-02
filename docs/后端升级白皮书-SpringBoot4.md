@@ -94,6 +94,34 @@ commons-* 全系、poi 5.5.1、bcprov 1.85、velocity、freemarker、p6spy、ref
 **④ 版本 pin 与依赖声明分离。** `snakeyaml` / `commons-compress` 源码零直接引用，
 从 `<dependencies>` 移除、**版本 pin 保留在 dependencyManagement**，实测树上仍是 2.6 / 1.28.0，无降版本。
 
+### 2.4 传递依赖瘦身（第三轮，2026-08-02）
+
+`dependency:analyze` 层面已无可删（sa-base 剩余 13 条 unused 全是 starter / 驱动 / 运行期装配的误报，
+common-api 与 sa-marketing 已无该告警）。剩下的空间在**传递依赖**：
+
+| 排除项 | 从哪来 | 依据 | 省 |
+|---|---|---|---|
+| `com.google.protobuf:protobuf-java` | `mysql-connector-j` | 只服务 X DevAPI（`mysqlx://`），本项目走经典 JDBC | 1.78 MB |
+| `software.amazon.awssdk:netty-nio-client` | `awssdk:s3` | 只用同步 `S3Client`，`S3AsyncClient` 一处没用；连带去掉 netty-codec-http/http2 等 | 1.55 MB |
+| `io.reactivex.rxjava3:rxjava` | `redisson-spring-boot-starter` | 只用 Redisson 同步 API（RLock/RScript/RTopic） | 2.54 MB |
+
+合计 **6 个构件、5.87 MB**（运行期 classpath 215 → 209 个构件，120.0 → 114.2 MB；fat jar 128M → 123M）。
+
+**评估后决定不动的**（记录理由，避免重复讨论）：
+
+| 候选 | 体积 | 为什么不动 |
+|---|---|---|
+| `org.ehcache:ehcache` + `cache-api` | 2.4 MB | **在用**。`GoodsService` 有 `FastExcel.read`，ehcache 在 xlsx 读取的共享字符串缓存路径上 |
+| `commons-math3`（poi 传递） | 2.1 MB | POI 公式求值要用。Excel 是本轮唯一没有自动化覆盖的功能面（§6.1），不在这里加风险 |
+| `kryo` / `reflectasm` / `minlog` / `jodd-util` | ~1 MB | Redisson 4 默认编解码器就是 Kryo5Codec，yaml 未显式改过，排掉会在第一次写 Redis 时炸 |
+| `io.projectreactor:reactor-core` | 2.2 MB | **排不掉**：真实来源是 `spring-boot-starter-data-redis`（Lettuce 需要），不是 Redisson |
+| `net.bytebuddy:byte-buddy` | 4.4 MB | 看着像 test 泄漏，实为 **Redisson 的 compile 依赖** |
+| `bcprov-jdk18on` | 9.8 MB | 单体加密提供者，无法按需裁剪，且国密相关代码在用 |
+
+> ⚠️ **教训**：`reactor-core` 那条我先写进了 pom，实测才发现它另有来源、排了等于没排 ——
+> 属于自己制造死配置，已删掉。**加 `<exclusion>` 后必须用 `dependency:list` 复核构件是否真的消失**，
+> 不能只看构建有没有报错。
+
 ### 2.3 收益
 
 fat jar 少了约 27MB；`dependency:analyze` 的 unused-declared 告警从 60 条（sa-base 21 + common-api 39）降到个位数。
@@ -354,7 +382,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 
 ### 5.3 工程质量（清理阶段的收益）
 
-- fat jar 减重约 27MB。
+- fat jar 从 155M 级别减到 **123M**（依赖清理约 27MB + 传递依赖瘦身 5.87MB）。
 - common-api 的 pom 从 227 行降到 66 行，"这个模块用了什么"重新变得可读。
 - 修掉一个潜伏故障（poi / poi-ooxml 版本错配）和两个死配置（redisson-spring-data-27、springdoc 空属性）。
 
