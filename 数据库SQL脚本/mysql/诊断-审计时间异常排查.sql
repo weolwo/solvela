@@ -107,8 +107,16 @@ SELECT m.id            AS mapping_id,
   LEFT JOIN t_task_config c ON c.id = m.task_config_id
  WHERE m.create_time IS NULL;
 
--- 步骤 2：确认无误后执行订正（默认注释掉）
---   这两行是 id = 4 (task_config_id=6) 与 id = 55 (task_config_id=50)
+-- 步骤 1 实跑结果（2026-08-02）：父行时间完好，回填可行
+--   mapping_id=4   task_config_id=6   任务名「P3验收-内嵌提交测试」  cfg_create_time=2026-07-30 08:41:29
+--   mapping_id=55  task_config_id=50  任务名「ggg」                  cfg_create_time=2026-08-01 18:24:04
+--
+-- ⚠️ 这两条任务名一看就是测试数据（P3 验收那轮 + 随手敲的 ggg）。
+--    若确认是开发库垃圾数据，选方案 B 直接删更干净；生产库或不确定时选方案 A。
+
+-- ------------------------------------------------------------
+-- 方案 A：从父表回填（保守，保留数据）
+-- ------------------------------------------------------------
 -- UPDATE t_task_prize_mapping m
 --   JOIN t_task_config c ON c.id = m.task_config_id
 --    SET m.create_time = c.create_time,
@@ -116,5 +124,14 @@ SELECT m.id            AS mapping_id,
 --  WHERE m.create_time IS NULL
 --    AND c.create_time IS NOT NULL;
 
--- 步骤 3：回填后复查，预期 0 行
+-- ------------------------------------------------------------
+-- 方案 B：确认是测试数据后直接删除
+--   ⚠️ 删之前再确认一次这两条任务配置本身要不要一并清理
+--      （t_task_config id = 6, 50），否则会留下没有奖励映射的孤儿配置。
+-- ------------------------------------------------------------
+-- DELETE FROM t_task_prize_mapping WHERE id IN (4, 55);
+
+-- ------------------------------------------------------------
+-- 步骤 3：处理后复查，预期 0 行
+-- ------------------------------------------------------------
 -- SELECT * FROM t_task_prize_mapping WHERE create_time IS NULL OR update_time IS NULL;
