@@ -48,10 +48,10 @@
         <a-select style="width: 100%" v-model:value="form.status" placeholder="请选择状态" :options="activityStatusOptions" />
       </a-form-item>
       <a-form-item label="活动开始时间" name="startTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.startTime" style="width: 100%" placeholder="活动开始时间" />
+        <a-date-picker :show-time="DAY_START_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.startTime" style="width: 100%" placeholder="活动开始时间" />
       </a-form-item>
       <a-form-item label="活动结束时间" name="endTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.endTime" style="width: 100%" placeholder="活动结束时间" />
+        <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.endTime" style="width: 100%" placeholder="活动结束时间" />
       </a-form-item>
       <a-form-item label="规则脚本id" name="scriptId">
         <a-input style="width: 100%" v-model:value="form.scriptId" placeholder="规则脚本id" />
@@ -67,6 +67,7 @@
   </a-modal>
 </template>
 <script setup>
+  import { DAY_END_SHOW_TIME, DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';

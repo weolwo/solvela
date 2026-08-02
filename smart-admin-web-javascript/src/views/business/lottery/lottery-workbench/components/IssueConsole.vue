@@ -51,7 +51,7 @@
                     <a-range-picker
                       v-model:value="createForm.saleRange"
                       value-format="YYYY-MM-DD HH:mm:ss"
-                      show-time
+                      :show-time="RANGE_SHOW_TIME"
                       class="w-full"
                       format="MM-DD HH:mm"
                     />
@@ -104,7 +104,7 @@
                   <a-range-picker
                     v-model:value="record._editRange"
                     value-format="YYYY-MM-DD HH:mm:ss"
-                    show-time
+                    :show-time="RANGE_SHOW_TIME"
                     size="small"
                     :placeholder="['发售', '截止']"
                     format="MM-DD HH:mm"
@@ -297,6 +297,7 @@
 </template>
 
 <script setup>
+  import { RANGE_SHOW_TIME } from '/@/constants/date-time-const';
   import { computed, ref, watch } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';

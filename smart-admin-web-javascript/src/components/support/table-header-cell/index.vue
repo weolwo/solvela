@@ -27,7 +27,7 @@
           </template>
           <template v-else-if="column.filterOptions.type === 'datetime-range'">
             <a-range-picker
-              show-time
+              :show-time="RANGE_SHOW_TIME"
               v-model:value="createDateRange"
               :ranges="column.filterOptions.ranges ? defaultTimeRanges : []"
               style="width: 100%"
@@ -63,6 +63,7 @@
   </div>
 </template>
 <script setup>
+  import { RANGE_SHOW_TIME } from '/@/constants/date-time-const';
   import { ref, useSlots, watch, onMounted, defineAsyncComponent } from 'vue';
   import dayjs from 'dayjs';
   import _ from 'lodash';

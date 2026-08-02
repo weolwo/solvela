@@ -24,10 +24,10 @@
         <a-input style="width: 100%" v-model:value="form.periodKey" placeholder="业务期数标识(防重用)：NONE, 日期(20260402)" />
       </a-form-item>
       <a-form-item label="开始时间" name="validStartTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validStartTime" style="width: 100%" placeholder="开始时间" />
+        <a-date-picker :show-time="DAY_START_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validStartTime" style="width: 100%" placeholder="开始时间" />
       </a-form-item>
       <a-form-item label="过期时间" name="validEndTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validEndTime" style="width: 100%" placeholder="过期时间" />
+        <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validEndTime" style="width: 100%" placeholder="过期时间" />
       </a-form-item>
       <a-form-item label="当前进度值：如已签到 3.0000 天" name="currentMetric">
         <a-input-number style="width: 100%" v-model:value="form.currentMetric" placeholder="当前进度值：如已签到 3.0000 天" />
@@ -61,6 +61,7 @@
   </a-modal>
 </template>
 <script setup>
+  import { DAY_END_SHOW_TIME, DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';

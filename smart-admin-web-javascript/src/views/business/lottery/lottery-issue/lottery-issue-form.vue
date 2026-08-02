@@ -25,7 +25,7 @@
       </a-form-item>
       <a-form-item label="售卖开始时间" name="saleStartTime">
         <a-date-picker
-          show-time
+          :show-time="DAY_START_SHOW_TIME"
           valueFormat="YYYY-MM-DD HH:mm:ss"
           v-model:value="form.saleStartTime"
           style="width: 100%"
@@ -33,7 +33,7 @@
         />
       </a-form-item>
       <a-form-item label="售卖结束时间" name="saleEndTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.saleEndTime" style="width: 100%" placeholder="售卖结束时间" />
+        <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.saleEndTime" style="width: 100%" placeholder="售卖结束时间" />
       </a-form-item>
       <a-form-item label="开奖时间" name="settleTime">
         <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.settleTime" style="width: 100%" placeholder="开奖时间" />
@@ -52,6 +52,7 @@
   </a-modal>
 </template>
 <script setup>
+  import { DAY_END_SHOW_TIME, DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';

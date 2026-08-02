@@ -56,10 +56,10 @@
         <a-input-number style="width: 100%" v-model:value="form.status" placeholder="任务状态 1-待生效, 2-生效中, 3-已下线" />
       </a-form-item>
       <a-form-item label="开始时间" name="startTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.startTime" style="width: 100%" placeholder="开始时间" />
+        <a-date-picker :show-time="DAY_START_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.startTime" style="width: 100%" placeholder="开始时间" />
       </a-form-item>
       <a-form-item label="结束时间" name="endTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.endTime" style="width: 100%" placeholder="结束时间" />
+        <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.endTime" style="width: 100%" placeholder="结束时间" />
       </a-form-item>
       <a-form-item label="创建人" name="createBy">
         <a-input style="width: 100%" v-model:value="form.createBy" placeholder="创建人" />
@@ -84,6 +84,7 @@
   </a-modal>
 </template>
 <script setup>
+  import { DAY_END_SHOW_TIME, DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';

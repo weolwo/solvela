@@ -56,7 +56,7 @@
           <a-form-item label="活动起止时间" name="timeRange">
             <a-range-picker
               v-model:value="form.timeRange"
-              show-time
+              :show-time="RANGE_SHOW_TIME"
               :placeholder="['开始时间', '结束时间']"
               value-format="YYYY-MM-DD HH:mm:ss"
               class="w-full"
@@ -173,6 +173,7 @@
 </template>
 
 <script setup>
+  import { RANGE_SHOW_TIME } from '/@/constants/date-time-const';
   import { computed, onMounted, reactive, ref, watch } from 'vue';
   import { message } from 'ant-design-vue';
   import { useRoute, useRouter } from 'vue-router';

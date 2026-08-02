@@ -195,7 +195,7 @@
               <a-form-item label="生效时间" :name="['audience', 'timeRange']" :rules="FORM_RULES.timeRange">
                 <a-range-picker
                   v-model:value="wizardForm.audience.timeRange"
-                  show-time
+                  :show-time="RANGE_SHOW_TIME"
                   value-format="YYYY-MM-DD HH:mm:ss"
                   :disabled="wizardForm.audience.longTerm"
                   class="w-full"
@@ -295,6 +295,7 @@
 </template>
 
 <script setup>
+  import { RANGE_SHOW_TIME } from '/@/constants/date-time-const';
   import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
   import { onBeforeRouteLeave, useRouter } from 'vue-router';
   import dayjs from 'dayjs';

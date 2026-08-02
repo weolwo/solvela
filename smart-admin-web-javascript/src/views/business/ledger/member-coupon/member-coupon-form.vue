@@ -36,10 +36,10 @@
         <a-input style="width: 100%" v-model:value="form.sourceBizId" placeholder="关联单号" />
       </a-form-item>
       <a-form-item label="有效期开始" name="validStartTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validStartTime" style="width: 100%" placeholder="有效期开始" />
+        <a-date-picker :show-time="DAY_START_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validStartTime" style="width: 100%" placeholder="有效期开始" />
       </a-form-item>
       <a-form-item label="有效期结束" name="validEndTime">
-        <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validEndTime" style="width: 100%" placeholder="有效期结束" />
+        <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validEndTime" style="width: 100%" placeholder="有效期结束" />
       </a-form-item>
     </a-form>
 
@@ -52,6 +52,7 @@
   </a-modal>
 </template>
 <script setup>
+  import { DAY_END_SHOW_TIME, DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
