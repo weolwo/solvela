@@ -3,8 +3,9 @@
 
   基于 CodeMirror 6 的代码编辑器。prop：v-model:value / language / theme / height / readOnly / dictionary。
 
-  ⚠️ language 取值**大小写敏感**：'QL' | 'java' | 'json' | 'javascript'。
-     传错不会报错，只是静默没有高亮 —— 本项目真出过这个 bug（写成 'JSON' 大写）。
+  language 只支持 'java' | 'json'（QLExpress 脚本用 java 高亮）。
+  ⚠️ 取值大小写敏感，传错不会报错、只是静默没有高亮 —— 本项目真出过这个 bug。
+  编辑器只做着色，不做语法检查；QL 的语法校验走后端 check(script) 接口。
 
   只读回显请优先用 highlight.js（见 code-generator-preview-modal.vue），比本组件更轻。
 -->
@@ -22,7 +23,7 @@
     baseExtensions,
     getLanguageExtension,
     createCompartments,
-    createQlCompletionSource,
+    createDictCompletionSource,
   } from '/@/lib/codemirror';
 
   const props = defineProps({
@@ -53,7 +54,8 @@
       doc,
       extensions: [
         ...baseExtensions(),
-        autocompletion({ override: props.language === 'QL' ? [createQlCompletionSource(() => props.dictionary)] : undefined }),
+        // 传了业务字典才接管补全，否则用语言自带的补全
+        autocompletion({ override: hasDictionary() ? [createDictCompletionSource(() => props.dictionary)] : undefined }),
         compartments.language.of(getLanguageExtension(props.language)),
         compartments.theme.of(themeExtension(props.theme)),
         // readOnly 拦截修改；editable 同时去掉 contenteditable 与光标，
@@ -67,6 +69,9 @@
       ],
     });
   }
+
+  const hasDictionary = () =>
+    !!(props.dictionary && (Object.keys(props.dictionary.objects || {}).length || props.dictionary.functions?.length || props.dictionary.keywords?.length));
 
   onMounted(() => {
     viewRef.value = new EditorView({ state: buildState(props.value ?? ''), parent: containerRef.value });

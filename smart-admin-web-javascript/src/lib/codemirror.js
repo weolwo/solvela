@@ -24,53 +24,18 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { java } from '@codemirror/lang-java';
 import { json } from '@codemirror/lang-json';
-import { javascript } from '@codemirror/lang-javascript';
 
-/**
- * QLExpress 语言
- * 原规则（保持一致，改这里要同步 docs 里的脚本文档）：
- *   关键字  如果|则|否则|返回|大于|等于|并且|或者
- *   类型    用户|订单
- *   字符串  "..."
- *   数字    [0-9]+
+/*
+ * 只支持 java 与 json 两种。
+ *
+ * QLExpress 脚本用 java 高亮：QLExpress 4 的语法已是 Java 风格（含原生 JSON 字面量），
+ * 比自己写的关键字 tokenizer 准得多。
+ * ⚠️ 编辑器只做**着色**，不做语法检查。QL 的语法校验要靠后端的 check(script) AST 预校验接口，
+ *    前端拿到错误位置再划红线 —— 那是另一件事，不要指望编辑器本身。
  */
-const QL_KEYWORDS = /^(如果|则|否则|返回|大于|等于|并且|或者)/;
-const QL_TYPES = /^(用户|订单)/;
-
-const qlLanguage = StreamLanguage.define({
-  name: 'QL',
-  token(stream) {
-    if (stream.eatSpace()) return null;
-    const rest = stream.string.slice(stream.pos);
-    let m = rest.match(QL_KEYWORDS);
-    if (m) {
-      stream.pos += m[0].length;
-      return 'keyword';
-    }
-    m = rest.match(QL_TYPES);
-    if (m) {
-      stream.pos += m[0].length;
-      return 'typeName';
-    }
-    if (stream.peek() === '"') {
-      stream.next();
-      while (!stream.eol() && stream.next() !== '"');
-      return 'string';
-    }
-    if (/[0-9]/.test(stream.peek())) {
-      stream.eatWhile(/[0-9]/);
-      return 'number';
-    }
-    stream.next();
-    return null;
-  },
-});
-
 const LANGUAGE_LOADERS = {
-  QL: () => qlLanguage,
   java: () => java(),
   json: () => json(),
-  javascript: () => javascript(),
 };
 
 export function getLanguageExtension(languageId) {
@@ -78,15 +43,19 @@ export function getLanguageExtension(languageId) {
   return loader ? loader() : [];
 }
 
-export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_LOADERS);
+/** 语言选择列表（工具栏下拉用） */
+export const LANGUAGE_OPTIONS = [
+  { value: 'java', label: 'Java / QLExpress' },
+  { value: 'json', label: 'JSON' },
+];
 
 /**
- * QL 智能提示
+ * 字典驱动的智能提示（QLExpress 规则脚本用）
  * - 输入 `对象名.` 时提示该对象的属性
  * - 否则提示：顶级对象 / 内置函数 / 关键字
  * @param {Function} getDictionary 返回当前字典（用函数而非快照，保证切换模板后取到最新的）
  */
-export function createQlCompletionSource(getDictionary) {
+export function createDictCompletionSource(getDictionary) {
   return (context) => {
     const dict = getDictionary() || {};
     const before = context.state.doc.sliceString(context.state.doc.lineAt(context.pos).from, context.pos);

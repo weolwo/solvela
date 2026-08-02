@@ -11,6 +11,11 @@
       </div>
 
       <div class="toolbar-right">
+        <select v-model="currentLanguage" class="ios-select" title="选择语言">
+          <option v-for="lang in LANGUAGE_OPTIONS" :key="lang.value" :value="lang.value">
+            {{ lang.label }}
+          </option>
+        </select>
         <select v-model="currentTheme" class="ios-select" title="切换主题">
           <option value="vs-dark">🌙 Dark</option>
           <option value="vs">☀️ Light</option>
@@ -65,6 +70,7 @@
   import { ref, watch, onMounted } from 'vue';
   import { message } from 'ant-design-vue';
   import SmartCodeEditor from '/@/components/business/code-editor/SmartCodeEditor.vue';
+  import { LANGUAGE_OPTIONS } from '/@/lib/codemirror';
   import SmartCodeDiff from '/@/components/business/code-editor/SmartCodeDiff.vue';
 
   // ==========================================
@@ -82,8 +88,8 @@
       type: Object,
       default: () => ({ objects: {}, functions: [], keywords: [] }),
     },
-    // 编辑器语言（固定，无切换入口）
-    language: { type: String, default: 'QL' },
+    // 初始语言，用户可在工具栏切换。QLExpress 脚本用 java 高亮
+    language: { type: String, default: 'java' },
     // 默认高度
     defaultHeight: { type: String, default: '30vh' },
   });
@@ -94,9 +100,7 @@
   // 🌟 2. 内部状态映射
   // ==========================================
   const innerCode = ref('');
-  // 语言由调用方通过 language prop 固定，编辑器不提供切换入口
-  // ⚠️ 取值必须与 /@/lib/codemirror.js 的 LANGUAGE_LOADERS key 完全一致，**大小写敏感**：
-  //    'QL' | 'java' | 'json' | 'javascript'。传错不报错，只是静默没有高亮。
+  // language prop 只作为初值，用户可在工具栏里切换（java / json）
   const currentLanguage = ref(props.language);
   const currentTheme = ref('vs-dark');
   const isReadOnly = ref(false);
@@ -165,7 +169,7 @@
   // JSON 用原生 JSON.stringify 重排；java / QL 没有格式化器，明确告知而不是静默无反应。
   const formatCode = () => {
     if (currentLanguage.value !== 'json') {
-      message.info(`当前语言（${currentLanguage.value}）暂不支持一键格式化`);
+      message.info(`一键格式化目前仅支持 JSON，当前语言为 ${currentLanguage.value}`);
       return;
     }
     try {
