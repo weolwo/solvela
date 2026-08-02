@@ -12,8 +12,8 @@
 
       <div class="toolbar-right">
         <select v-model="currentLanguage" class="ios-select" title="切换语言">
-          <option v-for="lang in languageList" :key="lang" :value="lang">
-            {{ lang }}
+          <option v-for="lang in languageList" :key="lang.value" :value="lang.value">
+            {{ lang.label }}
           </option>
         </select>
         <select v-model="currentTheme" class="ios-select" title="切换主题">
@@ -110,7 +110,15 @@
   const currentHeight = ref(props.defaultHeight);
   const showDiffModal = ref(false);
 
-  const languageList = ['QL', 'JSON', 'Javascript'];
+  // ⚠️ value 必须是 monaco 注册的语言 id，且**大小写敏感**。
+  //    原来这里写的是 ['QL', 'JSON', 'Javascript']，monaco 注册的却是小写的 json / javascript，
+  //    于是选中这两项时 model 语言会静默回落成 plaintext —— 表现是「没有语法高亮」，不报任何错。
+  //    QL 是本文件在下面用 monaco.languages.register({ id: 'QL' }) 注册的，大小写就是 QL。
+  const languageList = [
+    { label: 'QL', value: 'QL' },
+    { label: 'JSON', value: 'json' },
+    { label: 'Javascript', value: 'javascript' },
+  ];
 
   // 同步外部传进来的 v-model
   watch(

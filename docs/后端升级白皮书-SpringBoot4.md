@@ -33,7 +33,7 @@
 | Redisson | 3.50.0 | **4.6.1** | 大版本 |
 | spring-security-crypto | 6.5.1 | **7.1.0** | 大版本 |
 | MySQL Connector/J | 9.7.0 | **26.7.0** | Oracle 改用日历版本号 |
-| API 文档 | knife4j 4.6.0（内含 springdoc 2.7.0） | **springdoc-openapi 3.1.0** | **换实现** |
+| API 文档 | knife4j 4.6.0（内含 springdoc 2.7.0） | **knife4j(baizhukui) 5.2.1 + springdoc 3.0.3** | 换 fork，见 §4.1 |
 | MyBatis-Plus | 3.5.17（boot3 starter） | 3.5.17（**boot4 starter**） | 换 artifact |
 | sa-token | 1.45.0（boot3 starter） | 1.45.0（**boot4 starter**） | 换 artifact |
 
@@ -137,7 +137,7 @@ fat jar 少了约 27MB；`dependency:analyze` 的 unused-declared 告警从 60 �
 | `spring-boot-starter-aop` → `spring-boot-starter-aspectj` | Boot 4 中 aop starter **已删除并改名** |
 | `mybatis-plus-spring-boot3-starter` → `...-boot4-starter` | MP 3.5.17 已提供 boot4 starter |
 | `sa-token-spring-boot3-starter` → `...-boot4-starter` | sa-token 1.45.0 已提供，内部换用 `sa-token-jackson3` |
-| knife4j starter → `springdoc-openapi-starter-webmvc-ui` 3.1.0 | 见 §4.1 |
+| knife4j starter → `com.baizhukui:knife4j-openapi3-boot4-spring-boot-starter` 5.2.1 | 见 §4.1 |
 | redisson 排除项改名 | `redisson-spring-data-32` 在 4.x 已并入本体不存在；actuator 依赖从 starter 改成 `spring-boot-actuator` 本体 |
 
 ### 3.2 Spring API 迁移（源码）
@@ -244,22 +244,35 @@ Jackson 2 **仍然存在**，但来源变成了 `springdoc-openapi-starter-webmv
 
 ## 4. 升级中的难点与解决方案
 
-### 4.1 【拦路虎】knife4j 没有 Spring Boot 4 版本
+### 4.1 【拦路虎，后已解决】knife4j 的 Boot 4 适配
 
-**现象**：knife4j 最新的 4.6.0 在自己的 pom 里把 `springdoc-openapi-jakarta` 钉死在 **2.7.0**，
-而 springdoc 2.x 只支持 Spring Boot 3。官方至今没有 Boot 4 分支。
+**现象**：knife4j 官方与主流社区分支（`com.github.xiaoymin` 4.5.0 / `com.github.xingfudeshi` 4.6.0）
+都把 `springdoc-openapi-jakarta` 钉死在 **2.7.0**，而 springdoc 2.x 只支持 Spring Boot 3。
 
-**为什么不能硬扛**：springdoc 2.7.0 的自动配置引用的是 Boot 3 的类，强行覆盖 springdoc 版本到 3.1.0
+**为什么不能硬扛**：springdoc 2.7.0 的自动配置引用的是 Boot 3 的类，强行覆盖 springdoc 版本到 3.x
 只会把问题从"编译期"推到"启动期 NoClassDefFoundError"。
 
-**解决方案**：换回官方 `springdoc-openapi-starter-webmvc-ui` 3.1.0。
-项目代码里对 springdoc 的使用（`SwaggerConfig` / `SmartOperationCustomizer` / `SchemaEnumPropertyCustomizer`）
-用的都是 `org.springdoc.core.*` 的公共 API，**这部分一行没改就过了**。
+**第一版方案**：换回官方 `springdoc-openapi-starter-webmvc-ui` 3.1.0。
+项目里对 springdoc 的使用（`SwaggerConfig` / `SmartOperationCustomizer` / `SchemaEnumPropertyCustomizer`）
+都是 `org.springdoc.core.*` 公共 API，一行没改就过了。代价是 UI 退回 Swagger UI，失去 `/doc.html`。
 
-**代价（需要知悉）**：UI 从 knife4j 的 `/doc.html` 变成 Swagger UI 的 `/swagger-ui/index.html`。
+**最终方案（2026-08-02 修正）**：改用社区适配 Boot 4 的
+**`com.baizhukui:knife4j-openapi3-boot4-spring-boot-starter:5.2.1`**，`/doc.html` 恢复，实测可用。
 
-knife4j 的残留已一并清理干净（见 §3.6），`/doc.html` 现在确实不存在了
-（实测返回全局异常处理的 `NoResourceFoundException`）。
+> ⚠️ 三点需要知悉：
+> 1. **这是第三方 fork，不是 knife4j 官方**。groupId `com.baizhukui` 与官方 `com.github.xiaoymin`、
+>    社区常用的 `com.github.xingfudeshi` 都不同。当初离开 knife4j 的理由就是"受制于 fork 的发版节奏"，
+>    换到另一个 fork 并没有消除这个风险，只是换了个上游。引入前建议自行评估该发布者。
+> 2. **它会把 springdoc 拉低**：实测解析结果 springdoc **3.1.0 → 3.0.3**、
+>    swagger-core **2.2.52 → 2.2.47**、swagger-ui webjar 5.32.11 → 5.32.2。
+>    因为父 pom 里 springdoc 的 depMgmt 条目已移除，版本完全由 knife4j 传递决定。
+>    要锁高版本得自己加 depMgmt，但那样就脱离了 knife4j 的适配矩阵，需要重新验证。
+> 3. **`knife4j.*` 配置块四个 profile 要一起加**。切换时只加到了 dev，
+>    test/pre/prod 缺失会导致 basic 认证等设置在这三个环境静默不生效，已补齐。
+
+**实测**：`/doc.html`、`/v3/api-docs`、`/swagger-ui/index.html`、业务接口全部 200；
+启动日志 0 条 ERROR；重复启动耗时 10.8s / 11.3s，与换之前（9.5~10.5s）基本持平
+（构建后首次启动会到 30~38s，那是冷启动假象，不是回归）。
 
 ### 4.2 【工作量大头】Jackson 3 的破坏性远超"改个包名"
 

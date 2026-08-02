@@ -7,3 +7,6 @@ dist-ssr
 .idea
 /package-lock.json
 /vite.config.js.timestamp-1773931631681-b89f1507c4eff.mjs
+
+# 依赖体积分析产物
+stats.html

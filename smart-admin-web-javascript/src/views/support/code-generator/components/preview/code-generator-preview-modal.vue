@@ -42,11 +42,16 @@
   import { JAVA_FILE_LIST, LANGUAGE_LIST, JS_FILE_LIST, TS_FILE_LIST } from '../../code-generator-util';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { lineNumbersBlock } from '/@/lib/highlight-line-number';
-  import hljs from 'highlight.js';
+  // ⚠️ 必须从 lib/core 引入：默认入口 'highlight.js' 会把全部 ~190 种语言打进产物（约 900KB），
+  //    而这里只用到下面三种。core + 按需 registerLanguage 是官方推荐用法。
+  import hljs from 'highlight.js/lib/core';
   import 'highlight.js/styles/github-dark.css';
   import javascript from 'highlight.js/lib/languages/javascript';
   import typescript from 'highlight.js/lib/languages/typescript';
   import java from 'highlight.js/lib/languages/java';
+
+  // getLanguage() 返回的就是这三个键名
+  const HLJS_LANGUAGES = { javascript, typescript, java };
   import { message } from 'ant-design-vue';
 
   // ------------------ 显示，关闭 ------------------
@@ -118,7 +123,9 @@
     let templateFile = tab;
 
     let language = getLanguage();
-    hljs.registerLanguage(language, language == 'java' ? java : javascript);
+    // 原来是 `language == 'java' ? java : javascript`，
+    // 于是 typescript 那份语法从来没被注册过，TS 一直在用 JS 语法高亮
+    hljs.registerLanguage(language, HLJS_LANGUAGES[language]);
     codeClass.value = 'language-' + language;
 
     console.log(templateFile);

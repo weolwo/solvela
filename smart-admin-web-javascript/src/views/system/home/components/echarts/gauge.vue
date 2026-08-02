@@ -15,7 +15,7 @@
 </template>
 <script setup>
   import DefaultHomeCard from '/@/views/system/home/components/default-home-card.vue';
-  import * as echarts from 'echarts';
+  import echarts from '/@/lib/echarts';
   import { onMounted, watch } from 'vue';
   import { reactive } from 'vue';
 

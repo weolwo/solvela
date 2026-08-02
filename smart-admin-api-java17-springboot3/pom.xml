@@ -25,7 +25,6 @@
         <spring-security-crypto.version>7.1.0</spring-security-crypto.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <p6spy.version>3.9.1</p6spy.version>
-        <springdoc-openapi.version>3.1.0</springdoc-openapi.version>
         <google-guava.version>33.6.0-jre</google-guava.version>
         <reflections.version>0.10.2</reflections.version>
         <commons-io.version>2.22.0</commons-io.version>
@@ -53,6 +52,7 @@
         <qlexpress.version>4.1.2</qlexpress.version>
         <!-- BOM import 只继承 dependencyManagement 不继承 properties，处理器路径需要显式版本 -->
         <lombok.version>1.18.46</lombok.version>
+        <knife4j-baizhukui.version>5.2.1</knife4j-baizhukui.version>
     </properties>
 
     <dependencyManagement>
@@ -95,12 +95,11 @@
                 <version>${p6spy.version}</version>
             </dependency>
 
-            <!-- knife4j 4.6.0 把 springdoc 钉死在 2.7.0（只支持 Spring Boot 3），
-                 官方至今没有 Boot 4 版本，只能换回官方 springdoc 3.x（UI 是 Swagger UI，不再是 doc.html） -->
+            <!-- 使用社区适配 Spring Boot 4.x 的 Knife4j Next 分支，完美恢复 doc.html 体验 -->
             <dependency>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-                <version>${springdoc-openapi.version}</version>
+                <groupId>com.baizhukui</groupId>
+                <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
+                <version>${knife4j-baizhukui.version}</version>
             </dependency>
 
             <dependency>

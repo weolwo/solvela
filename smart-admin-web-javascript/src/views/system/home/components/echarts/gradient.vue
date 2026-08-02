@@ -7,7 +7,7 @@
 </template>
 <script setup>
   import DefaultHomeCard from '/@/views/system/home/components/default-home-card.vue';
-  import * as echarts from 'echarts';
+  import echarts from '/@/lib/echarts';
   import { onMounted } from 'vue';
 
   onMounted(() => {
