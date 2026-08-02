@@ -86,16 +86,35 @@ WHERE table_schema = DATABASE()
 -- 不生成 <if> 判空，于是 null 被显式写进 INSERT，把 DDL 默认值挡掉。
 -- 模板、生成器 import、以及 MybatisPlusFillHandler 里那段说反了的注释均已修正。
 --
--- ⚠️ 下面的订正语句请先跑 SELECT 确认这 2 行是什么数据再执行。
---    这两列没有可靠的原始时间可还原，此处用同行的 update_time 回填；
---    若 update_time 也为空，则只能用一个可解释的兜底值（如所属任务配置的创建时间）。
+-- ⚠️ 实际数据：这 2 行的 create_time 与 update_time **都是 NULL**，
+--    （update_time 的 DDL 是 DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP，
+--      能变成 NULL 只可能是被显式写入 —— 对应 @TableField(fill = FieldFill.INSERT_UPDATE)，
+--      INSERT_UPDATE 同样让 withInsertFill 为 true。诊断闭环。）
+--    所以行内已无可用时间，用 COALESCE(update_time, ...) 是不成立的。
+--
+--    改用父表回填：奖励映射不可能早于它所属的任务配置，且两者是同一次提交里
+--    一起落库的（任务向导拆解组装 taskConfig + prizeMappingList 主子表 DTO），
+--    取 t_task_config.create_time 是可解释、可复查的口径。
 -- ============================================================
 
--- 先看这 2 行长什么样
-SELECT * FROM t_task_prize_mapping WHERE create_time IS NULL;
+-- 步骤 1：先确认父行存在且时间可信（预期返回 2 行，且 cfg_create_time 非空）
+SELECT m.id            AS mapping_id,
+       m.task_config_id,
+       c.task_name,
+       c.create_time   AS cfg_create_time,
+       c.update_time   AS cfg_update_time
+  FROM t_task_prize_mapping m
+  LEFT JOIN t_task_config c ON c.id = m.task_config_id
+ WHERE m.create_time IS NULL;
 
--- 确认后再执行订正（默认注释掉）
--- UPDATE t_task_prize_mapping
---    SET create_time = COALESCE(update_time, create_time)
---  WHERE create_time IS NULL
---    AND update_time IS NOT NULL;
+-- 步骤 2：确认无误后执行订正（默认注释掉）
+--   这两行是 id = 4 (task_config_id=6) 与 id = 55 (task_config_id=50)
+-- UPDATE t_task_prize_mapping m
+--   JOIN t_task_config c ON c.id = m.task_config_id
+--    SET m.create_time = c.create_time,
+--        m.update_time = COALESCE(m.update_time, c.update_time, c.create_time)
+--  WHERE m.create_time IS NULL
+--    AND c.create_time IS NOT NULL;
+
+-- 步骤 3：回填后复查，预期 0 行
+-- SELECT * FROM t_task_prize_mapping WHERE create_time IS NULL OR update_time IS NULL;
