@@ -70,3 +70,32 @@ WHERE table_schema = DATABASE()
 --   ⚠️ 没有通用的正确答案，务必先人工确认样本再决定口径。
 -- ------------------------------------------------------------
 -- UPDATE t_task_config SET create_time = update_time WHERE update_time < create_time;
+
+-- ============================================================
+-- 实跑结果与订正（2026-08-02）
+--
+-- 排查结论：
+--   A. update_time < create_time            -> 无
+--   B. create_time IS NULL                  -> t_task_prize_mapping 2 行 ⚠️
+--   C. create_time 恰为 00:00:00            -> 无
+--   D. 缺少 DDL 默认值的表                   -> 无
+--
+-- 成因已定位：实体模板 Entity.java.vm 里对 create_time / update_time
+-- 硬编码了 @TableField(fill = ...)。MyBatis-Plus 3.5.17 的
+-- TableFieldInfo#getInsertSqlPropertyMaybeIf 中 withInsertFill 为 true 时直接 return，
+-- 不生成 <if> 判空，于是 null 被显式写进 INSERT，把 DDL 默认值挡掉。
+-- 模板、生成器 import、以及 MybatisPlusFillHandler 里那段说反了的注释均已修正。
+--
+-- ⚠️ 下面的订正语句请先跑 SELECT 确认这 2 行是什么数据再执行。
+--    这两列没有可靠的原始时间可还原，此处用同行的 update_time 回填；
+--    若 update_time 也为空，则只能用一个可解释的兜底值（如所属任务配置的创建时间）。
+-- ============================================================
+
+-- 先看这 2 行长什么样
+SELECT * FROM t_task_prize_mapping WHERE create_time IS NULL;
+
+-- 确认后再执行订正（默认注释掉）
+-- UPDATE t_task_prize_mapping
+--    SET create_time = COALESCE(update_time, create_time)
+--  WHERE create_time IS NULL
+--    AND update_time IS NOT NULL;

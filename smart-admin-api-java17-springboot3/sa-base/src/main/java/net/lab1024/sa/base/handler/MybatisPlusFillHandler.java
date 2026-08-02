@@ -17,8 +17,17 @@ import org.springframework.stereotype.Component;
  *   ② 亚秒舍入不一致：datetime(0) 截断时两边舍入方向不同，被 update 过的记录出现 update 早于 create 1 秒。
  * 只留数据库一个时钟即可根治，多实例部署时也不再受各节点 JVM 时钟漂移影响。
  *
- * 实体上保留的 {@code @TableField(fill = ...)} 注解无需摘除：此处不填，字段即为 null，
- * MyBatis-Plus 默认的 NOT_NULL 插入策略会把它从 SQL 中省略，DDL 的默认值随之生效。
+ * ⚠️ 实体上的 {@code @TableField(fill = ...)} 注解<b>必须一并摘除</b>，只把这里改空是不够的。
+ * MyBatis-Plus 3.5.17 的 {@code TableFieldInfo#getInsertSqlPropertyMaybeIf}：
+ * <pre>
+ *   if (withInsertFill) {
+ *       return sqlScript;          // 直接返回，不走 convertIf，即不生成 &lt;if&gt; 判空
+ *   }
+ *   return convertIf(sqlScript, newPrefix + property, insertStrategy);
+ * </pre>
+ * 而 {@code withInsertFill = fill == INSERT || fill == INSERT_UPDATE}。
+ * 只要注解还在，字段就会被无条件拼进 INSERT，此处不填得到的 null 会被<b>显式写入</b>，
+ * 反而把 DDL 的 DEFAULT CURRENT_TIMESTAMP 挡掉 —— 实测已在 t_task_prize_mapping 留下 create_time 为 NULL 的行。
  *
  * 若将来需要自动填充**非时间**字段（如租户ID、操作人），在此扩展即可。
  *

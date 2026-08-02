@@ -54,12 +54,9 @@ public class EntityVariableService extends CodeGenerateBaseVariableService {
         // mybatis plus
         result.add("import com.baomidou.mybatisplus.annotation.TableName;");
 
-        // 自动填充注解
-        boolean existCreateAndUpdate = fields.stream().anyMatch(e -> "create_time".equals(e.getColumnName()) || "update_time".equals(e.getColumnName()));
-        if (existCreateAndUpdate) {
-            result.add("import com.baomidou.mybatisplus.annotation.FieldFill;");
-            result.add("import com.baomidou.mybatisplus.annotation.TableField;");
-        }
+        // ⚠️ 这里曾为 create_time / update_time 补 FieldFill + TableField 的 import，
+        //    配合模板里硬编码的 @TableField(fill = ...) 一起产出。已随铁律 9 移除：
+        //    时间列一律由 DDL 的 DEFAULT CURRENT_TIMESTAMP / ON UPDATE 生成，代码不填。
 
         //主键
         boolean isExistPrimaryKey = fields.stream().anyMatch(e -> e.getPrimaryKeyFlag() != null && e.getPrimaryKeyFlag());

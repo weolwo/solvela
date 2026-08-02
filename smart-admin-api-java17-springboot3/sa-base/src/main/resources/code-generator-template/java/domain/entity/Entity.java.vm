@@ -26,12 +26,10 @@ public class ${name.upperCamel} {
     #if($field.primaryKeyFlag && !$field.autoIncreaseFlag)
     @TableId
     #end
-    #if($field.columnName == "create_time")
-    @TableField(fill = FieldFill.INSERT)
-    #end
-    #if($field.columnName == "update_time")
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    #end
+##  ⚠️ 不要给 create_time / update_time 加 @TableField(fill = ...)（铁律 9）。
+##     MyBatis-Plus 的 getInsertSqlPropertyMaybeIf 里 withInsertFill 为 true 就直接 return，
+##     不生成 <if> 判空，null 会被显式写进 SQL，把 DDL 的 DEFAULT CURRENT_TIMESTAMP 挡掉。
+##     这两列一律交给 DDL 生成，代码不填。
     private $field.javaType $field.fieldName;
 #end
 
