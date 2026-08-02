@@ -97,13 +97,17 @@
                 </a-space>
               </template>
               <template #extra>
-                <a-button type="link" size="small" @click.stop="isScriptLarge = !isScriptLarge">
-                  {{ isScriptLarge ? '收缩视图' : '放大视图' }}
-                </a-button>
+                <a-space @click.stop>
+                  <a-select v-model:value="scriptLanguage" :options="LANGUAGE_OPTIONS" size="small" style="width: 140px" title="语言" />
+                  <a-divider type="vertical" />
+                  <a-button type="link" size="small" @click="isScriptLarge = !isScriptLarge">
+                    {{ isScriptLarge ? '收缩视图' : '放大视图' }}
+                  </a-button>
+                </a-space>
               </template>
               <SmartCodeEditor
                 v-model:value="designer.ruleScript"
-                :language="RULE_SCRIPT_LANGUAGE"
+                :language="scriptLanguage"
                 :theme="currentTheme"
                 :height="isScriptLarge ? EDITOR_HEIGHT_LARGE : EDITOR_HEIGHT_NORMAL"
               />
@@ -124,6 +128,8 @@
               </template>
               <template #extra>
                 <a-space @click.stop>
+                  <a-select v-model:value="schemaLanguage" :options="LANGUAGE_OPTIONS" size="small" style="width: 140px" title="语言" />
+                  <a-divider type="vertical" />
                   <a-button type="link" size="small" @click="formatJson">一键格式化</a-button>
                   <a-divider type="vertical" />
                   <a-button type="link" size="small" @click="isSchemaLarge = !isSchemaLarge">
@@ -133,7 +139,7 @@
               </template>
               <SmartCodeEditor
                 v-model:value="designer.uiSchemaText"
-                :language="SCHEMA_LANGUAGE"
+                :language="schemaLanguage"
                 :theme="currentTheme"
                 :height="isSchemaLarge ? EDITOR_HEIGHT_LARGE : EDITOR_HEIGHT_NORMAL"
               />
@@ -206,6 +212,7 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
   import SmartCodeEditor from '/@/components/business/code-editor/SmartCodeEditor.vue';
+  import { LANGUAGE_OPTIONS } from '/@/lib/codemirror';
   import SchemaFormRenderer from '../task-wizard/SchemaFormRenderer.vue';
   import { regular } from '/@/constants/regular-const';
   import {
@@ -228,8 +235,10 @@
   const isDarkTheme = ref(true);
   const currentTheme = computed(() => (isDarkTheme.value ? 'vs-dark' : 'vs'));
 
-  const RULE_SCRIPT_LANGUAGE = 'java';
-  const SCHEMA_LANGUAGE = 'json';
+  // 两个编辑器各自的高亮语言，可在面板右上角切换。
+  // 默认值按内容类型给：规则脚本是 QLExpress（Java 风格语法），ui_schema 是 JSON
+  const scriptLanguage = ref('java');
+  const schemaLanguage = ref('json');
   // height 直接进 style，写成带 px 的字符串（SmartCodeEditor 内部也会兜底补 px）
   const EDITOR_HEIGHT_NORMAL = '300px';
   const EDITOR_HEIGHT_LARGE = '600px';
