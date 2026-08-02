@@ -39,7 +39,7 @@
         <a-form-item label="前端时间" name="frontDate">
           <a-date-picker
             style="width: 100%"
-            show-time
+            :show-time="DAY_START_SHOW_TIME"
             format="YYYY-MM-DD HH:mm:ss"
             v-model:value="formData.frontDate"
             placeholder="请输入 前端时间"
@@ -51,7 +51,7 @@
         <a-form-item label="后端时间" name="backendDate">
           <a-date-picker
             style="width: 100%"
-            show-time
+            :show-time="DAY_START_SHOW_TIME"
             format="YYYY-MM-DD HH:mm:ss"
             v-model:value="formData.backendDate"
             placeholder="请输入 后端时间"
@@ -136,6 +136,7 @@
 </template>
 
 <script setup>
+  import { DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { message, theme } from 'ant-design-vue';
   import dayjs from 'dayjs';
   import _ from 'lodash';

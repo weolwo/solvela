@@ -65,7 +65,7 @@
         <a-date-picker
           v-model:value="releaseTime"
           :format="timeFormat"
-          showTime
+          :show-time="DAY_START_SHOW_TIME"
           :allowClear="false"
           placeholder="请选择发布时间"
           style="width: 200px"
@@ -101,6 +101,7 @@
 </template>
 
 <script setup>
+  import { DAY_START_SHOW_TIME } from '/@/constants/date-time-const';
   import { reactive, ref, onMounted, watch, computed, nextTick } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import _ from 'lodash';
