@@ -101,12 +101,11 @@
                   {{ isScriptLarge ? '收缩视图' : '放大视图' }}
                 </a-button>
               </template>
-              <vue-monaco-editor
+              <SmartCodeEditor
                 v-model:value="designer.ruleScript"
                 :language="RULE_SCRIPT_LANGUAGE"
                 :theme="currentTheme"
                 :height="isScriptLarge ? EDITOR_HEIGHT_LARGE : EDITOR_HEIGHT_NORMAL"
-                :options="MONACO_OPTIONS"
               />
             </a-collapse-panel>
 
@@ -132,12 +131,11 @@
                   </a-button>
                 </a-space>
               </template>
-              <vue-monaco-editor
+              <SmartCodeEditor
                 v-model:value="designer.uiSchemaText"
                 :language="SCHEMA_LANGUAGE"
                 :theme="currentTheme"
                 :height="isSchemaLarge ? EDITOR_HEIGHT_LARGE : EDITOR_HEIGHT_NORMAL"
-                :options="MONACO_OPTIONS"
               />
             </a-collapse-panel>
           </a-collapse>
@@ -207,7 +205,7 @@
   import { taskApi } from '/@/api/business/task/task-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
-  import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
+  import SmartCodeEditor from '/@/components/business/code-editor/SmartCodeEditor.vue';
   import SchemaFormRenderer from '../task-wizard/SchemaFormRenderer.vue';
   import { regular } from '/@/constants/regular-const';
   import {
@@ -232,18 +230,9 @@
 
   const RULE_SCRIPT_LANGUAGE = 'java';
   const SCHEMA_LANGUAGE = 'json';
-  // vue-monaco-editor 的 height 原样进 style，必须带 px 单位的字符串（纯数字会被浏览器忽略导致容器塌陷）
+  // height 直接进 style，写成带 px 的字符串（SmartCodeEditor 内部也会兜底补 px）
   const EDITOR_HEIGHT_NORMAL = '300px';
   const EDITOR_HEIGHT_LARGE = '600px';
-  const MONACO_OPTIONS = {
-    automaticLayout: true,
-    minimap: { enabled: false },
-    scrollBeyondLastLine: false,
-    wordWrap: 'on',
-    fontSize: 13,
-    tabSize: 2,
-    formatOnPaste: true, // 开启粘贴自动格式化（需要语言支持）
-  };
 
   // ---------------------------- 默认值与单一状态源 ----------------------------
 

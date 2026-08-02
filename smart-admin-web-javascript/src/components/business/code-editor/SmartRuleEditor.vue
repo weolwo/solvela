@@ -32,13 +32,14 @@
       </div>
     </div>
 
-    <vue-monaco-editor
+    <SmartCodeEditor
       v-model:value="innerCode"
       :theme="currentTheme"
       :language="currentLanguage"
-      :options="dynamicOptions"
-      @mount="handleMount"
-      class="monaco-box"
+      :read-only="isReadOnly"
+      :dictionary="dictionary"
+      height="100%"
+      class="code-box"
     />
 
     <div v-if="showDiffModal" class="ios-modal-overlay">
@@ -48,13 +49,12 @@
           <p class="subtitle">左侧：线上原数据 &nbsp;|&nbsp; 右侧：本次修改的数据</p>
         </div>
         <div class="diff-editor-wrapper">
-          <vue-monaco-diff-editor
+          <SmartCodeDiff
             :original="originalValue"
             :modified="innerCode"
             :language="currentLanguage"
             :theme="currentTheme"
-            :options="diffOptions"
-            class="monaco-box"
+            class="code-box"
           />
         </div>
         <div class="modal-footer">
@@ -66,16 +66,11 @@
   </div>
 </template>
 
-<script>
-  // 🌟 架构师神技：将注册状态提到模块级作用域！
-  // 这样即使页面上有 10 个编辑器组件，Monaco 的语言注册也只会执行一次！
-  let isProviderRegistered = false;
-  let globalActiveDict = { objects: {}, functions: [], keywords: [] };
-</script>
-
 <script setup>
-  import { ref, shallowRef, computed, watch, onMounted } from 'vue';
-  import { VueMonacoEditor, VueMonacoDiffEditor } from '@guolao/vue-monaco-editor';
+  import { ref, watch, onMounted } from 'vue';
+  import { message } from 'ant-design-vue';
+  import SmartCodeEditor from '/@/components/business/code-editor/SmartCodeEditor.vue';
+  import SmartCodeDiff from '/@/components/business/code-editor/SmartCodeDiff.vue';
 
   // ==========================================
   // 🌟 1. 定义对外暴露的 API (Props & Emits)
@@ -110,10 +105,9 @@
   const currentHeight = ref(props.defaultHeight);
   const showDiffModal = ref(false);
 
-  // ⚠️ value 必须是 monaco 注册的语言 id，且**大小写敏感**。
-  //    原来这里写的是 ['QL', 'JSON', 'Javascript']，monaco 注册的却是小写的 json / javascript，
-  //    于是选中这两项时 model 语言会静默回落成 plaintext —— 表现是「没有语法高亮」，不报任何错。
-  //    QL 是本文件在下面用 monaco.languages.register({ id: 'QL' }) 注册的，大小写就是 QL。
+  // ⚠️ value 必须与 /@/lib/codemirror.js 里 LANGUAGE_LOADERS 的 key 完全一致，**大小写敏感**。
+  //    历史教训：monaco 时期这里写成 'JSON' / 'Javascript'，而注册的是小写，
+  //    结果语言静默回落成纯文本 —— 没有高亮却不报任何错。改这里务必同步那边。
   const languageList = [
     { label: 'QL', value: 'QL' },
     { label: 'JSON', value: 'json' },
@@ -136,108 +130,6 @@
       localStorage.setItem(props.cacheKey, newVal);
     }
   });
-
-  // ==========================================
-  // 🧠 3. Monaco 底层挂载与语言注册
-  // ==========================================
-  const editorRef = shallowRef();
-
-  const handleMount = (editor, monaco) => {
-    editorRef.value = editor;
-    // 更新全局字典引用为当前组件的字典
-    globalActiveDict = props.dictionary;
-
-    if (!isProviderRegistered) {
-      monaco.languages.register({ id: 'QL' });
-
-      // 词法高亮
-      monaco.languages.setMonarchTokensProvider('QL', {
-        tokenizer: {
-          root: [
-            [/如果|则|否则|返回|大于|等于|并且|或者/, 'keyword'],
-            [/用户|订单/, 'type'], // 这里最好是动态生成，但为性能考虑可写死常见大类
-            [/"[^"]*"/, 'string'],
-            [/[0-9]+/, 'number'],
-          ],
-        },
-      });
-
-      // 智能提示 (每次触发都会读取最新的 globalActiveDict)
-      monaco.languages.registerCompletionItemProvider('QL', {
-        triggerCharacters: ['.'],
-        provideCompletionItems: function (model, position) {
-          const textUntilPosition = model.getValueInRange({
-            startLineNumber: position.lineNumber,
-            startColumn: 1,
-            endLineNumber: position.lineNumber,
-            endColumn: position.column,
-          });
-          const match = textUntilPosition.match(/([a-zA-Z\u4e00-\u9fa5]+)\.$/);
-          const suggestions = [];
-
-          if (match) {
-            const objectName = match[1];
-            const targetObj = globalActiveDict.objects?.[objectName];
-            if (targetObj && targetObj.properties) {
-              for (const [propName, propConfig] of Object.entries(targetObj.properties)) {
-                suggestions.push({
-                  label: propName,
-                  kind: monaco.languages.CompletionItemKind.Field,
-                  insertText: propName,
-                  detail: `[属性] ${propConfig.type}`,
-                  documentation: propConfig.desc,
-                });
-              }
-            }
-            return { suggestions };
-          }
-
-          // 顶级对象提示
-          if (globalActiveDict.objects) {
-            for (const [objName, objConfig] of Object.entries(globalActiveDict.objects)) {
-              suggestions.push({
-                label: objName,
-                kind: monaco.languages.CompletionItemKind.Class,
-                insertText: objName,
-                detail: `[对象]`,
-                documentation: objConfig.desc,
-              });
-            }
-          }
-
-          // 顶级函数提示
-          if (globalActiveDict.functions) {
-            globalActiveDict.functions.forEach((fn) => {
-              suggestions.push({
-                label: fn.label,
-                kind: monaco.languages.CompletionItemKind.Function,
-                insertText: fn.insertText,
-                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                detail: `[内置函数]`,
-                documentation: fn.desc,
-              });
-            });
-          }
-
-          // 关键字提示
-          if (globalActiveDict.keywords) {
-            globalActiveDict.keywords.forEach((kw) => {
-              suggestions.push({
-                label: kw,
-                kind: monaco.languages.CompletionItemKind.Keyword,
-                insertText: kw,
-              });
-            });
-          }
-
-          return { suggestions };
-        },
-      });
-
-      isProviderRegistered = true;
-      console.log('✅ SmartCodeEditor: 通用 QLExpress 语言包挂载成功！');
-    }
-  };
 
   // ==========================================
   // 🚀 4. 交互动作逻辑
@@ -279,26 +171,22 @@
     if (props.cacheKey) localStorage.removeItem(props.cacheKey);
   };
 
+  // monaco 的 editor.action.formatDocument 是内置的，CodeMirror 没有通用 formatter。
+  // JSON 用原生 JSON.stringify 重排；java / QL 没有格式化器，明确告知而不是静默无反应。
   const formatCode = () => {
-    if (editorRef.value) editorRef.value.getAction('editor.action.formatDocument').run();
+    if (currentLanguage.value !== 'json') {
+      message.info(`当前语言（${currentLanguage.value}）暂不支持一键格式化`);
+      return;
+    }
+    try {
+      innerCode.value = JSON.stringify(JSON.parse(innerCode.value), null, 2);
+    } catch (e) {
+      message.error('JSON 格式有误，无法格式化：' + e.message);
+    }
   };
 
   const toggleReadOnly = () => (isReadOnly.value = !isReadOnly.value);
 
-  // 配置项计算
-  const dynamicOptions = computed(() => ({
-    automaticLayout: true,
-    wordWrap: 'on',
-    scrollBeyondLastLine: false,
-    minimap: { enabled: false },
-    formatOnPaste: true,
-    formatOnType: true,
-    autoIndent: 'full',
-    fontSize: 14,
-    fontFamily: "Consolas, 'Courier New', monospace",
-    readOnly: isReadOnly.value,
-  }));
-  const diffOptions = { readOnly: true, automaticLayout: true, renderSideBySide: true };
 </script>
 
 <style scoped>
@@ -398,7 +286,7 @@
     background-color: #2d2d2d;
     color: #e5e5e5;
   }
-  .monaco-box {
+  .code-box {
     flex: 1;
     width: 100%;
   }

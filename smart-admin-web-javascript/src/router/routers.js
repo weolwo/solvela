@@ -12,7 +12,7 @@ import { loginRouters } from './system/login';
 import { helpDocRouters } from './support/help-doc';
 import NotFound from '/@/views/system/40X/404.vue';
 import NoPrivilege from '/@/views/system/40X/403.vue';
-import JsonEditor from '../components/business/monaco-editor/JsonEditor.vue';
+import JsonEditor from '../components/business/code-editor/JsonEditor.vue';
 import EngineDoc from '../views/support/engine-doc/index.vue';
 
 export const routerArray = [

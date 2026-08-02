@@ -36,7 +36,6 @@ import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
 import '/@/utils/ployfill';
 import { useDictStore } from '/@/store/modules/system/dict';
 import { dictApi } from '/@/api/support/dict-api';
-import { loader } from '@guolao/vue-monaco-editor'
 
 /*
  * -------------------- ※ 着重 解释说明下main.js的初始化逻辑 begin ※ --------------------
@@ -51,12 +50,6 @@ import { loader } from '@guolao/vue-monaco-editor'
  * -------------------- ※ 着重 解释说明下main.js的初始化逻辑 end ※ --------------------
  */
 
-// 强行告诉编辑器：去本地拿文件，别去请求外网！
-loader.config({
-  paths: {
-    vs: '/vs' // 对应你 public/vs 目录
-  }
-});
 /**
  * 获取用户信息和用户权限对应的路由，构建动态路由
  */
