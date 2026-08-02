@@ -1,13 +1,11 @@
 /*
  * CodeMirror 6 装配层
  *
- * 替代 monaco-editor：本项目只需要「浏览器里看代码 + 偶尔改一改」，
- * monaco 为此要付 11.5MB 静态资源（其中 ts.worker 一个就 6.7MB，只为 JS 智能提示），
- * 而 CodeMirror 6 按需装语言约 250KB，能力对本项目够用。
+ * 本项目只需要「浏览器里看代码 + 偶尔改一改」，CodeMirror 6 按需装语言约 250KB 即可满足。
  * 只读回显的场景不要用这里，用 highlight.js（见 code-generator-preview-modal.vue 的用法），更轻。
  *
- * ⚠️ 新增语言时在 LANGUAGE_LOADERS 里补一条，key 用 monaco 时期沿用下来的 id，
- *    避免调用方到处改（大小写敏感，历史上 'JSON' 写成大写导致高亮静默失效，见 git 记录）。
+ * ⚠️ 新增语言时在 LANGUAGE_LOADERS 里补一条。key **大小写敏感**，
+ *    历史上写成大写 'JSON' 导致高亮静默失效（不报错），改动务必与调用方对齐。
  */
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
@@ -29,7 +27,7 @@ import { json } from '@codemirror/lang-json';
 import { javascript } from '@codemirror/lang-javascript';
 
 /**
- * QLExpress 语言：从原 monaco 版的 Monarch tokenizer 平移
+ * QLExpress 语言
  * 原规则（保持一致，改这里要同步 docs 里的脚本文档）：
  *   关键字  如果|则|否则|返回|大于|等于|并且|或者
  *   类型    用户|订单
@@ -83,7 +81,7 @@ export function getLanguageExtension(languageId) {
 export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_LOADERS);
 
 /**
- * QL 智能提示：与原 monaco CompletionItemProvider 行为一致
+ * QL 智能提示
  * - 输入 `对象名.` 时提示该对象的属性
  * - 否则提示：顶级对象 / 内置函数 / 关键字
  * @param {Function} getDictionary 返回当前字典（用函数而非快照，保证切换模板后取到最新的）
@@ -122,7 +120,7 @@ export function createQlCompletionSource(getDictionary) {
         type: 'function',
         detail: '[内置函数]',
         info: fn.desc,
-        // monaco 的 snippet 占位符（${1:xx}）CodeMirror 不认，插入前去掉
+        // 字典里可能带 ${1:xx} 形式的占位符，CodeMirror 不认，插入前去掉
         apply: String(fn.insertText || fn.label).replace(/\$\{\d+:?([^}]*)\}/g, '$1'),
       });
     });

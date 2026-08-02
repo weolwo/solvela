@@ -22,8 +22,8 @@ export const routerArray = [
   { path: '/:pathMatch(.*)*', name: '404', component: NotFound },
   { path: '/403', name: '403', component: NoPrivilege },
   {
-    path: '/monaco-editor',
-    name: 'MonacoEditor',
+    path: '/code-editor',
+    name: 'CodeEditor',
     component: JsonEditor,
   },
   {

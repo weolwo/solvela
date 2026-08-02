@@ -1,6 +1,6 @@
 <!--
   * 任务模板设计器（面向开发/超管，通过菜单权限只对技术角色开放）
-  * 左侧：模板基础信息 + rule_script(QLExpress) + ui_schema(JSON) 双 Monaco 编辑器
+  * 左侧：模板基础信息 + rule_script(QLExpress) + ui_schema(JSON) 双代码编辑器
   * 右侧：ui_schema 实时解析 -> SchemaFormRenderer 所见即所得预览 + rule_config/ui_config 拆分预览
   *
   * @Author:    alaric

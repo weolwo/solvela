@@ -1,11 +1,10 @@
 <!--
   代码编辑器（CodeMirror 6）
 
-  替代原来的 vue-monaco-editor。**prop 形态刻意与它保持一致**
-  （v-model:value / language / theme / height），调用方基本不用改。
+  基于 CodeMirror 6 的代码编辑器。prop：v-model:value / language / theme / height / readOnly / dictionary。
 
-  ⚠️ language 取值大小写敏感：'QL' | 'java' | 'json' | 'javascript'，
-     传错不会报错，只是没有高亮 —— monaco 时期就因为写成 'JSON' 静默失效过。
+  ⚠️ language 取值**大小写敏感**：'QL' | 'java' | 'json' | 'javascript'。
+     传错不会报错，只是静默没有高亮 —— 本项目真出过这个 bug（写成 'JSON' 大写）。
 
   只读回显请优先用 highlight.js（见 code-generator-preview-modal.vue），比本组件更轻。
 -->
@@ -29,7 +28,7 @@
   const props = defineProps({
     value: { type: String, default: '' },
     language: { type: String, default: 'json' },
-    // 沿用 monaco 的主题名，'vs-dark' 为暗色，其余为亮色
+    // 'vs-dark' 为暗色，其余为亮色
     theme: { type: String, default: 'vs-dark' },
     readOnly: { type: Boolean, default: false },
     height: { type: [String, Number], default: '300px' },
@@ -42,7 +41,7 @@
   const viewRef = shallowRef(null);
   const compartments = createCompartments();
 
-  // monaco 时期 height 传纯数字会导致容器塌陷，这里统一补 px
+  // height 传纯数字会导致容器塌陷（纯数字不是合法 CSS 长度），统一补 px
   const normalizedHeight = ref('');
   const normalizeHeight = (h) => (typeof h === 'number' || /^\d+$/.test(String(h)) ? `${h}px` : String(h));
   normalizedHeight.value = normalizeHeight(props.height);
@@ -58,7 +57,7 @@
         compartments.language.of(getLanguageExtension(props.language)),
         compartments.theme.of(themeExtension(props.theme)),
         // readOnly 拦截修改；editable 同时去掉 contenteditable 与光标，
-        // 否则只读时仍然能落光标、看起来像可以编辑（与原 monaco 只读观感不一致）
+        // 否则只读时仍然能落光标、看起来像可以编辑
         compartments.readOnly.of([EditorState.readOnly.of(props.readOnly), EditorView.editable.of(!props.readOnly)]),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;

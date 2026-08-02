@@ -66,7 +66,7 @@ public class EngineExecutionMonitorAspect {
             if (e instanceof EngineScriptException rse) {
                 log.error("👉 脚本精准报错: {},{}", rse.getScriptErrorDetail(), scriptName);
 
-                // 把精准的错误细节（比如"缺少分号"）直接拼接好抛给前端！前端 Monaco Editor 就可以直接弹窗提示了！
+                // 把精准的错误细节（比如"缺少分号"）直接拼接好抛给前端！前端代码编辑器就可以直接弹窗提示了！
                 throw new BusinessException(rse.getMessage() + " 详细原因: " + rse.getScriptErrorDetail());
             }
             // 拦截普通的业务异常

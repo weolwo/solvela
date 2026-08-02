@@ -1,8 +1,7 @@
 <!--
   代码对比（CodeMirror 6 MergeView）
 
-  替代原来的 vue-monaco-diff-editor，保持 original / modified / language / theme 四个 prop 不变。
-  左右分栏、只读，与原来的 renderSideBySide: true + readOnly: true 一致。
+  只读的左右分栏代码对比，prop：original / modified / language / theme。
 -->
 <template>
   <div ref="containerRef" class="smart-code-diff"></div>
@@ -39,7 +38,7 @@
       a: { doc: props.original ?? '', extensions: extensions() },
       b: { doc: props.modified ?? '', extensions: extensions() },
       parent: containerRef.value,
-      // 与原 monaco diff 的并排视图对齐
+      // 并排视图
       orientation: 'a-b',
       highlightChanges: true,
       gutter: true,

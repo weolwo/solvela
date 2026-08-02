@@ -11,11 +11,6 @@
       </div>
 
       <div class="toolbar-right">
-        <select v-model="currentLanguage" class="ios-select" title="切换语言">
-          <option v-for="lang in languageList" :key="lang.value" :value="lang.value">
-            {{ lang.label }}
-          </option>
-        </select>
         <select v-model="currentTheme" class="ios-select" title="切换主题">
           <option value="vs-dark">🌙 Dark</option>
           <option value="vs">☀️ Light</option>
@@ -87,8 +82,8 @@
       type: Object,
       default: () => ({ objects: {}, functions: [], keywords: [] }),
     },
-    // 默认语言
-    defaultLanguage: { type: String, default: 'QL' },
+    // 编辑器语言（固定，无切换入口）
+    language: { type: String, default: 'QL' },
     // 默认高度
     defaultHeight: { type: String, default: '30vh' },
   });
@@ -99,20 +94,15 @@
   // 🌟 2. 内部状态映射
   // ==========================================
   const innerCode = ref('');
-  const currentLanguage = ref(props.defaultLanguage);
+  // 语言由调用方通过 language prop 固定，编辑器不提供切换入口
+  // ⚠️ 取值必须与 /@/lib/codemirror.js 的 LANGUAGE_LOADERS key 完全一致，**大小写敏感**：
+  //    'QL' | 'java' | 'json' | 'javascript'。传错不报错，只是静默没有高亮。
+  const currentLanguage = ref(props.language);
   const currentTheme = ref('vs-dark');
   const isReadOnly = ref(false);
   const currentHeight = ref(props.defaultHeight);
   const showDiffModal = ref(false);
 
-  // ⚠️ value 必须与 /@/lib/codemirror.js 里 LANGUAGE_LOADERS 的 key 完全一致，**大小写敏感**。
-  //    历史教训：monaco 时期这里写成 'JSON' / 'Javascript'，而注册的是小写，
-  //    结果语言静默回落成纯文本 —— 没有高亮却不报任何错。改这里务必同步那边。
-  const languageList = [
-    { label: 'QL', value: 'QL' },
-    { label: 'JSON', value: 'json' },
-    { label: 'Javascript', value: 'javascript' },
-  ];
 
   // 同步外部传进来的 v-model
   watch(
@@ -171,7 +161,7 @@
     if (props.cacheKey) localStorage.removeItem(props.cacheKey);
   };
 
-  // monaco 的 editor.action.formatDocument 是内置的，CodeMirror 没有通用 formatter。
+  // CodeMirror 没有通用 formatter。
   // JSON 用原生 JSON.stringify 重排；java / QL 没有格式化器，明确告知而不是静默无反应。
   const formatCode = () => {
     if (currentLanguage.value !== 'json') {
