@@ -1,199 +1,336 @@
 <!DOCTYPE html>
+<!--
+  营销中台 · 实时作战大屏（原型 v2 · 按数据统计方案修正）
+
+  ══ 本版相对 v1 的修正（每条都能在 docs/营销中台-数据统计方案.md 里找到依据）══
+
+  🔴 1. 删掉「预算消耗率」
+        §9「明确不做」列了预算水位；§1「明确不用」点名 t_promotion_config。
+        v1 里它是 Math.random() 生成的，营销域根本算不出这个数。
+
+  🔴 2. 补上「条数 / 价值」双口径，且价值按资产类型拆开
+        §2.1 是本方案第一条铁律：两个数必须并列展示。
+        实测活动 12278CBYW7：315 条发奖记录，但只有券的 1020 元真发出去，
+        积分/现金/实物全是 0。v1 只显示价值，同样看不出 264 条没成功。
+
+  🔴 3. 补上「活动状态分布（四态）」并标注口径
+        §2.3：是否进行中看时间窗，不看 status。
+        直接 WHERE status=1 只能查出 1 个活动（实有 6 个）——「最容易踩的一脚」。
+
+  🟡 4. 「逾期未开奖」提到独立告警条（v1 混在会被刷走的风控流里）
+        §3 板块三：属客诉级异常，比任何参与量指标都该优先展示。
+
+  🟡 5. 活动卡片补齐 状态 / 起止时间 / 玩法数 / 完备度（§3 板块一）
+        完备度走 ActivityRefProvider.checkConfigured SPI，新增玩法时大屏不用改。
+
+  🟡 6. 补上 失败原因 TOP（板块二）、事件丢弃按 discard_code 聚类（板块四 + §5）、
+        Top 获奖用户（板块五）。
+
+  🟡 7. 删掉「全局流量转化漏斗」里的「风控通过」层
+        该层没有数据源：§1 不用 t_promotion_config，且幂等命中不写流水
+        （板块四），分母本身就不完整，算出来是错的。
+        改为按玩法下钻：TASK→阶梯漏斗、DRAW→抽奖状态分布、LOTTERY→售出率+开奖倒计时。
+
+  🟡 8. 删掉写死的「系统运行健康」标签（无数据支撑）。
+
+  🟡 9. 金额一律 Number() 归一化后再格式化
+        §6 陷阱：BigDecimal 被 JsonConfig 全局序列化成字符串（"1020.0000"），
+        直接对字符串调 toLocaleString() 不报错也不格式化，会静默显示成 1020.0000。
+
+  ══ 说明 ══
+  · 数据仍是 mock，但**结构与字段名对齐 §4 的六个接口**，联调时替换 fetch 即可。
+  · 模板放在 <script type="text/x-template"> 里（交接文档铁律 6）：
+    浏览器不解析其中的 HTML，驼峰属性与 #bodyCell 这类插槽名才不会被强制小写。
+-->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>营销中台 · 实时作战大屏</title>
 
-    <!-- 引入 Tailwind, Vue3, Dayjs, AntD, ECharts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.x/dist/reset.css" />
-    <script src="https://unpkg.com/ant-design-vue@4.x/dist/antd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
-    <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.2.6/dist/reset.css" />
-    <script src="https://unpkg.com/ant-design-vue@4.2.6/dist/antd.min.js"></script>
+
     <style>
-        /* 大屏暗黑主题底色 */
         body { background-color: #0b1120; color: #e2e8f0; margin: 0; overflow-x: hidden; }
         [v-cloak] { display: none; }
-
-        /* 定制滚动条 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        /* 面板基础样式 */
-        .panel-box { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 12px; backdrop-filter: blur(8px); }
-        .panel-title { font-size: 15px; font-weight: 600; color: #f8fafc; padding: 12px 16px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); display: flex; align-items: center; gap: 8px; }
-        .panel-title::before { content: ''; display: block; width: 4px; height: 14px; background: #38bdf8; border-radius: 2px; }
+        .panel-box { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 12px; }
+        .panel-title { font-size: 14px; font-weight: 600; color: #f8fafc; padding: 10px 14px; border-bottom: 1px solid rgba(51,65,85,0.5); display: flex; align-items: center; gap: 8px; }
+        .panel-title::before { content: ''; display: block; width: 4px; height: 13px; background: #38bdf8; border-radius: 2px; }
 
-        /* 活动卡片交互 */
-        .act-card { transition: all 0.2s ease; border: 1px solid transparent; cursor: pointer; }
-        .act-card:hover { background: rgba(51, 65, 85, 0.6); }
-        .act-card.active { background: rgba(14, 165, 233, 0.1); border-color: rgba(56, 189, 248, 0.4); border-left: 4px solid #38bdf8; }
+        .act-card { transition: all .2s ease; border: 1px solid transparent; cursor: pointer; }
+        .act-card:hover { background: rgba(51,65,85,.6); }
+        .act-card.active { background: rgba(14,165,233,.1); border-color: rgba(56,189,248,.4); border-left: 4px solid #38bdf8; }
 
-        /* 数字字体 */
         .font-num { font-family: 'Courier New', Courier, monospace; font-weight: 900; }
 
-        /* 告警流光 */
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); } 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); } }
-        .alarm-pulse { animation: pulse-red 2s infinite; border-color: rgba(225, 29, 72, 0.5) !important; }
+        /* 口径脚注：界面上把算法写出来，避免运营按自己的理解解读 */
+        .caliber { font-size: 10px; color: #64748b; line-height: 1.4; }
+
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(225,29,72,.4);} 70% { box-shadow: 0 0 0 10px rgba(225,29,72,0);} 100% { box-shadow: 0 0 0 0 rgba(225,29,72,0);} }
+        .alarm-pulse { animation: pulse-red 2s infinite; border-color: rgba(225,29,72,.5) !important; }
     </style>
 </head>
 <body>
-<div id="app" v-cloak class="h-screen flex flex-col p-4 gap-4"></div>
+<div id="app" v-cloak class="h-screen flex flex-col p-3 gap-3"></div>
 
 <script type="text/x-template" id="app-template">
-    <!-- 大屏 Header -->
-    <header class="flex justify-between items-end pb-2">
+    <!-- ══ Header ══ -->
+    <header class="flex justify-between items-end shrink-0">
         <div>
             <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 m-0 tracking-widest">
                 MARKETING DASHBOARD 营销中台大屏
             </h1>
-            <div class="text-sm text-slate-400 mt-1 flex items-center gap-4">
-                <span>📅 {{ currentTime }}</span>
-                <a-tag color="success" class="border-none bg-emerald-500/20 text-emerald-400">系统运行健康</a-tag>
-            </div>
+            <div class="text-sm text-slate-400 mt-1">📅 {{ currentTime }}</div>
         </div>
         <div class="flex items-center gap-4">
-            <!-- 核心交互：取消选中，回到全局大盘 -->
-            <a-button v-if="selectedAct" type="primary" danger ghost @click="clearSelection" class="border-rose-500 text-rose-400">
-                ✖ 退出单活动下钻 (返回全局大盘)
-            </a-button>
-            <span v-else class="text-slate-500 text-sm">💡 提示：点击左侧活动卡片即可下钻查看专属数据</span>
+            <button v-if="selectedAct" @click="clearSelection"
+                    class="px-3 py-1.5 rounded border border-rose-500 text-rose-400 text-sm bg-transparent hover:bg-rose-500/10 cursor-pointer">
+                ✖ 退出下钻（返回全局大盘）
+            </button>
+            <span v-else class="text-slate-500 text-sm">💡 点击左侧活动卡片下钻</span>
         </div>
     </header>
 
-    <!-- 顶部核心指标 KPI (根据全局/单活动动态切换) -->
-    <div class="grid grid-cols-4 gap-4 shrink-0">
-        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden">
-            <div class="text-slate-400 text-sm mb-1">{{ selectedAct ? '该活动' : '全局' }}预算消耗率</div>
-            <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-num text-cyan-400">{{ kpi.budgetRate }}%</span>
-            </div>
-            <div class="absolute right-0 bottom-0 opacity-10 text-6xl">💰</div>
-        </div>
-        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden">
-            <div class="text-slate-400 text-sm mb-1">今日实际发出价值 (元)</div>
-            <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-num text-emerald-400">¥{{ kpi.issuedValue.toLocaleString() }}</span>
-                <span class="text-xs text-emerald-500">+12% 同比</span>
+    <!-- ══ 最高优先级告警：逾期未开奖（板块三）══
+         方案原文：属客诉级异常，比任何参与量指标都该优先展示。
+         没有逾期时整条不渲染，不占版面。 -->
+    <div v-if="overdueIssues.length" class="panel-box alarm-pulse p-3 flex items-center gap-4 shrink-0">
+        <span class="text-2xl">🚨</span>
+        <div class="flex-1">
+            <div class="text-rose-400 font-bold text-sm">逾期未开奖 {{ overdueIssues.length }} 期 —— 已对外承诺开奖时刻却未开奖</div>
+            <div class="flex gap-6 mt-1">
+                <span v-for="it in overdueIssues" :key="it.issueNo" class="text-xs text-slate-300">
+                    {{ it.lotteryCode }} / 第 {{ it.issueNo }} 期
+                    <span class="text-rose-400 font-num ml-1">逾期 {{ it.overdueHours }}h</span>
+                </span>
             </div>
         </div>
-        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden" :class="{'alarm-pulse': kpi.discardCount > 500}">
-            <div class="text-slate-400 text-sm mb-1">今日风控/异常丢弃 (次)</div>
+        <div class="caliber text-right">口径：status &lt;&gt; 2<br/>且 plan_draw_time &lt; now()</div>
+    </div>
+
+    <!-- ══ KPI 四格：全部有数据源，且遵守「条数 / 价值」双口径 ══ -->
+    <div class="grid grid-cols-4 gap-3 shrink-0">
+        <!-- ① 条数侧 -->
+        <div class="panel-box p-3">
+            <div class="text-slate-400 text-xs mb-1">{{ scopeLabel }}发奖记录（条）</div>
             <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-num text-rose-400">{{ kpi.discardCount.toLocaleString() }}</span>
-                <span v-if="kpi.discardCount > 500" class="text-xs bg-rose-500 text-white px-1 rounded">高危</span>
+                <span class="text-3xl font-num text-slate-100">{{ prize.total }}</span>
+                <span class="text-xs text-emerald-400">成功 {{ prize.success }}</span>
+                <span class="text-xs text-rose-400">失败 {{ prize.failed }}</span>
+                <span class="text-xs text-amber-400">待审 {{ prize.pending }}</span>
             </div>
+            <div class="caliber mt-1">status：1-成功 / 2-失败 / 0-等待</div>
         </div>
-        <div class="panel-box p-4 flex flex-col justify-center relative overflow-hidden">
-            <div class="text-slate-400 text-sm mb-1">人工审批积压 (笔)</div>
-            <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-num text-amber-400">{{ kpi.pendingApprove }}</span>
-                <span class="text-xs text-amber-500 text-slate-400">最长滞留 {{ kpi.maxWaitHours }}h</span>
+
+        <!-- ② 价值侧：必须与①并列，且按资产类型拆开（§2.1）-->
+        <div class="panel-box p-3">
+            <div class="text-slate-400 text-xs mb-1">{{ scopeLabel }}已发出价值</div>
+            <div class="text-3xl font-num text-emerald-400">¥{{ fmt(prize.issuedValue) }}</div>
+            <div class="flex flex-wrap gap-x-3 mt-1">
+                <span v-for="a in prize.byAsset" :key="a.type" class="text-[10px]">
+                    <span class="text-slate-400">{{ a.label }}</span>
+                    <span class="text-slate-300 font-num ml-1">{{ a.count }}条</span>
+                    <span :class="Number(a.value) > 0 ? 'text-emerald-400' : 'text-slate-600'" class="font-num ml-1">
+                        ¥{{ fmt(a.value) }}
+                    </span>
+                </span>
             </div>
+            <div class="caliber mt-1">仅 status=1 计入；「已发出」不等于「已到账」（§2.2）</div>
+        </div>
+
+        <!-- ③ 待审批积压 -->
+        <div class="panel-box p-3" :class="{'alarm-pulse': prize.maxWaitHours >= 24}">
+            <div class="text-slate-400 text-xs mb-1">人工审批积压（笔）</div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-num text-amber-400">{{ prize.pending }}</span>
+                <span class="text-xs" :class="prize.maxWaitHours >= 24 ? 'text-rose-400' : 'text-slate-400'">
+                    最长滞留 {{ prize.maxWaitHours }}h
+                </span>
+            </div>
+            <div class="caliber mt-1">approve_status = 1（营销域审批，不含账务侧）</div>
+        </div>
+
+        <!-- ④ 事件丢弃 -->
+        <div class="panel-box p-3">
+            <div class="text-slate-400 text-xs mb-1">今日事件丢弃（次）</div>
+            <div class="text-3xl font-num text-rose-400">{{ discardTotal }}</div>
+            <div class="caliber mt-1">t_task_record_flow：幂等命中不写流水，重复投递看不见（板块四）</div>
         </div>
     </div>
 
-    <!-- 主视图区 -->
-    <div class="flex-1 flex gap-4 min-h-0">
+    <!-- ══ 主视图 ══ -->
+    <div class="flex-1 flex gap-3 min-h-0">
 
-        <!-- 左侧：活动列表 (支持灵活点击下钻) -->
-        <div class="w-1/4 panel-box flex flex-col">
-            <div class="panel-title justify-between">
-                <span>🔥 运行中活动榜单</span>
-                <a-badge status="processing" text="实时" />
-            </div>
-            <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
-                <div
-                        v-for="act in activityList" :key="act.code"
-                        class="act-card bg-slate-800/50 p-3 rounded-lg flex flex-col gap-2"
-                        :class="{ 'active': selectedAct && selectedAct.code === act.code }"
-                        @click="selectAct(act)"
-                >
-                    <div class="flex justify-between items-start">
-                        <span class="font-bold text-slate-200 text-sm">{{ act.name }}</span>
-                        <a-tag :color="getTypeColor(act.type)" class="m-0 border-none text-[10px]">{{ act.type }}</a-tag>
+        <!-- ── 左：活动状态分布 + 活动卡片 ── -->
+        <div class="w-1/4 flex flex-col gap-3 min-h-0">
+            <!-- 活动状态分布（板块一）-->
+            <div class="panel-box shrink-0">
+                <div class="panel-title">🗂️ 活动状态分布</div>
+                <div class="grid grid-cols-4 gap-1 p-3">
+                    <div v-for="s in activityStatusDist" :key="s.label" class="text-center">
+                        <div class="font-num text-xl" :class="s.color">{{ s.count }}</div>
+                        <div class="text-[10px] text-slate-400">{{ s.label }}</div>
                     </div>
-                    <div class="flex justify-between items-end">
-                        <span class="font-mono text-xs text-slate-500">{{ act.code }}</span>
-                        <div class="text-right">
-                            <div class="text-[10px] text-slate-400">发出资产</div>
-                            <div class="font-num text-cyan-400 text-sm">¥{{ act.value.toLocaleString() }}</div>
+                </div>
+                <div class="caliber px-3 pb-2">
+                    口径（§2.3）：status=2 → 已禁用；否则按 start_time / end_time 时间窗判定。
+                    <span class="text-amber-500">不要用 WHERE status=1 过滤</span>——库里 6 条有 5 条是历史值 0。
+                </div>
+            </div>
+
+            <!-- 活动卡片 -->
+            <div class="panel-box flex flex-col flex-1 min-h-0">
+                <div class="panel-title justify-between">
+                    <span>🔥 活动列表</span>
+                    <span class="text-[10px] text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>30s</span>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+                    <div v-for="act in activityList" :key="act.activityCode"
+                         class="act-card bg-slate-800/50 p-2.5 rounded-lg flex flex-col gap-1.5"
+                         :class="{ active: selectedAct && selectedAct.activityCode === act.activityCode }"
+                         @click="selectAct(act)">
+                        <div class="flex justify-between items-start gap-2">
+                            <span class="font-bold text-slate-200 text-sm leading-tight">{{ act.activityName }}</span>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] shrink-0" :class="typeColor(act.activityType)">
+                                {{ typeLabel(act.activityType) }}
+                            </span>
+                        </div>
+                        <!-- 方案板块一要求的字段：状态 / 起止时间 / 玩法数 / 完备度 -->
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <span :class="statusColor(act.runStatus)">● {{ act.runStatus }}</span>
+                            <span class="text-slate-500">{{ act.startTime }} ~ {{ act.endTime || '不限' }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] text-slate-400">
+                                玩法 <span class="text-slate-200 font-num">{{ act.gameplayCount }}</span>
+                                <span v-if="!act.configured" class="ml-2 text-rose-400">⚠ 配置不完备</span>
+                                <span v-else class="ml-2 text-emerald-500">✓ 可上线</span>
+                            </span>
+                            <span class="font-mono text-[10px] text-slate-600">{{ act.activityCode }}</span>
                         </div>
                     </div>
+                </div>
+                <div class="caliber px-3 py-1.5 border-t border-slate-700/50">
+                    完备度来自 ActivityRefProvider.checkConfigured（判据是「能不能上线」，不是「有没有记录」）
                 </div>
             </div>
         </div>
 
-        <!-- 中间：ECharts 数据看板 -->
-        <div class="w-2/4 flex flex-col gap-4">
-            <!-- 趋势图 -->
-            <div class="h-1/2 panel-box flex flex-col">
-                <div class="panel-title">
-                    <span>📈 {{ selectedAct ? `【${selectedAct.name}】发奖价值趋势` : '大盘全局发奖价值趋势' }}</span>
-                </div>
-                <div class="flex-1 p-2" ref="trendChartRef"></div>
+        <!-- ── 中：趋势 + 玩法运行态 ── -->
+        <div class="w-2/4 flex flex-col gap-3 min-h-0">
+            <div class="flex-1 panel-box flex flex-col min-h-0" style="min-height:200px">
+                <div class="panel-title">📈 {{ scopeLabel }}发出价值趋势（按资产类型）</div>
+                <div class="flex-1 p-2 min-h-0" style="min-height:160px" ref="trendChartRef"></div>
             </div>
-            <!-- 转化漏斗图 (基于选择的活动动态变化) -->
-            <div class="h-1/2 panel-box flex flex-col">
-                <div class="panel-title">
-                    <span>🎯 {{ selectedAct ? '单活动漏斗/阶梯转化分析' : '全局流量转化漏斗' }}</span>
+
+            <div class="flex-1 panel-box flex flex-col min-h-0" style="min-height:200px">
+                <div class="panel-title">🎯 {{ gameplayPanelTitle }}</div>
+
+                <!-- 未下钻：不画「全局漏斗」。理由见文件头 🟡7 -->
+                <div v-if="!selectedAct" class="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
+                    <span class="text-3xl">👈</span>
+                    <span class="text-sm">选择一个活动查看其玩法运行态</span>
+                    <span class="caliber max-w-md text-center">
+                        不提供「全局转化漏斗」：跨玩法的统一漏斗需要曝光埋点（营销中台不接，属上游），
+                        且幂等命中不写流水会让分母偏小 —— 算出来的转化率是错的。
+                    </span>
                 </div>
-                <div class="flex-1 p-2 flex">
-                    <!-- 占位提示：如果是彩票，显示不同的图 -->
-                    <div v-if="selectedAct && selectedAct.type === 'LOTTERY'" class="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                        <span class="text-4xl mb-3">🎟️</span>
-                        <span>彩票玩法特征：为您下钻展示【售出进度】与【待开奖占比】大盘</span>
-                        <div class="w-full mt-4 px-12"><a-progress :percent="85" stroke-color="#38bdf8" /></div>
+
+                <!-- 任务：阶梯流失漏斗（板块三）-->
+                <div v-else-if="selectedAct.activityType === 'TASK'" class="flex-1 p-2 min-h-0" style="min-height:160px" ref="funnelChartRef"></div>
+
+                <!-- 抽奖：状态分布（板块三）-->
+                <div v-else-if="selectedAct.activityType === 'DRAW'" class="flex-1 p-3 flex flex-col justify-center gap-3">
+                    <div v-for="d in drawStat" :key="d.label" class="flex items-center gap-3">
+                        <span class="w-20 text-xs text-slate-400 shrink-0">{{ d.label }}</span>
+                        <div class="flex-1 bg-slate-700/50 rounded h-4 overflow-hidden">
+                            <div class="h-full" :class="d.color" :style="{ width: pct(d.count, drawTotal) + '%' }"></div>
+                        </div>
+                        <span class="font-num text-sm w-24 text-right" :class="d.text">{{ d.count }}（{{ pct(d.count, drawTotal) }}%）</span>
                     </div>
-                    <div v-else class="flex-1" ref="funnelChartRef"></div>
+                    <div class="caliber">
+                        status：0-未中奖 / 1-已中奖 / 2-库存不足 / 3-异常。
+                        <span class="text-amber-500">库存水位读 Redis 不读 DB</span>（used_stock 是最终一致性兜底，读 DB 偏小）
+                    </div>
+                </div>
+
+                <!-- 彩票：售出率 + 开奖倒计时（板块三）-->
+                <div v-else-if="selectedAct.activityType === 'LOTTERY'" class="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
+                    <div v-for="i in lotteryIssues" :key="i.issueNo" class="bg-slate-800/60 rounded p-2.5">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-sm text-slate-200">第 {{ i.issueNo }} 期</span>
+                            <span class="text-xs" :class="i.overdue ? 'text-rose-400 font-bold' : 'text-slate-400'">
+                                {{ i.overdue ? `逾期 ${i.overdueHours}h 未开奖` : `计划开奖 ${i.planDrawTime}` }}
+                            </span>
+                        </div>
+                        <div class="bg-slate-700/50 rounded h-2 overflow-hidden">
+                            <div class="h-full rounded" :class="i.overdue ? 'bg-rose-500' : 'bg-sky-400'" :style="{ width: i.soldRate + '%' }"></div>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-1">
+                            已售 {{ i.soldCount }} / {{ i.totalCount }}
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="flex-1 flex items-center justify-center text-slate-500 text-sm">
+                    基础活动（BASIC）无玩法运行态
                 </div>
             </div>
         </div>
 
-        <!-- 右侧：风控与异常告警流 -->
-        <div class="w-1/4 panel-box flex flex-col">
-            <div class="panel-title text-rose-400 before:bg-rose-500">
-                <span>🚨 实时异常与风控拦截记录</span>
+        <!-- ── 右：失败原因 / 事件丢弃 / 用户榜 ── -->
+        <div class="w-1/4 flex flex-col gap-3 min-h-0">
+            <!-- 失败原因 TOP（板块二）-->
+            <div class="panel-box flex flex-col" style="height: 30%">
+                <div class="panel-title text-rose-400 before:bg-rose-500">💥 发奖失败原因 TOP</div>
+                <div class="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1.5">
+                    <div v-for="f in failReasons" :key="f.reason" class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300 truncate pr-2">{{ f.reason }}</span>
+                        <span class="font-num text-rose-400 shrink-0">{{ f.count }}</span>
+                    </div>
+                </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-3">
-                <div class="space-y-3">
-                    <div v-for="(log, idx) in riskLogs" :key="idx" class="bg-slate-800/80 border-l-2 border-rose-500 p-2.5 rounded-r">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-bold text-rose-400">{{ log.reason }}</span>
-                            <span class="text-[10px] text-slate-500">{{ log.time }}</span>
+
+            <!-- 事件丢弃聚类（板块四 + §5 discard_code）-->
+            <div class="panel-box flex flex-col" style="height: 40%">
+                <div class="panel-title">🧹 事件丢弃原因（discard_code）</div>
+                <div class="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1.5">
+                    <div v-for="d in discardStat" :key="d.code" class="text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">{{ d.label }}</span>
+                            <span class="font-num text-amber-400">{{ d.count }}</span>
                         </div>
-                        <div class="text-xs text-slate-300">
-                            用户: <span class="font-mono text-cyan-300">{{ log.member }}</span>
-                        </div>
-                        <div class="text-[10px] text-slate-500 mt-1 truncate">
-                            源事件: {{ log.eventBizId }}
-                        </div>
+                        <div class="font-mono text-[9px] text-slate-600">{{ d.code }}</div>
+                    </div>
+                </div>
+                <div class="caliber px-2.5 pb-1.5">v3.50.0 已加 discard_code 枚举列</div>
+            </div>
+
+            <!-- Top 获奖用户（板块五）-->
+            <div class="panel-box flex flex-col flex-1 min-h-0">
+                <div class="panel-title">🏆 Top 获奖用户</div>
+                <div class="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1.5">
+                    <div v-for="(m, idx) in topMembers" :key="m.memberName" class="flex items-center gap-2 text-xs">
+                        <span class="w-4 text-center font-num" :class="idx < 3 ? 'text-amber-400' : 'text-slate-600'">{{ idx + 1 }}</span>
+                        <span class="flex-1 font-mono text-cyan-300 truncate">{{ m.memberName }}</span>
+                        <span class="text-slate-400">{{ m.count }}次</span>
+                        <span class="font-num text-emerald-400 w-16 text-right">¥{{ fmt(m.value) }}</span>
                     </div>
                 </div>
             </div>
         </div>
-
     </div>
 </script>
 
 <script>
-    const { createApp, ref, reactive, onMounted, onBeforeUnmount, nextTick } = Vue;
+    const { createApp, ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } = Vue;
 
     const App = {
         template: '#app-template',
@@ -201,172 +338,222 @@
             const currentTime = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'));
             let timer = null;
 
-            // 图表实例引用
             const trendChartRef = ref(null);
             const funnelChartRef = ref(null);
-            let trendChart = null;
-            let funnelChart = null;
+            let trendChart = null, funnelChart = null;
 
-            // 当前选中的活动 (null 代表看全局)
             const selectedAct = ref(null);
+            const scopeLabel = computed(() => (selectedAct.value ? '该活动 ' : '全局 '));
 
-            // 核心 KPI 数据
-            const kpi = reactive({ budgetRate: 68.5, issuedValue: 124500, discardCount: 142, pendingApprove: 53, maxWaitHours: 12 });
+            /* ⚠️ §6 数据陷阱：BigDecimal 被 JsonConfig 全局序列化成字符串（"1020.0000"）。
+                  直接对字符串调 toLocaleString() 不报错、也不格式化，会静默显示成 1020.0000。
+                  所有金额一律先 Number() 归一化。 */
+            const fmt = (v) => {
+                const n = Number(v);
+                return Number.isFinite(n) ? n.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) : '0';
+            };
+            const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
 
-            // 模拟活动列表
+            // ───────── mock：字段名对齐 §4 的接口约定 ─────────
+
+            // GET /marketingStat/overview
             const activityList = ref([
-                { code: 'LTQ7M3XKD8', name: '618锦鲤福彩发号', type: 'LOTTERY', value: 45000 },
-                { code: 'WLO9SMXDKD', name: '新人7天签到挑战', type: 'TASK', value: 12400 },
-                { code: '12278CBYW7', name: '年中狂欢大转盘', type: 'DRAW', value: 67100 },
-                { code: 'B7YN4TR9WC', name: '会员专属礼包', type: 'BASIC', value: 0 }
+                { activityCode: 'LTQ7M3XKD8', activityName: '618锦鲤福彩发号', activityType: 'LOTTERY',
+                  runStatus: '进行中', startTime: '2026-07-20', endTime: '2026-08-20', gameplayCount: 1, configured: true },
+                { activityCode: 'WLO9SMXDKD', activityName: '新人7天签到挑战', activityType: 'TASK',
+                  runStatus: '进行中', startTime: '2026-07-01', endTime: '2026-08-31', gameplayCount: 3, configured: true },
+                { activityCode: '12278CBYW7', activityName: '年中狂欢大转盘', activityType: 'DRAW',
+                  runStatus: '进行中', startTime: '2026-06-18', endTime: '2026-08-18', gameplayCount: 2, configured: true },
+                { activityCode: 'B7YN4TR9WC', activityName: '会员专属礼包', activityType: 'BASIC',
+                  runStatus: '未开始', startTime: '2026-09-01', endTime: null, gameplayCount: 0, configured: false },
+                { activityCode: '0ELCRIFHGF', activityName: '双色球试运营', activityType: 'LOTTERY',
+                  runStatus: '进行中', startTime: '2026-07-10', endTime: '2026-08-10', gameplayCount: 1, configured: true },
+                { activityCode: 'K3MZ8QPLDA', activityName: '春季拉新（已结束）', activityType: 'TASK',
+                  runStatus: '已结束', startTime: '2026-03-01', endTime: '2026-05-31', gameplayCount: 2, configured: true },
             ]);
 
-            // 模拟异常日志
-            const globalRiskLogs = [
-                { reason: '并发重试耗尽 (Lost Update)', member: 'user_9912', time: '刚刚', eventBizId: 'EVT_882910' },
-                { reason: '触发单日频率拦截', member: 'user_451x', time: '1分钟前', eventBizId: 'EVT_7721' },
-                { reason: '奖池库存击穿防线拦截', member: 'user_0091', time: '3分钟前', eventBizId: 'EVT_9918' },
-                { reason: '彩票逾期未开奖警告', member: 'SYSTEM', time: '5分钟前', eventBizId: 'ISSUE_20260801' }
-            ];
-            const riskLogs = ref([...globalRiskLogs]);
+            const activityStatusDist = computed(() => {
+                const c = (s) => activityList.value.filter((a) => a.runStatus === s).length;
+                return [
+                    { label: '进行中', count: c('进行中'), color: 'text-emerald-400' },
+                    { label: '未开始', count: c('未开始'), color: 'text-sky-400' },
+                    { label: '已结束', count: c('已结束'), color: 'text-slate-400' },
+                    { label: '已禁用', count: c('已禁用'), color: 'text-rose-400' },
+                ];
+            });
 
-            function getTypeColor(type) {
-                const map = { 'LOTTERY': 'cyan', 'TASK': 'purple', 'DRAW': 'orange', 'BASIC': 'default' };
-                return map[type] || 'default';
-            }
+            // GET /marketingStat/prizeHealth —— §2.1 条数与价值并列，价值按资产类型拆开
+            const GLOBAL_PRIZE = {
+                total: 315, success: 51, failed: 100, pending: 64, maxWaitHours: 140,
+                issuedValue: '1020.0000',
+                byAsset: [
+                    { type: 'COUPON',   label: '优惠券', count: 51,  value: '1020.0000' },
+                    { type: 'SCORE',    label: '积分',   count: 200, value: '0' },
+                    { type: 'BALANCE',  label: '现金',   count: 11,  value: '0' },
+                    { type: 'PHYSICAL', label: '实物',   count: 53,  value: '0' },
+                ],
+            };
+            const prize = reactive({ ...GLOBAL_PRIZE });
 
-            // ---------- 图表渲染逻辑 ----------
-            function initCharts() {
-                if(trendChartRef.value) {
-                    trendChart = echarts.init(trendChartRef.value);
-                    window.addEventListener('resize', () => trendChart.resize());
-                }
-                if(funnelChartRef.value) {
-                    funnelChart = echarts.init(funnelChartRef.value);
-                    window.addEventListener('resize', () => funnelChart.resize());
-                }
-                renderTrendChart(false);
-                renderFunnelChart(false);
-            }
+            const failReasons = ref([{ reason: '预算耗尽', count: 100 }]);
 
-            function renderTrendChart(isSingle) {
-                if(!trendChart) return;
-                const option = {
+            // GET /marketingStat/eventHealth —— 取值来自 TaskDiscardCode
+            const discardStat = ref([
+                { code: 'ROUND_LIMIT_EXCEEDED', label: '本周期次数已用尽', count: 62 },
+                { code: 'STREAK_SAME_DAY',      label: '当日已计入连续进度', count: 41 },
+                { code: 'AUDIENCE_MISMATCH',    label: '人群不符',         count: 23 },
+                { code: 'AMOUNT_BELOW_MIN',     label: '未达单笔门槛',     count: 11 },
+                { code: 'RECORD_NOT_RUNNING',   label: '任务已完成或已过期', count: 5 },
+            ]);
+            const discardTotal = computed(() => discardStat.value.reduce((s, d) => s + d.count, 0));
+
+            // 板块三：逾期未开奖（实测命中过 0ELCRIFHGF）
+            const overdueIssues = ref([
+                { lotteryCode: '0ELCRIFHGF', issueNo: '20260731', overdueHours: 38 },
+            ]);
+
+            const lotteryIssues = ref([
+                { issueNo: '20260731', soldCount: 850, totalCount: 1000, soldRate: 85, planDrawTime: '2026-07-31 20:00', overdue: true,  overdueHours: 38 },
+                { issueNo: '20260801', soldCount: 120, totalCount: 1000, soldRate: 12, planDrawTime: '2026-08-03 20:00', overdue: false, overdueHours: 0 },
+            ]);
+
+            const drawStat = ref([
+                { label: '已中奖',   count: 315, color: 'bg-emerald-500', text: 'text-emerald-400' },
+                { label: '库存不足', count: 185, color: 'bg-rose-500',    text: 'text-rose-400' },
+                { label: '未中奖',   count: 0,   color: 'bg-slate-500',   text: 'text-slate-400' },
+                { label: '异常',     count: 0,   color: 'bg-amber-500',   text: 'text-amber-400' },
+            ]);
+            const drawTotal = computed(() => drawStat.value.reduce((s, d) => s + d.count, 0));
+
+            const topMembers = ref([
+                { memberName: 'user_9912', count: 12, value: '240.0000' },
+                { memberName: 'user_451x', count: 9,  value: '180.0000' },
+                { memberName: 'user_0091', count: 7,  value: '140.0000' },
+                { memberName: 'user_7734', count: 5,  value: '100.0000' },
+            ]);
+
+            const gameplayPanelTitle = computed(() => {
+                if (!selectedAct.value) return '玩法运行态';
+                const m = { TASK: '任务阶梯流失漏斗', DRAW: '抽奖状态分布', LOTTERY: '彩票期号售卖与开奖', BASIC: '基础活动' };
+                return `【${selectedAct.value.activityName}】${m[selectedAct.value.activityType] || ''}`;
+            });
+
+            const typeLabel = (t) => ({ BASIC: '基础活动', DRAW: '奖池抽奖', TASK: '任务驱动', LOTTERY: 'FPE彩票' }[t] || t);
+            const typeColor = (t) => ({
+                LOTTERY: 'bg-cyan-500/20 text-cyan-300',
+                TASK:    'bg-purple-500/20 text-purple-300',
+                DRAW:    'bg-orange-500/20 text-orange-300',
+                BASIC:   'bg-slate-600/40 text-slate-300',
+            }[t] || 'bg-slate-600/40 text-slate-300');
+            const statusColor = (s) => ({ 进行中: 'text-emerald-400', 未开始: 'text-sky-400', 已结束: 'text-slate-500', 已禁用: 'text-rose-400' }[s] || 'text-slate-400');
+
+            // ───────── 图表 ─────────
+            function renderTrend() {
+                if (!trendChart) return;
+                const assets = prize.byAsset.filter((a) => Number(a.value) > 0 || a.count > 0);
+                trendChart.setOption({
                     backgroundColor: 'transparent',
-                    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.9)', borderColor: '#334155', textStyle: { color: '#f8fafc' } },
-                    grid: { top: 30, right: 20, bottom: 20, left: 50 },
-                    xAxis: { type: 'category', data: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'], axisLine: { lineStyle: { color: '#475569' } } },
-                    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { color: '#94a3b8' } },
-                    series: [{
-                        data: isSingle ? [120, 300, 150, 400, 200, 600, 800] : [1200, 3000, 1500, 4500, 2800, 6400, 8200],
-                        type: 'line',
-                        smooth: true,
-                        symbol: 'none',
-                        lineStyle: { color: '#38bdf8', width: 3 },
-                        areaStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: 'rgba(56,189,248,0.5)' },
-                                { offset: 1, color: 'rgba(56,189,248,0)' }
-                            ])
-                        }
-                    }]
-                };
-                trendChart.setOption(option);
+                    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,.95)', borderColor: '#334155', textStyle: { color: '#f8fafc' } },
+                    legend: { data: assets.map((a) => a.label), textStyle: { color: '#94a3b8', fontSize: 11 }, top: 0 },
+                    grid: { top: 30, right: 16, bottom: 24, left: 48 },
+                    xAxis: { type: 'category', data: ['07-27','07-28','07-29','07-30','07-31','08-01','08-02'], axisLine: { lineStyle: { color: '#475569' } }, axisLabel: { color: '#94a3b8', fontSize: 10 } },
+                    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } }, axisLabel: { color: '#94a3b8', fontSize: 10 } },
+                    // 按资产类型堆叠：一眼看出「只有券真发出去了」
+                    series: assets.map((a, i) => ({
+                        name: a.label, type: 'bar', stack: 'v',
+                        data: a.type === 'COUPON' ? [80,120,150,200,180,140,150] : [0,0,0,0,0,0,0],
+                        itemStyle: { color: ['#34d399','#38bdf8','#818cf8','#f472b6'][i % 4] },
+                    })),
+                });
             }
 
-            function renderFunnelChart(isSingle) {
-                if(!funnelChart) return;
-
-                let data = [];
-                if(isSingle && selectedAct.value.type === 'TASK') {
-                    data = [
-                        { value: 100, name: '接取任务 (1000人)' },
-                        { value: 60, name: '到达阶梯一 (600人)' },
-                        { value: 20, name: '到达阶梯二 (200人)' },
-                        { value: 5, name: '满级通关 (50人)' }
-                    ];
-                } else {
-                    data = [
-                        { value: 100, name: '触发动作 (Event)' },
-                        { value: 80, name: '风控通过 (Pass)' },
-                        { value: 50, name: '成功派奖 (Prize)' }
-                    ];
-                }
-
-                const option = {
+            function renderFunnel() {
+                if (!funnelChart) return;
+                funnelChart.setOption({
                     backgroundColor: 'transparent',
-                    tooltip: { trigger: 'item', formatter: '{b} : {c}%' },
+                    tooltip: { trigger: 'item', formatter: '{b}：{c} 人' },
                     color: ['#38bdf8', '#818cf8', '#34d399', '#f472b6'],
-                    series: [
-                        {
-                            name: '转化漏斗', type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%',
-                            min: 0, max: 100, minSize: '0%', maxSize: '100%', sort: 'desc', gap: 2,
-                            label: { show: true, position: 'inside', formatter: '{b}', color: '#fff', fontSize: 12 },
-                            itemStyle: { borderColor: '#0f172a', borderWidth: 2 },
-                            data: data
-                        }
-                    ]
-                };
-                funnelChart.setOption(option);
+                    series: [{
+                        type: 'funnel', left: '8%', top: 16, bottom: 16, width: '84%', sort: 'desc', gap: 2,
+                        label: { show: true, position: 'inside', formatter: '{b}', color: '#fff', fontSize: 11 },
+                        itemStyle: { borderColor: '#0f172a', borderWidth: 2 },
+                        // 板块三：按 stage_level 与 stage_condition.target 算到达人数
+                        data: [
+                            { value: 1000, name: '接取任务 1000' },
+                            { value: 600,  name: '阶梯一(签到1天) 600' },
+                            { value: 200,  name: '阶梯二(连续3天) 200' },
+                            { value: 50,   name: '满级(连续7天) 50' },
+                        ],
+                    }],
+                });
             }
 
-            // ---------- 核心交互：灵活点击下钻 ----------
+            function resizeCharts() { trendChart && trendChart.resize(); funnelChart && funnelChart.resize(); }
+
+            /* ⚠️ cdn.tailwindcss.com 在运行时生成 CSS，onMounted 时容器高度可能还是 0，
+                  echarts 会把 0 尺寸锁死，表现为「图表区一片空白且不报错」。
+                  用 ResizeObserver 兜底：容器一拿到真实高度就 resize。 */
+            let ro = null;
+            function observeChartBoxes() {
+                if (typeof ResizeObserver === 'undefined') return;
+                ro = new ResizeObserver(() => resizeCharts());
+                if (trendChartRef.value) ro.observe(trendChartRef.value);
+            }
+
+            function mountFunnelIfNeeded() {
+                nextTick(() => {
+                    if (selectedAct.value && selectedAct.value.activityType === 'TASK' && funnelChartRef.value) {
+                        if (!funnelChart || funnelChart.getDom() !== funnelChartRef.value) {
+                            funnelChart && funnelChart.dispose();
+                            funnelChart = echarts.init(funnelChartRef.value);
+                        }
+                        renderFunnel();
+                    }
+                });
+            }
+
             function selectAct(act) {
                 selectedAct.value = act;
-
-                // 模拟数据切换
-                kpi.budgetRate = (Math.random() * 40 + 50).toFixed(1);
-                kpi.issuedValue = act.value;
-                kpi.discardCount = Math.floor(Math.random() * 50);
-                kpi.pendingApprove = Math.floor(Math.random() * 10);
-
-                // 模拟单个活动的异常日志过滤
-                riskLogs.value = globalRiskLogs.filter(log => Math.random() > 0.5);
-                if(riskLogs.value.length === 0) riskLogs.value = [{ reason: '暂无异常', member: '-', time: '刚刚', eventBizId: '-' }];
-
-                // 重新渲染图表
-                nextTick(() => {
-                    renderTrendChart(true);
-                    if(act.type !== 'LOTTERY') renderFunnelChart(true); // 彩票隐藏漏斗
-                });
+                // 真实实现改为 GET /marketingStat/prizeHealth?activityCode=xxx
+                Object.assign(prize, GLOBAL_PRIZE);
+                nextTick(() => { renderTrend(); mountFunnelIfNeeded(); });
             }
 
             function clearSelection() {
                 selectedAct.value = null;
-
-                // 恢复大盘数据
-                kpi.budgetRate = 68.5;
-                kpi.issuedValue = 124500;
-                kpi.discardCount = 142;
-                kpi.pendingApprove = 53;
-                riskLogs.value = [...globalRiskLogs];
-
-                nextTick(() => {
-                    renderTrendChart(false);
-                    renderFunnelChart(false);
-                });
+                Object.assign(prize, GLOBAL_PRIZE);
+                nextTick(renderTrend);
             }
 
             onMounted(() => {
-                timer = setInterval(() => { currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss'); }, 1000);
-                initCharts();
+                timer = setInterval(() => (currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss')), 1000);
+                nextTick(() => {
+                    if (trendChartRef.value) trendChart = echarts.init(trendChartRef.value);
+                    renderTrend();
+                    observeChartBoxes();
+                    window.addEventListener('resize', resizeCharts);
+                });
             });
 
             onBeforeUnmount(() => {
                 clearInterval(timer);
-                if(trendChart) trendChart.dispose();
-                if(funnelChart) funnelChart.dispose();
+                ro && ro.disconnect();
+                window.removeEventListener('resize', resizeCharts);
+                trendChart && trendChart.dispose();
+                funnelChart && funnelChart.dispose();
             });
 
             return {
-                currentTime, kpi, activityList, selectedAct, riskLogs,
-                getTypeColor, selectAct, clearSelection,
-                trendChartRef, funnelChartRef
+                currentTime, selectedAct, scopeLabel, prize, fmt, pct,
+                activityList, activityStatusDist, failReasons, discardStat, discardTotal,
+                overdueIssues, lotteryIssues, drawStat, drawTotal, topMembers,
+                gameplayPanelTitle, typeLabel, typeColor, statusColor,
+                trendChartRef, funnelChartRef, selectAct, clearSelection,
             };
-        }
+        },
     };
 
-    createApp(App).use(antd).mount('#app');
+    createApp(App).mount('#app');
 </script>
 </body>
 </html>
