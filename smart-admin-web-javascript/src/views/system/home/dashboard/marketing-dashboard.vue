@@ -340,6 +340,20 @@
     :deep(.ant-card) {
       margin-bottom: 10px;
     }
+
+    /*
+     * 🔴 必须把 DefaultHomeCard 的 height:100% 打掉，否则中间那栏会裂开一大段空白。
+     *
+     * 成因：a-row 是 flex 且默认 align-items:stretch，每个 a-col 的高度被拉成
+     * 「最高那一栏」的高度；而 DefaultHomeCard 的 .card-container 写死了 height:100%，
+     * 于是「活动参与统计」这一个卡片就把整栏高度吃满，后面的价值趋势与玩法运行态
+     * 被顶到几百像素的空白之下 —— 表现就是「最后那个图跑最下面去了」。
+     * 那个 height:100% 在原首页是对的（一栏一个卡片），在大屏这种一栏叠三个卡片的
+     * 布局里就不成立。改这里而不是改 DefaultHomeCard：它还被别处用着。
+     */
+    :deep(.card-container) {
+      height: auto;
+    }
   }
 
   .overdue-alert {

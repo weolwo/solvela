@@ -1,58 +1,18 @@
 <!--
   * 登录
   *
+  * 2026-08-03 精简：删掉左侧整块宣传栏（1024lab 介绍 / 卓大微信 / 公众号跑马灯）、
+  * 「9种登录背景风格」的推广通知与外链、右上角二维码，以及一堆从未渲染的图标 import。
+  * 同时删掉了 login2 / login3 两套备用皮肤（零引用）和 18 张只被它们用到的图片。
+  * 现在只剩一套登录页，登录相关逻辑（验证码开关 / 双因子邮箱验证码 / 密码 SM4 加密）一行没动。
+  *
   * @Author:    1024创新实验室-主任：卓大
-  * @Date:      2022-09-12 22:34:00
-  * @Wechat:    zhuda1024
-  * @Email:     lab1024@163.com
   * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
   *
 -->
 <template>
   <div class="login-container">
-    <div class="box-item desc">
-      <div class="welcome">
-        <p>欢迎登录 SmartAdmin V3</p>
-        <p class="desc">
-          SmartAdmin 是由 河南·洛阳
-          <a target="_blank" href="https://www.1024lab.net" style="color: white; weight: bolder; font-size: 15px; text-decoration: underline"
-            >1024创新实验室（1024Lab）</a
-          >
-          基于SpringBoot + Sa-Token + Mybatis-Plus 和 Vue3 + Vite5 + Ant Design Vue 4 (同时支持JavaScript和TypeScript双版本)
-          以「高质量代码」为核心，「简洁、高效、安全」的快速开发平台。
-          <br />
-          <br />
-          <span class="setence">
-            致伟大的开发者 ：
-            <br />
-            &nbsp;&nbsp;&nbsp;&nbsp;我们希望用一套漂亮优雅的代码和一套整洁高效的代码规范，让大家在这浮躁的世界里感受到一股把代码写好的清流 !
-            <br />
-            保持谦逊，保持学习，热爱代码，更热爱生活 !<br />
-            永远年轻，永远前行 !<br />
-            <span class="author">
-              <a target="_blank" href="https://zhuoda.vip" style="color: white; font-size: 13px; text-decoration: underline">
-                1024创新实验室-主任：卓大
-              </a>
-            </span>
-          </span>
-        </p>
-      </div>
-      <div class="app-qr-box">
-        <div class="app-qr">
-          <span class="qr-desc"> 加微信，骚扰卓大 :) </span>
-        </div>
-        <div class="app-qr">
-          <div class="qr-desc-marquee">
-            <div class="marquee">
-              <span>关注：六边形工程师</span>
-              <span>分享：AI、赚钱、代码、健康</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="box-item login">
-      <img class="login-qr" :src="loginQR" />
       <div class="login-title">账号登录</div>
       <a-form ref="formRef" class="login-form" :model="loginForm" :rules="rules">
         <a-form-item name="loginName">
@@ -67,14 +27,12 @@
           </a-input-group>
         </a-form-item>
         <a-form-item name="password">
-          <a-popover placement="top">
-            <a-input-password
-              v-model:value="loginForm.password"
-              autocomplete="on"
-              :type="showPassword ? 'text' : 'password'"
-              placeholder="请输入密码"
-            />
-          </a-popover>
+          <a-input-password
+            v-model:value="loginForm.password"
+            autocomplete="on"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="请输入密码"
+          />
         </a-form-item>
         <a-form-item name="captchaCode" v-if="captchaEnabled">
           <a-input class="captcha-input" v-model:value.trim="loginForm.captchaCode" placeholder="请输入验证码" />
@@ -89,28 +47,16 @@
   </div>
 </template>
 <script setup>
-  import { message, notification, Button } from 'ant-design-vue';
+  import { message } from 'ant-design-vue';
   import { onMounted, onUnmounted, reactive, ref, computed } from 'vue';
   import { useRouter } from 'vue-router';
   import { loginApi } from '/@/api/system/login-api';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { LOGIN_DEVICE_ENUM } from '/@/constants/system/login-device-const';
   import { useUserStore } from '/@/store/modules/system/user';
-  import zhuoda from '/@/assets/images/1024lab/zhuoda-wechat.jpg';
-  import loginQR from '/@/assets/images/login/login-qr.png';
-  import gzh from '/@/assets/images/1024lab/gzh.jpg';
-  import wechatIcon from '/@/assets/images/login/wechat-icon.png';
-  import aliIcon from '/@/assets/images/login/ali-icon.png';
-  import douyinIcon from '/@/assets/images/login/douyin-icon.png';
-  import qqIcon from '/@/assets/images/login/qq-icon.png';
-  import weiboIcon from '/@/assets/images/login/weibo-icon.png';
-  import feishuIcon from '/@/assets/images/login/feishu-icon.png';
-  import googleIcon from '/@/assets/images/login/google-icon.png';
-
   import { buildRoutes } from '/@/router/index';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { encryptData } from '/@/lib/encrypt';
-  import { h } from 'vue';
   import { localSave } from '/@/utils/local-util';
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { useDictStore } from '/@/store/modules/system/dict';
@@ -139,7 +85,6 @@
   const showPassword = ref(false);
   const router = useRouter();
   const formRef = ref();
-  const rememberPwd = ref(false);
 
   onMounted(() => {
     document.onkeyup = (e) => {
@@ -147,25 +92,6 @@
         onLogin();
       }
     };
-
-    notification['success']({
-      message: '温馨提示',
-      description: 'SmartAdmin 提供 9种 登录背景风格哦！',
-      duration: 8,
-      onClick: () => {},
-      btn: () =>
-        h(
-          Button,
-          {
-            type: 'primary',
-            target: '_blank',
-            size: 'small',
-            href: 'https://smartadmin.vip/views/doc/front/Login.html',
-            onClick: () => {},
-          },
-          { default: () => '去看看' }
-        ),
-    });
   });
 
   onUnmounted(() => {

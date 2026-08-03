@@ -21,6 +21,3 @@
 <script setup>
   import MarketingDashboard from './dashboard/marketing-dashboard.vue';
 </script>
-<style lang="less" scoped>
-  @import './index.less';
-</style>
