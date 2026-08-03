@@ -1,8 +1,33 @@
 <!DOCTYPE html>
 <!--
-  营销中台 · 实时作战大屏（原型 v2 · 按数据统计方案修正）
+  营销中台 · 实时作战大屏（原型 v2.1）
 
-  ══ 本版相对 v1 的修正（每条都能在 docs/营销中台-数据统计方案.md 里找到依据）══
+  ══ v2.1 修正（2026-08-03，按产品决策 + 交叉核对查出的错）══
+
+  🔴 1. 活动状态改为「只看 status」两态：启用 / 禁用，不再有四态时间窗
+        产品决策：活动的生命周期用开关表达，「有没有开始」是业务层按时间实时算的，
+        不是大屏该判的事（与 4.6③ 列表页改造、与首页参与图口径完全一致）。
+        判据：status = 2 → 禁用；其余（含历史值 0）→ 启用。
+        ⚠️ 起止时间仍在卡片上展示，但**只是信息，不参与状态判定**。
+        这同时消除了「首页图按 status、大屏按时间窗」两套口径并存的问题。
+
+  🔴 2. 彩票编码与活动编码分开，不再复用同一个串
+        t_lottery_config 自己带 activity_code，两者是**两套编码**，靠它关联：
+          activity_code ── t_activity_config（A 开头）
+          lottery_code  ── t_lottery_config（L 开头）
+        v2 里 0ELCRIFHGF 既当 activityCode 又当 lotteryCode，违反铁律 8「编码全局唯一」，
+        落地时会让人以为两张表能直接用同一个键 JOIN。
+
+  🔴 3. 修掉 KPI「发奖记录」四个数加不平的错（315 ≠ 51+100+64）
+        v2 的 success 只算了券那 51 条，漏了积分里零值短路成功的 100 条。
+        现在两套 mock 都能闭合，且下钻会真的换数（v2 是下钻后标题变、数字不变）：
+          全局      381 = 成功 217 + 失败 100 + 待审 64   （方案 §3 板块二实测）
+          12278CBYW7 315 = 成功 151 + 失败 100 + 待审 64   （方案 §2.1 实测拆分）
+
+  🟡 4. 落地提醒：阶梯漏斗是 type:'funnel'，而项目的 src/lib/echarts.js 目前只注册了
+        Bar / Line / Pie / Gauge。**漏注册是空白图且控制台零报错**，落地时必须补 FunnelChart。
+
+  ══ v2 相对 v1 的修正（每条都能在 docs/营销中台-数据统计方案.md 里找到依据）══
 
   🔴 1. 删掉「预算消耗率」
         §9「明确不做」列了预算水位；§1「明确不用」点名 t_promotion_config。
@@ -16,6 +41,8 @@
   🔴 3. 补上「活动状态分布（四态）」并标注口径
         §2.3：是否进行中看时间窗，不看 status。
         直接 WHERE status=1 只能查出 1 个活动（实有 6 个）——「最容易踩的一脚」。
+        ⚠️ **本条已被 v2.1-1 取代**：四态改两态。但「不能用 WHERE status=1 过滤」
+        这半条依然成立，且更重要了 —— 现在的判据是 status != 2。
 
   🟡 4. 「逾期未开奖」提到独立告警条（v1 混在会被刷走的风控流里）
         §3 板块三：属客诉级异常，比任何参与量指标都该优先展示。
@@ -107,7 +134,9 @@
             <div class="text-rose-400 font-bold text-sm">逾期未开奖 {{ overdueIssues.length }} 期 —— 已对外承诺开奖时刻却未开奖</div>
             <div class="flex gap-6 mt-1">
                 <span v-for="it in overdueIssues" :key="it.issueNo" class="text-xs text-slate-300">
-                    {{ it.lotteryCode }} / 第 {{ it.issueNo }} 期
+                    彩票 <span class="font-mono text-cyan-300">{{ it.lotteryCode }}</span>
+                    <span class="text-slate-500">（活动 {{ it.activityCode }}）</span>
+                    / 第 {{ it.issueNo }} 期
                     <span class="text-rose-400 font-num ml-1">逾期 {{ it.overdueHours }}h</span>
                 </span>
             </div>
@@ -126,7 +155,10 @@
                 <span class="text-xs text-rose-400">失败 {{ prize.failed }}</span>
                 <span class="text-xs text-amber-400">待审 {{ prize.pending }}</span>
             </div>
-            <div class="caliber mt-1">status：1-成功 / 2-失败 / 0-等待</div>
+            <div class="caliber mt-1">
+                status：1-成功 / 2-失败 / 0-等待
+                <span class="text-slate-600">·</span> 三项之和必须等于总数（v2 在这里漏算过 100 条）
+            </div>
         </div>
 
         <!-- ② 价值侧：必须与①并列，且按资产类型拆开（§2.1）-->
@@ -170,18 +202,20 @@
 
         <!-- ── 左：活动状态分布 + 活动卡片 ── -->
         <div class="w-1/4 flex flex-col gap-3 min-h-0">
-            <!-- 活动状态分布（板块一）-->
+            <!-- 活动状态分布（板块一）—— v2.1：只看 status，两态 -->
             <div class="panel-box shrink-0">
                 <div class="panel-title">🗂️ 活动状态分布</div>
-                <div class="grid grid-cols-4 gap-1 p-3">
+                <div class="grid grid-cols-2 gap-1 p-3">
                     <div v-for="s in activityStatusDist" :key="s.label" class="text-center">
                         <div class="font-num text-xl" :class="s.color">{{ s.count }}</div>
                         <div class="text-[10px] text-slate-400">{{ s.label }}</div>
                     </div>
                 </div>
                 <div class="caliber px-3 pb-2">
-                    口径（§2.3）：status=2 → 已禁用；否则按 start_time / end_time 时间窗判定。
-                    <span class="text-amber-500">不要用 WHERE status=1 过滤</span>——库里 6 条有 5 条是历史值 0。
+                    口径：<span class="text-slate-400">status = 2 → 禁用，其余（含历史值 0）→ 启用</span>。
+                    活动只有开关两态，<span class="text-amber-500">不看起止时间</span>——「有没有开始」由业务层按时间实时算。
+                    <span class="text-amber-500">不要用 WHERE status=1 过滤</span>：库里 6 条有 5 条是历史值 0，会只查出 1 个。
+                    与首页参与统计图同口径。
                 </div>
             </div>
 
@@ -202,9 +236,10 @@
                                 {{ typeLabel(act.activityType) }}
                             </span>
                         </div>
-                        <!-- 方案板块一要求的字段：状态 / 起止时间 / 玩法数 / 完备度 -->
+                        <!-- 方案板块一要求的字段：状态 / 起止时间 / 玩法数 / 完备度
+                             ⚠️ 起止时间只是展示，不参与状态判定（v2.1） -->
                         <div class="flex items-center gap-2 text-[10px]">
-                            <span :class="statusColor(act.runStatus)">● {{ act.runStatus }}</span>
+                            <span :class="statusColor(act.status)">● {{ statusLabel(act.status) }}</span>
                             <span class="text-slate-500">{{ act.startTime }} ~ {{ act.endTime || '不限' }}</span>
                         </div>
                         <div class="flex justify-between items-center">
@@ -227,7 +262,12 @@
         <div class="w-2/4 flex flex-col gap-3 min-h-0">
             <div class="flex-1 panel-box flex flex-col min-h-0" style="min-height:200px">
                 <div class="panel-title">📈 {{ scopeLabel }}发出价值趋势（按资产类型）</div>
-                <div class="flex-1 p-2 min-h-0" style="min-height:160px" ref="trendChartRef"></div>
+                <!-- 该活动一条发奖记录都没有时给明确的空态，而不是留一张空白图 ——
+                     空白图与「漏注册 series / 容器高度为 0」的表现一模一样，分不出是没数据还是坏了 -->
+                <div v-show="!prize.byAsset.length" class="flex-1 flex items-center justify-center text-slate-500 text-sm">
+                    该活动暂无发奖记录
+                </div>
+                <div v-show="prize.byAsset.length" class="flex-1 p-2 min-h-0" style="min-height:160px" ref="trendChartRef"></div>
             </div>
 
             <div class="flex-1 panel-box flex flex-col min-h-0" style="min-height:200px">
@@ -263,9 +303,18 @@
 
                 <!-- 彩票：售出率 + 开奖倒计时（板块三）-->
                 <div v-else-if="selectedAct.activityType === 'LOTTERY'" class="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
+                    <div class="caliber">
+                        玩法编码 <span class="font-mono text-cyan-300">lottery_code</span>
+                        与活动编码 <span class="font-mono text-slate-400">activity_code</span>
+                        是<span class="text-amber-500">两套编码</span>，靠 t_lottery_config.activity_code 关联
+                        —— 一个活动可挂多个彩票玩法，别复用同一个串（铁律 8）
+                    </div>
                     <div v-for="i in lotteryIssues" :key="i.issueNo" class="bg-slate-800/60 rounded p-2.5">
                         <div class="flex justify-between items-center mb-1.5">
-                            <span class="text-sm text-slate-200">第 {{ i.issueNo }} 期</span>
+                            <span class="text-sm text-slate-200">
+                                <span class="font-mono text-[10px] text-cyan-300 mr-1">{{ i.lotteryCode }}</span>
+                                第 {{ i.issueNo }} 期
+                            </span>
                             <span class="text-xs" :class="i.overdue ? 'text-rose-400 font-bold' : 'text-slate-400'">
                                 {{ i.overdue ? `逾期 ${i.overdueHours}h 未开奖` : `计划开奖 ${i.planDrawTime}` }}
                             </span>
@@ -356,43 +405,83 @@
 
             // ───────── mock：字段名对齐 §4 的接口约定 ─────────
 
-            // GET /marketingStat/overview
+            /* GET /marketingStat/overview
+               ⚠️ status 直接就是 t_activity_config.status：2=禁用，其余（含历史值 0）=启用。
+                  刻意保留一条 status=0 的历史值数据，用来演示「0 必须按启用处理」。
+               ⚠️ 编码规范（铁律 8）：活动编码 A 开头，与彩票玩法编码（L 开头）是两套编码，
+                  绝不复用同一个串。彩票靠 t_lottery_config.activity_code 关联到活动。 */
             const activityList = ref([
-                { activityCode: 'LTQ7M3XKD8', activityName: '618锦鲤福彩发号', activityType: 'LOTTERY',
-                  runStatus: '进行中', startTime: '2026-07-20', endTime: '2026-08-20', gameplayCount: 1, configured: true },
-                { activityCode: 'WLO9SMXDKD', activityName: '新人7天签到挑战', activityType: 'TASK',
-                  runStatus: '进行中', startTime: '2026-07-01', endTime: '2026-08-31', gameplayCount: 3, configured: true },
-                { activityCode: '12278CBYW7', activityName: '年中狂欢大转盘', activityType: 'DRAW',
-                  runStatus: '进行中', startTime: '2026-06-18', endTime: '2026-08-18', gameplayCount: 2, configured: true },
-                { activityCode: 'B7YN4TR9WC', activityName: '会员专属礼包', activityType: 'BASIC',
-                  runStatus: '未开始', startTime: '2026-09-01', endTime: null, gameplayCount: 0, configured: false },
-                { activityCode: '0ELCRIFHGF', activityName: '双色球试运营', activityType: 'LOTTERY',
-                  runStatus: '进行中', startTime: '2026-07-10', endTime: '2026-08-10', gameplayCount: 1, configured: true },
-                { activityCode: 'K3MZ8QPLDA', activityName: '春季拉新（已结束）', activityType: 'TASK',
-                  runStatus: '已结束', startTime: '2026-03-01', endTime: '2026-05-31', gameplayCount: 2, configured: true },
+                // 挂了两个彩票玩法（5位 / 7位各一个）—— 一个活动可以有多个 lottery_code
+                { activityCode: 'A9K4TQ7M3X', activityName: '618锦鲤福彩发号', activityType: 'LOTTERY',
+                  status: 1, startTime: '2026-07-20', endTime: '2026-08-20', gameplayCount: 2, configured: true },
+                { activityCode: 'AWLO9SMXDK', activityName: '新人7天签到挑战', activityType: 'TASK',
+                  status: 1, startTime: '2026-07-01', endTime: '2026-08-31', gameplayCount: 3, configured: true },
+                { activityCode: 'A2278CBYW7', activityName: '年中狂欢大转盘', activityType: 'DRAW',
+                  status: 1, startTime: '2026-06-18', endTime: '2026-08-18', gameplayCount: 2, configured: true },
+                { activityCode: 'AB7YN4TR9W', activityName: '会员专属礼包', activityType: 'BASIC',
+                  status: 0, startTime: '2026-09-01', endTime: null, gameplayCount: 0, configured: false },
+                { activityCode: 'A7RQ2M8KVD', activityName: '双色球试运营', activityType: 'LOTTERY',
+                  status: 1, startTime: '2026-07-10', endTime: '2026-08-10', gameplayCount: 1, configured: true },
+                { activityCode: 'AK3MZ8QPLD', activityName: '春季拉新', activityType: 'TASK',
+                  status: 2, startTime: '2026-03-01', endTime: '2026-05-31', gameplayCount: 2, configured: true },
             ]);
 
+            /* 只有启用 / 禁用两态（v2.1）。判据是 status != 2，历史值 0 落在「启用」里 ——
+               这正是方案 §2.3 警告的那一脚：用 status=1 过滤，上面 6 条只会剩 4 条。 */
             const activityStatusDist = computed(() => {
-                const c = (s) => activityList.value.filter((a) => a.runStatus === s).length;
+                const enabled = activityList.value.filter((a) => a.status !== 2).length;
                 return [
-                    { label: '进行中', count: c('进行中'), color: 'text-emerald-400' },
-                    { label: '未开始', count: c('未开始'), color: 'text-sky-400' },
-                    { label: '已结束', count: c('已结束'), color: 'text-slate-400' },
-                    { label: '已禁用', count: c('已禁用'), color: 'text-rose-400' },
+                    { label: '启用', count: enabled, color: 'text-emerald-400' },
+                    { label: '禁用', count: activityList.value.length - enabled, color: 'text-rose-400' },
                 ];
             });
 
-            // GET /marketingStat/prizeHealth —— §2.1 条数与价值并列，价值按资产类型拆开
+            /* GET /marketingStat/prizeHealth —— §2.1 条数与价值并列，价值按资产类型拆开
+
+               🔴 四个数必须闭合：total = success + failed + pending，
+                  且 byAsset 的 count 之和 = total。v2 在这里错过一次（success 只算了券的
+                  51 条，漏了积分里零值短路成功的 100 条，315 ≠ 51+100+64）——
+                  而这张卡正是用来演示 §2.1「指标算错比没有指标更糟」的，自己先算错了。 */
+
+            // 全局：方案 §3 板块二实测 —— 成功 217 / 失败 100 / 待审批 64，合计 381（= t_prize_log 全表）
             const GLOBAL_PRIZE = {
-                total: 315, success: 51, failed: 100, pending: 64, maxWaitHours: 140,
+                scope: '全局',
+                total: 381, success: 217, failed: 100, pending: 64, maxWaitHours: 140,
                 issuedValue: '1020.0000',
                 byAsset: [
                     { type: 'COUPON',   label: '优惠券', count: 51,  value: '1020.0000' },
-                    { type: 'SCORE',    label: '积分',   count: 200, value: '0' },
+                    // 积分 266 = 381 − 券51 − 现金11 − 实物53。其中 100 条预算耗尽失败、
+                    // 166 条是零值短路成功（价值 0），failed 全部落在这一项上
+                    { type: 'SCORE',    label: '积分',   count: 266, value: '0' },
                     { type: 'BALANCE',  label: '现金',   count: 11,  value: '0' },
                     { type: 'PHYSICAL', label: '实物',   count: 53,  value: '0' },
                 ],
             };
+
+            /* 下钻：活动 A2278CBYW7 的实测拆分（方案 §2.1 那张表，一个数都没改）
+               315 = 券51 + 积分200 + 现金11 + 实物53
+                   = 成功151（券51 + 积分零值100）+ 失败100（积分预算耗尽）+ 待审64（现金11 + 实物53） */
+            const ACT_PRIZE = {
+                'A2278CBYW7': {
+                    scope: '该活动',
+                    total: 315, success: 151, failed: 100, pending: 64, maxWaitHours: 140,
+                    issuedValue: '1020.0000',
+                    byAsset: [
+                        { type: 'COUPON',   label: '优惠券', count: 51,  value: '1020.0000' },
+                        { type: 'SCORE',    label: '积分',   count: 200, value: '0' },
+                        { type: 'BALANCE',  label: '现金',   count: 11,  value: '0' },
+                        { type: 'PHYSICAL', label: '实物',   count: 53,  value: '0' },
+                    ],
+                },
+            };
+
+            // 没有发奖记录的活动：全 0，而不是继续显示全局数字（v2 的下钻就是「标题变、数字不变」）
+            const emptyPrize = (name) => ({
+                scope: '该活动', total: 0, success: 0, failed: 0, pending: 0, maxWaitHours: 0,
+                issuedValue: '0',
+                byAsset: [],
+            });
+
             const prize = reactive({ ...GLOBAL_PRIZE });
 
             const failReasons = ref([{ reason: '预算耗尽', count: 100 }]);
@@ -407,15 +496,29 @@
             ]);
             const discardTotal = computed(() => discardStat.value.reduce((s, d) => s + d.count, 0));
 
-            // 板块三：逾期未开奖（实测命中过 0ELCRIFHGF）
+            /* 板块三：逾期未开奖（实测命中过彩票玩法 0ELCRIFHGF）
+               🔴 lotteryCode 与 activityCode 是**两套编码**，这里同时带上：
+                  告警要显示的是彩票玩法编码，而点进去下钻要用的是活动编码，
+                  两者靠 t_lottery_config.activity_code 关联。v2 把它们写成了同一个串。 */
             const overdueIssues = ref([
-                { lotteryCode: '0ELCRIFHGF', issueNo: '20260731', overdueHours: 38 },
+                { lotteryCode: '0ELCRIFHGF', activityCode: 'A7RQ2M8KVD', issueNo: '20260731', overdueHours: 38 },
             ]);
 
-            const lotteryIssues = ref([
-                { issueNo: '20260731', soldCount: 850, totalCount: 1000, soldRate: 85, planDrawTime: '2026-07-31 20:00', overdue: true,  overdueHours: 38 },
-                { issueNo: '20260801', soldCount: 120, totalCount: 1000, soldRate: 12, planDrawTime: '2026-08-03 20:00', overdue: false, overdueHours: 0 },
-            ]);
+            /* 期号按活动分开挂 —— 一个活动只该看到自己名下玩法的期号。
+               A9K4TQ7M3X 有两个玩法（5位/7位各一个），正好演示「一个活动挂多个 lottery_code」。 */
+            const ISSUES_BY_ACT = {
+                'A7RQ2M8KVD': [
+                    { lotteryCode: '0ELCRIFHGF', issueNo: '20260731', soldCount: 850, totalCount: 1000, soldRate: 85, planDrawTime: '2026-07-31 20:00', overdue: true,  overdueHours: 38 },
+                    { lotteryCode: '0ELCRIFHGF', issueNo: '20260801', soldCount: 120, totalCount: 1000, soldRate: 12, planDrawTime: '2026-08-03 20:00', overdue: false, overdueHours: 0 },
+                ],
+                'A9K4TQ7M3X': [
+                    { lotteryCode: 'LRMAAUK45T', issueNo: '20260802', soldCount: 62000, totalCount: 100000, soldRate: 62, planDrawTime: '2026-08-05 20:00', overdue: false, overdueHours: 0 },
+                    { lotteryCode: 'LNQ4W55L66', issueNo: '20260802', soldCount: 310000, totalCount: 10000000, soldRate: 3.1, planDrawTime: '2026-08-10 20:00', overdue: false, overdueHours: 0 },
+                ],
+            };
+            const lotteryIssues = computed(() =>
+                (selectedAct.value && ISSUES_BY_ACT[selectedAct.value.activityCode]) || []
+            );
 
             const drawStat = ref([
                 { label: '已中奖',   count: 315, color: 'bg-emerald-500', text: 'text-emerald-400' },
@@ -445,7 +548,10 @@
                 DRAW:    'bg-orange-500/20 text-orange-300',
                 BASIC:   'bg-slate-600/40 text-slate-300',
             }[t] || 'bg-slate-600/40 text-slate-300');
-            const statusColor = (s) => ({ 进行中: 'text-emerald-400', 未开始: 'text-sky-400', 已结束: 'text-slate-500', 已禁用: 'text-rose-400' }[s] || 'text-slate-400');
+            /* v2.1：只有启用 / 禁用两态。判据统一写在这两个函数里，别在模板里散写 status !== 2，
+               否则将来口径一变就得满文件找。历史值 0 走 default 分支落到「启用」。 */
+            const statusLabel = (s) => (s === 2 ? '禁用' : '启用');
+            const statusColor = (s) => (s === 2 ? 'text-rose-400' : 'text-emerald-400');
 
             // ───────── 图表 ─────────
             function renderTrend() {
@@ -515,7 +621,8 @@
             function selectAct(act) {
                 selectedAct.value = act;
                 // 真实实现改为 GET /marketingStat/prizeHealth?activityCode=xxx
-                Object.assign(prize, GLOBAL_PRIZE);
+                // mock 里也必须真换数：v2 下钻后标题变成「该活动」而数字仍是全局的，会误导评审
+                Object.assign(prize, ACT_PRIZE[act.activityCode] || emptyPrize(act.activityName));
                 nextTick(() => { renderTrend(); mountFunnelIfNeeded(); });
             }
 
@@ -547,7 +654,7 @@
                 currentTime, selectedAct, scopeLabel, prize, fmt, pct,
                 activityList, activityStatusDist, failReasons, discardStat, discardTotal,
                 overdueIssues, lotteryIssues, drawStat, drawTotal, topMembers,
-                gameplayPanelTitle, typeLabel, typeColor, statusColor,
+                gameplayPanelTitle, typeLabel, typeColor, statusColor, statusLabel,
                 trendChartRef, funnelChartRef, selectAct, clearSelection,
             };
         },
