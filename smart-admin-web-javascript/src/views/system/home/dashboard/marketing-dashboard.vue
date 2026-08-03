@@ -98,7 +98,7 @@
     <!-- ══ 主体三栏 ══ -->
     <a-row :gutter="[10, 10]" class="main-row">
       <!-- 左：活动状态分布 + 活动列表 -->
-      <a-col :span="6">
+      <a-col :span="6" class="side-col">
         <a-card size="small" title="活动状态分布" class="panel">
           <div class="status-dist">
             <div class="status-cell">
@@ -116,7 +116,7 @@
           </div>
         </a-card>
 
-        <a-card size="small" class="panel activity-panel">
+        <a-card size="small" class="panel activity-panel fill-card">
           <template #title>活动列表</template>
           <template #extra>
             <a v-if="selectedCode" @click="selectActivity(null)">退出下钻</a>
@@ -170,7 +170,7 @@
       </a-col>
 
       <!-- 右：失败原因 + 事件丢弃 + 用户榜 -->
-      <a-col :span="6">
+      <a-col :span="6" class="side-col">
         <a-card size="small" title="发奖失败原因 TOP" class="panel">
           <div v-if="!failList.length" class="dim center">暂无失败记录</div>
           <div v-for="f in failList" :key="f.failReason" class="line-item">
@@ -197,7 +197,7 @@
           </div>
         </a-card>
 
-        <a-card size="small" title="Top 获奖用户" class="panel">
+        <a-card size="small" title="Top 获奖用户" class="panel fill-card">
           <div v-if="!topMembers.length" class="dim center">暂无数据</div>
           <div v-for="(m, idx) in topMembers" :key="m.memberName" class="line-item">
             <span class="rank" :class="{ top: idx < 3 }">{{ idx + 1 }}</span>
@@ -369,6 +369,36 @@
     margin-top: 0;
   }
 
+  /*
+   * 三栏底部对齐：中间那栏（参与统计 + 价值趋势 + 玩法运行态）最高，
+   * 左右两栏原先各自按内容收，底部参差不齐，看着像没排版。
+   *
+   * a-row 是 flex 且默认 stretch，每个 a-col 本来就已经被拉到「最高那栏」的高度 ——
+   * 缺的只是把这份高度分下去。所以两侧栏改成 flex 纵向容器，
+   * 各自指定一个 .fill-card 去吃掉剩余空间（左边是活动列表、右边是获奖用户榜），
+   * 内容超出时卡片体内部滚动，而不是把整页撑长。
+   *
+   * ⚠️ min-height:0 不能省：flex 子项默认 min-height:auto，
+   * 不写的话内容多了会顶破容器，overflow 不生效（滚动条永远不出现）。
+   */
+  .side-col {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .fill-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+
+    :deep(.ant-card-body) {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+  }
+
   .kpi-card {
     height: 100%;
 
@@ -471,9 +501,9 @@
     color: #8c8c8c;
   }
 
+  /* 滚动交给 .fill-card 的卡片体，这里不再自己限高 */
   .activity-list {
-    max-height: 420px;
-    overflow-y: auto;
+    flex: 1;
   }
 
   .activity-card {
