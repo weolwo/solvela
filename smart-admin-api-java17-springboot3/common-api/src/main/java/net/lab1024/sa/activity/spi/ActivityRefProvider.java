@@ -36,6 +36,18 @@ public interface ActivityRefProvider {
     List<ActivityRefItem> countRefs(String activityCode);
 
     /**
+     * 该活动挂了几个「玩法主体」（抽奖=奖池数 / 任务=任务配置数 / 彩票=彩票玩法数）。
+     *
+     * <p>与 {@link #countRefs} 的区别：countRefs 是<b>删除守卫</b>用的，把物资、期号这类
+     * 附属引用也算进去（它们同样会被删成孤儿）；本方法只回答「这个活动配了几个玩法」，
+     * 是给统计与大屏展示用的一个数。
+     *
+     * <p>刻意做成 SPI 的一个方法，而不是在统计 SQL 里写三个子查询硬编码三张表 ——
+     * 后者每加一种玩法都要改统计代码，正是这个 SPI 当初要消灭的东西。
+     */
+    long gameplayCount(String activityCode);
+
+    /**
      * 该活动的玩法是否已配置完备（判据 = 能不能上线）。
      *
      * <p><b>返回 null 表示已完备</b>，返回非 null 时是「还差什么」的人话说明。

@@ -52,6 +52,13 @@ public class LotteryActivityRefProvider implements ActivityRefProvider {
         return refs;
     }
 
+    /** 彩票的玩法主体是 t_lottery_config —— 一个活动可以挂多个玩法（5位/7位各一个） */
+    @Override
+    public long gameplayCount(String activityCode) {
+        return lotteryConfigManager.lambdaQuery()
+                .eq(LotteryConfig::getActivityCode, activityCode).count();
+    }
+
     /**
      * 彩票的「配置完备」= 活动下至少有一个玩法，<b>且每个玩法都能上线</b>。
      *

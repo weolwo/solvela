@@ -88,4 +88,247 @@
           AND a.status != 2
     </sql>
 
+    <!--
+      ══════════════════ 以下是营销大屏（首页）的六个接口 ══════════════════
+
+      🔴 prize_value 是 varchar，不能直接求和。两个已知陷阱（方案 §6）：
+        1) 同一种券存了 `20` 和 `20.0000` 两种写法 —— 所以**分组一律按 prize_code /
+           prize_type，绝不按 prize_value**，否则同一个奖会被拆成两组。实测两种写法都存在。
+        2) 列注释是「积分数/券ID」，将来真存了 ID，CAST 会静默变 0。
+           故求和前用 REGEXP 挡一道，非数字直接不计入，而不是让它悄悄变成 0。
+
+      🔴 「已发出」只认 status = 1。等待中(0)与失败(2)的记录**条数照算、价值不算** ——
+         这正是 §2.1 要并列展示两个数的原因。
+    -->
+
+    <!-- 已发出价值表达式：仅成功、且值确实是个数才计入 -->
+    <sql id="issuedValueExpr">
+        CASE WHEN status = 1 AND prize_value REGEXP '^[0-9]+(\\.[0-9]+)?$'
+             THEN CAST(prize_value AS DECIMAL(18,4)) ELSE 0 END
+    </sql>
+
+    <!-- 活动范围过滤：不传 activityCode 就是全局 -->
+    <sql id="activityCodeFilter">
+        <if test="activityCode != null and activityCode != ''">
+            AND activity_code = #{activityCode}
+        </if>
+    </sql>
+
+    <!-- ───────── 板块一：活动总览 ───────── -->
+
+    <!--
+      ⚠️ 只取字段，不在这里算「玩法数」与「完备度」。
+         方案 §3 明确要求走 ActivityRefProvider SPI：硬编码三张表的子查询，
+         每加一种玩法都要回来改这段 SQL，正是那个 SPI 当初要消灭的东西。
+      ⚠️ status 原样返回，两态判定（!= 2 为启用）在 Service 里做一次，不在 SQL 里也判一遍。
+    -->
+    <select id="activityCardList" resultType="net.lab1024.sa.stat.domain.vo.OverviewVO$ActivityCard">
+        SELECT activity_code AS activityCode,
+               activity_name AS activityName,
+               activity_type AS activityType,
+               status        AS status,
+               start_time    AS startTime,
+               end_time      AS endTime
+        FROM t_activity_config
+        ORDER BY create_time DESC, id DESC
+    </select>
+
+    <!--
+      逾期未开奖：已过 plan_draw_time 却还没开奖。
+      「对外承诺了开奖时刻却没开」属客诉级异常，比任何参与量指标都该优先展示。
+      status: 0-销售中 1-开奖中 2-已开奖，所以判据是 &lt;&gt; 2 而不是 = 0
+      —— 卡在「开奖中」同样是没开出来，漏掉它就漏掉了最需要人介入的那种。
+    -->
+    <select id="overdueIssueList" resultType="net.lab1024.sa.stat.domain.vo.OverviewVO$OverdueIssue">
+        SELECT i.lottery_code   AS lotteryCode,
+               c.activity_code  AS activityCode,
+               c.lottery_name   AS lotteryName,
+               i.issue_no       AS issueNo,
+               i.plan_draw_time AS planDrawTime,
+               TIMESTAMPDIFF(HOUR, i.plan_draw_time, now()) AS overdueHours
+        FROM t_lottery_issue i
+        JOIN t_lottery_config c ON c.lottery_code = i.lottery_code
+        WHERE i.status &lt;&gt; 2
+          AND i.plan_draw_time IS NOT NULL
+          AND i.plan_draw_time &lt; now()
+        ORDER BY i.plan_draw_time
+    </select>
+
+    <!-- ───────── 板块二：发奖健康度 ───────── -->
+
+    <!--
+      🔴 三个状态数之和必须等于 total。用 SUM(status = x) 而不是分别查，
+         保证它们出自同一次扫描、同一份快照 —— 分开查会在并发写入时凑不平，
+         而「加不平的 KPI」正是本项目在原型上栽过的那一跤。
+    -->
+    <select id="prizeSummary" resultType="net.lab1024.sa.stat.domain.vo.PrizeHealthVO">
+        SELECT COUNT(*)                  AS total,
+               SUM(status = 1)           AS successCount,
+               SUM(status = 2)           AS failedCount,
+               SUM(status = 0)           AS waitingCount,
+               SUM(approve_status = 1)   AS pendingApproveCount,
+               COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue,
+               COALESCE(TIMESTAMPDIFF(HOUR, MIN(CASE WHEN approve_status = 1 THEN create_time END), now()), 0)
+                                         AS maxWaitHours
+        FROM t_prize_log
+        WHERE 1 = 1
+        <include refid="activityCodeFilter"/>
+    </select>
+
+    <select id="prizeByAsset" resultType="net.lab1024.sa.stat.domain.vo.PrizeHealthVO$AssetItem">
+        SELECT prize_type AS prizeType,
+               COUNT(*)   AS count,
+               COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue
+        FROM t_prize_log
+        WHERE 1 = 1
+        <include refid="activityCodeFilter"/>
+        GROUP BY prize_type
+        ORDER BY COUNT(*) DESC
+    </select>
+
+    <select id="prizeFailReasonTop" resultType="net.lab1024.sa.stat.domain.vo.PrizeHealthVO$FailReason">
+        SELECT fail_reason AS failReason,
+               COUNT(*)    AS count
+        FROM t_prize_log
+        WHERE status = 2 AND fail_reason IS NOT NULL AND fail_reason != ''
+        <include refid="activityCodeFilter"/>
+        GROUP BY fail_reason
+        ORDER BY COUNT(*) DESC
+        LIMIT 10
+    </select>
+
+    <select id="prizeTrend" resultType="net.lab1024.sa.stat.domain.vo.PrizeHealthVO$TrendItem">
+        SELECT DATE_FORMAT(create_time, '%Y-%m-%d') AS statDate,
+               prize_type                           AS prizeType,
+               COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue
+        FROM t_prize_log
+        WHERE create_time &gt;= #{fromTime}
+        <include refid="activityCodeFilter"/>
+        GROUP BY statDate, prize_type
+        ORDER BY statDate
+    </select>
+
+    <!-- ───────── 板块三：玩法运行态 ───────── -->
+
+    <!--
+      抽奖状态分布。同时给条数与人数：
+      条数是「抽了多少次」，人数是「多少人抽的」，运营看的是两件事。
+      ⚠️ 库存水位不在这里查 —— 真实剩余在 Redis 的 draw:stock:*，
+         t_prize_pool_item.used_stock 是最终一致性兜底，读 DB 会偏小（压测第 3 轮踩过）。
+    -->
+    <select id="drawStat" resultType="net.lab1024.sa.stat.domain.vo.GameplayVO$DrawStatItem">
+        SELECT status                        AS status,
+               COUNT(*)                      AS count,
+               COUNT(DISTINCT member_name)   AS memberCount
+        FROM t_draw_prize_log
+        WHERE activity_code = #{activityCode}
+        GROUP BY status
+        ORDER BY status
+    </select>
+
+    <select id="lotteryIssueList" resultType="net.lab1024.sa.stat.domain.vo.GameplayVO$LotteryIssueItem">
+        SELECT i.lottery_code   AS lotteryCode,
+               c.lottery_name   AS lotteryName,
+               i.issue_no       AS issueNo,
+               i.sold_count     AS soldCount,
+               c.total_count    AS totalCount,
+               i.status         AS status,
+               i.plan_draw_time AS planDrawTime,
+               CASE WHEN i.status &lt;&gt; 2 AND i.plan_draw_time IS NOT NULL AND i.plan_draw_time &lt; now()
+                    THEN TIMESTAMPDIFF(HOUR, i.plan_draw_time, now()) ELSE 0 END AS overdueHours
+        FROM t_lottery_issue i
+        JOIN t_lottery_config c ON c.lottery_code = i.lottery_code
+        WHERE c.activity_code = #{activityCode}
+        ORDER BY i.plan_draw_time DESC, i.issue_no DESC
+    </select>
+
+    <select id="taskOptionList" resultType="net.lab1024.sa.stat.domain.vo.GameplayVO$TaskOption">
+        SELECT t.id        AS taskConfigId,
+               t.task_name AS taskName,
+               (SELECT COUNT(DISTINCT r.member_name) FROM t_task_record r
+                 WHERE r.task_config_id = t.id) AS memberCount
+        FROM t_task_config t
+        WHERE t.activity_code = #{activityCode}
+        ORDER BY t.sort_weight DESC, t.id
+    </select>
+
+    <!--
+      阶梯到达人数。判据是 current_metric &gt;= 该档 target，**不是「发过这档的奖」** ——
+      发奖可能因预算耗尽或等审批停在半路，那是发奖健康度要回答的问题；
+      混进漏斗会让运营把「发不出去」误读成「用户没做到」。
+
+      ⚠️ stage_condition 是 JSON，target 取 $.target。JSON_UNQUOTE 必须有：
+         不去引号的话 CAST('"3"' AS DECIMAL) 在 MySQL 里会得到 0 —— 静默算错，不报错。
+
+      🔴 <b>必须 COUNT(DISTINCT member_name)，不能 COUNT(*)</b>。
+         周期型任务是「每人每周期一条记录」（uk 是 member_name + task_config_id + period_key），
+         用 COUNT(*) 数的是记录数而不是人数，而漏斗第一层 joinedCount 数的是人数 ——
+         两个单位混在一张漏斗里，下层会比上层还宽。
+         实测就撞上了：task_config_id=50 接取 12 人，而 COUNT(*) 口径下第一档「到达」18，
+         漏斗直接倒过来。两个数各自都没算错，错在放进了同一张图。
+    -->
+    <select id="taskFunnelStages" resultType="net.lab1024.sa.stat.domain.vo.TaskFunnelVO$StageItem">
+        SELECT m.stage_level AS stageLevel,
+               CAST(JSON_UNQUOTE(JSON_EXTRACT(m.stage_condition, '$.target')) AS DECIMAL(18,4)) AS target,
+               m.prize_code  AS prizeCode,
+               (SELECT COUNT(DISTINCT r.member_name) FROM t_task_record r
+                 WHERE r.task_config_id = m.task_config_id
+                   AND r.current_metric &gt;=
+                       CAST(JSON_UNQUOTE(JSON_EXTRACT(m.stage_condition, '$.target')) AS DECIMAL(18,4))
+               ) AS reachCount
+        FROM t_task_prize_mapping m
+        WHERE m.task_config_id = #{taskConfigId}
+        ORDER BY m.stage_level
+    </select>
+
+    <select id="taskName" resultType="java.lang.String">
+        SELECT task_name FROM t_task_config WHERE id = #{taskConfigId}
+    </select>
+
+    <select id="taskJoinedCount" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT member_name) FROM t_task_record WHERE task_config_id = #{taskConfigId}
+    </select>
+
+    <!-- ───────── 板块四：事件健康度 ───────── -->
+
+    <select id="eventFlowTypeCount" resultType="java.util.Map">
+        SELECT flow_type AS flowType, COUNT(*) AS cnt
+        FROM t_task_record_flow
+        WHERE create_time &gt;= #{fromTime}
+        GROUP BY flow_type
+    </select>
+
+    <!--
+      🔴 按 discard_code 聚类，不是 discard_reason。
+         后者是自由文本且刻意带了具体数值（「单笔金额 99 未达门槛 100」），是给人读的，
+         直接 GROUP BY 会炸成几百个不同的值。
+         实测印证过为什么两个字段必须并存：AUDIENCE_MISMATCH 这一个码下面躺着
+         「仅限新会员」和「仅限老会员」两种文本 —— 只留文本就聚不成一类。
+      走覆盖索引 idx_t_tsk_flw_stat(create_time, flow_type, discard_code)。
+      discardDesc 与 needsAttention 不在 SQL 里拼，由 Service 查 TaskDiscardCode 枚举补。
+    -->
+    <select id="discardStat" resultType="net.lab1024.sa.stat.domain.vo.EventHealthVO$DiscardItem">
+        SELECT discard_code AS discardCode,
+               COUNT(*)     AS count
+        FROM t_task_record_flow
+        WHERE create_time &gt;= #{fromTime}
+          AND flow_type = 2
+          AND discard_code IS NOT NULL
+        GROUP BY discard_code
+        ORDER BY COUNT(*) DESC
+    </select>
+
+    <!-- ───────── 板块五：用户维度 ───────── -->
+
+    <select id="topMembers" resultType="net.lab1024.sa.stat.domain.vo.TopMemberVO">
+        SELECT member_name AS memberName,
+               COUNT(*)    AS count,
+               COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue
+        FROM t_prize_log
+        WHERE create_time &gt;= #{fromTime}
+        GROUP BY member_name
+        ORDER BY issuedValue DESC, count DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

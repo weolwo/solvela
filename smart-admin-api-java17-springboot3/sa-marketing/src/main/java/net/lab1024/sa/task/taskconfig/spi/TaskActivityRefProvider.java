@@ -39,6 +39,13 @@ public class TaskActivityRefProvider implements ActivityRefProvider {
         return refs;
     }
 
+    /** 任务的玩法主体是任务配置 */
+    @Override
+    public long gameplayCount(String activityCode) {
+        return taskConfigManager.lambdaQuery()
+                .eq(TaskConfig::getActivityCode, activityCode).count();
+    }
+
     /**
      * 任务的「配置完备」= 至少有一个任务配置。
      *

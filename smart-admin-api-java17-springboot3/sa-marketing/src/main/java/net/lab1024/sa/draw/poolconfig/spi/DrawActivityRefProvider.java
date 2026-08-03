@@ -47,6 +47,13 @@ public class DrawActivityRefProvider implements ActivityRefProvider {
         return refs;
     }
 
+    /** 抽奖的玩法主体是奖池 */
+    @Override
+    public long gameplayCount(String activityCode) {
+        return prizePoolConfigManager.lambdaQuery()
+                .eq(PrizePoolConfig::getActivityCode, activityCode).count();
+    }
+
     /**
      * 抽奖的「配置完备」= 至少有一个奖池。
      *
