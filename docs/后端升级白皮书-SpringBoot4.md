@@ -12,7 +12,8 @@
 
 升级分两步走：**先做依赖清理（可独立回滚），再做 Spring Boot 4 迁移**。
 迁移的主体工作量不在 Spring 本身，而在 **Jackson 2 → Jackson 3（`com.fasterxml` → `tools.jackson`）**，
-共改动 40 个源文件；真正卡住路的只有一个 —— **knife4j 没有 Boot 4 版本，只能换回官方 springdoc**。
+共改动 40 个源文件；真正卡住路的只有一个 —— **knife4j 官方与主流社区分支都没有 Boot 4 版本**，
+先换回官方 springdoc（失去 `/doc.html`），最终改用第三方 fork `com.baizhukui` 5.2.1 把 `/doc.html` 找了回来（§4.1）。
 
 最值得记住的三条：**①** Jackson 3 的 mapper 不可变、受检异常变非受检，破坏性远超"改个包名"（§4.2）；
 **②** Redisson 4 不再把空密码当"没密码"，一行空的 `password:` 就能让启动失败（§4.3）；
@@ -74,7 +75,7 @@ commons-* 全系、poi 5.5.1、bcprov 1.85、velocity、freemarker、p6spy、ref
 | `poi-ooxml-full` 5.5.1 | 零引用 `org.openxmlformats`，且拖着 xmlbeans 全量 schema，**21MB** |
 | `poi-scratchpad` 5.5.1 | HSLF/HWPF/HSSF 一处没用，**4MB** |
 | `redisson-spring-data-27`（depMgmt） | 从未被任何模块声明，死条目 |
-| `springdoc-openapi.version`（property） | 属性声明了但没有 dependency 引用（后来在换 springdoc 时复活） |
+| `springdoc-openapi.version`（property） | 属性声明了但没有 dependency 引用。中途换官方 springdoc 时复活过，**最终又删了** —— 改用 baizhukui fork 后 springdoc 版本完全由它传递决定（见 §4.1） |
 
 ### 2.2 结构性修正
 
@@ -205,17 +206,19 @@ spring:
 
 以及删掉 `spring.data.redis.password` 那行空值（见 §4.3）。
 
-### 3.5 knife4j 残留清理
+### 3.5 knife4j 耦合点（一度摘除，最终全部还原）
 
-换掉 knife4j 后，散落在四处的耦合点一并摘除：
+> 🔴 **这一节记的是中间状态，最终形态是「原样保留」** —— 换成官方 springdoc 那一版
+> 把下面五处耦合点全摘了，后来改用 baizhukui fork 恢复 `/doc.html`，五处又全部还原。
+> **以代码为准**，别照着「已摘除」去改。
 
-| 位置 | 改动 |
-|---|---|
-| `WebServerListener` 启动横幅 | "knife4j地址: /doc.html" → "OpenAPI文档: /v3/api-docs"（原地址已 404） |
-| `MvcConfig.addResourceHandlers` | 删掉 `doc.html` 的静态资源映射（那是 knife4j 的 UI 入口页）；`/webjars/**` 保留，Swagger UI 要用 |
-| `SwaggerConfig.SWAGGER_WHITELIST` | 删掉 `/doc.html`（免登录白名单里的死条目） |
-| `SwaggerConfig` 注释 | 删掉 "如果使用knife4j则不需要" 这句已失效的说明 |
-| 四个 profile 的 yaml | 删掉整段 `knife4j:` 配置块（enable / basic 认证用户名密码） |
+| 位置 | 中途摘除的内容 | 最终状态 |
+|---|---|---|
+| `WebServerListener` 启动横幅 | "knife4j地址: /doc.html" → "OpenAPI文档: /v3/api-docs" | ✅ 已还原，横幅仍打 `/doc.html` |
+| `MvcConfig.addResourceHandlers`（在 **sa-admin**，不在 sa-base） | 删掉 `/doc.html` 的静态资源映射 | ✅ 已还原；`/webjars/**` 全程保留 |
+| `SwaggerConfig.SWAGGER_WHITELIST` | 删掉 `/doc.html` | ✅ 已还原，`/doc.html` 在免登录白名单里 |
+| `SwaggerConfig` 注释 | 删掉 "如果使用knife4j则不需要" | ✅ 仍在（该说明重新成立） |
+| 四个 profile 的 yaml | 删掉整段 `knife4j:` 配置块 | ✅ 已还原，dev/test/pre/prod **四个都有**（见 §4.1 注意事项 3） |
 
 ### 3.6 第三方 API
 
@@ -391,7 +394,9 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 - **Jackson 3 的不可变 mapper**：配置只能在 builder 阶段完成，杜绝了"运行期某处偷偷 `setXxx` 改全局 mapper"
   这类极难排查的串扰问题——本项目原来有 3 处这种写法。
 - **Jakarta EE 11 / Tomcat 11**：实测启动跑在 Apache Tomcat/11.0.22 上。
-- **API 文档回到官方 springdoc**：不再受第三方 fork 的发版节奏牵制（这次的拦路虎正是它）。
+- **API 文档链路升到了 springdoc 3.x（Boot 4 适配版）**，`/doc.html` 体验保留。
+  ⚠️ 这一条**不算收益**：实现方从官方 knife4j 换成了另一个第三方 fork（`com.baizhukui`），
+  「受制于 fork 发版节奏」的问题依旧存在，只是换了个 fork（见 §4.1）。
 
 ### 5.3 工程质量（清理阶段的收益）
 
@@ -408,6 +413,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 | 真实启动 | ✅ `Started AdminApplication in 10.051 seconds`，启动日志无 ERROR |
 | `GET /login/getCaptcha` | ✅ 200，返回验证码 base64 |
 | `POST /login` | ✅ 200，请求体反序列化 + ResponseDTO 序列化正常（Jackson 3 全链路） |
+| `GET /doc.html`（knife4j UI，主地址） | ✅ 200 |
 | `GET /swagger-ui/index.html` | ✅ 200 |
 | `GET /v3/api-docs` | ✅ 200 |
 | MyBatis-Plus / Redis / sa-token | ✅ 启动日志可见正常查询与连接 |
@@ -437,8 +443,10 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
    但若碰到冷门 xlsx 特性会在运行期抛 `NoClassDefFoundError: org.openxmlformats.schemas.*`，
    届时把 `poi-ooxml-full` 加回来即可。
    **这是本轮唯一没被自动化覆盖到的功能面**，其余都有单测或真实启动实测背书。
-3. **通知前端/测试：接口文档地址变了**。`/doc.html` 已不存在，改用 `/swagger-ui/index.html`。
-   如果有 CI 脚本、Nginx 规则、书签或对外文档指向 `/doc.html`，需要一并改。
+3. ~~通知前端/测试：接口文档地址变了~~ —— **最终形态下地址没变**，`/doc.html` 仍可用（实测 200），
+   指向它的 CI 脚本 / Nginx 规则 / 书签**都不用改**。
+   （中途换成官方 springdoc 时 `/doc.html` 确实消失过，那一版的结论已不成立，见 §4.1。）
+   另外 `/swagger-ui/index.html` 与 `/v3/api-docs` 同样可用，三者都在 `SWAGGER_WHITELIST` 里免登录。
 
 ### 6.2 已评估并决定「不做」（记录理由，避免下次重复讨论）
 
@@ -465,7 +473,9 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
    当前 v2 数据文件工作正常，不换也没有故障风险。
    - 注意：GitHub 的 v3.17.0 是**整个项目**的发版号，Java 构件 `org.lionsoul:ip2region`
      版本号独立，Central 上最高就是 3.3.7，两个号不要对齐着看。
-8. **knife4j 若发布 Boot 4 版本**，可考虑换回（当前是被迫改用 springdoc，UI 有落差）。
+8. **官方 knife4j（`com.github.xiaoymin`）若发布 Boot 4 版本，应从 `com.baizhukui` 这个 fork 换回官方**。
+   当前 fork 不仅决定 UI，还**决定 springdoc / swagger-core 的版本**（3.0.3 / 2.2.47），
+   它停更就等于这条链路停在原地。换回时记得同步 §4.1 里那三条注意事项。
 
 ### 6.4 可选的小清理
 
@@ -481,16 +491,25 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 
 本轮全部改动在 `upgrade/springboot4` 分支上，`task` 分支未受影响，直接切回即可。
 
-分支内共 6 个提交，**前端清理与后端升级是分开的**，可按需 revert 或 cherry-pick：
+分支内共 6 个提交（**截至白皮书成文时**；此后还有前端瘦身、CodeMirror 替换、
+`create_time` 收口、首页图表等提交，以 `git log task..upgrade/springboot4` 为准），
+**前端清理与后端升级是分开的**，可按需 revert 或 cherry-pick：
 
 | # | 提交 | 内容 | 可否单独摘出 |
 |---|---|---|---|
 | 1 | 前端依赖瘦身 | 仅 `smart-admin-web-javascript/`，卸 v-viewer 与失效的 eslint/stylelint 链 | ✅ 与后端无耦合，可单独摘到 `task` |
 | 2 | 后端升级 Spring Boot 4 | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） | ❌ 本轮的地基 |
 | 3 | 白皮书版本号订正 | 纯文档 | ✅ |
-| 4 | 清掉 knife4j 全部残留 | 横幅 / MvcConfig / 白名单 / 四个 yaml | 依赖 #2 |
+| 4 | 清掉 knife4j 全部残留（`e7b425f4`） | 横幅 / MvcConfig / 白名单 / 四个 yaml | 依赖 #2；**后被 `ca4e4701` 整体还原，见下方 🔴** |
 | 5 | 收口遗留排期项 | ip2region 3.3.7、tika 3.3.2、sa-token Redis DAO 换官方、前端死注释 | 依赖 #2 |
 | 6 | ip2region 数据格式归一化 | `SmartIpUtil` 按 xdb 文件头版本自适应 | 依赖 #5 |
+
+> 🔴 **改用 baizhukui fork 的那次改动藏在一个前端提交里**：`ca4e4701`「前端体积优化：产物 26MB → 19.4MB」
+> 同时改了 **9 个后端文件**（根 pom / sa-base pom / `MvcConfig` / `SwaggerConfig` / `WebServerListener` /
+> 四个 profile 的 `sa-base.yaml`），提交信息里一个字都没提。
+> 这正是本白皮书 §3.5、§5.2、§6.1、§6.3 一度与代码对不上的原因 ——
+> **要 revert 前端瘦身就会连带把 `/doc.html` 一起 revert 掉**，两者在同一个提交里，无法干净拆分。
+> 教训：跨端改动不要混进单端提交，否则历史里查不到、文档也不会跟着更新。
 
 > ⚠️ **数据面的注意**：Redis 里的值格式变了（见 §6.1），**回滚后同样要清一次 Redis**，
 > 否则 Jackson 3 写入的值会让回滚后的 Jackson 2 反序列化失败 —— 这个方向的污染同样存在，别只防单向。
