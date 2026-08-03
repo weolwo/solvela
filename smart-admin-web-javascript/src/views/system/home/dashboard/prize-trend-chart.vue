@@ -6,6 +6,10 @@
 
   ⚠️ 纵轴是「已发出价值」，只算 status=1 的记录。
      「已发出」不等于「已到账」（方案 §2.2），措辞不能混。
+
+  配色来自 dashboard-theme.js 的固定槽位，堆叠顺序也按槽位来（理由见那里）。
+  青、黄两槽对白底不足 3:1，故这张图的读数通道不只有颜色：
+  上方 KPI 卡把每种资产的条数与金额逐项列出来了，等价于一张明细表。
 -->
 <template>
   <div ref="chartRef" class="trend-chart"></div>
@@ -15,21 +19,12 @@
   import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
   import echarts from '/@/lib/echarts';
   import { PRIZE_TYPE_ENUM } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import { ASSET_COLOR, ASSET_ORDER, CHROME, axisStyle, legendStyle, splitLineStyle, tooltipStyle } from './dashboard-theme';
 
   const props = defineProps({
     dateList: { type: Array, default: () => [] },
     trendList: { type: Array, default: () => [] },
   });
-
-  // 与后端 PrizeTypeEnum 对齐；颜色固定，切活动时同一种资产不会换色
-  const ASSET_COLOR = {
-    COUPON: '#10b981',
-    SCORE: '#3b82f6',
-    BALANCE: '#f59e0b',
-    PHYSICAL: '#ec4899',
-    LOTTERY: '#8b5cf6',
-    CUSTOM: '#94a3b8',
-  };
 
   const chartRef = ref(null);
   const chart = shallowRef(null);
@@ -45,25 +40,52 @@
 
   function render() {
     if (!ensureChart()) return;
-    const types = [...new Set(props.trendList.map((t) => t.prizeType))];
+    // ⚠️ 堆叠顺序按固定槽位来，不按数值大小排：
+    //    ① 颜色跟着资产走，切活动时同一种资产不会换色；
+    //    ② 相邻两段的配色正是校验通过的那几对（见 dashboard-theme.js）。
+    const present = new Set(props.trendList.map((t) => t.prizeType));
+    const types = ASSET_ORDER.filter((t) => present.has(t)).concat([...present].filter((t) => !ASSET_ORDER.includes(t)));
+
     const series = types.map((type) => ({
       name: assetLabel(type),
       type: 'bar',
       stack: 'value',
-      barMaxWidth: 28,
-      itemStyle: { color: ASSET_COLOR[type] || '#94a3b8' },
+      barMaxWidth: 24,
+      itemStyle: {
+        color: ASSET_COLOR[type] || CHROME.axisLine,
+        // 段与段之间留一条底色缝：靠留白分隔，而不是给每段描个边（描边是多出来的、不表意的墨）
+        borderColor: CHROME.surface,
+        borderWidth: 1,
+        // 只有最上面那段圆角，堆叠体才像一根完整的柱子而不是一摞方块
+        borderRadius: [0, 0, 0, 0],
+      },
       data: props.dateList.map((d) => {
         const hit = props.trendList.find((t) => t.statDate === d && t.prizeType === type);
         return num(hit && hit.issuedValue);
       }),
     }));
+    if (series.length) {
+      series[series.length - 1].itemStyle.borderRadius = [4, 4, 0, 0];
+    }
+
     chart.value.setOption(
       {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { top: 0, itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 } },
-        grid: { top: 32, right: 16, bottom: 24, left: 52 },
-        xAxis: { type: 'category', data: props.dateList, axisLabel: { fontSize: 11 } },
-        yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(11,11,11,0.04)' } },
+          valueFormatter: (v) => '¥' + num(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 }),
+          ...tooltipStyle,
+        },
+        legend: { ...legendStyle, data: series.map((s) => s.name) },
+        grid: { top: 34, right: 16, bottom: 24, left: 56 },
+        xAxis: { type: 'category', data: props.dateList, ...axisStyle },
+        yAxis: {
+          type: 'value',
+          ...axisStyle,
+          ...splitLineStyle,
+          axisLine: { show: false },
+          axisLabel: { ...axisStyle.axisLabel, formatter: (v) => (v >= 1000 ? v / 1000 + 'k' : v) },
+        },
         series,
       },
       true

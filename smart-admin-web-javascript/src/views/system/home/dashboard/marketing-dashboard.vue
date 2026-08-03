@@ -37,16 +37,22 @@
       </template>
     </a-alert>
 
-    <!-- ══ KPI 四格 ══ -->
-    <a-row :gutter="[10, 10]">
+    <!--
+      ══ KPI 四格 ══
+      每格是同一套结构：一条角色色的顶栏 + 标签 + 主数 + 若干「点 + 文字」的分项 + 口径脚注。
+      ⚠️ 数字本身一律用正文墨色，不染成红绿 —— 语义由旁边那个小圆点和文字承担。
+         数字染色看着热闹，但一旦四个格子都在喊，就没有一个是重点了。
+    -->
+    <a-row :gutter="[12, 12]">
       <a-col :span="6">
-        <a-card size="small" class="kpi-card">
-          <div class="kpi-title">{{ scopeLabel }}发奖记录（条）</div>
-          <div class="kpi-main">
-            <span class="kpi-num">{{ num(prize.total) }}</span>
-            <span class="kpi-tag ok">成功 {{ num(prize.successCount) }}</span>
-            <span class="kpi-tag bad">失败 {{ num(prize.failedCount) }}</span>
-            <span class="kpi-tag warn">等待 {{ num(prize.waitingCount) }}</span>
+        <a-card size="small" class="kpi-card" :class="{ 'is-alarm': false }">
+          <span class="kpi-accent accent-brand"></span>
+          <div class="kpi-label">{{ scopeLabel }}发奖记录</div>
+          <div class="kpi-value">{{ num(prize.total) }}<i class="kpi-unit">条</i></div>
+          <div class="kpi-chips">
+            <span class="chip"><i class="dot dot-good"></i>成功 {{ num(prize.successCount) }}</span>
+            <span class="chip"><i class="dot dot-critical"></i>失败 {{ num(prize.failedCount) }}</span>
+            <span class="chip"><i class="dot dot-neutral"></i>等待 {{ num(prize.waitingCount) }}</span>
           </div>
           <div class="caliber">status：1-成功 / 2-失败 / 0-等待 · 三项之和等于总数</div>
         </a-card>
@@ -54,13 +60,13 @@
 
       <a-col :span="6">
         <a-card size="small" class="kpi-card">
-          <div class="kpi-title">{{ scopeLabel }}已发出价值</div>
-          <div class="kpi-num money">¥{{ fmt(prize.issuedValue) }}</div>
-          <div class="asset-line">
-            <span v-for="a in assetList" :key="a.prizeType" class="asset-item">
-              {{ a.label }}
-              <b>{{ num(a.count) }}条</b>
-              <span :class="num(a.issuedValue) > 0 ? 'ok' : 'dim'">¥{{ fmt(a.issuedValue) }}</span>
+          <span class="kpi-accent accent-good"></span>
+          <div class="kpi-label">{{ scopeLabel }}已发出价值</div>
+          <div class="kpi-value">¥{{ fmt(prize.issuedValue) }}</div>
+          <div class="kpi-chips">
+            <span v-for="a in assetList" :key="a.prizeType" class="chip">
+              <i class="dot" :style="{ background: a.color }"></i>{{ a.label }} {{ num(a.count) }}条
+              <b :class="num(a.issuedValue) > 0 ? 'chip-strong' : 'chip-zero'">¥{{ fmt(a.issuedValue) }}</b>
             </span>
           </div>
           <div class="caliber">仅 status=1 计入；「已发出」不等于「已到账」</div>
@@ -68,11 +74,13 @@
       </a-col>
 
       <a-col :span="6">
-        <a-card size="small" class="kpi-card" :class="{ alarm: num(prize.maxWaitHours) >= 24 }">
-          <div class="kpi-title">人工审批积压（笔）</div>
-          <div class="kpi-main">
-            <span class="kpi-num warn">{{ num(prize.pendingApproveCount) }}</span>
-            <span class="kpi-tag" :class="num(prize.maxWaitHours) >= 24 ? 'bad' : 'dim'">
+        <a-card size="small" class="kpi-card" :class="{ 'is-alarm': num(prize.maxWaitHours) >= 24 }">
+          <span class="kpi-accent accent-warning"></span>
+          <div class="kpi-label">人工审批积压</div>
+          <div class="kpi-value">{{ num(prize.pendingApproveCount) }}<i class="kpi-unit">笔</i></div>
+          <div class="kpi-chips">
+            <span class="chip">
+              <i class="dot" :class="num(prize.maxWaitHours) >= 24 ? 'dot-critical' : 'dot-neutral'"></i>
               最长滞留 {{ num(prize.maxWaitHours) }}h
             </span>
           </div>
@@ -81,14 +89,16 @@
       </a-col>
 
       <a-col :span="6">
-        <a-card size="small" class="kpi-card" :class="{ alarm: num(event.attentionCount) > 0 }">
-          <div class="kpi-title">近 {{ event.days || 7 }} 天事件丢弃（次）</div>
-          <div class="kpi-main">
-            <span class="kpi-num bad">{{ num(event.discardCount) }}</span>
-            <span class="kpi-tag" :class="num(event.attentionCount) > 0 ? 'bad' : 'dim'">
+        <a-card size="small" class="kpi-card" :class="{ 'is-alarm': num(event.attentionCount) > 0 }">
+          <span class="kpi-accent accent-critical"></span>
+          <div class="kpi-label">近 {{ event.days || 7 }} 天事件丢弃</div>
+          <div class="kpi-value">{{ num(event.discardCount) }}<i class="kpi-unit">次</i></div>
+          <div class="kpi-chips">
+            <span class="chip">
+              <i class="dot" :class="num(event.attentionCount) > 0 ? 'dot-critical' : 'dot-neutral'"></i>
               需人介入 {{ num(event.attentionCount) }}
             </span>
-            <span class="kpi-tag ok">有效推进 {{ num(event.advanceCount) }}</span>
+            <span class="chip"><i class="dot dot-good"></i>有效推进 {{ num(event.advanceCount) }}</span>
           </div>
           <div class="caliber">幂等命中不写流水，重复投递在这里看不见</div>
         </a-card>
@@ -102,12 +112,12 @@
         <a-card size="small" title="活动状态分布" class="panel">
           <div class="status-dist">
             <div class="status-cell">
-              <div class="status-num ok">{{ num(overview.enabledCount) }}</div>
-              <div class="status-label">启用</div>
+              <div class="status-num">{{ num(overview.enabledCount) }}</div>
+              <div class="status-label"><i class="dot dot-good"></i>启用</div>
             </div>
             <div class="status-cell">
-              <div class="status-num bad">{{ num(overview.disabledCount) }}</div>
-              <div class="status-label">禁用</div>
+              <div class="status-num">{{ num(overview.disabledCount) }}</div>
+              <div class="status-label"><i class="dot dot-neutral"></i>禁用</div>
             </div>
           </div>
           <div class="caliber">
@@ -137,7 +147,9 @@
                 </a-tag>
               </div>
               <div class="act-meta">
-                <span :class="act.enabled ? 'ok' : 'bad'">● {{ act.enabled ? '启用' : '禁用' }}</span>
+                <span class="act-status">
+                  <i class="dot" :class="act.enabled ? 'dot-good' : 'dot-neutral'"></i>{{ act.enabled ? '启用' : '禁用' }}
+                </span>
                 <span class="dim">{{ fmtDate(act.startTime) }} ~ {{ fmtDate(act.endTime) || '不限' }}</span>
               </div>
               <div class="act-meta">
@@ -174,8 +186,9 @@
         <a-card size="small" title="发奖失败原因 TOP" class="panel">
           <div v-if="!failList.length" class="dim center">暂无失败记录</div>
           <div v-for="f in failList" :key="f.failReason" class="line-item">
+            <i class="dot dot-critical"></i>
             <span class="line-text">{{ f.failReason }}</span>
-            <span class="bad">{{ num(f.count) }}</span>
+            <span class="line-num">{{ num(f.count) }}</span>
           </div>
         </a-card>
 
@@ -183,11 +196,12 @@
           <div v-if="!discardList.length" class="dim center">暂无丢弃事件</div>
           <div v-for="d in discardList" :key="d.discardCode" class="discard-item">
             <div class="line-item">
+              <i class="dot" :class="d.needsAttention ? 'dot-critical' : 'dot-neutral'"></i>
               <span class="line-text">
-                <a-tag v-if="d.needsAttention" color="red">需介入</a-tag>
                 {{ d.discardDesc }}
+                <a-tag v-if="d.needsAttention" color="red" class="tag-mini">需介入</a-tag>
               </span>
-              <span class="warn">{{ num(d.count) }}</span>
+              <span class="line-num">{{ num(d.count) }}</span>
             </div>
             <div class="act-code">{{ d.discardCode }}</div>
           </div>
@@ -203,7 +217,7 @@
             <span class="rank" :class="{ top: idx < 3 }">{{ idx + 1 }}</span>
             <span class="line-text mono">{{ m.memberName }}</span>
             <span class="dim">{{ num(m.count) }}次</span>
-            <span class="ok money-sm">¥{{ fmt(m.issuedValue) }}</span>
+            <span class="money-sm">¥{{ fmt(m.issuedValue) }}</span>
           </div>
           <div class="caliber">按已发出价值降序，仅 status=1 计入</div>
         </a-card>
@@ -221,6 +235,7 @@
   import GameplayPanel from './gameplay-panel.vue';
   import { marketingStatApi } from '/@/api/business/stat/marketing-stat-api';
   import { PRIZE_TYPE_ENUM } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import { ASSET_COLOR, STATUS } from './dashboard-theme';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE;
@@ -254,10 +269,13 @@
   const overdueList = computed(() => overview.overdueIssueList || []);
   const failList = computed(() => prize.failReasonList || []);
   const discardList = computed(() => event.discardList || []);
+  // 资产分项的小圆点用与趋势图同一套槽位色 —— 同一种资产在卡片上和图上必须是同一个颜色，
+  // 否则读者要在两处各记一遍图例
   const assetList = computed(() =>
     (prize.byAssetList || []).map((a) => ({
       ...a,
       label: PRIZE_TYPE_ENUM[a.prizeType] ? PRIZE_TYPE_ENUM[a.prizeType].desc : a.prizeType,
+      color: ASSET_COLOR[a.prizeType] || STATUS.neutral,
     }))
   );
 
@@ -336,9 +354,58 @@
 </script>
 
 <style lang="less" scoped>
+  /*
+   * ══ 视觉约定（改样式前先看这段）══
+   *
+   * 1. 层级只有三档：卡片标题 / 数据 / 口径脚注。脚注永远是最弱的一档，
+   *    它是「怕人误读」的保险，不是内容，抢戏就本末倒置了。
+   * 2. **数字不染色**。语义交给旁边的小圆点和文字（成功/失败/需人介入），
+   *    数字本身一律正文墨色 —— 四个格子都在喊红绿，就等于没有重点。
+   *    唯一例外是告警条与「需人介入」这类真·状态，且都配了文字，不靠颜色单独表意。
+   * 3. 颜色一律从 dashboard-theme.js 取，别在这里写死 hex（图上和卡片上必须同色）。
+   * 4. 分隔靠留白与一条极淡的描边，不用重阴影 —— 悬停时才给一点浮起，
+   *    静止状态下整屏应当是平的。
+   */
+
+  @ink: #0b0b0b;
+  @ink-secondary: #52514e;
+  @ink-muted: #898781;
+  @hairline: #ececea;
+  @surface-hover: #fafafa;
+
+  @c-brand: #2a78d6;
+  @c-good: #0ca30c;
+  @c-warning: #fab219;
+  @c-critical: #d03b3b;
+  @c-neutral: #c3c2b7;
+
   .dashboard {
     :deep(.ant-card) {
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      border-color: @hairline;
+      transition: box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    :deep(.ant-card:hover) {
+      border-color: darken(@hairline, 6%);
+      box-shadow: 0 4px 16px rgba(11, 11, 11, 0.06);
+    }
+
+    /* 卡片标题：小一号、字重收一点，标题不该比数据还响 */
+    :deep(.ant-card-head) {
+      min-height: 40px;
+      border-bottom-color: @hairline;
+    }
+
+    :deep(.ant-card-head-title) {
+      font-size: 13px;
+      font-weight: 600;
+      color: @ink;
+    }
+
+    :deep(.ant-card-extra) {
+      font-size: 12px;
     }
 
     /*
@@ -357,7 +424,8 @@
   }
 
   .overdue-alert {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    border-radius: 10px;
 
     .overdue-item {
       margin-right: 18px;
@@ -399,68 +467,129 @@
     }
   }
 
+  // ───────── KPI 四格 ─────────
+
   .kpi-card {
+    position: relative;
     height: 100%;
+    overflow: hidden;
 
-    &.alarm {
-      border-color: #ffa39e;
+    &.is-alarm {
+      border-color: fade(@c-critical, 45%);
+      background: fade(@c-critical, 2%);
     }
   }
 
-  .kpi-title {
-    margin-bottom: 4px;
-    font-size: 12px;
-    color: #8c8c8c;
+  /* 顶部一条 3px 的角色色 —— 四格靠它一眼分出「说的是哪件事」，而不是靠把数字染色 */
+  .kpi-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
   }
 
-  .kpi-main {
+  .accent-brand {
+    background: @c-brand;
+  }
+  .accent-good {
+    background: @c-good;
+  }
+  .accent-warning {
+    background: @c-warning;
+  }
+  .accent-critical {
+    background: @c-critical;
+  }
+
+  .kpi-label {
+    margin-bottom: 2px;
+    font-size: 12px;
+    color: @ink-muted;
+  }
+
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: @ink;
+    /* 大数字用比例数字：tabular 会把每个字都撑成 0 的宽度，显示尺寸下看着松垮 */
+    letter-spacing: -0.5px;
+  }
+
+  .kpi-unit {
+    margin-left: 3px;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 400;
+    color: @ink-muted;
+  }
+
+  .kpi-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    align-items: baseline;
+    gap: 4px 12px;
+    margin-top: 6px;
   }
 
-  .kpi-num {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 26px;
-    font-weight: 700;
-    line-height: 1.2;
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    color: @ink-secondary;
 
-    &.money {
-      color: #52c41a;
+    b {
+      margin-left: 4px;
+      font-weight: 600;
     }
   }
 
-  .kpi-tag {
-    font-size: 12px;
+  .chip-strong {
+    color: @c-good;
   }
 
-  .asset-line {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 10px;
-    margin-top: 4px;
-
-    .asset-item {
-      font-size: 11px;
-      color: #595959;
-    }
+  .chip-zero {
+    color: @ink-muted;
   }
+
+  /* 语义小圆点：颜色的落点在这里，不在数字上 */
+  .dot {
+    width: 6px;
+    height: 6px;
+    margin-right: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-good {
+    background: @c-good;
+  }
+  .dot-critical {
+    background: @c-critical;
+  }
+  .dot-warning {
+    background: @c-warning;
+  }
+  .dot-neutral {
+    background: @c-neutral;
+  }
+
+  // ───────── 通用文字层级 ─────────
 
   .ok {
-    color: #52c41a;
+    color: @c-good;
   }
 
   .bad {
-    color: #f5222d;
+    color: @c-critical;
   }
 
   .warn {
-    color: #faad14;
+    color: @c-warning;
   }
 
   .dim {
-    color: #8c8c8c;
+    color: @ink-muted;
   }
 
   .center {
@@ -469,17 +598,19 @@
   }
 
   .caliber {
-    padding-top: 6px;
+    padding-top: 8px;
     font-size: 11px;
     line-height: 1.6;
-    color: #8c8c8c;
+    color: @ink-muted;
   }
 
   .panel {
     :deep(.ant-card-body) {
-      padding: 10px 12px;
+      padding: 12px 14px;
     }
   }
+
+  // ───────── 左栏：状态分布 + 活动列表 ─────────
 
   .status-dist {
     display: flex;
@@ -488,39 +619,50 @@
   .status-cell {
     flex: 1;
     text-align: center;
+    padding: 4px 0;
+
+    & + .status-cell {
+      border-left: 1px solid @hairline;
+    }
   }
 
   .status-num {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: @ink;
   }
 
   .status-label {
+    margin-top: 2px;
     font-size: 11px;
-    color: #8c8c8c;
+    color: @ink-muted;
   }
 
-  /* 滚动交给 .fill-card 的卡片体，这里不再自己限高 */
   .activity-list {
     flex: 1;
   }
 
   .activity-card {
-    padding: 8px;
-    margin-bottom: 6px;
+    padding: 9px 10px;
+    margin-bottom: 8px;
     cursor: pointer;
-    background: #fafafa;
-    border: 1px solid transparent;
-    border-radius: 6px;
+    border: 1px solid @hairline;
+    border-left: 3px solid @hairline;
+    border-radius: 8px;
+    transition: all 0.15s ease;
 
     &:hover {
-      background: #f0f5ff;
+      border-color: fade(@c-brand, 35%);
+      border-left-color: fade(@c-brand, 55%);
+      background: @surface-hover;
     }
 
+    /* 选中态用左侧色条 + 淡底，而不是整块高亮 —— 列表里同时只有一个被选中，不需要喊 */
     &.active {
-      background: #e6f4ff;
-      border-color: #91caff;
+      border-color: fade(@c-brand, 45%);
+      border-left-color: @c-brand;
+      background: fade(@c-brand, 5%);
     }
   }
 
@@ -534,29 +676,40 @@
   .act-name {
     font-size: 13px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.35;
+    color: @ink;
   }
 
   .act-meta {
     display: flex;
     gap: 6px;
     justify-content: space-between;
-    margin-top: 3px;
+    align-items: center;
+    margin-top: 4px;
     font-size: 11px;
+    color: @ink-secondary;
   }
 
   .act-code {
     font-family: 'Courier New', Courier, monospace;
     font-size: 10px;
+    font-variant-numeric: tabular-nums;
     color: #bfbfbf;
   }
 
+  // ───────── 右栏：失败原因 / 丢弃 / 用户榜 ─────────
+
   .line-item {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
-    padding: 3px 0;
+    padding: 5px 0;
     font-size: 12px;
+    color: @ink-secondary;
+
+    & + .line-item {
+      border-top: 1px solid @hairline;
+    }
   }
 
   .line-text {
@@ -568,28 +721,68 @@
 
   .mono {
     font-family: 'Courier New', Courier, monospace;
-    color: #1677ff;
+    font-variant-numeric: tabular-nums;
+    color: @ink;
+  }
+
+  /* 榜单/清单里的数字要竖着对齐，这种场合才用等宽数字 */
+  .line-num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: @ink;
   }
 
   .money-sm {
     width: 64px;
-    font-family: 'Courier New', Courier, monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
     text-align: right;
+    color: @ink;
   }
 
+  .tag-mini {
+    margin-left: 4px;
+    font-size: 10px;
+    line-height: 16px;
+    transform: scale(0.92);
+    transform-origin: left center;
+  }
+
+  .act-status {
+    display: inline-flex;
+    align-items: center;
+    color: @ink-secondary;
+  }
+
+  /* 前三名给个实心徽章，其余只留序号 —— 榜单的重点是头部 */
   .rank {
-    width: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
     font-size: 11px;
-    color: #bfbfbf;
-    text-align: center;
+    color: @ink-muted;
+    flex-shrink: 0;
 
     &.top {
       font-weight: 700;
-      color: #faad14;
+      color: #fff;
+      background: @c-warning;
+      border-radius: 50%;
     }
   }
 
   .discard-item {
-    margin-bottom: 4px;
+    padding: 5px 0;
+
+    & + .discard-item {
+      border-top: 1px solid @hairline;
+    }
+
+    .line-item {
+      padding: 0;
+      border-top: none;
+    }
   }
 </style>

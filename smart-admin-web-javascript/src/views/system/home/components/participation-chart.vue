@@ -37,12 +37,21 @@
   import DefaultHomeCard from '/@/views/system/home/components/default-home-card.vue';
   import { marketingStatApi } from '/@/api/business/stat/marketing-stat-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import {
+    ACTIVITY_TYPE_COLOR,
+    CHROME,
+    axisStyle,
+    legendStyle,
+    splitLineStyle,
+    tooltipStyle,
+  } from '/@/views/system/home/dashboard/dashboard-theme';
 
   // 与后端 GAMEPLAY_TYPES 保持一致；BASIC 没有参与行为，不出现在图上
+  // 颜色按玩法类型固定取自共用槽位，不在这里另挑一套（否则同一个玩法在两张图里两种颜色）
   const TYPE_META = [
-    { type: 'DRAW', label: '奖池抽奖', color: '#f59e0b' },
-    { type: 'TASK', label: '任务驱动', color: '#8b5cf6' },
-    { type: 'LOTTERY', label: 'FPE彩票', color: '#06b6d4' },
+    { type: 'DRAW', label: '奖池抽奖', color: ACTIVITY_TYPE_COLOR.DRAW },
+    { type: 'TASK', label: '任务驱动', color: ACTIVITY_TYPE_COLOR.TASK },
+    { type: 'LOTTERY', label: 'FPE彩票', color: ACTIVITY_TYPE_COLOR.LOTTERY },
   ];
 
   const days = ref(7);
@@ -67,8 +76,21 @@
       type: 'line',
       smooth: true,
       symbol: 'circle',
-      symbolSize: 5,
-      itemStyle: { color: meta.color },
+      // 点要够大才点得中（≥8px），并套一圈底色环，交叉处才不糊在一起
+      symbolSize: 8,
+      lineStyle: { width: 2, cap: 'round', join: 'round' },
+      itemStyle: { color: meta.color, borderColor: CHROME.surface, borderWidth: 2 },
+      // 面积只做一层淡淡的washes，不是实心块——实心会把下面的线压住
+      areaStyle: { color: meta.color, opacity: 0.08 },
+      // 只标最后一个点：每个点都标数字等于没标（读者会直接放弃）
+      endLabel: {
+        show: true,
+        formatter: '{c}',
+        color: CHROME.textSecondary,
+        fontSize: 11,
+        distance: 6,
+      },
+      emphasis: { focus: 'series' },
       data: dateList.map((d) => {
         const hit = trendList.find((t) => t.statDate === d && t.activityType === meta.type);
         return num(hit && hit.memberCount);
@@ -76,11 +98,21 @@
     }));
     trendChart.value.setOption(
       {
-        tooltip: { trigger: 'axis' },
-        legend: { data: TYPE_META.map((m) => m.label), top: 0, itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 } },
-        grid: { top: 32, right: 16, bottom: 24, left: 40 },
-        xAxis: { type: 'category', boundaryGap: false, data: dateList, axisLabel: { fontSize: 11 } },
-        yAxis: { type: 'value', minInterval: 1, axisLabel: { fontSize: 11 } },
+        tooltip: {
+          trigger: 'axis',
+          valueFormatter: (v) => num(v) + ' 人',
+          ...tooltipStyle,
+        },
+        legend: { ...legendStyle, data: TYPE_META.map((m) => m.label) },
+        grid: { top: 34, right: 34, bottom: 24, left: 44 },
+        xAxis: { type: 'category', boundaryGap: false, data: dateList, ...axisStyle },
+        yAxis: {
+          type: 'value',
+          minInterval: 1,
+          ...axisStyle,
+          ...splitLineStyle,
+          axisLine: { show: false },
+        },
         series,
       },
       true
@@ -96,16 +128,24 @@
     });
     typeChart.value.setOption(
       {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: '{b}：{c} 人' },
-        grid: { top: 8, right: 32, bottom: 8, left: 70, containLabel: false },
-        xAxis: { type: 'value', minInterval: 1, axisLabel: { fontSize: 11 } },
-        yAxis: { type: 'category', data: rows.map((r) => r.label), axisLabel: { fontSize: 12 }, axisTick: { show: false } },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(11,11,11,0.04)' } }, formatter: '{b}：{c} 人', ...tooltipStyle },
+        grid: { top: 8, right: 44, bottom: 8, left: 70, containLabel: false },
+        xAxis: { type: 'value', minInterval: 1, show: false },
+        yAxis: {
+          type: 'category',
+          data: rows.map((r) => r.label),
+          axisLabel: { color: CHROME.textSecondary, fontSize: 12 },
+          axisTick: { show: false },
+          axisLine: { show: false },
+        },
         series: [
           {
             type: 'bar',
-            barWidth: 14,
+            // 细一点、留白多一点；数据端 4px 圆角，贴基线那端保持方角
+            barWidth: 12,
             data: rows.map((r) => ({ value: r.value, itemStyle: { color: r.color, borderRadius: [0, 4, 4, 0] } })),
-            label: { show: true, position: 'right', formatter: '{c} 人', fontSize: 11 },
+            // 值直接标在条末端：三根柱子，标注是主读数通道，所以 x 轴可以整条撤掉
+            label: { show: true, position: 'right', formatter: '{c} 人', fontSize: 11, color: CHROME.textSecondary },
           },
         ],
       },

@@ -109,16 +109,22 @@
   import echarts from '/@/lib/echarts';
   import { marketingStatApi } from '/@/api/business/stat/marketing-stat-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import { CHROME, DRAW_STATUS_COLOR, RAMP, tooltipStyle } from './dashboard-theme';
 
   const props = defineProps({
     activityCode: { type: String, default: '' },
   });
 
+  /*
+   * 抽奖状态用**状态色**而不是分类色：它表达的是「好 / 该管 / 危险」，不是「是谁」。
+   * 状态色是保留位，绝不拿去当第四个系列色 —— 否则读者会把一个普通系列误读成告警。
+   * 每条都带文字标签，颜色只是辅助，不单独承担语义。
+   */
   const DRAW_STATUS = {
-    0: { label: '未中奖', color: '#8c8c8c' },
-    1: { label: '已中奖', color: '#52c41a' },
-    2: { label: '库存不足', color: '#f5222d' },
-    3: { label: '异常', color: '#faad14' },
+    0: { label: '未中奖', color: DRAW_STATUS_COLOR[0] },
+    1: { label: '已中奖', color: DRAW_STATUS_COLOR[1] },
+    2: { label: '库存不足', color: DRAW_STATUS_COLOR[2] },
+    3: { label: '异常', color: DRAW_STATUS_COLOR[3] },
   };
 
   const ISSUE_STATUS = {
@@ -202,22 +208,34 @@
         value: num(s.reachCount),
       }))
     );
+
+    /*
+     * 漏斗是「同一个量的分档」，所以用**同一个蓝色由浅到深**，不是四种不同的颜色。
+     * 换成分类色会暗示这几档是四件不同的事，而它们是一件事的四个阶段。
+     * ⚠️ 前两档偏浅，白字压不住，按底色明度切换成深墨色。
+     */
+    const shades = rows.map((_, i) => RAMP[Math.min(i, RAMP.length - 1)]);
+
     funnelChart.value.setOption(
       {
-        tooltip: { trigger: 'item', formatter: '{b}：{c} 人' },
-        color: ['#1677ff', '#597ef7', '#52c41a', '#faad14', '#f5222d'],
+        tooltip: { trigger: 'item', formatter: '{b}<br/>{c} 人', ...tooltipStyle },
         series: [
           {
             type: 'funnel',
             left: '6%',
             width: '88%',
-            top: 8,
-            bottom: 8,
+            top: 10,
+            bottom: 10,
             sort: 'none',
+            // 段间留 2px 底色缝，靠留白分隔而不是描边
             gap: 2,
-            minSize: '20%',
-            label: { show: true, position: 'inside', formatter: '{b} {c}', fontSize: 11, color: '#fff' },
-            data: rows,
+            minSize: '30%',
+            label: { show: true, position: 'inside', formatter: '{b}  {c} 人', fontSize: 11, fontWeight: 500 },
+            data: rows.map((r, i) => ({
+              ...r,
+              itemStyle: { color: shades[i], borderColor: CHROME.surface, borderWidth: 1 },
+              label: { color: i < 2 ? '#0b0b0b' : '#ffffff' },
+            })),
           },
         ],
       },
