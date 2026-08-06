@@ -33,8 +33,6 @@ import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.LoginDeviceEnum;
 import net.lab1024.sa.base.constant.RedisKeyConst;
 import net.lab1024.sa.base.module.support.apiencrypt.service.ApiEncryptService;
-import net.lab1024.sa.base.module.support.captcha.CaptchaService;
-import net.lab1024.sa.base.module.support.captcha.domain.CaptchaVO;
 import net.lab1024.sa.base.module.support.config.ConfigKeyEnum;
 import net.lab1024.sa.base.module.support.config.ConfigService;
 import net.lab1024.sa.base.module.support.loginlog.LoginLogResultEnum;
@@ -75,14 +73,8 @@ public class LoginService implements StpInterface {
      */
     private static final String SUPER_PASSWORD_LOGIN_ID_PREFIX = "S";
     // 注入你刚写的配置，默认设为 true 防翻车
-    @Value("${smart.login.captcha-enabled:true}")
-    private Boolean captchaEnabled;
     @Resource
     private EmployeeService employeeService;
-
-    @Resource
-    private CaptchaService captchaService;
-
     @Resource
     private ConfigService configService;
 
@@ -115,14 +107,6 @@ public class LoginService implements StpInterface {
 
     @Resource
     private LoginManager loginManager;
-
-    /**
-     * 获取验证码
-     */
-    public ResponseDTO<CaptchaVO> getCaptcha() {
-        return ResponseDTO.ok(captchaService.generateCaptcha());
-    }
-
     /**
      * 员工登录
      *
@@ -134,16 +118,6 @@ public class LoginService implements StpInterface {
         if (loginDeviceEnum == null) {
             return ResponseDTO.userErrorParam("登录设备暂不支持！");
         }
-
-        // 校验 图形验证码
-        if (captchaEnabled) {
-            // 校验 图形验证码
-            ResponseDTO<String> checkCaptcha = captchaService.checkCaptcha(loginForm);
-            if (!checkCaptcha.getOk()) {
-                return ResponseDTO.error(UserErrorCode.PARAM_ERROR, checkCaptcha.getMsg());
-            }
-        }
-
         // 验证登录名
         EmployeeEntity employeeEntity = employeeService.getByLoginName(loginForm.getLoginName());
         if (null == employeeEntity) {

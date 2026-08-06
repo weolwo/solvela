@@ -34,11 +34,6 @@
             placeholder="请输入密码"
           />
         </a-form-item>
-        <a-form-item name="captchaCode" v-if="captchaEnabled">
-          <a-input class="captcha-input" v-model:value.trim="loginForm.captchaCode" placeholder="请输入验证码" />
-          <img class="captcha-img" :src="captchaBase64Image" @click="getCaptcha" />
-        </a-form-item>
-
         <a-form-item>
           <div class="btn" @click="onLogin">登录</div>
         </a-form-item>
@@ -48,7 +43,7 @@
 </template>
 <script setup>
   import { message } from 'ant-design-vue';
-  import { onMounted, onUnmounted, reactive, ref, computed } from 'vue';
+  import { onMounted, onUnmounted, reactive, ref } from 'vue';
   import { useRouter } from 'vue-router';
   import { loginApi } from '/@/api/system/login-api';
   import { SmartLoading } from '/@/components/framework/smart-loading';
@@ -63,22 +58,13 @@
   import { dictApi } from '/@/api/support/dict-api';
 
   //--------------------- 登录表单 ---------------------------------
-  // 1. 先定义开关变量（必须在 rules 之前）
-  const captchaEnabled = ref(true);
-
-  // 2. 再定义 rules，并使用 computed 包裹，实现动态响应
-  const rules = computed(() => {
-    return {
-      loginName: [{ required: true, message: '用户名不能为空' }],
-      password: [{ required: true, message: '密码不能为空' }],
-      captchaCode: captchaEnabled.value ? [{ required: true, message: '验证码不能为空' }] : [],
-    };
-  });
+  const rules = {
+    loginName: [{ required: true, message: '用户名不能为空' }],
+    password: [{ required: true, message: '密码不能为空' }],
+  };
   const loginForm = reactive({
     loginName: 'admin',
     password: '',
-    captchaCode: '',
-    captchaUuid: '',
     loginDevice: LOGIN_DEVICE_ENUM.PC.value,
   });
 
@@ -108,7 +94,6 @@
           password: encryptData(loginForm.password),
         });
         const res = await loginApi.login(encryptPasswordForm);
-        stopRefreshCaptchaInterval();
         localSave(LocalStorageKeyConst.USER_TOKEN, res.data.token ? res.data.token : '');
         message.success('登录成功');
         //更新用户信息到pinia
@@ -120,10 +105,6 @@
         buildRoutes();
         router.push('/home');
       } catch (e) {
-        if (e.data && e.data.code !== 0) {
-          loginForm.captchaCode = '';
-          getCaptcha();
-        }
         smartSentry.captureError(e);
       } finally {
         SmartLoading.hide();
@@ -131,51 +112,7 @@
     });
   }
 
-  //--------------------- 验证码 ---------------------------------
-
-  const captchaBase64Image = ref('');
-
-  async function getCaptcha() {
-    try {
-      let captchaResult = await loginApi.getCaptcha();
-      captchaBase64Image.value = captchaResult.data.captchaBase64Image;
-      loginForm.captchaUuid = captchaResult.data.captchaUuid;
-      beginRefreshCaptchaInterval(captchaResult.data.expireSeconds);
-    } catch (e) {
-      console.log(e);
-    }
-  }
-  // 3. 写一个获取开关状态的方法
-  async function fetchCaptchaFlag() {
-    try {
-      let result = await loginApi.getCaptchaFlag();
-      captchaEnabled.value = result.data; // 把后端返回的 true/false 赋给它
-
-      // 如果开关是开启的，才去请求图形验证码图片
-      if (captchaEnabled.value) {
-        getCaptcha();
-      }
-    } catch (e) {
-      console.error('获取验证码开关失败', e);
-    }
-  }
-  let refreshCaptchaInterval = null;
-
-  function beginRefreshCaptchaInterval(expireSeconds) {
-    if (refreshCaptchaInterval === null) {
-      refreshCaptchaInterval = setInterval(getCaptcha, (expireSeconds - 5) * 1000);
-    }
-  }
-
-  function stopRefreshCaptchaInterval() {
-    if (refreshCaptchaInterval != null) {
-      clearInterval(refreshCaptchaInterval);
-      refreshCaptchaInterval = null;
-    }
-  }
-
   onMounted(() => {
-    fetchCaptchaFlag(); // <- 替换掉原来直接调用的 getCaptcha()
     getTwoFactorLoginFlag();
   });
 

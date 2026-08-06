@@ -16,7 +16,6 @@ import net.lab1024.sa.base.common.annoation.NoNeedLogin;
 import net.lab1024.sa.base.common.constant.RequestHeaderConst;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
-import net.lab1024.sa.base.module.support.captcha.domain.CaptchaVO;
 import net.lab1024.sa.base.module.support.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -33,9 +32,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Tag(name = AdminSwaggerTagConst.System.SYSTEM_LOGIN)
 public class LoginController {
-
-    @Value("${smart.login.captcha-enabled:true}")
-    private Boolean captchaEnabled;
     @Resource
     private LoginService loginService;
 
@@ -65,14 +61,6 @@ public class LoginController {
     public ResponseDTO<String> logout() {
         return loginService.logout(SmartRequestUtil.getRequestUser());
     }
-
-    @Operation(summary = "获取验证码  @author 卓大")
-    @GetMapping("/login/getCaptcha")
-    @NoNeedLogin
-    public ResponseDTO<CaptchaVO> getCaptcha() {
-        return loginService.getCaptcha();
-    }
-
     @NoNeedLogin
     @GetMapping("/login/sendEmailCode/{loginName}")
     @Operation(summary = "获取邮箱登录验证码 @author 卓大")
@@ -88,13 +76,5 @@ public class LoginController {
         // 双因子登录
         boolean twoFactorLoginEnabled = level3ProtectConfigService.isTwoFactorLoginEnabled();
         return ResponseDTO.ok(twoFactorLoginEnabled);
-    }
-
-    @NoNeedLogin
-    @GetMapping("/login/getCaptchaFlag")
-    @Operation(summary = "获取图形验证码开关标识 @author 你的名字")
-    public ResponseDTO<Boolean> getCaptchaFlag() {
-        // 直接返回后端的配置给前端
-        return ResponseDTO.ok(captchaEnabled);
     }
 }

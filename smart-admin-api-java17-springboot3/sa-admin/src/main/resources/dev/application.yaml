@@ -17,9 +17,7 @@ server:
     context-path: /
 # 自定义登录安全配置
 smart:
-  login:
-    captcha-enabled: false  # 图形验证码开关：true-开启，false-关闭
-# 环境
+  login:# 环境
 spring:
   profiles:
     active: '@profiles.active@'

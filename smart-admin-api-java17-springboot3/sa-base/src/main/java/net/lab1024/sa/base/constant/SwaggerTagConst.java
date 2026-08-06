@@ -16,8 +16,7 @@ public class SwaggerTagConst {
         public static final String URL_PREFIX = "/support";
 
         public static final String CACHE = "业务支撑-缓存";
-
-        public static final String CAPTCHA = "业务支撑-验证码";
+
 
         public static final String OPERATE_LOG = "业务支撑-用户操作记录";
 

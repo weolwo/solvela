@@ -25,13 +25,6 @@ export const loginApi = {
   },
 
   /**
-   * 获取验证码 @author 卓大
-   */
-  getCaptcha: () => {
-    return getRequest('/login/getCaptcha');
-  },
-
-  /**
    * 获取登录信息 @author 卓大
    */
   getLoginInfo: () => {
@@ -50,11 +43,5 @@ export const loginApi = {
    */
   getTwoFactorLoginFlag: () => {
     return getRequest('/login/getTwoFactorLoginFlag');
-  },
-  /**
-   * 获取验证码开关 @author 卓大
-   */
-  getCaptchaFlag: () => {
-    return getRequest('/login/getCaptchaFlag');
   },
 };

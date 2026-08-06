@@ -6,7 +6,6 @@ import lombok.Data;
 import net.lab1024.sa.base.common.swagger.SchemaEnum;
 import net.lab1024.sa.base.common.validator.enumeration.CheckEnum;
 import net.lab1024.sa.base.constant.LoginDeviceEnum;
-import net.lab1024.sa.base.module.support.captcha.domain.CaptchaForm;
 import org.hibernate.validator.constraints.Length;
 
 /**
@@ -18,8 +17,13 @@ import org.hibernate.validator.constraints.Length;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
+/*
+ * 2026-08-06：图形验证码功能已整体移除，本类不再继承 CaptchaForm
+ * （原先带的 captchaCode / captchaUuid 两个字段随之消失）。
+ * 暴力破解的防线现在只剩「连续登录失败 N 次锁定账号」那一条，见 LoginService。
+ */
 @Data
-public class LoginForm extends CaptchaForm {
+public class LoginForm {
 
     @Schema(description = "登录账号")
     @NotBlank(message = "登录账号不能为空")

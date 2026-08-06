@@ -24,8 +24,7 @@ public class RedisKeyConst {
         public static final String SERIAL_NUMBER_LAST_INFO = "serial-number:last-info";
 
         public static final String SERIAL_NUMBER = "serial-number:";
-
-        public static final String CAPTCHA = "captcha:";
+
 
         public static final String LOGIN_VERIFICATION_CODE = "login:verification-code:";
     }
