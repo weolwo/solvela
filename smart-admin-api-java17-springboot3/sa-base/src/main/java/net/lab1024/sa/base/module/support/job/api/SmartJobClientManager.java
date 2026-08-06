@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.module.support.job.api;
 
 import cn.hutool.core.util.IdUtil;
-import com.google.common.collect.Lists;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.module.support.job.api.domain.SmartJobMsg;
@@ -22,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
 
 /**
  * smart job 执行端管理
@@ -116,7 +116,7 @@ public class SmartJobClientManager {
         if (null == jobEntity) {
             return;
         }
-        jobLauncher.startOrRefreshJob(Lists.newArrayList(jobEntity));
+        jobLauncher.startOrRefreshJob(new ArrayList<>(List.of(jobEntity)));
     }
 
     /**

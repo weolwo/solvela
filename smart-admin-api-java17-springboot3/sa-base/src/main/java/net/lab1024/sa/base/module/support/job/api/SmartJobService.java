@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.module.support.job.api;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.code.UserErrorCode;
 import net.lab1024.sa.base.common.domain.PageResult;
@@ -27,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 定时任务 接口业务管理
@@ -61,7 +61,7 @@ public class SmartJobService {
         }
         SmartJobVO jobVO = SmartBeanUtil.copy(jobEntity, SmartJobVO.class);
         // 处理设置job详情
-        this.handleJobInfo(Lists.newArrayList(jobVO));
+        this.handleJobInfo(new ArrayList<>(List.of(jobVO)));
         return ResponseDTO.ok(jobVO);
     }
 

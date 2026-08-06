@@ -2,7 +2,6 @@ package net.lab1024.sa.admin.module.system.employee.service;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.department.dao.DepartmentDao;
 import net.lab1024.sa.admin.module.system.department.domain.entity.DepartmentEntity;
@@ -34,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 员工 service
@@ -107,8 +107,8 @@ public class EmployeeService {
         Map<Long, String> positionNameMap = positionEntityList.stream().collect(Collectors.toMap(PositionEntity::getPositionId, PositionEntity::getPositionName));
 
         employeeList.forEach(e -> {
-            e.setRoleIdList(employeeRoleIdListMap.getOrDefault(e.getEmployeeId(), Lists.newArrayList()));
-            e.setRoleNameList(employeeRoleNameListMap.getOrDefault(e.getEmployeeId(), Lists.newArrayList()));
+            e.setRoleIdList(employeeRoleIdListMap.getOrDefault(e.getEmployeeId(), new ArrayList<>()));
+            e.setRoleNameList(employeeRoleNameListMap.getOrDefault(e.getEmployeeId(), new ArrayList<>()));
             e.setDepartmentName(departmentService.getDepartmentPath(e.getDepartmentId()));
             e.setPositionName(positionNameMap.get(e.getPositionId()));
         });

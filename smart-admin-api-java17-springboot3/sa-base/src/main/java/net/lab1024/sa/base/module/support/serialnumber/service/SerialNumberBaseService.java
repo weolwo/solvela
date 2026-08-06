@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.serialnumber.service;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.exception.BusinessException;
@@ -129,7 +128,7 @@ public abstract class SerialNumberBaseService implements SerialNumberService {
             isReset = true;
         }
 
-        ArrayList<Long> numberList = Lists.newArrayListWithCapacity(count);
+        ArrayList<Long> numberList = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             Integer stepRandomRange = serialNumberInfo.getStepRandomRange();
             if (stepRandomRange > 1) {
@@ -233,7 +232,7 @@ public abstract class SerialNumberBaseService implements SerialNumberService {
          * 第二步：替换数字
          */
 
-        List<String> numberList = Lists.newArrayListWithCapacity(generateResult.getNumberList().size());
+        List<String> numberList = new ArrayList<>(generateResult.getNumberList().size());
         for (Long number : generateResult.getNumberList()) {
             StringBuilder numberStringBuilder = new StringBuilder();
             int currentNumberCount = String.valueOf(number).length();

@@ -3,7 +3,6 @@ package net.lab1024.sa.base.common.util;
 import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.core.toolkit.sql.SqlInjectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.PageParam;
 import net.lab1024.sa.base.common.domain.PageResult;
@@ -12,6 +11,7 @@ import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedList;
 
 /**
  * 分页工具类
@@ -102,7 +102,7 @@ public class SmartPageUtil {
         int toIndex = Math.min(pageNum * pageSize, count);
 
         if (pageNum > pages) {
-            pageRet.setList(Lists.newLinkedList());
+            pageRet.setList(new LinkedList<>());
             pageRet.setPageNum(pageNum.longValue());
             pageRet.setPages((long) pages);
             pageRet.setTotal((long) count);

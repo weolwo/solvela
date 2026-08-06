@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.system.datascope.service;
 
-import com.google.common.collect.Lists;
 import net.lab1024.sa.admin.module.system.datascope.constant.DataScopeTypeEnum;
 import net.lab1024.sa.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
 import net.lab1024.sa.admin.module.system.datascope.domain.DataScopeAndViewTypeVO;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 数据范围 保存
@@ -42,7 +42,7 @@ public class DataScopeService {
      * 获取当前系统存在的数据可见范围
      */
     public List<DataScopeViewTypeVO> getViewType() {
-        List<DataScopeViewTypeVO> viewTypeList = Lists.newArrayList();
+        List<DataScopeViewTypeVO> viewTypeList = new ArrayList<>();
         DataScopeViewTypeEnum[] enums = DataScopeViewTypeEnum.class.getEnumConstants();
         DataScopeViewTypeVO dataScopeViewTypeDTO;
         for (DataScopeViewTypeEnum viewTypeEnum : enums) {
@@ -55,7 +55,7 @@ public class DataScopeService {
     }
 
     public List<DataScopeDTO> getDataScopeType() {
-        List<DataScopeDTO> dataScopeTypeList = Lists.newArrayList();
+        List<DataScopeDTO> dataScopeTypeList = new ArrayList<>();
         DataScopeTypeEnum[] enums = DataScopeTypeEnum.class.getEnumConstants();
         DataScopeDTO dataScopeDTO;
         for (DataScopeTypeEnum typeEnum : enums) {

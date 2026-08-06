@@ -5,8 +5,7 @@ import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.google.common.base.CaseFormat;
-import com.google.common.collect.Lists;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartBigDecimalUtil;
@@ -32,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
 
 /**
  * 数据变更内容
@@ -182,7 +182,7 @@ public class DataTracerChangeContentService {
             return "";
         }
         List<Field> fields = this.getField(objectList.get(0));
-        List<String> contentList = Lists.newArrayList();
+        List<String> contentList = new ArrayList<>();
         for (Object objItem : objectList) {
             Map<String, DataTracerContentBO> beanParseMap = this.fieldParse(objItem, fields);
             contentList.add(this.getAddDeleteContent(beanParseMap));
@@ -350,8 +350,8 @@ public class DataTracerChangeContentService {
         }
         String relateFieldValue = fieldValue.toString();
         QueryWrapper qw = new QueryWrapper();
-        qw.select(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, dataTracerFieldSql.relateDisplayColumn()));
-        qw.in(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, dataTracerFieldSql.relateColumn()), relateFieldValue);
+        qw.select(SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_UNDERSCORE, dataTracerFieldSql.relateDisplayColumn()));
+        qw.in(SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_UNDERSCORE, dataTracerFieldSql.relateColumn()), relateFieldValue);
         List<Object> displayValue = mapper.selectObjs(qw);
         if (CollectionUtils.isEmpty(displayValue)) {
             return "";

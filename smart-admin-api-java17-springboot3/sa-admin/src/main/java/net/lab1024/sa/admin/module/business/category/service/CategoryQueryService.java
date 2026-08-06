@@ -1,8 +1,6 @@
 package net.lab1024.sa.admin.module.business.category.service;
 
 import cn.hutool.core.util.StrUtil;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.admin.module.business.category.domain.dto.CategorySimpleDTO;
@@ -15,6 +13,8 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * 类目 查询 业务类
@@ -60,7 +60,7 @@ public class CategoryQueryService {
             return Collections.emptyMap();
         }
         categoryIdList = categoryIdList.stream().distinct().collect(Collectors.toList());
-        Map<Long, CategoryEntity> categoryEntityMap = Maps.newHashMap();
+        Map<Long, CategoryEntity> categoryEntityMap = new HashMap<>();
         for (Long categoryId : categoryIdList) {
             CategoryEntity categoryEntity = categoryCacheManager.queryCategory(categoryId);
             if (categoryEntity != null) {
@@ -81,7 +81,7 @@ public class CategoryQueryService {
             return Collections.emptyList();
         }
         //所有子类
-        List<CategoryEntity> categoryEntityList = Lists.newArrayList();
+        List<CategoryEntity> categoryEntityList = new ArrayList<>();
         categoryIdList.forEach(e -> {
             categoryEntityList.addAll(categoryCacheManager.querySubCategory(e));
         });
@@ -89,7 +89,7 @@ public class CategoryQueryService {
         // 递归查询子类
         categoryIdList = subTypeMap.values().stream().flatMap(Collection::stream).map(CategoryEntity::getCategoryId).distinct().collect(Collectors.toList());
         if (CollectionUtils.isEmpty(categoryIdList)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         categoryIdList.addAll(this.queryCategorySubId(categoryIdList));
         return categoryIdList;
@@ -104,7 +104,7 @@ public class CategoryQueryService {
             return null;
         }
         Map<Long, CategoryEntity> categoryMap = this.queryCategoryList(categoryIdList);
-        List<String> categoryNameList = Lists.newArrayList();
+        List<String> categoryNameList = new ArrayList<>();
         categoryIdList.forEach(e -> {
             CategoryEntity categoryEntity = categoryMap.get(e);
             if (categoryEntity != null) {
@@ -148,7 +148,7 @@ public class CategoryQueryService {
      * ps:特别注意返回的集合中 包含自己
      */
     public List<CategoryEntity> queryCategoryAndParent(Long categoryId) {
-        List<CategoryEntity> parentCategoryList = Lists.newArrayList();
+        List<CategoryEntity> parentCategoryList = new ArrayList<>();
         CategoryEntity categoryEntity = categoryCacheManager.queryCategory(categoryId);
         if (null == categoryEntity || categoryEntity.getDeletedFlag()) {
             return parentCategoryList;
@@ -179,7 +179,7 @@ public class CategoryQueryService {
      */
     public Map<Long, String> queryFullName(List<Long> categoryIdList) {
         if (CollectionUtils.isEmpty(categoryIdList)) {
-            return Maps.newHashMap();
+            return new HashMap<>();
         }
         // 循环内查询的缓存 还ok
         return categoryIdList.stream().collect(Collectors.toMap(Function.identity(), this::queryFullName));

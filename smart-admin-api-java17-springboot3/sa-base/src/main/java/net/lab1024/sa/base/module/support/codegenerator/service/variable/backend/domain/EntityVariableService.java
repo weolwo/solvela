@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.backend.domain;
 
-import com.google.common.collect.Lists;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeField;
 import net.lab1024.sa.base.module.support.codegenerator.service.variable.CodeGenerateBaseVariableService;
@@ -8,6 +7,7 @@ import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * @Author 1024创新实验室-主任:卓大
@@ -39,7 +39,7 @@ public class EntityVariableService extends CodeGenerateBaseVariableService {
 
     public List<String> getImportPackageList(List<CodeField> fields) {
         if (CollectionUtils.isEmpty(fields)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
 
         /**

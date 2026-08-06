@@ -2,7 +2,6 @@ package net.lab1024.sa.base.module.support.file.service;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.code.UserErrorCode;
 import net.lab1024.sa.base.common.constant.StringConst;
@@ -31,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 文件服务
@@ -124,7 +124,7 @@ public class FileService {
      */
     public List<FileVO> getFileList(List<String> fileKeyList) {
         if (CollectionUtils.isEmpty(fileKeyList)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
 
         // 查询数据库，并获取 file url
@@ -140,7 +140,7 @@ public class FileService {
         }
 
         // 返回结果
-        List<FileVO> result = Lists.newArrayListWithCapacity(fileKeyList.size());
+        List<FileVO> result = new ArrayList<>(fileKeyList.size());
         for (String fileKey : fileKeyList) {
             FileVO fileVO = fileMap.get(fileKey);
             if (fileVO != null) {
@@ -165,7 +165,7 @@ public class FileService {
         }
 
         List<String> fileKeyArray = StrUtil.split(fileKeys, StringConst.SEPARATOR);
-        List<String> fileUrlList = Lists.newArrayListWithCapacity(fileKeyArray.size());
+        List<String> fileUrlList = new ArrayList<>(fileKeyArray.size());
         for (String fileKey : fileKeyArray) {
             ResponseDTO<String> fileUrlResponse = fileStorageService.getFileUrl(fileKey);
             if (fileUrlResponse.getOk()) {

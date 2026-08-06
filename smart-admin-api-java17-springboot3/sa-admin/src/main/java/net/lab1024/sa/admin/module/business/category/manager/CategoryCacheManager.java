@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.business.category.manager;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.admin.constant.AdminCacheConst;
@@ -17,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 类目 查询 缓存
@@ -59,7 +59,7 @@ public class CategoryCacheManager {
      */
     @Cacheable(AdminCacheConst.Category.CATEGORY_SUB)
     public List<CategoryEntity> querySubCategory(Long categoryId) {
-        return categoryDao.queryByParentId(Lists.newArrayList(categoryId), false);
+        return categoryDao.queryByParentId(List.of(categoryId), false);
     }
 
 
@@ -96,7 +96,7 @@ public class CategoryCacheManager {
         List<CategoryEntity> categoryEntityList = allCategoryEntityList.stream().filter(e -> parentIdList.contains(e.getParentId())).collect(Collectors.toList());
         Map<Long, List<CategoryEntity>> categorySubMap = categoryEntityList.stream().collect(Collectors.groupingBy(CategoryEntity::getParentId));
         treeList.forEach(e -> {
-            List<CategoryEntity> childrenEntityList = categorySubMap.getOrDefault(e.getValue(), Lists.newArrayList());
+            List<CategoryEntity> childrenEntityList = categorySubMap.getOrDefault(e.getValue(), new ArrayList<>());
             List<CategoryTreeVO> childrenVOList = SmartBeanUtil.copyList(childrenEntityList, CategoryTreeVO.class);
             childrenVOList.forEach(item -> {
                 item.setLabel(item.getCategoryName());

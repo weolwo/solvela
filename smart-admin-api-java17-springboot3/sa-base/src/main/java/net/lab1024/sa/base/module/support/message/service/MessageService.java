@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.module.support.message.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
@@ -16,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * @author luoyi
@@ -58,7 +59,7 @@ public class MessageService {
      * 发送【模板消息】
      */
     public void sendTemplateMessage(MessageTemplateSendForm... sendTemplateForms) {
-        List<MessageSendForm> sendFormList = Lists.newArrayList();
+        List<MessageSendForm> sendFormList = new ArrayList<>();
         for (MessageTemplateSendForm sendTemplateForm : sendTemplateForms) {
             MessageTemplateEnum msgTemplateTypeEnum = sendTemplateForm.getMessageTemplateEnum();
             StringSubstitutor stringSubstitutor = new StringSubstitutor(sendTemplateForm.getContentParam());
@@ -81,7 +82,7 @@ public class MessageService {
      * 发送消息
      */
     public void sendMessage(MessageSendForm... sendForms) {
-        this.sendMessage(Lists.newArrayList(sendForms));
+        this.sendMessage(new ArrayList<>(Arrays.asList(sendForms)));
     }
 
     /**

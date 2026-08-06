@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.cache;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.constant.ReloadConst;
 import net.lab1024.sa.base.module.support.reload.core.annoation.SmartReload;
@@ -11,6 +10,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * caffeine 缓存实现
@@ -31,7 +31,7 @@ public class CaffeineCacheServiceImpl implements CacheService {
      */
     @Override
     public List<String> cacheNames() {
-        return Lists.newArrayList(caffeineCacheManager.getCacheNames());
+        return new ArrayList<>(caffeineCacheManager.getCacheNames());
     }
 
     /**
@@ -41,7 +41,7 @@ public class CaffeineCacheServiceImpl implements CacheService {
     public List<String> cacheKey(String cacheName) {
         CaffeineCache cache = (CaffeineCache) caffeineCacheManager.getCache(cacheName);
         if (cache == null) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         Set<Object> cacheKey = cache.getNativeCache().asMap().keySet();
         return cacheKey.stream().map(e -> e.toString()).collect(Collectors.toList());

@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.system.datascope.service;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.datascope.constant.DataScopeTypeEnum;
 import net.lab1024.sa.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
@@ -18,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 数据范围
@@ -57,7 +57,7 @@ public class DataScopeViewService {
             return this.getDepartmentAndSubEmployeeIdList(employeeId);
         }
         // 可以查看所有员工数据
-        return Lists.newArrayList();
+        return new ArrayList<>();
     }
 
     /**
@@ -66,7 +66,7 @@ public class DataScopeViewService {
     public List<Long> getCanViewDepartmentId(DataScopeViewTypeEnum viewType, Long employeeId) {
         if (DataScopeViewTypeEnum.ME == viewType) {
             // 数据可见范围类型为本人时 不可以查看任何部门数据
-            return Lists.newArrayList(0L);
+            return new ArrayList<>(List.of(0L));
         }
         if (DataScopeViewTypeEnum.DEPARTMENT == viewType) {
             return this.getMeDepartmentIdList(employeeId);
@@ -75,12 +75,12 @@ public class DataScopeViewService {
             return this.getDepartmentAndSubIdList(employeeId);
         }
         // 可以查看所有部门数据
-        return Lists.newArrayList();
+        return new ArrayList<>();
     }
 
     public List<Long> getMeDepartmentIdList(Long employeeId) {
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
-        return Lists.newArrayList(employeeEntity.getDepartmentId());
+        return new ArrayList<>(List.of(employeeEntity.getDepartmentId()));
     }
 
     public List<Long> getDepartmentAndSubIdList(Long employeeId) {
@@ -113,7 +113,7 @@ public class DataScopeViewService {
             return DataScopeViewTypeEnum.ME;
         }
         Map<Integer, List<RoleDataScopeEntity>> listMap = dataScopeRoleList.stream().collect(Collectors.groupingBy(RoleDataScopeEntity::getDataScopeType));
-        List<RoleDataScopeEntity> viewLevelList = listMap.getOrDefault(dataScopeTypeEnum.getValue(), Lists.newArrayList());
+        List<RoleDataScopeEntity> viewLevelList = listMap.getOrDefault(dataScopeTypeEnum.getValue(), new ArrayList<>());
         if (CollectionUtils.isEmpty(viewLevelList)) {
             return DataScopeViewTypeEnum.ME;
         }
@@ -125,7 +125,7 @@ public class DataScopeViewService {
      * 获取本人相关 可查看员工id
      */
     private List<Long> getMeEmployeeIdList(Long employeeId) {
-        return Lists.newArrayList(employeeId);
+        return new ArrayList<>(List.of(employeeId));
     }
 
     /**

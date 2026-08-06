@@ -25,7 +25,6 @@
         <spring-security-crypto.version>7.1.0</spring-security-crypto.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <p6spy.version>3.9.1</p6spy.version>
-        <google-guava.version>33.6.0-jre</google-guava.version>
         <reflections.version>0.10.2</reflections.version>
         <commons-io.version>2.22.0</commons-io.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
@@ -102,22 +101,16 @@
                 <version>${knife4j-baizhukui.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${google-guava.version}</version>
-            </dependency>
-
+            <!-- guava 已于 2026-08-06 整体移除：全项目只用到 Lists.newArrayList / Maps.newHashMap /
+                 CaseFormat / ThreadFactoryBuilder / Interners 五处，前两者是 JDK 一行等价物，
+                 后三者分别换成了 SmartCaseFormat、Thread.ofPlatform().factory()、ConcurrentHashMap 规范化锁。
+                 省 2.92MB，且它是唯一「除我们自己没人依赖」的工具库 —— 换成自研才真的删得掉 jar。
+                 ⚠️ reflections 0.10.2 早已不依赖 guava（依赖树里只有 javassist/jsr305/slf4j），
+                 原先挂在它上面的那段 guava exclusion 是历史遗留的空操作，一并删除。 -->
             <dependency>
                 <groupId>org.reflections</groupId>
                 <artifactId>reflections</artifactId>
                 <version>${reflections.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>guava</artifactId>
-                        <groupId>com.google.guava</groupId>
-                    </exclusion>
-                </exclusions>
             </dependency>
 
             <dependency>

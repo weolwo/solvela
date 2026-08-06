@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.business.category.service;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.business.category.dao.CategoryDao;
 import net.lab1024.sa.admin.module.business.category.domain.entity.CategoryEntity;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.ArrayList;
 
 /**
  * 类目
@@ -187,7 +187,7 @@ public class CategoryService {
             return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
         }
 
-        List<Long> categorySubId = categoryQueryService.queryCategorySubId(Lists.newArrayList(categoryId));
+        List<Long> categorySubId = categoryQueryService.queryCategorySubId(new ArrayList<>(List.of(categoryId)));
         if (CollectionUtils.isNotEmpty(categorySubId)) {
             return ResponseDTO.userErrorParam("请先删除子级类目");
         }

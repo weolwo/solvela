@@ -1,7 +1,6 @@
 package net.lab1024.sa.admin.module.system.role.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.department.dao.DepartmentDao;
 import net.lab1024.sa.admin.module.system.department.domain.entity.DepartmentEntity;
@@ -116,7 +115,7 @@ public class RoleEmployeeService {
         // 已选择的员工id列表
         Set<Long> selectedEmployeeIdList = roleEmployeeUpdateForm.getEmployeeIdList();
         // 数据库里已有的员工id列表
-        Set<Long> dbEmployeeIdList = roleEmployeeDao.selectEmployeeIdByRoleIdList(Lists.newArrayList(roleId));
+        Set<Long> dbEmployeeIdList = roleEmployeeDao.selectEmployeeIdByRoleIdList(List.of(roleId));
         // 从已选择的员工id列表里 过滤数据库里不存在的 即需要添加的员工 id
         Set<Long> addEmployeeIdList = selectedEmployeeIdList.stream().filter(id -> !dbEmployeeIdList.contains(id)).collect(Collectors.toSet());
 

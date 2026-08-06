@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.config;
 
-import com.google.common.collect.Lists;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -30,6 +29,7 @@ import org.springframework.http.HttpRequest;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 
 /**
  * springdoc-openapi 配置
@@ -140,7 +140,7 @@ public class SwaggerConfig {
                                          Optional<List<OpenApiBuilderCustomizer>> openApiBuilderCustomizers,
                                          Optional<List<ServerBaseUrlCustomizer>> serverBaseUrlCustomizers,
                                          Optional<JavadocProvider> javadocProvider) {
-        List<ServerBaseUrlCustomizer> list = Lists.newArrayList(new ServerBaseUrlCustomizer() {
+        List<ServerBaseUrlCustomizer> list = new ArrayList<>(List.<ServerBaseUrlCustomizer>of(new ServerBaseUrlCustomizer() {
             @Override
             public String customize(String serverBaseUrl, HttpRequest request) {
                 if (StringUtils.isNotBlank(serverBaseUrl)) {
@@ -148,7 +148,7 @@ public class SwaggerConfig {
                 }
                 return serverBaseUrl;
             }
-        });
+        }));
         return new OpenAPIService(openAPI, securityParser, springDocConfigProperties,
                 propertyResolverUtils, openApiBuilderCustomizers, Optional.of(list), javadocProvider);
     }

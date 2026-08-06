@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.system.role.service;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.menu.dao.MenuDao;
 import net.lab1024.sa.admin.module.system.menu.domain.entity.MenuEntity;
@@ -57,7 +56,7 @@ public class RoleMenuService {
         if (null == roleEntity) {
             return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
         }
-        List<RoleMenuEntity> roleMenuEntityList = Lists.newArrayList();
+        List<RoleMenuEntity> roleMenuEntityList = new ArrayList<>();
         RoleMenuEntity roleMenuEntity;
         for (Long menuId : roleMenuUpdateForm.getMenuIdList()) {
             roleMenuEntity = new RoleMenuEntity();
@@ -76,7 +75,7 @@ public class RoleMenuService {
     public List<MenuVO> getMenuList(List<Long> roleIdList, Boolean administratorFlag) {
         //管理员返回所有菜单
         if(administratorFlag){
-            List<MenuEntity> menuEntityList = roleMenuDao.selectMenuListByRoleIdList(Lists.newArrayList(), false);
+            List<MenuEntity> menuEntityList = roleMenuDao.selectMenuListByRoleIdList(new ArrayList<>(), false);
             return SmartBeanUtil.copyList(menuEntityList, MenuVO.class);
         }
         //非管理员 无角色 返回空菜单
@@ -112,7 +111,7 @@ public class RoleMenuService {
      */
     private List<MenuSimpleTreeVO> buildMenuTree(Map<Long, List<MenuVO>> parentMap, Long parentId) {
         // 获取本级菜单树List
-        List<MenuSimpleTreeVO> res = parentMap.getOrDefault(parentId, Lists.newArrayList()).stream()
+        List<MenuSimpleTreeVO> res = parentMap.getOrDefault(parentId, new ArrayList<>()).stream()
                 .map(e -> SmartBeanUtil.copy(e, MenuSimpleTreeVO.class)).collect(Collectors.toList());
         // 循环遍历下级菜单
         res.forEach(e -> {

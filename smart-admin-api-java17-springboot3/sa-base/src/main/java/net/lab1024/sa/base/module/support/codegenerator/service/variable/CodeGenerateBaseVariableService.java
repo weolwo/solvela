@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable;
 
-import com.google.common.base.CaseFormat;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
@@ -41,7 +41,7 @@ public abstract class CodeGenerateBaseVariableService {
      * @return
      */
     public List<String> getJavaBeanImportClass(CodeGeneratorConfigForm form) {
-        String upperCamelName = CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_CAMEL, form.getBasic().getModuleName());
+        String upperCamelName = SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.UPPER_CAMEL, form.getBasic().getModuleName());
         ArrayList<String> list = new ArrayList<>();
 
         list.add("import " + form.getBasic().getJavaPackageName() + ".domain.entity." + upperCamelName + ";");

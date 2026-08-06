@@ -1,7 +1,6 @@
 package net.lab1024.sa.admin.module.business.oa.notice.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.business.oa.notice.constant.NoticeVisibleRangeDataTypeEnum;
 import net.lab1024.sa.admin.module.business.oa.notice.dao.NoticeDao;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 
 /**
@@ -52,7 +52,7 @@ public class NoticeEmployeeService {
     public ResponseDTO<PageResult<NoticeEmployeeVO>> queryList(Long requestEmployeeId, NoticeEmployeeQueryForm noticeEmployeeQueryForm) {
         Page<?> page = SmartPageUtil.convert2PageQuery(noticeEmployeeQueryForm);
 
-        List<Long> employeeDepartmentIdList = Lists.newArrayList();
+        List<Long> employeeDepartmentIdList = new ArrayList<>();
         EmployeeEntity employeeEntity = employeeService.getById(requestEmployeeId);
         // 如果不是管理员 则获取请求人的 部门及其子部门
         if (!employeeEntity.getAdministratorFlag() && employeeEntity.getDepartmentId() != null) {

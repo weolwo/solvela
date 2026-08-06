@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.util;
 
-import com.google.common.base.CaseFormat;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.constant.StringConst;
 
 /**
@@ -22,7 +22,7 @@ public class CodeGeneratorTool {
         if (str == null) {
             return StringConst.EMPTY;
         }
-        return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, str);
+        return SmartCaseFormat.LOWER_CAMEL.to(SmartCaseFormat.UPPER_CAMEL, str);
     }
 
     /**
@@ -32,7 +32,7 @@ public class CodeGeneratorTool {
         if (str == null) {
             return StringConst.EMPTY;
         }
-        return CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_HYPHEN, str);
+        return SmartCaseFormat.LOWER_CAMEL.to(SmartCaseFormat.LOWER_HYPHEN, str);
     }
 
 

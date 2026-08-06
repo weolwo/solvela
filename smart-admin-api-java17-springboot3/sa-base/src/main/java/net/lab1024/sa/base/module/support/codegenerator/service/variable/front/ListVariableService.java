@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.front;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.google.common.base.CaseFormat;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeQueryFieldQueryTypeEnum;
@@ -35,7 +35,7 @@ public class ListVariableService extends CodeGenerateBaseVariableService {
 
 
         HashSet<String> frontImportSet = new HashSet<>();
-        frontImportSet.add("import " + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, form.getBasic().getModuleName()) + "Form from './" + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_HYPHEN, form.getBasic().getModuleName()) + "-form.vue';");
+        frontImportSet.add("import " + SmartCaseFormat.LOWER_CAMEL.to(SmartCaseFormat.UPPER_CAMEL, form.getBasic().getModuleName()) + "Form from './" + SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_HYPHEN, form.getBasic().getModuleName()) + "-form.vue';");
 
         // 查询参数
         List<Map<String, Object>> queryVariable = new ArrayList<>();
@@ -47,7 +47,7 @@ public class ListVariableService extends CodeGenerateBaseVariableService {
             CodeField codeField = getCodeFieldByColumnName(queryField.getColumnNameList().get(0), form);
 
             if (CodeQueryFieldQueryTypeEnum.ENUM.equalsValue(queryField.getQueryTypeEnum()) && SmartStringUtil.isNotBlank(codeField.getEnumName())) {
-                String upperUnderscoreEnum = CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, codeField.getEnumName());
+                String upperUnderscoreEnum = SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.UPPER_UNDERSCORE, codeField.getEnumName());
                 objectMap.put("frontEnumName", upperUnderscoreEnum);
                 frontImportSet.add("import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';");
             }
@@ -79,7 +79,7 @@ public class ListVariableService extends CodeGenerateBaseVariableService {
 
             // 是否存在枚举
             if (SmartStringUtil.isNotBlank(codeField.getEnumName())) {
-                String upperUnderscoreEnum = CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, codeField.getEnumName());
+                String upperUnderscoreEnum = SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.UPPER_UNDERSCORE, codeField.getEnumName());
                 objectMap.put("frontEnumPlugin", "$smartEnumPlugin.getDescByValue('" + upperUnderscoreEnum + "', text)");
             }
 

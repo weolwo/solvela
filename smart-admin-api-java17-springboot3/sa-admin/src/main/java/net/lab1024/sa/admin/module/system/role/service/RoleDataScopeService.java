@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.system.role.service;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.role.domain.entity.RoleDataScopeEntity;
 import net.lab1024.sa.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
@@ -14,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 角色-数据范围
@@ -38,7 +38,7 @@ public class RoleDataScopeService {
     public ResponseDTO<List<RoleDataScopeVO>> getRoleDataScopeList(Long roleId) {
         List<RoleDataScopeEntity> roleDataScopeEntityList = roleDataScopeManager.getBaseMapper().listByRoleId(roleId);
         if (CollectionUtils.isEmpty(roleDataScopeEntityList)) {
-            return ResponseDTO.ok(Lists.newArrayList());
+            return ResponseDTO.ok(new ArrayList<>());
         }
         List<RoleDataScopeVO> roleDataScopeList = SmartBeanUtil.copyList(roleDataScopeEntityList, RoleDataScopeVO.class);
         return ResponseDTO.ok(roleDataScopeList);

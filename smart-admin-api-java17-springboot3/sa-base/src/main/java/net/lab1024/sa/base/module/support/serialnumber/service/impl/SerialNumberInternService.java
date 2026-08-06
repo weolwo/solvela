@@ -1,7 +1,5 @@
 package net.lab1024.sa.base.module.support.serialnumber.service.impl;
 
-import com.google.common.collect.Interner;
-import com.google.common.collect.Interners;
 import net.lab1024.sa.base.module.support.serialnumber.domain.SerialNumberEntity;
 import net.lab1024.sa.base.module.support.serialnumber.domain.SerialNumberGenerateResultBO;
 import net.lab1024.sa.base.module.support.serialnumber.domain.SerialNumberInfoBO;
@@ -25,9 +23,25 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SerialNumberInternService extends SerialNumberBaseService {
 
     /**
-     * 按照 serialNumberId 进行锁
+     * 按照 serialNumberId 进行锁。
+     *
+     * <p>🔴 <b>这里必须拿到「同一个 id 对应同一个对象」，不能直接 synchronized(serialNumberId)。</b>
+     * Integer 只在 -128~127 之间有缓存，超出这个范围每次装箱都是<b>新对象</b>，
+     * 两个线程锁的根本不是同一把锁 —— 互斥静默失效，表现是并发下发重号。
+     * 这正是原先用 Guava {@code Interners.newStrongInterner()} 的原因。
+     *
+     * <p>去掉 Guava 后改用 {@code ConcurrentHashMap.computeIfAbsent} 做同样的事：
+     * 每个 id 规范化成唯一的一把锁。与 strong interner 一样不回收 ——
+     * 发号器 id 是有限的几个，不存在内存增长问题。
      */
-    private static final Interner<Integer> POOL = Interners.newStrongInterner();
+    private static final ConcurrentHashMap<Integer, Object> LOCK_POOL = new ConcurrentHashMap<>();
+
+    /**
+     * 取该 serialNumberId 的唯一锁对象
+     */
+    private static Object lockOf(Integer serialNumberId) {
+        return LOCK_POOL.computeIfAbsent(serialNumberId, id -> new Object());
+    }
 
 
     private ConcurrentHashMap<Integer, SerialNumberLastGenerateBO> serialNumberLastGenerateMap = new ConcurrentHashMap<>();
@@ -52,7 +66,7 @@ public class SerialNumberInternService extends SerialNumberBaseService {
     @Override
     public List<String> generateSerialNumberList(SerialNumberInfoBO serialNumberInfo, int count) {
         SerialNumberGenerateResultBO serialNumberGenerateResult = null;
-        synchronized (POOL.intern(serialNumberInfo.getSerialNumberId())) {
+        synchronized (lockOf(serialNumberInfo.getSerialNumberId())) {
 
             // 获取上次的生成结果
             SerialNumberLastGenerateBO lastGenerateBO = serialNumberLastGenerateMap.get(serialNumberInfo.getSerialNumberId());

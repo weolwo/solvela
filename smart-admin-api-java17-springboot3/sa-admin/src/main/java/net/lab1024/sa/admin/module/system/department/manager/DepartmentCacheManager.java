@@ -1,7 +1,5 @@
 package net.lab1024.sa.admin.module.system.department.manager;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.admin.constant.AdminCacheConst;
@@ -21,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.HashMap;
 
 /**
  * 部门 缓存相关
@@ -83,7 +82,7 @@ public class DepartmentCacheManager {
         List<DepartmentVO> departmentVOList = departmentDao.listAll();
         Map<Long, DepartmentVO> departmentMap = departmentVOList.stream().collect(Collectors.toMap(DepartmentVO::getDepartmentId, Function.identity()));
 
-        Map<Long, String> pathNameMap = Maps.newHashMap();
+        Map<Long, String> pathNameMap = new HashMap<>();
         for (DepartmentVO departmentVO : departmentVOList) {
             String pathName = this.buildDepartmentPath(departmentVO, departmentMap);
             pathNameMap.put(departmentVO.getDepartmentId(), pathName);
@@ -115,11 +114,11 @@ public class DepartmentCacheManager {
      */
     public List<DepartmentTreeVO> buildTree(List<DepartmentVO> voList) {
         if (CollectionUtils.isEmpty(voList)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         List<DepartmentVO> rootList = voList.stream().filter(e -> e.getParentId() == null || Objects.equals(e.getParentId(), NumberUtils.LONG_ZERO)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(rootList)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         List<DepartmentTreeVO> treeVOList = SmartBeanUtil.copyList(rootList, DepartmentTreeVO.class);
         this.recursiveBuildTree(treeVOList, voList);
@@ -182,7 +181,7 @@ public class DepartmentCacheManager {
     private List<DepartmentTreeVO> getChildren(Long departmentId, List<DepartmentVO> voList) {
         List<DepartmentVO> childrenEntityList = voList.stream().filter(e -> departmentId.equals(e.getParentId())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(childrenEntityList)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         return SmartBeanUtil.copyList(childrenEntityList, DepartmentTreeVO.class);
     }
@@ -192,7 +191,7 @@ public class DepartmentCacheManager {
      * 通过部门id,获取当前以及下属部门
      */
     public List<Long> selfAndChildrenIdList(Long departmentId, List<DepartmentVO> voList) {
-        List<Long> selfAndChildrenIdList = Lists.newArrayList();
+        List<Long> selfAndChildrenIdList = new ArrayList<>();
         if (CollectionUtils.isEmpty(voList)) {
             return selfAndChildrenIdList;
         }

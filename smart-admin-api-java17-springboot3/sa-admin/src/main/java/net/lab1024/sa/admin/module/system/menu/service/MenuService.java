@@ -1,7 +1,6 @@
 package net.lab1024.sa.admin.module.system.menu.service;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.menu.constant.MenuTypeEnum;
 import net.lab1024.sa.admin.module.system.menu.dao.MenuDao;
@@ -23,6 +22,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 菜单
@@ -167,8 +167,8 @@ public class MenuService {
      */
     private List<MenuVO> filterNoParentMenu(Map<Long, List<MenuVO>> parentMap, Long parentId) {
         // 获取本级菜单树List
-        List<MenuVO> res = parentMap.getOrDefault(parentId, Lists.newArrayList());
-        List<MenuVO> childMenu = Lists.newArrayList();
+        List<MenuVO> res = parentMap.getOrDefault(parentId, new ArrayList<>());
+        List<MenuVO> childMenu = new ArrayList<>();
         // 循环遍历下级菜单
         res.forEach(e -> {
             List<MenuVO> menuList = this.filterNoParentMenu(parentMap, e.getMenuId());
@@ -184,9 +184,9 @@ public class MenuService {
      * @param onlyMenu 不查询功能点
      */
     public ResponseDTO<List<MenuTreeVO>> queryMenuTree(Boolean onlyMenu) {
-        List<Integer> menuTypeList = Lists.newArrayList();
+        List<Integer> menuTypeList = new ArrayList<>();
         if (onlyMenu) {
-            menuTypeList = Lists.newArrayList(MenuTypeEnum.CATALOG.getValue(), MenuTypeEnum.MENU.getValue());
+            menuTypeList = List.of(MenuTypeEnum.CATALOG.getValue(), MenuTypeEnum.MENU.getValue());
         }
         List<MenuVO> menuVOList = menuDao.queryMenuList(Boolean.FALSE, null, menuTypeList);
         //根据ParentId进行分组
@@ -201,7 +201,7 @@ public class MenuService {
      */
     List<MenuTreeVO> buildMenuTree(Map<Long, List<MenuVO>> parentMap, Long parentId) {
         // 获取本级菜单树List
-        List<MenuTreeVO> res = parentMap.getOrDefault(parentId, Lists.newArrayList()).stream()
+        List<MenuTreeVO> res = parentMap.getOrDefault(parentId, new ArrayList<>()).stream()
                 .map(e -> SmartBeanUtil.copy(e, MenuTreeVO.class)).collect(Collectors.toList());
         // 循环遍历下级菜单
         res.forEach(e -> {

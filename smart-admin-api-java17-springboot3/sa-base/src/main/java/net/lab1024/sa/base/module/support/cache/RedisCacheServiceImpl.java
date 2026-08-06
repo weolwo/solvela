@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.module.support.cache;
 
 import cn.hutool.core.util.StrUtil;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.config.RedisConfig;
 import net.lab1024.sa.base.constant.ReloadConst;
@@ -15,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * redis 缓存实现
@@ -35,7 +35,7 @@ public class RedisCacheServiceImpl implements CacheService {
      */
     @Override
     public List<String> cacheNames() {
-        return Lists.newArrayList(redisCacheManager.getCacheNames());
+        return new ArrayList<>(redisCacheManager.getCacheNames());
     }
 
     /**
@@ -45,7 +45,7 @@ public class RedisCacheServiceImpl implements CacheService {
     public List<String> cacheKey(String cacheName) {
         RedisCache cache = (RedisCache) redisCacheManager.getCache(cacheName);
         if (cache == null) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         // 获取 Redis 连接
         RedisConnection connection = redisConnectionFactory.getConnection();
@@ -60,7 +60,7 @@ public class RedisCacheServiceImpl implements CacheService {
             }).collect(Collectors.toList());
         }
         connection.close();
-        return Lists.newArrayList(cacheName);
+        return new ArrayList<>(List.of(cacheName));
     }
 
     /**

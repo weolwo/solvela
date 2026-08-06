@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.backend;
 
-import com.google.common.base.CaseFormat;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeDeleteEnum;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
@@ -67,7 +67,7 @@ public class ControllerVariableService extends CodeGenerateBaseVariableService {
             }
         }
 
-        packageSet.add("import " + form.getBasic().getJavaPackageName() + ".service." + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, form.getBasic().getModuleName()) + "Service;");
+        packageSet.add("import " + form.getBasic().getJavaPackageName() + ".service." + SmartCaseFormat.LOWER_CAMEL.to(SmartCaseFormat.UPPER_CAMEL, form.getBasic().getModuleName()) + "Service;");
 
         // 排序一下
         ArrayList<String> packageList = new ArrayList<>(packageSet);

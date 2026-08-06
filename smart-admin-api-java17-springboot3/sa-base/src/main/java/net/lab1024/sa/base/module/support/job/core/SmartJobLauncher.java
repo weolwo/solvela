@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.job.core;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.module.support.job.config.SmartJobConfig;
@@ -51,7 +50,9 @@ public class SmartJobLauncher {
         Boolean refreshEnabled = jobConfig.getDbRefreshEnabled();
         Integer refreshInterval = jobConfig.getDbRefreshInterval();
 
-        ThreadFactory factory = new ThreadFactoryBuilder().setNameFormat("SmartJobLauncher-%d").build();
+        // JDK 21 起线程工厂是标准 API，命名语义与原来 Guava 的 "SmartJobLauncher-%d" 完全一致
+        // （SmartJobLauncher-0、SmartJobLauncher-1…），不必为一个命名扛 Guava
+        ThreadFactory factory = Thread.ofPlatform().name("SmartJobLauncher-", 0).factory();
         ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1, factory);
         Runnable launcherRunnable = () -> {
             try {

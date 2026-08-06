@@ -1,7 +1,6 @@
 package net.lab1024.sa.admin.module.business.oa.notice.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.business.oa.notice.constant.NoticeVisibleRangeDataTypeEnum;
 import net.lab1024.sa.admin.module.business.oa.notice.dao.NoticeDao;
@@ -37,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.HashMap;
 
 /**
  * 通知。公告 后台管理业务
@@ -222,7 +222,7 @@ public class NoticeService {
             if (CollectionUtils.isNotEmpty(employeeIdList)) {
                 employeeMap = employeeDao.selectBatchIds(employeeIdList).stream().collect(Collectors.toMap(EmployeeEntity::getEmployeeId, Function.identity()));
             } else {
-                employeeMap = Maps.newHashMap();
+                employeeMap = new HashMap<>();
             }
             for (NoticeVisibleRangeVO noticeVisibleRange : noticeVisibleRangeList) {
                 if (noticeVisibleRange.getDataType().equals(NoticeVisibleRangeDataTypeEnum.EMPLOYEE.getValue())) {

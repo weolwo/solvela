@@ -1,7 +1,6 @@
 package net.lab1024.sa.admin.module.business.oa.enterprise.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.admin.module.business.oa.enterprise.dao.EnterpriseDao;
@@ -30,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 企业
@@ -187,7 +187,7 @@ public class EnterpriseService {
         if (CollectionUtils.isEmpty(waitAddEmployeeIdList)) {
             return ResponseDTO.ok();
         }
-        List<EnterpriseEmployeeEntity> batchAddList = Lists.newArrayList();
+        List<EnterpriseEmployeeEntity> batchAddList = new ArrayList<>();
         for (Long employeeId : waitAddEmployeeIdList) {
             EnterpriseEmployeeEntity enterpriseEmployeeEntity = new EnterpriseEmployeeEntity();
             enterpriseEmployeeEntity.setEnterpriseId(enterpriseId);
@@ -219,7 +219,7 @@ public class EnterpriseService {
      */
     public List<EnterpriseEmployeeVO> employeeList(List<Long> enterpriseIdList) {
         if (CollectionUtils.isEmpty(enterpriseIdList)) {
-            return Lists.newArrayList();
+            return new ArrayList<>();
         }
         return enterpriseEmployeeDao.selectByEnterpriseIdList(enterpriseIdList);
     }

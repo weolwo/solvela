@@ -3,7 +3,6 @@ package net.lab1024.sa.base.common.json.serializer;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.SerializationContext;
-import com.google.common.collect.Lists;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.module.support.file.service.FileService;
@@ -12,6 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 文件key进行序列化对象
@@ -31,7 +31,7 @@ public class FileKeyVoSerializer extends ValueSerializer<String> {
     @Override
     public void serialize(String value, JsonGenerator jsonGenerator, SerializationContext serializerProvider) {
         if (StringUtils.isEmpty(value)) {
-            jsonGenerator.writePOJO(Lists.newArrayList());
+            jsonGenerator.writePOJO(new ArrayList<>());
             return;
         }
         if(fileService == null){

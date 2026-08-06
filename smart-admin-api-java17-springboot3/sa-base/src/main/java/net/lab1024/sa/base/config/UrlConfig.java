@@ -2,8 +2,6 @@ package net.lab1024.sa.base.config;
 
 import cn.dev33.satoken.annotation.SaIgnore;
 import cn.hutool.core.util.StrUtil;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +19,8 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * url配置
@@ -43,7 +43,7 @@ public class UrlConfig {
      */
     @Bean
     public Map<Method, Set<String>> methodUrlMap() {
-        Map<Method, Set<String>> methodUrlMap = Maps.newHashMap();
+        Map<Method, Set<String>> methodUrlMap = new HashMap<>();
         //获取url与类和方法的对应信息
         Map<RequestMappingInfo, HandlerMethod> map = requestMappingHandlerMapping.getHandlerMethods();
         for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : map.entrySet()) {
@@ -71,7 +71,7 @@ public class UrlConfig {
      */
     @Bean
     public List<RequestUrlVO> authUrl(Map<Method, Set<String>> methodUrlMap) {
-        List<RequestUrlVO> authUrlList = Lists.newArrayList();
+        List<RequestUrlVO> authUrlList = new ArrayList<>();
         for (Map.Entry<Method, Set<String>> entry : methodUrlMap.entrySet()) {
             Method method = entry.getKey();
             // 忽略权限
@@ -91,7 +91,7 @@ public class UrlConfig {
     }
 
     private List<RequestUrlVO> buildRequestUrl(Method method, Set<String> urlSet) {
-        List<RequestUrlVO> requestUrlList = Lists.newArrayList();
+        List<RequestUrlVO> requestUrlList = new ArrayList<>();
         if (CollectionUtils.isEmpty(urlSet)) {
             return requestUrlList;
         }
@@ -125,7 +125,7 @@ public class UrlConfig {
      */
     @Bean
     public List<String> noNeedLoginUrlList(Map<Method, Set<String>> methodUrlMap) {
-        List<String> noNeedLoginUrlList = Lists.newArrayList();
+        List<String> noNeedLoginUrlList = new ArrayList<>();
         for (Map.Entry<Method, Set<String>> entry : methodUrlMap.entrySet()) {
             Method method = entry.getKey();
             NoNeedLogin noNeedLogin = method.getAnnotation(NoNeedLogin.class);

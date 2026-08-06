@@ -1,7 +1,6 @@
 package net.lab1024.sa.admin.module.system.datascope;
 
 import cn.hutool.core.util.StrUtil;
-import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.datascope.domain.DataScopeSqlConfig;
 import net.lab1024.sa.admin.module.system.datascope.service.DataScopeSqlConfigService;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.HashMap;
 
 /**
  * mybaits sql 拦截
@@ -67,7 +67,7 @@ public class MyBatisPlugin extends DataScopePlugin {
 
 
     private Map<String, Object> getParamList(String paramName, Object parameter) {
-        Map<String, Object> paramMap = Maps.newHashMap();
+        Map<String, Object> paramMap = new HashMap<>();
         if (StringUtils.isEmpty(paramName)) {
             return paramMap;
         }

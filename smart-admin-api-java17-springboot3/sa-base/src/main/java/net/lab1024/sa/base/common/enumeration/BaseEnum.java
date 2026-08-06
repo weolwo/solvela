@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.common.enumeration;
 
-import com.google.common.base.CaseFormat;
-
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import java.util.Objects;
 
 /**
@@ -101,7 +100,7 @@ public interface BaseEnum {
         enumStr = enumStr.replace("\n", "<br>");
 
         // 拼接 export const 开头
-        String prefix = "  <br>  export const " + CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, clazz.getSimpleName()) + " = <br> ";
+        String prefix = "  <br>  export const " + SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.UPPER_UNDERSCORE, clazz.getSimpleName()) + " = <br> ";
         return prefix + enumStr + " <br>";
     }
 }

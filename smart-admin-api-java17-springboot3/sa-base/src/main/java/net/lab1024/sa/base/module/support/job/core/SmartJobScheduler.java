@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.job.core;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.module.support.job.config.SmartJobConfig;
 import net.lab1024.sa.base.module.support.job.constant.SmartJobTriggerTypeEnum;
@@ -48,7 +47,9 @@ public class SmartJobScheduler {
      */
     public static void init(SmartJobConfig config) {
         TASK_SCHEDULER = new ThreadPoolTaskScheduler();
-        ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("SmartJobExecutor-%d").build();
+        // JDK 21 起线程工厂是标准 API，命名语义与原来 Guava 的 "SmartJobExecutor-%d" 完全一致
+        // （SmartJobExecutor-0、SmartJobExecutor-1…），不必为一个命名扛 Guava
+        ThreadFactory threadFactory = Thread.ofPlatform().name("SmartJobExecutor-", 0).factory();
         TASK_SCHEDULER.setThreadFactory(threadFactory);
         TASK_SCHEDULER.setPoolSize(config.getCorePoolSize());
         // 线程池在关闭时会等待所有任务完成

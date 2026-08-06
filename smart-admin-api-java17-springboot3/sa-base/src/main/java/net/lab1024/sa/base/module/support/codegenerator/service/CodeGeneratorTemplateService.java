@@ -6,7 +6,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IORuntimeException;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ZipUtil;
-import com.google.common.base.CaseFormat;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
@@ -119,7 +119,7 @@ public class CodeGeneratorTemplateService {
             for (CodeField codeField : enumFiledList) {
                 Map<String, Object> variablesMap = new HashMap<>();
 
-                String enumName = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, codeField.getEnumName());
+                String enumName = SmartCaseFormat.LOWER_CAMEL.to(SmartCaseFormat.UPPER_CAMEL, codeField.getEnumName());
                 if (!enumName.endsWith("Enum")) {
                     enumName = enumName + "Enum";
                 }
@@ -192,9 +192,9 @@ public class CodeGeneratorTemplateService {
 
         //名词的大写开头和小写开头
         HashMap<String, String> names = new HashMap<>();
-        names.put("lowerCamel", CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, basic.getModuleName()));
-        names.put("upperCamel", CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_CAMEL, basic.getModuleName()));
-        names.put("lowerHyphenCamel", CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_HYPHEN, basic.getModuleName()));
+        names.put("lowerCamel", SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_CAMEL, basic.getModuleName()));
+        names.put("upperCamel", SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.UPPER_CAMEL, basic.getModuleName()));
+        names.put("lowerHyphenCamel", SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_HYPHEN, basic.getModuleName()));
         variablesMap.put("name", names);
 
         //主键字段名称和java类型

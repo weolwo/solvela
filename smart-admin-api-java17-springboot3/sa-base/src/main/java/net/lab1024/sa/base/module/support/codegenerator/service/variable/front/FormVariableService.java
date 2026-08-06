@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.front;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.google.common.base.CaseFormat;
+import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
@@ -51,7 +51,7 @@ public class FormVariableService extends CodeGenerateBaseVariableService {
             objectMap.put("dict", codeField.getDict());
 
             if (SmartStringUtil.isNotBlank(codeField.getEnumName())) {
-                String upperUnderscoreEnum = CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, codeField.getEnumName());
+                String upperUnderscoreEnum = SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.UPPER_UNDERSCORE, codeField.getEnumName());
                 objectMap.put("upperUnderscoreEnum", upperUnderscoreEnum);
             }
 
