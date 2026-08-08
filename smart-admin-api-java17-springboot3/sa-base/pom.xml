@@ -204,19 +204,6 @@
             <artifactId>fastexcel-reader</artifactId>
         </dependency>
 
-        <!-- ⬇️ 以下两条在第③档随 SonicExcel 读引擎落地后整体摘除（约 -19.1MB）。
-             第①档还留着：GoodsService 的导入仍走 cn.idev.excel，
-             而语义固化测试要用它把新旧两份导出结果逐格比对。 -->
-        <dependency>
-            <groupId>cn.idev.excel</groupId>
-            <artifactId>fastexcel</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>

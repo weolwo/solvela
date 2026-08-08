@@ -75,7 +75,9 @@ public class SonicExcelWriteTest {
                 () -> assertEquals("文本", data.get(0)),
                 () -> assertEquals("42", data.get(1)),
                 () -> assertEquals("99.99", data.get(2)),
-                () -> assertEquals("TRUE", data.get(3)),
+                // 布尔单元格里存的就是 true/false。第③档之前这里断言的是 "TRUE" ——
+                // 那是 POI 的 DataFormatter 渲染出来的显示值，不是存储值，文件内容并没有变
+                () -> assertEquals("true", data.get(3)),
                 () -> assertEquals("ON", data.get(6), "没挂转换器时枚举兜底写 name()"),
                 // 后三列是 null / 空串 / null：一个单元格都不写。
                 // Excel 里"单元格不存在"和"单元格是空的"渲染完全一样，但千万行导出时能省下可观的 XML 体积

@@ -16,7 +16,7 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 | 来源 | 结论 |
 |---|---|
 | v1 说"引入 dhatim 无传递依赖膨胀，可删 commons-compress" | ❌ **错**。reader 依赖 commons-compress，删不掉。见 §2.4 |
-| v1 收益账估 13.5MB | ✅ **低估**。实测净减 **19.1MB**（idev-fastexcel 拖了 ehcache + JAXB + commons-math3）。见 §2.2 |
+| v1 收益账估 13.5MB | ✅ **低估**。第③档落地后按 classpath 差集实测净减 **18.66MB**（idev-fastexcel 拖了 ehcache + JAXB，poi 拖了 commons-math3）。见 §2.2 |
 | v1 说"fastexcel 写端不支持图片" | ❌ **错**。0.20.2 的 `Worksheet#addImage` 存在。水印是**产品决策**砍的，不是技术限制。见 §1.2 |
 | v1 D6「reader 是否落临时文件」待实测 | ✅ **已定案**：不落盘，**整个文件进堆**。读侧 API 因此强制 `Path` 入参。见 §8.5 / §2.4 |
 | 🔴 **新发现：aalto-xml 会劫持 JVM 全局 StAX** | 实测 classpath 上有 **6 个库**会受影响（含 S3）。见 §9.1 |
@@ -95,11 +95,12 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 | `GoodsExcelVO` / `GoodsImportForm` / `EnterpriseExcelVO` | 仅 `@ExcelProperty("中文名")` | 换 `@SonicTitle`，一对一平移 |
 | `GoodsService#getAllGoods` | **手写字典/枚举翻译拼 VO** | 用 converter 收走，见 §5.3 |
 
-### 2.2 依赖收益账（实测，非估算）
+### 2.2 依赖收益账（**第③档完成后的实测结果**）
 
-`mvn dependency:tree -pl sa-base` + 本地 `.m2` / Maven Central 实测 jar 尺寸：
+对比 `sa-admin` 完整 runtime classpath 在改造前后的差集（在 500a9aaa 建临时 worktree 各跑一次
+`dependency:build-classpath`，逐 jar 量尺寸）：**214 个 jar → 204 个，净减 18.66 MB**。
 
-| 移除 | KB |
+| 移除（15 个） | KB |
 |---|---|
 | `poi-ooxml-lite` 5.5.1 | 5855 |
 | `poi` 5.5.1 | 2936 |
@@ -109,13 +110,27 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 | `poi-ooxml` 5.5.1 | 2004 |
 | **`jaxb-runtime` + `jaxb-core` + `txw2` + `istack-commons-runtime`**（ehcache 拖入） | 1134 |
 | `cn.idev.excel:fastexcel` + `fastexcel-support` | 983 |
-| `commons-codec` 1.22.1 | 413 |
-| `curvesapi` / `commons-csv` / `cache-api` / `SparseBitSet` | 244 |
-| `commons-compress` 1.28.0 | 1091 |
-| **移除小计** | **21395 (20.9 MB)** |
-| ➖ `commons-compress` **要退回来**（`fastexcel-reader` 依赖它，版本恰好同为 1.28.0，无冲突） | −1091 |
-| ➖ 新增 5 个 jar（见 §2.4） | −737 |
-| **净减** | **19567 KB ≈ 19.1 MB** |
+| `curvesapi` / `commons-csv` / `SparseBitSet` | 194 |
+| **小计** | **19842** |
+
+| 新增（5 个） | KB |
+|---|---|
+| `aalto-xml` 1.4.0 | 351 |
+| `stax2-api` 4.3.0 | 190 |
+| `org.dhatim:fastexcel` 0.20.2 | 129 |
+| `org.dhatim:fastexcel-reader` 0.20.2 | 40 |
+| `opczip` 1.2.0 | 27 |
+| **小计** | **736** |
+
+**净减 18.66 MB**，另有 POI / xmlbeans 历年 CVE 面一并消失。
+
+⚠️ **三个原本以为能删、实际删不掉的**（v2 的估算里错误地算进了收益，这里修正）：
+
+| | 为什么还在 |
+|---|---|
+| `commons-compress` | `fastexcel-reader` 的编译期依赖，换个上游继续存在 |
+| `commons-codec` | 原以为随 `commons-csv` 一起走，实测它现在挂在 `commons-compress` 下面 |
+| `cache-api` | 原以为是 ehcache 拖进来的，实测 **redisson** 也依赖它，与 Excel 无关 |
 
 ⚠️ `commons-lang3` / `commons-io` / `commons-collections4` **仍然删不掉**（项目自身分别用了 41 / 7 / 66 处），
 但摘掉 POI 后它们从"被迫保留"变成"我们自己在用"，**依赖关系变干净，体积不变**。别把这一项算进收益。
@@ -772,7 +787,7 @@ try {
 |---|---|---|---|
 | **①** ✅ **已完成 2026-08-08** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；**2 个导出 VO 平移**；`SmartExcelUtil#exportExcel` 切换成"先攒 byte[] 再落头"；**删除水印全部代码**，`EnterpriseController` 改调普通导出。35 条测试全绿 | 注解层保留 EasyExcel 可并行 | 引入 dhatim writer，POI 暂留 |
 | **②** ✅ **已完成 2026-08-08** | 读引擎（`Path` 入参 + 入口体检 + 临时文件闭环）+ 转换器 Spring 解析落地；`GoodsImportForm` **改成 record**；`GoodsService#importGoods` 改造成带行级错误回显；`getAllGoods` 的三处翻译全部收进 converter。累计 100 条测试全绿 | 导入可临时切回旧实现 | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
-| **③** | **摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`**，删 `commons-codec` 等；跑全量测试矩阵 | git revert 单 commit | **−19.1 MB** |
+| **③** ✅ **已完成 2026-08-08** | 摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`（连带 xmlbeans / ehcache / JAXB / commons-math3 等 15 个 jar）；测试回读改用 fastexcel-reader，迁移语义测试退化为固定快照 | git revert 单 commit | **实测 −18.66 MB** |
 | **④** | 增强：列宽估算、CSV 通道、错误报告导出、导入模板下载 + 下拉校验 | 纯新增 | 无 |
 
 每档一个 commit，message 沿用现有风格（`SonicExcel 第①档：…（−xMB）`）。
@@ -913,7 +928,7 @@ try (Stream<GoodsImportForm> rows = SonicExcel.read(tmp, GoodsImportForm.class).
 
 | 维度 | 阿里系现状 | SonicExcel | 差值 |
 |---|---|---|---|
-| 依赖体积 | 20.9 MB / 约 18 个 jar | 1.79 MB / 6 个 jar | **−19.1 MB** |
+| 依赖体积 | 19.4 MB / 15 个 jar | 0.74 MB / 5 个 jar | **实测 −18.66 MB** |
 | CVE 面 | POI + xmlbeans + ehcache + JAXB | opczip + aalto + stax2 | 大幅收窄 |
 | 一次导入的业务代码 | ~44 行 | ~3 行 | **−93%** |
 | 专有概念数 | `AnalysisEventListener` / `AnalysisContext` / `ReadRowHolder` / `ExcelDataConvertException` / `BATCH_COUNT` / `doAfterAllAnalysed` / `WriteHandler` = **7 个** | `Stream` + `Gatherers` = **0 个**（JDK 常识） | 心智负担归零 |
@@ -939,12 +954,12 @@ try (Stream<GoodsImportForm> rows = SonicExcel.read(tmp, GoodsImportForm.class).
 |---|---|
 | **读侧** | **压倒性胜利，架构级的**。事务边界、组合性、无状态，是阿里系在 POI SAX 上做不到的事 |
 | **写侧** | **小胜**。EasyExcel 的 `.sheet().doWrite(list)` 本就简洁，我们赢在内存确定性和依赖体积，**不在优雅** |
-| **依赖** | **大胜**，−19.1 MB，POI 全家桶连根拔起 |
+| **依赖** | **大胜**，实测 −18.66 MB（214 个 jar → 204 个），POI 全家桶连根拔起 |
 | **扩展性** | **净输**。放弃 `WriteHandler` 万能后门，换来小而清晰的 API |
 | **风险** | 兼容性与生态是长期负债，用测试矩阵 + 门面层（底层可换）对冲 |
 
 **值得做，但理由要摆正**：不是"自研的更优雅"，而是
-①摘掉 POI 省 19.1MB 和一整片 CVE 面，②拉模型顺手解决了事务边界这个真问题，③现存使用面只有 3 处、迁移成本近乎为零。
+①摘掉 POI 省 18.66MB 和一整片 CVE 面，②拉模型顺手解决了事务边界这个真问题，③现存使用面只有 3 处、迁移成本近乎为零。
 
 模板填充这个唯一可能翻盘的因素，已按产品决策关闭（§1.2）。
 
@@ -967,5 +982,5 @@ try (Stream<GoodsImportForm> rows = SonicExcel.read(tmp, GoodsImportForm.class).
 | 未提 SPI 冲突 | §9.1 完整隔离方案 + 实测证据 + **`.events.` 类名修正** | aalto 劫持 JVM 全局 StAX，影响 6 个库含 S3 |
 | 未提临时文件 | §10.2 完整生命周期 + **明确禁止 `deleteOnExit()`** | 它是内存泄漏且在 K8s SIGKILL 下不执行 |
 | 水印列为 Non-Goal，理由"引擎不支持" | 理由改为**产品决策** | 0.20.2 的 `addImage` 是存在的，理由写错会误导后人 |
-| 收益估 13.5MB | **实测 19.1MB**，且 commons-compress 删不掉 | `mvn dependency:tree` + jar 实测（§2.2） |
+| 收益估 13.5MB | **实测 −18.66MB**；commons-compress / commons-codec / cache-api 三个删不掉 | classpath 差集逐 jar 实测（§2.2） |
 | 未提 | `alias()`、`.xls` 探测、空行过滤、列宽、科学计数、基本类型拦截、Web 异常契约、阿里系对比 | 全是线上工单高发区（§5.1 / §7 / §8 / §10 / §15） |

@@ -12,10 +12,9 @@ import net.lab1024.sa.base.module.support.dict.service.DictService;
 import net.lab1024.sa.base.sonicexcel.SonicExcel;
 import net.lab1024.sa.base.sonicexcel.converter.SonicConverterFactory;
 import net.lab1024.sa.base.sonicexcel.error.SonicReadResult;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.dhatim.fastexcel.reader.ReadableWorkbook;
+import org.dhatim.fastexcel.reader.Row;
+import org.dhatim.fastexcel.reader.Sheet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,7 +104,10 @@ public class SonicExcelRealVoTest {
 
         assertEquals(List.of("商品分类", "商品名称", "商品状态错误", "产地", "商品价格", "备注"), rows.get(0),
                 "表头文本与列序必须和迁移前一字不差 —— 用户手里的旧模板还要能用");
-        assertEquals(List.of("数码", "机械键盘", "售卖中", "广东,江苏", "499", "带背光"), rows.get(1));
+        // 价格断言的是单元格里的存储值 499.00（BigDecimal 原样写入，小数位保留）。
+        // 第③档之前这里是 "499" —— 那是 POI DataFormatter 按 General 格式渲染出来的显示值。
+        // 文件内容没变，变的只是回读工具
+        assertEquals(List.of("数码", "机械键盘", "售卖中", "广东,江苏", "499.00", "带背光"), rows.get(1));
         assertEquals("售罄", rows.get(2).get(2));
         assertEquals("浙江", rows.get(2).get(3));
         assertEquals(3, rows.size());
@@ -192,16 +194,18 @@ public class SonicExcelRealVoTest {
         return buffer.toByteArray();
     }
 
+    /**
+     * 回读用 fastexcel-reader 而不是 SonicExcel 自己的读引擎 —— 自己写自己读，
+     * 两边有同一个理解偏差时会互相掩盖。取的是单元格存储值的文本形态。
+     */
     private static List<List<String>> read(byte[] xlsx) {
-        DataFormatter formatter = new DataFormatter();
         List<List<String>> rows = new ArrayList<>();
-        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
-            Sheet sheet = wb.getSheetAt(0);
-            for (int r = 0; r <= sheet.getLastRowNum(); r++) {
-                Row row = sheet.getRow(r);
+        try (ReadableWorkbook wb = new ReadableWorkbook(new ByteArrayInputStream(xlsx))) {
+            Sheet sheet = wb.getFirstSheet();
+            for (Row row : sheet.read()) {
                 List<String> cells = new ArrayList<>();
-                for (int c = 0; row != null && c < row.getLastCellNum(); c++) {
-                    cells.add(row.getCell(c) == null ? "" : formatter.formatCellValue(row.getCell(c)));
+                for (int c = 0; c < row.getCellCount(); c++) {
+                    cells.add(row.getCellText(c));
                 }
                 rows.add(cells);
             }

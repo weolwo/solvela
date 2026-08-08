@@ -1,71 +1,62 @@
 package net.lab1024.sa.base.sonicexcel;
 
-import cn.idev.excel.FastExcel;
-import cn.idev.excel.annotation.ExcelProperty;
 import net.lab1024.sa.base.common.util.SmartExcelUtil;
 import net.lab1024.sa.base.sonicexcel.annotation.SonicTitle;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 迁移语义固化：同一份数据，旧的 cn.idev.excel 和新的 SonicExcel 各导一次，<b>逐单元格比对</b>。
+ * 迁移语义固化：把导出结果钉死在一份<b>固定期望快照</b>上。
  *
- * <p>夹具刻意照抄 {@code GoodsExcelVO} 的形状（5 个 String + 1 个 BigDecimal），
- * 因为项目里真实迁移的两个 VO 就是这个形状 —— 比对的是真实迁移面，不是造出来的场景。
+ * <p><b>这份期望值的来历</b>：第①②档期间，这个类是拿同一份数据分别用
+ * {@code cn.idev.excel}（阿里系）和 SonicExcel 各导一次、逐单元格比对的，两边完全一致。
+ * 第③档把 cn.idev.excel 摘掉之后没有"另一个引擎"可比了，于是把当时比对通过的结果固化成常量。
+ * <b>所以下面每一个字符串都不是随手写的，是和旧库对齐过的。</b>
  *
- * <p>第③档摘掉 cn.idev.excel 之后，这个类会退化成"对一份固定期望快照"，
- * 那时候它的价值就从"迁移前后一致"变成"以后别改坏了"。
+ * <p>夹具刻意照抄 {@code GoodsExcelVO} 迁移前的形状（5 个 String + 1 个 BigDecimal），
+ * 因为项目里真实迁移的两个 VO 就是这个形状。
+ *
+ * <p>唯一一处已知且刻意保留的差异：值为 null / 空串时 SonicExcel <b>不写这个单元格</b>，
+ * 旧库会写一个空单元格占位。Excel 里"单元格不存在"和"单元格是空的"渲染完全一样，
+ * 但前者在千万行导出时能省下可观的 XML 体积 —— 所以快照里这些位置就是"短一截"。
  *
  * @Date 2026-08-08
  */
 public class SonicExcelMigrationSemanticsTest {
 
-    @Test
-    public void 旧库与SonicExcel逐格一致() {
-        List<Goods> data = sample();
-
-        byte[] legacy = writeWithLegacy(data);
-        byte[] sonic = SmartExcelUtil.toBytes("商品", Goods.class, data);
-
-        List<List<String>> expected = SonicExcelTestSupport.readFirstSheet(legacy);
-        List<List<String>> actual = SonicExcelTestSupport.readFirstSheet(sonic);
-
-        assertEquals(expected.size(), actual.size(), "行数不一致");
-        int width = expected.getFirst().size();
-        for (int r = 0; r < expected.size(); r++) {
-            assertEquals(pad(expected.get(r), width), pad(actual.get(r), width), "第 " + r + " 行不一致");
-        }
-    }
-
     /**
-     * 补齐到表头宽度再比。
-     *
-     * <p>唯一一处已知且刻意保留的差异：值为 null / 空串时 SonicExcel <b>不写这个单元格</b>，
-     * 而旧库会写一个空单元格占位。在 Excel 里"单元格不存在"和"单元格是空的"渲染完全一样，
-     * 但前者在千万行导出时能省下可观的 XML 体积，所以不打算跟旧库对齐。
+     * 与 cn.idev.excel 逐格比对通过的导出结果。
      */
-    private static List<String> pad(List<String> row, int width) {
-        List<String> padded = new ArrayList<>(row);
-        while (padded.size() < width) {
-            padded.add("");
+    private static final List<List<String>> EXPECTED = List.of(
+            List.of("商品分类", "商品名称", "商品状态", "产地", "商品价格", "备注"),
+            List.of("数码", "机械键盘", "在售", "广东,江苏", "499.00", "带背光"),
+            // remark 为 null：不写单元格，所以这一行只有 5 格
+            List.of("家居", "台灯", "售罄", "浙江", "89.90"),
+            // place 为空串、remark 为空串：同样不写
+            List.of("食品", "坚果礼盒", "在售", "", "0.01"));
+
+    @Test
+    public void 导出结果与旧库快照逐格一致() {
+        List<List<String>> actual = SonicExcelTestSupport.readFirstSheet(
+                SmartExcelUtil.toBytes("商品", Goods.class, sample()));
+
+        assertEquals(EXPECTED.size(), actual.size(), "行数不一致");
+        for (int r = 0; r < EXPECTED.size(); r++) {
+            assertEquals(EXPECTED.get(r), actual.get(r), "第 " + r + " 行不一致");
         }
-        return padded;
     }
 
     @Test
-    public void 表头文本与列序与旧库一致() {
-        List<List<String>> legacy = SonicExcelTestSupport.readFirstSheet(writeWithLegacy(sample()));
-        List<List<String>> sonic = SonicExcelTestSupport.readFirstSheet(
-                SmartExcelUtil.toBytes("商品", Goods.class, sample()));
-        assertEquals(legacy.getFirst(), sonic.getFirst());
-        assertEquals(List.of("商品分类", "商品名称", "商品状态", "产地", "商品价格", "备注"), sonic.getFirst());
+    public void 表头文本与列序不能漂() {
+        // 表头一旦漂了，用户手里所有旧模板全部导入失败 —— 这条要单独钉住
+        assertEquals(EXPECTED.getFirst(),
+                SonicExcelTestSupport.readFirstSheet(
+                        SmartExcelUtil.toBytes("商品", Goods.class, sample())).getFirst());
     }
 
     private static List<Goods> sample() {
@@ -77,38 +68,23 @@ public class SonicExcelMigrationSemanticsTest {
         return list;
     }
 
-    private static byte[] writeWithLegacy(List<Goods> data) {
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        FastExcel.write(os, Goods.class).autoCloseStream(Boolean.FALSE).sheet("商品").doWrite(data);
-        return os.toByteArray();
-    }
-
-    /**
-     * 两套注解并存，同一个对象喂给两个引擎。
-     */
     public static class Goods {
 
-        @ExcelProperty("商品分类")
         @SonicTitle("商品分类")
         private String categoryName;
 
-        @ExcelProperty("商品名称")
         @SonicTitle("商品名称")
         private String goodsName;
 
-        @ExcelProperty("商品状态")
         @SonicTitle("商品状态")
         private String goodsStatus;
 
-        @ExcelProperty("产地")
         @SonicTitle("产地")
         private String place;
 
-        @ExcelProperty("商品价格")
         @SonicTitle("商品价格")
         private BigDecimal price;
 
-        @ExcelProperty("备注")
         @SonicTitle("备注")
         private String remark;
 
@@ -129,48 +105,24 @@ public class SonicExcelMigrationSemanticsTest {
             return categoryName;
         }
 
-        public void setCategoryName(String categoryName) {
-            this.categoryName = categoryName;
-        }
-
         public String getGoodsName() {
             return goodsName;
-        }
-
-        public void setGoodsName(String goodsName) {
-            this.goodsName = goodsName;
         }
 
         public String getGoodsStatus() {
             return goodsStatus;
         }
 
-        public void setGoodsStatus(String goodsStatus) {
-            this.goodsStatus = goodsStatus;
-        }
-
         public String getPlace() {
             return place;
-        }
-
-        public void setPlace(String place) {
-            this.place = place;
         }
 
         public BigDecimal getPrice() {
             return price;
         }
 
-        public void setPrice(BigDecimal price) {
-            this.price = price;
-        }
-
         public String getRemark() {
             return remark;
-        }
-
-        public void setRemark(String remark) {
-            this.remark = remark;
         }
     }
 }
