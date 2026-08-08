@@ -1,17 +1,17 @@
 package net.lab1024.sa.base.module.support.repeatsubmit;
 
-import cn.hutool.core.util.ArrayUtil;
-import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.SecureUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.RedisKeyConst;
 import org.aspectj.lang.JoinPoint;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -23,22 +23,43 @@ public class DefaultMd5KeyGenerator implements RepeatSubmitKeyGenerator {
         String url = request.getRequestURL().toString();
         Long userId = SmartRequestUtil.getRequestUserId();
         String reqParams = argsArrayToString(point.getArgs());
-        String md5 = SecureUtil.md5(StrUtil.join(":", userId, url, reqParams));
+        String md5 = md5Hex(SmartStringUtil.join(":", userId, url, reqParams));
         // 唯一标识
         return String.join(":", RedisKeyConst.REPEAT_SUBMIT, md5);
     }
 
 
     /**
+     * MD5 十六进制小写串。
+     *
+     * 这里只是把「同一个用户 + 同一个 URL + 同一份参数」压成一个定长 redis key，
+     * 不做任何安全用途 —— MD5 早已不能用于口令或签名，别照抄到那种地方去。
+     */
+    private static String md5Hex(String text) {
+        try {
+            byte[] digest = MessageDigest.getInstance("MD5").digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+                sb.append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // MD5 是 JDK 必须实现的算法，走不到这里
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
      * 参数拼装
      */
     private String argsArrayToString(Object[] paramsArray) {
         StringJoiner params = new StringJoiner(" ");
-        if (ArrayUtil.isEmpty(paramsArray)) {
+        if (paramsArray == null || paramsArray.length == 0) {
             return params.toString();
         }
         for (Object o : paramsArray) {
-            if (ObjectUtil.isNotNull(o) && !isFilterObject(o)) {
+            if (o != null && !isFilterObject(o)) {
                 params.add(JsonUtils.toJson(o));
             }
         }

@@ -1,7 +1,6 @@
 package net.lab1024.sa.lottery.numberpool.service;
 
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.StrUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.exception.BusinessException;
 
@@ -27,8 +26,8 @@ public class DynamicNumbersGenerator {
 
         // 3. 绝对安全防御
         if (count > maxCapacity) {
-            throw new BusinessException(StrUtil.format(
-                    "配置错误：使用字符集[{}]，长度为{}，最多只能生成{}个号码。您要求生成{}个，会导致死循环！",
+            throw new BusinessException(String.format(
+                    "配置错误：使用字符集[%s]，长度为%d，最多只能生成%d个号码。您要求生成%d个，会导致死循环！",
                     charset, numbersLength, maxCapacity, count
             ));
         }
@@ -90,8 +89,7 @@ public class DynamicNumbersGenerator {
         Set<String> uniqueNumbers = new HashSet<>((int) (count / 0.75) + 1);
 
         while (uniqueNumbers.size() < count) {
-            // Hutool 会自动在咱们给定的 charset 里随机挑选
-            uniqueNumbers.add(RandomUtil.randomString(charset, length));
+            uniqueNumbers.add(SmartRandomUtil.randomString(charset, length));
         }
         return new ArrayList<>(uniqueNumbers);
     }

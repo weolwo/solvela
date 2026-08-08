@@ -1,9 +1,9 @@
 package net.lab1024.sa.aspect;
 
-import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.annoation.RedisLock;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import org.apache.logging.log4j.util.Strings;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -48,7 +48,7 @@ public class RedisLockAspect {
         RedisLock annotation = method.getAnnotation(RedisLock.class);
 
         String dynamicKey = parseKey(joinPoint);
-        String lockKey = StrUtil.join(":", annotation.prefixKey(), dynamicKey);
+        String lockKey = SmartStringUtil.join(":", annotation.prefixKey(), dynamicKey);
 
         RLock lock = redissonClient.getLock(lockKey);
         boolean isLocked = false;
@@ -97,7 +97,7 @@ public class RedisLockAspect {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         RedisLock annotation = method.getAnnotation(RedisLock.class);
         String key = annotation.key();
-        if (StrUtil.isEmpty(key)) {
+        if (SmartStringUtil.isEmpty(key)) {
             return Strings.EMPTY;
         }
         // el解析需要的上下文对象

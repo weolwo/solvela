@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.system.datascope;
 
-import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.datascope.domain.DataScopeSqlConfig;
 import net.lab1024.sa.admin.module.system.datascope.service.DataScopeSqlConfigService;
@@ -46,8 +45,9 @@ public class MyBatisPlugin extends DataScopePlugin {
         BoundSql boundSql = mappedStatement.getBoundSql(parameter);
         String originalSql = boundSql.getSql().trim();
         String id = mappedStatement.getId();
-        List<String> methodStrList = StrUtil.split(id, ".");
-        String path = methodStrList.get(methodStrList.size() - 2) + "." + methodStrList.get(methodStrList.size() - 1);
+        // id 形如 全限定Mapper类名.方法名，这里只要末尾两段：Mapper简单类名.方法名
+        String[] methodStrArr = id.split("\\.");
+        String path = methodStrArr[methodStrArr.length - 2] + "." + methodStrArr[methodStrArr.length - 1];
         DataScopeSqlConfigService dataScopeSqlConfigService = this.dataScopeSqlConfigService();
         if (dataScopeSqlConfigService == null) {
             return invocation.proceed();

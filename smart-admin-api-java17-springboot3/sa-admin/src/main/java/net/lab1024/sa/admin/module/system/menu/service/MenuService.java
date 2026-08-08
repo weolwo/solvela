@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.system.menu.service;
 
-import cn.hutool.core.collection.CollectionUtil;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.system.menu.constant.MenuTypeEnum;
 import net.lab1024.sa.admin.module.system.menu.dao.MenuDao;
@@ -106,7 +105,7 @@ public class MenuService {
 
     private void recursiveDeleteChildren(List<Long> menuIdList, Long employeeId) {
         List<Long> childrenMenuIdList = menuDao.selectMenuIdByParentIdList(menuIdList);
-        if (CollectionUtil.isEmpty(childrenMenuIdList)) {
+        if (CollectionUtils.isEmpty(childrenMenuIdList)) {
             return;
         }
         menuDao.deleteByMenuIdList(childrenMenuIdList, employeeId, Boolean.TRUE);

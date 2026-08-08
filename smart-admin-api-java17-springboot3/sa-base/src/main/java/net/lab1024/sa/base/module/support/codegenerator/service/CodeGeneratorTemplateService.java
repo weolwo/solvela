@@ -1,14 +1,12 @@
 package net.lab1024.sa.base.module.support.codegenerator.service;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IORuntimeException;
-import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.ZipUtil;
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
+import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.domain.entity.CodeGeneratorConfigEntity;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
@@ -31,14 +29,23 @@ import org.apache.velocity.tools.ToolManager;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * 代码生成器 模板 Service
@@ -85,7 +92,7 @@ public class CodeGeneratorTemplateService {
     }
 
     public void zipGeneratedFiles(OutputStream outputStream, String tableName, CodeGeneratorConfigEntity codeGeneratorConfigEntity) {
-        String uuid = IdUtil.fastSimpleUUID();
+        String uuid = SmartRandomUtil.simpleUuid();
         File dir = new File(uuid);
 
         // 1、生产文件
@@ -106,8 +113,8 @@ public class CodeGeneratorTemplateService {
                 String fileContent = generate(tableName, templateFile, codeGeneratorConfigEntity);
                 File file = new File(uuid + "/" + fullPathFileName);
                 file.getParentFile().mkdirs();
-                FileUtil.appendUtf8String(fileContent, file);
-            } catch (IORuntimeException e) {
+                appendUtf8(file, fileContent);
+            } catch (IOException e) {
                 log.error(e.getMessage(), e);
             }
         }
@@ -132,15 +139,82 @@ public class CodeGeneratorTemplateService {
                 String fileContent = render("code-generator-template/java/constant/enum.java.vm", variablesMap);
                 File file = new File(uuid + "/java/" + basic.getModuleName().toLowerCase() + "/constant/" + enumName + ".java");
                 file.getParentFile().mkdirs();
-                FileUtil.appendUtf8String(fileContent, file);
+                try {
+                    appendUtf8(file, fileContent);
+                } catch (IOException e) {
+                    log.error(e.getMessage(), e);
+                }
             }
         }
 
 
-        ZipUtil.zip(outputStream, StandardCharsets.UTF_8, false, null, dir);
+        try {
+            zipDirectoryContent(outputStream, dir);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
 
-        FileUtil.del(dir);
+    /**
+     * 生成时间戳，null 时返回 null —— 模板里 basic.frontDate 允许没配
+     */
+    private static String formatDateTime(java.time.LocalDateTime time) {
+        return time == null ? null : SmartLocalDateUtil.format(time, SmartDateFormatterEnum.YMD_HMS);
+    }
 
+    /**
+     * 以 UTF-8 追加写入，文件不存在则创建（原 FileUtil.appendUtf8String）
+     */
+    static void appendUtf8(File file, String content) throws IOException {
+        Files.writeString(file.toPath(), content, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
+
+    /**
+     * 把目录里的内容打成 zip 写进 outputStream —— 是「内容」，不含 dir 这一层目录本身
+     * （对应原 ZipUtil.zip 的 withSrcDir=false），所以解压出来直接就是 java/、js/ 这些目录。
+     *
+     * 这里必须关掉 ZipOutputStream：中央目录是在 close 时才写的，不关就是一个打不开的空包。
+     * 调用方传进来的是 ByteArrayOutputStream，关它没有副作用，toByteArray 照常可用。
+     */
+    static void zipDirectoryContent(OutputStream outputStream, File dir) throws IOException {
+        Path root = dir.toPath();
+        try (ZipOutputStream zipOut = new ZipOutputStream(outputStream, StandardCharsets.UTF_8);
+             Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                // zip 里一律用正斜杠，Windows 下 Path 的分隔符是反斜杠，直接拼会生成一个畸形包
+                String entryName = root.relativize(path).toString().replace(File.separatorChar, '/');
+                zipOut.putNextEntry(new ZipEntry(entryName));
+                Files.copy(path, zipOut);
+                zipOut.closeEntry();
+            }
+        }
+    }
+
+    /**
+     * 递归删除临时目录（原 FileUtil.del）。删不掉只记日志，不能让它盖掉正常返回。
+     *
+     * 包级可见而非 private：这三个方法是从 hutool FileUtil/ZipUtil 手抄回来的，
+     * 必须能被同包测试直接打，见 CodeGeneratorTemplateZipTest。
+     */
+    static void deleteRecursively(File dir) {
+        if (!dir.exists()) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(dir.toPath())) {
+            // 倒序：先文件后目录，否则非空目录删不掉
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    log.warn("删除代码生成临时文件失败：{}", path, e);
+                }
+            });
+        } catch (IOException e) {
+            log.warn("清理代码生成临时目录失败：{}", dir, e);
+        }
     }
 
 
@@ -179,8 +253,8 @@ public class CodeGeneratorTemplateService {
 
 
         Map<String, Object> basicMap = BeanUtil.beanToMap(basic);
-        basicMap.put("frontDate", DateUtil.formatLocalDateTime(basic.getFrontDate()));
-        basicMap.put("backendDate", DateUtil.formatLocalDateTime(basic.getBackendDate()));
+        basicMap.put("frontDate", formatDateTime(basic.getFrontDate()));
+        basicMap.put("backendDate", formatDateTime(basic.getBackendDate()));
 
         variablesMap.put("basic", basicMap);
         variablesMap.put("fields", fields);

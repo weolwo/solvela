@@ -1,7 +1,5 @@
 package net.lab1024.sa.base.config;
 
-import cn.hutool.core.date.DatePattern;
-import cn.hutool.core.date.LocalDateTimeUtil;
 import tools.jackson.databind.ser.std.ToStringSerializer;
 import tools.jackson.databind.ext.javatime.deser.LocalDateDeserializer;
 import tools.jackson.databind.ext.javatime.deser.LocalDateTimeDeserializer;
@@ -9,6 +7,8 @@ import tools.jackson.databind.ext.javatime.ser.LocalDateSerializer;
 import tools.jackson.databind.ext.javatime.ser.LocalDateTimeSerializer;
 import tools.jackson.databind.module.SimpleModule;
 import net.lab1024.sa.base.common.json.serializer.LongJsonSerializer;
+import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
+import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -42,10 +42,10 @@ public class JsonConfig {
     public JsonMapperBuilderCustomizer customizer() {
         return builder -> {
             SimpleModule module = new SimpleModule();
-            module.addDeserializer(LocalDate.class, new LocalDateDeserializer(DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter()));
-            module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter()));
-            module.addSerializer(LocalDate.class, new LocalDateSerializer(DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter()));
-            module.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter()));
+            module.addDeserializer(LocalDate.class, new LocalDateDeserializer(SmartDateFormatterEnum.YMD.getFormatter()));
+            module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(SmartDateFormatterEnum.YMD_HMS.getFormatter()));
+            module.addSerializer(LocalDate.class, new LocalDateSerializer(SmartDateFormatterEnum.YMD.getFormatter()));
+            module.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(SmartDateFormatterEnum.YMD_HMS.getFormatter()));
             module.addSerializer(Long.class, LongJsonSerializer.INSTANCE);
             module.addSerializer(Long.TYPE, LongJsonSerializer.INSTANCE);
             module.addSerializer(BigInteger.class, ToStringSerializer.instance);
@@ -70,7 +70,7 @@ public class JsonConfig {
             }
             LocalDateTime localDateTime;
             try {
-                localDateTime = LocalDateTimeUtil.parse(str, DatePattern.NORM_DATETIME_FORMAT.getDateTimeFormatter());
+                localDateTime = SmartLocalDateUtil.parse(str, SmartDateFormatterEnum.YMD_HMS);
             } catch (DateTimeParseException e) {
                 throw new RuntimeException("请输入正确的日期格式：yyyy-MM-dd HH:mm:ss");
             }
@@ -94,7 +94,7 @@ public class JsonConfig {
             }
             LocalDate localDate;
             try {
-                localDate = LocalDateTimeUtil.parseDate(str, DatePattern.NORM_DATE_FORMAT.getDateTimeFormatter());
+                localDate = SmartLocalDateUtil.parseDate(str, SmartDateFormatterEnum.YMD);
             } catch (DateTimeParseException e) {
                 throw new RuntimeException("请输入正确的日期格式：yyyy-MM-dd");
             }

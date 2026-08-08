@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.job.api;
 
-import cn.hutool.core.util.IdUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.module.support.job.api.domain.SmartJobMsg;
@@ -71,7 +71,7 @@ public class SmartJobClientManager {
      * 发布消息
      */
     public void publishToClient(SmartJobMsg msgDTO) {
-        msgDTO.setMsgId(IdUtil.fastSimpleUUID());
+        msgDTO.setMsgId(SmartRandomUtil.simpleUuid());
         topic.publish(msgDTO);
     }
 

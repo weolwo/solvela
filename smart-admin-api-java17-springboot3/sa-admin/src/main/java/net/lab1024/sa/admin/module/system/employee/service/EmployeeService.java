@@ -25,6 +25,7 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.enumeration.UserTypeEnum;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import net.lab1024.sa.base.module.support.securityprotect.service.SecurityPasswordService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.context.annotation.Lazy;
@@ -139,7 +140,7 @@ public class EmployeeService {
 
         EmployeeEntity entity = SmartBeanUtil.copy(employeeAddForm, EmployeeEntity.class);
         // 员工uid
-        String employeeUid = cn.hutool.core.lang.UUID.randomUUID(true).toString(true);
+        String employeeUid = SmartRandomUtil.simpleUuid();
         entity.setEmployeeUid(employeeUid);
 
         // 设置密码 随机密码

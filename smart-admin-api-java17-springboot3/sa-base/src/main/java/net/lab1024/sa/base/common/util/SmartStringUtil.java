@@ -1,12 +1,14 @@
 package net.lab1024.sa.base.common.util;
 
 
-import cn.hutool.core.util.StrUtil;
-
 import java.util.*;
 
 /**
  * 独有的字符串工具类
+ *
+ * 原先 extends cn.hutool.core.util.StrUtil，靠静态方法继承对外提供 isEmpty/isBlank/join/trim/equals。
+ * 移除 hutool 后这些方法在本类内自实现，语义与 StrUtil 保持一致（见各方法注释），
+ * 调用方一行都不用改。
  *
  * @Author 1024创新实验室-主任: 卓大
  * @Date 2021-09-02 20:21:10
@@ -14,7 +16,116 @@ import java.util.*;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
-public class SmartStringUtil extends StrUtil {
+public class SmartStringUtil {
+
+    // ===============判空 / 比较 / 拼接（原 StrUtil 继承而来）=======================
+
+    /**
+     * 是否为空：null 或长度为 0。
+     * 注意与 {@link #isBlank} 的区别：全空格的字符串在这里是「非空」。
+     */
+    public static boolean isEmpty(CharSequence str) {
+        return str == null || str.isEmpty();
+    }
+
+    public static boolean isNotEmpty(CharSequence str) {
+        return !isEmpty(str);
+    }
+
+    /**
+     * 是否为空白：null、长度为 0，或全部由空白字符组成。
+     *
+     * 没有直接用 String#isBlank()：JDK 只认 Character.isWhitespace，
+     * 而不间断空格 U+00A0、零宽 BOM U+FEFF 这些在它眼里都不是空白 ——
+     * 从前端/Excel 粘过来的文本里恰恰常有这类字符。此处沿用 hutool 的判定范围。
+     */
+    public static boolean isBlank(CharSequence str) {
+        if (isEmpty(str)) {
+            return true;
+        }
+        for (int i = 0; i < str.length(); i++) {
+            if (!isBlankChar(str.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static boolean isNotBlank(CharSequence str) {
+        return !isBlank(str);
+    }
+
+    /**
+     * 空白字符判定。除 JDK 认的空白外，还包含几个「看不见但不是空白」的字符：
+     * BOM、从左至右嵌入符、韩文填充符、盲文空格、蒙古文元音分隔符 —— 与 hutool CharUtil 口径一致。
+     * 这里一律写码点常量，不写字面量：这些字符在编辑器里不可见，写进源码没人看得出来。
+     */
+    private static boolean isBlankChar(char c) {
+        return Character.isWhitespace(c)
+                || Character.isSpaceChar(c)
+                || c == 0x0000
+                || c == 0xFEFF
+                || c == 0x202A
+                || c == 0x3164
+                || c == 0x2800
+                || c == 0x180E;
+    }
+
+    /**
+     * 去除首尾空白，null 安全（入参 null 返回 null，不抛异常也不返回 ""）。
+     * 空白字符的判定范围同 {@link #isBlank}。
+     */
+    public static String trim(CharSequence str) {
+        if (str == null) {
+            return null;
+        }
+        int start = 0;
+        int end = str.length();
+        while (start < end && isBlankChar(str.charAt(start))) {
+            start++;
+        }
+        while (end > start && isBlankChar(str.charAt(end - 1))) {
+            end--;
+        }
+        return str.toString().substring(start, end);
+    }
+
+    /**
+     * null 安全的相等判断：两个都为 null 视为相等。
+     */
+    public static boolean equals(CharSequence str1, CharSequence str2) {
+        if (str1 == null) {
+            return str2 == null;
+        }
+        if (str2 == null) {
+            return false;
+        }
+        return str1.toString().contentEquals(str2);
+    }
+
+    /**
+     * 拼接，分隔符在前（保持 StrUtil.join 的参数顺序，别顺手改成 String.join 的写法）。
+     * 元素为 null 时拼成 "null"，与 StrUtil 一致。
+     */
+    public static String join(CharSequence conjunction, Iterable<?> iterable) {
+        if (iterable == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Object item : iterable) {
+            if (!first) {
+                sb.append(conjunction);
+            }
+            sb.append(item);
+            first = false;
+        }
+        return sb.toString();
+    }
+
+    public static String join(CharSequence conjunction, Object... objects) {
+        return objects == null ? null : join(conjunction, Arrays.asList(objects));
+    }
 
     // ===============split =======================
 

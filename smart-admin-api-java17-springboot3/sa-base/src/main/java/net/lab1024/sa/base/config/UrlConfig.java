@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.config;
 
 import cn.dev33.satoken.annotation.SaIgnore;
-import cn.hutool.core.util.StrUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -98,8 +97,7 @@ public class UrlConfig {
         //url对应的方法名称
         String className = method.getDeclaringClass().getName();
         String methodName = method.getName();
-        List<String> list = StrUtil.split(className, ".");
-        String controllerName = list.get(list.size() - 1);
+        String controllerName = className.substring(className.lastIndexOf('.') + 1);
         String name = controllerName + "." + methodName;
         //swagger 说明信息
         String methodComment = null;

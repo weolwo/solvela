@@ -1,8 +1,5 @@
 package net.lab1024.sa.base.module.support.datatracer.service;
 
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.date.LocalDateTimeUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
@@ -11,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartBigDecimalUtil;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
+import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
+import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
 import net.lab1024.sa.base.module.support.datatracer.annoation.*;
 import net.lab1024.sa.base.module.support.datatracer.constant.DataTracerConst;
 import net.lab1024.sa.base.module.support.datatracer.domain.bo.DataTracerContentBO;
@@ -194,7 +193,7 @@ public class DataTracerChangeContentService {
         List<String> contentList = new ArrayList<>();
         for (Entry<String, DataTracerContentBO> entry : beanParseMap.entrySet()) {
             DataTracerContentBO dataTracerContentBO = entry.getValue();
-            boolean jsonFlag = JSONUtil.isTypeJSON(dataTracerContentBO.getFieldContent());
+            boolean jsonFlag = isJsonShaped(dataTracerContentBO.getFieldContent());
             String filedDesc = dataTracerContentBO.getFieldDesc();
             if (jsonFlag) {
                 contentList.add(filedDesc + "(请进入详情查看)");
@@ -236,7 +235,7 @@ public class DataTracerChangeContentService {
                 continue;
             }
             String fieldDesc = oldContentBO.getFieldDesc();
-            boolean jsonFlag = JSONUtil.isTypeJSON(oldContent) || JSONUtil.isTypeJSON(newContent);
+            boolean jsonFlag = isJsonShaped(oldContent) || isJsonShaped(newContent);
             if (jsonFlag) {
                 String content = fieldDesc + "【进入详情查看】";
                 contentList.add(content);
@@ -318,11 +317,11 @@ public class DataTracerChangeContentService {
         } else if (dataTracerFieldSql != null) {
             fieldContent = this.getRelateDisplayValue(fieldValue, dataTracerFieldSql);
         } else if (fieldValue instanceof Date) {
-            fieldContent = DateUtil.formatDateTime((Date) fieldValue);
+            fieldContent = SmartLocalDateUtil.format(SmartLocalDateUtil.toLocalDateTime((Date) fieldValue), SmartDateFormatterEnum.YMD_HMS);
         } else if (fieldValue instanceof LocalDateTime) {
-            fieldContent = LocalDateTimeUtil.formatNormal((LocalDateTime) fieldValue);
+            fieldContent = SmartLocalDateUtil.format((LocalDateTime) fieldValue, SmartDateFormatterEnum.YMD_HMS);
         } else if (fieldValue instanceof LocalDate) {
-            fieldContent = LocalDateTimeUtil.formatNormal((LocalDate) fieldValue);
+            fieldContent = SmartLocalDateUtil.format((LocalDate) fieldValue, SmartDateFormatterEnum.YMD);
         } else if (fieldValue instanceof BigDecimal) {
             DataTracerFieldBigDecimal dataTracerFieldBigDecimal = field.getAnnotation(DataTracerFieldBigDecimal.class);
             if (dataTracerFieldBigDecimal != null) {
@@ -337,6 +336,22 @@ public class DataTracerChangeContentService {
         dataTracerContentBO.setFieldValue(fieldValue);
         dataTracerContentBO.setFieldContent(fieldContent);
         return dataTracerContentBO;
+    }
+
+    /**
+     * 只看「长得像不像 JSON」：去掉首尾空白后被 {} 或 [] 包住即算。
+     *
+     * 这里刻意不做真解析 —— 用途只是决定变更日志里要不要写成「进入详情查看」，
+     * 一段畸形 JSON 也照样该收起来，为此去 try-catch 一次反序列化是白花开销。
+     * 与原 JSONUtil.isTypeJSON 的判定口径一致。
+     */
+    private boolean isJsonShaped(String str) {
+        if (SmartStringUtil.isBlank(str)) {
+            return false;
+        }
+        String trimmed = str.trim();
+        return (trimmed.startsWith("{") && trimmed.endsWith("}"))
+                || (trimmed.startsWith("[") && trimmed.endsWith("]"));
     }
 
     /**

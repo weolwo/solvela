@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.file.service;
 
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.code.UserErrorCode;
@@ -164,8 +163,8 @@ public class FileService {
             return ResponseDTO.error(UserErrorCode.PARAM_ERROR);
         }
 
-        List<String> fileKeyArray = StrUtil.split(fileKeys, StringConst.SEPARATOR);
-        List<String> fileUrlList = new ArrayList<>(fileKeyArray.size());
+        String[] fileKeyArray = fileKeys.split(StringConst.SEPARATOR);
+        List<String> fileUrlList = new ArrayList<>(fileKeyArray.length);
         for (String fileKey : fileKeyArray) {
             ResponseDTO<String> fileUrlResponse = fileStorageService.getFileUrl(fileKey);
             if (fileUrlResponse.getOk()) {

@@ -1,6 +1,6 @@
 package net.lab1024.sa.admin.module.system.support;
 
-import cn.hutool.core.util.RandomUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
@@ -35,14 +35,14 @@ public class AdminDataMaskingDemoController extends SupportBaseController {
     public ResponseDTO<List<DataVO>> query() {
 
         List<DataVO> list = new ArrayList<>();
-        for (int i = 0; i < RandomUtil.randomInt(10,16); i++) {
+        for (int i = 0; i < SmartRandomUtil.randomInt(10,16); i++) {
             DataVO data = new DataVO();
-            data.setUserId(RandomUtil.randomLong(1328479238, 83274298347982L));
-            data.setPhone("1" + RandomUtil.randomNumbers(10));
-            data.setIdCard("410" + RandomUtil.randomNumbers(3) + RandomUtil.randomInt(1980, 2010) + RandomUtil.randomInt(10, 12) + RandomUtil.randomInt(10, 30) + RandomUtil.randomNumbers(4));
-            data.setAddress(RandomUtil.randomBoolean() ? "河南省洛阳市洛龙区一零二四大街1024号" : "河南省郑州市高新区六边形大街六边形大楼");
-            data.setPassword(RandomUtil.randomString(10));
-            data.setEmail(RandomUtil.randomString(RandomUtil.randomInt(6, 10)) + "@" + RandomUtil.randomString(2) + ".com");
+            data.setUserId(SmartRandomUtil.randomLong(1328479238, 83274298347982L));
+            data.setPhone("1" + SmartRandomUtil.randomNumbers(10));
+            data.setIdCard("410" + SmartRandomUtil.randomNumbers(3) + SmartRandomUtil.randomInt(1980, 2010) + SmartRandomUtil.randomInt(10, 12) + SmartRandomUtil.randomInt(10, 30) + SmartRandomUtil.randomNumbers(4));
+            data.setAddress(SmartRandomUtil.randomBoolean() ? "河南省洛阳市洛龙区一零二四大街1024号" : "河南省郑州市高新区六边形大街六边形大楼");
+            data.setPassword(SmartRandomUtil.randomString(10));
+            data.setEmail(SmartRandomUtil.randomString(SmartRandomUtil.randomInt(6, 10)) + "@" + SmartRandomUtil.randomString(2) + ".com");
             data.setCarLicense("豫" + RandomStringUtils.randomAlphabetic(1).toUpperCase()+" " + RandomStringUtils.randomAlphanumeric(5).toUpperCase());
             data.setBankCard("6225" + RandomStringUtils.randomNumeric(14));
             data.setOther(RandomStringUtils.randomAlphanumeric(1, 12));

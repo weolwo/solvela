@@ -2,9 +2,6 @@ package net.lab1024.sa.admin.module.system.login.service;
 
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.core.lang.UUID;
-import cn.hutool.core.util.NumberUtil;
-import cn.hutool.core.util.RandomUtil;
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +26,7 @@ import net.lab1024.sa.base.common.enumeration.UserTypeEnum;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartIpUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.LoginDeviceEnum;
 import net.lab1024.sa.base.constant.RedisKeyConst;
@@ -152,7 +150,7 @@ public class LoginService implements StpInterface {
         if (superPasswordFlag) {
 
             // 对于万能密码：受限制sa token 要求loginId唯一，万能密码只能插入一段uuid
-            String saTokenLoginId = SUPER_PASSWORD_LOGIN_ID_PREFIX + StringConst.COLON + UUID.randomUUID().toString().replace("-", "") + StringConst.COLON + employeeEntity.getEmployeeId();
+            String saTokenLoginId = SUPER_PASSWORD_LOGIN_ID_PREFIX + StringConst.COLON + SmartRandomUtil.simpleUuid() + StringConst.COLON + employeeEntity.getEmployeeId();
             // 万能密码登录只能登录30分钟
             StpUtil.login(saTokenLoginId, 180000000);
 
@@ -394,7 +392,7 @@ public class LoginService implements StpInterface {
         String emailCode = redisService.get(redisVerificationCodeKey);
         long sendCodeTimeMills = -1;
         if (!SmartStringUtil.isEmpty(emailCode)) {
-            sendCodeTimeMills = NumberUtil.parseLong(emailCode.split(StringConst.UNDERLINE)[1]);
+            sendCodeTimeMills = Long.parseLong(emailCode.split(StringConst.UNDERLINE)[1]);
         }
 
         if (System.currentTimeMillis() - sendCodeTimeMills < 60 * 1000) {
@@ -403,7 +401,7 @@ public class LoginService implements StpInterface {
 
         //生成验证码
         long currentTimeMillis = System.currentTimeMillis();
-        String verificationCode = RandomUtil.randomNumbers(4);
+        String verificationCode = SmartRandomUtil.secureRandomNumbers(4);
         redisService.set(redisVerificationCodeKey, verificationCode + StringConst.UNDERLINE + currentTimeMillis, 300);
 
         // 发送邮件验证码

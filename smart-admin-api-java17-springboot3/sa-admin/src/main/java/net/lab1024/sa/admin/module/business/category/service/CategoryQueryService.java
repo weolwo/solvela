@@ -1,12 +1,12 @@
 package net.lab1024.sa.admin.module.business.category.service;
 
-import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.admin.module.business.category.domain.dto.CategorySimpleDTO;
 import net.lab1024.sa.admin.module.business.category.domain.entity.CategoryEntity;
 import net.lab1024.sa.admin.module.business.category.manager.CategoryCacheManager;
 import net.lab1024.sa.base.common.constant.StringConst;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
@@ -171,7 +171,7 @@ public class CategoryQueryService {
         List<CategoryEntity> parentCategoryList = this.queryCategoryAndParent(categoryId);
         // 拼接父级类目名称 斜杠分隔返回
         List<String> nameList = parentCategoryList.stream().map(CategoryEntity::getCategoryName).collect(Collectors.toList());
-        return StrUtil.join(StringConst.SEPARATOR_SLASH, nameList);
+        return SmartStringUtil.join(StringConst.SEPARATOR_SLASH, nameList);
     }
 
     /**

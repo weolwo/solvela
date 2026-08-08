@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.config;
 
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
@@ -10,6 +9,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.ReloadConst;
 import net.lab1024.sa.base.module.support.config.domain.*;
 import net.lab1024.sa.base.module.support.reload.core.annoation.SmartReload;
@@ -97,7 +97,7 @@ public class ConfigService {
      *
      */
     public ConfigVO getConfig(String configKey) {
-        if (StrUtil.isBlank(configKey)) {
+        if (SmartStringUtil.isBlank(configKey)) {
             return null;
         }
         ConfigEntity entity = this.CONFIG_CACHE.get(configKey.toLowerCase());

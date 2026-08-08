@@ -1,11 +1,11 @@
 package net.lab1024.sa.base.module.support.serialnumber.service.impl;
 
-import cn.hutool.core.util.RandomUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.RedisKeyConst;
 import net.lab1024.sa.base.module.support.redis.RedisService;
@@ -101,7 +101,7 @@ public class SerialNumberRedisService extends SerialNumberBaseService {
             int stepIncrease = 1;
             Integer stepRandomRange = serialNumberInfo.getStepRandomRange();
             if (stepRandomRange > 1) {
-                stepIncrease = RandomUtil.getSecureRandom().nextInt(1, serialNumberInfo.getStepRandomRange() + 1);
+                stepIncrease = SmartRandomUtil.secureRandom().nextInt(1, serialNumberInfo.getStepRandomRange() + 1);
             }
             redisIncrease += stepIncrease;
             list.add(stepIncrease);

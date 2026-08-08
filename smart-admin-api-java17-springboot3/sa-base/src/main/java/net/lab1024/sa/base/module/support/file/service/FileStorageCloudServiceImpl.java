@@ -1,8 +1,8 @@
 package net.lab1024.sa.base.module.support.file.service;
 
-import cn.hutool.core.date.DatePattern;
-import cn.hutool.core.date.LocalDateTimeUtil;
-import cn.hutool.core.util.IdUtil;
+import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
+import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.code.SystemErrorCode;
@@ -92,8 +92,8 @@ public class FileStorageCloudServiceImpl implements IFileStorageService {
         }
 
         String fileType = FilenameUtils.getExtension(originalFileName);
-        String uuid = IdUtil.fastSimpleUUID();
-        String time = LocalDateTimeUtil.format(LocalDateTime.now(), DatePattern.PURE_DATETIME_FORMATTER);
+        String uuid = SmartRandomUtil.simpleUuid();
+        String time = SmartLocalDateUtil.format(LocalDateTime.now(), SmartDateFormatterEnum.YMDHMS);
         String fileKey = path + uuid + "_" + time + "." + fileType;
 
         // 文件名称 URL 编码

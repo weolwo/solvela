@@ -1,7 +1,6 @@
 package net.lab1024.sa.base.module.support.securityprotect.service;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.Getter;
@@ -11,6 +10,7 @@ import net.lab1024.sa.base.module.support.config.ConfigKeyEnum;
 import net.lab1024.sa.base.module.support.config.ConfigService;
 import net.lab1024.sa.base.module.support.securityprotect.domain.Level3ProtectConfigForm;
 import net.lab1024.sa.base.common.util.JsonUtils;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import org.springframework.stereotype.Service;
 
 /**
@@ -118,7 +118,7 @@ public class Level3ProtectConfigService {
     @PostConstruct
     void init() {
         String configValue = configService.getConfigValue(ConfigKeyEnum.LEVEL3_PROTECT_CONFIG);
-        if (StrUtil.isEmpty(configValue)) {
+        if (SmartStringUtil.isEmpty(configValue)) {
             throw new ExceptionInInitializerError("t_config 表 三级等保配置为空，请进行配置！");
         }
         Level3ProtectConfigForm level3ProtectConfigForm = JsonUtils.parseObject(configValue, Level3ProtectConfigForm.class);

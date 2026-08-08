@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.module.support.file.service;
 
-import cn.hutool.core.date.DatePattern;
-import cn.hutool.core.date.LocalDateTimeUtil;
+import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
+import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
 import cn.hutool.core.net.NetUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -86,7 +86,7 @@ public class FileStorageLocalServiceImpl implements IFileStorageService {
         String originalFileName = multipartFile.getOriginalFilename();
         //新文件名
         String uuid = UUID.randomUUID().toString().replaceAll("-", "");
-        String time = LocalDateTimeUtil.format(LocalDateTime.now(), DatePattern.PURE_DATETIME_FORMATTER);
+        String time = SmartLocalDateUtil.format(LocalDateTime.now(), SmartDateFormatterEnum.YMDHMS);
         String newFileName = uuid + "_" + time;
         String fileType = FilenameUtils.getExtension(originalFileName);
         if (SmartStringUtil.isNotEmpty(fileType)) {

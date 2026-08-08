@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.job.core;
 
-import cn.hutool.core.exceptions.ExceptionUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartIpUtil;
 import net.lab1024.sa.base.module.support.job.constant.SmartJobConst;
@@ -12,6 +11,8 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.util.StopWatch;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,12 @@ public class SmartJobExecutor implements Runnable {
     private final RedissonClient redissonClient;
 
     private static final String EXECUTE_LOCK = "smart-job-lock-execute-";
+
+    /**
+     * 执行结果列（t_smart_job_log.execute_result）的长度上限，堆栈超出必须先截断再落库。
+     * 见铁律：往列里塞超长文本会在异常分支上二次抛异常，把原本要记录的失败原因彻底吞掉。
+     */
+    private static final int EXECUTE_RESULT_MAX_LENGTH = 1800;
 
     public SmartJobExecutor(SmartJobEntity jobEntity,
                             SmartJobRepository jobRepository,
@@ -106,7 +113,7 @@ public class SmartJobExecutor implements Runnable {
             stopWatch.stop();
             successFlag = false;
             // ps:异常信息不大于数据库字段长度限制
-            executeResult = ExceptionUtil.stacktraceToString(t, 1800);
+            executeResult = stackTraceToString(t, EXECUTE_RESULT_MAX_LENGTH);
             log.error("==== SmartJob ==== execute err:", t);
         }
 
@@ -164,5 +171,17 @@ public class SmartJobExecutor implements Runnable {
      */
     public SmartJobEntity getJob() {
         return jobEntity;
+    }
+
+    /**
+     * 异常堆栈转字符串，并按 maxLength 截断
+     */
+    private static String stackTraceToString(Throwable throwable, int maxLength) {
+        StringWriter stringWriter = new StringWriter();
+        try (PrintWriter printWriter = new PrintWriter(stringWriter)) {
+            throwable.printStackTrace(printWriter);
+        }
+        String stackTrace = stringWriter.toString();
+        return stackTrace.length() > maxLength ? stackTrace.substring(0, maxLength) : stackTrace;
     }
 }

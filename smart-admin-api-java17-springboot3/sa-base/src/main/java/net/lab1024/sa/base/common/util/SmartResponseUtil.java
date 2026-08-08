@@ -11,7 +11,8 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-import static cn.hutool.core.util.CharsetUtil.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * 返回工具栏
@@ -29,7 +30,7 @@ public class SmartResponseUtil {
     public static void write(HttpServletResponse response, ResponseDTO<?> responseDTO) {
         // 重置response
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(UTF_8);
+        response.setCharacterEncoding(UTF_8.name());
 
         try {
             response.getWriter().write(JsonUtils.toJson(responseDTO));
@@ -45,7 +46,7 @@ public class SmartResponseUtil {
     }
 
     public static void setDownloadFileHeader(HttpServletResponse response, String fileName, Long fileSize) {
-        response.setCharacterEncoding(UTF_8);
+        response.setCharacterEncoding(UTF_8.name());
         if (fileSize != null) {
             response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileSize));
         }

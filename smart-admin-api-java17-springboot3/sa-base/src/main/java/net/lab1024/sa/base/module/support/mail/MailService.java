@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.module.support.mail;
 
 
-import cn.hutool.core.util.IdUtil;
+import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -162,7 +162,7 @@ public class MailService {
     private String freemarkerResolverContent(String htmlTemplate, Map<String, Object> templateParamsMap) {
         Configuration configuration = new Configuration(Configuration.VERSION_2_3_23);
         StringTemplateLoader stringLoader = new StringTemplateLoader();
-        String templateName = IdUtil.fastSimpleUUID();
+        String templateName = SmartRandomUtil.simpleUuid();
         stringLoader.putTemplate(templateName, htmlTemplate);
         configuration.setTemplateLoader(stringLoader);
         try {

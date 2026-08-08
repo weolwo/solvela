@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.operatelog.core;
 
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -216,7 +215,7 @@ public abstract class OperateLogAspect {
         Tag api = this.getApi(joinPoint);
         if (api != null) {
             String name = api.name();
-            operateLogEntity.setModule(StrUtil.join(",", name));
+            operateLogEntity.setModule(name);
         }
 
         // 处理返回值 ResponseDTO

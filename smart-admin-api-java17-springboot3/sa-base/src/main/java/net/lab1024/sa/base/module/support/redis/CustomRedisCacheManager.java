@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.module.support.redis;
 
-import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import org.springframework.boot.convert.DurationStyle;
 import org.springframework.data.redis.cache.*;
 
@@ -94,11 +94,11 @@ public class CustomRedisCacheManager extends RedisCacheManager {
         }
 
         CacheKeyPrefix keyPrefix = cacheName -> {
-            if (StrUtil.isBlank(cacheName)) {
+            if (SmartStringUtil.isBlank(cacheName)) {
                 return CACHE_PREFIX + COLON;
             }
             String[] parts = cacheName.split(CUSTOM_TTL_SEPARATOR, 2);
-            String cleanName = StrUtil.trim(parts[0]);
+            String cleanName = SmartStringUtil.trim(parts[0]);
             return CACHE_PREFIX + COLON + cleanName + COLON;
         };
 
@@ -115,7 +115,7 @@ public class CustomRedisCacheManager extends RedisCacheManager {
      * @return 解析出的 Duration若无效则返回 null；若为 -1，则返回 Duration.ofMillis(-1) 表示永久缓存
      */
     private Duration parseTtlFromCacheName(String name) {
-        if (StrUtil.isBlank(name)) {
+        if (SmartStringUtil.isBlank(name)) {
             return null;
         }
 
@@ -124,8 +124,8 @@ public class CustomRedisCacheManager extends RedisCacheManager {
             return null; // 无 TTL 部分
         }
 
-        String ttlStr = StrUtil.trim(parts[1]);
-        if (StrUtil.isBlank(ttlStr)) {
+        String ttlStr = SmartStringUtil.trim(parts[1]);
+        if (SmartStringUtil.isBlank(ttlStr)) {
             return null;
         }
 

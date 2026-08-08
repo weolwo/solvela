@@ -1,12 +1,12 @@
 package net.lab1024.sa.admin.module.business.oa.notice.service;
 
-import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.business.oa.notice.dao.NoticeTypeDao;
 import net.lab1024.sa.admin.module.business.oa.notice.domain.entity.NoticeTypeEntity;
 import net.lab1024.sa.admin.module.business.oa.notice.domain.vo.NoticeTypeVO;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartStringUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +42,7 @@ public class NoticeTypeService {
     }
 
     public synchronized ResponseDTO<String> add(String name) {
-        if (StrUtil.isBlank(name)) {
+        if (SmartStringUtil.isBlank(name)) {
             return ResponseDTO.userErrorParam("类型名称不能为空");
         }
 
@@ -58,7 +58,7 @@ public class NoticeTypeService {
     }
 
     public synchronized ResponseDTO<String> update(Long noticeTypeId, String name) {
-        if (StrUtil.isBlank(name)) {
+        if (SmartStringUtil.isBlank(name)) {
             return ResponseDTO.userErrorParam("类型名称不能为空");
         }
 
