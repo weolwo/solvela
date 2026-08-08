@@ -1,6 +1,6 @@
 package net.lab1024.sa.admin.module.business.oa.enterprise.domain.vo;
 
-import cn.idev.excel.annotation.ExcelProperty;
+import net.lab1024.sa.base.sonicexcel.annotation.SonicTitle;
 import lombok.Data;
 
 /**
@@ -15,34 +15,34 @@ import lombok.Data;
 @Data
 public class EnterpriseExcelVO {
 
-    @ExcelProperty("企业名称")
+    @SonicTitle("企业名称")
     private String enterpriseName;
 
-    @ExcelProperty("统一社会信用代码")
+    @SonicTitle("统一社会信用代码")
     private String unifiedSocialCreditCode;
 
-    @ExcelProperty("企业类型")
+    @SonicTitle("企业类型")
     private String typeName;
 
-    @ExcelProperty("联系人")
+    @SonicTitle("联系人")
     private String contact;
 
-    @ExcelProperty("联系人电话")
+    @SonicTitle("联系人电话")
     private String contactPhone;
 
-    @ExcelProperty("邮箱")
+    @SonicTitle("邮箱")
     private String email;
 
-    @ExcelProperty("省份名称")
+    @SonicTitle("省份名称")
     private String provinceName;
 
-    @ExcelProperty("城市名称")
+    @SonicTitle("城市名称")
     private String cityName;
 
-    @ExcelProperty("区县名称")
+    @SonicTitle("区县名称")
     private String districtName;
 
-    @ExcelProperty("详细地址")
+    @SonicTitle("详细地址")
     private String address;
 
 }

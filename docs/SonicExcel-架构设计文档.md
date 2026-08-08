@@ -127,6 +127,8 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 ```
 sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
 ├── SonicExcel.java                 门面（唯一入口）
+├── SonicExcelConfiguration.java    与 Spring 的唯一接线点：StAX 隔离 / BeanFactory / profile
+├── SonicExcelSettings.java         框架级开关（严格元数据模式）
 ├── SonicStaxIsolation.java         StAX SPI 隔离与启动自检（§9.1）
 ├── annotation/SonicTitle.java
 ├── converter/
@@ -310,7 +312,8 @@ public interface SonicConverter<J, E> {
     final class None implements SonicConverter<Object, Object> { /* 恒等 */ }
 }
 
-public record SonicContext(int rowIndex, ColumnMeta column, Object rowObject) {}
+// 只带列的标识而不是整个 ColumnMeta：避免 converter ←→ meta 两个包互相依赖
+public record SonicContext(int rowIndex, int columnIndex, String title, Object rowObject) {}
 ```
 
 ### 5.3 转换器的实例化策略（**本设计最关键的一条**）
@@ -353,7 +356,11 @@ public record SonicContext(int rowIndex, ColumnMeta column, Object rowObject) {}
 **规范**：
 
 1. getter → `Function<T,Object>`，setter → `BiConsumer<T,Object>`，均由 `LambdaMetafactory.metafactory` 生成，
-   调用点退化为 `invokeinterface`，**JIT 可内联**。生成失败时回退 `MethodHandle`。
+   调用点退化为 `invokeinterface`，**JIT 可内联**。
+   ⚠️ **LMF 只接受方法/构造器句柄，不接受字段句柄** —— 直接喂 `unreflectGetter` 会抛
+   `LambdaConversionException: Unsupported MethodHandle kind: getField`（实现时实际踩到）。
+   所以"没有 getter 的字段"必须退回 `MethodHandle`（`asType` 成 `(Object)Object` 后 `invokeExact`）。
+   业务 DTO 基本都有 Lombok getter，走的是快路径；兜底路径同样要有测试覆盖。
 2. 非 public 成员需要 **`MethodHandles.privateLookupIn(targetClass, lookup)`**，不能只用 `lookup()`。
 3. **record 的 canonical 构造器做不成 `Function`**（参数个数不定），这条路径只能走
    `MethodHandle#invokeWithArguments` / `asSpreader`。"getter/setter 用 LMF、record 构造用 MH"必须分开写。
@@ -483,6 +490,10 @@ switch (value) {
 }
 ```
 
+**与旧库的一处刻意差异：值为 `null` 或空串时，SonicExcel 完全不写这个单元格**，
+而 EasyExcel 会写一个空单元格占位。Excel 里"单元格不存在"和"单元格是空的"渲染完全一样，
+但前者在千万行导出时能省下可观的 XML 体积。语义固化测试里对这一处做了补齐后比对。
+
 ### 7.2 flush 策略（**"防 OOM" 的开关之一**）
 
 fastexcel 的 `Worksheet` 在 `flush()` 之前，所有 cell 攒在内存里 —— **不 flush 的流式写和一次性写占用一模一样**。
@@ -503,8 +514,11 @@ xlsx 单表硬上限 **1,048,576 行**，"千万级导出"必须滚 Sheet，否�
 ### 7.4 列宽
 
 fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**，不处理的话中文列全是 `####`。
-`@SonicTitle(width=...)` 优先；否则按 **表头 + 前 100 行**估算（ASCII 记 1，CJK 记 2，上限 60 字符）。
-只看前 100 行，不破坏流式。
+`@SonicTitle(width=...)` 优先；否则**按表头文本估算**（ASCII 记 1，CJK 记 2，加 2 字符余量，钳制在 8..60）。
+列宽必须在第一次 `flush()` 之前设好 —— `<cols>` 是首次 flush 时一次性写出去的。
+
+**按数据内容自适应（采样前 100 行）挪到第④档**：它要在首次 flush 前缓冲采样值，和流式写入的耦合比看上去深。
+第①档的表头估算是零成本的，已经解决了"中文列变 `####`"这个主要痛点。
 
 ### 7.5 数字被 Excel 转科学计数
 
@@ -628,9 +642,15 @@ System.setProperty("javax.xml.stream.XMLEventFactory",  "com.sun.xml.internal.st
 | **XXE** | reader 的 `XMLInputFactory` **显式**设 `SUPPORT_DTD=false`、`IS_SUPPORTING_EXTERNAL_ENTITIES=false`。不赌默认值 |
 | **Zip bomb** | 限制解压总字节数（默认 200MB）、zip 条目数（默认 100）、单条目大小 |
 | **行数炸弹** | `maxRows` 默认 10 万，Web 上传口径可再收紧 |
-| **公式注入** | 导出时以 `=` `+` `-` `@` `\t` `\r` 开头的**文本**前置 `'`。默认开启 |
+| **公式注入** | 提供 `escapeFormula(boolean)`，以 `=` `+` `-` `@` `\t` `\r` 开头的文本前置 `'`。**默认关闭，见下方说明** |
 | **单元格长度** | 上限 32767 字符，超长截断并计一条 `SonicRowError` |
 | 上传文件大小 | 由 Spring `multipart.max-file-size` 兜底，框架层不重复限制 |
+
+**🔁 公式转义默认值在实现期改了（v2 原文是"默认开启"）。** 理由是 §7.6 定案之后前提变了：
+所有文本都写成 `inlineStr`，而 **Excel 对文本型单元格根本不做公式求值** —— xlsx 内的注入面几乎不存在，
+真正的风险只剩"用户另存为 CSV 再打开"。而默认开启的代价是确定发生的数据污染：
+`+8613800000000` 这类合法手机号会被改成 `'+8613800000000` 写进文件。
+**用确定的数据污染换几乎不存在的收益，不划算**，因此默认关闭、保留开关。已有测试固化两种行为。
 
 ---
 
@@ -723,8 +743,8 @@ try {
 
 | 档 | 内容 | 可回滚点 | 依赖变化 |
 |---|---|---|---|
-| **①** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；3 个 VO 平移；`SmartExcelUtil#exportExcel` 切换；**删除水印全部代码**，`EnterpriseController` 改调普通导出 | 注解层保留 EasyExcel 可并行 | 引入 dhatim，POI 暂留 |
-| **②** | 读引擎（`Path` 入参 + 临时文件闭环）+ 错误模型 + 转换器 Spring 解析；`GoodsService#importGoods` 改造；`getAllGoods` 的字典/枚举翻译收进 converter | 导入可临时切回旧实现 | 无 |
+| **①** ✅ **已完成 2026-08-08** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；**2 个导出 VO 平移**；`SmartExcelUtil#exportExcel` 切换成"先攒 byte[] 再落头"；**删除水印全部代码**，`EnterpriseController` 改调普通导出。35 条测试全绿 | 注解层保留 EasyExcel 可并行 | 引入 dhatim writer，POI 暂留 |
+| **②** | 读引擎（`Path` 入参 + 临时文件闭环）+ 转换器 Spring 解析落地；**`GoodsImportForm` 平移**（它是导入侧，第①档必须留在 `@ExcelProperty` 上，否则现有导入立刻挂）；`GoodsService#importGoods` 改造；`getAllGoods` 的字典/枚举翻译收进 converter | 导入可临时切回旧实现 | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
 | **③** | **摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`**，删 `commons-codec` 等；跑全量测试矩阵 | git revert 单 commit | **−19.1 MB** |
 | **④** | 增强：列宽估算、CSV 通道、错误报告导出、导入模板下载 + 下拉校验 | 纯新增 | 无 |
 

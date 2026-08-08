@@ -14,7 +14,6 @@ import net.lab1024.sa.admin.module.business.oa.enterprise.domain.vo.EnterpriseEx
 import net.lab1024.sa.admin.module.business.oa.enterprise.domain.vo.EnterpriseListVO;
 import net.lab1024.sa.admin.module.business.oa.enterprise.domain.vo.EnterpriseVO;
 import net.lab1024.sa.admin.module.business.oa.enterprise.service.EnterpriseService;
-import net.lab1024.sa.admin.util.AdminRequestUtil;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
@@ -24,7 +23,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -61,11 +59,9 @@ public class EnterpriseController {
             return;
         }
 
-        String watermark = AdminRequestUtil.getRequestUser().getActualName();
-        watermark += SmartLocalDateUtil.format(LocalDateTime.now(), SmartDateFormatterEnum.YMD_HMS);
-
-        SmartExcelUtil.exportExcelWithWatermark(response,"企业基本信息.xlsx","企业信息",EnterpriseExcelVO.class,data,watermark);
-
+        // 原来这里会给 Excel 打一层「导出人 + 导出时间」的水印，已按产品决策砍掉：
+        // 拿到文件的人只觉得碍事。审计线索由类上的 @OperateLog 承接，操作人/时间/IP/入参都已入库。
+        SmartExcelUtil.exportExcel(response, "企业基本信息.xlsx", "企业信息", EnterpriseExcelVO.class, data);
     }
 
     @Operation(summary = "查询企业详情 @author 开云")

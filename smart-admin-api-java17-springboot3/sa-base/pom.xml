@@ -188,6 +188,15 @@
             <artifactId>bcprov-jdk18on</artifactId>
         </dependency>
 
+        <!-- SonicExcel 写引擎。读引擎（fastexcel-reader）在第②档引入 -->
+        <dependency>
+            <groupId>org.dhatim</groupId>
+            <artifactId>fastexcel</artifactId>
+        </dependency>
+
+        <!-- ⬇️ 以下两条在第③档随 SonicExcel 读引擎落地后整体摘除（约 -19.1MB）。
+             第①档还留着：GoodsService 的导入仍走 cn.idev.excel，
+             而语义固化测试要用它把新旧两份导出结果逐格比对。 -->
         <dependency>
             <groupId>cn.idev.excel</groupId>
             <artifactId>fastexcel</artifactId>

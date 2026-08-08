@@ -1,7 +1,7 @@
 package net.lab1024.sa.admin.module.business.goods.domain.vo;
 
 
-import cn.idev.excel.annotation.ExcelProperty;
+import net.lab1024.sa.base.sonicexcel.annotation.SonicTitle;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,21 +24,21 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class GoodsExcelVO {
 
-    @ExcelProperty("商品分类")
+    @SonicTitle("商品分类")
     private String categoryName;
 
-    @ExcelProperty("商品名称")
+    @SonicTitle("商品名称")
     private String goodsName;
 
-    @ExcelProperty("商品状态错误")
+    @SonicTitle("商品状态错误")
     private String goodsStatus;
 
-    @ExcelProperty("产地")
+    @SonicTitle("产地")
     private String place;
 
-    @ExcelProperty("商品价格")
+    @SonicTitle("商品价格")
     private BigDecimal price;
 
-    @ExcelProperty("备注")
+    @SonicTitle("备注")
     private String remark;
 }
