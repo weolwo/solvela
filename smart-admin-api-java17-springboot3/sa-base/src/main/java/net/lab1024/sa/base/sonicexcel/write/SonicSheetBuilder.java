@@ -1,7 +1,5 @@
 package net.lab1024.sa.base.sonicexcel.write;
 
-import net.lab1024.sa.base.sonicexcel.SonicExcelException;
-import net.lab1024.sa.base.sonicexcel.converter.SonicContext;
 import net.lab1024.sa.base.sonicexcel.error.SonicErrorPolicy;
 import net.lab1024.sa.base.sonicexcel.error.SonicRowError;
 import net.lab1024.sa.base.sonicexcel.meta.ColumnMeta;
@@ -15,9 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -61,8 +57,7 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
 
     private SheetRoller roller;
     private CellWriter cellWriter;
-    private final List<SonicRowError> errors = new ArrayList<>();
-    private long skippedRows;
+    private RowConverter<T> rowConverter;
     private boolean started;
     private boolean closed;
 
@@ -171,11 +166,11 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
     // ------------------------------------------------------------------ 结果
 
     public List<SonicRowError> errors() {
-        return Collections.unmodifiableList(errors);
+        return rowConverter == null ? List.of() : rowConverter.errors();
     }
 
     public long skippedRows() {
-        return skippedRows;
+        return rowConverter == null ? 0 : rowConverter.skippedRows();
     }
 
     public long writtenRows() {
@@ -208,7 +203,7 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
     private void writeRow(T row) {
         try {
             int r = roller.prepareRow();
-            Object[] values = convertRow(row, r);
+            Object[] values = rowConverter.convert(row, r);
             if (values == null) {
                 return;
             }
@@ -217,49 +212,10 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
             for (int c = 0; c < columns.size(); c++) {
                 cellWriter.write(ws, r, c, values[c], columns.get(c));
             }
-            roller.commitRow();
+            roller.commitRow(values);
         } catch (IOException e) {
             throw new UncheckedIOException("SonicExcel 导出写盘失败", e);
         }
-    }
-
-    /**
-     * 先把整行的值全部算出来再落笔：这样"某一列转换炸了要跳过整行"才是可实现的 ——
-     * 一旦开始往 Worksheet 写，已写的单元格就撤不回来了。
-     *
-     * @return null 表示这一行按策略被跳过
-     */
-    private Object[] convertRow(T row, int rowIndex) {
-        List<ColumnMeta> columns = meta.columns();
-        Object[] values = new Object[columns.size()];
-        for (int c = 0; c < columns.size(); c++) {
-            ColumnMeta col = columns.get(c);
-            try {
-                Object raw = col.getter().apply(row);
-                values[c] = col.converter().exportConvert(raw,
-                        new SonicContext(rowIndex, c, col.title(), col.javaType(), col.element(), row));
-            } catch (Exception e) {
-                SonicRowError error = new SonicRowError(rowIndex, col.title(), null,
-                        e.getClass().getSimpleName() + ": " + e.getMessage());
-                switch (errorPolicy) {
-                    case SonicErrorPolicy.FailFast ignored ->
-                            throw new SonicExcelException("导出失败，" + error.describe(), e);
-                    case SonicErrorPolicy.Collect(int maxErrors) -> {
-                        errors.add(error);
-                        if (errors.size() > maxErrors) {
-                            throw new SonicExcelException(
-                                    "导出错误数超过上限 " + maxErrors + "，已熔断。首条：" + errors.getFirst().describe(), e);
-                        }
-                    }
-                    case SonicErrorPolicy.Skip ignored -> {
-                        // 静默跳过，只在 close() 时打一条汇总，不是每行一条日志
-                    }
-                }
-                skippedRows++;
-                return null;
-            }
-        }
-        return values;
     }
 
     private void ensureStarted() {
@@ -268,6 +224,7 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
         }
         started = true;
         this.cellWriter = new CellWriter(escapeFormula);
+        this.rowConverter = new RowConverter<>(meta, errorPolicy);
         this.roller = new SheetRoller(workbook, meta, sheetName, maxRowsPerSheet, flushEvery, freezeHeader);
     }
 
@@ -284,9 +241,10 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
     }
 
     private void logSummary() {
-        if (skippedRows > 0 || cellWriter.truncatedCount() > 0) {
+        if (rowConverter.skippedRows() > 0 || cellWriter.truncatedCount() > 0) {
             log.warn("[SonicExcel] 导出 {} 完成：写入 {} 行，跳过 {} 行，截断 {} 个超长单元格",
-                    meta.type().getSimpleName(), roller.totalDataRows(), skippedRows, cellWriter.truncatedCount());
+                    meta.type().getSimpleName(), roller.totalDataRows(),
+                    rowConverter.skippedRows(), cellWriter.truncatedCount());
         }
     }
 

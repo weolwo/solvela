@@ -6,28 +6,24 @@ import org.dhatim.fastexcel.Workbook;
 import org.dhatim.fastexcel.Worksheet;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
- * 行位分配 + 刷盘 + 超行数自动换 Sheet。
+ * 行位分配 + 刷盘 + 超行数自动换 Sheet + 列宽落地。
  *
- * <p>两个"不做就等于没做"的点：
+ * <p>三个"不做就等于没做"的点：
  * <ul>
  *   <li><b>flush</b>：fastexcel 的 Worksheet 在 flush() 之前所有 cell 都攒在内存里，
  *       不 flush 的流式写和一次性写占用一模一样。flush 只能顺序向前，所以行号必须单线程分配。</li>
  *   <li><b>滚 Sheet</b>：xlsx 单表硬上限 1,048,576 行，不换 Sheet 的话"千万级导出"根本不成立。
  *       换 Sheet 时对旧表调 finish()，它内部会 {@code rows.clear()} 把那一整张表的行数组释放掉。</li>
+ *   <li><b>列宽</b>：{@code <cols>} 是首次 flush 时一次性写出的，所以宽度必须<b>赶在第一次 flush 之前</b>
+ *       落定 —— 采样够了就立刻落，没够也要在 flush / finish 前强制落。</li>
  * </ul>
  *
  * @Date 2026-08-08
  */
 final class SheetRoller {
-
-    private static final int MIN_WIDTH = 8;
-    private static final int MAX_WIDTH = 60;
-    /**
-     * 中文字符在 Excel 里约占两个字符宽，另加一点余量避免贴边。
-     */
-    private static final int WIDTH_PADDING = 2;
 
     private final Workbook workbook;
     private final SheetMeta meta;
@@ -35,11 +31,13 @@ final class SheetRoller {
     private final int maxRowsPerSheet;
     private final int flushEvery;
     private final boolean freezeHeader;
+    private final ColumnWidths widths;
 
     private Worksheet current;
     private int sheetSeq;
     private int dataRowsInSheet;
     private long totalDataRows;
+    private boolean widthsApplied;
 
     SheetRoller(Workbook workbook, SheetMeta meta, String baseName,
                 int maxRowsPerSheet, int flushEvery, boolean freezeHeader) {
@@ -49,6 +47,7 @@ final class SheetRoller {
         this.maxRowsPerSheet = maxRowsPerSheet;
         this.flushEvery = flushEvery;
         this.freezeHeader = freezeHeader;
+        this.widths = new ColumnWidths(meta);
     }
 
     /**
@@ -58,17 +57,28 @@ final class SheetRoller {
     int prepareRow() throws IOException {
         ensureSheet();
         if (dataRowsInSheet >= maxRowsPerSheet) {
+            applyWidths();
             current.finish();
             newSheet();
         } else if (dataRowsInSheet > 0 && dataRowsInSheet % flushEvery == 0) {
+            applyWidths();
             current.flush();
         }
         return dataRowsInSheet + 1;
     }
 
-    void commitRow() {
+    /**
+     * 用刚写完的这一行参与列宽估算。采样满了就立刻把宽度落下去，别拖到 flush 前。
+     */
+    void commitRow(Object[] values) {
         dataRowsInSheet++;
         totalDataRows++;
+        if (!widthsApplied) {
+            widths.sample(values);
+            if (widths.sampleFull()) {
+                applyWidths();
+            }
+        }
     }
 
     Worksheet sheet() throws IOException {
@@ -80,12 +90,10 @@ final class SheetRoller {
         return totalDataRows;
     }
 
-    int sheetCount() {
-        return sheetSeq;
-    }
-
     void finish() throws IOException {
         ensureSheet();
+        // 行数不足一次采样的小表走这条路：finish() 内部第一件事就是 flush，宽度必须抢在它前面
+        applyWidths();
         current.finish();
     }
 
@@ -102,40 +110,32 @@ final class SheetRoller {
         // 名称非法字符与 31 字符上限由 fastexcel 的 newWorksheet 自己处理，这里不重复裁剪
         current = workbook.newWorksheet(sheetSeq == 1 ? baseName : baseName + "_" + sheetSeq);
         dataRowsInSheet = 0;
+        // 换到新表要重新落一次宽度；此时采样多半已经满了，会立刻生效
+        widthsApplied = false;
         writeHeader();
+        if (widths.sampleFull()) {
+            applyWidths();
+        }
     }
 
     private void writeHeader() {
-        java.util.List<ColumnMeta> columns = meta.columns();
+        List<ColumnMeta> columns = meta.columns();
         for (int c = 0; c < columns.size(); c++) {
-            ColumnMeta col = columns.get(c);
-            current.inlineString(0, c, col.title());
+            current.inlineString(0, c, columns.get(c).title());
             current.style(0, c).bold().set();
-            // 列宽必须在第一次 flush 之前设好 —— flush 会把 <cols> 一次性写出去
-            current.width(c, resolveWidth(col));
         }
         if (freezeHeader) {
             current.freezePane(0, 1);
         }
     }
 
-    /**
-     * 第①档只按表头文本估算，够用且零成本；按数据内容自适应放在第④档。
-     * 不处理的话中文列全是 ####。
-     */
-    private static int resolveWidth(ColumnMeta col) {
-        if (col.width() > 0) {
-            return col.width();
+    private void applyWidths() {
+        if (widthsApplied) {
+            return;
         }
-        int w = displayWidth(col.title()) + WIDTH_PADDING;
-        return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w));
-    }
-
-    private static int displayWidth(String s) {
-        int w = 0;
-        for (int i = 0; i < s.length(); i++) {
-            w += s.charAt(i) > 0xFF ? 2 : 1;
+        widthsApplied = true;
+        for (int c = 0; c < widths.columnCount(); c++) {
+            current.width(c, widths.widthOf(c));
         }
-        return w;
     }
 }

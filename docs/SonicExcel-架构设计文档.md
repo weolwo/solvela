@@ -144,6 +144,7 @@ sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
 ├── SonicExcel.java                 门面（唯一入口）
 ├── SonicExcelConfiguration.java    与 Spring 的唯一接线点：StAX 隔离 / BeanFactory / profile
 ├── SonicExcelSettings.java         框架级开关（严格元数据模式）
+├── annotation/SonicOptions.java    导入模板的下拉选项（§8.6）
 ├── SonicStaxIsolation.java         StAX SPI 隔离与启动自检（§9.1）
 ├── annotation/SonicTitle.java
 ├── converter/
@@ -152,10 +153,16 @@ sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
 │   └── builtin/                    仅 JDK 级：枚举、Y/N、BigDecimal 精度
 ├── meta/
 │   ├── ColumnMeta.java  SheetMeta.java  MetaResolver.java
+├── option/
+│   └── SonicOptionProvider.java    导入模板下拉的选项来源（§8.6）
 ├── write/
-│   ├── SonicSheetBuilder.java      写门面（AutoCloseable）
+│   ├── SonicSheetBuilder.java      xlsx 写门面（AutoCloseable）
+│   ├── SonicCsvWriter.java         CSV 通道（§7.7）
+│   ├── SonicTemplateWriter.java    导入模板 + 下拉校验（§8.6）
+│   ├── RowConverter.java           实体 → 行值数组 + 错误策略（xlsx / CSV 共用）
 │   ├── CellWriter.java             类型路由 + inline strings 红线（§7.6）
-│   └── SheetRoller.java            超行数自动滚 Sheet
+│   ├── ColumnWidths.java           列宽估算（§7.4）
+│   └── SheetRoller.java            刷盘 + 超行数自动滚 Sheet + 列宽落地
 ├── SonicTempFiles.java             导入临时文件：创建 + finally 删 + 启动扫残留（§10.2）
 ├── read/
 │   ├── SonicSheetReader.java       读门面
@@ -173,6 +180,7 @@ sa-base/src/main/java/net/lab1024/sa/base/module/support/dict/excel/   ← 业�
 
 sa-base/src/main/java/net/lab1024/sa/base/common/excel/
 ├── SonicEnumConverter.java         依赖 SmartEnumUtil / BaseEnum，同样是项目侧
+├── SonicEnumOptionProvider.java    复用 @SonicEnum 给模板生成下拉选项
 └── SonicEnum.java                  @SonicEnum(GoodsStatusEnum.class)
 
 sa-admin/.../module/business/goods/excel/
@@ -545,17 +553,19 @@ fastexcel 的 `Worksheet` 在 `flush()` 之前，所有 cell 攒在内存里 —
 xlsx 单表硬上限 **1,048,576 行**，"千万级导出"必须滚 Sheet，否则指标不成立。
 达到 `maxRowsPerSheet`（默认 1,000,000）时新建 `名称_2`、`名称_3`…，每个新 Sheet 重写表头。
 
-🔴 **D4：是否提供 CSV 通道。** 真·千万级用 xlsx，光 Deflate 就是分钟级，生成的文件 Excel 打开要几十秒。
-建议 v2 加 `SonicExcel.writeCsv(...)`，v1 先只做滚 Sheet。
+✅ **D4 已落地（第④档）**：`SonicExcel.writeCsv(...)`，见 §7.7。
 
-### 7.4 列宽
+### 7.4 列宽（第④档已落地为数据自适应）
 
 fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**，不处理的话中文列全是 `####`。
-`@SonicTitle(width=...)` 优先；否则**按表头文本估算**（ASCII 记 1，CJK 记 2，加 2 字符余量，钳制在 8..60）。
-列宽必须在第一次 `flush()` 之前设好 —— `<cols>` 是首次 flush 时一次性写出去的。
 
-**按数据内容自适应（采样前 100 行）挪到第④档**：它要在首次 flush 前缓冲采样值，和流式写入的耦合比看上去深。
-第①档的表头估算是零成本的，已经解决了"中文列变 `####`"这个主要痛点。
+**硬约束：`<cols>` 在第一次 flush 时一次性写出，之后再调 `width()` 毫无效果。**
+所以估算只能采样 **前 100 行**（必须远小于 `flushEvery` 默认的 1000），并在三个时机强制落定：
+采样满 100 行时、每次 flush 之前、`finish()` 之前（行数不足 100 的小表走的是最后这条）。
+
+- `@SonicTitle(width=12)` 显式指定 → **原样 12**，既不补余量也不钳制。
+  用户明确指定的东西被框架偷偷改掉是最难排查的那类问题（实现时正是先写错、被测试抓出来的）。
+- 未指定 → `max(表头宽, 前 100 行数据宽) + 2`，钳制在 8..60。ASCII 记 1，CJK 记 2。
 
 ### 7.5 数字被 Excel 转科学计数
 
@@ -579,6 +589,20 @@ fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**，不处理的话中�
 断言产出包中**不存在 `xl/sharedStrings.xml`**。
 
 ---
+
+### 7.7 CSV 通道（第④档已落地，原 D4）
+
+`SonicExcel.writeCsv(os, Foo.class)`，与 xlsx 共用 `SheetMeta` 和转换器 —— **同一个 DTO 注解一份，两种格式都能导**。
+
+**什么时候该用**：真·千万级。xlsx 光 Deflate 就是分钟级，生成的文件 Excel 打开还要几十秒，
+而且有单表 1,048,576 行的硬上限逼着滚 Sheet。CSV 没有行数上限、几乎不耗 CPU。
+代价是没有样式、没有多 sheet。
+
+两个不写就要被投诉的细节：
+
+- **UTF-8 BOM 默认写**。不写这三个字节，Excel 打开中文 CSV 就是乱码 —— CSV 导出被投诉最多的一件事。
+  只有确认下游是程序而不是 Excel 时才该 `withBom(false)`。
+- **BigDecimal 用 `toPlainString()`**。否则大数写成科学计数，下游再读解析不回原值。
 
 ## 8. 读引擎实现要点
 
@@ -635,6 +659,28 @@ Excel 常带成千上万个"看起来是空的"行。读端必须**过滤全空�
 **这条要写进 README，不能宣称"绝对不 OOM"。**
 
 ---
+
+### 8.6 导入模板下载（第④档已落地）
+
+`SonicExcel.writeTemplate(os, Foo.class).sheet("导入模板").sample("张三", "在售").write()`
+
+表头 + 可选示例行 + **下拉校验**。下拉是"防脏数据"最划算的一招 —— 用户根本填不出非法值，
+比事后报错强得多。
+
+选项来源是 `@SonicOptions`：字面量 `{"在售","售罄"}`，或 `provider = XxxProvider.class`
+（实例解析规则同转换器：Spring Bean 优先、无参构造兜底）。
+`SonicEnumOptionProvider` 复用字段上已有的 `@SonicEnum`，**枚举加一项模板下拉自动跟着变**，
+不会出现"代码改了模板没改"的漂移。
+
+两处必须防的坑，都已固化成测试：
+
+- fastexcel 只能通过 `validateWithListByFormula` 写内联列表，选项里**不能含逗号和引号**，
+  否则会把 `formula1` 撕开 —— 含这两个字符的选项直接跳过并告警。
+- Excel 对内联下拉的 `formula1` 有 **255 字符上限**，超了整个文件会被判定损坏。
+  超长时跳过下拉、保住文件可用，而不是产出一个打不开的模板。
+
+**注意还没有对外的下载接口。** 加 `/goods/importTemplate` 这类端点要配权限和前端入口，
+属于产品决策，不在本轮范围内；框架能力已经就绪，接上去只是几行 Controller。
 
 ## 9. 依赖隔离与安全
 
@@ -788,7 +834,7 @@ try {
 | **①** ✅ **已完成 2026-08-08** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；**2 个导出 VO 平移**；`SmartExcelUtil#exportExcel` 切换成"先攒 byte[] 再落头"；**删除水印全部代码**，`EnterpriseController` 改调普通导出。35 条测试全绿 | 注解层保留 EasyExcel 可并行 | 引入 dhatim writer，POI 暂留 |
 | **②** ✅ **已完成 2026-08-08** | 读引擎（`Path` 入参 + 入口体检 + 临时文件闭环）+ 转换器 Spring 解析落地；`GoodsImportForm` **改成 record**；`GoodsService#importGoods` 改造成带行级错误回显；`getAllGoods` 的三处翻译全部收进 converter。累计 100 条测试全绿 | 导入可临时切回旧实现 | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
 | **③** ✅ **已完成 2026-08-08** | 摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`（连带 xmlbeans / ehcache / JAXB / commons-math3 等 15 个 jar）；测试回读改用 fastexcel-reader，迁移语义测试退化为固定快照 | git revert 单 commit | **实测 −18.66 MB** |
-| **④** | 增强：列宽估算、CSV 通道、错误报告导出、导入模板下载 + 下拉校验 | 纯新增 | 无 |
+| **④** ✅ **已完成 2026-08-08** | 列宽按数据自适应、CSV 通道、错误报告导出、导入模板 + 下拉校验。累计 215 条测试全绿 | 纯新增 | 无 |
 
 每档一个 commit，message 沿用现有风格（`SonicExcel 第①档：…（−xMB）`）。
 
@@ -823,7 +869,7 @@ try {
 | ~~D2~~ | ~~字典转换器放哪~~ | **已定：业务侧 `support.dict.excel`；框架 builtin 只留 JDK 级**（§5.3） |
 | ~~D3~~ | ~~水印删除后的审计线索~~ | **已定：靠现有 `@OperateLog` 承接，零改动**（§1.2） |
 | 🔴 D10 | **字典转换器的导入方向**（标签 → 码）。现在 `SonicDictConverter#importConvert` 直接抛异常 | **待排期**。需要字典模块提供一条<b>带缓存</b>的 label→value 查询：`DictManager` 目前只有 (code,value)→VO 这一条缓存路径，用 `DictService#getAll()` 现查是直连 DB、每个单元格一次全表读。补那条反向缓存属于字典模块的改动，不该夹带在 Excel 轮次里；现有导入也没有字典列 |
-| D4 | CSV 导出通道 | 已定：v2 再做（§7.3） |
+| ~~D4~~ | ~~CSV 导出通道~~ | **已落地（第④档）**，见 §7.7 |
 | ~~D5~~ | ~~sharedStrings vs inline~~ | **已定：强制 inline，且底层无开关，走 `inlineString()`**（§7.6） |
 | ~~D6~~ | ~~reader 是否落临时文件~~ | **已定：不落盘、整个进堆 → 读侧强制 `Path` 入参**（§8.5） |
 | ~~D7~~ | ~~导出中途异常的响应契约~~ | **已定：小数据先缓冲、大数据流式抛异常**（§10.3） |

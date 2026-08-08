@@ -1,5 +1,9 @@
 package net.lab1024.sa.admin.module.business.goods.domain.form;
 
+import net.lab1024.sa.admin.module.business.goods.constant.GoodsStatusEnum;
+import net.lab1024.sa.base.common.excel.SonicEnum;
+import net.lab1024.sa.base.common.excel.SonicEnumOptionProvider;
+import net.lab1024.sa.base.sonicexcel.annotation.SonicOptions;
 import net.lab1024.sa.base.sonicexcel.annotation.SonicTitle;
 
 import java.math.BigDecimal;
@@ -26,8 +30,13 @@ public record GoodsImportForm(
 
         @SonicTitle("商品名称") String goodsName,
 
-        // 表头这个错别字是历史遗留，用 alias 兜住可能已经被人手工改对的模板
-        @SonicTitle(value = "商品状态错误", alias = "商品状态") String goodsStatus,
+        // 表头这个错别字是历史遗留，用 alias 兜住可能已经被人手工改对的模板。
+        // 模板里这一列带下拉，选项从 GoodsStatusEnum 自动生成 —— 枚举加一项模板就跟着变，
+        // 不会出现"代码改了模板没改"的漂移
+        @SonicTitle(value = "商品状态错误", alias = "商品状态")
+        @SonicEnum(GoodsStatusEnum.class)
+        @SonicOptions(provider = SonicEnumOptionProvider.class)
+        String goodsStatus,
 
         @SonicTitle("产地") String place,
 

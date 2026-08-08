@@ -48,23 +48,42 @@ public final class SonicConverterFactory {
         return CACHE.get(type);
     }
 
+    /**
+     * 同样的「Bean 优先、无参构造兜底」规则，给转换器之外的扩展点用（如选项提供器）。
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T resolveExtension(Class<T> type) {
+        return (T) EXTENSIONS.get(type);
+    }
+
+    private static final ClassValue<Object> EXTENSIONS = new ClassValue<>() {
+        @Override
+        protected Object computeValue(Class<?> type) {
+            return instantiate(type);
+        }
+    };
+
     @SuppressWarnings("unchecked")
     private static SonicConverter<Object, Object> doResolve(Class<?> type) {
+        return (SonicConverter<Object, Object>) instantiate(type);
+    }
+
+    private static Object instantiate(Class<?> type) {
         BeanFactory factory = beanFactory;
         if (factory != null) {
-            // getBeanProvider 拿不到就返回 null，不抛异常 —— 转换器没被声明成 Bean 是常态，不是错误
+            // getBeanProvider 拿不到就返回 null，不抛异常 —— 没被声明成 Bean 是常态，不是错误
             Object bean = factory.getBeanProvider(type).getIfAvailable();
             if (bean != null) {
-                return (SonicConverter<Object, Object>) bean;
+                return bean;
             }
         }
         try {
             Constructor<?> ctor = type.getDeclaredConstructor();
             ctor.setAccessible(true);
-            return (SonicConverter<Object, Object>) ctor.newInstance();
+            return ctor.newInstance();
         } catch (ReflectiveOperationException e) {
             throw new SonicExcelException(
-                    "转换器 " + type.getName() + " 实例化失败：既不是 Spring Bean，也没有可用的无参构造", e);
+                    type.getName() + " 实例化失败：既不是 Spring Bean，也没有可用的无参构造", e);
         }
     }
 }

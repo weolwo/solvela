@@ -1,14 +1,19 @@
 package net.lab1024.sa.base.sonicexcel;
 
+import net.lab1024.sa.base.sonicexcel.annotation.SonicTitle;
 import net.lab1024.sa.base.sonicexcel.error.SonicReadResult;
+import net.lab1024.sa.base.sonicexcel.error.SonicRowError;
 import net.lab1024.sa.base.sonicexcel.read.SonicSheetReader;
+import net.lab1024.sa.base.sonicexcel.write.SonicCsvWriter;
 import net.lab1024.sa.base.sonicexcel.write.SonicSheetBuilder;
+import net.lab1024.sa.base.sonicexcel.write.SonicTemplateWriter;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * SonicExcel 唯一入口。
@@ -70,6 +75,45 @@ public final class SonicExcel {
         } finally {
             deleteQuietly(tmp);
         }
+    }
+
+    /**
+     * CSV 导出通道。真·千万级用它 —— xlsx 光压缩就是分钟级，还有单表 1,048,576 行的硬上限。
+     */
+    public static <T> SonicCsvWriter<T> writeCsv(OutputStream os, Class<T> head) {
+        return new SonicCsvWriter<>(os, head);
+    }
+
+    /**
+     * 生成导入模板：表头 + 可选示例行 + 下拉校验（列上标了 {@code @SonicOptions} 才有）。
+     */
+    public static <T> SonicTemplateWriter<T> writeTemplate(OutputStream os, Class<T> head) {
+        return new SonicTemplateWriter<>(os, head);
+    }
+
+    /**
+     * 把行级错误清单导成 xlsx 回给用户。
+     *
+     * <p>这是导入体验的最后一环：500 行里 30 行有问题，与其在页面上堆一段截断的文字，
+     * 不如给一个能直接打开、逐条对照修改的文件。
+     */
+    public static void writeErrorReport(OutputStream os, List<SonicRowError> errors) {
+        List<ErrorRow> rows = errors.stream()
+                .map(e -> new ErrorRow(e.rowIndex() + 1, e.title(), e.rawValue(), e.message()))
+                .toList();
+        try (SonicSheetBuilder<ErrorRow> builder = write(os, ErrorRow.class).sheet("错误明细")) {
+            builder.append(rows);
+        }
+    }
+
+    /**
+     * 错误报告的一行。行号已经换算成 Excel 里肉眼可见的编号。
+     */
+    public record ErrorRow(
+            @SonicTitle("行号") Integer rowNumber,
+            @SonicTitle("列名") String title,
+            @SonicTitle("原始值") String rawValue,
+            @SonicTitle("错误说明") String message) {
     }
 
     private static void deleteQuietly(Path path) {
