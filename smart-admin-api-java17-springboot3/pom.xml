@@ -36,7 +36,6 @@
         <poi.version>5.5.1</poi.version>
         <awssdk-s3.version>2.50.2</awssdk-s3.version>
         <mysql-connector-j.version>26.7.0</mysql-connector-j.version>
-        <hutool.version>5.8.47</hutool.version>
         <velocity-engine-core.version>2.4.1</velocity-engine-core.version>
         <velocity-tools.version>3.1</velocity-tools.version>
         <sa-token.version>1.45.0</sa-token.version>
@@ -161,11 +160,6 @@
                 <version>${commons-text.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>cn.hutool</groupId>
-                <artifactId>hutool-all</artifactId>
-                <version>${hutool.version}</version>
-            </dependency>
             <!--velocity begin-->
             <dependency>
                 <groupId>org.apache.velocity</groupId>

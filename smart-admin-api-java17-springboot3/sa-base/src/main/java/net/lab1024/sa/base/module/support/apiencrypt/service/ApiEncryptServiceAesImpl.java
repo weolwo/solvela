@@ -1,11 +1,12 @@
 package net.lab1024.sa.base.module.support.apiencrypt.service;
 
-import cn.hutool.crypto.symmetric.AES;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.constant.StringConst;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
-import java.security.Security;
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Base64;
 
 /**
@@ -14,6 +15,16 @@ import java.util.Base64;
  * 2、AES 要求秘钥为 128bit，转化字节为 16个字节；
  * 3、js前端使用 UCS-2 或者 UTF-16 编码，字母、数字、特殊符号等 占用1个字节；
  * 4、所以：秘钥Key 组成为：字母、数字、特殊符号 一共16个即可
+ *
+ * <p>
+ * 移除 hutool 时把实现换成了 JDK 自带的 {@link Cipher}（AES 不需要 BouncyCastle）。
+ * 模式与填充沿用原 hutool {@code new AES(key)} 的默认值：<b>ECB + PKCS5Padding，无 IV</b>。
+ * 与 SM4 那边不同，<b>AES 这条链路只有一层 Base64</b>，没有中间的 hex 层。
+ *
+ * <p>
+ * ⚠️ 当前没有任何地方注入这个实现（它没有 {@code @Service}，实际生效的是
+ * {@link ApiEncryptServiceSmImpl}）。保留它是为了随时可切换，
+ * 但真要启用前请先跑 ApiEncryptServiceAesImplTest 确认前端那侧的实现能对上。
  *
  * @Author 1024创新实验室-主任:卓大
  * @Date 2023/10/21 11:41:46
@@ -25,21 +36,19 @@ import java.util.Base64;
 @Slf4j
 public class ApiEncryptServiceAesImpl implements ApiEncryptService {
 
-    private static final String CHARSET = "UTF-8";
-
     private static final String AES_KEY = "1024lab__1024lab";
 
-    static {
-        Security.addProvider(new BouncyCastleProvider());
-    }
+    /** ECB + PKCS5Padding，与原 hutool new AES(key) 的默认值一致，不要改 */
+    private static final String TRANSFORMATION = "AES/ECB/PKCS5Padding";
+
+    private static final String ALGORITHM = "AES";
 
     @Override
     public String encrypt(String data) {
         try {
             //  AES 加密 并转为 base64
-            AES aes = new AES(hexToBytes(stringToHex(AES_KEY)));
-            return aes.encryptBase64(data);
-
+            byte[] encrypted = cipher(Cipher.ENCRYPT_MODE).doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(encrypted);
 
         } catch (Exception e) {
             log.error(e.getMessage(), e);
@@ -54,14 +63,23 @@ public class ApiEncryptServiceAesImpl implements ApiEncryptService {
             byte[] base64Decode = Base64.getDecoder().decode(data);
 
             // 第二步： AES 解密
-            AES aes = new AES(hexToBytes(stringToHex(AES_KEY)));
-            byte[] decryptedBytes = aes.decrypt(base64Decode);
-            return new String(decryptedBytes, CHARSET);
+            byte[] decryptedBytes = cipher(Cipher.DECRYPT_MODE).doFinal(base64Decode);
+            return new String(decryptedBytes, StandardCharsets.UTF_8);
 
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             return StringConst.EMPTY;
         }
+    }
+
+    /**
+     * Cipher 不是线程安全的，每次调用都要新建，不能提成字段复用
+     */
+    private static Cipher cipher(int mode) throws Exception {
+        Key key = new SecretKeySpec(hexToBytes(stringToHex(AES_KEY)), ALGORITHM);
+        Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+        cipher.init(mode, key);
+        return cipher;
     }
 
     /**
