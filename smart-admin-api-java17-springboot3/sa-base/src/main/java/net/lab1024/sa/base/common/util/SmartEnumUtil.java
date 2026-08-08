@@ -1,7 +1,7 @@
 package net.lab1024.sa.base.common.util;
 
 import net.lab1024.sa.base.common.enumeration.BaseEnum;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collection;
@@ -94,7 +94,7 @@ public class SmartEnumUtil {
     }
 
     public static <T> String getEnumDescByValueList(Collection<T> values, Class<? extends BaseEnum> enumClass) {
-        if (CollectionUtils.isEmpty(values)) {
+        if (SmartCollectionUtil.isEmpty(values)) {
             return "";
         }
         return Stream.of(enumClass.getEnumConstants()).filter(e -> values.contains(e.getValue())).map(BaseEnum::getDesc).collect(Collectors.joining(","));

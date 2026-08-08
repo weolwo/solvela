@@ -7,10 +7,10 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.enumeration.UserTypeEnum;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.base.common.util.SmartTemplateUtil;
 import net.lab1024.sa.base.module.support.message.constant.MessageTemplateEnum;
 import net.lab1024.sa.base.module.support.message.dao.MessageDao;
 import net.lab1024.sa.base.module.support.message.domain.*;
-import org.apache.commons.text.StringSubstitutor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,8 +62,7 @@ public class MessageService {
         List<MessageSendForm> sendFormList = new ArrayList<>();
         for (MessageTemplateSendForm sendTemplateForm : sendTemplateForms) {
             MessageTemplateEnum msgTemplateTypeEnum = sendTemplateForm.getMessageTemplateEnum();
-            StringSubstitutor stringSubstitutor = new StringSubstitutor(sendTemplateForm.getContentParam());
-            String content = stringSubstitutor.replace(msgTemplateTypeEnum.getContent());
+            String content = SmartTemplateUtil.render(msgTemplateTypeEnum.getContent(), sendTemplateForm.getContentParam());
 
             MessageSendForm messageSendForm = new MessageSendForm();
             messageSendForm.setMessageType(msgTemplateTypeEnum.getMessageTypeEnum().getValue());

@@ -18,11 +18,11 @@ import net.lab1024.sa.base.common.code.UserErrorCode;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.module.support.datatracer.constant.DataTracerTypeEnum;
 import net.lab1024.sa.base.module.support.datatracer.domain.form.DataTracerForm;
 import net.lab1024.sa.base.module.support.datatracer.service.DataTracerService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -180,11 +180,11 @@ public class EnterpriseService {
         //过滤掉已存在的员工
         List<Long> waitAddEmployeeIdList = enterpriseEmployeeForm.getEmployeeIdList();
         List<EnterpriseEmployeeEntity> enterpriseEmployeeEntityList = enterpriseEmployeeDao.selectByEnterpriseAndEmployeeIdList(enterpriseId, waitAddEmployeeIdList);
-        if (CollectionUtils.isNotEmpty(enterpriseEmployeeEntityList)) {
+        if (SmartCollectionUtil.isNotEmpty(enterpriseEmployeeEntityList)) {
             List<Long> existEmployeeIdList = enterpriseEmployeeEntityList.stream().map(EnterpriseEmployeeEntity::getEmployeeId).collect(Collectors.toList());
             waitAddEmployeeIdList = waitAddEmployeeIdList.stream().filter(e -> !existEmployeeIdList.contains(e)).collect(Collectors.toList());
         }
-        if (CollectionUtils.isEmpty(waitAddEmployeeIdList)) {
+        if (SmartCollectionUtil.isEmpty(waitAddEmployeeIdList)) {
             return ResponseDTO.ok();
         }
         List<EnterpriseEmployeeEntity> batchAddList = new ArrayList<>();
@@ -218,7 +218,7 @@ public class EnterpriseService {
      *
      */
     public List<EnterpriseEmployeeVO> employeeList(List<Long> enterpriseIdList) {
-        if (CollectionUtils.isEmpty(enterpriseIdList)) {
+        if (SmartCollectionUtil.isEmpty(enterpriseIdList)) {
             return new ArrayList<>();
         }
         return enterpriseEmployeeDao.selectByEnterpriseIdList(enterpriseIdList);

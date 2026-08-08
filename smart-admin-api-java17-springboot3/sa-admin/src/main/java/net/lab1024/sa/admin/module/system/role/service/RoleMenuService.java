@@ -15,7 +15,7 @@ import net.lab1024.sa.admin.module.system.role.manager.RoleMenuManager;
 import net.lab1024.sa.base.common.code.UserErrorCode;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.stereotype.Service;
 
@@ -79,7 +79,7 @@ public class RoleMenuService {
             return SmartBeanUtil.copyList(menuEntityList, MenuVO.class);
         }
         //非管理员 无角色 返回空菜单
-        if (CollectionUtils.isEmpty(roleIdList)) {
+        if (SmartCollectionUtil.isEmpty(roleIdList)) {
             return new ArrayList<>();
         }
         List<MenuEntity> menuEntityList = roleMenuDao.selectMenuListByRoleIdList(roleIdList, false);

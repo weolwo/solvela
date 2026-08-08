@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -135,13 +136,12 @@ public class RedisService {
      *
      * @param key 可以传一个值 或多个
      */
-    @SuppressWarnings("unchecked")
     public void delete(String... key) {
         if (key != null && key.length > 0) {
             if (key.length == 1) {
                 redisTemplate.delete(key[0]);
             } else {
-                redisTemplate.delete((Collection<String>) CollectionUtils.arrayToList(key));
+                redisTemplate.delete(Arrays.asList(key));
             }
         }
     }

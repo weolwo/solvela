@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.lottery.config.domain.entity.LotteryConfig;
 import net.lab1024.sa.lottery.numberpool.dao.LotteryNumberPoolDao;
@@ -15,7 +16,6 @@ import net.lab1024.sa.lottery.numberpool.domain.form.LotteryNumberPoolQueryForm;
 import net.lab1024.sa.lottery.numberpool.domain.form.LotteryNumberPoolUpdateForm;
 import net.lab1024.sa.lottery.numberpool.domain.vo.LotteryNumberPoolVO;
 import net.lab1024.sa.lottery.numberpool.manager.LotteryNumberPoolManager;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.ByteArrayInputStream;
@@ -70,7 +70,7 @@ public class LotteryNumberPoolService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
 

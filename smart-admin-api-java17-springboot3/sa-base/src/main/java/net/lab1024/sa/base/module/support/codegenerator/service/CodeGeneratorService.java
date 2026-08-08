@@ -5,6 +5,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeGeneratorConstant;
@@ -19,7 +20,6 @@ import net.lab1024.sa.base.module.support.codegenerator.domain.vo.TableColumnVO;
 import net.lab1024.sa.base.module.support.codegenerator.domain.vo.TableConfigVO;
 import net.lab1024.sa.base.module.support.codegenerator.domain.vo.TableVO;
 import net.lab1024.sa.base.common.util.JsonUtils;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -199,7 +199,7 @@ public class CodeGeneratorService {
         }
 
         List<TableColumnVO> columns = getTableColumns(form.getTableName());
-        if (CollectionUtils.isEmpty(columns)) {
+        if (SmartCollectionUtil.isEmpty(columns)) {
             return ResponseDTO.userErrorParam("表没有列信息无法生成");
         }
 
@@ -230,7 +230,7 @@ public class CodeGeneratorService {
         }
 
         List<TableColumnVO> columns = getTableColumns(tableName);
-        if (CollectionUtils.isEmpty(columns)) {
+        if (SmartCollectionUtil.isEmpty(columns)) {
             return ResponseDTO.userErrorParam("表没有列信息无法生成");
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();

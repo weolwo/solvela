@@ -24,13 +24,14 @@ import net.lab1024.sa.base.common.constant.StringConst;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.module.support.datatracer.constant.DataTracerTypeEnum;
 import net.lab1024.sa.base.module.support.datatracer.service.DataTracerService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +125,7 @@ public class NoticeService {
          * 非全部可见时 校验选择的员工|部门
          */
         List<NoticeVisibleRangeForm> visibleRangeUpdateList = form.getVisibleRangeList();
-        if (CollectionUtils.isEmpty(visibleRangeUpdateList)) {
+        if (SmartCollectionUtil.isEmpty(visibleRangeUpdateList)) {
             return ResponseDTO.userErrorParam("未设置可见范围");
         }
 
@@ -133,10 +134,12 @@ public class NoticeService {
                 .filter(e -> NoticeVisibleRangeDataTypeEnum.EMPLOYEE.equalsValue(e.getDataType()))
                 .map(NoticeVisibleRangeForm::getDataId)
                 .distinct().collect(Collectors.toList());
-        if (CollectionUtils.isNotEmpty(employeeIdList)) {
+        if (SmartCollectionUtil.isNotEmpty(employeeIdList)) {
             employeeIdList = employeeIdList.stream().distinct().collect(Collectors.toList());
             List<Long> dbEmployeeIdList = employeeDao.selectBatchIds(employeeIdList).stream().map(EmployeeEntity::getEmployeeId).collect(Collectors.toList());
-            Collection<Long> subtract = CollectionUtils.subtract(employeeIdList, dbEmployeeIdList);
+            // employeeIdList 上面已经 distinct 过，没有重复元素，所以这里用 removeAll 与原先的多重集语义等价
+            List<Long> subtract = new ArrayList<>(employeeIdList);
+            subtract.removeAll(dbEmployeeIdList);
             if (!subtract.isEmpty()) {
                 return ResponseDTO.userErrorParam("员工id不存在：" + subtract);
             }
@@ -147,10 +150,12 @@ public class NoticeService {
                 .filter(e -> NoticeVisibleRangeDataTypeEnum.DEPARTMENT.equalsValue(e.getDataType()))
                 .map(NoticeVisibleRangeForm::getDataId)
                 .distinct().collect(Collectors.toList());
-        if (CollectionUtils.isNotEmpty(deptIdList)) {
+        if (SmartCollectionUtil.isNotEmpty(deptIdList)) {
             deptIdList = deptIdList.stream().distinct().collect(Collectors.toList());
             List<Long> dbDeptIdList = departmentDao.selectBatchIds(deptIdList).stream().map(DepartmentEntity::getDepartmentId).collect(Collectors.toList());
-            Collection<Long> subtract = CollectionUtils.subtract(deptIdList, dbDeptIdList);
+            // deptIdList 上面已经 distinct 过，没有重复元素，所以这里用 removeAll 与原先的多重集语义等价
+            List<Long> subtract = new ArrayList<>(deptIdList);
+            subtract.removeAll(dbDeptIdList);
             if (!subtract.isEmpty()) {
                 return ResponseDTO.userErrorParam("部门id不存在：" + subtract);
             }
@@ -219,7 +224,7 @@ public class NoticeService {
                     .collect(Collectors.toList());
 
             Map<Long, EmployeeEntity> employeeMap = null;
-            if (CollectionUtils.isNotEmpty(employeeIdList)) {
+            if (SmartCollectionUtil.isNotEmpty(employeeIdList)) {
                 employeeMap = employeeDao.selectBatchIds(employeeIdList).stream().collect(Collectors.toMap(EmployeeEntity::getEmployeeId, Function.identity()));
             } else {
                 employeeMap = new HashMap<>();

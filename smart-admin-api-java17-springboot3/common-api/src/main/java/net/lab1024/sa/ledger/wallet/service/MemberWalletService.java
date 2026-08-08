@@ -8,6 +8,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.enums.PrizeTypeEnum;
 import net.lab1024.sa.ledger.transaction.dao.MemberAssetTransactionDao;
@@ -19,7 +20,6 @@ import net.lab1024.sa.ledger.wallet.domain.form.MemberWalletQueryForm;
 import net.lab1024.sa.ledger.wallet.domain.form.MemberWalletUpdateForm;
 import net.lab1024.sa.ledger.wallet.domain.vo.MemberWalletVO;
 import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -211,7 +211,7 @@ public class MemberWalletService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
 

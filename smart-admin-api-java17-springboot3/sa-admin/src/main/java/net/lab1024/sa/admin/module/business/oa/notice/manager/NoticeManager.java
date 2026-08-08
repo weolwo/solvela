@@ -4,9 +4,9 @@ import jakarta.annotation.Resource;
 import net.lab1024.sa.admin.module.business.oa.notice.dao.NoticeDao;
 import net.lab1024.sa.admin.module.business.oa.notice.domain.entity.NoticeEntity;
 import net.lab1024.sa.admin.module.business.oa.notice.domain.form.NoticeVisibleRangeForm;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.module.support.datatracer.constant.DataTracerTypeEnum;
 import net.lab1024.sa.base.module.support.datatracer.service.DataTracerService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +38,7 @@ public class NoticeManager {
         noticeDao.insert(noticeEntity);
         Long noticeId = noticeEntity.getNoticeId();
         // 保存可见范围
-        if (CollectionUtils.isNotEmpty(visibleRangeFormList)) {
+        if (SmartCollectionUtil.isNotEmpty(visibleRangeFormList)) {
             noticeDao.insertVisibleRange(noticeId, visibleRangeFormList);
         }
         dataTracerService.insert(noticeId, DataTracerTypeEnum.OA_NOTICE);
@@ -53,7 +53,7 @@ public class NoticeManager {
         noticeDao.updateById(noticeEntity);
         Long noticeId = noticeEntity.getNoticeId();
         // 保存可见范围
-        if (CollectionUtils.isNotEmpty(visibleRangeList)) {
+        if (SmartCollectionUtil.isNotEmpty(visibleRangeList)) {
             noticeDao.deleteVisibleRange(noticeId);
             noticeDao.insertVisibleRange(noticeId, visibleRangeList);
         }

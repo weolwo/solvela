@@ -7,6 +7,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.module.support.job.api.domain.*;
 import net.lab1024.sa.base.module.support.job.config.SmartJobAutoConfiguration;
@@ -16,7 +17,6 @@ import net.lab1024.sa.base.module.support.job.repository.SmartJobDao;
 import net.lab1024.sa.base.module.support.job.repository.SmartJobLogDao;
 import net.lab1024.sa.base.module.support.job.repository.domain.SmartJobEntity;
 import net.lab1024.sa.base.module.support.job.repository.domain.SmartJobLogEntity;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
@@ -86,13 +86,13 @@ public class SmartJobService {
      * @param jobList
      */
     private void handleJobInfo(List<SmartJobVO> jobList) {
-        if (CollectionUtils.isEmpty(jobList)) {
+        if (SmartCollectionUtil.isEmpty(jobList)) {
             return;
         }
         // 查询最后一次执行记录
         List<Long> logIdList = jobList.stream().map(SmartJobVO::getLastExecuteLogId).filter(Objects::nonNull).collect(Collectors.toList());
         Map<Long, SmartJobLogVO> lastLogMap = Collections.emptyMap();
-        if (CollectionUtils.isNotEmpty(logIdList)) {
+        if (SmartCollectionUtil.isNotEmpty(logIdList)) {
             lastLogMap = jobLogDao.selectBatchIds(logIdList)
                     .stream()
                     .collect(Collectors.toMap(SmartJobLogEntity::getLogId, e -> SmartBeanUtil.copy(e, SmartJobLogVO.class)));

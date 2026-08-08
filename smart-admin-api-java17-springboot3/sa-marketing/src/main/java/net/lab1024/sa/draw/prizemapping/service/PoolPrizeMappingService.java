@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.draw.prizemapping.dao.PoolPrizeMappingDao;
 import net.lab1024.sa.draw.prizemapping.domain.entity.PoolPrizeMapping;
@@ -12,7 +13,6 @@ import net.lab1024.sa.draw.prizemapping.domain.form.PoolPrizeMappingAddForm;
 import net.lab1024.sa.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
 import net.lab1024.sa.draw.prizemapping.domain.form.PoolPrizeMappingUpdateForm;
 import net.lab1024.sa.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,7 +62,7 @@ public class PoolPrizeMappingService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 

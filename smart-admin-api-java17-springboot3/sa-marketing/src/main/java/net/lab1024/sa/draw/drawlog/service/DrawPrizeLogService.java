@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.draw.drawlog.dao.DrawPrizeLogDao;
 import net.lab1024.sa.draw.drawlog.domain.entity.DrawPrizeLog;
@@ -12,7 +13,6 @@ import net.lab1024.sa.draw.drawlog.domain.form.DrawPrizeLogAddForm;
 import net.lab1024.sa.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
 import net.lab1024.sa.draw.drawlog.domain.form.DrawPrizeLogUpdateForm;
 import net.lab1024.sa.draw.drawlog.domain.vo.DrawPrizeLogVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,7 +62,7 @@ public class DrawPrizeLogService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 

@@ -6,7 +6,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.annoation.NoNeedLogin;
 import net.lab1024.sa.base.common.domain.RequestUrlVO;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerMethod;
@@ -53,7 +53,7 @@ public class UrlConfig {
             }
 
             Set<String> urls = pathPatternsCondition.getPatternValues();
-            if (CollectionUtils.isEmpty(urls)) {
+            if (SmartCollectionUtil.isEmpty(urls)) {
                 continue;
             }
             HandlerMethod handlerMethod = entry.getValue();
@@ -91,7 +91,7 @@ public class UrlConfig {
 
     private List<RequestUrlVO> buildRequestUrl(Method method, Set<String> urlSet) {
         List<RequestUrlVO> requestUrlList = new ArrayList<>();
-        if (CollectionUtils.isEmpty(urlSet)) {
+        if (SmartCollectionUtil.isEmpty(urlSet)) {
             return requestUrlList;
         }
         //url对应的方法名称

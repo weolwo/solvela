@@ -7,7 +7,7 @@ import net.lab1024.sa.admin.module.system.department.dao.DepartmentDao;
 import net.lab1024.sa.admin.module.system.department.domain.vo.DepartmentTreeVO;
 import net.lab1024.sa.admin.module.system.department.domain.vo.DepartmentVO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -113,11 +113,11 @@ public class DepartmentCacheManager {
      * 构建部门树结构
      */
     public List<DepartmentTreeVO> buildTree(List<DepartmentVO> voList) {
-        if (CollectionUtils.isEmpty(voList)) {
+        if (SmartCollectionUtil.isEmpty(voList)) {
             return new ArrayList<>();
         }
         List<DepartmentVO> rootList = voList.stream().filter(e -> e.getParentId() == null || Objects.equals(e.getParentId(), NumberUtils.LONG_ZERO)).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(rootList)) {
+        if (SmartCollectionUtil.isEmpty(rootList)) {
             return new ArrayList<>();
         }
         List<DepartmentTreeVO> treeVOList = SmartBeanUtil.copyList(rootList, DepartmentTreeVO.class);
@@ -147,19 +147,19 @@ public class DepartmentCacheManager {
             List<DepartmentTreeVO> children = getChildren(node.getDepartmentId(), allDepartmentList);
 
             List<Long> tempChildIdList = new ArrayList<>();
-            if (CollectionUtils.isNotEmpty(children)) {
+            if (SmartCollectionUtil.isNotEmpty(children)) {
                 node.setChildren(children);
                 tempChildIdList = this.recursiveBuildTree(children, allDepartmentList);
             }
 
-            if (CollectionUtils.isEmpty(node.getSelfAndAllChildrenIdList())) {
+            if (SmartCollectionUtil.isEmpty(node.getSelfAndAllChildrenIdList())) {
                 node.setSelfAndAllChildrenIdList(
                         new ArrayList<>()
                 );
             }
             node.getSelfAndAllChildrenIdList().add(node.getDepartmentId());
 
-            if (CollectionUtils.isNotEmpty(tempChildIdList)) {
+            if (SmartCollectionUtil.isNotEmpty(tempChildIdList)) {
                 node.getSelfAndAllChildrenIdList().addAll(tempChildIdList);
                 childIdList.addAll(tempChildIdList);
             }
@@ -180,7 +180,7 @@ public class DepartmentCacheManager {
      */
     private List<DepartmentTreeVO> getChildren(Long departmentId, List<DepartmentVO> voList) {
         List<DepartmentVO> childrenEntityList = voList.stream().filter(e -> departmentId.equals(e.getParentId())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(childrenEntityList)) {
+        if (SmartCollectionUtil.isEmpty(childrenEntityList)) {
             return new ArrayList<>();
         }
         return SmartBeanUtil.copyList(childrenEntityList, DepartmentTreeVO.class);
@@ -192,12 +192,12 @@ public class DepartmentCacheManager {
      */
     public List<Long> selfAndChildrenIdList(Long departmentId, List<DepartmentVO> voList) {
         List<Long> selfAndChildrenIdList = new ArrayList<>();
-        if (CollectionUtils.isEmpty(voList)) {
+        if (SmartCollectionUtil.isEmpty(voList)) {
             return selfAndChildrenIdList;
         }
         selfAndChildrenIdList.add(departmentId);
         List<DepartmentTreeVO> children = this.getChildren(departmentId, voList);
-        if (CollectionUtils.isEmpty(children)) {
+        if (SmartCollectionUtil.isEmpty(children)) {
             return selfAndChildrenIdList;
         }
         List<Long> childrenIdList = children.stream().map(DepartmentTreeVO::getDepartmentId).collect(Collectors.toList());
@@ -213,7 +213,7 @@ public class DepartmentCacheManager {
      */
     public void selfAndChildrenRecursion(List<Long> selfAndChildrenIdList, Long departmentId, List<DepartmentVO> voList) {
         List<DepartmentTreeVO> children = this.getChildren(departmentId, voList);
-        if (CollectionUtils.isEmpty(children)) {
+        if (SmartCollectionUtil.isEmpty(children)) {
             return;
         }
         List<Long> childrenIdList = children.stream().map(DepartmentTreeVO::getDepartmentId).collect(Collectors.toList());

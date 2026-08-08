@@ -1,9 +1,9 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.backend;
 
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeInsertAndUpdateField;
 import net.lab1024.sa.base.module.support.codegenerator.service.variable.CodeGenerateBaseVariableService;
-import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -38,7 +38,7 @@ public class ManagerVariableService extends CodeGenerateBaseVariableService {
 
 
     public List<String> getPackageList(List<CodeInsertAndUpdateField> fields, CodeGeneratorConfigForm form) {
-        if (CollectionUtils.isEmpty(fields)) {
+        if (SmartCollectionUtil.isEmpty(fields)) {
             return new ArrayList<>();
         }
 

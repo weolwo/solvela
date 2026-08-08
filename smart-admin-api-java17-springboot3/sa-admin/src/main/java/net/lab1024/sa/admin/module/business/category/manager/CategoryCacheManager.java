@@ -8,7 +8,7 @@ import net.lab1024.sa.admin.module.business.category.domain.entity.CategoryEntit
 import net.lab1024.sa.admin.module.business.category.domain.vo.CategoryTreeVO;
 import net.lab1024.sa.base.common.constant.StringConst;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -89,7 +89,7 @@ public class CategoryCacheManager {
      *
      */
     private void queryAndSetSubCategory(List<CategoryTreeVO> treeList, List<CategoryEntity> allCategoryEntityList) {
-        if (CollectionUtils.isEmpty(treeList)) {
+        if (SmartCollectionUtil.isEmpty(treeList)) {
             return;
         }
         List<Long> parentIdList = treeList.stream().map(CategoryTreeVO::getValue).collect(Collectors.toList());

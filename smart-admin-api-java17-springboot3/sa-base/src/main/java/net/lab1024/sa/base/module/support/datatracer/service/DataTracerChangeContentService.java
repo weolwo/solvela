@@ -6,6 +6,7 @@ import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.util.SmartBigDecimalUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
@@ -16,7 +17,6 @@ import net.lab1024.sa.base.module.support.datatracer.domain.bo.DataTracerContent
 import net.lab1024.sa.base.module.support.dict.domain.vo.DictDataVO;
 import net.lab1024.sa.base.module.support.dict.service.DictService;
 import net.lab1024.sa.base.common.util.JsonUtils;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
@@ -177,7 +177,7 @@ public class DataTracerChangeContentService {
      * @return 内容
      */
     private <T> String getObjectListContent(List<T> objectList) {
-        if (CollectionUtils.isEmpty(objectList)) {
+        if (SmartCollectionUtil.isEmpty(objectList)) {
             return "";
         }
         List<Field> fields = this.getField(objectList.get(0));
@@ -244,7 +244,7 @@ public class DataTracerChangeContentService {
             String content = fieldDesc + ":" + "由【" + oldContent + "】变更为【" + newContent + "】";
             contentList.add(content);
         }
-        if (CollectionUtils.isEmpty(contentList)) {
+        if (SmartCollectionUtil.isEmpty(contentList)) {
             return "";
         }
         String operateContent = StringUtils.join(contentList, "<br/>");
@@ -368,7 +368,7 @@ public class DataTracerChangeContentService {
         qw.select(SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_UNDERSCORE, dataTracerFieldSql.relateDisplayColumn()));
         qw.in(SmartCaseFormat.UPPER_CAMEL.to(SmartCaseFormat.LOWER_UNDERSCORE, dataTracerFieldSql.relateColumn()), relateFieldValue);
         List<Object> displayValue = mapper.selectObjs(qw);
-        if (CollectionUtils.isEmpty(displayValue)) {
+        if (SmartCollectionUtil.isEmpty(displayValue)) {
             return "";
         }
         return SmartStringUtil.join(",", displayValue);
@@ -428,16 +428,16 @@ public class DataTracerChangeContentService {
      * 校验
      */
     private <T> boolean valid(List<T> oldObjectList, List<T> newObjectList) {
-        if (CollectionUtils.isEmpty(oldObjectList) && CollectionUtils.isEmpty(newObjectList)) {
+        if (SmartCollectionUtil.isEmpty(oldObjectList) && SmartCollectionUtil.isEmpty(newObjectList)) {
             return false;
         }
-        if (CollectionUtils.isEmpty(oldObjectList) && CollectionUtils.isNotEmpty(newObjectList)) {
+        if (SmartCollectionUtil.isEmpty(oldObjectList) && SmartCollectionUtil.isNotEmpty(newObjectList)) {
             return true;
         }
-        if (CollectionUtils.isNotEmpty(oldObjectList) && CollectionUtils.isEmpty(newObjectList)) {
+        if (SmartCollectionUtil.isNotEmpty(oldObjectList) && SmartCollectionUtil.isEmpty(newObjectList)) {
             return true;
         }
-        if (CollectionUtils.isNotEmpty(oldObjectList) && CollectionUtils.isNotEmpty(newObjectList)) {
+        if (SmartCollectionUtil.isNotEmpty(oldObjectList) && SmartCollectionUtil.isNotEmpty(newObjectList)) {
             T oldObject = oldObjectList.get(0);
             T newObject = newObjectList.get(0);
             String oldClass = oldObject.getClass().getName();

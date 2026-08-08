@@ -1,9 +1,12 @@
 package net.lab1024.sa.base.common.code;
 
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,11 +77,16 @@ class ErrorCodeRangeContainer {
             return code;
         }).collect(Collectors.toList());
 
-        // 校验code是否重复
+        // 校验code是否重复。
+        // 原先写的是 CollectionUtils.subtract(codeList, distinctCodeList) —— 它靠的是 commons 的
+        // **多重集语义**（按重数扣减），拿原表减去去重表剩下的就是重复项。换成 removeAll 会永远返回空、
+        // 这条校验静默失效，所以这里直接写成显式的"找出出现多于一次的 code"。
         List<Integer> distinctCodeList = codeList.stream().distinct().collect(Collectors.toList());
-        Collection<Integer> subtract = CollectionUtils.subtract(codeList, distinctCodeList);
-        if (CollectionUtils.isNotEmpty(subtract)) {
-            throw new IllegalArgumentException(String.format("<<ErrorCodeRangeValidator>> error: %s code %s is repeat!", simpleName, subtract));
+        Set<Integer> seen = new HashSet<>();
+        Set<Integer> repeated = codeList.stream().filter(code -> !seen.add(code))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!repeated.isEmpty()) {
+            throw new IllegalArgumentException(String.format("<<ErrorCodeRangeValidator>> error: %s code %s is repeat!", simpleName, repeated));
         }
 
         CODE_RANGE_MAP.put(clazz, ImmutablePair.of(start, end));

@@ -1,12 +1,12 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.backend.domain;
 
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeField;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeTableField;
 import net.lab1024.sa.base.module.support.codegenerator.service.variable.CodeGenerateBaseVariableService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.util.*;
@@ -44,7 +44,7 @@ public class VOVariableService extends CodeGenerateBaseVariableService {
     }
 
     public ImmutablePair<List<String>, List<Map<String, Object>>> getPackageListAndFields(List<CodeTableField> fields, CodeGeneratorConfigForm form) {
-        if (CollectionUtils.isEmpty(fields)) {
+        if (SmartCollectionUtil.isEmpty(fields)) {
             return ImmutablePair.of(new ArrayList<>(), new ArrayList<>());
         }
 

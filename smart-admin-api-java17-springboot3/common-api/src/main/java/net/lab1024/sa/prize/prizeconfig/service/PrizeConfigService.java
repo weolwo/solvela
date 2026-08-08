@@ -6,6 +6,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.prize.prizeconfig.dao.PrizeConfigDao;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
@@ -17,7 +18,6 @@ import net.lab1024.sa.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import net.lab1024.sa.prize.prizeconfig.manager.PrizeConfigManager;
 import net.lab1024.sa.risk.promotionconfig.domain.entity.PromotionConfig;
 import net.lab1024.sa.risk.promotionconfig.service.PromotionConfigService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -190,7 +190,7 @@ public class PrizeConfigService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 

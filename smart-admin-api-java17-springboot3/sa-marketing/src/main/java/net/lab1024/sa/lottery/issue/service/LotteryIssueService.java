@@ -1,6 +1,7 @@
 package net.lab1024.sa.lottery.issue.service;
 
 import java.util.List;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.lottery.issue.dao.LotteryIssueDao;
 import net.lab1024.sa.lottery.issue.manager.LotteryIssueManager;
 import net.lab1024.sa.lottery.config.service.LotteryConfigService;
@@ -14,7 +15,6 @@ import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.PageResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
@@ -146,7 +146,7 @@ public class LotteryIssueService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
         for (Long id : idList) {

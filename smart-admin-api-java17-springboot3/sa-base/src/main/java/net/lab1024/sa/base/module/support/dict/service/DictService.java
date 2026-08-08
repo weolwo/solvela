@@ -6,6 +6,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.CacheKeyConst;
@@ -17,7 +18,6 @@ import net.lab1024.sa.base.module.support.dict.domain.form.*;
 import net.lab1024.sa.base.module.support.dict.domain.vo.DictDataVO;
 import net.lab1024.sa.base.module.support.dict.domain.vo.DictVO;
 import net.lab1024.sa.base.module.support.dict.manager.DictManager;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
@@ -129,7 +129,7 @@ public class DictService {
             @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
     public synchronized ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
 
@@ -188,7 +188,7 @@ public class DictService {
      */
     public String getDictDataValueByLabel(String dictCode, String dataLabel) {
         List<DictDataVO> matched = dictManager.listDictDataByLabel(dictCode, dataLabel);
-        if (CollectionUtils.isEmpty(matched)) {
+        if (SmartCollectionUtil.isEmpty(matched)) {
             return null;
         }
         if (matched.size() > 1) {
@@ -250,7 +250,7 @@ public class DictService {
      * 批量删除
      */
     public synchronized ResponseDTO<String> batchDeleteDictData(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
         // 清除缓存

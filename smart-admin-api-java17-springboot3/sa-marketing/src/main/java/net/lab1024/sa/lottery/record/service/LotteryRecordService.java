@@ -1,6 +1,7 @@
 package net.lab1024.sa.lottery.record.service;
 
 import java.util.List;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.lottery.record.dao.LotteryRecordDao;
 import net.lab1024.sa.lottery.record.domain.entity.LotteryRecord;
 import net.lab1024.sa.lottery.record.domain.form.LotteryRecordAddForm;
@@ -12,7 +13,6 @@ import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.PageResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 

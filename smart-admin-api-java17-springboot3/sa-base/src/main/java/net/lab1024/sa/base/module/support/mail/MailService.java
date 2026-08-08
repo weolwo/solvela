@@ -1,6 +1,7 @@
 package net.lab1024.sa.base.module.support.mail;
 
 
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
@@ -11,12 +12,11 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.SystemEnvironment;
+import net.lab1024.sa.base.common.util.SmartTemplateUtil;
 import net.lab1024.sa.base.module.support.mail.constant.MailTemplateCodeEnum;
 import net.lab1024.sa.base.module.support.mail.constant.MailTemplateTypeEnum;
 import net.lab1024.sa.base.module.support.mail.domain.MailTemplateEntity;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.text.StringSubstitutor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Value;
@@ -112,7 +112,7 @@ public class MailService {
      */
     public void sendMail(String subject, String content, List<File> fileList, List<String> receiverUserList, boolean isHtml) throws MessagingException {
 
-        if (CollectionUtils.isEmpty(receiverUserList)) {
+        if (SmartCollectionUtil.isEmpty(receiverUserList)) {
             throw new RuntimeException("接收方不能为空");
         }
 
@@ -127,7 +127,7 @@ public class MailService {
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
 
         //是否为多文件上传
-        boolean multiparty = !CollectionUtils.isEmpty(fileList);
+        boolean multiparty = !SmartCollectionUtil.isEmpty(fileList);
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, multiparty);
         helper.setFrom(clientMail);
         helper.setTo(receiverUserList.toArray(new String[0]));
@@ -148,8 +148,7 @@ public class MailService {
      * 使用字符串生成最终内容
      */
     private String stringResolverContent(String stringTemplate, Map<String, Object> templateParamsMap) {
-        StringSubstitutor stringSubstitutor = new StringSubstitutor(templateParamsMap);
-        String contractHtml = stringSubstitutor.replace(stringTemplate);
+        String contractHtml = SmartTemplateUtil.render(stringTemplate, templateParamsMap);
         Document doc = Jsoup.parse(contractHtml);
         doc.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
         return doc.outerHtml();

@@ -4,6 +4,7 @@ import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
 import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
 import net.lab1024.sa.base.common.util.SmartRandomUtil;
@@ -20,7 +21,6 @@ import net.lab1024.sa.base.module.support.codegenerator.service.variable.front.F
 import net.lab1024.sa.base.module.support.codegenerator.service.variable.front.ListVariableService;
 import net.lab1024.sa.base.module.support.codegenerator.util.CodeGeneratorTool;
 import net.lab1024.sa.base.common.util.JsonUtils;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.velocity.Template;
 import org.apache.velocity.app.Velocity;
 import org.apache.velocity.app.VelocityEngine;
@@ -121,7 +121,7 @@ public class CodeGeneratorTemplateService {
 
         // 2、后端的枚举文件
         List<CodeField> fields = JsonUtils.parseList(codeGeneratorConfigEntity.getFields(), CodeField.class);
-        if (CollectionUtils.isNotEmpty(fields)) {
+        if (SmartCollectionUtil.isNotEmpty(fields)) {
             List<CodeField> enumFiledList = fields.stream().filter(e -> SmartStringUtil.isNotBlank(e.getEnumName())).collect(Collectors.toList());
             for (CodeField codeField : enumFiledList) {
                 Map<String, Object> variablesMap = new HashMap<>();

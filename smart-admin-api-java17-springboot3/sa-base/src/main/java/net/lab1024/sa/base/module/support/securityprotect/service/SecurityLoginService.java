@@ -1,5 +1,6 @@
 package net.lab1024.sa.base.module.support.securityprotect.service;
 
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
 import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -13,7 +14,6 @@ import net.lab1024.sa.base.module.support.securityprotect.dao.LoginFailDao;
 import net.lab1024.sa.base.module.support.securityprotect.domain.LoginFailEntity;
 import net.lab1024.sa.base.module.support.securityprotect.domain.LoginFailQueryForm;
 import net.lab1024.sa.base.module.support.securityprotect.domain.LoginFailVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -164,7 +164,7 @@ public class SecurityLoginService {
      * @return
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
 

@@ -7,6 +7,7 @@ import net.lab1024.sa.base.common.constant.StringConst;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
@@ -19,7 +20,6 @@ import net.lab1024.sa.base.module.support.file.domain.vo.FileUploadVO;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.module.support.redis.RedisService;
 import net.lab1024.sa.base.module.support.securityprotect.service.SecurityFileService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -122,7 +122,7 @@ public class FileService {
      * @return
      */
     public List<FileVO> getFileList(List<String> fileKeyList) {
-        if (CollectionUtils.isEmpty(fileKeyList)) {
+        if (SmartCollectionUtil.isEmpty(fileKeyList)) {
             return new ArrayList<>();
         }
 

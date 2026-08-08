@@ -1,6 +1,7 @@
 package net.lab1024.sa.task.taskconfig.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
@@ -20,7 +21,6 @@ import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
 import net.lab1024.sa.task.taskconfig.domain.vo.TaskConfigVO;
 import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
 import net.lab1024.sa.task.tasktemplate.service.TaskTemplateService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -194,7 +194,7 @@ public class TaskConfigService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 

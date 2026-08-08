@@ -7,11 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.PageParam;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.exception.BusinessException;
-import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedList;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 
 /**
  * 分页工具类
@@ -36,7 +36,7 @@ public class SmartPageUtil {
         }
 
         List<PageParam.SortItem> sortItemList = pageParam.getSortItemList();
-        if (CollectionUtils.isEmpty(sortItemList)) {
+        if (SmartCollectionUtil.isEmpty(sortItemList)) {
             return page;
         }
 
@@ -75,7 +75,7 @@ public class SmartPageUtil {
         pageResult.setTotal(page.getTotal());
         pageResult.setPages(page.getPages());
         pageResult.setList(sourceList);
-        pageResult.setEmptyFlag(CollectionUtils.isEmpty(sourceList));
+        pageResult.setEmptyFlag(SmartCollectionUtil.isEmpty(sourceList));
         return pageResult;
     }
 

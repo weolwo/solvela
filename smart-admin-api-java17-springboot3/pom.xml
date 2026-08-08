@@ -28,10 +28,8 @@
         <reflections.version>0.10.2</reflections.version>
         <commons-io.version>2.22.0</commons-io.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
-        <commons-collections4.version>4.5.0</commons-collections4.version>
         <commons-compress.version>1.28.0</commons-compress.version>
         <commons-codec.version>1.22.1</commons-codec.version>
-        <commons-text.version>1.15.0</commons-text.version>
         <!-- SonicExcel 的底层引擎（法国人的 org.dhatim:fastexcel，
              和被本轮摘掉的阿里系 cn.idev.excel:fastexcel 毫无关系）。
              读写两个 artifact 从 0.20.0 起统一版本号，一起升。 -->
@@ -126,11 +124,6 @@
                 <version>${commons-lang3.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-collections4</artifactId>
-                <version>${commons-collections4.version}</version>
-            </dependency>
 
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -156,11 +149,6 @@
                 </exclusions>
             </dependency>
 
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-text</artifactId>
-                <version>${commons-text.version}</version>
-            </dependency>
 
             <!--velocity begin-->
             <dependency>

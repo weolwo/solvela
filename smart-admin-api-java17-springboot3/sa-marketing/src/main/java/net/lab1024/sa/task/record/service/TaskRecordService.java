@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.task.record.dao.TaskRecordDao;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
@@ -12,7 +13,6 @@ import net.lab1024.sa.task.record.domain.form.TaskRecordAddForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordQueryForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordUpdateForm;
 import net.lab1024.sa.task.record.domain.vo.TaskRecordVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,7 +62,7 @@ public class TaskRecordService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 

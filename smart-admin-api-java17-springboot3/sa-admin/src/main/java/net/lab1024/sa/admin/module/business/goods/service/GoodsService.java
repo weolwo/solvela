@@ -20,12 +20,12 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartExcelUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.module.support.datatracer.constant.DataTracerTypeEnum;
 import net.lab1024.sa.base.module.support.datatracer.service.DataTracerService;
 import net.lab1024.sa.base.sonicexcel.error.SonicReadResult;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -127,7 +127,7 @@ public class GoodsService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> goodsIdList) {
-        if (CollectionUtils.isEmpty(goodsIdList)) {
+        if (SmartCollectionUtil.isEmpty(goodsIdList)) {
             return ResponseDTO.ok();
         }
 

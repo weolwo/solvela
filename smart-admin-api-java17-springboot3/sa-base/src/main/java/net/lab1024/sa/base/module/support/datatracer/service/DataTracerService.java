@@ -8,6 +8,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartIpUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
@@ -19,7 +20,6 @@ import net.lab1024.sa.base.module.support.datatracer.domain.form.DataTracerForm;
 import net.lab1024.sa.base.module.support.datatracer.domain.form.DataTracerQueryForm;
 import net.lab1024.sa.base.module.support.datatracer.domain.vo.DataTracerVO;
 import net.lab1024.sa.base.module.support.datatracer.manager.DataTracerManger;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -129,7 +129,7 @@ public class DataTracerService {
      * @param type
      */
     public void batchDelete(List<Long> dataIdList, DataTracerTypeEnum type) {
-        if (CollectionUtils.isEmpty(dataIdList)) {
+        if (SmartCollectionUtil.isEmpty(dataIdList)) {
             return;
         }
 
@@ -192,7 +192,7 @@ public class DataTracerService {
      * 批量保存数据变动记录
      */
     public void addTraceList(List<DataTracerForm> tracerFormList, RequestUser requestUser) {
-        if (CollectionUtils.isEmpty(tracerFormList)) {
+        if (SmartCollectionUtil.isEmpty(tracerFormList)) {
             return;
         }
 

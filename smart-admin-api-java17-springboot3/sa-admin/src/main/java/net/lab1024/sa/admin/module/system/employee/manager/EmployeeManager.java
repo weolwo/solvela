@@ -8,7 +8,7 @@ import net.lab1024.sa.admin.module.system.employee.domain.entity.EmployeeEntity;
 import net.lab1024.sa.admin.module.system.role.dao.RoleEmployeeDao;
 import net.lab1024.sa.admin.module.system.role.domain.entity.RoleEmployeeEntity;
 import net.lab1024.sa.admin.module.system.role.service.RoleEmployeeService;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,7 +45,7 @@ public class EmployeeManager extends ServiceImpl<EmployeeDao, EmployeeEntity> {
         // 保存员工 获得id
         employeeDao.insert(employee);
 
-        if (CollectionUtils.isNotEmpty(roleIdList)) {
+        if (SmartCollectionUtil.isNotEmpty(roleIdList)) {
             List<RoleEmployeeEntity> roleEmployeeList = roleIdList.stream().map(e -> new RoleEmployeeEntity(e, employee.getEmployeeId())).collect(Collectors.toList());
             roleEmployeeService.batchInsert(roleEmployeeList);
         }
@@ -61,7 +61,7 @@ public class EmployeeManager extends ServiceImpl<EmployeeDao, EmployeeEntity> {
         employeeDao.updateById(employee);
 
         // 若为空，则删除所有角色
-        if (CollectionUtils.isEmpty(roleIdList)) {
+        if (SmartCollectionUtil.isEmpty(roleIdList)) {
             roleEmployeeDao.deleteByEmployeeId(employee.getEmployeeId());
             return;
         }
@@ -78,7 +78,7 @@ public class EmployeeManager extends ServiceImpl<EmployeeDao, EmployeeEntity> {
 
         roleEmployeeDao.deleteByEmployeeId(employeeId);
 
-        if (CollectionUtils.isNotEmpty(roleEmployeeList)) {
+        if (SmartCollectionUtil.isNotEmpty(roleEmployeeList)) {
             roleEmployeeService.batchInsert(roleEmployeeList);
         }
     }

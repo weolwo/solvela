@@ -19,6 +19,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.enums.ActivityTypeEnum;
 import net.lab1024.sa.base.common.exception.BusinessException;
@@ -26,7 +27,6 @@ import net.lab1024.sa.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import net.lab1024.sa.prize.prizeconfig.manager.PrizeConfigManager;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -115,7 +115,7 @@ public class ActivityConfigService {
      */
     public Map<String, Boolean> queryConfiguredStatus(List<String> activityCodeList) {
         Map<String, Boolean> result = new HashMap<>();
-        if (CollectionUtils.isEmpty(activityCodeList)) {
+        if (SmartCollectionUtil.isEmpty(activityCodeList)) {
             return result;
         }
         List<ActivityConfig> activityList = activityConfigManager.lambdaQuery()
@@ -181,7 +181,7 @@ public class ActivityConfigService {
                     List.of());
         }
         List<ActivityRefItem> refs = countRefs(activity);
-        if (CollectionUtils.isEmpty(refs)) {
+        if (SmartCollectionUtil.isEmpty(refs)) {
             return ActivityDeleteCheckVO.ok();
         }
         String detail = refs.stream()
@@ -351,7 +351,7 @@ public class ActivityConfigService {
             return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 2-禁用");
         }
         List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(form.getIdList());
-        if (CollectionUtils.isEmpty(activityList)) {
+        if (SmartCollectionUtil.isEmpty(activityList)) {
             return ResponseDTO.userErrorParam("活动不存在");
         }
 
@@ -403,7 +403,7 @@ public class ActivityConfigService {
         ActivityRefProvider provider = findProvider(target.getValue());
         if (provider != null) {
             List<ActivityRefItem> refs = provider.countRefs(activity.getActivityCode());
-            if (CollectionUtils.isNotEmpty(refs)) {
+            if (SmartCollectionUtil.isNotEmpty(refs)) {
                 String detail = refs.stream()
                         .map(r -> r.bizName() + " " + r.count() + " 个")
                         .collect(Collectors.joining(" / "));
@@ -423,7 +423,7 @@ public class ActivityConfigService {
      * 不做「跳过不能删的、删掉能删的」—— 部分成功对运营是更难排查的结果。
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
         List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(idList);

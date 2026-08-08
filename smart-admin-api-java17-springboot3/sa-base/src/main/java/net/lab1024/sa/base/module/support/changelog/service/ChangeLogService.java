@@ -5,6 +5,7 @@ import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.module.support.changelog.dao.ChangeLogDao;
 import net.lab1024.sa.base.module.support.changelog.domain.entity.ChangeLogEntity;
@@ -12,7 +13,6 @@ import net.lab1024.sa.base.module.support.changelog.domain.form.ChangeLogAddForm
 import net.lab1024.sa.base.module.support.changelog.domain.form.ChangeLogQueryForm;
 import net.lab1024.sa.base.module.support.changelog.domain.form.ChangeLogUpdateForm;
 import net.lab1024.sa.base.module.support.changelog.domain.vo.ChangeLogVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -71,7 +71,7 @@ public class ChangeLogService {
      * 批量删除
      */
     public synchronized ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
 

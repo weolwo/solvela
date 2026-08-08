@@ -18,8 +18,8 @@ import net.lab1024.sa.base.common.constant.StringConst;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -69,7 +69,7 @@ public class RoleEmployeeService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         List<Long> departmentIdList = employeeList.stream().filter(e -> e != null && e.getDepartmentId() != null).map(EmployeeVO::getDepartmentId).collect(Collectors.toList());
-        if (CollectionUtils.isNotEmpty(departmentIdList)) {
+        if (SmartCollectionUtil.isNotEmpty(departmentIdList)) {
             List<DepartmentEntity> departmentEntities = departmentDao.selectBatchIds(departmentIdList);
             Map<Long, String> departmentIdNameMap = departmentEntities.stream().collect(Collectors.toMap(DepartmentEntity::getDepartmentId, DepartmentEntity::getDepartmentName));
             employeeList.forEach(e -> {
@@ -120,7 +120,7 @@ public class RoleEmployeeService {
         Set<Long> addEmployeeIdList = selectedEmployeeIdList.stream().filter(id -> !dbEmployeeIdList.contains(id)).collect(Collectors.toSet());
 
         // 添加角色员工
-        if (CollectionUtils.isNotEmpty(addEmployeeIdList)) {
+        if (SmartCollectionUtil.isNotEmpty(addEmployeeIdList)) {
             List<RoleEmployeeEntity> roleEmployeeList = addEmployeeIdList.stream()
                     .map(employeeId -> new RoleEmployeeEntity(roleId, employeeId))
                     .collect(Collectors.toList());

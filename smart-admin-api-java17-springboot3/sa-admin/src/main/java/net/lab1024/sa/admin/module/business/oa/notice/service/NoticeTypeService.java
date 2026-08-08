@@ -6,8 +6,8 @@ import net.lab1024.sa.admin.module.business.oa.notice.domain.entity.NoticeTypeEn
 import net.lab1024.sa.admin.module.business.oa.notice.domain.vo.NoticeTypeVO;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -47,7 +47,7 @@ public class NoticeTypeService {
         }
 
         List<NoticeTypeEntity> noticeTypeEntityList = noticeTypeDao.selectList(null);
-        if (!CollectionUtils.isEmpty(noticeTypeEntityList)) {
+        if (!SmartCollectionUtil.isEmpty(noticeTypeEntityList)) {
             boolean exist = noticeTypeEntityList.stream().map(NoticeTypeEntity::getNoticeTypeName).collect(Collectors.toSet()).contains(name);
             if (exist) {
                 return ResponseDTO.userErrorParam("类型名称已经存在");
@@ -68,7 +68,7 @@ public class NoticeTypeService {
         }
 
         List<NoticeTypeEntity> noticeTypeEntityList = noticeTypeDao.selectList(null);
-        if (!CollectionUtils.isEmpty(noticeTypeEntityList)) {
+        if (!SmartCollectionUtil.isEmpty(noticeTypeEntityList)) {
             Optional<NoticeTypeEntity> optionalNoticeTypeEntity = noticeTypeEntityList.stream().filter(e -> e.getNoticeTypeName().equals(name)).findFirst();
             if (optionalNoticeTypeEntity.isPresent() && !optionalNoticeTypeEntity.get().getNoticeTypeId().equals(noticeTypeId)) {
                 return ResponseDTO.userErrorParam("类型名称已经存在");

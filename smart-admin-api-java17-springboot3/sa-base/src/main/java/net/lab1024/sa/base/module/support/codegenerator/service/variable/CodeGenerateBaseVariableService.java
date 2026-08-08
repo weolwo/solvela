@@ -1,13 +1,13 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable;
 
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeField;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeInsertAndUpdate;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeInsertAndUpdateField;
-import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.*;
 import java.util.function.Function;
@@ -60,7 +60,7 @@ public abstract class CodeGenerateBaseVariableService {
      */
     public CodeField getCodeFieldByColumnName(String columnName, CodeGeneratorConfigForm form) {
         List<CodeField> fields = form.getFields();
-        if (CollectionUtils.isEmpty(fields)) {
+        if (SmartCollectionUtil.isEmpty(fields)) {
             return null;
         }
 
@@ -78,7 +78,7 @@ public abstract class CodeGenerateBaseVariableService {
         }
 
         List<CodeInsertAndUpdateField> fieldList = insertAndUpdate.getFieldList();
-        if (CollectionUtils.isEmpty(fieldList)) {
+        if (SmartCollectionUtil.isEmpty(fieldList)) {
             return false;
         }
 
@@ -109,7 +109,7 @@ public abstract class CodeGenerateBaseVariableService {
 
     private CodeField getCodeField(String columnName, CodeGeneratorConfigForm form) {
         List<CodeField> fields = form.getFields();
-        if (CollectionUtils.isEmpty(fields)) {
+        if (SmartCollectionUtil.isEmpty(fields)) {
             return null;
         }
 

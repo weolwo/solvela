@@ -7,6 +7,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.ledger.engine.AssetDispatchEngine;
 import net.lab1024.sa.risk.engine.RiskChainEngine;
@@ -20,7 +21,6 @@ import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordQueryForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordUpdateForm;
 import net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -309,7 +309,7 @@ public class ProposalRecordService {
      * 批量删除
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (CollectionUtils.isEmpty(idList)){
+        if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 

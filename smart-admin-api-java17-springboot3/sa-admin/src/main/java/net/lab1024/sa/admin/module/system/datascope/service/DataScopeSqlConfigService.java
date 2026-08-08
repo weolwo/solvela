@@ -10,8 +10,8 @@ import net.lab1024.sa.admin.module.system.datascope.constant.DataScopeViewTypeEn
 import net.lab1024.sa.admin.module.system.datascope.constant.DataScopeWhereInTypeEnum;
 import net.lab1024.sa.admin.module.system.datascope.domain.DataScopeSqlConfig;
 import net.lab1024.sa.admin.module.system.datascope.strategy.AbstractDataScopeStrategy;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -128,7 +128,7 @@ public class DataScopeSqlConfigService {
         }
         if (DataScopeWhereInTypeEnum.EMPLOYEE == sqlConfigDTO.getDataScopeWhereInType()) {
             List<Long> canViewEmployeeIds = dataScopeViewService.getCanViewEmployeeId(viewTypeEnum, employeeId);
-            if (CollectionUtils.isEmpty(canViewEmployeeIds)) {
+            if (SmartCollectionUtil.isEmpty(canViewEmployeeIds)) {
                 return "";
             }
             String employeeIds = StringUtils.join(canViewEmployeeIds, ",");
@@ -137,7 +137,7 @@ public class DataScopeSqlConfigService {
         }
         if (DataScopeWhereInTypeEnum.DEPARTMENT == sqlConfigDTO.getDataScopeWhereInType()) {
             List<Long> canViewDepartmentIds = dataScopeViewService.getCanViewDepartmentId(viewTypeEnum, employeeId);
-            if (CollectionUtils.isEmpty(canViewDepartmentIds)) {
+            if (SmartCollectionUtil.isEmpty(canViewDepartmentIds)) {
                 return "";
             }
             String departmentIds = StringUtils.join(canViewDepartmentIds, ",");

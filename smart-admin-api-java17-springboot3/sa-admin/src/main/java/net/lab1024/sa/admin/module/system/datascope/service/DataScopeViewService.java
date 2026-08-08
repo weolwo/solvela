@@ -9,8 +9,8 @@ import net.lab1024.sa.admin.module.system.employee.domain.entity.EmployeeEntity;
 import net.lab1024.sa.admin.module.system.role.dao.RoleDataScopeDao;
 import net.lab1024.sa.admin.module.system.role.dao.RoleEmployeeDao;
 import net.lab1024.sa.admin.module.system.role.domain.entity.RoleDataScopeEntity;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -104,17 +104,17 @@ public class DataScopeViewService {
 
         List<Long> roleIdList = roleEmployeeDao.selectRoleIdByEmployeeId(employeeId);
         //未设置角色 默认本人
-        if (CollectionUtils.isEmpty(roleIdList)) {
+        if (SmartCollectionUtil.isEmpty(roleIdList)) {
             return DataScopeViewTypeEnum.ME;
         }
         //未设置角色数据范围 默认本人
         List<RoleDataScopeEntity> dataScopeRoleList = roleDataScopeDao.listByRoleIdList(roleIdList);
-        if (CollectionUtils.isEmpty(dataScopeRoleList)) {
+        if (SmartCollectionUtil.isEmpty(dataScopeRoleList)) {
             return DataScopeViewTypeEnum.ME;
         }
         Map<Integer, List<RoleDataScopeEntity>> listMap = dataScopeRoleList.stream().collect(Collectors.groupingBy(RoleDataScopeEntity::getDataScopeType));
         List<RoleDataScopeEntity> viewLevelList = listMap.getOrDefault(dataScopeTypeEnum.getValue(), new ArrayList<>());
-        if (CollectionUtils.isEmpty(viewLevelList)) {
+        if (SmartCollectionUtil.isEmpty(viewLevelList)) {
             return DataScopeViewTypeEnum.ME;
         }
         RoleDataScopeEntity maxLevel = viewLevelList.stream().max(Comparator.comparing(e -> SmartEnumUtil.getEnumByValue(e.getViewType(), DataScopeViewTypeEnum.class).getLevel())).get();

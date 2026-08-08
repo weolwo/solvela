@@ -19,7 +19,6 @@ import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.*;
 import net.lab1024.sa.base.module.support.operatelog.annotation.OperateLog;
-import org.apache.commons.collections.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -54,7 +53,7 @@ public class EnterpriseController {
     @PostMapping("/oa/enterprise/exportExcel")
     public void exportExcel(@RequestBody @Valid EnterpriseQueryForm queryForm, HttpServletResponse response) throws IOException {
         List<EnterpriseExcelVO> data = enterpriseService.getExcelExportData(queryForm);
-        if (CollectionUtils.isEmpty(data)) {
+        if (SmartCollectionUtil.isEmpty(data)) {
             SmartResponseUtil.write(response, ResponseDTO.userErrorParam("暂无数据"));
             return;
         }

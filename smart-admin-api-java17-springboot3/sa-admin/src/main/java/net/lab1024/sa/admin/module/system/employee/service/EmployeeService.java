@@ -24,10 +24,10 @@ import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.enumeration.UserTypeEnum;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import net.lab1024.sa.base.module.support.securityprotect.service.SecurityPasswordService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,7 +91,7 @@ public class EmployeeService {
         }
 
         List<EmployeeVO> employeeList = employeeDao.queryEmployee(pageParam, employeeQueryForm, departmentIdList);
-        if (CollectionUtils.isEmpty(employeeList)) {
+        if (SmartCollectionUtil.isEmpty(employeeList)) {
             PageResult<EmployeeVO> pageResult = SmartPageUtil.convert2PageResult(pageParam, employeeList);
             return ResponseDTO.ok(pageResult);
         }
@@ -289,11 +289,11 @@ public class EmployeeService {
      * 批量删除员工
      */
     public ResponseDTO<String> batchUpdateDeleteFlag(List<Long> employeeIdList) {
-        if (CollectionUtils.isEmpty(employeeIdList)) {
+        if (SmartCollectionUtil.isEmpty(employeeIdList)) {
             return ResponseDTO.ok();
         }
         List<EmployeeEntity> employeeEntityList = employeeManager.listByIds(employeeIdList);
-        if (CollectionUtils.isEmpty(employeeEntityList)) {
+        if (SmartCollectionUtil.isEmpty(employeeEntityList)) {
             return ResponseDTO.ok();
         }
         // 更新删除
@@ -387,7 +387,7 @@ public class EmployeeService {
     public ResponseDTO<List<EmployeeVO>> getAllEmployeeByDepartmentId(Long departmentId) {
         List<EmployeeEntity> employeeEntityList = employeeDao.selectByDepartmentId(departmentId, Boolean.FALSE);
 
-        if (CollectionUtils.isEmpty(employeeEntityList)) {
+        if (SmartCollectionUtil.isEmpty(employeeEntityList)) {
             return ResponseDTO.ok(Collections.emptyList());
         }
 

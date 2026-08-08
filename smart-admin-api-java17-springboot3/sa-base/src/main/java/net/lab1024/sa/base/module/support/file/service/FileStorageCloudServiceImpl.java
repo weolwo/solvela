@@ -1,5 +1,6 @@
 package net.lab1024.sa.base.module.support.file.service;
 
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
 import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
 import net.lab1024.sa.base.common.util.SmartRandomUtil;
@@ -17,7 +18,6 @@ import net.lab1024.sa.base.module.support.file.domain.vo.FileMetadataVO;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileUploadVO;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.module.support.redis.RedisService;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -200,7 +200,7 @@ public class FileStorageCloudServiceImpl implements IFileStorageService {
         HeadObjectResponse headObjectResponse = s3Client.headObject(objectRequest);
         Map<String, String> userMetadata = headObjectResponse.metadata();
         FileMetadataVO metadataDTO = null;
-        if (MapUtils.isNotEmpty(userMetadata)) {
+        if (SmartCollectionUtil.isNotEmpty(userMetadata)) {
             metadataDTO = new FileMetadataVO();
             metadataDTO.setFileFormat(userMetadata.get(USER_METADATA_FILE_FORMAT));
             metadataDTO.setFileName(userMetadata.get(USER_METADATA_FILE_NAME));

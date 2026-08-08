@@ -6,8 +6,8 @@ import net.lab1024.sa.admin.module.business.category.domain.dto.CategorySimpleDT
 import net.lab1024.sa.admin.module.business.category.domain.entity.CategoryEntity;
 import net.lab1024.sa.admin.module.business.category.manager.CategoryCacheManager;
 import net.lab1024.sa.base.common.constant.StringConst;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -56,7 +56,7 @@ public class CategoryQueryService {
      * 根据 类目id集合 查询未删除的类目集合
      */
     public Map<Long, CategoryEntity> queryCategoryList(List<Long> categoryIdList) {
-        if (CollectionUtils.isEmpty(categoryIdList)) {
+        if (SmartCollectionUtil.isEmpty(categoryIdList)) {
             return Collections.emptyMap();
         }
         categoryIdList = categoryIdList.stream().distinct().collect(Collectors.toList());
@@ -77,7 +77,7 @@ public class CategoryQueryService {
      * 注意：查询出来的集合 不包含传递的父类参数
      */
     public List<Long> queryCategorySubId(List<Long> categoryIdList) {
-        if (CollectionUtils.isEmpty(categoryIdList)) {
+        if (SmartCollectionUtil.isEmpty(categoryIdList)) {
             return Collections.emptyList();
         }
         //所有子类
@@ -88,7 +88,7 @@ public class CategoryQueryService {
         Map<Long, List<CategoryEntity>> subTypeMap = categoryEntityList.stream().collect(Collectors.groupingBy(CategoryEntity::getCategoryId));
         // 递归查询子类
         categoryIdList = subTypeMap.values().stream().flatMap(Collection::stream).map(CategoryEntity::getCategoryId).distinct().collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(categoryIdList)) {
+        if (SmartCollectionUtil.isEmpty(categoryIdList)) {
             return new ArrayList<>();
         }
         categoryIdList.addAll(this.queryCategorySubId(categoryIdList));
@@ -100,7 +100,7 @@ public class CategoryQueryService {
      * 处理类目名称
      */
     public List<String> queryCategoryName(List<Long> categoryIdList) {
-        if (CollectionUtils.isEmpty(categoryIdList)) {
+        if (SmartCollectionUtil.isEmpty(categoryIdList)) {
             return null;
         }
         Map<Long, CategoryEntity> categoryMap = this.queryCategoryList(categoryIdList);
@@ -178,7 +178,7 @@ public class CategoryQueryService {
      * 查询 分类全称 如：医考/医师资格/临床执业
      */
     public Map<Long, String> queryFullName(List<Long> categoryIdList) {
-        if (CollectionUtils.isEmpty(categoryIdList)) {
+        if (SmartCollectionUtil.isEmpty(categoryIdList)) {
             return new HashMap<>();
         }
         // 循环内查询的缓存 还ok

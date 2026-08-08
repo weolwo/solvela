@@ -12,7 +12,7 @@ import net.lab1024.sa.admin.module.business.category.manager.CategoryCacheManage
 import net.lab1024.sa.base.common.code.UserErrorCode;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import org.apache.commons.collections4.CollectionUtils;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.stereotype.Service;
 
@@ -188,7 +188,7 @@ public class CategoryService {
         }
 
         List<Long> categorySubId = categoryQueryService.queryCategorySubId(new ArrayList<>(List.of(categoryId)));
-        if (CollectionUtils.isNotEmpty(categorySubId)) {
+        if (SmartCollectionUtil.isNotEmpty(categorySubId)) {
             return ResponseDTO.userErrorParam("请先删除子级类目");
         }
 

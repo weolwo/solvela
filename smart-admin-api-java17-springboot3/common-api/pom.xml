@@ -39,10 +39,6 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-collections4</artifactId>
-        </dependency>
 
         <!-- scriptengine 规则引擎，全工程只有本模块用 -->
         <dependency>

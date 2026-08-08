@@ -1,10 +1,10 @@
 package net.lab1024.sa.base.module.support.helpdoc.manager;
 
 import jakarta.annotation.Resource;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.module.support.helpdoc.dao.HelpDocDao;
 import net.lab1024.sa.base.module.support.helpdoc.domain.entity.HelpDocEntity;
 import net.lab1024.sa.base.module.support.helpdoc.domain.form.HelpDocRelationForm;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ public class HelpDocManager {
         helpDocDao.insert(helpDocEntity);
         Long helpDocId = helpDocEntity.getHelpDocId();
         // 保存关联
-        if (CollectionUtils.isNotEmpty(relationList)) {
+        if (SmartCollectionUtil.isNotEmpty(relationList)) {
             helpDocDao.insertRelation(helpDocId, relationList);
         }
     }
@@ -52,7 +52,7 @@ public class HelpDocManager {
         helpDocDao.updateById(helpDocEntity);
         Long helpDocId = helpDocEntity.getHelpDocId();
         // 保存关联
-        if (CollectionUtils.isNotEmpty(relationList)) {
+        if (SmartCollectionUtil.isNotEmpty(relationList)) {
             helpDocDao.deleteRelation(helpDocId);
             helpDocDao.insertRelation(helpDocId, relationList);
         }

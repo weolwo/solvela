@@ -3,10 +3,10 @@ package net.lab1024.sa.base.module.support.table;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.module.support.table.domain.TableColumnEntity;
 import net.lab1024.sa.base.module.support.table.domain.TableColumnUpdateForm;
 import net.lab1024.sa.base.common.util.JsonUtils;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 /**
@@ -40,7 +40,7 @@ public class TableColumnService {
      * @return
      */
     public ResponseDTO<String> updateTableColumns(RequestUser requestUser, TableColumnUpdateForm updateForm) {
-        if (CollectionUtils.isEmpty(updateForm.getColumnList())) {
+        if (SmartCollectionUtil.isEmpty(updateForm.getColumnList())) {
             return ResponseDTO.ok();
         }
         Integer tableId = updateForm.getTableId();

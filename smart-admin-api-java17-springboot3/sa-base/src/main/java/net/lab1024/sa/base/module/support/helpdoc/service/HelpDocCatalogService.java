@@ -3,6 +3,7 @@ package net.lab1024.sa.base.module.support.helpdoc.service;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
+import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.module.support.helpdoc.dao.HelpDocCatalogDao;
 import net.lab1024.sa.base.module.support.helpdoc.dao.HelpDocDao;
 import net.lab1024.sa.base.module.support.helpdoc.domain.entity.HelpDocCatalogEntity;
@@ -10,7 +11,6 @@ import net.lab1024.sa.base.module.support.helpdoc.domain.form.HelpDocCatalogAddF
 import net.lab1024.sa.base.module.support.helpdoc.domain.form.HelpDocCatalogUpdateForm;
 import net.lab1024.sa.base.module.support.helpdoc.domain.vo.HelpDocCatalogVO;
 import net.lab1024.sa.base.module.support.helpdoc.domain.vo.HelpDocVO;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -105,7 +105,7 @@ public class HelpDocCatalogService {
 
         //查询是否有帮助文档
         List<HelpDocVO> helpDocVOList = helpDocDao.queryHelpDocByCatalogId(helpDocCatalogId);
-        if (CollectionUtils.isNotEmpty(helpDocVOList)) {
+        if (SmartCollectionUtil.isNotEmpty(helpDocVOList)) {
             return ResponseDTO.userErrorParam("目录下存在文档，不能删除");
         }
         helpDocCatalogDao.deleteById(helpDocCatalogId);
