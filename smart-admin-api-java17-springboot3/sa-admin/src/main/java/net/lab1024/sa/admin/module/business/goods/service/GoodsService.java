@@ -1,6 +1,5 @@
 package net.lab1024.sa.admin.module.business.goods.service;
 
-import cn.idev.excel.FastExcel;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -19,20 +18,18 @@ import net.lab1024.sa.admin.module.business.goods.domain.vo.GoodsVO;
 import net.lab1024.sa.base.common.code.UserErrorCode;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import net.lab1024.sa.base.common.util.SmartEnumUtil;
+import net.lab1024.sa.base.common.util.SmartExcelUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.module.support.datatracer.constant.DataTracerTypeEnum;
 import net.lab1024.sa.base.module.support.datatracer.service.DataTracerService;
-import net.lab1024.sa.base.module.support.dict.service.DictService;
+import net.lab1024.sa.base.sonicexcel.error.SonicReadResult;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,8 +55,6 @@ public class GoodsService {
     @Resource
     private DataTracerService dataTracerService;
 
-    @Resource
-    private DictService dictService;
 
     /**
      * 添加商品
@@ -171,41 +166,30 @@ public class GoodsService {
      * @return 结果
      */
     public ResponseDTO<String> importGoods(MultipartFile file) {
-        List<GoodsImportForm> dataList;
-        try {
-            dataList = FastExcel.read(file.getInputStream()).head(GoodsImportForm.class)
-                    .sheet()
-                    .doReadSync();
-        } catch (IOException e) {
-            log.error(e.getMessage(), e);
-            throw new BusinessException("数据格式存在问题，无法读取");
+        // 上传文件落临时文件再解析，finally 一定删掉；行级错误随结果一起回来
+        SonicReadResult<GoodsImportForm> result = SmartExcelUtil.importExcel(file, GoodsImportForm.class);
+
+        if (result.hasError()) {
+            // 关键差异：能明确告诉用户是第几行第几列错了，而不是"成功导入 470 条"让人自己猜丢了谁
+            return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误："
+                    + result.describeErrors(5));
         }
 
-        if (CollectionUtils.isEmpty(dataList)) {
+        if (result.isEmpty()) {
             return ResponseDTO.userErrorParam("数据为空");
         }
 
+        List<GoodsImportForm> dataList = result.data();
         return ResponseDTO.okMsg("成功导入" + dataList.size() + "条，具体数据为：" + JsonUtils.toJson(dataList));
     }
 
     /**
-     * 商品导出
+     * 商品导出。
+     *
+     * <p>类目名 / 状态描述 / 产地字典这三处翻译原先手写在这里拼 VO，
+     * 现在全部由 {@code GoodsExcelVO} 上挂的转换器负责，这里只管把实体原样搬过去。
      */
     public List<GoodsExcelVO> getAllGoods() {
-        List<GoodsEntity> goodsEntityList = goodsDao.selectList(null);
-        String dictCode = "GOODS_PLACE";
-        return goodsEntityList.stream()
-                .map(e ->
-                        GoodsExcelVO.builder()
-                                .goodsStatus(SmartEnumUtil.getEnumDescByValue(e.getGoodsStatus(), GoodsStatusEnum.class))
-                                .categoryName(categoryQueryService.queryCategoryName(e.getCategoryId()))
-                                .place(Arrays.stream(e.getPlace().split(",")).map(code -> dictService.getDictDataLabel(dictCode, code)).collect(Collectors.joining(",")))
-                                .price(e.getPrice())
-                                .goodsName(e.getGoodsName())
-                                .remark(e.getRemark())
-                                .build()
-                )
-                .collect(Collectors.toList());
-
+        return SmartBeanUtil.copyList(goodsDao.selectList(null), GoodsExcelVO.class);
     }
 }

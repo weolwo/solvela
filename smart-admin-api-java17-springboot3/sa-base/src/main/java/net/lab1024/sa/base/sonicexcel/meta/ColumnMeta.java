@@ -17,6 +17,7 @@ import java.util.function.Function;
  * @param forceText      强制文本写出
  * @param javaType       字段声明类型
  * @param fieldName      字段名（报错定位用）
+ * @param element        字段本身（Field / RecordComponent），带参转换器靠它读配置注解
  * @param getter         LambdaMetafactory 生成的取值器，导出用
  * @param setter         LambdaMetafactory 生成的赋值器，POJO 导入用；record / 无 setter 时为 null
  * @param componentIndex record canonical 构造器的参数下标；POJO 为 -1
@@ -32,6 +33,7 @@ public record ColumnMeta(
         boolean forceText,
         Class<?> javaType,
         String fieldName,
+        java.lang.reflect.AnnotatedElement element,
         Function<Object, Object> getter,
         BiConsumer<Object, Object> setter,
         int componentIndex,

@@ -188,10 +188,20 @@
             <artifactId>bcprov-jdk18on</artifactId>
         </dependency>
 
-        <!-- SonicExcel 写引擎。读引擎（fastexcel-reader）在第②档引入 -->
+        <!-- SonicExcel 写引擎 -->
         <dependency>
             <groupId>org.dhatim</groupId>
             <artifactId>fastexcel</artifactId>
+        </dependency>
+
+        <!-- SonicExcel 读引擎。它会带进 aalto-xml，而 aalto 的 META-INF/services 会抢占
+             JVM 全局 StAX 实现（影响 spring-core / spring-web / hibernate-validator /
+             mysql-connector-j / tika-core / aws-query-protocol）——
+             由 SonicStaxIsolation 拨回 JDK 实现，SonicStaxIsolationTest 是它的哨兵。
+             另外它还会带进 commons-compress，所以第③档摘 POI 时这一条删不掉。 -->
+        <dependency>
+            <groupId>org.dhatim</groupId>
+            <artifactId>fastexcel-reader</artifactId>
         </dependency>
 
         <!-- ⬇️ 以下两条在第③档随 SonicExcel 读引擎落地后整体摘除（约 -19.1MB）。

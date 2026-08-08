@@ -236,7 +236,8 @@ public final class SonicSheetBuilder<T> implements AutoCloseable {
             ColumnMeta col = columns.get(c);
             try {
                 Object raw = col.getter().apply(row);
-                values[c] = col.converter().exportConvert(raw, new SonicContext(rowIndex, c, col.title(), row));
+                values[c] = col.converter().exportConvert(raw,
+                        new SonicContext(rowIndex, c, col.title(), col.javaType(), col.element(), row));
             } catch (Exception e) {
                 SonicRowError error = new SonicRowError(rowIndex, col.title(), null,
                         e.getClass().getSimpleName() + ": " + e.getMessage());

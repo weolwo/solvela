@@ -35,6 +35,10 @@ public class SonicExcelConfiguration {
         boolean strict = Arrays.stream(environment.getActiveProfiles()).anyMatch(STRICT_PROFILES::contains);
         SonicExcelSettings.setStrictMeta(strict);
 
+        // 崩溃残留的兜底清理。正常路径由 SmartExcelUtil 的 finally 负责，
+        // 这里覆盖的是 Pod 被 SIGKILL / OOMKilled 那种 finally 根本没机会跑的情况
+        SonicTempFiles.sweepStale(SonicTempFiles.DEFAULT_STALE_AGE);
+
         log.info("[SonicExcel] 就绪，严格元数据模式={}，StAX 自检 {}", strict, SonicStaxIsolation.selfCheck());
     }
 }

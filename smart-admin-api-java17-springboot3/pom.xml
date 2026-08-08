@@ -339,6 +339,11 @@
                 <includes>
                     <include>*.*</include>
                 </includes>
+                <!-- 必须排除 *.yaml：上一个 resource 已带 filtering 复制过 yaml，
+                     这里若不排除会再用未过滤的原文覆盖，@profiles.active@ 占位符就替换不掉了 -->
+                <excludes>
+                    <exclude>*.yaml</exclude>
+                </excludes>
             </resource>
         </resources>
 

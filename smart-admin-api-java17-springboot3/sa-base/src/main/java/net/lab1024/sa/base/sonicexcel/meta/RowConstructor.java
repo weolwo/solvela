@@ -1,6 +1,7 @@
 package net.lab1024.sa.base.sonicexcel.meta;
 
 import java.lang.invoke.MethodHandle;
+import java.util.List;
 
 /**
  * 行对象的构造策略。导出用不到，导入（第②档）按类型分派。
@@ -21,8 +22,15 @@ public sealed interface RowConstructor {
 
     /**
      * record：攒齐 Object[] 后一次性调 canonical 构造器。
+     *
+     * <p>要带上全部组件类型，不能只带个数 —— 没被 {@code @SonicTitle} 标注的组件也得填值，
+     * 而基本类型组件填 null 会让 {@code invokeWithArguments} 直接 NPE。
      */
-    record RecordCanonical(MethodHandle constructor, int componentCount) implements RowConstructor {
+    record RecordCanonical(MethodHandle constructor, List<Class<?>> componentTypes) implements RowConstructor {
+
+        public int componentCount() {
+            return componentTypes.size();
+        }
     }
 
     /**

@@ -141,8 +141,13 @@ sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
 │   ├── SonicSheetBuilder.java      写门面（AutoCloseable）
 │   ├── CellWriter.java             类型路由 + inline strings 红线（§7.6）
 │   └── SheetRoller.java            超行数自动滚 Sheet
+├── SonicTempFiles.java             导入临时文件：创建 + finally 删 + 启动扫残留（§10.2）
 ├── read/
-│   ├── SonicSheetReader.java  HeaderMatcher.java  RowMapper.java
+│   ├── SonicSheetReader.java       读门面
+│   ├── WorkbookGuard.java          入口体检：.xls 探测 + zip 炸弹（§8.3 / §9.2）
+│   ├── HeaderMatcher.java          表头动态寻址 + 隐形空白字符归一化
+│   ├── CellCoercion.java           单元格 → Java 类型（文本形态的数字/日期也要能读）
+│   └── RowMapper.java              行 → 对象（POJO setter / record canonical 两条路径）
 ├── error/
 │   ├── SonicErrorPolicy.java  SonicRowError.java  SonicReadResult.java
 └── SonicExcelException.java
@@ -150,7 +155,17 @@ sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
 sa-base/src/main/java/net/lab1024/sa/base/module/support/dict/excel/   ← 业务侧（D2）
 ├── SonicDictConverter.java         依赖 DictService，不进框架目录
 └── SonicDict.java                  @SonicDict("GOODS_PLACE")
+
+sa-base/src/main/java/net/lab1024/sa/base/common/excel/
+├── SonicEnumConverter.java         依赖 SmartEnumUtil / BaseEnum，同样是项目侧
+└── SonicEnum.java                  @SonicEnum(GoodsStatusEnum.class)
+
+sa-admin/.../module/business/goods/excel/
+└── GoodsCategoryConverter.java     依赖 CategoryQueryService
 ```
+
+**转换器的归属规则：与它包装的组件同模块。** 框架目录 `sonicexcel/` 里一个业务依赖都没有，
+将来要独立开源，整个目录搬走即可。
 
 ✅ **D1 已定案：包放 `net.lab1024.sa.base.sonicexcel`，与 `common` 平级。**
 将来拆子模块独立开源时，一整个目录搬走即可，不用从 `common` 里往外挑文件。
@@ -312,8 +327,11 @@ public interface SonicConverter<J, E> {
     final class None implements SonicConverter<Object, Object> { /* 恒等 */ }
 }
 
-// 只带列的标识而不是整个 ColumnMeta：避免 converter ←→ meta 两个包互相依赖
-public record SonicContext(int rowIndex, int columnIndex, String title, Object rowObject) {}
+// 不带整个 ColumnMeta：避免 converter ←→ meta 两个包互相依赖。
+// element 是字段本身（Field / RecordComponent）——「带参转换器」靠它读自己的配置注解，
+// 比如 @SonicDict("GOODS_PLACE")。转换器实例是按类缓存的单例，参数只能从这里来。
+public record SonicContext(int rowIndex, int columnIndex, String title,
+                           Class<?> javaType, AnnotatedElement element, Object rowObject) {}
 ```
 
 ### 5.3 转换器的实例化策略（**本设计最关键的一条**）
@@ -379,8 +397,12 @@ public final class SonicExcel {
     /** 唯一的读入口：必须是落盘文件。原因见 §8.5 */
     public static <T> SonicSheetReader<T> read(Path file, Class<T> head);
 
-    /** 逃生口：仅限确定很小的场景（如从对象存储拉模板）。全量进堆，硬上限 5MB */
-    public static <T> SonicSheetReader<T> readBytes(byte[] small, Class<T> head);
+    /**
+     * 逃生口：仅限确定很小的场景（如从对象存储拉模板）。全量进堆，硬上限 5MB。
+     * 刻意只给一次性读完的重载、不返回 Stream —— 临时文件的生命周期要和流绑定，
+     * 徒增一处可能泄漏的地方，而这条路径本来就不该用于大文件。
+     */
+    public static <T> SonicReadResult<T> readBytes(byte[] content, Class<T> head);
 }
 ```
 
@@ -573,6 +595,11 @@ fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**，不处理的话中�
 | `D0 CF 11 E0 A1 B1 1A E1`（OLE2） | 抛 `SonicExcelException("检测到旧版 .xls 格式，请用 Excel 另存为 .xlsx 后重新上传")` |
 | 其他 | 抛 `SonicExcelException("文件不是有效的 Excel 文件")` |
 
+**实现期踩到的坑：`Row#getCell(int)` 越界会直接抛 `IndexOutOfBoundsException`。**
+而"最后几列全空、所以这一行根本没那么多单元格"是 xlsx 里最普通不过的形态 ——
+写侧不写 null 单元格（§7.1），自己写出去的文件读回来就会撞上。
+所有取单元格的地方必须先判 `position < row.getCellCount()`。已有往返测试固化。
+
 ### 8.4 空行与尾部脏数据
 
 Excel 常带成千上万个"看起来是空的"行。读端必须**过滤全空行**，
@@ -639,7 +666,7 @@ System.setProperty("javax.xml.stream.XMLEventFactory",  "com.sun.xml.internal.st
 
 | 风险 | 处置 |
 |---|---|
-| **XXE** | reader 的 `XMLInputFactory` **显式**设 `SUPPORT_DTD=false`、`IS_SUPPORTING_EXTERNAL_ENTITIES=false`。不赌默认值 |
+| **XXE** | ✅ **已由上游处理**：`fastexcel-reader` 自带的 `DefaultXMLInputFactory` 就显式设了 `SUPPORT_DTD=false`、`IS_SUPPORTING_EXTERNAL_ENTITIES=false`。我们不重复实现，只加一条回归测试当哨兵 —— 哪天升级把这个行为改没了要立刻知道 |
 | **Zip bomb** | 限制解压总字节数（默认 200MB）、zip 条目数（默认 100）、单条目大小 |
 | **行数炸弹** | `maxRows` 默认 10 万，Web 上传口径可再收紧 |
 | **公式注入** | 提供 `escapeFormula(boolean)`，以 `=` `+` `-` `@` `\t` `\r` 开头的文本前置 `'`。**默认关闭，见下方说明** |
@@ -744,7 +771,7 @@ try {
 | 档 | 内容 | 可回滚点 | 依赖变化 |
 |---|---|---|---|
 | **①** ✅ **已完成 2026-08-08** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；**2 个导出 VO 平移**；`SmartExcelUtil#exportExcel` 切换成"先攒 byte[] 再落头"；**删除水印全部代码**，`EnterpriseController` 改调普通导出。35 条测试全绿 | 注解层保留 EasyExcel 可并行 | 引入 dhatim writer，POI 暂留 |
-| **②** | 读引擎（`Path` 入参 + 临时文件闭环）+ 转换器 Spring 解析落地；**`GoodsImportForm` 平移**（它是导入侧，第①档必须留在 `@ExcelProperty` 上，否则现有导入立刻挂）；`GoodsService#importGoods` 改造；`getAllGoods` 的字典/枚举翻译收进 converter | 导入可临时切回旧实现 | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
+| **②** ✅ **已完成 2026-08-08** | 读引擎（`Path` 入参 + 入口体检 + 临时文件闭环）+ 转换器 Spring 解析落地；`GoodsImportForm` **改成 record**；`GoodsService#importGoods` 改造成带行级错误回显；`getAllGoods` 的三处翻译全部收进 converter。累计 100 条测试全绿 | 导入可临时切回旧实现 | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
 | **③** | **摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`**，删 `commons-codec` 等；跑全量测试矩阵 | git revert 单 commit | **−19.1 MB** |
 | **④** | 增强：列宽估算、CSV 通道、错误报告导出、导入模板下载 + 下拉校验 | 纯新增 | 无 |
 
@@ -773,13 +800,14 @@ try {
 
 ---
 
-## 14. 决策清单（全部关闭，可开工）
+## 14. 决策清单
 
 | # | 问题 | 状态 |
 |---|---|---|
 | ~~D1~~ | ~~包路径~~ | **已定：`net.lab1024.sa.base.sonicexcel`，与 `common` 平级**（§2.3） |
 | ~~D2~~ | ~~字典转换器放哪~~ | **已定：业务侧 `support.dict.excel`；框架 builtin 只留 JDK 级**（§5.3） |
 | ~~D3~~ | ~~水印删除后的审计线索~~ | **已定：靠现有 `@OperateLog` 承接，零改动**（§1.2） |
+| 🔴 D10 | **字典转换器的导入方向**（标签 → 码）。现在 `SonicDictConverter#importConvert` 直接抛异常 | **待排期**。需要字典模块提供一条<b>带缓存</b>的 label→value 查询：`DictManager` 目前只有 (code,value)→VO 这一条缓存路径，用 `DictService#getAll()` 现查是直连 DB、每个单元格一次全表读。补那条反向缓存属于字典模块的改动，不该夹带在 Excel 轮次里；现有导入也没有字典列 |
 | D4 | CSV 导出通道 | 已定：v2 再做（§7.3） |
 | ~~D5~~ | ~~sharedStrings vs inline~~ | **已定：强制 inline，且底层无开关，走 `inlineString()`**（§7.6） |
 | ~~D6~~ | ~~reader 是否落临时文件~~ | **已定：不落盘、整个进堆 → 读侧强制 `Path` 入参**（§8.5） |

@@ -100,6 +100,7 @@ public final class MetaResolver {
                        SonicTitle annotation,
                        Field field,
                        Method accessor,
+                       java.lang.reflect.AnnotatedElement element,
                        int componentIndex,
                        int declarationOrder) {
     }
@@ -117,7 +118,7 @@ public final class MetaResolver {
             if (ann == null) {
                 continue;
             }
-            raws.add(new Raw(rc.getName(), rc.getType(), ann, null, rc.getAccessor(), i, raws.size()));
+            raws.add(new Raw(rc.getName(), rc.getType(), ann, null, rc.getAccessor(), rc, i, raws.size()));
         }
         return raws;
     }
@@ -144,7 +145,7 @@ public final class MetaResolver {
                 if (ann == null) {
                     continue;
                 }
-                raws.add(new Raw(f.getName(), f.getType(), ann, f, accessor, -1, raws.size()));
+                raws.add(new Raw(f.getName(), f.getType(), ann, f, accessor, f, -1, raws.size()));
             }
         }
         return raws;
@@ -235,6 +236,7 @@ public final class MetaResolver {
                 ann.forceText(),
                 raw.valueType(),
                 raw.name(),
+                raw.element(),
                 buildGetter(lookup, type, raw),
                 buildSetter(lookup, type, raw),
                 raw.componentIndex(),
@@ -328,7 +330,7 @@ public final class MetaResolver {
                 RecordComponent[] components = type.getRecordComponents();
                 Class<?>[] params = Arrays.stream(components).map(RecordComponent::getType).toArray(Class<?>[]::new);
                 MethodHandle mh = lookup.unreflectConstructor(type.getDeclaredConstructor(params));
-                return new RowConstructor.RecordCanonical(mh, components.length);
+                return new RowConstructor.RecordCanonical(mh, List.of(params));
             }
             return new RowConstructor.PojoNoArg(lookup.unreflectConstructor(type.getDeclaredConstructor()));
         } catch (ReflectiveOperationException e) {
