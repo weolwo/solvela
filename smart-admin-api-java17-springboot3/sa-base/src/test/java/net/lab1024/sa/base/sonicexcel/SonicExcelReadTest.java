@@ -223,6 +223,25 @@ public class SonicExcelReadTest {
     }
 
     @Test
+    public void 合法zip但不是Excel时给出可照抄的提示() {
+        // WorkbookGuard 只能按字节头挡掉「根本不是 xlsx」的东西。
+        // 非 Excel 工具产出的 xlsx 是合法 zip，挡不住，只会在解析到一半时炸 ——
+        // 本项目不承诺兼容这类文件（架构文档 §1.2），但必须让用户知道该怎么办
+        Path file = dir.resolve("zip-but-not-xlsx.xlsx");
+        try (var zos = new java.util.zip.ZipOutputStream(Files.newOutputStream(file))) {
+            zos.putNextEntry(new java.util.zip.ZipEntry("hello.txt"));
+            zos.write("not an excel".getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+
+        SonicExcelException e = assertThrows(SonicExcelException.class,
+                () -> SonicExcel.read(file, Person.class).doReadAll());
+        assertTrue(e.getMessage().contains("另存为 .xlsx"), "要给出用户能照着做的动作：" + e.getMessage());
+    }
+
+    @Test
     public void 非Excel文件给出明确错误() {
         Path file = dir.resolve("note.xlsx");
         writeBytes(file, "这其实是一个文本文件".getBytes(StandardCharsets.UTF_8));

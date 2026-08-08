@@ -6,6 +6,7 @@ import net.lab1024.sa.base.sonicexcel.error.SonicReadResult;
 import net.lab1024.sa.base.sonicexcel.error.SonicRowError;
 import net.lab1024.sa.base.sonicexcel.meta.MetaResolver;
 import net.lab1024.sa.base.sonicexcel.meta.SheetMeta;
+import org.dhatim.fastexcel.reader.ExcelReaderException;
 import org.dhatim.fastexcel.reader.ReadableWorkbook;
 import org.dhatim.fastexcel.reader.Row;
 import org.dhatim.fastexcel.reader.Sheet;
@@ -114,7 +115,7 @@ public final class SonicSheetReader<T> {
             workbook = new ReadableWorkbook(file.toFile());
             Sheet sheet = pickSheet(workbook);
             rows = sheet.openStream();
-            Iterator<Row> iterator = rows.iterator();
+            Iterator<Row> iterator = translating(rows.iterator());
             RowMapper<T> mapper = new RowMapper<>(meta, readHeader(iterator));
 
             Stream<T> result = StreamSupport
@@ -127,8 +128,52 @@ public final class SonicSheetReader<T> {
             throw new UncheckedIOException("读取 Excel 失败", e);
         } catch (RuntimeException e) {
             closeQuietly(rows, workbook);
-            throw e;
+            throw translate(e);
         }
+    }
+
+    /**
+     * 惰性流是在 try 块之外被消费的，解析异常会绕过上面的 catch —— 在迭代器这一层再兜一次。
+     */
+    private static Iterator<Row> translating(Iterator<Row> delegate) {
+        return new Iterator<>() {
+            @Override
+            public boolean hasNext() {
+                try {
+                    return delegate.hasNext();
+                } catch (RuntimeException e) {
+                    throw translate(e);
+                }
+            }
+
+            @Override
+            public Row next() {
+                try {
+                    return delegate.next();
+                } catch (RuntimeException e) {
+                    throw translate(e);
+                }
+            }
+        };
+    }
+
+    /**
+     * 把底层解析异常翻译成用户能照着做的话。
+     *
+     * <p>`WorkbookGuard` 只能按字节头挡掉「根本不是 xlsx」的东西；
+     * <b>非 Excel 工具（WPS 等）产出的文件是合法 zip，挡不住</b>，只会在解析到一半时炸。
+     * 本项目<b>不承诺兼容非 Excel 产出的 xlsx</b>（见架构文档 §1.2），
+     * 但至少要让用户知道该怎么办，而不是收到一段 StAX 天书。
+     */
+    private static RuntimeException translate(RuntimeException e) {
+        if (e instanceof SonicExcelException) {
+            return e;
+        }
+        if (e instanceof ExcelReaderException) {
+            return new SonicExcelException("Excel 文件解析失败。本系统只支持 Microsoft Excel 生成的标准 .xlsx，"
+                    + "如果这个文件来自其他表格软件，请先用 Excel 打开并另存为 .xlsx 后重试", e);
+        }
+        return e;
     }
 
     /**
