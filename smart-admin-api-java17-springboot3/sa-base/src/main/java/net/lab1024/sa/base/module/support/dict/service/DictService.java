@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
@@ -20,6 +21,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -104,7 +106,10 @@ public class DictService {
     /**
      * 更新
      */
-    @CacheEvict(CacheKeyConst.Dict.DICT_DATA)
+    @Caching(evict = {
+            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, allEntries = true),
+            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
+    })
     public synchronized ResponseDTO<String> update(DictUpdateForm updateForm) {
         DictEntity existDictCode = dictDao.selectByCode(updateForm.getDictCode());
         if (null != existDictCode && !existDictCode.getDictId().equals(updateForm.getDictId())) {
@@ -119,7 +124,10 @@ public class DictService {
     /**
      * 批量删除
      */
-    @CacheEvict(CacheKeyConst.Dict.DICT_DATA)
+    @Caching(evict = {
+            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, allEntries = true),
+            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
+    })
     public synchronized ResponseDTO<String> batchDelete(List<Long> idList) {
         if (CollectionUtils.isEmpty(idList)) {
             return ResponseDTO.ok();
@@ -132,7 +140,10 @@ public class DictService {
     /**
      * 单个删除
      */
-    @CacheEvict(CacheKeyConst.Dict.DICT_DATA)
+    @Caching(evict = {
+            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, allEntries = true),
+            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
+    })
     public synchronized ResponseDTO<String> delete(Long dictId) {
         if (null == dictId) {
             return ResponseDTO.ok();
@@ -169,6 +180,25 @@ public class DictService {
     }
 
     /**
+     * 按标签反查码值（Excel 导入用：用户填的是"广东"，库里要存 "GD"）。
+     *
+     * @return 查不到返回 null
+     * @throws BusinessException 同一字典下有多个同名标签时。映射有歧义还硬挑一个，
+     *                           就是往库里写脏数据；这属于字典配置错误，必须让人看见
+     */
+    public String getDictDataValueByLabel(String dictCode, String dataLabel) {
+        List<DictDataVO> matched = dictManager.listDictDataByLabel(dictCode, dataLabel);
+        if (CollectionUtils.isEmpty(matched)) {
+            return null;
+        }
+        if (matched.size() > 1) {
+            throw new BusinessException("字典 " + dictCode + " 下存在 " + matched.size()
+                    + " 个同名标签「" + dataLabel + "」，无法确定对应的码值，请先修正字典配置");
+        }
+        return matched.getFirst().getDataValue();
+    }
+
+    /**
      * 添加
      */
     public synchronized ResponseDTO<String> addDictData(DictDataAddForm addForm) {
@@ -193,10 +223,13 @@ public class DictService {
     /**
      * 更新
      */
-    @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, key = "#updateForm.dictCode + '_' + #updateForm.dataValue")
     public synchronized ResponseDTO<String> updateDictData(DictDataUpdateForm updateForm) {
 
         updateForm.setDataValue(SmartStringUtil.trim(updateForm.getDataValue()));
+
+        // ⚠️ 必须在更新前清：清缓存要按数据库里的旧 code/value/label 去 evict，
+        // 改完再清就只能拿到新值，旧 key 会永远留在缓存里
+        clearDictDataCache(Collections.singletonList(updateForm.getDictDataId()));
 
         DictEntity dictEntity = dictDao.selectById(updateForm.getDictId());
         if (null == dictEntity) {
@@ -247,13 +280,17 @@ public class DictService {
      */
     private void clearDictDataCache(List<Long> idList) {
         List<DictDataVO> dictDataList = dictDataDao.selectByDictDataIds(idList);
-        Cache cache = cacheManager.getCache(CacheKeyConst.Dict.DICT_DATA);
-        if (cache == null) {
-            return;
-        }
+        Cache valueCache = cacheManager.getCache(CacheKeyConst.Dict.DICT_DATA);
+        Cache labelCache = cacheManager.getCache(CacheKeyConst.Dict.DICT_DATA_LABEL);
 
         for (DictDataVO dictDataVO : dictDataList) {
-            cache.evict(dictDataVO.getDictCode() + "_" + dictDataVO.getDataValue());
+            if (valueCache != null) {
+                valueCache.evict(dictDataVO.getDictCode() + "_" + dictDataVO.getDataValue());
+            }
+            // 正查和反查是两个缓存，漏掉任何一个都会让「字典改了、导入还按旧配置映射」
+            if (labelCache != null) {
+                labelCache.evict(dictDataVO.getDictCode() + "_" + dictDataVO.getDataLabel());
+            }
         }
     }
 

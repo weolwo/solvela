@@ -21,11 +21,12 @@ import java.util.stream.Collectors;
  * 所以字典翻译只能一直手写在 service 里拼 VO。SonicConverterFactory 会优先从容器取 Bean，
  * 这个转换器才能注入 DictService。
  *
- * <p><b>已知限制：只支持导出方向。</b> 反向（标签 → 码）需要字典模块提供一个带缓存的
- * label→value 查询，而 DictManager 现在只有 (code,value) → VO 这一条缓存路径，
- * 用 {@code DictService#getAll()} 现查是直连 DB、每个单元格一次全表读。
- * 补那条反向缓存属于字典模块的改动，不该夹带在 Excel 这一轮里做 —— 现有导入也没有字典列。
- * 真要用时会拿到明确的报错而不是错数据。
+ * <p><b>双向可用。</b> 反向（标签 → 码）走 {@code DictService#getDictDataValueByLabel}，
+ * 底层是 {@code DICT_DATA_LABEL} 这个独立缓存 —— 不能用 {@code DictService#getAll()} 现查，
+ * 那是直连 DB、每个单元格一次全表读。
+ *
+ * <p>同一字典下出现同名标签时直接报错而不是随便挑一个：映射有歧义还硬映射，
+ * 就是往库里写脏数据。
  *
  * @Date 2026-08-08
  */
@@ -59,8 +60,27 @@ public class SonicDictConverter implements SonicConverter<String, String> {
 
     @Override
     public String importConvert(String value, SonicContext ctx) {
-        throw new SonicExcelException("列「" + ctx.title() + "」的字典转换目前只支持导出方向，"
-                + "导入需要字典模块补一条带缓存的 标签→码 查询");
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        SonicDict config = config(ctx);
+        StringBuilder codes = new StringBuilder();
+        for (String label : value.split(java.util.regex.Pattern.quote(config.separator()))) {
+            String trimmed = label.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            String code = dictService.getDictDataValueByLabel(config.value(), trimmed);
+            if (code == null) {
+                // 报到行级错误里，用户能看到是哪一行的哪个值不认识
+                throw new SonicExcelException("「" + trimmed + "」不是字典 " + config.value() + " 中的合法取值");
+            }
+            if (!codes.isEmpty()) {
+                codes.append(config.separator());
+            }
+            codes.append(code);
+        }
+        return codes.toString();
     }
 
     private SonicDict config(SonicContext ctx) {

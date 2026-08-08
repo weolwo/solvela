@@ -28,5 +28,11 @@ public interface DictDataDao extends BaseMapper<DictDataEntity> {
 
     DictDataEntity selectByDictIdAndValue(@Param("dictId") Long dictId, @Param("dataValue") String dataValue);
 
+    /**
+     * 按标签反查。返回 List 而不是单个 —— 同一字典下标签理论上可以重复（库里没有唯一约束），
+     * 撞了必须让调用方知道，不能随便挑一个回去。
+     */
+    List<DictDataEntity> selectByDictIdAndLabel(@Param("dictId") Long dictId, @Param("dataLabel") String dataLabel);
+
     List<DictDataVO> getAll();
 }

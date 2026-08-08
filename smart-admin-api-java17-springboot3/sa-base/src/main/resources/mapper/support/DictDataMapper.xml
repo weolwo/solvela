@@ -29,6 +29,15 @@
           and data_value = #{dataValue}
     </select>
 
+    <select id="selectByDictIdAndLabel"
+            resultType="net.lab1024.sa.base.module.support.dict.domain.entity.DictDataEntity">
+        select *
+        from t_dict_data
+        where dict_id = #{dictId}
+          and data_label = #{dataLabel}
+        order by dict_data_id
+    </select>
+
     <select id="selectByDictDataIds" resultType="net.lab1024.sa.base.module.support.dict.domain.vo.DictDataVO">
         select
         t_dict_data.*,

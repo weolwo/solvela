@@ -884,7 +884,7 @@ try {
 | ~~D1~~ | ~~包路径~~ | **已定：`net.lab1024.sa.base.sonicexcel`，与 `common` 平级**（§2.3） |
 | ~~D2~~ | ~~字典转换器放哪~~ | **已定：业务侧 `support.dict.excel`；框架 builtin 只留 JDK 级**（§5.3） |
 | ~~D3~~ | ~~水印删除后的审计线索~~ | **已定：靠现有 `@OperateLog` 承接，零改动**（§1.2） |
-| 🔴 D10 | **字典转换器的导入方向**（标签 → 码）。现在 `SonicDictConverter#importConvert` 直接抛异常 | **待排期**。需要字典模块提供一条<b>带缓存</b>的 label→value 查询：`DictManager` 目前只有 (code,value)→VO 这一条缓存路径，用 `DictService#getAll()` 现查是直连 DB、每个单元格一次全表读。补那条反向缓存属于字典模块的改动，不该夹带在 Excel 轮次里；现有导入也没有字典列 |
+| ~~D10~~ | ~~字典转换器的导入方向~~ | **已落地 2026-08-08**：新增 `DICT_DATA_LABEL` 独立缓存 + `DictManager#listDictDataByLabel`，见 §16 |
 | ~~D4~~ | ~~CSV 导出通道~~ | **已落地（第④档）**，见 §7.7 |
 | ~~D5~~ | ~~sharedStrings vs inline~~ | **已定：强制 inline，且底层无开关，走 `inlineString()`**（§7.6） |
 | ~~D6~~ | ~~reader 是否落临时文件~~ | **已定：不落盘、整个进堆 → 读侧强制 `Path` 入参**（§8.5） |
@@ -1026,6 +1026,31 @@ try (Stream<GoodsImportForm> rows = SonicExcel.read(tmp, GoodsImportForm.class).
 模板填充这个唯一可能翻盘的因素，已按产品决策关闭（§1.2）。
 
 ---
+
+## 16. 字典反查（D10 落地记录）
+
+字典配在库里，导入不能反查等于半个功能 —— 本节记录实现时的三个非显然决策。
+
+**① 为什么是独立缓存 `DICT_DATA_LABEL`，不是复用 `DICT_DATA` 加前缀。**
+复用时 key 形如 `CODE_L_xxx`，而 `dataValue` 本身完全可能就等于 `L_xxx`，两种 key 会撞在一起。
+
+**② 为什么 `listDictDataByLabel` 返回 List 而不是单个。**
+两个原因：
+
+- 同一字典下标签**没有唯一约束**，理论上会重复。撞了必须让调用方知道 ——
+  映射有歧义还硬挑一个，就是往库里写脏数据。`DictService#getDictDataValueByLabel` 遇到多条直接抛。
+- 缓存配置是 `disableCachingNullValues`，返回 null 会在写缓存时抛异常。
+  而"标签查不到"在导入场景里是**常态**（用户填错字），返回空 List 既能正常缓存、
+  又不会把这条路变成异常路径。
+
+**③ 顺带修正了缓存失效的三处漏洞** —— 不修的话反查缓存会让"字典改了、导入还按旧配置映射"，
+比原来的正查缓存后果更严重（写进库的是错的码值）：
+
+| 位置 | 原来 | 现在 |
+|---|---|---|
+| `update` / `batchDelete` / `delete`（字典级） | `@CacheEvict(DICT_DATA)` 不带 key 也不带 allEntries，用的是默认 key（dictId / form 对象），**永远匹配不上 `CODE_value` 形状的 key，等于没清** | 两个缓存都 `allEntries = true`。字典级改动是低频管理操作，全清最省心 |
+| `updateDictData` | 只按 `(新 code, 新 value)` 清正查缓存；**改标签时旧标签的缓存留在原地** | 改成更新**前**按 id 反查出旧的 code/value/label 一起清 |
+| `clearDictDataCache` | 只清正查 | 正查 + 反查一起清 |
 
 ## 附：与初版规格书的差异汇总
 
