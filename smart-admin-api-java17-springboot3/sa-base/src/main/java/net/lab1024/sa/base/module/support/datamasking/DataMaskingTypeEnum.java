@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.datamasking;
 
-import cn.hutool.core.util.DesensitizedUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -18,22 +17,25 @@ import lombok.Getter;
 @Getter
 public enum DataMaskingTypeEnum {
 
-    COMMON(null, "通用"),
-    PHONE(DesensitizedUtil.DesensitizedType.MOBILE_PHONE, "手机号"),
-    CHINESE_NAME(DesensitizedUtil.DesensitizedType.CHINESE_NAME, "中文名"),
-    ID_CARD(DesensitizedUtil.DesensitizedType.ID_CARD, "身份证号"),
-    FIXED_PHONE(DesensitizedUtil.DesensitizedType.FIXED_PHONE, "座机号"),
-    ADDRESS(DesensitizedUtil.DesensitizedType.ADDRESS, "地址"),
-    EMAIL(DesensitizedUtil.DesensitizedType.EMAIL, "电子邮件"),
-    PASSWORD(DesensitizedUtil.DesensitizedType.PASSWORD, "密码"),
-    CAR_LICENSE(DesensitizedUtil.DesensitizedType.CAR_LICENSE, "中国大陆车牌"),
-    BANK_CARD(DesensitizedUtil.DesensitizedType.BANK_CARD, "银行卡"),
-    USER_ID(DesensitizedUtil.DesensitizedType.USER_ID, "用户id");
+    COMMON("通用"),
+    PHONE("手机号"),
+    CHINESE_NAME("中文名"),
+    ID_CARD("身份证号"),
+    FIXED_PHONE("座机号"),
+    ADDRESS("地址"),
+    EMAIL("电子邮件"),
+    PASSWORD("密码"),
+    CAR_LICENSE("中国大陆车牌"),
+    BANK_CARD("银行卡"),
+    USER_ID("用户id");
 
 
 
-    private DesensitizedUtil.DesensitizedType type;
-
+    /**
+     * ⚠️ 原本还有一个 DesensitizedUtil.DesensitizedType 字段，随 hutool 一起删了。
+     * 它从来没有被任何地方读取过 —— 打码规则全在 DataMaskingUtil 的 switch 里按枚举常量分发，
+     * 那个字段只是把 hutool 的类型枚举又抄了一遍。
+     */
     private String desc;
 
 

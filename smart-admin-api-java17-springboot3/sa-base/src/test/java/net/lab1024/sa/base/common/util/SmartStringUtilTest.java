@@ -124,6 +124,35 @@ public class SmartStringUtilTest {
         assertNull(SmartStringUtil.join(",", (List<String>) null));
     }
 
+    /** U+1F600，一个需要代理对表示的字符 */
+    private static final String EMOJI = new String(Character.toChars(0x1F600));
+
+    @Test
+    public void hide_按码点打码_越界一律返回原串() {
+        assertEquals("a****", SmartStringUtil.hide("abcde", 1, 5));
+        assertEquals("abcde", SmartStringUtil.hide("abcde", 3, 2), "start > end 时原样返回");
+        assertEquals("abcde", SmartStringUtil.hide("abcde", 9, 20), "start 越界时原样返回");
+        assertEquals("a****", SmartStringUtil.hide("abcde", 1, 99), "end 越界时截到末尾");
+        assertEquals("", SmartStringUtil.hide("", 0, 3));
+        assertNull(SmartStringUtil.hide(null, 0, 3));
+        // 越界一律返回原串而不是抛异常是刻意的：脱敏发生在 JSON 序列化途中，
+        // 为一个短字符串炸掉整个响应不值当
+        assertEquals("abc", SmartStringUtil.hide("abc", 10, 20));
+
+        // 一个 emoji 是两个 char，按码点打码才不会把代理对劈开成乱码方块
+        assertEquals(EMOJI + "***" + EMOJI, SmartStringUtil.hide(EMOJI.repeat(5), 1, 4));
+    }
+
+    @Test
+    public void cleanBlank_去掉所有空白而不只是首尾() {
+        assertEquals("6217000010001234", SmartStringUtil.cleanBlank("  6217 0000 1000 1234  "));
+        assertEquals("abc", SmartStringUtil.cleanBlank("a b	c"));
+        assertEquals("", SmartStringUtil.cleanBlank("   "));
+        assertNull(SmartStringUtil.cleanBlank(null));
+        // 不可见空白同样清掉
+        assertEquals("ab", SmartStringUtil.cleanBlank("a" + NO_BREAK_SPACE + "b"));
+    }
+
     @Test
     public void truncate_按列长度安全截断() {
         assertNull(SmartStringUtil.truncate(null, 10));

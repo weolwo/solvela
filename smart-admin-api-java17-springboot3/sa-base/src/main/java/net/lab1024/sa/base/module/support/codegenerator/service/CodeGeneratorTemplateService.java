@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service;
 
-import cn.hutool.core.bean.BeanUtil;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -252,7 +252,7 @@ public class CodeGeneratorTemplateService {
         Map<String, Object> variablesMap = new HashMap<>();
 
 
-        Map<String, Object> basicMap = BeanUtil.beanToMap(basic);
+        Map<String, Object> basicMap = SmartBeanUtil.beanToMap(basic);
         basicMap.put("frontDate", formatDateTime(basic.getFrontDate()));
         basicMap.put("backendDate", formatDateTime(basic.getBackendDate()));
 

@@ -1,7 +1,7 @@
 package net.lab1024.sa.admin.module.business.oa.notice.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.hutool.extra.servlet.JakartaServletUtil;
+import net.lab1024.sa.base.common.util.SmartServletUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -121,7 +121,7 @@ public class NoticeController {
         return noticeEmployeeService.view(
                 SmartRequestUtil.getRequestUserId(),
                 noticeId,
-                JakartaServletUtil.getClientIP(request),
+                SmartServletUtil.getClientIP(request),
                 request.getHeader("User-Agent")
         );
     }

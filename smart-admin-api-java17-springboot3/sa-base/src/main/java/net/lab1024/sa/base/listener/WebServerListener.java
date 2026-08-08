@@ -1,10 +1,10 @@
 package net.lab1024.sa.base.listener;
 
-import cn.hutool.core.net.NetUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.code.ErrorCodeRegister;
 import net.lab1024.sa.base.common.enumeration.SystemEnvironmentEnum;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
+import net.lab1024.sa.base.common.util.SmartIpUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.boot.web.server.context.WebServerInitializedEvent;
@@ -47,7 +47,7 @@ public class WebServerListener implements ApplicationListener<WebServerInitializ
         Environment env = context.getEnvironment();
 
         //获取服务信息
-        String ip = NetUtil.getLocalhost().getHostAddress();
+        String ip = SmartIpUtil.getLocalFirstIp();
         Integer port = webServerInitializedEvent.getWebServer().getPort();
         String contextPath = env.getProperty("server.servlet.context-path");
         if (contextPath == null) {

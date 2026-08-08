@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.backend.domain;
 
-import cn.hutool.core.bean.BeanUtil;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeQueryFieldQueryTypeEnum;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
 import net.lab1024.sa.base.module.support.codegenerator.domain.model.CodeQueryField;
@@ -31,7 +31,7 @@ public class MapperVariableService extends CodeGenerateBaseVariableService {
         Map<String, Object> variablesMap = new HashMap<>();
         List<Map<String, Object>> finalQueryFiledList = new ArrayList<>();
         for (CodeQueryField queryField : form.getQueryFields()) {
-            Map<String, Object> fieldMap = BeanUtil.beanToMap(queryField);
+            Map<String, Object> fieldMap = SmartBeanUtil.beanToMap(queryField);
             finalQueryFiledList.add(fieldMap);
 
             //模糊查询

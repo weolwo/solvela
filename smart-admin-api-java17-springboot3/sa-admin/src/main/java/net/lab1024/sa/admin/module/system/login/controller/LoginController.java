@@ -1,7 +1,7 @@
 package net.lab1024.sa.admin.module.system.login.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.extra.servlet.JakartaServletUtil;
+import net.lab1024.sa.base.common.util.SmartServletUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -42,8 +42,8 @@ public class LoginController {
     @PostMapping("/login")
     @Operation(summary = "登录 @author 卓大")
     public ResponseDTO<LoginResultVO> login(@Valid @RequestBody LoginForm loginForm, HttpServletRequest request) {
-        String ip = JakartaServletUtil.getClientIP(request);
-        String userAgent = JakartaServletUtil.getHeaderIgnoreCase(request, RequestHeaderConst.USER_AGENT);
+        String ip = SmartServletUtil.getClientIP(request);
+        String userAgent = request.getHeader(RequestHeaderConst.USER_AGENT);
         return loginService.login(loginForm, ip, userAgent);
     }
 

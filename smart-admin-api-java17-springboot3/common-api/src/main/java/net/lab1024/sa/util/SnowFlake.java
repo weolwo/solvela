@@ -1,13 +1,11 @@
 package net.lab1024.sa.util;
 
-import cn.hutool.core.lang.Snowflake;
-import cn.hutool.core.util.IdUtil;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class SnowFlake {
 
-    private static Snowflake snowflake;
+    private static SnowflakeIdGenerator snowflake;
 
     /**
      * 初始化配置
@@ -16,7 +14,7 @@ public class SnowFlake {
      * @param datacenterId
      */
     public static void initialize(long workerId, long datacenterId) {
-        snowflake = IdUtil.getSnowflake(workerId, datacenterId);
+        snowflake = new SnowflakeIdGenerator(workerId, datacenterId);
     }
 
     public static long getId() {

@@ -127,6 +127,54 @@ public class SmartStringUtil {
         return objects == null ? null : join(conjunction, Arrays.asList(objects));
     }
 
+    /**
+     * 去掉**所有**空白字符，不只是首尾（原 StrUtil.cleanBlank）。
+     * 与 {@link #trim} 的区别是中间的也去掉：银行卡号 "6217 0000 1000 1234" 要先压成连续数字才好分组打码。
+     */
+    public static String cleanBlank(CharSequence str) {
+        if (str == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(str.length());
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (!isBlankChar(c)) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 把 [startInclude, endExclude) 区间内的字符替换成 '*'（原 StrUtil.hide），脱敏用。
+     *
+     * 按**码点**而不是 char 遍历：一个 emoji 或生僻字是两个 char，
+     * 按 char 打码会把代理对劈开，拼出乱码方块。
+     *
+     * 越界一律返回原串而不是抛异常：脱敏发生在序列化途中，为一个短字符串炸掉整个响应不值当。
+     */
+    public static String hide(CharSequence str, int startInclude, int endExclude) {
+        if (isEmpty(str)) {
+            return str == null ? null : str.toString();
+        }
+        String original = str.toString();
+        int[] codePoints = original.codePoints().toArray();
+        int length = codePoints.length;
+        if (startInclude > length || startInclude > endExclude) {
+            return original;
+        }
+        int end = Math.min(endExclude, length);
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            if (i >= startInclude && i < end) {
+                sb.append('*');
+            } else {
+                sb.appendCodePoint(codePoints[i]);
+            }
+        }
+        return sb.toString();
+    }
+
     // ===============split =======================
 
     public static Set<String> splitConvertToSet(String str, String split) {

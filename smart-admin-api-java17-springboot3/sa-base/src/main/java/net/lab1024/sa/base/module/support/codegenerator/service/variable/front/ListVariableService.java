@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.front;
 
-import cn.hutool.core.bean.BeanUtil;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
@@ -42,7 +42,7 @@ public class ListVariableService extends CodeGenerateBaseVariableService {
         List<CodeQueryField> queryFields = form.getQueryFields();
 
         for (CodeQueryField queryField : queryFields) {
-            Map<String, Object> objectMap = BeanUtil.beanToMap(queryField);
+            Map<String, Object> objectMap = SmartBeanUtil.beanToMap(queryField);
 
             CodeField codeField = getCodeFieldByColumnName(queryField.getColumnNameList().get(0), form);
 
@@ -69,7 +69,7 @@ public class ListVariableService extends CodeGenerateBaseVariableService {
         List<CodeTableField> tableFields = form.getTableFields().stream().filter(CodeTableField::getShowFlag).toList();
 
         for (CodeTableField tableField : tableFields) {
-            Map<String, Object> objectMap = BeanUtil.beanToMap(tableField);
+            Map<String, Object> objectMap = SmartBeanUtil.beanToMap(tableField);
             objectMap.put("fieldName", tableField.getFieldName());
 
             CodeField codeField = getCodeFieldByColumnName(tableField.getColumnName(), form);

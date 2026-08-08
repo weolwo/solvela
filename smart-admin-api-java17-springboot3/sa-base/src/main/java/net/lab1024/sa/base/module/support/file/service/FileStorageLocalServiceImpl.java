@@ -1,8 +1,8 @@
 package net.lab1024.sa.base.module.support.file.service;
 
 import net.lab1024.sa.base.common.util.SmartDateFormatterEnum;
+import net.lab1024.sa.base.common.util.SmartIpUtil;
 import net.lab1024.sa.base.common.util.SmartLocalDateUtil;
-import cn.hutool.core.net.NetUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.code.SystemErrorCode;
@@ -58,7 +58,7 @@ public class FileStorageLocalServiceImpl implements IFileStorageService {
             return;
         }
 
-        String localhostIp = NetUtil.getLocalhostStr();
+        String localhostIp = SmartIpUtil.getLocalFirstIp();
         String finalContextPath = contextPath.startsWith("/") ? contextPath : "/" + contextPath;
         if (finalContextPath.endsWith("/")) {
             finalContextPath = finalContextPath.substring(0, finalContextPath.length() - 1);

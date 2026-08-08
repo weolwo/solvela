@@ -4,9 +4,14 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.springframework.beans.BeanUtils;
+import org.springframework.util.ReflectionUtils;
 
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,6 +30,36 @@ public class SmartBeanUtil {
      * 验证器
      */
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
+
+    /**
+     * bean 转 Map，key 为属性名，value 为**原始对象**（不做任何序列化转换）。
+     *
+     * 移除 hutool 后接管 BeanUtil.beanToMap，代码生成器把结果直接喂给 velocity 模板。
+     *
+     * 🔴 不要改成 Jackson 的 convertValue：本项目的 JSON 层挂了 LongJsonSerializer
+     * （Long 序列化成 String，防前端精度丢失）以及各种自定义序列化器，
+     * 走 Jackson 会让模板里拿到的类型悄悄变掉 —— 生成出来的代码能编译，只是内容不对。
+     *
+     * null 值会保留（模板里靠 key 是否存在做判断），"class" 属性剔除。
+     *
+     * @param bean 待转换对象，为 null 时返回空 Map
+     */
+    public static Map<String, Object> beanToMap(Object bean) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (bean == null) {
+            return map;
+        }
+        for (PropertyDescriptor descriptor : BeanUtils.getPropertyDescriptors(bean.getClass())) {
+            String name = descriptor.getName();
+            Method readMethod = descriptor.getReadMethod();
+            if (readMethod == null || "class".equals(name)) {
+                continue;
+            }
+            ReflectionUtils.makeAccessible(readMethod);
+            map.put(name, ReflectionUtils.invokeMethod(readMethod, bean));
+        }
+        return map;
+    }
 
     /**
      * 复制bean的属性

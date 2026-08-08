@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.backend.domain;
 
-import cn.hutool.core.bean.BeanUtil;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
 import net.lab1024.sa.base.module.support.codegenerator.domain.form.CodeGeneratorConfigForm;
@@ -84,8 +84,8 @@ public class UpdateFormVariableService extends CodeGenerateBaseVariableService {
             }
 
             // CodeField 和 InsertAndUpdateField 合并
-            Map<String, Object> finalFieldMap = BeanUtil.beanToMap(field);
-            finalFieldMap.putAll(BeanUtil.beanToMap(codeField));
+            Map<String, Object> finalFieldMap = SmartBeanUtil.beanToMap(field);
+            finalFieldMap.putAll(SmartBeanUtil.beanToMap(codeField));
 
             // 枚举
             if (SmartStringUtil.isNotEmpty(codeField.getEnumName())) {

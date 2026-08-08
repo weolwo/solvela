@@ -2,7 +2,6 @@ package net.lab1024.sa.admin.module.system.login.service;
 
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.extra.servlet.JakartaServletUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +26,7 @@ import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartIpUtil;
 import net.lab1024.sa.base.common.util.SmartRandomUtil;
+import net.lab1024.sa.base.common.util.SmartServletUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.constant.LoginDeviceEnum;
 import net.lab1024.sa.base.constant.RedisKeyConst;
@@ -255,8 +255,8 @@ public class LoginService implements StpInterface {
         RequestEmployee requestEmployee = loginManager.getRequestEmployee(requestEmployeeId);
 
         // 更新请求ip和user agent
-        requestEmployee.setUserAgent(JakartaServletUtil.getHeaderIgnoreCase(request, RequestHeaderConst.USER_AGENT));
-        requestEmployee.setIp(JakartaServletUtil.getClientIP(request));
+        requestEmployee.setUserAgent(request.getHeader(RequestHeaderConst.USER_AGENT));
+        requestEmployee.setIp(SmartServletUtil.getClientIP(request));
 
         return requestEmployee;
     }

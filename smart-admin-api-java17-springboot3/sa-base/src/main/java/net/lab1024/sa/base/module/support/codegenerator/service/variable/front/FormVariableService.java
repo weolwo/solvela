@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.codegenerator.service.variable.front;
 
-import cn.hutool.core.bean.BeanUtil;
+import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCaseFormat;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.codegenerator.constant.CodeFrontComponentEnum;
@@ -40,7 +40,7 @@ public class FormVariableService extends CodeGenerateBaseVariableService {
                 continue;
             }
 
-            Map<String, Object> objectMap = BeanUtil.beanToMap(field);
+            Map<String, Object> objectMap = SmartBeanUtil.beanToMap(field);
 
             CodeField codeField = getCodeFieldByColumnName(field.getColumnName(), form);
             if (codeField == null) {

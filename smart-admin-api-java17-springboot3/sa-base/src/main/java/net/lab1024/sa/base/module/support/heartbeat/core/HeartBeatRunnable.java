@@ -1,6 +1,6 @@
 package net.lab1024.sa.base.module.support.heartbeat.core;
 
-import cn.hutool.core.net.NetUtil;
+import net.lab1024.sa.base.common.util.SmartIpUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.lang.management.ManagementFactory;
@@ -52,7 +52,7 @@ public class HeartBeatRunnable implements Runnable {
     private void initServerInfo(){
         RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
        this.projectPath = System.getProperty("user.dir");
-       this.serverIps = new ArrayList<>(NetUtil.localIpv4s());
+       this.serverIps = new ArrayList<>(SmartIpUtil.getLocalIp());
        this.processNo = Integer.valueOf(runtimeMXBean.getName().split("@")[0]).intValue();
        this.processStartTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(runtimeMXBean.getStartTime()), ZoneId.systemDefault());
     }

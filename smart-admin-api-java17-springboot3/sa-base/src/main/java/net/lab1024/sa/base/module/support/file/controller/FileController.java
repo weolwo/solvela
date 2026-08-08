@@ -1,6 +1,5 @@
 package net.lab1024.sa.base.module.support.file.controller;
 
-import cn.hutool.extra.servlet.JakartaServletUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -57,7 +56,7 @@ public class FileController extends SupportBaseController {
     @Operation(summary = "下载文件流（根据fileKey） @author 胡克")
     @GetMapping("/file/downLoad")
     public void downLoad(@RequestParam String fileKey, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String userAgent = JakartaServletUtil.getHeaderIgnoreCase(request, RequestHeaderConst.USER_AGENT);
+        String userAgent = request.getHeader(RequestHeaderConst.USER_AGENT);
         ResponseDTO<FileDownloadVO> downloadFileResult = fileService.getDownloadFile(fileKey, userAgent);
         if (!downloadFileResult.getOk()) {
             SmartResponseUtil.write(response, downloadFileResult);
