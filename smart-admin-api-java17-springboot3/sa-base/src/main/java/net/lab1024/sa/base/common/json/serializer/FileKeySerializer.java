@@ -4,8 +4,7 @@ import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.SerializationContext;
 import jakarta.annotation.Resource;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.module.support.file.service.FileService;
+import net.lab1024.sa.base.module.support.file.service.FileAssetService;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -22,7 +21,7 @@ import java.io.IOException;
 public class FileKeySerializer extends ValueSerializer<String> {
 
     @Resource
-    private FileService fileService;
+    private FileAssetService fileAssetService;
 
 
     @Override
@@ -31,15 +30,12 @@ public class FileKeySerializer extends ValueSerializer<String> {
             jsonGenerator.writeString(value);
             return;
         }
-        if (fileService == null) {
+        if (fileAssetService == null) {
             jsonGenerator.writeString(value);
             return;
         }
-        ResponseDTO<String> responseDTO = fileService.getFileUrl(value);
-        if (responseDTO.getOk()) {
-            jsonGenerator.writeString(responseDTO.getData());
-            return;
-        }
-        jsonGenerator.writeString(value);
+        String url = fileAssetService.urlByStorageKeys(value);
+        // 查不到就原样回 storageKey，比吐一个空串更容易排查
+        jsonGenerator.writeString(url.isEmpty() ? value : url);
     }
 }

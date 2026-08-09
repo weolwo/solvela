@@ -1,8 +1,6 @@
 package net.lab1024.sa.base.config;
 
 import lombok.Data;
-import net.lab1024.sa.base.module.support.file.service.FileStorageLocalServiceImpl;
-import net.lab1024.sa.base.module.support.file.service.IFileStorageService;
 import net.lab1024.sa.base.storage.ObjectStorage;
 import net.lab1024.sa.base.storage.impl.LocalFileStorage;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +39,16 @@ public class FileConfig implements WebMvcConfigurer {
 
     private static final String MODE_LOCAL = "local";
 
+    /**
+     * 本地模式下公开文件的静态资源前缀。原先挂在 {@code FileStorageLocalServiceImpl} 上，
+     * 那个类已随档⑤ 删除，常量搬到这里 —— 它本来就是「怎么对外暴露」的配置，
+     * 属于配置类而不是某个存储实现。
+     *
+     * <p>⚠️ 这个路径上的文件<b>谁拿到 URL 谁就能下</b>。私有文件不走这条路，
+     * 走 {@code /file/download/{fileId}} 的登录态鉴权，见 {@code FileVisibilityEnum}。
+     */
+    public static final String UPLOAD_MAPPING = "/upload";
+
     @Value("${file.storage.mode}")
     private String mode;
 
@@ -71,16 +79,6 @@ public class FileConfig implements WebMvcConfigurer {
 
     @Bean
     @ConditionalOnProperty(prefix = "file.storage", name = {"mode"}, havingValue = MODE_LOCAL)
-    public IFileStorageService initLocalFileService() {
-        return new FileStorageLocalServiceImpl();
-    }
-
-    /**
-     * 新存储层（档①）。与上面的 {@link IFileStorageService} <b>并存</b>，
-     * 调用方在档⑤ 统一迁移过去，届时旧实现整体删除。
-     */
-    @Bean
-    @ConditionalOnProperty(prefix = "file.storage", name = {"mode"}, havingValue = MODE_LOCAL)
     public ObjectStorage localObjectStorage() {
         return new LocalFileStorage(Path.of(localUploadPath));
     }
@@ -89,7 +87,7 @@ public class FileConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         if (MODE_LOCAL.equals(mode)) {
             String path = localUploadPath.endsWith("/") ? localUploadPath : localUploadPath + "/";
-            registry.addResourceHandler(FileStorageLocalServiceImpl.UPLOAD_MAPPING + "/**").addResourceLocations("file:" + path);
+            registry.addResourceHandler(UPLOAD_MAPPING + "/**").addResourceLocations("file:" + path);
         }
     }
 

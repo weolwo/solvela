@@ -11,7 +11,7 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.constant.SwaggerTagConst;
 import net.lab1024.sa.base.module.support.file.domain.form.FileQueryForm;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
-import net.lab1024.sa.base.module.support.file.service.FileService;
+import net.lab1024.sa.base.module.support.file.service.FileAssetService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,13 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminFileController extends SupportBaseController {
 
     @Resource
-    private FileService fileService;
+    private FileAssetService fileAssetService;
 
     @Operation(summary = "分页查询 @author 1024创新实验室-主任-卓大")
     @PostMapping("/file/queryPage")
     @SaCheckPermission("support:file:query")
     public ResponseDTO<PageResult<FileVO>> queryPage(@RequestBody @Valid FileQueryForm queryForm) {
-        return ResponseDTO.ok(fileService.queryPage(queryForm));
+        return ResponseDTO.ok(fileAssetService.queryPage(queryForm));
     }
 
 }

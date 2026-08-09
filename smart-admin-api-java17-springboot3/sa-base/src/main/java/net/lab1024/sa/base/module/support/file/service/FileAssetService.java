@@ -1,6 +1,11 @@
 package net.lab1024.sa.base.module.support.file.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import net.lab1024.sa.base.common.constant.StringConst;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.util.SmartPageUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.exception.BusinessException;
@@ -14,6 +19,8 @@ import net.lab1024.sa.base.module.support.file.domain.ImageVariant;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileRelationEntity;
+import net.lab1024.sa.base.module.support.file.domain.form.FileQueryForm;
+import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.module.support.securityprotect.service.SecurityFileService;
 import net.lab1024.sa.base.storage.ByteRange;
 import net.lab1024.sa.base.storage.ObjectMeta;
@@ -34,9 +41,11 @@ import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -192,6 +201,93 @@ public class FileAssetService {
             throw new BusinessException("文件上传失败：" + e.getMessage());
         }
         return entity;
+    }
+
+    /**
+     * 按分类 ID 上传。给旧的 {@code /file/upload?folder=N} 接口用 ——
+     * 迁移脚本把内置分类的 ID 对齐成了原 {@code folderType} 的值，所以前端不用改。
+     */
+    public FileEntity upload(MultipartFile file, Long categoryId, RequestUser user) {
+        FileCategoryEntity category = fileCategoryDao.selectById(categoryId);
+        if (category == null) {
+            throw new BusinessException("文件分类不存在：" + categoryId);
+        }
+        return upload(file, category.getCategoryCode(), user);
+    }
+
+    // ------------------------------------------------------------------ 按 storageKey 查询
+
+    /**
+     * 按 storageKey 批量取文件信息。<b>一次查库</b>。
+     *
+     * <p>业务表里存的是 storageKey 字符串（如 {@code t_employee.avatar}、逗号拼接的
+     * {@code attachment}），所以这条路径必须保留 —— 把它们全部改存 fileId 是另一次数据迁移。
+     */
+    public List<FileVO> listByStorageKeys(Collection<String> storageKeys) {
+        if (storageKeys == null || storageKeys.isEmpty()) {
+            return List.of();
+        }
+        List<FileVO> list = fileDao.selectByFileKeyList(new LinkedHashSet<>(storageKeys));
+        Map<String, FileVO> byKey = list.stream()
+                .collect(java.util.stream.Collectors.toMap(FileVO::getFileKey, v -> v, (a, b) -> a));
+        for (FileVO vo : list) {
+            vo.setFileUrl(urlOfVo(vo));
+        }
+        // 按入参顺序返回，查不到的跳过。顺序有业务含义（附件展示顺序）
+        List<FileVO> result = new ArrayList<>(storageKeys.size());
+        for (String key : storageKeys) {
+            FileVO vo = byKey.get(key);
+            if (vo != null) {
+                result.add(vo);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 按 storageKey 取访问 URL，支持逗号分隔的多个 key。
+     */
+    public String urlByStorageKeys(String storageKeys) {
+        if (storageKeys == null || storageKeys.isBlank()) {
+            return "";
+        }
+        List<String> keys = Arrays.stream(storageKeys.split(StringConst.SEPARATOR))
+                .map(String::trim)
+                .filter(k -> !k.isEmpty())
+                .toList();
+        return listByStorageKeys(keys).stream()
+                .map(FileVO::getFileUrl)
+                .collect(java.util.stream.Collectors.joining(StringConst.SEPARATOR));
+    }
+
+    public FileEntity requireByStorageKey(String storageKey) {
+        FileEntity entity = fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
+                .eq(FileEntity::getStorageKey, storageKey)
+                .eq(FileEntity::getDeletedFlag, 0));
+        if (entity == null) {
+            throw new BusinessException("文件不存在");
+        }
+        return entity;
+    }
+
+    public PageResult<FileVO> queryPage(FileQueryForm queryForm) {
+        Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
+        List<FileVO> list = fileDao.queryPage(page, queryForm);
+        list.forEach(vo -> vo.setFileUrl(urlOfVo(vo)));
+        return SmartPageUtil.convert2PageResult(page, list);
+    }
+
+    /**
+     * FileVO 走的是和 {@link #urlOf} 一样的规则。这里单独写一份是因为 VO 与 Entity
+     * 没有共同父类，硬抽一个基类只会为了省十行代码引入一层继承。
+     */
+    private String urlOfVo(FileVO vo) {
+        boolean publicReadable = FileVisibilityEnum.PUBLIC.equalsValue(vo.getVisibility());
+        if (!publicReadable || publicUrlPrefix.isBlank()) {
+            return DOWNLOAD_PATH + vo.getFileId();
+        }
+        String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
+        return prefix + vo.getFileKey();
     }
 
     // ------------------------------------------------------------------ 生命周期

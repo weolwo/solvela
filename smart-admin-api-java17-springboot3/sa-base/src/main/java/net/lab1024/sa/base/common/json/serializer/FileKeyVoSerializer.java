@@ -5,7 +5,7 @@ import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.SerializationContext;
 import jakarta.annotation.Resource;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
-import net.lab1024.sa.base.module.support.file.service.FileService;
+import net.lab1024.sa.base.module.support.file.service.FileAssetService;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.util.ArrayList;
 public class FileKeyVoSerializer extends ValueSerializer<String> {
 
     @Resource
-    private FileService fileService;
+    private FileAssetService fileAssetService;
 
 
     @Override
@@ -34,13 +34,13 @@ public class FileKeyVoSerializer extends ValueSerializer<String> {
             jsonGenerator.writePOJO(new ArrayList<>());
             return;
         }
-        if(fileService == null){
+        if(fileAssetService == null){
             jsonGenerator.writeString(value);
             return;
         }
         String[] fileKeyArray = value.split(",");
         List<String> fileKeyList = Arrays.asList(fileKeyArray);
-        List<FileVO> fileKeyVOList = fileService.getFileList(fileKeyList);
+        List<FileVO> fileKeyVOList = fileAssetService.listByStorageKeys(fileKeyList);
         jsonGenerator.writePOJO(fileKeyVOList);
     }
 }

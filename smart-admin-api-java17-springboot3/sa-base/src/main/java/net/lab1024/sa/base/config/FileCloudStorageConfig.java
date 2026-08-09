@@ -1,8 +1,6 @@
 package net.lab1024.sa.base.config;
 
 import jakarta.annotation.Resource;
-import net.lab1024.sa.base.module.support.file.service.FileStorageCloudServiceImpl;
-import net.lab1024.sa.base.module.support.file.service.IFileStorageService;
 import net.lab1024.sa.base.storage.ObjectStorage;
 import net.lab1024.sa.base.storage.impl.S3ObjectStorage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -79,15 +77,6 @@ public class FileCloudStorageConfig {
                 .build();
     }
 
-    @Bean
-    public IFileStorageService initCloudFileService() {
-        return new FileStorageCloudServiceImpl();
-    }
-
-    /**
-     * 新存储层（档①）。与上面的 {@link IFileStorageService} <b>并存</b>，
-     * 调用方在档⑤ 统一迁移过去，届时旧实现整体删除。
-     */
     @Bean
     public ObjectStorage s3ObjectStorage(S3Client s3Client, S3Presigner s3Presigner) {
         return new S3ObjectStorage(s3Client, s3Presigner, fileConfig.getCloudBucketName());

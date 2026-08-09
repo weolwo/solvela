@@ -5,19 +5,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import net.lab1024.sa.base.common.constant.RequestHeaderConst;
 import net.lab1024.sa.base.common.controller.SupportBaseController;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartContentDispositionUtil;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
-import net.lab1024.sa.base.common.util.SmartResponseUtil;
 import net.lab1024.sa.base.constant.SwaggerTagConst;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
-import net.lab1024.sa.base.module.support.file.domain.vo.FileDownloadVO;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileUploadVO;
 import net.lab1024.sa.base.module.support.file.service.FileAssetService;
-import net.lab1024.sa.base.module.support.file.service.FileService;
 import net.lab1024.sa.base.storage.StoredObject;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,7 +27,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 /**
- * 文件服务
+ * 文件服务。
+ *
+ * <p><b>这是整个文件模块唯一认识 {@code ResponseDTO} 和 HttpServletResponse 的地方</b>。
+ * 业务层抛 {@code BusinessException}，翻译成响应结构只在这一层发生一次。
  *
  * @Author 1024创新实验室: 罗伊
  * @Date 2019年10月11日 15:34:47
@@ -44,52 +43,38 @@ import java.io.IOException;
 public class FileController extends SupportBaseController {
 
     @Resource
-    private FileService fileService;
-
-    @Resource
     private FileAssetService fileAssetService;
-
 
     @Operation(summary = "文件上传 @author 胡克")
     @PostMapping("/file/upload")
     public ResponseDTO<FileUploadVO> upload(@RequestParam MultipartFile file, @RequestParam Integer folder) {
         RequestUser requestUser = SmartRequestUtil.getRequestUser();
-        return fileService.fileUpload(file, folder, requestUser);
+        // folder 沿用原来的 folderType 取值：迁移脚本把内置分类的 ID 对齐成了同一个数字，
+        // 所以这个接口的契约不用动
+        FileEntity entity = fileAssetService.upload(file, Long.valueOf(folder), requestUser);
+        return ResponseDTO.ok(toUploadVO(entity));
     }
 
     @Operation(summary = "获取文件URL：根据fileKey @author 胡克")
     @GetMapping("/file/getFileUrl")
     public ResponseDTO<String> getUrl(@RequestParam String fileKey) {
-        return fileService.getFileUrl(fileKey);
-    }
-
-    @Operation(summary = "下载文件流（根据fileKey） @author 胡克")
-    @GetMapping("/file/downLoad")
-    public void downLoad(@RequestParam String fileKey, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String userAgent = request.getHeader(RequestHeaderConst.USER_AGENT);
-        ResponseDTO<FileDownloadVO> downloadFileResult = fileService.getDownloadFile(fileKey, userAgent);
-        if (!downloadFileResult.getOk()) {
-            SmartResponseUtil.write(response, downloadFileResult);
-            return;
-        }
-        // 下载文件信息
-        FileDownloadVO fileDownloadVO = downloadFileResult.getData();
-        // 设置下载消息头
-        SmartResponseUtil.setDownloadFileHeader(response, fileDownloadVO.getMetadata().getFileName(), fileDownloadVO.getMetadata().getFileSize());
-        // 下载
-        response.getOutputStream().write(fileDownloadVO.getData());
+        return ResponseDTO.ok(fileAssetService.urlByStorageKeys(fileKey));
     }
 
     /**
-     * 档③ 新增的流式下载。与上面的 {@code /file/downLoad} 并存，档⑤ 迁移前端后删旧的。
-     *
-     * <p>与旧接口的三处区别：
-     * <ul>
-     *   <li><b>真流式</b>：边读边写，堆占用与文件大小无关；旧接口先把整个文件读成 byte[]</li>
-     *   <li><b>支持 Range</b>：大图和 PDF 的分段加载、断点续传依赖它</li>
-     *   <li><b>Content-Disposition 走 RFC 6266 双写法</b>，中文名在各浏览器都对，
-     *       且文件名里的分号撕不开 header</li>
-     * </ul>
+     * 按 storageKey 下载。保留是因为业务表里存的就是 storageKey 字符串
+     * （{@code t_employee.avatar}、逗号拼接的 {@code attachment}），
+     * 把它们全部改存 fileId 是另一次数据迁移。
+     */
+    @Operation(summary = "下载文件流（根据fileKey） @author 胡克")
+    @GetMapping("/file/downLoad")
+    public void downLoad(@RequestParam String fileKey, HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        writeFile(fileAssetService.requireByStorageKey(fileKey), false, request, response);
+    }
+
+    /**
+     * 按 fileId 下载。
      *
      * @param inline 图片 / PDF 在线预览传 true。同一个对象既能 attachment 又能 inline ——
      *               这正是 disposition 不该在上传时烧进对象元数据的原因
@@ -100,9 +85,20 @@ public class FileController extends SupportBaseController {
                          @RequestParam(required = false, defaultValue = "false") boolean inline,
                          HttpServletRequest request,
                          HttpServletResponse response) throws IOException {
-        FileEntity file = fileAssetService.requireFile(fileId);
-        long total = file.getFileSize() == null ? 0 : file.getFileSize();
+        writeFile(fileAssetService.requireFile(fileId), inline, request, response);
+    }
 
+    // ------------------------------------------------------------------
+
+    /**
+     * 真流式：边读边写，堆占用与文件大小无关。
+     *
+     * <p>旧实现是 {@code copyToByteArray} 先把整个文件读成 byte[] 再吐出去，
+     * 名字叫"流式下载"，实际 100MB 文件就是 100MB 堆。
+     */
+    private void writeFile(FileEntity file, boolean inline,
+                           HttpServletRequest request, HttpServletResponse response) throws IOException {
+        long total = file.getFileSize() == null ? 0 : file.getFileSize();
         DownloadRangeResolver.Resolved resolved = DownloadRangeResolver.resolve(
                 request.getHeader(HttpHeaders.RANGE), total);
         if (!resolved.satisfiable()) {
@@ -129,8 +125,20 @@ public class FileController extends SupportBaseController {
                 response.setHeader(HttpHeaders.CONTENT_RANGE,
                         "bytes " + start + "-" + (start + object.length() - 1) + "/" + object.totalLength());
             }
-            // transferTo 走 8KB 缓冲逐段搬运，堆占用与文件大小无关
             object.stream().transferTo(response.getOutputStream());
         }
+    }
+
+    private FileUploadVO toUploadVO(FileEntity entity) {
+        FileUploadVO vo = new FileUploadVO();
+        vo.setFileId(entity.getFileId());
+        vo.setFileKey(entity.getStorageKey());
+        // 这里给的是用户上传时的原名，不是生成的存储名。旧的两个实现在这个字段上塞了
+        // 相反的东西（local 塞生成名、cloud 塞原名），是同一份前端代码在两种部署下表现不同的根因
+        vo.setFileName(entity.getOriginalName());
+        vo.setFileType(entity.getExtension());
+        vo.setFileSize(entity.getFileSize());
+        vo.setFileUrl(fileAssetService.url(entity, null));
+        return vo;
     }
 }

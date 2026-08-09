@@ -1,8 +1,5 @@
 package net.lab1024.sa.base.config;
 
-import net.lab1024.sa.base.module.support.file.dao.FileDao;
-import net.lab1024.sa.base.module.support.file.service.IFileStorageService;
-import net.lab1024.sa.base.module.support.redis.RedisService;
 import net.lab1024.sa.base.storage.ObjectStorage;
 import net.lab1024.sa.base.storage.StorageKind;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +14,6 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 /**
  * 云存储依赖可选化之后的装配验证。
@@ -68,7 +64,6 @@ class FileCloudStorageConditionTest {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(FileCloudStorageConfig.class);
                     assertThat(context).doesNotHaveBean(FileCloudStorageMissingGuard.class);
-                    assertThat(context).hasSingleBean(IFileStorageService.class);
                     // 档① 的新存储层：local 模式装本地实现，且不能牵连任何 AWS 类
                     assertThat(context).hasSingleBean(ObjectStorage.class);
                     assertThat(context.getBean(ObjectStorage.class).kind()).isEqualTo(StorageKind.LOCAL);
@@ -89,20 +84,13 @@ class FileCloudStorageConditionTest {
     @Test
     @DisplayName("mode=cloud + 依赖在：S3Client / S3Presigner / 云存储实现都要在")
     void cloudModeWithSdk() {
-        // FileStorageCloudServiceImpl 用 @Resource 注入 RedisService / FileDao，这里只验证装配关系，
-        // 不碰它们的行为。注意必须走 registerSingleton 而不是 withBean —— mock 出来的对象是
-        // RedisService 的子类，继承了它那些带 @Resource 的字段，走正常 Bean 生命周期时
-        // Spring 会接着去注入 mock 自己的依赖然后炸掉。registerSingleton 直接塞成品，跳过后置处理。
+        // 档⑤ 删掉 FileStorageCloudServiceImpl 之后，这里不再需要 RedisService / FileDao 的
+        // mock —— 剩下的三个 Bean 都是纯配置对象，没有任何外部依赖
         runner.withPropertyValues("file.storage.mode=cloud")
-                .withInitializer(context -> {
-                    context.getBeanFactory().registerSingleton("redisService", mock(RedisService.class));
-                    context.getBeanFactory().registerSingleton("fileDao", mock(FileDao.class));
-                })
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(S3Client.class);
                     assertThat(context).hasSingleBean(S3Presigner.class);
-                    assertThat(context).hasSingleBean(IFileStorageService.class);
                     assertThat(context).doesNotHaveBean(FileCloudStorageMissingGuard.class);
                     // 档① 的新存储层：cloud 模式装 S3 实现
                     assertThat(context).hasSingleBean(ObjectStorage.class);

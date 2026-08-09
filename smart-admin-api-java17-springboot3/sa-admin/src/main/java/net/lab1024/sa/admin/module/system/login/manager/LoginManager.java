@@ -17,7 +17,7 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.UserPermission;
 import net.lab1024.sa.base.common.enumeration.UserTypeEnum;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
-import net.lab1024.sa.base.module.support.file.service.IFileStorageService;
+import net.lab1024.sa.base.module.support.file.service.FileAssetService;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.cache.annotation.CacheEvict;
@@ -48,7 +48,7 @@ public class LoginManager {
     private DepartmentService departmentService;
 
     @Resource
-    private IFileStorageService fileStorageService;
+    private FileAssetService fileAssetService;
 
     @Resource
     private EmployeeService employeeService;
@@ -93,9 +93,11 @@ public class LoginManager {
         // 头像信息
         String avatar = employeeEntity.getAvatar();
         if (StringUtils.isNotBlank(avatar)) {
-            ResponseDTO<String> getFileUrl = fileStorageService.getFileUrl(avatar);
-            if (BooleanUtils.isTrue(getFileUrl.getOk())) {
-                requestEmployee.setAvatar(getFileUrl.getData());
+            // 头像存的是 storageKey，展示时才换算成 URL。查不到就保持原值，
+            // 让"头像不见了"表现为一张裂图而不是登录直接失败
+            String avatarUrl = fileAssetService.urlByStorageKeys(avatar);
+            if (StringUtils.isNotBlank(avatarUrl)) {
+                requestEmployee.setAvatar(avatarUrl);
             }
         }
         return requestEmployee;
