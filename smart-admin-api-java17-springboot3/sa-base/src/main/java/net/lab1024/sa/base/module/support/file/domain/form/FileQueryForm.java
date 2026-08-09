@@ -25,6 +25,15 @@ public class FileQueryForm extends PageParam {
     @CheckEnum(value = FileFolderTypeEnum.class, message = "文件夹类型 错误")
     private Integer folderType;
 
+    @Schema(description = "分类ID")
+    private Long categoryId;
+
+    /**
+     * 单个标签。查询时会被拼成 {@code ,标签,} 去匹配，避免「618」命中「6180」。
+     */
+    @Schema(description = "标签")
+    private String tag;
+
     @Schema(description = "文件名词")
     private String fileName;
 

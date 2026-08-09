@@ -6,9 +6,11 @@ import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
 import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
+import net.lab1024.sa.base.module.support.file.config.FileImageProperties;
 import net.lab1024.sa.base.module.support.file.dao.FileCategoryDao;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.dao.FileRelationDao;
+import net.lab1024.sa.base.module.support.file.domain.ImageVariant;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileRelationEntity;
@@ -90,6 +92,9 @@ public class FileAssetService {
     @Resource
     private FileRelationDao fileRelationDao;
 
+    @Resource
+    private FileImageProperties imageProperties;
+
     private final StorageKeyGenerator keyGenerator = new StorageKeyGenerator();
 
     /**
@@ -121,6 +126,7 @@ public class FileAssetService {
      */
     public FileEntity upload(MultipartFile file, String categoryCode, RequestUser user) {
         FileCategoryEntity category = requireCategory(categoryCode);
+        FileImageProperties.Rule rule = imageProperties.ruleOf(category.getCategoryCode());
 
         // ── 第一关：大小。必须在读任何字节之前，否则类型嗅探本身就成了攻击面
         long size = file.getSize();
@@ -129,6 +135,11 @@ public class FileAssetService {
         }
         if (size > maxFileSizeKb * 1024) {
             throw new BusinessException("上传文件最大为 " + (maxFileSizeKb / 1024) + " MB");
+        }
+        // 分类级上限比全局更严时以它为准
+        if (rule != null && rule.getMaxSizeKb() != null && size > rule.getMaxSizeKb() * 1024L) {
+            throw new BusinessException("「" + category.getCategoryName() + "」分类的文件最大为 "
+                    + rule.getMaxSizeKb() + " KB");
         }
 
         String originalName = file.getOriginalFilename();
@@ -164,6 +175,9 @@ public class FileAssetService {
         entity.setCreateBy(user == null ? null : user.getUserName());
         if (IMAGE_MIME_TYPES.contains(contentType)) {
             readImageSize(file, entity);
+            // 尺寸不合规必须在上传时就拦下来。等运营把 banner 发布出去、页面变形了才发现，
+            // 那时已经要走一遍下线-重传-重新发布的流程
+            checkImageRule(entity, rule, category.getCategoryName());
         }
 
         // 先落库再写对象存储。反过来的话，写完字节而落库失败会留下一份「没有任何记录指向它」
@@ -272,28 +286,50 @@ public class FileAssetService {
      * 猜一个前缀拼出打不开的 URL，比多走一跳后端要难排查得多。
      */
     public Map<Long, String> batchUrl(Collection<Long> fileIds) {
+        return batchUrl(fileIds, ImageVariant.ORIGINAL);
+    }
+
+    public Map<Long, String> batchUrl(Collection<Long> fileIds, ImageVariant variant) {
         if (fileIds == null || fileIds.isEmpty()) {
             return Map.of();
         }
         List<FileEntity> files = fileDao.selectByIds(fileIds);
         Map<Long, String> urls = new LinkedHashMap<>(files.size());
         for (FileEntity file : files) {
-            urls.put(file.getFileId(), urlOf(file));
+            urls.put(file.getFileId(), urlOf(file, variant));
         }
         return urls;
     }
 
-    public String url(FileEntity file) {
-        return urlOf(file);
+    public String url(FileEntity file, ImageVariant variant) {
+        return urlOf(file, variant);
     }
 
-    private String urlOf(FileEntity file) {
+    private String urlOf(FileEntity file, ImageVariant variant) {
         boolean publicReadable = FileVisibilityEnum.PUBLIC.equalsValue(file.getVisibility());
-        if (publicReadable && !publicUrlPrefix.isBlank()) {
-            String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
-            return prefix + file.getStorageKey();
+        if (!publicReadable || publicUrlPrefix.isBlank()) {
+            // 私有文件不给静态 URL；公开前缀没配时也走后端 —— 猜一个前缀拼出打不开的 URL
+            // 比多走一跳后端难排查得多
+            return DOWNLOAD_PATH + file.getFileId();
         }
-        return DOWNLOAD_PATH + file.getFileId();
+        String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
+        return prefix + file.getStorageKey() + processSuffix(file, variant);
+    }
+
+    /**
+     * 云端图片处理参数。<b>没配模板就返回空串（原图）</b> ——
+     * 通用 S3 协议没有图片处理能力，硬拼一个 {@code x-oss-process} 上去，
+     * 在 MinIO / AWS S3 上只会换来一个 400。
+     */
+    private String processSuffix(FileEntity file, ImageVariant variant) {
+        String template = imageProperties.getProcessTemplate();
+        if (variant == null || variant.isOriginal()
+                || template == null || template.isBlank()
+                || !IMAGE_MIME_TYPES.contains(file.getContentType())) {
+            return "";
+        }
+        return template.replace("{w}", String.valueOf(variant.width()))
+                .replace("{h}", String.valueOf(variant.height()));
     }
 
     /**
@@ -307,6 +343,59 @@ public class FileAssetService {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * 分类级图片约束。<b>只校验配了的项</b>，没配的一律放过。
+     *
+     * <p>读不出宽高时（格式不认识、文件损坏）直接跳过校验而不是报错 ——
+     * 那种情况用「禁止上传此文件类型」拦更准确，尺寸校验不该越权替它报错。
+     */
+    private static void checkImageRule(FileEntity entity, FileImageProperties.Rule rule, String categoryName) {
+        if (rule == null || entity.getImageWidth() == null || entity.getImageHeight() == null) {
+            return;
+        }
+        int w = entity.getImageWidth();
+        int h = entity.getImageHeight();
+        String prefix = "「" + categoryName + "」分类要求图片";
+
+        if (rule.getWidth() != null && w != rule.getWidth()) {
+            throw new BusinessException(prefix + "宽度为 " + rule.getWidth() + "px，当前 " + w + "px");
+        }
+        if (rule.getHeight() != null && h != rule.getHeight()) {
+            throw new BusinessException(prefix + "高度为 " + rule.getHeight() + "px，当前 " + h + "px");
+        }
+        if (rule.getMinWidth() != null && w < rule.getMinWidth()) {
+            throw new BusinessException(prefix + "宽度不小于 " + rule.getMinWidth() + "px，当前 " + w + "px");
+        }
+        if (rule.getMinHeight() != null && h < rule.getMinHeight()) {
+            throw new BusinessException(prefix + "高度不小于 " + rule.getMinHeight() + "px，当前 " + h + "px");
+        }
+        checkRatio(rule.getRatio(), w, h, prefix);
+    }
+
+    /**
+     * 宽高比用交叉相乘比较，<b>不做浮点除法</b> —— 16:9 的 1920×1080 用浮点算会出现
+     * 1.7777777 与 1.7777778 不相等这种事，而它明明是精确匹配的。
+     */
+    private static void checkRatio(String ratio, int w, int h, String prefix) {
+        if (ratio == null || ratio.isBlank()) {
+            return;
+        }
+        String[] parts = ratio.split(":");
+        if (parts.length != 2) {
+            log.warn("[File] 图片宽高比配置格式错误，已忽略：{}", ratio);
+            return;
+        }
+        try {
+            long rw = Long.parseLong(parts[0].trim());
+            long rh = Long.parseLong(parts[1].trim());
+            if ((long) w * rh != (long) h * rw) {
+                throw new BusinessException(prefix + "宽高比为 " + ratio + "，当前 " + w + "×" + h);
+            }
+        } catch (NumberFormatException e) {
+            log.warn("[File] 图片宽高比配置无法解析，已忽略：{}", ratio);
+        }
+    }
 
     private FileCategoryEntity requireCategory(String categoryCode) {
         FileCategoryEntity category = fileCategoryDao.getByCode(categoryCode);

@@ -2,7 +2,9 @@ package net.lab1024.sa.base.module.support.file.service;
 
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
+import net.lab1024.sa.base.module.support.file.config.FileImageProperties;
 import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
+import net.lab1024.sa.base.module.support.file.domain.ImageVariant;
 import net.lab1024.sa.base.module.support.file.dao.FileCategoryDao;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.dao.FileRelationDao;
@@ -72,6 +74,8 @@ class FileAssetServiceTest {
 
     private InMemoryObjectStorage storage;
 
+    private FileImageProperties imageProperties;
+
     private FileAssetService service;
 
     @BeforeEach
@@ -83,6 +87,8 @@ class FileAssetServiceTest {
         ReflectionTestUtils.setField(service, "fileCategoryDao", fileCategoryDao);
         ReflectionTestUtils.setField(service, "fileRelationDao", fileRelationDao);
         ReflectionTestUtils.setField(service, "maxFileSizeKb", 10240L);
+        imageProperties = new FileImageProperties();
+        ReflectionTestUtils.setField(service, "imageProperties", imageProperties);
 
         FileCategoryEntity category = new FileCategoryEntity();
         category.setCategoryId(1L);
@@ -226,6 +232,76 @@ class FileAssetServiceTest {
                 file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC)));
 
         assertThat(service.batchUrl(List.of(1L)).get(1L)).isEqualTo("/file/download/1");
+    }
+
+    @Test
+    @DisplayName("分类级尺寸约束：banner 必须 1920×640，不合规在上传时就拦")
+    void rejectsWrongImageSize() {
+        FileImageProperties.Rule rule = new FileImageProperties.Rule();
+        rule.setWidth(1920);
+        rule.setHeight(640);
+        imageProperties.getRules().put("BANNER", rule);
+
+        assertThatThrownBy(() -> service.upload(png("a.png"), "BANNER", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("宽度为 1920px");
+        assertThat(storage.size()).isZero();
+    }
+
+    @Test
+    @DisplayName("宽高比用交叉相乘比较：16:9 的 1920×1080 不能因为浮点误差被判不等")
+    void ratioUsesCrossMultiplication() {
+        FileImageProperties.Rule rule = new FileImageProperties.Rule();
+        rule.setRatio("1:1");
+        imageProperties.getRules().put("BANNER", rule);
+        // 1×1 的图正好是 1:1，应当通过
+        assertThat(service.upload(png("a.png"), "BANNER", null)).isNotNull();
+
+        rule.setRatio("16:9");
+        assertThatThrownBy(() -> service.upload(png("b.png"), "BANNER", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("宽高比");
+    }
+
+    @Test
+    @DisplayName("分类级大小上限比全局更严时以它为准")
+    void categoryLevelSizeLimit() {
+        FileImageProperties.Rule rule = new FileImageProperties.Rule();
+        rule.setMaxSizeKb(0);
+        imageProperties.getRules().put("BANNER", rule);
+
+        assertThatThrownBy(() -> service.upload(png("a.png"), "BANNER", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("分类的文件最大为");
+    }
+
+    @Test
+    @DisplayName("没配处理模板时变体一律返回原图URL —— 通用S3没有图片处理能力，硬拼参数只会换来400")
+    void variantWithoutTemplateReturnsOriginal() {
+        ReflectionTestUtils.setField(service, "publicUrlPrefix", "https://cdn.example.com");
+        FileEntity image = file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC);
+        image.setContentType("image/png");
+        when(fileDao.selectByIds(any())).thenReturn(List.of(image));
+
+        assertThat(service.batchUrl(List.of(1L), ImageVariant.THUMBNAIL).get(1L))
+                .isEqualTo("https://cdn.example.com/banner/202608/10/a.png");
+    }
+
+    @Test
+    @DisplayName("配了模板才拼处理参数，且占位符被替换")
+    void variantAppliesTemplate() {
+        ReflectionTestUtils.setField(service, "publicUrlPrefix", "https://cdn.example.com");
+        imageProperties.setProcessTemplate("?x-oss-process=image/resize,w_{w}");
+        FileEntity image = file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC);
+        image.setContentType("image/png");
+        when(fileDao.selectByIds(any())).thenReturn(List.of(image));
+
+        assertThat(service.batchUrl(List.of(1L), ImageVariant.THUMBNAIL).get(1L))
+                .isEqualTo("https://cdn.example.com/banner/202608/10/a.png?x-oss-process=image/resize,w_200");
+        // 非图片不该被加上图片处理参数
+        image.setContentType("application/pdf");
+        assertThat(service.batchUrl(List.of(1L), ImageVariant.THUMBNAIL).get(1L))
+                .doesNotContain("x-oss-process");
     }
 
     private static FileEntity file(Long id, String key, FileVisibilityEnum visibility) {

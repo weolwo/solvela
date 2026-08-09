@@ -57,6 +57,17 @@
             <if test="queryForm.fileType != null">
                 AND t_file.file_type = #{queryForm.fileType}
             </if>
+            <!--分类-->
+            <if test="queryForm.categoryId != null">
+                AND t_file.category_id = #{queryForm.categoryId}
+            </if>
+            <!--标签。tags 存成前后各带一个逗号的形式（,双十一,banner,），
+                所以必须连着逗号一起匹配：直接 INSTR(tags,'618') 会命中「6180」，
+                INSTR(tags,'11') 会命中「双11」和「1111」。这种错不报警，
+                只是搜出一堆不相干的东西，运营会当成"搜索不准"忍下来-->
+            <if test="queryForm.tag != null and queryForm.tag != ''">
+                AND INSTR(t_file.tags, CONCAT(',', #{queryForm.tag}, ','))
+            </if>
             <!--创建人-->
             <if test="queryForm.creatorName != null and queryForm.creatorName != ''">
                 AND INSTR(t_file.creator_name,#{queryForm.creatorName})
