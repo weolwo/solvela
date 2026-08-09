@@ -110,6 +110,17 @@
                 <groupId>org.reflections</groupId>
                 <artifactId>reflections</artifactId>
                 <version>${reflections.version}</version>
+                <exclusions>
+                    <!-- jsr305 是一包只给静态分析工具看的空注解（@Nullable / @Nonnull），没有任何逻辑代码。
+                         FindBugs 项目 2012 年就停更（后继者是 SpotBugs），JSR-305 规范本身也一直停在 dormant，
+                         而它占着 javax.annotation 包名，和 JDK 的 java.annotation 模块是 split package。
+                         本项目一行都没 import 过 javax.annotation.*，reflections 只在自己源码里用它标记参数，
+                         注解类运行期缺失时 JVM 静默忽略、不会 NoClassDefFoundError，所以摘掉是安全的。 -->
+                    <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
@@ -137,16 +148,15 @@
                 <version>${commons-codec.version}</version>
             </dependency>
 
+            <!-- ⚠️ 原先挂在这里的 commons-logging exclusion 是空操作，已删除：
+                 awssdk v2 全线用 slf4j，2.50.2 的 31 个 pom 里没有任何一个提到 commons-logging，
+                 只有早已停更的 v1 才依赖它 —— 和之前那段 guava exclusion 同一个性质的历史遗留。
+                 真正有效的 exclusion（netty-nio-client）在 sa-base/pom.xml 的引入处，
+                 因为它的成立前提是「本项目只用同步 S3Client」，属于用法约束而非版本约束。 -->
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>s3</artifactId>
                 <version>${awssdk-s3.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>commons-logging</artifactId>
-                        <groupId>commons-logging</groupId>
-                    </exclusion>
-                </exclusions>
             </dependency>
 
 
