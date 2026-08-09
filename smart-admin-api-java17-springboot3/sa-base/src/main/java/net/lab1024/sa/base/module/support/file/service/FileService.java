@@ -46,9 +46,10 @@ import java.util.ArrayList;
 public class FileService {
 
     /**
-     * 文件名最大长度
+     * 文件名最大长度。v3.53.0 起 {@code t_file.original_name} 放宽到 varchar(200)，
+     * 这里不跟着放宽的话，放宽了也用不上。
      */
-    private static final int FILE_NAME_MAX_LENGTH = 100;
+    private static final int FILE_NAME_MAX_LENGTH = 200;
 
     @Resource
     private IFileStorageService fileStorageService;
