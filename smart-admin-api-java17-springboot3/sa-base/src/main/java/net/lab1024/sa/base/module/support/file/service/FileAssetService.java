@@ -260,6 +260,77 @@ public class FileAssetService {
                 .collect(java.util.stream.Collectors.joining(StringConst.SEPARATOR));
     }
 
+    /**
+     * 把一批图片 URL 反查成 fileId。查不到的静默跳过（外链图片、已删除的文件都很正常）。
+     *
+     * <p><b>两种 URL 形态都要认</b>，因为它们都是本模块自己生成的：
+     * <ul>
+     *   <li>{@code /file/download/123} —— 私有文件或没配公开前缀时</li>
+     *   <li>{@code https://cdn.x.com/banner/202608/10/abc.png?x-oss-process=...} —— 公开文件</li>
+     * </ul>
+     *
+     * <p>从 URL 还原 storageKey 的做法是<b>取末尾若干段路径</b>而不是去剥前缀 ——
+     * 前缀可能是 CDN 域名、可能带路径、可能配置改过，剥不干净；而 key 的段数是已知的
+     * （新格式 4 段 {@code code/yyyyMM/dd/id.ext}，历史遗留 3 段 {@code private/common/xxx.png}），
+     * 两种都试一次即可。宁可多试一次查询，也不能漏掉引用 —— 漏掉的后果是图被清理任务删掉。
+     */
+    public List<Long> resolveFileIds(Collection<String> urls) {
+        if (urls == null || urls.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        Set<String> keyCandidates = new LinkedHashSet<>();
+        for (String url : urls) {
+            Long direct = fileIdFromDownloadPath(url);
+            if (direct != null) {
+                ids.add(direct);
+                continue;
+            }
+            keyCandidates.addAll(storageKeyCandidates(url));
+        }
+        if (!keyCandidates.isEmpty()) {
+            // 复用已有的 selectByFileKeyList 而不是再写一个 LambdaQueryWrapper：
+            // 那条 XML 查询做的是同一件事、已经过滤了 deleted_flag，而且不依赖
+            // MyBatis-Plus 的 TableInfo 缓存 —— 后者在没有 Spring 上下文的单测里根本不存在
+            fileDao.selectByFileKeyList(keyCandidates).forEach(vo -> ids.add(vo.getFileId()));
+        }
+        return ids.stream().distinct().toList();
+    }
+
+    private static Long fileIdFromDownloadPath(String url) {
+        int idx = url.indexOf(DOWNLOAD_PATH);
+        if (idx < 0) {
+            return null;
+        }
+        String tail = url.substring(idx + DOWNLOAD_PATH.length());
+        int end = 0;
+        while (end < tail.length() && Character.isDigit(tail.charAt(end))) {
+            end++;
+        }
+        return end == 0 ? null : Long.valueOf(tail.substring(0, end));
+    }
+
+    private static Set<String> storageKeyCandidates(String url) {
+        String path = url;
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            path = path.substring(0, q);
+        }
+        int h = path.indexOf('#');
+        if (h >= 0) {
+            path = path.substring(0, h);
+        }
+        String[] segments = path.split("/");
+        Set<String> candidates = new LinkedHashSet<>();
+        for (int take : new int[]{4, 3}) {
+            if (segments.length >= take) {
+                candidates.add(String.join("/",
+                        Arrays.copyOfRange(segments, segments.length - take, segments.length)));
+            }
+        }
+        return candidates;
+    }
+
     public FileEntity requireByStorageKey(String storageKey) {
         FileEntity entity = fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
                 .eq(FileEntity::getStorageKey, storageKey)

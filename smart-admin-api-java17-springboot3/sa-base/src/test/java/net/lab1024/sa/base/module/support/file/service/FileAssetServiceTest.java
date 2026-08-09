@@ -10,6 +10,7 @@ import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.dao.FileRelationDao;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
+import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.storage.ByteRange;
 import net.lab1024.sa.base.storage.ObjectMeta;
 import net.lab1024.sa.base.storage.ObjectStorage;
@@ -302,6 +303,44 @@ class FileAssetServiceTest {
         image.setContentType("application/pdf");
         assertThat(service.batchUrl(List.of(1L), ImageVariant.THUMBNAIL).get(1L))
                 .doesNotContain("x-oss-process");
+    }
+
+    @Test
+    @DisplayName("URL 反查 fileId：/file/download/123 直接取 ID，不查库")
+    void resolveFileIdsFromDownloadPath() {
+        assertThat(service.resolveFileIds(List.of(
+                "/file/download/123",
+                "https://admin.example.com/file/download/456?inline=true")))
+                .containsExactly(123L, 456L);
+        // 走的是路径解析，一次库都不用查
+        verify(fileDao, org.mockito.Mockito.never()).selectByFileKeyList(any());
+    }
+
+    @Test
+    @DisplayName("URL 反查 fileId：CDN 地址取末尾路径段当 storageKey，查询参数不干扰")
+    void resolveFileIdsFromCdnUrl() {
+        when(fileDao.selectByFileKeyList(any())).thenReturn(List.of(
+                vo(7L, "banner/202608/10/abc.png")));
+
+        assertThat(service.resolveFileIds(List.of(
+                "https://cdn.example.com/banner/202608/10/abc.png?x-oss-process=image/resize,w_200")))
+                .containsExactly(7L);
+    }
+
+    @Test
+    @DisplayName("查不到的 URL 静默跳过 —— 外链图片和已删文件都是正常情况")
+    void resolveFileIdsIgnoresUnknown() {
+        when(fileDao.selectByFileKeyList(any())).thenReturn(List.of());
+        assertThat(service.resolveFileIds(List.of("https://other-site.com/x/y/z/foo.png"))).isEmpty();
+        assertThat(service.resolveFileIds(List.of())).isEmpty();
+        assertThat(service.resolveFileIds(null)).isEmpty();
+    }
+
+    private static FileVO vo(Long id, String key) {
+        FileVO v = new FileVO();
+        v.setFileId(id);
+        v.setStorageKey(key);
+        return v;
     }
 
     private static FileEntity file(Long id, String key, FileVisibilityEnum visibility) {
