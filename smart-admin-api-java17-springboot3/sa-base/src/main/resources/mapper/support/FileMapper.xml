@@ -3,22 +3,17 @@
 <mapper namespace="net.lab1024.sa.base.module.support.file.dao.FileDao">
 
     <!--
-      v3.53.0 起 t_file 的两列改了名：file_key -> storage_key、file_name -> original_name。
+      档⑤ 起 FileVO 的属性名与 DB 列名完全对齐（storageKey / originalName），别名已撤除。
 
-      FileVO 的属性名<b>刻意保持 fileKey / fileName 不变</b> —— 前端有 5 个文件在用这两个字段名，
-      改 JSON 契约是档⑤（调用方迁移）的事，不该在数据模型这一档顺手做掉。
-      所以这里显式列出字段并做别名，而不是继续 SELECT *：SELECT * 只会把 storage_key
-      映射到 VO 里并不存在的 storageKey 上，fileKey 静默变成 null。
-
-      顺带把 SELECT * 换成显式列表 —— t_file 现在有 20+ 列（含 content_hash / tags 等），
-      列表查询没必要全捞。
+      仍然显式列字段而不是 SELECT *：t_file 现在有 20+ 列（含 content_hash / tags 等），
+      列表查询没必要全捞，而且显式列表能让"这个接口到底给前端什么"一眼看清。
     -->
     <sql id="voColumns">
         t_file.file_id,
         t_file.category_id,
         t_file.folder_type,
-        t_file.original_name AS fileName,
-        t_file.storage_key   AS fileKey,
+        t_file.original_name,
+        t_file.storage_key,
         t_file.file_size,
         t_file.file_type,
         t_file.extension,
@@ -46,12 +41,12 @@
                 AND t_file.folder_type = #{queryForm.folderType}
             </if>
             <!--文件名词-->
-            <if test="queryForm.fileName != null and queryForm.fileName != ''">
-                AND INSTR(t_file.original_name,#{queryForm.fileName})
+            <if test="queryForm.originalName != null and queryForm.originalName != ''">
+                AND INSTR(t_file.original_name,#{queryForm.originalName})
             </if>
             <!--文件Key-->
-            <if test="queryForm.fileKey != null and queryForm.fileKey != ''">
-                AND INSTR(t_file.storage_key,#{queryForm.fileKey})
+            <if test="queryForm.storageKey != null and queryForm.storageKey != ''">
+                AND INSTR(t_file.storage_key,#{queryForm.storageKey})
             </if>
             <!--文件类型-->
             <if test="queryForm.fileType != null">

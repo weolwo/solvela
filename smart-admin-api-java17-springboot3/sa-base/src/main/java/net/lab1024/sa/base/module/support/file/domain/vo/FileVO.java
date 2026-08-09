@@ -32,13 +32,8 @@ public class FileVO {
     @Schema(description = "分类ID")
     private Long categoryId;
 
-    /**
-     * 对应 DB 的 {@code original_name}（v3.53.0 改名）。
-     * <b>属性名刻意不跟着改</b> —— 前端有 5 个文件在用 fileName / fileKey，
-     * JSON 契约的变更属于档⑤，SQL 里已做别名。
-     */
-    @Schema(description = "文件名称（用户上传时的原名）")
-    private String fileName;
+    @Schema(description = "用户上传时的原始文件名")
+    private String originalName;
 
     /**
      * v3.53.0 起 DB 列是 bigint。原来是 Integer，2GB 以上会静默溢出。
@@ -55,11 +50,8 @@ public class FileVO {
     @Schema(description = "真实MIME")
     private String contentType;
 
-    /**
-     * 对应 DB 的 {@code storage_key}（v3.53.0 改名），见上面 fileName 的说明。
-     */
-    @Schema(description = "存储键")
-    private String fileKey;
+    @Schema(description = "存储键，系统生成、不可变")
+    private String storageKey;
 
     @Schema(description = "存储介质：LOCAL / S3")
     private String storageKind;

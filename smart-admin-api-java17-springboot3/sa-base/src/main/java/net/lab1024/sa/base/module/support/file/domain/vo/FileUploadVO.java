@@ -19,13 +19,13 @@ public class FileUploadVO {
     private Long fileId;
 
     @Schema(description = "文件名称")
-    private String fileName;
+    private String originalName;
 
     @Schema(description = "fileUrl")
     private String fileUrl;
 
-    @Schema(description = "fileKey")
-    private String fileKey;
+    @Schema(description = "storageKey")
+    private String storageKey;
 
     @Schema(description = "文件大小")
     private Long fileSize;

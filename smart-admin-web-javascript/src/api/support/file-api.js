@@ -23,16 +23,16 @@ export const fileApi = {
     return postRequest('/support/file/queryPage', param);
   },
   /**
-   * 获取文件URL：根据fileKey @author 胡克
+   * 获取文件URL：根据storageKey @author 胡克
    */
-  getUrl: (fileKey) => {
-    return getRequest(`/support/file/getFileUrl?fileKey=${fileKey}`);
+  getUrl: (storageKey) => {
+    return getRequest(`/support/file/getFileUrl?storageKey=${storageKey}`);
   },
 
   /**
-   * 下载文件流（根据fileKey） @author 胡克
+   * 下载文件流（根据storageKey） @author 胡克
    */
-  downLoadFile: (fileKey) => {
-    return getDownload('/support/file/downLoad', { fileKey });
+  downLoadFile: (storageKey) => {
+    return getDownload('/support/file/downLoad', { storageKey });
   },
 };

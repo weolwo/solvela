@@ -229,7 +229,7 @@ public class FileAssetService {
         }
         List<FileVO> list = fileDao.selectByFileKeyList(new LinkedHashSet<>(storageKeys));
         Map<String, FileVO> byKey = list.stream()
-                .collect(java.util.stream.Collectors.toMap(FileVO::getFileKey, v -> v, (a, b) -> a));
+                .collect(java.util.stream.Collectors.toMap(FileVO::getStorageKey, v -> v, (a, b) -> a));
         for (FileVO vo : list) {
             vo.setFileUrl(urlOfVo(vo));
         }
@@ -287,7 +287,7 @@ public class FileAssetService {
             return DOWNLOAD_PATH + vo.getFileId();
         }
         String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
-        return prefix + vo.getFileKey();
+        return prefix + vo.getStorageKey();
     }
 
     // ------------------------------------------------------------------ 生命周期

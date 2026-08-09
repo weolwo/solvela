@@ -25,7 +25,7 @@
       <a-descriptions-item label="删除状态">{{ noticeDetail.deletedFlag ? '已删除' : '未删除' }}</a-descriptions-item>
       <a-descriptions-item v-if="!$lodash.isEmpty(noticeDetail.attachment)" label="附件">
         <div class="file-list">
-          <a class="file-item" v-for="item in noticeDetail.attachment" :key="item.fileId" @click="onPrevFile(item)">{{ item.fileName }}</a>
+          <a class="file-item" v-for="item in noticeDetail.attachment" :key="item.fileId" @click="onPrevFile(item)">{{ item.originalName }}</a>
         </div>
       </a-descriptions-item>
       <a-descriptions-item label="可见范围">

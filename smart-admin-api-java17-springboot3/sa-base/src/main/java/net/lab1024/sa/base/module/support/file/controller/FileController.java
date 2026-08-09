@@ -55,10 +55,10 @@ public class FileController extends SupportBaseController {
         return ResponseDTO.ok(toUploadVO(entity));
     }
 
-    @Operation(summary = "获取文件URL：根据fileKey @author 胡克")
+    @Operation(summary = "获取文件URL：根据storageKey，支持逗号分隔 @author 胡克")
     @GetMapping("/file/getFileUrl")
-    public ResponseDTO<String> getUrl(@RequestParam String fileKey) {
-        return ResponseDTO.ok(fileAssetService.urlByStorageKeys(fileKey));
+    public ResponseDTO<String> getUrl(@RequestParam String storageKey) {
+        return ResponseDTO.ok(fileAssetService.urlByStorageKeys(storageKey));
     }
 
     /**
@@ -66,11 +66,11 @@ public class FileController extends SupportBaseController {
      * （{@code t_employee.avatar}、逗号拼接的 {@code attachment}），
      * 把它们全部改存 fileId 是另一次数据迁移。
      */
-    @Operation(summary = "下载文件流（根据fileKey） @author 胡克")
+    @Operation(summary = "下载文件流（根据storageKey） @author 胡克")
     @GetMapping("/file/downLoad")
-    public void downLoad(@RequestParam String fileKey, HttpServletRequest request, HttpServletResponse response)
+    public void downLoad(@RequestParam String storageKey, HttpServletRequest request, HttpServletResponse response)
             throws IOException {
-        writeFile(fileAssetService.requireByStorageKey(fileKey), false, request, response);
+        writeFile(fileAssetService.requireByStorageKey(storageKey), false, request, response);
     }
 
     /**
@@ -132,10 +132,10 @@ public class FileController extends SupportBaseController {
     private FileUploadVO toUploadVO(FileEntity entity) {
         FileUploadVO vo = new FileUploadVO();
         vo.setFileId(entity.getFileId());
-        vo.setFileKey(entity.getStorageKey());
+        vo.setStorageKey(entity.getStorageKey());
         // 这里给的是用户上传时的原名，不是生成的存储名。旧的两个实现在这个字段上塞了
         // 相反的东西（local 塞生成名、cloud 塞原名），是同一份前端代码在两种部署下表现不同的根因
-        vo.setFileName(entity.getOriginalName());
+        vo.setOriginalName(entity.getOriginalName());
         vo.setFileType(entity.getExtension());
         vo.setFileSize(entity.getFileSize());
         vo.setFileUrl(fileAssetService.url(entity, null));

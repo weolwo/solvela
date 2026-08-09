@@ -188,7 +188,7 @@
       let file = res.data;
       avatarUrl.value = file.fileUrl;
       // 更新头像
-      let updateAvatarForm = { avatar: file.fileKey };
+      let updateAvatarForm = { avatar: file.storageKey };
       await employeeApi.updateAvatar(updateAvatarForm);
       message.success('更新成功');
       // 重新获取详情，刷新整体缓存

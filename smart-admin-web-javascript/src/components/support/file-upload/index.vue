@@ -103,7 +103,7 @@
     if (props.defaultFileList && props.defaultFileList.length > 0) {
       props.defaultFileList.forEach((element) => {
         element.url = element.fileUrl;
-        element.name = element.fileName;
+        element.name = element.originalName;
         res.push(element);
       });
       return res;
@@ -136,7 +136,7 @@
       let res = await fileApi.uploadFile(formData, props.folder);
       let file = res.data;
       file.url = file.fileUrl;
-      file.name = file.fileName;
+      file.name = file.originalName;
       fileList.value.push(file);
       emit('change', fileList.value);
     } catch (e) {
@@ -209,7 +209,7 @@
       previewUrl.value = file.url || file.preview;
       previewVisible.value = true;
     } else {
-      fileApi.downLoadFile(file.fileKey);
+      fileApi.downLoadFile(file.storageKey);
     }
   };
 

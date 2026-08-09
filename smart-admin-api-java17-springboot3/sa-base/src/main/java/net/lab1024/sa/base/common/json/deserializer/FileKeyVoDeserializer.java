@@ -39,7 +39,7 @@ public class FileKeyVoDeserializer extends ValueDeserializer<String> {
             } else {
                 list.add(deserializationContext.readTreeAsValue(listOrObjectNode, FileVO.class));
             }
-            deserialize = list.stream().map(FileVO::getFileKey).collect(Collectors.joining(","));
+            deserialize = list.stream().map(FileVO::getStorageKey).collect(Collectors.joining(","));
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             deserialize = listOrObjectNode.asText();

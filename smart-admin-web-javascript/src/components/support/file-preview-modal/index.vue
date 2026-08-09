@@ -36,7 +36,7 @@
       (async () => {
         SmartLoading.show();
         try {
-          let res = await fileApi.getUrl(fileItem.fileKey);
+          let res = await fileApi.getUrl(fileItem.storageKey);
           fileItem.fileUrl = res.data;
           showFile(fileItem);
         } catch (e) {
@@ -61,7 +61,7 @@
       setVisible(true);
       return;
     }
-    fileApi.downLoadFile(fileItem.fileKey);
+    fileApi.downLoadFile(fileItem.storageKey);
   }
 
   // 判断图片类型

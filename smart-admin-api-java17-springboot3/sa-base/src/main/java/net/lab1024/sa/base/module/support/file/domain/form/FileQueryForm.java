@@ -35,10 +35,10 @@ public class FileQueryForm extends PageParam {
     private String tag;
 
     @Schema(description = "文件名词")
-    private String fileName;
+    private String originalName;
 
     @Schema(description = "文件Key")
-    private String fileKey;
+    private String storageKey;
 
     @Schema(description = "文件类型")
     private String fileType;

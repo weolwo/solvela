@@ -12,7 +12,7 @@
   <div>
     <template v-if="type === 'text'">
       <a v-for="(item, index) in fileList" :key="index" @click="preview(item, index)">
-        {{ item.fileName }}
+        {{ item.originalName }}
         <span v-if="index !== fileList.length - 1" v-html="separator"></span>
       </a>
     </template>
@@ -65,7 +65,7 @@
       previewCurrent.value = index;
       visible.value = true;
     } else {
-      fileApi.downLoadFile(file.fileKey);
+      fileApi.downLoadFile(file.storageKey);
     }
   }
 

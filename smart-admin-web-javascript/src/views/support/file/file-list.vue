@@ -13,10 +13,10 @@
         <SmartEnumSelect width="150px" v-model:value="queryForm.folderType" enumName="FILE_FOLDER_TYPE_ENUM" placeholder="文件夹类型" />
       </a-form-item>
       <a-form-item label="文件名" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.fileName" placeholder="文件名" />
+        <a-input style="width: 150px" v-model:value="queryForm.originalName" placeholder="文件名" />
       </a-form-item>
       <a-form-item label="文件Key" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.fileKey" placeholder="文件Key" />
+        <a-input style="width: 150px" v-model:value="queryForm.storageKey" placeholder="文件Key" />
       </a-form-item>
       <a-form-item label="文件类型" class="smart-query-form-item">
         <a-input style="width: 150px" v-model:value="queryForm.fileType" placeholder="文件类型" />
@@ -150,7 +150,7 @@
     },
     {
       title: '文件名称',
-      dataIndex: 'fileName',
+      dataIndex: 'originalName',
       ellipsis: true,
       width: 200,
     },
@@ -174,7 +174,7 @@
     },
     {
       title: '文件Key',
-      dataIndex: 'fileKey',
+      dataIndex: 'storageKey',
       ellipsis: true,
       width: 100,
     },
@@ -190,8 +190,8 @@
 
   const queryFormState = {
     folderType: undefined, //文件夹类型
-    fileName: undefined, //文件名词
-    fileKey: undefined, //文件Key
+    originalName: undefined, //文件名词
+    storageKey: undefined, //文件Key
     fileType: undefined, //文件类型
     creatorName: undefined, //创建人
     createTime: [], //创建时间
@@ -265,7 +265,7 @@
   // 下载文件
   async function download(file) {
     try {
-      await fileApi.downLoadFile(file.fileKey);
+      await fileApi.downLoadFile(file.storageKey);
     } catch (e) {
       smartSentry.captureError(e);
     }
