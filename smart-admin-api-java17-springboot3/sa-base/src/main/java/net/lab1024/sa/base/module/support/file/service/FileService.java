@@ -12,6 +12,8 @@ import net.lab1024.sa.base.common.util.SmartEnumUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.base.common.util.SmartStringUtil;
 import net.lab1024.sa.base.module.support.file.constant.FileFolderTypeEnum;
+import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
+import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
 import net.lab1024.sa.base.module.support.file.domain.form.FileQueryForm;
@@ -100,13 +102,22 @@ public class FileService {
         FileUploadVO uploadVO = response.getData();
         FileEntity fileEntity = new FileEntity();
         fileEntity.setFolderType(folderTypeEnum.getValue());
-        fileEntity.setFileName(originalFilename);
+        // 迁移期双写：新旧字段并存，档⑤ 清退旧实现时一并删除旧的
+        fileEntity.setCategoryId(Long.valueOf(folderTypeEnum.getValue()));
+        fileEntity.setOriginalName(originalFilename);
         fileEntity.setFileSize(file.getSize());
-        fileEntity.setFileKey(uploadVO.getFileKey());
+        fileEntity.setStorageKey(uploadVO.getFileKey());
         fileEntity.setFileType(uploadVO.getFileType());
+        fileEntity.setExtension(uploadVO.getFileType());
         fileEntity.setCreatorId(requestUser == null ? null : requestUser.getUserId());
         fileEntity.setCreatorName(requestUser == null ? null : requestUser.getUserName());
+        fileEntity.setCreateBy(requestUser == null ? null : requestUser.getUserName());
         fileEntity.setCreatorUserType(requestUser == null ? null : requestUser.getUserType().getValue());
+        // 旧上传路径没有 TEMP/CONFIRMED 的概念，一律按已确认落库，否则会被清理任务删掉
+        fileEntity.setStatus(FileStatusEnum.CONFIRMED.getValue());
+        fileEntity.setVisibility(uploadVO.getFileKey() != null
+                && uploadVO.getFileKey().startsWith(FileFolderTypeEnum.FOLDER_PRIVATE)
+                ? FileVisibilityEnum.PRIVATE.getValue() : FileVisibilityEnum.PUBLIC.getValue());
         fileDao.insert(fileEntity);
 
         // 将fileId 返回给前端
