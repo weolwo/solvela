@@ -8,8 +8,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -52,8 +50,14 @@ public class SmartResponseUtil {
         }
 
         if (SmartStringUtil.isNotEmpty(fileName)) {
-            response.setHeader(HttpHeaders.CONTENT_TYPE, MediaTypeFactory.getMediaType(fileName).orElse(MediaType.APPLICATION_OCTET_STREAM) + ";charset=utf-8");
-            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20"));
+            MediaType mediaType = MediaTypeFactory.getMediaType(fileName).orElse(MediaType.APPLICATION_OCTET_STREAM);
+            // charset 只对文本类型有意义。给 image/png 挂 ;charset=utf-8 是无意义的噪音，
+            // 个别下载器还会因此把二进制当文本处理
+            response.setHeader(HttpHeaders.CONTENT_TYPE,
+                    "text".equals(mediaType.getType()) ? mediaType + ";charset=utf-8" : mediaType.toString());
+            // RFC 6266 双写法。旧实现用 URLEncoder.encode（那是 form 编码不是 percent-encoding），
+            // 空格变 + 要打补丁，而分号逗号不转义可以直接把这个 header 撕成两截
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, SmartContentDispositionUtil.attachment(fileName));
             response.setHeader(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION);
         }
     }

@@ -13,10 +13,12 @@ import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileRelationEntity;
 import net.lab1024.sa.base.module.support.securityprotect.service.SecurityFileService;
+import net.lab1024.sa.base.storage.ByteRange;
 import net.lab1024.sa.base.storage.ObjectMeta;
 import net.lab1024.sa.base.storage.ObjectStorage;
 import net.lab1024.sa.base.storage.StorageKey;
 import net.lab1024.sa.base.storage.StorageKeyGenerator;
+import net.lab1024.sa.base.storage.StoredObject;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,7 +34,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -94,6 +98,18 @@ public class FileAssetService {
      */
     @Value("${file.storage.max-file-size-kb:10240}")
     private long maxFileSizeKb;
+
+    /**
+     * 公开文件的 URL 前缀（CDN 或对象存储域名）。<b>不配则一律走后端下载接口</b> ——
+     * 猜一个前缀拼出打不开的 URL，比多走一跳后端难排查得多。
+     */
+    @Value("${file.storage.public-url-prefix:}")
+    private String publicUrlPrefix = "";
+
+    /**
+     * 后端流式下载接口，见 {@code FileController#download}。
+     */
+    private static final String DOWNLOAD_PATH = "/file/download/";
 
     // ------------------------------------------------------------------ 上传
 
@@ -212,6 +228,72 @@ public class FileAssetService {
     @Transactional(rollbackFor = Exception.class)
     public void releaseRelation(String bizType, Long bizId) {
         fileRelationDao.deleteByBiz(bizType, bizId);
+    }
+
+    // ------------------------------------------------------------------ 读取
+
+    /**
+     * 取文件记录，不存在或已删除直接抛。
+     */
+    public FileEntity requireFile(Long fileId) {
+        FileEntity entity = fileId == null ? null : fileDao.selectById(fileId);
+        if (entity == null || (entity.getDeletedFlag() != null && entity.getDeletedFlag() == 1)) {
+            throw new BusinessException("文件不存在");
+        }
+        return entity;
+    }
+
+    /**
+     * 打开文件流。<b>调用方负责关闭</b>返回的 {@link StoredObject}。
+     *
+     * <p>返回流而不是 {@code byte[]} —— 旧的两个实现都是先全量读进堆再吐出去，
+     * 名字叫"流式下载"，实际 100MB 文件就是 100MB 堆。
+     */
+    public StoredObject open(FileEntity file, ByteRange range) {
+        return objectStorage.open(new StorageKey(file.getStorageKey()), range);
+    }
+
+    /**
+     * 批量取访问 URL。<b>一次查库，没有 N+1。</b>
+     *
+     * <p>旧路径的 {@code FileService#getFileList} 已经批量查过库了，却又在循环里逐个调
+     * {@code getFileUrl}，而云端那个实现每次还要查一次 Redis、缓存没命中再查一次 DB、
+     * 再算一次 SigV4 签名 —— 100 个私有附件冷缓存就是 1 次批量查 + 100 次 Redis
+     * + 100 次单条 DB + 100 次 HMAC。
+     *
+     * <p>URL 形态由可见性决定（设计文档 §7.4）：
+     * <ul>
+     *   <li>公开 → {@code publicUrlPrefix + storageKey}，可挂 CDN 且因为 key 不可变
+     *       可以设 {@code immutable}</li>
+     *   <li>私有 → 后端下载接口，走完整登录态鉴权</li>
+     * </ul>
+     *
+     * <p>{@code publicUrlPrefix} 没配时<b>一律走后端下载接口</b>。这是刻意的保守默认：
+     * 猜一个前缀拼出打不开的 URL，比多走一跳后端要难排查得多。
+     */
+    public Map<Long, String> batchUrl(Collection<Long> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return Map.of();
+        }
+        List<FileEntity> files = fileDao.selectByIds(fileIds);
+        Map<Long, String> urls = new LinkedHashMap<>(files.size());
+        for (FileEntity file : files) {
+            urls.put(file.getFileId(), urlOf(file));
+        }
+        return urls;
+    }
+
+    public String url(FileEntity file) {
+        return urlOf(file);
+    }
+
+    private String urlOf(FileEntity file) {
+        boolean publicReadable = FileVisibilityEnum.PUBLIC.equalsValue(file.getVisibility());
+        if (publicReadable && !publicUrlPrefix.isBlank()) {
+            String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
+            return prefix + file.getStorageKey();
+        }
+        return DOWNLOAD_PATH + file.getFileId();
     }
 
     /**

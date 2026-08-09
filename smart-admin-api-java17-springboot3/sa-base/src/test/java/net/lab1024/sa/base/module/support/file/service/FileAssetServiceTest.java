@@ -2,6 +2,7 @@ package net.lab1024.sa.base.module.support.file.service;
 
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
+import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
 import net.lab1024.sa.base.module.support.file.dao.FileCategoryDao;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.dao.FileRelationDao;
@@ -29,6 +30,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -198,6 +201,39 @@ class FileAssetServiceTest {
         assertThatThrownBy(() -> service.upload(png("a.png"), "BANNER", null))
                 .isInstanceOf(BusinessException.class);
         verify(fileDao).deleteById(1001L);
+    }
+
+    @Test
+    @DisplayName("批量取URL只查一次库 —— 旧路径批量查完又在循环里逐个查 Redis+DB+算签名")
+    void batchUrlQueriesOnce() {
+        ReflectionTestUtils.setField(service, "publicUrlPrefix", "https://cdn.example.com");
+        when(fileDao.selectByIds(any())).thenReturn(List.of(
+                file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC),
+                file(2L, "banner/202608/10/b.png", FileVisibilityEnum.PRIVATE)));
+
+        Map<Long, String> urls = service.batchUrl(List.of(1L, 2L));
+
+        assertThat(urls.get(1L)).isEqualTo("https://cdn.example.com/banner/202608/10/a.png");
+        // 私有文件不给静态 URL，走后端下载接口（走登录态鉴权）
+        assertThat(urls.get(2L)).isEqualTo("/file/download/2");
+        verify(fileDao, org.mockito.Mockito.times(1)).selectByIds(any());
+    }
+
+    @Test
+    @DisplayName("没配 publicUrlPrefix 时公开文件也走后端接口 —— 保守默认，不猜前缀")
+    void fallsBackToBackendWhenPrefixMissing() {
+        when(fileDao.selectByIds(any())).thenReturn(List.of(
+                file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC)));
+
+        assertThat(service.batchUrl(List.of(1L)).get(1L)).isEqualTo("/file/download/1");
+    }
+
+    private static FileEntity file(Long id, String key, FileVisibilityEnum visibility) {
+        FileEntity entity = new FileEntity();
+        entity.setFileId(id);
+        entity.setStorageKey(key);
+        entity.setVisibility(visibility.getValue());
+        return entity;
     }
 
     @Test
