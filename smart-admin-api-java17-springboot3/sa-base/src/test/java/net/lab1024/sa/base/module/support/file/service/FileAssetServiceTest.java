@@ -126,6 +126,20 @@ class FileAssetServiceTest {
     }
 
     @Test
+    @DisplayName("confirm 收到空集合＝这个业务对象一张图都不引用了，必须照样清掉旧关系")
+    void confirmWithEmptyListStillClearsRelations() {
+        // 原先这里是 if (empty) return;，于是「把最后一张图移除后保存」永远解除不掉引用，
+        // 那张图从此删不掉（守卫说"正被 1 处业务引用"），而实际上没有人在用它。
+        // 3 张变 2 张是对的、1 张变 0 张是错的 —— 差一个元素，行为完全相反
+        service.confirm(List.of(), "ACTIVITY_DISPLAY", 20L);
+
+        verify(fileRelationDao).deleteByBiz("ACTIVITY_DISPLAY", 20L);
+        verify(fileRelationDao, org.mockito.Mockito.never()).insert(any(FileRelationEntity.class));
+        // 空集合不该去查文件表
+        verify(fileDao, org.mockito.Mockito.never()).selectByIds(any());
+    }
+
+    @Test
     @DisplayName("免登录读取口只认公开文件：私有文件返回 null（调用方给 404，不给 403）")
     void publicLookupRejectsPrivateFile() {
         FileEntity privateFile = file(1L, "feedback/202608/10/a.jpg", FileVisibilityEnum.PRIVATE);

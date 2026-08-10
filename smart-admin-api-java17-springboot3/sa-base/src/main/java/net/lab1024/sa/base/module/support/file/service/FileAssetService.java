@@ -522,28 +522,34 @@ public class FileAssetService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void confirm(List<Long> fileIds, String bizType, Long bizId) {
-        if (fileIds == null || fileIds.isEmpty()) {
-            return;
-        }
-        List<FileEntity> files = fileDao.selectByIds(fileIds);
-        if (files.size() != fileIds.size()) {
-            throw new BusinessException("部分文件不存在，无法确认引用");
-        }
-        for (FileEntity file : files) {
-            if (!FileStatusEnum.CONFIRMED.equalsValue(file.getStatus())) {
-                FileEntity update = new FileEntity();
-                update.setFileId(file.getFileId());
-                update.setStatus(FileStatusEnum.CONFIRMED.getValue());
-                fileDao.updateById(update);
+        // 🔴 空集合不能提前返回。它的含义是「这个业务对象现在一张图都不引用了」，
+        // 恰恰是最需要执行下面那句 deleteByBiz 的场景。
+        // 原先在这里 return，导致「把最后一张图移除后保存」的引用永远解除不掉 ——
+        // 实测：展示配置移除主视觉并保存，t_file_relation 里那行纹丝不动，
+        // 于是那张图永远删不掉（删除守卫说"正被 1 处业务引用"），而实际上没有人在用它。
+        // 3 张变 2 张是对的，1 张变 0 张是错的 —— 边界只差一个元素，行为完全相反。
+        List<Long> ids = fileIds == null ? List.of() : fileIds;
+        if (!ids.isEmpty()) {
+            List<FileEntity> files = fileDao.selectByIds(ids);
+            if (files.size() != ids.size()) {
+                throw new BusinessException("部分文件不存在，无法确认引用");
+            }
+            for (FileEntity file : files) {
+                if (!FileStatusEnum.CONFIRMED.equalsValue(file.getStatus())) {
+                    FileEntity update = new FileEntity();
+                    update.setFileId(file.getFileId());
+                    update.setStatus(FileStatusEnum.CONFIRMED.getValue());
+                    fileDao.updateById(update);
+                }
             }
         }
         // 先清后建，让 confirm 幂等：同一个业务对象重复提交表单不会累积出重复关系，
-        // 也能正确反映「这次去掉了某个附件」
+        // 也能正确反映「这次去掉了某个附件」（包括去掉最后一个）
         fileRelationDao.deleteByBiz(bizType, bizId);
-        List<FileRelationEntity> relations = new ArrayList<>(fileIds.size());
-        for (int i = 0; i < fileIds.size(); i++) {
+        List<FileRelationEntity> relations = new ArrayList<>(ids.size());
+        for (int i = 0; i < ids.size(); i++) {
             FileRelationEntity relation = new FileRelationEntity();
-            relation.setFileId(fileIds.get(i));
+            relation.setFileId(ids.get(i));
             relation.setBizType(bizType);
             relation.setBizId(bizId);
             // 顺序取自入参顺序 —— N 次并发上传的返回顺序是乱的，轮播图必须靠这个
