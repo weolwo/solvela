@@ -40,11 +40,15 @@ public class ActivityDisplayController {
 
     private final ActivityDisplayService activityDisplayService;
 
+    /**
+     * 按活动编码查。<b>对外一律用 activityCode 寻址</b> —— 整个活动域都是这么做的，
+     * 而 {@code wizardCreate} 压根不返回 id，前端拿不到。
+     */
     @Operation(summary = "查询活动展示配置 @author 1024")
-    @GetMapping("/get/{activityId}")
+    @GetMapping("/get/{activityCode}")
     @SaCheckPermission("activityConfig:query")
-    public ResponseDTO<ActivityDisplay> get(@PathVariable Long activityId) {
-        return ResponseDTO.ok(activityDisplayService.getByActivityId(activityId));
+    public ResponseDTO<ActivityDisplay> get(@PathVariable String activityCode) {
+        return ResponseDTO.ok(activityDisplayService.getByActivityCode(activityCode));
     }
 
     /**
@@ -54,9 +58,10 @@ public class ActivityDisplayController {
      * 包括三个独立图片字段和富文本正文里的图。不登记的话孤儿清理任务会把它们删掉。
      */
     @Operation(summary = "保存活动展示配置 @author 1024")
-    @PostMapping("/save")
+    @PostMapping("/save/{activityCode}")
     @SaCheckPermission("activityConfig:update")
-    public ResponseDTO<ActivityDisplay> save(@RequestBody @Valid ActivityDisplay form) {
-        return ResponseDTO.ok(activityDisplayService.save(form, SmartRequestUtil.getRequestUser()));
+    public ResponseDTO<ActivityDisplay> save(@PathVariable String activityCode,
+                                             @RequestBody @Valid ActivityDisplay form) {
+        return ResponseDTO.ok(activityDisplayService.saveByCode(activityCode, form, SmartRequestUtil.getRequestUser()));
     }
 }

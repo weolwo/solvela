@@ -35,7 +35,7 @@
     <a-card :bordered="false" class="shadow-sm">
       <!-- 步骤条按类型伸缩：BASIC 两步、玩法类三步 -->
       <div class="px-6 pt-2 pb-6">
-        <a-steps :current="step" size="small" :items="stepItems" />
+        <a-steps :current="stepIndex" size="small" :items="stepItems" />
       </div>
 
       <a-divider class="my-0" />
@@ -148,6 +148,23 @@
         </div>
       </div>
 
+      <!-- ==================== 展示配置（可跳过） ==================== -->
+      <div v-else-if="step === STEP.DISPLAY" class="p-6">
+        <div class="flex items-center gap-4 mb-4 px-4 py-3 bg-slate-50 rounded-lg border border-slate-200 flex-wrap">
+          <a-tag :color="typeMeta.color" class="m-0">{{ typeMeta.icon }} {{ typeMeta.desc }}</a-tag>
+          <span class="font-bold text-sm">{{ created.activityName }}</span>
+          <span class="font-mono text-xs text-slate-500">{{ created.activityCode }}</span>
+          <span class="text-xs text-slate-400 ml-auto">有些活动不需要 C 端展示，这一步可以跳过</span>
+        </div>
+
+        <ActivityDisplayForm
+          :activity-code="created.activityCode"
+          :skippable="true"
+          @saved="step = STEP.DONE"
+          @skip="step = STEP.DONE"
+        />
+      </div>
+
       <!-- ==================== 完成页 ==================== -->
       <div v-else class="p-6">
         <a-result
@@ -185,13 +202,22 @@
   import TaskWizard from '/@/views/business/task/task-wizard/TaskWizard.vue';
   import LotteryWorkbench from '/@/views/business/lottery/lottery-workbench/LotteryWorkbench.vue';
   import PrizeQuickPanel from './components/PrizeQuickPanel.vue';
+  import ActivityDisplayForm from '../components/activity-display-form.vue';
 
   // ⚠️ 路由 path 以 t_menu 实际记录为准，不要照搬组件目录：
   // 活动配置列表的菜单 path 是 /activity/activity-config/list（component 才是 /business/... 开头的目录）
   const ACTIVITY_LIST_PATH = '/activity/activity-config/list';
 
-  // 步骤下标。BASIC 时 GAMEPLAY 这一档被跳过，DONE 仍是最后一档（步骤条只渲染两项）
-  const STEP = { BASE: 0, GAMEPLAY: 1, DONE: 2 };
+  /**
+   * 步骤用语义名而不是数字下标。
+   *
+   * 原先是 { BASE:0, GAMEPLAY:1, DONE:2 } 的数字常量，加了「展示配置」之后 BASIC 类型
+   * 会跳过 GAMEPLAY、后面的下标整体前移一位 —— 数字常量就得按类型算两套，
+   * 而「当前在第几步」和「步骤条渲染几项」一旦对不齐，高亮就串位，且构建期完全发现不了。
+   *
+   * 改成语义名之后，下标只在渲染步骤条时算一次，业务代码里不再出现魔数。
+   */
+  const STEP = { BASE: 'BASE', GAMEPLAY: 'GAMEPLAY', DISPLAY: 'DISPLAY', DONE: 'DONE' };
 
   // 组件名 → 组件实现的唯一映射。常量文件只存名字（它不该 import 组件），在这里落地
   const GAMEPLAY_COMPONENTS = { DrawWorkbench, TaskWizard, LotteryWorkbench };
@@ -239,8 +265,19 @@
   const gameplayComponent = computed(() => GAMEPLAY_COMPONENTS[typeMeta.value.component] || null);
 
   const stepItems = computed(() =>
-    isBasic.value ? [{ title: '创建活动' }, { title: '完成' }] : [{ title: '创建活动' }, { title: '配置玩法' }, { title: '完成' }]
+    isBasic.value
+      ? [{ title: '创建活动' }, { title: '展示配置' }, { title: '完成' }]
+      : [{ title: '创建活动' }, { title: '配置玩法' }, { title: '展示配置' }, { title: '完成' }]
   );
+
+  // 语义名 → 步骤条下标。BASIC 少一档，后面整体前移一位；这是唯一出现数字的地方
+  const stepIndex = computed(() => {
+    const order = isBasic.value
+      ? [STEP.BASE, STEP.DISPLAY, STEP.DONE]
+      : [STEP.BASE, STEP.GAMEPLAY, STEP.DISPLAY, STEP.DONE];
+    const idx = order.indexOf(step.value);
+    return idx < 0 ? 0 : idx;
+  });
 
   const rules = {
     activityName: [{ required: true, message: '请输入活动名称' }],
@@ -291,8 +328,8 @@
       created.activityCode = form.activityCode;
       created.activityName = form.activityName;
       created.activityType = form.activityType;
-      // BASIC 没有第二步，直接到完成页（步骤条只有两项，下标 1 即最后一项）
-      step.value = hasGameplay(form.activityType) ? STEP.GAMEPLAY : STEP.DONE;
+      // BASIC 没有玩法配置那一步，直接进展示配置；展示配置本身可跳过
+      step.value = hasGameplay(form.activityType) ? STEP.GAMEPLAY : STEP.DISPLAY;
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -302,7 +339,7 @@
 
   // 玩法组件保存成功后由它主动通知，外壳据此推进 —— 外壳自己不判断「配完了没有」
   function onGameplaySaved() {
-    step.value = STEP.DONE;
+    step.value = STEP.DISPLAY;
   }
 
   function onConfigLater() {

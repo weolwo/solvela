@@ -3,6 +3,7 @@ package net.lab1024.sa.activity.service;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.activity.dao.ActivityDisplayDao;
+import net.lab1024.sa.activity.domain.entity.ActivityConfig;
 import net.lab1024.sa.activity.domain.entity.ActivityDisplay;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.exception.BusinessException;
@@ -43,8 +44,45 @@ public class ActivityDisplayService {
     @Resource
     private FileAssetService fileAssetService;
 
+    @Resource
+    private ActivityConfigService activityConfigService;
+
     public ActivityDisplay getByActivityId(Long activityId) {
         return activityDisplayDao.getByActivityId(activityId);
+    }
+
+    /**
+     * 按活动编码查。
+     *
+     * <p><b>对外一律用 activityCode 寻址，不用 activityId</b>：整个活动域都是这么做的 ——
+     * 向导返回的是 code、路由参数是 code、玩法配置的保存接口收的也是 code。
+     * 而 {@code wizardCreate} 压根不返回 id，前端拿不到。
+     *
+     * <p>存储层仍然 FK 到 {@code activity_id}（数值外键更小、索引更省），
+     * code → id 的换算在这一层做掉。这是「API 用业务键、存储用代理键」的常规分工。
+     */
+    public ActivityDisplay getByActivityCode(String activityCode) {
+        ActivityConfig activity = requireActivity(activityCode);
+        return activityDisplayDao.getByActivityId(activity.getId());
+    }
+
+    /**
+     * 按活动编码保存。租户从活动上带过来，前端不用传也篡改不了。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ActivityDisplay saveByCode(String activityCode, ActivityDisplay form, RequestUser user) {
+        ActivityConfig activity = requireActivity(activityCode);
+        form.setActivityId(activity.getId());
+        form.setTenantId(activity.getTenantId());
+        return save(form, user);
+    }
+
+    private ActivityConfig requireActivity(String activityCode) {
+        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
+        if (activity == null) {
+            throw new BusinessException("活动不存在：" + activityCode);
+        }
+        return activity;
     }
 
     /**
