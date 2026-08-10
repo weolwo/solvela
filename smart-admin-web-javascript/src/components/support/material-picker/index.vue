@@ -60,6 +60,7 @@
               <div class="thumb-wrap">
                 <FileThumb
                   :file-id="file.fileId"
+                  :file-url="file.fileUrl"
                   :content-type="file.contentType"
                   :extension="file.extension"
                   :alt="file.originalName"
@@ -101,7 +102,7 @@
   import { computed, reactive, ref } from 'vue';
   import { message } from 'ant-design-vue';
   import { fileApi } from '/@/api/support/file-api';
-  import { FILE_FOLDER_TYPE_ENUM } from '/@/constants/support/file-const';
+  import { FILE_CATEGORY_CODE } from '/@/constants/support/file-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import FileThumb from '/@/components/support/file-thumb/index.vue';
 
@@ -113,6 +114,11 @@
     // 多选上限，0 表示不限
     limit: { type: Number, default: 0 },
     accept: { type: String, default: 'image/*' },
+    /**
+     * 没在左侧选具体分类时，弹窗内上传落到哪个分类（分类编码）。
+     * 默认活动素材：这个选择器目前的调用方都是活动配图，而活动图必须是公开可读的分类。
+     */
+    defaultCategoryCode: { type: String, default: FILE_CATEGORY_CODE.ACTIVITY },
   });
 
   const emit = defineEmits(['select']);
@@ -229,18 +235,19 @@
   }
 
   /**
-   * 传进来的文件落在当前分类下；在「全部素材」里传则落到通用分类。
-   * 与素材库页面同一口径 —— 两处对不上会让运营在选图器里传的图在素材库里找不到。
+   * 传进来的文件落在左侧选中的那个分类下；停在「全部素材」时落到 defaultCategoryCode。
+   *
+   * <p>选中分类时按 ID 传没问题 —— 那个 ID 是刚从服务端列表里拿的，不是代码里写死的数字；
+   * 而缺省分类必须按编码传，理由见 file-const 里的说明。
    */
-  const COMMON_CATEGORY_ID = FILE_FOLDER_TYPE_ENUM.COMMON.value;
-
   async function customUpload({ file, onSuccess, onError }) {
     uploading.value = true;
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const folder = currentCategoryId.value || COMMON_CATEGORY_ID;
-      let res = await fileApi.uploadFile(formData, folder);
+      let res = currentCategoryId.value
+        ? await fileApi.uploadFile(formData, currentCategoryId.value)
+        : await fileApi.uploadFileByCategory(formData, props.defaultCategoryCode);
       onSuccess(res, file);
       message.success('上传成功');
       // 刚传的图直接选中：上传的动机就是"我要用这张"，还要再点一下是多余的。

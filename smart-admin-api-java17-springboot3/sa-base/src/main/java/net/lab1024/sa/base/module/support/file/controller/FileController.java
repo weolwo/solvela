@@ -8,12 +8,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.lab1024.sa.base.common.controller.SupportBaseController;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.common.util.SmartContentDispositionUtil;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
+import net.lab1024.sa.base.config.FileConfig;
 import net.lab1024.sa.base.constant.SwaggerTagConst;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileUploadVO;
 import net.lab1024.sa.base.module.support.file.service.FileAssetService;
+import net.lab1024.sa.base.storage.StorageKey;
 import net.lab1024.sa.base.storage.StoredObject;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 文件服务。
@@ -45,14 +50,30 @@ public class FileController extends SupportBaseController {
     @Resource
     private FileAssetService fileAssetService;
 
-    @Operation(summary = "文件上传 @author 胡克")
+    /**
+     * @param folder       旧契约：分类 ID。迁移脚本把四个内置分类的 ID 对齐成了原 folderType 的数字，
+     *                     所以老调用方不用改
+     * @param categoryCode 新契约：分类编码。<b>新增的分类必须走这个参数</b> —— 它们的 ID 是各环境
+     *                     数据库各自生成的（dev 上「活动素材」是 5，prod 上可能是 9），
+     *                     前端硬编码数字就是 v3.53.0 里写明的那个"枚举变表最经典的翻车点"
+     */
+    @Operation(summary = "文件上传（categoryCode 与 folder 二选一） @author 胡克")
     @PostMapping("/file/upload")
-    public ResponseDTO<FileUploadVO> upload(@RequestParam MultipartFile file, @RequestParam Integer folder) {
+    public ResponseDTO<FileUploadVO> upload(@RequestParam MultipartFile file,
+                                            @RequestParam(required = false) Integer folder,
+                                            @RequestParam(required = false) String categoryCode) {
         RequestUser requestUser = SmartRequestUtil.getRequestUser();
-        // folder 沿用原来的 folderType 取值：迁移脚本把内置分类的 ID 对齐成了同一个数字，
-        // 所以这个接口的契约不用动
-        FileEntity entity = fileAssetService.upload(file, Long.valueOf(folder), requestUser);
+        FileEntity entity = (categoryCode == null || categoryCode.isBlank())
+                ? fileAssetService.upload(file, Long.valueOf(requireFolder(folder)), requestUser)
+                : fileAssetService.upload(file, categoryCode, requestUser);
         return ResponseDTO.ok(toUploadVO(entity));
+    }
+
+    private static Integer requireFolder(Integer folder) {
+        if (folder == null) {
+            throw new BusinessException("上传必须指定 categoryCode 或 folder");
+        }
+        return folder;
     }
 
     @Operation(summary = "获取文件URL：根据storageKey，支持逗号分隔 @author 胡克")
@@ -86,6 +107,47 @@ public class FileController extends SupportBaseController {
                          HttpServletRequest request,
                          HttpServletResponse response) throws IOException {
         writeFile(fileAssetService.requireFile(fileId), inline, request, response);
+    }
+
+    /**
+     * 公开文件的免登录读取口。<b>C 端用户是匿名的，永远带不上 token</b>，
+     * 所以活动展示图必须有这么一条路 —— 这不是为了省事，是 C 端能不能显示图的前提。
+     *
+     * <p>与被删掉的 {@code /upload/**} 静态映射的区别只有一条，但是决定性的：
+     * <b>它查 visibility</b>。私有文件走到这里一律 404，而那个静态映射把整个上传目录
+     * 无差别地端出去（实测不带 token 也能拿到意见反馈的附件）。
+     *
+     * <p>路径里是 storageKey 而不是 fileId：这样 URL 可以直接换成 CDN 域名 + 同一个 key
+     * （见 {@code FileAssetService#urlOf}），本地与云端两种部署下前端拿到的形态是一致的。
+     * key 由 {@link StorageKey} 的构造器校验，{@code ..} / 反斜杠 / 空路径段一概拒绝 ——
+     * 这条路径直接拼磁盘路径，是最典型的目录穿越入口。
+     *
+     * <p>404 而不是 403：不告诉外面"这个 key 存在但你没权限"。
+     *
+     * <p>缓存头敢写 immutable，是因为 storageKey 不可变、永不覆盖（红线 1）。
+     * 换图 = 换 key = 换 URL，所以浏览器和 CDN 缓存一年也不会拿到过期内容。
+     */
+    @Operation(summary = "读取公开文件（免登录，私有文件404） @author 1024")
+    @GetMapping(FileConfig.PUBLIC_FILE_PATH + "/**")
+    public void publicAccess(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String uri = request.getRequestURI();
+        int idx = uri.indexOf(FileConfig.PUBLIC_FILE_MAPPING + "/");
+        String rawKey = idx < 0 ? "" : uri.substring(idx + FileConfig.PUBLIC_FILE_MAPPING.length() + 1);
+        String storageKey = URLDecoder.decode(rawKey, StandardCharsets.UTF_8);
+
+        FileEntity file;
+        try {
+            file = fileAssetService.findPublicByStorageKey(new StorageKey(storageKey).value());
+        } catch (IllegalArgumentException e) {
+            // 非法 key（穿越尝试等）与不存在同样处理，不给探测者任何区分信号
+            file = null;
+        }
+        if (file == null) {
+            response.setStatus(HttpStatus.NOT_FOUND.value());
+            return;
+        }
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable");
+        writeFile(file, true, request, response);
     }
 
     // ------------------------------------------------------------------

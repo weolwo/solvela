@@ -23,12 +23,21 @@
 
   const props = defineProps({
     fileId: { type: Number, default: null },
+    /**
+     * 后端下发的 fileUrl。**公开文件的 URL 可以直接用**（走 /support/file/public/ 或 CDN，
+     * 免登录），这时不必带着 token 把字节拉进内存 —— 交给浏览器缓存比我们自己缓存好得多。
+     * 只有指向登录态下载接口的 URL 才需要走取字节那条路。
+     */
+    fileUrl: { type: String, default: '' },
     // 用来判断要不要真去取字节；拿不到就按图片试一次
     contentType: { type: String, default: 'image/' },
     extension: { type: String, default: '' },
     alt: { type: String, default: '' },
     height: { type: Number, default: 110 },
   });
+
+  /** 要登录态的那条路径。判它而不是判"是不是 http 开头"：公开前缀可能是相对路径 */
+  const AUTH_DOWNLOAD_PATH = '/file/download/';
 
   const src = ref('');
   const loading = ref(false);
@@ -40,6 +49,11 @@
   async function load() {
     src.value = '';
     if (!props.fileId || !isImage.value) {
+      return;
+    }
+    if (props.fileUrl && !props.fileUrl.includes(AUTH_DOWNLOAD_PATH)) {
+      // 公开图：直接交给 <img>，省一次 XHR，也让浏览器/CDN 的缓存真正起作用
+      src.value = props.fileUrl;
       return;
     }
     loading.value = true;
@@ -58,7 +72,7 @@
     }
   }
 
-  watch(() => props.fileId, load, { immediate: true });
+  watch(() => [props.fileId, props.fileUrl], load, { immediate: true });
 </script>
 
 <style scoped lang="less">

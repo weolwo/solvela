@@ -109,6 +109,35 @@ class FileAssetServiceTest {
     }
 
     @Test
+    @DisplayName("可见性由分类决定：分类没配就按私有算，绝不默认公开")
+    void visibilityComesFromCategory() {
+        // BANNER 这个 fixture 没设 defaultVisibility，等价于「加分类的人没想过这件事」
+        assertThat(service.upload(png("a.png"), "BANNER", null).getVisibility())
+                .isEqualTo(FileVisibilityEnum.PRIVATE.getValue());
+
+        FileCategoryEntity publicCategory = new FileCategoryEntity();
+        publicCategory.setCategoryId(9L);
+        publicCategory.setCategoryCode("ACTIVITY");
+        publicCategory.setDefaultVisibility(FileVisibilityEnum.PUBLIC.getValue());
+        when(fileCategoryDao.getByCode("ACTIVITY")).thenReturn(publicCategory);
+
+        assertThat(service.upload(png("b.png"), "ACTIVITY", null).getVisibility())
+                .isEqualTo(FileVisibilityEnum.PUBLIC.getValue());
+    }
+
+    @Test
+    @DisplayName("免登录读取口只认公开文件：私有文件返回 null（调用方给 404，不给 403）")
+    void publicLookupRejectsPrivateFile() {
+        FileEntity privateFile = file(1L, "feedback/202608/10/a.jpg", FileVisibilityEnum.PRIVATE);
+        when(fileDao.selectOne(any())).thenReturn(privateFile);
+        assertThat(service.findPublicByStorageKey("feedback/202608/10/a.jpg")).isNull();
+
+        FileEntity publicFile = file(2L, "activity/202608/10/b.jpg", FileVisibilityEnum.PUBLIC);
+        when(fileDao.selectOne(any())).thenReturn(publicFile);
+        assertThat(service.findPublicByStorageKey("activity/202608/10/b.jpg")).isSameAs(publicFile);
+    }
+
+    @Test
     @DisplayName("扩展名从嗅探MIME反推：内容是PNG但命名 evil.html，也存成 .png")
     void extensionComesFromSniffedMime() {
         FileEntity saved = service.upload(png("evil.html"), "BANNER", null);

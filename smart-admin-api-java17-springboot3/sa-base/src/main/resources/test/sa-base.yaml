@@ -106,6 +106,10 @@ server:
 file:
   storage:
     mode: local
+    # 公开文件的 URL 前缀，见 dev 的说明。本地模式填 http(s)://<后端域名>/support/file/public/，
+    # 上了 CDN 就填 CDN 域名。**这里刻意留空而不是写占位符**：占位符只会拼出一个打不开的 URL，
+    # 而留空会稳稳退回登录态下载接口，管理端照常可用，C 端图不显示 —— 后者一眼就能发现。
+    # public-url-prefix:
     local:
       upload-path: /home/smart_admin_v3/upload/   #文件上传目录
       url-prefix:

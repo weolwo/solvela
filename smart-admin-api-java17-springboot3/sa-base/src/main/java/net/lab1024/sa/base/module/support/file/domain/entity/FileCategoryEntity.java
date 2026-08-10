@@ -47,6 +47,17 @@ public class FileCategoryEntity {
 
     private Integer sort;
 
+    /**
+     * 该分类下新文件的默认可见性（1公开 2私有），见 {@code FileVisibilityEnum}。
+     *
+     * <p><b>可见性由分类决定，不由上传处决定</b>：原先 {@code FileAssetService} 把每一次上传
+     * 都写死成公开，于是「哪些文件该被匿名取到」这个问题在代码里根本没有答案。
+     *
+     * <p>DB 默认值是<b>私有</b>：将来有人加分类却没想过这件事时，结果是"图看不见"
+     * 而不是"附件被公开了"。前者会被立刻发现，后者可能永远不会。
+     */
+    private Integer defaultVisibility;
+
     private String createBy;
 
     private LocalDateTime createTime;

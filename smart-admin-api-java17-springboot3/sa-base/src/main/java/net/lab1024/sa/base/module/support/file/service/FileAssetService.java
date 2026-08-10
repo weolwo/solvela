@@ -195,7 +195,11 @@ public class FileAssetService {
         entity.setExtension(extension);
         entity.setContentType(contentType);
         entity.setFileSize(size);
-        entity.setVisibility(FileVisibilityEnum.PUBLIC.getValue());
+        // 可见性从分类带下来，不在这里写死。原先无条件写 PUBLIC，配合免登录的静态资源映射，
+        // 等于所有文件都能被匿名取到（包括意见反馈的附件）。分类没配就按私有算 —— 保守的那一侧
+        entity.setVisibility(category.getDefaultVisibility() == null
+                ? FileVisibilityEnum.PRIVATE.getValue()
+                : category.getDefaultVisibility());
         entity.setStatus(FileStatusEnum.TEMP.getValue());
         entity.setDeletedFlag(0);
         entity.setCreateBy(user == null ? null : user.getUserName());
@@ -354,6 +358,26 @@ public class FileAssetService {
                 .eq(FileEntity::getDeletedFlag, 0));
         if (entity == null) {
             throw new BusinessException("文件不存在");
+        }
+        return entity;
+    }
+
+    /**
+     * 按 storageKey 找<b>公开</b>文件，给免登录的读取口用。找不到或不是公开的一律返回 null。
+     *
+     * <p>刻意与 {@link #requireByStorageKey} 分开而不是加一个 boolean 参数：
+     * 这个方法是<b>暴露在登录态之外</b>的唯一取数入口，独立成一个方法名，
+     * 将来 grep「谁能被匿名调用」时一眼就能数清楚。
+     *
+     * <p>返回 null 而不抛异常：调用方要的是 404，而 {@code BusinessException} 会被
+     * 全局处理器翻译成 200 + 业务错误码的 JSON，那对一个 {@code <img>} 请求毫无意义。
+     */
+    public FileEntity findPublicByStorageKey(String storageKey) {
+        FileEntity entity = fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
+                .eq(FileEntity::getStorageKey, storageKey)
+                .eq(FileEntity::getDeletedFlag, 0));
+        if (entity == null || !FileVisibilityEnum.PUBLIC.equalsValue(entity.getVisibility())) {
+            return null;
         }
         return entity;
     }

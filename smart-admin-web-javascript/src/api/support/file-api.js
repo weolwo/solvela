@@ -17,6 +17,17 @@ export const fileApi = {
   },
 
   /**
+   * 按分类编码上传。
+   *
+   * <p>新增的分类一律走这个，别用 folder（分类 ID）：ID 是各环境数据库各自生成的，
+   * dev 上「活动素材」是 5，prod 上可能是 9，前端写死数字就会传错分类。
+   * 四个内置分类的 ID 因为迁移脚本对齐过，才可以继续用 folder。 @author 1024
+   */
+  uploadFileByCategory: (param, categoryCode) => {
+    return postRequest(`/support/file/upload?categoryCode=${categoryCode}`, param);
+  },
+
+  /**
    * 分页查询  @author 卓大
    */
   queryPage: (param) => {

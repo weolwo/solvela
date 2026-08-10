@@ -128,7 +128,13 @@
         <div v-for="file in fileList" :key="file.fileId" class="file-card" :class="{ selected: isSelected(file.fileId) }">
           <a-checkbox class="file-check" :checked="isSelected(file.fileId)" @change="toggleSelect(file.fileId)" />
           <div class="thumb-wrap" @click="openDetail(file)">
-            <FileThumb :file-id="file.fileId" :content-type="file.contentType" :extension="file.extension" :alt="file.originalName" />
+            <FileThumb
+              :file-id="file.fileId"
+              :file-url="file.fileUrl"
+              :content-type="file.contentType"
+              :extension="file.extension"
+              :alt="file.originalName"
+            />
           </div>
           <div class="file-name" :title="file.originalName" @click="openDetail(file)">{{ file.originalName }}</div>
 

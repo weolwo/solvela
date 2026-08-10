@@ -26,6 +26,19 @@ export const FILE_FOLDER_TYPE_ENUM = {
     desc: '意见反馈',
   },
 };
+/**
+ * 分类编码。**新增分类一律用编码引用，不要用 ID** —— ID 各环境数据库各自生成，
+ * 上面那个 FILE_FOLDER_TYPE_ENUM 之所以能用数字，是因为迁移脚本把四个内置分类的 ID
+ * 对齐成了原 folderType 的值，这是历史特例不是惯例。
+ */
+export const FILE_CATEGORY_CODE = {
+  COMMON: 'COMMON',
+  // 活动素材：唯一默认公开的分类。C 端匿名用户要能取到活动图，
+  // 其余分类默认私有（见 v3.55.0 与 t_file_category.default_visibility）
+  ACTIVITY: 'ACTIVITY',
+};
+
 export default {
   FILE_FOLDER_TYPE_ENUM,
+  FILE_CATEGORY_CODE,
 };
