@@ -1,5 +1,7 @@
 package net.lab1024.sa.activity.service;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import net.lab1024.sa.activity.dao.ActivityDisplayDao;
 import net.lab1024.sa.activity.domain.entity.ActivityDisplay;
 import net.lab1024.sa.base.common.exception.BusinessException;
@@ -14,7 +16,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.ReflectionUtils;
 
+import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -155,5 +159,44 @@ class ActivityDisplayServiceTest {
         assertThat(form.getId()).isEqualTo(77L);
         verify(activityDisplayDao).updateById(form);
         verify(activityDisplayDao, never()).insert(any(ActivityDisplay.class));
+    }
+
+    /**
+     * 这是一个<b>注解固化测试</b>，不是行为测试 —— 因为这个 bug 用 mock 的 DAO 根本测不出来：
+     * {@code updateById} 跳过 null 字段是 MyBatis-Plus 在生成 SQL 时干的事，
+     * DAO 一 mock，前后都是绿的（文件模块 §12.3 记的同一类陷阱）。
+     *
+     * <p>实测症状：把主视觉「移除」再保存，界面提示保存成功、图也消失了，
+     * 刷新回来图还在，{@code t_file_relation} 里的引用也没解除。全链路零报错。
+     *
+     * <p>所以这里固化的是「这些字段必须能被写回 null」这条约定。谁把注解删了，
+     * 会看到这条用例红掉并读到原因，而不是三个月后再踩一次。
+     */
+    @Test
+    @DisplayName("可清空字段必须标 updateStrategy=ALWAYS —— 否则「移除主视觉」在库里什么都不会发生")
+    void nullableFieldsMustBeWritableBackToNull() {
+        List<String> mustBeAlways = List.of("mainImageId", "bgImageId", "shareImageId",
+                "shareTitle", "shareDesc", "subTitle", "themeColor", "ruleContent", "extraConfig");
+
+        for (String name : mustBeAlways) {
+            Field field = ReflectionUtils.findField(ActivityDisplay.class, name);
+            assertThat(field).as("字段 %s 不存在了？", name).isNotNull();
+            TableField annotation = field.getAnnotation(TableField.class);
+            assertThat(annotation)
+                    .as("%s 少了 @TableField(updateStrategy = ALWAYS)，清空它将静默失败", name)
+                    .isNotNull();
+            assertThat(annotation.updateStrategy())
+                    .as("%s 的 updateStrategy 必须是 ALWAYS", name)
+                    .isEqualTo(FieldStrategy.ALWAYS);
+        }
+
+        // 反过来：时间列绝不能标 ALWAYS，否则会把 DDL 产生的时间写成 NULL（铁律 9）
+        for (String name : List.of("createTime", "updateTime")) {
+            Field field = ReflectionUtils.findField(ActivityDisplay.class, name);
+            assertThat(field).isNotNull();
+            assertThat(field.getAnnotation(TableField.class))
+                    .as("%s 不该有 @TableField —— 时间由数据库产生", name)
+                    .isNull();
+        }
     }
 }
