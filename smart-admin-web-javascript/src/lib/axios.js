@@ -203,6 +203,18 @@ export const getDownload = function (url, params) {
     });
 };
 
+/**
+ * 取文件字节，交给调用方自己处理（图片预览转 object URL 等）。
+ *
+ * <p>为什么图片不能直接 `<img :src="fileUrl">`：下载接口要鉴权，而 `<img>` 发不出
+ * Authorization 头（token 存在 localStorage 里，不是 cookie），浏览器拿回来的是一段
+ * JSON 错误体，表现为一张打不开的图且控制台不报错。开发环境还多一层 ——
+ * 前端 8081、后端 1024，相对路径会打到 dev server 上。
+ */
+export const getBlob = function (url, params) {
+  return request({ method: 'get', url, params, responseType: 'blob' }).then((res) => res.data);
+};
+
 function handleDownloadError(error) {
   if (error instanceof Blob) {
     const fileReader = new FileReader();

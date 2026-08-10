@@ -13,7 +13,9 @@
       <div v-if="detail.file">
         <!-- 预览区：图片给大图，其他给扩展名占位 -->
         <div class="preview">
-          <a-image v-if="isImage" :src="detail.file.fileUrl" :alt="detail.file.originalName" />
+          <!-- 用 a-image 是为了点击放大看细节；src 必须是带 token 取回来的 object URL，
+               直接用后端下发的 fileUrl 只会得到一张打不开的图（下载接口要登录态） -->
+          <a-image v-if="isImage && previewSrc" :src="previewSrc" :alt="detail.file.originalName" />
           <div v-else class="preview-placeholder">
             <div class="ext">{{ (detail.file.extension || 'FILE').toUpperCase() }}</div>
           </div>
@@ -106,6 +108,7 @@
   import { computed, reactive, ref } from 'vue';
   import { Empty, message } from 'ant-design-vue';
   import { fileApi } from '/@/api/support/file-api';
+  import { getFilePreviewUrl } from '/@/lib/file-preview';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   const emit = defineEmits(['reload']);
@@ -118,6 +121,7 @@
   const editing = ref(false);
   const detail = reactive({ file: null, references: [] });
   const editForm = reactive({ originalName: '', tags: [] });
+  const previewSrc = ref('');
 
   const isImage = computed(() => !!detail.file && (detail.file.contentType || '').startsWith('image/'));
   const hasReferences = computed(() => !!detail.references && detail.references.length > 0);
@@ -136,10 +140,15 @@
     loading.value = true;
     detail.file = null;
     detail.references = [];
+    previewSrc.value = '';
     try {
       let res = await fileApi.detail(fileId);
       detail.file = res.data.file;
       detail.references = res.data.references || [];
+      if (isImage.value) {
+        // 取不到就留空，抽屉的其余信息（尤其引用列表）照样要能看
+        previewSrc.value = await getFilePreviewUrl(fileId).catch(() => '');
+      }
     } catch (e) {
       smartSentry.captureError(e);
     } finally {

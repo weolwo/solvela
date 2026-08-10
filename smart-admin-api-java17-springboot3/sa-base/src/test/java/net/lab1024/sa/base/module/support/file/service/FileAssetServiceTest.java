@@ -222,8 +222,9 @@ class FileAssetServiceTest {
         Map<Long, String> urls = service.batchUrl(List.of(1L, 2L));
 
         assertThat(urls.get(1L)).isEqualTo("https://cdn.example.com/banner/202608/10/a.png");
-        // 私有文件不给静态 URL，走后端下载接口（走登录态鉴权）
-        assertThat(urls.get(2L)).isEqualTo("/file/download/2");
+        // 私有文件不给静态 URL，走后端下载接口（走登录态鉴权）。
+        // 路径必须带 /support —— 控制器挂在 SupportBaseController 下，少一段就是个 404
+        assertThat(urls.get(2L)).isEqualTo("/support/file/download/2");
         verify(fileDao, org.mockito.Mockito.times(1)).selectByIds(any());
     }
 
@@ -233,7 +234,7 @@ class FileAssetServiceTest {
         when(fileDao.selectByIds(any())).thenReturn(List.of(
                 file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC)));
 
-        assertThat(service.batchUrl(List.of(1L)).get(1L)).isEqualTo("/file/download/1");
+        assertThat(service.batchUrl(List.of(1L)).get(1L)).isEqualTo("/support/file/download/1");
     }
 
     @Test
@@ -307,12 +308,15 @@ class FileAssetServiceTest {
     }
 
     @Test
-    @DisplayName("URL 反查 fileId：/file/download/123 直接取 ID，不查库")
+    @DisplayName("URL 反查 fileId：新老两种下载路径都要认，直接取 ID 不查库")
     void resolveFileIdsFromDownloadPath() {
         assertThat(service.resolveFileIds(List.of(
+                // 修 /support 前缀之前生成的形态，已经写进历史富文本正文，必须继续认
                 "/file/download/123",
-                "https://admin.example.com/file/download/456?inline=true")))
-                .containsExactly(123L, 456L);
+                "https://admin.example.com/file/download/456?inline=true",
+                // 现在生成的形态
+                "/support/file/download/789")))
+                .containsExactly(123L, 456L, 789L);
         // 走的是路径解析，一次库都不用查
         verify(fileDao, org.mockito.Mockito.never()).selectByFileKeyList(any());
     }

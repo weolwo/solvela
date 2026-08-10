@@ -123,8 +123,24 @@ public class FileAssetService {
 
     /**
      * 后端流式下载接口，见 {@code FileController#download}。
+     *
+     * <p>🔴 <b>必须带 {@code /support} 前缀</b>：{@code FileController} 继承
+     * {@code SupportBaseController}，类级 {@code @RequestMapping} 是 {@code /support}，
+     * 真实路径是 {@code /support/file/download/{id}}。这里原先少了这一段，
+     * 于是所有下发给前端的 {@code fileUrl} 都指向一个不存在的路径 ——
+     * 素材库的缩略图、展示配置的预览图全是空的，而且不报错（{@code <img>} 加载失败是静默的）。
      */
-    private static final String DOWNLOAD_PATH = "/file/download/";
+    private static final String DOWNLOAD_PATH = "/support/file/download/";
+
+    /**
+     * 反查 fileId 时用来匹配的<b>短形态</b>，刻意与 {@link #DOWNLOAD_PATH} 分开。
+     *
+     * <p>匹配是 {@code indexOf} 子串查找，短形态同时命中新老两种 URL：
+     * 修前生成的 {@code /file/download/12} 已经写进了历史富文本正文，
+     * 若拿新的长前缀去匹配，这些引用会<b>静默失配</b> —— 保存活动规则时登记不上引用，
+     * 图随后被孤儿清理任务删掉（设计文档红线 4）。
+     */
+    private static final String DOWNLOAD_PATH_MATCH = "/file/download/";
 
     // ------------------------------------------------------------------ 上传
 
@@ -299,11 +315,11 @@ public class FileAssetService {
     }
 
     private static Long fileIdFromDownloadPath(String url) {
-        int idx = url.indexOf(DOWNLOAD_PATH);
+        int idx = url.indexOf(DOWNLOAD_PATH_MATCH);
         if (idx < 0) {
             return null;
         }
-        String tail = url.substring(idx + DOWNLOAD_PATH.length());
+        String tail = url.substring(idx + DOWNLOAD_PATH_MATCH.length());
         int end = 0;
         while (end < tail.length() && Character.isDigit(tail.charAt(end))) {
             end++;
