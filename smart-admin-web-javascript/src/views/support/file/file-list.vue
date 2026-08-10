@@ -1,97 +1,101 @@
 <!--
-  * 文件
+  * 素材库
   *
-  * @Author:    1024创新实验室-主任-卓大
-  * @Date:      2020-10-10 22:13:18
-  * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
+  * 交互三层：分类卡片 → 素材网格 → 右侧详情抽屉。
+  *
+  * 为什么网格不是表格：运营找图靠的是看，不是读文件名。原先的 a-table 对通用文件管理够用，
+  * 对运营素材场景是错的 —— 一屏十几行文件名，谁也认不出哪张是双十一主视觉。
+  *
+  * 为什么保留「全部素材」入口：分类只是维度之一，运营找三个月前那张图时
+  * 往往不记得它在哪个分类，强制先选分类会很难受。
+  *
+  * @Copyright  1024创新实验室 （ https://1024lab.net ）
 -->
 <template>
-  <!---------- 查询表单form begin ----------->
-  <a-form class="smart-query-form" v-privilege="'support:file:query'">
-    <a-row class="smart-query-form-row">
-      <a-form-item label="分类" class="smart-query-form-item">
-        <a-select style="width: 150px" v-model:value="queryForm.categoryId" placeholder="分类" allow-clear>
-          <a-select-option v-for="item in categoryList" :key="item.categoryId" :value="item.categoryId">
+  <!---------- 分类卡片页 begin ----------->
+  <a-card v-if="mode === 'category'" size="small" :bordered="false" :hoverable="true">
+    <div class="page-header">
+      <span class="page-title">素材库</span>
+      <a-button type="primary" @click="showUploadModal">上传素材</a-button>
+    </div>
+
+    <a-spin :spinning="categoryLoading">
+      <div class="category-grid">
+        <!-- 「全部素材」放在第一张：不用先选分类也能搜 -->
+        <div class="category-card all" @click="enterCategory(null)">
+          <div class="category-name">全部素材</div>
+          <div class="category-count">{{ totalFileCount }} 个文件</div>
+        </div>
+
+        <div v-for="item in categoryList" :key="item.categoryId" class="category-card" @click="enterCategory(item)">
+          <div class="category-name">
             {{ item.categoryName }}
-          </a-select-option>
-        </a-select>
-      </a-form-item>
-      <a-form-item label="文件名" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.originalName" placeholder="文件名" />
-      </a-form-item>
-      <a-form-item label="文件Key" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.storageKey" placeholder="文件Key" />
-      </a-form-item>
-      <a-form-item label="扩展名" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.extension" placeholder="扩展名" />
-      </a-form-item>
-      <a-form-item label="创建人" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.createBy" placeholder="创建人" />
-      </a-form-item>
-      <a-form-item label="创建时间" class="smart-query-form-item">
-        <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 220px" @change="onChangeCreateTime" />
-      </a-form-item>
-      <a-form-item class="smart-query-form-item">
-        <a-button-group>
-          <a-button type="primary" @click="queryData">
-            <template #icon>
-              <SearchOutlined />
-            </template>
-            查询
-          </a-button>
-          <a-button @click="resetQuery">
-            <template #icon>
-              <ReloadOutlined />
-            </template>
-            重置
-          </a-button>
-        </a-button-group>
-      </a-form-item>
-    </a-row>
-  </a-form>
-  <!---------- 查询表单form end ----------->
-
-  <a-card size="small" :bordered="false" :hoverable="true">
-    <!---------- 表格操作行 begin ----------->
-    <a-row class="smart-table-btn-block">
-      <div class="smart-table-operate-block">
-        <a-button type="primary" @click="showUploadModal">
-          <template #icon>
-            <cloud-upload-outlined />
-          </template>
-          上传文件
-        </a-button>
-      </div>
-      <div class="smart-table-setting-block">
-        <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.SUPPORT.FILE" :refresh="queryData" />
-      </div>
-    </a-row>
-    <!---------- 表格操作行 end ----------->
-
-    <!---------- 表格 begin ----------->
-    <a-table
-      size="small"
-      :scroll="{ x: 1300 }"
-      :dataSource="tableData"
-      :columns="columns"
-      rowKey="fileId"
-      bordered
-      :loading="tableLoading"
-      :pagination="false"
-    >
-      <template #bodyCell="{ text, record, column }">
-        <template v-if="column.dataIndex === 'categoryId'">
-          <span>{{ categoryNameMap[text] || text }}</span>
-        </template>
-        <template v-if="column.dataIndex === 'action'">
-          <div class="smart-table-operate">
-            <a-button @click="view(record)" type="link">查看</a-button>
-            <a-button @click="download(record)" type="link">下载</a-button>
+            <a-tag v-if="item.categoryTag" color="blue" size="small">{{ item.categoryTag }}</a-tag>
           </div>
-        </template>
-      </template>
-    </a-table>
-    <!---------- 表格 end ----------->
+          <div class="category-count">{{ item.fileCount }} 个文件</div>
+          <div class="category-code">{{ item.categoryCode }}</div>
+        </div>
+      </div>
+    </a-spin>
+  </a-card>
+  <!---------- 分类卡片页 end ----------->
+
+  <!---------- 素材网格页 begin ----------->
+  <a-card v-else size="small" :bordered="false" :hoverable="true">
+    <div class="page-header">
+      <a-breadcrumb>
+        <a-breadcrumb-item><a @click="backToCategory">素材库</a></a-breadcrumb-item>
+        <a-breadcrumb-item>{{ currentCategoryName }}</a-breadcrumb-item>
+      </a-breadcrumb>
+      <a-button type="primary" @click="showUploadModal">上传素材</a-button>
+    </div>
+
+    <a-form class="smart-query-form">
+      <a-row class="smart-query-form-row">
+        <a-form-item label="文件名" class="smart-query-form-item">
+          <a-input style="width: 150px" v-model:value="queryForm.originalName" placeholder="文件名" allow-clear />
+        </a-form-item>
+        <a-form-item label="标签" class="smart-query-form-item">
+          <a-input style="width: 130px" v-model:value="queryForm.tag" placeholder="标签" allow-clear />
+        </a-form-item>
+        <a-form-item label="扩展名" class="smart-query-form-item">
+          <a-input style="width: 110px" v-model:value="queryForm.extension" placeholder="如 png" allow-clear />
+        </a-form-item>
+        <a-form-item label="上传人" class="smart-query-form-item">
+          <a-input style="width: 120px" v-model:value="queryForm.createBy" placeholder="上传人" allow-clear />
+        </a-form-item>
+        <a-form-item label="上传时间" class="smart-query-form-item">
+          <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 220px" @change="onChangeCreateTime" />
+        </a-form-item>
+        <a-form-item class="smart-query-form-item">
+          <a-button type="primary" @click="onSearch">查询</a-button>
+          <a-button @click="resetQuery" class="smart-margin-left10">重置</a-button>
+        </a-form-item>
+      </a-row>
+    </a-form>
+
+    <!-- 批量条：只在选中时出现。刻意没有「批量删除」—— 删除不可恢复，不该做成批量操作 -->
+    <div v-if="selectedIds.length" class="batch-bar">
+      <span>已选 {{ selectedIds.length }} 项</span>
+      <a-select v-model:value="batchTags" mode="tags" style="width: 260px" placeholder="输入标签后回车" :token-separators="[',', '，']" />
+      <a-button type="primary" size="small" :loading="batchSaving" @click="batchAddTags">批量打标签</a-button>
+      <a-button size="small" @click="clearSelection">取消选择</a-button>
+    </div>
+
+    <a-spin :spinning="tableLoading">
+      <div class="file-grid">
+        <div v-for="file in fileList" :key="file.fileId" class="file-card" :class="{ selected: isSelected(file.fileId) }">
+          <a-checkbox class="file-check" :checked="isSelected(file.fileId)" @change="toggleSelect(file.fileId)" />
+          <div class="file-thumb" @click="openDetail(file)">
+            <img v-if="isImage(file)" :src="file.fileUrl" :alt="file.originalName" loading="lazy" />
+            <div v-else class="thumb-placeholder">{{ (file.extension || 'FILE').toUpperCase() }}</div>
+          </div>
+          <div class="file-name" :title="file.originalName" @click="openDetail(file)">{{ file.originalName }}</div>
+          <div class="file-sub">{{ readableSize(file.fileSize) }}</div>
+        </div>
+      </div>
+      <a-empty v-if="!tableLoading && !fileList.length" description="这个分类下还没有素材" />
+    </a-spin>
 
     <div class="smart-query-table-page">
       <a-pagination
@@ -104,134 +108,123 @@
         v-model:pageSize="queryForm.pageSize"
         :total="total"
         @change="queryData"
-        :show-total="(total) => `共${total}条`"
+        :show-total="(t) => `共${t}条`"
       />
     </div>
-
-    <FilePreviewModal ref="filePreviewModalRef" />
-
-    <a-modal v-model:open="uploadModalFlag" title="上传文件" @onCancel="hideUploadModal" @ok="hideUploadModal">
-      <FileUpload
-        list-type="text"
-        :maxUploadSize="5"
-        buttonText="点击上传文件"
-        :defaultFileList="[]"
-        :multiple="true"
-        :folder="FILE_FOLDER_TYPE_ENUM.COMMON.value"
-      />
-    </a-modal>
   </a-card>
+  <!---------- 素材网格页 end ----------->
+
+  <FileDetailDrawer ref="detailDrawerRef" @reload="onDetailChanged" />
+
+  <a-modal v-model:open="uploadModalFlag" title="上传素材" @onCancel="hideUploadModal" @ok="hideUploadModal">
+    <FileUpload
+      list-type="text"
+      :maxUploadSize="10"
+      buttonText="点击上传"
+      :defaultFileList="[]"
+      :multiple="true"
+      :folder="uploadFolder"
+    />
+  </a-modal>
 </template>
+
 <script setup>
-  import { onMounted, reactive, ref } from 'vue';
+  import { computed, onMounted, reactive, ref } from 'vue';
+  import { message } from 'ant-design-vue';
   import { fileApi } from '/@/api/support/file-api';
-  import TableOperator from '/@/components/support/table-operator/index.vue';
-  import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import FilePreviewModal from '/@/components/support/file-preview-modal/index.vue';
   import FileUpload from '/@/components/support/file-upload/index.vue';
-  // ---------------------------- 表格列 ----------------------------
+  import FileDetailDrawer from './components/file-detail-drawer.vue';
 
-  const columns = ref([
-    {
-      title: '主键ID',
-      dataIndex: 'fileId',
-      ellipsis: true,
-      width: 70,
-    },
-    {
-      title: '分类',
-      dataIndex: 'categoryId',
-      ellipsis: true,
-      width: 90,
-    },
-    {
-      title: '文件名称',
-      dataIndex: 'originalName',
-      ellipsis: true,
-      width: 200,
-    },
-    {
-      title: '文件大小',
-      dataIndex: 'fileSize',
-      ellipsis: true,
-      width: 100,
-    },
-    {
-      title: '扩展名',
-      dataIndex: 'extension',
-      ellipsis: true,
-      width: 80,
-    },
-    {
-      title: '上传时间',
-      dataIndex: 'createTime',
-      ellipsis: true,
-      width: 150,
-    },
-    {
-      title: '文件Key',
-      dataIndex: 'storageKey',
-      ellipsis: true,
-      width: 100,
-    },
-    {
-      title: '操作',
-      dataIndex: 'action',
-      width: 120,
-      fixed: 'right',
-    },
-  ]);
+  // ---------------------------- 视图切换 ----------------------------
 
-  // ---------------------------- 查询数据表单和方法 ----------------------------
+  const mode = ref('category');
+  const currentCategory = ref(null);
 
-  const queryFormState = {
-    categoryId: undefined, //分类
-    originalName: undefined, //文件名词
-    storageKey: undefined, //文件Key
-    extension: undefined, //扩展名
-    createBy: undefined, //创建人
-    createTime: [], //创建时间
-    createTimeBegin: undefined, //创建时间 开始
-    createTimeEnd: undefined, //创建时间 结束
-    pageNum: 1,
-    pageSize: 10,
-  };
-  // 查询表单form
-  const queryForm = reactive({ ...queryFormState });
-  // 表格加载loading
-  const tableLoading = ref(false);
-  // 表格数据
-  const tableData = ref([]);
-  // 总数
-  const total = ref(0);
+  const currentCategoryName = computed(() => (currentCategory.value ? currentCategory.value.categoryName : '全部素材'));
 
-  // 重置查询条件
-  function resetQuery() {
-    let pageSize = queryForm.pageSize;
-    Object.assign(queryForm, queryFormState);
-    queryForm.pageSize = pageSize;
-    queryData();
+  // 上传落到哪个分类：在某个分类里就传那个分类，在「全部素材」里退回通用分类
+  const COMMON_CATEGORY_ID = 1;
+  const uploadFolder = computed(() => (currentCategory.value ? currentCategory.value.categoryId : COMMON_CATEGORY_ID));
+
+  function enterCategory(category) {
+    currentCategory.value = category;
+    mode.value = 'grid';
+    resetQuery();
   }
 
-  // 查询数据
+  function backToCategory() {
+    mode.value = 'category';
+    clearSelection();
+    // 回到卡片页要重新拉计数：刚才可能传了或删了素材
+    queryCategoryList();
+  }
+
+  // ---------------------------- 分类 ----------------------------
+
+  const categoryList = ref([]);
+  const categoryLoading = ref(false);
+
+  const totalFileCount = computed(() => categoryList.value.reduce((sum, e) => sum + (e.fileCount || 0), 0));
+
+  async function queryCategoryList() {
+    categoryLoading.value = true;
+    try {
+      let res = await fileApi.getCategoryList();
+      categoryList.value = res.data || [];
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      categoryLoading.value = false;
+    }
+  }
+
+  // ---------------------------- 素材列表 ----------------------------
+
+  const queryFormState = {
+    categoryId: undefined,
+    originalName: undefined,
+    tag: undefined,
+    extension: undefined,
+    createBy: undefined,
+    createTime: [],
+    createTimeBegin: undefined,
+    createTimeEnd: undefined,
+    pageNum: 1,
+    pageSize: 24,
+  };
+  const queryForm = reactive({ ...queryFormState });
+  const fileList = ref([]);
+  const total = ref(0);
+  const tableLoading = ref(false);
+
+  function onChangeCreateTime(dates, dateStrings) {
+    queryForm.createTimeBegin = dateStrings[0];
+    queryForm.createTimeEnd = dateStrings[1];
+  }
 
   function onSearch() {
     queryForm.pageNum = 1;
     queryData();
   }
 
+  function resetQuery() {
+    Object.assign(queryForm, queryFormState);
+    queryForm.createTime = [];
+    // 分类是由外层视图决定的，不属于可重置的筛选条件
+    queryForm.categoryId = currentCategory.value ? currentCategory.value.categoryId : undefined;
+    clearSelection();
+    queryData();
+  }
+
   async function queryData() {
     tableLoading.value = true;
     try {
-      let queryResult = await fileApi.queryPage(queryForm);
-      for (const file of queryResult.data.list) {
-        file.fileSize = getFileSize(file.fileSize);
-      }
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      let res = await fileApi.queryPage(queryForm);
+      fileList.value = res.data.list;
+      total.value = res.data.total;
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -239,59 +232,74 @@
     }
   }
 
-  function onChangeCreateTime(dates, dateStrings) {
-    queryForm.createTimeBegin = dateStrings[0];
-    queryForm.createTimeEnd = dateStrings[1];
+  function isImage(file) {
+    return (file.contentType || '').startsWith('image/');
   }
 
-  function getFileSize(size) {
-    //把字节转换成正常文件大小
-    if (!size) return '';
-    var num = 1024.0; //byte
-    if (size < num) return size + 'B';
-    if (size < Math.pow(num, 2)) return (size / num).toFixed(2) + 'KB'; //kb
-    if (size < Math.pow(num, 3)) return (size / Math.pow(num, 2)).toFixed(2) + 'MB'; //M
-    if (size < Math.pow(num, 4)) return (size / Math.pow(num, 3)).toFixed(2) + 'G'; //G
-    return (size / Math.pow(num, 4)).toFixed(2) + 'T'; //T
+  // ---------------------------- 多选与批量打标签 ----------------------------
+
+  const selectedIds = ref([]);
+  const batchTags = ref([]);
+  const batchSaving = ref(false);
+
+  function isSelected(fileId) {
+    return selectedIds.value.includes(fileId);
   }
 
-  // 查看文件
-  const filePreviewModalRef = ref();
-  function view(file) {
-    filePreviewModalRef.value.showPreview(file);
-  }
-
-  // 下载文件
-  async function download(file) {
-    try {
-      await fileApi.downLoadFile(file.storageKey);
-    } catch (e) {
-      smartSentry.captureError(e);
+  function toggleSelect(fileId) {
+    const idx = selectedIds.value.indexOf(fileId);
+    if (idx >= 0) {
+      selectedIds.value.splice(idx, 1);
+    } else {
+      selectedIds.value.push(fileId);
     }
   }
 
-  // ---------------------------- 分类下拉 ----------------------------
-  // 分类从接口来而不是写死的枚举：运营可以在后台增删改分类、调排序，
-  // 前端硬编码一份就必然和库里对不上
-  const categoryList = ref([]);
-  const categoryNameMap = ref({});
+  function clearSelection() {
+    selectedIds.value = [];
+    batchTags.value = [];
+  }
 
-  async function queryCategoryList() {
+  /**
+   * 批量打标签是「追加」不是「覆盖」：一次活动传二十张图，逐个打标签会疯，
+   * 但覆盖会把之前打好的标签抹掉，那不是运营想要的。
+   */
+  async function batchAddTags() {
+    if (!batchTags.value.length) {
+      message.warning('请先输入标签');
+      return;
+    }
+    batchSaving.value = true;
     try {
-      let res = await fileApi.getCategoryList();
-      categoryList.value = res.data || [];
-      categoryNameMap.value = Object.fromEntries(categoryList.value.map((e) => [e.categoryId, e.categoryName]));
+      const selectedFiles = fileList.value.filter((f) => selectedIds.value.includes(f.fileId));
+      for (const file of selectedFiles) {
+        const merged = Array.from(new Set([...(file.tags || '').split(',').filter((t) => t), ...batchTags.value]));
+        await fileApi.updateMeta({ fileId: file.fileId, tags: merged });
+      }
+      message.success(`已为 ${selectedFiles.length} 个素材打标签`);
+      clearSelection();
+      queryData();
     } catch (e) {
       smartSentry.captureError(e);
+    } finally {
+      batchSaving.value = false;
     }
   }
 
-  onMounted(() => {
-    queryCategoryList();
+  // ---------------------------- 详情抽屉 ----------------------------
+
+  const detailDrawerRef = ref();
+
+  function openDetail(file) {
+    detailDrawerRef.value.show(file.fileId);
+  }
+
+  function onDetailChanged() {
     queryData();
-  });
+  }
 
-  // ------------- 上传文件 --------------------
+  // ---------------------------- 上传 ----------------------------
+
   const uploadModalFlag = ref(false);
 
   function showUploadModal() {
@@ -300,6 +308,155 @@
 
   function hideUploadModal() {
     uploadModalFlag.value = false;
-    queryData();
+    if (mode.value === 'grid') {
+      queryData();
+    } else {
+      queryCategoryList();
+    }
   }
+
+  function readableSize(size) {
+    if (!size) return '';
+    const num = 1024.0;
+    if (size < num) return size + 'B';
+    if (size < Math.pow(num, 2)) return (size / num).toFixed(2) + 'KB';
+    if (size < Math.pow(num, 3)) return (size / Math.pow(num, 2)).toFixed(2) + 'MB';
+    return (size / Math.pow(num, 3)).toFixed(2) + 'GB';
+  }
+
+  onMounted(queryCategoryList);
 </script>
+
+<style scoped lang="less">
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .category-card {
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #1890ff;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 9%);
+    }
+
+    &.all {
+      background: #f6faff;
+      border-color: #d6e8ff;
+    }
+  }
+
+  .category-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .category-count {
+    color: #888;
+    font-size: 13px;
+  }
+
+  .category-code {
+    color: #bfbfbf;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: #f6faff;
+    border: 1px solid #d6e8ff;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  .file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+  }
+
+  .file-card {
+    position: relative;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    padding: 8px;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #1890ff;
+    }
+
+    &.selected {
+      border-color: #1890ff;
+      background: #f6faff;
+    }
+  }
+
+  .file-check {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 2;
+  }
+
+  .file-thumb {
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fafafa;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  .thumb-placeholder {
+    font-size: 18px;
+    font-weight: 600;
+    color: #bfbfbf;
+    letter-spacing: 1px;
+  }
+
+  .file-name {
+    margin-top: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-sub {
+    color: #bfbfbf;
+    font-size: 12px;
+  }
+</style>
