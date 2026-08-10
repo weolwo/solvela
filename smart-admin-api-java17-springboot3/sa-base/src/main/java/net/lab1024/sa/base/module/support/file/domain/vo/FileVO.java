@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import net.lab1024.sa.base.common.swagger.SchemaEnum;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
-import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
 
 import java.time.LocalDateTime;
 
@@ -46,10 +45,6 @@ public class FileVO {
 
     @Schema(description = "存储介质：LOCAL / S3")
     private String storageKind;
-
-    @Schema(description = "可见性")
-    @SchemaEnum(FileVisibilityEnum.class)
-    private Integer visibility;
 
     @Schema(description = "生命周期状态")
     @SchemaEnum(FileStatusEnum.class)

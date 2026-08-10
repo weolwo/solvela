@@ -86,11 +86,6 @@ public class FileEntity {
     private Integer imageHeight;
 
     /**
-     * 可见性，见 {@code FileVisibilityEnum}。从路径前缀里解放出来的产物。
-     */
-    private Integer visibility;
-
-    /**
      * 生命周期状态，见 {@code FileStatusEnum}。
      *
      * <p>没有它的话，"用户选了文件然后关掉页面没提交"产生的文件永远没人引用也永远不会被删，

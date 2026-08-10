@@ -33,9 +33,11 @@ export const FILE_FOLDER_TYPE_ENUM = {
  */
 export const FILE_CATEGORY_CODE = {
   COMMON: 'COMMON',
-  // 活动素材：唯一默认公开的分类。C 端匿名用户要能取到活动图，
-  // 其余分类默认私有（见 v3.55.0 与 t_file_category.default_visibility）
+  // 运营主动上传的活动素材（主视觉、背景、分享图）
   ACTIVITY: 'ACTIVITY',
+  // 富文本编辑器里随手插的正文配图。单独一个分类纯粹是为了素材库别乱：
+  // 运营挑主视觉时不想在一堆正文截图里翻
+  CONTENT: 'CONTENT',
 };
 
 export default {

@@ -39,20 +39,14 @@ public class FileConfig {
     private static final String MODE_LOCAL = "local";
 
     /**
-     * 🔴 <b>这里原先有一段把整个上传目录挂成免登录静态资源的映射（{@code /upload/**}），已删除。</b>
+     * 免登录读取口的路径。这里<b>原先是一段把上传目录整个挂成静态资源的映射</b>（{@code /upload/**}），
+     * 已换成 {@code FileController#publicAccess}。
      *
-     * <p>它不看 {@code visibility}：实测不带任何 token 请求
-     * {@code /upload/feedback/202608/10/xxx.jpg} 会返回 200 + 完整字节，而同一个文件走
-     * {@code /support/file/download/{id}} 是要登录态的。也就是说，<b>档⑤ 声称修掉的
-     * 「本地模式下私有文件根本不私有」，换了个地方原样活着</b> —— 只是当时所有文件的
-     * visibility 都被上传处写死成公开，这个矛盾没有机会暴露。
+     * <p>换掉的理由不是权限（本模块的文件一律公开，v3.56.0 起没有可见性这个维度），
+     * 而是那段映射<b>只在本地存储模式下成立</b>：切到对象存储时它什么都服务不了，
+     * 而走控制器的话，本地与云端是同一条代码路径，Range、Content-Type、日志也都由一处产出。
      *
-     * <p>替代方案是 {@code FileController#publicAccess}（{@code /support/file/public/**}）：
-     * 同样免登录、同样可以被 CDN 回源，但<b>会查一次 visibility</b>，私有文件一律 404。
-     * 之所以不改成"公私分目录、静态映射只挂公开那棵树"，是因为设计决策 D2 写得很清楚：
-     * <b>权限进 DB 元数据，不进路径</b>。把可见性编回目录名，就是在重犯 {@code private/} 前缀那个错。
-     *
-     * <p>代价是丢掉了操作系统级的静态文件服务，换来每次请求一次主键查询；
+     * <p>代价是丢掉操作系统级的静态文件服务，换来每次请求一次主键查询；
      * 用 {@code Cache-Control: immutable} 把这一跳挡在浏览器和 CDN 之外
      * （storageKey 不可变、永不覆盖，所以这个缓存头是安全的）。
      */

@@ -32,12 +32,12 @@ public class MvcConfig implements WebMvcConfigurer {
     /**
      * 免登录路径。
      *
-     * <p>公开文件的读取口必须在这里 —— <b>C 端用户是匿名的，永远带不上 token</b>，
-     * 活动展示图走的就是这条路。它自己会查 {@code visibility}，私有文件一律 404，
-     * 所以放行的只是"本来就该给所有人看的那些字节"，见 {@code FileController#publicAccess}。
+     * <p>文件读取口必须在这里 —— <b>C 端用户是匿名的，永远带不上 token</b>，
+     * 活动展示图和富文本正文里的图走的都是这条路，见 {@code FileController#publicAccess}。
+     * 本模块的文件一律公开（服务的是活动/任务配置，不是网盘），所以放行的是全部素材。
      *
      * <p>⚠️ 往这个数组里加东西之前想清楚：这里的每一条都是**完全无鉴权**的。
-     * 上一版把整个上传目录挂成静态资源，就是从"少想了一步"开始的。
+     * 将来若开放 C 端用户上传，那条链路要单独设计（配额/审核），别顺手挂到这里。
      */
     private static final String[] PUBLIC_FILE_WHITELIST = {FileConfig.PUBLIC_FILE_MAPPING + "/**"};
 

@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
-import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
 import net.lab1024.sa.base.module.support.file.config.FileImageProperties;
 import net.lab1024.sa.base.module.support.file.dao.FileCategoryDao;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
@@ -115,8 +114,13 @@ public class FileAssetService {
     private long maxFileSizeKb;
 
     /**
-     * 公开文件的 URL 前缀（CDN 或对象存储域名）。<b>不配则一律走后端下载接口</b> ——
+     * 对外 URL 前缀（免登录读取口 / 对象存储 / CDN 域名）。<b>不配则一律走后端下载接口</b> ——
      * 猜一个前缀拼出打不开的 URL，比多走一跳后端难排查得多。
+     *
+     * <p>本模块<b>没有「私有文件」这个概念</b>（v3.56.0 起）：它服务的是活动/任务配置，
+     * 运营传的每一张图最终都要给匿名的 C 端用户看，「公开」是唯一有意义的状态。
+     * 将来若开放 C 端用户上传，那是独立的一条链路 —— 要防的是上传本身（配额/审核），
+     * 不是给文件挂一个可见性标记，两件事塞进一张表只会两边都做不干净。
      */
     @Value("${file.storage.public-url-prefix:}")
     private String publicUrlPrefix = "";
@@ -195,11 +199,6 @@ public class FileAssetService {
         entity.setExtension(extension);
         entity.setContentType(contentType);
         entity.setFileSize(size);
-        // 可见性从分类带下来，不在这里写死。原先无条件写 PUBLIC，配合免登录的静态资源映射，
-        // 等于所有文件都能被匿名取到（包括意见反馈的附件）。分类没配就按私有算 —— 保守的那一侧
-        entity.setVisibility(category.getDefaultVisibility() == null
-                ? FileVisibilityEnum.PRIVATE.getValue()
-                : category.getDefaultVisibility());
         entity.setStatus(FileStatusEnum.TEMP.getValue());
         entity.setDeletedFlag(0);
         entity.setCreateBy(user == null ? null : user.getUserName());
@@ -363,23 +362,18 @@ public class FileAssetService {
     }
 
     /**
-     * 按 storageKey 找<b>公开</b>文件，给免登录的读取口用。找不到或不是公开的一律返回 null。
+     * 按 storageKey 找文件，<b>找不到返回 null 而不是抛异常</b>。
      *
-     * <p>刻意与 {@link #requireByStorageKey} 分开而不是加一个 boolean 参数：
-     * 这个方法是<b>暴露在登录态之外</b>的唯一取数入口，独立成一个方法名，
-     * 将来 grep「谁能被匿名调用」时一眼就能数清楚。
+     * <p>刻意与 {@link #requireByStorageKey} 分开：调用它的是免登录的读取口，
+     * 那里要的是一个干净的 404，而 {@code BusinessException} 会被全局处理器翻译成
+     * 200 + 业务错误码的 JSON —— 对一个 {@code <img>} 请求毫无意义。
      *
-     * <p>返回 null 而不抛异常：调用方要的是 404，而 {@code BusinessException} 会被
-     * 全局处理器翻译成 200 + 业务错误码的 JSON，那对一个 {@code <img>} 请求毫无意义。
+     * <p>这里<b>没有可见性判断</b>：本模块的文件一律公开（见 {@link #publicUrlPrefix} 的说明）。
      */
-    public FileEntity findPublicByStorageKey(String storageKey) {
-        FileEntity entity = fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
+    public FileEntity findByStorageKey(String storageKey) {
+        return fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
                 .eq(FileEntity::getStorageKey, storageKey)
                 .eq(FileEntity::getDeletedFlag, 0));
-        if (entity == null || !FileVisibilityEnum.PUBLIC.equalsValue(entity.getVisibility())) {
-            return null;
-        }
-        return entity;
     }
 
     public PageResult<FileVO> queryPage(FileQueryForm queryForm) {
@@ -394,8 +388,7 @@ public class FileAssetService {
      * 没有共同父类，硬抽一个基类只会为了省十行代码引入一层继承。
      */
     private String urlOfVo(FileVO vo) {
-        boolean publicReadable = FileVisibilityEnum.PUBLIC.equalsValue(vo.getVisibility());
-        if (!publicReadable || publicUrlPrefix.isBlank()) {
+        if (publicUrlPrefix.isBlank()) {
             return DOWNLOAD_PATH + vo.getFileId();
         }
         String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
@@ -504,7 +497,6 @@ public class FileAssetService {
         vo.setExtension(entity.getExtension());
         vo.setContentType(entity.getContentType());
         vo.setFileSize(entity.getFileSize());
-        vo.setVisibility(entity.getVisibility());
         vo.setStatus(entity.getStatus());
         vo.setTags(entity.getTags());
         vo.setCreateBy(entity.getCreateBy());
@@ -596,18 +588,16 @@ public class FileAssetService {
      *
      * <p>旧路径的 {@code FileService#getFileList} 已经批量查过库了，却又在循环里逐个调
      * {@code getFileUrl}，而云端那个实现每次还要查一次 Redis、缓存没命中再查一次 DB、
-     * 再算一次 SigV4 签名 —— 100 个私有附件冷缓存就是 1 次批量查 + 100 次 Redis
+     * 再算一次 SigV4 签名 —— 100 个附件冷缓存就是 1 次批量查 + 100 次 Redis
      * + 100 次单条 DB + 100 次 HMAC。
      *
-     * <p>URL 形态由可见性决定（设计文档 §7.4）：
+     * <p>URL 形态只由「配没配前缀」决定（v3.56.0 起没有可见性这个维度）：
      * <ul>
-     *   <li>公开 → {@code publicUrlPrefix + storageKey}，可挂 CDN 且因为 key 不可变
+     *   <li>配了 → {@code publicUrlPrefix + storageKey}，可挂 CDN 且因为 key 不可变
      *       可以设 {@code immutable}</li>
-     *   <li>私有 → 后端下载接口，走完整登录态鉴权</li>
+     *   <li>没配 → 后端下载接口。这是刻意的保守默认：猜一个前缀拼出打不开的 URL，
+     *       比多走一跳后端要难排查得多</li>
      * </ul>
-     *
-     * <p>{@code publicUrlPrefix} 没配时<b>一律走后端下载接口</b>。这是刻意的保守默认：
-     * 猜一个前缀拼出打不开的 URL，比多走一跳后端要难排查得多。
      */
     public Map<Long, String> batchUrl(Collection<Long> fileIds) {
         return batchUrl(fileIds, ImageVariant.ORIGINAL);
@@ -630,10 +620,8 @@ public class FileAssetService {
     }
 
     private String urlOf(FileEntity file, ImageVariant variant) {
-        boolean publicReadable = FileVisibilityEnum.PUBLIC.equalsValue(file.getVisibility());
-        if (!publicReadable || publicUrlPrefix.isBlank()) {
-            // 私有文件不给静态 URL；公开前缀没配时也走后端 —— 猜一个前缀拼出打不开的 URL
-            // 比多走一跳后端难排查得多
+        if (publicUrlPrefix.isBlank()) {
+            // 前缀没配就走后端下载接口 —— 猜一个前缀拼出打不开的 URL，比多走一跳后端难排查得多
             return DOWNLOAD_PATH + file.getFileId();
         }
         String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";

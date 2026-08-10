@@ -3,7 +3,6 @@ package net.lab1024.sa.base.module.support.file.service;
 import net.lab1024.sa.base.common.exception.BusinessException;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
 import net.lab1024.sa.base.module.support.file.config.FileImageProperties;
-import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
 import net.lab1024.sa.base.module.support.file.domain.ImageVariant;
 import net.lab1024.sa.base.module.support.file.dao.FileCategoryDao;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
@@ -109,23 +108,6 @@ class FileAssetServiceTest {
     }
 
     @Test
-    @DisplayName("可见性由分类决定：分类没配就按私有算，绝不默认公开")
-    void visibilityComesFromCategory() {
-        // BANNER 这个 fixture 没设 defaultVisibility，等价于「加分类的人没想过这件事」
-        assertThat(service.upload(png("a.png"), "BANNER", null).getVisibility())
-                .isEqualTo(FileVisibilityEnum.PRIVATE.getValue());
-
-        FileCategoryEntity publicCategory = new FileCategoryEntity();
-        publicCategory.setCategoryId(9L);
-        publicCategory.setCategoryCode("ACTIVITY");
-        publicCategory.setDefaultVisibility(FileVisibilityEnum.PUBLIC.getValue());
-        when(fileCategoryDao.getByCode("ACTIVITY")).thenReturn(publicCategory);
-
-        assertThat(service.upload(png("b.png"), "ACTIVITY", null).getVisibility())
-                .isEqualTo(FileVisibilityEnum.PUBLIC.getValue());
-    }
-
-    @Test
     @DisplayName("confirm 收到空集合＝这个业务对象一张图都不引用了，必须照样清掉旧关系")
     void confirmWithEmptyListStillClearsRelations() {
         // 原先这里是 if (empty) return;，于是「把最后一张图移除后保存」永远解除不掉引用，
@@ -140,15 +122,14 @@ class FileAssetServiceTest {
     }
 
     @Test
-    @DisplayName("免登录读取口只认公开文件：私有文件返回 null（调用方给 404，不给 403）")
-    void publicLookupRejectsPrivateFile() {
-        FileEntity privateFile = file(1L, "feedback/202608/10/a.jpg", FileVisibilityEnum.PRIVATE);
-        when(fileDao.selectOne(any())).thenReturn(privateFile);
-        assertThat(service.findPublicByStorageKey("feedback/202608/10/a.jpg")).isNull();
+    @DisplayName("免登录读取口：找不到返回 null 而不是抛异常（调用方要的是干净的 404）")
+    void publicLookupReturnsNullWhenMissing() {
+        when(fileDao.selectOne(any())).thenReturn(null);
+        assertThat(service.findByStorageKey("activity/202608/10/none.jpg")).isNull();
 
-        FileEntity publicFile = file(2L, "activity/202608/10/b.jpg", FileVisibilityEnum.PUBLIC);
-        when(fileDao.selectOne(any())).thenReturn(publicFile);
-        assertThat(service.findPublicByStorageKey("activity/202608/10/b.jpg")).isSameAs(publicFile);
+        FileEntity found = file(2L, "activity/202608/10/b.jpg");
+        when(fileDao.selectOne(any())).thenReturn(found);
+        assertThat(service.findByStorageKey("activity/202608/10/b.jpg")).isSameAs(found);
     }
 
     @Test
@@ -259,24 +240,23 @@ class FileAssetServiceTest {
     void batchUrlQueriesOnce() {
         ReflectionTestUtils.setField(service, "publicUrlPrefix", "https://cdn.example.com");
         when(fileDao.selectByIds(any())).thenReturn(List.of(
-                file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC),
-                file(2L, "banner/202608/10/b.png", FileVisibilityEnum.PRIVATE)));
+                file(1L, "banner/202608/10/a.png"),
+                file(2L, "banner/202608/10/b.png")));
 
         Map<Long, String> urls = service.batchUrl(List.of(1L, 2L));
 
         assertThat(urls.get(1L)).isEqualTo("https://cdn.example.com/banner/202608/10/a.png");
-        // 私有文件不给静态 URL，走后端下载接口（走登录态鉴权）。
-        // 路径必须带 /support —— 控制器挂在 SupportBaseController 下，少一段就是个 404
-        assertThat(urls.get(2L)).isEqualTo("/support/file/download/2");
+        assertThat(urls.get(2L)).isEqualTo("https://cdn.example.com/banner/202608/10/b.png");
         verify(fileDao, org.mockito.Mockito.times(1)).selectByIds(any());
     }
 
     @Test
-    @DisplayName("没配 publicUrlPrefix 时公开文件也走后端接口 —— 保守默认，不猜前缀")
+    @DisplayName("没配 publicUrlPrefix 时退回后端下载接口 —— 保守默认，不猜前缀")
     void fallsBackToBackendWhenPrefixMissing() {
         when(fileDao.selectByIds(any())).thenReturn(List.of(
-                file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC)));
+                file(1L, "banner/202608/10/a.png")));
 
+        // 路径必须带 /support —— 控制器挂在 SupportBaseController 下，少一段就是个 404
         assertThat(service.batchUrl(List.of(1L)).get(1L)).isEqualTo("/support/file/download/1");
     }
 
@@ -325,7 +305,7 @@ class FileAssetServiceTest {
     @DisplayName("没配处理模板时变体一律返回原图URL —— 通用S3没有图片处理能力，硬拼参数只会换来400")
     void variantWithoutTemplateReturnsOriginal() {
         ReflectionTestUtils.setField(service, "publicUrlPrefix", "https://cdn.example.com");
-        FileEntity image = file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC);
+        FileEntity image = file(1L, "banner/202608/10/a.png");
         image.setContentType("image/png");
         when(fileDao.selectByIds(any())).thenReturn(List.of(image));
 
@@ -338,7 +318,7 @@ class FileAssetServiceTest {
     void variantAppliesTemplate() {
         ReflectionTestUtils.setField(service, "publicUrlPrefix", "https://cdn.example.com");
         imageProperties.setProcessTemplate("?x-oss-process=image/resize,w_{w}");
-        FileEntity image = file(1L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC);
+        FileEntity image = file(1L, "banner/202608/10/a.png");
         image.setContentType("image/png");
         when(fileDao.selectByIds(any())).thenReturn(List.of(image));
 
@@ -400,7 +380,7 @@ class FileAssetServiceTest {
     @Test
     @DisplayName("有引用的文件不能删，且字节一个都没动")
     void deleteRejectsReferencedFile() {
-        FileEntity entity = file(5L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC);
+        FileEntity entity = file(5L, "banner/202608/10/a.png");
         when(fileDao.selectById(5L)).thenReturn(entity);
         FileRelationEntity relation = new FileRelationEntity();
         relation.setFileId(5L);
@@ -428,7 +408,7 @@ class FileAssetServiceTest {
     @Test
     @DisplayName("改名打标签不碰 storageKey —— key 不可变是 CDN 能设 immutable 的前提")
     void updateMetaNeverTouchesStorageKey() {
-        when(fileDao.selectById(9L)).thenReturn(file(9L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC));
+        when(fileDao.selectById(9L)).thenReturn(file(9L, "banner/202608/10/a.png"));
 
         service.updateMeta(9L, "新名字.png", List.of("双十一"), null);
 
@@ -446,11 +426,10 @@ class FileAssetServiceTest {
         return v;
     }
 
-    private static FileEntity file(Long id, String key, FileVisibilityEnum visibility) {
+    private static FileEntity file(Long id, String key) {
         FileEntity entity = new FileEntity();
         entity.setFileId(id);
         entity.setStorageKey(key);
-        entity.setVisibility(visibility.getValue());
         return entity;
     }
 

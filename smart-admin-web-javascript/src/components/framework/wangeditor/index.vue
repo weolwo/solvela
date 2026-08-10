@@ -23,7 +23,7 @@
 </template>
 <script setup>
   import { shallowRef, onBeforeUnmount, watch, ref } from 'vue';
-  import { FILE_FOLDER_TYPE_ENUM } from '/@/constants/support/file-const';
+  import { FILE_CATEGORY_CODE } from '/@/constants/support/file-const';
   import { fileApi } from '/@/api/support/file-api';
   import '@wangeditor-next/editor/dist/css/style.css';
   import { Editor, Toolbar } from '@wangeditor-next/editor-for-vue';
@@ -32,13 +32,22 @@
   //菜单
   const editorConfig = { MENU_CONF: {} };
 
-  //上传
+  /**
+   * 上传。正文配图统一落到 CONTENT 分类。
+   *
+   * <p>为什么单独一个分类：正文图是编辑器里随手插的，量大且零散，
+   * 和运营专门挑选的活动素材混在一起，会让选图器变得很难用。
+   *
+   * <p>⚠️ 插进正文的是 URL 而不是 fileId —— 富文本就是这么工作的。所以这些图
+   * <b>必须能被 `<img>` 直接加载</b>（浏览器渲染时带不了 token）。
+   * 这也是本模块不做私有文件的原因之一，见 v3.56.0。
+   */
   let customUpload = {
     async customUpload(file, insertFn) {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        let res = await fileApi.uploadFile(formData, FILE_FOLDER_TYPE_ENUM.COMMON.value);
+        let res = await fileApi.uploadFileByCategory(formData, FILE_CATEGORY_CODE.CONTENT);
         let data = res.data;
         insertFn(data.fileUrl);
       } catch (error) {

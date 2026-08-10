@@ -17,7 +17,6 @@
         t_file.extension,
         t_file.content_type,
         t_file.storage_kind,
-        t_file.visibility,
         t_file.status,
         t_file.tags,
         t_file.create_by,

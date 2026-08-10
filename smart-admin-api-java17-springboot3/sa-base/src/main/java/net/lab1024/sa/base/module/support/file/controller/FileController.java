@@ -110,24 +110,23 @@ public class FileController extends SupportBaseController {
     }
 
     /**
-     * 公开文件的免登录读取口。<b>C 端用户是匿名的，永远带不上 token</b>，
-     * 所以活动展示图必须有这么一条路 —— 这不是为了省事，是 C 端能不能显示图的前提。
+     * 免登录读取口。<b>C 端用户是匿名的，永远带不上 token</b>，所以活动展示图必须有这么一条路
+     * —— 这不是为了省事，是 C 端能不能显示图的前提。同理，富文本正文里的图也只能走这里。
      *
-     * <p>与被删掉的 {@code /upload/**} 静态映射的区别只有一条，但是决定性的：
-     * <b>它查 visibility</b>。私有文件走到这里一律 404，而那个静态映射把整个上传目录
-     * 无差别地端出去（实测不带 token 也能拿到意见反馈的附件）。
+     * <p>本模块的文件<b>一律公开</b>（v3.56.0 起没有可见性这个维度）：它服务的是活动/任务配置，
+     * 运营传的每一张图最终都要给匿名用户看。所以这里不做任何权限判断，
+     * 它取代的是原先那段把上传目录整个挂成静态资源的映射 —— 行为等价，但走本地/云端两种存储
+     * 都成立，且日志、Range、Content-Type 都由同一处产出。
      *
-     * <p>路径里是 storageKey 而不是 fileId：这样 URL 可以直接换成 CDN 域名 + 同一个 key
-     * （见 {@code FileAssetService#urlOf}），本地与云端两种部署下前端拿到的形态是一致的。
+     * <p>路径里是 storageKey 而不是 fileId：URL 可以直接换成 CDN 域名 + 同一个 key
+     * （见 {@code FileAssetService#urlOf}），两种部署下前端拿到的形态一致。
      * key 由 {@link StorageKey} 的构造器校验，{@code ..} / 反斜杠 / 空路径段一概拒绝 ——
      * 这条路径直接拼磁盘路径，是最典型的目录穿越入口。
-     *
-     * <p>404 而不是 403：不告诉外面"这个 key 存在但你没权限"。
      *
      * <p>缓存头敢写 immutable，是因为 storageKey 不可变、永不覆盖（红线 1）。
      * 换图 = 换 key = 换 URL，所以浏览器和 CDN 缓存一年也不会拿到过期内容。
      */
-    @Operation(summary = "读取公开文件（免登录，私有文件404） @author 1024")
+    @Operation(summary = "读取文件（免登录，给C端与富文本用） @author 1024")
     @GetMapping(FileConfig.PUBLIC_FILE_PATH + "/**")
     public void publicAccess(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String uri = request.getRequestURI();
@@ -137,7 +136,7 @@ public class FileController extends SupportBaseController {
 
         FileEntity file;
         try {
-            file = fileAssetService.findPublicByStorageKey(new StorageKey(storageKey).value());
+            file = fileAssetService.findByStorageKey(new StorageKey(storageKey).value());
         } catch (IllegalArgumentException e) {
             // 非法 key（穿越尝试等）与不存在同样处理，不给探测者任何区分信号
             file = null;
