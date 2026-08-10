@@ -79,6 +79,7 @@ public class FileCategoryService {
     @Transactional(rollbackFor = Exception.class)
     public FileCategoryEntity add(FileCategoryEntity form, RequestUser user) {
         String code = requireCode(form.getCategoryCode());
+        form.setCategoryName(requireName(form.getCategoryName()));
         if (fileCategoryDao.getByCode(code) != null) {
             throw new BusinessException("分类编码已存在：" + code);
         }
@@ -99,6 +100,7 @@ public class FileCategoryService {
     public void update(FileCategoryEntity form, RequestUser user) {
         FileCategoryEntity existing = require(form.getCategoryId());
         String newCode = requireCode(form.getCategoryCode());
+        form.setCategoryName(requireName(form.getCategoryName()));
         if (!existing.getCategoryCode().equals(newCode)) {
             if (SYSTEM_CODES.contains(existing.getCategoryCode())) {
                 throw new BusinessException("内置分类的编码不允许修改：" + existing.getCategoryCode());
@@ -178,6 +180,25 @@ public class FileCategoryService {
         String trimmed = code.trim();
         if (!trimmed.matches("[A-Za-z0-9_-]{1,50}")) {
             throw new BusinessException("分类编码只允许字母、数字、下划线和短横线，且不超过 50 位");
+        }
+        return trimmed;
+    }
+
+    /**
+     * 分类名称。<b>{@code category_name} 是 NOT NULL 且没有默认值</b>，
+     * 不在这里拦的话用户会收到一整段 DataIntegrityViolationException 的 SQL 原文 ——
+     * 既看不懂，又把表结构泄露到了响应里（实测确认过）。
+     *
+     * <p>这是「列约束与代码校验面不一致」的第二例，第一例是 t_file.folder_type。
+     * 教训一样：DB 上每一个 NOT NULL 且无默认值的列，代码里都必须有一处对应的校验。
+     */
+    private static String requireName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new BusinessException("分类名称不能为空");
+        }
+        String trimmed = name.trim();
+        if (trimmed.length() > 50) {
+            throw new BusinessException("分类名称最长 50 个字符");
         }
         return trimmed;
     }

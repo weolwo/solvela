@@ -16,7 +16,10 @@
   <a-card v-if="mode === 'category'" size="small" :bordered="false" :hoverable="true">
     <div class="page-header">
       <span class="page-title">素材库</span>
-      <a-button type="primary" @click="showUploadModal">上传素材</a-button>
+      <a-space>
+        <a-button @click="openCategoryModal(null)">新建分类</a-button>
+        <a-button type="primary" @click="showUploadModal">上传素材</a-button>
+      </a-space>
     </div>
 
     <a-spin :spinning="categoryLoading">
@@ -34,6 +37,20 @@
           </div>
           <div class="category-count">{{ item.fileCount }} 个文件</div>
           <div class="category-code">{{ item.categoryCode }}</div>
+
+          <!-- 卡片操作。@click.stop 不能少，否则点编辑会连带触发卡片的进入分类 -->
+          <div class="category-actions" @click.stop>
+            <a @click="openCategoryModal(item)">编辑</a>
+            <a-tooltip v-if="item.systemFlag" title="内置分类被代码引用，不能删除">
+              <span class="disabled-link">删除</span>
+            </a-tooltip>
+            <a-tooltip v-else-if="item.fileCount > 0" title="分类下还有文件，不能删除">
+              <span class="disabled-link">删除</span>
+            </a-tooltip>
+            <a-popconfirm v-else title="确定删除该分类？" @confirm="removeCategory(item)">
+              <a class="danger-link">删除</a>
+            </a-popconfirm>
+          </div>
         </div>
       </div>
     </a-spin>
@@ -116,6 +133,34 @@
 
   <FileDetailDrawer ref="detailDrawerRef" @reload="onDetailChanged" />
 
+  <a-modal v-model:open="categoryModalFlag" :title="categoryForm.categoryId ? '编辑分类' : '新建分类'" @ok="saveCategory" :confirm-loading="categorySaving">
+    <a-form :label-col="{ span: 5 }" :wrapper-col="{ span: 17 }" class="mt-4">
+      <a-form-item label="分类编码" required>
+        <a-input
+          v-model:value="categoryForm.categoryCode"
+          placeholder="字母数字下划线短横线"
+          :disabled="categoryForm.systemFlag"
+          :maxlength="50"
+        />
+        <!-- code 会成为 storageKey 的第一段前缀，所以字符集必须收窄；
+             内置分类的 code 被代码引用着，改了等于把引用全部指空 -->
+        <div class="form-tip">
+          {{ categoryForm.systemFlag ? '内置分类的编码被代码引用，不可修改' : '会作为存储路径前缀，只允许字母、数字、下划线、短横线' }}
+        </div>
+      </a-form-item>
+      <a-form-item label="分类名称" required>
+        <a-input v-model:value="categoryForm.categoryName" placeholder="展示用名称，可随时改" :maxlength="50" />
+      </a-form-item>
+      <a-form-item label="标签">
+        <a-input v-model:value="categoryForm.categoryTag" placeholder="选填，用于分组展示" :maxlength="32" />
+      </a-form-item>
+      <a-form-item label="排序">
+        <a-input-number v-model:value="categoryForm.sort" :min="0" style="width: 120px" />
+        <div class="form-tip">数字小的排前面</div>
+      </a-form-item>
+    </a-form>
+  </a-modal>
+
   <a-modal v-model:open="uploadModalFlag" title="上传素材" @onCancel="hideUploadModal" @ok="hideUploadModal">
     <FileUpload
       list-type="text"
@@ -178,6 +223,63 @@
       smartSentry.captureError(e);
     } finally {
       categoryLoading.value = false;
+    }
+  }
+
+  // ---------------------------- 分类增删改 ----------------------------
+
+  const categoryModalFlag = ref(false);
+  const categorySaving = ref(false);
+  const categoryForm = reactive({ categoryId: null, categoryCode: '', categoryName: '', categoryTag: '', sort: 0, systemFlag: false });
+
+  function openCategoryModal(item) {
+    Object.assign(categoryForm, {
+      categoryId: item ? item.categoryId : null,
+      categoryCode: item ? item.categoryCode : '',
+      categoryName: item ? item.categoryName : '',
+      categoryTag: item ? item.categoryTag : '',
+      sort: item ? item.sort : 0,
+      systemFlag: item ? !!item.systemFlag : false,
+    });
+    categoryModalFlag.value = true;
+  }
+
+  async function saveCategory() {
+    if (!categoryForm.categoryCode || !categoryForm.categoryName) {
+      message.warning('分类编码与名称都不能为空');
+      return;
+    }
+    categorySaving.value = true;
+    try {
+      const param = {
+        categoryId: categoryForm.categoryId,
+        categoryCode: categoryForm.categoryCode,
+        categoryName: categoryForm.categoryName,
+        categoryTag: categoryForm.categoryTag,
+        sort: categoryForm.sort,
+      };
+      if (categoryForm.categoryId) {
+        await fileApi.updateCategory(param);
+      } else {
+        await fileApi.addCategory(param);
+      }
+      message.success('已保存');
+      categoryModalFlag.value = false;
+      queryCategoryList();
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      categorySaving.value = false;
+    }
+  }
+
+  async function removeCategory(item) {
+    try {
+      await fileApi.deleteCategory(item.categoryId);
+      message.success('已删除');
+      queryCategoryList();
+    } catch (e) {
+      smartSentry.captureError(e);
     }
   }
 
@@ -373,6 +475,28 @@
   .category-count {
     color: #888;
     font-size: 13px;
+  }
+
+  .category-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+  }
+
+  .disabled-link {
+    color: #d9d9d9;
+    cursor: not-allowed;
+  }
+
+  .danger-link {
+    color: #ff4d4f;
+  }
+
+  .form-tip {
+    color: #bfbfbf;
+    font-size: 12px;
+    line-height: 18px;
   }
 
   .category-code {
