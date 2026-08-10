@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 文件服务
@@ -46,5 +47,13 @@ public interface FileDao extends BaseMapper<FileEntity> {
      * @return
      */
     List<FileVO> queryPage(Page page, @Param("queryForm") FileQueryForm queryForm);
+
+    /**
+     * 各分类的文件数。<b>一次 GROUP BY 出全部</b>，不是每个分类查一次 ——
+     * 分类卡片页一次要展示几十张卡，逐个 count 就是 N+1，而这是运营每天进的页面。
+     *
+     * @return categoryId -> count
+     */
+    List<Map<String, Object>> countGroupByCategory();
 
 }

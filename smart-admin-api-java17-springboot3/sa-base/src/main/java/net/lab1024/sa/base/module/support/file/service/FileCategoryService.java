@@ -8,10 +8,13 @@ import net.lab1024.sa.base.module.support.file.dao.FileCategoryDao;
 import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
+import net.lab1024.sa.base.module.support.file.domain.vo.FileCategoryVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -42,6 +45,35 @@ public class FileCategoryService {
      */
     public List<FileCategoryEntity> list() {
         return fileCategoryDao.listOrdered();
+    }
+
+    /**
+     * 带文件数的分类列表，给素材库的分类卡片用。
+     *
+     * <p><b>两次查询搞定，不是每张卡片查一次</b>：分类列表一次 + GROUP BY 计数一次。
+     * 逐个 count 是 N+1，而这是运营每天进的页面。
+     */
+    public List<FileCategoryVO> listWithCount() {
+        Map<Long, Long> counts = new HashMap<>();
+        for (Map<String, Object> row : fileDao.countGroupByCategory()) {
+            Object id = row.get("categoryId");
+            Object count = row.get("fileCount");
+            if (id instanceof Number idNum && count instanceof Number countNum) {
+                counts.put(idNum.longValue(), countNum.longValue());
+            }
+        }
+        return fileCategoryDao.listOrdered().stream().map(entity -> {
+            FileCategoryVO vo = new FileCategoryVO();
+            vo.setCategoryId(entity.getCategoryId());
+            vo.setCategoryCode(entity.getCategoryCode());
+            vo.setCategoryName(entity.getCategoryName());
+            vo.setCategoryTag(entity.getCategoryTag());
+            vo.setSort(entity.getSort());
+            vo.setFileCount(counts.getOrDefault(entity.getCategoryId(), 0L));
+            // 前端据此把内置分类的删除按钮灰掉，而不是等点了之后收一个报错
+            vo.setSystemFlag(SYSTEM_CODES.contains(entity.getCategoryCode()));
+            return vo;
+        }).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)

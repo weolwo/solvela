@@ -10,6 +10,7 @@ import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartRequestUtil;
 import net.lab1024.sa.base.constant.SwaggerTagConst;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
+import net.lab1024.sa.base.module.support.file.domain.vo.FileCategoryVO;
 import net.lab1024.sa.base.module.support.file.service.FileCategoryService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,10 +35,10 @@ public class FileCategoryController extends SupportBaseController {
     @Resource
     private FileCategoryService fileCategoryService;
 
-    @Operation(summary = "文件分类列表（按展示顺序） @author 1024")
+    @Operation(summary = "文件分类列表（按展示顺序，带文件数） @author 1024")
     @GetMapping("/file/category/list")
-    public ResponseDTO<List<FileCategoryEntity>> list() {
-        return ResponseDTO.ok(fileCategoryService.list());
+    public ResponseDTO<List<FileCategoryVO>> list() {
+        return ResponseDTO.ok(fileCategoryService.listWithCount());
     }
 
     @Operation(summary = "新建文件分类 @author 1024")

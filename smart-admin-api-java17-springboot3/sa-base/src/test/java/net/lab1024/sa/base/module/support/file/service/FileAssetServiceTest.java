@@ -10,6 +10,7 @@ import net.lab1024.sa.base.module.support.file.dao.FileDao;
 import net.lab1024.sa.base.module.support.file.dao.FileRelationDao;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
+import net.lab1024.sa.base.module.support.file.domain.entity.FileRelationEntity;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.storage.ByteRange;
 import net.lab1024.sa.base.storage.ObjectMeta;
@@ -334,6 +335,61 @@ class FileAssetServiceTest {
         assertThat(service.resolveFileIds(List.of("https://other-site.com/x/y/z/foo.png"))).isEmpty();
         assertThat(service.resolveFileIds(List.of())).isEmpty();
         assertThat(service.resolveFileIds(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("标签拼成前后带逗号的形式 —— 少了这两个逗号，搜「618」会命中「6180」")
+    void normalizeTags() {
+        assertThat(FileAssetService.normalizeTags(List.of("双十一", "banner")))
+                .isEqualTo(",双十一,banner,");
+        // 含逗号的标签会破坏存储结构，直接丢弃而不是"尽力转义"
+        assertThat(FileAssetService.normalizeTags(List.of("a,b", "ok", "全角，逗号")))
+                .isEqualTo(",ok,");
+        assertThat(FileAssetService.normalizeTags(List.of("  x  ", "x"))).isEqualTo(",x,");
+        assertThat(FileAssetService.normalizeTags(List.of())).isNull();
+        assertThat(FileAssetService.normalizeTags(List.of("  "))).isNull();
+    }
+
+    @Test
+    @DisplayName("有引用的文件不能删，且字节一个都没动")
+    void deleteRejectsReferencedFile() {
+        FileEntity entity = file(5L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC);
+        when(fileDao.selectById(5L)).thenReturn(entity);
+        FileRelationEntity relation = new FileRelationEntity();
+        relation.setFileId(5L);
+        relation.setBizType("ACTIVITY_DISPLAY");
+        when(fileRelationDao.listByFileIds(any())).thenReturn(List.of(relation));
+
+        assertThatThrownBy(() -> service.delete(5L, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("正被 1 处业务引用");
+        verify(fileDao, never()).updateById(any(FileEntity.class));
+    }
+
+    @Test
+    @DisplayName("无引用可删：先标记再删对象 —— DB 事务回滚得了，删掉的字节回滚不了")
+    void deleteRemovesObjectWhenUnreferenced() {
+        FileEntity saved = service.upload(png("a.png"), "BANNER", null);
+        StorageKey key = new StorageKey(saved.getStorageKey());
+        when(fileDao.selectById(1001L)).thenReturn(saved);
+        when(fileRelationDao.listByFileIds(any())).thenReturn(List.of());
+
+        service.delete(1001L, null);
+        assertThat(storage.exists(key)).isFalse();
+    }
+
+    @Test
+    @DisplayName("改名打标签不碰 storageKey —— key 不可变是 CDN 能设 immutable 的前提")
+    void updateMetaNeverTouchesStorageKey() {
+        when(fileDao.selectById(9L)).thenReturn(file(9L, "banner/202608/10/a.png", FileVisibilityEnum.PUBLIC));
+
+        service.updateMeta(9L, "新名字.png", List.of("双十一"), null);
+
+        org.mockito.ArgumentCaptor<FileEntity> captor = org.mockito.ArgumentCaptor.forClass(FileEntity.class);
+        verify(fileDao).updateById(captor.capture());
+        assertThat(captor.getValue().getStorageKey()).isNull();
+        assertThat(captor.getValue().getOriginalName()).isEqualTo("新名字.png");
+        assertThat(captor.getValue().getTags()).isEqualTo(",双十一,");
     }
 
     private static FileVO vo(Long id, String key) {

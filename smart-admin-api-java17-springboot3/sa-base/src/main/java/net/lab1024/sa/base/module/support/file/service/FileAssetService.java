@@ -20,6 +20,7 @@ import net.lab1024.sa.base.module.support.file.domain.entity.FileCategoryEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileEntity;
 import net.lab1024.sa.base.module.support.file.domain.entity.FileRelationEntity;
 import net.lab1024.sa.base.module.support.file.domain.form.FileQueryForm;
+import net.lab1024.sa.base.module.support.file.domain.vo.FileDetailVO;
 import net.lab1024.sa.base.module.support.file.domain.vo.FileVO;
 import net.lab1024.sa.base.module.support.securityprotect.service.SecurityFileService;
 import net.lab1024.sa.base.storage.ByteRange;
@@ -359,6 +360,116 @@ public class FileAssetService {
         }
         String prefix = publicUrlPrefix.endsWith("/") ? publicUrlPrefix : publicUrlPrefix + "/";
         return prefix + vo.getStorageKey();
+    }
+
+    // ------------------------------------------------------------------ 详情与维护
+
+    /**
+     * 文件详情 + <b>被谁引用着</b>。
+     *
+     * <p>引用列表是这个接口的主要价值：运营删图前看一眼「这张图正在 3 个活动里用」，
+     * 比删完了才发现活动页变叉强得多。走 {@code idx_file} 索引。
+     */
+    public FileDetailVO detail(Long fileId) {
+        FileEntity entity = requireFile(fileId);
+        FileVO vo = toVo(entity);
+        vo.setFileUrl(urlOf(entity, ImageVariant.ORIGINAL));
+
+        List<FileDetailVO.Reference> references = fileRelationDao.listByFileIds(List.of(fileId)).stream()
+                .map(r -> {
+                    FileDetailVO.Reference ref = new FileDetailVO.Reference();
+                    ref.setBizType(r.getBizType());
+                    ref.setBizId(r.getBizId());
+                    return ref;
+                })
+                .toList();
+
+        FileDetailVO detail = new FileDetailVO();
+        detail.setFile(vo);
+        detail.setReferences(references);
+        return detail;
+    }
+
+    /**
+     * 改名 / 打标签。<b>只动展示层信息，storageKey 一个字符都不碰</b> ——
+     * key 不可变是 CDN 能设 immutable、以及"换图不用刷缓存"的前提（设计文档 §7.6）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateMeta(Long fileId, String originalName, List<String> tags, RequestUser user) {
+        FileEntity existing = requireFile(fileId);
+        FileEntity update = new FileEntity();
+        update.setFileId(existing.getFileId());
+        if (originalName != null && !originalName.isBlank()) {
+            if (originalName.length() > 200) {
+                throw new BusinessException("文件名称最大长度为 200");
+            }
+            update.setOriginalName(originalName.trim());
+        }
+        if (tags != null) {
+            update.setTags(normalizeTags(tags));
+        }
+        update.setUpdateBy(user == null ? null : user.getUserName());
+        fileDao.updateById(update);
+    }
+
+    /**
+     * 把标签列表拼成<b>前后各带一个逗号</b>的存储形式：{@code ,双十一,banner,}
+     *
+     * <p>这个形式不是为了好看，是为了让 {@code LIKE '%,618,%'} 能精确匹配 ——
+     * 少了这两个逗号，搜「618」会命中「6180」、搜「11」会命中「双11」和「1111」，
+     * 而且不报错，只是搜出一堆不相干的东西。
+     *
+     * <p>标签自身含逗号会破坏这个结构，所以直接丢弃而不是"尽力转义"。
+     */
+    static String normalizeTags(List<String> tags) {
+        List<String> cleaned = tags.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(t -> !t.isEmpty() && t.indexOf(',') < 0 && t.indexOf('，') < 0)
+                .distinct()
+                .toList();
+        return cleaned.isEmpty() ? null : "," + String.join(",", cleaned) + ",";
+    }
+
+    /**
+     * 删除文件。<b>有任何业务在引用就拒绝</b>。
+     *
+     * <p>行标记为已删除，同时把对象从存储里真删掉。之所以不只做软删：
+     * 孤儿清理任务还没落地（等定时任务模块重构后再做），只软删的话存储只增不减，
+     * 而且没有任何机制会回来收它。<b>代价是删除不可恢复</b>，所以上面那道引用检查必须严。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long fileId, RequestUser user) {
+        FileEntity existing = requireFile(fileId);
+        List<FileRelationEntity> references = fileRelationDao.listByFileIds(List.of(fileId));
+        if (!references.isEmpty()) {
+            throw new BusinessException("该文件正被 " + references.size() + " 处业务引用，不能删除");
+        }
+        FileEntity update = new FileEntity();
+        update.setFileId(fileId);
+        update.setDeletedFlag(1);
+        update.setUpdateBy(user == null ? null : user.getUserName());
+        fileDao.updateById(update);
+        // 放在最后：DB 事务回滚得了，删掉的字节回滚不了
+        objectStorage.delete(new StorageKey(existing.getStorageKey()));
+    }
+
+    private FileVO toVo(FileEntity entity) {
+        FileVO vo = new FileVO();
+        vo.setFileId(entity.getFileId());
+        vo.setCategoryId(entity.getCategoryId());
+        vo.setOriginalName(entity.getOriginalName());
+        vo.setStorageKey(entity.getStorageKey());
+        vo.setStorageKind(entity.getStorageKind());
+        vo.setExtension(entity.getExtension());
+        vo.setContentType(entity.getContentType());
+        vo.setFileSize(entity.getFileSize());
+        vo.setVisibility(entity.getVisibility());
+        vo.setStatus(entity.getStatus());
+        vo.setTags(entity.getTags());
+        vo.setCreateBy(entity.getCreateBy());
+        vo.setCreateTime(entity.getCreateTime());
+        return vo;
     }
 
     // ------------------------------------------------------------------ 生命周期
