@@ -11,20 +11,15 @@
     <sql id="voColumns">
         t_file.file_id,
         t_file.category_id,
-        t_file.folder_type,
         t_file.original_name,
         t_file.storage_key,
         t_file.file_size,
-        t_file.file_type,
         t_file.extension,
         t_file.content_type,
         t_file.storage_kind,
         t_file.visibility,
         t_file.status,
         t_file.tags,
-        t_file.creator_id,
-        t_file.creator_name,
-        t_file.creator_user_type,
         t_file.create_by,
         t_file.create_time
     </sql>
@@ -36,10 +31,6 @@
         FROM t_file
         <where>
             t_file.deleted_flag = 0
-            <!--文件夹类型-->
-            <if test="queryForm.folderType != null">
-                AND t_file.folder_type = #{queryForm.folderType}
-            </if>
             <!--文件名词-->
             <if test="queryForm.originalName != null and queryForm.originalName != ''">
                 AND INSTR(t_file.original_name,#{queryForm.originalName})
@@ -48,9 +39,9 @@
             <if test="queryForm.storageKey != null and queryForm.storageKey != ''">
                 AND INSTR(t_file.storage_key,#{queryForm.storageKey})
             </if>
-            <!--文件类型-->
-            <if test="queryForm.fileType != null">
-                AND t_file.file_type = #{queryForm.fileType}
+            <!--扩展名-->
+            <if test="queryForm.extension != null and queryForm.extension != ''">
+                AND t_file.extension = #{queryForm.extension}
             </if>
             <!--分类-->
             <if test="queryForm.categoryId != null">
@@ -64,8 +55,8 @@
                 AND INSTR(t_file.tags, CONCAT(',', #{queryForm.tag}, ','))
             </if>
             <!--创建人-->
-            <if test="queryForm.creatorName != null and queryForm.creatorName != ''">
-                AND INSTR(t_file.creator_name,#{queryForm.creatorName})
+            <if test="queryForm.createBy != null and queryForm.createBy != ''">
+                AND INSTR(t_file.create_by,#{queryForm.createBy})
             </if>
             <!--创建时间-->
             <if test="queryForm.createTimeBegin != null">

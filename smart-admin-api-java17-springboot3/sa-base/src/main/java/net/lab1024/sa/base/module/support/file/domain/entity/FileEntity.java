@@ -39,11 +39,6 @@ public class FileEntity {
      */
     private Long categoryId;
 
-    /**
-     * @deprecated 被 {@link #categoryId} 取代。保留一个版本双写观察，档⑤ 随旧实现一并删除。
-     */
-    @Deprecated(since = "3.53.0")
-    private Integer folderType;
 
     /**
      * 存储键，系统生成，<b>不可变</b>。换图是传新文件 + 改引用，绝不覆盖同一个 key（§7.6）。
@@ -74,11 +69,6 @@ public class FileEntity {
      */
     private String contentType;
 
-    /**
-     * @deprecated 语义与 {@link #extension} 重复。保留一个版本，档⑤ 删除。
-     */
-    @Deprecated(since = "3.53.0")
-    private String fileType;
 
     private Long fileSize;
 
@@ -123,17 +113,6 @@ public class FileEntity {
 
     private String updateBy;
 
-    /**
-     * @deprecated 被 {@link #createBy} 取代（语义完全一致，迁移时已平移）。档⑤ 删除。
-     */
-    @Deprecated(since = "3.53.0")
-    private Long creatorId;
-
-    @Deprecated(since = "3.53.0")
-    private Integer creatorUserType;
-
-    @Deprecated(since = "3.53.0")
-    private String creatorName;
 
     private LocalDateTime updateTime;
 

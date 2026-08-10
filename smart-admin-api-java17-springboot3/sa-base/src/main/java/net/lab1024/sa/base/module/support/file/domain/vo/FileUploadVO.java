@@ -30,6 +30,6 @@ public class FileUploadVO {
     @Schema(description = "文件大小")
     private Long fileSize;
 
-    @Schema(description = "文件类型")
-    private String fileType;
+    @Schema(description = "扩展名")
+    private String extension;
 }

@@ -136,7 +136,7 @@ public class FileController extends SupportBaseController {
         // 这里给的是用户上传时的原名，不是生成的存储名。旧的两个实现在这个字段上塞了
         // 相反的东西（local 塞生成名、cloud 塞原名），是同一份前端代码在两种部署下表现不同的根因
         vo.setOriginalName(entity.getOriginalName());
-        vo.setFileType(entity.getExtension());
+        vo.setExtension(entity.getExtension());
         vo.setFileSize(entity.getFileSize());
         vo.setFileUrl(fileAssetService.url(entity, null));
         return vo;

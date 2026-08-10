@@ -9,8 +9,12 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form" v-privilege="'support:file:query'">
     <a-row class="smart-query-form-row">
-      <a-form-item label="文件夹类型" class="smart-query-form-item">
-        <SmartEnumSelect width="150px" v-model:value="queryForm.folderType" enumName="FILE_FOLDER_TYPE_ENUM" placeholder="文件夹类型" />
+      <a-form-item label="分类" class="smart-query-form-item">
+        <a-select style="width: 150px" v-model:value="queryForm.categoryId" placeholder="分类" allow-clear>
+          <a-select-option v-for="item in categoryList" :key="item.categoryId" :value="item.categoryId">
+            {{ item.categoryName }}
+          </a-select-option>
+        </a-select>
       </a-form-item>
       <a-form-item label="文件名" class="smart-query-form-item">
         <a-input style="width: 150px" v-model:value="queryForm.originalName" placeholder="文件名" />
@@ -18,11 +22,11 @@
       <a-form-item label="文件Key" class="smart-query-form-item">
         <a-input style="width: 150px" v-model:value="queryForm.storageKey" placeholder="文件Key" />
       </a-form-item>
-      <a-form-item label="文件类型" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.fileType" placeholder="文件类型" />
+      <a-form-item label="扩展名" class="smart-query-form-item">
+        <a-input style="width: 150px" v-model:value="queryForm.extension" placeholder="扩展名" />
       </a-form-item>
       <a-form-item label="创建人" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.creatorName" placeholder="创建人" />
+        <a-input style="width: 150px" v-model:value="queryForm.createBy" placeholder="创建人" />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 220px" @change="onChangeCreateTime" />
@@ -76,11 +80,8 @@
       :pagination="false"
     >
       <template #bodyCell="{ text, record, column }">
-        <template v-if="column.dataIndex === 'folderType'">
-          <span>{{ $smartEnumPlugin.getDescByValue('FILE_FOLDER_TYPE_ENUM', text) }}</span>
-        </template>
-        <template v-if="column.dataIndex === 'creatorUserType'">
-          <span>{{ $smartEnumPlugin.getDescByValue('USER_TYPE_ENUM', text) }}</span>
+        <template v-if="column.dataIndex === 'categoryId'">
+          <span>{{ categoryNameMap[text] || text }}</span>
         </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
@@ -124,7 +125,6 @@
 <script setup>
   import { onMounted, reactive, ref } from 'vue';
   import { fileApi } from '/@/api/support/file-api';
-  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -132,7 +132,6 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import FilePreviewModal from '/@/components/support/file-preview-modal/index.vue';
   import FileUpload from '/@/components/support/file-upload/index.vue';
-  import { FILE_FOLDER_TYPE_ENUM } from '/@/constants/support/file-const';
   // ---------------------------- 表格列 ----------------------------
 
   const columns = ref([
@@ -143,10 +142,10 @@
       width: 70,
     },
     {
-      title: '文件夹',
-      dataIndex: 'folderType',
+      title: '分类',
+      dataIndex: 'categoryId',
       ellipsis: true,
-      width: 70,
+      width: 90,
     },
     {
       title: '文件名称',
@@ -161,8 +160,8 @@
       width: 100,
     },
     {
-      title: '文件类型',
-      dataIndex: 'fileType',
+      title: '扩展名',
+      dataIndex: 'extension',
       ellipsis: true,
       width: 80,
     },
@@ -189,11 +188,11 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    folderType: undefined, //文件夹类型
+    categoryId: undefined, //分类
     originalName: undefined, //文件名词
     storageKey: undefined, //文件Key
-    fileType: undefined, //文件类型
-    creatorName: undefined, //创建人
+    extension: undefined, //扩展名
+    createBy: undefined, //创建人
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束
@@ -271,7 +270,26 @@
     }
   }
 
-  onMounted(queryData);
+  // ---------------------------- 分类下拉 ----------------------------
+  // 分类从接口来而不是写死的枚举：运营可以在后台增删改分类、调排序，
+  // 前端硬编码一份就必然和库里对不上
+  const categoryList = ref([]);
+  const categoryNameMap = ref({});
+
+  async function queryCategoryList() {
+    try {
+      let res = await fileApi.getCategoryList();
+      categoryList.value = res.data || [];
+      categoryNameMap.value = Object.fromEntries(categoryList.value.map((e) => [e.categoryId, e.categoryName]));
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
+  }
+
+  onMounted(() => {
+    queryCategoryList();
+    queryData();
+  });
 
   // ------------- 上传文件 --------------------
   const uploadModalFlag = ref(false);

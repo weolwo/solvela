@@ -2,9 +2,7 @@ package net.lab1024.sa.base.module.support.file.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import net.lab1024.sa.base.common.enumeration.UserTypeEnum;
 import net.lab1024.sa.base.common.swagger.SchemaEnum;
-import net.lab1024.sa.base.module.support.file.constant.FileFolderTypeEnum;
 import net.lab1024.sa.base.module.support.file.constant.FileStatusEnum;
 import net.lab1024.sa.base.module.support.file.constant.FileVisibilityEnum;
 
@@ -25,10 +23,6 @@ public class FileVO {
     @Schema(description = "主键")
     private Long fileId;
 
-    @Schema(description = "存储文件夹类型")
-    @SchemaEnum(FileFolderTypeEnum.class)
-    private Integer folderType;
-
     @Schema(description = "分类ID")
     private Long categoryId;
 
@@ -40,9 +34,6 @@ public class FileVO {
      */
     @Schema(description = "文件大小（字节）")
     private Long fileSize;
-
-    @Schema(description = "文件类型")
-    private String fileType;
 
     @Schema(description = "扩展名（从嗅探MIME反推）")
     private String extension;
@@ -67,17 +58,8 @@ public class FileVO {
     @Schema(description = "标签，前后各带逗号")
     private String tags;
 
-    @Schema(description = "上传人")
-    private Long creatorId;
-
-    @Schema(description = "上传人")
-    private String creatorName;
-
     @Schema(description = "创建人（用户名）")
     private String createBy;
-
-    @SchemaEnum(value = UserTypeEnum.class, desc = "创建人类型")
-    private Integer creatorUserType;
 
     @Schema(description = "文件展示url")
     private String fileUrl;

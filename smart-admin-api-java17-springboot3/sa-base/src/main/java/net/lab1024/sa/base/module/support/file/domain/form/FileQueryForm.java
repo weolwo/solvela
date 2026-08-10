@@ -5,7 +5,6 @@ import lombok.Data;
 import net.lab1024.sa.base.common.domain.PageParam;
 import net.lab1024.sa.base.common.swagger.SchemaEnum;
 import net.lab1024.sa.base.common.validator.enumeration.CheckEnum;
-import net.lab1024.sa.base.module.support.file.constant.FileFolderTypeEnum;
 
 import java.time.LocalDate;
 
@@ -20,10 +19,6 @@ import java.time.LocalDate;
  */
 @Data
 public class FileQueryForm extends PageParam {
-
-    @SchemaEnum(value = FileFolderTypeEnum.class, desc = "文件夹类型")
-    @CheckEnum(value = FileFolderTypeEnum.class, message = "文件夹类型 错误")
-    private Integer folderType;
 
     @Schema(description = "分类ID")
     private Long categoryId;
@@ -40,11 +35,11 @@ public class FileQueryForm extends PageParam {
     @Schema(description = "文件Key")
     private String storageKey;
 
-    @Schema(description = "文件类型")
-    private String fileType;
+    @Schema(description = "扩展名")
+    private String extension;
 
-    @Schema(description = "创建人")
-    private String creatorName;
+    @Schema(description = "创建人（用户名）")
+    private String createBy;
 
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;

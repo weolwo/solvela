@@ -23,6 +23,13 @@ export const fileApi = {
     return postRequest('/support/file/queryPage', param);
   },
   /**
+   * 文件分类列表（按后台配置的展示顺序） @author 1024
+   */
+  getCategoryList: () => {
+    return getRequest('/support/file/category/list');
+  },
+
+  /**
    * 获取文件URL：根据storageKey @author 胡克
    */
   getUrl: (storageKey) => {
