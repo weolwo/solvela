@@ -27,7 +27,10 @@
     <!-- 分页查询 -->
     <select id="queryPage" resultType="net.lab1024.sa.base.module.support.file.domain.vo.FileVO">
         SELECT
-        <include refid="voColumns"/>
+        <include refid="voColumns"/>,
+        <!-- 引用数直接在列表里给出来，省得为「这张图在不在用」逐个点开详情。
+             相关子查询走 t_file_relation 的 idx_file，不是 N+1（一条 SQL 出全部） -->
+        (SELECT COUNT(*) FROM t_file_relation r WHERE r.file_id = t_file.file_id) AS referenceCount
         FROM t_file
         <where>
             t_file.deleted_flag = 0

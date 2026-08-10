@@ -14,12 +14,14 @@
 <template>
   <!---------- 分类卡片页 begin ----------->
   <a-card v-if="mode === 'category'" size="small" :bordered="false" :hoverable="true">
+    <!--
+      这一页刻意没有全局的「上传素材」按钮：文件必须落进某个分类，
+      而在分类卡片页按下它时「哪个分类」是没有答案的 —— 原先默认丢进「通用」，
+      运营看到的是"传完了但不在我以为的地方"。上传入口做到每张卡片上，分类就是自明的。
+    -->
     <div class="page-header">
       <span class="page-title">素材库</span>
-      <a-space>
-        <a-button @click="openCategoryModal(null)">新建分类</a-button>
-        <a-button type="primary" @click="showUploadModal">上传素材</a-button>
-      </a-space>
+      <a-button @click="openCategoryModal(null)">新建分类</a-button>
     </div>
 
     <a-spin :spinning="categoryLoading">
@@ -40,6 +42,10 @@
 
           <!-- 卡片操作。@click.stop 不能少，否则点编辑会连带触发卡片的进入分类 -->
           <div class="category-actions" @click.stop>
+            <!-- 上传直接挂在卡片上：点哪张卡就传进哪个分类，不需要再问一次 -->
+            <a-upload :show-upload-list="false" :multiple="true" :custom-request="(opt) => customUpload(opt, item.categoryId)">
+              <a>上传</a>
+            </a-upload>
             <a @click="openCategoryModal(item)">编辑</a>
             <a-tooltip v-if="item.systemFlag" title="内置分类被代码引用，不能删除">
               <span class="disabled-link">删除</span>
@@ -60,11 +66,29 @@
   <!---------- 素材网格页 begin ----------->
   <a-card v-else size="small" :bordered="false" :hoverable="true">
     <div class="page-header">
-      <a-breadcrumb>
-        <a-breadcrumb-item><a @click="backToCategory">素材库</a></a-breadcrumb-item>
-        <a-breadcrumb-item>{{ currentCategoryName }}</a-breadcrumb-item>
-      </a-breadcrumb>
-      <a-button type="primary" @click="showUploadModal">上传素材</a-button>
+      <!--
+        返回上一层必须有一个显式的按钮：面包屑那条「素材库」链接在视觉上只是导航文字，
+        运营没把它当成可点的东西，结果是进了分类就出不来、只能关页面重点菜单。
+        按钮留着面包屑一起 —— 面包屑负责说明「我在哪」，按钮负责「怎么回去」。
+      -->
+      <a-space>
+        <a-button size="small" @click="backToCategory">
+          <template #icon><LeftOutlined /></template>
+          返回分类
+        </a-button>
+        <a-breadcrumb>
+          <a-breadcrumb-item><a @click="backToCategory">素材库</a></a-breadcrumb-item>
+          <a-breadcrumb-item>{{ currentCategoryName }}</a-breadcrumb-item>
+        </a-breadcrumb>
+      </a-space>
+      <!--
+        点按钮直接弹系统文件框，选完才出待传列表 —— 原先是先开一个弹窗、
+        弹窗里再点一次「点击上传」才弹文件框，中间那一步什么都没问，纯属多一次点击。
+        「全部素材」里没有分类可言，退回通用分类，并在按钮上写明白传到哪。
+      -->
+      <a-upload :show-upload-list="false" :multiple="true" :custom-request="(opt) => customUpload(opt, uploadCategoryId)">
+        <a-button type="primary">上传到「{{ uploadCategoryName }}」</a-button>
+      </a-upload>
     </div>
 
     <a-form class="smart-query-form">
@@ -103,12 +127,30 @@
       <div class="file-grid">
         <div v-for="file in fileList" :key="file.fileId" class="file-card" :class="{ selected: isSelected(file.fileId) }">
           <a-checkbox class="file-check" :checked="isSelected(file.fileId)" @change="toggleSelect(file.fileId)" />
-          <div class="file-thumb" @click="openDetail(file)">
-            <img v-if="isImage(file)" :src="file.fileUrl" :alt="file.originalName" loading="lazy" />
-            <div v-else class="thumb-placeholder">{{ (file.extension || 'FILE').toUpperCase() }}</div>
+          <div class="thumb-wrap" @click="openDetail(file)">
+            <FileThumb :file-id="file.fileId" :content-type="file.contentType" :extension="file.extension" :alt="file.originalName" />
           </div>
           <div class="file-name" :title="file.originalName" @click="openDetail(file)">{{ file.originalName }}</div>
-          <div class="file-sub">{{ readableSize(file.fileSize) }}</div>
+
+          <!--
+            卡片上直接给「标签 / 上传时间 / 引用情况」：找图靠扫，扫到一半还要点开详情
+            才知道这张在不在用、是不是上个月那批，等于把网格退化成一个缩略图列表。
+          -->
+          <div class="file-tags">
+            <a-tag v-for="tag in splitTags(file.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
+            <span v-if="!splitTags(file.tags).length" class="file-muted">未打标签</span>
+          </div>
+
+          <div class="file-sub">
+            <span>{{ readableSize(file.fileSize) }}</span>
+            <span class="file-muted">{{ shortDate(file.createTime) }}</span>
+          </div>
+
+          <!-- 引用数是删除守卫的依据：有引用删不掉，先在卡片上说清楚，别等点了删除才报错 -->
+          <div class="file-ref">
+            <a-tag v-if="file.referenceCount > 0" color="green">引用 {{ file.referenceCount }}</a-tag>
+            <a-tag v-else>未被引用</a-tag>
+          </div>
         </div>
       </div>
       <a-empty v-if="!tableLoading && !fileList.length" description="这个分类下还没有素材" />
@@ -161,26 +203,36 @@
     </a-form>
   </a-modal>
 
-  <a-modal v-model:open="uploadModalFlag" title="上传素材" @onCancel="hideUploadModal" @ok="hideUploadModal">
-    <FileUpload
-      list-type="text"
-      :maxUploadSize="10"
-      buttonText="点击上传"
-      :defaultFileList="[]"
-      :multiple="true"
-      :folder="uploadFolder"
-    />
+  <!--
+    待传列表在选完文件之后才出现，全成功就自己关掉 —— 没出错的时候不需要人来点一下确认。
+    有失败的就留着，逐个说明哪一个为什么没传上去（类型不允许、超限都是后端逐条给的话）。
+  -->
+  <a-modal v-model:open="uploadPanelFlag" title="上传素材" :footer="null" :mask-closable="!uploading" @cancel="closeUploadPanel">
+    <div v-for="task in uploadQueue" :key="task.uid" class="upload-task">
+      <span class="upload-task-name" :title="task.name">{{ task.name }}</span>
+      <span v-if="task.status === 'uploading'" class="upload-task-status"><a-spin size="small" /> 上传中</span>
+      <span v-else-if="task.status === 'done'" class="upload-task-status success">已上传</span>
+      <a-tooltip v-else :title="task.error">
+        <span class="upload-task-status error">失败</span>
+      </a-tooltip>
+    </div>
+    <div class="upload-panel-footer">
+      <a-button size="small" :disabled="uploading" @click="closeUploadPanel">关闭</a-button>
+    </div>
   </a-modal>
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref } from 'vue';
+  import { computed, onMounted, reactive, ref, watch } from 'vue';
+  import { useRoute, useRouter } from 'vue-router';
   import { message } from 'ant-design-vue';
+  import { LeftOutlined } from '@ant-design/icons-vue';
   import { fileApi } from '/@/api/support/file-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import FileUpload from '/@/components/support/file-upload/index.vue';
+  import { FILE_FOLDER_TYPE_ENUM } from '/@/constants/support/file-const';
+  import FileThumb from '/@/components/support/file-thumb/index.vue';
   import FileDetailDrawer from './components/file-detail-drawer.vue';
 
   // ---------------------------- 视图切换 ----------------------------
@@ -190,21 +242,71 @@
 
   const currentCategoryName = computed(() => (currentCategory.value ? currentCategory.value.categoryName : '全部素材'));
 
-  // 上传落到哪个分类：在某个分类里就传那个分类，在「全部素材」里退回通用分类
-  const COMMON_CATEGORY_ID = 1;
-  const uploadFolder = computed(() => (currentCategory.value ? currentCategory.value.categoryId : COMMON_CATEGORY_ID));
+  // 上传落到哪个分类：在某个分类里就传那个分类，在「全部素材」里退回通用分类。
+  // 按钮上把分类名写出来，运营按下之前就知道会传到哪
+  const COMMON_CATEGORY_ID = FILE_FOLDER_TYPE_ENUM.COMMON.value;
+  const uploadCategoryId = computed(() => (currentCategory.value ? currentCategory.value.categoryId : COMMON_CATEGORY_ID));
+  const uploadCategoryName = computed(() => {
+    if (currentCategory.value) {
+      return currentCategory.value.categoryName;
+    }
+    const common = categoryList.value.find((e) => e.categoryId === COMMON_CATEGORY_ID);
+    return common ? common.categoryName : '通用';
+  });
+
+  /**
+   * 「在哪一层」写进 URL 而不是只放在组件状态里。
+   *
+   * <p>只放在状态里的代价：**浏览器后退没有任何东西可退**（路由压根没变），
+   * 刷新一下也会掉回分类页 —— 运营的表现是「进了分类就出不来，只能关掉重点菜单」。
+   * 写进 query 之后后退键、刷新、以及把链接发给同事都成立了。
+   *
+   * <p>`categoryId=all` 是「全部素材」那一档：它同样是网格页，但没有具体分类，
+   * 用缺省值表达不了（缺省已经被「分类卡片页」占了）。
+   */
+  const route = useRoute();
+  const router = useRouter();
 
   function enterCategory(category) {
-    currentCategory.value = category;
-    mode.value = 'grid';
-    resetQuery();
+    router.push({ query: { categoryId: category ? category.categoryId : 'all' } });
   }
 
   function backToCategory() {
-    mode.value = 'category';
+    router.push({ query: {} });
+  }
+
+  /**
+   * URL → 视图。onMounted 与 watch(query) 共用一份，
+   * 否则从别处带 query 跳回来时 path 没变、组件不重挂载，会停在上一次的分类里。
+   */
+  function initFromQuery() {
+    const raw = route.query.categoryId;
+    if (!raw) {
+      const backFromGrid = mode.value === 'grid';
+      mode.value = 'category';
+      currentCategory.value = null;
+      clearSelection();
+      if (backFromGrid) {
+        // 从网格页回来要重新拉计数：刚才可能传了或删了素材。
+        // 首次挂载不用重拉 —— onMounted 里已经拉过一次了
+        queryCategoryList();
+      }
+      return;
+    }
+    if (raw === 'all') {
+      currentCategory.value = null;
+    } else {
+      const hit = categoryList.value.find((e) => String(e.categoryId) === String(raw));
+      if (!hit) {
+        // 分类被删了或 URL 是手敲的，退回卡片页，别把人晾在一个空网格里
+        router.replace({ query: {} });
+        return;
+      }
+      currentCategory.value = hit;
+    }
+    mode.value = 'grid';
     clearSelection();
-    // 回到卡片页要重新拉计数：刚才可能传了或删了素材
-    queryCategoryList();
+    resetQuery();
   }
 
   // ---------------------------- 分类 ----------------------------
@@ -334,10 +436,6 @@
     }
   }
 
-  function isImage(file) {
-    return (file.contentType || '').startsWith('image/');
-  }
-
   // ---------------------------- 多选与批量打标签 ----------------------------
 
   const selectedIds = ref([]);
@@ -402,19 +500,74 @@
 
   // ---------------------------- 上传 ----------------------------
 
-  const uploadModalFlag = ref(false);
+  /**
+   * 上传队列。a-upload 多选时会对每个文件各调一次 customRequest，
+   * 所以进度是逐个文件维护的，不是一个全局的 loading。
+   */
+  const uploadQueue = ref([]);
+  const uploadPanelFlag = ref(false);
 
-  function showUploadModal() {
-    uploadModalFlag.value = true;
+  const uploading = computed(() => uploadQueue.value.some((e) => e.status === 'uploading'));
+
+  async function customUpload({ file, onSuccess, onError }, categoryId) {
+    // 选完文件才开面板：没选之前弹一个空框，就是原先那多出来的一次点击
+    uploadPanelFlag.value = true;
+    const task = reactive({ uid: file.uid || `${file.name}_${Date.now()}`, name: file.name, status: 'uploading', error: '' });
+    uploadQueue.value.push(task);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      let res = await fileApi.uploadFile(formData, categoryId);
+      task.status = 'done';
+      onSuccess(res, file);
+    } catch (e) {
+      task.status = 'error';
+      // 后端对类型/大小是逐条给人话的，原样带出来才知道这一个为什么没传上去
+      task.error = e?.msg || e?.data?.msg || '上传失败';
+      onError(e);
+    } finally {
+      afterOneUploaded();
+    }
   }
 
-  function hideUploadModal() {
-    uploadModalFlag.value = false;
+  /** 一批全部结束后：刷新数据；全成功就自己关掉，有失败则留着让人看清是哪几个 */
+  function afterOneUploaded() {
+    if (uploading.value) {
+      return;
+    }
+    refreshCurrentView();
+    if (uploadQueue.value.every((e) => e.status === 'done')) {
+      message.success(`已上传 ${uploadQueue.value.length} 个素材`);
+      closeUploadPanel();
+    }
+  }
+
+  function closeUploadPanel() {
+    if (uploading.value) {
+      return;
+    }
+    uploadPanelFlag.value = false;
+    uploadQueue.value = [];
+  }
+
+  function refreshCurrentView() {
     if (mode.value === 'grid') {
       queryData();
-    } else {
-      queryCategoryList();
     }
+    // 分类卡片上的计数在两个视图下都要刷：网格页返回时不再重拉也能看到新数字
+    queryCategoryList();
+  }
+
+  /** tags 后端存成 ,a,b, 的形式（前后带逗号是为了检索能精确匹配），展示时拆开 */
+  function splitTags(tags) {
+    if (!tags) return [];
+    return tags.split(',').filter((t) => t);
+  }
+
+  /** 卡片位置有限，只留「几月几号」；完整时间在详情抽屉里 */
+  function shortDate(createTime) {
+    if (!createTime) return '';
+    return createTime.substring(0, 10);
   }
 
   function readableSize(size) {
@@ -426,7 +579,13 @@
     return (size / Math.pow(num, 3)).toFixed(2) + 'GB';
   }
 
-  onMounted(queryCategoryList);
+  watch(() => route.query.categoryId, initFromQuery);
+
+  onMounted(async () => {
+    // 必须先有分类列表再解析 URL：进的是哪个分类要靠 id 在列表里认领
+    await queryCategoryList();
+    initFromQuery();
+  });
 </script>
 
 <style scoped lang="less">
@@ -546,28 +705,44 @@
     z-index: 2;
   }
 
-  .file-thumb {
-    height: 110px;
+  .thumb-wrap {
+    cursor: pointer;
+  }
+
+  .upload-task {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: #fafafa;
-    border-radius: 4px;
-    overflow: hidden;
-    cursor: pointer;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
 
-    img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
+  .upload-task-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .upload-task-status {
+    flex: none;
+    color: #999;
+    font-size: 12px;
+
+    &.success {
+      color: #52c41a;
+    }
+
+    &.error {
+      color: #ff4d4f;
+      cursor: help;
     }
   }
 
-  .thumb-placeholder {
-    font-size: 18px;
-    font-weight: 600;
-    color: #bfbfbf;
-    letter-spacing: 1px;
+  .upload-panel-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 12px;
   }
 
   .file-name {
@@ -579,8 +754,36 @@
     white-space: nowrap;
   }
 
+  .file-tags {
+    margin-top: 4px;
+    height: 22px;
+    overflow: hidden;
+
+    :deep(.ant-tag) {
+      margin-inline-end: 4px;
+      font-size: 11px;
+      line-height: 18px;
+    }
+  }
+
   .file-sub {
-    color: #bfbfbf;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
     font-size: 12px;
+    color: #999;
+  }
+
+  .file-muted {
+    color: #bfbfbf;
+  }
+
+  .file-ref {
+    margin-top: 4px;
+
+    :deep(.ant-tag) {
+      font-size: 11px;
+      line-height: 18px;
+    }
   }
 </style>

@@ -66,4 +66,13 @@ public class FileVO {
 
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
+
+    /**
+     * 被多少个业务引用着。列表页直接给出来，运营扫一眼就知道哪些图在用、哪些是可以清理的
+     * —— 否则要逐个点开详情抽屉才看得到。
+     *
+     * <p>用相关子查询一次算完，不在循环里逐个查（{@code idx_file} 正好覆盖）。
+     */
+    @Schema(description = "被引用次数")
+    private Integer referenceCount;
 }
