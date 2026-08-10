@@ -369,9 +369,20 @@
    * ② 继续配置（?activityCode=&activityType=&activityName=&step=2）：
    *    活动已存在，直接进第二步。这是「空壳活动」的恢复路径 ——
    *    第一步落库后运营中途关掉浏览器，活动已在库里，不该让他重建一个。
+   * ③ 补配展示（同上，step=display）：
+   *    展示配置在向导里是可跳过的一步，跳过之后必须还有路回来 ——
+   *    否则运营等设计出图后想补主视觉，只能重建一个活动。
    */
   function initFromQuery() {
     const { activityCode, activityType, activityName, step: stepParam } = route.query;
+    if (activityCode && stepParam === 'display') {
+      created.activityCode = activityCode;
+      created.activityName = activityName || '';
+      created.activityType = activityType || '';
+      form.activityType = created.activityType;
+      step.value = STEP.DISPLAY;
+      return;
+    }
     if (activityCode && stepParam === '2') {
       created.activityCode = activityCode;
       created.activityType = activityType || '';

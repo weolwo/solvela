@@ -117,6 +117,12 @@
               {{ configuredMap[record.activityCode] === false ? '继续配置' : '配置玩法' }}
             </a-button>
             <a-button v-else type="link" @click="openUpgrade(record)">升级玩法</a-button>
+            <!--
+              展示配置在向导里是可跳过的一步，跳过之后必须还有路回来 ——
+              否则运营等设计出图后想补主视觉，只能重建一个活动。
+              复用向导的恢复机制，不在编辑弹窗里再塞一个带富文本的大表单。
+            -->
+            <a-button type="link" @click="resumeDisplay(record)">展示配置</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
             <!-- 不提供删除：活动的生命周期用「启用/禁用」表达。
                  发奖流水按 activity_code 追溯（t_prize_log 上有 (member_name, activity_code) 索引），
@@ -375,6 +381,21 @@
         activityType: record.activityType,
         activityName: record.activityName,
         step: '2',
+      },
+    });
+  }
+
+  /**
+   * 补配 C 端展示：把向导直接定位到展示配置那一步。
+   */
+  function resumeDisplay(record) {
+    router.push({
+      path: ACTIVITY_WIZARD_PATH,
+      query: {
+        activityCode: record.activityCode,
+        activityType: record.activityType,
+        activityName: record.activityName,
+        step: 'display',
       },
     });
   }
