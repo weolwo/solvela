@@ -54,6 +54,10 @@
             <if test="queryForm.tag != null and queryForm.tag != ''">
                 AND INSTR(t_file.tags, CONCAT(',', #{queryForm.tag}, ','))
             </if>
+            <!--只查图片。选图器用，content_type 是上传时嗅探的结论，比扩展名可信-->
+            <if test="queryForm.imageOnly != null and queryForm.imageOnly">
+                AND t_file.content_type LIKE 'image/%'
+            </if>
             <!--创建人-->
             <if test="queryForm.createBy != null and queryForm.createBy != ''">
                 AND INSTR(t_file.create_by,#{queryForm.createBy})

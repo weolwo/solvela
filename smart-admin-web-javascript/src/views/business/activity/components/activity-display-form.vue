@@ -13,13 +13,13 @@
   <a-spin :spinning="loading">
     <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 18 }">
       <a-form-item label="主视觉">
-        <ImageField v-model:fileId="form.mainImageId" v-model:url="preview.main" tip="活动页顶部大图" />
+        <ImageField v-model:fileId="form.mainImageId" tip="活动页顶部大图" />
       </a-form-item>
       <a-form-item label="背景图">
-        <ImageField v-model:fileId="form.bgImageId" v-model:url="preview.bg" tip="可不传，不传则用主题色" />
+        <ImageField v-model:fileId="form.bgImageId" tip="可不传，不传则用主题色" />
       </a-form-item>
       <a-form-item label="分享图">
-        <ImageField v-model:fileId="form.shareImageId" v-model:url="preview.share" tip="微信分享卡片缩略图" />
+        <ImageField v-model:fileId="form.shareImageId" tip="微信分享卡片缩略图" />
       </a-form-item>
 
       <a-form-item label="副标题">
@@ -53,13 +53,12 @@
 </template>
 
 <script setup>
-  import { h, onMounted, reactive, ref, watch } from 'vue';
-  import { Button, message, Upload } from 'ant-design-vue';
+  import { onMounted, reactive, ref, watch } from 'vue';
+  import { message } from 'ant-design-vue';
   import { activityDisplayApi } from '/@/api/business/activity/activity-display-api';
-  import { fileApi } from '/@/api/support/file-api';
-  import { FILE_FOLDER_TYPE_ENUM } from '/@/constants/support/file-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import Wangeditor from '/@/components/framework/wangeditor/index.vue';
+  import ImageField from '/@/components/support/image-field/index.vue';
 
   const props = defineProps({
     activityCode: { type: String, required: true },
@@ -81,8 +80,8 @@
     shareDesc: '',
     ruleContent: '',
   });
-  // 图片只在 form 里存 fileId，URL 单独放：存 URL 的话换 CDN 域名要洗全表
-  const preview = reactive({ main: '', bg: '', share: '' });
+  // 表单里只存 fileId，不存 URL：存 URL 的话换 CDN 域名要洗全表。
+  // 预览由 ImageField 自己按 fileId 取，这里不再维护第二份 URL 状态
 
   async function load() {
     if (!props.activityCode) return;
@@ -93,33 +92,10 @@
       if (res.data) {
         Object.assign(form, res.data);
       }
-      await loadPreviews();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
       loading.value = false;
-    }
-  }
-
-  /** 三个图片字段存的是 fileId，展示时才换算成 URL */
-  async function loadPreviews() {
-    const pairs = [
-      ['main', form.mainImageId],
-      ['bg', form.bgImageId],
-      ['share', form.shareImageId],
-    ];
-    for (const [key, fileId] of pairs) {
-      if (!fileId) {
-        preview[key] = '';
-        continue;
-      }
-      try {
-        let res = await fileApi.detail(fileId);
-        preview[key] = res.data.file.fileUrl;
-      } catch (e) {
-        // 图被删了也不该让整个表单打不开，留空即可
-        preview[key] = '';
-      }
     }
   }
 
@@ -138,70 +114,6 @@
 
   watch(() => props.activityCode, load);
   onMounted(load);
-
-  // ---------------------------- 内联的图片字段组件 ----------------------------
-
-  /**
-   * 上传即用：拿到 fileId 和 fileUrl，form 里只留 fileId。
-   *
-   * <p>暂时没有「从素材库选图」的入口 —— 那需要把素材网格抽成可复用的选择器弹窗，
-   * 是独立的一块工作。现在的形态是可用的：上传的图同样进素材库，只是复用要重新传一次。
-   */
-  const ImageField = {
-    props: {
-      fileId: { type: Number, default: null },
-      url: { type: String, default: '' },
-      tip: { type: String, default: '' },
-    },
-    emits: ['update:fileId', 'update:url'],
-    setup(fieldProps, { emit: fieldEmit }) {
-      const uploading = ref(false);
-
-      async function customRequest({ file, onSuccess, onError }) {
-        uploading.value = true;
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          let res = await fileApi.uploadFile(formData, FILE_FOLDER_TYPE_ENUM.COMMON.value);
-          fieldEmit('update:fileId', res.data.fileId);
-          fieldEmit('update:url', res.data.fileUrl);
-          onSuccess(res, file);
-        } catch (e) {
-          smartSentry.captureError(e);
-          onError(e);
-        } finally {
-          uploading.value = false;
-        }
-      }
-
-      function clear() {
-        fieldEmit('update:fileId', null);
-        fieldEmit('update:url', '');
-      }
-
-      return () =>
-        h('div', { class: 'image-field' }, [
-          fieldProps.url
-            ? h('div', { class: 'image-field-preview' }, [
-                h('img', { src: fieldProps.url }),
-                h('a', { class: 'image-field-clear', onClick: clear }, '移除'),
-              ])
-            : null,
-          h(
-            Upload,
-            {
-              showUploadList: false,
-              accept: 'image/*',
-              customRequest,
-            },
-            // 渲染函数里必须传组件对象而不是 'a-button' 字符串 —— 字符串会被当成原生标签，
-            // 浏览器不认识它，按钮会变成一个没样式的裸元素，而构建期完全发现不了
-            () => [h(Button, { loading: uploading.value }, () => (fieldProps.url ? '更换图片' : '上传图片'))]
-          ),
-          fieldProps.tip ? h('span', { class: 'image-field-tip' }, fieldProps.tip) : null,
-        ]);
-    },
-  };
 </script>
 
 <style scoped lang="less">
@@ -210,30 +122,5 @@
     justify-content: flex-end;
     gap: 8px;
     padding-top: 12px;
-  }
-
-  :deep(.image-field) {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  :deep(.image-field-preview) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    img {
-      max-height: 64px;
-      max-width: 160px;
-      object-fit: contain;
-      border: 1px solid #f0f0f0;
-      border-radius: 4px;
-    }
-  }
-
-  :deep(.image-field-tip) {
-    color: #bfbfbf;
-    font-size: 12px;
   }
 </style>

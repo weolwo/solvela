@@ -41,6 +41,15 @@ public class FileQueryForm extends PageParam {
     @Schema(description = "创建人（用户名）")
     private String createBy;
 
+    /**
+     * 只要图片。给「选图器」用：主视觉字段选中一个 PDF 是纯粹的错误，不该等到 C 端才发现。
+     *
+     * <p>按 {@code content_type} 前缀筛而不是按扩展名白名单：扩展名是从嗅探出的 MIME 反推的，
+     * content_type 才是那次嗅探的原始结论，中间少一层换算就少一处会漂移的地方。
+     */
+    @Schema(description = "只查图片")
+    private Boolean imageOnly;
+
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;
 
