@@ -39,4 +39,20 @@ export const jobApi = {
   deleteJob: (param) => {
     return getRequest(`/support/job/delete?jobId=${param}`);
   },
+  // 定时任务-查询所有已注册的执行器（新增任务时下拉选择） @alaric
+  queryHandlerList: () => {
+    return getRequest('/support/job/handler/list');
+  },
+  // 定时任务-一键重跑（沿用原参数与业务日期，不是拿当前配置跑） @alaric
+  rerunJobLog: (logId) => {
+    return getRequest(`/support/job/log/rerun?logId=${logId}`);
+  },
+  // 定时任务-终止执行（发出中断信号，能否停止取决于执行器是否响应中断） @alaric
+  terminateJobLog: (logId) => {
+    return getRequest(`/support/job/log/terminate?logId=${logId}`);
+  },
+  // 定时任务-查看某次执行的实时日志 @alaric
+  queryExecuteLog: (logId) => {
+    return getRequest(`/support/job/log/detail?logId=${logId}`);
+  },
 };

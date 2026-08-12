@@ -1,164 +1,96 @@
 package net.lab1024.sa.base.module.support.job.api;
 
-import net.lab1024.sa.base.common.util.SmartRandomUtil;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import net.lab1024.sa.base.module.support.job.api.domain.SmartJobMsg;
-import net.lab1024.sa.base.module.support.job.config.SmartJobAutoConfiguration;
-import net.lab1024.sa.base.module.support.job.core.SmartJob;
-import net.lab1024.sa.base.module.support.job.core.SmartJobExecutor;
-import net.lab1024.sa.base.module.support.job.core.SmartJobLauncher;
-import net.lab1024.sa.base.module.support.job.repository.SmartJobRepository;
-import net.lab1024.sa.base.module.support.job.repository.domain.SmartJobEntity;
-import org.redisson.api.RLock;
+import net.lab1024.sa.base.module.support.job.config.SmartJobConfig;
+import net.lab1024.sa.base.module.support.job.core.SmartJobRunningRegistry;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.listener.MessageListener;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
 
 /**
- * smart job 执行端管理
- * 分布式系统之间 用发布/订阅消息的形式 来管理多个job
+ * 消息订阅端。
+ *
+ * <p>🔴 <b>抢占式调度之后，这个类几乎没活可干了 —— 这正是重构想要的结果。</b>
+ *
+ * <p>原实现里它承担着两件要命的事：在 Redisson 的<b>回调线程上同步执行整个任务</b>
+ * （一个慢任务能占住回调线程池，波及全局的分布式锁与缓存），
+ * 以及用一把和自动调度<b>互不排斥</b>的锁去防重（结果是同一任务可能并发跑两遍）。
+ *
+ * <p>现在这两件事都不存在了：
+ * <ul>
+ *   <li>手动触发由 {@code SmartJobService} 写一条 PENDING 日志，扫描线程自然会捞走执行 ——
+ *       与定时调度走同一套抢占，天然互斥；</li>
+ *   <li>配置变更由 {@code trigger_version} 天然感知，不需要通知。</li>
+ * </ul>
+ *
+ * <p>所以 pub/sub <b>降级成了纯加速通道</b>：收到消息只是「提前唤醒一次扫描」，
+ * 让生效从「最多 1 秒」变成「几乎立刻」。
+ * <b>丢消息不再影响正确性</b> —— 这一点很关键，因为 pub/sub 本来就不保证送达，
+ * 订阅端此刻掉线消息就永久丢了。把正确性建立在它上面是原设计最大的隐患。
  *
  * @author huke
  * @date 2024/6/22 20:31
  */
-@ConditionalOnBean(SmartJobAutoConfiguration.class)
 @Slf4j
-@Service
 public class SmartJobClientManager {
 
-    private final SmartJobLauncher jobLauncher;
-
-    private final SmartJobRepository jobRepository;
-
-    private final List<SmartJob> jobInterfaceList;
-
-    private static final String EXECUTE_LOCK = "smart-job-lock-msg-execute-";
-
-    private static final String TOPIC = "smart-job-instance";
-
-    private final RedissonClient redissonClient;
+    /**
+     * 🔴 topic 名带环境后缀。原来写死 {@code smart-job-instance}：
+     * dev 一旦连到与生产同源的 Redis，就会收到生产的触发消息 ——
+     * 这种串台极难从现象倒推原因
+     */
+    private static final String TOPIC_PREFIX = "smart-job-instance:";
 
     private final RTopic topic;
 
     private final SmartJobMsgListener jobMsgListener;
 
-    public SmartJobClientManager(SmartJobLauncher jobLauncher,
-                                 SmartJobRepository jobRepository,
-                                 List<SmartJob> jobInterfaceList,
-                                 RedissonClient redissonClient) {
-        this.jobLauncher = jobLauncher;
-        this.jobRepository = jobRepository;
-        this.jobInterfaceList = jobInterfaceList;
-        this.redissonClient = redissonClient;
+    private final SmartJobRunningRegistry runningRegistry;
 
-        // 添加监听器
-        this.topic = redissonClient.getTopic(TOPIC);
+    public SmartJobClientManager(SmartJobConfig jobConfig, RedissonClient redissonClient,
+                                 SmartJobRunningRegistry runningRegistry) {
+        this.runningRegistry = runningRegistry;
+        this.topic = redissonClient.getTopic(TOPIC_PREFIX + jobConfig.getEnv());
         this.jobMsgListener = new SmartJobMsgListener();
         topic.addListener(SmartJobMsg.class, jobMsgListener);
-        log.info("==== SmartJob ==== client-manager init");
+        log.info("==== SmartJob ==== client-manager init, topic={}", TOPIC_PREFIX + jobConfig.getEnv());
     }
 
     /**
-     * 发布消息
-     */
-    public void publishToClient(SmartJobMsg msgDTO) {
-        msgDTO.setMsgId(SmartRandomUtil.simpleUuid());
-        topic.publish(msgDTO);
-    }
-
-    /**
-     * 处理消息
+     * ⚠️ 这个方法跑在 Redisson 的回调线程上，<b>必须秒回</b>。
+     *
+     * <p>现在它真的只是记一行日志：真正的工作由扫描线程完成。
+     * 扫描间隔本就是 1 秒，「提前唤醒」的收益有限，
+     * 因此刻意<b>不</b>在这里去戳扫描线程 —— 那需要跨线程唤醒机制，
+     * 为了省半秒引入一处并发复杂度不划算。
      */
     private class SmartJobMsgListener implements MessageListener<SmartJobMsg> {
 
         @Override
         public void onMessage(CharSequence channel, SmartJobMsg msg) {
-            log.info("==== SmartJob ==== on-message :{}", msg);
-            // 判断消息类型 业务简单就直接判断 复杂的话可以策略模式
-            SmartJobMsg.MsgTypeEnum msgType = msg.getMsgType();
-            // 更新任务
-            if (SmartJobMsg.MsgTypeEnum.UPDATE_JOB == msgType) {
-                updateJob(msg.getJobId());
+            try {
+                if (SmartJobMsg.MsgTypeEnum.TERMINATE_JOB == msg.getMsgType()) {
+                    // 只有持有那个 Future 的节点会命中；其余节点查无此条，安静忽略。
+                    // cancel 本身是非阻塞的，放在回调线程上没问题
+                    boolean hit = runningRegistry.cancel(msg.getLogId());
+                    if (hit) {
+                        log.warn("==== SmartJob ==== 本节点已对 logId={} 发出中断信号（操作人 {}）",
+                                msg.getLogId(), msg.getUpdateName());
+                    }
+                    return;
+                }
+                log.info("==== SmartJob ==== 收到任务变更通知（扫描线程将在下一轮生效）：{}", msg);
+            } catch (Throwable t) {
+                // 异常逃出去会污染 Redisson 的回调线程，且没有任何人会看到
+                log.error("==== SmartJob ==== 消息处理异常：{}", msg, t);
             }
-            // 执行任务
-            if (SmartJobMsg.MsgTypeEnum.EXECUTE_JOB == msgType) {
-                executeJob(msg);
-            }
         }
     }
-
-    /**
-     * 获取任务执行类
-     *
-     * @param jobClass
-     * @return
-     */
-    private Optional<SmartJob> queryJobImpl(String jobClass) {
-        return jobInterfaceList.stream().filter(e -> Objects.equals(e.getClassName(), jobClass)).findFirst();
-    }
-
-    /**
-     * 更新任务
-     *
-     * @param jobId
-     */
-    private void updateJob(Integer jobId) {
-        SmartJobEntity jobEntity = jobRepository.getJobDao().selectById(jobId);
-        if (null == jobEntity) {
-            return;
-        }
-        jobLauncher.startOrRefreshJob(new ArrayList<>(List.of(jobEntity)));
-    }
-
-    /**
-     * 立即执行任务
-     *
-     * @param msg
-     */
-    private void executeJob(SmartJobMsg msg) {
-        Integer jobId = msg.getJobId();
-        SmartJobEntity jobEntity = jobRepository.getJobDao().selectById(jobId);
-        if (null == jobEntity) {
-            return;
-        }
-        // 获取定时任务实现类
-        Optional<SmartJob> optional = this.queryJobImpl(jobEntity.getJobClass());
-        if (!optional.isPresent()) {
-            return;
-        }
-
-        // 获取执行锁 无需主动释放
-        RLock rLock = redissonClient.getLock(EXECUTE_LOCK + msg.getMsgId());
-        try {
-            boolean getLock = rLock.tryLock(0, 20, TimeUnit.SECONDS);
-            if (!getLock) {
-                return;
-            }
-        } catch (InterruptedException e) {
-            log.error("==== SmartJob ==== msg execute err:", e);
-            return;
-        }
-
-        // 通过执行器 执行任务
-        jobEntity.setParam(msg.getParam());
-        SmartJobExecutor jobExecutor = new SmartJobExecutor(jobEntity, jobRepository, optional.get(), redissonClient);
-        jobExecutor.execute(msg.getUpdateName());
-    }
-
 
     @PreDestroy
     public void destroy() {
         topic.removeListener(jobMsgListener);
     }
-
-
 }

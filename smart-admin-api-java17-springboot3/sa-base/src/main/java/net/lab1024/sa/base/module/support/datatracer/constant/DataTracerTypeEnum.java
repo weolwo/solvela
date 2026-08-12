@@ -33,6 +33,15 @@ public enum DataTracerTypeEnum implements BaseEnum {
      */
     OA_ENTERPRISE(3, "OA-企业信息"),
 
+    /**
+     * 定时任务配置变更。
+     *
+     * <p>🔴 定时任务能触发发奖与结算，改 cron、改参数、启停都属高危操作，
+     * <b>改动无痕是不可接受的</b>。复用本模块而不是新建审计表 ——
+     * 能力已经有了，新建等于多一份要维护的东西。
+     */
+    SMART_JOB(10, "定时任务"),
+
     ;
 
     private final Integer value;

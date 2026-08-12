@@ -23,8 +23,11 @@ public class SmartJobLogQueryForm extends PageParam {
     @Schema(description = "任务id|可选")
     private Integer jobId;
 
-    @Schema(description = "是否成功|可选")
-    private Boolean successFlag;
+    @Schema(description = "执行状态|可选：1-执行中 2-成功 3-失败 4-超时中断")
+    private Integer status;
+
+    @Schema(description = "触发来源|可选：SCHEDULE/MANUAL")
+    private String triggerSource;
 
     @Schema(description = "开始时间|可选", example = "2024-06-06")
     private LocalDate startTime;

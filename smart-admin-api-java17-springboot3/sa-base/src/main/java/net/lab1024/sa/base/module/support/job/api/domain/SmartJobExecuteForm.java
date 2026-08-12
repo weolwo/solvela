@@ -22,6 +22,15 @@ public class SmartJobExecuteForm {
     @Length(max = 2000, message = "定时任务参数最多2000字符")
     private String param;
 
+    /**
+     * 业务日期。不传则按执行器声明的 bizDateOffset 推导。
+     *
+     * <p>🔴 这是数据类任务的运营刚需：「昨天的统计跑错了，重跑 8 月 9 号那天」——
+     * 没有这个字段根本表达不了，只能改系统时间或手改数据。
+     */
+    @Schema(description = "业务日期|可选，用于补跑历史日期")
+    private java.time.LocalDate bizDate;
+
     @Schema(hidden = true)
     private String updateName;
 }

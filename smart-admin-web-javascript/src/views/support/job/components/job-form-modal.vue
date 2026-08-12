@@ -31,14 +31,24 @@
           >
           </a-input-number>
         </a-form-item>
-        <a-form-item label="执行类" name="jobClass">
-          <a-textarea
-              :auto-size="{ minRows: 2, maxRows: 4 }"
-              v-model:value="updateForm.jobClass"
-              placeholder="示例：net.lab1024.sa.base.module.support.job.sample.SmartJobSample1"
-              :maxlength="200"
-              :showCount="true"
+        <!--
+          🔴 从「手打全限定类名」改成「下拉选择已注册的执行器」。
+          手打是「配了却永远不跑」的温床：旧实现用类名匹配，执行类一旦被 CGLIB 代理
+          就永远对不上，而保存时的校验用的是原类名，必然通过 —— 保存成功、任务不跑、零报错。
+          现在候选项直接来自后端注册表，与运行期匹配用的是同一份真源，选不出不存在的执行器。
+        -->
+        <a-form-item label="执行器" name="handlerName">
+          <a-select
+              v-model:value="updateForm.handlerName"
+              placeholder="请选择执行器"
+              :loading="handlerLoading"
+              show-search
+              option-filter-prop="label"
+              :options="handlerOptions"
           />
+          <div v-if="selectedHandlerDesc" style="color: #999; font-size: 12px; margin-top: 4px">
+            {{ selectedHandlerDesc }}
+          </div>
         </a-form-item>
         <a-form-item label="任务参数" name="param">
           <a-textarea
@@ -49,30 +59,44 @@
               :showCount="true"
           />
         </a-form-item>
+        <!--
+          🔴 「固定间隔」已下线：它与抢占式调度概念上不相容 ——
+          「上次跑完再等 N 秒」要求知道任务何时结束，而抢占发生在任务开始之前。
+          短周期改用 cron 的秒字段；「不许与上一次重叠」由阻塞策略负责，不该由触发类型表达。
+        -->
         <a-form-item label="触发类型" name="triggerType">
           <a-radio-group v-model:value="updateForm.triggerType">
             <a-radio-button :value="TRIGGER_TYPE_ENUM.CRON.value">CRON表达式</a-radio-button>
-            <a-radio-button :value="TRIGGER_TYPE_ENUM.FIXED_DELAY.value">固定间隔</a-radio-button>
+            <a-radio-button :value="TRIGGER_TYPE_ENUM.ONE_TIME.value">一次性</a-radio-button>
           </a-radio-group>
         </a-form-item>
         <a-form-item label="触发时间" name="triggerTime">
           <a-input
               v-if="updateForm.triggerType === TRIGGER_TYPE_ENUM.CRON.value"
-              placeholder="示例：10 15 0/1 * * *"
+              placeholder="六段式：秒 分 时 日 月 周。示例：0 15 2 * * *（每天 2:15）"
               v-model:value="updateForm.cron"
               :maxlength="100"
               :showCount="true"
           />
-          <a-input-number
-              v-else-if="updateForm.triggerType === TRIGGER_TYPE_ENUM.FIXED_DELAY.value"
-              v-model:value="updateForm.fixedDelay"
-              :min="1"
-              :max="100000000"
-              :precision="0"
-          >
-            <template #addonBefore>每隔</template>
-            <template #addonAfter>秒</template>
-          </a-input-number>
+          <a-date-picker
+              v-else
+              v-model:value="updateForm.oneTime"
+              show-time
+              value-format="YYYY-MM-DD HH:mm:ss"
+              placeholder="选择触发时刻"
+              style="width: 100%"
+          />
+          <div v-if="updateForm.triggerType === TRIGGER_TYPE_ENUM.ONE_TIME.value" style="color: #999; font-size: 12px">
+            一次性任务执行后自动终结，且不参与打散（业务时间点必须准时）
+          </div>
+        </a-form-item>
+        <a-form-item label="运行档位" name="presetCode">
+          <a-radio-group v-model:value="updateForm.presetCode">
+            <a-radio-button v-for="item in presetOptions" :key="item.value" :value="item.value">
+              {{ item.desc }}
+            </a-radio-button>
+          </a-radio-group>
+          <div style="color: #999; font-size: 12px; margin-top: 4px">{{ selectedPresetHint }}</div>
         </a-form-item>
         <a-form-item label="是否开启" name="enabledFlag">
           <a-switch v-model:checked="updateForm.enabledFlag" />
@@ -99,8 +123,8 @@
         <a-form-item label="任务名称" name="jobName">
           <a-input v-model:value="executeForm.jobName" :disabled="true" />
         </a-form-item>
-        <a-form-item label="任务类名" name="jobClass">
-          <a-textarea :auto-size="{ minRows: 2, maxRows: 4 }" v-model:value="executeForm.jobClass" :disabled="true" />
+        <a-form-item label="执行器" name="handlerName">
+          <a-input v-model:value="executeForm.handlerName" :disabled="true" />
         </a-form-item>
         <a-form-item label="任务参数" name="param">
           <a-textarea
@@ -117,14 +141,62 @@
 </template>
 <script setup>
 import { message } from 'ant-design-vue';
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { jobApi } from '/@/api/support/job-api';
 import { smartSentry } from '/@/lib/smart-sentry';
 import { SmartLoading } from '/@/components/framework/smart-loading/index';
-import { TRIGGER_TYPE_ENUM } from '/@/constants/support/job-const';
+import { TRIGGER_TYPE_ENUM, PRESET_ENUM } from '/@/constants/support/job-const';
 
 // emit
 const emit = defineEmits(['reloadList']);
+
+// ------------------------------------ 执行器下拉 -------------------------------------
+
+const handlerList = ref([]);
+const handlerLoading = ref(false);
+
+const handlerOptions = computed(() =>
+  handlerList.value.map((e) => ({
+    value: e.handlerName,
+    label: `${e.title}（${e.handlerName}）`,
+  }))
+);
+
+// 选中项的补充说明：把幂等与超时摆出来，省得运营去翻代码
+const selectedHandlerDesc = computed(() => {
+  const hit = handlerList.value.find((e) => e.handlerName === updateForm.handlerName);
+  if (!hit) {
+    return '';
+  }
+  const timeout = hit.defaultTimeoutSeconds > 0 ? `${hit.defaultTimeoutSeconds} 秒` : '不限';
+  return `分组：${hit.groupName} ｜ 超时：${timeout} ｜ ${hit.idempotent ? '幂等，可安全重跑' : '非幂等，重跑需谨慎'}`;
+});
+
+// 档位候选：受执行器声明的车道约束 ——
+// FAST 执行器只能选轻量档，其余档位的超时都突破了快车道 30 秒的硬上限。
+// 这个约束服务端也会再校验一次（前端 UI 校验只是防呆，铁律 2）
+const presetOptions = computed(() => {
+  const hit = handlerList.value.find((e) => e.handlerName === updateForm.handlerName);
+  const lane = hit?.lane;
+  return Object.values(PRESET_ENUM).filter((p) => !lane || !p.lane || p.lane === lane);
+});
+
+const selectedPresetHint = computed(() => {
+  const hit = Object.values(PRESET_ENUM).find((e) => e.value === updateForm.presetCode);
+  return hit ? hit.hint : '';
+});
+
+async function loadHandlerList() {
+  try {
+    handlerLoading.value = true;
+    const res = await jobApi.queryHandlerList();
+    handlerList.value = res.data || [];
+  } catch (e) {
+    smartSentry.captureError(e);
+  } finally {
+    handlerLoading.value = false;
+  }
+}
 
 const isAdd = ref(false);
 const updateModalShow = ref(false);
@@ -133,11 +205,12 @@ const updateFormRef = ref();
 const updateFormDefault = {
   jobId: null,
   jobName: '',
-  jobClass: '',
+  handlerName: undefined,
   triggerType: TRIGGER_TYPE_ENUM.CRON.value,
   triggerValue: null,
   cron: '',
-  fixedDelay: null,
+  oneTime: null,
+  presetCode: PRESET_ENUM.NORMAL.value,
   param: '',
   enabledFlag: false,
   remark: '',
@@ -146,22 +219,25 @@ const updateFormDefault = {
 let updateForm = reactive({ ...updateFormDefault });
 const updateRules = {
   jobName: [{ required: true, message: '请输入任务名称' }],
-  jobClass: [{ required: true, message: '请输入执行类' }],
+  handlerName: [{ required: true, message: '请选择执行器' }],
   triggerType: [{ required: true, message: '请选择触发类型' }],
+  presetCode: [{ required: true, message: '请选择运行档位' }],
   sort: [{ required: true, message: '请输入排序' }],
 };
 
 // 打开编辑弹框
 function openUpdateModal(record) {
   isAdd.value = null == record;
+  // 每次打开都重新拉一次：执行器列表来自后端注册表，发版后会变
+  loadHandlerList();
   // 更新
   if(!isAdd.value){
     Object.assign(updateForm, record);
     if (TRIGGER_TYPE_ENUM.CRON.value === record.triggerType) {
       updateForm.cron = record.triggerValue;
     }
-    if (TRIGGER_TYPE_ENUM.FIXED_DELAY.value === record.triggerType) {
-      updateForm.fixedDelay = record.triggerValue;
+    if (TRIGGER_TYPE_ENUM.ONE_TIME.value === record.triggerType) {
+      updateForm.oneTime = record.triggerValue;
     }
   }
   updateModalShow.value = true;
@@ -182,8 +258,8 @@ async function confirmUpdateJob() {
         if (TRIGGER_TYPE_ENUM.CRON.value === updateForm.triggerType) {
           updateForm.triggerValue = updateForm.cron;
         }
-        if (TRIGGER_TYPE_ENUM.FIXED_DELAY.value === updateForm.triggerType) {
-          updateForm.triggerValue = updateForm.fixedDelay;
+        if (TRIGGER_TYPE_ENUM.ONE_TIME.value === updateForm.triggerType) {
+          updateForm.triggerValue = updateForm.oneTime;
         }
 
         if(!updateForm.triggerValue){
@@ -219,7 +295,7 @@ const executeModalShow = ref(false);
 const executeFormDefault = {
   jobId: null,
   jobName: '',
-  jobClass: '',
+  handlerName: '',
   param: null,
 };
 let executeForm = reactive({ ...executeFormDefault });

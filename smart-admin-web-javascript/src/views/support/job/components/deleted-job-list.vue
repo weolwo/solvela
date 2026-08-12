@@ -65,22 +65,25 @@
       :pagination="false"
     >
       <template #bodyCell="{ record, column }">
-        <template v-if="column.dataIndex === 'jobClass'">
+        <template v-if="column.dataIndex === 'handlerName'">
           <a-tooltip>
-            <template #title>{{ record.jobClass }}</template>
-            {{ handleJobClass(record.jobClass) }}
+            <template #title>
+              {{ record.handlerMissingFlag ? '⚠️ 代码中不存在该执行器，任务不会被执行' : record.handlerTitle }}
+            </template>
+            <a-tag v-if="record.handlerMissingFlag" color="error">{{ record.handlerName }}</a-tag>
+            <span v-else>{{ record.handlerName }}</span>
           </a-tooltip>
         </template>
         <template v-if="column.dataIndex === 'triggerType'">
           <a-tag v-if="record.triggerType === TRIGGER_TYPE_ENUM.CRON.value" color="success">{{ record.triggerTypeDesc }}</a-tag>
-          <a-tag v-else-if="record.triggerType === TRIGGER_TYPE_ENUM.FIXED_DELAY.value" color="processing">{{ record.triggerTypeDesc }}</a-tag>
+          <a-tag v-else-if="record.triggerType === TRIGGER_TYPE_ENUM.ONE_TIME.value" color="processing">{{ record.triggerTypeDesc }}</a-tag>
           <a-tag v-else color="pink">{{ record.triggerTypeDesc }}</a-tag>
         </template>
         <template v-if="column.dataIndex === 'lastJob'">
           <div v-if="record.lastJobLog">
             <a-tooltip>
-              <template #title>{{ handleExecuteResult(record.lastJobLog.executeResult) }}</template>
-              <CheckOutlined v-if="record.lastJobLog.successFlag" style="color: #39c710" />
+              <template #title>{{ handleExecuteResult(record.lastJobLog.resultSummary || record.lastJobLog.errorDetail) }}</template>
+              <CheckOutlined v-if="record.lastJobLog.status === EXECUTE_STATUS_ENUM.SUCCESS.value" style="color: #39c710" />
               <WarningOutlined v-else style="color: #f50" />
               {{ record.lastJobLog.executeStartTime }}
             </a-tooltip>
@@ -130,7 +133,7 @@
   import { jobApi } from '/@/api/support/job-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { TRIGGER_TYPE_ENUM } from '/@/constants/support/job-const';
+  import { TRIGGER_TYPE_ENUM, EXECUTE_STATUS_ENUM } from '/@/constants/support/job-const';
   import JobLogListModal from './job-log-list-modal.vue';
   import {TABLE_ID_CONST} from "/@/constants/support/table-id-const.js";
   import TableOperator from "/@/components/support/table-operator/index.vue";
@@ -148,8 +151,8 @@
       ellipsis: true,
     },
     {
-      title: '执行类',
-      dataIndex: 'jobClass',
+      title: '执行器',
+      dataIndex: 'handlerName',
       minWidth: 180,
       ellipsis: true,
     },
@@ -238,9 +241,6 @@
   }
 
   // 处理执行类展示 默认返回类
-  function handleJobClass(jobClass) {
-    return jobClass.split('.').pop();
-  }
 
   // 上次处理结果展示
   function handleExecuteResult(result) {

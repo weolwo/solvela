@@ -74,22 +74,33 @@
             :pagination="false"
           >
             <template #bodyCell="{ record, column }">
-              <template v-if="column.dataIndex === 'jobClass'">
+              <template v-if="column.dataIndex === 'jobName'">
+                <!-- 🔴 系统内置与向导衍生的任务：可见、打标签、但就地只读。
+                     既满足排障要的全局视图，又避免配置入口脑裂 -->
+                <a-tag v-if="record.source === JOB_SOURCE_ENUM.SYSTEM.value" color="purple">衍生</a-tag>
+                {{ record.jobName }}
+              </template>
+              <template v-if="column.dataIndex === 'handlerName'">
+                <!-- 🔴 handler 在代码里找不到时必须标红：这类任务永远不会被执行，
+                     而在旧实现里它和正常任务长得一模一样，只能靠翻日志才知道 -->
                 <a-tooltip>
-                  <template #title>{{ record.jobClass }}</template>
-                  {{ handleJobClass(record.jobClass) }}
+                  <template #title>
+                    {{ record.handlerMissingFlag ? '⚠️ 代码中不存在该执行器，任务不会被执行' : record.handlerTitle }}
+                  </template>
+                  <a-tag v-if="record.handlerMissingFlag" color="error">{{ record.handlerName }}</a-tag>
+                  <span v-else>{{ record.handlerName }}</span>
                 </a-tooltip>
               </template>
               <template v-if="column.dataIndex === 'triggerType'">
                 <a-tag v-if="record.triggerType === TRIGGER_TYPE_ENUM.CRON.value" color="success">{{ record.triggerTypeDesc }}</a-tag>
-                <a-tag v-else-if="record.triggerType === TRIGGER_TYPE_ENUM.FIXED_DELAY.value" color="processing">{{ record.triggerTypeDesc }}</a-tag>
+                <a-tag v-else-if="record.triggerType === TRIGGER_TYPE_ENUM.ONE_TIME.value" color="processing">{{ record.triggerTypeDesc }}</a-tag>
                 <a-tag v-else color="pink">{{ record.triggerTypeDesc }}</a-tag>
               </template>
               <template v-if="column.dataIndex === 'lastJob'">
                 <div v-if="record.lastJobLog">
                   <a-tooltip>
-                    <template #title>{{ handleExecuteResult(record.lastJobLog.executeResult) }}</template>
-                    <CheckOutlined v-if="record.lastJobLog.successFlag" style="color: #39c710" />
+                    <template #title>{{ handleExecuteResult(record.lastJobLog.resultSummary || record.lastJobLog.errorDetail) }}</template>
+                    <CheckOutlined v-if="record.lastJobLog.status === EXECUTE_STATUS_ENUM.SUCCESS.value" style="color: #39c710" />
                     <WarningOutlined v-else style="color: #f50" />
                     {{ record.lastJobLog.executeStartTime }}
                   </a-tooltip>
@@ -115,10 +126,21 @@
               </template>
               <template v-if="column.dataIndex === 'action'">
                 <div class="smart-table-operate">
-                  <a-button v-privilege="'support:job:update'" @click="openUpdateModal(record)" type="link">编辑</a-button>
+                  <!--
+                    🔴 衍生任务就地只读：编辑与删除禁掉，改配置请回到来源处。
+                    默认静默允许两处都能改，是「同一个东西两个入口、迟早不一致」的开始。
+                    ⚠️ 前端禁用只是防呆（铁律 2），服务端仍会按 source 再判一次。
+                  -->
+                  <a-tooltip v-if="record.source === JOB_SOURCE_ENUM.SYSTEM.value" title="衍生任务不可就地编辑，请到来源处修改">
+                    <a-button type="link" disabled>编辑</a-button>
+                  </a-tooltip>
+                  <a-button v-else v-privilege="'support:job:update'" @click="openUpdateModal(record)" type="link">编辑</a-button>
                   <a-button v-privilege="'support:job:execute'" type="link" @click="openExecuteModal(record)">执行</a-button>
                   <a-button v-privilege="'support:job:log:query'" @click="openJobLogModal(record.jobId, record.jobName)" type="link">记录</a-button>
-                  <a-button danger v-privilege="'support:job:log:delete'" @click="confirmDelete(record.jobId, record.jobName)" type="link"
+                  <a-tooltip v-if="record.source === JOB_SOURCE_ENUM.SYSTEM.value" title="衍生任务不可就地删除，请到来源处停用">
+                    <a-button type="link" disabled>删除</a-button>
+                  </a-tooltip>
+                  <a-button v-else danger v-privilege="'support:job:log:delete'" @click="confirmDelete(record.jobId, record.jobName)" type="link"
                     >删除</a-button
                   >
                 </div>
@@ -160,7 +182,7 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import DeletedJobList from './components/deleted-job-list.vue';
-  import { TRIGGER_TYPE_ENUM } from '/@/constants/support/job-const';
+  import { TRIGGER_TYPE_ENUM, EXECUTE_STATUS_ENUM, JOB_SOURCE_ENUM } from '/@/constants/support/job-const';
   import JobFormModal from './components/job-form-modal.vue';
   import JobLogListModal from './components/job-log-list-modal.vue';
   import { SmartLoading } from '/@/components/framework/smart-loading/index';
@@ -178,8 +200,8 @@
       ellipsis: true,
     },
     {
-      title: '执行类',
-      dataIndex: 'jobClass',
+      title: '执行器',
+      dataIndex: 'handlerName',
       minWidth: 180,
       ellipsis: true,
     },
@@ -268,9 +290,6 @@
   }
 
   // 处理执行类展示 默认返回类
-  function handleJobClass(jobClass) {
-    return jobClass.split('.').pop();
-  }
 
   // 上次处理结果展示
   function handleExecuteResult(result) {

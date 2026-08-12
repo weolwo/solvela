@@ -30,4 +30,15 @@ public class SmartJobQueryForm extends PageParam {
 
     @Schema(description = "是否删除|可选")
     private Boolean deletedFlag;
+
+    @Schema(description = "分组|可选")
+    private String jobGroup;
+
+    /**
+     * 是否包含已终结的一次性任务。
+     *
+     * <p>默认不含：活动多了以后终态任务只增不减，不过滤的话列表会被历史任务淹没
+     */
+    @Schema(description = "是否包含已终结的一次性任务|默认否")
+    private Boolean includeTerminal;
 }
