@@ -222,7 +222,12 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
+        <!-- 引入 Jackson 的 Smile 二进制数据格式支持 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-smile</artifactId>
+            <!-- 不需要写 version，Spring Boot 的依赖池已经管理了它与当前环境匹配的版本 -->
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>

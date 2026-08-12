@@ -430,12 +430,13 @@ public class SmartJobService {
         logEntity.setStatus(SmartJobExecuteStatusEnum.PENDING.getValue());
         // 🔴 只有 PENDING 记录带 fire_time；立即执行即 now
         logEntity.setFireTime(now);
-        logEntity.setExecuteStartTime(now);
-        logEntity.setExecuteTimeMillis(0L);
         logEntity.setCreateName(operator);
-        logEntity.setIp("-");
-        logEntity.setProcessId("-");
-        logEntity.setProgramPath("-");
+        // ⚠️ execute_start_time / ip / process_id / program_path 一律留 NULL：
+        //    这条记录还没开始执行，也还不知道会落到哪个节点上。
+        //    v3.59.0 之前这里填的是 now 和 '-' 三个占位值 —— 那是在数据里写谎话，
+        //    列表页会给一条根本没跑的记录显示「开始时间」。
+        //    真值由扫描线程在抢占时补上（preemptPendingLog + fillNodeInfo）。
+        logEntity.setExecuteTimeMillis(0L);
 
         try {
             jobLogDao.insert(logEntity);

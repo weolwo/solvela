@@ -54,13 +54,29 @@ public class SmartJobRepository {
     }
 
     /**
-     * 只插一条记录（BLOCKED / MISFIRE 这类「没真跑」的记录用）。
+     * 插一条「没真跑」的记录（BLOCKED / MISFIRE）。
      *
-     * <p>它们不该回写 {@code last_execute_time} —— 那一列的语义是「最后一次<b>执行</b>」，
-     * 把「被丢弃」也算进去会让运营误以为任务跑过了
+     * <p>🔴 <b>回写 {@code last_execute_log_id} 但不回写 {@code last_execute_time}。</b>
+     * 两列的语义被刻意分开：
+     * <ul>
+     *   <li>{@code last_execute_time} = 最后一次<b>真正执行</b>的时刻 ——
+     *       把「被丢弃」算进去会让运营误以为任务跑过了；</li>
+     *   <li>{@code last_execute_log_id} = 最后一条<b>执行记录</b>（不论什么状态）。</li>
+     * </ul>
+     *
+     * <p>为什么必须回写后者：2026-08-12 实测发现，只插记录不回写的话，
+     * 一个昨晚被 SKIP 掉的任务在列表页显示的是「最后一次：<b>无</b>」——
+     * 而「无」在运营眼里等于「从没跑过」，真相却是「昨晚跳过了」。
+     * 要点开日志抽屉才看得见，等于把「让漏跑可见」这件事<b>只做了一半</b>，
+     * 而那正是整个重构最核心的可观测性收益。
      */
+    @Transactional(rollbackFor = Throwable.class)
     public void saveLogOnly(SmartJobLogEntity logEntity) {
         jobLogDao.insert(logEntity);
+        SmartJobEntity updateJob = new SmartJobEntity();
+        updateJob.setJobId(logEntity.getJobId());
+        updateJob.setLastExecuteLogId(logEntity.getLogId());
+        jobDao.updateById(updateJob);
     }
 
     /**

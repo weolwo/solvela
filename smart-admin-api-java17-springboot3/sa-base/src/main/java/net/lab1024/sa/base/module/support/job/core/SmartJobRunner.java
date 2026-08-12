@@ -229,6 +229,12 @@ public class SmartJobRunner {
         // 🔴 只有 PENDING 记录带 fire_time
         retry.setFireTime(logEntity.getExecuteStartTime().plusSeconds(interval));
         retry.setCreateName(logEntity.getCreateName());
+        // ⚠️ execute_start_time / ip / process_id / program_path 刻意留 NULL ——
+        //    重试记录还没开始执行，也不知道会落到哪个节点。这几列 v3.59.0 起可空。
+        //    （在那之前它们是 NOT NULL，插入直接报
+        //     `Field 'execute_start_time' doesn't have a default value`，
+        //     而这个插入与「置 FAIL」在同一事务里 —— 一起回滚，
+        //     记录就永久卡在 RUNNING 了。2026-08-12 实测踩到。）
         return retry;
     }
 
