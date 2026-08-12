@@ -37,11 +37,17 @@ ALTER TABLE `t_smart_job_log`
         COMMENT '执行程序目录，PENDING 为 NULL';
 
 -- 把手动触发路径写进去的占位值清掉，让存量数据也说实话。
--- 这些记录当时被填了 ip='-'、process_id='-'、program_path='-'，
--- 真实节点信息在抢占时才被覆盖 —— 仍是 '-' 的说明它们从未被执行过。
+-- 这些记录当时被填了 ip='-'、process_id='-'、program_path='-'。
+--
+-- ⚠️ 判据只看 process_id，不要写成「三列都等于 '-'」：
+--    抢占那一步（preemptPendingLog）只覆盖 ip 一列，所以一条「抢到了但随即被判 BLOCKED」
+--    的记录会是 ip=真实地址、process_id='-'、program_path='-' 的混合状态 ——
+--    按三列全等去匹配就会漏掉它们。2026-08-12 实测确实漏了一条。
 UPDATE `t_smart_job_log`
-   SET `ip` = NULL, `process_id` = NULL, `program_path` = NULL
- WHERE `ip` = '-' AND `process_id` = '-' AND `program_path` = '-';
+   SET `ip` = CASE WHEN `ip` = '-' THEN NULL ELSE `ip` END,
+       `process_id` = NULL,
+       `program_path` = NULL
+ WHERE `process_id` = '-';
 
 
 -- ----------------------------------------------------------------------------

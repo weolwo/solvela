@@ -1,13 +1,13 @@
 package net.lab1024.sa.base.module.support.job.bootstrap;
 
 import lombok.extern.slf4j.Slf4j;
-import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.module.support.job.config.SmartJobConfig;
 import net.lab1024.sa.base.module.support.job.constant.SmartJobPresetEnum;
 import net.lab1024.sa.base.module.support.job.constant.SmartJobTriggerTypeEnum;
 import net.lab1024.sa.base.module.support.job.repository.SmartJobDao;
 import net.lab1024.sa.base.module.support.job.repository.domain.SmartJobEntity;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.List;
 
@@ -59,7 +59,13 @@ public class SmartJobBootstrapInitializer implements SmartInitializingSingleton 
             return;
         }
         SmartJobEntity entity = new SmartJobEntity();
-        entity.setJobCode(SmartCodeUtil.generateUniqueBizCode(jobDao::existsJobCode));
+        // 🔴 系统任务用**确定性编码**，而不是随机生成。
+        //    上面那句 selectByHandlerName 是典型的 check-then-act：两个 WORKER 节点同时启动，
+        //    都查到「不存在」、都往下走插入 —— 而 handler_name 上<b>没有</b>唯一约束
+        //    （那是刻意的：同一个执行器允许挂 N 个任务）。结果是三个系统任务各被插两份，
+        //    然后同一份工作被两条配置各跑一遍。单节点下这个竞态永远不会显形。
+        //    编码确定之后，uk_job_code 就成了天然的幂等键：谁先插谁赢，输的那个吃 DuplicateKey。
+        entity.setJobCode(systemJobCode(handlerName));
         entity.setJobName(jobName);
         entity.setHandlerName(handlerName);
         entity.setJobGroup("SYSTEM");
@@ -91,7 +97,31 @@ public class SmartJobBootstrapInitializer implements SmartInitializingSingleton 
         entity.setRemark(remark);
         entity.setUpdateName("system");
 
-        jobDao.insert(entity);
-        log.info("==== SmartJob ==== 已自动创建内置任务：{}（{}）", jobName, cron);
+        try {
+            jobDao.insert(entity);
+            log.info("==== SmartJob ==== 已自动创建内置任务：{}（{}）", jobName, cron);
+        } catch (DuplicateKeyException e) {
+            // 别的节点抢先插入了 —— 这不是错误，是幂等生效
+            log.info("==== SmartJob ==== 内置任务已由其它节点创建，跳过：{}", jobName);
+        }
+    }
+
+    /**
+     * 由 handler 名派生出稳定的 10 位业务编码（铁律 8：{@code ^[A-Z0-9]{10}$}）。
+     *
+     * <p>同一个 handler 名在任何节点、任何时刻算出的编码都相同 ——
+     * 这正是它能当幂等键用的原因。
+     *
+     * <p>用 36 进制而不是 hex：36 进制的字符集恰好是 {@code 0-9a-z}，
+     * 转大写后天然落在 {@code [A-Z0-9]} 内，不需要额外过滤。
+     */
+    static String systemJobCode(String handlerName) {
+        // 取绝对值前先处理 Integer.MIN_VALUE（它取绝对值仍是负数）
+        long hash = Math.abs((long) handlerName.hashCode());
+        String base36 = Long.toString(hash, 36).toUpperCase();
+        // 不足补 0、超长截断，保证恰好 10 位
+        return base36.length() >= 10
+                ? base36.substring(0, 10)
+                : "0".repeat(10 - base36.length()) + base36;
     }
 }

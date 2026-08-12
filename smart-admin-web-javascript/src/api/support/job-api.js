@@ -55,4 +55,8 @@ export const jobApi = {
   queryExecuteLog: (logId) => {
     return getRequest(`/support/job/log/detail?logId=${logId}`);
   },
+  // 定时任务-触发时间预览（保存前算出接下来 5 次） @alaric
+  previewTriggerTime: (param) => {
+    return postRequest('/support/job/trigger/preview', param);
+  },
 };

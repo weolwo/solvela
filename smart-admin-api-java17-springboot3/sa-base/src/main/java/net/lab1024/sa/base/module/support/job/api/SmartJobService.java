@@ -182,6 +182,92 @@ public class SmartJobService {
         return ResponseDTO.ok(voList);
     }
 
+    /**
+     * 触发时间预览：任务<b>保存之前</b>就把接下来几次的触发时刻算出来。
+     *
+     * <p>它补的是两个坑：
+     * <ol>
+     *   <li>cron 写错是静默失败 —— 合法 ≠ 符合预期。
+     *       {@code 0 0 0 1 * *} 究竟是「每月 1 号」还是「每天 1 点」，看五次预览两秒就知道；</li>
+     *   <li>🔴 <b>打散默认开启且原本不可见</b> —— 配「每天 2:00」实际在 {@code 02:00:37} 触发，
+     *       没有预览的话这个 37 秒会被当成 bug 报上来。</li>
+     * </ol>
+     *
+     * <p>🔴 <b>新建任务时预览是「不精确」的，而且必须如实说出来。</b>
+     * 打散偏移是 {@code hash(jobId) % jitterSeconds}，而 id 要等保存后才有 ——
+     * 这时只能给出未打散的基准时刻。假装算准比不给预览更糟：
+     * 运营会拿着一个精确到秒的时刻去对，然后发现对不上。
+     */
+    public ResponseDTO<SmartJobTriggerPreviewVO> previewTriggerTime(SmartJobTriggerPreviewForm form) {
+        SmartJobTriggerPreviewVO vo = new SmartJobTriggerPreviewVO();
+        String triggerType = form.getTriggerType();
+        String triggerValue = null == form.getTriggerValue() ? "" : form.getTriggerValue().trim();
+
+        // 打散秒数：非 CUSTOM 档位一律取档位值，与 applyPreset 的口径保持一致 ——
+        // 两处若各算各的，预览就会和实际对不上，那比没有预览更误导人
+        SmartJobPresetEnum preset = SmartJobPresetEnum.resolve(form.getPresetCode());
+        int jitterSeconds = preset.isCustom()
+                ? (null == form.getJitterSeconds() ? 0 : form.getJitterSeconds())
+                : preset.getJitterSeconds();
+
+        if (SmartJobTriggerTypeEnum.ONE_TIME.equalsValue(triggerType)) {
+            // 一次性任务强制不打散：那是业务时间点，不是调度时间点
+            vo.setJitterSeconds(0);
+            vo.setExact(true);
+            try {
+                LocalDateTime fireTime = LocalDateTime.parse(triggerValue.replace(' ', 'T'));
+                vo.setValid(true);
+                vo.setNextTimeList(List.of(fireTime));
+                vo.setMessage(fireTime.isBefore(LocalDateTime.now())
+                        ? "⚠️ 该时刻已过去：任务保存后会被判定为「错过调度」，按 misfire 策略处理"
+                        : "一次性任务，执行后自动终结");
+            } catch (Exception e) {
+                vo.setValid(false);
+                vo.setMessage("时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
+            }
+            return ResponseDTO.ok(vo);
+        }
+
+        if (!SmartJobTriggerTypeEnum.CRON.equalsValue(triggerType)) {
+            vo.setValid(false);
+            vo.setMessage("不支持的触发类型：" + triggerType);
+            return ResponseDTO.ok(vo);
+        }
+        if (!SmartJobUtil.checkCron(triggerValue)) {
+            vo.setValid(false);
+            vo.setMessage("cron 表达式无法解析。本项目用六段式：秒 分 时 日 月 周，例如 0 15 2 * * *（每天 2:15）");
+            return ResponseDTO.ok(vo);
+        }
+
+        // jobId 为空（新建）时 applyJitter 会原样返回，正好就是「未打散的基准时刻」
+        List<LocalDateTime> nextList = SmartJobUtil.queryNextTimeList(
+                triggerType, triggerValue, LocalDateTime.now(), form.getJobId(), jitterSeconds, PREVIEW_COUNT);
+        if (nextList.isEmpty()) {
+            // 语法合法但永远排不出下一次，例如 2 月 30 日
+            vo.setValid(false);
+            vo.setMessage("表达式合法，但算不出任何未来触发时刻 —— 请检查日期组合是否根本不存在");
+            return ResponseDTO.ok(vo);
+        }
+
+        boolean exact = null != form.getJobId() || jitterSeconds <= 0;
+        vo.setValid(true);
+        vo.setJitterSeconds(jitterSeconds);
+        vo.setExact(exact);
+        vo.setNextTimeList(nextList);
+        if (jitterSeconds > 0) {
+            vo.setMessage(exact
+                    ? "已含打散偏移（同一任务每次固定，用于错开整点惊群）"
+                    : String.format("以上是未打散的基准时刻。实际触发会固定延后 0~%d 秒 —— "
+                            + "具体偏移在保存后才确定（由任务 id 决定，同一任务每次相同）", jitterSeconds));
+        }
+        return ResponseDTO.ok(vo);
+    }
+
+    /**
+     * 预览几次。五次足够看出周期规律，再多屏幕放不下
+     */
+    private static final int PREVIEW_COUNT = 5;
+
     // ==================== 增改 ====================
 
     public synchronized ResponseDTO<String> addJob(SmartJobAddForm addForm) {

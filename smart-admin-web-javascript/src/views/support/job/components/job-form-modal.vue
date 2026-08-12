@@ -89,6 +89,29 @@
           <div v-if="updateForm.triggerType === TRIGGER_TYPE_ENUM.ONE_TIME.value" style="color: #999; font-size: 12px">
             一次性任务执行后自动终结，且不参与打散（业务时间点必须准时）
           </div>
+
+          <!--
+            🔴 保存前的触发时间预览。补的是两个坑：
+            ① cron 写错是静默失败 —— 合法 ≠ 符合预期，看五次就知道；
+            ② 打散默认开启且原本不可见 —— 配「每天 2:00」实际在 02:00:37 触发，
+               没有这块提示的话那 37 秒会被当成 bug 报上来。
+          -->
+          <div class="trigger-preview" v-if="previewLoading || preview">
+            <a-spin v-if="previewLoading" size="small" />
+            <template v-else-if="preview && !preview.valid">
+              <div class="preview-invalid">⚠️ {{ preview.message }}</div>
+            </template>
+            <template v-else-if="preview">
+              <div class="preview-title">
+                接下来 {{ preview.nextTimeList.length }} 次
+                <a-tag v-if="preview.exact === false" color="orange" style="margin-left: 6px">基准时刻</a-tag>
+              </div>
+              <div v-for="(t, i) in preview.nextTimeList" :key="t" class="preview-item">
+                <span class="preview-idx">{{ i + 1 }}.</span> {{ t }}
+              </div>
+              <div v-if="preview.message" class="preview-note">{{ preview.message }}</div>
+            </template>
+          </div>
         </a-form-item>
         <a-form-item label="运行档位" name="presetCode">
           <a-radio-group v-model:value="updateForm.presetCode">
@@ -141,7 +164,7 @@
 </template>
 <script setup>
 import { message } from 'ant-design-vue';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { jobApi } from '/@/api/support/job-api';
 import { smartSentry } from '/@/lib/smart-sentry';
 import { SmartLoading } from '/@/components/framework/smart-loading/index';
@@ -186,6 +209,48 @@ const selectedPresetHint = computed(() => {
   return hit ? hit.hint : '';
 });
 
+// ------------------------------------ 触发时间预览 -------------------------------------
+
+const preview = ref(null);
+const previewLoading = ref(false);
+let previewTimer = null;
+
+/**
+ * 防抖 400ms —— 运营是一个字一个字敲 cron 的，
+ * 不防抖会在「0 」「0 1」「0 15」这些中间态上打出一串必然失败的请求
+ */
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(doPreview, 400);
+}
+
+async function doPreview() {
+  const value =
+    updateForm.triggerType === TRIGGER_TYPE_ENUM.CRON.value ? updateForm.cron : updateForm.oneTime;
+  if (!value) {
+    preview.value = null;
+    return;
+  }
+  try {
+    previewLoading.value = true;
+    const res = await jobApi.previewTriggerTime({
+      // 🔴 编辑时把 jobId 传上去，预览才能算准打散偏移；
+      //    新建时不传 —— 后端会如实标 exact=false，前端据此显示「基准时刻」而不是假装精确
+      jobId: updateForm.jobId,
+      triggerType: updateForm.triggerType,
+      triggerValue: value,
+      presetCode: updateForm.presetCode,
+      jitterSeconds: updateForm.jitterSeconds,
+    });
+    preview.value = res.data;
+  } catch (e) {
+    // 预览失败不该打断填表：静默降级，用户照样能保存（服务端还会再校验一次）
+    preview.value = null;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
 async function loadHandlerList() {
   try {
     handlerLoading.value = true;
@@ -217,6 +282,18 @@ const updateFormDefault = {
   sort: null,
 };
 let updateForm = reactive({ ...updateFormDefault });
+
+// 🔴 这个 watch 必须放在 updateForm 声明**之后**。
+//    watch 的 getter 会在 setup 期立刻求值一次以建立依赖，而 updateForm 是 let 声明的 ——
+//    放在它前面就会撞上暂时性死区（TDZ），抛
+//    `Cannot access 'updateForm' before initialization`，整个组件渲染失败、页面空白。
+//    ⚠️ vite build 照样绿：这是运行时错误，编译期看不出来。
+//    （上面几个 computed 之所以能放在前面，是因为 computed 的 getter 是惰性的。）
+// cron / 一次性时刻 / 档位（影响打散秒数）任一变化都要重算
+watch(
+  () => [updateForm.triggerType, updateForm.cron, updateForm.oneTime, updateForm.presetCode],
+  schedulePreview
+);
 const updateRules = {
   jobName: [{ required: true, message: '请输入任务名称' }],
   handlerName: [{ required: true, message: '请选择执行器' }],
@@ -230,6 +307,7 @@ function openUpdateModal(record) {
   isAdd.value = null == record;
   // 每次打开都重新拉一次：执行器列表来自后端注册表，发版后会变
   loadHandlerList();
+  preview.value = null;
   // 更新
   if(!isAdd.value){
     Object.assign(updateForm, record);
@@ -246,6 +324,8 @@ function openUpdateModal(record) {
 // 关闭编辑弹框
 function closeUpdateModal() {
   Object.assign(updateForm, updateFormDefault);
+  clearTimeout(previewTimer);
+  preview.value = null;
   updateModalShow.value = false;
 }
 
@@ -338,3 +418,36 @@ defineExpose({
   openExecuteModal,
 });
 </script>
+
+<style scoped>
+  .trigger-preview {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .preview-title {
+    color: #666;
+    margin-bottom: 4px;
+  }
+  .preview-item {
+    color: #262626;
+    font-family: Consolas, Monaco, monospace;
+    line-height: 20px;
+  }
+  .preview-idx {
+    color: #bfbfbf;
+    display: inline-block;
+    width: 16px;
+  }
+  .preview-note {
+    color: #999;
+    margin-top: 6px;
+    line-height: 17px;
+  }
+  .preview-invalid {
+    color: #f50;
+  }
+</style>

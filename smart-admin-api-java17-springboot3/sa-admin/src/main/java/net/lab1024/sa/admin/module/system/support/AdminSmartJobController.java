@@ -129,6 +129,17 @@ public class AdminSmartJobController extends SupportBaseController {
         return jobService.terminate(logId, SmartRequestUtil.getRequestUser().getUserName());
     }
 
+    /**
+     * ⚠️ 新建任务时预览是<b>不精确</b>的（`exact=false`）：打散偏移由 jobId 决定，
+     * 而 id 要等保存后才有。前端必须把这一点如实呈现给运营，不要只显示时刻。
+     */
+    @Operation(summary = "定时任务-触发时间预览（保存前算出接下来5次） @alaric")
+    @PostMapping("/job/trigger/preview")
+    public ResponseDTO<SmartJobTriggerPreviewVO> previewTriggerTime(
+            @RequestBody @Valid SmartJobTriggerPreviewForm form) {
+        return jobService.previewTriggerTime(form);
+    }
+
     @Operation(summary = "定时任务-查看某次执行的实时日志 @alaric")
     @GetMapping("/job/log/detail")
     public ResponseDTO<List<String>> queryExecuteLog(@RequestParam Long logId) {

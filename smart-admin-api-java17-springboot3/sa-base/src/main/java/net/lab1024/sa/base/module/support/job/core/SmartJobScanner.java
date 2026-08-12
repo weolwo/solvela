@@ -318,6 +318,12 @@ public class SmartJobScanner {
             update.setExecuteTimeMillis(0L);
             update.setResultSummary("上一次执行尚未结束，按阻塞策略丢弃本次");
             update.setTraceId(pending.getTraceId());
+            // 🔴 阻塞记录也要记下「是哪个节点做的判定」。
+            //    多节点下这是唯一能区分「跨节点阻塞」与「同节点阻塞」的线索 ——
+            //    2026-08-12 实测时正因为这里缺了节点信息，拿到一条 pid 为空的 BLOCKED 记录，
+            //    没法证明判定究竟发生在哪一侧。排障时这个区别很关键：
+            //    跨节点说明 DB 兜底那层在工作，同节点则可能是 Redis 快判没生效。
+            this.fillNodeInfo(update);
             jobRepository.getJobLogDao().updateById(update);
             return;
         }
