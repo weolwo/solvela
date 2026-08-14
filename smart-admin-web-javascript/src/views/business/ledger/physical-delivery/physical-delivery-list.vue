@@ -25,7 +25,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.logisticsNo" placeholder="物流单号" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="DELIVERY_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
@@ -84,6 +84,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="deliveryStatusOf(text).color">{{ deliveryStatusOf(text).desc }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -124,6 +127,7 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import PhysicalDeliveryForm from './physical-delivery-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { DELIVERY_STATUS_OPTIONS, deliveryStatusOf } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
 
   // ---------------------------- 表格列 ----------------------------
 

@@ -36,7 +36,7 @@
         <a-input style="width: 100%" v-model:value="form.logisticsNo" placeholder="物流单号" />
       </a-form-item>
       <a-form-item label="状态" name="status">
-        <SmartEnumSelect width="100%" v-model:value="form.status" enum-name="" placeholder="状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回" />
+        <a-select style="width: 100%" v-model:value="form.status" :options="DELIVERY_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
       </a-form-item>
     </a-form>
 
@@ -55,7 +55,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { physicalDeliveryApi } from '/@/api/business/ledger/physical-delivery/physical-delivery-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
+  import { DELIVERY_STATUS_OPTIONS } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -70,10 +70,6 @@
     if (rowData && !_.isEmpty(rowData)) {
       Object.assign(form, rowData);
     }
-    // 使用字典时把下面这注释修改成自己的字典字段 有多个字典字段就复制多份同理修改 不然打开表单时不显示字典初始值
-    // if (form.status && form.status.length > 0) {
-    //   form.status = form.status.map((e) => e.valueCode);
-    // }
     visibleFlag.value = true;
     nextTick(() => {
       formRef.value.clearValidate();

@@ -1,6 +1,8 @@
 <!--
   * 会员优惠券
   *
+  * 只读台账：券由发奖链路发放、由核销链路回写，管理端不提供增删改。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-18 23:42:44
   * @Copyright  weolwo
@@ -28,7 +30,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.couponType" placeholder="券类型" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-未使用, 1-已使用, 2-已过期, 3-已作废" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="COUPON_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -51,20 +53,6 @@
   <a-card size="small" :bordered="false" :hoverable="true">
     <!---------- 表格操作行 begin ----------->
     <a-row class="smart-table-btn-block">
-      <div class="smart-table-operate-block">
-        <a-button @click="showForm" type="primary" size="small">
-          <template #icon>
-            <PlusOutlined />
-          </template>
-          新建
-        </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
-          <template #icon>
-            <DeleteOutlined />
-          </template>
-          批量删除
-        </a-button>
-      </div>
       <div class="smart-table-setting-block">
         <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.BUSINESS.MARKETING.MEMBER_COUPON" :refresh="queryData" />
       </div>
@@ -81,14 +69,10 @@
       bordered
       :loading="tableLoading"
       :pagination="false"
-      :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
-      <template #bodyCell="{ text, record, column }">
-        <template v-if="column.dataIndex === 'action'">
-          <div class="smart-table-operate">
-            <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
-          </div>
+      <template #bodyCell="{ text, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="couponStatusOf(text).color">{{ couponStatusOf(text).desc }}</a-tag>
         </template>
       </template>
     </a-table>
@@ -109,21 +93,17 @@
         :show-total="(total) => `共${total}条`"
       />
     </div>
-
-    <MemberCouponForm ref="formRef" @reloadList="queryData" />
   </a-card>
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
-  import { message, Modal } from 'ant-design-vue';
-  import { SmartLoading } from '/@/components/framework/smart-loading';
   import { memberCouponApi } from '/@/api/business/ledger/member-coupon/member-coupon-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import MemberCouponForm from './member-coupon-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { COUPON_STATUS_OPTIONS, couponStatusOf } from '/@/constants/business/ledger/member-coupon/member-coupon-const';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -208,12 +188,6 @@
       dataIndex: 'updateTime',
       ellipsis: true,
     },
-    {
-      title: '操作',
-      dataIndex: 'action',
-      fixed: 'right',
-      width: 90,
-    },
   ]);
 
   // ---------------------------- 查询数据表单和方法 ----------------------------
@@ -274,82 +248,4 @@
   }
 
   onMounted(queryData);
-
-  // ---------------------------- 添加/修改 ----------------------------
-  const formRef = ref();
-
-  function showForm(data) {
-    formRef.value.show(data);
-  }
-
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求删除
-  async function requestDelete(data) {
-    SmartLoading.show();
-    try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await memberCouponApi.delete(data.id);
-      message.success('删除成功');
-      queryData();
-    } catch (e) {
-      smartSentry.captureError(e);
-    } finally {
-      SmartLoading.hide();
-    }
-  }
-
-  // ---------------------------- 批量删除 ----------------------------
-
-  // 选择表格行
-  const selectedRowKeyList = ref([]);
-
-  function onSelectChange(selectedRowKeys) {
-    selectedRowKeyList.value = selectedRowKeys;
-  }
-
-  // 批量删除
-  function confirmBatchDelete() {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestBatchDelete();
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求批量删除
-  async function requestBatchDelete() {
-    try {
-      SmartLoading.show();
-      await memberCouponApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
-      queryData();
-    } catch (e) {
-      smartSentry.captureError(e);
-    } finally {
-      SmartLoading.hide();
-    }
-  }
 </script>
