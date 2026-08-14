@@ -174,7 +174,24 @@
               show-icon
               message="支持配置多级阶梯（如签到3天/7天/30天分别给不同奖励），每级可选择 固定 FIXED / 比例 RATIO / 公式 FORMULA 三种发奖模式"
             />
-            <PrizeLadderBuilder v-model="wizardForm.prizeLadders" :condition-unit="stageConditionUnit" />
+            <!-- 没选活动 / 该活动下还没配奖品时，先把话说清楚，别让运营对着一个空下拉猜 -->
+            <a-alert
+              v-if="!wizardForm.base.activityCode"
+              type="warning"
+              show-icon
+              message="请先在第 1 步选择所属活动 —— 奖励只能从该活动下已配置的奖品里挑。"
+            />
+            <a-alert v-else-if="!prizeLoading && prizeOptions.length === 0" type="warning" show-icon>
+              <template #message>
+                当前活动「{{ summary.activityLabel }}」下还没有配置奖品，请先到「活动中心 › 奖品配置」建好奖品再回来配阶梯。
+              </template>
+            </a-alert>
+            <PrizeLadderBuilder
+              v-model="wizardForm.prizeLadders"
+              :condition-unit="stageConditionUnit"
+              :prize-options="prizeOptions"
+              :prize-loading="prizeLoading"
+            />
           </a-space>
         </a-card>
       </div>
@@ -304,6 +321,7 @@
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import SmartRichEditor from '/@/components/framework/wangeditor/index.vue';
   import SchemaFormRenderer from './SchemaFormRenderer.vue';
@@ -395,6 +413,51 @@
     }
   }
 
+  // ---------------------------- 奖品下拉（按所属活动过滤） ----------------------------
+
+  const prizeOptions = ref([]);
+  const prizeLoading = ref(false);
+
+  /**
+   * 奖励阶梯里的 prize_code 必须是**当前活动下已配置的奖品**。
+   *
+   * 此前这里是个自由文本框（默认值还是写死的 SCORE_100）：拼错、或者填了别的活动的奖品编码，
+   * 任务照样能保存，但发奖时按 prize_code 查不到 t_prize_config —— 派发在
+   * AFTER_COMMIT 里静默失败，前台完全无感，要翻 t_prize_log.fail_reason 才发现。
+   * 改成下拉后运营根本填不出不存在的编码。
+   */
+  async function loadPrizeOptions(activityCode) {
+    if (!activityCode) {
+      prizeOptions.value = [];
+      return;
+    }
+    prizeLoading.value = true;
+    try {
+      const res = await prizeConfigApi.optionList(activityCode);
+      prizeOptions.value = (res.data || []).map((item) => ({
+        value: item.prizeCode,
+        label: `${item.prizeName}（${item.prizeCode}）`,
+      }));
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      prizeLoading.value = false;
+    }
+  }
+
+  // 换活动就换一批候选奖品；已选中的若不在新活动下，清掉而不是留着一个跨活动的脏编码
+  watch(
+    () => wizardForm.base.activityCode,
+    async (activityCode) => {
+      await loadPrizeOptions(activityCode);
+      const valid = new Set(prizeOptions.value.map((o) => o.value));
+      wizardForm.prizeLadders = wizardForm.prizeLadders.map((row) =>
+        row.prizeCode && !valid.has(row.prizeCode) ? { ...row, prizeCode: undefined } : row
+      );
+    },
+    { immediate: true }
+  );
+
   const selectedEvent = computed(() => eventOptions.value.find((e) => e.value === wizardForm.base.triggerEvent));
 
   // 只有 DAILY / WEEKLY 受 limit_count 轮次限制，与后端 TaskPeriodResolver.supportsRoundLimit 同一口径
@@ -481,8 +544,30 @@
     return STEP_VALIDATE_FIELDS[step];
   }
 
+  /**
+   * 奖励阶梯不是 a-form-item 绑定的字段（它是自绘表格），validateFields 管不到它 ——
+   * 这一步此前完全没有校验，阶梯的奖品留空也能一路点到提交。
+   * 返回错误文案，没问题时返回空串。
+   */
+  function validatePrizeLadders() {
+    const missing = wizardForm.prizeLadders
+      .map((row, index) => (row.prizeCode ? null : index + 1))
+      .filter((i) => i !== null);
+    if (missing.length) {
+      return `第 ${missing.join('、')} 级阶梯还没选奖品`;
+    }
+    return '';
+  }
+
   async function nextStep() {
     try {
+      if (currentStep.value === WIZARD_STEP.PRIZE) {
+        const err = validatePrizeLadders();
+        if (err) {
+          message.error(err);
+          return;
+        }
+      }
       const fields = getStepValidateFields(currentStep.value);
       if (fields && fields.length) {
         await formRef.value.validateFields(fields);
@@ -575,6 +660,14 @@
   });
 
   async function onSubmit() {
+    // 阶梯不在 a-form 的管辖范围内，validate() 查不到它 —— 提交前单独兜一道。
+    // 走到这里通常已被「下一步」拦过，但草稿恢复可能直接落在汇总页，那条路绕开了逐步校验
+    const ladderError = validatePrizeLadders();
+    if (ladderError) {
+      message.error(ladderError);
+      currentStep.value = WIZARD_STEP.PRIZE;
+      return;
+    }
     // 校验失败与接口失败分开处理：校验不过不进入 loading
     try {
       await formRef.value.validate();

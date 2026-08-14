@@ -39,10 +39,20 @@
           />
         </template>
 
+        <!--
+          只能从当前活动下已配置的奖品里选。此前是自由文本框，编码拼错或跨活动填写时，
+          任务能存下来但发奖必然查不到奖品配置，而那次失败是静默的。
+        -->
         <template v-else-if="column.dataIndex === LADDER_FIELD.PRIZE_CODE">
-          <a-input
+          <a-select
             :value="record.prizeCode"
-            placeholder="如 SCORE_100"
+            :options="prizeOptions"
+            :loading="prizeLoading"
+            :disabled="prizeOptions.length === 0"
+            :placeholder="prizeOptions.length ? '请选择奖品' : '当前活动下暂无奖品'"
+            class="w-full"
+            show-search
+            option-filter-prop="label"
             @update:value="(v) => updateRow(index, LADDER_FIELD.PRIZE_CODE, v)"
           />
         </template>
@@ -91,6 +101,15 @@
     conditionUnit: {
       type: String,
       default: '次',
+    },
+    // 当前活动下已配置的奖品，来自 t_prize_config（由向导按 activityCode 拉取）
+    prizeOptions: {
+      type: Array,
+      default: () => [],
+    },
+    prizeLoading: {
+      type: Boolean,
+      default: false,
     },
   });
 

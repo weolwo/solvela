@@ -99,17 +99,15 @@ export const DEFAULT_LIMIT_COUNT = 1;
 // 同上：向导的奖励阶梯写的就是 t_task_prize_mapping，字典唯一出处放在常量目录
 export { PRIZE_MODE_ENUM, PRIZE_MODE_OPTIONS };
 
-// 奖品编码（实际应由 t_prize_config 接口下发）
-export const PRIZE_CODE_OPTIONS = [
-  { value: 'SCORE_100', label: '积分 · 100分' },
-  { value: 'COUPON_100_20', label: '优惠券 · 满100减20' },
-  { value: 'CASH_RANDOM', label: '现金红包 · 随机' },
-  { value: 'PHYSICAL_LIMITED', label: '实物 · 限量周边' },
-];
+// ⚠️ 这里原本有一份写死的 PRIZE_CODE_OPTIONS（SCORE_100 / COUPON_100_20 …），
+// 已删除：奖品编码是 t_prize_config 里的数据且**按活动隔离**，写死的四个占位值
+// 在任何真实活动下都不存在。现由向导按 activityCode 调 prizeConfigApi.optionList 下发。
 
 export const DEFAULT_PRIZE_LADDER = {
   stageCondition: 1,
-  prizeCode: 'SCORE_100',
+  // 刻意留空：新增一级阶梯时不预填奖品，逼运营从下拉里挑一个真实存在的。
+  // 之前默认填 'SCORE_100'，运营不改就能一路点到提交，建出必然发不出奖的任务。
+  prizeCode: undefined,
   prizeMode: PRIZE_MODE_ENUM.FIXED,
   prizeValue: 100,
 };
