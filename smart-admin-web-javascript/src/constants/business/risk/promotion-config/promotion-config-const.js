@@ -42,6 +42,24 @@ export const PRIZE_TYPE_OPTIONS = Object.values(PRIZE_TYPE_ENUM).map((i) => ({
 }));
 
 /**
+ * 「不限制」哨兵值：total_quota / total_amount / 各 xxx_limit 都用 -1 表示不限。
+ */
+export const UNLIMITED = -1;
+
+/**
+ * 按「个数」控量的资产类型 —— 看 total_quota / used_quota。
+ * 其余（积分、现金）按「金额」控量，看 total_amount / used_amount。
+ *
+ * 两侧是二选一的：不适用的那一侧填 -1。判据集中放这里，
+ * 免得表单、列表、详情各写一遍 `prizeType === 'COUPON' || ...`。
+ */
+export const QUOTA_BASED_PRIZE_TYPES = [PRIZE_TYPE_ENUM.COUPON.value, PRIZE_TYPE_ENUM.PHYSICAL.value];
+
+export function isQuotaBased(prizeType) {
+  return QUOTA_BASED_PRIZE_TYPES.includes(prizeType);
+}
+
+/**
  * 审核层级：对齐 t_promotion_config.review_level
  *
  * 决定提案走几道审批，与 t_proposal_record.status 的 10/11 两档直接对应，见 [[proposal-record-const]]。
@@ -97,6 +115,9 @@ export default {
   PROMOTION_STATUS_OPTIONS,
   PRIZE_TYPE_ENUM,
   PRIZE_TYPE_OPTIONS,
+  UNLIMITED,
+  QUOTA_BASED_PRIZE_TYPES,
+  isQuotaBased,
   REVIEW_LEVEL_ENUM,
   REVIEW_LEVEL_OPTIONS,
   LIMIT_PERIOD_ENUM,

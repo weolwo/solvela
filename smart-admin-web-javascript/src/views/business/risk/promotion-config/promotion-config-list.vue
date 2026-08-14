@@ -1,6 +1,11 @@
 <!--
   * 优惠配置表
   *
+  * 表里 23 列全铺开没人读得完。这里只留 8 列决策信息：
+  *   · 预算/库存的四列（总量、已用 × 数量、金额）合成一个「额度用量」进度条列；
+  *   · 五个 xxx_limit 合成一个「防刷限制」列，-1（不限）的不显示；
+  * 其余字段默认隐藏（可在右上角列设置里调出），或点「详情」看完整分组。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-18 23:28:25
   * @Copyright  weolwo
@@ -9,30 +14,33 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="优惠配置名称" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.promoName" placeholder="优惠配置名称" />
       </a-form-item>
       <a-form-item label="资产类型" class="smart-query-form-item">
         <a-select style="width: 200px" v-model:value="queryForm.prizeType" :options="PRIZE_TYPE_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
-      <a-form-item label="创建时间" class="smart-query-form-item">
-        <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
-      </a-form-item>
-      <a-form-item label="Id限制" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.identifyLimit" placeholder="同周期内，单会员ID最多领取次数 (-1为不限)" />
-      </a-form-item>
-      <a-form-item label="手机号限制" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.phoneLimit" placeholder="同周期内，单手机号最多领取次数 (-1为不限)" />
-      </a-form-item>
-      <a-form-item label="IP限制" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.ipLimit" placeholder="同周期内，单IP地址最多领取次数 (-1为不限)" />
-      </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
         <a-select style="width: 200px" v-model:value="queryForm.status" :options="PROMOTION_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
+      <a-form-item label="创建时间" class="smart-query-form-item">
+        <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
+      </a-form-item>
+      <!-- 租户ID 与三个防刷次数：按具体次数精确匹配的检索几乎用不上，收进「更多」里 -->
+      <template v-if="showMoreQuery">
+        <a-form-item label="租户ID" class="smart-query-form-item">
+          <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
+        </a-form-item>
+        <a-form-item label="单会员ID限制" class="smart-query-form-item">
+          <a-input style="width: 200px" v-model:value="queryForm.identifyLimit" placeholder="按次数精确匹配，-1 为不限" />
+        </a-form-item>
+        <a-form-item label="单手机号限制" class="smart-query-form-item">
+          <a-input style="width: 200px" v-model:value="queryForm.phoneLimit" placeholder="按次数精确匹配，-1 为不限" />
+        </a-form-item>
+        <a-form-item label="单IP限制" class="smart-query-form-item">
+          <a-input style="width: 200px" v-model:value="queryForm.ipLimit" placeholder="按次数精确匹配，-1 为不限" />
+        </a-form-item>
+      </template>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
           <template #icon>
@@ -45,6 +53,10 @@
             <ReloadOutlined />
           </template>
           重置
+        </a-button>
+        <a-button type="link" @click="showMoreQuery = !showMoreQuery">
+          {{ showMoreQuery ? '收起' : '更多条件' }}
+          <DownOutlined :rotate="showMoreQuery ? 180 : 0" />
         </a-button>
       </a-form-item>
     </a-row>
@@ -77,7 +89,7 @@
     <!---------- 表格 begin ----------->
     <a-table
       size="small"
-      :scroll="{ y: 800 }"
+      :scroll="{ x: 1200, y: 800 }"
       :dataSource="tableData"
       :columns="columns"
       rowKey="id"
@@ -90,14 +102,44 @@
         <template v-if="column.dataIndex === 'status'">
           <a-tag :color="promotionStatusOf(text).color">{{ promotionStatusOf(text).desc }}</a-tag>
         </template>
-        <template v-if="column.dataIndex === 'prizeType'">
+
+        <template v-else-if="column.dataIndex === 'prizeType'">
           <a-tag :color="prizeTypeOf(text).color">{{ prizeTypeOf(text).desc }}</a-tag>
         </template>
-        <template v-if="column.dataIndex === 'limitPeriod'">
+
+        <!-- 额度用量：券/实物看数量，积分/现金看金额，用同一列表达 -->
+        <template v-else-if="column.dataIndex === 'usage'">
+          <div v-if="usageOf(record).unlimited" class="text-slate-400">不限制</div>
+          <div v-else>
+            <a-progress
+              :percent="usageOf(record).percent"
+              :status="usageOf(record).percent >= 100 ? 'exception' : 'normal'"
+              size="small"
+              :show-info="false"
+            />
+            <div class="text-[12px] text-slate-500">{{ usageOf(record).text }}</div>
+          </div>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'reviewLevel'">
+          <span>{{ reviewLevelOf(text).desc }}</span>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'limitPeriod'">
           <span>{{ limitPeriodOf(text).desc }}</span>
         </template>
-        <template v-if="column.dataIndex === 'action'">
+
+        <!-- 防刷限制：五个维度合成一列，-1（不限）的不显示；全不限时给个明确的「无」 -->
+        <template v-else-if="column.dataIndex === 'limits'">
+          <template v-if="limitsOf(record).length">
+            <a-tag v-for="item in limitsOf(record)" :key="item" class="mb-1">{{ item }}</a-tag>
+          </template>
+          <span v-else class="text-slate-400">无</span>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
+            <a-button @click="showDetail(record)" type="link">详情</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
             <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
@@ -123,6 +165,53 @@
     </div>
 
     <PromotionConfigForm ref="formRef" @reloadList="queryData" />
+
+    <!---------- 详情抽屉：只读，分组与编辑抽屉一致 ----------->
+    <a-drawer :title="`优惠配置详情 · ${detail.promoName || ''}`" :width="720" :open="detailVisible" @close="detailVisible = false">
+      <a-descriptions title="基本信息" bordered size="small" :column="2" class="mb-6">
+        <a-descriptions-item label="配置ID">{{ detail.id }}</a-descriptions-item>
+        <a-descriptions-item label="租户ID">{{ detail.tenantId }}</a-descriptions-item>
+        <a-descriptions-item label="配置名称" :span="2">{{ detail.promoName }}</a-descriptions-item>
+        <a-descriptions-item label="资产类型">
+          <a-tag :color="prizeTypeOf(detail.prizeType).color">{{ prizeTypeOf(detail.prizeType).desc }}</a-tag>
+        </a-descriptions-item>
+        <a-descriptions-item label="状态">
+          <a-tag :color="promotionStatusOf(detail.status).color">{{ promotionStatusOf(detail.status).desc }}</a-tag>
+        </a-descriptions-item>
+      </a-descriptions>
+
+      <a-descriptions :title="isQuotaBased(detail.prizeType) ? '库存控制（按个数）' : '预算控制（按金额）'" bordered size="small" :column="2" class="mb-6">
+        <template v-if="isQuotaBased(detail.prizeType)">
+          <a-descriptions-item label="总库存">{{ totalText(detail.totalQuota) }}</a-descriptions-item>
+          <a-descriptions-item label="已消耗库存">{{ detail.usedQuota }}</a-descriptions-item>
+        </template>
+        <template v-else>
+          <a-descriptions-item label="总预算">{{ totalText(detail.totalAmount) }}</a-descriptions-item>
+          <a-descriptions-item label="已消耗预算">{{ detail.usedAmount }}</a-descriptions-item>
+        </template>
+      </a-descriptions>
+
+      <a-descriptions title="审核层级" bordered size="small" :column="2" class="mb-6">
+        <a-descriptions-item label="审核层级" :span="2">{{ reviewLevelOf(detail.reviewLevel).desc }}</a-descriptions-item>
+        <a-descriptions-item label="一审触发阈值">{{ detail.firstReviewThreshold }}</a-descriptions-item>
+        <a-descriptions-item label="二审触发阈值">{{ detail.secondReviewThreshold }}</a-descriptions-item>
+      </a-descriptions>
+
+      <a-descriptions title="单次发放兜底" bordered size="small" :column="2" class="mb-6">
+        <a-descriptions-item label="单次最大数量">{{ detail.singleMaxQuota }}</a-descriptions-item>
+        <a-descriptions-item label="单次最大金额">{{ detail.singleMaxAmount }}</a-descriptions-item>
+      </a-descriptions>
+
+      <a-descriptions title="风控与防刷" bordered size="small" :column="2">
+        <a-descriptions-item label="限制周期" :span="2">{{ limitPeriodOf(detail.limitPeriod).desc }}</a-descriptions-item>
+        <a-descriptions-item label="单会员ID限制">{{ limitText(detail.identifyLimit) }}</a-descriptions-item>
+        <a-descriptions-item label="单手机号限制">{{ limitText(detail.phoneLimit) }}</a-descriptions-item>
+        <a-descriptions-item label="单IP限制">{{ limitText(detail.ipLimit) }}</a-descriptions-item>
+        <a-descriptions-item label="单设备号限制">{{ limitText(detail.deviceLimit) }}</a-descriptions-item>
+        <a-descriptions-item label="单端指纹限制">{{ limitText(detail.fingerprintLimit) }}</a-descriptions-item>
+        <a-descriptions-item label="互斥规则">{{ detail.mutexRule || '无' }}</a-descriptions-item>
+      </a-descriptions>
+    </a-drawer>
   </a-card>
 </template>
 <script setup>
@@ -139,10 +228,66 @@
   import {
     PRIZE_TYPE_OPTIONS,
     PROMOTION_STATUS_OPTIONS,
+    UNLIMITED,
+    isQuotaBased,
     limitPeriodOf,
     prizeTypeOf,
     promotionStatusOf,
+    reviewLevelOf,
   } from '/@/constants/business/risk/promotion-config/promotion-config-const';
+
+  // ---------------------------- 查询区展开 ----------------------------
+
+  const showMoreQuery = ref(false);
+
+  // ---------------------------- 额度用量 / 防刷限制的派生展示 ----------------------------
+
+  /**
+   * 把「总量 + 已用」压成一个百分比。券/实物看数量，积分/现金看金额 ——
+   * 两套字段本来就是二选一的，列表里没必要占四列。
+   */
+  function usageOf(record) {
+    const quotaBased = isQuotaBased(record.prizeType);
+    const total = Number(quotaBased ? record.totalQuota : record.totalAmount);
+    const used = Number(quotaBased ? record.usedQuota : record.usedAmount) || 0;
+
+    if (total === UNLIMITED || Number.isNaN(total)) {
+      return { unlimited: true, percent: 0, text: '' };
+    }
+    // total 为 0 时算百分比会得到 Infinity/NaN，直接按已用尽处理
+    const percent = total > 0 ? Math.min(Math.round((used / total) * 100), 100) : 100;
+    return {
+      unlimited: false,
+      percent,
+      text: `${used} / ${total}${quotaBased ? '' : ' 元'}`,
+    };
+  }
+
+  /**
+   * 五个防刷维度合成短标签，-1（不限）的不出现 —— 全是 -1 时返回空数组，
+   * 由模板显示成「无」，而不是五个「不限」把列撑爆。
+   */
+  function limitsOf(record) {
+    return [
+      { label: '会员', value: record.identifyLimit },
+      { label: '手机', value: record.phoneLimit },
+      { label: 'IP', value: record.ipLimit },
+      { label: '设备', value: record.deviceLimit },
+      { label: '指纹', value: record.fingerprintLimit },
+    ]
+      .filter((i) => i.value != null && Number(i.value) !== UNLIMITED)
+      .map((i) => `${i.label} ${i.value}`);
+  }
+
+  function limitText(value) {
+    return value == null || Number(value) === UNLIMITED ? '不限' : value;
+  }
+
+  // 金额列后端是 BigDecimal，序列化后可能是 "-1.0000" 这样的字符串 ——
+  // 直接 === -1 比不中，会把「不限制」显示成一个莫名其妙的 -1.0000
+  function totalText(value) {
+    return value == null || Number(value) === UNLIMITED ? '不限制' : value;
+  }
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -150,97 +295,90 @@
     {
       title: '配置ID',
       dataIndex: 'id',
+      width: 80,
+    },
+    {
+      title: '优惠配置名称',
+      dataIndex: 'promoName',
+      width: 160,
       ellipsis: true,
     },
+    {
+      title: '资产类型',
+      dataIndex: 'prizeType',
+      width: 100,
+    },
+    {
+      title: '额度用量',
+      dataIndex: 'usage',
+      width: 160,
+    },
+    {
+      title: '审核层级',
+      dataIndex: 'reviewLevel',
+      width: 100,
+    },
+    {
+      title: '限制周期',
+      dataIndex: 'limitPeriod',
+      width: 100,
+    },
+    {
+      title: '防刷限制',
+      dataIndex: 'limits',
+      width: 200,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 90,
+    },
+    // ↓ 以下默认隐藏：已并进上面的派生列，需要时在列设置里调出。
+    //   租户ID/创建人/更新人/更新时间不在这里标 —— DEFAULT_HIDDEN_COLUMNS 已统一收口
     {
       title: '租户ID',
       dataIndex: 'tenantId',
       ellipsis: true,
     },
     {
-      title: '优惠配置名称',
-      dataIndex: 'promoName',
-      ellipsis: true,
-    },
-    {
-      title: '资产类型',
-      dataIndex: 'prizeType',
-      ellipsis: true,
-    },
-    {
       title: '总库存',
       dataIndex: 'totalQuota',
-      ellipsis: true,
+      showFlag: false,
     },
     {
-      title: '已消耗库存(个数)',
+      title: '已消耗库存',
       dataIndex: 'usedQuota',
-      ellipsis: true,
+      showFlag: false,
     },
     {
       title: '总预算',
       dataIndex: 'totalAmount',
-      ellipsis: true,
+      showFlag: false,
     },
     {
       title: '已消耗预算',
       dataIndex: 'usedAmount',
-      ellipsis: true,
+      showFlag: false,
     },
     {
       title: '一审触发阈值',
       dataIndex: 'firstReviewThreshold',
-      ellipsis: true,
+      showFlag: false,
     },
     {
       title: '二审触发阈值',
       dataIndex: 'secondReviewThreshold',
-      ellipsis: true,
+      showFlag: false,
     },
     {
-      title: '单次最大数',
+      title: '单次最大数量',
       dataIndex: 'singleMaxQuota',
-      ellipsis: true,
+      showFlag: false,
     },
     {
       title: '单次最大金额',
       dataIndex: 'singleMaxAmount',
-      ellipsis: true,
-    },
-    {
-      title: '限制周期',
-      dataIndex: 'limitPeriod',
-      ellipsis: true,
-    },
-    {
-      title: 'Id限制',
-      dataIndex: 'identifyLimit',
-      ellipsis: true,
-    },
-    {
-      title: '手机号限制',
-      dataIndex: 'phoneLimit',
-      ellipsis: true,
-    },
-    {
-      title: 'IP限制',
-      dataIndex: 'ipLimit',
-      ellipsis: true,
-    },
-    {
-      title: '设备Id限制',
-      dataIndex: 'deviceLimit',
-      ellipsis: true,
-    },
-    {
-      title: '指纹限制',
-      dataIndex: 'fingerprintLimit',
-      ellipsis: true,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      ellipsis: true,
+      showFlag: false,
     },
     {
       title: '创建人',
@@ -250,6 +388,7 @@
     {
       title: '创建时间',
       dataIndex: 'createTime',
+      showFlag: false,
       ellipsis: true,
     },
     {
@@ -266,7 +405,7 @@
       title: '操作',
       dataIndex: 'action',
       fixed: 'right',
-      width: 90,
+      width: 160,
     },
   ]);
 
@@ -275,7 +414,7 @@
   const queryFormState = {
     tenantId: undefined, //租户ID
     promoName: undefined, //优惠配置名称
-    prizeType: undefined, //资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)
+    prizeType: undefined, //资产类型：SCORE / BALANCE / COUPON / PHYSICAL
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束
@@ -330,6 +469,16 @@
 
   onMounted(queryData);
 
+  // ---------------------------- 详情 ----------------------------
+
+  const detailVisible = ref(false);
+  const detail = ref({});
+
+  function showDetail(data) {
+    detail.value = { ...data };
+    detailVisible.value = true;
+  }
+
   // ---------------------------- 添加/修改 ----------------------------
   const formRef = ref();
 
@@ -357,9 +506,6 @@
   async function requestDelete(data) {
     SmartLoading.show();
     try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
       await promotionConfigApi.delete(data.id);
       message.success('删除成功');
       queryData();

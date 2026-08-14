@@ -32,17 +32,14 @@ public class PromotionConfigAddForm {
     @NotNull(message = "总库存(个数)：-1为不限制(适用于券/实物) 不能为空")
     private Integer totalQuota;
 
-    @Schema(description = "已消耗库存(个数)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "已消耗库存(个数) 不能为空")
-    private Integer usedQuota;
+    // ⚠️ used_quota / used_amount 刻意不在表单里：它们是预算扣减的运行态计数器，
+    // 只能由 PromotionConfigMapper 里那条 CAS 式原子 SQL 维护
+    // （used_amount = used_amount + #{amount} WHERE total_amount - used_amount >= #{amount}）。
+    // 让管理端传值意味着新建时能凭空指定「已消耗」，等于开局就把预算闸门拨到任意位置。
 
     @Schema(description = "总预算(金额)：-1为不限制(适用于积分/现金)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "总预算(金额)：-1为不限制(适用于积分/现金) 不能为空")
     private BigDecimal totalAmount;
-
-    @Schema(description = "已消耗预算(金额)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "已消耗预算(金额) 不能为空")
-    private BigDecimal usedAmount;
 
     @Schema(description = "审核层级控制：0-无需审核, 1-单层审批, 2-双层审批", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审核层级控制：0-无需审核, 1-单层审批, 2-双层审批 不能为空")

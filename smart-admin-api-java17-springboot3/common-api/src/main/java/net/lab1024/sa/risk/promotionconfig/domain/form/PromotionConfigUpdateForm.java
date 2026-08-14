@@ -33,17 +33,22 @@ public class PromotionConfigUpdateForm {
     @NotNull(message = "总库存(个数)：-1为不限制(适用于券/实物) 不能为空")
     private Integer totalQuota;
 
-    @Schema(description = "已消耗库存(个数)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "已消耗库存(个数) 不能为空")
-    private Integer usedQuota;
+    // 🔴 used_quota / used_amount 刻意不在表单里，这是一处资损修复：
+    //
+    // 这两列由 PromotionConfigMapper 里的 CAS 式原子 SQL 维护：
+    //   set used_amount = used_amount + #{amount}
+    //   where (total_amount = -1 or total_amount - used_amount >= #{amount})
+    // 而本表单走的是 updateById 全字段覆写，写进去的是**运营打开弹窗那一刻的快照值**。
+    // 于是「进后台改个名字点保存」会把这期间所有并发扣减一笔勾销 ——
+    // used_amount 回退，GlobalBudgetRiskFilter 拿 totalAmount - usedAmount 判预算，
+    // 闸门就被重新打开了，且现场没有任何报错。
+    //
+    // 去掉字段后实体里这两个属性为 null，MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+    // 会把它们排除在 UPDATE 语句外（全工程没有改过该策略），原值得以保留。
 
     @Schema(description = "总预算(金额)：-1为不限制(适用于积分/现金)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "总预算(金额)：-1为不限制(适用于积分/现金) 不能为空")
     private BigDecimal totalAmount;
-
-    @Schema(description = "已消耗预算(金额)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "已消耗预算(金额) 不能为空")
-    private BigDecimal usedAmount;
 
     @Schema(description = "审核层级控制：0-无需审核, 1-单层审批, 2-双层审批", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审核层级控制：0-无需审核, 1-单层审批, 2-双层审批 不能为空")
