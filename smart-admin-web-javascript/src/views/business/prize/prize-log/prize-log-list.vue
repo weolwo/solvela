@@ -66,6 +66,11 @@
   <a-card size="small" :bordered="false" :hoverable="true">
     <a-row class="smart-table-btn-block">
       <div class="smart-table-operate-block">
+        <!-- 人工补发：新建一条待审批记录，审批通过后才真正走派发链路 -->
+        <a-button type="primary" v-privilege="'prizeLog:add'" @click="showForm">
+          <template #icon><PlusOutlined /></template>
+          人工补发
+        </a-button>
         <!-- 待审批是这个页面唯一需要「找出来处理」的东西，给个一键筛选 -->
         <a-button :type="onlyPending ? 'primary' : 'default'" @click="togglePending">
           <template #icon><AuditOutlined /></template>
@@ -161,13 +166,16 @@
       </div>
       <a-textarea v-model:value="rejectReason" :rows="3" placeholder="请填写驳回理由，将记入审批留痕" />
     </a-modal>
+
+    <PrizeLogForm ref="formRef" @reloadList="queryData" />
   </a-card>
 </template>
 
 <script setup>
   import { computed, onMounted, reactive, ref } from 'vue';
   import { message } from 'ant-design-vue';
-  import { SearchOutlined, ReloadOutlined, AuditOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
+  import { SearchOutlined, ReloadOutlined, AuditOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons-vue';
+  import PrizeLogForm from './prize-log-form.vue';
   import { prizeLogApi } from '/@/api/business/prize/prize-log/prize-log-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
@@ -299,4 +307,12 @@
   }
 
   onMounted(queryData);
+
+  // ---------------------------- 人工补发 ----------------------------
+
+  const formRef = ref();
+
+  function showForm() {
+    formRef.value.show();
+  }
 </script>

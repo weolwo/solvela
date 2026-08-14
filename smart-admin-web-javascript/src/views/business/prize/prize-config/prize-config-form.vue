@@ -87,41 +87,18 @@
       <a-form-item label="奖励价值" name="prizeValue">
         <a-input-number style="width: 100%" v-model:value="form.prizeValue" placeholder="奖励价值" />
       </a-form-item>
-      <!-- 开关与列表页的两个 a-switch 同一套语义：开=人工审批（更保守的一侧放在「开」） -->
-      <a-form-item label="审批模式" name="approveMode">
-        <a-switch
-          v-model:checked="form.approveMode"
-          :checkedValue="APPROVE_MODE_MANUAL"
-          :unCheckedValue="APPROVE_MODE_AUTO"
-          checked-children="人工审批"
-          un-checked-children="自动免审"
-        />
-      </a-form-item>
-      <a-form-item label="排序权重" name="sortWeight">
-        <a-input-number style="width: 100%" v-model:value="form.sortWeight" placeholder="排序权重" />
-      </a-form-item>
-      <a-form-item label="状态" name="status">
-        <a-switch
-          v-model:checked="form.status"
-          :checkedValue="PRIZE_STATUS_ENUM.ENABLED.value"
-          :unCheckedValue="PRIZE_STATUS_ENUM.DISABLED.value"
-          checked-children="启用"
-          un-checked-children="停用"
-        />
-      </a-form-item>
-
       <!-- ==================== 高级配置：写进 ext（json） ==================== -->
-      <a-collapse v-model:activeKey="advancedKeys" :bordered="false" ghost class="advanced-collapse -ml-1">
-        <a-collapse-panel key="advanced">
-          <template #header>
-            <span class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <PictureOutlined class="text-violet-500" />
-              高级配置
-              <span class="text-xs font-normal text-slate-400">选填</span>
-              <a-tag v-if="extImages.length" color="purple" class="m-0!">{{ extImages.length }} 张图</a-tag>
-            </span>
-          </template>
+      <a-form-item label="高级配置">
+        <div class="flex items-center gap-2">
+          <a-switch v-model:checked="advancedOn" checked-children="开" un-checked-children="关" />
+          <PictureOutlined class="text-violet-500" />
+          <span class="text-xs text-slate-400">奖品图片等扩展信息，存入 ext</span>
+          <a-tag v-if="extImages.length" color="purple" class="m-0!">{{ extImages.length }} 张图</a-tag>
+        </div>
+      </a-form-item>
 
+      <a-form-item v-if="advancedOn" :wrapper-col="{ offset: 5, span: 19 }">
+        <div class="rounded-lg border border-solid border-violet-100 bg-violet-50/30 p-3">
           <a-alert type="info" show-icon class="mb-3 rounded-lg!">
             <template #message>
               <span class="text-xs leading-relaxed text-slate-600">
@@ -172,14 +149,42 @@
           >
             已添加 {{ MAX_EXT_IMAGES }} 张，达到上限（移除一张后可继续添加）
           </div>
-        </a-collapse-panel>
-      </a-collapse>
+        </div>
+      </a-form-item>
+      <!-- 开关与列表页的两个 a-switch 同一套语义：开=人工审批（更保守的一侧放在「开」） -->
+      <a-form-item label="审批模式" name="approveMode">
+        <a-switch
+          v-model:checked="form.approveMode"
+          :checkedValue="APPROVE_MODE_MANUAL"
+          :unCheckedValue="APPROVE_MODE_AUTO"
+          checked-children="人工审批"
+          un-checked-children="自动免审"
+        />
+      </a-form-item>
+      <a-form-item label="排序权重" name="sortWeight">
+        <a-input-number style="width: 100%" v-model:value="form.sortWeight" placeholder="排序权重" />
+      </a-form-item>
+      <a-form-item label="状态" name="status">
+        <a-switch
+          v-model:checked="form.status"
+          :checkedValue="PRIZE_STATUS_ENUM.ENABLED.value"
+          :unCheckedValue="PRIZE_STATUS_ENUM.DISABLED.value"
+          checked-children="启用"
+          un-checked-children="停用"
+        />
+      </a-form-item>
+
     </a-form>
 
     <template #footer>
       <a-space>
         <a-button @click="onClose">取消</a-button>
-        <a-button type="primary" @click="onSubmit">保存</a-button>
+        <!--
+          奖品通常是一个活动下连着配好几个，保存完就关弹窗意味着「再点新建、再选一遍活动/类型/优惠配置」。
+          「保存并继续」保留这三项公共前缀，只清掉奖品自身的字段。编辑态没有这个语义，故只在新建时出现。
+        -->
+        <a-button v-if="!form.id" :loading="saving" @click="onSubmit(true)">保存并继续</a-button>
+        <a-button type="primary" :loading="saving" @click="onSubmit(false)">保存</a-button>
       </a-space>
     </template>
   </a-modal>
@@ -327,7 +332,7 @@
   // 放在 JS 里而不是直接写进模板：这串里有 {{ }}，写在模板上会被 Vue 当插值解析
   const EXT_SHAPE_HINT = '{"images": {"mainImage": 12}}';
 
-  const advancedKeys = ref([]);
+  const advancedOn = ref(false);
   const extImages = ref([]);
   const extImageError = ref('');
   // ext 里除 images 之外的内容（DDL 注释提到还会放跳转链接等），原样留着不动
@@ -370,7 +375,7 @@
         .map(([name, fileId]) => newExtImage(name, Number(fileId) || null));
     }
     // 有图就默认把高级配置展开，否则运营看不出这条奖品其实配过图
-    advancedKeys.value = extImages.value.length ? ['advanced'] : [];
+    advancedOn.value = extImages.value.length > 0;
   }
 
   const canAddExtImage = computed(() => extImages.value.length < MAX_EXT_IMAGES);
@@ -469,27 +474,51 @@
     }
   }
 
-  // 点击确定，验证表单
-  async function onSubmit() {
+  const saving = ref(false);
+
+  // 点击确定，验证表单。continueAdding=true 时保存后不关弹窗，接着录下一个奖品
+  async function onSubmit(continueAdding = false) {
     try {
       await formRef.value.validateFields();
     } catch (err) {
       message.error('参数验证错误，请仔细填写表单数据!');
       return;
     }
-    // ext 不是 a-form 管辖的字段，单独校验；出错时展开高级配置，否则提示指向的是收起来的内容
+    // ext 不是 a-form 管辖的字段，单独校验；出错时打开高级配置开关，否则提示指向的是被收起来的内容
     const built = buildExt();
     if (!built.ok) {
       extImageError.value = built.message;
-      advancedKeys.value = ['advanced'];
+      advancedOn.value = true;
       message.error(built.message);
       return;
     }
-    save(built.ext);
+    save(built.ext, continueAdding);
+  }
+
+  /**
+   * 连续录入时保留的「公共前缀」：同一个活动下配多个奖品，这几项几乎不会变，
+   * 每次都重选一遍纯属重复劳动。奖品自身的字段（名称/编码/级别/价值/图片）一律清空。
+   */
+  function resetForNextPrize() {
+    const keep = {
+      activityCode: form.activityCode,
+      prizeType: form.prizeType,
+      promotionConfigId: form.promotionConfigId,
+      approveMode: form.approveMode,
+      sortWeight: form.sortWeight,
+      status: form.status,
+    };
+    Object.assign(form, formDefault, keep);
+    extImages.value = [];
+    extRest = {};
+    extImageError.value = '';
+    advancedOn.value = false;
+    nextTick(() => formRef.value?.clearValidate());
   }
 
   // 新建、编辑API
-  async function save(ext) {
+  async function save(ext, continueAdding) {
+    saving.value = true;
     SmartLoading.show();
     try {
       const params = { ...form, ext };
@@ -498,12 +527,18 @@
       } else {
         await prizeConfigApi.add(params);
       }
-      message.success('操作成功');
+      // 连续录入时把刚存的奖品名带进提示 —— 弹窗不关，否则运营分不清「到底存进去没有」
+      message.success(continueAdding ? `已保存「${params.prizeName}」，可继续录入下一个` : '操作成功');
       emits('reloadList');
-      onClose();
+      if (continueAdding) {
+        resetForNextPrize();
+      } else {
+        onClose();
+      }
     } catch (err) {
       smartSentry.captureError(err);
     } finally {
+      saving.value = false;
       SmartLoading.hide();
     }
   }
@@ -528,14 +563,4 @@
     }
   }
 
-  .advanced-collapse {
-    :deep(.ant-collapse-content-box) {
-      padding-inline: 0;
-      padding-block-start: 4px;
-    }
-
-    :deep(.ant-collapse-header) {
-      padding-inline: 4px !important;
-    }
-  }
 </style>
