@@ -15,6 +15,12 @@
       <a-form-item label="活动名称" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.activityName" placeholder="活动名称" />
       </a-form-item>
+      <a-form-item label="活动类型" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.activityType" :options="ACTIVITY_TYPE_OPTIONS" placeholder="全部" allowClear />
+      </a-form-item>
+      <a-form-item label="状态" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="ACTIVITY_STATUS_OPTIONS" placeholder="全部" allowClear />
+      </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
       </a-form-item>
@@ -193,6 +199,8 @@
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import {
     ACTIVITY_STATUS_ENUM,
+    ACTIVITY_STATUS_OPTIONS,
+    ACTIVITY_TYPE_OPTIONS,
     PLAYABLE_TYPE_LIST,
     activityTypeMeta,
     hasGameplay,
@@ -282,6 +290,8 @@
     tenantId: undefined, //租户id
     activityCode: undefined, //活动编码
     activityName: undefined, //活动名称
+    activityType: undefined, //活动类型：BASIC / DRAW / TASK / LOTTERY
+    status: undefined, //状态：1-启用, 2-禁用（0 为历史遗留，按未启用处理）
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始
     createTimeEnd: undefined, //创建时间 结束

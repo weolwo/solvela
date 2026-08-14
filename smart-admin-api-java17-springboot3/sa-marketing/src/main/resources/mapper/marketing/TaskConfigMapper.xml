@@ -70,6 +70,9 @@
                         <if test="queryForm.triggerEvent != null">
                             AND trigger_event = #{queryForm.triggerEvent}
                         </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
         </where>
     </sql>
 

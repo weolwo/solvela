@@ -83,8 +83,12 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'prizeType'">
+          <a-tag>{{ prizeTypeOf(text) }}</a-tag>
+        </template>
+
         <!-- 状态：开关就地切换 -->
-        <template v-if="column.dataIndex === 'status'">
+        <template v-else-if="column.dataIndex === 'status'">
           <a-switch
             :checked="isPrizeEnabled(record.status)"
             :loading="statusLoadingId === record.id"
@@ -164,6 +168,7 @@
     PRIZE_STATUS_ENUM,
     PRIZE_STATUS_OPTIONS,
     isPrizeEnabled,
+    prizeTypeOf,
   } from '/@/constants/business/prize/prize-config/prize-config-const';
 
   // ---------------------------- 表格列 ----------------------------

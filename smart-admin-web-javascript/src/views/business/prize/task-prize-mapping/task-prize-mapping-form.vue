@@ -8,29 +8,28 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户ID" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户ID" />
       </a-form-item>
       <a-form-item label="任务配置ID" name="taskConfigId">
         <a-input-number style="width: 100%" v-model:value="form.taskConfigId" placeholder="任务配置ID" />
       </a-form-item>
+      <!-- stage_condition / prize_strategy 在库里是 json、在接口上是 String，
+           原先绑的是 a-input-number（数字框里塞 JSON，编辑已有数据必然显示为空）—— 改成文本域 -->
       <a-form-item label="阶段达标条件" name="stageCondition">
-        <a-input-number style="width: 100%" v-model:value="form.stageCondition" placeholder="阶段达标条件" />
+        <a-textarea :rows="2" v-model:value="form.stageCondition" placeholder='JSON，如 {"min": 10, "max": 99} 或 {"action": "share"}' />
       </a-form-item>
       <a-form-item label="任务阶段" name="stageLevel">
-        <a-input-number style="width: 100%" v-model:value="form.stageLevel" placeholder="任务阶段：单次任务填1，阶梯任务填 1, 2, 3..." />
+        <a-input-number style="width: 100%" v-model:value="form.stageLevel" placeholder="单次任务填 1，阶梯任务填 1, 2, 3..." />
       </a-form-item>
       <a-form-item label="奖励编码" name="prizeCode">
         <a-input style="width: 100%" v-model:value="form.prizeCode" placeholder="奖励编码" />
       </a-form-item>
       <a-form-item label="计算类型" name="prizeMode">
-        <a-input style="width: 100%" v-model:value="form.prizeMode" placeholder="计算类型：FIXED(固定), RATIO(比例), FORMULA(公式)" />
+        <a-select style="width: 100%" v-model:value="form.prizeMode" :options="PRIZE_MODE_OPTIONS" placeholder="请选择计算类型" allowClear />
       </a-form-item>
       <a-form-item label="动态发奖策略" name="prizeStrategy">
-        <a-input-number style="width: 100%" v-model:value="form.prizeStrategy" placeholder="动态发奖策略" />
+        <a-textarea :rows="2" v-model:value="form.prizeStrategy" placeholder='JSON，如 {"amount": 20} 或 {"ratio": 0.05}' />
       </a-form-item>
     </a-form>
 
@@ -49,6 +48,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { taskPrizeMappingApi } from '/@/api/business/prize/task-prize-mapping/task-prize-mapping-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import { PRIZE_MODE_OPTIONS } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -97,13 +97,12 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户ID 必填' }],
     taskConfigId: [{ required: true, message: '任务配置ID 必填' }],
-    stageCondition: [{ required: true, message: '阶段达标条件：如 {"min": 10, "max": 99} 或 {"action": "share"} 必填' }],
-    stageLevel: [{ required: true, message: '任务阶段：单次任务填1，阶梯任务填 1, 2, 3... 必填' }],
+    stageCondition: [{ required: true, message: '阶段达标条件 必填' }],
+    stageLevel: [{ required: true, message: '任务阶段 必填' }],
     prizeCode: [{ required: true, message: '奖励编码 必填' }],
-    prizeMode: [{ required: true, message: '计算类型：FIXED(固定), RATIO(比例), FORMULA(公式) 必填' }],
+    prizeMode: [{ required: true, message: '计算类型 必填' }],
   };
 
   // 点击确定，验证表单

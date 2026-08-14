@@ -22,7 +22,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.poolName" placeholder="奖池名称" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="0关闭，1开启" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="POOL_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
@@ -81,6 +81,18 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="poolStatusOf(text).color">{{ poolStatusOf(text).desc }}</a-tag>
+        </template>
+        <template v-if="column.dataIndex === 'costAssetType'">
+          <span>{{ costAssetTypeOf(text) }}</span>
+        </template>
+        <template v-if="column.dataIndex === 'resetPeriod'">
+          <span>{{ resetPeriodOf(text) }}</span>
+        </template>
+        <template v-if="column.dataIndex === 'drawMode'">
+          <span>{{ drawModeOf(text) }}</span>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -121,6 +133,13 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import PrizePoolConfigForm from './prize-pool-config-form.vue';
+  import {
+    POOL_STATUS_OPTIONS,
+    costAssetTypeOf,
+    drawModeOf,
+    poolStatusOf,
+    resetPeriodOf,
+  } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
 
   // ---------------------------- 表格列 ----------------------------
 

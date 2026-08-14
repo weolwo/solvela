@@ -64,6 +64,12 @@
           </template>
           批量删除
         </a-button>
+        <a-button @click="showImportModal" type="primary" size="small">
+          <template #icon>
+            <ImportOutlined />
+          </template>
+          导入
+        </a-button>
       </div>
       <div class="smart-table-setting-block">
         <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.BUSINESS.MARKETING.PHYSICAL_DELIVERY" :refresh="queryData" />
@@ -114,6 +120,48 @@
     </div>
 
     <PhysicalDeliveryForm ref="formRef" @reloadList="queryData" />
+
+    <!---------- 导入弹窗 begin ----------->
+    <a-modal v-model:open="importModalOpen" title="Excel 导入" :footer="null" @cancel="hideImportModal">
+      <!--
+        两种模式语义完全不同，必须让人先选：
+        「回填物流」按 提案ID+来源类型 更新已有履约单，「新增履约单」是凭空建单。
+        选错模式导入，轻则报一堆匹配不上，重则建出一批没有提案的孤儿单。
+      -->
+      <a-radio-group v-model:value="importMode" button-style="solid" style="margin-bottom: 16px">
+        <a-radio-button value="ship">回填物流</a-radio-button>
+        <a-radio-button value="add">新增履约单</a-radio-button>
+      </a-radio-group>
+
+      <a-alert :message="IMPORT_MODE_TIP[importMode]" type="info" show-icon style="margin-bottom: 16px" />
+
+      <div style="text-align: center">
+        <a-button @click="downloadTemplate">
+          <template #icon>
+            <DownloadOutlined />
+          </template>
+          第一步：下载模板
+        </a-button>
+        <br />
+        <br />
+        <a-upload :file-list="fileList" name="file" :multiple="false" accept=".xls,.xlsx" :before-upload="beforeUpload" @remove="onRemoveFile">
+          <a-button>
+            <template #icon>
+              <UploadOutlined />
+            </template>
+            第二步：选择文件
+          </a-button>
+        </a-upload>
+        <br />
+        <a-button type="primary" :disabled="fileList.length === 0" @click="onImport">
+          <template #icon>
+            <ImportOutlined />
+          </template>
+          第三步：开始导入
+        </a-button>
+      </div>
+    </a-modal>
+    <!---------- 导入弹窗 end ----------->
   </a-card>
 </template>
 <script setup>
@@ -344,6 +392,62 @@
       SmartLoading.show();
       await physicalDeliveryApi.batchDelete(selectedRowKeyList.value);
       message.success('删除成功');
+      queryData();
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      SmartLoading.hide();
+    }
+  }
+
+  // ---------------------------- Excel 导入 ----------------------------
+
+  const IMPORT_MODE_TIP = {
+    ship: '按「发奖提案ID + 来源类型」匹配已有履约单，回填物流公司、物流单号与状态。匹配不到的行会报错退回，不会新建单据。',
+    add: '整行新建履约单，等价于批量点「新建」。已存在的单据请改用「回填物流」，否则会撞唯一键报错。',
+  };
+
+  const importModalOpen = ref(false);
+  const importMode = ref('ship');
+  const fileList = ref([]);
+
+  function showImportModal() {
+    fileList.value = [];
+    importMode.value = 'ship';
+    importModalOpen.value = true;
+  }
+
+  function hideImportModal() {
+    importModalOpen.value = false;
+  }
+
+  // 返回 false 拦下 antd 的自动上传，文件留在本地，等点「开始导入」再自己发
+  function beforeUpload(file) {
+    fileList.value = [file];
+    return false;
+  }
+
+  function onRemoveFile() {
+    fileList.value = [];
+  }
+
+  async function downloadTemplate() {
+    if (importMode.value === 'ship') {
+      await physicalDeliveryApi.downloadShipTemplate();
+    } else {
+      await physicalDeliveryApi.downloadAddTemplate();
+    }
+  }
+
+  async function onImport() {
+    const formData = new FormData();
+    formData.append('file', fileList.value[0]);
+
+    SmartLoading.show();
+    try {
+      let res = importMode.value === 'ship' ? await physicalDeliveryApi.importShip(formData) : await physicalDeliveryApi.importAdd(formData);
+      message.success(res.msg);
+      hideImportModal();
       queryData();
     } catch (e) {
       smartSentry.captureError(e);

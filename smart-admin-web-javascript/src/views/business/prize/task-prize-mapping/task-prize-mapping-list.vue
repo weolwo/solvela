@@ -72,6 +72,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'prizeMode'">
+          <a-tag>{{ prizeModeOf(text) }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -110,6 +113,7 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
+  import { prizeModeOf } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
   import TaskPrizeMappingForm from './task-prize-mapping-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
@@ -132,12 +136,12 @@
       ellipsis: true,
     },
     {
-      title: '阶段达标条件：如 {"min": 10, "max": 99} 或 {"action": "share"}',
+      title: '阶段达标条件',
       dataIndex: 'stageCondition',
       ellipsis: true,
     },
     {
-      title: '任务阶段：单次任务填1，阶梯任务填 1, 2, 3...',
+      title: '任务阶段',
       dataIndex: 'stageLevel',
       ellipsis: true,
     },
@@ -147,12 +151,12 @@
       ellipsis: true,
     },
     {
-      title: '计算类型：FIXED(固定), RATIO(比例), FORMULA(公式)',
+      title: '计算类型',
       dataIndex: 'prizeMode',
       ellipsis: true,
     },
     {
-      title: '动态发奖策略JSON：如 {"amount": 20} 或 {"ratio": 0.05}',
+      title: '动态发奖策略',
       dataIndex: 'prizeStrategy',
       ellipsis: true,
     },

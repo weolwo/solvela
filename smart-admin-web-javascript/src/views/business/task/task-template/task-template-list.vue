@@ -19,7 +19,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.templateName" placeholder="模板名称" />
       </a-form-item>
       <a-form-item label="流转类型" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.taskType" placeholder="流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)" />
+        <a-select style="width: 200px" v-model:value="queryForm.taskType" :options="TASK_TYPE_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
@@ -78,6 +78,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'taskType'">
+          <a-tag>{{ taskTypeOf(text) }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -118,6 +121,7 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import TaskTemplateForm from './task-template-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { TASK_TYPE_OPTIONS, taskTypeOf } from '/@/constants/business/task/task-template/task-template-const';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -143,7 +147,7 @@
       ellipsis: true,
     },
     {
-      title: '流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)',
+      title: '流转类型',
       dataIndex: 'taskType',
       ellipsis: true,
     },

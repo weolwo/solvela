@@ -65,6 +65,13 @@ export const PRIZE_STATUS_ENUM = {
 
 export const PRIZE_STATUS_OPTIONS = Object.values(PRIZE_STATUS_ENUM).map((s) => ({ value: s.value, label: s.desc }));
 
+/**
+ * 资产类型取值 -> 中文描述。表格里直接显示 SCORE/PHYSICAL 这种裸取值对运营没有意义。
+ */
+export function prizeTypeOf(value) {
+  return Object.values(PRIZE_TYPE_ENUM).find((i) => i.value === value)?.desc || value || '-';
+}
+
 export function isPrizeEnabled(status) {
   return status === PRIZE_STATUS_ENUM.ENABLED.value;
 }

@@ -28,7 +28,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.poolCode" placeholder="奖池编码" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态: 0-未中奖, 1-已中奖, 2-库存不足, 3-异常" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="DRAW_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -65,6 +65,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="drawStatusOf(text).color">{{ drawStatusOf(text).desc }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="onDelete(record)" danger type="link">删除</a-button>
@@ -100,6 +103,7 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { DRAW_STATUS_OPTIONS, drawStatusOf } from '/@/constants/business/draw/draw-prize-log/draw-prize-log-const';
 
   // ---------------------------- 表格列 ----------------------------
 

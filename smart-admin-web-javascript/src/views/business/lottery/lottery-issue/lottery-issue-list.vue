@@ -19,7 +19,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.issueNo" placeholder="期号" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态: 0-待开奖, 1-售卖中, 2-已开奖" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="ISSUE_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
@@ -78,6 +78,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="issueStatusOf(text).color">{{ issueStatusOf(text).desc }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -117,6 +120,7 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import LotteryIssueForm from './lottery-issue-form.vue';
+  import { ISSUE_STATUS_OPTIONS, issueStatusOf } from '/@/constants/business/lottery/lottery-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
   // ---------------------------- 表格列 ----------------------------
@@ -168,7 +172,7 @@
       ellipsis: true,
     },
     {
-      title: '状态: 0-待开奖, 1-售卖中, 2-已开奖',
+      title: '状态',
       dataIndex: 'status',
       ellipsis: true,
     },

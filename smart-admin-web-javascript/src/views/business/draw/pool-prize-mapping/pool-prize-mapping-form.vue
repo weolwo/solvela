@@ -8,9 +8,6 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
@@ -93,7 +90,6 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户id 必填' }],
     poolCode: [{ required: true, message: '奖池编码 必填' }],
     prizeItemId: [{ required: true, message: '奖项id 必填' }],

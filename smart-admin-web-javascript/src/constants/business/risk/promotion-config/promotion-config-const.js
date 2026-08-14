@@ -1,11 +1,108 @@
 /**
- * 资产域-优惠配置(预算与风控兜底)表 枚举
+ * 风控域-优惠配置表 枚举
+ *
+ * 取值对齐后端 t_promotion_config 的列注释。
  *
  * @Author:    weolwo
- * @Date:      2026-04-03 18:44:52
+ * @Date:      2026-04-03 17:19:16
  * @Copyright  weolwo
  */
 
+/**
+ * 配置状态：对齐 t_promotion_config.status
+ *
+ * PromotionConfigService 只捞 status=1 的配置，停用即等于该预算池不再出账。
+ */
+export const PROMOTION_STATUS_ENUM = {
+  DISABLED: { value: 0, desc: '停用', color: 'default' },
+  ENABLED: { value: 1, desc: '启用', color: 'green' },
+};
+
+export const PROMOTION_STATUS_OPTIONS = Object.values(PROMOTION_STATUS_ENUM).map((i) => ({
+  value: i.value,
+  label: i.desc,
+}));
+
+/**
+ * 资产类型：对齐 t_promotion_config.prize_type，与后端 PrizeTypeEnum 同一字典
+ *
+ * 库存(total_quota)与预算(total_amount)是二选一用的：券/实物看库存，积分/现金看预算，
+ * 不适用的那个填 -1 表示不限制。
+ */
+export const PRIZE_TYPE_ENUM = {
+  SCORE: { value: 'SCORE', desc: '积分', color: 'blue' },
+  BALANCE: { value: 'BALANCE', desc: '现金', color: 'green' },
+  COUPON: { value: 'COUPON', desc: '优惠券', color: 'orange' },
+  PHYSICAL: { value: 'PHYSICAL', desc: '实物', color: 'purple' },
+};
+
+export const PRIZE_TYPE_OPTIONS = Object.values(PRIZE_TYPE_ENUM).map((i) => ({
+  value: i.value,
+  label: i.desc,
+}));
+
+/**
+ * 审核层级：对齐 t_promotion_config.review_level
+ *
+ * 决定提案走几道审批，与 t_proposal_record.status 的 10/11 两档直接对应，见 [[proposal-record-const]]。
+ */
+export const REVIEW_LEVEL_ENUM = {
+  NONE: { value: 0, desc: '无需审核', color: 'default' },
+  SINGLE: { value: 1, desc: '单层审批', color: 'blue' },
+  DOUBLE: { value: 2, desc: '双层审批', color: 'orange' },
+};
+
+export const REVIEW_LEVEL_OPTIONS = Object.values(REVIEW_LEVEL_ENUM).map((i) => ({
+  value: i.value,
+  label: i.desc,
+}));
+
+/**
+ * 限制周期：对齐 t_promotion_config.limit_period
+ *
+ * 下面那一组 xxx_limit（会员/手机号/IP/设备/指纹）都是"同一个周期内"的次数上限，
+ * 周期换了，计数就重新开始。
+ */
+export const LIMIT_PERIOD_ENUM = {
+  LIFETIME: { value: 'LIFETIME', desc: '终身', color: 'default' },
+  DAILY: { value: 'DAILY', desc: '每日', color: 'blue' },
+  WEEKLY: { value: 'WEEKLY', desc: '每周', color: 'cyan' },
+  MONTHLY: { value: 'MONTHLY', desc: '每月', color: 'purple' },
+  CUSTOM: { value: 'CUSTOM', desc: '自定义', color: 'gold' },
+};
+
+export const LIMIT_PERIOD_OPTIONS = Object.values(LIMIT_PERIOD_ENUM).map((i) => ({
+  value: i.value,
+  label: i.desc,
+}));
+
+export function promotionStatusOf(value) {
+  return Object.values(PROMOTION_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
+}
+
+export function prizeTypeOf(value) {
+  return Object.values(PRIZE_TYPE_ENUM).find((i) => i.value === value) || { desc: value || '-', color: 'default' };
+}
+
+export function reviewLevelOf(value) {
+  return Object.values(REVIEW_LEVEL_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
+}
+
+export function limitPeriodOf(value) {
+  return Object.values(LIMIT_PERIOD_ENUM).find((i) => i.value === value) || { desc: value || '-', color: 'default' };
+}
 
 export default {
+  PROMOTION_STATUS_ENUM,
+  PROMOTION_STATUS_OPTIONS,
+  PRIZE_TYPE_ENUM,
+  PRIZE_TYPE_OPTIONS,
+  REVIEW_LEVEL_ENUM,
+  REVIEW_LEVEL_OPTIONS,
+  LIMIT_PERIOD_ENUM,
+  LIMIT_PERIOD_OPTIONS,
+  promotionStatusOf,
+  prizeTypeOf,
+  reviewLevelOf,
+  limitPeriodOf,
 };

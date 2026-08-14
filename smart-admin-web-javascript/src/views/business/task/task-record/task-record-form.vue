@@ -8,9 +8,6 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="会员名" name="memberName">
         <a-input style="width: 100%" v-model:value="form.memberName" placeholder="会员名" />
       </a-form-item>
@@ -20,8 +17,8 @@
       <a-form-item label="活动编码" name="activityCode">
         <a-input style="width: 100%" v-model:value="form.activityCode" placeholder="活动编码" />
       </a-form-item>
-      <a-form-item label="业务期数标识(防重用)：NONE, 日期(20260402)" name="periodKey">
-        <a-input style="width: 100%" v-model:value="form.periodKey" placeholder="业务期数标识(防重用)：NONE, 日期(20260402)" />
+      <a-form-item label="业务期数标识" name="periodKey">
+        <a-input style="width: 100%" v-model:value="form.periodKey" placeholder="防重用：NONE 或日期(如 20260402)" />
       </a-form-item>
       <a-form-item label="开始时间" name="validStartTime">
         <a-date-picker :show-time="DAY_START_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validStartTime" style="width: 100%" placeholder="开始时间" />
@@ -29,11 +26,11 @@
       <a-form-item label="过期时间" name="validEndTime">
         <a-date-picker :show-time="DAY_END_SHOW_TIME" valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.validEndTime" style="width: 100%" placeholder="过期时间" />
       </a-form-item>
-      <a-form-item label="当前进度值：如已签到 3.0000 天" name="currentMetric">
-        <a-input-number style="width: 100%" v-model:value="form.currentMetric" placeholder="当前进度值：如已签到 3.0000 天" />
+      <a-form-item label="当前进度值" name="currentMetric">
+        <a-input-number style="width: 100%" v-model:value="form.currentMetric" placeholder="如已签到 3 天" />
       </a-form-item>
-      <a-form-item label="状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期" name="status">
-        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期" />
+      <a-form-item label="状态" name="status">
+        <a-select style="width: 100%" v-model:value="form.status" :options="RECORD_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
       </a-form-item>
       <a-form-item label="达标时间" name="completeTime">
         <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.completeTime" style="width: 100%" placeholder="达标时间" />
@@ -56,6 +53,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { taskRecordApi } from '/@/api/business/task/task-record/task-record-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import { RECORD_STATUS_OPTIONS } from '/@/constants/business/task/task-record/task-record-const';
   import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
 
   // ------------------------ 事件 ------------------------
@@ -110,14 +108,13 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: 'id 必填' }],
     memberName: [{ required: true, message: '会员名 必填' }],
     taskConfigId: [{ required: true, message: '任务配置ID 必填' }],
     activityCode: [{ required: true, message: '活动编码 必填' }],
-    periodKey: [{ required: true, message: '业务期数标识(防重用)：NONE, 日期(20260402) 必填' }],
+    periodKey: [{ required: true, message: '业务期数标识 必填' }],
     validStartTime: [{ required: true, message: '开始时间 必填' }],
     validEndTime: [{ required: true, message: '过期时间 必填' }],
-    currentMetric: [{ required: true, message: '当前进度值：如已签到 3.0000 天 必填' }],
+    currentMetric: [{ required: true, message: '当前进度值 必填' }],
   };
 
   // 点击确定，验证表单

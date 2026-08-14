@@ -16,11 +16,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.promoName" placeholder="优惠配置名称" />
       </a-form-item>
       <a-form-item label="资产类型" class="smart-query-form-item">
-        <a-input
-          style="width: 200px"
-          v-model:value="queryForm.prizeType"
-          placeholder="资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)"
-        />
+        <a-select style="width: 200px" v-model:value="queryForm.prizeType" :options="PRIZE_TYPE_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
@@ -35,7 +31,7 @@
         <a-input style="width: 200px" v-model:value="queryForm.ipLimit" placeholder="同周期内，单IP地址最多领取次数 (-1为不限)" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.status" placeholder="状态：0-停用, 1-启用" />
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="PROMOTION_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -91,6 +87,15 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="promotionStatusOf(text).color">{{ promotionStatusOf(text).desc }}</a-tag>
+        </template>
+        <template v-if="column.dataIndex === 'prizeType'">
+          <a-tag :color="prizeTypeOf(text).color">{{ prizeTypeOf(text).desc }}</a-tag>
+        </template>
+        <template v-if="column.dataIndex === 'limitPeriod'">
+          <span>{{ limitPeriodOf(text).desc }}</span>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -131,6 +136,13 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import PromotionConfigForm from './promotion-config-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import {
+    PRIZE_TYPE_OPTIONS,
+    PROMOTION_STATUS_OPTIONS,
+    limitPeriodOf,
+    prizeTypeOf,
+    promotionStatusOf,
+  } from '/@/constants/business/risk/promotion-config/promotion-config-const';
 
   // ---------------------------- 表格列 ----------------------------
 

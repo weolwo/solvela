@@ -8,9 +8,6 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
@@ -21,7 +18,7 @@
         <a-input-number style="width: 100%" v-model:value="form.prizeLevel" placeholder="奖品奖级" />
       </a-form-item>
       <a-form-item label="匹配规则" name="matchRule">
-        <a-input style="width: 100%" v-model:value="form.matchRule" placeholder="匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配" />
+        <a-select style="width: 100%" v-model:value="form.matchRule" :options="MATCH_RULE_OPTIONS" placeholder="请选择匹配规则" allowClear />
       </a-form-item>
       <a-form-item label="匹配长度" name="matchLength">
         <a-input-number style="width: 100%" v-model:value="form.matchLength" placeholder="匹配长度" />
@@ -46,6 +43,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { lotteryPrizeRuleApi } from '/@/api/business/lottery/lottery-prize-rule/lottery-prize-rule-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import { MATCH_RULE_OPTIONS } from '/@/constants/business/lottery/lottery-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -93,7 +91,6 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户id 必填' }],
     lotteryCode: [{ required: true, message: '彩票编码 必填' }],
     prizeLevel: [{ required: true, message: '奖品奖级 必填' }],

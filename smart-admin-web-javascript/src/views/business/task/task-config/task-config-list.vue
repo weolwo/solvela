@@ -24,12 +24,21 @@
       <a-form-item label="开始时间" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.startTime" placeholder="开始时间" />
       </a-form-item>
+      <!-- 触发事件是开放集合，选项来自服务端注册表 t_task_event，不写死在前端 -->
       <a-form-item label="触发事件" class="smart-query-form-item">
-        <a-input
+        <a-select
           style="width: 200px"
           v-model:value="queryForm.triggerEvent"
-          placeholder="触发事件：ORDERPAID(支付), MEMBERREGISTER(注册), DAILYSIGN(签到), PAGEVIEW(浏览), CUSTOM(自定义)"
+          :options="eventOptions"
+          :loading="eventLoading"
+          placeholder="全部"
+          allowClear
+          show-search
+          option-filter-prop="label"
         />
+      </a-form-item>
+      <a-form-item label="任务状态" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="CONFIG_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -85,6 +94,18 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="configStatusOf(text).color">{{ configStatusOf(text).desc }}</a-tag>
+        </template>
+        <template v-if="column.dataIndex === 'taskGroup'">
+          <span>{{ taskGroupOf(text) }}</span>
+        </template>
+        <template v-if="column.dataIndex === 'targetAudience'">
+          <span>{{ targetAudienceOf(text) }}</span>
+        </template>
+        <template v-if="column.dataIndex === 'limitType'">
+          <span>{{ limitTypeOf(text) }}</span>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -125,6 +146,15 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import TaskConfigForm from './task-config-form.vue';
+  import { taskApi } from '/@/api/business/task/task-api';
+  import { toEventOptions } from '../task-wizard/task-wizard-const';
+  import {
+    CONFIG_STATUS_OPTIONS,
+    configStatusOf,
+    limitTypeOf,
+    targetAudienceOf,
+    taskGroupOf,
+  } from '/@/constants/business/task/task-config/task-config-const';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -155,27 +185,27 @@
       ellipsis: true,
     },
     {
-      title: '触发事件：ORDER_PAID(支付), MEMBER_REGISTER(注册), DAILY_SIGN(签到), PAGE_VIEW(浏览), CUSTOM(自定义)',
+      title: '触发事件',
       dataIndex: 'triggerEvent',
       ellipsis: true,
     },
     {
-      title: '任务分组：NEWBIE(新手), DAILY(日常), PROMO(大促), VIP(会员专属)',
+      title: '任务分组',
       dataIndex: 'taskGroup',
       ellipsis: true,
     },
     {
-      title: '目标人群：ALL(全部), NEW_MEMBER(新会员), OLD_MEMBER(老会员)',
+      title: '目标人群',
       dataIndex: 'targetAudience',
       ellipsis: true,
     },
     {
-      title: '参与频次：ONCE(终身一次), DAILY(每日重复), WEEKLY(每周重复), UNLIMITED(无限制)',
+      title: '参与频次',
       dataIndex: 'limitType',
       ellipsis: true,
     },
     {
-      title: '配合频次类型，限制次数',
+      title: '限制次数',
       dataIndex: 'limitCount',
       ellipsis: true,
     },
@@ -185,7 +215,7 @@
       ellipsis: true,
     },
     {
-      title: '排序权重，越大越靠前',
+      title: '排序权重',
       dataIndex: 'sortWeight',
       ellipsis: true,
     },
@@ -195,12 +225,12 @@
       ellipsis: true,
     },
     {
-      title: '展示UI(图标/角标等)',
+      title: '展示UI',
       dataIndex: 'uiConfig',
       ellipsis: true,
     },
     {
-      title: '任务状态 1-待生效, 2-生效中, 3-已下线',
+      title: '任务状态',
       dataIndex: 'status',
       ellipsis: true,
     },
@@ -250,7 +280,8 @@
     templateCode: undefined, //模板Code
     activityCode: undefined, //活动编码
     startTime: undefined, //开始时间
-    triggerEvent: undefined, //触发事件：ORDERPAID(支付), MEMBERREGISTER(注册), DAILYSIGN(签到), PAGEVIEW(浏览), CUSTOM(自定义)
+    triggerEvent: undefined, //触发事件：取值来自注册表 t_task_event
+    status: undefined, //任务状态：1-待生效, 2-生效中, 3-已下线
     pageNum: 1,
     pageSize: 10,
   };
@@ -292,6 +323,23 @@
     }
   }
 
+  // ---------------------------- 触发事件下拉（服务端注册表） ----------------------------
+
+  const eventOptions = ref([]);
+  const eventLoading = ref(false);
+
+  async function loadEventOptions() {
+    eventLoading.value = true;
+    try {
+      const res = await taskApi.queryEventOptionList();
+      eventOptions.value = toEventOptions(res.data);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      eventLoading.value = false;
+    }
+  }
+
   // 支持从任务配置向导成功页跳转而来：按 query 回填查询条件，直接定位刚创建的任务
   onMounted(() => {
     const { taskName, activityCode } = route.query;
@@ -301,6 +349,7 @@
     if (activityCode) {
       queryForm.activityCode = activityCode;
     }
+    loadEventOptions();
     queryData();
   });
 

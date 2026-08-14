@@ -24,30 +24,23 @@
       <a-form-item label="优惠配置ID" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.promotionConfigId" placeholder="优惠配置ID" />
       </a-form-item>
-      <a-form-item
-        label="状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截"
-        class="smart-query-form-item"
-      >
-        <a-input
-          style="width: 200px"
-          v-model:value="queryForm.status"
-          placeholder="状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截"
-        />
+      <a-form-item label="状态" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.status" :options="PROPOSAL_STATUS_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
-      <a-form-item label="来源：TASK(任务), DRAW(抽奖), MANUAL(人工)" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.sourceType" placeholder="来源：TASK(任务), DRAW(抽奖), MANUAL(人工)" />
+      <a-form-item label="来源" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.sourceType" :options="PROPOSAL_SOURCE_TYPE_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
-      <a-form-item label="来源单号(taskRecordId 或 drawLogTraceId)" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.sourceBizId" placeholder="来源单号(taskRecordId 或 drawLogTraceId)" />
+      <a-form-item label="来源单号" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.sourceBizId" placeholder="来源单号" />
       </a-form-item>
       <a-form-item label="一审人" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.firstReviewer" placeholder="一审人" />
       </a-form-item>
-      <a-form-item label="提案单号，服务端生成，对外唯一标识" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tradeNo" placeholder="提案单号，服务端生成，对外唯一标识" />
+      <a-form-item label="提案单号" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.tradeNo" placeholder="提案单号" />
       </a-form-item>
-      <a-form-item label="SCORE/BALANCE/COUPON/PHYSICAL" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.assetType" placeholder="SCORE/BALANCE/COUPON/PHYSICAL" />
+      <a-form-item label="资产类型" class="smart-query-form-item">
+        <a-select style="width: 200px" v-model:value="queryForm.assetType" :options="ASSET_TYPE_OPTIONS" placeholder="全部" allowClear />
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -103,6 +96,15 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'status'">
+          <a-tag :color="proposalStatusOf(text).color">{{ proposalStatusOf(text).desc }}</a-tag>
+        </template>
+        <template v-if="column.dataIndex === 'sourceType'">
+          <a-tag :color="proposalSourceTypeOf(text).color">{{ proposalSourceTypeOf(text).desc }}</a-tag>
+        </template>
+        <template v-if="column.dataIndex === 'assetType'">
+          <a-tag :color="assetTypeOf(text).color">{{ assetTypeOf(text).desc }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -143,6 +145,14 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import ProposalRecordForm from './proposal-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import {
+    ASSET_TYPE_OPTIONS,
+    PROPOSAL_SOURCE_TYPE_OPTIONS,
+    PROPOSAL_STATUS_OPTIONS,
+    assetTypeOf,
+    proposalSourceTypeOf,
+    proposalStatusOf,
+  } from '/@/constants/business/risk/proposal-record/proposal-record-const';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -158,7 +168,7 @@
       ellipsis: true,
     },
     {
-      title: '提案单号，服务端生成，对外唯一标识',
+      title: '提案单号',
       dataIndex: 'tradeNo',
       ellipsis: true,
     },
@@ -168,12 +178,12 @@
       ellipsis: true,
     },
     {
-      title: 'SCORE/BALANCE/COUPON/PHYSICAL',
+      title: '资产类型',
       dataIndex: 'assetType',
       ellipsis: true,
     },
     {
-      title: '资产引用：券模/SKU，值类资产为空',
+      title: '资产引用',
       dataIndex: 'assetRef',
       ellipsis: true,
     },
@@ -183,17 +193,17 @@
       ellipsis: true,
     },
     {
-      title: '发放数量，扣 used_quota 用',
+      title: '发放数量',
       dataIndex: 'quantity',
       ellipsis: true,
     },
     {
-      title: '来源：TASK(任务), DRAW(抽奖), MANUAL(人工)',
+      title: '来源',
       dataIndex: 'sourceType',
       ellipsis: true,
     },
     {
-      title: '来源单号(task_record_id 或 draw_log_trace_id)',
+      title: '来源单号',
       dataIndex: 'sourceBizId',
       ellipsis: true,
     },
@@ -203,12 +213,12 @@
       ellipsis: true,
     },
     {
-      title: '状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截',
+      title: '状态',
       dataIndex: 'status',
       ellipsis: true,
     },
     {
-      title: '执行失败/风控拦截原因',
+      title: '备注',
       dataIndex: 'remark',
       ellipsis: true,
     },

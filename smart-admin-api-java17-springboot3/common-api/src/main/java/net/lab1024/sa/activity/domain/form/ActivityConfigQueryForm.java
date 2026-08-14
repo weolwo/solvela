@@ -33,4 +33,10 @@ public class ActivityConfigQueryForm extends PageParam {
     @Schema(description = "创建时间")
     private LocalDate createTimeEnd;
 
+    @Schema(description = "活动类型：BASIC / DRAW / TASK / LOTTERY")
+    private String activityType;
+
+    @Schema(description = "状态：0-未开始, 1-上线, 2-下线")
+    private Integer status;
+
 }

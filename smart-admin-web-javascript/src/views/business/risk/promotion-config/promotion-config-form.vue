@@ -8,18 +8,11 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="配置ID" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="配置ID" />
-      </a-form-item>
       <a-form-item label="优惠配置名称" name="promoName">
         <a-input style="width: 100%" v-model:value="form.promoName" placeholder="优惠配置名称" />
       </a-form-item>
       <a-form-item label="资产类型" name="prizeType">
-        <a-input
-          style="width: 100%"
-          v-model:value="form.prizeType"
-          placeholder="资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)"
-        />
+        <a-select style="width: 100%" v-model:value="form.prizeType" :options="PRIZE_TYPE_OPTIONS" placeholder="请选择资产类型" allowClear />
       </a-form-item>
       <a-form-item label="总库存" name="totalQuota">
         <a-input-number style="width: 100%" v-model:value="form.totalQuota" placeholder="总库存(个数)：-1为不限制(适用于券/实物)" />
@@ -34,7 +27,7 @@
         <a-input-number style="width: 100%" v-model:value="form.usedAmount" placeholder="已消耗预算(金额)" />
       </a-form-item>
       <a-form-item label="审核层级控制" name="reviewLevel">
-        <a-input-number style="width: 100%" v-model:value="form.reviewLevel" placeholder="审核层级控制：0-无需审核, 1-单层审批, 2-双层审批" />
+        <a-select style="width: 100%" v-model:value="form.reviewLevel" :options="REVIEW_LEVEL_OPTIONS" placeholder="请选择审核层级" allowClear />
       </a-form-item>
       <a-form-item label="一审触发阈值" name="firstReviewThreshold">
         <a-input-number
@@ -57,11 +50,7 @@
         <a-input-number style="width: 100%" v-model:value="form.singleMaxAmount" placeholder="单次最大金额兜底，超限阻断" />
       </a-form-item>
       <a-form-item label="限制周期" name="limitPeriod">
-        <a-input
-          style="width: 100%"
-          v-model:value="form.limitPeriod"
-          placeholder="限制周期：LIFETIME(终身), DAILY(每日), WEEKLY(每周), MONTHLY(每月), CUSTOM"
-        />
+        <a-select style="width: 100%" v-model:value="form.limitPeriod" :options="LIMIT_PERIOD_OPTIONS" placeholder="请选择限制周期" allowClear />
       </a-form-item>
       <a-form-item label="ID限制" name="identifyLimit">
         <a-input-number style="width: 100%" v-model:value="form.identifyLimit" placeholder="同周期内，单会员ID最多领取次数 (-1为不限)" />
@@ -79,7 +68,7 @@
         <a-input-number style="width: 100%" v-model:value="form.fingerprintLimit" placeholder="同周期内，单客户端指纹最多领取次数 (-1为不限)" />
       </a-form-item>
       <a-form-item label="状态" name="status">
-        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态：0-停用, 1-启用" />
+        <a-select style="width: 100%" v-model:value="form.status" :options="PROMOTION_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
       </a-form-item>
     </a-form>
 
@@ -98,7 +87,12 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
+  import {
+    LIMIT_PERIOD_OPTIONS,
+    PRIZE_TYPE_OPTIONS,
+    PROMOTION_STATUS_OPTIONS,
+    REVIEW_LEVEL_OPTIONS,
+  } from '/@/constants/business/risk/promotion-config/promotion-config-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -113,10 +107,6 @@
     if (rowData && !_.isEmpty(rowData)) {
       Object.assign(form, rowData);
     }
-    // 使用字典时把下面这注释修改成自己的字典字段 有多个字典字段就复制多份同理修改 不然打开表单时不显示字典初始值
-    // if (form.status && form.status.length > 0) {
-    //   form.status = form.status.map((e) => e.valueCode);
-    // }
     visibleFlag.value = true;
     nextTick(() => {
       formRef.value.clearValidate();
@@ -159,19 +149,18 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: '配置ID 必填' }],
     promoName: [{ required: true, message: '优惠配置名称 必填' }],
-    prizeType: [{ required: true, message: '资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物) 必填' }],
-    totalQuota: [{ required: true, message: '总库存(个数)：-1为不限制(适用于券/实物) 必填' }],
-    usedQuota: [{ required: true, message: '已消耗库存(个数) 必填' }],
-    totalAmount: [{ required: true, message: '总预算(金额)：-1为不限制(适用于积分/现金) 必填' }],
-    usedAmount: [{ required: true, message: '已消耗预算(金额) 必填' }],
-    reviewLevel: [{ required: true, message: '审核层级控制：0-无需审核, 1-单层审批, 2-双层审批 必填' }],
-    firstReviewThreshold: [{ required: true, message: '一审触发阈值：动账金额 >= 此值必须一审(值为0代表笔笔一审) 必填' }],
-    secondReviewThreshold: [{ required: true, message: '二审触发阈值：动账金额 >= 此值必须二审(前提 review_level=2) 必填' }],
-    singleMaxQuota: [{ required: true, message: '单次最大数量兜底，超限阻断 必填' }],
-    singleMaxAmount: [{ required: true, message: '单次最大金额兜底，超限阻断 必填' }],
-    limitPeriod: [{ required: true, message: '限制周期：LIFETIME(终身), DAILY(每日), WEEKLY(每周), MONTHLY(每月), CUSTOM 必填' }],
+    prizeType: [{ required: true, message: '资产类型 必填' }],
+    totalQuota: [{ required: true, message: '总库存 必填' }],
+    usedQuota: [{ required: true, message: '已消耗库存 必填' }],
+    totalAmount: [{ required: true, message: '总预算 必填' }],
+    usedAmount: [{ required: true, message: '已消耗预算 必填' }],
+    reviewLevel: [{ required: true, message: '审核层级控制 必填' }],
+    firstReviewThreshold: [{ required: true, message: '一审触发阈值 必填' }],
+    secondReviewThreshold: [{ required: true, message: '二审触发阈值 必填' }],
+    singleMaxQuota: [{ required: true, message: '单次最大数量 必填' }],
+    singleMaxAmount: [{ required: true, message: '单次最大金额 必填' }],
+    limitPeriod: [{ required: true, message: '限制周期 必填' }],
   };
 
   // 点击确定，验证表单

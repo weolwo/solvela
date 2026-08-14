@@ -1,9 +1,23 @@
 /**
  * 任务配置向导 常量与枚举（消除魔法值的唯一出处）
  *
+ * 其中「描述数据库列取值」的那几本字典（任务类型/分组/频次/人群）已收到 constants 目录，
+ * 本文件转出即可 —— 它们不是向导独有的，列表页与表单页配的是同一批列。
+ *
  * @Author:    alaric
  * @Date:      2026-07-19
  */
+
+import { TASK_TYPE_ENUM, TASK_TYPE_OPTIONS } from '/@/constants/business/task/task-template/task-template-const';
+import { PRIZE_MODE_ENUM, PRIZE_MODE_OPTIONS } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
+import {
+  TASK_GROUP_ENUM,
+  TASK_GROUP_OPTIONS,
+  LIMIT_TYPE_ENUM,
+  LIMIT_TYPE_OPTIONS,
+  TARGET_AUDIENCE_ENUM,
+  TARGET_AUDIENCE_OPTIONS,
+} from '/@/constants/business/task/task-config/task-config-const';
 
 // ---------------------------- 页面路由（与菜单配置的「路由地址」保持一致） ----------------------------
 
@@ -41,17 +55,10 @@ export const WIDGET_TYPE = {
 
 // ---------------------------- 任务类型 ----------------------------
 
-export const TASK_TYPE_ENUM = {
-  SIMPLE: 'SIMPLE',
-  COUNT: 'COUNT',
-  AMOUNT: 'AMOUNT',
-};
-
-export const TASK_TYPE_OPTIONS = [
-  { value: TASK_TYPE_ENUM.SIMPLE, label: 'SIMPLE 单次节点型' },
-  { value: TASK_TYPE_ENUM.COUNT, label: 'COUNT 计次型' },
-  { value: TASK_TYPE_ENUM.AMOUNT, label: 'AMOUNT 计额型' },
-];
+// 向导与「任务模板设计」配的是同一张 t_task_template，字典抄两份迟早会漂 —— 从常量目录转出。
+// 用 import + export 而不是 `export ... from`：本文件下方的默认值要用到这些绑定，
+// 而 `export ... from` 只做转发、不会在本模块作用域里建立绑定。
+export { TASK_TYPE_ENUM, TASK_TYPE_OPTIONS };
 
 // ---------------------------- 触发事件 ----------------------------
 
@@ -80,67 +87,17 @@ export function toEventOptions(list) {
   }));
 }
 
-// ---------------------------- 任务分组 ----------------------------
+// ---------------------------- 任务分组 / 参与频次 / 目标人群 ----------------------------
 
-export const TASK_GROUP_ENUM = {
-  NEWBIE: 'NEWBIE',
-  DAILY: 'DAILY',
-  PROMO: 'PROMO',
-  VIP: 'VIP',
-};
-
-export const TASK_GROUP_OPTIONS = [
-  { value: TASK_GROUP_ENUM.NEWBIE, label: '新手' },
-  { value: TASK_GROUP_ENUM.DAILY, label: '日常' },
-  { value: TASK_GROUP_ENUM.PROMO, label: '大促' },
-  { value: TASK_GROUP_ENUM.VIP, label: '会员专属' },
-];
-
-// ---------------------------- 参与频次 ----------------------------
-
-export const LIMIT_TYPE_ENUM = {
-  ONCE: 'ONCE',
-  DAILY: 'DAILY',
-  WEEKLY: 'WEEKLY',
-  UNLIMITED: 'UNLIMITED',
-};
-
-export const LIMIT_TYPE_OPTIONS = [
-  { value: LIMIT_TYPE_ENUM.ONCE, label: '终身一次' },
-  { value: LIMIT_TYPE_ENUM.DAILY, label: '每日重复' },
-  { value: LIMIT_TYPE_ENUM.WEEKLY, label: '每周重复' },
-  { value: LIMIT_TYPE_ENUM.UNLIMITED, label: '无限制' },
-];
+// 同上：这三本字典描述的是 t_task_config 的列，向导和列表页共用，唯一出处放在常量目录
+export { TASK_GROUP_ENUM, TASK_GROUP_OPTIONS, LIMIT_TYPE_ENUM, LIMIT_TYPE_OPTIONS, TARGET_AUDIENCE_ENUM, TARGET_AUDIENCE_OPTIONS };
 
 export const DEFAULT_LIMIT_COUNT = 1;
 
-// ---------------------------- 目标人群 ----------------------------
-
-export const TARGET_AUDIENCE_ENUM = {
-  ALL: 'ALL',
-  NEW_MEMBER: 'NEW_MEMBER',
-  OLD_MEMBER: 'OLD_MEMBER',
-};
-
-export const TARGET_AUDIENCE_OPTIONS = [
-  { value: TARGET_AUDIENCE_ENUM.ALL, label: '全部会员' },
-  { value: TARGET_AUDIENCE_ENUM.NEW_MEMBER, label: '新会员' },
-  { value: TARGET_AUDIENCE_ENUM.OLD_MEMBER, label: '老会员' },
-];
-
 // ---------------------------- 奖励阶梯 ----------------------------
 
-export const PRIZE_MODE_ENUM = {
-  FIXED: 'FIXED',
-  RATIO: 'RATIO',
-  FORMULA: 'FORMULA',
-};
-
-export const PRIZE_MODE_OPTIONS = [
-  { value: PRIZE_MODE_ENUM.FIXED, label: '固定 FIXED' },
-  { value: PRIZE_MODE_ENUM.RATIO, label: '比例 RATIO' },
-  { value: PRIZE_MODE_ENUM.FORMULA, label: '公式 FORMULA' },
-];
+// 同上：向导的奖励阶梯写的就是 t_task_prize_mapping，字典唯一出处放在常量目录
+export { PRIZE_MODE_ENUM, PRIZE_MODE_OPTIONS };
 
 // 奖品编码（实际应由 t_prize_config 接口下发）
 export const PRIZE_CODE_OPTIONS = [

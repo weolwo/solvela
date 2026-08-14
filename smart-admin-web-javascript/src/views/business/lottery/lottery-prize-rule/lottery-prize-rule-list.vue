@@ -72,6 +72,9 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'matchRule'">
+          <a-tag>{{ matchRuleOf(text) }}</a-tag>
+        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -111,6 +114,7 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import LotteryPrizeRuleForm from './lottery-prize-rule-form.vue';
+  import { matchRuleOf } from '/@/constants/business/lottery/lottery-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
   // ---------------------------- 表格列 ----------------------------
@@ -137,7 +141,7 @@
       ellipsis: true,
     },
     {
-      title: '匹配规则,EXACT:全号, TAIL:尾号匹配, HEAD:首号匹配',
+      title: '匹配规则',
       dataIndex: 'matchRule',
       ellipsis: true,
     },

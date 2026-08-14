@@ -82,7 +82,7 @@
     >
       <template #bodyCell="{ text, record, column }">
         <template v-if="column.dataIndex === 'status'">
-          <a-tag :color="RECORD_STATUS_COLOR[text] || 'default'">{{ RECORD_STATUS_LABEL[text] || text }}</a-tag>
+          <a-tag :color="recordStatusOf(text).color">{{ recordStatusOf(text).desc }}</a-tag>
         </template>
 
         <template v-if="column.dataIndex === 'action'">
@@ -163,21 +163,10 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
+  import { RECORD_STATUS_OPTIONS, recordStatusOf } from '/@/constants/business/task/task-record/task-record-const';
   import TaskRecordForm from './task-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import { taskEventApi } from '/@/api/business/task/task-event/task-event-api';
-
-  // ---------------------------- 任务记录状态（对齐 t_task_record.status） ----------------------------
-  // ⚠️ 阶梯任务下「第1档已发、第2档进行中」仍是 0-进行中：status 只表示最高档是否达标，
-  //    低档的发放情况记在 progress_data.dispatchedStages（展示用，非判据）
-  const RECORD_STATUS_LABEL = { 0: '进行中', 1: '已完成', 2: '已发奖', 3: '已过期' };
-  const RECORD_STATUS_COLOR = { 0: 'processing', 1: 'blue', 2: 'green', 3: 'default' };
-  const RECORD_STATUS_OPTIONS = [
-    { value: 0, label: '进行中' },
-    { value: 1, label: '已完成' },
-    { value: 2, label: '已发奖' },
-    { value: 3, label: '已过期' },
-  ];
 
   // ---------------------------- 表格列 ----------------------------
 

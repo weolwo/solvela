@@ -1,9 +1,13 @@
 package net.lab1024.sa.ledger.logistic.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import net.lab1024.sa.base.common.domain.ValidateList;
+import net.lab1024.sa.base.common.util.SmartExcelUtil;
 import net.lab1024.sa.ledger.logistic.domain.entity.PhysicalDelivery;
 import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
+import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
 import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
+import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
 import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
 import net.lab1024.sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
 import net.lab1024.sa.ledger.logistic.service.PhysicalDeliveryService;
@@ -12,11 +16,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.io.IOException;
+import java.util.Collections;
 /**
  * 发货物流表 Controller
  *
@@ -65,5 +73,39 @@ public class PhysicalDeliveryController {
     @SaCheckPermission("physicalDelivery:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
         return Service.delete(id);
+    }
+
+    // ------------------------------------------------------------------ Excel 导入
+
+    @Operation(summary = "导入模板下载：新增履约单")
+    @GetMapping("/importAddTemplate")
+    @SaCheckPermission("physicalDelivery:import")
+    public void importAddTemplate(HttpServletResponse response) throws IOException {
+        // 空数据 = 只有表头（带下拉）的模板；表头由 Form 上的 @SonicTitle 单一来源生成，
+        // 不会出现"字段改了模板没改"的漂移
+        SmartExcelUtil.exportExcel(response, "发货物流-新增模板.xlsx", "新增履约单",
+                PhysicalDeliveryImportForm.class, Collections.emptyList());
+    }
+
+    @Operation(summary = "导入模板下载：回填物流")
+    @GetMapping("/importShipTemplate")
+    @SaCheckPermission("physicalDelivery:import")
+    public void importShipTemplate(HttpServletResponse response) throws IOException {
+        SmartExcelUtil.exportExcel(response, "发货物流-回填模板.xlsx", "回填物流",
+                PhysicalDeliveryShipImportForm.class, Collections.emptyList());
+    }
+
+    @Operation(summary = "导入：新增履约单")
+    @PostMapping("/importAdd")
+    @SaCheckPermission("physicalDelivery:import")
+    public ResponseDTO<String> importAdd(@RequestParam MultipartFile file) {
+        return Service.importAdd(file);
+    }
+
+    @Operation(summary = "导入：回填物流")
+    @PostMapping("/importShip")
+    @SaCheckPermission("physicalDelivery:import")
+    public ResponseDTO<String> importShip(@RequestParam MultipartFile file) {
+        return Service.importShip(file);
     }
 }

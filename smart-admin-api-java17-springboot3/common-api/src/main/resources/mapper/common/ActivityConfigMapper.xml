@@ -51,6 +51,12 @@
                         <if test="queryForm.createTimeEnd != null">
                             AND create_time &lt;= #{queryForm.createTimeEnd}
                         </if>
+                        <if test="queryForm.activityType != null">
+                            AND activity_type = #{queryForm.activityType}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
         </where>
     </sql>
 

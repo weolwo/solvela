@@ -8,9 +8,6 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户ID" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户ID" />
       </a-form-item>
@@ -21,7 +18,7 @@
         <a-input style="width: 100%" v-model:value="form.templateName" placeholder="模板名称" />
       </a-form-item>
       <a-form-item label="流转类型" name="taskType">
-        <a-input style="width: 100%" v-model:value="form.taskType" placeholder="流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)" />
+        <a-select style="width: 100%" v-model:value="form.taskType" :options="TASK_TYPE_OPTIONS" placeholder="请选择流转类型" allowClear />
       </a-form-item>
       <a-form-item label="QLExpress脚本" name="ruleScript">
         <a-textarea style="width: 100%" v-model:value="form.ruleScript" placeholder="QLExpress脚本" />
@@ -43,6 +40,7 @@
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { taskTemplateApi } from '/@/api/business/task/task-template/task-template-api';
   import { smartSentry } from '/@/lib/smart-sentry';
+  import { TASK_TYPE_OPTIONS } from '/@/constants/business/task/task-template/task-template-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -90,11 +88,10 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    id: [{ required: true, message: 'id 必填' }],
     tenantId: [{ required: true, message: '租户ID 必填' }],
     templateCode: [{ required: true, message: '模板编码 必填' }],
     templateName: [{ required: true, message: '模板名称 必填' }],
-    taskType: [{ required: true, message: '流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型) 必填' }],
+    taskType: [{ required: true, message: '流转类型 必填' }],
     uiSchema: [{ required: true, message: '前端渲染规则 必填' }],
     ruleScript: [{ required: true, message: 'QLExpress脚本 必填' }],
   };

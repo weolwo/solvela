@@ -8,9 +8,6 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="id" name="id">
-        <a-input-number style="width: 100%" v-model:value="form.id" placeholder="id" />
-      </a-form-item>
       <a-form-item label="租户id" name="tenantId">
         <a-input style="width: 100%" v-model:value="form.tenantId" placeholder="租户id" />
       </a-form-item>
@@ -47,22 +44,28 @@
         <a-input style="width: 100%" v-model:value="form.poolName" placeholder="奖池名称" />
       </a-form-item>
       <a-form-item label="消耗资产类型" name="costAssetType">
-        <a-input style="width: 100%" v-model:value="form.costAssetType" placeholder="消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)" />
+        <a-select style="width: 100%" v-model:value="form.costAssetType" :options="COST_ASSET_TYPE_OPTIONS" placeholder="请选择消耗资产类型" allowClear />
       </a-form-item>
+      <!-- 选了「无消耗」这一项就没意义了，免得配出「免费抽但扣 5 积分」这种自相矛盾的奖池 -->
       <a-form-item label="消耗数值(单价)" name="costValue">
-        <a-input-number style="width: 100%" v-model:value="form.costValue" placeholder="消耗数值(单价)" />
+        <a-input-number
+          style="width: 100%"
+          v-model:value="form.costValue"
+          :disabled="form.costAssetType === COST_ASSET_TYPE_ENUM.NONE.value"
+          placeholder="消耗数值(单价)"
+        />
       </a-form-item>
       <a-form-item label="重置周期" name="resetPeriod">
-        <a-input style="width: 100%" v-model:value="form.resetPeriod" placeholder="重置周期，天，周，月，活动期间" />
+        <a-select style="width: 100%" v-model:value="form.resetPeriod" :options="RESET_PERIOD_OPTIONS" placeholder="请选择重置周期" allowClear />
       </a-form-item>
-      <a-form-item label="抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)" name="drawMode">
-        <a-input-number style="width: 100%" v-model:value="form.drawMode" placeholder="抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)" />
+      <a-form-item label="抽奖算法" name="drawMode">
+        <a-select style="width: 100%" v-model:value="form.drawMode" :options="DRAW_MODE_OPTIONS" placeholder="请选择抽奖算法" allowClear />
       </a-form-item>
-      <a-form-item label="进入该奖池的前置脚本" name="scriptId">
+      <a-form-item label="前置脚本" name="scriptId">
         <a-input style="width: 100%" v-model:value="form.scriptId" placeholder="进入该奖池的前置脚本" />
       </a-form-item>
-      <a-form-item label="0关闭，1开启" name="status">
-        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="0关闭，1开启" />
+      <a-form-item label="状态" name="status">
+        <a-select style="width: 100%" v-model:value="form.status" :options="POOL_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
       </a-form-item>
     </a-form>
 
@@ -84,6 +87,13 @@
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
+  import {
+    COST_ASSET_TYPE_ENUM,
+    COST_ASSET_TYPE_OPTIONS,
+    DRAW_MODE_OPTIONS,
+    POOL_STATUS_OPTIONS,
+    RESET_PERIOD_OPTIONS,
+  } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -143,9 +153,9 @@
       { pattern: regular.bizCode, message: regular.bizCodeDesc },
     ],
     poolName: [{ required: true, message: '奖池名称 必填' }],
-    costAssetType: [{ required: true, message: '消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗) 必填' }],
+    costAssetType: [{ required: true, message: '消耗资产类型 必填' }],
     costValue: [{ required: true, message: '消耗数值(单价) 必填' }],
-    resetPeriod: [{ required: true, message: '重置周期，天，周，月，活动期间 必填' }],
+    resetPeriod: [{ required: true, message: '重置周期 必填' }],
   };
 
   // ------------------------ 归属活动下拉 ------------------------

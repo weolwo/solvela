@@ -70,7 +70,17 @@
       bordered
       :loading="tableLoading"
       :pagination="false"
-    />
+    >
+      <template #bodyCell="{ text, column }">
+        <template v-if="column.dataIndex === 'winStatus'">
+          <a-tag :color="winStatusOf(text).color">{{ winStatusOf(text).desc }}</a-tag>
+        </template>
+        <!-- prize_level 用 99 表示未中奖，直接显示 99 会被当成第 99 等奖 -->
+        <template v-if="column.dataIndex === 'prizeLevel'">
+          <span>{{ text === PRIZE_LEVEL_NONE ? '—' : text }}</span>
+        </template>
+      </template>
+    </a-table>
     <!---------- 表格 end ----------->
 
     <div class="smart-query-table-page">
@@ -98,6 +108,7 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { PRIZE_LEVEL_NONE, winStatusOf } from '/@/constants/business/lottery/lottery-const';
   // 生成器产物漏了这行：模板里用了 <SmartEnumSelect> 却没导入，
   // 表现是控制台一直报 Failed to resolve component（组件不渲染，但页面其余部分正常）
   import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';

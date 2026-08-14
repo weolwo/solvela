@@ -62,6 +62,9 @@ export const ACTIVITY_TYPE_LIST = Object.values(ACTIVITY_TYPE_ENUM);
 /** 挂玩法的类型（用于「升级玩法」候选项），由 component 推导而非另写一份 */
 export const PLAYABLE_TYPE_LIST = ACTIVITY_TYPE_LIST.filter((t) => t.component !== null);
 
+/** 查询下拉用 */
+export const ACTIVITY_TYPE_OPTIONS = ACTIVITY_TYPE_LIST.map((t) => ({ value: t.value, label: t.desc }));
+
 /** 该类型是否需要走向导第二步 */
 export function hasGameplay(type) {
   return Boolean(ACTIVITY_TYPE_ENUM[type]?.component);
@@ -97,6 +100,9 @@ export const ACTIVITY_STATUS_ENUM = {
 };
 
 export const ACTIVITY_STATUS_LIST = Object.values(ACTIVITY_STATUS_ENUM);
+
+/** 查询下拉用。只给 1/2 两档 —— 0 不是运营可选的状态，见上面的说明 */
+export const ACTIVITY_STATUS_OPTIONS = ACTIVITY_STATUS_LIST.map((i) => ({ value: i.value, label: i.desc }));
 
 /** 是否处于启用态。只有 1 算启用；0（历史未开始）与 2（禁用）都算未启用 */
 export function isActivityEnabled(status) {

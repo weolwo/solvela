@@ -5,7 +5,7 @@
  * @Date:      2026-04-04 16:12:19
  * @Copyright  weolwo
  */
-import { postRequest, getRequest } from '/src/lib/axios';
+import { postRequest, getRequest, getDownload } from '/src/lib/axios';
 
 export const physicalDeliveryApi = {
   /**
@@ -41,5 +41,33 @@ export const physicalDeliveryApi = {
    */
   batchDelete: (idList) => {
     return postRequest('/physicalDelivery/batchDelete', idList);
+  },
+
+  /**
+   * 导入模板下载：新增履约单
+   */
+  downloadAddTemplate: () => {
+    return getDownload('/physicalDelivery/importAddTemplate');
+  },
+
+  /**
+   * 导入模板下载：回填物流
+   */
+  downloadShipTemplate: () => {
+    return getDownload('/physicalDelivery/importShipTemplate');
+  },
+
+  /**
+   * 导入：新增履约单
+   */
+  importAdd: (formData) => {
+    return postRequest('/physicalDelivery/importAdd', formData);
+  },
+
+  /**
+   * 导入：回填物流
+   */
+  importShip: (formData) => {
+    return postRequest('/physicalDelivery/importShip', formData);
   },
 };

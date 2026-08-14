@@ -34,7 +34,10 @@ public class TaskConfigQueryForm extends PageParam {
     @Schema(description = "开始时间")
     private LocalDateTime startTime;
 
-    @Schema(description = "触发事件：ORDERPAID(支付), MEMBERREGISTER(注册), DAILYSIGN(签到), PAGEVIEW(浏览), CUSTOM(自定义)")
+    @Schema(description = "触发事件：取值来自注册表 t_task_event，不是固定枚举")
     private String triggerEvent;
+
+    @Schema(description = "任务状态：1-待生效, 2-生效中, 3-已下线（见 TaskConst.CONFIG_STATUS_*）")
+    private Integer status;
 
 }
