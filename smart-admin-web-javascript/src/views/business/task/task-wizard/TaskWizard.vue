@@ -341,6 +341,7 @@
     splitSchemaValues,
     buildDefaultRuleParams,
     buildDefaultWizardForm,
+    withLadderUid,
   } from './task-wizard-const';
 
   // ---------------------------- 内嵌契约 ----------------------------
@@ -769,6 +770,8 @@
     const draft = pendingDraft.value;
     const { ruleParams, ...rest } = draft.wizardForm;
     Object.assign(wizardForm, rest);
+    // 老草稿是在 _uid 这套行标识之前存下的，补齐后表格才有稳定的 row-key
+    wizardForm.prizeLadders = withLadderUid(wizardForm.prizeLadders);
     currentStep.value = draft.currentStep ?? WIZARD_STEP.BASE;
     pendingDraft.value = null;
     // templateCode 赋值会触发 watch 用模板默认值重建 ruleParams，必须等它跑完再回填草稿参数

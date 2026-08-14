@@ -11,7 +11,7 @@
       :data-source="modelValue"
       :columns="LADDER_COLUMNS"
       :pagination="false"
-      :row-key="(record, index) => index"
+      row-key="_uid"
       size="small"
       bordered
     >
@@ -89,7 +89,7 @@
 
 <script setup>
   import { PlusOutlined } from '@ant-design/icons-vue';
-  import { DEFAULT_PRIZE_LADDER, MIN_PRIZE_LADDER_COUNT, PRIZE_MODE_OPTIONS } from './task-wizard-const';
+  import { MIN_PRIZE_LADDER_COUNT, PRIZE_MODE_OPTIONS, newPrizeLadder } from './task-wizard-const';
 
   const props = defineProps({
     // 阶梯数组（t_task_prize_mapping 行集合）
@@ -139,7 +139,7 @@
   }
 
   function addRow() {
-    emit('update:modelValue', [...props.modelValue, { ...DEFAULT_PRIZE_LADDER }]);
+    emit('update:modelValue', [...props.modelValue, newPrizeLadder()]);
   }
 
   function removeRow(index) {

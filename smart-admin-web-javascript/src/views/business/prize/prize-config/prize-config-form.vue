@@ -62,7 +62,22 @@
             @change="onCodeInput"
           />
           <a-tooltip :title="form.id ? '奖品编码创建后不可修改' : '随机生成一个未被占用的编码'">
-            <a-button style="width: 96px" :disabled="!!form.id" :loading="codeGenerating" @click="generateCode">生成</a-button>
+            <!-- ghost + 紫调：跟页脚那颗蓝色「保存」拉开区分，一眼看出这是个辅助动作而不是提交 -->
+            <!--
+              宽度必须写死 96px 跟左边输入框的 calc(100% - 96px) 对上。
+              这里不能用 w-24：本项目根字号是 14px，rem 型工具类全部被缩放成 0.875 倍，
+              w-24 实际只有 84px，按钮右边会空出 12px 对不齐
+            -->
+            <a-button
+              class="w-[96px]! font-medium"
+              :class="form.id ? '' : 'border-violet-300! bg-violet-50! text-violet-600! hover:border-violet-400! hover:text-violet-700!'"
+              :disabled="!!form.id"
+              :loading="codeGenerating"
+              @click="generateCode"
+            >
+              <template #icon><ThunderboltOutlined /></template>
+              生成
+            </a-button>
           </a-tooltip>
         </a-input-group>
       </a-form-item>
@@ -72,15 +87,93 @@
       <a-form-item label="奖励价值" name="prizeValue">
         <a-input-number style="width: 100%" v-model:value="form.prizeValue" placeholder="奖励价值" />
       </a-form-item>
+      <!-- 开关与列表页的两个 a-switch 同一套语义：开=人工审批（更保守的一侧放在「开」） -->
       <a-form-item label="审批模式" name="approveMode">
-        <a-input-number style="width: 100%" v-model:value="form.approveMode" placeholder="审批模式：0-自动免审, 1-人工审批" />
+        <a-switch
+          v-model:checked="form.approveMode"
+          :checkedValue="APPROVE_MODE_MANUAL"
+          :unCheckedValue="APPROVE_MODE_AUTO"
+          checked-children="人工审批"
+          un-checked-children="自动免审"
+        />
       </a-form-item>
       <a-form-item label="排序权重" name="sortWeight">
         <a-input-number style="width: 100%" v-model:value="form.sortWeight" placeholder="排序权重" />
       </a-form-item>
       <a-form-item label="状态" name="status">
-        <a-input-number style="width: 100%" v-model:value="form.status" placeholder="状态：0-停用, 1-启用" />
+        <a-switch
+          v-model:checked="form.status"
+          :checkedValue="PRIZE_STATUS_ENUM.ENABLED.value"
+          :unCheckedValue="PRIZE_STATUS_ENUM.DISABLED.value"
+          checked-children="启用"
+          un-checked-children="停用"
+        />
       </a-form-item>
+
+      <!-- ==================== 高级配置：写进 ext（json） ==================== -->
+      <a-collapse v-model:activeKey="advancedKeys" :bordered="false" ghost class="advanced-collapse -ml-1">
+        <a-collapse-panel key="advanced">
+          <template #header>
+            <span class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <PictureOutlined class="text-violet-500" />
+              高级配置
+              <span class="text-xs font-normal text-slate-400">选填</span>
+              <a-tag v-if="extImages.length" color="purple" class="m-0!">{{ extImages.length }} 张图</a-tag>
+            </span>
+          </template>
+
+          <a-alert type="info" show-icon class="mb-3 rounded-lg!">
+            <template #message>
+              <span class="text-xs leading-relaxed text-slate-600">
+                图片存进奖品的 <b class="text-slate-800">ext</b> 字段（JSON），形如
+                <code class="rounded bg-slate-100 px-1 py-0.5 text-[11px] text-violet-700">{{ EXT_SHAPE_HINT }}</code>，
+                字段名由你自己起、C 端按这个名字取图；最多 {{ MAX_EXT_IMAGES }} 张。ext 里的其它内容（如跳转链接）不会被覆盖。
+              </span>
+            </template>
+          </a-alert>
+
+          <div
+            v-for="(item, index) in extImages"
+            :key="item._uid"
+            class="mb-2 flex items-center gap-3 rounded-lg border border-solid border-slate-200 bg-slate-50/70 px-3 py-2.5 transition-colors hover:border-violet-300 hover:bg-violet-50/40"
+          >
+            <span
+              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-xs font-semibold text-white"
+            >
+              {{ index + 1 }}
+            </span>
+            <a-input
+              v-model:value="item.name"
+              class="w-44! shrink-0"
+              :maxlength="32"
+              placeholder="字段名，如 mainImage"
+              @change="onExtNameInput(item)"
+            />
+            <ImageField v-model:fileId="item.fileId" class="min-w-0 flex-1" />
+            <a-button danger type="text" size="small" class="shrink-0" @click="removeExtImage(index)">
+              <template #icon><DeleteOutlined /></template>
+            </a-button>
+          </div>
+
+          <div v-if="extImageError" class="mb-2 text-xs text-red-500">{{ extImageError }}</div>
+
+          <!--
+            满 3 张时直接不渲染按钮，换一行说明文字。
+            比渲染一颗禁用按钮更干净：不用去和 antd 注入的 disabled 配色抢优先级
+            （实测无论工具类还是 scoped 规则都压不住它），也少一个点不动的控件
+          -->
+          <a-button v-if="canAddExtImage" type="dashed" block class="ext-add-btn h-9 font-medium" @click="addExtImage">
+            <template #icon><PlusOutlined /></template>
+            添加图片（{{ extImages.length }}/{{ MAX_EXT_IMAGES }}）
+          </a-button>
+          <div
+            v-else
+            class="flex h-9 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400"
+          >
+            已添加 {{ MAX_EXT_IMAGES }} 张，达到上限（移除一张后可继续添加）
+          </div>
+        </a-collapse-panel>
+      </a-collapse>
     </a-form>
 
     <template #footer>
@@ -95,13 +188,19 @@
   import { computed, reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
+  import { DeleteOutlined, PictureOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
-  import { PRIZE_TYPE_OPTIONS } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import ImageField from '/@/components/support/image-field/index.vue';
+  import { PRIZE_STATUS_ENUM, PRIZE_TYPE_OPTIONS } from '/@/constants/business/prize/prize-config/prize-config-const';
+
+  // 审批模式：对齐 t_prize_config.approve_mode，与列表页的开关同一套取值
+  const APPROVE_MODE_AUTO = 0;
+  const APPROVE_MODE_MANUAL = 1;
 
   // ------------------------ 事件 ------------------------
 
@@ -116,12 +215,15 @@
     if (rowData && !_.isEmpty(rowData)) {
       Object.assign(form, rowData);
     }
+    // 新建时给两个开关一个明确初始值，否则 a-switch 拿到 undefined 会显示成「关」，
+    // 但提交上去是 undefined —— 界面和实际存的值对不上
+    if (!form.id) {
+      form.approveMode = form.approveMode ?? APPROVE_MODE_AUTO;
+      form.status = form.status ?? PRIZE_STATUS_ENUM.ENABLED.value;
+    }
+    parseExt(form.ext);
     loadActivityOptions();
     loadPromotionOptions();
-    // 使用字典时把下面这注释修改成自己的字典字段 有多个字典字段就复制多份同理修改 不然打开表单时不显示字典初始值
-    // if (form.status && form.status.length > 0) {
-    //   form.status = form.status.map((e) => e.valueCode);
-    // }
     visibleFlag.value = true;
     nextTick(() => {
       formRef.value.clearValidate();
@@ -139,6 +241,11 @@
   const formRef = ref();
 
   const formDefault = {
+    // 🔴 id 必须在这里列出来。formDefault 少一个 key，Object.assign(form, formDefault) 就清不掉它 ——
+    // 于是「编辑一条 → 关闭 → 点新建」会拿到一个 form.id still set 的表单：
+    // 标题显示「编辑」、归属活动与奖品编码被 :disabled="!!form.id" 锁死填不了，
+    // 而 save() 判 form.id 走的是 update —— 填完保存会把刚才编辑的那条记录覆盖成这次的内容。
+    id: undefined, //配置ID
     activityCode: undefined, //活动编码
     promotionConfigId: undefined, //优惠配置ID
     prizeType: undefined, //资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM
@@ -163,7 +270,7 @@
       { required: true, message: '奖品编码 必填' },
       { pattern: regular.bizCode, message: regular.bizCodeDesc },
     ],
-    approveMode: [{ required: true, message: '审批模式：0-自动免审, 1-人工审批 必填' }],
+    approveMode: [{ required: true, message: '审批模式 必填' }],
   };
 
   // ------------------------ 优惠配置级联下拉 ------------------------
@@ -211,6 +318,111 @@
     if (!stillValid) {
       form.promotionConfigId = undefined;
     }
+  }
+
+  // ------------------------ 高级配置：ext(json) 里的图片 ------------------------
+
+  const MAX_EXT_IMAGES = 3;
+  const EXT_IMAGES_KEY = 'images';
+  // 放在 JS 里而不是直接写进模板：这串里有 {{ }}，写在模板上会被 Vue 当插值解析
+  const EXT_SHAPE_HINT = '{"images": {"mainImage": 12}}';
+
+  const advancedKeys = ref([]);
+  const extImages = ref([]);
+  const extImageError = ref('');
+  // ext 里除 images 之外的内容（DDL 注释提到还会放跳转链接等），原样留着不动
+  let extRest = {};
+  let extUidSeq = 0;
+
+  function newExtImage(name = '', fileId = null) {
+    return { _uid: `ext_${++extUidSeq}`, name, fileId };
+  }
+
+  /**
+   * 把 ext 字符串拆成「图片列表 + 其它内容」。
+   * ext 是运营/其它系统都可能写的自由 JSON，解析失败时不能把人家的内容吃掉 ——
+   * 解析不了就整段原样留在 extRest 之外（保持原字符串），只是这次不提供图片编辑。
+   */
+  function parseExt(raw) {
+    extImages.value = [];
+    extRest = {};
+    extImageError.value = '';
+    if (!raw) {
+      return;
+    }
+    let parsed;
+    try {
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e) {
+      // 不是合法 JSON：不动它，保存时原样写回，免得把手工填的内容洗掉
+      extRest = null;
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      extRest = null;
+      return;
+    }
+    const { [EXT_IMAGES_KEY]: images, ...rest } = parsed;
+    extRest = rest;
+    if (images && typeof images === 'object' && !Array.isArray(images)) {
+      extImages.value = Object.entries(images)
+        .slice(0, MAX_EXT_IMAGES)
+        .map(([name, fileId]) => newExtImage(name, Number(fileId) || null));
+    }
+    // 有图就默认把高级配置展开，否则运营看不出这条奖品其实配过图
+    advancedKeys.value = extImages.value.length ? ['advanced'] : [];
+  }
+
+  const canAddExtImage = computed(() => extImages.value.length < MAX_EXT_IMAGES);
+
+  function addExtImage() {
+    if (!canAddExtImage.value) {
+      return;
+    }
+    extImages.value.push(newExtImage());
+  }
+
+  function removeExtImage(index) {
+    extImages.value.splice(index, 1);
+    extImageError.value = '';
+  }
+
+  // 字段名要当 JSON 的 key 用，留白和奇怪符号会让 C 端取值很难受
+  function onExtNameInput(item) {
+    if (item.name) {
+      item.name = item.name.trim().replace(/\s+/g, '');
+    }
+    extImageError.value = '';
+  }
+
+  /**
+   * 校验并组装 ext 字符串。返回 { ok, ext }。
+   * 只填了名字没传图、或只传了图没起名的行，都算没配完 —— 直接放行会写出半截 JSON。
+   */
+  function buildExt() {
+    // 原始 ext 不是合法 JSON 对象时不接管，保存时原样送回
+    if (extRest === null) {
+      return { ok: true, ext: form.ext };
+    }
+
+    const rows = extImages.value.filter((i) => i.name || i.fileId);
+    const incomplete = rows.some((i) => !i.name || !i.fileId);
+    if (incomplete) {
+      return { ok: false, message: '高级配置里有未配完的图片：字段名和图片都要填' };
+    }
+    const names = rows.map((i) => i.name);
+    if (new Set(names).size !== names.length) {
+      return { ok: false, message: '高级配置里的字段名不能重复' };
+    }
+
+    const next = { ...extRest };
+    if (rows.length) {
+      next[EXT_IMAGES_KEY] = Object.fromEntries(rows.map((i) => [i.name, i.fileId]));
+    } else {
+      delete next[EXT_IMAGES_KEY];
+    }
+    // 整个 ext 空了就存 null，别往库里塞一个 "{}"
+    return { ok: true, ext: Object.keys(next).length ? JSON.stringify(next) : null };
   }
 
   // ------------------------ 归属活动下拉 ------------------------
@@ -261,20 +473,30 @@
   async function onSubmit() {
     try {
       await formRef.value.validateFields();
-      save();
     } catch (err) {
       message.error('参数验证错误，请仔细填写表单数据!');
+      return;
     }
+    // ext 不是 a-form 管辖的字段，单独校验；出错时展开高级配置，否则提示指向的是收起来的内容
+    const built = buildExt();
+    if (!built.ok) {
+      extImageError.value = built.message;
+      advancedKeys.value = ['advanced'];
+      message.error(built.message);
+      return;
+    }
+    save(built.ext);
   }
 
   // 新建、编辑API
-  async function save() {
+  async function save(ext) {
     SmartLoading.show();
     try {
+      const params = { ...form, ext };
       if (form.id) {
-        await prizeConfigApi.update(form);
+        await prizeConfigApi.update(params);
       } else {
-        await prizeConfigApi.add(form);
+        await prizeConfigApi.add(params);
       }
       message.success('操作成功');
       emits('reloadList');
@@ -290,3 +512,30 @@
     show,
   });
 </script>
+
+<style scoped lang="less">
+  /*
+   * 行内布局与配色全部走 Tailwind，这里只收 ghost 折叠面板自带的左右内边距 ——
+   * 那部分是 antd 的内部结构（:deep 才够得着），用工具类表达不了
+   */
+  .ext-add-btn {
+    color: #7c3aed;
+    border-color: #ddd6fe;
+
+    &:hover {
+      color: #6d28d9;
+      border-color: #a78bfa;
+    }
+  }
+
+  .advanced-collapse {
+    :deep(.ant-collapse-content-box) {
+      padding-inline: 0;
+      padding-block-start: 4px;
+    }
+
+    :deep(.ant-collapse-header) {
+      padding-inline: 4px !important;
+    }
+  }
+</style>

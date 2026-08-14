@@ -112,6 +112,29 @@ export const DEFAULT_PRIZE_LADDER = {
   prizeValue: 100,
 };
 
+/**
+ * 阶梯行的稳定标识。
+ *
+ * 表格原先用 `:row-key="(record, index) => index"`，antd 会警告 rowKey 的 index 入参已废弃；
+ * 而直接改用对象标识又不行 —— 编辑一行会 `{ ...row }` 生成新对象，key 跟着变，
+ * 整行重新挂载，输入框每敲一个字就失焦。
+ *
+ * 所以给每行一个创建时生成、随 spread 一路继承下去的 `_uid`。
+ * 它只服务于前端渲染，buildSubmitData 是按字段白名单组装的，不会漏到接口上。
+ */
+let ladderUidSeq = 0;
+
+export function newPrizeLadder() {
+  return { ...DEFAULT_PRIZE_LADDER, _uid: `ladder_${++ladderUidSeq}` };
+}
+
+/**
+ * 给缺 `_uid` 的行补上（默认表单、草稿恢复这两条路径产出的行没有）。
+ */
+export function withLadderUid(list) {
+  return (list || []).map((row) => (row._uid ? row : { ...row, _uid: `ladder_${++ladderUidSeq}` }));
+}
+
 // 阶梯至少保留 1 级，不允许删空
 export const MIN_PRIZE_LADDER_COUNT = 1;
 
@@ -188,7 +211,7 @@ export function buildDefaultWizardForm() {
       limitCount: DEFAULT_LIMIT_COUNT,
     },
     // 第3步：奖励阶梯（子表）
-    prizeLadders: [{ ...DEFAULT_PRIZE_LADDER }],
+    prizeLadders: [newPrizeLadder()],
     // 第4步：受众与时间
     audience: {
       targetAudience: TARGET_AUDIENCE_ENUM.ALL,
