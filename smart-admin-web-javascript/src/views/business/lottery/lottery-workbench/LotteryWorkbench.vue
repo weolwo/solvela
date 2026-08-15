@@ -139,9 +139,10 @@
 <script setup>
   import { computed, onMounted, ref, watch } from 'vue';
   import { message, Modal } from 'ant-design-vue';
-  import { onBeforeRouteLeave } from 'vue-router';
+  import { onBeforeRouteLeave, useRoute } from 'vue-router';
   import { CloudUploadOutlined } from '@ant-design/icons-vue';
   import { lotteryWorkbenchApi } from '/@/api/business/lottery/lottery-workbench/lottery-workbench-api';
+  import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { LOTTERY_STATUS_ENUM } from '/@/constants/business/lottery/lottery-const';
@@ -163,6 +164,17 @@
   });
 
   const emit = defineEmits(['saved']);
+
+  const route = useRoute();
+
+  /*
+   * 「新建玩法」意图（来自 ?mode=new，即彩票配置列表页顶部那个按钮）。
+   *
+   * 它不是一次性的开关，而是一直保持到运营真的选了某个已有玩法、或者新玩法保存成功为止：
+   * 带着建新玩法的意图进来，中途换个活动，要的仍然是在新活动下建一个新的，
+   * 而不是被塞进那个活动的第一个已有玩法里。
+   */
+  const pendingNew = ref(false);
 
   const activeTab = ref('engine');
   const engineRef = ref();
@@ -210,7 +222,7 @@
   async function switchOnline(toOnline) {
     statusChanging.value = true;
     try {
-      const api = toOnline ? lotteryWorkbenchApi.online : lotteryWorkbenchApi.offline;
+      const api = toOnline ? lotteryConfigApi.online : lotteryConfigApi.offline;
       await api(loadedLottery.value);
       message.success(toOnline ? '已上线，现在可以对外发号' : '已下线，已停止发号');
       // 状态以服务端为准重新拉一次：上线会触发结构锁，面板里的禁用态要跟着变
@@ -305,14 +317,9 @@
     const prevLottery = loadedLottery.value;
     guard(
       async () => {
-        loadedActivity.value = activityCode;
-        await loadLotteries(activityCode);
-        // 换活动后默认打开第一个玩法；一个都没有就进新建态，不让主体区空着
-        const first = lotteryOptions.value[0];
-        currentLottery.value = first?.value;
-        loadedLottery.value = first?.value;
-        currentStatus.value = first?.status ?? null;
-        await loadDetail(activityCode, first?.value);
+        // 走 openActivity 而不是在这里重写一遍：换活动后默认打开第一个玩法、一个都没有就进新建态，
+        // 以及「带着新建意图时不接管已有玩法」这几条判断只该有一处
+        await openActivity(activityCode);
       },
       () => {
         currentActivity.value = prevActivity;
@@ -325,6 +332,8 @@
     const prev = loadedLottery.value;
     guard(
       () => {
+        // 运营明确挑了一个已有玩法，新建意图到此为止
+        pendingNew.value = false;
         loadedLottery.value = lotteryCode;
         currentStatus.value = lotteryOptions.value.find((o) => o.value === lotteryCode)?.status ?? null;
         loadDetail(currentActivity.value, lotteryCode);
@@ -335,15 +344,23 @@
     );
   }
 
+  /**
+   * 进入「新建玩法」态：玩法下拉清空，detail 传空 lotteryCode 会拿到带预生成编码的空壳。
+   * 顶部的 ➕ 按钮与 ?mode=new 深链走的是同一段。
+   */
+  function enterCreateMode(activityCode) {
+    pendingNew.value = true;
+    currentLottery.value = undefined;
+    loadedLottery.value = undefined;
+    currentStatus.value = null;
+    return loadDetail(activityCode, '');
+  }
+
   function onCreateNew() {
     const prev = loadedLottery.value;
     guard(
       () => {
-        // 玩法下拉清空表示「新建态」，detail 传空 lotteryCode 会拿到带预生成编码的空壳
-        currentLottery.value = undefined;
-        loadedLottery.value = undefined;
-        currentStatus.value = null;
-        loadDetail(currentActivity.value, '');
+        enterCreateMode(currentActivity.value);
       },
       () => {
         currentLottery.value = prev;
@@ -365,6 +382,8 @@
       await lotteryWorkbenchApi.save(param);
       message.success('保存成功');
       dirty.value = false;
+      // 新玩法已经落库，接下来加载的就是它本身，不再是「待新建」
+      pendingNew.value = false;
       // 新建的玩法要进下拉并选中；结构锁、已发号数一律以服务端为准，不拿本地状态猜
       await loadLotteries(currentActivity.value);
       currentLottery.value = param.lotteryCode;
@@ -396,18 +415,28 @@
   });
 
   /**
-   * 打开一个活动：拉它的玩法列表，选中第一个并回显。
+   * 打开一个活动：拉它的玩法列表，选中一个并回显。
    * 独立入口的「只有一个活动就自动打开」与内嵌模式的「外壳指定活动」走的是同一段逻辑。
+   *
+   * @param preferLotteryCode 指定要定位的玩法（列表页「编辑」带 query 跳过来时用）；
+   *                          不传或在该活动下找不到时退回第一个玩法
    */
-  async function openActivity(activityCode) {
+  async function openActivity(activityCode, preferLotteryCode) {
     currentActivity.value = activityCode;
     loadedActivity.value = activityCode;
     await loadLotteries(activityCode);
-    const firstLottery = lotteryOptions.value[0];
-    currentLottery.value = firstLottery?.value;
-    loadedLottery.value = firstLottery?.value;
-    currentStatus.value = firstLottery?.status ?? null;
-    await loadDetail(activityCode, firstLottery?.value);
+
+    // 带着新建意图进来就停在空壳态，不自动接管一个已有玩法
+    if (pendingNew.value) {
+      enterCreateMode(activityCode);
+      return;
+    }
+
+    const target = lotteryOptions.value.find((o) => o.value === preferLotteryCode) || lotteryOptions.value[0];
+    currentLottery.value = target?.value;
+    loadedLottery.value = target?.value;
+    currentStatus.value = target?.status ?? null;
+    await loadDetail(activityCode, target?.value);
   }
 
   /*
@@ -433,7 +462,28 @@
       return;
     }
     await loadActivities();
-    // 只有一个活动时直接打开，省掉一次点击；多个时让运营自己选，避免默认选错还没察觉
+
+    /*
+     * ?mode=new：彩票配置列表页顶部那个按钮，意图是「配一个新玩法」。
+     * 必须先于下面的自动打开生效 —— 否则只有一个彩票活动时会被自动带进该活动的第一个已有玩法，
+     * 点「新建」却进了别人的配置页。
+     */
+    pendingNew.value = route.query.mode === 'new';
+
+    /*
+     * 深链：彩票配置列表页的「编辑」带 ?activityCode=&lotteryCode= 跳过来，直接定位到那一个玩法。
+     *
+     * 不校验 activityCode 是否在下拉里：optionList 默认过滤掉已下线/已过期的活动，
+     * 而列表页恰恰能查到这些活动下的玩法 —— 拿不到选项也照样要能打开，否则「编辑」按钮时灵时不灵。
+     */
+    const queryActivity = route.query.activityCode;
+    if (queryActivity) {
+      await openActivity(String(queryActivity), route.query.lotteryCode ? String(route.query.lotteryCode) : undefined);
+      return;
+    }
+
+    // 只有一个活动时直接打开，省掉一次点击；多个时让运营自己选，避免默认选错还没察觉。
+    // 带 mode=new 时 openActivity 会停在空壳态，不会接管已有玩法
     const firstActivity = activityOptions.value[0];
     if (activityOptions.value.length === 1 && firstActivity) {
       await openActivity(firstActivity.value);

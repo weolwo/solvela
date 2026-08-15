@@ -1,5 +1,6 @@
 package net.lab1024.sa.lottery.issue.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.lottery.issue.dao.LotteryIssueDao;
@@ -143,20 +144,69 @@ public class LotteryIssueService {
     }
 
     /**
-     * 批量删除
+     * 停售（列表页的「禁用」）：把售卖结束时间提前到此刻，立刻停止发号。
+     *
+     * <p>🔴 期号<b>没有</b>「启用/禁用」这一维。它的 status 是生命周期
+     * （0-待开奖 / 1-核销中 / 2-已开奖），不是开关。
+     * 而「这一期现在还能不能领号」的判据，运行态 {@code TicketIssueService} 只认三条：
+     * 玩法已上线、期号是待开奖、当前时间落在 [sale_start_time, sale_end_time] 内。
+     * 再加一个禁用标志位就是第四个判据，和售卖窗口重叠 —— 两个判据一定会漂移。
+     * 所以停售就落在窗口上：改的是既有字段，运行态一个字都不用动。
+     *
+     * <p>可逆：想恢复售卖，把结束时间改回一个未来时刻即可（走编辑）。
+     *
+     * <p>为什么减 1 秒：结束时间的判据是 {@code now.isAfter(saleEndTime)}，
+     * 取严格大于。若把结束时间设成整点的「此刻」，同一秒内进来的请求 isAfter 为 false，
+     * 会漏出一个可领号的窗口。止血动作不该留这种缝。
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (SmartCollectionUtil.isEmpty(idList)){
+    public ResponseDTO<String> stopSale(Long id) {
+        LotteryIssue issue = lotteryIssueDao.selectById(id);
+        if (issue == null) {
+            return ResponseDTO.userErrorParam("期号不存在");
+        }
+        if (!STATUS_WAIT.equals(issue.getStatus())) {
+            return ResponseDTO.userErrorParam("期号「" + issue.getIssueNo() + "」已开奖或正在核销，本就不再发号");
+        }
+        // 时间只由数据库产生（铁律 9/10）：售卖窗口的判定用的是 DB 时钟，写入也必须用同一个
+        LocalDateTime stopAt = lotteryIssueDao.selectDbNow().minusSeconds(1);
+        if (issue.getSaleEndTime() != null && !issue.getSaleEndTime().isAfter(stopAt)) {
+            return ResponseDTO.userErrorParam("期号「" + issue.getIssueNo() + "」已经停止发售");
+        }
+
+        LotteryIssue update = new LotteryIssue();
+        update.setId(issue.getId());
+        update.setSaleEndTime(stopAt);
+        // 尚未开始售卖的期：把开始时间一并拉到 stopAt，否则会落下 end < start 的自相矛盾数据，
+        // 之后再编辑会被 checkSaleWindow 挡住。此时 sold_count 必为 0，拉早开始时间没有副作用
+        if (issue.getSaleStartTime() == null || issue.getSaleStartTime().isAfter(stopAt)) {
+            update.setSaleStartTime(stopAt);
+        }
+        lotteryIssueDao.updateById(update);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 批量停售。
+     *
+     * <p>与彩票玩法的批量禁用同构：<b>不</b>做成一个事务里全成或全败 ——
+     * 止血动作里混着几个「本来就停售了」是常态，不该把其余的一起回滚掉。
+     * 已停售 / 已开奖计入跳过，最后回一句人话汇总。
+     */
+    public ResponseDTO<String> batchStopSale(List<Long> idList) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
             return ResponseDTO.ok();
         }
+        int success = 0;
+        int skipped = 0;
         for (Long id : idList) {
-            String error = checkDeletable(id);
-            if (error != null) {
-                return ResponseDTO.userErrorParam(error);
+            if (stopSale(id).getOk()) {
+                success++;
+            } else {
+                skipped++;
             }
         }
-        lotteryIssueDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
+        return ResponseDTO.ok("已停售 " + success + " 期"
+                + (skipped > 0 ? "，跳过 " + skipped + " 期（已停售或已开奖）" : ""));
     }
 
     /**

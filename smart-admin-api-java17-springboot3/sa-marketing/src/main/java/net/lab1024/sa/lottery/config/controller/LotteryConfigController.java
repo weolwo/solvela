@@ -9,9 +9,7 @@ import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.ValidateList;
 import net.lab1024.sa.lottery.config.domain.form.FpePreviewForm;
-import net.lab1024.sa.lottery.config.domain.form.LotteryConfigAddForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryConfigQueryForm;
-import net.lab1024.sa.lottery.config.domain.form.LotteryConfigUpdateForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryWorkbenchSaveForm;
 import net.lab1024.sa.lottery.config.domain.vo.LotteryConfigOptionVO;
 import net.lab1024.sa.lottery.config.domain.vo.LotteryConfigVO;
@@ -23,6 +21,17 @@ import java.util.List;
 
 /**
  * 彩票配置 Controller
+ *
+ * <p>🔴 <b>没有 add / update / delete。</b> 一个玩法不是一张扁平表单能配出来的东西：
+ * 它至少要同时落 {@code t_lottery_config} 与 {@code t_lottery_prize_rule}，
+ * 而且号码长度、发行总量在发过号之后是<b>永久冻结</b>的（结构锁）。
+ * 生成器产出的那套扁平增改绕开了这些校验 —— 配出来的玩法上不了线，改出来的玩法会把
+ * 发号引擎参数改坏。所有写操作统一收口到工作台的
+ * {@code /workbench/save}（配置 + 奖级，单事务）。
+ *
+ * <p>删除同理不给：{@code t_lottery_record} 里存着 lottery_code，
+ * 删配置会让用户手里已发出的号码指向一条不存在的玩法，开奖与客诉自证全断。
+ * 停售用 {@link #offline(String)} —— 立刻停止发号，已发出的号码不受影响，期号照常开奖。
  *
  * @Author weolwo
  * @Date 2026-04-19 11:16:39
@@ -88,6 +97,13 @@ public class LotteryConfigController {
         return Service.offline(lotteryCode);
     }
 
+    @Operation(summary = "批量下线：列表页的「批量禁用」，逐个下线并回一句汇总")
+    @PostMapping("/batchOffline")
+    @SaCheckPermission("lotteryConfig:update")
+    public ResponseDTO<String> batchOffline(@RequestBody ValidateList<String> lotteryCodeList) {
+        return Service.batchOffline(lotteryCodeList);
+    }
+
     @Operation(summary = "FPE 算号推演：用固定演示期号算样例号码，与线上发号同一段代码")
     @PostMapping("/fpe/preview")
     @SaCheckPermission("lotteryConfig:query")
@@ -95,31 +111,4 @@ public class LotteryConfigController {
         return Service.fpePreview(form);
     }
 
-    @Operation(summary = "添加")
-    @PostMapping("/add")
-    @SaCheckPermission("lotteryConfig:add")
-    public ResponseDTO<String> add(@RequestBody @Valid LotteryConfigAddForm addForm) {
-        return Service.add(addForm);
-    }
-
-    @Operation(summary = "更新")
-    @PostMapping("/update")
-    @SaCheckPermission("lotteryConfig:update")
-    public ResponseDTO<String> update(@RequestBody @Valid LotteryConfigUpdateForm updateForm) {
-        return Service.update(updateForm);
-    }
-
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("lotteryConfig:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
-    }
-
-    @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("lotteryConfig:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
-    }
 }

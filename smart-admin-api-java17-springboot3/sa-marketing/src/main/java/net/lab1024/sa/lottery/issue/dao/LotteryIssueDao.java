@@ -80,12 +80,11 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
 
             // ----- 物理删除 -----
                 /**
-                 * 单个物理删除
+                 * 单个物理删除。
+                 *
+                 * 只用于清理「零发号 + 待开奖」的空期（守卫见 LotteryIssueService.checkDeletable）——
+                 * 发过号的期删不得：t_lottery_record 里的记录既是用户凭证，也是开奖核销的依据。
+                 * 批量版本已移除，期号是一期期建的，没有批量删的场景。
                  */
                 long deleteById(@Param("id") Long id);
-
-                /**
-                 * 批量物理删除
-                 */
-                void batchDelete(@Param("idList") List<Long> idList);
 }

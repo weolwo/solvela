@@ -36,19 +36,8 @@ export const lotteryWorkbenchApi = {
     return postRequest('/lotteryConfig/workbench/save', param);
   },
 
-  /**
-   * 上线：允许开始发号。服务端会校验必须已配奖级规则  @author  alaric
-   */
-  online: (lotteryCode) => {
-    return getRequest(`/lotteryConfig/online/${lotteryCode}`);
-  },
-
-  /**
-   * 下线：停止发号。已发出的号码不受影响，期号照常可以开奖  @author  alaric
-   */
-  offline: (lotteryCode) => {
-    return getRequest(`/lotteryConfig/offline/${lotteryCode}`);
-  },
+  // 上下线在 lotteryConfigApi 里（列表页的「禁用」用的是同两个接口）。
+  // 一个接口只留一处封装，免得两边的错误处理各写一套后慢慢走样。
 
   /**
    * FPE 算号推演。

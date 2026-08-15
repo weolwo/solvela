@@ -53,14 +53,21 @@ public class LotteryIssueController {
         return Service.update(updateForm);
     }
 
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("lotteryIssue:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+    @Operation(summary = "停售：把售卖结束时间提前到此刻，立刻停止发号。想恢复售卖走编辑改回未来时刻")
+    @GetMapping("/stopSale/{id}")
+    @SaCheckPermission("lotteryIssue:update")
+    public ResponseDTO<String> stopSale(@PathVariable Long id) {
+        return Service.stopSale(id);
     }
 
-    @Operation(summary = "单个删除")
+    @Operation(summary = "批量停售：逐期停售并回一句汇总，已停售/已开奖计入跳过")
+    @PostMapping("/batchStopSale")
+    @SaCheckPermission("lotteryIssue:update")
+    public ResponseDTO<String> batchStopSale(@RequestBody ValidateList<Long> idList) {
+        return Service.batchStopSale(idList);
+    }
+
+    @Operation(summary = "单个删除：只能删「零发号 + 待开奖」的空期，供工作台清理误建的期号")
     @GetMapping("/delete/{id}")
     @SaCheckPermission("lotteryIssue:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {

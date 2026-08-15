@@ -77,13 +77,8 @@
         ORDER BY create_time DESC
     </select>
 
-                <delete id="batchDelete">
-                    delete from t_lottery_issue
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
+                <!-- 批量物理删除已移除：期号是一期期建的，没有批量删的场景。
+                     列表页原先那个「批量删除」已换成批量停售（改售卖结束时间），见 LotteryIssueService.batchStopSale -->
                 <delete id="deleteById">
                     delete from t_lottery_issue
                         where id = #{id}

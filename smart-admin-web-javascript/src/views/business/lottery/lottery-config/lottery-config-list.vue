@@ -1,6 +1,15 @@
 <!--
   * 彩票配置
   *
+  * 🔴 本页不做写操作，只做「看 + 停售 + 跳转」：
+  *   新建 / 编辑 一律跳「彩票配置工作台」—— 一个玩法要同时落彩票配置与奖级规则，
+  *   而且号码长度、发行总量在发过号之后永久冻结（结构锁）。扁平弹窗绕开这些校验，
+  *   配出来的玩法上不了线、改出来的玩法会把发号引擎参数改坏。
+  *
+  *   删除换成禁用（下线）：t_lottery_record 里存着 lottery_code，
+  *   删配置会让用户手里已发出的号码指向一条不存在的玩法，开奖与客诉自证全断。
+  *   下线只停后续发号，已发出的号码照常开奖 —— 出问题时这才是运营要的止血按钮。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-19 11:16:39
   * @Copyright  weolwo
@@ -9,9 +18,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户id" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户id" />
-      </a-form-item>
       <a-form-item label="活动编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.activityCode" placeholder="活动编码" />
       </a-form-item>
@@ -49,17 +55,18 @@
     <!---------- 表格操作行 begin ----------->
     <a-row class="smart-table-btn-block">
       <div class="smart-table-operate-block">
-        <a-button @click="showForm" type="primary" size="small">
+        <a-button @click="goWorkbench()" type="primary" size="small">
           <template #icon>
             <PlusOutlined />
           </template>
-          新建
+          彩票配置工作台
         </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <!-- 批量禁用而不是批量删除：止血只需要停发号，不需要毁配置 -->
+        <a-button @click="confirmBatchOffline" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
-            <DeleteOutlined />
+            <StopOutlined />
           </template>
-          批量删除
+          批量禁用
         </a-button>
       </div>
       <div class="smart-table-setting-block">
@@ -86,8 +93,27 @@
         </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
-            <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
+            <a-button @click="showDetail(record)" type="link">详情</a-button>
+            <a-button @click="goWorkbench(record)" type="link">编辑</a-button>
+            <!-- 上线有前置条件（必须已配奖级规则），服务端会拦；这里只把它的话原样透出来 -->
+            <a-popconfirm
+              v-if="record.status === LOTTERY_STATUS_ENUM.OFFLINE.value"
+              title="启用后即可对外发号。请确认奖级规则已配置正确。"
+              ok-text="确认启用"
+              cancel-text="再想想"
+              @confirm="requestOnline(record)"
+            >
+              <a-button type="link">启用</a-button>
+            </a-popconfirm>
+            <a-popconfirm
+              v-else
+              title="禁用后立即停止发号。已发出的号码不受影响，期号照常可以开奖。"
+              ok-text="确认禁用"
+              cancel-text="再想想"
+              @confirm="requestOffline(record)"
+            >
+              <a-button danger type="link">禁用</a-button>
+            </a-popconfirm>
           </div>
         </template>
       </template>
@@ -110,21 +136,75 @@
       />
     </div>
 
-    <LotteryConfigForm ref="formRef" @reloadList="queryData" />
+    <!---------- 详情抽屉：只读，玩法 + 发行进度 + 奖级规则 ----------->
+    <a-drawer :title="`玩法详情 · ${detail.lotteryName || ''}`" :width="760" :open="detailVisible" @close="detailVisible = false">
+      <a-spin :spinning="detailLoading">
+        <a-descriptions title="基础信息" bordered size="small" :column="2" class="mb-6">
+          <a-descriptions-item label="彩票编码">{{ detail.lotteryCode }}</a-descriptions-item>
+          <a-descriptions-item label="状态">
+            <a-tag :color="lotteryStatusOf(detail.status).color">{{ lotteryStatusOf(detail.status).desc }}</a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="彩票名称" :span="2">{{ detail.lotteryName }}</a-descriptions-item>
+          <a-descriptions-item label="归属活动">{{ detail.activityName }}</a-descriptions-item>
+          <a-descriptions-item label="活动编码">{{ detail.activityCode }}</a-descriptions-item>
+          <a-descriptions-item label="号码长度">{{ detail.numberLength }} 位</a-descriptions-item>
+          <a-descriptions-item label="单期发行上限">{{ (detail.totalCount || 0).toLocaleString() }} 张</a-descriptions-item>
+          <a-descriptions-item label="已创建期号">{{ detail.issueCount }} 期</a-descriptions-item>
+          <a-descriptions-item label="累计已发号">{{ (detail.soldTotal || 0).toLocaleString() }} 张</a-descriptions-item>
+          <!-- 结构锁是「为什么这两个参数改不了」的答案，比一个禁用态的输入框有用得多 -->
+          <a-descriptions-item label="结构锁" :span="2">
+            <a-tag v-if="!detail.structureLocked" color="green">未冻结，发号规格仍可调整</a-tag>
+            <span v-else class="text-orange-600">🔒 {{ detail.lockReason }}</span>
+          </a-descriptions-item>
+        </a-descriptions>
+
+        <div class="mb-2 flex items-center gap-2">
+          <span class="text-base font-medium">奖级规则</span>
+          <span class="text-xs text-slate-400">t_lottery_prize_rule</span>
+        </div>
+        <!-- 没有奖级规则的玩法上不了线：online 接口的唯一前置条件就是它 -->
+        <a-table size="small" bordered :data-source="detail.prizeRuleList || []" :columns="RULE_COLUMNS" :pagination="false" row-key="prizeLevel">
+          <template #emptyText>
+            <div class="py-4 text-xs text-orange-500">该玩法未配置任何奖级规则，无法上线（号码发出去了却无奖可发）</div>
+          </template>
+          <template #bodyCell="{ text, record, column }">
+            <template v-if="column.dataIndex === 'matchRule'">
+              <a-tag>{{ matchRuleOf(text) }}</a-tag>
+              <span class="text-xs text-slate-400">{{ record.matchLength }} 位</span>
+            </template>
+            <template v-if="column.dataIndex === 'prizeCode'">
+              <span>{{ text }}</span>
+              <div class="text-xs text-slate-400">{{ record.prizeName || '奖品配置不存在' }}</div>
+            </template>
+          </template>
+        </a-table>
+
+        <div class="mt-6">
+          <a-button type="primary" ghost @click="goWorkbench(detailRecord)">去工作台编辑</a-button>
+        </div>
+      </a-spin>
+    </a-drawer>
   </a-card>
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
+  import { useRouter } from 'vue-router';
   import { message, Modal } from 'ant-design-vue';
+  import { StopOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
+  import { lotteryWorkbenchApi } from '/@/api/business/lottery/lottery-workbench/lottery-workbench-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import LotteryConfigForm from './lottery-config-form.vue';
-  import { LOTTERY_STATUS_OPTIONS, lotteryStatusOf } from '/@/constants/business/lottery/lottery-const';
+  import { LOTTERY_STATUS_ENUM, LOTTERY_STATUS_OPTIONS, lotteryStatusOf, matchRuleOf } from '/@/constants/business/lottery/lottery-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+
+  const router = useRouter();
+
+  // 与 activity-config-const.js 里 LOTTERY 玩法的 route 保持一致，改路由时两处一起改
+  const LOTTERY_WORKBENCH_PATH = '/business/lottery/lottery-workbench';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -198,14 +278,13 @@
       title: '操作',
       dataIndex: 'action',
       fixed: 'right',
-      width: 90,
+      width: 190,
     },
   ]);
 
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户id
     activityCode: undefined, //活动编码
     lotteryCode: undefined, //彩票编码
     lotteryName: undefined, //彩票名称
@@ -246,6 +325,9 @@
       let queryResult = await lotteryConfigApi.queryPage(queryForm);
       tableData.value = queryResult.data.list;
       total.value = queryResult.data.total;
+      // 状态变了的行留在选中列表里没意义，且容易让人对着旧状态再点一次批量禁用
+      selectedRowKeyList.value = [];
+      selectedRowList.value = [];
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -260,38 +342,69 @@
 
   onMounted(queryData);
 
-  // ---------------------------- 添加/修改 ----------------------------
-  const formRef = ref();
+  // ---------------------------- 跳转工作台 ----------------------------
 
-  function showForm(data) {
-    formRef.value.show(data);
-  }
-
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
+  /*
+   * 新建与编辑同一个出口。
+   *
+   * 不传 record = 新建：必须带 mode=new。工作台在「只有一个彩票活动」时会自动打开该活动的
+   * 第一个玩法，不带这个标记从本页点「新建」会直接落在某个已有玩法上，像是进错了页面。
+   *
+   * 传了 record = 编辑：带 activityCode + lotteryCode 深链到那一个玩法。
+   */
+  function goWorkbench(record) {
+    if (!record) {
+      router.push({ path: LOTTERY_WORKBENCH_PATH, query: { mode: 'new' } });
+      return;
+    }
+    router.push({
+      path: LOTTERY_WORKBENCH_PATH,
+      query: { activityCode: record.activityCode, lotteryCode: record.lotteryCode },
     });
   }
 
-  //请求删除
-  async function requestDelete(data) {
+  // ---------------------------- 详情 ----------------------------
+
+  const RULE_COLUMNS = [
+    { title: '奖级', dataIndex: 'prizeLevel', width: 70 },
+    { title: '匹配规则', dataIndex: 'matchRule', width: 180 },
+    { title: '奖品编码', dataIndex: 'prizeCode', ellipsis: true },
+    { title: '奖品价值', dataIndex: 'prizeValue', width: 100 },
+  ];
+
+  const detailVisible = ref(false);
+  const detailLoading = ref(false);
+  const detail = ref({});
+  // 抽屉里的「去工作台编辑」需要原始行，detail 里没有列表行的字段
+  const detailRecord = ref(null);
+
+  /*
+   * 复用工作台的聚合回显接口，不另开一个 detail：
+   * 详情要看的（发行进度、结构锁、奖级规则）正是工作台加载的那一份，
+   * 两个接口各查一次，迟早出现「详情说没锁、工作台里却改不了」。
+   */
+  async function showDetail(record) {
+    detailRecord.value = record;
+    detail.value = {};
+    detailVisible.value = true;
+    detailLoading.value = true;
+    try {
+      const res = await lotteryWorkbenchApi.detail(record.activityCode, record.lotteryCode);
+      detail.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      detailLoading.value = false;
+    }
+  }
+
+  // ---------------------------- 启用 / 禁用 ----------------------------
+
+  async function requestOnline(record) {
     SmartLoading.show();
     try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await lotteryConfigApi.delete(data.id);
-      message.success('删除成功');
+      await lotteryConfigApi.online(record.lotteryCode);
+      message.success('已启用，现在可以对外发号');
       queryData();
     } catch (e) {
       smartSentry.captureError(e);
@@ -300,36 +413,53 @@
     }
   }
 
-  // ---------------------------- 批量删除 ----------------------------
+  async function requestOffline(record) {
+    SmartLoading.show();
+    try {
+      await lotteryConfigApi.offline(record.lotteryCode);
+      message.success('已禁用，已停止发号');
+      queryData();
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      SmartLoading.hide();
+    }
+  }
+
+  // ---------------------------- 批量禁用 ----------------------------
 
   // 选择表格行
   const selectedRowKeyList = ref([]);
+  // 行选中给的是 rowKey(id)，而上下线接口按 lotteryCode 定位，这里存一份映射
+  const selectedRowList = ref([]);
 
-  function onSelectChange(selectedRowKeys) {
+  function onSelectChange(selectedRowKeys, selectedRows) {
     selectedRowKeyList.value = selectedRowKeys;
+    selectedRowList.value = selectedRows;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  function confirmBatchOffline() {
     Modal.confirm({
       title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      content: `确定禁用选中的 ${selectedRowKeyList.value.length} 个玩法吗？禁用后立即停止发号，已发出的号码不受影响。`,
+      okText: '确认禁用',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchOffline();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  async function requestBatchOffline() {
     try {
       SmartLoading.show();
-      await lotteryConfigApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
+      const codeList = selectedRowList.value.map((item) => item.lotteryCode);
+      const res = await lotteryConfigApi.batchOffline(codeList);
+      // 服务端回的是「已禁用 N 个，跳过 M 个…」的汇总，原样透出来 ——
+      // 批量里混着已下线的玩法是常态，笼统提示一句「操作成功」会掩盖掉失败的那几个
+      message.success(res.data || '操作成功');
       queryData();
     } catch (e) {
       smartSentry.captureError(e);

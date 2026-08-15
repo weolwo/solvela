@@ -52,11 +52,13 @@
           </template>
           新建
         </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <!-- 批量停售而不是批量删除：期号删了会让 t_lottery_record 里的记录变成孤儿，
+             而那些记录既是用户凭证也是开奖核销的依据。停售只关发号口子，不动任何已有数据 -->
+        <a-button @click="confirmBatchStopSale" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
-            <DeleteOutlined />
+            <StopOutlined />
           </template>
-          批量删除
+          批量停售
         </a-button>
       </div>
       <div class="smart-table-setting-block">
@@ -83,8 +85,23 @@
         </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
-            <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
+            <!-- 已开奖/核销中的期不能改（服务端也拦），编辑只对待开奖开放 -->
+            <a-button @click="showForm(record)" type="link" :disabled="record.status !== ISSUE_STATUS_ENUM.WAIT.value">编辑</a-button>
+            <!--
+              停售不按前端时钟判「现在是否在售」：售卖窗口的判据是数据库时钟（铁律 9/10），
+              浏览器再算一遍就是第二个时钟源。这里只按状态放开按钮，
+              「本来就已停售」由服务端返回原话
+            -->
+            <a-popconfirm
+              v-if="record.status === ISSUE_STATUS_ENUM.WAIT.value"
+              title="停售会把售卖结束时间提前到此刻，立即停止发号。已发出的号码不受影响，本期照常可以开奖。"
+              ok-text="确认停售"
+              cancel-text="再想想"
+              @confirm="requestStopSale(record)"
+            >
+              <a-button danger type="link">停售</a-button>
+            </a-popconfirm>
+            <span v-else class="text-xs text-slate-300">已开奖</span>
           </div>
         </template>
       </template>
@@ -113,6 +130,7 @@
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
   import { message, Modal } from 'ant-design-vue';
+  import { StopOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { lotteryIssueApi } from '/@/api/business/lottery/lottery-issue/lottery-issue-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -120,7 +138,7 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import LotteryIssueForm from './lottery-issue-form.vue';
-  import { ISSUE_STATUS_OPTIONS, issueStatusOf } from '/@/constants/business/lottery/lottery-const';
+  import { ISSUE_STATUS_ENUM, ISSUE_STATUS_OPTIONS, issueStatusOf } from '/@/constants/business/lottery/lottery-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
   // ---------------------------- 表格列 ----------------------------
@@ -200,7 +218,7 @@
       title: '操作',
       dataIndex: 'action',
       fixed: 'right',
-      width: 90,
+      width: 140,
     },
   ]);
 
@@ -268,31 +286,23 @@
     formRef.value.show(data);
   }
 
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
+  // ---------------------------- 停售 ----------------------------
 
-  //请求删除
-  async function requestDelete(data) {
+  /*
+   * 「禁用」在期号上的落点是售卖窗口，不是状态位。
+   *
+   * t_lottery_issue.status 是生命周期（0-待开奖 / 1-核销中 / 2-已开奖），不是开关；
+   * 而运行态 TicketIssueService 判「现在还能不能领号」只认三条：
+   * 玩法已上线、期号是待开奖、当前时间落在售卖窗口内。
+   * 再加一个禁用标志位就是第四个判据，与售卖窗口重叠 —— 两个判据一定会漂移。
+   *
+   * 所以停售 = 把售卖结束时间提前到此刻。可逆：想恢复就在编辑里把结束时间改回未来。
+   */
+  async function requestStopSale(data) {
     SmartLoading.show();
     try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await lotteryIssueApi.delete(data.id);
-      message.success('删除成功');
+      await lotteryIssueApi.stopSale(data.id);
+      message.success('已停售，本期停止发号');
       queryData();
     } catch (e) {
       smartSentry.captureError(e);
@@ -301,7 +311,7 @@
     }
   }
 
-  // ---------------------------- 批量删除 ----------------------------
+  // ---------------------------- 批量停售 ----------------------------
 
   // 选择表格行
   const selectedRowKeyList = ref([]);
@@ -310,27 +320,28 @@
     selectedRowKeyList.value = selectedRowKeys;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  function confirmBatchStopSale() {
     Modal.confirm({
       title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      content: `确定停售选中的 ${selectedRowKeyList.value.length} 期吗？停售后立即停止发号，已发出的号码不受影响，本期照常可以开奖。`,
+      okText: '确认停售',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchStopSale();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  async function requestBatchStopSale() {
     try {
       SmartLoading.show();
-      await lotteryIssueApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
+      const res = await lotteryIssueApi.batchStopSale(selectedRowKeyList.value);
+      // 服务端回的是「已停售 N 期，跳过 M 期」的汇总，原样透出来 ——
+      // 批量里混着已停售/已开奖的期是常态，笼统提示一句「操作成功」会把跳过的那几期盖掉
+      message.success(res.data || '操作成功');
+      selectedRowKeyList.value = [];
       queryData();
     } catch (e) {
       smartSentry.captureError(e);

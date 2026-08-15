@@ -46,14 +46,6 @@ public interface LotteryConfigDao extends BaseMapper<LotteryConfig> {
      */
     int updateStatus(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
 
-            // ----- 物理删除 -----
-                /**
-                 * 单个物理删除
-                 */
-                long deleteById(@Param("id") Long id);
-
-                /**
-                 * 批量物理删除
-                 */
-                void batchDelete(@Param("idList") List<Long> idList);
+    // 物理删除已移除：t_lottery_record 里存着 lottery_code，删配置会让用户手里已发出的号码断链。
+    // 停售走 updateStatus 下线 —— 见 LotteryConfigController 的类注释
 }

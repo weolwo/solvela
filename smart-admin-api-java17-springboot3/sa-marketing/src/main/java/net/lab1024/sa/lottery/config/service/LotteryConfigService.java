@@ -7,7 +7,6 @@ import net.lab1024.sa.activity.domain.entity.ActivityConfig;
 import net.lab1024.sa.activity.service.ActivityConfigService;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
@@ -15,9 +14,7 @@ import net.lab1024.sa.enums.ActivityTypeEnum;
 import net.lab1024.sa.lottery.config.dao.LotteryConfigDao;
 import net.lab1024.sa.lottery.config.domain.entity.LotteryConfig;
 import net.lab1024.sa.lottery.config.domain.form.FpePreviewForm;
-import net.lab1024.sa.lottery.config.domain.form.LotteryConfigAddForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryConfigQueryForm;
-import net.lab1024.sa.lottery.config.domain.form.LotteryConfigUpdateForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryWorkbenchRuleForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryWorkbenchSaveForm;
 import net.lab1024.sa.lottery.config.domain.vo.LotteryConfigOptionVO;
@@ -454,6 +451,46 @@ public class LotteryConfigService {
                 .encrypt(sequenceNo));
     }
 
+    /**
+     * 批量下线（列表页的「批量禁用」）。
+     *
+     * <p>刻意<b>不</b>做成一个事务里全成或全败：批量下线是止血动作，
+     * 选中的 10 个里有 1 个已经是下线态，不该把另外 9 个的止血一起回滚掉。
+     * 逐个走 {@link #offline(String)}，复用它的条件更新闸门，最后回一句人话汇总。
+     *
+     * <p>「已是下线」不算失败，计入跳过 —— 运营框选一批时本来就分不清哪些已经下线了。
+     */
+    public ResponseDTO<String> batchOffline(List<String> lotteryCodeList) {
+        if (SmartCollectionUtil.isEmpty(lotteryCodeList)) {
+            return ResponseDTO.ok();
+        }
+        int success = 0;
+        int skipped = 0;
+        List<String> failed = new ArrayList<>();
+        for (String lotteryCode : lotteryCodeList) {
+            LotteryConfig config = getByLotteryCode(lotteryCode);
+            if (config == null) {
+                failed.add(lotteryCode + "（玩法不存在）");
+                continue;
+            }
+            if (STATUS_OFFLINE.equals(config.getStatus())) {
+                skipped++;
+                continue;
+            }
+            ResponseDTO<String> result = offline(lotteryCode);
+            if (result.getOk()) {
+                success++;
+            } else {
+                failed.add(lotteryCode + "（" + result.getMsg() + "）");
+            }
+        }
+        String summary = "已禁用 " + success + " 个玩法"
+                + (skipped > 0 ? "，跳过 " + skipped + " 个（本就是下线态）" : "")
+                + (failed.isEmpty() ? "" : "，失败 " + failed.size() + " 个：" + String.join("、", failed));
+        // 有失败也返回 ok：成功的那部分已经落库了，报错会让运营以为一个都没生效
+        return ResponseDTO.ok(summary);
+    }
+
     // ==================== 生成器产出的 CRUD ====================
 
     /**
@@ -463,53 +500,5 @@ public class LotteryConfigService {
         Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
         List<LotteryConfigVO> list = lotteryConfigDao.queryPage(page, queryForm);
         return SmartPageUtil.convert2PageResult(page, list);
-    }
-
-    /**
-     * 添加
-     * 彩票编码允许手工输入，故服务端必须重校验格式与唯一性（表上虽有唯一索引，但直接抛 SQL 异常对运营不友好）
-     */
-    public ResponseDTO<String> add(LotteryConfigAddForm addForm) {
-        if (!SmartCodeUtil.isValidBizCode(addForm.getLotteryCode())) {
-            return ResponseDTO.userErrorParam("彩票" + SmartCodeUtil.BIZ_CODE_MESSAGE);
-        }
-        if (existsByLotteryCode(addForm.getLotteryCode())) {
-            return ResponseDTO.userErrorParam("彩票编码已存在：" + addForm.getLotteryCode());
-        }
-        LotteryConfig lotteryConfig = SmartBeanUtil.copy(addForm, LotteryConfig.class);
-        lotteryConfig.setNumberCharset(LotteryConst.NUMBER_CHARSET);
-        lotteryConfigDao.insert(lotteryConfig);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 更新
-     */
-    public ResponseDTO<String> update(LotteryConfigUpdateForm updateForm) {
-        LotteryConfig lotteryConfig = SmartBeanUtil.copy(updateForm, LotteryConfig.class);
-        lotteryConfigDao.updateById(lotteryConfig);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 批量删除
-     */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (SmartCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
-        }
-        lotteryConfigDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 单个删除
-     */
-    public ResponseDTO<String> delete(Long id) {
-        if (null == id) {
-            return ResponseDTO.ok();
-        }
-        lotteryConfigDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 }

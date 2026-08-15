@@ -76,18 +76,6 @@
         ORDER BY create_time DESC
     </select>
 
-                <delete id="batchDelete">
-                    delete from t_lottery_config
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
-                <delete id="deleteById">
-                    delete from t_lottery_config
-                        where id = #{id}
-                </delete>
-
     <!-- 状态条件流转：WHERE status = #{from} 是并发闸门，不是多余条件 -->
     <update id="updateStatus">
         UPDATE t_lottery_config
