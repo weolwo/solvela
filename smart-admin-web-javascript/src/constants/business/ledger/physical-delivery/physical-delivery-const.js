@@ -18,6 +18,7 @@ export const DELIVERY_STATUS_ENUM = {
   DELIVERED: { value: 1, desc: '已发货', color: 'blue' },
   SIGNED: { value: 2, desc: '已签收', color: 'green' },
   RETURNED: { value: 3, desc: '异常退回', color: 'red' },
+  DISCARDED: { value: -1, desc: '废弃', color: 'grey' },
 };
 
 export const DELIVERY_STATUS_OPTIONS = Object.values(DELIVERY_STATUS_ENUM).map((i) => ({

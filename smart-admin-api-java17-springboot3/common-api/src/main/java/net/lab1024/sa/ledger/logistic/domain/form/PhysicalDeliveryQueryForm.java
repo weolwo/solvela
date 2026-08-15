@@ -1,10 +1,11 @@
 package net.lab1024.sa.ledger.logistic.domain.form;
 
-import net.lab1024.sa.base.common.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDate;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import net.lab1024.sa.base.common.domain.PageParam;
+
+import java.time.LocalDate;
 
 /**
  * 发货物流表 分页查询表单
@@ -17,9 +18,6 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class PhysicalDeliveryQueryForm extends PageParam {
-
-    @Schema(description = "租户ID")
-    private String tenantId;
 
     @Schema(description = "会员名")
     private String memberName;

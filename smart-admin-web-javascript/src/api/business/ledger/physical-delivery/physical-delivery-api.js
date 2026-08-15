@@ -32,15 +32,15 @@ export const physicalDeliveryApi = {
   /**
    * 删除  @author  weolwo
    */
-  delete: (id) => {
-    return getRequest(`/physicalDelivery/delete/${id}`);
+  discard: (id) => {
+    return getRequest(`/physicalDelivery/discard/${id}`);
   },
 
   /**
    * 批量删除  @author  weolwo
    */
-  batchDelete: (idList) => {
-    return postRequest('/physicalDelivery/batchDelete', idList);
+  batchDiscard: (idList) => {
+    return postRequest('/physicalDelivery/batchDiscard', idList);
   },
 
   /**
@@ -69,5 +69,12 @@ export const physicalDeliveryApi = {
    */
   importShip: (formData) => {
     return postRequest('/physicalDelivery/importShip', formData);
+  },
+
+  /**
+   * 导出：履约单
+   */
+  exportOrder: (formData) => {
+    return postRequest('/physicalDelivery/exportOrder', formData);
   },
 };

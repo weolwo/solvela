@@ -75,24 +75,24 @@ public class PhysicalDeliveryService {
     /**
      * 批量删除
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public ResponseDTO<String> batchDiscard(List<Long> idList) {
         if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
 
-        physicalDeliveryDao.deleteBatchIds(idList);
+        physicalDeliveryDao.discardBatchIds(idList);
         return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public ResponseDTO<String> discard(Long id) {
         if (null == id){
             return ResponseDTO.ok();
         }
 
-        physicalDeliveryDao.deleteById(id);
+        physicalDeliveryDao.discardById(id);
         return ResponseDTO.ok();
     }
 

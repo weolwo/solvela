@@ -1,30 +1,24 @@
 package net.lab1024.sa.ledger.logistic.controller;
 
-import jakarta.servlet.http.HttpServletResponse;
-import net.lab1024.sa.base.common.domain.ValidateList;
-import net.lab1024.sa.base.common.util.SmartExcelUtil;
-import net.lab1024.sa.ledger.logistic.domain.entity.PhysicalDelivery;
-import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
-import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
-import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
-import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
-import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
-import net.lab1024.sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
-import net.lab1024.sa.ledger.logistic.service.PhysicalDeliveryService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import net.lab1024.sa.base.common.domain.ResponseDTO;
-import net.lab1024.sa.base.common.domain.PageResult;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.ResponseDTO;
+import net.lab1024.sa.base.common.domain.ValidateList;
+import net.lab1024.sa.base.common.util.SmartExcelUtil;
+import net.lab1024.sa.ledger.logistic.domain.form.*;
+import net.lab1024.sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
+import net.lab1024.sa.ledger.logistic.service.PhysicalDeliveryService;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Collections;
+
 /**
  * 发货物流表 Controller
  *
@@ -62,17 +56,17 @@ public class PhysicalDeliveryController {
     }
 
     @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("physicalDelivery:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+    @PostMapping("/batchDiscard")
+    @SaCheckPermission("physicalDelivery:discard")
+    public ResponseDTO<String> batchDiscard(@RequestBody ValidateList<Long> idList) {
+        return Service.batchDiscard(idList);
     }
 
     @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("physicalDelivery:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
+    @GetMapping("/discard/{id}")
+    @SaCheckPermission("physicalDelivery:discard")
+    public ResponseDTO<String> discard(@PathVariable Long id) {
+        return Service.discard(id);
     }
 
     // ------------------------------------------------------------------ Excel 导入

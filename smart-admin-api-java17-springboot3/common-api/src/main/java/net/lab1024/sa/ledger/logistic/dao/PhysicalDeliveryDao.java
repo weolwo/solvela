@@ -1,13 +1,13 @@
 package net.lab1024.sa.ledger.logistic.dao;
 
-        import java.util.List;
-        import net.lab1024.sa.ledger.logistic.domain.entity.PhysicalDelivery;
-        import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
-        import net.lab1024.sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import net.lab1024.sa.ledger.logistic.domain.entity.PhysicalDelivery;
+import net.lab1024.sa.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
+import net.lab1024.sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
 import java.util.List;
 
 /**
@@ -23,7 +23,7 @@ public interface PhysicalDeliveryDao extends BaseMapper<PhysicalDelivery> {
     /**
      * 分页查询
      *
-     * @param page 分页参数
+     * @param page      分页参数
      * @param queryForm 查询表单
      * @return 列表数据
      */
@@ -37,14 +37,15 @@ public interface PhysicalDeliveryDao extends BaseMapper<PhysicalDelivery> {
      */
     List<PhysicalDeliveryVO> queryList(@Param("queryForm") PhysicalDeliveryQueryForm queryForm);
 
-            // ----- 物理删除 -----
-                /**
-                 * 单个物理删除
-                 */
-                long deleteById(@Param("id") Long id);
+    // ----- 物理删除 -----
 
-                /**
-                 * 批量物理删除
-                 */
-                void batchDelete(@Param("idList") List<Long> idList);
+    /**
+     * 单个物理删除
+     */
+    long discardById(@Param("id") Long id);
+
+    /**
+     * 批量物理删除
+     */
+    void discardBatchIds(@Param("idList") List<Long> idList);
 }

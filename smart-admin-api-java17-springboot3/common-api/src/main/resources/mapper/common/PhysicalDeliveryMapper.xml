@@ -40,9 +40,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.memberName != null">
                             AND member_name = #{queryForm.memberName}
                         </if>
@@ -83,16 +80,16 @@
         ORDER BY create_time DESC
     </select>
 
-                <delete id="batchDelete">
-                    delete from t_physical_delivery
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
-                <delete id="deleteById">
-                    delete from t_physical_delivery
-                        where id = #{id}
-                </delete>
+    <delete id="discardBatchIds">
+        update  t_physical_delivery set status=-1
+        where status=0 and id in
+        <foreach collection="idList" open="(" close=")" separator="," item="item">
+            #{item}
+        </foreach>
+    </delete>
+    <delete id="discardById">
+        update  t_physical_delivery set status=-1
+            where id = #{id} and status=0
+    </delete>
 
 </mapper>
