@@ -16,6 +16,7 @@ import net.lab1024.sa.task.taskconfig.dao.TaskConfigDao;
 import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigAddForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigQueryForm;
+import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigStatusUpdateForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigUpdateForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardConfigForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
@@ -54,6 +55,12 @@ public class TaskConfigService {
      * 任务状态：1-待生效
      */
     private static final Integer STATUS_PENDING = 1;
+
+    /**
+     * 任务状态：2-生效中 / 3-已下线（对齐 TaskConst.CONFIG_STATUS_*）
+     */
+    private static final Integer STATUS_ACTIVE = 2;
+    private static final Integer STATUS_OFFLINE = 3;
 
     /**
      * image_upload 控件的参数值随 uiConfig 提交，与前端 splitSchemaValues 同一拆分语义
@@ -114,6 +121,28 @@ public class TaskConfigService {
 
         // 返回主表ID，前端成功页据此定位刚创建的任务
         return ResponseDTO.ok(taskConfig.getId());
+    }
+
+    /**
+     * 任务配置 上/下线（列表页的批量下线用它）。
+     *
+     * <p>替代删除：任务记录里存着 task_config_id，删配置会让历史记录指向一条不存在的配置。
+     * 下线后运行态不再订阅该任务的事件（判据是 status != 3，见 TaskConst.CONFIG_STATUS_OFFLINE），
+     * 已在跑的记录按接取时的快照走完，不受影响。
+     */
+    public ResponseDTO<String> updateStatus(TaskConfigStatusUpdateForm form) {
+        if (!STATUS_PENDING.equals(form.getStatus())
+                && !STATUS_ACTIVE.equals(form.getStatus())
+                && !STATUS_OFFLINE.equals(form.getStatus())) {
+            return ResponseDTO.userErrorParam("目标状态只能是 1-待生效、2-生效中 或 3-已下线");
+        }
+        for (Long id : form.getIdList()) {
+            TaskConfig update = new TaskConfig();
+            update.setId(id);
+            update.setStatus(form.getStatus());
+            taskConfigDao.updateById(update);
+        }
+        return ResponseDTO.ok();
     }
 
     /**

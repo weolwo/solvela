@@ -55,11 +55,14 @@
           </template>
           新建
         </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <!-- 只提供批量禁用：任务记录是运行态流水（含 rule_snapshot / prize_snapshot），
+             删掉等于抹掉这个人当初参与过的证据，客诉自证就没了依据；
+             禁用 = 置为已过期，不再推进也不再发奖 -->
+        <a-button @click="confirmBatchDisable" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
-            <DeleteOutlined />
+            <StopOutlined />
           </template>
-          批量删除
+          批量禁用
         </a-button>
       </div>
       <div class="smart-table-setting-block">
@@ -89,7 +92,6 @@
           <div class="smart-table-operate">
             <a-button @click="showFlow(record)" type="link">事件流水</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
         </template>
       </template>
@@ -163,7 +165,7 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import { RECORD_STATUS_OPTIONS, recordStatusOf } from '/@/constants/business/task/task-record/task-record-const';
+  import { RECORD_STATUS_ENUM, RECORD_STATUS_OPTIONS, recordStatusOf } from '/@/constants/business/task/task-record/task-record-const';
   import TaskRecordForm from './task-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import { taskEventApi } from '/@/api/business/task/task-event/task-event-api';
@@ -341,39 +343,6 @@
     formRef.value.show(data);
   }
 
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求删除
-  async function requestDelete(data) {
-    SmartLoading.show();
-    try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await taskRecordApi.delete(data.id);
-      message.success('删除成功');
-      queryData();
-    } catch (e) {
-      smartSentry.captureError(e);
-    } finally {
-      SmartLoading.hide();
-    }
-  }
-
   // ---------------------------- 事件流水（客诉自证） ----------------------------
 
   const flowVisible = ref(false);
@@ -400,7 +369,7 @@
     expandedPayloadId.value = expandedPayloadId.value === id ? null : id;
   }
 
-  // ---------------------------- 批量删除 ----------------------------
+  // ---------------------------- 批量禁用 ----------------------------
 
   // 选择表格行
   const selectedRowKeyList = ref([]);
@@ -409,28 +378,31 @@
     selectedRowKeyList.value = selectedRowKeys;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  function confirmBatchDisable() {
     Modal.confirm({
-      title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      title: '批量禁用',
+      content: `确定要禁用选中的 ${selectedRowKeyList.value.length} 条任务记录吗？将置为「已过期」，不再推进进度也不再发奖，历史流水保留。`,
+      okText: '禁用',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchDisable();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  async function requestBatchDisable() {
     try {
       SmartLoading.show();
-      await taskRecordApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
-      queryData();
+      // 服务端只放行 3-已过期：t_task_record.status 没有「禁用」这一档
+      await taskRecordApi.updateStatus({
+        idList: selectedRowKeyList.value,
+        status: RECORD_STATUS_ENUM.EXPIRED.value,
+      });
+      message.success('已批量禁用');
+      selectedRowKeyList.value = [];
+      await queryData();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {

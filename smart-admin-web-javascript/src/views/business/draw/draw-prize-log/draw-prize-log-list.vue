@@ -9,9 +9,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户id" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户id" />
-      </a-form-item>
       <a-form-item label="请求ID" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.traceId" placeholder="请求ID" />
       </a-form-item>
@@ -68,11 +65,6 @@
         <template v-if="column.dataIndex === 'status'">
           <a-tag :color="drawStatusOf(text).color">{{ drawStatusOf(text).desc }}</a-tag>
         </template>
-        <template v-if="column.dataIndex === 'action'">
-          <div class="smart-table-operate">
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
-          </div>
-        </template>
       </template>
     </a-table>
     <!---------- 表格 end ----------->
@@ -111,11 +103,6 @@
     {
       title: 'id',
       dataIndex: 'id',
-      ellipsis: true,
-    },
-    {
-      title: '租户id',
-      dataIndex: 'tenantId',
       ellipsis: true,
     },
     {
@@ -162,20 +149,12 @@
       title: '创建时间',
       dataIndex: 'createTime',
       ellipsis: true,
-    },
-    {
-      title: '操作',
-      dataIndex: 'action',
-      fixed: 'right',
-      width: 90,
-    },
+    }
   ]);
 
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户id
-    traceId: undefined, //请求ID
     activityCode: undefined, //活动编码
     createTime: [], //创建时间
     createTimeBegin: undefined, //创建时间 开始

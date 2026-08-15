@@ -18,6 +18,7 @@ import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateQueryForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateSaveForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateUpdateForm;
 import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateOptionVO;
+import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateStatusUpdateForm;
 import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateVO;
 import net.lab1024.sa.task.tasktemplate.manager.TaskTemplateManager;
 import org.apache.commons.lang3.StringUtils;
@@ -43,6 +44,12 @@ public class TaskTemplateService {
 
     private final TaskTemplateDao taskTemplateDao;
     private final TaskTemplateManager taskTemplateManager;
+
+    /**
+     * 模板状态：1-启用, 0-禁用（对齐 t_task_template.status）
+     */
+    private static final Integer STATUS_ENABLED = 1;
+    private static final Integer STATUS_DISABLED = 0;
 
     /**
      * ui_schema 里承载卡片展示信息的两个可选字段：模板设计器写在 JSON 里，向导卡片读出来渲染
@@ -77,7 +84,12 @@ public class TaskTemplateService {
      * 单个模板的 ui_schema 脏了不该让整个向导开不了，解析失败的模板跳过并告警
      */
     public ResponseDTO<List<TaskTemplateOptionVO>> queryOptionList() {
-        List<TaskTemplate> list = taskTemplateManager.lambdaQuery().orderByDesc(TaskTemplate::getId).list();
+        // 只给启用中的模板：禁用的意义就是「不再让人拿它建新任务」，
+        // 已经用它建好的任务不受影响（运行态按 template_code 取脚本，与这里的候选列表无关）
+        List<TaskTemplate> list = taskTemplateManager.lambdaQuery()
+                .eq(TaskTemplate::getStatus, STATUS_ENABLED)
+                .orderByDesc(TaskTemplate::getId)
+                .list();
         List<TaskTemplateOptionVO> optionList = new ArrayList<>(list.size());
         for (TaskTemplate template : list) {
             Map<String, Object> uiSchema = parseUiSchema(template);
@@ -272,6 +284,37 @@ public class TaskTemplateService {
         }
         String schemaError = checkUiSchema(uiSchema);
         return schemaError != null ? schemaError : checkTargetParamDeclared(taskType, uiSchema);
+    }
+
+    /**
+     * 模板启用 / 禁用（单个开关与批量禁用共用）。
+     *
+     * <p>管理端用它替代删除：模板被 t_task_config.template_code 引用，运行态还要按 code 取
+     * ui_schema / rule_script。删掉不会立刻报错，而是让引用它的任务安静地不再推进 ——
+     * 禁用则只是不再出现在向导的候选里，存量任务照常跑。
+     */
+    public ResponseDTO<String> updateStatus(TaskTemplateStatusUpdateForm form) {
+        if (!STATUS_ENABLED.equals(form.getStatus()) && !STATUS_DISABLED.equals(form.getStatus())) {
+            return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 0-禁用");
+        }
+        for (Long id : form.getIdList()) {
+            TaskTemplate update = new TaskTemplate();
+            update.setId(id);
+            update.setStatus(form.getStatus());
+            taskTemplateDao.updateById(update);
+        }
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 模板详情：供模板设计器的编辑态回显 ui_schema / rule_script。
+     */
+    public ResponseDTO<TaskTemplateVO> detail(Long id) {
+        TaskTemplate template = taskTemplateDao.selectById(id);
+        if (template == null) {
+            return ResponseDTO.userErrorParam("任务模板不存在");
+        }
+        return ResponseDTO.ok(SmartBeanUtil.copy(template, TaskTemplateVO.class));
     }
 
     /**

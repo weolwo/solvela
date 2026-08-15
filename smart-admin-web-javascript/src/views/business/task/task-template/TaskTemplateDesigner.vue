@@ -7,7 +7,16 @@
   * @Date:      2026-07-19
 -->
 <template>
-  <a-card :bordered="false">
+  <a-card :bordered="false" :loading="detailLoading">
+    <!-- 编辑态横幅：设计器长得和新建一模一样，不说清楚很容易以为在建新模板 -->
+    <a-alert v-if="isEditMode" type="info" show-icon class="mb-4">
+      <template #message>
+        正在编辑模板「{{ designer.base.templateName || '—' }}」（编码 {{ designer.base.templateCode }}）。
+        保存即覆盖该模板的 ui_schema 与规则脚本；<b>模板编码不可更改</b>。
+        已用它建好的任务不受影响（运行态按编码取脚本，改脚本会影响后续接取的任务）。
+      </template>
+    </a-alert>
+
     <!-- 草稿恢复提示：浏览器崩溃/强制关闭等未走离开拦截的情况下兜底 -->
     <a-alert v-if="pendingDraft" type="warning" show-icon class="mb-4">
       <template #message>
@@ -32,15 +41,20 @@
                   <!-- 模板编码：10位大写字母+数字，同时也是 upsert 唯一键；填已存在的编码即覆盖该模板 -->
                   <a-form-item label="模板编码 template_code" :name="['base', 'templateCode']" :rules="FORM_RULES.templateCode">
                     <a-input-group compact>
+                      <!-- 编辑态锁死编码：保存是按 template_code 做 upsert，改了编码就变成新建另一个模板，
+                           原模板还留在库里，而运营以为自己只是改了个名字 -->
                       <a-input
                         v-model:value="designer.base.templateCode"
                         style="width: calc(100% - 96px)"
                         :maxlength="10"
+                        :disabled="isEditMode"
                         placeholder="如 H88JHKJFNE，或点右侧生成"
                         @change="onTemplateCodeInput"
                       />
-                      <a-tooltip title="随机生成一个未被占用的编码（等同于新建一个模板）">
-                        <a-button style="width: 96px" :loading="codeGenerating" @click="generateTemplateCode">生成</a-button>
+                      <a-tooltip :title="isEditMode ? '编辑模板时不可更改编码' : '随机生成一个未被占用的编码（等同于新建一个模板）'">
+                        <a-button style="width: 96px" :disabled="isEditMode" :loading="codeGenerating" @click="generateTemplateCode">
+                          生成
+                        </a-button>
                       </a-tooltip>
                     </a-input-group>
                   </a-form-item>
@@ -209,6 +223,10 @@
   import { localRead, localRemove, localSave } from '/@/utils/local-util';
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
+  import { taskTemplateApi } from '/@/api/business/task/task-template/task-template-api';
+  import { useRoute } from 'vue-router';
+
+  const route = useRoute();
   import { smartSentry } from '/@/lib/smart-sentry';
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
   import SmartCodeEditor from '/@/components/business/code-editor/SmartCodeEditor.vue';
@@ -339,6 +357,56 @@
   async function prefillTemplateCode() {
     await generateTemplateCode();
     savedSnapshot.value = currentSnapshot.value;
+  }
+
+  // ---------------------------- 编辑态：列表页带 id 进来，回显既有模板 ----------------------------
+
+  /*
+   * 保存走的是按 template_code 的 upsert，所以「编辑」= 载入原模板 + 保持编码不变 + 再保存一次。
+   * 正因如此编辑态必须锁死编码：改了编码就不是更新这个模板，而是凭空建出一个新模板，
+   * 原模板还留在库里 —— 而运营以为自己只是改了个名字。
+   */
+  const editId = ref(null);
+  const isEditMode = computed(() => !!editId.value);
+  const detailLoading = ref(false);
+
+  async function loadTemplateDetail(id) {
+    detailLoading.value = true;
+    try {
+      const res = await taskTemplateApi.detail(id);
+      const d = res.data;
+      if (!d) {
+        message.error('任务模板不存在');
+        return;
+      }
+      Object.assign(designer.base, {
+        templateCode: d.templateCode,
+        templateName: d.templateName,
+        taskType: d.taskType,
+        triggerEvent: d.triggerEvent || undefined,
+      });
+      designer.ruleScript = d.ruleScript || '';
+      // ui_schema 接口下发的是字符串，编辑器要的是格式化后的文本；
+      // 解析不了就原样放进去，让人在编辑器里看到真实内容而不是一句报错
+      designer.uiSchemaText = formatSchemaText(d.uiSchema);
+      // 回显完成才是编辑态的基线，否则一进来就被判成有未保存改动
+      savedSnapshot.value = currentSnapshot.value;
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      detailLoading.value = false;
+    }
+  }
+
+  function formatSchemaText(raw) {
+    if (!raw) {
+      return '';
+    }
+    try {
+      return JSON.stringify(typeof raw === 'string' ? JSON.parse(raw) : raw, null, 2);
+    } catch (e) {
+      return typeof raw === 'string' ? raw : '';
+    }
   }
 
   const FORM_RULES = {
@@ -481,8 +549,10 @@
 
   // 内容变化即自动暂存，不依赖使用者记得手动点
   watch(currentSnapshot, () => {
-    // 历史草稿待用户决定期间冻结自动暂存，否则随手一改就会把待恢复的内容覆盖掉
-    if (pendingDraft.value) {
+    // 历史草稿待用户决定期间冻结自动暂存，否则随手一改就会把待恢复的内容覆盖掉。
+    // 编辑态同样不写草稿：草稿是「还没建出来的新模板」，把一次编辑存成草稿，
+    // 下次进设计器新建时会被当成未完成的新模板恢复出来
+    if (pendingDraft.value || isEditMode.value) {
       return;
     }
     clearTimeout(draftTimer);
@@ -527,10 +597,19 @@
   }
 
   onMounted(() => {
-    prefillTemplateCode();
     loadEventOptions();
-
     window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 编辑态：回显既有模板，既不生成新编码，也不走草稿恢复
+    // （草稿是「上次没编完的新模板」，恢复到一个正在编辑的既有模板上只会把它覆盖掉）
+    const idFromQuery = route.query.id;
+    if (idFromQuery) {
+      editId.value = Number(idFromQuery);
+      loadTemplateDetail(editId.value);
+      return;
+    }
+
+    prefillTemplateCode();
     // 检测上次遗留的草稿（浏览器崩溃、强制关闭等未走离开拦截的情况）
     const raw = localRead(LocalStorageKeyConst.TASK_TEMPLATE_DRAFT);
     if (!raw) {

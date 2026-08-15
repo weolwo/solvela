@@ -30,6 +30,14 @@ export const taskConfigApi = {
   },
 
   /**
+   * 上/下线：列表页的批量下线用它，替代删除。
+   * ⚠️ 任务记录里存着 task_config_id，删配置会让历史记录指向一条不存在的配置  @author  alaric
+   */
+  updateStatus: (param) => {
+    return postRequest('/taskConfig/updateStatus', param);
+  },
+
+  /**
    * 删除  @author  weolwo
    */
   delete: (id) => {

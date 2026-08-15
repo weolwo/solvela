@@ -1,9 +1,7 @@
 package net.lab1024.sa.task.runtime;
 
-import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.lab1024.sa.base.common.util.JsonUtils;
 import net.lab1024.sa.domain.event.UserPrizeEvent;
 import net.lab1024.sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import net.lab1024.sa.prize.prizeconfig.service.PrizeConfigService;
@@ -21,7 +19,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 阶梯发奖：把「本次事件跨过了哪些档位」翻译成 {@link UserPrizeEvent}，复用既有派奖链路。
@@ -157,16 +154,12 @@ public class TaskPrizeDispatcher {
         return readDecimal(mapping.getStageCondition(), TaskConst.STAGE_KEY_TARGET);
     }
 
+    /**
+     * 子表两个 json 列的取值口径。管理端的巡检页（{@code TaskPrizeMappingService}）读的是同一条路径 ——
+     * 各写一份「差不多的」解析，迟早出现「页面显示正常、运行态解析不出」的漂移。
+     */
     private BigDecimal readDecimal(String json, String key) {
-        if (json == null || json.isBlank()) {
-            return null;
-        }
-        Map<String, Object> map = JsonUtils.parseType(json, new TypeReference<Map<String, Object>>() {
-        });
-        if (map == null) {
-            return null;
-        }
-        return new TaskRuleConfig(map).decimal(key);
+        return TaskRuleConfig.parse(json).decimal(key);
     }
 
     /**

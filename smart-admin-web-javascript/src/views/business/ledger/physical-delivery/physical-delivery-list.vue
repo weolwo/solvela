@@ -58,11 +58,11 @@
           </template>
           新建
         </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <a-button @click="confirmBatchDiscard()" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
             <DeleteOutlined />
           </template>
-          批量删除
+          批量废弃
         </a-button>
         <a-button @click="showImportModal" type="primary" size="small">
           <template #icon>
@@ -96,7 +96,7 @@
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
+            <a-button v-if="record.status === DELIVERY_STATUS_ENUM.PENDING.value" @click="onDiscard(record)" danger type="link">废弃</a-button>
           </div>
         </template>
       </template>
@@ -175,7 +175,11 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import PhysicalDeliveryForm from './physical-delivery-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-  import { DELIVERY_STATUS_OPTIONS, deliveryStatusOf } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
+  import {
+    DELIVERY_STATUS_ENUM,
+    DELIVERY_STATUS_OPTIONS,
+    deliveryStatusOf
+  } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
 
   // ---------------------------- 表格列 ----------------------------
 
@@ -266,7 +270,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户ID
     memberName: undefined, //会员名
     proposalId: undefined, //发奖提案ID
     sourceType: undefined, //来源类型
@@ -329,31 +332,28 @@
     formRef.value.show(data);
   }
 
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
+  // ---------------------------- 确认废弃 ----------------------------
+  //确认废弃
+  function onDiscard(data) {
     Modal.confirm({
       title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
+      content: '确定要确认废弃选吗?',
+      okText: '废弃',
       okType: 'danger',
       onOk() {
-        requestDelete(data);
+        requestDiscard(data);
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求删除
-  async function requestDelete(data) {
+  //请求确认废弃
+  async function requestDiscard(data) {
     SmartLoading.show();
     try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await physicalDeliveryApi.delete(data.id);
-      message.success('删除成功');
+      await physicalDeliveryApi.discard(data.id);
+      message.success('操作成功');
       queryData();
     } catch (e) {
       smartSentry.captureError(e);
@@ -371,27 +371,27 @@
     selectedRowKeyList.value = selectedRowKeys;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  // 批量废弃
+  function confirmBatchDiscard() {
     Modal.confirm({
       title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      content: '确定要批量废弃这些数据吗?',
+      okText: '废弃',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchDiscard();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  //请求批量废弃
+  async function requestBatchDiscard() {
     try {
       SmartLoading.show();
-      await physicalDeliveryApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
+      await physicalDeliveryApi.batchDiscard(selectedRowKeyList.value);
+      message.success('操作成功');
       queryData();
     } catch (e) {
       smartSentry.captureError(e);

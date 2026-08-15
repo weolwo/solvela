@@ -5,6 +5,7 @@ import net.lab1024.sa.task.tasktemplate.domain.entity.TaskTemplate;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateAddForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateQueryForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateSaveForm;
+import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateStatusUpdateForm;
 import net.lab1024.sa.task.tasktemplate.domain.form.TaskTemplateUpdateForm;
 import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateOptionVO;
 import net.lab1024.sa.task.tasktemplate.domain.vo.TaskTemplateVO;
@@ -76,6 +77,20 @@ public class TaskTemplateController {
     @SaCheckPermission("taskTemplate:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskTemplateUpdateForm updateForm) {
         return Service.update(updateForm);
+    }
+
+    @Operation(summary = "启用/禁用（单个开关与批量禁用共用）")
+    @PostMapping("/updateStatus")
+    @SaCheckPermission("taskTemplate:update")
+    public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskTemplateStatusUpdateForm form) {
+        return Service.updateStatus(form);
+    }
+
+    @Operation(summary = "模板详情（供模板设计器编辑态回显）")
+    @GetMapping("/detail/{id}")
+    @SaCheckPermission("taskTemplate:query")
+    public ResponseDTO<TaskTemplateVO> detail(@PathVariable Long id) {
+        return Service.detail(id);
     }
 
     @Operation(summary = "批量删除")

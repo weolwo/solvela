@@ -61,6 +61,11 @@ public class TaskTemplate {
     private String ruleScript;
 
     /**
+     * 状态：0-禁用, 1-启用
+     */
+    private Integer status;
+
+    /**
      * 创建人
      */
     private String createBy;

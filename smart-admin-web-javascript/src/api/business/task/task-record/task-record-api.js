@@ -30,6 +30,15 @@ export const taskRecordApi = {
   },
 
   /**
+   * 批量禁用：置为 3-已过期。
+   * ⚠️ t_task_record.status 没有「禁用」这一档，「不再推进、不再发奖」的终态只有已过期，
+   * 服务端也只放行 3  @author  alaric
+   */
+  updateStatus: (param) => {
+    return postRequest('/taskRecord/updateStatus', param);
+  },
+
+  /**
    * 删除  @author  weolwo
    */
   delete: (id) => {

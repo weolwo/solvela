@@ -4,6 +4,7 @@ import net.lab1024.sa.base.common.domain.ValidateList;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.record.domain.form.TaskRecordAddForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordQueryForm;
+import net.lab1024.sa.task.record.domain.form.TaskRecordStatusUpdateForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordUpdateForm;
 import net.lab1024.sa.task.record.domain.vo.TaskRecordVO;
 import net.lab1024.sa.task.record.service.TaskRecordService;
@@ -51,6 +52,13 @@ public class TaskRecordController {
     @SaCheckPermission("taskRecord:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskRecordUpdateForm updateForm) {
         return Service.update(updateForm);
+    }
+
+    @Operation(summary = "批量禁用（置为 3-已过期，替代删除）")
+    @PostMapping("/updateStatus")
+    @SaCheckPermission("taskRecord:update")
+    public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskRecordStatusUpdateForm form) {
+        return Service.updateStatus(form);
     }
 
     @Operation(summary = "批量删除")

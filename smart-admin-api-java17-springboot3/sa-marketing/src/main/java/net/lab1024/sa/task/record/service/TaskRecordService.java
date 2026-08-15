@@ -11,6 +11,7 @@ import net.lab1024.sa.task.record.dao.TaskRecordDao;
 import net.lab1024.sa.task.record.domain.entity.TaskRecord;
 import net.lab1024.sa.task.record.domain.form.TaskRecordAddForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordQueryForm;
+import net.lab1024.sa.task.record.domain.form.TaskRecordStatusUpdateForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordUpdateForm;
 import net.lab1024.sa.task.record.domain.vo.TaskRecordVO;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,11 @@ import java.util.List;
 public class TaskRecordService {
 
     private final TaskRecordDao taskRecordDao;
+
+    /**
+     * 任务记录状态：3-已过期（对齐 TaskConst.RECORD_STATUS_EXPIRED）
+     */
+    private static final Integer STATUS_EXPIRED = 3;
 
     /**
      * 分页查询
@@ -55,6 +61,27 @@ public class TaskRecordService {
     public ResponseDTO<String> update(TaskRecordUpdateForm updateForm) {
         TaskRecord taskRecord = SmartBeanUtil.copy(updateForm, TaskRecord.class);
         taskRecordDao.updateById(taskRecord);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 任务记录 批量禁用：置为 3-已过期。
+     *
+     * <p>t_task_record.status 没有「禁用」这一档，「让这条记录不再推进、不再发奖」在库里
+     * 只有「已过期」一个终态可表达（过期任务本来也是这么收口的）。
+     * 故这里只放行 3，不接受其它值 —— 允许管理端随手把记录改回「进行中」或「已发奖」，
+     * 等于给了一条绕过运行态直接改结果的路。
+     */
+    public ResponseDTO<String> updateStatus(TaskRecordStatusUpdateForm form) {
+        if (!STATUS_EXPIRED.equals(form.getStatus())) {
+            return ResponseDTO.userErrorParam("任务记录只支持置为 3-已过期（即管理端的「禁用」）");
+        }
+        for (Long id : form.getIdList()) {
+            TaskRecord update = new TaskRecord();
+            update.setId(id);
+            update.setStatus(form.getStatus());
+            taskRecordDao.updateById(update);
+        }
         return ResponseDTO.ok();
     }
 

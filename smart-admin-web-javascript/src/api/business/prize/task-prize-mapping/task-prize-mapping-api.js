@@ -1,11 +1,15 @@
 /**
  * 任务阶段与奖励映射表 api 封装
  *
+ * 🔴 只有查询。这张表由任务配置向导整体托管（保存时按 taskConfigId 全删重插），
+ * 单条增删改在这里做了也会被下一次向导保存抹掉；停发奖励的正确做法是把任务下线。
+ * 服务端对应的 add/update/delete/batchDelete 接口已一并移除。
+ *
  * @Author:    weolwo
  * @Date:      2026-04-18 20:41:02
  * @Copyright  weolwo
  */
-import { postRequest, getRequest } from '/@/lib/axios';
+import { postRequest } from '/@/lib/axios';
 
 export const taskPrizeMappingApi = {
 
@@ -14,35 +18,6 @@ export const taskPrizeMappingApi = {
    */
   queryPage : (param) => {
     return postRequest('/taskPrizeMapping/queryPage', param);
-  },
-
-  /**
-   * 增加  @author  weolwo
-   */
-  add: (param) => {
-      return postRequest('/taskPrizeMapping/add', param);
-  },
-
-  /**
-   * 修改  @author  weolwo
-   */
-  update: (param) => {
-      return postRequest('/taskPrizeMapping/update', param);
-  },
-
-
-  /**
-   * 删除  @author  weolwo
-   */
-  delete: (id) => {
-      return getRequest(`/taskPrizeMapping/delete/${id}`);
-  },
-
-  /**
-   * 批量删除  @author  weolwo
-   */
-  batchDelete: (idList) => {
-      return postRequest('/taskPrizeMapping/batchDelete', idList);
   },
 
 };

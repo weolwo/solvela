@@ -30,6 +30,21 @@ export const taskTemplateApi = {
   },
 
   /**
+   * 启用/禁用：单个开关与批量禁用共用，替代删除。
+   * ⚠️ 模板被 t_task_config.template_code 引用，删掉会让引用它的任务安静地不再推进  @author  alaric
+   */
+  updateStatus: (param) => {
+    return postRequest('/taskTemplate/updateStatus', param);
+  },
+
+  /**
+   * 模板详情：供模板设计器编辑态回显 ui_schema / rule_script  @author  alaric
+   */
+  detail: (id) => {
+    return getRequest(`/taskTemplate/detail/${id}`);
+  },
+
+  /**
    * 删除  @author  weolwo
    */
   delete: (id) => {

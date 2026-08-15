@@ -5,6 +5,7 @@ import net.lab1024.sa.task.taskconfig.domain.entity.TaskConfig;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigAddForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigQueryForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigUpdateForm;
+import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigStatusUpdateForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardUpdateForm;
 import net.lab1024.sa.task.taskconfig.domain.vo.TaskConfigWizardDetailVO;
@@ -54,6 +55,13 @@ public class TaskConfigController {
     @SaCheckPermission("taskConfig:wizard:submit")
     public ResponseDTO<Long> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
         return Service.wizardSubmit(submitForm);
+    }
+
+    @Operation(summary = "上/下线（列表页批量下线用它，替代删除）")
+    @PostMapping("/updateStatus")
+    @SaCheckPermission("taskConfig:update")
+    public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskConfigStatusUpdateForm form) {
+        return Service.updateStatus(form);
     }
 
     @Operation(summary = "任务配置向导回显（主子表一次性返回，供编辑态铺回 5 个步骤）")

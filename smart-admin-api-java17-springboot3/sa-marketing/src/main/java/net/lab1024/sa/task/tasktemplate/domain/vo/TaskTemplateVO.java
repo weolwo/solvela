@@ -40,6 +40,9 @@ public class TaskTemplateVO {
     @Schema(description = "QLExpress脚本")
     private String ruleScript;
 
+    @Schema(description = "状态：0-禁用, 1-启用")
+    private Integer status;
+
     @Schema(description = "创建人")
     private String createBy;
 

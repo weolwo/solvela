@@ -30,6 +30,9 @@ public class TaskTemplateQueryForm extends PageParam {
     @Schema(description = "流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)")
     private String taskType;
 
+    @Schema(description = "状态：0-禁用, 1-启用")
+    private Integer status;
+
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;
 

@@ -72,11 +72,13 @@
           </template>
           任务配置向导
         </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
+        <!-- 只提供批量下线：任务记录里存着 task_config_id，删配置会让历史记录指向一条不存在的配置，
+             复盘时查不到这条任务当初是怎么配的；下线后运行态不再订阅事件，已在跑的记录按快照走完 -->
+        <a-button @click="confirmBatchOffline" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
-            <DeleteOutlined />
+            <StopOutlined />
           </template>
-          批量删除
+          批量下线
         </a-button>
       </div>
       <div class="smart-table-setting-block">
@@ -114,7 +116,6 @@
           <div class="smart-table-operate">
             <a-button @click="showDetail(record)" type="link">详情</a-button>
             <a-button @click="goWizardEdit(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
         </template>
       </template>
@@ -208,6 +209,7 @@
   import { toEventOptions } from '../task-wizard/task-wizard-const';
   import { prizeModeOf } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
   import {
+    CONFIG_STATUS_ENUM,
     CONFIG_STATUS_OPTIONS,
     configStatusOf,
     limitTypeOf,
@@ -432,12 +434,15 @@
 
   // ---------------------------- 详情 ----------------------------
 
+  // 达标值/奖励值取服务端从 stage_condition.target、prize_strategy.value 拆好的字段，
+  // 不再直接铺原始 JSON —— 与「任务奖励总览」页看到的是同一份口径
   const LADDER_COLUMNS = [
     { title: '阶梯', dataIndex: 'stageLevel', width: 70 },
-    { title: '达标条件', dataIndex: 'stageCondition', width: 160, ellipsis: true },
+    { title: '达标值', dataIndex: 'stageTarget', width: 100 },
     { title: '奖励编码', dataIndex: 'prizeCode', width: 140, ellipsis: true },
+    { title: '奖品名称', dataIndex: 'prizeName', width: 140, ellipsis: true },
     { title: '计算类型', dataIndex: 'prizeMode', width: 100 },
-    { title: '发奖策略', dataIndex: 'prizeStrategy', ellipsis: true },
+    { title: '奖励值', dataIndex: 'prizeValue', width: 100 },
   ];
 
   const detailVisible = ref(false);
@@ -474,40 +479,7 @@
     }
   }
 
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求删除
-  async function requestDelete(data) {
-    SmartLoading.show();
-    try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await taskConfigApi.delete(data.id);
-      message.success('删除成功');
-      queryData();
-    } catch (e) {
-      smartSentry.captureError(e);
-    } finally {
-      SmartLoading.hide();
-    }
-  }
-
-  // ---------------------------- 批量删除 ----------------------------
+  // ---------------------------- 批量下线 ----------------------------
 
   // 选择表格行
   const selectedRowKeyList = ref([]);
@@ -516,28 +488,30 @@
     selectedRowKeyList.value = selectedRowKeys;
   }
 
-  // 批量删除
-  function confirmBatchDelete() {
+  function confirmBatchOffline() {
     Modal.confirm({
-      title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
+      title: '批量下线',
+      content: `确定要下线选中的 ${selectedRowKeyList.value.length} 个任务吗？下线后不再接收上游事件，已在跑的任务记录按接取时的快照走完，可随时改回。`,
+      okText: '下线',
       okType: 'danger',
       onOk() {
-        requestBatchDelete();
+        requestBatchOffline();
       },
       cancelText: '取消',
       onCancel() {},
     });
   }
 
-  //请求批量删除
-  async function requestBatchDelete() {
+  async function requestBatchOffline() {
     try {
       SmartLoading.show();
-      await taskConfigApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
-      queryData();
+      await taskConfigApi.updateStatus({
+        idList: selectedRowKeyList.value,
+        status: CONFIG_STATUS_ENUM.OFFLINE.value,
+      });
+      message.success('已批量下线');
+      selectedRowKeyList.value = [];
+      await queryData();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
