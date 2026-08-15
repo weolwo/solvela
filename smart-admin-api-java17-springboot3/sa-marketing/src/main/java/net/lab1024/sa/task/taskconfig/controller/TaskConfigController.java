@@ -6,6 +6,8 @@ import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigAddForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigQueryForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigUpdateForm;
 import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
+import net.lab1024.sa.task.taskconfig.domain.form.TaskConfigWizardUpdateForm;
+import net.lab1024.sa.task.taskconfig.domain.vo.TaskConfigWizardDetailVO;
 import net.lab1024.sa.task.taskconfig.domain.vo.TaskConfigVO;
 import net.lab1024.sa.task.taskconfig.service.TaskConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,6 +54,20 @@ public class TaskConfigController {
     @SaCheckPermission("taskConfig:wizard:submit")
     public ResponseDTO<Long> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
         return Service.wizardSubmit(submitForm);
+    }
+
+    @Operation(summary = "任务配置向导回显（主子表一次性返回，供编辑态铺回 5 个步骤）")
+    @GetMapping("/wizard/detail/{id}")
+    @SaCheckPermission("taskConfig:query")
+    public ResponseDTO<TaskConfigWizardDetailVO> wizardDetail(@PathVariable Long id) {
+        return Service.wizardDetail(id);
+    }
+
+    @Operation(summary = "任务配置向导更新（主表更新 + 奖励阶梯整体替换，同一事务）")
+    @PostMapping("/wizard/update")
+    @SaCheckPermission("taskConfig:wizard:submit")
+    public ResponseDTO<Long> wizardUpdate(@RequestBody @Valid TaskConfigWizardUpdateForm updateForm) {
+        return Service.wizardUpdate(updateForm);
     }
 
     @Operation(summary = "更新")

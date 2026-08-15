@@ -10,17 +10,22 @@
     <!-- ==================== 提交成功页：替代整个向导，同时天然杜绝重复提交 ====================
          内嵌于活动创建向导时不展示本页：外壳有自己的完成页，两个成功页叠在一起会让运营
          以为流程结束了两次。此时改由 emit('saved') 通知外壳推进步骤。 -->
-    <a-result v-if="submitResult.submitted && !embedded" status="success" title="任务配置提交成功">
+    <a-result
+      v-if="submitResult.submitted && !embedded"
+      status="success"
+      :title="isEditMode ? '任务配置更新成功' : '任务配置提交成功'"
+    >
       <template #subTitle>
-        任务「{{ submitResult.taskName }}」已创建，归属活动：{{ submitResult.activityLabel }}
+        任务「{{ submitResult.taskName }}」{{ isEditMode ? '已更新' : '已创建' }}，归属活动：{{ submitResult.activityLabel }}
       </template>
       <template #extra>
         <a-space direction="vertical" align="center" :size="12">
           <a-space>
             <a-button type="primary" @click="goTaskList">返回任务列表</a-button>
-            <a-button @click="createNextTask">在同一活动下再建一个</a-button>
+            <!-- 「再建一个」只在新建流里有意义：编辑完接着建新任务是两回事 -->
+            <a-button v-if="!isEditMode" @click="createNextTask">在同一活动下再建一个</a-button>
           </a-space>
-          <a-button type="link" @click="viewCreatedTask">查看刚创建的任务</a-button>
+          <a-button type="link" @click="viewCreatedTask">{{ isEditMode ? '查看这条任务' : '查看刚创建的任务' }}</a-button>
         </a-space>
       </template>
     </a-result>
@@ -37,6 +42,15 @@
           <a-button size="small" type="primary" @click="restoreDraft">恢复草稿</a-button>
           <a-button size="small" @click="discardDraft">丢弃</a-button>
         </a-space>
+      </template>
+    </a-alert>
+
+    <!-- 编辑态给个明确横幅：向导长得和新建一模一样，不说清楚很容易以为自己在建新任务 -->
+    <a-alert v-if="isEditMode" type="info" show-icon class="mb-4">
+      <template #message>
+        正在编辑任务「{{ wizardForm.base.taskName || '—' }}」（ID {{ editId }}）。
+        保存后覆盖原配置，奖励阶梯整体替换；<b>归属活动不可更改</b>。
+        已在跑的任务记录按接取时的快照执行，不受本次修改影响。
       </template>
     </a-alert>
 
@@ -86,17 +100,21 @@
             label="所属活动大类 activity_code"
             :name="['base', 'activityCode']"
             :rules="FORM_RULES.activityCode"
-            :extra="embedded ? '由活动创建向导锁定，不可更改' : '原子任务必须归属一个活动大类，C端按大类聚合展示'"
+            :extra="activityExtraTip"
           >
+            <!--
+              编辑态锁死归属活动：奖励阶梯里的 prize_code 是按活动隔离的，
+              换活动等于把这些奖品全部作废，那是重建一个任务而不是改配置。服务端也会忽略传入值
+            -->
             <a-select
               v-model:value="wizardForm.base.activityCode"
               :options="activityOptions"
               :loading="activityLoading"
-              :disabled="embedded"
+              :disabled="activityLocked"
               placeholder="请选择所属活动"
               show-search
               option-filter-prop="label"
-              :allow-clear="!embedded"
+              :allow-clear="!activityLocked"
             />
           </a-form-item>
           <a-row :gutter="16">
@@ -314,7 +332,7 @@
 <script setup>
   import { RANGE_SHOW_TIME } from '/@/constants/date-time-const';
   import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-  import { onBeforeRouteLeave, useRouter } from 'vue-router';
+  import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
   import dayjs from 'dayjs';
   import { message, Modal } from 'ant-design-vue';
   import { localRead, localRemove, localSave } from '/@/utils/local-util';
@@ -369,6 +387,7 @@
   const currentStep = ref(WIZARD_STEP.BASE);
   const formRef = ref();
   const router = useRouter();
+  const route = useRoute();
 
   // ---------------------------- 活动大类与模板：均由服务端下发 ----------------------------
 
@@ -678,7 +697,10 @@
     }
     submitLoading.value = true;
     try {
-      const res = await taskApi.submitTaskConfig(buildSubmitData());
+      const payload = buildSubmitData();
+      const res = isEditMode.value
+        ? await taskApi.updateTaskConfig({ ...payload, id: editId.value })
+        : await taskApi.submitTaskConfig(payload);
       // 成功页展示与跳转定位所需信息，需在表单重置前留存
       submitResult.taskConfigId = res.data;
       submitResult.taskName = wizardForm.base.taskName;
@@ -698,11 +720,15 @@
 
   // ---------------------------- 未保存内容保护 ----------------------------
 
-  // 初始空表单快照：与之不同即视为运营已填了东西
-  const INITIAL_SNAPSHOT = JSON.stringify(buildDefaultWizardForm());
+  /*
+   * 「有没有改动」的比较基线。
+   * 新建时是空表单；编辑时是回显完成后的那一刻 —— 否则一进编辑页就被判成有未保存改动，
+   * 点返回必弹「有未提交的配置」。回显结束后由 loadWizardDetail 重置它。
+   */
+  const baseSnapshot = ref(JSON.stringify(buildDefaultWizardForm()));
   const currentSnapshot = computed(() => JSON.stringify(wizardForm));
   // 已提交成功的内容已入库，不再视为待保存
-  const isDirty = computed(() => !submitResult.submitted && currentSnapshot.value !== INITIAL_SNAPSHOT);
+  const isDirty = computed(() => !submitResult.submitted && currentSnapshot.value !== baseSnapshot.value);
 
   onBeforeRouteLeave(() => {
     if (!isDirty.value) {
@@ -753,8 +779,10 @@
   }
 
   watch(currentSnapshot, () => {
-    // 历史草稿待决策期间冻结暂存，避免把待恢复内容覆盖掉；已提交成功的也不再暂存
-    if (pendingDraft.value || submitResult.submitted) {
+    // 历史草稿待决策期间冻结暂存，避免把待恢复内容覆盖掉；已提交成功的也不再暂存。
+    // 编辑态同样不写草稿：草稿是「还没建出来的任务」，把一次编辑存成草稿，
+    // 下次进新建向导会被当成未完成的新任务恢复出来，凭空多一条任务
+    if (pendingDraft.value || submitResult.submitted || isEditMode.value) {
       return;
     }
     clearTimeout(draftTimer);
@@ -786,6 +814,106 @@
     message.success('草稿已丢弃');
   }
 
+  // ---------------------------- 编辑态：从列表页带 id 进来，回显既有配置 ----------------------------
+
+  /*
+   * 编辑与新建复用同一套向导：任务是主子表 + 模板驱动的动态表单，
+   * 再维护一份「编辑专用表单」等于把 ui_schema 渲染、阶梯校验、奖品级联全抄一遍。
+   *
+   * 与新建的差别只有四处：活动锁死、不走草稿、提交打 update、成功页文案。
+   */
+  const editId = ref(null);
+  const isEditMode = computed(() => !!editId.value);
+  const detailLoading = ref(false);
+
+  // 内嵌（活动向导锁定）与编辑（换活动会让阶梯失效）两种情况都不允许改活动
+  const activityLocked = computed(() => props.embedded || isEditMode.value);
+  const activityExtraTip = computed(() => {
+    if (props.embedded) {
+      return '由活动创建向导锁定，不可更改';
+    }
+    if (isEditMode.value) {
+      return '编辑时不可更改：换活动会让已配的奖励阶梯全部失效';
+    }
+    return '原子任务必须归属一个活动大类，C端按大类聚合展示';
+  });
+
+  /*
+   * 同一路由只是 query 变化时 vue-router 会复用组件而不重新挂载 ——
+   * 从「编辑(?id=5)」直接点菜单进「任务配置向导(无 query)」就属于这种情况。
+   * 只写 onMounted 的话 editId 会残留，新建流程会把新任务提交成对 5 号的更新。
+   */
+  watch(
+    () => route.query.id,
+    (id) => {
+      const next = id ? Number(id) : null;
+      if (next === editId.value) {
+        return;
+      }
+      editId.value = next;
+      // 回到新建态：表单清回初始值，基线也跟着回到空表单
+      Object.assign(wizardForm, buildDefaultWizardForm());
+      baseSnapshot.value = JSON.stringify(buildDefaultWizardForm());
+      currentStep.value = WIZARD_STEP.BASE;
+      if (next) {
+        loadWizardDetail(next);
+      }
+    }
+  );
+
+  async function loadWizardDetail(id) {
+    detailLoading.value = true;
+    try {
+      const res = await taskApi.queryWizardDetail(id);
+      const d = res.data;
+      if (!d) {
+        message.error('任务配置不存在');
+        return;
+      }
+
+      Object.assign(wizardForm.base, {
+        activityCode: d.activityCode,
+        templateCode: d.templateCode,
+        taskName: d.taskName,
+        triggerEvent: d.triggerEvent,
+        taskGroup: d.taskGroup,
+      });
+      Object.assign(wizardForm.limit, { limitType: d.limitType, limitCount: d.limitCount });
+      Object.assign(wizardForm.audience, {
+        targetAudience: d.targetAudience,
+        // 起止时间两头都空 = 长期有效，与提交时 longTerm 的写法互逆
+        longTerm: !d.startTime && !d.endTime,
+        timeRange: d.startTime && d.endTime ? [d.startTime, d.endTime] : [],
+        sortWeight: d.sortWeight,
+        actionUrl: d.actionUrl || '',
+        badge: d.badge || '',
+      });
+      Object.assign(wizardForm.display, { taskDesc: d.taskDesc || '', ruleDesc: d.ruleDesc || '' });
+      wizardForm.prizeLadders = withLadderUid(
+        (d.prizeMappingList || []).map((item) => ({
+          stageCondition: item.stageCondition,
+          prizeCode: item.prizeCode,
+          prizeMode: item.prizeMode,
+          prizeValue: item.prizeValue,
+        }))
+      );
+
+      // 同 restoreDraft：templateCode 一赋值就会触发 watch 用模板默认值重建 ruleParams，
+      // 必须等它跑完再把库里的参数值盖回去，否则回显出来的是模板默认值而不是运营当初填的
+      await nextTick();
+      wizardForm.ruleParams = { ...(d.ruleConfig || {}), ...(d.uiConfig || {}) };
+
+      // 回显完成才是编辑态的「初始状态」；不重置基线的话，一进来就被判成有未保存改动，
+      // 点返回必弹「有未提交的配置」
+      await nextTick();
+      baseSnapshot.value = JSON.stringify(wizardForm);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      detailLoading.value = false;
+    }
+  }
+
   /*
    * 内嵌模式：活动由外壳锁定，写进表单的单一状态源里（铁律 4），
    * 而不是在提交时另找一个地方取值 —— 那样校验、摘要、草稿三处都会看到不一致的活动。
@@ -810,6 +938,14 @@
     loadEventOptions();
 
     window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 编辑态：列表页「编辑」带 ?id= 进来，回显既有配置
+    const idFromQuery = route.query.id;
+    if (idFromQuery) {
+      editId.value = Number(idFromQuery);
+      loadWizardDetail(editId.value);
+      return;
+    }
 
     // 内嵌时不走草稿恢复：草稿是「上次没配完的任务」，与本次向导正在建的活动多半不是一回事，
     // 弹出来只会让运营把无关配置恢复到新活动下

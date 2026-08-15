@@ -62,11 +62,15 @@
     <!---------- 表格操作行 begin ----------->
     <a-row class="smart-table-btn-block">
       <div class="smart-table-operate-block">
-        <a-button @click="showForm" type="primary" size="small">
+        <!--
+          新建走向导而不是这里的扁平表单：任务配置是主子表（t_task_config + t_task_prize_mapping），
+          规则参数还要按模板 ui_schema 动态渲染。扁平表单填不出奖励阶梯，建出来的任务没有奖可发。
+        -->
+        <a-button @click="goWizard" type="primary" size="small">
           <template #icon>
             <PlusOutlined />
           </template>
-          新建
+          任务配置向导
         </a-button>
         <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
           <template #icon>
@@ -108,7 +112,8 @@
         </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
-            <a-button @click="showForm(record)" type="link">编辑</a-button>
+            <a-button @click="showDetail(record)" type="link">详情</a-button>
+            <a-button @click="goWizardEdit(record)" type="link">编辑</a-button>
             <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
         </template>
@@ -132,12 +137,65 @@
       />
     </div>
 
-    <TaskConfigForm ref="formRef" @reloadList="queryData" />
+    <!---------- 详情抽屉：只读，主表 + 奖励阶梯子表 ----------->
+    <a-drawer :title="`任务详情 · ${detail.taskName || ''}`" :width="760" :open="detailVisible" @close="detailVisible = false">
+      <a-descriptions title="基础信息" bordered size="small" :column="2" class="mb-6">
+        <a-descriptions-item label="任务ID">{{ detail.id }}</a-descriptions-item>
+        <a-descriptions-item label="任务状态">
+          <a-tag :color="configStatusOf(detail.status).color">{{ configStatusOf(detail.status).desc }}</a-tag>
+        </a-descriptions-item>
+        <a-descriptions-item label="任务名称" :span="2">{{ detail.taskName }}</a-descriptions-item>
+        <a-descriptions-item label="归属活动">{{ detail.activityCode }}</a-descriptions-item>
+        <a-descriptions-item label="模板Code">{{ detail.templateCode }}</a-descriptions-item>
+        <a-descriptions-item label="触发事件">{{ detail.triggerEvent }}</a-descriptions-item>
+        <a-descriptions-item label="任务分组">{{ taskGroupOf(detail.taskGroup) }}</a-descriptions-item>
+        <a-descriptions-item label="目标人群">{{ targetAudienceOf(detail.targetAudience) }}</a-descriptions-item>
+        <a-descriptions-item label="参与频次">{{ limitTypeOf(detail.limitType) }}（{{ detail.limitCount }} 次）</a-descriptions-item>
+        <a-descriptions-item label="开始时间">{{ detail.startTime || '长期有效' }}</a-descriptions-item>
+        <a-descriptions-item label="结束时间">{{ detail.endTime || '长期有效' }}</a-descriptions-item>
+        <a-descriptions-item label="排序权重">{{ detail.sortWeight }}</a-descriptions-item>
+        <a-descriptions-item label="跳转地址">{{ detail.actionUrl || '-' }}</a-descriptions-item>
+      </a-descriptions>
+
+      <div class="mb-2 flex items-center gap-2">
+        <span class="text-base font-medium">奖励阶梯</span>
+        <span class="text-xs text-slate-400">t_task_prize_mapping</span>
+      </div>
+      <!-- 阶梯是任务能不能发出奖的关键，没有子表的任务等于配了个发不出奖的空壳 -->
+      <a-table
+        size="small"
+        bordered
+        :data-source="detailLadders"
+        :columns="LADDER_COLUMNS"
+        :loading="detailLadderLoading"
+        :pagination="false"
+        row-key="id"
+        class="mb-6"
+      >
+        <template #emptyText>
+          <div class="py-4 text-xs text-orange-500">该任务没有配置奖励阶梯，达标后不会发出任何奖励</div>
+        </template>
+        <template #bodyCell="{ text, column }">
+          <template v-if="column.dataIndex === 'prizeMode'">
+            <a-tag>{{ prizeModeOf(text) }}</a-tag>
+          </template>
+        </template>
+      </a-table>
+
+      <a-descriptions title="规则与展示（JSON）" bordered size="small" :column="1">
+        <a-descriptions-item label="规则配置 rule_config">
+          <pre class="m-0 max-h-40 overflow-auto text-xs">{{ prettyJson(detail.ruleConfig) }}</pre>
+        </a-descriptions-item>
+        <a-descriptions-item label="展示配置 ui_config">
+          <pre class="m-0 max-h-40 overflow-auto text-xs">{{ prettyJson(detail.uiConfig) }}</pre>
+        </a-descriptions-item>
+      </a-descriptions>
+    </a-drawer>
   </a-card>
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
-  import { useRoute } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { taskConfigApi } from '/@/api/business/task/task-config/task-config-api';
@@ -145,9 +203,10 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import TaskConfigForm from './task-config-form.vue';
   import { taskApi } from '/@/api/business/task/task-api';
+  import { taskPrizeMappingApi } from '/@/api/business/prize/task-prize-mapping/task-prize-mapping-api';
   import { toEventOptions } from '../task-wizard/task-wizard-const';
+  import { prizeModeOf } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
   import {
     CONFIG_STATUS_OPTIONS,
     configStatusOf,
@@ -288,6 +347,10 @@
   // 查询表单form
   const queryForm = reactive({ ...queryFormState });
   const route = useRoute();
+  const router = useRouter();
+
+  // 与菜单里「任务配置向导」的路由地址保持一致
+  const TASK_WIZARD_PATH = '/business/task/task-wizard';
   // 表格加载loading
   const tableLoading = ref(false);
   // 表格数据
@@ -353,11 +416,62 @@
     queryData();
   });
 
-  // ---------------------------- 添加/修改 ----------------------------
-  const formRef = ref();
+  // ---------------------------- 新建：跳向导 ----------------------------
 
-  function showForm(data) {
-    formRef.value.show(data);
+  function goWizard() {
+    router.push(TASK_WIZARD_PATH);
+  }
+
+  /*
+   * 编辑同样走向导：任务是主子表 + 模板驱动的动态表单，
+   * 原来那个扁平弹窗改不了规则参数、也改不了奖励阶梯，改完等于只动了几个无关紧要的字段。
+   */
+  function goWizardEdit(record) {
+    router.push({ path: TASK_WIZARD_PATH, query: { id: record.id } });
+  }
+
+  // ---------------------------- 详情 ----------------------------
+
+  const LADDER_COLUMNS = [
+    { title: '阶梯', dataIndex: 'stageLevel', width: 70 },
+    { title: '达标条件', dataIndex: 'stageCondition', width: 160, ellipsis: true },
+    { title: '奖励编码', dataIndex: 'prizeCode', width: 140, ellipsis: true },
+    { title: '计算类型', dataIndex: 'prizeMode', width: 100 },
+    { title: '发奖策略', dataIndex: 'prizeStrategy', ellipsis: true },
+  ];
+
+  const detailVisible = ref(false);
+  const detail = ref({});
+  const detailLadders = ref([]);
+  const detailLadderLoading = ref(false);
+
+  // rule_config / ui_config 在库里是 json，接口下发的是字符串，直接铺出来是一坨
+  function prettyJson(raw) {
+    if (!raw) {
+      return '-';
+    }
+    try {
+      return JSON.stringify(typeof raw === 'string' ? JSON.parse(raw) : raw, null, 2);
+    } catch (e) {
+      // 不是合法 JSON 就原样显示，不要因为格式化失败把内容藏掉
+      return raw;
+    }
+  }
+
+  async function showDetail(record) {
+    detail.value = { ...record };
+    detailLadders.value = [];
+    detailVisible.value = true;
+    detailLadderLoading.value = true;
+    try {
+      // 子表没有「按任务查」的专用接口，借分页接口按 taskConfigId 过滤；单个任务的阶梯撑死几条
+      const res = await taskPrizeMappingApi.queryPage({ taskConfigId: record.id, pageNum: 1, pageSize: 50 });
+      detailLadders.value = res.data?.list || [];
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      detailLadderLoading.value = false;
+    }
   }
 
   // ---------------------------- 单个删除 ----------------------------

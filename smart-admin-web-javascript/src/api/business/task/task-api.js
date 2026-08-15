@@ -43,6 +43,21 @@ export const taskApi = {
   },
 
   /**
+   * 任务配置向导回显：主子表一次性返回，编辑态据此铺回 5 个步骤  @author  alaric
+   */
+  queryWizardDetail: (id) => {
+    return getRequest(`/taskConfig/wizard/detail/${id}`);
+  },
+
+  /**
+   * 任务配置向导更新：主表更新 + 奖励阶梯整体替换，同一事务。
+   * ⚠️ 归属活动服务端锁死（换活动会让阶梯里的 prize_code 全部失效），传了也会被忽略  @author  alaric
+   */
+  updateTaskConfig: (param) => {
+    return postRequest('/taskConfig/wizard/update', param);
+  },
+
+  /**
    * 保存任务模板设计器（uiSchema + ruleScript，归属后端 tasktemplate 模块）  @author  alaric
    */
   saveTaskTemplate: (param) => {
