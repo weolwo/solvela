@@ -471,6 +471,15 @@
     pendingNew.value = route.query.mode === 'new';
 
     /*
+     * ?tab=issue：期号巡检页的「去开奖」跳过来，直接落到期号 Tab。
+     * 白名单取值而不是原样赋给 activeKey —— URL 上随手写个不存在的 key，
+     * a-tabs 会渲染出一个空白面板，看起来像页面坏了。
+     */
+    if (route.query.tab === 'issue') {
+      activeTab.value = 'issue';
+    }
+
+    /*
      * 深链：彩票配置列表页的「编辑」带 ?activityCode=&lotteryCode= 跳过来，直接定位到那一个玩法。
      *
      * 不校验 activityCode 是否在下拉里：optionList 默认过滤掉已下线/已过期的活动，

@@ -3,6 +3,7 @@ package net.lab1024.sa.lottery.issue.dao;
         import java.util.List;
         import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;
         import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueQueryForm;
+        import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueOverviewVO;
         import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -36,6 +37,16 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      * @return 列表数据
      */
     List<LotteryIssueVO> queryList(@Param("queryForm") LotteryIssueQueryForm queryForm);
+
+    /**
+     * 巡检概览：逾期未开奖 / 售卖中 / 已售罄 / 今日计划开奖，一次扫表算完。
+     *
+     * 不拆成四条 count：分四次执行会拿到四个不同的 NOW()，
+     * 出现「卡片说售卖中 3 期、点进去只有 2 期」这种自相矛盾。
+     *
+     * 只吃 tenantId / lotteryCode，其余筛选条件刻意不参与，理由见 mapper 注释。
+     */
+    LotteryIssueOverviewVO overview(@Param("queryForm") LotteryIssueQueryForm queryForm);
 
     /**
      * 数据库当前时间。

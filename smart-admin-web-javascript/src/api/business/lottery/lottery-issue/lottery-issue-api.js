@@ -17,6 +17,17 @@ export const lotteryIssueApi = {
   },
 
   /**
+   * 巡检概览：逾期未开奖 / 售卖中 / 已售罄 / 今日计划开奖。
+   *
+   * 只吃 tenantId 与 lotteryCode，其余筛选条件服务端刻意忽略 ——
+   * 卡片本身就是筛选入口，若它跟着筛选结果变，点一下「逾期」之后
+   * 其余三张卡全部归零，就没法互相对照了  @author  alaric
+   */
+  overview: (param) => {
+    return postRequest('/lotteryIssue/overview', param);
+  },
+
+  /**
    * 增加  @author  weolwo
    */
   add: (param) => {

@@ -10,6 +10,7 @@ import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueAddForm;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueQueryForm;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueUpdateForm;
+import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueOverviewVO;
 import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueVO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
@@ -46,6 +47,16 @@ public class LotteryIssueService {
         Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
         List<LotteryIssueVO> list = lotteryIssueDao.queryPage(page, queryForm);
         return SmartPageUtil.convert2PageResult(page, list);
+    }
+
+    /**
+     * 巡检概览：列表页顶部四张卡片。
+     *
+     * 口径与列表的派生字段共用同一份 SQL 表达式，所以点卡片筛出来的行数
+     * 必然等于卡片上的数字 —— 两处各写一套统计逻辑迟早对不上。
+     */
+    public LotteryIssueOverviewVO overview(LotteryIssueQueryForm queryForm) {
+        return lotteryIssueDao.overview(queryForm);
     }
 
     /**

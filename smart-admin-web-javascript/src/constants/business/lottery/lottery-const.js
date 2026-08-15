@@ -64,6 +64,33 @@ export const ISSUE_STATUS_ENUM = {
 export const ISSUE_STATUS_OPTIONS = Object.values(ISSUE_STATUS_ENUM).map((i) => ({ value: i.value, label: i.desc }));
 
 /**
+ * 期号售卖态：「这一期现在还能不能领号」的结论，对齐后端 LotteryIssueVO.saleState。
+ *
+ * ⚠️ 这是<b>服务端算好的结论</b>，前端只负责翻译成文案，不要在浏览器里
+ * 拿 saleStartTime / saleEndTime 和 new Date() 再算一遍 —— 那就是第二个时钟源
+ * （铁律 9/10）。多实例部署 + 客户端时钟偏差下，页面显示的「在售」
+ * 与运行态发号的判定必然漂移，运营会照着一个假结论做决策。
+ *
+ * 与 ISSUE_STATUS_ENUM 是两个维度：那个是生命周期（开奖走到哪一步），
+ * 这个是售卖窗口。列表两个都要显示，否则「待开奖」一个标签会同时盖住
+ * 「还没开售」「正在售」「已停售待开」三种完全不同的处境。
+ */
+export const SALE_STATE_ENUM = {
+  NOT_STARTED: { value: 0, desc: '未开始', color: 'default' },
+  ON_SALE: { value: 1, desc: '售卖中', color: 'green' },
+  ENDED: { value: 2, desc: '已结束', color: 'default' },
+  STOPPED: { value: 3, desc: '已停止发号', color: 'purple' },
+  UNAVAILABLE: { value: 4, desc: '玩法不可售', color: 'red' },
+  SOLD_OUT: { value: 5, desc: '已售罄', color: 'orange' },
+};
+
+export const SALE_STATE_OPTIONS = Object.values(SALE_STATE_ENUM).map((i) => ({ value: i.value, label: i.desc }));
+
+export function saleStateOf(value) {
+  return Object.values(SALE_STATE_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
+}
+
+/**
  * 购彩记录的中奖状态，对齐 t_lottery_record.win_status 与后端 TicketStatusEnum。
  *
  * ⚠️ 取值必须与后端一致：后端按该值做筛选校验，对不上会直接 400
@@ -118,6 +145,8 @@ export default {
   MATCH_RULE_ENUM,
   MATCH_RULE_OPTIONS,
   LOTTERY_STATUS_ENUM,
+  ISSUE_STATUS_ENUM,
+  SALE_STATE_ENUM,
   WIN_STATUS_ENUM,
   PRIZE_TYPE_ICON,
   prizeIcon,

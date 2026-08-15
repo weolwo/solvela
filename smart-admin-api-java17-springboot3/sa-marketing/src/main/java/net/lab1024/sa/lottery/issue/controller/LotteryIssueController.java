@@ -5,6 +5,7 @@ import net.lab1024.sa.lottery.issue.domain.entity.LotteryIssue;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueAddForm;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueQueryForm;
 import net.lab1024.sa.lottery.issue.domain.form.LotteryIssueUpdateForm;
+import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueOverviewVO;
 import net.lab1024.sa.lottery.issue.domain.vo.LotteryIssueVO;
 import net.lab1024.sa.lottery.issue.service.LotteryIssueService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,13 @@ public class LotteryIssueController {
     @SaCheckPermission("lotteryIssue:query")
     public ResponseDTO<PageResult<LotteryIssueVO>> queryPage(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "巡检概览：逾期未开奖/售卖中/已售罄/今日计划开奖。只吃 tenantId 与 lotteryCode 两个条件")
+    @PostMapping("/overview")
+    @SaCheckPermission("lotteryIssue:query")
+    public ResponseDTO<LotteryIssueOverviewVO> overview(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
+        return ResponseDTO.ok(Service.overview(queryForm));
     }
 
     @Operation(summary = "添加")
