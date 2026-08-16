@@ -69,6 +69,21 @@ export const ASSET_TYPE_OPTIONS = Object.values(ASSET_TYPE_ENUM).map((i) => ({
   label: i.desc,
 }));
 
+/**
+ * 资产计量单位：金额只在同一 assetType 内可加，展示时必须带上单位，
+ * 否则「5830」既可能是积分也可能是元，看的人只能猜。
+ */
+export const ASSET_UNIT = {
+  SCORE: '积分',
+  BALANCE: '元',
+  COUPON: '张',
+  PHYSICAL: '件',
+};
+
+export function assetUnitOf(value) {
+  return ASSET_UNIT[value] || '';
+}
+
 export function proposalStatusOf(value) {
   return Object.values(PROPOSAL_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
 }
@@ -88,6 +103,8 @@ export default {
   PROPOSAL_SOURCE_TYPE_OPTIONS,
   ASSET_TYPE_ENUM,
   ASSET_TYPE_OPTIONS,
+  ASSET_UNIT,
+  assetUnitOf,
   proposalStatusOf,
   proposalSourceTypeOf,
   assetTypeOf,

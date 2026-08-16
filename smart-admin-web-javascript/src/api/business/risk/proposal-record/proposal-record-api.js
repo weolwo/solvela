@@ -17,6 +17,15 @@ export const proposalRecordApi = {
   },
 
   /**
+   * 提案漏斗：到账率、审批积压、下发卡单、资产/来源分布与流程体检。
+   * ⚠️ 服务端刻意忽略 status 筛选项 —— 它是漏斗要拆解的维度，跟着筛会让到账率恒为 100%；
+   * assetType / sourceType / 时间范围这些切片维度照常生效  @author  alaric
+   */
+  funnel: (param) => {
+    return postRequest('/proposalRecord/funnel', param);
+  },
+
+  /**
    * 增加  @author  weolwo
    */
   add: (param) => {

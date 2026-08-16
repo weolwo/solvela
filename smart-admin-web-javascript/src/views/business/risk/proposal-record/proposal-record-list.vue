@@ -1,11 +1,160 @@
 <!--
-  * 提案表
+  * 提案记录与提案漏斗
+  *
+  * 提案表是「钱出去的必经之路」：提案 → 风控 → 审批 → 执行 → 到账。
+  * 顶部漏斗回答运营每天最该问的三件事：今天发出去多少（按资产类型分开算，
+  * 积分和现金不能加在一起）、有没有单子压在审批池里没人管、有没有钱卡在半路。
+  *
+  * 「卡在下发」是本页独有的：下发在提案事务提交后同步调起，进程中途退出就没有第二次机会，
+  * 而工程里没有任何重试/补偿任务 —— 卡住的提案会一直停在待执行/执行中，没人查就发现不了。
   *
   * @Author:    weolwo
   * @Date:      2026-04-18 23:13:50
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 提案漏斗 begin ----------->
+  <div class="funnel-toggle">
+    <a-button type="link" size="small" class="funnel-toggle-btn" @click="funnelOpen = !funnelOpen">
+      <template #icon>
+        <DownOutlined v-if="funnelOpen" />
+        <RightOutlined v-else />
+      </template>
+      提案漏斗
+    </a-button>
+    <span v-if="!funnelOpen" class="funnel-summary">
+      共 {{ num(funnel.totalCount) }} 条 · 到账 {{ percent(funnel.successRate) }} ·
+      <span :class="funnel.pendingReviewCount > 0 ? 'summary-alert' : ''"> 待审 {{ num(funnel.pendingReviewCount) }} </span>
+      ·
+      <span :class="funnel.stuckDispatchCount > 0 ? 'summary-alert' : ''"> 卡单 {{ num(funnel.stuckDispatchCount) }} </span>
+    </span>
+  </div>
+
+  <div v-show="funnelOpen">
+    <a-row :gutter="12" class="overview-row">
+      <a-col :span="5">
+        <div class="overview-card tone-primary">
+          <div class="overview-card-label">提案总数</div>
+          <div class="overview-card-value">{{ num(funnel.totalCount) }}</div>
+          <div class="overview-card-foot">涉及 {{ num(funnel.memberCount) }} 名会员</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <div class="overview-card tone-success">
+          <div class="overview-card-label">
+            到账率
+            <a-tooltip title="分母是提案总数。提案链路上每一步都可能把钱拦下来，剔掉任何一段都会让这个比率虚高——运营要的恰恰是「一百个提案里最后几个到账」">
+              <QuestionCircleOutlined class="overview-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="overview-card-value">{{ percent(funnel.successRate) }}</div>
+          <div class="overview-card-foot">成功 {{ num(funnel.successCount) }} · 驳回 {{ num(funnel.rejectedCount) }}</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- 提案压在审批池里，对用户就是「奖一直没发」-->
+        <div class="overview-card" :class="reviewBacklogTone">
+          <div class="overview-card-label">
+            待审积压
+            <a-tooltip title="待一审 + 待二审。只看条数看不出「压了三天」，所以同时给出最久的一条已经等了多久">
+              <QuestionCircleOutlined class="overview-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="overview-card-value">{{ num(funnel.pendingReviewCount) }}</div>
+          <div class="overview-card-foot">最久等待 {{ waitedText }}</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- 没有任何重试/补偿任务，卡住的提案不会自己往下走 -->
+        <div class="overview-card" :class="funnel.stuckDispatchCount > 0 ? 'tone-critical' : 'tone-muted'">
+          <div class="overview-card-label">
+            卡在下发
+            <a-tooltip title="待执行/执行中且 30 分钟没动过。下发在提案事务提交后同步调起，进程中途退出就没有第二次机会，而工程里没有任何重试任务——钱既没发出去也没标成失败">
+              <QuestionCircleOutlined class="overview-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="overview-card-value">{{ num(funnel.stuckDispatchCount) }}</div>
+          <div class="overview-card-foot">待执行 {{ num(funnel.pendingExecuteCount) }} · 执行中 {{ num(funnel.executingCount) }}</div>
+        </div>
+      </a-col>
+      <a-col :span="4">
+        <!-- 失败/部分成功 = 钱没到用户手上；风控拦截是防线生效，两者性质不同，不要混在一起看 -->
+        <div class="overview-card" :class="funnel.failedCount > 0 || funnel.partialCount > 0 ? 'tone-critical' : 'tone-muted'">
+          <div class="overview-card-label">发放异常</div>
+          <div class="overview-card-value">
+            {{ num(funnel.failedCount) }}
+            <span class="overview-card-slash">失败</span>
+          </div>
+          <div class="overview-card-foot">部分成功 {{ num(funnel.partialCount) }} · 拦截 {{ num(funnel.blockedCount) }}</div>
+        </div>
+      </a-col>
+    </a-row>
+
+    <!-- 漏斗刻意不吃状态筛选，筛了却不生效比不筛更让人困惑，故明说 -->
+    <div v-if="queryForm.status !== undefined" class="funnel-note">
+      漏斗不受「状态」筛选影响：它正是漏斗要拆解的维度，跟着筛会让到账率恒为 100%
+    </div>
+
+    <a-alert v-for="(issue, idx) in funnel.issueList || []" :key="idx" type="error" show-icon class="mb-2">
+      <template #message>
+        <span class="text-xs">{{ issue }}</span>
+      </template>
+    </a-alert>
+
+    <a-row :gutter="12">
+      <a-col :span="10">
+        <!-- 金额按资产类型分开算：积分/现金/券张数/实物件数不是同一个量纲 -->
+        <a-card v-if="funnel.assetList && funnel.assetList.length > 0" size="small" :bordered="false" class="stat-card">
+          <div class="stat-head">
+            资产发放
+            <span class="stat-head-sub">积分与现金量纲不同，不合计</span>
+          </div>
+          <div v-for="item in funnel.assetList" :key="item.assetType" class="asset-row">
+            <a-tag :color="assetTypeOf(item.assetType).color">{{ assetTypeOf(item.assetType).desc }}</a-tag>
+            <span class="asset-main">已发出 {{ money(item.successAmount) }} {{ assetUnitOf(item.assetType) }}</span>
+            <span class="asset-sub">{{ num(item.successCount) }}/{{ num(item.proposalCount) }} 条</span>
+            <span class="asset-sub">
+              在途 {{ money(item.pendingAmount) }} · 拦截
+              <span :class="Number(item.blockedAmount) > 0 ? 'text-alert' : ''">{{ money(item.blockedAmount) }}</span>
+            </span>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="7">
+        <a-card v-if="funnel.sourceList && funnel.sourceList.length > 0" size="small" :bordered="false" class="stat-card">
+          <div class="stat-head">来源分布（条形为到账率）</div>
+          <div v-for="item in funnel.sourceList" :key="item.sourceType" class="stat-row">
+            <div class="stat-name" :class="item.unknownSource ? 'stat-name-alert' : ''">
+              {{ item.unknownSource ? '🔴' : '' }} {{ item.sourceDesc }}
+            </div>
+            <div class="stat-bar-wrap">
+              <div class="stat-bar" :style="{ width: barPercent(item.successRate) + '%' }"></div>
+            </div>
+            <div class="stat-num">{{ num(item.proposalCount) }} 条 · {{ percent(item.successRate) }}</div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="7">
+        <a-card v-if="funnel.blockReasonList && funnel.blockReasonList.length > 0" size="small" :bordered="false" class="stat-card">
+          <div class="stat-head">
+            风控拦截原因
+            <span class="stat-head-sub">拦截率 {{ percent(funnel.blockRate) }}</span>
+          </div>
+          <div v-for="item in funnel.blockReasonList" :key="item.reason" class="stat-row">
+            <a-tooltip :title="item.reason">
+              <div class="stat-name">{{ item.reason }}</div>
+            </a-tooltip>
+            <div class="stat-bar-wrap">
+              <div class="stat-bar stat-bar-alert" :style="{ width: barPercent(item.blockShare) + '%' }"></div>
+            </div>
+            <div class="stat-num">{{ num(item.blockCount) }} · {{ percent(item.blockShare) }}</div>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+  </div>
+  <!---------- 提案漏斗 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
@@ -131,11 +280,12 @@
       />
     </div>
 
-    <ProposalRecordForm ref="formRef" @reloadList="queryData" />
+    <ProposalRecordForm ref="formRef" @reloadList="reload" />
   </a-card>
 </template>
 <script setup>
-  import { reactive, ref, onMounted } from 'vue';
+  import { computed, reactive, ref, watch, onMounted } from 'vue';
+  import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { proposalRecordApi } from '/@/api/business/risk/proposal-record/proposal-record-api';
@@ -150,6 +300,7 @@
     PROPOSAL_SOURCE_TYPE_OPTIONS,
     PROPOSAL_STATUS_OPTIONS,
     assetTypeOf,
+    assetUnitOf,
     proposalSourceTypeOf,
     proposalStatusOf,
   } from '/@/constants/business/risk/proposal-record/proposal-record-const';
@@ -305,18 +456,36 @@
   // 总数
   const total = ref(0);
 
+  // 漏斗数据
+  const funnel = ref({});
+
   // 重置查询条件
   function resetQuery() {
     let pageSize = queryForm.pageSize;
     Object.assign(queryForm, queryFormState);
     queryForm.pageSize = pageSize;
-    queryData();
+    reload();
   }
 
   // 搜索
   function onSearch() {
     queryForm.pageNum = 1;
-    queryData();
+    reload();
+  }
+
+  // 列表与漏斗一起刷：换了筛选条件只刷一个会让两者对不上
+  async function reload() {
+    await Promise.all([queryData(), loadFunnel()]);
+  }
+
+  async function loadFunnel() {
+    try {
+      // status 服务端刻意忽略：它是漏斗要拆解的维度本身
+      const res = await proposalRecordApi.funnel(queryForm);
+      funnel.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
   }
 
   // 查询数据
@@ -343,7 +512,89 @@
     queryForm.createTimeEnd = dateStrings[1];
   }
 
-  onMounted(queryData);
+  onMounted(reload);
+
+  // ---------------------------- 漏斗展示辅助 ----------------------------
+
+  function num(value) {
+    return value == null ? '-' : Number(value).toLocaleString();
+  }
+
+  function percent(rate) {
+    if (rate == null) {
+      return '-';
+    }
+    const v = Number(rate) * 100;
+    if (v === 0) {
+      return '0%';
+    }
+    return v >= 1 ? `${v.toFixed(2)}%` : `${v.toPrecision(2)}%`;
+  }
+
+  // 金额去掉无意义的尾数：DECIMAL(13,4) 直接显示会变成「5830.0000 积分」
+  function money(value) {
+    if (value == null) {
+      return '0';
+    }
+    return Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  }
+
+  // 占比再小也给 1% 的宽度，否则条形图上只剩一条看不见的缝，读者会以为渲染坏了
+  function barPercent(rate) {
+    return Math.max(1, Math.round(Number(rate || 0) * 100));
+  }
+
+  const MINUTES_PER_HOUR = 60;
+  const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+
+  // 「1440 分钟」没人读得出是一天，按量级换算成小时/天
+  const waitedText = computed(() => {
+    const minutes = Number(funnel.value.pendingReviewOldestMinutes || 0);
+    if (!funnel.value.pendingReviewCount) {
+      return '无积压';
+    }
+    if (minutes < MINUTES_PER_HOUR) {
+      return `${minutes} 分钟`;
+    }
+    if (minutes < MINUTES_PER_DAY) {
+      return `${Math.floor(minutes / MINUTES_PER_HOUR)} 小时`;
+    }
+    return `${Math.floor(minutes / MINUTES_PER_DAY)} 天`;
+  });
+
+  // 有积压才提醒，超过一天才标红：审批本就不是分钟级的事，门槛太低会天天报警，报警就没人看了
+  const reviewBacklogTone = computed(() => {
+    if (!funnel.value.pendingReviewCount) {
+      return 'tone-muted';
+    }
+    return Number(funnel.value.pendingReviewOldestMinutes || 0) >= MINUTES_PER_DAY ? 'tone-critical' : 'tone-warning';
+  });
+
+  // ---------------------------- 漏斗折叠 ----------------------------
+
+  /*
+   * 默认展开；排查具体某条提案时可折叠，折叠后把关键结论压成一行摘要留在视线里。
+   * 状态记在 localStorage，读写都用 try/catch 包住 ——
+   * 隐私模式下 localStorage 会抛异常，不能让折叠状态把页面初始化带崩。
+   */
+  const FUNNEL_OPEN_KEY = 'proposal-record:funnel-open';
+  const funnelOpen = ref(readFunnelOpen());
+
+  function readFunnelOpen() {
+    try {
+      return localStorage.getItem(FUNNEL_OPEN_KEY) !== '0';
+    } catch (e) {
+      return true;
+    }
+  }
+
+  watch(funnelOpen, (open) => {
+    try {
+      localStorage.setItem(FUNNEL_OPEN_KEY, open ? '1' : '0');
+    } catch (e) {
+      // 存不了就算了，折叠状态不值得打断用户
+    }
+  });
 
   // ---------------------------- 添加/修改 ----------------------------
   const formRef = ref();
@@ -377,7 +628,7 @@
       };
       await proposalRecordApi.delete(data.id);
       message.success('删除成功');
-      queryData();
+      reload();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -415,7 +666,7 @@
       SmartLoading.show();
       await proposalRecordApi.batchDelete(selectedRowKeyList.value);
       message.success('删除成功');
-      queryData();
+      reload();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -423,3 +674,196 @@
     }
   }
 </script>
+
+<style lang="less" scoped>
+  .funnel-toggle {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .funnel-toggle-btn {
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .funnel-summary {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .summary-alert {
+    font-weight: 600;
+    color: #b91c1c;
+  }
+
+  .funnel-note {
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .overview-row {
+    margin-bottom: 12px;
+  }
+
+  .overview-card {
+    padding: 12px 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    border-radius: 6px;
+  }
+
+  .tone-primary {
+    border-left-color: #3b82f6;
+  }
+
+  .tone-success {
+    border-left-color: #10b981;
+
+    .overview-card-value {
+      color: #059669;
+    }
+  }
+
+  .tone-warning {
+    border-left-color: #f59e0b;
+
+    .overview-card-value {
+      color: #b45309;
+    }
+  }
+
+  .tone-critical {
+    background: #fef2f2;
+    border-left-color: #b91c1c;
+
+    .overview-card-value {
+      color: #b91c1c;
+    }
+  }
+
+  .tone-muted {
+    border-left-color: #cbd5e1;
+  }
+
+  .overview-card-label {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .overview-card-hint {
+    margin-left: 4px;
+    color: #cbd5e1;
+  }
+
+  .overview-card-value {
+    margin-top: 2px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #0f172a;
+  }
+
+  .overview-card-slash {
+    margin-left: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #94a3b8;
+  }
+
+  .overview-card-foot {
+    margin-top: 2px;
+    font-size: 11px;
+    color: #cbd5e1;
+  }
+
+  .stat-card {
+    margin-bottom: 12px;
+  }
+
+  .stat-head {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .stat-head-sub {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 3px 0;
+  }
+
+  .stat-name {
+    flex: 0 0 96px;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stat-name-alert {
+    font-weight: 600;
+    color: #b91c1c;
+  }
+
+  .stat-bar-wrap {
+    flex: 1;
+    height: 14px;
+    overflow: hidden;
+    background: #f1f5f9;
+    border-radius: 3px;
+  }
+
+  .stat-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #6ee7b7);
+  }
+
+  .stat-bar-alert {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+  }
+
+  .stat-num {
+    flex: 0 0 110px;
+    font-size: 12px;
+    color: #64748b;
+    text-align: right;
+  }
+
+  .asset-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .asset-main {
+    flex: 0 0 150px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .asset-sub {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .text-alert {
+    font-weight: 600;
+    color: #b91c1c;
+  }
+</style>

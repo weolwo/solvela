@@ -98,6 +98,150 @@
         </where>
     </sql>
 
+    <!--
+        漏斗统计的筛选条件：与列表共用同一批条件，但<b>刻意不吃 status</b> ——
+        它正是漏斗要拆解的维度，跟着筛，点「只看成功」之后到账率会变成 100%，
+        几个数字互相之间就没法对照了。
+        assetType / sourceType / promotionConfigId 这些是正经的切片维度，照常生效。
+
+        ⚠️ 不套 &lt;where&gt;，只给裸条件片段：拦截原因那条查询还要在同一个 &lt;where&gt; 里
+        追加 status=80，本片段自带 &lt;where&gt; 会让追加的条件落在外面，
+        而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
+    -->
+    <sql id="funnel_conditions">
+        <if test="queryForm.tenantId != null">
+            AND tenant_id = #{queryForm.tenantId}
+        </if>
+        <if test="queryForm.memberName != null">
+            AND member_name = #{queryForm.memberName}
+        </if>
+        <if test="queryForm.updateTimeBegin != null">
+            AND update_time &gt;= #{queryForm.updateTimeBegin}
+        </if>
+        <if test="queryForm.updateTimeEnd != null">
+            AND update_time &lt;= #{queryForm.updateTimeEnd}
+        </if>
+        <if test="queryForm.createTimeBegin != null">
+            AND create_time &gt;= #{queryForm.createTimeBegin}
+        </if>
+        <if test="queryForm.createTimeEnd != null">
+            AND create_time &lt;= #{queryForm.createTimeEnd}
+        </if>
+        <if test="queryForm.promotionConfigId != null">
+            AND promotion_config_id = #{queryForm.promotionConfigId}
+        </if>
+        <if test="queryForm.sourceType != null">
+            AND source_type = #{queryForm.sourceType}
+        </if>
+        <if test="queryForm.sourceBizId != null">
+            AND source_biz_id = #{queryForm.sourceBizId}
+        </if>
+        <if test="queryForm.firstReviewer != null">
+            AND first_reviewer = #{queryForm.firstReviewer}
+        </if>
+        <if test="queryForm.tradeNo != null">
+            AND trade_no = #{queryForm.tradeNo}
+        </if>
+        <if test="queryForm.assetType != null">
+            AND asset_type = #{queryForm.assetType}
+        </if>
+    </sql>
+
+    <!--
+        漏斗计数 + 审批积压 + 下发卡单 + 一致性体检，一次扫表算完。
+        不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+        出现「分项加起来不等于总数」这种自相矛盾。
+
+        三个最该被盯住的数字：
+          - pendingReviewOldestMinutes：最久的一条待审已经等了多久。只看条数看不出「压了三天」，
+            而提案压在审批池里，对用户就是「奖没发」；
+          - stuckDispatchCount        ：卡在 30-待执行 / 40-执行中 且 30 分钟没动过。下发是在提案
+            事务提交后同步调起的，进程中途退出就没有第二次机会，而全工程没有任何重试/补偿的
+            定时任务 —— 这些提案会永远停在半路，钱既没发出去也没标成失败；
+          - sameReviewerCount        ：一审二审同一个人。审批接口不校验两级审批人是否同一人，
+            双层审批一旦变成同一个人点两次，这道防线就只是形式。
+
+        另外两个是流程体检：
+          - rejectNoCommentCount ：驳回却没写理由，事后说不清为什么不给这个人发；
+          - reviewerNoTimeCount  ：有审批人却没有审批时间。updateReview 是同一条 SQL 同时写这两个
+            字段的，正常不可能只有一半 —— 出现即说明这行被人工改过（本页的「编辑」按钮
+            对这张财务审批表是全字段可写的）。
+    -->
+    <select id="selectFunnel" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                   AS totalCount,
+            COUNT(DISTINCT member_name)                                AS memberCount,
+            COALESCE(SUM(status = 0), 0)                               AS waitingCount,
+            COALESCE(SUM(status = 10), 0)                              AS firstReviewCount,
+            COALESCE(SUM(status = 11), 0)                              AS secondReviewCount,
+            COALESCE(SUM(status = 20), 0)                              AS rejectedCount,
+            COALESCE(SUM(status = 30), 0)                              AS pendingExecuteCount,
+            COALESCE(SUM(status = 40), 0)                              AS executingCount,
+            COALESCE(SUM(status = 50), 0)                              AS successCount,
+            COALESCE(SUM(status = 60), 0)                              AS partialCount,
+            COALESCE(SUM(status = 70), 0)                              AS failedCount,
+            COALESCE(SUM(status = 80), 0)                              AS blockedCount,
+            COALESCE(TIMESTAMPDIFF(MINUTE,
+                     MIN(CASE WHEN status IN (10, 11) THEN create_time END), now()), 0) AS pendingReviewOldestMinutes,
+            COALESCE(SUM(status IN (30, 40)
+                     AND update_time &lt; DATE_SUB(now(), INTERVAL 30 MINUTE)), 0)      AS stuckDispatchCount,
+            COALESCE(SUM(second_reviewer IS NOT NULL
+                     AND second_reviewer = first_reviewer), 0)         AS sameReviewerCount,
+            COALESCE(SUM(status = 20
+                     AND (review_comment IS NULL OR review_comment = '')), 0)         AS rejectNoCommentCount,
+            COALESCE(SUM((first_reviewer IS NOT NULL AND first_review_time IS NULL)
+                      OR (second_reviewer IS NOT NULL AND second_review_time IS NULL)), 0) AS reviewerNoTimeCount
+        FROM t_proposal_record
+        <where><include refid="funnel_conditions"/></where>
+    </select>
+
+    <!--
+        按资产类型汇总。⚠️ 金额必须按 asset_type 分组：积分、现金、券张数、实物件数
+        不是同一个量纲，合成一个「总金额」的那个数字没有任何含义。
+        单条价值 = amount × quantity（quantity 就是扣 used_quota 的那个数量）。
+    -->
+    <select id="selectAssetStat" resultType="java.util.Map">
+        SELECT asset_type                                                        AS assetType,
+               COUNT(*)                                                          AS proposalCount,
+               COALESCE(SUM(status = 50), 0)                                     AS successCount,
+               COALESCE(SUM(CASE WHEN status = 50 THEN amount * quantity END), 0) AS successAmount,
+               COALESCE(SUM(CASE WHEN status IN (10, 11, 30, 40) THEN amount * quantity END), 0) AS pendingAmount,
+               COALESCE(SUM(CASE WHEN status = 80 THEN amount * quantity END), 0) AS blockedAmount
+        FROM t_proposal_record
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY asset_type
+        ORDER BY proposalCount DESC
+    </select>
+
+    <!-- 按来源汇总：哪种玩法在花钱、哪种玩法的奖最容易发不出去 -->
+    <select id="selectSourceStat" resultType="java.util.Map">
+        SELECT source_type                   AS sourceType,
+               COUNT(*)                      AS proposalCount,
+               COALESCE(SUM(status = 50), 0) AS successCount
+        FROM t_proposal_record
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY source_type
+        ORDER BY proposalCount DESC
+    </select>
+
+    <!--
+        风控拦截原因分布。只能按 remark 这个自由文本聚类 —— RiskResult.code
+        （SINGLE_MAX_AMOUNT_LIMIT / USER_FREQUENCY_LIMIT / GLOBAL_BUDGET_LIMIT）没有落库，
+        拦截文案一改这里就会悄悄裂成两条。已知脆弱点，对照 t_task_record_flow.discard_code 的做法。
+        LIMIT 10：真裂开了也不至于把页面刷满。
+    -->
+    <select id="selectBlockReasonStat" resultType="java.util.Map">
+        SELECT remark AS reason, COUNT(*) AS blockCount
+        FROM t_proposal_record
+        <where>
+            AND status = 80
+            <include refid="funnel_conditions"/>
+        </where>
+        GROUP BY remark
+        ORDER BY blockCount DESC
+        LIMIT 10
+    </select>
+
     <select id="queryPage" resultMap="ProposalRecordVO">
         SELECT
         <include refid="base_columns"/>

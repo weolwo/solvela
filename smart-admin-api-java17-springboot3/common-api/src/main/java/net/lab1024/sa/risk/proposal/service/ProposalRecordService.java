@@ -9,6 +9,7 @@ import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.enums.ProposalSourceTypeEnum;
 import net.lab1024.sa.ledger.engine.AssetDispatchEngine;
 import net.lab1024.sa.risk.engine.RiskChainEngine;
 import net.lab1024.sa.risk.engine.RiskContext;
@@ -20,6 +21,7 @@ import net.lab1024.sa.risk.proposal.domain.entity.ProposalRecord;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordQueryForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordUpdateForm;
+import net.lab1024.sa.risk.proposal.domain.vo.ProposalFunnelVO;
 import net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 提案表 Service
@@ -60,6 +65,18 @@ public class ProposalRecordService {
      * 调用方未指定发放数量时的默认值
      */
     private static final int DEFAULT_QUANTITY = 1;
+
+    /**
+     * 比率保留位数（与彩票/抽奖/任务三个漏斗一致）
+     */
+    private static final int RATE_SCALE = 4;
+
+    private static final long MINUTES_PER_HOUR = 60L;
+
+    /**
+     * 待审积压超过一天才提示：审批本来就不是分钟级的事，门槛太低会天天报警，报警就没人看了
+     */
+    private static final long MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO addProposal(ProposalRecordAddForm req) {
@@ -287,6 +304,145 @@ public class ProposalRecordService {
     }
 
     /**
+     * 提案漏斗。
+     *
+     * <p>回答的是翻十页提案也答不出来的三件事：今天发出去多少（按资产类型分开算）、
+     * 有没有单子压在审批池里没人管、<b>有没有钱卡在半路既没发也没标失败</b>。
+     *
+     * <p>最后一个是本页独有的：下发是在提案事务提交后同步调起的，进程中途退出就没有第二次机会，
+     * 而全工程没有任何重试/补偿的定时任务 —— 卡住的提案会一直停在 30/40，没人查就发现不了。
+     */
+    public ProposalFunnelVO funnel(ProposalRecordQueryForm queryForm) {
+        Map<String, Object> row = proposalRecordDao.selectFunnel(queryForm);
+        ProposalFunnelVO vo = new ProposalFunnelVO();
+
+        long total = toLong(row.get("totalCount"));
+        long firstReview = toLong(row.get("firstReviewCount"));
+        long secondReview = toLong(row.get("secondReviewCount"));
+        long success = toLong(row.get("successCount"));
+        long partial = toLong(row.get("partialCount"));
+        long failed = toLong(row.get("failedCount"));
+        long blocked = toLong(row.get("blockedCount"));
+        long waiting = toLong(row.get("waitingCount"));
+        long stuckDispatch = toLong(row.get("stuckDispatchCount"));
+
+        vo.setTotalCount(total);
+        vo.setMemberCount(toLong(row.get("memberCount")));
+        vo.setWaitingCount(waiting);
+        vo.setFirstReviewCount(firstReview);
+        vo.setSecondReviewCount(secondReview);
+        vo.setRejectedCount(toLong(row.get("rejectedCount")));
+        vo.setPendingExecuteCount(toLong(row.get("pendingExecuteCount")));
+        vo.setExecutingCount(toLong(row.get("executingCount")));
+        vo.setSuccessCount(success);
+        vo.setPartialCount(partial);
+        vo.setFailedCount(failed);
+        vo.setBlockedCount(blocked);
+        /*
+         * 到账率与拦截率的分母都用「提案总数」：提案链路上的每一步都可能把钱拦下来，
+         * 剔掉任何一段都会让剩下那个比率虚高，而运营要的恰恰是「一百个提案里最后几个到账」。
+         */
+        vo.setSuccessRate(rate(success, total));
+        vo.setBlockRate(rate(blocked, total));
+        vo.setPendingReviewCount(firstReview + secondReview);
+        vo.setPendingReviewOldestMinutes(toLong(row.get("pendingReviewOldestMinutes")));
+        vo.setStuckDispatchCount(stuckDispatch);
+
+        // ---- 资产维度：金额按 asset_type 分开算，绝不合并 ----
+        List<ProposalFunnelVO.AssetStatVO> assetList = new ArrayList<>();
+        for (Map<String, Object> stat : proposalRecordDao.selectAssetStat(queryForm)) {
+            ProposalFunnelVO.AssetStatVO item = new ProposalFunnelVO.AssetStatVO();
+            item.setAssetType(stat.get("assetType") == null ? null : String.valueOf(stat.get("assetType")));
+            item.setProposalCount(toLong(stat.get("proposalCount")));
+            item.setSuccessCount(toLong(stat.get("successCount")));
+            item.setSuccessAmount(toDecimal(stat.get("successAmount")));
+            item.setPendingAmount(toDecimal(stat.get("pendingAmount")));
+            item.setBlockedAmount(toDecimal(stat.get("blockedAmount")));
+            assetList.add(item);
+        }
+        vo.setAssetList(assetList);
+
+        // ---- 来源维度 ----
+        long unknownSourceCount = 0L;
+        List<ProposalFunnelVO.SourceStatVO> sourceList = new ArrayList<>();
+        for (Map<String, Object> stat : proposalRecordDao.selectSourceStat(queryForm)) {
+            ProposalFunnelVO.SourceStatVO item = new ProposalFunnelVO.SourceStatVO();
+            String sourceType = stat.get("sourceType") == null ? null : String.valueOf(stat.get("sourceType"));
+            ProposalSourceTypeEnum sourceEnum = sourceType == null ? null : ProposalSourceTypeEnum.resolve(sourceType);
+            long count = toLong(stat.get("proposalCount"));
+            long sourceSuccess = toLong(stat.get("successCount"));
+            item.setSourceType(sourceType);
+            // 字典外的取值原样回显，不要用「其它」盖住它 —— 那正是要被看见的东西
+            item.setSourceDesc(sourceEnum == null ? sourceType : sourceEnum.getDesc());
+            item.setProposalCount(count);
+            item.setSuccessCount(sourceSuccess);
+            item.setSuccessRate(rate(sourceSuccess, count));
+            item.setUnknownSource(sourceEnum == null);
+            if (sourceEnum == null) {
+                unknownSourceCount += count;
+            }
+            sourceList.add(item);
+        }
+        vo.setSourceList(sourceList);
+
+        // ---- 风控拦截原因 ----
+        List<ProposalFunnelVO.BlockReasonVO> blockReasonList = new ArrayList<>();
+        for (Map<String, Object> stat : proposalRecordDao.selectBlockReasonStat(queryForm)) {
+            ProposalFunnelVO.BlockReasonVO item = new ProposalFunnelVO.BlockReasonVO();
+            long count = toLong(stat.get("blockCount"));
+            item.setReason(stat.get("reason") == null ? "（未记录原因）" : String.valueOf(stat.get("reason")));
+            item.setBlockCount(count);
+            item.setBlockShare(rate(count, blocked));
+            blockReasonList.add(item);
+        }
+        vo.setBlockReasonList(blockReasonList);
+
+        // ---- 流程与一致性体检 ----
+        List<String> issues = new ArrayList<>();
+        if (stuckDispatch > 0) {
+            issues.add("有 " + stuckDispatch + " 条提案卡在「待执行/执行中」超过 30 分钟：下发是在提案事务提交后"
+                    + "同步调起的，进程中途退出就没有第二次机会，而工程里没有任何重试/补偿任务 —— "
+                    + "这些钱既没发出去也没标成失败，需要人工确认后重新触发");
+        }
+        long oldestMinutes = vo.getPendingReviewOldestMinutes();
+        if (oldestMinutes >= MINUTES_PER_DAY) {
+            issues.add("待审提案里最久的一条已经等了 " + (oldestMinutes / MINUTES_PER_HOUR) + " 小时："
+                    + "提案压在审批池里，对用户就是「奖一直没发」");
+        }
+        if (failed > 0 || partial > 0) {
+            issues.add("有 " + failed + " 条彻底失败、" + partial + " 条部分成功：部分成功意味着奖只发出去一半，"
+                    + "用户拿到的与承诺的不一致，需要人工补齐。失败原因见每条提案的备注");
+        }
+        long sameReviewer = toLong(row.get("sameReviewerCount"));
+        if (sameReviewer > 0) {
+            issues.add("有 " + sameReviewer + " 条提案的一审人与二审人是同一个人：审批接口不校验这一点，"
+                    + "双层审批变成同一个人点两次，这道防线只剩形式");
+        }
+        if (waiting > 0) {
+            issues.add("有 " + waiting + " 条提案停在「等待中」：正常链路只会落 待一审/待执行/风控拦截 三种初始状态，"
+                    + "出现 0 说明这些记录是绕过提案链路直接写进来的（后台「新建」按钮就能做到），"
+                    + "它们不会被任何流程推进");
+        }
+        long rejectNoComment = toLong(row.get("rejectNoCommentCount"));
+        if (rejectNoComment > 0) {
+            issues.add("有 " + rejectNoComment + " 条驳回没有填写理由：事后说不清为什么不给这个人发，"
+                    + "客诉与审计时都拿不出依据");
+        }
+        long reviewerNoTime = toLong(row.get("reviewerNoTimeCount"));
+        if (reviewerNoTime > 0) {
+            issues.add("有 " + reviewerNoTime + " 条提案有审批人却没有审批时间：这两个字段是同一条 SQL 一起写的，"
+                    + "只有一半说明该行被人工改过");
+        }
+        if (unknownSourceCount > 0) {
+            issues.add("有 " + unknownSourceCount + " 条提案的来源不在字典内（TASK/DRAW/LOTTERY/MANUAL）："
+                    + "历史上四个发奖 handler 都硬编码写了 LOTTERY_DRAW，任务发的奖也被记成彩票抽奖，"
+                    + "这批数据按来源统计时会被算错");
+        }
+        vo.setIssueList(issues);
+        return vo;
+    }
+
+    /**
      * 添加
      */
     public ResponseDTO<String> add(ProposalRecordAddForm addForm) {
@@ -327,5 +483,27 @@ public class ProposalRecordService {
 
         proposalRecordDao.deleteById(id);
         return ResponseDTO.ok();
+    }
+
+    private BigDecimal rate(long part, long total) {
+        if (total <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(part).divide(BigDecimal.valueOf(total), RATE_SCALE, RoundingMode.HALF_UP);
+    }
+
+    private long toLong(Object value) {
+        return value == null ? 0L : ((Number) value).longValue();
+    }
+
+    /**
+     * 金额统一保留两位。DECIMAL(13,4) 直接透出会变成「1100.0000 积分」，多出来的两位没有意义。
+     */
+    private BigDecimal toDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal decimal = value instanceof BigDecimal bd ? bd : new BigDecimal(value.toString());
+        return decimal.setScale(2, RoundingMode.HALF_UP);
     }
 }

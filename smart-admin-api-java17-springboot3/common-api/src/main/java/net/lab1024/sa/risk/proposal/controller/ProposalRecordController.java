@@ -12,6 +12,7 @@ import net.lab1024.sa.base.common.util.SmartRequestUtil;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordQueryForm;
 import net.lab1024.sa.risk.proposal.domain.form.ProposalRecordUpdateForm;
+import net.lab1024.sa.risk.proposal.domain.vo.ProposalFunnelVO;
 import net.lab1024.sa.risk.proposal.domain.vo.ProposalRecordVO;
 import net.lab1024.sa.risk.proposal.service.ProposalRecordService;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +37,13 @@ public class ProposalRecordController {
     @SaCheckPermission("proposalRecord:query")
     public ResponseDTO<PageResult<ProposalRecordVO>> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "提案漏斗：到账率、审批积压、下发卡单、资产/来源分布与流程体检")
+    @PostMapping("/funnel")
+    @SaCheckPermission("proposalRecord:query")
+    public ResponseDTO<ProposalFunnelVO> funnel(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(queryForm));
     }
 
     @Operation(summary = "提案审批通过（财务视角；一审通过后按 review_level 决定进二审还是直接放行下发）")
