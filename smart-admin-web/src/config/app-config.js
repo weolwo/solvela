@@ -12,14 +12,14 @@ export const appDefaultConfig = {
   language: 'zh_CN',
   // 布局: side 或者 side-expand 或者 top
   layout: 'side',
-  // 侧边菜单宽度 ， 默认为200px
-  sideMenuWidth: 200,
+  // 侧边菜单宽度：iOS 分组卡片布局下 200 太挤（磁贴 28 + 文字 15px），默认放宽到 240
+  sideMenuWidth: 240,
   //标签页位置
   pageTagLocation: 'center',
   // 夜间模式
   darkModeFlag: false,
-  // 菜单主题
-  sideMenuTheme: 'dark',
+  // 菜单主题：side 布局默认改为浅色（原来的深色藏青底显得沉闷），dark 现在是中性深灰而非 #001529
+  sideMenuTheme: 'light',
   // 主题颜色索引
   colorIndex: 0,
   // 顶部菜单页面宽度

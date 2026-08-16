@@ -6,7 +6,7 @@
       class="side-menu"
       :width="sideMenuWidth"
       v-model:collapsed="collapsed"
-      :theme="theme"
+      theme="light"
       v-show="!fullScreenFlag"
     >
       <!-- 左侧菜单 -->
@@ -104,6 +104,7 @@
   import MenuLocationBreadcrumb from './components/menu-location-breadcrumb/index.vue';
   import PageTag from './components/page-tag/index.vue';
   import SideMenu from './components/side-menu/index.vue';
+  import { useSideMenuTheme } from './components/side-menu/use-side-menu-theme';
   import SmartFooter from './components/smart-footer/index.vue';
   import { smartKeepAlive } from './components/smart-keep-alive';
   import IframeIndex from '/@/components/framework/iframe/iframe-index.vue';
@@ -122,8 +123,8 @@
   const fullScreenFlag = computed(() => useAppConfigStore().$state.fullScreenFlag);
   //菜单宽度
   const sideMenuWidth = computed(() => useAppConfigStore().$state.sideMenuWidth);
-  //主题颜色
-  const theme = computed(() => useAppConfigStore().$state.sideMenuTheme);
+  // 侧边栏底色：sider 自身也要上色，否则菜单内容不够高时底部会露出 antd 的白底
+  const { sideMenuBg } = useSideMenuTheme();
   //是否显示标签页
   const pageTagFlag = computed(() => useAppConfigStore().$state.pageTagFlag);
   // 是否显示帮助文档
@@ -292,7 +293,12 @@
     .side-menu {
       height: 100vh;
       overflow-x: hidden;
-      overflow-y: scroll;
+      overflow-y: auto;
+      background: v-bind(sideMenuBg);
+
+      :deep(.ant-layout-sider-children) {
+        background: v-bind(sideMenuBg);
+      }
 
       &.fixed-side {
         position: fixed;
@@ -308,12 +314,12 @@
 
     .side-menu::-webkit-scrollbar-thumb {
       border-radius: 10px;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(128, 128, 128, 0.35);
     }
 
     .side-menu::-webkit-scrollbar-track {
       border-radius: 0;
-      background: rgba(0, 0, 0, 0.1);
+      background: transparent;
     }
 
     .help-doc-sider {

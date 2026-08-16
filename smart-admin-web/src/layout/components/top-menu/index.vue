@@ -116,6 +116,7 @@
     border-bottom: 1px solid @color-border-secondary;
 
     .logo {
+      flex: 0 0 auto;
       min-width: 192px;
       display: flex;
       flex-direction: row;
@@ -140,7 +141,21 @@
       }
     }
 
+    /**
+     * 菜单区域必须能被压缩。antd 的 .ant-menu-overflow 是 display:flex 且子项 flex:none，
+     * 作为弹性子元素它的 min-width:auto = 所有菜单项宽度之和；一级菜单一多，
+     * 这个 ul 就把右侧用户区（含设置按钮）整个顶出屏幕，设置抽屉再也打不开。
+     * 加 min-width:0 让它可以收缩，antd 的 overflow 容器量到受限宽度后
+     * 才会把放不下的菜单收进「...」里。
+     */
+    :deep(.smart-menu) {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+    }
+
     .user-space {
+      flex: 0 0 auto;
       min-width: 208px;
       margin-left: auto;
       padding-right: 10px;

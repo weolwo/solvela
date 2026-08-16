@@ -1,2 +1,24 @@
 @import "tailwindcss/theme";
 @import "tailwindcss/utilities";
+
+/*
+ * 显式声明扫描范围（相对本文件，即整个 src/）。
+ *
+ * 这里只 import 了 theme + utilities，没有用 @import "tailwindcss"，
+ * 因此拿不到它自带的自动 source 检测：实测只有进入 vite 模块图的文件
+ * （被 import 过的）才会贡献类名，还没被引用的新文件里的类一律不生成。
+ * 加上 @source 后按文件系统扫描，新建组件不必先被 import 就能出样式。
+ */
+@source "../";
+
+/*
+ * dark: 变体改为类驱动。
+ *
+ * Tailwind v4 默认把 dark: 绑到系统的 prefers-color-scheme，
+ * 但本项目的明暗是由「设置-菜单主题 / 夜间模式」控制的，跟系统无关，
+ * 所以改成：祖先或自身带 .dark 类时生效。
+ *
+ * 注意本文件没有引入 tailwindcss/preflight（避免和 antd 的 reset 打架），
+ * 所以浏览器默认样式仍然存在：自己写的 ul / button 需要显式重置。
+ */
+@custom-variant dark (&:where(.dark, .dark *));

@@ -13,6 +13,8 @@ import dayjs from 'dayjs/locale/zh-cn';
 export default {
   antdLocale: antd,
   dayjsLocale: dayjs,
+  'menu.search.placeholder': '搜索菜单',
+  'menu.search.empty': '没有匹配的菜单',
   'setting.title': '网站设置',
   'setting.table.yHeight': '表格高度',
   'setting.pagetag.location': '标签页位置',

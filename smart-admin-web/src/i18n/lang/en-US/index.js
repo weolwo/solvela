@@ -13,6 +13,8 @@ import dayjs from 'dayjs/locale/eu';
 export default {
   antdLocale: antd,
   dayjsLocale: dayjs,
+  'menu.search.placeholder': 'Search menu',
+  'menu.search.empty': 'No matching menu',
   'setting.title': 'Setting',
   'setting.table.yHeight': 'Table Height',
   'setting.pagetag.location': 'TagPage Position',
