@@ -1,0 +1,21 @@
+# 构建上下文瘦身：这些要么由构建阶段自己生成，要么跟镜像无关。
+# 尤其 target/ —— 本地打过包的话它有 80MB+，白白传给 daemon。
+target/
+*/target/
+**/target/
+
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+logs/
+*.log
+
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+README.md
