@@ -1,11 +1,135 @@
 <!--
-  * 任务记录表
+  * 任务记录与任务漏斗
+  *
+  * 顶部漏斗回答的是「翻十页记录也答不出来」的问题：达标率多少、哪个任务没人做得完、
+  * 用户明明做了事进度却为什么不涨。
+  *
+  * 其中两段是本页独有的：
+  * ① 「已过有效期仍在进行中」—— 工程里没有过期扫描任务，这些记录永远不会自己收口，
+  *    用户端会一直看到一个做不完的任务，而没人查就发现不了；
+  * ② 「事件丢弃分类」—— 被丢弃的事件压根没建记录，在下面的列表里怎么翻都看不到，
+  *    答案只在流水表的 discard_code 里。
   *
   * @Author:    weolwo
   * @Date:      2026-04-18 21:02:56
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 任务漏斗 begin ----------->
+  <div class="funnel-toggle">
+    <a-button type="link" size="small" class="funnel-toggle-btn" @click="funnelOpen = !funnelOpen">
+      <template #icon>
+        <DownOutlined v-if="funnelOpen" />
+        <RightOutlined v-else />
+      </template>
+      任务漏斗
+    </a-button>
+    <span v-if="!funnelOpen" class="funnel-summary">
+      共 {{ num(funnel.totalCount) }} 条 · 达标 {{ percent(funnel.reachRate) }} ·
+      <span :class="funnel.staleRunningCount > 0 ? 'summary-alert' : ''"> 过期未收口 {{ num(funnel.staleRunningCount) }} </span>
+    </span>
+  </div>
+
+  <div v-show="funnelOpen">
+    <a-row :gutter="12" class="overview-row">
+      <a-col :span="6">
+        <div class="overview-card tone-primary">
+          <div class="overview-card-label">接取总数</div>
+          <div class="overview-card-value">{{ num(funnel.totalCount) }}</div>
+          <div class="overview-card-foot">{{ num(funnel.memberCount) }} 人参与 · 人均 {{ funnel.recordPerMember ?? '-' }} 个</div>
+        </div>
+      </a-col>
+      <a-col :span="6">
+        <div class="overview-card tone-success">
+          <div class="overview-card-label">
+            达标率
+            <a-tooltip title="分母是接取总数。任务不像开奖有明确的揭晓时刻，「进行中」本身就是一种结果（做不完也是做不完），把它剔出分母会让达标率虚高">
+              <QuestionCircleOutlined class="overview-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="overview-card-value">{{ percent(funnel.reachRate) }}</div>
+          <div class="overview-card-foot">已发奖 {{ num(funnel.dispatchedCount) }} · 进行中 {{ num(funnel.runningCount) }}</div>
+        </div>
+      </a-col>
+      <a-col :span="6">
+        <!-- 没有过期扫描任务，这些记录不会自己收口，用户端会一直看到一个做不完的任务 -->
+        <div class="overview-card" :class="funnel.staleRunningCount > 0 ? 'tone-critical' : 'tone-muted'">
+          <div class="overview-card-label">
+            过期未收口
+            <a-tooltip title="已过有效期却仍是「进行中」。工程里没有过期扫描任务，它们不会自己变成已过期，用户端会一直看到一个永远完不成的任务。可勾选后用「批量禁用」置为已过期">
+              <QuestionCircleOutlined class="overview-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="overview-card-value">{{ num(funnel.staleRunningCount) }}</div>
+          <div class="overview-card-foot">已过期 {{ num(funnel.expiredCount) }} · 完成未发奖 {{ num(funnel.completedCount) }}</div>
+        </div>
+      </a-col>
+      <a-col :span="6">
+        <!-- 需要人介入的丢弃：正常业务拦截量再大也不用管，这三类几条都该查 -->
+        <div class="overview-card" :class="funnel.discardAttentionCount > 0 ? 'tone-critical' : 'tone-muted'">
+          <div class="overview-card-label">
+            事件丢弃
+            <a-tooltip title="用户做了事进度却不涨，原因都在这里。被丢弃的事件压根没建记录，下面的列表里看不到它们">
+              <QuestionCircleOutlined class="overview-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="overview-card-value">
+            {{ num(funnel.discardAttentionCount) }}
+            <span class="overview-card-slash">需排查</span>
+          </div>
+          <div class="overview-card-foot">丢弃合计 {{ num(funnel.discardTotalCount) }}（含正常规则拦截）</div>
+        </div>
+      </a-col>
+    </a-row>
+
+    <!-- 漏斗刻意不吃这两个筛选项，筛了却不生效比不筛更让人困惑，故明说 -->
+    <div v-if="queryForm.status !== undefined || queryForm.completeTimeBegin" class="funnel-note">
+      漏斗不受「状态」「达标时间」筛选影响：它们正是漏斗要拆解的维度，跟着筛会让达标率恒为 100%
+    </div>
+
+    <a-alert v-for="(issue, idx) in funnel.issueList || []" :key="idx" type="error" show-icon class="mb-2">
+      <template #message>
+        <span class="text-xs">{{ issue }}</span>
+      </template>
+    </a-alert>
+
+    <a-row :gutter="12">
+      <a-col :span="14">
+        <a-card v-if="funnel.taskList && funnel.taskList.length > 0" size="small" :bordered="false" class="stat-card">
+          <div class="stat-head">任务达标分布（接取量 TOP 20）</div>
+          <div v-for="item in funnel.taskList" :key="item.taskConfigId" class="stat-row">
+            <div class="stat-name">
+              {{ item.taskName || `（配置已删除 #${item.taskConfigId}）` }}
+              <span v-if="item.staleRunningCount > 0" class="stat-stale">过期未收口 {{ num(item.staleRunningCount) }}</span>
+            </div>
+            <div class="stat-bar-wrap">
+              <div class="stat-bar" :style="{ width: barPercent(item.reachRate) + '%' }"></div>
+            </div>
+            <div class="stat-num">{{ num(item.reachedCount) }}/{{ num(item.recordCount) }} · {{ percent(item.reachRate) }}</div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="10">
+        <a-card v-if="funnel.discardList && funnel.discardList.length > 0" size="small" :bordered="false" class="stat-card">
+          <div class="stat-head">
+            事件丢弃原因（共 {{ num(funnel.discardTotalCount) }} 条）
+            <span class="stat-head-sub">红色的三类不是正常业务拦截，要去找上游或修配置</span>
+          </div>
+          <div v-for="item in funnel.discardList" :key="item.discardCode || 'UNKNOWN'" class="stat-row">
+            <div class="stat-name" :class="item.needsAttention ? 'stat-name-alert' : ''">
+              {{ item.needsAttention ? '🔴' : '' }} {{ item.discardDesc }}
+            </div>
+            <div class="stat-bar-wrap">
+              <div class="stat-bar" :class="item.needsAttention ? 'stat-bar-alert' : ''" :style="{ width: barPercent(item.discardShare) + '%' }"></div>
+            </div>
+            <div class="stat-num">{{ num(item.discardCount) }} · {{ percent(item.discardShare) }}</div>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+  </div>
+  <!---------- 任务漏斗 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
@@ -114,7 +238,7 @@
       />
     </div>
 
-    <TaskRecordForm ref="formRef" @reloadList="queryData" />
+    <TaskRecordForm ref="formRef" @reloadList="reload" />
   </a-card>
 
   <!---------- 事件流水抽屉：客诉自证入口 ----------->
@@ -157,7 +281,8 @@
   </a-drawer>
 </template>
 <script setup>
-  import { reactive, ref, onMounted } from 'vue';
+  import { reactive, ref, watch, onMounted } from 'vue';
+  import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { taskRecordApi } from '/@/api/business/task/task-record/task-record-api';
@@ -296,18 +421,36 @@
   // 总数
   const total = ref(0);
 
+  // 漏斗数据
+  const funnel = ref({});
+
   // 重置查询条件
   function resetQuery() {
     let pageSize = queryForm.pageSize;
     Object.assign(queryForm, queryFormState);
     queryForm.pageSize = pageSize;
-    queryData();
+    reload();
   }
 
   // 搜索
   function onSearch() {
     queryForm.pageNum = 1;
-    queryData();
+    reload();
+  }
+
+  // 列表与漏斗一起刷：换了筛选条件只刷一个会让两者对不上
+  async function reload() {
+    await Promise.all([queryData(), loadFunnel()]);
+  }
+
+  async function loadFunnel() {
+    try {
+      // status / completeTime 服务端刻意忽略：它们是漏斗要拆解的维度本身
+      const res = await taskRecordApi.funnel(queryForm);
+      funnel.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
   }
 
   // 查询数据
@@ -334,7 +477,55 @@
     queryForm.completeTimeEnd = dateStrings[1];
   }
 
-  onMounted(queryData);
+  onMounted(reload);
+
+  // ---------------------------- 漏斗展示辅助 ----------------------------
+
+  function num(value) {
+    return value == null ? '-' : Number(value).toLocaleString();
+  }
+
+  function percent(rate) {
+    if (rate == null) {
+      return '-';
+    }
+    const v = Number(rate) * 100;
+    if (v === 0) {
+      return '0%';
+    }
+    return v >= 1 ? `${v.toFixed(2)}%` : `${v.toPrecision(2)}%`;
+  }
+
+  // 占比再小也给 1% 的宽度，否则条形图上只剩一条看不见的缝，读者会以为渲染坏了
+  function barPercent(rate) {
+    return Math.max(1, Math.round(Number(rate || 0) * 100));
+  }
+
+  // ---------------------------- 漏斗折叠 ----------------------------
+
+  /*
+   * 默认展开；排查具体某条记录时可折叠，折叠后把关键结论压成一行摘要留在视线里。
+   * 状态记在 localStorage，读写都用 try/catch 包住 ——
+   * 隐私模式下 localStorage 会抛异常，不能让折叠状态把页面初始化带崩。
+   */
+  const FUNNEL_OPEN_KEY = 'task-record:funnel-open';
+  const funnelOpen = ref(readFunnelOpen());
+
+  function readFunnelOpen() {
+    try {
+      return localStorage.getItem(FUNNEL_OPEN_KEY) !== '0';
+    } catch (e) {
+      return true;
+    }
+  }
+
+  watch(funnelOpen, (open) => {
+    try {
+      localStorage.setItem(FUNNEL_OPEN_KEY, open ? '1' : '0');
+    } catch (e) {
+      // 存不了就算了，折叠状态不值得打断用户
+    }
+  });
 
   // ---------------------------- 添加/修改 ----------------------------
   const formRef = ref();
@@ -402,7 +593,8 @@
       });
       message.success('已批量禁用');
       selectedRowKeyList.value = [];
-      await queryData();
+      // 禁用会把「过期未收口」的记录搬进「已过期」，漏斗必须跟着刷新，否则数字还停在改动之前
+      await reload();
     } catch (e) {
       smartSentry.captureError(e);
     } finally {
@@ -410,3 +602,170 @@
     }
   }
 </script>
+
+<style lang="less" scoped>
+  .funnel-toggle {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .funnel-toggle-btn {
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .funnel-summary {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .summary-alert {
+    font-weight: 600;
+    color: #b91c1c;
+  }
+
+  .funnel-note {
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .overview-row {
+    margin-bottom: 12px;
+  }
+
+  .overview-card {
+    padding: 12px 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    border-radius: 6px;
+  }
+
+  .tone-primary {
+    border-left-color: #3b82f6;
+  }
+
+  .tone-success {
+    border-left-color: #10b981;
+
+    .overview-card-value {
+      color: #059669;
+    }
+  }
+
+  .tone-critical {
+    background: #fef2f2;
+    border-left-color: #b91c1c;
+
+    .overview-card-value {
+      color: #b91c1c;
+    }
+  }
+
+  .tone-muted {
+    border-left-color: #cbd5e1;
+  }
+
+  .overview-card-label {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .overview-card-hint {
+    margin-left: 4px;
+    color: #cbd5e1;
+  }
+
+  .overview-card-value {
+    margin-top: 2px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #0f172a;
+  }
+
+  .overview-card-slash {
+    margin-left: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #94a3b8;
+  }
+
+  .overview-card-foot {
+    margin-top: 2px;
+    font-size: 11px;
+    color: #cbd5e1;
+  }
+
+  .stat-card {
+    margin-bottom: 12px;
+  }
+
+  .stat-head {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .stat-head-sub {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 3px 0;
+  }
+
+  .stat-name {
+    flex: 0 0 200px;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stat-name-alert {
+    font-weight: 600;
+    color: #b91c1c;
+  }
+
+  .stat-stale {
+    margin-left: 6px;
+    font-size: 11px;
+    color: #b91c1c;
+  }
+
+  .stat-bar-wrap {
+    flex: 1;
+    height: 14px;
+    overflow: hidden;
+    background: #f1f5f9;
+    border-radius: 3px;
+  }
+
+  .stat-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #6ee7b7);
+  }
+
+  .stat-bar-alert {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+  }
+
+  .stat-num {
+    flex: 0 0 150px;
+    font-size: 12px;
+    color: #64748b;
+    text-align: right;
+  }
+</style>

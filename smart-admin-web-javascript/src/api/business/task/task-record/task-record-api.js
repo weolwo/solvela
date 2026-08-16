@@ -16,6 +16,15 @@ export const taskRecordApi = {
   },
 
   /**
+   * 任务漏斗：达标率、任务分布、事件丢弃原因与数据一致性体检。
+   * ⚠️ 服务端刻意忽略 status 与 completeTime 两个筛选项 —— 它们正是漏斗要拆解的维度，
+   * 跟着筛会让达标率恒为 100%  @author  alaric
+   */
+  funnel: (param) => {
+    return postRequest('/taskRecord/funnel', param);
+  },
+
+  /**
    * 增加  @author  weolwo
    */
   add: (param) => {

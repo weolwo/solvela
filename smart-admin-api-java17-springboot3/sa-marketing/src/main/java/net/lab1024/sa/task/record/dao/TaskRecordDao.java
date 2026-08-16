@@ -37,6 +37,30 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      */
     List<TaskRecordVO> queryList(@Param("queryForm") TaskRecordQueryForm queryForm);
 
+    // ==================== 漏斗统计 ====================
+
+    /**
+     * 漏斗计数 + 过期收口体检 + 一致性体检，一次扫表算完。
+     *
+     * 不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+     * 出现「分项加起来不等于总数」这种自相矛盾。
+     * 刻意不吃 status / completeTime 条件 —— 那两个正是漏斗要拆解的维度。
+     */
+    java.util.Map<String, Object> selectFunnel(@Param("queryForm") TaskRecordQueryForm queryForm);
+
+    /**
+     * 任务维度分布（接取量 TOP 20），一次查全 —— 逐个任务查一次在任务多起来之后就是 N+1。
+     */
+    List<java.util.Map<String, Object>> selectTaskStat(@Param("queryForm") TaskRecordQueryForm queryForm);
+
+    /**
+     * 事件丢弃分类分布，查的是 {@code t_task_record_flow}（走 idx_t_tsk_flw_stat）。
+     *
+     * <p>「用户做了事进度却不涨」的答案在这里，而不在记录表里：被丢弃的事件<b>压根没建记录</b>，
+     * 记录表怎么翻都看不到它们。
+     */
+    List<java.util.Map<String, Object>> selectDiscardStat(@Param("queryForm") TaskRecordQueryForm queryForm);
+
             // ----- 物理删除 -----
                 /**
                  * 单个物理删除

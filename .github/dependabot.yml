@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # 针对 develop 分支的后端 Maven 更新
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "upgrade/springboot4"  # <--- 这里指定目标分支
+
+  # 针对 develop 分支的前端 Vue 更新
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    target-branch: "upgrade/springboot4"  # <--- 这里指定目标分支

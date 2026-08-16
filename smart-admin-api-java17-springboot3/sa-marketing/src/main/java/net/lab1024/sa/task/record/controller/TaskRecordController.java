@@ -6,6 +6,7 @@ import net.lab1024.sa.task.record.domain.form.TaskRecordAddForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordQueryForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordStatusUpdateForm;
 import net.lab1024.sa.task.record.domain.form.TaskRecordUpdateForm;
+import net.lab1024.sa.task.record.domain.vo.TaskRecordFunnelVO;
 import net.lab1024.sa.task.record.domain.vo.TaskRecordVO;
 import net.lab1024.sa.task.record.service.TaskRecordService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +39,13 @@ public class TaskRecordController {
     @SaCheckPermission("taskRecord:query")
     public ResponseDTO<PageResult<TaskRecordVO>> queryPage(@RequestBody @Valid TaskRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "任务漏斗：达标率、任务分布、事件丢弃原因与数据一致性体检")
+    @PostMapping("/funnel")
+    @SaCheckPermission("taskRecord:query")
+    public ResponseDTO<TaskRecordFunnelVO> funnel(@RequestBody @Valid TaskRecordQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(queryForm));
     }
 
     @Operation(summary = "添加")

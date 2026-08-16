@@ -44,6 +44,133 @@
                 update_time
     </sql>
 
+    <!--
+        漏斗统计的筛选条件：与列表共用同一批条件，但<b>刻意不吃 status 与 completeTime</b>。
+        那两个正是漏斗要拆解的维度 ——
+          · 跟着 status 筛，点「只看已发奖」之后漏斗会变成「达标率 100%」；
+          · completeTime 只有达标的记录才有值，跟着它筛等于先把进行中/已过期的行全删掉，
+            达标率同样恒为 100%。
+        几个数字互相之间就没法对照了，而这正是漏斗存在的意义。
+
+        ⚠️ 不套 &lt;where&gt;，只给裸条件片段：丢弃分布那条查询还要在同一个 &lt;where&gt; 里
+        追加 flow_type=2，本片段自带 &lt;where&gt; 会让追加的条件落在外面，
+        而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
+    -->
+    <sql id="funnel_conditions">
+        <if test="queryForm.tenantId != null">
+            AND tenant_id = #{queryForm.tenantId}
+        </if>
+        <if test="queryForm.memberName != null">
+            AND member_name = #{queryForm.memberName}
+        </if>
+        <if test="queryForm.activityCode != null">
+            AND activity_code = #{queryForm.activityCode}
+        </if>
+        <if test="queryForm.validStartTimeBegin != null">
+            AND valid_start_time &gt;= #{queryForm.validStartTimeBegin}
+        </if>
+        <if test="queryForm.validStartTimeEnd != null">
+            AND valid_start_time &lt;= #{queryForm.validStartTimeEnd}
+        </if>
+    </sql>
+
+    <!--
+        漏斗计数 + 过期收口体检 + 一致性体检，一次扫表算完。
+        不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+        出现「分项加起来不等于总数」这种自相矛盾。
+
+        staleRunningCount 是本页最该被盯住的数字：全工程没有任何地方把 status 改成 3-已过期
+        （idx_t_tsk_rec_expire(status, valid_end_time) 就是给那个扫描建的，但扫描没写），
+        这些记录不会自己收口，用户端会一直看到一个永远完不成的任务。
+
+        末尾四个是数据一致性检查（本页的 add/update 还在，人工改坏是有路径的）：
+          - reachedNoCompleteTime  ：达标了却没有达标时间，客诉时说不清是哪天完成的
+          - runningWithCompleteTime：进行中却带着达标时间，与 status 自相矛盾
+          - reachedNoPrizeSnapshot ：达标了但奖励快照是空数组，即「任务压根没配奖励」，达标也没奖可发
+          - noRuleSnapshot         ：规则快照为空（"{}"），策略层读不到目标值，这条记录永远不会达标
+
+        ⚠️ rule_snapshot / prize_snapshot 是 JSON 列，不能写 `= ''`（MySQL 会按 JSON 解析空串直接报错），
+        判空一律用 JSON_LENGTH：'{}' 与 '[]' 都是 0。
+    -->
+    <select id="selectFunnel" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                      AS totalCount,
+            COUNT(DISTINCT member_name)                                   AS memberCount,
+            COALESCE(SUM(status = 0), 0)                                  AS runningCount,
+            COALESCE(SUM(status = 1), 0)                                  AS completedCount,
+            COALESCE(SUM(status = 2), 0)                                  AS dispatchedCount,
+            COALESCE(SUM(status = 3), 0)                                  AS expiredCount,
+            COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0)    AS staleRunningCount,
+            COALESCE(SUM(status IN (1, 2) AND complete_time IS NULL), 0)  AS reachedNoCompleteTime,
+            COALESCE(SUM(status = 0 AND complete_time IS NOT NULL), 0)    AS runningWithCompleteTime,
+            COALESCE(SUM(status IN (1, 2)
+                     AND (prize_snapshot IS NULL OR JSON_LENGTH(prize_snapshot) = 0)), 0) AS reachedNoPrizeSnapshot,
+            COALESCE(SUM(rule_snapshot IS NULL OR JSON_LENGTH(rule_snapshot) = 0), 0)     AS noRuleSnapshot
+        FROM t_task_record
+        <where><include refid="funnel_conditions"/></where>
+    </select>
+
+    <!--
+        任务维度分布：哪个任务接得多、哪个任务没人做得完。
+        LIMIT 20 是刻意的 —— 前 20 之后的长尾在页面上只会挤成一片，要全量请走导出。
+    -->
+    <select id="selectTaskStat" resultType="java.util.Map">
+        SELECT task_config_id                                          AS taskConfigId,
+               COUNT(*)                                                AS recordCount,
+               COUNT(DISTINCT member_name)                             AS memberCount,
+               COALESCE(SUM(status IN (1, 2)), 0)                      AS reachedCount,
+               COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0) AS staleRunningCount
+        FROM t_task_record
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY task_config_id
+        ORDER BY recordCount DESC
+        LIMIT 20
+    </select>
+
+    <!--
+        事件丢弃分类分布。查的是流水表而不是记录表：被丢弃的事件压根没建记录
+        （人群不符、配置异常、线程池打满都发生在建记录之前），记录表怎么翻都看不到它们。
+        走 idx_t_tsk_flw_stat(create_time, flow_type, discard_code)。
+
+        筛选条件只挑流水表<b>确实有</b>的那几列对齐：
+          · tenant_id / member_name 直接对应；
+          · activity_code 流水表没有，经 task_config_id 关联配置表取（用 LEFT JOIN：
+            task_config_id=0 是「还没匹配到任何配置就被拒」的哨兵值，INNER JOIN 会把它整类吃掉。
+            不过一旦按活动筛，丢掉这类无归属流水本来就是对的）；
+          · 时间窗借用「开始时间」那一段，落到 f.create_time 上 —— 两者不是同一个口径
+            （一个是任务的生效起点、一个是事件发生时刻），但运营要问的是「这段时间里
+            事件为什么没转化成进度」，按同一段窗口对齐才答得上来。
+        ⚠️ 结束日必须用 &lt; 次日零点：create_time 带时分秒，写 &lt;= '2026-08-16'
+        会把 8/16 当天白天的流水全筛掉（valid_start_time 多是整点零时，才容得下 &lt;=）。
+    -->
+    <select id="selectDiscardStat" resultType="java.util.Map">
+        SELECT f.discard_code AS discardCode, COUNT(*) AS discardCount
+        FROM t_task_record_flow f
+        <if test="queryForm.activityCode != null">
+            LEFT JOIN t_task_config c ON c.id = f.task_config_id
+        </if>
+        <where>
+            AND f.flow_type = 2
+            <if test="queryForm.tenantId != null">
+                AND f.tenant_id = #{queryForm.tenantId}
+            </if>
+            <if test="queryForm.memberName != null">
+                AND f.member_name = #{queryForm.memberName}
+            </if>
+            <if test="queryForm.activityCode != null">
+                AND c.activity_code = #{queryForm.activityCode}
+            </if>
+            <if test="queryForm.validStartTimeBegin != null">
+                AND f.create_time &gt;= #{queryForm.validStartTimeBegin}
+            </if>
+            <if test="queryForm.validStartTimeEnd != null">
+                AND f.create_time &lt; DATE_ADD(#{queryForm.validStartTimeEnd}, INTERVAL 1 DAY)
+            </if>
+        </where>
+        GROUP BY f.discard_code
+        ORDER BY discardCount DESC
+    </select>
+
     <sql id="query_conditions">
         <where>
                         <if test="queryForm.tenantId != null">
