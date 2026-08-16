@@ -22,6 +22,16 @@ export const lotteryConfigApi = {
   },
 
   /**
+   * 玩法一览：号码空间占用、期号与发号实况、参与人数与体检告警。列表页主视图。
+   *
+   * queryPage 保留给下拉选项那类只要 lotteryCode/lotteryName 的场景 ——
+   * 那些地方不需要为了一个下拉去跑一遍全量体检  @author  alaric
+   */
+  board: (param) => {
+    return postRequest('/lotteryConfig/board', param);
+  },
+
+  /**
    * 上线：允许开始发号。服务端会校验必须已配奖级规则  @author  alaric
    */
   online: (lotteryCode) => {

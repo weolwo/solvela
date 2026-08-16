@@ -88,4 +88,16 @@
                         where id = #{id}
                 </delete>
 
+    <!--
+        奖池开关的条件更新。WHERE status = #{from} 是并发闸门：
+        两个运营同时点禁用，第二个人 rows=0，不会出现「都以为自己成功了」。
+        与 LotteryConfigMapper.updateStatus 同构。
+    -->
+    <update id="updateStatus">
+        UPDATE t_prize_pool_config
+        SET status = #{to}
+        WHERE id = #{id}
+          AND status = #{from}
+    </update>
+
 </mapper>

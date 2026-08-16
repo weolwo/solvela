@@ -15,23 +15,60 @@
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 概览 begin ----------->
+  <a-row :gutter="12" class="overview-row">
+    <a-col :span="8">
+      <!-- 「配了 N 个玩法、只有 M 个此刻真能领号」是本页最该先回答的问题 -->
+      <div class="overview-card" :class="sellableTone">
+        <div class="overview-card-label">
+          当前可领号的玩法
+          <a-tooltip title="三条同时成立才算：玩法已上线 + 配了奖级规则 + 有处于售卖窗口内的待开奖期号。判据与运行态领号逐条一致">
+            <QuestionCircleOutlined class="overview-card-hint" />
+          </a-tooltip>
+        </div>
+        <div class="overview-card-value">
+          {{ boardResult.sellableCount ?? '-' }}
+          <span class="overview-card-slash">/ {{ boardResult.lotteryCount ?? '-' }}</span>
+        </div>
+        <div class="overview-card-foot">
+          {{ notSellableCount > 0 ? `${notSellableCount} 个玩法用户现在领不到号` : '全部玩法均可正常领号' }}
+        </div>
+      </div>
+    </a-col>
+    <a-col :span="8">
+      <div class="overview-card tone-danger" :class="{ active: queryForm.onlyIssue }" @click="toggleOnlyIssue">
+        <div class="overview-card-label">体检告警</div>
+        <div class="overview-card-value">
+          {{ boardResult.dangerCount ?? '-' }}
+          <span v-if="boardResult.warnCount > 0" class="overview-card-sub">+{{ boardResult.warnCount }} 警告</span>
+        </div>
+        <div class="overview-card-foot">{{ queryForm.onlyIssue ? '已筛选 · 再点取消' : '点击只看有问题的玩法' }}</div>
+      </div>
+    </a-col>
+    <a-col :span="8">
+      <div class="overview-card tone-primary">
+        <div class="overview-card-label">累计已发号</div>
+        <div class="overview-card-value">{{ num(boardResult.totalSold) }}</div>
+        <div class="overview-card-foot">各玩法各期 sold_count 之和</div>
+      </div>
+    </a-col>
+  </a-row>
+  <!---------- 概览 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="活动编码" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.activityCode" placeholder="活动编码" />
-      </a-form-item>
       <a-form-item label="彩票编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.lotteryCode" placeholder="彩票编码" />
       </a-form-item>
       <a-form-item label="彩票名称" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.lotteryName" placeholder="彩票名称" />
+        <a-input style="width: 200px" v-model:value="queryForm.lotteryName" placeholder="支持模糊搜索" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
-        <a-select style="width: 200px" v-model:value="queryForm.status" :options="LOTTERY_STATUS_OPTIONS" placeholder="全部" allowClear />
+        <a-select style="width: 150px" v-model:value="queryForm.status" :options="LOTTERY_STATUS_OPTIONS" placeholder="全部" allowClear @change="onSearch" />
       </a-form-item>
-      <a-form-item label="创建时间" class="smart-query-form-item">
-        <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
+      <a-form-item class="smart-query-form-item">
+        <a-checkbox v-model:checked="queryForm.onlyIssue" @change="onSearch">只看有告警的</a-checkbox>
       </a-form-item>
       <a-form-item class="smart-query-form-item">
         <a-button type="primary" @click="onSearch">
@@ -88,6 +125,51 @@
       :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'lotteryName'">
+          <div class="cell-stack">
+            <span class="font-bold">{{ record.lotteryName }}</span>
+            <span class="cell-sub font-mono">{{ record.lotteryCode }}</span>
+          </div>
+        </template>
+
+        <!-- 占用率顶满 + 已发过号 = 发行量再也加不上去，这一列就是为了让人在发号前看见 -->
+        <template v-if="column.dataIndex === 'spaceUsage'">
+          <div class="cell-stack">
+            <div>
+              <span class="font-bold" :class="usageClass(record)">{{ percent(record.spaceUsage) }}</span>
+              <a-tag v-if="record.paramsFrozen" color="default" class="cell-tag ml-1">参数已冻结</a-tag>
+            </div>
+            <span class="cell-sub">
+              {{ record.numberLength }} 位 · 上限 {{ num(record.totalCount) }} / 空间 {{ num(record.numberSpace) }}
+            </span>
+          </div>
+        </template>
+
+        <template v-if="column.dataIndex === 'issueCount'">
+          <div class="cell-stack">
+            <span>{{ record.issueCount }} 期（待开奖 {{ record.waitIssueCount }}）</span>
+            <span class="cell-sub">已发 {{ num(record.soldTotal) }} 个号 · 奖级 {{ record.ruleCount }} 条</span>
+          </div>
+        </template>
+
+        <template v-if="column.dataIndex === 'memberCount'">
+          <div class="cell-stack">
+            <span>{{ num(record.memberCount) }} 人</span>
+            <span class="cell-sub">中奖 {{ num(record.winCount) }} 注</span>
+          </div>
+        </template>
+
+        <template v-if="column.dataIndex === 'issue'">
+          <div v-if="!record.issueList || record.issueList.length === 0" class="text-ok">✓</div>
+          <div v-else class="cell-stack">
+            <a-tooltip v-for="(issue, idx) in record.issueList" :key="idx" :title="issue.message">
+              <a-tag :color="issue.level === 'DANGER' ? 'red' : 'orange'" class="cell-tag issue-tag">
+                {{ issue.level === 'DANGER' ? '危险' : '警告' }} · {{ shortIssue(issue.message) }}
+              </a-tag>
+            </a-tooltip>
+          </div>
+        </template>
+
         <template v-if="column.dataIndex === 'status'">
           <a-tag :color="lotteryStatusOf(text).color">{{ lotteryStatusOf(text).desc }}</a-tag>
         </template>
@@ -187,9 +269,10 @@
   </a-card>
 </template>
 <script setup>
-  import { reactive, ref, onMounted } from 'vue';
+  import { computed, reactive, ref, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { message, Modal } from 'ant-design-vue';
+  import { QuestionCircleOutlined } from '@ant-design/icons-vue';
   import { StopOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
@@ -199,7 +282,6 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { LOTTERY_STATUS_ENUM, LOTTERY_STATUS_OPTIONS, lotteryStatusOf, matchRuleOf } from '/@/constants/business/lottery/lottery-const';
-  import { defaultTimeRanges } from '/@/lib/default-time-ranges';
 
   const router = useRouter();
 
@@ -222,32 +304,46 @@
     {
       title: '活动编码',
       dataIndex: 'activityCode',
+      width: 160,
       ellipsis: true,
     },
     {
-      title: '彩票编码',
-      dataIndex: 'lotteryCode',
-      ellipsis: true,
-    },
-    {
-      title: '彩票名称',
+      // 玩法名 + 编码合并成一列，编码是十位随机码，单独占一列既宽又不好认
+      title: '玩法',
       dataIndex: 'lotteryName',
-      ellipsis: true,
+      width: 200,
     },
     {
       title: '字符集：0-9, A-Z',
       dataIndex: 'numberCharset',
       ellipsis: true,
+      showFlag: false,
     },
     {
-      title: '号码长度',
-      dataIndex: 'numberLength',
-      ellipsis: true,
+      /*
+       * 号码长度与发行上限原先是两个裸数字，谁也不会去心算 10 的 n 次方。
+       * 合成一列并给出占用率 —— 那才是「还有多少扩容余地」的答案，
+       * 而发过号之后这两个参数永久冻结，占用率顶满就再也加不上去了。
+       */
+      title: '号码空间占用',
+      dataIndex: 'spaceUsage',
+      width: 210,
     },
     {
-      title: '号池总数 (如: 1,000,000)',
-      dataIndex: 'totalCount',
-      ellipsis: true,
+      // 期号与发号实况：玩法配得再好，没有可领号的期号，用户照样领不到
+      title: '期号 / 已发号',
+      dataIndex: 'issueCount',
+      width: 180,
+    },
+    {
+      title: '参与 / 中奖',
+      dataIndex: 'memberCount',
+      width: 130,
+    },
+    {
+      title: '体检',
+      dataIndex: 'issue',
+      width: 240,
     },
     {
       title: '状态',
@@ -282,6 +378,47 @@
     },
   ]);
 
+  // ---------------------------- 展示辅助 ----------------------------
+
+  function num(value) {
+    return value == null ? '-' : Number(value).toLocaleString();
+  }
+
+  function percent(rate) {
+    if (rate == null) {
+      return '-';
+    }
+    const v = Number(rate) * 100;
+    // 占用率常见是整数（100%、50%），去掉无意义的尾零
+    return `${Number(v.toFixed(2))}%`;
+  }
+
+  function shortIssue(message) {
+    const cut = message.indexOf('：');
+    return cut > 0 ? message.slice(0, cut) : message.slice(0, 14);
+  }
+
+  /*
+   * 占用率分档：≥100% 是超发（永远发不完）、≥90% 是快顶满、其余正常。
+   * 之所以在 90% 就变色：号码长度一旦发号就冻结，等到 100% 才提醒已经晚了。
+   */
+  function usageClass(record) {
+    const v = Number(record.spaceUsage ?? 0);
+    if (v > 1) {
+      return 'text-dead';
+    }
+    return v >= 0.9 ? 'text-warn' : '';
+  }
+
+  const notSellableCount = computed(() => {
+    if (boardResult.value.lotteryCount == null) {
+      return 0;
+    }
+    return boardResult.value.lotteryCount - (boardResult.value.sellableCount ?? 0);
+  });
+
+  const sellableTone = computed(() => (notSellableCount.value > 0 ? 'tone-warning' : 'tone-success'));
+
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
@@ -289,9 +426,7 @@
     lotteryCode: undefined, //彩票编码
     lotteryName: undefined, //彩票名称
     status: undefined, //状态：0-下线, 1-上线
-    createTime: [], //创建时间
-    createTimeBegin: undefined, //创建时间 开始
-    createTimeEnd: undefined, //创建时间 结束
+    onlyIssue: false, //只看有体检告警的玩法
     pageNum: 1,
     pageSize: 10,
   };
@@ -303,6 +438,13 @@
   const tableData = ref([]);
   // 总数
   const total = ref(0);
+  // 概览（与明细同一次请求返回，卡片数字与列表必然一致）
+  const boardResult = ref({});
+
+  function toggleOnlyIssue() {
+    queryForm.onlyIssue = !queryForm.onlyIssue;
+    onSearch();
+  }
 
   // 重置查询条件
   function resetQuery() {
@@ -322,7 +464,9 @@
   async function queryData() {
     tableLoading.value = true;
     try {
-      let queryResult = await lotteryConfigApi.queryPage(queryForm);
+      // 走 board 而不是 queryPage：多带号码空间占用、期号发号实况与体检结论
+      let queryResult = await lotteryConfigApi.board(queryForm);
+      boardResult.value = queryResult.data || {};
       tableData.value = queryResult.data.list;
       total.value = queryResult.data.total;
       // 状态变了的行留在选中列表里没意义，且容易让人对着旧状态再点一次批量禁用
@@ -335,10 +479,8 @@
     }
   }
 
-  function onChangeCreateTime(dates, dateStrings) {
-    queryForm.createTimeBegin = dateStrings[0];
-    queryForm.createTimeEnd = dateStrings[1];
-  }
+  // 「创建时间」筛选已随查询区精简移除：玩法是配置数据、总共就几条，
+  // 按创建时间筛没有实际用途，位置让给了「只看有告警的」
 
   onMounted(queryData);
 
@@ -468,3 +610,128 @@
     }
   }
 </script>
+
+<style lang="less" scoped>
+  .overview-row {
+    margin-bottom: 12px;
+  }
+
+  .overview-card {
+    padding: 12px 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .tone-success {
+    border-left-color: #10b981;
+
+    .overview-card-value {
+      color: #059669;
+    }
+  }
+
+  .tone-warning {
+    border-left-color: #f59e0b;
+
+    .overview-card-value {
+      color: #d97706;
+    }
+  }
+
+  .tone-danger {
+    cursor: pointer;
+    border-left-color: #ef4444;
+
+    &:hover {
+      box-shadow: 0 2px 10px rgb(15 23 42 / 8%);
+    }
+
+    &.active {
+      background: #f8fafc;
+      box-shadow: 0 2px 10px rgb(15 23 42 / 10%);
+    }
+
+    .overview-card-value {
+      color: #dc2626;
+    }
+  }
+
+  .tone-primary {
+    border-left-color: #3b82f6;
+  }
+
+  .overview-card-label {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .overview-card-hint {
+    margin-left: 4px;
+    color: #cbd5e1;
+  }
+
+  .overview-card-value {
+    margin-top: 2px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #0f172a;
+  }
+
+  .overview-card-slash {
+    font-size: 16px;
+    font-weight: 500;
+    color: #cbd5e1;
+  }
+
+  .overview-card-sub {
+    margin-left: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #f59e0b;
+  }
+
+  .overview-card-foot {
+    margin-top: 2px;
+    font-size: 11px;
+    color: #cbd5e1;
+  }
+
+  .cell-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
+
+  .cell-sub {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .cell-tag {
+    margin: 0;
+  }
+
+  .issue-tag {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .text-dead {
+    color: #dc2626;
+  }
+
+  .text-warn {
+    color: #d97706;
+  }
+
+  .text-ok {
+    color: #10b981;
+  }
+</style>

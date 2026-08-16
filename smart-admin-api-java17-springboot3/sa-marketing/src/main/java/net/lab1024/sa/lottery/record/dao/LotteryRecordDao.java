@@ -38,6 +38,27 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
     List<LotteryRecordVO> queryList(@Param("queryForm") LotteryRecordQueryForm queryForm);
 
     /**
+     * 漏斗计数 + 派发状态 + 一致性体检，一次扫表算完。
+     *
+     * 不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+     * 出现「分项加起来不等于总数」这种自相矛盾。
+     * 刻意不吃 winStatus / prizeLevel 条件 —— 那两个正是漏斗要拆解的维度。
+     */
+    java.util.Map<String, Object> selectFunnel(@Param("queryForm") LotteryRecordQueryForm queryForm);
+
+    /**
+     * 奖级分布，按奖级升序。只统计 win_status=2 的行 ——
+     * 未中奖行的 prize_level 是 99 占位，不是奖级。
+     */
+    List<java.util.Map<String, Object>> selectPrizeLevelStat(@Param("queryForm") LotteryRecordQueryForm queryForm);
+
+    /**
+     * 按玩法汇总参与人数与中奖注数，供彩票玩法一览一次性取全部玩法的实况。
+     * 不做成「逐个玩法查一次」——玩法多起来就是 N+1。
+     */
+    List<java.util.Map<String, Object>> selectStatByLottery();
+
+    /**
      * 某期已发出的最大游标，供 Redis 冷启动回源用。
      *
      * ⚠️ 必须取 MAX 而不是 COUNT：发号过程中失败会留下空洞（游标消耗了但记录没落库），

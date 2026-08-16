@@ -33,6 +33,13 @@ public class LotteryConfigQueryForm extends PageParam {
     @Schema(description = "状态：0-下线, 1-上线")
     private Integer status;
 
+    /**
+     * 只看有体检告警的玩法。「已上线却没配奖级」「上线了但没有可领号的期号」
+     * 这类问题看裸字段一个都看不出来，而它们的后果是用户当场领不到号。
+     */
+    @Schema(description = "只看有体检告警的玩法")
+    private Boolean onlyIssue;
+
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;
 

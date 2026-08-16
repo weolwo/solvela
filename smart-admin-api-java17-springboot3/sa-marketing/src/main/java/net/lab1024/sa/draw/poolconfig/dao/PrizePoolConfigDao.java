@@ -37,6 +37,15 @@ public interface PrizePoolConfigDao extends BaseMapper<PrizePoolConfig> {
      */
     List<PrizePoolConfigVO> queryList(@Param("queryForm") PrizePoolConfigQueryForm queryForm);
 
+    /**
+     * 条件更新奖池开关，返回影响行数。
+     *
+     * WHERE status = #{from} 是并发闸门，不是多余条件：两个运营同时点禁用，
+     * 第二个人拿到 rows=0 就知道状态已被别人改过，而不是两个人都以为自己成功了。
+     * 与 {@code LotteryConfigDao.updateStatus} 同构 —— 这类开关全项目一个形状。
+     */
+    int updateStatus(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
+
             // ----- 物理删除 -----
                 /**
                  * 单个物理删除

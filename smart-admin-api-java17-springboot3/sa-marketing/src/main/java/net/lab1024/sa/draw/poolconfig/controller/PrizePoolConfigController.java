@@ -2,6 +2,8 @@ package net.lab1024.sa.draw.poolconfig.controller;
 
 import net.lab1024.sa.base.common.domain.ValidateList;
 import net.lab1024.sa.draw.poolconfig.domain.entity.PrizePoolConfig;
+import net.lab1024.sa.draw.poolconfig.domain.vo.PrizePoolBoardResultVO;
+import net.lab1024.sa.draw.poolconfig.service.PrizePoolBoardService;
 import net.lab1024.sa.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
 import net.lab1024.sa.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
@@ -34,18 +36,20 @@ public class PrizePoolConfigController {
 
     private final PrizePoolConfigService Service;
 
-    @Operation(summary = "分页查询")
+    private final PrizePoolBoardService prizePoolBoardService;
+
+    @Operation(summary = "分页查询：奖池原始行，供下拉选项等场景使用")
     @PostMapping("/queryPage")
     @SaCheckPermission("prizePoolConfig:query")
     public ResponseDTO<PageResult<PrizePoolConfigVO>> queryPage(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
-    @Operation(summary = "添加")
-    @PostMapping("/add")
-    @SaCheckPermission("prizePoolConfig:add")
-    public ResponseDTO<String> add(@RequestBody @Valid PrizePoolConfigAddForm addForm) {
-        return Service.add(addForm);
+    @Operation(summary = "奖池一览：可编辑字段 + 坑位/概率/限领搭配的体检结论，列表页主视图")
+    @PostMapping("/board")
+    @SaCheckPermission("prizePoolConfig:query")
+    public ResponseDTO<PrizePoolBoardResultVO> board(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
+        return ResponseDTO.ok(prizePoolBoardService.board(queryForm));
     }
 
     @Operation(summary = "生成奖池编码（10位大写字母+数字，已判重）")
@@ -76,17 +80,40 @@ public class PrizePoolConfigController {
         return Service.update(updateForm);
     }
 
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("prizePoolConfig:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+    /*
+     * ⚠️ add / delete / batchDelete 已移除，取而代之的是下面三个：
+     *
+     *  - 新建奖池 → 抽奖工作台。只有 t_prize_pool_config 一行、没有坑位映射的池，
+     *    抽奖时快照构造直接抛「奖池快照不能为空」，是个建了就用不了的空壳；
+     *    工作台把「池 + 坑位 + 概率闭环校验」放在一个事务里，那才是奖池的完整形态。
+     *
+     *  - 删除 → 禁用。删池会留下孤儿坑位映射，更要命的是 t_draw_prize_log 里存着 pool_code，
+     *    那是发奖凭证：用户说「我明明在这个池抽中过」而那个池已不存在，客诉自证当场断掉。
+     *    禁用则一个字都不动历史数据，运行态直接拒绝新请求，而且可逆。
+     *    与彩票玩法「删除换成下线」是同一个决定（见 v3.63.0.sql）。
+     *
+     * 三个接口都用 prizePoolConfig:update，不新增权限点 ——
+     * 「改配置」与「停用」对角色授权而言是同一件事（沿用 v3.63.0 的判断）。
+     */
+
+    @Operation(summary = "禁用奖池：关闭开关，运行态立即拒绝新的抽奖请求；历史流水与坑位不受影响，可逆")
+    @GetMapping("/offline/{id}")
+    @SaCheckPermission("prizePoolConfig:update")
+    public ResponseDTO<String> offline(@PathVariable Long id) {
+        return Service.offline(id);
     }
 
-    @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("prizePoolConfig:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
+    @Operation(summary = "启用奖池：把开关拨回开启")
+    @GetMapping("/online/{id}")
+    @SaCheckPermission("prizePoolConfig:update")
+    public ResponseDTO<String> online(@PathVariable Long id) {
+        return Service.online(id);
+    }
+
+    @Operation(summary = "批量禁用：逐个禁用并回一句汇总，本就已关闭的计入跳过")
+    @PostMapping("/batchOffline")
+    @SaCheckPermission("prizePoolConfig:update")
+    public ResponseDTO<String> batchOffline(@RequestBody ValidateList<Long> idList) {
+        return Service.batchOffline(idList);
     }
 }

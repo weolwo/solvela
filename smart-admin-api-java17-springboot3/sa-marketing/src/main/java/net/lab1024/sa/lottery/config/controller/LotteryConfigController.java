@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import net.lab1024.sa.base.common.domain.PageResult;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.domain.ValidateList;
+import net.lab1024.sa.lottery.config.domain.vo.LotteryConfigBoardResultVO;
+import net.lab1024.sa.lottery.config.service.LotteryConfigBoardService;
 import net.lab1024.sa.lottery.config.domain.form.FpePreviewForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryConfigQueryForm;
 import net.lab1024.sa.lottery.config.domain.form.LotteryWorkbenchSaveForm;
@@ -45,11 +47,20 @@ public class LotteryConfigController {
 
     private final LotteryConfigService Service;
 
+    private final LotteryConfigBoardService lotteryConfigBoardService;
+
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @SaCheckPermission("lotteryConfig:query")
     public ResponseDTO<PageResult<LotteryConfigVO>> queryPage(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "玩法一览：号码空间占用、期号与发号实况、参与人数与体检告警，列表页主视图")
+    @PostMapping("/board")
+    @SaCheckPermission("lotteryConfig:query")
+    public ResponseDTO<LotteryConfigBoardResultVO> board(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
+        return ResponseDTO.ok(lotteryConfigBoardService.board(queryForm));
     }
 
     // ==================== 彩票工作台 ====================

@@ -7,7 +7,22 @@ import java.math.BigDecimal;
 import lombok.Data;
 
 /**
- * 奖池配置 更新表单
+ * 奖池配置 更新表单 —— <b>只允许改名称与限领重置周期</b>。
+ *
+ * <p>生成器原本还开放了 drawMode / scriptId / status 三个字段，已全部移除：
+ * <ul>
+ *   <li><b>drawMode / scriptId</b>：后端从未读取过这两个字段（全仓库 grep 确认）。
+ *       选「按库存比例」照样按概率抽、填了脚本 id 也不会有任何前置校验 ——
+ *       是两个假开关，留着只会让人以为配了就生效；</li>
+ *   <li><b>status</b>：奖池开关的唯一入口是 {@code offline} / {@code online} 两个接口。
+ *       它们有并发闸门（{@code WHERE status = #{from}}），两个运营同时点时第二个人会拿到
+ *       「状态已被其他人变更」而不是静默覆盖。走这个表单改 status 则两样都没有 ——
+ *       同一件事留两条路径，其中一条还更弱，迟早从弱的那条出事。</li>
+ * </ul>
+ * 这里直接不定义字段，而不是在 Service 里忽略 —— 让越权意图在编译期就无处安放。
+ *
+ * <p>activityCode 与 poolCode 也刻意不在此列：poolCode 被坑位映射与抽奖流水引用，
+ * 改了会让历史流水指向一个不存在的池。
  *
  * @Author weolwo
  * @Date 2026-04-19 09:42:12
@@ -25,17 +40,8 @@ public class PrizePoolConfigUpdateForm {
     @NotBlank(message = "奖池名称 不能为空")
     private String poolName;
 
-    @Schema(description = "重置周期，天，周，月，活动期间", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "重置周期，天，周，月，活动期间 不能为空")
+    @Schema(description = "限领重置周期: DAY/WEEK/MONTH/ACTIVITY", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "限领重置周期 不能为空")
     private String resetPeriod;
-
-    @Schema(description = "抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)")
-    private Integer drawMode;
-
-    @Schema(description = "进入该奖池的前置脚本")
-    private String scriptId;
-
-    @Schema(description = "0关闭，1开启")
-    private Integer status;
 
 }

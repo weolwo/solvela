@@ -106,6 +106,29 @@ export const WIN_STATUS_ENUM = {
 
 export const WIN_STATUS_OPTIONS = Object.values(WIN_STATUS_ENUM).map((i) => ({ value: i.value, label: i.desc }));
 
+/**
+ * 中奖后的派发状态，对齐 t_lottery_record.dispatch_status。
+ *
+ * ⚠️ 与 win_status 是两个阶段：中奖只是第一步，奖品还要经派发链路
+ * （consumer → risk → ledger）真正到用户手上才算完。
+ * 0 对未中奖的号码同样适用（它们本就无需派发），所以「待派发」这个数
+ * 只有在已中奖的记录里才有意义 —— 漏斗里的派发三项都带了 win_status=2 的前提。
+ *
+ * 🔴 FAILURE 是全模块最该被盯住的状态：用户看到自己中了奖、系统也认，
+ * 但东西没发出去，而这种事没人主动查就不会被发现。
+ */
+export const DISPATCH_STATUS_ENUM = {
+  WAIT: { value: 0, desc: '待派发/无需派发', color: 'default' },
+  DISPATCHED: { value: 1, desc: '已投递', color: 'green' },
+  FAILURE: { value: 2, desc: '投递失败', color: 'red' },
+};
+
+export const DISPATCH_STATUS_OPTIONS = Object.values(DISPATCH_STATUS_ENUM).map((i) => ({ value: i.value, label: i.desc }));
+
+export function dispatchStatusOf(value) {
+  return Object.values(DISPATCH_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
+}
+
 export function lotteryStatusOf(value) {
   return Object.values(LOTTERY_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
 }
@@ -148,6 +171,7 @@ export default {
   ISSUE_STATUS_ENUM,
   SALE_STATE_ENUM,
   WIN_STATUS_ENUM,
+  DISPATCH_STATUS_ENUM,
   PRIZE_TYPE_ICON,
   prizeIcon,
 };

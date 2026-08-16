@@ -33,6 +33,13 @@ public class PrizePoolConfigQueryForm extends PageParam {
     @Schema(description = "0关闭，1开启")
     private Integer status;
 
+    /**
+     * 只看有体检告警的奖池。「配了却抽不了」是这页最该先处理的一类问题 ——
+     * 概率没闭环、没配坑位、活动上线了池却关着，看裸字段一个都看不出来。
+     */
+    @Schema(description = "只看有体检告警的奖池")
+    private Boolean onlyIssue;
+
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;
 

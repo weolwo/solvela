@@ -82,6 +82,13 @@ public class PrizePoolConfigService {
     private static final Integer ACTIVITY_STATUS_ONLINE = 1;
 
     /**
+     * 奖池开关（对齐 t_prize_pool_config.status）。
+     * 运行态 DrawExecuteService 判 status 是否为 OPEN 来决定放不放行。
+     */
+    private static final Integer POOL_STATUS_OPEN = 1;
+    private static final Integer POOL_STATUS_CLOSED = 0;
+
+    /**
      * 库存/限领「不限量」哨兵值
      */
     private static final Integer UNLIMITED = -1;
@@ -424,14 +431,10 @@ public class PrizePoolConfigService {
      * 添加
      * 奖池编码允许手工输入，故服务端必须重校验唯一性（格式由 AddForm 的 @Pattern 拦）
      */
-    public ResponseDTO<String> add(PrizePoolConfigAddForm addForm) {
-        if (existsByPoolCode(addForm.getPoolCode())) {
-            return ResponseDTO.userErrorParam("奖池编码已存在：" + addForm.getPoolCode());
-        }
-        PrizePoolConfig prizePoolConfig = SmartBeanUtil.copy(addForm, PrizePoolConfig.class);
-        prizePoolConfigDao.insert(prizePoolConfig);
-        return ResponseDTO.ok();
-    }
+    // ⚠️ add 已移除：新建奖池统一走抽奖工作台。
+    // 一个奖池不是一张扁平表单能配出来的东西 —— 光有 t_prize_pool_config 一行、
+    // 没有坑位映射的池，抽奖时快照构造直接抛「奖池快照不能为空」，是个建了就用不了的空壳。
+    // 工作台的聚合保存把「池 + 坑位 + 概率闭环校验」放在一个事务里，那才是奖池的完整形态。
 
     /**
      * 更新
@@ -444,76 +447,83 @@ public class PrizePoolConfigService {
     }
 
     /**
-     * 批量删除。逐个走同一套守卫，任一条不可删就整批拒绝并说明原因 ——
-     * 删一半留一半会让运营以为「删掉了」，而实际有几个池还在。
-     */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (SmartCollectionUtil.isEmpty(idList)){
-            return ResponseDTO.ok();
-        }
-        for (Long id : idList) {
-            String error = checkDeletable(id);
-            if (error != null) {
-                return ResponseDTO.userErrorParam(error);
-            }
-        }
-        prizePoolConfigDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 单个删除
-     */
-    public ResponseDTO<String> delete(Long id) {
-        if (null == id){
-            return ResponseDTO.ok();
-        }
-        String error = checkDeletable(id);
-        if (error != null) {
-            return ResponseDTO.userErrorParam(error);
-        }
-        prizePoolConfigDao.deleteById(id);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 奖池可删性守卫，返回 null 表示可删。
+     * 禁用奖池（关闭开关）。
      *
-     * <p>生成器产出的 delete 是裸的 {@code deleteById}，会留下两类烂摊子：
+     * <h3>🔴 奖池只有禁用，没有删除</h3>
+     * 生成器产出的 delete 是裸的 {@code deleteById}，删下去会留下两类烂摊子，
+     * 而且都是<b>事后才发现、且无法还原</b>的那种：
      * <ul>
      *   <li><b>孤儿坑位映射。</b>{@code t_pool_prize_mapping} 按 pool_code 关联，
-     *       池没了映射还在，既不会被抽奖用到、也无处修改 ——
-     *       只有把奖池筛选清空才能在概率分析页看到它们；</li>
+     *       池没了映射还在，既不会被抽奖用到、也无处修改；</li>
      *   <li><b>断掉的抽奖流水。</b>{@code t_draw_prize_log} 里存着 pool_code，
-     *       那是发奖凭证与对账依据，指向一个不存在的奖池之后客诉自证就断了。</li>
+     *       那是发奖凭证与对账依据 —— 用户说「我明明在这个池抽中过」，
+     *       而那个池已经不存在了，客诉自证当场断掉。</li>
      * </ul>
+     * 禁用则完全没有这些问题：运行态判 {@code POOL_STATUS_OPEN} 直接拒绝新的抽奖请求，
+     * 已有的流水与坑位一个字都不动，而且<b>可逆</b> —— 出问题时这才是运营要的止血按钮。
+     * 与彩票玩法「删除换成下线」是同一个决定（见 v3.63.0.sql）。
      *
-     * <p>已上线的活动一律不许删池：与工作台的上线结构锁同一个判据
-     * （{@code checkOnlineStructureLock} 里「活动已上线，禁止删除奖池」），
-     * 两边必须一致，否则从这个入口就能绕过结构锁。
+     * <p>用条件更新做并发闸门：两个运营同时点，第二次 rows=0，
+     * 不会出现「都以为自己禁用成功了」的假象。
      */
-    private String checkDeletable(Long id) {
+    public ResponseDTO<String> offline(Long id) {
         PrizePoolConfig pool = prizePoolConfigDao.selectById(id);
         if (pool == null) {
-            return null;
+            return ResponseDTO.userErrorParam("奖池不存在");
         }
-        ActivityConfig activity = activityConfigService.getByActivityCode(pool.getActivityCode());
-        if (activity != null && ACTIVITY_STATUS_ONLINE.equals(activity.getStatus())) {
-            return "奖池「" + pool.getPoolName() + "」所属活动已上线，禁止删除；请先下线活动";
+        if (!POOL_STATUS_OPEN.equals(pool.getStatus())) {
+            return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」本来就是关闭状态");
         }
-        long mappingCount = poolPrizeMappingManager.lambdaQuery()
-                .eq(PoolPrizeMapping::getPoolCode, pool.getPoolCode()).count();
-        if (mappingCount > 0) {
-            return "奖池「" + pool.getPoolName() + "」下还有 " + mappingCount
-                    + " 个奖项坑位，直接删会留下孤儿映射。请先在抽奖工作台清空该池的坑位";
+        int rows = prizePoolConfigDao.updateStatus(id, POOL_STATUS_OPEN, POOL_STATUS_CLOSED);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("禁用失败：状态已被其他人变更，请刷新后重试");
         }
-        long logCount = drawPrizeLogManager.lambdaQuery()
-                .eq(DrawPrizeLog::getPoolCode, pool.getPoolCode()).count();
-        if (logCount > 0) {
-            return "奖池「" + pool.getPoolName() + "」已产生 " + logCount
-                    + " 条抽奖流水，不能删除：流水是发奖凭证与对账依据，指向一个不存在的奖池会让客诉无法自证。"
-                    + "如需停用请把状态改为「关闭」";
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 启用奖池。禁用是可逆的，这是那条回头路。
+     *
+     * <p>刻意<b>不</b>在这里校验「概率是否闭环、有没有坑位」——
+     * 启用只是把开关拨回去，配置是否可用由奖池一览的体检去回答（那里看得更全）。
+     * 若在此拦截，运营会遇到「禁用得掉、启用不回来」的单向门，比让他自己看告警更糟。
+     */
+    public ResponseDTO<String> online(Long id) {
+        PrizePoolConfig pool = prizePoolConfigDao.selectById(id);
+        if (pool == null) {
+            return ResponseDTO.userErrorParam("奖池不存在");
         }
-        return null;
+        if (POOL_STATUS_OPEN.equals(pool.getStatus())) {
+            return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」已经是开启状态");
+        }
+        int rows = prizePoolConfigDao.updateStatus(id, POOL_STATUS_CLOSED, POOL_STATUS_OPEN);
+        if (rows == 0) {
+            return ResponseDTO.userErrorParam("启用失败：状态已被其他人变更，请刷新后重试");
+        }
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 批量禁用。
+     *
+     * <p>与彩票玩法的批量下线同构：<b>不</b>做成一个事务里全成或全败 ——
+     * 止血动作里混着几个「本来就已关闭」是常态，不该把其余的一起回滚掉。
+     * 已关闭的计入跳过，最后回一句人话汇总。
+     */
+    public ResponseDTO<String> batchOffline(List<Long> idList) {
+        if (SmartCollectionUtil.isEmpty(idList)) {
+            return ResponseDTO.ok();
+        }
+        int success = 0;
+        int skipped = 0;
+        for (Long id : idList) {
+            if (offline(id).getOk()) {
+                success++;
+            } else {
+                skipped++;
+            }
+        }
+        return ResponseDTO.ok("已禁用 " + success + " 个奖池"
+                + (skipped > 0 ? "，跳过 " + skipped + " 个（本就已关闭或不存在）" : ""));
     }
 }
