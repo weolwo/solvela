@@ -78,4 +78,9 @@
         WHERE id = #{id} AND (total_stock = -1 OR used_stock &lt; total_stock)
     </update>
 
+    <!-- 奖池重置周期的计数桶按它计算，全系统只认数据库一个时钟（铁律 9/10） -->
+    <select id="selectDbNow" resultType="java.time.LocalDateTime">
+        SELECT NOW()
+    </select>
+
 </mapper>

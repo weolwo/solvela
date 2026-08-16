@@ -12,6 +12,8 @@ import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartCodeUtil;
 import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.draw.drawlog.domain.entity.DrawPrizeLog;
+import net.lab1024.sa.draw.drawlog.manager.DrawPrizeLogManager;
 import net.lab1024.sa.draw.poolconfig.dao.PrizePoolConfigDao;
 import net.lab1024.sa.draw.poolconfig.domain.entity.PrizePoolConfig;
 import net.lab1024.sa.draw.poolconfig.domain.form.DrawWorkbenchMappingForm;
@@ -71,6 +73,8 @@ public class PrizePoolConfigService {
     private final ActivityConfigService activityConfigService;
     private final PrizeConfigService prizeConfigService;
     private final DrawStockService drawStockService;
+    // 删除守卫要看这个池有没有产生过抽奖流水 —— 流水在，池就不能删
+    private final DrawPrizeLogManager drawPrizeLogManager;
 
     /**
      * 活动状态：1-上线（上线后启用结构锁：库存只增不减、禁止删奖项/删池/池内增删坑位）
@@ -440,13 +444,19 @@ public class PrizePoolConfigService {
     }
 
     /**
-     * 批量删除
+     * 批量删除。逐个走同一套守卫，任一条不可删就整批拒绝并说明原因 ——
+     * 删一半留一半会让运营以为「删掉了」，而实际有几个池还在。
      */
     public ResponseDTO<String> batchDelete(List<Long> idList) {
         if (SmartCollectionUtil.isEmpty(idList)){
             return ResponseDTO.ok();
         }
-
+        for (Long id : idList) {
+            String error = checkDeletable(id);
+            if (error != null) {
+                return ResponseDTO.userErrorParam(error);
+            }
+        }
         prizePoolConfigDao.deleteBatchIds(idList);
         return ResponseDTO.ok();
     }
@@ -458,8 +468,52 @@ public class PrizePoolConfigService {
         if (null == id){
             return ResponseDTO.ok();
         }
-
+        String error = checkDeletable(id);
+        if (error != null) {
+            return ResponseDTO.userErrorParam(error);
+        }
         prizePoolConfigDao.deleteById(id);
         return ResponseDTO.ok();
+    }
+
+    /**
+     * 奖池可删性守卫，返回 null 表示可删。
+     *
+     * <p>生成器产出的 delete 是裸的 {@code deleteById}，会留下两类烂摊子：
+     * <ul>
+     *   <li><b>孤儿坑位映射。</b>{@code t_pool_prize_mapping} 按 pool_code 关联，
+     *       池没了映射还在，既不会被抽奖用到、也无处修改 ——
+     *       只有把奖池筛选清空才能在概率分析页看到它们；</li>
+     *   <li><b>断掉的抽奖流水。</b>{@code t_draw_prize_log} 里存着 pool_code，
+     *       那是发奖凭证与对账依据，指向一个不存在的奖池之后客诉自证就断了。</li>
+     * </ul>
+     *
+     * <p>已上线的活动一律不许删池：与工作台的上线结构锁同一个判据
+     * （{@code checkOnlineStructureLock} 里「活动已上线，禁止删除奖池」），
+     * 两边必须一致，否则从这个入口就能绕过结构锁。
+     */
+    private String checkDeletable(Long id) {
+        PrizePoolConfig pool = prizePoolConfigDao.selectById(id);
+        if (pool == null) {
+            return null;
+        }
+        ActivityConfig activity = activityConfigService.getByActivityCode(pool.getActivityCode());
+        if (activity != null && ACTIVITY_STATUS_ONLINE.equals(activity.getStatus())) {
+            return "奖池「" + pool.getPoolName() + "」所属活动已上线，禁止删除；请先下线活动";
+        }
+        long mappingCount = poolPrizeMappingManager.lambdaQuery()
+                .eq(PoolPrizeMapping::getPoolCode, pool.getPoolCode()).count();
+        if (mappingCount > 0) {
+            return "奖池「" + pool.getPoolName() + "」下还有 " + mappingCount
+                    + " 个奖项坑位，直接删会留下孤儿映射。请先在抽奖工作台清空该池的坑位";
+        }
+        long logCount = drawPrizeLogManager.lambdaQuery()
+                .eq(DrawPrizeLog::getPoolCode, pool.getPoolCode()).count();
+        if (logCount > 0) {
+            return "奖池「" + pool.getPoolName() + "」已产生 " + logCount
+                    + " 条抽奖流水，不能删除：流水是发奖凭证与对账依据，指向一个不存在的奖池会让客诉无法自证。"
+                    + "如需停用请把状态改为「关闭」";
+        }
+        return null;
     }
 }

@@ -28,8 +28,16 @@ public class DrawStockService {
 
     /**
      * 库存预扣 + 单人限领校验，单脚本原子执行
-     * KEYS[1]=库存key KEYS[2]=单人已领key ARGV[1]=单人限领上限(-1不限)
+     * KEYS[1]=库存key KEYS[2]=单人已领key(含周期段) ARGV[1]=单人限领上限(-1不限) ARGV[2]=计数key的TTL秒(0不过期)
      * 返回：1成功 / -1库存不足 / -2超单人限领 / -3缓存未预热
+     *
+     * ⚠️ EXPIRE 必须在 INCR <b>之后</b>且在同一脚本内：分成两次调用的话，
+     * INCR 完成而 EXPIRE 尚未执行时进程崩溃，会留下一个<b>永不过期</b>的计数 key，
+     * 那个用户在该奖项上就被永久锁死了。
+     *
+     * 每次 INCR 都重设 TTL 是刻意的：周期由 key 名决定，TTL 只负责回收，
+     * 重设不会让窗口变长（换周期就是换 key），却能保证「周期内最后一次抽奖之后
+     * 仍留足回收余量」，避免活跃用户的计数被提前清掉。
      */
     private static final String DEDUCT_LUA = """
             local stock = redis.call('GET', KEYS[1])
@@ -43,6 +51,8 @@ public class DrawStockService {
             end
             if stock > 0 then redis.call('DECR', KEYS[1]) end
             redis.call('INCR', KEYS[2])
+            local ttl = tonumber(ARGV[2])
+            if ttl > 0 then redis.call('EXPIRE', KEYS[2], ttl) end
             return 1
             """;
 
@@ -97,23 +107,33 @@ public class DrawStockService {
         return current == null ? remain : Integer.parseInt(current.toString());
     }
 
-    public StockDeductResult deduct(String activityCode, long prizeItemId, String memberName, int userMaxCount) {
+    /**
+     * 预扣。
+     *
+     * @param period 当前周期桶，由 {@link DrawPeriodResolver} 按奖池 reset_period 算出。
+     *               ⚠️ 同一次请求的 deduct 与 rollback <b>必须传同一个 period</b>，
+     *               否则回滚会去减另一个桶的计数：本桶的计数永远退不回来，
+     *               用户白白损失一次限领额度。
+     */
+    public StockDeductResult deduct(String activityCode, long prizeItemId, String memberName,
+                                    int userMaxCount, DrawPeriodResolver.Period period) {
         Long code = redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 DEDUCT_LUA,
                 RScript.ReturnType.LONG,
                 List.of(DrawCacheKey.stock(activityCode, prizeItemId),
-                        DrawCacheKey.userCount(activityCode, prizeItemId, memberName)),
-                String.valueOf(userMaxCount));
+                        DrawCacheKey.userCount(activityCode, prizeItemId, period.bucket(), memberName)),
+                String.valueOf(userMaxCount), String.valueOf(period.ttlSeconds()));
         return StockDeductResult.ofLuaCode(code);
     }
 
-    public void rollback(String activityCode, long prizeItemId, String memberName) {
+    public void rollback(String activityCode, long prizeItemId, String memberName,
+                         DrawPeriodResolver.Period period) {
         redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 ROLLBACK_LUA,
                 RScript.ReturnType.LONG,
                 List.of(DrawCacheKey.stock(activityCode, prizeItemId),
-                        DrawCacheKey.userCount(activityCode, prizeItemId, memberName)));
+                        DrawCacheKey.userCount(activityCode, prizeItemId, period.bucket(), memberName)));
     }
 }

@@ -44,6 +44,11 @@ export const RESET_PERIOD_OPTIONS = Object.values(RESET_PERIOD_ENUM).map((i) => 
  *
  * 按概率 = 用 t_pool_prize_mapping.probability 直接抽；
  * 按库存比例 = 按各奖项剩余库存的占比抽，库存多的更容易中。
+ *
+ * ⚠️ <b>后端从未读取过 draw_mode，这个枚举当前不接在任何界面上</b>（同 script_id）。
+ * 全仓库 grep 确认：DrawEngine 只实现了「按概率」，选「按库存比例」照样按概率抽。
+ * 表单与列表里的对应项已于 v3.64 摘除，免得运营配一个假开关。
+ * 枚举与数据库列都先留着，等真做出来了再放回界面。
  */
 export const DRAW_MODE_ENUM = {
   PROBABILITY: { value: 1, desc: '按概率' },

@@ -87,9 +87,6 @@
         <template v-if="column.dataIndex === 'resetPeriod'">
           <span>{{ resetPeriodOf(text) }}</span>
         </template>
-        <template v-if="column.dataIndex === 'drawMode'">
-          <span>{{ drawModeOf(text) }}</span>
-        </template>
         <template v-if="column.dataIndex === 'action'">
           <div class="smart-table-operate">
             <a-button @click="showForm(record)" type="link">编辑</a-button>
@@ -132,7 +129,6 @@
   import PrizePoolConfigForm from './prize-pool-config-form.vue';
   import {
     POOL_STATUS_OPTIONS,
-    drawModeOf,
     poolStatusOf,
     resetPeriodOf,
   } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
@@ -166,15 +162,12 @@
       ellipsis: true,
     },
     {
-      title: '重置周期',
+      // 奖项「单人限领次数」的归零粒度，是这张表上唯一真正生效的业务开关
+      title: '限领重置周期',
       dataIndex: 'resetPeriod',
       ellipsis: true,
     },
-    {
-      title: '抽奖算法',
-      dataIndex: 'drawMode',
-      ellipsis: true,
-    },
+    // 「抽奖算法」列已移除：draw_mode 后端从未读取，配了也不生效（同 script_id）
     {
       title: '状态',
       dataIndex: 'status',

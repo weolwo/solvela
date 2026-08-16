@@ -178,10 +178,19 @@ public class DrawExecuteService {
         }
         DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(form.getPoolCode(), prizes, probabilities);
 
-        // 5. 纯函数判定 + 双层扣减 + 落流水（sealed + 模式匹配消费）
+        /*
+         * 5. 解析本次抽奖归属的限领周期桶。
+         *
+         * 只有「奖池配了按天/周/月重置」且「确实存在限领的奖项」时才去取数据库时钟 ——
+         * 抽奖是热路径，一次额外往返能省则省。两个条件任一不成立，桶都恒为 ALL，
+         * 与本次改动之前的行为完全一致。
+         */
+        DrawPeriodResolver.Period period = resolvePeriod(pool, itemMap);
+
+        // 6. 纯函数判定 + 双层扣减 + 落流水（sealed + 模式匹配消费）
         return switch (DrawEngine.draw(snapshot, form.getMemberName())) {
             case DrawResult.Hit(DrawPrizeSnapshot prize, DrawResult.HitSource source) ->
-                    settle(form, traceId, snapshot, itemMap, prize, source);
+                    settle(form, traceId, snapshot, itemMap, prize, source, period);
             case DrawResult.NoStock(String candidateCode) -> {
                 // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
                 saveLog(form, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
@@ -217,8 +226,9 @@ public class DrawExecuteService {
      */
     private ResponseDTO<DrawExecuteVO> settle(DrawExecuteForm form, String traceId, DrawPoolSnapshot snapshot,
                                               Map<Long, PrizePoolItem> itemMap,
-                                              DrawPrizeSnapshot candidate, DrawResult.HitSource source) {
-        if (tryDeduct(form, itemMap, candidate)) {
+                                              DrawPrizeSnapshot candidate, DrawResult.HitSource source,
+                                              DrawPeriodResolver.Period period) {
+        if (tryDeduct(form, itemMap, candidate, period)) {
             saveLog(form, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
             publishPrizeEvent(form, traceId, candidate.prizeCode());
             return ResponseDTO.ok(DrawExecuteVO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name()));
@@ -226,7 +236,8 @@ public class DrawExecuteService {
 
         // 候选奖项扣减失败（并发抢空/超单人限领）-> 降级兜底
         DrawPrizeSnapshot fallback = snapshot.fallbackPrize();
-        if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId() && tryDeduct(form, itemMap, fallback)) {
+        if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId()
+                && tryDeduct(form, itemMap, fallback, period)) {
             saveLog(form, traceId, fallback.prizeItemId(), fallback.prizeCode(), LOG_STATUS_HIT,
                     DrawResult.HitSource.FALLBACK_DEGRADE.name());
             publishPrizeEvent(form, traceId, fallback.prizeCode());
@@ -240,14 +251,42 @@ public class DrawExecuteService {
     }
 
     /**
+     * 解析本次抽奖归属的单人限领周期桶。
+     *
+     * <p>两级短路，为的是不给热路径白加一次数据库往返：
+     * <ol>
+     *   <li>奖池的 reset_period 是 ACTIVITY / 空 / 脏值 —— 桶恒为 ALL，与时间无关；</li>
+     *   <li>本池所有奖项都不限领（user_max_count 全是 -1）—— 计数 key 压根不会被读，
+     *       桶叫什么都无所谓。</li>
+     * </ol>
+     * 两者任一成立就直接返回 ALL 桶，行为与「没有周期重置」时完全一致。
+     *
+     * <p>需要时钟时取的是<b>数据库</b>时间（铁律 9/10）：多实例部署下各节点 JVM 时钟未必一致，
+     * 跨零点那一刻用 JVM 时间会出现「A 节点认为还是昨天、B 节点认为已是今天」，
+     * 同一个用户在两个桶里各拿一次额度 —— 正好是限领要防的那件事。
+     */
+    private DrawPeriodResolver.Period resolvePeriod(PrizePoolConfig pool, Map<Long, PrizePoolItem> itemMap) {
+        if (!DrawPeriodResolver.needsClock(pool.getResetPeriod())) {
+            return new DrawPeriodResolver.Period(DrawPeriodResolver.BUCKET_ALL, DrawPeriodResolver.TTL_NONE);
+        }
+        boolean anyLimited = itemMap.values().stream()
+                .anyMatch(item -> item.getUserMaxCount() != null && item.getUserMaxCount() != UNLIMITED);
+        if (!anyLimited) {
+            return new DrawPeriodResolver.Period(DrawPeriodResolver.BUCKET_ALL, DrawPeriodResolver.TTL_NONE);
+        }
+        return DrawPeriodResolver.resolve(pool.getResetPeriod(), prizePoolItemDao.selectDbNow());
+    }
+
+    /**
      * 双层扣减：Redis Lua 原子预扣扛并发；DB 条件更新做最终一致性兜底，DB 拒绝则补偿回滚 Redis
      */
-    private boolean tryDeduct(DrawExecuteForm form, Map<Long, PrizePoolItem> itemMap, DrawPrizeSnapshot prize) {
+    private boolean tryDeduct(DrawExecuteForm form, Map<Long, PrizePoolItem> itemMap, DrawPrizeSnapshot prize,
+                              DrawPeriodResolver.Period period) {
         PrizePoolItem item = itemMap.get(prize.prizeItemId());
         int userMax = item == null || item.getUserMaxCount() == null ? UNLIMITED : item.getUserMaxCount();
 
         StockDeductResult redisResult = drawStockService.deduct(
-                form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), userMax);
+                form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), userMax, period);
         if (!redisResult.success()) {
             log.info("[抽奖预扣拒绝] member={}, prizeItemId={}, reason={}",
                     form.getMemberName(), prize.prizeItemId(), redisResult.message());
@@ -258,13 +297,13 @@ public class DrawExecuteService {
             int rows = prizePoolItemDao.increaseUsedStock(prize.prizeItemId());
             if (rows == 0) {
                 // Redis 与 DB 不一致（如缓存被误预热），以 DB 为准并补偿
-                drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberName());
+                drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), period);
                 log.warn("[抽奖DB兜底拒绝] prizeItemId={}, Redis已回滚", prize.prizeItemId());
                 return false;
             }
             return true;
         } catch (RuntimeException e) {
-            drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberName());
+            drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), period);
             throw e;
         }
     }

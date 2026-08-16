@@ -26,6 +26,16 @@ public interface PrizePoolItemDao extends BaseMapper<PrizePoolItem> {
     int increaseUsedStock(@Param("id") Long id);
 
     /**
+     * 数据库当前时间。
+     *
+     * 奖池的重置周期（每天/每周/每月）要据此算出单人限领的计数桶，
+     * 不能用 JVM 的 {@code LocalDateTime.now()} —— 铁律 9/10：全系统只认数据库一个时钟。
+     * 多实例部署时各节点 JVM 时钟未必一致，跨零点那一刻会出现
+     * 「A 节点认为还是昨天、B 节点认为已是今天」，同一个用户在两个桶里各拿一次额度。
+     */
+    java.time.LocalDateTime selectDbNow();
+
+    /**
      * 分页查询
      *
      * @param page 分页参数

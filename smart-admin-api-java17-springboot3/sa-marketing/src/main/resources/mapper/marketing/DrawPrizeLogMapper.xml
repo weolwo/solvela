@@ -30,6 +30,72 @@
                 create_time
     </sql>
 
+    <!--
+        漏斗统计的筛选条件：与列表共用同一批条件，但<b>刻意不吃 status</b>。
+        status 是漏斗要拆解的那个维度本身 —— 若跟着筛，点「只看库存不足」之后
+        漏斗会变成「库存不足 100%」，四个数字互相之间就没法对照了。
+    -->
+    <!--
+        ⚠️ 这里刻意<b>不</b>套 &lt;where&gt;，只给裸条件片段。
+        因为奖品分布那条查询还要在同一个 &lt;where&gt; 里追加 status=1：
+        若本片段自带 &lt;where&gt;，追加的条件就会落在它外面，
+        而所有筛选项都为空时会拼出一句悬空的 AND，直接语法错误。
+        由调用方各自套 &lt;where&gt;，它会自动吃掉多余的前导 AND。
+    -->
+    <sql id="funnel_conditions">
+        <if test="queryForm.tenantId != null">
+            AND tenant_id = #{queryForm.tenantId}
+        </if>
+        <if test="queryForm.traceId != null">
+            AND trace_id = #{queryForm.traceId}
+        </if>
+        <if test="queryForm.activityCode != null">
+            AND activity_code = #{queryForm.activityCode}
+        </if>
+        <if test="queryForm.createTimeBegin != null">
+            AND create_time &gt;= #{queryForm.createTimeBegin}
+        </if>
+        <if test="queryForm.createTimeEnd != null">
+            AND create_time &lt;= #{queryForm.createTimeEnd}
+        </if>
+        <if test="queryForm.memberName != null">
+            AND member_name = #{queryForm.memberName}
+        </if>
+        <if test="queryForm.poolCode != null">
+            AND pool_code = #{queryForm.poolCode}
+        </if>
+    </sql>
+
+    <!--
+        四个状态的计数 + 去重人数，一次扫表算完。
+        不拆成五条 count：五次执行不但慢，还可能落在不同的数据快照上，
+        出现「四个数加起来不等于总数」这种自相矛盾。
+    -->
+    <select id="selectFunnel" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                              AS totalCount,
+            COALESCE(SUM(status = 1), 0)                          AS hitCount,
+            COALESCE(SUM(status = 0), 0)                          AS missCount,
+            COALESCE(SUM(status = 2), 0)                          AS noStockCount,
+            COALESCE(SUM(status = 3), 0)                          AS errorCount,
+            COUNT(DISTINCT member_name)                           AS memberCount
+        FROM t_draw_prize_log
+        <where><include refid="funnel_conditions"/></where>
+    </select>
+
+    <!-- 奖品发放分布：只统计真正中奖的行（status=1），未中奖行的 prize_code 是候选奖项、不是发出去的奖 -->
+    <select id="selectPrizeHit" resultType="java.util.Map">
+        SELECT prize_code AS prizeCode, COUNT(*) AS hitCount
+        FROM t_draw_prize_log
+        <where>
+            AND status = 1
+            AND prize_code IS NOT NULL
+            <include refid="funnel_conditions"/>
+        </where>
+        GROUP BY prize_code
+        ORDER BY hitCount DESC
+    </select>
+
     <sql id="query_conditions">
         <where>
                         <if test="queryForm.tenantId != null">

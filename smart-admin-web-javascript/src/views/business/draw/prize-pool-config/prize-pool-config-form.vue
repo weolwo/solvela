@@ -43,15 +43,26 @@
       <a-form-item label="奖池名称" name="poolName">
         <a-input style="width: 100%" v-model:value="form.poolName" placeholder="奖池名称" />
       </a-form-item>
-      <a-form-item label="重置周期" name="resetPeriod">
-        <a-select style="width: 100%" v-model:value="form.resetPeriod" :options="RESET_PERIOD_OPTIONS" placeholder="请选择重置周期" allowClear />
+      <!--
+        重置周期是这个表单上唯一真正生效的业务开关：它决定奖项的「单人限领次数」
+        按什么粒度归零（每天/每周/每月/整个活动期间）。
+        v3.64 之前它是个装饰字段，运行态压根不读；现已由 DrawPeriodResolver 落到
+        限领计数的 Redis key 上，换周期即换 key，计数天然归零。
+      -->
+      <a-form-item label="限领重置周期" name="resetPeriod">
+        <a-select style="width: 100%" v-model:value="form.resetPeriod" :options="RESET_PERIOD_OPTIONS" placeholder="请选择重置周期" />
+        <div class="form-hint">
+          决定奖项的「单人限领次数」多久归零一次。选「活动期间」表示整个活动内累计不重置。
+          限领次数本身在奖项上配（工作台 → 奖项库）。
+        </div>
       </a-form-item>
-      <a-form-item label="抽奖算法" name="drawMode">
-        <a-select style="width: 100%" v-model:value="form.drawMode" :options="DRAW_MODE_OPTIONS" placeholder="请选择抽奖算法" allowClear />
-      </a-form-item>
-      <a-form-item label="前置脚本" name="scriptId">
-        <a-input style="width: 100%" v-model:value="form.scriptId" placeholder="进入该奖池的前置脚本" />
-      </a-form-item>
+
+      <!--
+        ⚠️ 抽奖算法(draw_mode) 与 前置脚本(script_id) 已从表单摘除。
+        全仓库 grep 确认：后端从未读取过这两个字段 —— 选「按库存比例」照样按概率抽，
+        填了脚本 id 也不会有任何前置校验。留在界面上只会让运营配一个假开关。
+        数据库列暂时保留（见 v3.64.0.sql），将来真做出来了再放开。
+      -->
       <a-form-item label="状态" name="status">
         <a-select style="width: 100%" v-model:value="form.status" :options="POOL_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
       </a-form-item>
@@ -76,7 +87,6 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
   import {
-    DRAW_MODE_OPTIONS,
     POOL_STATUS_OPTIONS,
     RESET_PERIOD_OPTIONS,
   } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
@@ -121,9 +131,9 @@
     activityCode: undefined, //活动编码
     poolCode: undefined, //奖池唯一编码 (如: VIP_POOL)
     poolName: undefined, //奖池名称
-    resetPeriod: undefined, //重置周期，天，周，月，活动期间
-    drawMode: undefined, //抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)
-    scriptId: undefined, //进入该奖池的前置脚本
+    // 重置周期：奖项「单人限领次数」的归零粒度，运行态由 DrawPeriodResolver 消费
+    resetPeriod: undefined,
+    // drawMode / scriptId 刻意不提交：后端从未读取过，是两个假开关
     status: undefined, //0关闭，1开启
   };
 
@@ -217,3 +227,12 @@
     show,
   });
 </script>
+
+<style lang="less" scoped>
+  .form-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #94a3b8;
+  }
+</style>
