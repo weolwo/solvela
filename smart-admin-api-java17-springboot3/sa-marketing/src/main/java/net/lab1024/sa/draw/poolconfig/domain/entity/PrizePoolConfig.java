@@ -47,16 +47,6 @@ public class PrizePoolConfig {
     private String poolName;
 
     /**
-     * 消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)
-     */
-    private String costAssetType;
-
-    /**
-     * 消耗数值(单价)
-     */
-    private BigDecimal costValue;
-
-    /**
      * 重置周期，天，周，月，活动期间
      */
     private String resetPeriod;

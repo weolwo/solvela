@@ -295,7 +295,7 @@ public class PrizePoolConfigService {
             prizePoolItemDao.deleteBatchIds(removeItemIdList);
         }
 
-        // 7. 落库：奖池 upsert（工作台只管理 poolName，costAssetType 等门票配置由奖池 CRUD 页维护，不覆盖）
+        // 7. 落库：奖池 upsert（工作台只管理 poolName，resetPeriod 等奖池自身配置由奖池 CRUD 页维护，不覆盖）
         for (DrawWorkbenchPoolForm pool : form.getPoolList()) {
             PrizePoolConfig existed = dbPoolMap.get(pool.getPoolCode());
             if (existed == null) {

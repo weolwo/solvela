@@ -32,12 +32,6 @@ public class PrizePoolConfigVO {
     @Schema(description = "奖池名称")
     private String poolName;
 
-    @Schema(description = "消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)")
-    private String costAssetType;
-
-    @Schema(description = "消耗数值(单价)")
-    private BigDecimal costValue;
-
     @Schema(description = "重置周期，天，周，月，活动期间")
     private String resetPeriod;
 

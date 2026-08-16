@@ -18,18 +18,14 @@ export const POOL_STATUS_ENUM = {
 
 export const POOL_STATUS_OPTIONS = Object.values(POOL_STATUS_ENUM).map((i) => ({ value: i.value, label: i.desc }));
 
-/**
- * 消耗资产类型（抽奖门票）：对齐 t_prize_pool_config.cost_asset_type
+/*
+ * ⚠️ COST_ASSET_TYPE_ENUM 已于 v3.64.0 随 cost_asset_type / cost_value 两个字段一起移除。
  *
- * NONE 表示免费抽，此时 cost_value 无意义。
+ * 抽一次消耗什么、消耗多少属于业务规则，和「去哪个奖池抽」一样由上游算完再调进来，
+ * 不是抽奖引擎该决定的事（彩票模块的 TicketIssueService 从一开始就是这么做的）。
+ * 原先那个三选一还有个实际问题：TICKET 在运行态直接返回「暂未开放」，
+ * CREDIT 恒定映射钱包 SCORE —— 下拉里能选三个，其中两个选了会失败或没区别。
  */
-export const COST_ASSET_TYPE_ENUM = {
-  CREDIT: { value: 'CREDIT', desc: '积分' },
-  TICKET: { value: 'TICKET', desc: '抽奖券' },
-  NONE: { value: 'NONE', desc: '无消耗' },
-};
-
-export const COST_ASSET_TYPE_OPTIONS = Object.values(COST_ASSET_TYPE_ENUM).map((i) => ({ value: i.value, label: i.desc }));
 
 /**
  * 重置周期：对齐 t_prize_pool_config.reset_period
@@ -60,10 +56,6 @@ export function poolStatusOf(value) {
   return Object.values(POOL_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
 }
 
-export function costAssetTypeOf(value) {
-  return Object.values(COST_ASSET_TYPE_ENUM).find((i) => i.value === value)?.desc || value || '-';
-}
-
 export function resetPeriodOf(value) {
   return Object.values(RESET_PERIOD_ENUM).find((i) => i.value === value)?.desc || value || '-';
 }
@@ -75,14 +67,11 @@ export function drawModeOf(value) {
 export default {
   POOL_STATUS_ENUM,
   POOL_STATUS_OPTIONS,
-  COST_ASSET_TYPE_ENUM,
-  COST_ASSET_TYPE_OPTIONS,
   RESET_PERIOD_ENUM,
   RESET_PERIOD_OPTIONS,
   DRAW_MODE_ENUM,
   DRAW_MODE_OPTIONS,
   poolStatusOf,
-  costAssetTypeOf,
   resetPeriodOf,
   drawModeOf,
 };

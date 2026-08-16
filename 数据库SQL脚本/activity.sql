@@ -50,9 +50,9 @@ CREATE TABLE `t_prize_pool_config`
     `activity_code`   varchar(32)    NOT NULL COMMENT '活动编码',
     `pool_code`       varchar(32)    NOT NULL COMMENT '奖池编码：10位大写字母+数字，全局唯一 (如: H88JHKJFNE)',
     `pool_name`       varchar(128)   NOT NULL COMMENT '奖池名称',
-    -- 建议改名如下，看起来会更有“门票”和“资产”的感觉
-    `cost_asset_type` varchar(32)    NOT NULL DEFAULT 'CREDIT' COMMENT '消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)',
-    `cost_value`      decimal(18, 4) NOT NULL DEFAULT 0.0000 COMMENT '消耗数值(单价)',
+    -- ⚠️ cost_asset_type / cost_value 已于 v3.64.0 移除：
+    -- 抽一次消耗什么、消耗多少属于业务规则，和「去哪个奖池抽」一样由上游算完再调进来，
+    -- 不是抽奖引擎该决定的事（同 t_lottery_config：彩票模块从一开始就没有消耗字段）。
     `reset_period`    varchar(32)    NOT NULL DEFAULT 'DAY' COMMENT '重置周期，天，周，月，活动期间',
     `draw_mode`       tinyint        NULL     DEFAULT 1 COMMENT '抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)',
     `script_id`       varchar(64)             DEFAULT NULL COMMENT '进入该奖池的前置脚本',

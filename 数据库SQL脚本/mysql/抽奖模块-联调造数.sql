@@ -51,16 +51,12 @@ VALUES
 -- SELECT activity_code, activity_name FROM t_activity_config WHERE activity_type = 'DRAW';
 -- SELECT pool_code, pool_name FROM t_prize_pool_config WHERE activity_code = '12278CBYW7';
 
--- ---------- 3.（可选）压测账号钱包 ----------
--- 仅当把奖池的 cost_asset_type 配成 CREDIT 且 cost_value > 0 时才需要：
--- 工作台新建的奖池取 DDL 默认值 cost_asset_type='CREDIT'、cost_value=0，
--- 而 DrawExecuteService 对 costValue<=0 直接跳过扣减，所以默认情况下压测不需要钱包。
--- 压测脚本的用户名规则是 stress_user_{序号}，如需验证积分扣减，放开下面两句并按并发量调整数量。
---
--- DELETE FROM `t_member_wallet` WHERE `member_name` LIKE 'stress_user_%';
--- INSERT INTO `t_member_wallet` (`tenant_id`, `member_name`, `asset_type`, `balance`, `status`, `version`)
--- SELECT '0', CONCAT('stress_user_', n.num), 'SCORE', 100000.0000, 1, 0
--- FROM (SELECT @row := @row + 1 AS num FROM information_schema.columns, (SELECT @row := -1) r LIMIT 500) n;
+-- ---------- 3. 压测账号钱包：已无需准备 ----------
+-- v3.64.0 起抽奖引擎不再扣费：cost_asset_type / cost_value 两个字段连同
+-- DrawExecuteService 的 deductDrawCost / refundDrawCost 一并移除了。
+-- 抽一次消耗什么由上游业务自己扣，压测直连 /drawPrizeLog/execute 不碰钱包，
+-- 所以这里不用再造余额。
+-- 若要连同上游扣费一起压，请在压测脚本里走业务侧入口，钱包数据按那条链路的要求准备。
 
 -- ---------- 4. 重跑压测前的清场（按需执行） ----------
 -- 抽奖流水、已发库存、Redis 缓存三者必须一起清，否则第二轮压测的基线是脏的。

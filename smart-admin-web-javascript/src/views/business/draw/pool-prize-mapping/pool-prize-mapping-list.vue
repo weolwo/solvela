@@ -194,10 +194,6 @@
           </div>
           <div class="metric-value" :class="availableClass(pool)">{{ num(pool.availableProbability) }}%</div>
         </div>
-        <div class="metric">
-          <div class="metric-label">单抽消耗</div>
-          <div class="metric-value">{{ costText(pool) }}</div>
-        </div>
         <div class="metric metric-cost">
           <div class="metric-label">单抽期望赔付</div>
           <div class="metric-value">￥{{ money(pool.expectedCostPerDraw) }}</div>
@@ -339,7 +335,7 @@
   import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { POOL_STATUS_ENUM, COST_ASSET_TYPE_ENUM } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
+  import { POOL_STATUS_ENUM } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
   import { prizeIcon } from '/@/constants/business/lottery/lottery-const';
 
   const router = useRouter();
@@ -380,16 +376,6 @@
       return '0.00';
     }
     return Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  function costText(pool) {
-    if (!pool.costAssetType || pool.costAssetType === COST_ASSET_TYPE_ENUM.NONE.value) {
-      return '免费';
-    }
-    const name = COST_ASSET_TYPE_ENUM[pool.costAssetType]?.desc || pool.costAssetType;
-    const value = Number(pool.costValue || 0);
-    // 声明了消耗但单价非正 = 运行态不扣减，这里直接说破，别让人以为在扣
-    return value > 0 ? `${value} ${name}` : `${name}（单价 ${value}，实际不扣）`;
   }
 
   function hasDanger(record) {

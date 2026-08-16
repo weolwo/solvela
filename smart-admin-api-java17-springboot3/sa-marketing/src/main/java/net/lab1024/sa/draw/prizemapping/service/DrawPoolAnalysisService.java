@@ -73,8 +73,6 @@ public class DrawPoolAnalysisService {
 
     private static final Integer FALLBACK_YES = 1;
 
-    private static final String COST_TYPE_NONE = "NONE";
-
     private static final int AMOUNT_SCALE = 4;
 
     /**
@@ -188,22 +186,11 @@ public class DrawPoolAnalysisService {
         } else {
             vo.setPoolName(pool.getPoolName());
             vo.setPoolStatus(pool.getStatus());
-            vo.setCostAssetType(pool.getCostAssetType());
-            vo.setCostValue(pool.getCostValue());
             activityCode = pool.getActivityCode();
             vo.setActivityCode(activityCode);
             ActivityConfig activity = activityMap.get(activityCode);
             if (activity != null) {
                 vo.setActivityStatus(activity.getStatus());
-            }
-            // 声称扣积分却扣不到：deductDrawCost 判 costValue.signum() <= 0 直接返回 null，一分不扣
-            if (StringUtils.isNotBlank(pool.getCostAssetType())
-                    && !COST_TYPE_NONE.equals(pool.getCostAssetType())
-                    && (pool.getCostValue() == null || pool.getCostValue().signum() <= 0)) {
-                vo.getIssueList().add(DrawPoolIssueVO.warn("COST_VALUE_NON_POSITIVE",
-                        "奖池声明消耗 " + pool.getCostAssetType() + "，但单价为 "
-                                + (pool.getCostValue() == null ? "空" : pool.getCostValue().toPlainString())
-                                + "：运行态判定为不扣减，实际是免费抽"));
             }
         }
 

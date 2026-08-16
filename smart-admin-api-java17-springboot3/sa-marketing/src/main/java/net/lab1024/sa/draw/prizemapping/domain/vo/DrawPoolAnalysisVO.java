@@ -33,12 +33,6 @@ public class DrawPoolAnalysisVO {
     @Schema(description = "奖池开关: 0-关闭, 1-开启")
     private Integer poolStatus;
 
-    @Schema(description = "消耗资产类型: CREDIT/TICKET/NONE")
-    private String costAssetType;
-
-    @Schema(description = "单次抽奖消耗数值")
-    private BigDecimal costValue;
-
     @Schema(description = "坑位数量")
     private Integer slotCount;
 

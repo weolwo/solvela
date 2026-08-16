@@ -25,14 +25,6 @@ public class PrizePoolConfigUpdateForm {
     @NotBlank(message = "奖池名称 不能为空")
     private String poolName;
 
-    @Schema(description = "消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗) 不能为空")
-    private String costAssetType;
-
-    @Schema(description = "消耗数值(单价)", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "消耗数值(单价) 不能为空")
-    private BigDecimal costValue;
-
     @Schema(description = "重置周期，天，周，月，活动期间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "重置周期，天，周，月，活动期间 不能为空")
     private String resetPeriod;

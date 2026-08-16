@@ -84,9 +84,6 @@
         <template v-if="column.dataIndex === 'status'">
           <a-tag :color="poolStatusOf(text).color">{{ poolStatusOf(text).desc }}</a-tag>
         </template>
-        <template v-if="column.dataIndex === 'costAssetType'">
-          <span>{{ costAssetTypeOf(text) }}</span>
-        </template>
         <template v-if="column.dataIndex === 'resetPeriod'">
           <span>{{ resetPeriodOf(text) }}</span>
         </template>
@@ -135,7 +132,6 @@
   import PrizePoolConfigForm from './prize-pool-config-form.vue';
   import {
     POOL_STATUS_OPTIONS,
-    costAssetTypeOf,
     drawModeOf,
     poolStatusOf,
     resetPeriodOf,
@@ -167,16 +163,6 @@
     {
       title: '奖池名称',
       dataIndex: 'poolName',
-      ellipsis: true,
-    },
-    {
-      title: '消耗资产类型',
-      dataIndex: 'costAssetType',
-      ellipsis: true,
-    },
-    {
-      title: '消耗数值(单价)',
-      dataIndex: 'costValue',
       ellipsis: true,
     },
     {

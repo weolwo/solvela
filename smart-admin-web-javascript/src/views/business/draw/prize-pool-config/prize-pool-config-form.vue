@@ -43,18 +43,6 @@
       <a-form-item label="奖池名称" name="poolName">
         <a-input style="width: 100%" v-model:value="form.poolName" placeholder="奖池名称" />
       </a-form-item>
-      <a-form-item label="消耗资产类型" name="costAssetType">
-        <a-select style="width: 100%" v-model:value="form.costAssetType" :options="COST_ASSET_TYPE_OPTIONS" placeholder="请选择消耗资产类型" allowClear />
-      </a-form-item>
-      <!-- 选了「无消耗」这一项就没意义了，免得配出「免费抽但扣 5 积分」这种自相矛盾的奖池 -->
-      <a-form-item label="消耗数值(单价)" name="costValue">
-        <a-input-number
-          style="width: 100%"
-          v-model:value="form.costValue"
-          :disabled="form.costAssetType === COST_ASSET_TYPE_ENUM.NONE.value"
-          placeholder="消耗数值(单价)"
-        />
-      </a-form-item>
       <a-form-item label="重置周期" name="resetPeriod">
         <a-select style="width: 100%" v-model:value="form.resetPeriod" :options="RESET_PERIOD_OPTIONS" placeholder="请选择重置周期" allowClear />
       </a-form-item>
@@ -88,8 +76,6 @@
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
   import {
-    COST_ASSET_TYPE_ENUM,
-    COST_ASSET_TYPE_OPTIONS,
     DRAW_MODE_OPTIONS,
     POOL_STATUS_OPTIONS,
     RESET_PERIOD_OPTIONS,
@@ -135,8 +121,6 @@
     activityCode: undefined, //活动编码
     poolCode: undefined, //奖池唯一编码 (如: VIP_POOL)
     poolName: undefined, //奖池名称
-    costAssetType: undefined, //消耗资产类型: CREDIT(积分), TICKET(抽奖券), NONE(无消耗)
-    costValue: undefined, //消耗数值(单价)
     resetPeriod: undefined, //重置周期，天，周，月，活动期间
     drawMode: undefined, //抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)
     scriptId: undefined, //进入该奖池的前置脚本
@@ -153,8 +137,6 @@
       { pattern: regular.bizCode, message: regular.bizCodeDesc },
     ],
     poolName: [{ required: true, message: '奖池名称 必填' }],
-    costAssetType: [{ required: true, message: '消耗资产类型 必填' }],
-    costValue: [{ required: true, message: '消耗数值(单价) 必填' }],
     resetPeriod: [{ required: true, message: '重置周期 必填' }],
   };
 

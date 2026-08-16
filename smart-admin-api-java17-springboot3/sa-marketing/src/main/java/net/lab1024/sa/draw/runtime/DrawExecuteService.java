@@ -49,10 +49,30 @@ import java.util.stream.Collectors;
 /**
  * 抽奖执行编排（运行态核心链路）
  *
- * 流程：幂等防重 -> 组装奖池快照 -> DrawEngine 纯函数判定 -> Redis Lua 原子预扣(防超发第一道)
- *      -> DB 条件更新库存(防超发第二道，失败补偿回滚 Redis) -> 落抽奖流水
+ * 流程：幂等防重 -> 防刷限流 -> 组装奖池快照 -> DrawEngine 纯函数判定 -> Redis Lua 原子预扣(防超发第一道)
+ *      -> DB 条件更新库存(防超发第二道，失败补偿回滚 Redis) -> 落抽奖流水 -> 中奖异步派发
  *
- * TODO 后续接入：RRateLimiter 防刷限流、抽奖资格扣减(积分/门票走 ledger)、中奖后异步派发(consumer -> risk -> ledger)
+ * <h3>没有资产扣减，是刻意的</h3>
+ * 本模块是纯粹的<b>命中判定与库存派发引擎</b>：抽一次消耗多少积分、要不要门票、
+ * 无货时退不退，全部由上游业务算完再调进来 —— 与「去哪个奖池抽」是同一类决策，
+ * 引擎不该替业务做主。
+ *
+ * <p>此前奖池表上挂着 {@code cost_asset_type} / {@code cost_value}，
+ * 由本链路在抽奖前扣钱包积分、无货时退还。已于 v3.42 移除，理由有三：
+ * <ul>
+ *   <li><b>定价是业务规则，不是奖池属性。</b>同一个奖池对新人免费、对老用户收 100 分，
+ *       是完全正常的诉求；把单价钉死在奖池上，这类规则一条都写不出来；</li>
+ *   <li><b>扣减语义被写死成了积分。</b>{@code cost_asset_type} 名义上支持 CREDIT/TICKET/NONE，
+ *       实现里 TICKET 直接返回「暂未开放」，CREDIT 恒定映射钱包 SCORE ——
+ *       三选一的配置项实际只有一个值可用；</li>
+ *   <li><b>与彩票模块不一致。</b>{@code TicketIssueService} 早就是纯派发引擎，
+ *       类注释明写「消耗多少积分、单人限购几张，都由上游业务算完再调进来」。
+ *       两个同类引擎各写一套，迟早漂移。</li>
+ * </ul>
+ *
+ * <p>⚠️ <b>契约变更</b>：本接口不再扣费，因此<b>也不再退费</b>。
+ * 返回 {@code ofMiss（手慢了，奖品已被抽完）} 时上游若已扣过资产，需要自行退还 ——
+ * 判断依据就是返回值，不需要额外接口。
  *
  * @Author alaric
  * @Date 2026-07-26
@@ -69,24 +89,12 @@ public class DrawExecuteService {
     private final DrawPrizeLogDao drawPrizeLogDao;
     private final DrawStockService drawStockService;
     private final RedissonClient redissonClient;
-    private final MemberWalletService memberWalletService;
     private final PrizeConfigService prizeConfigService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private static final Integer POOL_STATUS_OPEN = 1;
     private static final int UNLIMITED = -1;
 
-    /**
-     * 奖池消耗资产类型（对齐 t_prize_pool_config.cost_asset_type）
-     */
-    private static final String COST_TYPE_CREDIT = "CREDIT";
-    private static final String COST_TYPE_TICKET = "TICKET";
-    private static final String COST_TYPE_NONE = "NONE";
-    /**
-     * 抽奖消耗/退还的流水业务类型
-     */
-    private static final String BIZ_TYPE_DRAW_COST = "DRAW_COST";
-    private static final String BIZ_TYPE_DRAW_COST_REFUND = "DRAW_COST_REFUND";
     /**
      * 防刷限流：单用户单活动每秒最多 2 次；限流器 key 一小时无活动自动过期
      */
@@ -141,13 +149,7 @@ public class DrawExecuteService {
         String traceId = form.getRequestId() != null && !form.getRequestId().isBlank()
                 ? form.getRequestId() : UUID.randomUUID().toString().replace("-", "");
 
-        // 4. 抽奖资格扣减（按奖池门票配置；余额不足由 BusinessException 统一转译给前端）
-        if (COST_TYPE_TICKET.equals(pool.getCostAssetType())) {
-            return ResponseDTO.userErrorParam("抽奖券消耗类型暂未开放，请将奖池配置为积分或无消耗");
-        }
-        PrizeTypeEnum costAsset = deductDrawCost(form, pool, traceId);
-
-        // 5. 组装快照（配置读 DB，库存读 Redis；缓存未预热则回源并预热）
+        // 4. 组装快照（配置读 DB，库存读 Redis；缓存未预热则回源并预热）
         List<PoolPrizeMapping> mappings = poolPrizeMappingManager.lambdaQuery()
                 .eq(PoolPrizeMapping::getPoolCode, form.getPoolCode())
                 .orderByAsc(PoolPrizeMapping::getSortWeight).list();
@@ -176,44 +178,16 @@ public class DrawExecuteService {
         }
         DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(form.getPoolCode(), prizes, probabilities);
 
-        // 6. 纯函数判定 + 双层扣减 + 落流水（sealed + 模式匹配消费）
+        // 5. 纯函数判定 + 双层扣减 + 落流水（sealed + 模式匹配消费）
         return switch (DrawEngine.draw(snapshot, form.getMemberName())) {
             case DrawResult.Hit(DrawPrizeSnapshot prize, DrawResult.HitSource source) ->
-                    settle(form, traceId, snapshot, itemMap, prize, source, pool, costAsset);
+                    settle(form, traceId, snapshot, itemMap, prize, source);
             case DrawResult.NoStock(String candidateCode) -> {
+                // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
                 saveLog(form, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
-                refundDrawCost(form, pool, costAsset, traceId);
                 yield ResponseDTO.ok(DrawExecuteVO.ofMiss("手慢了，奖品已被抽完"));
             }
         };
-    }
-
-    /**
-     * 抽奖资格扣减：CREDIT(积分)映射钱包 SCORE 资产；NONE 无消耗；TICKET 待抽奖券资产建模后支持
-     *
-     * @return 实际扣减的资产类型，未扣减返回 null（供 NoStock 时退还判断）
-     */
-    private PrizeTypeEnum deductDrawCost(DrawExecuteForm form, PrizePoolConfig pool, String traceId) {
-        String costType = pool.getCostAssetType();
-        BigDecimal costValue = pool.getCostValue();
-        if (costType == null || COST_TYPE_NONE.equals(costType) || costValue == null || costValue.signum() <= 0) {
-            return null;
-        }
-        // CREDIT -> 钱包积分资产
-        memberWalletService.executeWalletDeduct(form.getMemberName(), PrizeTypeEnum.SCORE, costValue,
-                BIZ_TYPE_DRAW_COST, traceId, "抽奖消耗[" + pool.getPoolCode() + "]");
-        return PrizeTypeEnum.SCORE;
-    }
-
-    /**
-     * 系统无货导致本次抽奖未产生任何结果时，退还已扣的抽奖资格（同一事务，流水双向留痕）
-     */
-    private void refundDrawCost(DrawExecuteForm form, PrizePoolConfig pool, PrizeTypeEnum costAsset, String traceId) {
-        if (costAsset == null) {
-            return;
-        }
-        memberWalletService.executeWalletRefund(form.getMemberName(), costAsset, pool.getCostValue(),
-                BIZ_TYPE_DRAW_COST_REFUND, traceId, "抽奖无货退还[" + pool.getPoolCode() + "]");
     }
 
     /**
@@ -243,8 +217,7 @@ public class DrawExecuteService {
      */
     private ResponseDTO<DrawExecuteVO> settle(DrawExecuteForm form, String traceId, DrawPoolSnapshot snapshot,
                                               Map<Long, PrizePoolItem> itemMap,
-                                              DrawPrizeSnapshot candidate, DrawResult.HitSource source,
-                                              PrizePoolConfig pool, PrizeTypeEnum costAsset) {
+                                              DrawPrizeSnapshot candidate, DrawResult.HitSource source) {
         if (tryDeduct(form, itemMap, candidate)) {
             saveLog(form, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
             publishPrizeEvent(form, traceId, candidate.prizeCode());
@@ -261,8 +234,8 @@ public class DrawExecuteService {
                     DrawResult.HitSource.FALLBACK_DEGRADE.name()));
         }
 
+        // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
         saveLog(form, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_NO_STOCK, "预扣失败且兜底不可用");
-        refundDrawCost(form, pool, costAsset, traceId);
         return ResponseDTO.ok(DrawExecuteVO.ofMiss("手慢了，奖品已被抽完"));
     }
 

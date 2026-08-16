@@ -8,8 +8,6 @@
             <result column="activity_code" property="activityCode" />
             <result column="pool_code" property="poolCode" />
             <result column="pool_name" property="poolName" />
-            <result column="cost_asset_type" property="costAssetType" />
-            <result column="cost_value" property="costValue" />
             <result column="reset_period" property="resetPeriod" />
             <result column="draw_mode" property="drawMode" />
             <result column="script_id" property="scriptId" />
@@ -25,10 +23,8 @@
                 tenant_id, 
                 activity_code, 
                 pool_code, 
-                pool_name, 
-                cost_asset_type, 
-                cost_value, 
-                reset_period, 
+                pool_name,
+                reset_period,
                 draw_mode, 
                 script_id, 
                 status, 
