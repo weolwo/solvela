@@ -482,7 +482,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 9. **前端 lint 是彻底卸掉的状态**。若要恢复，需要写 `eslint.config.js`（flat config，eslint 9 起不认 eslintrc）、
    从 stylelint 配置里摘掉已废弃的 `stylelint-config-prettier`，并补上 `lint` 脚本 ——
    不要只把包装回来，那样仍然跑不起来。
-10. `smart-admin-web-javascript/postcss.config.cjs` 的 `plugins` 是空对象（Tailwind v4 走 vite 插件），文件可删。
+10. `smart-admin-web/postcss.config.cjs` 的 `plugins` 是空对象（Tailwind v4 走 vite 插件），文件可删。
 11. `uuid` 依赖的唯一使用者是 `src/components/framework/text-ellipsis/index.vue`，而该组件全项目无人引用；
     删组件即可连带卸掉 uuid，或把那行换成原生 `crypto.randomUUID()`。
 12. `smart-app/`（uni-app）那套 eslint 8 链同样闲置无脚本，本轮按要求未动。
@@ -497,7 +497,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 
 | # | 提交 | 内容 | 可否单独摘出 |
 |---|---|---|---|
-| 1 | 前端依赖瘦身 | 仅 `smart-admin-web-javascript/`，卸 v-viewer 与失效的 eslint/stylelint 链 | ✅ 与后端无耦合，可单独摘到 `task` |
+| 1 | 前端依赖瘦身 | 仅 `smart-admin-web/`，卸 v-viewer 与失效的 eslint/stylelint 链 | ✅ 与后端无耦合，可单独摘到 `task` |
 | 2 | 后端升级 Spring Boot 4 | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） | ❌ 本轮的地基 |
 | 3 | 白皮书版本号订正 | 纯文档 | ✅ |
 | 4 | 清掉 knife4j 全部残留（`e7b425f4`） | 横幅 / MvcConfig / 白名单 / 四个 yaml | 依赖 #2；**后被 `ca4e4701` 整体还原，见下方 🔴** |

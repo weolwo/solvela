@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+**/.DS_Store
+dist
+dist-ssr
+*.local
+.idea
+/package-lock.json
+# vite 重启会生成一批带时间戳的临时配置，按模式忽略（钉死单个文件名的话，换个时间戳就又冒出来一个）
+/vite.config.js.timestamp-*.mjs
+
+# 依赖体积分析产物
+stats.html
