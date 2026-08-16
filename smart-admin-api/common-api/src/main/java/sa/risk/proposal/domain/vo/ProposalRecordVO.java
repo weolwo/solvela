@@ -35,6 +35,9 @@ public class ProposalRecordVO {
     @Schema(description = "资产引用：券模/SKU，值类资产为空")
     private String assetRef;
 
+    @Schema(description = "资产展示名（券名/商品名），由营销侧传入")
+    private String assetName;
+
     @Schema(description = "发放金额/积分数")
     private BigDecimal amount;
 
