@@ -11,6 +11,7 @@ import net.lab1024.sa.base.common.util.SmartCollectionUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
 import net.lab1024.sa.enums.ProposalSourceTypeEnum;
 import net.lab1024.sa.ledger.engine.AssetDispatchEngine;
+import net.lab1024.sa.risk.engine.RiskBlockCode;
 import net.lab1024.sa.risk.engine.RiskChainEngine;
 import net.lab1024.sa.risk.engine.RiskContext;
 import net.lab1024.sa.risk.engine.RiskResult;
@@ -97,8 +98,12 @@ public class ProposalRecordService {
 
         if (!riskResult.isPassed()) {
             log.warn("【风控拦截】提案未通过安全校验: {}", riskResult.getReason());
-            // 落地一条 status=80(风控拦截) 的提案记录，用于合规审计和客诉排查
-            saveProposal(req, config, 80, "风控拦截: " + riskResult.getReason());
+            /*
+             * 落地一条 status=80(风控拦截) 的提案记录，用于合规审计和客诉排查。
+             * ruleCode 必须一起落库：文案是给用户看的、会改，编码才是漏斗聚类的判据
+             * （此前它只进了日志，于是漏斗只能按 remark 自由文本聚类）。
+             */
+            saveProposal(req, config, 80, "风控拦截: " + riskResult.getReason(), riskResult.getRuleCode());
             return ResponseDTO.userErrorParam(riskResult.getReason());
         }
 
@@ -112,7 +117,8 @@ public class ProposalRecordService {
         // ==========================================
         ProposalRecord proposal;
         try {
-            proposal = saveProposal(req, config, targetStatus, "提案生成成功");
+            // 没被拦截，risk_code 留空 —— 它只在 status=80 时有意义
+            proposal = saveProposal(req, config, targetStatus, "提案生成成功", null);
         } catch (DuplicateKeyException e) {
             log.warn("【提案防重】该业务单号已存在提案记录，直接忽略: {}", req.getSourceBizId());
             return ResponseDTO.ok(); // 幂等返回成功
@@ -267,8 +273,11 @@ public class ProposalRecordService {
 
     /**
      * 构建并保存提案实体
+     *
+     * @param riskCode 风控拦截分类，仅 status=80 时传值；其余场景传 null
      */
-    private ProposalRecord saveProposal(ProposalRecordAddForm req, PromotionConfig config, int status, String remark) {
+    private ProposalRecord saveProposal(ProposalRecordAddForm req, PromotionConfig config,
+                                        int status, String remark, String riskCode) {
         ProposalRecord record = new ProposalRecord();
         // 单号由提案域自己生成，不采信调用方传值：它是本域对外的凭证，交易号的唯一性必须由发号方保证
         record.setTradeNo(SmartCodeUtil.generateTradeNo(TRADE_NO_PREFIX));
@@ -289,6 +298,7 @@ public class ProposalRecordService {
 
         record.setStatus(status);
         record.setRemark(remark);
+        record.setRiskCode(riskCode);
 
         proposalRecordDao.insert(record);
         return record;
@@ -385,14 +395,28 @@ public class ProposalRecordService {
         }
         vo.setSourceList(sourceList);
 
-        // ---- 风控拦截原因 ----
+        // ---- 风控拦截原因：按 risk_code 聚类，文案改了统计也不会裂 ----
+        long blockAttention = 0L;
         List<ProposalFunnelVO.BlockReasonVO> blockReasonList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectBlockReasonStat(queryForm)) {
             ProposalFunnelVO.BlockReasonVO item = new ProposalFunnelVO.BlockReasonVO();
+            String code = stat.get("riskCode") == null ? null : String.valueOf(stat.get("riskCode"));
+            String sampleRemark = stat.get("sampleRemark") == null ? null : String.valueOf(stat.get("sampleRemark"));
+            RiskBlockCode blockCode = code == null ? null : RiskBlockCode.resolve(code);
             long count = toLong(stat.get("blockCount"));
-            item.setReason(stat.get("reason") == null ? "（未记录原因）" : String.valueOf(stat.get("reason")));
+            item.setRiskCode(code);
+            /*
+             * 归不了类的回显 remark 原文，不用「其它」盖掉：那批是回填规则没覆盖到的历史文案，
+             * 盖住之后就再也没人知道它们是什么了。
+             */
+            item.setReason(blockCode != null ? blockCode.getDesc()
+                    : sampleRemark != null ? sampleRemark : "（未记录原因）");
             item.setBlockCount(count);
             item.setBlockShare(rate(count, blocked));
+            item.setNeedsAttention(blockCode != null && blockCode.needsAttention());
+            if (Boolean.TRUE.equals(item.getNeedsAttention())) {
+                blockAttention += count;
+            }
             blockReasonList.add(item);
         }
         vo.setBlockReasonList(blockReasonList);
@@ -412,6 +436,12 @@ public class ProposalRecordService {
         if (failed > 0 || partial > 0) {
             issues.add("有 " + failed + " 条彻底失败、" + partial + " 条部分成功：部分成功意味着奖只发出去一半，"
                     + "用户拿到的与承诺的不一致，需要人工补齐。失败原因见每条提案的备注");
+        }
+        if (blockAttention > 0) {
+            issues.add("有 " + blockAttention + " 条拦截属于「单次金额超限」或「预算已耗尽」："
+                    + "前者是系统兜底真的被触发了（上游算出了超过配置上限的金额），"
+                    + "后者意味着从那一刻起所有人都拿不到奖 —— 这两类和防刷拦截性质不同，"
+                    + "光看拦截总量会被防刷淹没");
         }
         long sameReviewer = toLong(row.get("sameReviewerCount"));
         if (sameReviewer > 0) {

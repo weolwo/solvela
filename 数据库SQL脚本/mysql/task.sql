@@ -201,6 +201,8 @@ CREATE TABLE `t_proposal_record`
     `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
     `status`              int            NOT NULL DEFAULT 0 COMMENT '0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截',
     `remark`              varchar(255)            DEFAULT NULL COMMENT '执行失败/风控拦截原因，或调用方传入的场景说明',
+    -- 拦截分类与 remark 并存：remark 是给人读的话术（会改、会带数值），risk_code 是给漏斗聚类的封闭取值
+    `risk_code`           varchar(32)             DEFAULT NULL COMMENT '风控拦截分类(给漏斗聚类)：SINGLE_MAX_AMOUNT_LIMIT/USER_FREQUENCY_LIMIT/GLOBAL_BUDGET_LIMIT，仅 status=80 有值',
     -- 审批字段不变 ...
     `first_reviewer`      varchar(64)             DEFAULT NULL COMMENT '一审人',
     `first_review_time`   datetime                DEFAULT NULL COMMENT '一审时间',
@@ -216,7 +218,9 @@ CREATE TABLE `t_proposal_record`
     UNIQUE KEY `uk_trade_no` (`trade_no`),
     UNIQUE KEY `uk_prop_source` (`source_type`, `asset_type`, `source_biz_id`),
     KEY `idx_prop_cfg_sts` (`promotion_config_id`, `status`),
-    KEY `idx_prop_member` (`member_name`, `create_time`)
+    KEY `idx_prop_member` (`member_name`, `create_time`),
+    -- 提案漏斗按「时间范围 + 状态 + 拦截分类」聚合，create_time 放最左（统计查询都带时间范围）
+    KEY `idx_prop_risk_stat` (`create_time`, `status`, `risk_code`)
 ) COMMENT ='提案表';
 
 DROP TABLE IF EXISTS `t_prize_log`;

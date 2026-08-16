@@ -50,7 +50,7 @@ public class FrequencyRiskFilter implements IRiskFilter{
         }
 
         if (currentCount != null && currentCount > config.getIdentifyLimit()) {
-            return RiskResult.reject("USER_FREQUENCY_LIMIT", "您的参与太频繁了，请稍后再试");
+            return RiskResult.reject(RiskBlockCode.USER_FREQUENCY_LIMIT, "您的参与太频繁了，请稍后再试");
         }
 
         return RiskResult.pass();

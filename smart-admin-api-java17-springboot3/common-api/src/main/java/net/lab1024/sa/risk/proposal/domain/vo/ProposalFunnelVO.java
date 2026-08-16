@@ -174,14 +174,17 @@ public class ProposalFunnelVO {
     /**
      * 一类风控拦截原因。
      *
-     * <p>⚠️ 只能按 {@code remark} 这个<b>自由文本</b>聚类：{@code RiskResult.code}
-     * （SINGLE_MAX_AMOUNT_LIMIT / USER_FREQUENCY_LIMIT / GLOBAL_BUDGET_LIMIT）没有落库。
-     * 拦截文案一改，这里的统计就会悄悄裂成两条。
+     * <p>按 {@code risk_code}（取值封闭，见 {@code RiskBlockCode}）聚类，而不是按 remark 文案 ——
+     * 话术会改、也早晚会带上具体数值，按文案聚类的统计迟早会悄悄裂成两条。
+     * 归不了类的历史行（回填规则没覆盖到的文案）保留原文展示，不用「其它」把它盖掉。
      */
     @Data
     public static class BlockReasonVO {
 
-        @Schema(description = "拦截原因（取自 remark 原文）")
+        @Schema(description = "拦截分类编码，对齐 RiskBlockCode；历史数据可能为 null")
+        private String riskCode;
+
+        @Schema(description = "拦截原因：能归类的取分类说明，归不了类的回显 remark 原文")
         private String reason;
 
         @Schema(description = "条数")
@@ -189,5 +192,13 @@ public class ProposalFunnelVO {
 
         @Schema(description = "占全部拦截的比例")
         private BigDecimal blockShare;
+
+        /**
+         * 是否需要人介入。防刷拦得再多也不用管，
+         * 「单次金额超限（系统兜底被触发）」和「预算已耗尽」哪怕几条都该有人看。
+         * 判据收在 {@code RiskBlockCode.needsAttention()} 一处。
+         */
+        @Schema(description = "是否需要人介入排查")
+        private Boolean needsAttention;
     }
 }

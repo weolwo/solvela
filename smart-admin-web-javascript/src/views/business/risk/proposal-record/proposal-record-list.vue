@@ -138,14 +138,16 @@
         <a-card v-if="funnel.blockReasonList && funnel.blockReasonList.length > 0" size="small" :bordered="false" class="stat-card">
           <div class="stat-head">
             风控拦截原因
-            <span class="stat-head-sub">拦截率 {{ percent(funnel.blockRate) }}</span>
+            <span class="stat-head-sub">拦截率 {{ percent(funnel.blockRate) }}，红色的不是防刷</span>
           </div>
-          <div v-for="item in funnel.blockReasonList" :key="item.reason" class="stat-row">
-            <a-tooltip :title="item.reason">
-              <div class="stat-name">{{ item.reason }}</div>
+          <div v-for="item in funnel.blockReasonList" :key="item.riskCode || item.reason" class="stat-row">
+            <a-tooltip :title="item.riskCode ? `${item.reason}（${item.riskCode}）` : item.reason">
+              <div class="stat-name" :class="item.needsAttention ? 'stat-name-alert' : ''">
+                {{ item.needsAttention ? '🔴' : '' }} {{ item.reason }}
+              </div>
             </a-tooltip>
             <div class="stat-bar-wrap">
-              <div class="stat-bar stat-bar-alert" :style="{ width: barPercent(item.blockShare) + '%' }"></div>
+              <div class="stat-bar" :class="item.needsAttention ? 'stat-bar-alert' : ''" :style="{ width: barPercent(item.blockShare) + '%' }"></div>
             </div>
             <div class="stat-num">{{ num(item.blockCount) }} · {{ percent(item.blockShare) }}</div>
           </div>

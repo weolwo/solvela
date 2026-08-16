@@ -145,8 +145,29 @@ class FunnelStatTest {
         }
         List<Map<String, Object>> blockStat = proposalRecordDao.selectBlockReasonStat(new ProposalRecordQueryForm());
         if (!blockStat.isEmpty()) {
-            assertEquals(Set.of("reason", "blockCount"), blockStat.get(0).keySet());
+            assertEquals(Set.of("riskCode", "sampleRemark", "blockCount"), blockStat.get(0).keySet());
         }
+    }
+
+    @Test
+    @DisplayName("提案漏斗：拦截原因按 risk_code 聚类，且条数之和 = 风控拦截总数")
+    void proposalBlockReasonGroupedByCode() {
+        long blocked = count("SELECT COUNT(*) FROM t_proposal_record WHERE status = 80");
+        assertTrue(blocked > 0, "库里没有被风控拦截的提案，本用例无法证明任何事 —— 先造数再跑");
+
+        ProposalFunnelVO vo = proposalRecordService.funnel(new ProposalRecordQueryForm());
+        assertEquals(blocked, vo.getBlockedCount());
+        assertEquals(blocked,
+                vo.getBlockReasonList().stream().mapToLong(ProposalFunnelVO.BlockReasonVO::getBlockCount).sum(),
+                "拦截原因条数之和与拦截总数对不上（分类超过 10 类时 LIMIT 10 会截断，届时本断言需要跟着改）");
+
+        /*
+         * v3.68.0 之后，被拦截的提案必须带得上分类：全是 null 说明迁移没跑，
+         * 或者写入侧没把 RiskResult.ruleCode 传下来 —— 而那种情况下漏斗看起来仍然「正常」
+         * （只是所有拦截都挤进「未归类」一条），正是要在这里拦住的。
+         */
+        assertTrue(vo.getBlockReasonList().stream().anyMatch(item -> item.getRiskCode() != null),
+                "所有拦截行的 risk_code 都是空的：v3.68.0.sql 没执行，或写入侧没落编码");
     }
 
     @Test

@@ -36,7 +36,7 @@ public class GlobalBudgetRiskFilter implements IRiskFilter {
         BigDecimal remainAmount = config.getTotalAmount().subtract(config.getUsedAmount());
 
         if (applyAmount.compareTo(remainAmount) > 0) {
-            return RiskResult.reject("GLOBAL_BUDGET_LIMIT", "活动过于火爆，当前奖项预算已耗尽");
+            return RiskResult.reject(RiskBlockCode.GLOBAL_BUDGET_LIMIT, "活动过于火爆，当前奖项预算已耗尽");
         }
 
         return RiskResult.pass();

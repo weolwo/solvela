@@ -22,7 +22,7 @@ public class BasicLimitRiskFilter implements IRiskFilter {
         // 校验：单次最大金额兜底 (t_promotion_config.single_max_amount)
         if (config.getSingleMaxAmount().compareTo(BigDecimal.ZERO) > 0
                 && applyAmount.compareTo(config.getSingleMaxAmount()) > 0) {
-            return RiskResult.reject("SINGLE_MAX_AMOUNT_LIMIT", "单次发奖金额超限，触发系统兜底");
+            return RiskResult.reject(RiskBlockCode.SINGLE_MAX_AMOUNT_LIMIT, "单次发奖金额超限，触发系统兜底");
         }
 
         // 可以继续加单次最大数量(single_max_quota)等基础校验...

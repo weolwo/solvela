@@ -17,6 +17,7 @@
             <result column="promotion_config_id" property="promotionConfigId" />
             <result column="status" property="status" />
             <result column="remark" property="remark" />
+            <result column="risk_code" property="riskCode" />
             <result column="first_reviewer" property="firstReviewer" />
             <result column="first_review_time" property="firstReviewTime" />
             <result column="second_reviewer" property="secondReviewer" />
@@ -41,9 +42,10 @@
                 source_type, 
                 source_biz_id, 
                 promotion_config_id, 
-                status, 
-                remark, 
-                first_reviewer, 
+                status,
+                remark,
+                risk_code,
+                first_reviewer,
                 first_review_time, 
                 second_reviewer, 
                 second_review_time, 
@@ -225,19 +227,23 @@
     </select>
 
     <!--
-        风控拦截原因分布。只能按 remark 这个自由文本聚类 —— RiskResult.code
-        （SINGLE_MAX_AMOUNT_LIMIT / USER_FREQUENCY_LIMIT / GLOBAL_BUDGET_LIMIT）没有落库，
-        拦截文案一改这里就会悄悄裂成两条。已知脆弱点，对照 t_task_record_flow.discard_code 的做法。
-        LIMIT 10：真裂开了也不至于把页面刷满。
+        风控拦截原因分布，按 risk_code（v3.68.0 新增）聚类 —— 取值封闭，
+        改拦截话术不会再让统计悄悄裂成两条。与 t_task_record_flow.discard_code 同款做法。
+
+        sampleRemark 取同组里的一条原文：risk_code 归不了类的历史行（回填规则没覆盖到的文案）
+        只有原文可读，前端展示的就是它。用 MIN() 而不是 GROUP_CONCAT —— 这里只要一个样本，
+        不是要把几百条文案都拼出来。
+
+        LIMIT 10：真出现没归类的长尾，也不至于把页面刷满。
     -->
     <select id="selectBlockReasonStat" resultType="java.util.Map">
-        SELECT remark AS reason, COUNT(*) AS blockCount
+        SELECT risk_code AS riskCode, MIN(remark) AS sampleRemark, COUNT(*) AS blockCount
         FROM t_proposal_record
         <where>
             AND status = 80
             <include refid="funnel_conditions"/>
         </where>
-        GROUP BY remark
+        GROUP BY risk_code
         ORDER BY blockCount DESC
         LIMIT 10
     </select>

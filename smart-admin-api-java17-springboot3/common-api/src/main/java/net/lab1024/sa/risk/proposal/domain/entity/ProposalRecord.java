@@ -97,6 +97,15 @@ public class ProposalRecord {
     private String remark;
 
     /**
+     * 风控拦截分类（对齐 {@code RiskBlockCode}）：仅 status=80 时有值。
+     *
+     * <p>与 {@link #remark} <b>并存且用途相反</b>：这一列取值封闭、给漏斗聚类用；
+     * remark 是给用户/客服看的话术，会改、也早晚会带上具体数值。
+     * 只留文案会统计不了，只留编码会查不了客诉 —— 与 {@code t_task_record_flow.discard_code} 同一模式。
+     */
+    private String riskCode;
+
+    /**
      * 一审人
      */
     private String firstReviewer;

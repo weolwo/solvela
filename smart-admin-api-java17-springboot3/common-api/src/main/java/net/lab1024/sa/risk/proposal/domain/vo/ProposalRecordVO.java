@@ -56,6 +56,9 @@ public class ProposalRecordVO {
     @Schema(description = "执行失败/风控拦截原因")
     private String remark;
 
+    @Schema(description = "风控拦截分类（对齐 RiskBlockCode）：仅 status=80 时有值")
+    private String riskCode;
+
     @Schema(description = "一审人")
     private String firstReviewer;
 
