@@ -83,7 +83,7 @@ CREATE INDEX `idx_job_time` ON `t_smart_job_log` (`job_id`, `execute_start_time`
 -- ----------------------------------------------------------------------------
 -- ③ 清理示例任务
 --
--- net.lab1024.sa.base.module.support.job.sample.SmartJobSample1 / 2 已随重构删除。
+-- sa.base.module.support.job.sample.SmartJobSample1 / 2 已随重构删除。
 -- 这两条配置留着的话，启动对账会把它们报成「handler 在代码中不存在」——
 -- 那是对的行为，但用两条示例数据去触发它没有意义。
 --
@@ -91,15 +91,15 @@ CREATE INDEX `idx_job_time` ON `t_smart_job_log` (`job_id`, `execute_start_time`
 --    启动日志会逐条点名。处理方式：给对应执行类补上 @SmartJobHandler 注解，
 --    再把这一列的值改成注解里的 name。示例：
 --      UPDATE t_smart_job SET handler_name = 'fileOrphanClean'
---       WHERE handler_name = 'net.lab1024.sa.base.xxx.FileOrphanCleanJob';
+--       WHERE handler_name = 'sa.base.xxx.FileOrphanCleanJob';
 -- ----------------------------------------------------------------------------
 -- 先删日志再删配置：反过来的话第一条 DELETE 之后就查不到 job_id 了，日志会变成孤儿
 DELETE FROM `t_smart_job_log`
  WHERE `job_id` IN (SELECT `job_id` FROM `t_smart_job`
-                     WHERE `handler_name` LIKE 'net.lab1024.sa.base.module.support.job.sample.%');
+                     WHERE `handler_name` LIKE 'sa.base.module.support.job.sample.%');
 
 DELETE FROM `t_smart_job`
- WHERE `handler_name` LIKE 'net.lab1024.sa.base.module.support.job.sample.%';
+ WHERE `handler_name` LIKE 'sa.base.module.support.job.sample.%';
 
 
 -- ----------------------------------------------------------------------------

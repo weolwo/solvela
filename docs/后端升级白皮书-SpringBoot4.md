@@ -2,7 +2,7 @@
 
 > 分支：`upgrade/springboot4`（从 `task` 拉出）
 > 日期：2026-08-02
-> 范围：`smart-admin-api-java17-springboot3/` 全部四个模块（sa-base / common-api / sa-marketing / sa-admin）
+> 范围：`smart-admin-api/` 全部四个模块（sa-base / common-api / sa-marketing / sa-admin）
 > 验证状态：全模块编译通过 · 单测 73/73 全绿 · **真实启动成功（10.051s，日志无 ERROR）** · 登录/验证码/Swagger 接口实测 200
 > · sa-token 新 Redis DAO 读路径实测通 · ip2region 新旧数据布局逐字段核对 · 前端 `vite build` 通过
 
@@ -70,7 +70,7 @@ commons-* 全系、poi 5.5.1、bcprov 1.85、velocity、freemarker、p6spy、ref
 
 | 依赖 | 判定证据 |
 |---|---|
-| `net.1024lab:smartdb` 1.2.0 | 源码零引用 `net.lab1024.smartdb`，jar 停留在 2021 年 |
+| `net.1024lab:smartdb` 1.2.0 | 源码零引用 `sa.smartdb`，jar 停留在 2021 年 |
 | `concurrentlinkedhashmap-lru` 1.4.2 | 源码零引用 |
 | `poi-ooxml-full` 5.5.1 | 零引用 `org.openxmlformats`，且拖着 xmlbeans 全量 schema，**21MB** |
 | `poi-scratchpad` 5.5.1 | HSLF/HWPF/HSSF 一处没用，**4MB** |

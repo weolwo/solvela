@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.base.module.support.job.repository.SmartJobLogDao">
+
+    <!-- 定时任务-执行记录-分页查询 -->
+    <select id="query" resultType="sa.base.module.support.job.api.domain.SmartJobLogVO">
+        SELECT *
+        FROM t_smart_job_log
+        <where>
+            <if test="query.searchWord != null and query.searchWord != ''">
+                AND ( INSTR(job_name,#{query.searchWord})
+                OR INSTR(param_snapshot,#{query.searchWord})
+                OR INSTR(result_summary,#{query.searchWord})
+                OR INSTR(trace_id,#{query.searchWord})
+                OR INSTR(create_name,#{query.searchWord})
+                )
+            </if>
+            <if test="query.jobId != null">
+                AND job_id = #{query.jobId}
+            </if>
+            <if test="query.status != null">
+                AND status = #{query.status}
+            </if>
+            <if test="query.triggerSource != null and query.triggerSource != ''">
+                AND trigger_source = #{query.triggerSource}
+            </if>
+            <if test="query.startTime != null">
+                AND DATE_FORMAT(execute_start_time, '%Y-%m-%d') &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND DATE_FORMAT(execute_start_time, '%Y-%m-%d') &lt;= #{query.endTime}
+            </if>
+        </where>
+        <if test="query.sortItemList == null or query.sortItemList.size == 0">
+            ORDER BY log_id DESC
+        </if>
+    </select>
+
+    <!--
+      🔴 手动触发与失败重试共用同一个状态机：两者都是一条 status = 0(PENDING) 的记录，
+         区别只在 fire_time（手动 = now，重试 = now + interval）。
+         所以这里只有一个条件、没有任何分支 —— v3 方案里两者分头扫描才是自相矛盾的那版
+    -->
+    <select id="selectPendingList" resultType="sa.base.module.support.job.repository.domain.SmartJobLogEntity">
+        SELECT *
+        FROM t_smart_job_log
+        WHERE app_env = #{appEnv}
+          AND status = 0
+          AND fire_time IS NOT NULL
+          AND fire_time &lt;= #{dbNow}
+        ORDER BY fire_time
+        LIMIT #{limit}
+    </select>
+
+    <!--
+      🔴 抢的是日志行的 status，不是 job 表的 trigger_version。
+         抢版本号会连带改写 next_trigger_time，扰乱正常的 cron 节奏 ——
+         运营点一次「立即执行」，下一次定时就漂了
+    -->
+    <update id="preemptPendingLog">
+        UPDATE t_smart_job_log
+        SET status = 1,
+            ip = #{ip},
+            execute_start_time = #{startTime},
+            fire_time = NULL
+        WHERE log_id = #{logId}
+          AND status = 0
+    </update>
+
+    <select id="countRunning" resultType="int">
+        SELECT COUNT(1)
+        FROM t_smart_job_log
+        WHERE job_id = #{jobId}
+          AND status = 1
+          AND execute_start_time &gt;= #{earliestStartTime}
+        <!-- 🔴 排除本次自己：手动/重试路径先抢成 RUNNING 再判阻塞，不排除就会数到自己 -->
+        <if test="excludeLogId != null">
+            AND log_id != #{excludeLogId}
+        </if>
+    </select>
+
+    <select id="selectZombieList" resultType="sa.base.module.support.job.repository.domain.SmartJobLogEntity">
+        SELECT *
+        FROM t_smart_job_log
+        WHERE status = 1
+          AND execute_start_time &lt; #{beforeTime}
+        ORDER BY log_id
+        LIMIT #{limit}
+    </select>
+
+    <!-- 分批删除：一次删几十万行会锁表并撑爆 binlog -->
+    <delete id="deleteBeforeTime">
+        DELETE FROM t_smart_job_log
+        WHERE create_time &lt; #{beforeTime}
+        LIMIT #{limit}
+    </delete>
+
+</mapper>

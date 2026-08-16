@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.ledger.coupon.dao.MemberCouponDao">
+
+    <resultMap id="MemberCouponVO" type="sa.ledger.coupon.domain.vo.MemberCouponVO">
+            <result column="id" property="id" />
+            <result column="tenant_id" property="tenantId" />
+            <result column="member_name" property="memberName" />
+            <result column="coupon_code" property="couponCode" />
+            <result column="coupon_type" property="couponType" />
+            <result column="coupon_name" property="couponName" />
+            <result column="status" property="status" />
+            <result column="source_type" property="sourceType" />
+            <result column="source_biz_id" property="sourceBizId" />
+            <result column="valid_start_time" property="validStartTime" />
+            <result column="valid_end_time" property="validEndTime" />
+            <result column="used_time" property="usedTime" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                tenant_id, 
+                member_name, 
+                coupon_code, 
+                coupon_type, 
+                coupon_name, 
+                status, 
+                source_type, 
+                source_biz_id, 
+                valid_start_time, 
+                valid_end_time, 
+                used_time, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.tenantId != null">
+                            AND tenant_id = #{queryForm.tenantId}
+                        </if>
+                        <if test="queryForm.memberName != null">
+                            AND member_name = #{queryForm.memberName}
+                        </if>
+                        <if test="queryForm.couponCode != null">
+                            AND coupon_code = #{queryForm.couponCode}
+                        </if>
+                        <if test="queryForm.validStartTimeBegin != null">
+                            AND valid_start_time &gt;= #{queryForm.validStartTimeBegin}
+                        </if>
+                        <if test="queryForm.validStartTimeEnd != null">
+                            AND valid_start_time &lt;= #{queryForm.validStartTimeEnd}
+                        </if>
+                        <if test="queryForm.couponName != null">
+                            AND coupon_name = #{queryForm.couponName}
+                        </if>
+                        <if test="queryForm.couponType != null">
+                            AND coupon_type = #{queryForm.couponType}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MemberCouponVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_member_coupon
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MemberCouponVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_member_coupon
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+                <delete id="batchDelete">
+                    delete from t_member_coupon
+                    where id in
+                    <foreach collection="idList" open="(" close=")" separator="," item="item">
+                        #{item}
+                    </foreach>
+                </delete>
+                <delete id="deleteById">
+                    delete from t_member_coupon
+                        where id = #{id}
+                </delete>
+
+</mapper>

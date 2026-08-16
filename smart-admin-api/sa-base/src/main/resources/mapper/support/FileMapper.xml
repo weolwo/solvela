@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.base.module.support.file.dao.FileDao">
+
+    <!--
+      档⑤ 起 FileVO 的属性名与 DB 列名完全对齐（storageKey / originalName），别名已撤除。
+
+      仍然显式列字段而不是 SELECT *：t_file 现在有 20+ 列（含 content_hash / tags 等），
+      列表查询没必要全捞，而且显式列表能让"这个接口到底给前端什么"一眼看清。
+    -->
+    <sql id="voColumns">
+        t_file.file_id,
+        t_file.category_id,
+        t_file.original_name,
+        t_file.storage_key,
+        t_file.file_size,
+        t_file.extension,
+        t_file.content_type,
+        t_file.storage_kind,
+        t_file.status,
+        t_file.tags,
+        t_file.create_by,
+        t_file.create_time
+    </sql>
+
+    <!-- 分页查询 -->
+    <select id="queryPage" resultType="sa.base.module.support.file.domain.vo.FileVO">
+        SELECT
+        <include refid="voColumns"/>,
+        <!-- 引用数直接在列表里给出来，省得为「这张图在不在用」逐个点开详情。
+             相关子查询走 t_file_relation 的 idx_file，不是 N+1（一条 SQL 出全部） -->
+        (SELECT COUNT(*) FROM t_file_relation r WHERE r.file_id = t_file.file_id) AS referenceCount
+        FROM t_file
+        <where>
+            t_file.deleted_flag = 0
+            <!--文件名词-->
+            <if test="queryForm.originalName != null and queryForm.originalName != ''">
+                AND INSTR(t_file.original_name,#{queryForm.originalName})
+            </if>
+            <!--文件Key-->
+            <if test="queryForm.storageKey != null and queryForm.storageKey != ''">
+                AND INSTR(t_file.storage_key,#{queryForm.storageKey})
+            </if>
+            <!--扩展名-->
+            <if test="queryForm.extension != null and queryForm.extension != ''">
+                AND t_file.extension = #{queryForm.extension}
+            </if>
+            <!--分类-->
+            <if test="queryForm.categoryId != null">
+                AND t_file.category_id = #{queryForm.categoryId}
+            </if>
+            <!--标签。tags 存成前后各带一个逗号的形式（,双十一,banner,），
+                所以必须连着逗号一起匹配：直接 INSTR(tags,'618') 会命中「6180」，
+                INSTR(tags,'11') 会命中「双11」和「1111」。这种错不报警，
+                只是搜出一堆不相干的东西，运营会当成"搜索不准"忍下来-->
+            <if test="queryForm.tag != null and queryForm.tag != ''">
+                AND INSTR(t_file.tags, CONCAT(',', #{queryForm.tag}, ','))
+            </if>
+            <!--只查图片。选图器用，content_type 是上传时嗅探的结论，比扩展名可信-->
+            <if test="queryForm.imageOnly != null and queryForm.imageOnly">
+                AND t_file.content_type LIKE 'image/%'
+            </if>
+            <!--创建人-->
+            <if test="queryForm.createBy != null and queryForm.createBy != ''">
+                AND INSTR(t_file.create_by,#{queryForm.createBy})
+            </if>
+            <!--创建时间-->
+            <if test="queryForm.createTimeBegin != null">
+                AND DATE_FORMAT(t_file.create_time, '%Y-%m-%d') &gt;= #{queryForm.createTimeBegin}
+            </if>
+            <if test="queryForm.createTimeEnd != null">
+                AND DATE_FORMAT(t_file.create_time, '%Y-%m-%d') &lt;= #{queryForm.createTimeEnd}
+            </if>
+        </where>
+        <if test="queryForm.sortItemList == null or queryForm.sortItemList.size == 0">
+            ORDER BY t_file.create_time DESC
+        </if>
+    </select>
+
+    <select id="getByFileKey" resultType="sa.base.module.support.file.domain.vo.FileVO">
+        SELECT
+        <include refid="voColumns"/>
+        FROM t_file WHERE t_file.storage_key = #{fileKey} AND t_file.deleted_flag = 0
+    </select>
+
+    <select id="selectByFileKeyList" resultType="sa.base.module.support.file.domain.vo.FileVO">
+        SELECT
+        <include refid="voColumns"/>
+        FROM t_file WHERE t_file.deleted_flag = 0 AND t_file.storage_key IN
+        <foreach collection="fileKeyList" open="(" close=")" separator="," item="item">
+            #{item}
+        </foreach>
+    </select>
+
+    <!--
+      各分类的文件数。一次 GROUP BY 出全部，避免分类卡片页 N+1。
+      resultType 用 map 是刻意的：这里只要 (categoryId, count) 两个数，
+      为它单开一个 VO 类反而增加阅读成本。
+    -->
+    <select id="countGroupByCategory" resultType="map">
+        SELECT t_file.category_id AS categoryId, COUNT(*) AS fileCount
+        FROM t_file
+        WHERE t_file.deleted_flag = 0
+        GROUP BY t_file.category_id
+    </select>
+
+</mapper>

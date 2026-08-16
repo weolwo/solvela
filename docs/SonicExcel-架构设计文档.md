@@ -141,7 +141,7 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 ### 2.3 包结构
 
 ```
-sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
+sa-base/src/main/java/sa/base/sonicexcel/
 ├── SonicExcel.java                 门面（唯一入口）
 ├── SonicExcelConfiguration.java    与 Spring 的唯一接线点：StAX 隔离 / BeanFactory / profile
 ├── SonicExcelSettings.java         框架级开关（严格元数据模式）
@@ -175,11 +175,11 @@ sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/
 │   ├── SonicErrorPolicy.java  SonicRowError.java  SonicReadResult.java
 └── SonicExcelException.java
 
-sa-base/src/main/java/net/lab1024/sa/base/module/support/dict/excel/   ← 业务侧（D2）
+sa-base/src/main/java/sa/base/module/support/dict/excel/   ← 业务侧（D2）
 ├── SonicDictConverter.java         依赖 DictService，不进框架目录
 └── SonicDict.java                  @SonicDict("GOODS_PLACE")
 
-sa-base/src/main/java/net/lab1024/sa/base/common/excel/
+sa-base/src/main/java/sa/base/common/excel/
 ├── SonicEnumConverter.java         依赖 SmartEnumUtil / BaseEnum，同样是项目侧
 ├── SonicEnumOptionProvider.java    复用 @SonicEnum 给模板生成下拉选项
 └── SonicEnum.java                  @SonicEnum(GoodsStatusEnum.class)
@@ -191,7 +191,7 @@ sa-admin/.../module/business/goods/excel/
 **转换器的归属规则：与它包装的组件同模块。** 框架目录 `sonicexcel/` 里一个业务依赖都没有，
 将来要独立开源，整个目录搬走即可。
 
-✅ **D1 已定案：包放 `net.lab1024.sa.base.sonicexcel`，与 `common` 平级。**
+✅ **D1 已定案：包放 `sa.base.sonicexcel`，与 `common` 平级。**
 将来拆子模块独立开源时，一整个目录搬走即可，不用从 `common` 里往外挑文件。
 
 ### 2.4 底层引擎尽调（实测结论，实施前必读）
@@ -361,7 +361,7 @@ public record SonicContext(int rowIndex, int columnIndex, String title,
 ### 5.3 转换器的实例化策略（**本设计最关键的一条**）
 
 **阿里系与我们最实质的差异点。** EasyExcel 的 `Converter` 同样靠反射无参构造实例化，够不到 Spring 容器 ——
-这就是为什么 [GoodsService.java:196](../smart-admin-api-java17-springboot3/sa-admin/src/main/java/net/lab1024/sa/admin/module/business/goods/service/GoodsService.java) 到今天还在手写字典翻译：
+这就是为什么 [GoodsService.java:196](../smart-admin-api/sa-admin/src/main/java/sa/admin/module/business/goods/service/GoodsService.java) 到今天还在手写字典翻译：
 
 ```java
 .place(Arrays.stream(e.getPlace().split(","))
@@ -386,7 +386,7 @@ public record SonicContext(int rowIndex, int columnIndex, String title,
 ✅ **D2 已定案：字典转换器放业务侧。**
 
 - `sonicexcel/converter/builtin` **只放 JDK 级**的内置转换器：枚举、Y/N、BigDecimal 精度。这些不依赖任何业务组件。
-- `SonicDictConverter` + `@SonicDict` 放业务包 **`net.lab1024.sa.base.module.support.dict.excel`**，
+- `SonicDictConverter` + `@SonicDict` 放业务包 **`sa.base.module.support.dict.excel`**，
   与 `DictService` 同模块 —— 独立开源时框架目录不用拆，业务侧那份留在项目里。
 
 ### 5.4 访问器：`LambdaMetafactory` 主路径
@@ -881,7 +881,7 @@ try {
 
 | # | 问题 | 状态 |
 |---|---|---|
-| ~~D1~~ | ~~包路径~~ | **已定：`net.lab1024.sa.base.sonicexcel`，与 `common` 平级**（§2.3） |
+| ~~D1~~ | ~~包路径~~ | **已定：`sa.base.sonicexcel`，与 `common` 平级**（§2.3） |
 | ~~D2~~ | ~~字典转换器放哪~~ | **已定：业务侧 `support.dict.excel`；框架 builtin 只留 JDK 级**（§5.3） |
 | ~~D3~~ | ~~水印删除后的审计线索~~ | **已定：靠现有 `@OperateLog` 承接，零改动**（§1.2） |
 | ~~D10~~ | ~~字典转换器的导入方向~~ | **已落地 2026-08-08**：新增 `DICT_DATA_LABEL` 独立缓存 + `DictManager#listDictDataByLabel`，见 §16 |

@@ -16,7 +16,7 @@
 
 SonicExcel 是一层**元数据驱动的双向映射引擎**：把 `@SonicTitle` 标注的 Java 类型编译成一份不可变的列描述（`SheetMeta`），然后用同一份描述同时驱动**导出、导入、模板生成**三条通道。底层引擎是 `org.dhatim:fastexcel`（拉模型 + 流式 zip），**整个项目不含 Apache POI**。
 
-关键词是**对称**：一个 DTO 只标注一次，下载下来的模板就是能上传回去的模板。这不是巧合，是 `SheetMeta` 被读写两侧共用的必然结果（[SheetMeta.java:6](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/meta/SheetMeta.java:6)）。
+关键词是**对称**：一个 DTO 只标注一次，下载下来的模板就是能上传回去的模板。这不是巧合，是 `SheetMeta` 被读写两侧共用的必然结果（[SheetMeta.java:6](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/meta/SheetMeta.java:6)）。
 
 ## 1. 分层
 
@@ -70,7 +70,7 @@ flowchart LR
 
 | 模式 | 落点 | 不用它会怎样 |
 |---|---|---|
-| **门面 Facade** | `SonicExcel`（[SonicExcel.java:25](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicExcel.java:25)） | 调用方要自己 new Workbook、自己关流、自己拼 Meta。收敛成一个类之后，"必须 try-with-resources"这种约束才有地方写 |
+| **门面 Facade** | `SonicExcel`（[SonicExcel.java:25](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicExcel.java:25)） | 调用方要自己 new Workbook、自己关流、自己拼 Meta。收敛成一个类之后，"必须 try-with-resources"这种约束才有地方写 |
 | **建造者 Builder + 流式配置** | `SonicSheetBuilder`、`SonicSheetReader` | 十几个可选参数只能靠重载爆炸或者一个 12 参构造器。而且 builder 能做"开写之后不许改配置"的状态校验（`ensureNotStarted()`） |
 | **享元 / 惰性缓存** | `ClassValue<SheetMeta>`、`ClassValue<SonicConverter>` | 每导一次就反射解析一遍类。**注意这里刻意不用 `ConcurrentHashMap<Class,?>`**——那玩意持有 Class 强引用，是经典的类加载器泄漏源 |
 | **策略 Strategy（代数数据类型形态）** | `sealed interface SonicErrorPolicy` + record 三兄弟 | 脏数据处置只能硬编码。做成 sealed 之后，`switch` 少写一个分支**编译不过**，新增策略时编译器会把所有遗漏点指给你 |
@@ -89,10 +89,10 @@ flowchart LR
 这三条写错，功能"看起来正常"，但会在生产上以最难排查的方式炸掉。
 
 1. **所有文本一律走 `inlineString`，禁止 `value(r, c, String)`**
-   fastexcel 的 `Workbook` 没有关闭 shared strings 的开关，内部 `StringCache` 是一个无条件启用、永不清理的 HashMap。只要有一处调了 `value(String)`，那个字符串就永久驻留堆中。千万级高基数文本（订单号、地址、姓名）会直接把堆吃穿。代价是文件变大（重复文本不去重），换来的是**堆占用与数据量彻底解耦**。（[CellWriter.java:20](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/CellWriter.java:20)）
+   fastexcel 的 `Workbook` 没有关闭 shared strings 的开关，内部 `StringCache` 是一个无条件启用、永不清理的 HashMap。只要有一处调了 `value(String)`，那个字符串就永久驻留堆中。千万级高基数文本（订单号、地址、姓名）会直接把堆吃穿。代价是文件变大（重复文本不去重），换来的是**堆占用与数据量彻底解耦**。（[CellWriter.java:20](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/CellWriter.java:20)）
 
 2. **读侧入参只接受 `Path`，不接受 `InputStream`**
-   解析 OOXML 需要 zip 随机访问。把 `InputStream` 交给 fastexcel-reader，它会用 `SeekableInMemoryByteChannel` 把整个 xlsx 读成堆里的 `byte[]`——100MB 的上传文件在读第一行之前就先吃掉 100MB **连续**堆内存。这种"假流式"从 API 层面掐断，比在文档里写一句提醒可靠得多。（[SonicExcel.java:43](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicExcel.java:43)）
+   解析 OOXML 需要 zip 随机访问。把 `InputStream` 交给 fastexcel-reader，它会用 `SeekableInMemoryByteChannel` 把整个 xlsx 读成堆里的 `byte[]`——100MB 的上传文件在读第一行之前就先吃掉 100MB **连续**堆内存。这种"假流式"从 API 层面掐断，比在文档里写一句提醒可靠得多。（[SonicExcel.java:43](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicExcel.java:43)）
 
 3. **写侧必须 try-with-resources**
    xlsx 的 zip 中央目录是 `close()` 里最后写的。不关流 = 产出一个 Excel 打不开的文件，而且这个文件的字节数看起来完全正常。
@@ -126,7 +126,7 @@ flowchart LR
 - **绝不能靠文件扩展名判断格式**。用户把 `.xls` 改名成 `.xlsx` 是日常操作，不拦的话抛出来的会是一段不知所云的 zip/StAX 异常，客服完全没法回复。**魔数（magic number）在文件头几个字节，是格式的真身**，扩展名只是个昵称。
 - `.xls` 的魔数 `D0CF11E0` 是 **OLE2 复合文档**格式——微软早年的"文件里的文件系统"，Word/Excel/PPT 老格式共用。`.xlsx` 则是一个**普通的 zip**，解开来是一堆 XML。
 - **zip 炸弹**的原理：zip 的中央目录里记着每个条目的原始大小，攻击者可以用几十 KB 的文件声明自己解压后有几十 GB。解析器老老实实按声明分配缓冲区，服务就没了。防御手段不是"解压看看"，而是**在解压之前读元信息、算压缩比**。正常 xlsx 的压缩比在 10:1 上下，200:1 已经是明显异常。
-- 有个细节容易漏：流式写出的 zip，中央目录里 `size` 可能是 `-1`。这种条目只能放过，交给解析器按流处理（[WorkbookGuard.java:89](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/WorkbookGuard.java:89)）。
+- 有个细节容易漏：流式写出的 zip，中央目录里 `size` 可能是 `-1`。这种条目只能放过，交给解析器按流处理（[WorkbookGuard.java:89](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/WorkbookGuard.java:89)）。
 
 > **保安拦不住的**：WPS 等非 Excel 工具产出的 xlsx 是**合法 zip、正确魔数**，体检全过，只会在解析到一半时炸。本项目不承诺兼容这类文件，但 `translate()` 会把底层异常翻译成"请先用 Excel 打开并另存为 .xlsx 后重试"——**挡不住的东西，至少要让用户知道该怎么办**。
 
@@ -143,7 +143,7 @@ flowchart LR
 - **zip 的中央目录（Central Directory）在文件末尾**，不在开头。这是历史设计——zip 诞生于软盘时代，要支持跨盘分卷和追加写入，所以"目录"放最后。后果是：**读 zip 必须能 seek**，纯顺序的 `InputStream` 做不到。
 - 所以任何"给我个 InputStream 就能流式读 Excel"的 API，背后必然在偷偷做一件事：把整个流读进内存变成可随机访问的 buffer。**它是流式的，但它不省内存**。这就是"假流式"。
 - 临时文件的清理**不能用 `File#deleteOnExit()`**。它把文件名注册进 `DeleteOnExitHook` 的一个 static Set **永久持有**，且只在 JVM 正常退出时执行。K8s 里 Pod 被 SIGKILL / OOMKilled 时钩子根本不跑——**它想兜的底恰恰兜不住，运行期还持续漏内存**。
-- 正确姿势是双保险：`finally` 删（管正常路径）+ **启动时扫描删 2 小时前的残留**（管 crash 路径）。文件统一放在自己的子目录，扫描只碰自己的东西（[SonicTempFiles.java:14](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicTempFiles.java:14)）。
+- 正确姿势是双保险：`finally` 删（管正常路径）+ **启动时扫描删 2 小时前的残留**（管 crash 路径）。文件统一放在自己的子目录，扫描只碰自己的东西（[SonicTempFiles.java:14](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicTempFiles.java:14)）。
 
 ---
 
@@ -153,7 +153,7 @@ flowchart LR
 
 **框架映射**：接线员手里一本《物料别名手册》（`@SonicTitle(alias={...})`）。他读一遍送货单，建一张「归一化名称 → 实际车厢号」的表，然后按工厂的物料清单去查，得到 `int[] positions`——第 i 位就是这一列在文件里的真实下标，`-1` 表示"这批货里没有"。
 
-查找是**四级降级**的（[HeaderMatcher.java:51](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/HeaderMatcher.java:51)）：
+查找是**四级降级**的（[HeaderMatcher.java:51](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/HeaderMatcher.java:51)）：
 
 ```
 ① 正式名精确匹配  →  ② 别名精确匹配  →  ③ 正式名忽略大小写  →  ④ 别名忽略大小写  →  -1
@@ -169,13 +169,13 @@ flowchart LR
   | 零宽不换行空格 BOM | `U+FEFF` | 文件编码头残留 | **false** |
   | 全角空格 | `U+3000` | 中文输入法直接打出来的 | **false** |
 
-  三个全都"不算空白"，三个全都肉眼不可见。所以 `isBlankish()` 必须手动列举它们。代码里刻意用转义写法而不是字面量——**这三个字符在编辑器里是隐形的，写成字面量后没人看得出改动**（[HeaderMatcher.java:95](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/HeaderMatcher.java:95)）。
+  三个全都"不算空白"，三个全都肉眼不可见。所以 `isBlankish()` 必须手动列举它们。代码里刻意用转义写法而不是字面量——**这三个字符在编辑器里是隐形的，写成字面量后没人看得出改动**（[HeaderMatcher.java:95](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/HeaderMatcher.java:95)）。
 
-- **alias 是刚需不是锦上添花**。中文表头改一个字，用户手里所有存量模板立刻全部导入失败。真实例子就在仓库里：`GoodsImportForm` 的商品状态列，正式表头是历史遗留的错别字 `"商品状态错误"`，用 `alias = "商品状态"` 兜住那些被人手工改对的模板（[GoodsImportForm.java:36](smart-admin-api-java17-springboot3/sa-admin/src/main/java/net/lab1024/sa/admin/module/business/goods/domain/form/GoodsImportForm.java:36)）。
+- **alias 是刚需不是锦上添花**。中文表头改一个字，用户手里所有存量模板立刻全部导入失败。真实例子就在仓库里：`GoodsImportForm` 的商品状态列，正式表头是历史遗留的错别字 `"商品状态错误"`，用 `alias = "商品状态"` 兜住那些被人手工改对的模板（[GoodsImportForm.java:36](smart-admin-api/sa-admin/src/main/java/sa/admin/module/business/goods/domain/form/GoodsImportForm.java:36)）。
 
 - **列顺序错乱为什么免疫**：因为映射是"按名字查下标"，不是"按位置读"。用户把列拖来拖去、在中间插一列广告，都不影响。多出来的列忽略，缺的列留空。
 
-- **一列都对不上时直接抛**，不是留空跑完——那说明用户拿的根本不是这个模板，让他导入 5000 行空数据毫无意义。缺一部分列则只 warn（[SonicSheetReader.java:224](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/SonicSheetReader.java:224)）。
+- **一列都对不上时直接抛**，不是留空跑完——那说明用户拿的根本不是这个模板，让他导入 5000 行空数据毫无意义。缺一部分列则只 warn（[SonicSheetReader.java:224](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/SonicSheetReader.java:224)）。
 
 ---
 
@@ -203,17 +203,17 @@ flowchart LR
 
 - **为什么不是 `MethodHandle`**：从缓存字段里取出来的 MethodHandle 只能走 `invoke`（不是 `invokeExact`、不是 `static final` 常量），JIT 拿不到常量折叠，实测通常**不比 `setAccessible` 后的 Field 快**。MethodHandle 的性能优势严格依赖"调用点是 static final 常量"这个前提，而缓存在 Map 里的句柄不满足。
 - **代价是每个访问器生成一个 hidden class**（JDK 15+ 的隐藏类，不占常规类空间但仍有元空间成本）。所以必须靠 `ClassValue` 保证**每个 DTO 只生成一次**。
-- **`LambdaMetafactory` 只吃方法/构造器句柄，不吃字段句柄**。直接喂 `unreflectGetter` 会抛 `LambdaConversionException: Unsupported MethodHandle kind: getField`。所以没有 getter 的字段只能退回 MethodHandle 兜底（[MetaResolver.java:267](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/meta/MetaResolver.java:267)）。实际业务 DTO 基本都有 Lombok 生成的 getter，走的是快路径。
+- **`LambdaMetafactory` 只吃方法/构造器句柄，不吃字段句柄**。直接喂 `unreflectGetter` 会抛 `LambdaConversionException: Unsupported MethodHandle kind: getField`。所以没有 getter 的字段只能退回 MethodHandle 兜底（[MetaResolver.java:267](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/meta/MetaResolver.java:267)）。实际业务 DTO 基本都有 Lombok 生成的 getter，走的是快路径。
 - **装箱适配**：`instantiatedMethodType` 用包装类型声明（`box(valueType)`），让 LMF 自己插入装箱代码，不用手写。
 
-> ⚠️ **诚实的性能账**：这条路径的真实价值是"**不用 `setAccessible`、不和将来的 JPMS 打架**"，不是"快 10 倍"。导出的瓶颈在 XML 序列化 + Deflate 压缩 + IO，属性访问占比不到 5%。这句话直接写在源码注释里（[MetaResolver.java:38](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/meta/MetaResolver.java:38)）——**框架文档里最值钱的往往是这种"我们没那么快"的自我拆穿**。
+> ⚠️ **诚实的性能账**：这条路径的真实价值是"**不用 `setAccessible`、不和将来的 JPMS 打架**"，不是"快 10 倍"。导出的瓶颈在 XML 序列化 + Deflate 压缩 + IO，属性访问占比不到 5%。这句话直接写在源码注释里（[MetaResolver.java:38](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/meta/MetaResolver.java:38)）——**框架文档里最值钱的往往是这种"我们没那么快"的自我拆穿**。
 
 ### 3.3 出工艺卡时顺手做的三道校验
 
 档案室不只是生成，还负责**在开工前把建模问题拦住**：
 
-1. **基本类型拦截**（[MetaResolver.java:164](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/meta/MetaResolver.java:164)）
-   `int stock` 和 `Integer stock` 在导入缺列时天差地别：包装类型得 `null`（"这一列没填"），基本类型被**静默赋 0**（"库存是 0"）。业务上完全不是一回事，而且悄无声息。所以 dev/test/local profile 下直接抛异常，让这个问题在 CI 就红；生产环境降级为 WARN（[SonicExcelConfiguration.java:29](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicExcelConfiguration.java:29)）。
+1. **基本类型拦截**（[MetaResolver.java:164](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/meta/MetaResolver.java:164)）
+   `int stock` 和 `Integer stock` 在导入缺列时天差地别：包装类型得 `null`（"这一列没填"），基本类型被**静默赋 0**（"库存是 0"）。业务上完全不是一回事，而且悄无声息。所以 dev/test/local profile 下直接抛异常，让这个问题在 CI 就红；生产环境降级为 WARN（[SonicExcelConfiguration.java:29](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicExcelConfiguration.java:29)）。
 
 2. **index 全有或全无**
    要么全不写（按声明顺序），要么全写且构成 `0..n-1` 的**连续序列**。允许空洞的话表头行会出现空单元格，而空标题在导入侧无法寻址——与其让它半坏，不如直接拒绝。
@@ -241,7 +241,7 @@ flowchart LR
 都失败     → 这一格才算坏了，扔残次品筐
 ```
 
-细节里的世故：千分位同时处理半角 `,` 和**全角 `，`**；布尔值认 `是/否/y/n/√/×/对/错`（[CellCoercion.java:42](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/CellCoercion.java:42)）。
+细节里的世故：千分位同时处理半角 `,` 和**全角 `，`**；布尔值认 `是/否/y/n/√/×/对/错`（[CellCoercion.java:42](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/CellCoercion.java:42)）。
 
 ### 4.2 定制清洗线：转换器
 
@@ -254,7 +254,7 @@ flowchart LR
 
 **底层知识**：
 
-- **Bean 优先、无参构造兜底**，这一条是 SonicExcel 相对阿里系唯一主动多做的设计。EasyExcel 的 Converter 靠反射无参构造实例化，**够不到 Spring 容器**——于是字典翻译只能一直手写在 service 里拼 VO。允许转换器是 Bean 之后，`@SonicTitle(converter = SonicDictConverter.class)` 才能真正把那段代码收走（[SonicConverterFactory.java:8](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/converter/SonicConverterFactory.java:8)）。
+- **Bean 优先、无参构造兜底**，这一条是 SonicExcel 相对阿里系唯一主动多做的设计。EasyExcel 的 Converter 靠反射无参构造实例化，**够不到 Spring 容器**——于是字典翻译只能一直手写在 service 里拼 VO。允许转换器是 Bean 之后，`@SonicTitle(converter = SonicDictConverter.class)` 才能真正把那段代码收走（[SonicConverterFactory.java:8](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/converter/SonicConverterFactory.java:8)）。
 - **转换器怎么拿到自己的参数**：实例是按类缓存的单例，参数不能存在实例字段里。所以 `SonicContext` 带上了 `AnnotatedElement element`——转换器从字段本身读 `@SonicDict("GOODS_PLACE")` 这类配置注解。注意**每个单元格都会访问一次**，所以转换器内部要自己按 element 缓存注解读取结果（`SonicDictConverter` 用了一个 `ConcurrentHashMap<AnnotatedElement, SonicDict>`）。
 - **反查为什么不能现算**：标签 → 码走 `DictService#getDictDataValueByLabel`，底层是独立缓存。**不能用 `getAll()` 现查**——那是直连 DB，等于每个单元格一次全表读。
 - **有歧义就报错，不猜**：同一字典下出现同名标签时直接抛异常。映射有歧义还硬映射，就是往库里写脏数据。
@@ -281,7 +281,7 @@ flowchart LR
 - **为什么必须熔断**：千万行全脏时，一行一条日志能把磁盘写满。
 - **初版设计里"warn 日志 + 跳过该行"这个唯一策略是不能接受的**：用户传 500 行、30 行被静默丢掉，界面只回一句"成功导入 470 条"，没人知道丢了谁。
 - **残次品筐要能拿回去看**：`SonicExcel.writeErrorReport()` 把错误清单导成一个 xlsx 回给用户。500 行里 30 行有问题，与其在页面上堆一段被截断的文字，不如给一个能直接打开、逐条对照修改的文件——**这是导入体验的最后一环**。
-- **写侧的一个精妙处**：`RowConverter` 先把整行的值**全部算出来再落笔**。因为一旦开始往输出流写，已写的单元格就撤不回来了——"某一列转换炸了要跳过整行"只有先算后写才成立（[RowConverter.java:19](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/RowConverter.java:19)）。同理，`SheetRoller#prepareRow()` **只返回行号、不消费行位**，所以跳过一行不会在文件里留下空行。
+- **写侧的一个精妙处**：`RowConverter` 先把整行的值**全部算出来再落笔**。因为一旦开始往输出流写，已写的单元格就撤不回来了——"某一列转换炸了要跳过整行"只有先算后写才成立（[RowConverter.java:19](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/RowConverter.java:19)）。同理，`SheetRoller#prepareRow()` **只返回行号、不消费行位**，所以跳过一行不会在文件里留下空行。
 
 ---
 
@@ -300,9 +300,9 @@ flowchart LR
 **底层知识**：
 
 - **record 是一等公民**。EasyExcel 读侧靠无参构造 + setter 注入，**record 根本用不了**。SonicExcel 走 canonical 构造器，所以导入 DTO 可以是 record——而导入 DTO 本来就该是不可变的。
-- **注解要标两个地方找**：`@SonicTitle` 的 `@Target` 必须同时包含 `FIELD` 和 `RECORD_COMPONENT`。只写 `FIELD` 的话，注解能否从 record 组件传播到合成字段是有条件的，解析端就得绕道 `getDeclaringRecord().getDeclaredField(name)`。一次写对，省掉一堆边界（[SonicTitle.java:20](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/annotation/SonicTitle.java:20)）。
+- **注解要标两个地方找**：`@SonicTitle` 的 `@Target` 必须同时包含 `FIELD` 和 `RECORD_COMPONENT`。只写 `FIELD` 的话，注解能否从 record 组件传播到合成字段是有条件的，解析端就得绕道 `getDeclaringRecord().getDeclaredField(name)`。一次写对，省掉一堆边界（[SonicTitle.java:20](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/annotation/SonicTitle.java:20)）。
 - **record 装罐前要先铺默认值**：`componentTypes` 必须完整带上，因为**没被 `@SonicTitle` 标注的组件也得填值**，而基本类型组件填 `null` 会让 `invokeWithArguments` 直接 NPE。
-- **结构性问题在开读之前就报**：`RowMapper` 构造时就检查"POJO 少 setter""类没有无参构造"。不能等读到第 5000 行才每行抛一次一模一样的异常（[RowMapper.java:30](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/RowMapper.java:30)）。
+- **结构性问题在开读之前就报**：`RowMapper` 构造时就检查"POJO 少 setter""类没有无参构造"。不能等读到第 5000 行才每行抛一次一模一样的异常（[RowMapper.java:30](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/RowMapper.java:30)）。
 - **越界不算错**：`Row#getCell(int)` 在行比请求下标短时会抛 `IndexOutOfBounds`，而"最后几列全空所以这一行根本没那么多单元格"**是 xlsx 里最普通不过的形态**。所以统一走 `cellAt()`，越界返回 null。
 - **空行必须过滤**：Excel 里被选中过、设过格式的行会以"看起来是空的"形态存在，成千上万行。不滤掉就会出现"导入了 3 条却提示处理了 5000 行"。
 
@@ -340,7 +340,7 @@ fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**。不处理的话中�
   └─ 没满但要 flush / finish 了 → 强制落
 ```
 
-采样上限（100）**必须远小于 flushEvery（1000）**，否则第一批还没采完就已经写出去了。这两个常量之间存在的是**隐式耦合**，改任何一个都要回头看另一个（[ColumnWidths.java:26](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/ColumnWidths.java:26)）。
+采样上限（100）**必须远小于 flushEvery（1000）**，否则第一批还没采完就已经写出去了。这两个常量之间存在的是**隐式耦合**，改任何一个都要回头看另一个（[ColumnWidths.java:26](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/ColumnWidths.java:26)）。
 
 中文按 2 个字符宽计算（`charAt(i) > 0xFF`）。自动估算的宽度会加 2 的余量并钳制在 `[8, 60]`；但**显式写了 `@SonicTitle(width=12)` 就原样是 12，既不补余量也不钳制**——用户明确指定的东西被框架偷偷改掉，是最难排查的那类问题。
 
@@ -371,7 +371,7 @@ fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**。不处理的话中�
 - 本框架所有文本都写成 `inlineStr`，**Excel 对文本型单元格根本不做公式求值**，注入面在 xlsx 内几乎不存在。
 - 而默认开启会把 `+8613800000000` 这类**合法手机号**改成 `'+8613800000000`。
 
-结论：**用确定发生的数据污染，换取几乎不存在的收益，是负收益**。真要防"用户另存为 CSV 再打开"的场景时，显式打开它（[SonicSheetBuilder.java:108](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/SonicSheetBuilder.java:108)）。
+结论：**用确定发生的数据污染，换取几乎不存在的收益，是负收益**。真要防"用户另存为 CSV 再打开"的场景时，显式打开它（[SonicSheetBuilder.java:108](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/SonicSheetBuilder.java:108)）。
 
 ---
 
@@ -426,7 +426,7 @@ fastexcel 只有 `ws.width(col, w)`，**没有 auto-size**。不处理的话中�
 - **Java SPI（`META-INF/services`）是全局单例式的服务发现**：谁的 jar 在 classpath 里声明了实现，谁就赢。这是一种**隐式的、无声的全局副作用**——你只是加了一个 Excel 依赖，却改掉了整个 JVM 的 XML 解析器。这类问题在依赖升级时最常发生，且极难归因。
 - **为什么拨回 JDK 实现是安全的**：`fastexcel-reader` 自己有一个 `DefaultXMLInputFactory`，直接 `new com.fasterxml.aalto.stax.InputFactoryImpl()`，**压根不走 SPI**。所以把 SPI 拨回 JDK 不影响它自身的解析性能。
 - **落地方式是双层**：主路径是 JVM 参数（运维可见、可摘、可回滚），`SonicStaxIsolation` 只做兜底——**已经被外部设置过的属性不会被覆盖**。
-- ⚠️ **一个极易写错、且写错不会立刻暴露的地方**：`XMLEventFactory` 的 JDK 实现类在 **`.events.` 子包**下（`com.sun.xml.internal.stream.events.XMLEventFactoryImpl`），另外两个不在。写错了启动完全正常，要等某个组件**首次使用** `XMLEventFactory` 才抛 `FactoryConfigurationError`——典型的"上线三天后随机报错"（[SonicStaxIsolation.java:29](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicStaxIsolation.java:29)）。所以启动时会做自检并打日志。
+- ⚠️ **一个极易写错、且写错不会立刻暴露的地方**：`XMLEventFactory` 的 JDK 实现类在 **`.events.` 子包**下（`com.sun.xml.internal.stream.events.XMLEventFactoryImpl`），另外两个不在。写错了启动完全正常，要等某个组件**首次使用** `XMLEventFactory` 才抛 `FactoryConfigurationError`——典型的"上线三天后随机报错"（[SonicStaxIsolation.java:29](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicStaxIsolation.java:29)）。所以启动时会做自检并打日志。
 
 ---
 
@@ -579,20 +579,20 @@ SonicRowError(rowIndex=42, title="洋葱品种", rawValue="红皮", message="「
 
 | 工位 | 类 | 文件 |
 |---|---|---|
-| 🚧 大门保安 | `WorkbookGuard` | [read/WorkbookGuard.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/WorkbookGuard.java) |
-| 🧊 冷链月台 | `SonicTempFiles` / `SmartExcelUtil` | [SonicTempFiles.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicTempFiles.java) |
-| 🚛 收货调度室 | `HeaderMatcher` | [read/HeaderMatcher.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/HeaderMatcher.java) |
-| 🗂️ 工艺档案室 | `MetaResolver` → `SheetMeta` / `ColumnMeta` | [meta/MetaResolver.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/meta/MetaResolver.java) |
-| 🧽 通用清洗机 | `CellCoercion` | [read/CellCoercion.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/CellCoercion.java) |
-| 🧽 定制清洗机 | `SonicConverter` / `SonicConverterFactory` | [converter/](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/converter/SonicConverterFactory.java) |
-| 🗑️ 残次品筐 | `SonicErrorPolicy` / `SonicRowError` | [error/SonicErrorPolicy.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/error/SonicErrorPolicy.java) |
-| 🤖 装罐机 | `RowMapper` / `RowConstructor` | [read/RowMapper.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/read/RowMapper.java) |
-| 📦 发货仓 | `SheetRoller` / `ColumnWidths` | [write/SheetRoller.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/SheetRoller.java) |
-| 🏷️ 标签打印机 | `CellWriter` | [write/CellWriter.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/CellWriter.java) |
-| ✈️ 空运通道 | `SonicCsvWriter` | [write/SonicCsvWriter.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/SonicCsvWriter.java) |
-| 📋 空白订货单 | `SonicTemplateWriter` | [write/SonicTemplateWriter.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/write/SonicTemplateWriter.java) |
-| ⚡ 电力总闸 | `SonicStaxIsolation` | [SonicStaxIsolation.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicStaxIsolation.java) |
-| 🧹 值班表 | `SonicExcelConfiguration` | [SonicExcelConfiguration.java](smart-admin-api-java17-springboot3/sa-base/src/main/java/net/lab1024/sa/base/sonicexcel/SonicExcelConfiguration.java) |
+| 🚧 大门保安 | `WorkbookGuard` | [read/WorkbookGuard.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/WorkbookGuard.java) |
+| 🧊 冷链月台 | `SonicTempFiles` / `SmartExcelUtil` | [SonicTempFiles.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicTempFiles.java) |
+| 🚛 收货调度室 | `HeaderMatcher` | [read/HeaderMatcher.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/HeaderMatcher.java) |
+| 🗂️ 工艺档案室 | `MetaResolver` → `SheetMeta` / `ColumnMeta` | [meta/MetaResolver.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/meta/MetaResolver.java) |
+| 🧽 通用清洗机 | `CellCoercion` | [read/CellCoercion.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/CellCoercion.java) |
+| 🧽 定制清洗机 | `SonicConverter` / `SonicConverterFactory` | [converter/](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/converter/SonicConverterFactory.java) |
+| 🗑️ 残次品筐 | `SonicErrorPolicy` / `SonicRowError` | [error/SonicErrorPolicy.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/error/SonicErrorPolicy.java) |
+| 🤖 装罐机 | `RowMapper` / `RowConstructor` | [read/RowMapper.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/read/RowMapper.java) |
+| 📦 发货仓 | `SheetRoller` / `ColumnWidths` | [write/SheetRoller.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/SheetRoller.java) |
+| 🏷️ 标签打印机 | `CellWriter` | [write/CellWriter.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/CellWriter.java) |
+| ✈️ 空运通道 | `SonicCsvWriter` | [write/SonicCsvWriter.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/SonicCsvWriter.java) |
+| 📋 空白订货单 | `SonicTemplateWriter` | [write/SonicTemplateWriter.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/write/SonicTemplateWriter.java) |
+| ⚡ 电力总闸 | `SonicStaxIsolation` | [SonicStaxIsolation.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicStaxIsolation.java) |
+| 🧹 值班表 | `SonicExcelConfiguration` | [SonicExcelConfiguration.java](smart-admin-api/sa-base/src/main/java/sa/base/sonicexcel/SonicExcelConfiguration.java) |
 
 ## 附录 B · 关键常量一览
 

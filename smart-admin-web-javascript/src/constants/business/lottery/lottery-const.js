@@ -1,7 +1,7 @@
 /**
  * 彩票模块 枚举与常量
  *
- * 与后端 net.lab1024.sa.lottery.constant.LotteryConst 同源，改动时两边必须一起改。
+ * 与后端 sa.lottery.constant.LotteryConst 同源，改动时两边必须一起改。
  *
  * @Author:    alaric
  * @Date:      2026-07-27

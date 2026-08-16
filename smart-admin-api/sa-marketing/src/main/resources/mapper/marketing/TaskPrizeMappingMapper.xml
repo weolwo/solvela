@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.task.prizemapping.dao.TaskPrizeMappingDao">
+
+    <resultMap id="TaskPrizeMappingVO" type="sa.task.prizemapping.domain.vo.TaskPrizeMappingVO">
+            <result column="id" property="id" />
+            <result column="task_config_id" property="taskConfigId" />
+            <result column="activity_code" property="activityCode" />
+            <result column="task_name" property="taskName" />
+            <result column="task_status" property="taskStatus" />
+            <result column="stage_condition" property="stageCondition" />
+            <result column="stage_level" property="stageLevel" />
+            <result column="prize_code" property="prizeCode" />
+            <result column="prize_name" property="prizeName" />
+            <result column="prize_mode" property="prizeMode" />
+            <result column="prize_strategy" property="prizeStrategy" />
+    </resultMap>
+
+    <!--
+      三表关系：
+        m JOIN tc    子表必然挂在某个任务下；主表没了这条子表就是脏数据，INNER JOIN 正好把它挡在列表外
+        m LEFT JOIN pc  按「活动 + 奖励编码」匹配，与运行态 PrizeConfigService.getByActivityCodeAndPrizeCode
+                        完全同一口径 —— 这里匹配不到，运行态派奖时也一定匹配不到（会静默跳过这一档），
+                        所以 prize_name 为空就是一条待修的配置。t_prize_config 上 prize_code 全局唯一，
+                        LEFT JOIN 至多带出一行，不会把列表撑出重复。
+    -->
+    <sql id="base_from">
+        FROM t_task_prize_mapping m
+        INNER JOIN t_task_config tc ON tc.id = m.task_config_id
+        LEFT JOIN t_prize_config pc ON pc.activity_code = tc.activity_code AND pc.prize_code = m.prize_code
+    </sql>
+
+    <sql id="base_columns">
+                m.id,
+                m.task_config_id,
+                tc.activity_code,
+                tc.task_name,
+                tc.status AS task_status,
+                m.stage_condition,
+                m.stage_level,
+                m.prize_code,
+                pc.prize_name,
+                m.prize_mode,
+                m.prize_strategy
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.activityCode != null and queryForm.activityCode != ''">
+                            AND tc.activity_code = #{queryForm.activityCode}
+                        </if>
+                        <if test="queryForm.taskName != null and queryForm.taskName != ''">
+                            AND tc.task_name LIKE CONCAT('%', #{queryForm.taskName}, '%')
+                        </if>
+                        <if test="queryForm.taskStatus != null">
+                            AND tc.status = #{queryForm.taskStatus}
+                        </if>
+                        <if test="queryForm.taskConfigId != null">
+                            AND m.task_config_id = #{queryForm.taskConfigId}
+                        </if>
+                        <if test="queryForm.prizeCode != null and queryForm.prizeCode != ''">
+                            AND m.prize_code = #{queryForm.prizeCode}
+                        </if>
+        </where>
+    </sql>
+
+    <!--
+      排序按「任务 + 阶梯」而不是 create_time：同一批阶梯是 insertBatch 进去的，create_time 完全相同，
+      按时间排的话 1/2/3 档在结果集里的先后是不确定的 —— 对一个用来看配置的页面，这是硬伤。
+    -->
+    <sql id="base_order">
+        ORDER BY tc.activity_code, m.task_config_id, m.stage_level
+    </sql>
+
+    <select id="queryPage" resultMap="TaskPrizeMappingVO">
+        SELECT
+        <include refid="base_columns"/>
+        <include refid="base_from"/>
+        <include refid="query_conditions"/>
+        <include refid="base_order"/>
+    </select>
+
+    <select id="queryList" resultMap="TaskPrizeMappingVO">
+        SELECT
+        <include refid="base_columns"/>
+        <include refid="base_from"/>
+        <include refid="query_conditions"/>
+        <include refid="base_order"/>
+    </select>
+
+</mapper>

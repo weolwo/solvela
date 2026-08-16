@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.task.tasktemplate.dao.TaskTemplateDao">
+
+    <resultMap id="TaskTemplateVO" type="sa.task.tasktemplate.domain.vo.TaskTemplateVO">
+            <result column="id" property="id" />
+            <result column="tenant_id" property="tenantId" />
+            <result column="template_code" property="templateCode" />
+            <result column="template_name" property="templateName" />
+            <result column="task_type" property="taskType" />
+            <result column="trigger_event" property="triggerEvent" />
+            <result column="ui_schema" property="uiSchema" />
+            <result column="rule_script" property="ruleScript" />
+            <result column="status" property="status" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                tenant_id, 
+                template_code, 
+                template_name, 
+                task_type,
+                trigger_event,
+                ui_schema,
+                rule_script, 
+                status,
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.tenantId != null">
+                            AND tenant_id = #{queryForm.tenantId}
+                        </if>
+                        <if test="queryForm.templateCode != null">
+                            AND template_code = #{queryForm.templateCode}
+                        </if>
+                        <if test="queryForm.templateName != null">
+                            AND template_name = #{queryForm.templateName}
+                        </if>
+                        <if test="queryForm.taskType != null">
+                            AND task_type = #{queryForm.taskType}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <if test="queryForm.createTimeEnd != null">
+                            AND create_time &lt;= #{queryForm.createTimeEnd}
+                        </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="TaskTemplateVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_task_template
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="TaskTemplateVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_task_template
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+                <delete id="batchDelete">
+                    delete from t_task_template
+                    where id in
+                    <foreach collection="idList" open="(" close=")" separator="," item="item">
+                        #{item}
+                    </foreach>
+                </delete>
+                <delete id="deleteById">
+                    delete from t_task_template
+                        where id = #{id}
+                </delete>
+
+</mapper>

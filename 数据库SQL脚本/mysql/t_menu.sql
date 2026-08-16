@@ -11,7 +11,7 @@
  Target Server Version : 80408 (8.4.8)
  File Encoding         : 65001
 
- Date: 15/08/2026 23:15:58
+ Date: 16/08/2026 13:33:59
 */
 
 SET NAMES utf8mb4;
@@ -265,7 +265,7 @@ INSERT INTO `t_menu` VALUES (376, '删除', 3, 372, NULL, NULL, NULL, 1, 'activi
 INSERT INTO `t_menu` VALUES (377, '奖品配置', 2, 0, NULL, '/activity/prize-config/list', '/business/activity/prize-config/prize-config-list.vue', 1, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, 0, 1, 1, '2026-04-18 12:13:29', 1, '2026-04-18 12:14:47');
 INSERT INTO `t_menu` VALUES (378, '任务奖励', 2, 319, 9, '/prize/task-prize-mapping/list', '/business/prize/task-prize-mapping/task-prize-mapping-list.vue', 1, NULL, NULL, 'BankOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 12:46:22', 1, '2026-04-18 12:50:14');
 INSERT INTO `t_menu` VALUES (379, '查询', 3, 378, NULL, NULL, NULL, 1, 'taskPrizeMapping:query', 'taskPrizeMapping:query', NULL, 378, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 12:46:23', NULL, '2026-04-18 12:46:23');
-INSERT INTO `t_menu` VALUES (383, '提案表', 2, 371, 1, '/risk/proposal-record/list', '/business/risk/proposal-record/proposal-record-list.vue', 1, NULL, NULL, 'BarsOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 15:20:56', 1, '2026-04-18 15:21:44');
+INSERT INTO `t_menu` VALUES (383, '提案记录', 2, 371, 1, '/risk/proposal-record/list', '/business/risk/proposal-record/proposal-record-list.vue', 1, NULL, NULL, 'BarsOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 15:20:56', 1, '2026-08-16 13:08:45');
 INSERT INTO `t_menu` VALUES (384, '查询', 3, 383, NULL, NULL, NULL, 1, 'proposalRecord:query', 'proposalRecord:query', NULL, 383, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 15:20:56', NULL, '2026-04-18 15:20:56');
 INSERT INTO `t_menu` VALUES (385, '添加', 3, 383, NULL, NULL, NULL, 1, 'proposalRecord:add', 'proposalRecord:add', NULL, 383, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 15:20:56', NULL, '2026-04-18 15:20:56');
 INSERT INTO `t_menu` VALUES (386, '更新', 3, 383, NULL, NULL, NULL, 1, 'proposalRecord:update', 'proposalRecord:update', NULL, 383, 0, NULL, 0, 1, 0, 0, 1, '2026-04-18 15:20:56', NULL, '2026-04-18 15:20:56');
@@ -279,17 +279,17 @@ INSERT INTO `t_menu` VALUES (396, '查询', 3, 395, NULL, NULL, NULL, 1, 'prizeP
 INSERT INTO `t_menu` VALUES (398, '更新', 3, 395, NULL, NULL, NULL, 1, 'prizePoolConfig:update', 'prizePoolConfig:update', NULL, 395, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 01:50:10', NULL, '2026-04-19 01:50:10');
 INSERT INTO `t_menu` VALUES (400, '奖池奖项', 2, 393, 7, '/draw/prize-pool-item/list', '/business/draw/prize-pool-item/prize-pool-item-list.vue', 1, NULL, NULL, 'BarsOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 01:56:55', 1, '2026-04-19 02:05:44');
 INSERT INTO `t_menu` VALUES (401, '查询', 3, 400, NULL, NULL, NULL, 1, 'prizePoolItem:query', 'prizePoolItem:query', NULL, 400, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 01:56:55', NULL, '2026-04-19 01:56:55');
-INSERT INTO `t_menu` VALUES (405, '奖池奖项映射', 2, 393, 7, '/draw/pool-prize-mapping/list', '/business/draw/pool-prize-mapping/pool-prize-mapping-list.vue', 1, NULL, NULL, 'DatabaseOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 02:09:02', 1, '2026-04-19 02:09:33');
+INSERT INTO `t_menu` VALUES (405, '奖池奖项巡检', 2, 393, 7, '/draw/pool-prize-mapping/list', '/business/draw/pool-prize-mapping/pool-prize-mapping-list.vue', 1, NULL, NULL, 'DatabaseOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 02:09:02', 1, '2026-08-16 12:51:59');
 INSERT INTO `t_menu` VALUES (406, '查询', 3, 405, NULL, NULL, NULL, 1, 'poolPrizeMapping:query', 'poolPrizeMapping:query', NULL, 405, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 02:09:02', NULL, '2026-04-19 02:09:02');
 INSERT INTO `t_menu` VALUES (410, '彩票配置', 2, 394, 0, '/lottery/lottery-config/list', '/business/lottery/lottery-config/lottery-config-list.vue', 1, NULL, NULL, 'AntDesignOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:19:12', 1, '2026-04-19 03:22:32');
 INSERT INTO `t_menu` VALUES (411, '查询', 3, 410, NULL, NULL, NULL, 1, 'lotteryConfig:query', 'lotteryConfig:query', NULL, 410, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:19:12', NULL, '2026-04-19 03:19:12');
 INSERT INTO `t_menu` VALUES (413, '更新', 3, 410, NULL, NULL, NULL, 1, 'lotteryConfig:update', 'lotteryConfig:update', NULL, 410, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:19:12', NULL, '2026-04-19 03:19:12');
-INSERT INTO `t_menu` VALUES (415, '期号配置', 2, 394, 2, '/lottery/lottery-issue/list', '/business/lottery/lottery-issue/lottery-issue-list.vue', 1, NULL, NULL, 'FieldNumberOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:28:57', 1, '2026-04-19 03:30:23');
+INSERT INTO `t_menu` VALUES (415, '期号巡检', 2, 394, 2, '/lottery/lottery-issue/list', '/business/lottery/lottery-issue/lottery-issue-list.vue', 1, NULL, NULL, 'FieldNumberOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:28:57', 1, '2026-08-15 23:42:46');
 INSERT INTO `t_menu` VALUES (416, '查询', 3, 415, NULL, NULL, NULL, 1, 'lotteryIssue:query', 'lotteryIssue:query', NULL, 415, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:28:57', NULL, '2026-04-19 03:28:57');
 INSERT INTO `t_menu` VALUES (417, '添加', 3, 415, NULL, NULL, NULL, 1, 'lotteryIssue:add', 'lotteryIssue:add', NULL, 415, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:28:57', NULL, '2026-04-19 03:28:57');
 INSERT INTO `t_menu` VALUES (418, '更新', 3, 415, NULL, NULL, NULL, 1, 'lotteryIssue:update', 'lotteryIssue:update', NULL, 415, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:28:57', NULL, '2026-04-19 03:28:57');
 INSERT INTO `t_menu` VALUES (419, '删除', 3, 415, NULL, NULL, NULL, 1, 'lotteryIssue:delete', 'lotteryIssue:delete', NULL, 415, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:28:57', NULL, '2026-04-19 03:28:57');
-INSERT INTO `t_menu` VALUES (425, '彩票奖励配置', 2, 394, 4, '/lottery/lottery-prize-rule/list', '/business/lottery/lottery-prize-rule/lottery-prize-rule-list.vue', 1, NULL, NULL, 'CloudServerOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:52:47', 1, '2026-04-19 03:56:08');
+INSERT INTO `t_menu` VALUES (425, '彩票奖励分析', 2, 394, 4, '/lottery/lottery-prize-rule/list', '/business/lottery/lottery-prize-rule/lottery-prize-rule-list.vue', 1, NULL, NULL, 'CloudServerOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:52:47', 1, '2026-08-16 07:39:03');
 INSERT INTO `t_menu` VALUES (426, '查询', 3, 425, NULL, NULL, NULL, 1, 'lotteryPrizeRule:query', 'lotteryPrizeRule:query', NULL, 425, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 03:52:47', NULL, '2026-04-19 03:52:47');
 INSERT INTO `t_menu` VALUES (430, '用户号码记录', 2, 394, 8, '/lottery/lottery-record/list', '/business/lottery/lottery-record/lottery-record-list.vue', 1, NULL, NULL, 'BarsOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 04:00:02', 1, '2026-04-19 04:09:27');
 INSERT INTO `t_menu` VALUES (431, '查询', 3, 430, NULL, NULL, NULL, 1, 'lotteryRecord:query', 'lotteryRecord:query', NULL, 430, 0, NULL, 0, 1, 0, 0, 1, '2026-04-19 04:00:02', NULL, '2026-04-19 04:00:02');

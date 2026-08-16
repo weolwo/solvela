@@ -1,0 +1,36 @@
+package sa.ledger.wallet.domain.form;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import java.math.BigDecimal;
+import lombok.Data;
+
+/**
+ * 会员钱包表 新建表单
+ *
+ * @Author weolwo
+ * @Date 2026-04-18 23:56:48
+ * @Copyright weolwo
+ */
+
+@Data
+public class MemberWalletAddForm {
+
+    @Schema(description = "租户ID，不传落库取默认值 '0'")
+    private String tenantId;
+
+    @Schema(description = "会员名", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "会员名 不能为空")
+    private String memberName;
+
+    @Schema(description = "资产类型：SCORE-积分, BALANCE-现金", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "资产类型 不能为空")
+    private String assetType;
+
+    @Schema(description = "余额")
+    private BigDecimal balance;
+
+    @Schema(description = "乐观锁版本号")
+    private Integer version;
+
+}

@@ -1,0 +1,214 @@
+spring:
+  # 数据库连接信息
+  datasource:
+    url: jdbc:p6spy:mysql://127.0.0.1:3306/smart_admin_v3?autoReconnect=true&useServerPreparedStmts=false&rewriteBatchedStatements=true&characterEncoding=UTF-8&useSSL=false&allowMultiQueries=true&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
+    username: root
+    password: SmartAdmin666
+    driver-class-name: com.p6spy.engine.spy.P6SpyDriver
+    initial-size: 2
+    min-idle: 2
+    max-active: 10
+    max-wait: 60000
+    time-between-eviction-runs-millis: 60000
+    min-evictable-idle-time-millis: 300000
+    filters: stat
+    druid:
+      username: druid
+      password: 1024
+      login:
+        enabled: false
+      method:
+        pointcut: sa..*Service.*
+
+  # redis 连接池配置信息
+  data:
+    redis:
+      database: 1
+      host: 127.0.0.1
+      port: 6379
+      # ⚠️ 这里原本有一行空的 `password:`。Redisson 3 会把空串当成"没有密码"，
+      #    Redisson 4 不再做这个宽容处理，照样发 AUTH，对无密码的 Redis 直接报
+      #    `ERR Client sent AUTH, but no password is set` 而启动失败。
+      #    没有密码就不要留这个键；有密码时正常填即可。
+      timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 5
+          min-idle: 1
+          max-idle: 3
+          max-wait: 30000ms
+
+  # 邮件，置以SSL的方式发送, 这个需要使用这种方式并且端口是465
+  mail:
+    host: smtp.163.com
+    port: 465
+    username: lab1024@163.com
+    password: LAB1024LAB
+    test-connection: false
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            socketFactory:
+              class: com.sun.mail.util.MailSSLSocketFactory
+              fallback: false
+        debug: false
+
+  # json序列化相关配置
+  jackson:
+    # ⚠️ Jackson 3 把枚举/日期相关的开关从 Serialization/DeserializationFeature 拆到了
+    #    EnumFeature 与 DateTimeFeature，Spring Boot 4 对应挪到 spring.jackson.datatype.* 下。
+    #    还留在老位置会在启动时直接绑定失败（No enum constant ...），不是运行期才暴露。
+    datatype:
+      enum:
+        write-enums-using-to-string: true
+        read-enums-using-to-string: true
+      datetime:
+        write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: always
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+  # 上传文件和请求大小
+  servlet:
+    multipart:
+      max-file-size: 20MB # 单个文件的最大大小
+      max-request-size: 10MB # 整个请求的最大大小
+
+  # 缓存实现类型
+  cache:
+    type: redis
+
+# 健康检查
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    mail:
+      enabled: false
+
+# tomcat 配置，主要用于 配置 访问日志（便于将来排查错误）
+server:
+  tomcat:
+    basedir: ${project.log-directory}/tomcat-logs
+    accesslog:
+      enabled: true
+      max-days: 7
+      pattern: "%t %{X-Forwarded-For}i %a %r %s (%D ms) %I (%B byte)"
+
+# 文件上传 配置
+file:
+  storage:
+    mode: local
+    # 公开文件的 URL 前缀，见 dev 的说明。本地模式填 http(s)://<后端域名>/support/file/public/，
+    # 上了 CDN 就填 CDN 域名。**这里刻意留空而不是写占位符**：占位符只会拼出一个打不开的 URL，
+    # 而留空会稳稳退回登录态下载接口，管理端照常可用，C 端图不显示 —— 后者一眼就能发现。
+    # public-url-prefix:
+    local:
+      upload-path: /home/smart_admin_v3/upload/   #文件上传目录
+      url-prefix:
+    cloud:
+      region: oss-cn-hangzhou
+      endpoint: https://oss-cn-hangzhou.aliyuncs.com
+      bucket-name: 1024lab-smart-admin
+      access-key:
+      secret-key:
+      private-url-expire-seconds: 3600
+      # 云计算厂商支持公开的文件访问模式；minio默认是不支持的，对于minio用户可以配置为空
+      public-url-prefix: https://1024lab-smart-admin.oss-cn-hangzhou.aliyuncs.com/
+
+# open api配置
+springdoc:
+  swagger-ui:
+    enabled: true # 开关
+    doc-expansion: none  #关闭展开
+    tags-sorter: alpha
+    server-base-url:
+  api-docs:
+    enabled: true # 开关
+knife4j:
+  enable: true
+  basic:
+    enable: false
+    username: api # Basic认证用户名
+    password: 1024 # Basic认证密码
+
+# RestTemplate 请求配置 毫秒
+http:
+  pool:
+    max-total: 20
+    connect-timeout: 50000
+    read-timeout: 50000
+    write-timeout: 50000
+    keep-alive: 300000
+
+# 跨域配置
+access-control-allow-origin: '*'
+
+# 心跳配置
+heart-beat:
+  interval-seconds: 300
+
+# 热加载配置
+reload:
+  interval-seconds: 300
+
+# sa-token 配置
+sa-token:
+  # token 名称（同时也是 cookie 名称）
+  token-name: Authorization
+  # token 前缀 例如:Bearer
+  token-prefix: Bearer
+  # token 有效期（单位：秒） 默认30天（2592000秒），-1 代表永久有效
+  timeout: 2592000
+  # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
+  active-timeout: -1
+  # 是否允许同一账号多地同时登录 （为 true 时允许一起登录, 为 false 时新登录挤掉旧登录）
+  is-concurrent: false
+  # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token, 为 false 时每次登录新建一个 token）(jwt模式下恒false)
+  is-share: false
+  # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）(jwt模式下无用)
+  token-style: simple-uuid
+  # 是否打开自动续签 （如果此值为true，框架会在每次直接或间接调用 getLoginId() 时进行一次过期检查与续签操作）
+  auto-renew: true
+  # 是否输出操作日志
+  is-log: true
+  # 日志等级（trace、debug、info、warn、error、fatal）
+  log-level: debug
+  # 启动时的字符画打印
+  is-print: false
+  # 是否从cookie读取token
+  is-read-cookie: false
+
+# SmartJob 定时任务配置(不需要可以直接删除以下配置，详细文档请看：https://www.xxxxxx.com)
+smart:
+  job:
+    enabled: true
+    # 任务初始化延迟 默认30秒 可选
+    init-delay: 10
+    # 定时任务执行线程池数量 默认2 可选
+    core-pool-size: 2
+    # 数据库配置检测-开关 默认开启 可选（作用是固定间隔读取数据库配置更新任务，关闭后只能重启服务或通过接口修改定时任务，建议开启）
+    db-refresh-enabled: true
+    # 数据库配置检测-执行间隔 默认120秒 可选
+    db-refresh-interval: 60
+
+# 彩票中台 —— 部署本环境前必须放开下面的配置
+#
+# FPE 发号主密钥，派生规则 key = HMAC-SHA256(master-secret, lotteryCode + "|" + issueNo)。
+# 刻意留成注释而不是写 ${LOTTERY_FPE_MASTER_SECRET} 占位：占位符在环境变量缺失时会让应用直接启不来，
+# 而彩票只是众多模块之一，不该由它决定整个后台能不能起。
+# 未配置时的表现是「领号/开奖接口报『FPE 主密钥未配置』」，指向明确，不会静默出错。
+#
+# ⚠️ 一旦有期号发过号，本值不可再变更：号码是游标经 FPE 加密得来的，
+#    换密钥会让已发号码反解失效，且新号码可能与历史号码重复。
+#
+# lottery:
+#   fpe:
+#     master-secret: ${LOTTERY_FPE_MASTER_SECRET}

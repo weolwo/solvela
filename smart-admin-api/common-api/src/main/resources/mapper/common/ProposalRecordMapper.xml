@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.risk.proposal.dao.ProposalRecordDao">
+
+    <resultMap id="ProposalRecordVO" type="sa.risk.proposal.domain.vo.ProposalRecordVO">
+            <result column="id" property="id" />
+            <result column="tenant_id" property="tenantId" />
+            <result column="trade_no" property="tradeNo" />
+            <result column="member_name" property="memberName" />
+            <result column="asset_type" property="assetType" />
+            <result column="asset_ref" property="assetRef" />
+            <result column="asset_name" property="assetName" />
+            <result column="amount" property="amount" />
+            <result column="quantity" property="quantity" />
+            <result column="source_type" property="sourceType" />
+            <result column="source_biz_id" property="sourceBizId" />
+            <result column="promotion_config_id" property="promotionConfigId" />
+            <result column="status" property="status" />
+            <result column="remark" property="remark" />
+            <result column="risk_code" property="riskCode" />
+            <result column="first_reviewer" property="firstReviewer" />
+            <result column="first_review_time" property="firstReviewTime" />
+            <result column="second_reviewer" property="secondReviewer" />
+            <result column="second_review_time" property="secondReviewTime" />
+            <result column="review_comment" property="reviewComment" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                tenant_id, 
+                trade_no, 
+                member_name, 
+                asset_type, 
+                asset_ref,
+                asset_name,
+                amount,
+                quantity, 
+                source_type, 
+                source_biz_id, 
+                promotion_config_id, 
+                status,
+                remark,
+                risk_code,
+                first_reviewer,
+                first_review_time, 
+                second_reviewer, 
+                second_review_time, 
+                review_comment, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.tenantId != null">
+                            AND tenant_id = #{queryForm.tenantId}
+                        </if>
+                        <if test="queryForm.memberName != null">
+                            AND member_name = #{queryForm.memberName}
+                        </if>
+                        <if test="queryForm.updateTimeBegin != null">
+                            AND update_time &gt;= #{queryForm.updateTimeBegin}
+                        </if>
+                        <if test="queryForm.updateTimeEnd != null">
+                            AND update_time &lt;= #{queryForm.updateTimeEnd}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <if test="queryForm.createTimeEnd != null">
+                            AND create_time &lt;= #{queryForm.createTimeEnd}
+                        </if>
+                        <if test="queryForm.promotionConfigId != null">
+                            AND promotion_config_id = #{queryForm.promotionConfigId}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.sourceType != null">
+                            AND source_type = #{queryForm.sourceType}
+                        </if>
+                        <if test="queryForm.sourceBizId != null">
+                            AND source_biz_id = #{queryForm.sourceBizId}
+                        </if>
+                        <if test="queryForm.firstReviewer != null">
+                            AND first_reviewer = #{queryForm.firstReviewer}
+                        </if>
+                        <if test="queryForm.tradeNo != null">
+                            AND trade_no = #{queryForm.tradeNo}
+                        </if>
+                        <if test="queryForm.assetType != null">
+                            AND asset_type = #{queryForm.assetType}
+                        </if>
+        </where>
+    </sql>
+
+    <!--
+        漏斗统计的筛选条件：与列表共用同一批条件，但<b>刻意不吃 status</b> ——
+        它正是漏斗要拆解的维度，跟着筛，点「只看成功」之后到账率会变成 100%，
+        几个数字互相之间就没法对照了。
+        assetType / sourceType / promotionConfigId 这些是正经的切片维度，照常生效。
+
+        ⚠️ 不套 &lt;where&gt;，只给裸条件片段：拦截原因那条查询还要在同一个 &lt;where&gt; 里
+        追加 status=80，本片段自带 &lt;where&gt; 会让追加的条件落在外面，
+        而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
+    -->
+    <sql id="funnel_conditions">
+        <if test="queryForm.tenantId != null">
+            AND tenant_id = #{queryForm.tenantId}
+        </if>
+        <if test="queryForm.memberName != null">
+            AND member_name = #{queryForm.memberName}
+        </if>
+        <if test="queryForm.updateTimeBegin != null">
+            AND update_time &gt;= #{queryForm.updateTimeBegin}
+        </if>
+        <if test="queryForm.updateTimeEnd != null">
+            AND update_time &lt;= #{queryForm.updateTimeEnd}
+        </if>
+        <if test="queryForm.createTimeBegin != null">
+            AND create_time &gt;= #{queryForm.createTimeBegin}
+        </if>
+        <if test="queryForm.createTimeEnd != null">
+            AND create_time &lt;= #{queryForm.createTimeEnd}
+        </if>
+        <if test="queryForm.promotionConfigId != null">
+            AND promotion_config_id = #{queryForm.promotionConfigId}
+        </if>
+        <if test="queryForm.sourceType != null">
+            AND source_type = #{queryForm.sourceType}
+        </if>
+        <if test="queryForm.sourceBizId != null">
+            AND source_biz_id = #{queryForm.sourceBizId}
+        </if>
+        <if test="queryForm.firstReviewer != null">
+            AND first_reviewer = #{queryForm.firstReviewer}
+        </if>
+        <if test="queryForm.tradeNo != null">
+            AND trade_no = #{queryForm.tradeNo}
+        </if>
+        <if test="queryForm.assetType != null">
+            AND asset_type = #{queryForm.assetType}
+        </if>
+    </sql>
+
+    <!--
+        漏斗计数 + 审批积压 + 下发卡单 + 一致性体检，一次扫表算完。
+        不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+        出现「分项加起来不等于总数」这种自相矛盾。
+
+        三个最该被盯住的数字：
+          - pendingReviewOldestMinutes：最久的一条待审已经等了多久。只看条数看不出「压了三天」，
+            而提案压在审批池里，对用户就是「奖没发」；
+          - stuckDispatchCount        ：卡在 30-待执行 / 40-执行中 且 30 分钟没动过。下发是在提案
+            事务提交后同步调起的，进程中途退出就没有第二次机会，而全工程没有任何重试/补偿的
+            定时任务 —— 这些提案会永远停在半路，钱既没发出去也没标成失败；
+          - sameReviewerCount        ：一审二审同一个人。审批接口不校验两级审批人是否同一人，
+            双层审批一旦变成同一个人点两次，这道防线就只是形式。
+
+        另外两个是流程体检：
+          - rejectNoCommentCount ：驳回却没写理由，事后说不清为什么不给这个人发；
+          - reviewerNoTimeCount  ：有审批人却没有审批时间。updateReview 是同一条 SQL 同时写这两个
+            字段的，正常不可能只有一半 —— 出现即说明这行被人工改过（本页的「编辑」按钮
+            对这张财务审批表是全字段可写的）。
+    -->
+    <select id="selectFunnel" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                   AS totalCount,
+            COUNT(DISTINCT member_name)                                AS memberCount,
+            COALESCE(SUM(status = 0), 0)                               AS waitingCount,
+            COALESCE(SUM(status = 10), 0)                              AS firstReviewCount,
+            COALESCE(SUM(status = 11), 0)                              AS secondReviewCount,
+            COALESCE(SUM(status = 20), 0)                              AS rejectedCount,
+            COALESCE(SUM(status = 30), 0)                              AS pendingExecuteCount,
+            COALESCE(SUM(status = 40), 0)                              AS executingCount,
+            COALESCE(SUM(status = 50), 0)                              AS successCount,
+            COALESCE(SUM(status = 60), 0)                              AS partialCount,
+            COALESCE(SUM(status = 70), 0)                              AS failedCount,
+            COALESCE(SUM(status = 80), 0)                              AS blockedCount,
+            COALESCE(TIMESTAMPDIFF(MINUTE,
+                     MIN(CASE WHEN status IN (10, 11) THEN create_time END), now()), 0) AS pendingReviewOldestMinutes,
+            COALESCE(SUM(status IN (30, 40)
+                     AND update_time &lt; DATE_SUB(now(), INTERVAL 30 MINUTE)), 0)      AS stuckDispatchCount,
+            COALESCE(SUM(second_reviewer IS NOT NULL
+                     AND second_reviewer = first_reviewer), 0)         AS sameReviewerCount,
+            COALESCE(SUM(status = 20
+                     AND (review_comment IS NULL OR review_comment = '')), 0)         AS rejectNoCommentCount,
+            COALESCE(SUM((first_reviewer IS NOT NULL AND first_review_time IS NULL)
+                      OR (second_reviewer IS NOT NULL AND second_review_time IS NULL)), 0) AS reviewerNoTimeCount
+        FROM t_proposal_record
+        <where><include refid="funnel_conditions"/></where>
+    </select>
+
+    <!--
+        按资产类型汇总。⚠️ 金额必须按 asset_type 分组：积分、现金、券张数、实物件数
+        不是同一个量纲，合成一个「总金额」的那个数字没有任何含义。
+        单条价值 = amount × quantity（quantity 就是扣 used_quota 的那个数量）。
+    -->
+    <select id="selectAssetStat" resultType="java.util.Map">
+        SELECT asset_type                                                        AS assetType,
+               COUNT(*)                                                          AS proposalCount,
+               COALESCE(SUM(status = 50), 0)                                     AS successCount,
+               COALESCE(SUM(CASE WHEN status = 50 THEN amount * quantity END), 0) AS successAmount,
+               COALESCE(SUM(CASE WHEN status IN (10, 11, 30, 40) THEN amount * quantity END), 0) AS pendingAmount,
+               COALESCE(SUM(CASE WHEN status = 80 THEN amount * quantity END), 0) AS blockedAmount
+        FROM t_proposal_record
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY asset_type
+        ORDER BY proposalCount DESC
+    </select>
+
+    <!-- 按来源汇总：哪种玩法在花钱、哪种玩法的奖最容易发不出去 -->
+    <select id="selectSourceStat" resultType="java.util.Map">
+        SELECT source_type                   AS sourceType,
+               COUNT(*)                      AS proposalCount,
+               COALESCE(SUM(status = 50), 0) AS successCount
+        FROM t_proposal_record
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY source_type
+        ORDER BY proposalCount DESC
+    </select>
+
+    <!--
+        风控拦截原因分布，按 risk_code（v3.68.0 新增）聚类 —— 取值封闭，
+        改拦截话术不会再让统计悄悄裂成两条。与 t_task_record_flow.discard_code 同款做法。
+
+        sampleRemark 取同组里的一条原文：risk_code 归不了类的历史行（回填规则没覆盖到的文案）
+        只有原文可读，前端展示的就是它。用 MIN() 而不是 GROUP_CONCAT —— 这里只要一个样本，
+        不是要把几百条文案都拼出来。
+
+        LIMIT 10：真出现没归类的长尾，也不至于把页面刷满。
+    -->
+    <select id="selectBlockReasonStat" resultType="java.util.Map">
+        SELECT risk_code AS riskCode, MIN(remark) AS sampleRemark, COUNT(*) AS blockCount
+        FROM t_proposal_record
+        <where>
+            AND status = 80
+            <include refid="funnel_conditions"/>
+        </where>
+        GROUP BY risk_code
+        ORDER BY blockCount DESC
+        LIMIT 10
+    </select>
+
+    <select id="queryPage" resultMap="ProposalRecordVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_proposal_record
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="ProposalRecordVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_proposal_record
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+                <delete id="batchDelete">
+                    delete from t_proposal_record
+                    where id in
+                    <foreach collection="idList" open="(" close=")" separator="," item="item">
+                        #{item}
+                    </foreach>
+                </delete>
+                <delete id="deleteById">
+                    delete from t_proposal_record
+                        where id = #{id}
+                </delete>
+    <!--
+      条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态。
+
+      注意本文件所有 update 都刻意不写 update_time：DDL 已有 ON UPDATE CURRENT_TIMESTAMP，
+      显式再写一遍是冗余。真正要留意的是**时区**——now() 与 ON UPDATE CURRENT_TIMESTAMP 都按
+      MySQL 的 session 时区求值，而 create_time 走 MyBatis-Plus 的 Java 自动填充（JVM 时区）。
+      两者不一致时会出现「更新时间早于创建时间」，靠连接串的
+      connectionTimeZone + forceConnectionTimeZoneToSession 统一（见 sa-base.yaml）。
+    -->
+    <update id="updateStatus">
+        update t_proposal_record
+        set status = #{toStatus}
+        where id = #{id}
+          and status = #{fromStatus}
+    </update>
+
+    <update id="updateStatusAndRemark">
+        update t_proposal_record
+        set status = #{status},
+            remark = #{remark}
+        where id = #{id}
+    </update>
+
+    <!--
+      审批流转。reviewerField 只允许取 first_reviewer / second_reviewer 两个字面量，
+      由 Service 侧用枚举收敛后传入，不接受外部输入，避免 ${} 拼接引入注入风险。
+    -->
+    <update id="updateReview">
+        update t_proposal_record
+        set status = #{toStatus},
+            ${reviewerField} = #{reviewer},
+            <choose>
+                <when test="reviewerField == 'first_reviewer'">first_review_time = now(),</when>
+                <otherwise>second_review_time = now(),</otherwise>
+            </choose>
+            review_comment = #{comment}
+        where id = #{id}
+          and status = #{fromStatus}
+    </update>
+</mapper>

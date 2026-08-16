@@ -7,7 +7,7 @@
  */
 
 /**
- * 活动类型：与后端 net.lab1024.sa.enums.ActivityTypeEnum 一一对应。
+ * 活动类型：与后端 sa.enums.ActivityTypeEnum 一一对应。
  *
  * ⚠️ 路由、组件、图标、文案全部收在这一处（铁律 3：消除魔法值）。
  * 原型里曾把它散在 getRoutePath / getTypeIcon / getTypeName / getComponentName 四个函数里，
