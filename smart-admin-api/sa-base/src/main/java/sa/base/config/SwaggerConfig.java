@@ -53,17 +53,13 @@ public class SwaggerConfig {
     @Value("${springdoc.swagger-ui.server-base-url}")
     private String serverBaseUrl;
 
-    public static final String[] SWAGGER_WHITELIST = {
-            "/swagger-ui/**",
-            "/swagger-ui/index.html",
-            "/swagger-ui.html",
-            "/swagger-ui.html/**",
-            "/v3/api-docs",
-            "/v3/api-docs/**",
-            "/doc.html",
-            "/webjars/**",
-            "/favicon.ico"
-    };
+    /**
+     * @deprecated 已移到 {@link sa.base.constant.SwaggerWhitelistConst#SWAGGER_WHITELIST}。
+     * 拦截器等非文档代码请直接引那边，别引这里 —— 引用本类会连带加载 springdoc 类型，
+     * 而生产包里没有它们。保留这个别名只为兼容外部引用。
+     */
+    @Deprecated
+    public static final String[] SWAGGER_WHITELIST = sa.base.constant.SwaggerWhitelistConst.SWAGGER_WHITELIST;
 
     @Bean
     public OpenAPI api() {

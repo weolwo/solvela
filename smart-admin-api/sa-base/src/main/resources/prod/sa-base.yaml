@@ -124,16 +124,21 @@ file:
       public-url-prefix: https://1024lab-smart-admin.oss-cn-hangzhou.aliyuncs.com/
 
 # open api配置
+# ⚠️ 生产环境全部关闭：此前三个开关都是 true 且 knife4j.basic.enable=false，
+#    等于 /doc.html、/swagger-ui/index.html、/v3/api-docs 三个入口全部无鉴权对外开放，
+#    整套后台接口清单（含参数结构）任何人可读。
+#    另外 prod 打包时这些 jar 已被 spring-boot-maven-plugin 排除（见 sa-admin/pom.xml 的 prod profile），
+#    所以这里的开关只是第二道保险 —— 类都不在包里，自动配置根本不会装配。
 springdoc:
   swagger-ui:
-    enabled: true # 开关
+    enabled: false # 开关
     doc-expansion: none  #关闭展开
     tags-sorter: alpha
     server-base-url:
   api-docs:
-    enabled: true # 开关
+    enabled: false # 开关
 knife4j:
-  enable: true
+  enable: false
   basic:
     enable: false
     username: api # Basic认证用户名

@@ -1,15 +1,58 @@
 version: 2
-updates:
-  # 针对 develop 分支的后端 Maven 更新
-  - package-ecosystem: "maven"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    target-branch: "upgrade/springboot4"  # <--- 这里指定目标分支
 
-  # 针对 develop 分支的前端 Vue 更新
-  - package-ecosystem: "npm"
-    directory: "/frontend"
+# ⚠️ 生效前提（缺一不可，改这个文件本身不够）：
+#   1. Dependabot 只从仓库【默认分支】读取本文件。当前默认分支是 master，而 master 上
+#      连 .github 目录都没有 —— 本文件只存在于 upgrade/springboot4。
+#      既然 upgrade/springboot4 不打算并回 master，二选一：
+#        · 把默认分支切到 upgrade/springboot4（GitHub → Settings → General → Default branch）
+#        · 或者单独把 .github/dependabot.yml 提交一份到 master
+#   2. 本仓库是 1024-lab/smart-admin 的 fork，fork 的 Dependabot version updates 默认关闭，
+#      需在 Settings → Code security 里手动开启。
+#
+# target-branch 的作用是【去哪个分支读 pom/package.json、往哪个分支提 PR】，
+# 管不了本文件自己该放在哪 —— 别把这两件事混为一谈。
+# 下面的目录名对应 upgrade/springboot4 的结构；master 上是
+# smart-admin-api-java17-springboot3 / smart-admin-web-javascript，两者不通用。
+
+updates:
+  # 后端 Maven。
+  # 不用担心漏掉 sa-base / sa-admin / common-api / sa-marketing 四个子模块：
+  # 27 个第三方版本属性全集中在 smart-admin-api/pom.xml 的 properties + dependencyManagement，
+  # 子 pom 里的 <version> 只用来钉兄弟模块的 3.0.0。更新落点就是父 pom 这一个文件。
+  - package-ecosystem: "maven"
+    directory: "/smart-admin-api"
     schedule:
       interval: "weekly"
-    target-branch: "upgrade/springboot4"  # <--- 这里指定目标分支
+    target-branch: "upgrade/springboot4"
+    open-pull-requests-limit: 5
+    groups:
+      spring:
+        patterns:
+          - "org.springframework*"
+          - "org.springframework.boot*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # 管理端前端（Vue3 + Vite），有 package-lock.json
+  - package-ecosystem: "npm"
+    directory: "/smart-admin-web"
+    schedule:
+      interval: "weekly"
+    target-branch: "upgrade/springboot4"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # 移动端 uni-app。⚠️ 这个目录没有 lock 文件，Dependabot 只能改 package.json，
+  # 提上来的 PR 需要人工跑一次安装确认没炸。
+  - package-ecosystem: "npm"
+    directory: "/smart-app"
+    schedule:
+      interval: "weekly"
+    target-branch: "upgrade/springboot4"
+    open-pull-requests-limit: 3

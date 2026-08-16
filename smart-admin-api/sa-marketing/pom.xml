@@ -22,9 +22,11 @@
             <artifactId>common-api</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <scope>provided</scope>
         </dependency>
         <!-- 本模块有单测（draw/lottery 引擎共 45 个），必须自己声明；
              此前是靠 common-api → sa-base 的 compile 作用域传递白嫖来的 -->

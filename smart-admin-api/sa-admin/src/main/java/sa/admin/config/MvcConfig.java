@@ -3,7 +3,7 @@ package sa.admin.config;
 import jakarta.annotation.Resource;
 import sa.admin.interceptor.AdminInterceptor;
 import sa.base.config.FileConfig;
-import sa.base.config.SwaggerConfig;
+import sa.base.constant.SwaggerWhitelistConst;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -44,7 +44,7 @@ public class MvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         String[] whitelist = Stream.concat(
-                        Arrays.stream(SwaggerConfig.SWAGGER_WHITELIST),
+                        Arrays.stream(SwaggerWhitelistConst.SWAGGER_WHITELIST),
                         Arrays.stream(PUBLIC_FILE_WHITELIST))
                 .toArray(String[]::new);
         registry.addInterceptor(adminInterceptor)

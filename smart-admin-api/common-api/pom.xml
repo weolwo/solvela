@@ -29,9 +29,11 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>

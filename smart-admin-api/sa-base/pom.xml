@@ -24,10 +24,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+            <!-- ⚠️ Lettuce 排掉了（2.49MB）：Redis 连接工厂由 redisson-spring-data-41 提供的
+                 RedissonConnectionFactory 承担，全量检索下来 Lettuce 一处没用，
+                 LettuceConnectionConfiguration 是 @ConditionalOnClass(RedisClient) 的，类不在即不装配。
+                 sa-token-redis-template 走的也是 RedisTemplate → 同一个 RedissonConnectionFactory。
+                 ⚠️ 不要顺手排 reactor-core：spring-data-redis 的响应式部分自己要用。 -->
             <exclusions>
                 <exclusion>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.lettuce</groupId>
+                    <artifactId>lettuce-core</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -93,9 +102,13 @@
             </exclusions>
         </dependency>
 
+        <!-- provided：lombok 是纯编译期的注解处理器，之前漏写 scope 导致 1.95MB 被打进
+             BOOT-INF/lib，还把 jdk.compiler 拽进了 JDK 模块图。
+             provided 不传递，所以每个用 @Data 的模块都要各自声明一次。 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -220,11 +233,30 @@
                     <groupId>io.reactivex.rxjava3</groupId>
                     <artifactId>rxjava</artifactId>
                 </exclusion>
+                <!-- byte-buddy 4.44MB：Redisson 只在 RLiveObject / RemoteService 的动态代理里用它，
+                     本项目只用 RLock / RScript / RTopic，一处没碰。 -->
+                <exclusion>
+                    <groupId>net.bytebuddy</groupId>
+                    <artifactId>byte-buddy</artifactId>
+                </exclusion>
+                <!-- kryo 及其 reflectasm / minlog / jodd-util 共 0.75MB：只服务 Kryo5Codec，
+                     而 RedissonPasswordConfigurationCustomizer 已把 codec 换成 SmileJackson3Codec。 -->
+                <exclusion>
+                    <groupId>com.esotericsoftware</groupId>
+                    <artifactId>kryo</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jodd</groupId>
+                    <artifactId>jodd-util</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
-        <!-- 引入 Jackson 的 Smile 二进制数据格式支持 -->
+        <!-- Smile 二进制格式，配合 Redisson 的 SmileJackson3Codec。
+             ⚠️ groupId 是 Jackson 3 的 tools.jackson.dataformat，不是 Jackson 2 的
+             com.fasterxml.jackson.dataformat —— 后者会把整套 Jackson 2 运行时（2.36MB）
+             拖进来和 Spring Boot 4 自带的 Jackson 3 并存。 -->
         <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <groupId>tools.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-smile</artifactId>
             <!-- 不需要写 version，Spring Boot 的依赖池已经管理了它与当前环境匹配的版本 -->
         </dependency>

@@ -27,6 +27,13 @@
             <artifactId>sa-marketing</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!-- 本模块大量用 @Data / @Slf4j；此前是靠 sa-base 的 compile 作用域传递白嫖来的，
+             sa-base 改成 provided 后不再传递，必须自己声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <!-- DataScopeSqlConfigService 扫描注解要用；此前是靠 sa-base 传递白嫖来的，
              而 sa-base 自己一处没用，已从那边移除 -->
         <dependency>
@@ -48,6 +55,15 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>sa.admin.AdminApplication</mainClass>
+                    <!-- repackage 默认会把 provided 作用域也打进 BOOT-INF/lib（为了 servlet-api 之类的场景），
+                         所以光把 lombok 改成 provided 不够，这里还要显式排掉。
+                         spring-boot-starter-parent 自带这条默认配置，本项目走 BOM import 没有继承到。 -->
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
                 </configuration>
                 <executions>
                     <execution>
@@ -59,5 +75,111 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- 生产包：把整套 API 文档依赖排出 BOOT-INF/lib（约 5.9MB）。
+             注意这是 repackage 阶段的排除，编译期这些 jar 仍在 classpath 上，
+             所以 SwaggerConfig / SchemaEnumPropertyCustomizer 照常编译，只是不进生产包。
+
+             运行期安全性由两处条件保证：
+               · SwaggerConfig     —— @Conditional(SystemEnvironmentConfig.class)，只在 dev/test 装配
+               · SchemaEnumPropertyCustomizer —— @ConditionalOnClass(PropertyCustomizer.class)
+             prod/sa-base.yaml 里的三个 enabled:false 是第三道保险。
+
+             ⚠️ 故意保留的两个：
+               · io.swagger.core.v3:swagger-annotations-jakarta（28KB）——
+                 全项目 312 处 @Schema / 72 处 @Operation / 71 处 @Tag 都是 RUNTIME 保留，
+                 注解类缺失时 JVM 虽会静默跳过，但任何走 getAnnotations() 的反射路径都可能
+                 抛 TypeNotPresentException。省这 28KB 不值当。
+               · com.fasterxml.jackson.core:jackson-annotations —— swagger-annotations 的依赖，同理。
+             Jackson 2 的其余部分（core/databind/yaml/jsr310）唯一来源就是 swagger-core-jakarta，
+             已用 dependency:tree -Dverbose 核实过，随文档一起排掉是安全的。 -->
+        <profile>
+            <id>prod</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>sa.admin.AdminApplication</mainClass>
+                            <excludes>
+                                <exclude>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </exclude>
+                                <!-- knife4j -->
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-core</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-openapi3-ui</artifactId>
+                                </exclude>
+                                <!-- springdoc + swagger -->
+                                <exclude>
+                                    <groupId>org.springdoc</groupId>
+                                    <artifactId>springdoc-openapi-starter-common</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>org.springdoc</groupId>
+                                    <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>org.springdoc</groupId>
+                                    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>org.webjars</groupId>
+                                    <artifactId>swagger-ui</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>io.swagger.core.v3</groupId>
+                                    <artifactId>swagger-core-jakarta</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>io.swagger.core.v3</groupId>
+                                    <artifactId>swagger-models-jakarta</artifactId>
+                                </exclude>
+                                <!-- Jackson 2：唯一来源是 swagger-core-jakarta，跟着一起走 -->
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.core</groupId>
+                                    <artifactId>jackson-core</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.core</groupId>
+                                    <artifactId>jackson-databind</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.dataformat</groupId>
+                                    <artifactId>jackson-dataformat-yaml</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.datatype</groupId>
+                                    <artifactId>jackson-datatype-jsr310</artifactId>
+                                </exclude>
+                            </excludes>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>repackage</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

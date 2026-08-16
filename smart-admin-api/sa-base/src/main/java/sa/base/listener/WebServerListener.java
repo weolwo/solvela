@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ClassUtils;
 
 /**
  * 启动监听器
@@ -63,17 +64,25 @@ public class WebServerListener implements ApplicationListener<WebServerInitializ
         int codeCount = ErrorCodeRegister.initialize();
         String localhostUrl = normalizeUrl(String.format("http://localhost:%d%s", port, contextPath));
         String externalUrl = normalizeUrl(String.format("http://%s:%d%s", ip, port, contextPath));
-        String swaggerUrl = normalizeUrl(String.format("http://localhost:%d%s/swagger-ui/index.html", port, contextPath));
-        String knife4jUrl = normalizeUrl(String.format("http://localhost:%d%s/doc.html", port, contextPath));
+        // 文档地址只在 springdoc 真正装配时才打印。
+        // 生产包里整套 springdoc / swagger 已被排除（见 sa-admin/pom.xml 的 prod profile），
+        // 照旧打印这两行会让运维以为文档还开着，跑去访问又是一片报错。
+        boolean docEnabled = ClassUtils.isPresent("org.springdoc.core.customizers.OperationCustomizer",
+                WebServerListener.class.getClassLoader());
+        String docLines = "";
+        if (docEnabled) {
+            String swaggerUrl = normalizeUrl(String.format("http://localhost:%d%s/swagger-ui/index.html", port, contextPath));
+            String knife4jUrl = normalizeUrl(String.format("http://localhost:%d%s/doc.html", port, contextPath));
+            docLines = String.format("%n\tSwagger地址:\t%s%n\tknife4j地址:\t%s", swaggerUrl, knife4jUrl);
+        }
         log.warn("\n{}\n" +
                         "\t当前启动环境:\t{} , {}" +
                         "\n\t返回码初始化:\t完成{}个返回码初始化" +
                         "\n\t服务本机地址:\t{}" +
                         "\n\t服务外网地址:\t{}" +
-                        "\n\tSwagger地址:\t{}" +
-                        "\n\tknife4j地址:\t{}" +
+                        "{}" +
                         "\n-------------------------------------------------------------------------------------\n",
-                title, profile, environmentEnum.getDesc(), codeCount, localhostUrl, externalUrl, swaggerUrl, knife4jUrl);
+                title, profile, environmentEnum.getDesc(), codeCount, localhostUrl, externalUrl, docLines);
     }
 
     /**

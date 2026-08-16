@@ -126,14 +126,14 @@ file:
 # open api配置
 springdoc:
   swagger-ui:
-    enabled: true # 开关
+    enabled: false # 开关
     doc-expansion: none  #关闭展开
     tags-sorter: alpha
     server-base-url:
   api-docs:
-    enabled: true # 开关
+    enabled: false # 开关
 knife4j:
-  enable: true
+  enable: false
   basic:
     enable: false
     username: api # Basic认证用户名

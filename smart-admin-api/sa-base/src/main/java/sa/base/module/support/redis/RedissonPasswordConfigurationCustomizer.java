@@ -28,8 +28,11 @@ public class RedissonPasswordConfigurationCustomizer implements RedissonAutoConf
         // 将默认的 Kryo 编码器替换为 Jackson (JSON格式，安全且不依赖 Unsafe)
         //config.setCodec(new JsonJacksonCodec());
 
-        // 既抛弃了危险的 Kryo，又比纯 JSON 更省内存和网络
-        configuration.setCodec(new org.redisson.codec.SmileJacksonCodec());
+        // 既抛弃了危险的 Kryo，又比纯 JSON 更省内存和网络。
+        // ⚠️ 用 SmileJackson3Codec 而不是 SmileJacksonCodec：后者是 Jackson 2 的实现，
+        // 而 Spring Boot 4 全线已是 Jackson 3（tools.jackson），用旧的等于在运行包里
+        // 多养一整套 Jackson 2（2.36MB）。Smile 是格式规范，两代实现产出的字节流一致。
+        configuration.setCodec(new org.redisson.codec.SmileJackson3Codec());
 
         // 2. 修复原代码因为调用废弃 API 导致无限打印警告的 Bug
         // ==========================================
