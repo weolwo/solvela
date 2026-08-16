@@ -183,7 +183,8 @@
       z-index: 3;
       right: 0;
       position: fixed;
-      background-color: v-bind('color.background');
+      // 底色交给里面的 .header-main（它按明暗主题上色），这里不要再刷一层
+      background-color: transparent;
     }
 
     .admin-layout-content {

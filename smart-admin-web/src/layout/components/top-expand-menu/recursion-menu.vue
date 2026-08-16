@@ -1,5 +1,8 @@
 <!--
-  * 递归菜单
+  * 左侧栏：当前一级菜单下的子菜单
+  *
+  * 一张 iOS 卡片，整栏同一个色系（颜色取自顶部选中的那个一级菜单）。
+  * 展开/选中/跳转的状态逻辑走 side-menu/use-menu-state，与其它三种布局同一套。
   *
   * @Author:    1024创新实验室-主任：卓大
   * @Date:      2022-09-06 20:29:12
@@ -8,49 +11,43 @@
   * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
 -->
 <template>
-  <div class="recursion-container" v-show="topMenu.children && topMenu.children.length > 0">
+  <div
+    class="h-full overflow-x-hidden overflow-y-auto bg-[#F2F2F7] dark:bg-black"
+    :class="{ dark: darkFlag }"
+    v-show="visibleFlag"
+  >
     <!-- 顶部logo区域 -->
-    <div class="logo" @click="onGoHome" :style="sideMenuWidth" v-if="!collapsed">
-      <img class="logo-img" :src="logoImg" />
-      <div class="title" >{{ websiteName }}</div>
+    <div
+      class="sticky top-0 z-10 flex h-[46px] cursor-pointer items-center gap-[10px] bg-[#F2F2F7] select-none dark:bg-black"
+      :class="collapsed ? 'w-[80px] justify-center' : 'px-[14px]'"
+      @click="onGoHome"
+    >
+      <img class="h-[26px] w-[26px] shrink-0 rounded-[7px]" :src="logoImg" />
+      <div v-if="!collapsed" class="truncate text-[15px] font-semibold tracking-[-0.24px] text-black dark:text-white">
+        {{ websiteName }}
+      </div>
     </div>
-    <div class="min-logo" @click="onGoHome" v-if="collapsed">
-      <img class="logo-img" :src="logoImg" />
+
+    <div v-if="!collapsed" class="mx-[10px] mb-[12px]">
+      <MenuCard :nodes="visibleChildren" :color-key="topMenu.menuId" />
     </div>
-    <!-- 次级菜单展示 -->
-    <a-menu :selectedKeys="selectedKeys" theme="light" :openKeys="openKeys" mode="inline">
-      <template v-for="item in topMenu.children" :key="item.menuId">
-        <template v-if="item.visibleFlag">
-          <template v-if="$lodash.isEmpty(item.children)">
-            <a-menu-item :key="item.menuId.toString()" @click="turnToPage(item)">
-              <template #icon v-if="item.icon">
-                <component :is="$antIcons[item.icon]" />
-              </template>
-              {{ item.menuName }}
-            </a-menu-item>
-          </template>
-          <template v-else>
-            <SubMenu :menu-info="item" :key="item.menuId" @turnToPage="turnToPage" />
-          </template>
-        </template>
-      </template>
-    </a-menu>
   </div>
 </template>
+
 <script setup>
-  import { ref, computed, watch } from 'vue';
-  import { HOME_PAGE_NAME } from '/@/constants/system/home-const';
-  import SubMenu from './sub-menu.vue';
-  import { router } from '/@/router';
-  import { useRoute } from 'vue-router';
   import _ from 'lodash';
+  import { computed, ref, watch } from 'vue';
+  import { HOME_PAGE_NAME } from '/@/constants/system/home-const';
+  import { router } from '/@/router';
   import menuEmitter from './top-expand-menu-mitt';
   import { useAppConfigStore } from '/@/store/modules/system/app-config';
-  import { useUserStore } from '/@/store/modules/system/user';
   import logoImg from '/@/assets/images/logo/smart-admin-logo.png';
+  import MenuCard from '../side-menu/menu-card.vue';
+  import { useSideMenuTheme } from '../side-menu/use-side-menu-theme';
+  import { useSmartMenuState } from '../side-menu/use-menu-state';
 
   const websiteName = computed(() => useAppConfigStore().websiteName);
-  const theme = computed(() => useAppConfigStore().$state.sideMenuTheme);
+  const { darkFlag } = useSideMenuTheme();
 
   const props = defineProps({
     collapsed: {
@@ -59,134 +56,49 @@
     },
   });
 
-  //菜单宽度
-  const sideMenuWidth = computed(() => useAppConfigStore().$state.sideMenuWidth);
-
   // 选中的顶级菜单
-  let topMenu = ref({});
+  const topMenu = ref({});
+  const visibleChildren = computed(() => (topMenu.value.children || []).filter((e) => e.visibleFlag && !e.disabledFlag));
+  const visibleFlag = computed(() => visibleChildren.value.length > 0);
+
+  // 这一栏里可展开的是二级（一级在顶栏上），单开模式下二级之间互斥
+  const accordionKeys = computed(() => visibleChildren.value.filter((e) => !_.isEmpty(e.children)).map((e) => e.menuId));
+  const { openKeys, syncFromRoute } = useSmartMenuState({ accordionKeys });
+
   menuEmitter.on('selectTopMenu', onSelectTopMenu);
 
   //动态通知顶部菜单栏侧边栏状态
   watch(
-    topMenu,
+    visibleFlag,
     (value) => {
-      let hasSideMenu = value.children && value.children.length > 0;
-      menuEmitter.emit('sideMenuChange', hasSideMenu);
+      menuEmitter.emit('sideMenuChange', value);
     },
-    { immediate: true, deep: true }
+    { immediate: true }
   );
 
-  // 监听选中顶级菜单事件
+  // 监听选中顶级菜单事件：切换模块时默认全部展开，和原来的行为一致
   function onSelectTopMenu(selectedTopMenu) {
-    topMenu.value = selectedTopMenu;
-    if (selectedTopMenu.children && selectedTopMenu.children.length > 0) {
-      openKeys.value = _.map(selectedTopMenu.children, 'menuId').map((e) => e.toString());
-    } else {
-      openKeys.value = [];
-    }
-    selectedKeys.value = [];
+    topMenu.value = selectedTopMenu || {};
+    openKeys.value = visibleChildren.value.map((e) => e.menuId);
   }
-
-  //展开的菜单
-  let currentRoute = useRoute();
-  const selectedKeys = ref([]);
-  const openKeys = ref([]);
 
   function updateSelectKeyAndOpenKey(parentList, currentSelectKey) {
     if (!parentList) {
       return;
     }
-    //获取需要展开的menu key集合
-    openKeys.value = _.map(parentList, 'name');
-    selectedKeys.value = [currentSelectKey];
+    const needOpenKeys = syncFromRoute('none');
+    openKeys.value = _.union(openKeys.value, needOpenKeys);
   }
 
+  // 路由变化时（比如通过标签页跳转）也要跟着更新选中
   watch(
-    currentRoute,
-    (value) => {
-      selectedKeys.value = [value.name];
-    },
-    {
-      immediate: true,
-    }
+    () => topMenu.value.menuId,
+    () => syncFromRoute('none')
   );
-  // 页面跳转
-  function turnToPage(route) {
-    useUserStore().deleteKeepAliveIncludes(route.menuId.toString());
-    router.push({ name: route.menuId.toString() });
-  }
 
   function onGoHome() {
     router.push({ name: HOME_PAGE_NAME });
   }
 
   defineExpose({ updateSelectKeyAndOpenKey });
-
-  const darkModeFlag = computed(() => useAppConfigStore().$state.darkModeFlag);
-
-  const logoHeight = computed(() => {
-    if(useAppConfigStore().$state.compactFlag){
-      return '40px';
-    }else{
-      return '46px';
-    }
-  });
 </script>
-<style scoped lang="less">
-  .recursion-container {
-    height: 100%;
-  }
-
-  .min-logo {
-    height: v-bind(logoHeight);
-    line-height: v-bind(logoHeight);
-    padding: 0px 15px 0px 15px;
-
-    width: 80px;
-    z-index: 21;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    .logo-img {
-      width: 30px;
-      height: 30px;
-    }
-  }
-  .top-menu {
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: v-bind(logoHeight);
-    font-size: 16px;
-    color: #515a6e;
-    border-bottom: 1px solid #f3f3f3;
-    border-right: 1px solid #f3f3f3;
-  }
-  .logo {
-    height: v-bind(logoHeight);
-    line-height: v-bind(logoHeight);
-    padding: 0px 15px 0px 15px;
-    width: 100%;
-    z-index: 100;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    background-color: #001529;
-
-    .logo-img {
-      width: 30px;
-      height: 30px;
-    }
-
-    .title {
-      font-size: 16px;
-      font-weight: 600;
-      overflow: hidden;
-      word-wrap: break-word;
-      white-space: nowrap;
-      color: #ffffff;
-    }
-  }
-</style>

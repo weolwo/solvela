@@ -62,13 +62,15 @@
     display: flex;
     height: 100%;
 
+    // 第一列只放磁贴 + 两字缩写，比原来窄；省下的宽度让给第二列，
+    // 第二列要装下 29px 磁贴 + 文字 + 箭头的卡片行，126px 不够用
     .top-menu {
-      width: 114px;
+      width: 88px;
       flex-shrink: 0;
     }
 
     .recursion-menu {
-      min-width: 126px;
+      min-width: 200px;
       flex: 1;
     }
   }

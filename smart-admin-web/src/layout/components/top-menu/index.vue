@@ -1,6 +1,10 @@
 <!--
   * 顶部菜单
   *
+  * 一整行三段：logo / 横向菜单条 / 用户操作区。
+  * 三段都用 flex：logo 与用户操作区 shrink-0，中间菜单条 min-w-0 + overflow-hidden，
+  * 这样菜单再多也只会收进「更多」，绝不会把右侧的设置按钮顶出屏幕。
+  *
   * @Author:    1024创新实验室-主任：卓大
   * @Date:      2022-09-06 20:29:12
   * @Wechat:    zhuda1024
@@ -8,47 +12,50 @@
   * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
 -->
 <template>
-  <!--总共3部分：1、logo区域，包含 logo和名称; 2、菜单区域  ;3、用户操作区域-->
-  <div class="header-main">
+  <div
+    class="header-main relative flex h-[48px] w-full items-center bg-[#F9F9F9] pr-[10px] pl-[16px] text-black dark:bg-[#1C1C1E] dark:text-white"
+    :class="{ dark: darkFlag }"
+  >
     <!-- 1、logo区域 -->
-    <div class="logo" @click="onGoHome">
-      <img class="logo-img" :src="logoImg" />
-      <div class="title smart-logo title-light" v-if="sideMenuTheme === 'light'">{{ websiteName }}</div>
-      <div class="title smart-logo title-dark" v-if="sideMenuTheme === 'dark'">{{ websiteName }}</div>
+    <div class="mr-[16px] flex shrink-0 cursor-pointer items-center gap-[10px] select-none" @click="onGoHome">
+      <img class="h-[28px] w-[28px] shrink-0 rounded-[7px]" :src="logoImg" />
+      <div class="smart-logo truncate text-[15px] font-semibold tracking-[-0.24px]">{{ websiteName }}</div>
     </div>
+
     <!-- 2、菜单区域 -->
-    <RecursionMenu ref="menuRef" />
+    <MenuBar ref="menuRef" />
 
     <!-- 3、用户操作区域 -->
-    <div class="user-space">
-      <div class="setting">
-        <!---消息通知--->
-        <HeaderMessage ref="headerMessage" />
-        <!---设置--->
-        <a-button type="text" @click="showSetting" class="operate-icon">
-          <template #icon><setting-outlined /></template>
-        </a-button>
-      </div>
+    <div class="ml-[12px] flex shrink-0 items-center gap-[4px]">
+      <!---消息通知--->
+      <HeaderMessage ref="headerMessage" />
+      <!---设置--->
+      <a-button type="text" @click="showSetting">
+        <template #icon><setting-outlined /></template>
+      </a-button>
       <!---头像信息--->
-      <div class="user-space-item">
+      <div class="ml-[6px]">
         <HeaderAvatar />
       </div>
       <HeaderSetting ref="headerSetting" />
     </div>
+
+    <!-- 底部极细分割线 -->
+    <span class="pointer-events-none absolute right-0 bottom-0 left-0 h-px bg-[#E5E5EA] dark:bg-[#38383A]"></span>
   </div>
 </template>
 
 <script setup>
-  import { computed, ref, watch } from 'vue';
+  import { computed, ref } from 'vue';
   import { useRouter } from 'vue-router';
-  import RecursionMenu from './recursion-menu.vue';
+  import MenuBar from './menu-bar.vue';
   import logoImg from '/@/assets/images/logo/smart-admin-logo.png';
   import { HOME_PAGE_NAME } from '/@/constants/system/home-const';
   import { useAppConfigStore } from '/@/store/modules/system/app-config';
   import HeaderAvatar from '../header-user-space/header-avatar.vue';
   import HeaderSetting from '../header-user-space/header-setting.vue';
   import HeaderMessage from '../header-user-space/header-message.vue';
-  import { theme } from 'ant-design-vue';
+  import { useSideMenuTheme } from '../side-menu/use-side-menu-theme';
 
   // 设置
   const headerSetting = ref();
@@ -58,137 +65,24 @@
 
   //消息通知
   const headerMessage = ref();
-  function showMessage() {
-    headerMessage.value.showMessage();
-  }
 
   const websiteName = computed(() => useAppConfigStore().websiteName);
-  const sideMenuTheme = computed(() => useAppConfigStore().sideMenuTheme);
-
-  const props = defineProps({
-    collapsed: {
-      type: Boolean,
-      required: false,
-      default: false,
-    },
-  });
+  const { darkFlag } = useSideMenuTheme();
 
   const menuRef = ref();
-
-  watch(
-    () => props.collapsed,
-    (newValue, oldValue) => {
-      // 如果是展开菜单的话，重新获取更新菜单的展开项: openkeys和selectKeys
-      if (!newValue) {
-        menuRef.value.updateSelectKeys();
-      }
-    }
-  );
-
-  const color = computed(() => {
-    let isLight = useAppConfigStore().$state.sideMenuTheme === 'light';
-    return {
-      color: isLight ? '#001529' : '#FFFFFF',
-      background: isLight ? '#FFFFFF' : '#001529',
-    };
-  });
 
   const router = useRouter();
   function onGoHome() {
     router.push({ name: HOME_PAGE_NAME });
   }
-
-  const { useToken } = theme;
-  const { token } = useToken();
 </script>
 
 <style lang="less" scoped>
-  @color-border-secondary: v-bind('token.colorBorderSecondary');
-
+  // antd 给按钮和徽标写死了颜色，这里让它们跟随外层的明暗文字色
   .header-main {
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-start;
-    width: 100%;
-    padding-left: 16px;
-    height: 48px;
-    z-index: 21;
-    border-bottom: 1px solid @color-border-secondary;
-
-    .logo {
-      flex: 0 0 auto;
-      min-width: 192px;
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      align-items: center;
-
-      .logo-img {
-        display: inline-block;
-        height: 30px;
-        vertical-align: middle;
-      }
-      .title {
-        font-size: 16px;
-        font-weight: 600;
-        margin-left: 8px;
-      }
-      .title-light {
-        color: #001529;
-      }
-      .title-dark {
-        color: #ffffff;
-      }
+    :deep(.ant-btn-text),
+    :deep(.ant-badge) {
+      color: inherit;
     }
-
-    /**
-     * 菜单区域必须能被压缩。antd 的 .ant-menu-overflow 是 display:flex 且子项 flex:none，
-     * 作为弹性子元素它的 min-width:auto = 所有菜单项宽度之和；一级菜单一多，
-     * 这个 ul 就把右侧用户区（含设置按钮）整个顶出屏幕，设置抽屉再也打不开。
-     * 加 min-width:0 让它可以收缩，antd 的 overflow 容器量到受限宽度后
-     * 才会把放不下的菜单收进「...」里。
-     */
-    :deep(.smart-menu) {
-      flex: 1 1 auto;
-      min-width: 0;
-      overflow: hidden;
-    }
-
-    .user-space {
-      flex: 0 0 auto;
-      min-width: 208px;
-      margin-left: auto;
-      padding-right: 10px;
-      color: v-bind('color.color');
-      display: flex;
-      flex-direction: row;
-      vertical-align: middle;
-      align-items: center;
-      justify-content: flex-end;
-
-      .setting {
-        height: @header-user-height;
-        line-height: @header-user-height;
-        vertical-align: middle;
-        display: flex;
-        align-items: center;
-
-        :deep(.ant-badge) {
-          color: v-bind('color.color');
-        }
-      }
-      .operate-icon {
-        margin-left: 20px;
-        color: v-bind('color.color');
-      }
-
-      .user-space-item {
-        margin-left: 10px;
-      }
-    }
-  }
-
-  :deep(.ant-menu-horizontal) {
-    border-bottom: 0;
   }
 </style>
