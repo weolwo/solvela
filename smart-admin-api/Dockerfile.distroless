@@ -1,0 +1,122 @@
+# syntax=docker/dockerfile:1
+#
+# sa-admin 生产镜像（distroless 版）。与 Dockerfile 的区别只在最后一段的基座：
+#     debian:bookworm-slim (113MB) + apt 装 tzdata/ca-certificates/curl (16MB)
+#  →  gcr.io/distroless/base-debian12:nonroot (33MB，自带 glibc/tzdata/ca-certificates/nonroot 用户)
+#
+#     docker build -f smart-admin-api/Dockerfile.distroless -t smart-admin:3.0.0-distroless smart-admin-api
+#
+# distroless 没有 shell、没有包管理器、没有 curl，带来三处必须绕开的约束，
+# 每一处的解法都写在下面对应位置。前三段与 Dockerfile 完全一致。
+
+# ============================================================================
+# ① 构建
+# ============================================================================
+FROM maven:3.9-eclipse-temurin-25 AS build
+WORKDIR /src
+COPY pom.xml ./
+COPY sa-base/pom.xml       sa-base/
+COPY common-api/pom.xml    common-api/
+COPY sa-marketing/pom.xml  sa-marketing/
+COPY sa-admin/pom.xml      sa-admin/
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -Pprod -DskipTests dependency:go-offline -Dsilent=true || true
+COPY . .
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -Pprod -DskipTests clean package \
+ && cp sa-admin/target/sa-admin-prod-*.jar /app.jar
+
+# ============================================================================
+# ② jlink 裁剪运行时（模块清单的来龙去脉见 Dockerfile 里的长注释，此处不重复）
+# ============================================================================
+FROM eclipse-temurin:25-jdk-noble AS jre
+RUN jlink \
+      --add-modules "java.base,java.compiler,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.security.sasl,java.sql,java.sql.rowset,java.transaction.xa,java.xml,jdk.jfr,jdk.net,jdk.unsupported,jdk.localedata,jdk.management,jdk.management.agent,jdk.jcmd,jdk.naming.dns,jdk.zipfs" \
+      --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
+      --output /jre
+
+# 【约束一】没有 curl，HEALTHCHECK 没法用命令行工具。
+# 也不能用 `java 某个.java` 单文件源码启动 —— 那需要 jdk.compiler，而运行时把它裁掉了。
+# 解法：在这一段（有完整 JDK）把探针预编译成 class，运行时只是 `java -cp` 跑它。
+# 依赖的 java.net.http 已在模块清单里。
+RUN mkdir -p /probe && cat > /probe/HealthCheck.java <<'EOF' && javac -d /probe /probe/HealthCheck.java && rm /probe/HealthCheck.java
+import java.net.URI;
+import java.net.http.*;
+import java.time.Duration;
+
+/** 容器存活探针。退出码 0 表示健康。distroless 里没有 curl，只能这么来。 */
+public class HealthCheck {
+    public static void main(String[] args) {
+        String url = args.length > 0 ? args[0] : "http://127.0.0.1:1024/login/getTwoFactorLoginFlag";
+        try {
+            HttpResponse<Void> r = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(2)).build()
+                    .send(HttpRequest.newBuilder(URI.create(url))
+                            .timeout(Duration.ofSeconds(2)).GET().build(),
+                          HttpResponse.BodyHandlers.discarding());
+            System.exit(r.statusCode() == 200 ? 0 : 1);
+        } catch (Exception e) {
+            System.exit(1);
+        }
+    }
+}
+EOF
+
+# ============================================================================
+# ③ Spring Boot 分层解包
+# ============================================================================
+FROM eclipse-temurin:25-jdk-noble AS extract
+COPY --from=build /app.jar /app.jar
+RUN java -Djarmode=tools -jar /app.jar extract --layers --launcher --destination /extracted
+
+# 【约束二】distroless 没有 shell，跑不了 RUN mkdir/chown，
+# 而应用启动期要写两个目录（缺了直接起不来，详见 Dockerfile 里的说明）：
+#     /home/logs/smart_admin_v3     ← project.log-directory
+#     /home/smart_admin_v3/upload   ← file.storage.local.upload-path
+# 解法：在这一段把空目录连同属主一起造好，最后 COPY 过去。
+# 65532 是 distroless 的 nonroot uid。
+RUN mkdir -p /skel/home/logs/smart_admin_v3 /skel/home/smart_admin_v3/upload \
+ && chown -R 65532:65532 /skel/home
+
+# ============================================================================
+# ④ 运行镜像
+# ============================================================================
+FROM gcr.io/distroless/base-debian12:nonroot
+
+# 基座自带 glibc / ca-certificates / tzdata / nonroot 用户，不需要 apt。
+# TZ 环境变量对 glibc 和 JVM 都有效，配合基座里的 zoneinfo 就够了，
+# 不必再 ln -s /etc/localtime（也没 shell 可用）。
+ENV TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    JAVA_HOME=/opt/jre \
+    PATH=/opt/jre/bin:$PATH
+
+# 【约束三】没有 shell，ENTRYPOINT 只能用 exec 形式，`$JAVA_OPTS` 不会被展开。
+# 解法：改用 JDK_JAVA_OPTIONS —— 这是 java 启动器自己读的环境变量，不经过 shell。
+# 副作用是每次启动会往 stderr 打一行 "NOTE: Picked up JDK_JAVA_OPTIONS: ..."，属正常。
+#
+# -Duser.language=zh -Duser.country=CN 的原因见 Dockerfile：容器里默认 Locale 是 en，
+# 未指定 Locale 的格式化会静默变英文格式。
+ENV JDK_JAVA_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai -Duser.language=zh -Duser.country=CN"
+
+COPY --from=jre   /jre    /opt/jre
+COPY --from=jre   /probe  /opt/probe
+COPY --from=extract /skel/home /home
+
+WORKDIR /app
+COPY --from=extract --chown=65532:65532 /extracted/dependencies/          ./
+COPY --from=extract --chown=65532:65532 /extracted/spring-boot-loader/    ./
+COPY --from=extract --chown=65532:65532 /extracted/snapshot-dependencies/ ./
+COPY --from=extract --chown=65532:65532 /extracted/application/           ./
+
+USER nonroot:nonroot
+EXPOSE 1024
+
+VOLUME ["/home/logs", "/home/smart_admin_v3/upload"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD ["/opt/jre/bin/java", "-XX:TieredStopAtLevel=1", "-cp", "/opt/probe", "HealthCheck"]
+
+# 依赖 WORKDIR=/app：没有 -cp，java 用默认类路径 "."，
+# 靠的是 extract --launcher 把 loader 类和 BOOT-INF 摊在了 /app 下。
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
