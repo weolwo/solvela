@@ -1,24 +1,22 @@
 package sa.ledger.coupon.controller;
 
-import sa.base.common.domain.ValidateList;
-import sa.ledger.coupon.domain.entity.MemberCoupon;
-import sa.ledger.coupon.domain.form.MemberCouponAddForm;
-import sa.ledger.coupon.domain.form.MemberCouponQueryForm;
-import sa.ledger.coupon.domain.form.MemberCouponUpdateForm;
-import sa.ledger.coupon.domain.vo.MemberCouponStatVO;
-import sa.ledger.coupon.domain.vo.MemberCouponVO;
-import sa.ledger.stat.domain.form.LedgerStatForm;
-import sa.ledger.coupon.service.MemberCouponService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import sa.base.common.domain.ResponseDTO;
-import sa.base.common.domain.PageResult;
-import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import sa.base.common.domain.PageResult;
+import sa.base.common.domain.ResponseDTO;
+import sa.ledger.coupon.domain.form.MemberCouponQueryForm;
+import sa.ledger.coupon.domain.vo.MemberCouponStatVO;
+import sa.ledger.coupon.domain.vo.MemberCouponVO;
+import sa.ledger.coupon.service.MemberCouponService;
+import sa.ledger.stat.domain.form.LedgerStatForm;
+
 /**
  * 会员优惠券 Controller
  *
@@ -48,31 +46,15 @@ public class MemberCouponController {
         return ResponseDTO.ok(Service.stat(form));
     }
 
-    @Operation(summary = "添加")
-    @PostMapping("/add")
-    @SaCheckPermission("memberCoupon:add")
-    public ResponseDTO<String> add(@RequestBody @Valid MemberCouponAddForm addForm) {
-        return Service.add(addForm);
-    }
-
-    @Operation(summary = "更新")
-    @PostMapping("/update")
-    @SaCheckPermission("memberCoupon:update")
-    public ResponseDTO<String> update(@RequestBody @Valid MemberCouponUpdateForm updateForm) {
-        return Service.update(updateForm);
-    }
-
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("memberCoupon:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
-    }
-
-    @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("memberCoupon:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
-    }
+    /*
+     * 生成器给的「添加 / 更新 / 批量删除 / 单个删除」四个接口已整组移除（v3.69.0）。
+     *
+     * 这张表是账务流水，不是业务配置：
+     *   · 改一行等于让账面和真实发生过的事脱节，而对账正是以它为准；
+     *   · 原先的 delete 还是<b>物理删除</b>（mapper 里就是 DELETE FROM），删完不留痕，
+     *     事后连"少了什么"都查不出来。
+     *
+     * 前端本来就没调用这几个接口（api 封装里只留了查询），但 HTTP 出口一直是活的 ——
+     * 拿到 token 就能打。真需要人工订正，走提案链路或 DBA 流程并留痕。
+     */
 }

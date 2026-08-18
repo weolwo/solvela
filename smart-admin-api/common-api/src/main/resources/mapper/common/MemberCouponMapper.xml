@@ -90,17 +90,10 @@
         ORDER BY create_time DESC
     </select>
 
-                <delete id="batchDelete">
-                    delete from t_member_coupon
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
-                <delete id="deleteById">
-                    delete from t_member_coupon
-                        where id = #{id}
-                </delete>
+    <!--
+        原先这里有 batchDelete / deleteById 两条 DELETE FROM，已随写接口一起移除（v3.69.0）：
+        账务与审计流水删掉就再也查不回来，事后连「少了什么」都不知道。
+    -->
 
     <!--
         统计面板的时间窗（发放口径，落在 create_time 上）。写法与另外三个财务页面一致：
@@ -208,5 +201,33 @@
         GROUP BY source_type
         ORDER BY issuedCount DESC
     </select>
+
+    <!--
+        ==================== 过期收口（couponExpire 定时任务） ====================
+
+        在这个任务之前，全工程没有任何地方把券写成 2-已过期 —— 于是过了有效期的券
+        一直挂在「未使用」里：用户端看到一张永远用不了的券，而按状态做的统计全部虚高。
+
+        ⚠️ now 由任务上下文传入（数据库时钟，铁律 9），这里不写 now()：
+        两个时钟差几个小时的话，被判过期的就是不该过期的那一批，而且改完不可逆。
+    -->
+    <select id="countExpirableCoupon" resultType="long">
+        SELECT COUNT(*) FROM t_member_coupon
+        WHERE status = 0 AND valid_end_time &lt; #{now}
+    </select>
+
+    <!--
+        条件里带着 status = 0，所以天然幂等：重复执行第二遍影响行数就是 0，
+        也不会把已使用/已作废的券误伤成过期。
+
+        LIMIT 分批不是性能优化 —— 一次 UPDATE 掉几十万行会长时间持有行锁、撑爆 binlog，
+        一个收口任务不该有能力影响线上业务。
+    -->
+    <update id="expireCouponBatch">
+        UPDATE t_member_coupon
+        SET status = 2
+        WHERE status = 0 AND valid_end_time &lt; #{now}
+        LIMIT #{limit}
+    </update>
 
 </mapper>

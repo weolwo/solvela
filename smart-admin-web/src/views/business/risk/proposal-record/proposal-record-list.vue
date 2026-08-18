@@ -214,20 +214,13 @@
   <a-card size="small" :bordered="false" :hoverable="true">
     <!---------- 表格操作行 begin ----------->
     <a-row class="smart-table-btn-block">
-      <div class="smart-table-operate-block">
-        <a-button @click="showForm" type="primary" size="small">
-          <template #icon>
-            <PlusOutlined />
-          </template>
-          新建
-        </a-button>
-        <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
-          <template #icon>
-            <DeleteOutlined />
-          </template>
-          批量删除
-        </a-button>
-      </div>
+      <!--
+        新建 / 批量删除已移除（v3.69.0）：提案只能由发奖链路创建，由审批与下发推进状态。
+        「新建」造出来的是 status=0 的提案 —— 正常链路只落 10/30/80，
+        0 是绕过风控与预算直接插库的产物，不会被任何流程推进；
+        上面漏斗里那条「有 N 条提案停在等待中」的告警，来源就是这个按钮。
+      -->
+      <div class="smart-table-operate-block"></div>
       <div class="smart-table-setting-block">
         <TableOperator v-model="columns" :tableId="TABLE_ID_CONST.BUSINESS.MARKETING.PROPOSAL_RECORD" :refresh="queryData" />
       </div>
@@ -244,7 +237,6 @@
       bordered
       :loading="tableLoading"
       :pagination="false"
-      :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
     >
       <template #bodyCell="{ text, record, column }">
         <template v-if="column.dataIndex === 'status'">
@@ -255,12 +247,6 @@
         </template>
         <template v-if="column.dataIndex === 'assetType'">
           <a-tag :color="assetTypeOf(text).color">{{ assetTypeOf(text).desc }}</a-tag>
-        </template>
-        <template v-if="column.dataIndex === 'action'">
-          <div class="smart-table-operate">
-            <a-button @click="showForm(record)" type="link">编辑</a-button>
-            <a-button @click="onDelete(record)" danger type="link">删除</a-button>
-          </div>
         </template>
       </template>
     </a-table>
@@ -282,20 +268,16 @@
       />
     </div>
 
-    <ProposalRecordForm ref="formRef" @reloadList="reload" />
   </a-card>
 </template>
 <script setup>
   import { computed, reactive, ref, watch, onMounted } from 'vue';
   import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
-  import { message, Modal } from 'ant-design-vue';
-  import { SmartLoading } from '/@/components/framework/smart-loading';
   import { proposalRecordApi } from '/@/api/business/risk/proposal-record/proposal-record-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import ProposalRecordForm from './proposal-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import {
     ASSET_TYPE_OPTIONS,
@@ -419,12 +401,6 @@
       title: '更新时间',
       dataIndex: 'updateTime',
       ellipsis: true,
-    },
-    {
-      title: '操作',
-      dataIndex: 'action',
-      fixed: 'right',
-      width: 90,
     },
   ]);
 
@@ -598,83 +574,11 @@
     }
   });
 
-  // ---------------------------- 添加/修改 ----------------------------
-  const formRef = ref();
-
-  function showForm(data) {
-    formRef.value.show(data);
-  }
-
-  // ---------------------------- 单个删除 ----------------------------
-  //确认删除
-  function onDelete(data) {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要删除选吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestDelete(data);
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求删除
-  async function requestDelete(data) {
-    SmartLoading.show();
-    try {
-      let deleteForm = {
-        goodsIdList: selectedRowKeyList.value,
-      };
-      await proposalRecordApi.delete(data.id);
-      message.success('删除成功');
-      reload();
-    } catch (e) {
-      smartSentry.captureError(e);
-    } finally {
-      SmartLoading.hide();
-    }
-  }
-
-  // ---------------------------- 批量删除 ----------------------------
-
-  // 选择表格行
-  const selectedRowKeyList = ref([]);
-
-  function onSelectChange(selectedRowKeys) {
-    selectedRowKeyList.value = selectedRowKeys;
-  }
-
-  // 批量删除
-  function confirmBatchDelete() {
-    Modal.confirm({
-      title: '提示',
-      content: '确定要批量删除这些数据吗?',
-      okText: '删除',
-      okType: 'danger',
-      onOk() {
-        requestBatchDelete();
-      },
-      cancelText: '取消',
-      onCancel() {},
-    });
-  }
-
-  //请求批量删除
-  async function requestBatchDelete() {
-    try {
-      SmartLoading.show();
-      await proposalRecordApi.batchDelete(selectedRowKeyList.value);
-      message.success('删除成功');
-      reload();
-    } catch (e) {
-      smartSentry.captureError(e);
-    } finally {
-      SmartLoading.hide();
-    }
-  }
+  /*
+   * 增删改整组移除（v3.69.0）：提案只能由发奖链路创建，由审批与下发推进状态。
+   * 后端 /proposalRecord 的 add / update / delete / batchDelete 四个接口也已经删掉，
+   * 留着按钮只会点出 404。审批相关的操作在上面的 approve / reject 里。
+   */
 </script>
 
 <style lang="less" scoped>

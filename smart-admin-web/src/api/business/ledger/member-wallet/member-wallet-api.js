@@ -26,31 +26,13 @@ export const memberWalletApi = {
     return postRequest('/memberWallet/stat', param);
   },
 
-  /**
-   * 增加  @author  weolwo
+  /*
+   * 不再封装增删改 —— 后端对应的四个接口已整组移除（v3.69.0）。
+   *
+   * 尤其是 update：它能直接改余额**且不写任何流水**，改完钱包与交易明细就永久对不上，
+   * 而统计面板的体检也发现不了（那里只查得出「余额为负」这种明显异常）。
+   * 余额的唯一合法入口是钱包服务里「改余额 + 落流水」绑在同一个事务的那几个方法。
+   *
+   * 原先的 delete 还是物理删除，删掉一个账户等于把这个人的资产凭空抹掉。
    */
-  add: (param) => {
-    return postRequest('/memberWallet/add', param);
-  },
-
-  /**
-   * 修改  @author  weolwo
-   */
-  update: (param) => {
-    return postRequest('/memberWallet/update', param);
-  },
-
-  /**
-   * 删除  @author  weolwo
-   */
-  delete: (id) => {
-    return getRequest(`/memberWallet/delete/${id}`);
-  },
-
-  /**
-   * 批量删除  @author  weolwo
-   */
-  batchDelete: (idList) => {
-    return postRequest('/memberWallet/batchDelete', idList);
-  },
 };

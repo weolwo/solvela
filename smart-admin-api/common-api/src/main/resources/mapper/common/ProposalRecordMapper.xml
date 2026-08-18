@@ -68,13 +68,15 @@
                             AND update_time &gt;= #{queryForm.updateTimeBegin}
                         </if>
                         <if test="queryForm.updateTimeEnd != null">
-                            AND update_time &lt;= #{queryForm.updateTimeEnd}
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND update_time &lt; DATE_ADD(#{queryForm.updateTimeEnd}, INTERVAL 1 DAY)
                         </if>
                         <if test="queryForm.createTimeBegin != null">
                             AND create_time &gt;= #{queryForm.createTimeBegin}
                         </if>
                         <if test="queryForm.createTimeEnd != null">
-                            AND create_time &lt;= #{queryForm.createTimeEnd}
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
                         </if>
                         <if test="queryForm.promotionConfigId != null">
                             AND promotion_config_id = #{queryForm.promotionConfigId}
@@ -121,13 +123,15 @@
             AND update_time &gt;= #{queryForm.updateTimeBegin}
         </if>
         <if test="queryForm.updateTimeEnd != null">
-            AND update_time &lt;= #{queryForm.updateTimeEnd}
+            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+            AND update_time &lt; DATE_ADD(#{queryForm.updateTimeEnd}, INTERVAL 1 DAY)
         </if>
         <if test="queryForm.createTimeBegin != null">
             AND create_time &gt;= #{queryForm.createTimeBegin}
         </if>
         <if test="queryForm.createTimeEnd != null">
-            AND create_time &lt;= #{queryForm.createTimeEnd}
+            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
         </if>
         <if test="queryForm.promotionConfigId != null">
             AND promotion_config_id = #{queryForm.promotionConfigId}
@@ -264,17 +268,10 @@
         ORDER BY create_time DESC
     </select>
 
-                <delete id="batchDelete">
-                    delete from t_proposal_record
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
-                <delete id="deleteById">
-                    delete from t_proposal_record
-                        where id = #{id}
-                </delete>
+    <!--
+        原先这里有 batchDelete / deleteById 两条 DELETE FROM，已随写接口一起移除（v3.69.0）：
+        账务与审计流水删掉就再也查不回来，事后连「少了什么」都不知道。
+    -->
     <!--
       条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态。
 
@@ -314,4 +311,36 @@
         where id = #{id}
           and status = #{fromStatus}
     </update>
+
+    <!--
+        ==================== 卡单扫描（proposalStuckScan 定时任务） ====================
+
+        status IN (30-待执行, 40-执行中) 且很久没动过 = 钱卡在半路：
+        下发在提案事务提交后同步调起，进程中途退出就没有第二次机会，
+        而工程里没有任何补偿 —— 这些提案不会自己往下走。
+
+        ⚠️ 只扫描不修：从这张表分不出「根本没开始下发」和「发了一半」
+        （60-部分成功 的存在说明后者真实发生过），分不清就重发等于按概率发两次钱。
+
+        now 由任务上下文传入（数据库时钟，铁律 9）。
+    -->
+    <select id="countStuckDispatch" resultType="long">
+        SELECT COUNT(*) FROM t_proposal_record
+        WHERE status IN (30, 40)
+          AND update_time &lt; DATE_SUB(#{now}, INTERVAL #{minutes} MINUTE)
+    </select>
+
+    <!-- 样本按卡得最久的排前面：要人工介入的话，先看压得最久的那几条 -->
+    <select id="selectStuckDispatchSample" resultType="java.util.Map">
+        SELECT trade_no                                        AS tradeNo,
+               status                                          AS status,
+               member_name                                     AS memberName,
+               TIMESTAMPDIFF(MINUTE, update_time, #{now})      AS stuckMinutes
+        FROM t_proposal_record
+        WHERE status IN (30, 40)
+          AND update_time &lt; DATE_SUB(#{now}, INTERVAL #{minutes} MINUTE)
+        ORDER BY update_time
+        LIMIT #{limit}
+    </select>
+
 </mapper>

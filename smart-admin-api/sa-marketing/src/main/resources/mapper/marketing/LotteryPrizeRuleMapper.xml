@@ -42,7 +42,8 @@
                             AND create_time &gt;= #{queryForm.createTimeBegin}
                         </if>
                         <if test="queryForm.createTimeEnd != null">
-                            AND create_time &lt;= #{queryForm.createTimeEnd}
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
                         </if>
         </where>
     </sql>

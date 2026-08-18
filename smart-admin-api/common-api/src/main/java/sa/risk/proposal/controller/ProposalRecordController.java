@@ -5,17 +5,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
 import sa.base.common.domain.PageResult;
 import sa.base.common.domain.ResponseDTO;
-import sa.base.common.domain.ValidateList;
 import sa.base.common.util.SmartRequestUtil;
-import sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import sa.risk.proposal.domain.form.ProposalRecordQueryForm;
-import sa.risk.proposal.domain.form.ProposalRecordUpdateForm;
 import sa.risk.proposal.domain.vo.ProposalFunnelVO;
 import sa.risk.proposal.domain.vo.ProposalRecordVO;
 import sa.risk.proposal.service.ProposalRecordService;
-import org.springframework.web.bind.annotation.*;
 
 /**
  * 提案表 Controller
@@ -60,31 +57,17 @@ public class ProposalRecordController {
         return Service.reject(id, SmartRequestUtil.getRequestUser().getUserName(), comment);
     }
 
-    @Operation(summary = "添加")
-    @PostMapping("/add")
-    @SaCheckPermission("proposalRecord:add")
-    public ResponseDTO<String> add(@RequestBody @Valid ProposalRecordAddForm addForm) {
-        return Service.add(addForm);
-    }
-
-    @Operation(summary = "更新")
-    @PostMapping("/update")
-    @SaCheckPermission("proposalRecord:update")
-    public ResponseDTO<String> update(@RequestBody @Valid ProposalRecordUpdateForm updateForm) {
-        return Service.update(updateForm);
-    }
-
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("proposalRecord:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
-    }
-
-    @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("proposalRecord:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
-    }
+    /*
+     * 生成器给的「添加 / 更新 / 批量删除 / 单个删除」四个接口已整组移除（v3.69.0）。
+     *
+     * 提案表是"钱出去的必经之路"，也是账务对账的主线：
+     *   · 「新建」按钮会造出 status=0 的提案 —— 正常链路只落 10/30/80 三种初始状态，
+     *     0 是绕过风控与预算直接插库的产物，不会被任何流程推进，也没人会发现；
+     *     提案漏斗里那条"有 N 条提案停在等待中"的告警，来源就是这个按钮；
+     *   · delete 是物理删除，而 t_physical_delivery.proposal_id 和
+     *     t_member_asset_transaction.biz_ref_id 都指着它 —— 删掉提案，
+     *     下游的履约单和流水就成了无源之水，出账查不到依据。
+     *
+     * 提案只能由发奖链路创建（addProposal），由审批与下发推进状态。
+     */
 }

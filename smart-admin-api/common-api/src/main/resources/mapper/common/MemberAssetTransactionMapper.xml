@@ -83,17 +83,10 @@
         ORDER BY create_time DESC
     </select>
 
-                <delete id="batchDelete">
-                    delete from t_member_asset_transaction
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
-                <delete id="deleteById">
-                    delete from t_member_asset_transaction
-                        where id = #{id}
-                </delete>
+    <!--
+        原先这里有 batchDelete / deleteById 两条 DELETE FROM，已随写接口一起移除（v3.69.0）：
+        账务与审计流水删掉就再也查不回来，事后连「少了什么」都不知道。
+    -->
 
     <!--
         统计面板的时间窗，四个财务页面同一个写法。

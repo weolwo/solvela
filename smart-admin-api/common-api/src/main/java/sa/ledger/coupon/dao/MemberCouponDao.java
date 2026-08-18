@@ -70,14 +70,27 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      */
     List<java.util.Map<String, Object>> selectSourceStat(@Param("form") LedgerStatForm form);
 
-            // ----- 物理删除 -----
-                /**
-                 * 单个物理删除
-                 */
-                long deleteById(@Param("id") Long id);
+    // ==================== 过期收口（couponExpire 定时任务） ====================
 
-                /**
-                 * 批量物理删除
-                 */
-                void batchDelete(@Param("idList") List<Long> idList);
+    /**
+     * 已过有效期却仍是「未使用」的张数。给试运行用 —— 先看清楚要改多少行再动手。
+     *
+     * @param now 数据库时钟，由任务上下文传入（铁律 9：不要在这里用 JVM 时间）
+     */
+    long countExpirableCoupon(@Param("now") java.time.LocalDateTime now);
+
+    /**
+     * 把过了有效期的未使用券置为 2-已过期，一次最多 {@code limit} 行。
+     *
+     * <p>条件里带着 {@code status = 0}，所以天然幂等：重复执行第二遍影响行数就是 0，
+     * 也不会把已使用/已作废的券误伤成过期。
+     *
+     * @return 实际更新行数
+     */
+    int expireCouponBatch(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+
+    /*
+     * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。
+     * 账务与审计流水删掉就再也查不回来，事后连"少了什么"都不知道。
+     */
 }

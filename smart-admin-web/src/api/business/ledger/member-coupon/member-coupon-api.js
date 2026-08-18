@@ -28,31 +28,10 @@ export const memberCouponApi = {
     return postRequest('/memberCoupon/stat', param);
   },
 
-  /**
-   * 增加  @author  weolwo
+  /*
+   * 不再封装增删改 —— 后端对应的四个接口已整组移除（v3.69.0）。
+   * 这是账务台账：券由发奖链路发放、由核销链路回写，改一行就让台账和真实发生过的事脱节；
+   * 原先的 delete 还是物理删除，删完连「少了什么」都查不出来。
+   * 真需要人工订正，走提案链路或 DBA 流程并留痕。
    */
-  add: (param) => {
-    return postRequest('/memberCoupon/add', param);
-  },
-
-  /**
-   * 修改  @author  weolwo
-   */
-  update: (param) => {
-    return postRequest('/memberCoupon/update', param);
-  },
-
-  /**
-   * 删除  @author  weolwo
-   */
-  delete: (id) => {
-    return getRequest(`/memberCoupon/delete/${id}`);
-  },
-
-  /**
-   * 批量删除  @author  weolwo
-   */
-  batchDelete: (idList) => {
-    return postRequest('/memberCoupon/batchDelete', idList);
-  },
 };

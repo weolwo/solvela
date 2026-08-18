@@ -89,17 +89,10 @@
         WHERE member_name = #{memberName} AND asset_type = #{assetType}
     </select>
 
-    <delete id="batchDelete">
-                    delete from t_member_wallet
-                    where id in
-                    <foreach collection="idList" open="(" close=")" separator="," item="item">
-                        #{item}
-                    </foreach>
-                </delete>
-                <delete id="deleteById">
-                    delete from t_member_wallet
-                        where id = #{id}
-                </delete>
+    <!--
+        原先这里有 batchDelete / deleteById 两条 DELETE FROM，已随写接口一起移除（v3.69.0）：
+        账务与审计流水删掉就再也查不回来，事后连「少了什么」都不知道。
+    -->
 
     <!--
         钱包总计与体检。⚠️ <b>刻意不带时间窗，统计的是全量</b>：

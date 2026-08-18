@@ -1,24 +1,22 @@
 package sa.ledger.wallet.controller;
 
-import sa.base.common.domain.ValidateList;
-import sa.ledger.wallet.domain.entity.MemberWallet;
-import sa.ledger.wallet.domain.form.MemberWalletAddForm;
-import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
-import sa.ledger.wallet.domain.form.MemberWalletUpdateForm;
-import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
-import sa.ledger.wallet.domain.vo.MemberWalletVO;
-import sa.ledger.stat.domain.form.LedgerStatForm;
-import sa.ledger.wallet.service.MemberWalletService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import sa.base.common.domain.ResponseDTO;
-import sa.base.common.domain.PageResult;
-import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import sa.base.common.domain.PageResult;
+import sa.base.common.domain.ResponseDTO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
+import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
+import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
+import sa.ledger.wallet.domain.vo.MemberWalletVO;
+import sa.ledger.wallet.service.MemberWalletService;
+
 /**
  * 会员钱包表 Controller
  *
@@ -48,31 +46,14 @@ public class MemberWalletController {
         return ResponseDTO.ok(Service.stat(form));
     }
 
-    @Operation(summary = "添加")
-    @PostMapping("/add")
-    @SaCheckPermission("memberWallet:add")
-    public ResponseDTO<String> add(@RequestBody @Valid MemberWalletAddForm addForm) {
-        return Service.add(addForm);
-    }
-
-    @Operation(summary = "更新")
-    @PostMapping("/update")
-    @SaCheckPermission("memberWallet:update")
-    public ResponseDTO<String> update(@RequestBody @Valid MemberWalletUpdateForm updateForm) {
-        return Service.update(updateForm);
-    }
-
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("memberWallet:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
-    }
-
-    @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("memberWallet:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
-    }
+    /*
+     * 生成器给的「添加 / 更新 / 批量删除 / 单个删除」四个接口已整组移除（v3.69.0）。
+     *
+     * 钱包这张表尤其不能开写口子：/memberWallet/update 能<b>直接改余额且不写任何流水</b>，
+     * 改完余额与 t_member_asset_transaction 就永久对不上，
+     * 而统计面板的体检项也发现不了（它只查得出余额为负这种明显异常）。
+     * 余额的唯一合法入口是钱包服务里那几个"改余额 + 落流水"绑在同一个事务里的方法。
+     *
+     * delete 原先还是物理删除，删掉一个账户等于把这个人的资产凭空抹掉。
+     */
 }

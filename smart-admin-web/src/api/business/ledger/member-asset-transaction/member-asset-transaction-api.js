@@ -28,31 +28,10 @@ export const memberAssetTransactionApi = {
     return postRequest('/memberAssetTransaction/stat', param);
   },
 
-  /**
-   * 增加  @author  weolwo
+  /*
+   * 不再封装增删改 —— 后端对应的四个接口已整组移除（v3.69.0）。
+   * 这是账务域唯一的资金流水，钱包余额的每一次变动都在这里留了一行：
+   * 改一行就让账面和真实发生过的事脱节，而对账正是以它为准；
+   * 原先的 delete 还是物理删除，删完连「少了什么」都查不出来。
    */
-  add: (param) => {
-    return postRequest('/memberAssetTransaction/add', param);
-  },
-
-  /**
-   * 修改  @author  weolwo
-   */
-  update: (param) => {
-    return postRequest('/memberAssetTransaction/update', param);
-  },
-
-  /**
-   * 删除  @author  weolwo
-   */
-  delete: (id) => {
-    return getRequest(`/memberAssetTransaction/delete/${id}`);
-  },
-
-  /**
-   * 批量删除  @author  weolwo
-   */
-  batchDelete: (idList) => {
-    return postRequest('/memberAssetTransaction/batchDelete', idList);
-  },
 };

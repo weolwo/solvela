@@ -100,14 +100,30 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      */
     List<java.util.Map<String, Object>> selectBlockReasonStat(@Param("queryForm") ProposalRecordQueryForm queryForm);
 
-            // ----- 物理删除 -----
-                /**
-                 * 单个物理删除
-                 */
-                long deleteById(@Param("id") Long id);
+    // ==================== 卡单扫描（proposalStuckScan 定时任务） ====================
 
-                /**
-                 * 批量物理删除
-                 */
-                void batchDelete(@Param("idList") List<Long> idList);
+    /**
+     * 卡在下发的提案条数：{@code status IN (30, 40)} 且超过 {@code minutes} 分钟没有任何更新。
+     *
+     * <p>下发是在提案事务提交后同步调起的，进程中途退出就没有第二次机会 ——
+     * 这些提案不会自己往下走，钱既没发出去也没标成失败。
+     *
+     * @param now 数据库时钟，由任务上下文传入（铁律 9）
+     */
+    long countStuckDispatch(@Param("now") java.time.LocalDateTime now, @Param("minutes") int minutes);
+
+    /**
+     * 卡单样本（最多 {@code limit} 条），给日志用：让人能直接拿单号去查。
+     *
+     * <p>不返回全量 —— 真卡了几千条，前十条和后十条是同一个原因，
+     * 把几千个单号刷进日志只会把真正有用的那行冲掉。
+     */
+    List<java.util.Map<String, Object>> selectStuckDispatchSample(@Param("now") java.time.LocalDateTime now,
+                                                                 @Param("minutes") int minutes,
+                                                                 @Param("limit") int limit);
+
+    /*
+     * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。
+     * 账务与审计流水删掉就再也查不回来，事后连"少了什么"都不知道。
+     */
 }

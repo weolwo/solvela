@@ -1,25 +1,21 @@
 package sa.prize.prizelog.controller;
 
-import sa.base.common.domain.ValidateList;
-import sa.prize.prizelog.domain.entity.PrizeLog;
-import sa.prize.prizelog.domain.form.PrizeLogAddForm;
-import sa.prize.prizelog.domain.form.PrizeLogQueryForm;
-import sa.prize.prizelog.domain.form.PrizeLogUpdateForm;
-import sa.prize.prizelog.domain.vo.PrizeLogFunnelVO;
-import sa.prize.prizelog.domain.vo.PrizeLogVO;
-import sa.base.common.util.SmartRequestUtil;
-import sa.consumer.handler.PrizeDispatchHandler;
-import sa.prize.prizelog.service.PrizeLogService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import sa.base.common.domain.ResponseDTO;
-import sa.base.common.domain.PageResult;
-import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import sa.base.common.domain.PageResult;
+import sa.base.common.domain.ResponseDTO;
+import sa.base.common.util.SmartRequestUtil;
+import sa.consumer.handler.PrizeDispatchHandler;
+import sa.prize.prizelog.domain.form.PrizeLogAddForm;
+import sa.prize.prizelog.domain.form.PrizeLogQueryForm;
+import sa.prize.prizelog.domain.vo.PrizeLogFunnelVO;
+import sa.prize.prizelog.domain.vo.PrizeLogVO;
+import sa.prize.prizelog.service.PrizeLogService;
+
 /**
  * 奖励记录表 Controller
  *
@@ -72,24 +68,13 @@ public class PrizeLogController {
         return Service.add(addForm);
     }
 
-    @Operation(summary = "更新")
-    @PostMapping("/update")
-    @SaCheckPermission("prizeLog:update")
-    public ResponseDTO<String> update(@RequestBody @Valid PrizeLogUpdateForm updateForm) {
-        return Service.update(updateForm);
-    }
-
-    @Operation(summary = "批量删除")
-    @PostMapping("/batchDelete")
-    @SaCheckPermission("prizeLog:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
-    }
-
-    @Operation(summary = "单个删除")
-    @GetMapping("/delete/{id}")
-    @SaCheckPermission("prizeLog:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
-    }
+    /*
+     * 生成器给的「更新 / 批量删除 / 单个删除」已移除（v3.69.0）：
+     * t_prize_log 是"实际发了什么奖"的审计流水，改历史会让流水与真实发放脱节，
+     * 而 delete 原先还是物理删除，删完连"少了什么"都查不出来。
+     *
+     * ⚠️ add 刻意保留：人工补发是<b>往前追加一条新流水</b>，不是改旧账，
+     * 它本身就是一次真实发放的起点（落 approve_status=1 待审批，
+     * 审批通过后才真正走提案与账务）。前端「人工补发」按钮用的就是它。
+     */
 }

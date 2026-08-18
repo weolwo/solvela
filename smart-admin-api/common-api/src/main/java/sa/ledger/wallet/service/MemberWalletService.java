@@ -3,39 +3,33 @@ package sa.ledger.wallet.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import sa.base.common.code.BizErrorCode;
-import sa.base.common.domain.PageResult;
-import sa.base.common.domain.ResponseDTO;
-import sa.base.common.exception.BusinessException;
-import sa.base.common.util.SmartBeanUtil;
-import sa.base.common.util.SmartCollectionUtil;
-import sa.base.common.util.SmartPageUtil;
-import sa.enums.PrizeTypeEnum;
-import sa.ledger.transaction.dao.MemberAssetTransactionDao;
-import sa.ledger.transaction.domain.entity.MemberAssetTransaction;
-import sa.ledger.wallet.dao.MemberWalletDao;
-import sa.ledger.wallet.domain.entity.MemberWallet;
-import sa.ledger.wallet.domain.form.MemberWalletAddForm;
-import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
-import sa.ledger.wallet.domain.form.MemberWalletUpdateForm;
-import sa.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
-import sa.ledger.transaction.service.MemberAssetTransactionService;
-import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
-import sa.ledger.wallet.domain.vo.MemberWalletVO;
-import sa.ledger.stat.domain.form.LedgerStatForm;
-import static sa.ledger.stat.LedgerStatSupport.toDecimal;
-import static sa.ledger.stat.LedgerStatSupport.toLong;
-import static sa.ledger.stat.LedgerStatSupport.toStr;
-import sa.risk.proposal.domain.entity.ProposalRecord;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import sa.base.common.code.BizErrorCode;
+import sa.base.common.domain.PageResult;
+import sa.base.common.exception.BusinessException;
+import sa.base.common.util.SmartPageUtil;
+import sa.enums.PrizeTypeEnum;
+import sa.ledger.stat.domain.form.LedgerStatForm;
+import sa.ledger.transaction.dao.MemberAssetTransactionDao;
+import sa.ledger.transaction.domain.entity.MemberAssetTransaction;
+import sa.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import sa.ledger.transaction.service.MemberAssetTransactionService;
+import sa.ledger.wallet.dao.MemberWalletDao;
+import sa.ledger.wallet.domain.entity.MemberWallet;
+import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
+import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
+import sa.ledger.wallet.domain.vo.MemberWalletVO;
+import sa.risk.proposal.domain.entity.ProposalRecord;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static sa.ledger.stat.LedgerStatSupport.*;
 
 /**
  * （只抛异常，绝不返回 DTO）
@@ -117,24 +111,6 @@ public class MemberWalletService {
         Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
         List<MemberWalletVO> list = memberWalletDao.queryPage(page, queryForm);
         return SmartPageUtil.convert2PageResult(page, list);
-    }
-
-    /**
-     * 添加
-     */
-    public ResponseDTO<String> add(MemberWalletAddForm addForm) {
-        MemberWallet memberWallet = SmartBeanUtil.copy(addForm, MemberWallet.class);
-        memberWalletDao.insert(memberWallet);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 更新
-     */
-    public ResponseDTO<String> update(MemberWalletUpdateForm updateForm) {
-        MemberWallet memberWallet = SmartBeanUtil.copy(updateForm, MemberWallet.class);
-        memberWalletDao.updateById(memberWallet);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -274,27 +250,4 @@ public class MemberWalletService {
         return wallet;
     }
 
-    /**
-     * 批量删除
-     */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (SmartCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
-        }
-
-        memberWalletDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 单个删除
-     */
-    public ResponseDTO<String> delete(Long id) {
-        if (null == id) {
-            return ResponseDTO.ok();
-        }
-
-        memberWalletDao.deleteById(id);
-        return ResponseDTO.ok();
-    }
 }

@@ -1,30 +1,22 @@
 package sa.ledger.transaction.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import sa.base.common.domain.PageResult;
+import sa.base.common.util.SmartPageUtil;
+import sa.ledger.stat.domain.form.LedgerStatForm;
+import sa.ledger.transaction.dao.MemberAssetTransactionDao;
+import sa.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
+import sa.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import sa.ledger.transaction.domain.vo.MemberAssetTransactionVO;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import sa.base.common.util.SmartBeanUtil;
-import sa.base.common.util.SmartCollectionUtil;
-import sa.base.common.util.SmartPageUtil;
-import sa.ledger.transaction.dao.MemberAssetTransactionDao;
-import sa.ledger.transaction.domain.entity.MemberAssetTransaction;
-import sa.ledger.transaction.domain.form.MemberAssetTransactionAddForm;
-import sa.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
-import sa.ledger.transaction.domain.form.MemberAssetTransactionUpdateForm;
-import sa.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
-import sa.ledger.transaction.domain.vo.MemberAssetTransactionVO;
-import sa.ledger.stat.domain.form.LedgerStatForm;
-import static sa.ledger.stat.LedgerStatSupport.rate;
-import static sa.ledger.stat.LedgerStatSupport.toDecimal;
-import static sa.ledger.stat.LedgerStatSupport.toLong;
-import static sa.ledger.stat.LedgerStatSupport.toStr;
-import sa.base.common.domain.ResponseDTO;
-import sa.base.common.domain.PageResult;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+import static sa.ledger.stat.LedgerStatSupport.*;
 
 /**
  * 交易明细表 Service
@@ -127,46 +119,4 @@ public class MemberAssetTransactionService {
         return item;
     }
 
-    /**
-     * 添加
-     */
-    public ResponseDTO<String> add(MemberAssetTransactionAddForm addForm) {
-        MemberAssetTransaction memberAssetTransaction = SmartBeanUtil.copy(addForm, MemberAssetTransaction.class);
-        memberAssetTransactionDao.insert(memberAssetTransaction);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 更新
-     *
-     */
-    public ResponseDTO<String> update(MemberAssetTransactionUpdateForm updateForm) {
-        MemberAssetTransaction memberAssetTransaction = SmartBeanUtil.copy(updateForm, MemberAssetTransaction.class);
-        memberAssetTransactionDao.updateById(memberAssetTransaction);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 批量删除
-     */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (SmartCollectionUtil.isEmpty(idList)){
-            return ResponseDTO.ok();
-        }
-
-        memberAssetTransactionDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 单个删除
-     */
-    public ResponseDTO<String> delete(Long id) {
-        if (null == id){
-            return ResponseDTO.ok();
-        }
-
-        memberAssetTransactionDao.deleteById(id);
-        return ResponseDTO.ok();
-    }
 }

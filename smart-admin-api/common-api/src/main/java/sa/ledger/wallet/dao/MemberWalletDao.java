@@ -63,17 +63,10 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
      */
     MemberWallet getByMemberNameAndAssetType(@Param("memberName") String memberName, @Param("assetType") String assetType);
 
-    // ----- 物理删除 -----
-
-    /**
-     * 单个物理删除
+    /*
+     * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。
+     * 账务与审计流水删掉就再也查不回来，事后连"少了什么"都不知道。
      */
-    long deleteById(@Param("id") Long id);
-
-    /**
-     * 批量物理删除
-     */
-    void batchDelete(@Param("idList") List<Long> idList);
 
     /**
      * 增加余额（乐观锁），资产类型由所在行决定，任何资产通用

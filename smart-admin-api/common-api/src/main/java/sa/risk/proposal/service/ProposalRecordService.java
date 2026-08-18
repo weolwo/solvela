@@ -3,11 +3,14 @@ package sa.risk.proposal.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import sa.base.common.domain.PageResult;
 import sa.base.common.domain.ResponseDTO;
-import sa.base.common.util.SmartBeanUtil;
 import sa.base.common.util.SmartCodeUtil;
-import sa.base.common.util.SmartCollectionUtil;
 import sa.base.common.util.SmartPageUtil;
 import sa.enums.ProposalSourceTypeEnum;
 import sa.ledger.engine.AssetDispatchEngine;
@@ -21,14 +24,8 @@ import sa.risk.proposal.dao.ProposalRecordDao;
 import sa.risk.proposal.domain.entity.ProposalRecord;
 import sa.risk.proposal.domain.form.ProposalRecordAddForm;
 import sa.risk.proposal.domain.form.ProposalRecordQueryForm;
-import sa.risk.proposal.domain.form.ProposalRecordUpdateForm;
 import sa.risk.proposal.domain.vo.ProposalFunnelVO;
 import sa.risk.proposal.domain.vo.ProposalRecordVO;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -470,49 +467,6 @@ public class ProposalRecordService {
         }
         vo.setIssueList(issues);
         return vo;
-    }
-
-    /**
-     * 添加
-     */
-    public ResponseDTO<String> add(ProposalRecordAddForm addForm) {
-        ProposalRecord proposalRecord = SmartBeanUtil.copy(addForm, ProposalRecord.class);
-        proposalRecordDao.insert(proposalRecord);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 更新
-     *
-     */
-    public ResponseDTO<String> update(ProposalRecordUpdateForm updateForm) {
-        ProposalRecord proposalRecord = SmartBeanUtil.copy(updateForm, ProposalRecord.class);
-        proposalRecordDao.updateById(proposalRecord);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 批量删除
-     */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
-        if (SmartCollectionUtil.isEmpty(idList)){
-            return ResponseDTO.ok();
-        }
-
-        proposalRecordDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
-    }
-
-    /**
-     * 单个删除
-     */
-    public ResponseDTO<String> delete(Long id) {
-        if (null == id){
-            return ResponseDTO.ok();
-        }
-
-        proposalRecordDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 
     private BigDecimal rate(long part, long total) {

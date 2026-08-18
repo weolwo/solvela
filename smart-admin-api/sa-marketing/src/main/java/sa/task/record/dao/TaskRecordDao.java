@@ -144,6 +144,27 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      */
     int updateProgressData(@Param("id") Long id, @Param("progressData") String progressData);
 
+    // ==================== 过期收口（taskRecordExpire 定时任务） ====================
+
+    /**
+     * 已过有效期却仍是「进行中」的条数。给试运行用 —— 先看清楚要改多少行再动手。
+     *
+     * @param now 数据库时钟，由任务上下文传入（铁律 9：不要在这里用 JVM 时间）
+     */
+    long countExpirableRecord(@Param("now") java.time.LocalDateTime now);
+
+    /**
+     * 把过了有效期的进行中记录置为 3-已过期，一次最多 {@code limit} 行。
+     *
+     * <p>走 {@code idx_t_tsk_rec_expire(status, valid_end_time)} —— 那个索引<b>本来就是
+     * 给这个扫描建的</b>，只是扫描一直没写。
+     *
+     * <p>条件里只认 {@code status = 0}，所以幂等，也不会误伤已完成/已发奖的记录。
+     *
+     * @return 实际更新行数
+     */
+    int expireRecordBatch(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+
     /**
      * 取数据库时钟（铁律 9：时间只认数据库一个时钟，不用 JVM 的 LocalDateTime.now()）
      */

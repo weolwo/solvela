@@ -70,7 +70,8 @@
             AND valid_start_time &gt;= #{queryForm.validStartTimeBegin}
         </if>
         <if test="queryForm.validStartTimeEnd != null">
-            AND valid_start_time &lt;= #{queryForm.validStartTimeEnd}
+            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+            AND valid_start_time &lt; DATE_ADD(#{queryForm.validStartTimeEnd}, INTERVAL 1 DAY)
         </if>
     </sql>
 
@@ -186,7 +187,8 @@
                             AND valid_start_time &gt;= #{queryForm.validStartTimeBegin}
                         </if>
                         <if test="queryForm.validStartTimeEnd != null">
-                            AND valid_start_time &lt;= #{queryForm.validStartTimeEnd}
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND valid_start_time &lt; DATE_ADD(#{queryForm.validStartTimeEnd}, INTERVAL 1 DAY)
                         </if>
                         <if test="queryForm.status != null">
                             AND status = #{queryForm.status}
@@ -195,7 +197,8 @@
                             AND complete_time &gt;= #{queryForm.completeTimeBegin}
                         </if>
                         <if test="queryForm.completeTimeEnd != null">
-                            AND complete_time &lt;= #{queryForm.completeTimeEnd}
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND complete_time &lt; DATE_ADD(#{queryForm.completeTimeEnd}, INTERVAL 1 DAY)
                         </if>
         </where>
     </sql>
@@ -310,5 +313,30 @@
     <select id="selectDbNow" resultType="java.time.LocalDateTime">
         SELECT now()
     </select>
+
+    <!--
+        ==================== 过期收口（taskRecordExpire 定时任务） ====================
+
+        idx_t_tsk_rec_expire(status, valid_end_time) 这个索引本来就是给这个扫描建的，
+        只是扫描一直没写 —— 于是过了有效期的记录永远停在「进行中」，
+        用户端一直看到一个永远完不成的任务，达标率的分母里也一直混着这批僵尸记录。
+
+        ⚠️ now 由任务上下文传入（数据库时钟，铁律 9），这里不写 now()。
+    -->
+    <select id="countExpirableRecord" resultType="long">
+        SELECT COUNT(*) FROM t_task_record
+        WHERE status = 0 AND valid_end_time &lt; #{now}
+    </select>
+
+    <!--
+        条件里只认 status = 0：幂等，且不会误伤已完成(1)/已发奖(2)的记录。
+        LIMIT 分批，避免一次锁太多行。
+    -->
+    <update id="expireRecordBatch">
+        UPDATE t_task_record
+        SET status = 3
+        WHERE status = 0 AND valid_end_time &lt; #{now}
+        LIMIT #{limit}
+    </update>
 
 </mapper>
