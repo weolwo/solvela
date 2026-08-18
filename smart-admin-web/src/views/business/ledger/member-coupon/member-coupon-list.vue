@@ -3,11 +3,137 @@
   *
   * 只读台账：券由发奖链路发放、由核销链路回写，管理端不提供增删改。
   *
+  * 顶部统计里，**发放和核销是两个口径**（发放看 create_time、核销看 used_time），
+  * 两个数没有包含关系，不要相减：今天核销的券可能是上个月发的。
+  * 用同一个窗口算「今日核销 / 今日发放」得到的必然是个接近 0 的数 ——
+  * 那不是核销率低，是口径错了，而它错得很像一条正常的业务结论。
+  *
+  * ⚠️ 「券库存」那一组是**全量**，不随时间范围变化：压着多少张没用的券是存量问题，
+  * 限制在今天只会把它藏起来。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-18 23:42:44
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 优惠券统计 begin ----------->
+  <StatPanel title="优惠券统计" storage-key="member-coupon" :issue-list="stat.issueList" @change="loadStat">
+    <template #summary>
+      本期发放 {{ num(stat.issuedCount) }} 张 · 本期核销 {{ num(stat.usedCount) }} 张
+      <span v-if="stat.staleUnusedCount > 0" class="smart-stat-summary-alert"> · 过期未收口 {{ num(stat.staleUnusedCount) }} 张 </span>
+    </template>
+
+    <a-row :gutter="12" class="smart-stat-row">
+      <a-col :span="5">
+        <div class="smart-stat-card is-primary">
+          <div class="smart-stat-card-label">本期发放</div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.issuedCount) }}
+            <span class="smart-stat-card-unit">张</span>
+          </div>
+          <div class="smart-stat-card-foot">涉及 {{ num(stat.issuedMemberCount) }} 名会员</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- ⚠️ 核销走 used_time，和发放不是同一批券，两个数不要相减 -->
+        <div class="smart-stat-card is-success">
+          <div class="smart-stat-card-label">
+            本期核销
+            <a-tooltip title="按核销时间统计，和「本期发放」不是同一批券——今天核销的券可能是上个月发的，两个数没有包含关系，不要相减">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.usedCount) }}
+            <span class="smart-stat-card-unit">张</span>
+          </div>
+          <div class="smart-stat-card-foot">涉及 {{ num(stat.usedMemberCount) }} 名会员</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <div class="smart-stat-card is-muted">
+          <div class="smart-stat-card-label">
+            本期发放的核销率
+            <a-tooltip title="分母是本期发放的这批券，所以是有意义的转化率。但刚发的券天然还没来得及用——时间范围选得越近，这个数越低，不要据此判断券不好用">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">{{ percent(stat.issuedUsedRate) }}</div>
+          <div class="smart-stat-card-foot">这批券里已用 {{ num(stat.issuedUsedCount) }} 张</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- 存量：压着多少张没用的券，限制在今天就看不见了 -->
+        <div class="smart-stat-card is-muted">
+          <div class="smart-stat-card-label">
+            未使用库存
+            <span class="smart-stat-card-tag">全量</span>
+            <a-tooltip title="不受时间范围影响。这个数是虚高的——没有过期扫描任务，过了有效期的券也还挂在「未使用」里">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.stockUnusedCount) }}
+            <span class="smart-stat-card-unit">张</span>
+          </div>
+          <div class="smart-stat-card-foot">真正还能用 {{ num(realUsableCount) }} 张 · 券总量 {{ num(stat.stockTotalCount) }}</div>
+        </div>
+      </a-col>
+      <a-col :span="4">
+        <!-- 全工程没有任何地方把券置为已过期，这批券永远不会自己收口 -->
+        <div class="smart-stat-card" :class="stat.staleUnusedCount > 0 ? 'is-critical' : 'is-muted'">
+          <div class="smart-stat-card-label">
+            过期未收口
+            <span class="smart-stat-card-tag">全量</span>
+          </div>
+          <div class="smart-stat-card-value">{{ num(stat.staleUnusedCount) }}</div>
+          <div class="smart-stat-card-foot">7 天内到期 {{ num(stat.expiringSoonCount) }} 张</div>
+        </div>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="12">
+      <a-col :span="12">
+        <a-card v-if="stat.couponList && stat.couponList.length > 0" size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            券模分布（条形为核销率）
+            <span class="smart-stat-block-sub">按本期发放量 TOP 10</span>
+          </div>
+          <div v-for="item in stat.couponList" :key="item.couponCode" class="smart-stat-line">
+            <a-tooltip :title="item.couponName ? item.couponName + '（' + item.couponCode + '）' : item.couponCode">
+              <div class="smart-stat-name">{{ item.couponName || item.couponCode }}</div>
+            </a-tooltip>
+            <div class="smart-stat-bar-wrap">
+              <div class="smart-stat-bar" :style="{ width: barPercent(item.usedRate) + '%' }"></div>
+            </div>
+            <div class="smart-stat-num">
+              {{ num(item.issuedCount) }} 张 · {{ percent(item.usedRate) }}
+              <span v-if="item.staleCount > 0" class="smart-stat-alert-text"> · 过期 {{ num(item.staleCount) }} </span>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="12">
+        <a-card v-if="stat.sourceList && stat.sourceList.length > 0" size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            来源分布
+            <span class="smart-stat-block-sub">本期发放，取值原样回显（这一列没有枚举约束）</span>
+          </div>
+          <div v-for="item in stat.sourceList" :key="item.sourceType || 'none'" class="smart-stat-line">
+            <a-tooltip :title="item.sourceType || '（写入侧没写来源）'">
+              <div class="smart-stat-name">{{ item.sourceType || '（未记录）' }}</div>
+            </a-tooltip>
+            <div class="smart-stat-bar-wrap">
+              <div class="smart-stat-bar" :style="{ width: barPercent(item.issuedShare) + '%' }"></div>
+            </div>
+            <div class="smart-stat-num">{{ num(item.issuedCount) }} 张 · {{ percent(item.issuedShare) }}</div>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+  </StatPanel>
+  <!---------- 优惠券统计 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
@@ -96,14 +222,44 @@
   </a-card>
 </template>
 <script setup>
-  import { reactive, ref, onMounted } from 'vue';
+  import { computed, reactive, ref, onMounted } from 'vue';
+  import { QuestionCircleOutlined } from '@ant-design/icons-vue';
   import { memberCouponApi } from '/@/api/business/ledger/member-coupon/member-coupon-api';
+  import StatPanel from '/@/components/business/stat-panel/index.vue';
+  import { barPercent, num, percent } from '/@/lib/stat-format';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
   import { COUPON_STATUS_OPTIONS, couponStatusOf } from '/@/constants/business/ledger/member-coupon/member-coupon-const';
+
+  // ---------------------------- 统计面板 ----------------------------
+
+  /*
+   * 时间范围由 StatPanel 自己管（默认当天），与下面列表的筛选<b>刻意不联动</b>。
+   * 券库存那一组指标服务端就是按全量算的，不受这个范围影响。
+   */
+  const stat = ref({});
+
+  async function loadStat(form) {
+    try {
+      const res = await memberCouponApi.stat(form);
+      stat.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
+  }
+
+  /*
+   * 真正还能用的券 = 未使用 - 已过有效期还挂在未使用里的。
+   * 直接把「未使用」当成可用库存会高估 —— 全工程没有任何地方把券置为已过期。
+   */
+  const realUsableCount = computed(() => {
+    const unused = Number(stat.value.stockUnusedCount || 0);
+    const stale = Number(stat.value.staleUnusedCount || 0);
+    return unused - stale;
+  });
 
   // ---------------------------- 表格列 ----------------------------
 

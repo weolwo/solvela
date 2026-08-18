@@ -21,6 +21,22 @@ import java.util.List;
 @Mapper
 public interface MemberWalletDao extends BaseMapper<MemberWallet> {
 
+    // ==================== 统计面板 ====================
+
+    /**
+     * 钱包总计与体检。<b>刻意不带时间范围，统计的是全量</b>：
+     * 钱包表是存量表，只有当前余额、没有历史切片，「今天的总余额」这个说法本身不成立。
+     *
+     * <p>本页的「本期变动」走交易明细表，不在这里另写一份。
+     */
+    java.util.Map<String, Object> selectStat();
+
+    /**
+     * 按资产类型的余额存量。余额必须按类型分开 —— 积分和现金不是同一个量纲。
+     */
+    List<java.util.Map<String, Object>> selectAssetBalanceStat();
+
+
     /**
      * 分页查询
      *

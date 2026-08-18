@@ -5,7 +5,9 @@ import sa.ledger.wallet.domain.entity.MemberWallet;
 import sa.ledger.wallet.domain.form.MemberWalletAddForm;
 import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
 import sa.ledger.wallet.domain.form.MemberWalletUpdateForm;
+import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
 import sa.ledger.wallet.domain.vo.MemberWalletVO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
 import sa.ledger.wallet.service.MemberWalletService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +39,13 @@ public class MemberWalletController {
     @SaCheckPermission("memberWallet:query")
     public ResponseDTO<PageResult<MemberWalletVO>> queryPage(@RequestBody @Valid MemberWalletQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "钱包统计：资产存量（全量）+ 本期变动（默认当天，取自交易明细）")
+    @PostMapping("/stat")
+    @SaCheckPermission("memberWallet:query")
+    public ResponseDTO<MemberWalletStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(form));
     }
 
     @Operation(summary = "添加")

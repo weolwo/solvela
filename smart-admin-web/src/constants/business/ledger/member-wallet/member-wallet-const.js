@@ -36,6 +36,15 @@ export const ASSET_TYPE_OPTIONS = Object.values(ASSET_TYPE_ENUM).map((i) => ({
   label: i.desc,
 }));
 
+/**
+ * 资产计量单位：余额只在同一 assetType 内可加，展示时必须带上单位，
+ * 否则「5830」既可能是积分也可能是元，看的人只能猜。
+ *
+ * 直接复用提案域那一份，不在这里再抄一遍 —— t_member_wallet.asset_type 与
+ * t_proposal_record.asset_type 本来就是同一个字典（后端同一个 PrizeTypeEnum）。
+ */
+export { assetUnitOf } from '/@/constants/business/risk/proposal-record/proposal-record-const';
+
 export function walletStatusOf(value) {
   return Object.values(WALLET_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
 }

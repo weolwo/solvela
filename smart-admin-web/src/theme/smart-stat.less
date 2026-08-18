@@ -1,0 +1,228 @@
+/*
+ * 统计面板的公共样式（财务中心四个页面共用）
+ *
+ * 为什么放全局而不是各页 scoped：四个页面的面板长得一模一样，
+ * 各抄一份就是四份会各自漂移的样式 —— 改个配色要改四处，漏一处就长得不一样了。
+ *
+ * 类名一律 smart-stat- 前缀，与项目里 smart- 的全局约定一致，
+ * 也避免和提案/任务/奖励三个漏斗页里那套同名 scoped 类（.overview-card 等）撞上。
+ *
+ * @Author:    alaric
+ * @Date:      2026-08-18
+ */
+
+/**********************************  折叠条 **********************************/
+.smart-stat-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.smart-stat-toggle-btn {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.smart-stat-summary {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.smart-stat-summary-alert {
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.smart-stat-range {
+  margin-left: auto;
+}
+
+.smart-stat-note {
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/**********************************  概览卡片 **********************************/
+.smart-stat-row {
+  margin-bottom: 12px;
+}
+
+.smart-stat-card {
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #cbd5e1;
+  border-radius: 6px;
+
+  /* 语气：主色 / 正向 / 需要注意 / 需要立刻处理 / 中性 */
+  &.is-primary {
+    border-left-color: #3b82f6;
+  }
+
+  &.is-success {
+    border-left-color: #10b981;
+
+    .smart-stat-card-value {
+      color: #059669;
+    }
+  }
+
+  &.is-warning {
+    border-left-color: #f59e0b;
+
+    .smart-stat-card-value {
+      color: #b45309;
+    }
+  }
+
+  &.is-critical {
+    background: #fef2f2;
+    border-left-color: #b91c1c;
+
+    .smart-stat-card-value {
+      color: #b91c1c;
+    }
+  }
+
+  &.is-muted {
+    border-left-color: #cbd5e1;
+  }
+}
+
+.smart-stat-card-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.smart-stat-card-hint {
+  margin-left: 4px;
+  color: #cbd5e1;
+}
+
+/* 存量指标要显眼地标出「不受时间范围影响」，否则读者会默认它也是当天的 */
+.smart-stat-card-tag {
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.smart-stat-card-value {
+  margin-top: 2px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.smart-stat-card-unit {
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.smart-stat-card-foot {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+/**********************************  分布卡片 **********************************/
+.smart-stat-block {
+  margin-bottom: 12px;
+}
+
+.smart-stat-block-head {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.smart-stat-block-sub {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.smart-stat-line {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.smart-stat-name {
+  flex: 0 0 96px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smart-stat-name-alert {
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.smart-stat-bar-wrap {
+  flex: 1;
+  height: 14px;
+  overflow: hidden;
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.smart-stat-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #6ee7b7);
+}
+
+.smart-stat-bar-alert {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.smart-stat-num {
+  flex: 0 0 110px;
+  font-size: 12px;
+  color: #64748b;
+  text-align: right;
+}
+
+/**********************************  金额行 **********************************/
+.smart-stat-asset-line {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.smart-stat-asset-main {
+  flex: 0 0 160px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.smart-stat-asset-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.smart-stat-alert-text {
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+/* 净额为负是一个结论，不是错误，用中性偏冷的色，别和告警红混在一起 */
+.smart-stat-negative {
+  font-weight: 600;
+  color: #2563eb;
+}

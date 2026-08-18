@@ -11,7 +11,9 @@ import sa.base.common.domain.ResponseDTO;
 import sa.base.common.domain.ValidateList;
 import sa.base.common.util.SmartExcelUtil;
 import sa.ledger.logistic.domain.form.*;
+import sa.ledger.logistic.domain.vo.PhysicalDeliveryStatVO;
 import sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
 import sa.ledger.logistic.service.PhysicalDeliveryService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,6 +41,13 @@ public class PhysicalDeliveryController {
     @SaCheckPermission("physicalDelivery:query")
     public ResponseDTO<PageResult<PhysicalDeliveryVO>> queryPage(@RequestBody @Valid PhysicalDeliveryQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "发货统计：本期新增（默认当天）+ 待发货积压与收件信息体检（积压是全量）")
+    @PostMapping("/stat")
+    @SaCheckPermission("physicalDelivery:query")
+    public ResponseDTO<PhysicalDeliveryStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(form));
     }
 
     @Operation(summary = "添加")

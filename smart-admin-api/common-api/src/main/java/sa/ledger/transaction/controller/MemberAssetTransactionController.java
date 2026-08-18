@@ -5,7 +5,9 @@ import sa.ledger.transaction.domain.entity.MemberAssetTransaction;
 import sa.ledger.transaction.domain.form.MemberAssetTransactionAddForm;
 import sa.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
 import sa.ledger.transaction.domain.form.MemberAssetTransactionUpdateForm;
+import sa.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
 import sa.ledger.transaction.domain.vo.MemberAssetTransactionVO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
 import sa.ledger.transaction.service.MemberAssetTransactionService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +39,13 @@ public class MemberAssetTransactionController {
     @SaCheckPermission("memberAssetTransaction:query")
     public ResponseDTO<PageResult<MemberAssetTransactionVO>> queryPage(@RequestBody @Valid MemberAssetTransactionQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "交易统计：按资产类型的收支与净额、业务类型分布、账务体检（时间范围默认当天）")
+    @PostMapping("/stat")
+    @SaCheckPermission("memberAssetTransaction:query")
+    public ResponseDTO<MemberAssetTransactionStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(form));
     }
 
     @Operation(summary = "添加")

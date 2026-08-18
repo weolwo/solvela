@@ -5,7 +5,9 @@ import sa.ledger.coupon.domain.entity.MemberCoupon;
 import sa.ledger.coupon.domain.form.MemberCouponAddForm;
 import sa.ledger.coupon.domain.form.MemberCouponQueryForm;
 import sa.ledger.coupon.domain.form.MemberCouponUpdateForm;
+import sa.ledger.coupon.domain.vo.MemberCouponStatVO;
 import sa.ledger.coupon.domain.vo.MemberCouponVO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
 import sa.ledger.coupon.service.MemberCouponService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +39,13 @@ public class MemberCouponController {
     @SaCheckPermission("memberCoupon:query")
     public ResponseDTO<PageResult<MemberCouponVO>> queryPage(@RequestBody @Valid MemberCouponQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "优惠券统计：本期发放与本期核销（两个口径）、券库存与过期体检（时间范围默认当天）")
+    @PostMapping("/stat")
+    @SaCheckPermission("memberCoupon:query")
+    public ResponseDTO<MemberCouponStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(form));
     }
 
     @Operation(summary = "添加")

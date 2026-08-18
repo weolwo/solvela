@@ -19,7 +19,12 @@ import sa.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
 import sa.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
 import sa.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
 import sa.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
+import sa.ledger.logistic.domain.vo.PhysicalDeliveryStatVO;
 import sa.ledger.logistic.domain.vo.PhysicalDeliveryVO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
+import static sa.ledger.stat.LedgerStatSupport.rate;
+import static sa.ledger.stat.LedgerStatSupport.toLong;
+import static sa.ledger.stat.LedgerStatSupport.toStr;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,6 +56,104 @@ public class PhysicalDeliveryService {
         Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
         List<PhysicalDeliveryVO> list = physicalDeliveryDao.queryPage(page, queryForm);
         return SmartPageUtil.convert2PageResult(page, list);
+    }
+
+
+    private static final long MINUTES_PER_HOUR = 60L;
+
+    /**
+     * 积压超过一天才提示：仓库本来就不是分钟级发货，门槛太低会天天报警，报警就没人看了
+     */
+    private static final long MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+
+    /**
+     * 发货统计：今天新增了多少履约单，以及手上到底积压着多少单没发出去。
+     *
+     * <p><b>积压那一组数字刻意不跟时间范围走</b>：它是存量 ——
+     * 限制在今天，压了三天的那些单子会正好从页面上消失，
+     * 而那恰恰是这个页面唯一需要有人动手的东西。
+     *
+     * <p>待发货拆成两类：收件信息没补全的（想发也发不了，要催用户）和地址齐了等发货的
+     * （运营今天真正能干的活）。实物是三段式履约，status=0 里天然混着这两种。
+     */
+    public PhysicalDeliveryStatVO stat(LedgerStatForm form) {
+        PhysicalDeliveryStatVO vo = new PhysicalDeliveryStatVO();
+
+        Map<String, Object> newRow = physicalDeliveryDao.selectNewStat(form);
+        vo.setNewCount(toLong(newRow.get("newCount")));
+        vo.setNewMemberCount(toLong(newRow.get("newMemberCount")));
+
+        // ---- 履约状态：全量，不受时间范围影响 ----
+        Map<String, Object> row = physicalDeliveryDao.selectStatusStat();
+        long total = toLong(row.get("totalCount"));
+        long pending = toLong(row.get("pendingCount"));
+        long pendingNoAddress = toLong(row.get("pendingNoAddressCount"));
+        long delivered = toLong(row.get("deliveredCount"));
+        long signed = toLong(row.get("signedCount"));
+        long returned = toLong(row.get("returnedCount"));
+        long discarded = toLong(row.get("discardedCount"));
+        long oldestMinutes = toLong(row.get("pendingOldestMinutes"));
+
+        vo.setTotalCount(total);
+        vo.setPendingCount(pending);
+        vo.setPendingNoAddressCount(pendingNoAddress);
+        // 地址齐了、就等发货的那一部分：这才是运营今天能干的活
+        vo.setPendingReadyCount(pending - pendingNoAddress);
+        // 没有积压时 SQL 里的 MIN(...) 是 NULL，被 COALESCE 兜成 0；不要解读成「等了 0 分钟」
+        vo.setPendingOldestMinutes(pending == 0 ? 0L : oldestMinutes);
+        vo.setDeliveredCount(delivered);
+        vo.setSignedCount(signed);
+        vo.setReturnedCount(returned);
+        vo.setDiscardedCount(discarded);
+        /*
+         * 发货率的分母剔掉已作废：那些单子是被主动撤回的（页面「删除」= UPDATE status=-1），
+         * 算成「没发出去」会平白拉低发货率，而运营根本没法把它们发出去。
+         */
+        vo.setValidCount(total - discarded);
+        vo.setDeliveredRate(rate(delivered + signed, total - discarded));
+
+        // ---- 来源分布 ----
+        List<PhysicalDeliveryStatVO.SourceStatVO> sourceList = new ArrayList<>();
+        for (Map<String, Object> stat : physicalDeliveryDao.selectSourceStat()) {
+            PhysicalDeliveryStatVO.SourceStatVO item = new PhysicalDeliveryStatVO.SourceStatVO();
+            long count = toLong(stat.get("deliveryCount"));
+            item.setSourceType(toStr(stat, "sourceType"));
+            item.setDeliveryCount(count);
+            long sourceDiscarded = toLong(stat.get("discardedCount"));
+            item.setPendingCount(toLong(stat.get("pendingCount")));
+            item.setDiscardedCount(sourceDiscarded);
+            item.setDeliveredRate(rate(toLong(stat.get("shippedCount")), count - sourceDiscarded));
+            sourceList.add(item);
+        }
+        vo.setSourceList(sourceList);
+
+        // ---- 体检 ----
+        List<String> issues = new ArrayList<>();
+        if (pendingNoAddress > 0) {
+            issues.add("有 " + pendingNoAddress + " 单待发货是因为「收件信息还没补全」：实物是三段式履约，"
+                    + "中奖时用户还没填地址，履约单先落、收件信息后补 —— 这批单子想发也发不了，"
+                    + "要去催用户填地址，不是仓库的活。剩下 " + (pending - pendingNoAddress) + " 单是地址齐了等发货的");
+        }
+        if (pending > 0 && oldestMinutes >= MINUTES_PER_DAY) {
+            issues.add("最久的一单待发货已经压了 " + (oldestMinutes / MINUTES_PER_HOUR) + " 小时："
+                    + "履约单不会自己往下走，没人发就一直是待发货，用户那边看到的就是「奖到手了但东西没来」");
+        }
+        long shippedNoLogisticsNo = toLong(row.get("shippedNoLogisticsNo"));
+        if (shippedNoLogisticsNo > 0) {
+            issues.add("有 " + shippedNoLogisticsNo + " 单状态是已发货/已签收却没有物流单号："
+                    + "用户查不到件，客服也查不到，出了纠纷拿不出发货凭证");
+        }
+        long returnedNoLogisticsNo = toLong(row.get("returnedNoLogisticsNo"));
+        if (returnedNoLogisticsNo > 0) {
+            issues.add("有 " + returnedNoLogisticsNo + " 单异常退回却没有物流单号：退回这件事本身无从追溯，"
+                    + "东西到底回没回来只能靠人问");
+        }
+        if (returned > 0) {
+            issues.add("有 " + returned + " 单异常退回：这是终态，不会有任何流程再推进它们，"
+                    + "东西既没到用户手上也没重新发出，需要人工决定是补发还是作废");
+        }
+        vo.setIssueList(issues);
+        return vo;
     }
 
     /**

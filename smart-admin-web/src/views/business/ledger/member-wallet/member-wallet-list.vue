@@ -3,11 +3,99 @@
   *
   * 只读台账：钱包余额由发奖/消费链路写入，管理端不提供增删改。
   *
+  * ⚠️ 顶部统计里，**余额是存量、是全量，不随时间范围变化**：
+  * 钱包表一个会员一种资产一行、只有当前余额，没有历史切片 ——
+  * 按创建时间筛出来的是「今天新开的钱包」，那几个账户的余额加起来
+  * 既不是今天发出去的钱、也不是用户现在手上的钱，是一个什么都不回答的数字。
+  * 真正跟时间范围走的只有「本期变动」，它取自交易明细表（与交易明细页同一条 SQL）。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-18 23:56:48
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 钱包统计 begin ----------->
+  <StatPanel title="钱包统计" storage-key="member-wallet" :issue-list="stat.issueList" @change="loadStat">
+    <template #summary>
+      {{ num(stat.walletCount) }} 个账户 · {{ num(stat.memberCount) }} 名会员
+      <span v-if="stat.frozenCount > 0" class="smart-stat-summary-alert"> · 冻结 {{ num(stat.frozenCount) }} 个 </span>
+    </template>
+
+    <a-row :gutter="12" class="smart-stat-row">
+      <a-col :span="6">
+        <div class="smart-stat-card is-primary">
+          <div class="smart-stat-card-label">
+            钱包账户
+            <span class="smart-stat-card-tag">全量</span>
+            <a-tooltip title="一个会员一种资产一行，所以账户数不等于会员数。钱包表是存量表，这些数字不随时间范围变化">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">{{ num(stat.walletCount) }}</div>
+          <div class="smart-stat-card-foot">涉及 {{ num(stat.memberCount) }} 名会员 · 冻结 {{ num(stat.frozenCount) }} 个</div>
+        </div>
+      </a-col>
+      <!-- 余额是存量：按创建时间筛出来的是「今天新开的钱包」，那个数什么也回答不了 -->
+      <a-col :span="6" v-for="item in stat.assetList || []" :key="item.assetType">
+        <div class="smart-stat-card is-success">
+          <div class="smart-stat-card-label">
+            {{ assetTypeOf(item.assetType).desc }}余额
+            <span class="smart-stat-card-tag">全量</span>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ money(item.totalBalance) }}
+            <span class="smart-stat-card-unit">{{ assetUnitOf(item.assetType) }}</span>
+          </div>
+          <div class="smart-stat-card-foot">
+            {{ num(item.walletCount) }} 个账户 · 人均 {{ money(item.avgBalance) }}
+            <span v-if="Number(item.frozenBalance) > 0" class="smart-stat-alert-text"> · 冻结中 {{ money(item.frozenBalance) }} </span>
+          </div>
+        </div>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="12">
+      <a-col :span="12">
+        <!-- 这一块才是跟着时间范围走的：数据来自交易明细表 -->
+        <a-card size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            本期变动
+            <span class="smart-stat-block-sub">跟随上方时间范围，数据取自交易明细表</span>
+          </div>
+          <div v-if="!stat.flowList || stat.flowList.length === 0" class="smart-stat-asset-sub">这段时间没有任何资产变动</div>
+          <div v-for="item in stat.flowList || []" :key="item.assetType" class="smart-stat-asset-line">
+            <a-tag :color="assetTypeOf(item.assetType).color">{{ assetTypeOf(item.assetType).desc }}</a-tag>
+            <span class="smart-stat-asset-main">
+              净额
+              <span :class="Number(item.netAmount) < 0 ? 'smart-stat-negative' : ''">{{ money(item.netAmount) }}</span>
+              {{ assetUnitOf(item.assetType) }}
+            </span>
+            <span class="smart-stat-asset-sub">收入 {{ money(item.incomeAmount) }} / {{ num(item.incomeCount) }} 笔</span>
+            <span class="smart-stat-asset-sub">支出 {{ money(item.expenseAmount) }} / {{ num(item.expenseCount) }} 笔</span>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="12">
+        <a-card v-if="stat.assetList && stat.assetList.length > 0" size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            资产存量明细
+            <span class="smart-stat-block-sub">全量；不同资产不合计</span>
+          </div>
+          <div v-for="item in stat.assetList" :key="item.assetType" class="smart-stat-asset-line">
+            <a-tag :color="assetTypeOf(item.assetType).color">{{ assetTypeOf(item.assetType).desc }}</a-tag>
+            <span class="smart-stat-asset-main">{{ money(item.totalBalance) }} {{ assetUnitOf(item.assetType) }}</span>
+            <span class="smart-stat-asset-sub">{{ num(item.walletCount) }} 个账户</span>
+            <span class="smart-stat-asset-sub">人均 {{ money(item.avgBalance) }}</span>
+            <span class="smart-stat-asset-sub" :class="Number(item.frozenBalance) > 0 ? 'smart-stat-alert-text' : ''">
+              冻结中 {{ money(item.frozenBalance) }}
+            </span>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+  </StatPanel>
+  <!---------- 钱包统计 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
@@ -94,7 +182,10 @@
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
+  import { QuestionCircleOutlined } from '@ant-design/icons-vue';
   import { memberWalletApi } from '/@/api/business/ledger/member-wallet/member-wallet-api';
+  import StatPanel from '/@/components/business/stat-panel/index.vue';
+  import { money, num } from '/@/lib/stat-format';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -104,8 +195,26 @@
     ASSET_TYPE_OPTIONS,
     WALLET_STATUS_OPTIONS,
     assetTypeOf,
+    assetUnitOf,
     walletStatusOf,
   } from '/@/constants/business/ledger/member-wallet/member-wallet-const';
+
+  // ---------------------------- 统计面板 ----------------------------
+
+  /*
+   * 时间范围只作用于「本期变动」（取自交易明细表）；
+   * 余额与账户数是存量，服务端按全量算，卡片上也标了「全量」。
+   */
+  const stat = ref({});
+
+  async function loadStat(form) {
+    try {
+      const res = await memberWalletApi.stat(form);
+      stat.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
+  }
 
   // ---------------------------- 表格列 ----------------------------
 

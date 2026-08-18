@@ -18,14 +18,24 @@ import sa.ledger.wallet.domain.entity.MemberWallet;
 import sa.ledger.wallet.domain.form.MemberWalletAddForm;
 import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
 import sa.ledger.wallet.domain.form.MemberWalletUpdateForm;
+import sa.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import sa.ledger.transaction.service.MemberAssetTransactionService;
+import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
 import sa.ledger.wallet.domain.vo.MemberWalletVO;
+import sa.ledger.stat.domain.form.LedgerStatForm;
+import static sa.ledger.stat.LedgerStatSupport.toDecimal;
+import static sa.ledger.stat.LedgerStatSupport.toLong;
+import static sa.ledger.stat.LedgerStatSupport.toStr;
 import sa.risk.proposal.domain.entity.ProposalRecord;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * （只抛异常，绝不返回 DTO）
@@ -42,6 +52,63 @@ public class MemberWalletService {
 
     private final MemberWalletDao memberWalletDao;
     private final MemberAssetTransactionDao memberAssetTransactionDao;
+
+    /**
+     * 钱包统计：用户手上现在有多少资产（存量，全量），以及这段时间变动了多少（跟时间范围走）。
+     *
+     * <p><b>余额刻意不跟时间范围走</b>：钱包表是存量表，一个会员一种资产一行、只有当前余额，
+     * 没有历史切片。按 create_time 筛出来的是「今天新开的钱包」，那几个账户的余额加起来
+     * 既不是今天发出去的钱、也不是用户现在手上的钱 —— 是一个什么都不回答的数字。
+     *
+     * <p>「本期变动」直接调交易明细页的那条 SQL（{@code selectAssetFlowStat}），
+     * 不在钱包这边另写一份：同一个口径两处实现，早晚会漂成两个对不上的数。
+     */
+    public MemberWalletStatVO stat(LedgerStatForm form) {
+        MemberWalletStatVO vo = new MemberWalletStatVO();
+
+        Map<String, Object> row = memberWalletDao.selectStat();
+        vo.setWalletCount(toLong(row.get("walletCount")));
+        vo.setMemberCount(toLong(row.get("memberCount")));
+        vo.setFrozenCount(toLong(row.get("frozenCount")));
+
+        // ---- 资产存量：余额只在同一资产类型内可加 ----
+        List<MemberWalletStatVO.AssetBalanceVO> assetList = new ArrayList<>();
+        for (Map<String, Object> stat : memberWalletDao.selectAssetBalanceStat()) {
+            MemberWalletStatVO.AssetBalanceVO item = new MemberWalletStatVO.AssetBalanceVO();
+            long walletCount = toLong(stat.get("walletCount"));
+            BigDecimal totalBalance = toDecimal(stat.get("totalBalance"));
+            item.setAssetType(toStr(stat, "assetType"));
+            item.setWalletCount(walletCount);
+            item.setTotalBalance(totalBalance);
+            item.setAvgBalance(walletCount == 0 ? BigDecimal.ZERO
+                    : totalBalance.divide(BigDecimal.valueOf(walletCount), 2, RoundingMode.HALF_UP));
+            item.setFrozenBalance(toDecimal(stat.get("frozenBalance")));
+            assetList.add(item);
+        }
+        vo.setAssetList(assetList);
+
+        // ---- 本期变动：复用交易明细页的 SQL 与转换 ----
+        List<MemberAssetTransactionStatVO.AssetFlowVO> flowList = new ArrayList<>();
+        for (Map<String, Object> stat : memberAssetTransactionDao.selectAssetFlowStat(form)) {
+            flowList.add(MemberAssetTransactionService.toAssetFlow(stat));
+        }
+        vo.setFlowList(flowList);
+
+        // ---- 体检 ----
+        List<String> issues = new ArrayList<>();
+        long negativeBalance = toLong(row.get("negativeBalanceCount"));
+        if (negativeBalance > 0) {
+            issues.add("有 " + negativeBalance + " 个钱包余额是负数：扣减走的是 deductBalanceWithVersion"
+                    + "（条件里带 balance >= amount），正常扣不出负数 —— 出现说明有人绕过钱包服务直接改了库");
+        }
+        long frozenWithBalance = toLong(row.get("frozenWithBalanceCount"));
+        if (frozenWithBalance > 0) {
+            issues.add("有 " + frozenWithBalance + " 个账户被冻结但里面还有余额：钱在账上，"
+                    + "用户既取不出也用不了，冻结久了就是客诉 —— 这个数没人主动查就一直不会有人发现");
+        }
+        vo.setIssueList(issues);
+        return vo;
+    }
 
     /**
      * 分页查询

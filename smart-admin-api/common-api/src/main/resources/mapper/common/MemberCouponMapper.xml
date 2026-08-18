@@ -54,8 +54,13 @@
                         <if test="queryForm.validStartTimeBegin != null">
                             AND valid_start_time &gt;= #{queryForm.validStartTimeBegin}
                         </if>
+                        <!--
+                            ⚠️ 结束日必须用 &lt; 次日零点：validStartTimeEnd 是 LocalDate，
+                            绑进来是当天 00:00:00，而 valid_start_time 带时分秒 ——
+                            原先的 &lt;= 会把结束日当天生效的券整天筛掉，且没有任何报错。
+                        -->
                         <if test="queryForm.validStartTimeEnd != null">
-                            AND valid_start_time &lt;= #{queryForm.validStartTimeEnd}
+                            AND valid_start_time &lt; DATE_ADD(#{queryForm.validStartTimeEnd}, INTERVAL 1 DAY)
                         </if>
                         <if test="queryForm.couponName != null">
                             AND coupon_name = #{queryForm.couponName}
@@ -96,5 +101,112 @@
                     delete from t_member_coupon
                         where id = #{id}
                 </delete>
+
+    <!--
+        统计面板的时间窗（发放口径，落在 create_time 上）。写法与另外三个财务页面一致：
+        两个日期都为 null 时用数据库的 CURDATE() 落到当天（铁律 9：时间只认数据库一个钟）；
+        jdbcType=DATE 不能省，否则传 null 时 MyBatis 会抛「JdbcType OTHER」；
+        结束日用 &lt; 次日零点，写 &lt;= 会把结束日当天发的券整天筛掉。
+    -->
+    <sql id="stat_window_issued">
+        AND create_time &gt;= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+        AND create_time &lt; DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+    </sql>
+
+    <!--
+        核销口径的时间窗，落在 used_time 上 —— 和发放<b>不是同一批券</b>：
+        今天核销的券可能是上个月发的。
+        用同一个窗口算「今日核销 / 今日发放」会得到一个必然接近 0 的比率，
+        而它错得很像真的（看上去就是一条「核销率偏低」的正常业务结论）。
+    -->
+    <sql id="stat_window_used">
+        AND used_time &gt;= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+        AND used_time &lt; DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+    </sql>
+
+    <!--
+        本期发放：张数、会员数，以及这批券里已经被用掉/已经过期的张数。
+        分母是「同一批券」，所以 issuedUsedCount / issuedCount 是个有意义的转化率 ——
+        但时间范围选得越近它越低，因为刚发的券还来不及用。
+    -->
+    <select id="selectIssuedStat" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                     AS issuedCount,
+            COUNT(DISTINCT member_name)                  AS issuedMemberCount,
+            COALESCE(SUM(status = 1), 0)                 AS issuedUsedCount
+        FROM t_member_coupon
+        <where><include refid="stat_window_issued"/></where>
+    </select>
+
+    <!--
+        本期核销。used_time 为空的行天然不会落进窗口，不需要再加 status 条件 ——
+        真要加反而会掩盖「status=0 却有核销时间」这种脏数据（那由体检项单独报）。
+    -->
+    <select id="selectUsedStat" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                        AS usedCount,
+            COUNT(DISTINCT member_name)     AS usedMemberCount
+        FROM t_member_coupon
+        <where><include refid="stat_window_used"/></where>
+    </select>
+
+    <!--
+        券库存 + 体检：⚠️ <b>刻意不带时间窗，统计的是全量</b>。
+        「手上还压着多少张没用的券」是个存量问题，限制在今天只会把它藏起来 ——
+        今天发的券当然全是未使用，那个数字什么也回答不了。
+
+        staleUnusedCount 是本页最该被盯住的数：全工程没有任何地方把券置为 2-已过期
+        （没有这样的定时任务，也没有任何 Java 代码写这个状态），
+        所以过了有效期的券会一直挂在「未使用」里 —— 也就是说 stockUnusedCount 本身是虚高的，
+        真正还能用的是 stockUnusedCount - staleUnusedCount。
+
+        末尾三个是一致性体检：
+          - usedNoTimeCount   ：已使用却没有核销时间，事后说不清是哪天用的
+          - unusedWithTimeCount：未使用却带着核销时间，与状态自相矛盾
+          - badValidRangeCount ：有效期结束 &lt;= 开始，这种券发出去就是废的
+    -->
+    <select id="selectStockStat" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                            AS stockTotalCount,
+            COALESCE(SUM(status = 0), 0)                                        AS stockUnusedCount,
+            COALESCE(SUM(status = 1), 0)                                        AS stockUsedCount,
+            COALESCE(SUM(status = 2), 0)                                        AS stockExpiredCount,
+            COALESCE(SUM(status = 3), 0)                                        AS stockVoidCount,
+            COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0)         AS staleUnusedCount,
+            COALESCE(SUM(status = 0 AND valid_end_time &gt;= now()
+                     AND valid_end_time &lt; DATE_ADD(now(), INTERVAL 7 DAY)), 0) AS expiringSoonCount,
+            COALESCE(SUM(status = 1 AND used_time IS NULL), 0)                  AS usedNoTimeCount,
+            COALESCE(SUM(status = 0 AND used_time IS NOT NULL), 0)              AS unusedWithTimeCount,
+            COALESCE(SUM(valid_end_time &lt;= valid_start_time), 0)            AS badValidRangeCount
+        FROM t_member_coupon
+    </select>
+
+    <!--
+        券模维度分布（本期发放量 TOP 10）。
+        coupon_name 用 MIN() 取同组样本，避免把它塞进 GROUP BY ——
+        券改过名的历史行会让同一个编码裂成两行。
+    -->
+    <select id="selectCouponStat" resultType="java.util.Map">
+        SELECT coupon_code                                                   AS couponCode,
+               MIN(coupon_name)                                              AS couponName,
+               COUNT(*)                                                      AS issuedCount,
+               COUNT(DISTINCT member_name)                                   AS memberCount,
+               COALESCE(SUM(status = 1), 0)                                  AS usedCount,
+               COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0)   AS staleCount
+        FROM t_member_coupon
+        <where><include refid="stat_window_issued"/></where>
+        GROUP BY coupon_code
+        ORDER BY issuedCount DESC
+        LIMIT 10
+    </select>
+
+    <!-- 来源分布（本期发放）。source_type 没有枚举约束，原样分组、原样回显 -->
+    <select id="selectSourceStat" resultType="java.util.Map">
+        SELECT source_type AS sourceType, COUNT(*) AS issuedCount
+        FROM t_member_coupon
+        <where><include refid="stat_window_issued"/></where>
+        GROUP BY source_type
+        ORDER BY issuedCount DESC
+    </select>
 
 </mapper>

@@ -3,11 +3,104 @@
   *
   * 只读流水：由钱包变动链路逐笔落账，管理端不提供增删改。
   *
+  * 顶部统计回答财务每天要问的：这段时间净发出去多少（**按资产类型分开算**，
+  * 积分和现金不能相加）、钱花在哪个业务上、有没有人在手工调账。
+  * ⚠️ 方向只看 transaction_type —— change_amount 存的是绝对值，
+  * 收入和支出在数值上都是正数，直接相加出来的数既不是收入也不是支出。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-18 23:49:03
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 交易统计 begin ----------->
+  <StatPanel title="交易统计" storage-key="member-asset-transaction" :issue-list="stat.issueList" @change="loadStat">
+    <template #summary>
+      共 {{ num(stat.txCount) }} 笔 · {{ num(stat.memberCount) }} 人
+      <span v-if="stat.manualAdjustCount > 0" class="smart-stat-summary-alert"> · 人工调账 {{ num(stat.manualAdjustCount) }} 笔 </span>
+    </template>
+
+    <a-row :gutter="12" class="smart-stat-row">
+      <a-col :span="6">
+        <div class="smart-stat-card is-primary">
+          <div class="smart-stat-card-label">流水笔数</div>
+          <div class="smart-stat-card-value">{{ num(stat.txCount) }}</div>
+          <div class="smart-stat-card-foot">涉及 {{ num(stat.memberCount) }} 名会员</div>
+        </div>
+      </a-col>
+      <!-- 收支必须按资产类型分开：积分和现金加在一起的那个数没有任何含义 -->
+      <a-col :span="6" v-for="item in stat.assetList || []" :key="item.assetType">
+        <div class="smart-stat-card" :class="Number(item.netAmount) < 0 ? 'is-warning' : 'is-success'">
+          <div class="smart-stat-card-label">
+            {{ assetTypeOf(item.assetType).desc }}净额
+            <a-tooltip title="净额 = 收入 - 支出。为负说明这段时间用户手上的这种资产是净减少的（消耗大于发放）">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ money(item.netAmount) }}
+            <span class="smart-stat-card-unit">{{ assetUnitOf(item.assetType) }}</span>
+          </div>
+          <div class="smart-stat-card-foot">
+            收入 {{ money(item.incomeAmount) }}（{{ num(item.incomeCount) }} 笔） · 支出 {{ money(item.expenseAmount) }}（{{ num(item.expenseCount) }} 笔）
+          </div>
+        </div>
+      </a-col>
+      <a-col :span="6">
+        <!-- 系统自己发的奖不需要人插手，这一类是有人手工改了别人的钱 -->
+        <div class="smart-stat-card" :class="stat.manualAdjustCount > 0 ? 'is-critical' : 'is-muted'">
+          <div class="smart-stat-card-label">
+            人工调账
+            <a-tooltip title="biz_type = MANUAL_ADJUST。系统自己发的奖不需要人插手，这一类是有人手工改了别人的钱，量再小也建议逐笔确认操作人和事由">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">{{ num(stat.manualAdjustCount) }}</div>
+          <div class="smart-stat-card-foot">财务对账第一个要查的</div>
+        </div>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="12">
+      <a-col :span="12">
+        <a-card v-if="stat.bizTypeList && stat.bizTypeList.length > 0" size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            业务类型分布
+            <span class="smart-stat-block-sub">只给笔数：同一类型下混着积分和现金，给金额就是跨量纲相加</span>
+          </div>
+          <div v-for="item in stat.bizTypeList" :key="item.bizType || 'none'" class="smart-stat-line">
+            <a-tooltip :title="item.bizType || '（写入侧没写业务类型）'">
+              <div class="smart-stat-name">{{ item.bizType || '（未记录）' }}</div>
+            </a-tooltip>
+            <div class="smart-stat-bar-wrap">
+              <div class="smart-stat-bar" :style="{ width: barPercent(item.txShare) + '%' }"></div>
+            </div>
+            <div class="smart-stat-num">{{ num(item.txCount) }} 笔 · {{ num(item.memberCount) }} 人</div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :span="12">
+        <a-card v-if="stat.assetList && stat.assetList.length > 0" size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            资产收支明细
+            <span class="smart-stat-block-sub">不同资产不合计</span>
+          </div>
+          <div v-for="item in stat.assetList" :key="item.assetType" class="smart-stat-asset-line">
+            <a-tag :color="assetTypeOf(item.assetType).color">{{ assetTypeOf(item.assetType).desc }}</a-tag>
+            <span class="smart-stat-asset-main">
+              净额
+              <span :class="Number(item.netAmount) < 0 ? 'smart-stat-negative' : ''">{{ money(item.netAmount) }}</span>
+              {{ assetUnitOf(item.assetType) }}
+            </span>
+            <span class="smart-stat-asset-sub">收入 {{ money(item.incomeAmount) }} / {{ num(item.incomeCount) }} 笔</span>
+            <span class="smart-stat-asset-sub">支出 {{ money(item.expenseAmount) }} / {{ num(item.expenseCount) }} 笔</span>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+  </StatPanel>
+  <!---------- 交易统计 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
@@ -97,7 +190,10 @@
 </template>
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
+  import { QuestionCircleOutlined } from '@ant-design/icons-vue';
   import { memberAssetTransactionApi } from '/@/api/business/ledger/member-asset-transaction/member-asset-transaction-api';
+  import StatPanel from '/@/components/business/stat-panel/index.vue';
+  import { barPercent, money, num } from '/@/lib/stat-format';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -107,8 +203,27 @@
     ASSET_TYPE_OPTIONS,
     TRANSACTION_TYPE_OPTIONS,
     assetTypeOf,
+    assetUnitOf,
     transactionTypeOf,
   } from '/@/constants/business/ledger/member-asset-transaction/member-asset-transaction-const';
+
+  // ---------------------------- 统计面板 ----------------------------
+
+  /*
+   * 面板的时间范围由 StatPanel 自己管（默认当天），通过 @change 抛下来，
+   * 与下面列表的筛选条件<b>刻意不联动</b>：面板回答的是「这段时间整体发生了什么」，
+   * 跟着某个会员名筛之后它就不再是概览了。
+   */
+  const stat = ref({});
+
+  async function loadStat(form) {
+    try {
+      const res = await memberAssetTransactionApi.stat(form);
+      stat.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
+  }
 
   // ---------------------------- 表格列 ----------------------------
 

@@ -1,11 +1,132 @@
 <!--
   * 发货物流表
   *
+  * 顶部统计回答仓库每天要问的：今天新增了多少单，以及**手上到底积压着多少单没发出去**。
+  *
+  * ⚠️ 只有「本期新增」跟时间范围走，积压那一组是**全量**：
+  * 把积压限制在今天，压了三天的单子会正好从页面上消失，
+  * 而那恰恰是这个页面唯一需要有人动手的东西。
+  *
+  * ⚠️ 待发货拆成两类，性质完全不同：「等用户补地址」想发也发不了（要催用户），
+  * 「可直接发」才是今天真正能干的活。实物是三段式履约，中奖时用户还没填地址，
+  * 履约单先落、收件信息后补，所以 status=0 里天然混着这两种。
+  *
   * @Author:    weolwo
   * @Date:      2026-04-19 00:03:01
   * @Copyright  weolwo
 -->
 <template>
+  <!---------- 发货统计 begin ----------->
+  <StatPanel title="发货统计" storage-key="physical-delivery" :issue-list="stat.issueList" @change="loadStat">
+    <template #summary>
+      本期新增 {{ num(stat.newCount) }} 单 ·
+      <span :class="stat.pendingCount > 0 ? 'smart-stat-summary-alert' : ''"> 待发货 {{ num(stat.pendingCount) }} 单 </span>
+      · 可直接发 {{ num(stat.pendingReadyCount) }} 单
+    </template>
+
+    <a-row :gutter="12" class="smart-stat-row">
+      <a-col :span="5">
+        <div class="smart-stat-card is-primary">
+          <div class="smart-stat-card-label">本期新增</div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.newCount) }}
+            <span class="smart-stat-card-unit">单</span>
+          </div>
+          <div class="smart-stat-card-foot">涉及 {{ num(stat.newMemberCount) }} 名会员</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- 积压是存量：限制在今天，压了三天的单子会正好从页面上消失 -->
+        <div class="smart-stat-card" :class="pendingTone">
+          <div class="smart-stat-card-label">
+            待发货积压
+            <span class="smart-stat-card-tag">全量</span>
+            <a-tooltip title="不受时间范围影响。积压是存量——限制在今天，压了三天的单子会正好从页面上消失，而那恰恰是这个页面唯一需要有人动手的东西">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.pendingCount) }}
+            <span class="smart-stat-card-unit">单</span>
+          </div>
+          <div class="smart-stat-card-foot">最久等待 {{ pendingWaitedText }}</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- 这才是运营今天真正能干的活 -->
+        <div class="smart-stat-card" :class="stat.pendingReadyCount > 0 ? 'is-warning' : 'is-muted'">
+          <div class="smart-stat-card-label">
+            可直接发
+            <span class="smart-stat-card-tag">全量</span>
+            <a-tooltip title="待发货里收件信息已经齐全的单子，这是今天真正能发出去的活">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.pendingReadyCount) }}
+            <span class="smart-stat-card-unit">单</span>
+          </div>
+          <div class="smart-stat-card-foot">收件信息齐全，可安排出库</div>
+        </div>
+      </a-col>
+      <a-col :span="5">
+        <!-- 想发也发不了：中奖时用户还没填地址，履约单先落、收件信息后补 -->
+        <div class="smart-stat-card is-muted">
+          <div class="smart-stat-card-label">
+            等用户补地址
+            <span class="smart-stat-card-tag">全量</span>
+            <a-tooltip title="待发货里收件人/电话/地址任一为空的单子。实物是三段式履约，中奖时用户还没填地址——这批单子想发也发不了，要去催用户，不是仓库的活">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">
+            {{ num(stat.pendingNoAddressCount) }}
+            <span class="smart-stat-card-unit">单</span>
+          </div>
+          <div class="smart-stat-card-foot">催用户，不是催仓库</div>
+        </div>
+      </a-col>
+      <a-col :span="4">
+        <div class="smart-stat-card" :class="stat.returnedCount > 0 ? 'is-critical' : 'is-success'">
+          <div class="smart-stat-card-label">
+            发货率
+            <a-tooltip title="(已发货 + 已签收) / 有效单数。分母剔掉了已作废的单——那些是被主动撤回的，算成「没发出去」会平白拉低发货率">
+              <QuestionCircleOutlined class="smart-stat-card-hint" />
+            </a-tooltip>
+          </div>
+          <div class="smart-stat-card-value">{{ percent(stat.deliveredRate) }}</div>
+          <div class="smart-stat-card-foot">
+            已签收 {{ num(stat.signedCount) }} · 退回 {{ num(stat.returnedCount) }} · 作废 {{ num(stat.discardedCount) }}
+          </div>
+        </div>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="12">
+      <a-col :span="12">
+        <a-card v-if="stat.sourceList && stat.sourceList.length > 0" size="small" :bordered="false" class="smart-stat-block">
+          <div class="smart-stat-block-head">
+            来源分布（条形为发货率）
+            <span class="smart-stat-block-sub">全量，取值原样回显（这一列没有枚举约束）</span>
+          </div>
+          <div v-for="item in stat.sourceList" :key="item.sourceType || 'none'" class="smart-stat-line">
+            <a-tooltip :title="item.sourceType || '（写入侧没写来源）'">
+              <div class="smart-stat-name">{{ item.sourceType || '（未记录）' }}</div>
+            </a-tooltip>
+            <div class="smart-stat-bar-wrap">
+              <div class="smart-stat-bar" :style="{ width: barPercent(item.deliveredRate) + '%' }"></div>
+            </div>
+            <div class="smart-stat-num">
+              {{ num(item.deliveryCount) }} 单 · {{ percent(item.deliveredRate) }}
+              <span v-if="item.pendingCount > 0" class="smart-stat-alert-text"> · 待发 {{ num(item.pendingCount) }} </span>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+  </StatPanel>
+  <!---------- 发货统计 end ----------->
+
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
@@ -165,8 +286,11 @@
   </a-card>
 </template>
 <script setup>
-  import { reactive, ref, onMounted } from 'vue';
+  import { computed, reactive, ref, onMounted } from 'vue';
   import { message, Modal } from 'ant-design-vue';
+  import { QuestionCircleOutlined } from '@ant-design/icons-vue';
+  import StatPanel from '/@/components/business/stat-panel/index.vue';
+  import { backlogTone, barPercent, num, percent, waitedText } from '/@/lib/stat-format';
   import { SmartLoading } from '/@/components/framework/smart-loading';
   import { physicalDeliveryApi } from '/@/api/business/ledger/physical-delivery/physical-delivery-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -180,6 +304,28 @@
     DELIVERY_STATUS_OPTIONS,
     deliveryStatusOf
   } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
+
+  // ---------------------------- 统计面板 ----------------------------
+
+  /*
+   * 时间范围由 StatPanel 自己管（默认当天），只作用于「本期新增」；
+   * 积压那一组服务端就是按全量算的，卡片上也标了「全量」。
+   */
+  const stat = ref({});
+
+  async function loadStat(form) {
+    try {
+      const res = await physicalDeliveryApi.stat(form);
+      stat.value = res.data || {};
+    } catch (e) {
+      smartSentry.captureError(e);
+    }
+  }
+
+  // 有积压才提醒，超过一天才标红：仓库本来就不是分钟级发货，门槛太低会天天报警
+  const pendingTone = computed(() => backlogTone(stat.value.pendingCount, stat.value.pendingOldestMinutes));
+
+  const pendingWaitedText = computed(() => waitedText(stat.value.pendingOldestMinutes, !!stat.value.pendingCount));
 
   // ---------------------------- 表格列 ----------------------------
 
