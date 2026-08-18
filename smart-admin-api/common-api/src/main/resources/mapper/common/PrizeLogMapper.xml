@@ -52,6 +52,31 @@
 
     <sql id="query_conditions">
         <where>
+            <include refid="funnel_conditions"/>
+                        <if test="queryForm.approveStatus != null">
+                            AND approve_status = #{queryForm.approveStatus}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+        </where>
+    </sql>
+
+    <!--
+        列表与漏斗共用的筛选条件，但<b>刻意不含 status 与 approveStatus</b>：
+        那两个正是漏斗要拆解的维度 —— 跟着 status 筛，点「只看成功」之后漏斗会变成
+        「已发出率 100%」；跟着 approveStatus 筛，待审积压会恒等于总数。
+        几个数字互相之间就没法对照了，而这正是漏斗存在的意义。
+
+        ⚠️ 结束日必须用 &lt; 次日零点。createTimeEnd / validUntilEnd 是 LocalDate，
+        绑进来是「2026-08-18 00:00:00」，而 create_time / valid_until 带时分秒 ——
+        写 &lt;= 会把结束日当天的记录整天筛掉，而且是<b>静默</b>少算：
+        页面只是少了几行，没有任何报错。（原先这里就是 &lt;=。）
+
+        ⚠️ 不套 &lt;where&gt;，只给裸条件片段：失败原因那条查询还要在同一个 &lt;where&gt; 里
+        追加 status=2，本片段自带 &lt;where&gt; 会让追加的条件落在外面。由调用方各自套。
+    -->
+    <sql id="funnel_conditions">
                         <if test="queryForm.tenantId != null">
                             AND tenant_id = #{queryForm.tenantId}
                         </if>
@@ -68,22 +93,144 @@
                             AND create_time &gt;= #{queryForm.createTimeBegin}
                         </if>
                         <if test="queryForm.createTimeEnd != null">
-                            AND create_time &lt;= #{queryForm.createTimeEnd}
-                        </if>
-                        <if test="queryForm.approveStatus != null">
-                            AND approve_status = #{queryForm.approveStatus}
-                        </if>
-                        <if test="queryForm.status != null">
-                            AND status = #{queryForm.status}
+                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
                         </if>
                         <if test="queryForm.validUntilBegin != null">
                             AND valid_until &gt;= #{queryForm.validUntilBegin}
                         </if>
                         <if test="queryForm.validUntilEnd != null">
-                            AND valid_until &lt;= #{queryForm.validUntilEnd}
+                            AND valid_until &lt; DATE_ADD(#{queryForm.validUntilEnd}, INTERVAL 1 DAY)
                         </if>
-        </where>
     </sql>
+
+    <!--
+        漏斗计数 + 审批积压 + 卡单 + 一致性体检，一次扫表算完。
+        不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+        出现「分项加起来不等于总数」这种自相矛盾。
+
+        本页最该被盯住的两个数：
+          - approveOldestMinutes：approve_mode=1 的奖唯一的出口就是有人来点「通过」，
+            没人点它就永远停在待审批。实测最早一条曾挂了 140 小时（近 6 天），
+            而它在任何「发奖总数」里都看不出来；
+          - stuckWaitingCount  ：不是在等审批却停在 0-等待执行。
+            ⚠️ 它不等于故障 —— 提案进了财务审批池时，发奖记录合理地停在 0
+            （见 PrizeDispatchHandler.doDispatch 的注释）。本表分不出这两种情况，
+            要拿 external_biz_no 去提案记录页查。但工程里没有任何重试/补偿任务，
+            停得越久越不可能是前者。
+
+        末尾六个是一致性体检（本页保留了「人工补发」入口，人工把状态填错是有路径的）：
+          - rejectedButSentCount      ：驳回了钱却还是发出去了，最严重的一种
+          - failedNoReasonCount       ：失败却没有原因，客诉与排查都没有依据
+          - successWithFailReasonCount：成功却带着失败原因，与 status 自相矛盾
+          - noExternalBizNoCount      ：没有外部单号。跨系统防重全靠 uk_external_biz，
+            单号为空的行不受唯一索引约束（MySQL 允许多个 NULL），事件重投就会重复发奖
+          - badValueCount             ：奖励体值不是数字。四个发奖策略开头全是
+            new BigDecimal(prizeValue)，解析不了就当场失败，而且这批行的价值
+            不会计入「已发出价值」——静默少算
+          - expiredWaitingCount       ：已过有效期却还停在等待执行，发出去也没意义了
+
+        ⚠️ prize_value 是 varchar，判「是不是数字」只能用 REGEXP。
+        不能直接 CAST：MySQL 对无法解析的字符串只给警告并返回 0，
+        于是坏数据会安安静静地变成「价值 0」，永远没人发现。
+        小数点写成字符组 [.] 而不是反斜杠转义：这个正则要在 XML、SQL 字符串、
+        正则三层里穿过去，反斜杠每层都要翻倍，写错一层就是一个「谁都不匹配」的静默错误。
+    -->
+    <select id="selectFunnel" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                     AS totalCount,
+            COUNT(DISTINCT member_name)                                  AS memberCount,
+            COALESCE(SUM(status = 1), 0)                                 AS successCount,
+            COALESCE(SUM(status = 0), 0)                                 AS waitingCount,
+            COALESCE(SUM(status = 2), 0)                                 AS failedCount,
+            COALESCE(SUM(approve_status = 0), 0)                         AS approveNoneCount,
+            COALESCE(SUM(approve_status = 1), 0)                         AS approvePendingCount,
+            COALESCE(SUM(approve_status = 2), 0)                         AS approvePassedCount,
+            COALESCE(SUM(approve_status = 3), 0)                         AS approveRejectedCount,
+            COALESCE(TIMESTAMPDIFF(MINUTE,
+                     MIN(CASE WHEN approve_status = 1 THEN create_time END), now()), 0) AS approveOldestMinutes,
+            COALESCE(SUM(status = 0 AND approve_status &lt;&gt; 1
+                     AND update_time &lt; DATE_SUB(now(), INTERVAL 30 MINUTE)), 0)   AS stuckWaitingCount,
+            COALESCE(SUM(approve_status = 3 AND status = 1), 0)          AS rejectedButSentCount,
+            COALESCE(SUM(status = 2 AND (fail_reason IS NULL OR fail_reason = '')), 0)  AS failedNoReasonCount,
+            COALESCE(SUM(status = 1 AND fail_reason IS NOT NULL AND fail_reason &lt;&gt; ''), 0)
+                                                                         AS successWithFailReasonCount,
+            COALESCE(SUM(external_biz_no IS NULL OR external_biz_no = ''), 0)          AS noExternalBizNoCount,
+            COALESCE(SUM(prize_value NOT REGEXP '^-?[0-9]+([.][0-9]+)?$'), 0)          AS badValueCount,
+            COALESCE(SUM(status = 0 AND valid_until IS NOT NULL AND valid_until &lt; now()), 0)
+                                                                         AS expiredWaitingCount
+        FROM t_prize_log
+        <where><include refid="funnel_conditions"/></where>
+    </select>
+
+    <!--
+        奖励类型维度：条数与价值双口径。
+        ⚠️ 价值必须按 prize_type 分组：积分、现金、券面额、实物价值不是同一个量纲，
+        合成一个「总价值」的那个数字没有任何含义。
+        《营销中台-数据统计方案》§2.1 实测过 —— 315 条发奖记录里除了券一分钱都没发出去，
+        只看条数完全看不出来。
+
+        金额一律先用 REGEXP 过一遍再 CAST：解析不了的行不计入金额（另有 badValueCount 单独报出），
+        否则 MySQL 会把它们静默算成 0，看的人以为「发出去了 0 元」而不是「这行算不出来」。
+    -->
+    <select id="selectPrizeTypeStat" resultType="java.util.Map">
+        SELECT prize_type                                                AS prizeType,
+               COUNT(*)                                                  AS logCount,
+               COALESCE(SUM(status = 1), 0)                              AS successCount,
+               COALESCE(SUM(CASE WHEN status = 1 AND prize_value REGEXP '^-?[0-9]+([.][0-9]+)?$'
+                            THEN CAST(prize_value AS DECIMAL(18, 4)) END), 0) AS successValue,
+               COALESCE(SUM(CASE WHEN status = 0 AND prize_value REGEXP '^-?[0-9]+([.][0-9]+)?$'
+                            THEN CAST(prize_value AS DECIMAL(18, 4)) END), 0) AS waitingValue,
+               COALESCE(SUM(CASE WHEN status = 2 AND prize_value REGEXP '^-?[0-9]+([.][0-9]+)?$'
+                            THEN CAST(prize_value AS DECIMAL(18, 4)) END), 0) AS failedValue,
+               COALESCE(SUM(prize_value NOT REGEXP '^-?[0-9]+([.][0-9]+)?$'), 0) AS badValueCount
+        FROM t_prize_log
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY prize_type
+        ORDER BY logCount DESC
+    </select>
+
+    <!--
+        奖品维度分布：哪个奖发得多、哪个奖最容易发不出去。
+        LIMIT 20 是刻意的 —— 前 20 之后的长尾在页面上只会挤成一片，要全量请走导出。
+
+        prize_name / prize_type 用 MIN() 取同组的一个样本：同一个 prize_code 的这两列本该一致，
+        取样本是为了避免把它们塞进 GROUP BY（奖品改过名的历史行会让同一个编码裂成两行）。
+    -->
+    <select id="selectPrizeStat" resultType="java.util.Map">
+        SELECT prize_code                        AS prizeCode,
+               MIN(prize_name)                   AS prizeName,
+               MIN(prize_type)                   AS prizeType,
+               COUNT(*)                          AS logCount,
+               COALESCE(SUM(status = 1), 0)      AS successCount,
+               COALESCE(SUM(status = 0), 0)      AS waitingCount,
+               COALESCE(SUM(status = 2), 0)      AS failedCount,
+               COALESCE(SUM(approve_status = 1), 0) AS pendingCount
+        FROM t_prize_log
+        <where><include refid="funnel_conditions"/></where>
+        GROUP BY prize_code
+        ORDER BY logCount DESC
+        LIMIT 20
+    </select>
+
+    <!--
+        失败原因分布。只能按 fail_reason 的文案原文聚类 ——
+        这张表没有 fail_code 那样的封闭编码列（对比 t_proposal_record.risk_code、
+        t_task_record_flow.discard_code），文案一旦带上具体数值，同一种原因就会裂成多条。
+        这是已知代价，如实按原文展示，不在这里编造分类把它盖住。
+
+        LIMIT 10：真裂开了也不至于把页面刷满。
+    -->
+    <select id="selectFailReasonStat" resultType="java.util.Map">
+        SELECT fail_reason AS failReason, COUNT(*) AS failCount
+        FROM t_prize_log
+        <where>
+            AND status = 2
+            <include refid="funnel_conditions"/>
+        </where>
+        GROUP BY fail_reason
+        ORDER BY failCount DESC
+        LIMIT 10
+    </select>
 
     <select id="queryPage" resultMap="PrizeLogVO">
         SELECT

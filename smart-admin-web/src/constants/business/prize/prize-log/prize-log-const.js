@@ -46,6 +46,33 @@ export const DISPATCH_STATUS_OPTIONS = Object.values(DISPATCH_STATUS_ENUM).map((
   label: i.desc,
 }));
 
+/**
+ * 奖励类型：t_prize_log.prize_type 与 t_proposal_record.asset_type 是<b>同一个字典</b>
+ * （后端同一个 PrizeTypeEnum），所以直接复用提案域那一份，不在这里再抄一遍 ——
+ * 抄一遍就是第二个真相源，将来改了名称或颜色两个页面会悄悄不一致。
+ */
+export { ASSET_TYPE_ENUM as PRIZE_TYPE_ENUM, assetTypeOf as prizeTypeOf } from '/@/constants/business/risk/proposal-record/proposal-record-const';
+
+/**
+ * 奖励体值的单位。
+ *
+ * ⚠️ 与提案域的 ASSET_UNIT 刻意不同，不要「统一」掉：
+ * t_prize_log.prize_value 在四种类型下<b>都是金额/数值</b>——
+ * 券是<b>面额</b>（CouponHandler 里那个变量就叫 amount，一次固定发一张券），
+ * 实物是<b>价值</b>。所以 COUPON / PHYSICAL 的单位是元，不是「张 / 件」。
+ * DDL 里「奖励体值(积分数/券ID)」那句列注释是早年的，已经和四个发奖策略的代码对不上了。
+ */
+export const PRIZE_VALUE_UNIT = {
+  SCORE: '积分',
+  BALANCE: '元',
+  COUPON: '元',
+  PHYSICAL: '元',
+};
+
+export function prizeValueUnitOf(value) {
+  return PRIZE_VALUE_UNIT[value] || '';
+}
+
 export function approveStatusOf(value) {
   return Object.values(APPROVE_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
 }
@@ -59,6 +86,8 @@ export default {
   APPROVE_STATUS_OPTIONS,
   DISPATCH_STATUS_ENUM,
   DISPATCH_STATUS_OPTIONS,
+  PRIZE_VALUE_UNIT,
   approveStatusOf,
   dispatchStatusOf,
+  prizeValueUnitOf,
 };

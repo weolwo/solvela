@@ -1,5 +1,9 @@
 package sa.admin.funnel;
 
+import sa.prize.prizelog.dao.PrizeLogDao;
+import sa.prize.prizelog.domain.form.PrizeLogQueryForm;
+import sa.prize.prizelog.domain.vo.PrizeLogFunnelVO;
+import sa.prize.prizelog.service.PrizeLogService;
 import sa.risk.proposal.domain.form.ProposalRecordQueryForm;
 import sa.risk.proposal.dao.ProposalRecordDao;
 import sa.risk.proposal.domain.vo.ProposalFunnelVO;
@@ -60,6 +64,10 @@ class FunnelStatTest {
     @Autowired
     private ProposalRecordDao proposalRecordDao;
     @Autowired
+    private PrizeLogService prizeLogService;
+    @Autowired
+    private PrizeLogDao prizeLogDao;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /**
@@ -76,6 +84,12 @@ class FunnelStatTest {
             "rejectedCount", "pendingExecuteCount", "executingCount", "successCount", "partialCount",
             "failedCount", "blockedCount", "pendingReviewOldestMinutes", "stuckDispatchCount",
             "sameReviewerCount", "rejectNoCommentCount", "reviewerNoTimeCount");
+
+    private static final Set<String> PRIZE_FUNNEL_KEYS = Set.of(
+            "totalCount", "memberCount", "successCount", "waitingCount", "failedCount",
+            "approveNoneCount", "approvePendingCount", "approvePassedCount", "approveRejectedCount",
+            "approveOldestMinutes", "stuckWaitingCount", "rejectedButSentCount", "failedNoReasonCount",
+            "successWithFailReasonCount", "noExternalBizNoCount", "badValueCount", "expiredWaitingCount");
 
     // ==================== 任务漏斗 ====================
 
@@ -207,6 +221,96 @@ class FunnelStatTest {
             assertEquals(expected, asset.getSuccessAmount().doubleValue(), 0.001,
                     "资产 " + asset.getAssetType() + " 的已发出金额与库里对不上");
         }
+    }
+
+    // ==================== 奖励漏斗 ====================
+
+    @Test
+    @DisplayName("奖励漏斗：SQL 别名与 Service 读取的 key 完全一致")
+    void prizeFunnelKeysMatch() {
+        Map<String, Object> row = prizeLogDao.selectFunnel(new PrizeLogQueryForm());
+        assertNotNull(row, "selectFunnel 不该返回 null：它是聚合查询，空表也会有一行");
+        assertEquals(PRIZE_FUNNEL_KEYS, row.keySet(),
+                "SQL 别名与 Service 读取的 key 对不上：多出来的是白算的，少的那个会被兜底成 0");
+
+        List<Map<String, Object>> typeStat = prizeLogDao.selectPrizeTypeStat(new PrizeLogQueryForm());
+        if (!typeStat.isEmpty()) {
+            assertEquals(Set.of("prizeType", "logCount", "successCount",
+                            "successValue", "waitingValue", "failedValue", "badValueCount"),
+                    typeStat.get(0).keySet());
+        }
+        List<Map<String, Object>> prizeStat = prizeLogDao.selectPrizeStat(new PrizeLogQueryForm());
+        if (!prizeStat.isEmpty()) {
+            assertEquals(Set.of("prizeCode", "prizeName", "prizeType", "logCount",
+                            "successCount", "waitingCount", "failedCount", "pendingCount"),
+                    prizeStat.get(0).keySet());
+        }
+        List<Map<String, Object>> failStat = prizeLogDao.selectFailReasonStat(new PrizeLogQueryForm());
+        if (!failStat.isEmpty()) {
+            assertEquals(Set.of("failReason", "failCount"), failStat.get(0).keySet());
+        }
+    }
+
+    @Test
+    @DisplayName("奖励漏斗：执行状态桶、审批状态桶、类型分布三者各自都要等于总数")
+    void prizeFunnelNumbersAddUp() {
+        long dbTotal = count("SELECT COUNT(*) FROM t_prize_log");
+        // 铁律 16：先确认前提成立，否则「全 0 也通过」的空过与真通过分不出来
+        assertTrue(dbTotal > 0, "t_prize_log 没有数据，本用例无法证明任何事 —— 先造数再跑");
+
+        PrizeLogFunnelVO vo = prizeLogService.funnel(new PrizeLogQueryForm());
+        assertEquals(dbTotal, vo.getTotalCount());
+        assertEquals(vo.getTotalCount(),
+                vo.getSuccessCount() + vo.getWaitingCount() + vo.getFailedCount(),
+                "执行状态桶之和不等于总数：要么 SQL 漏了一个 status 取值，要么库里有字典外的状态");
+        assertEquals(vo.getTotalCount(),
+                vo.getApproveNoneCount() + vo.getApprovePendingCount()
+                        + vo.getApprovePassedCount() + vo.getApproveRejectedCount(),
+                "审批状态桶之和不等于总数：库里出现了 0/1/2/3 之外的 approve_status");
+        assertEquals(vo.getTotalCount(),
+                vo.getTypeList().stream().mapToLong(PrizeLogFunnelVO.PrizeTypeStatVO::getLogCount).sum(),
+                "奖励类型分布条数之和不等于总数");
+
+        long prizeSum = vo.getPrizeList().stream()
+                .mapToLong(PrizeLogFunnelVO.PrizeStatVO::getLogCount).sum();
+        long top20Total = count("SELECT COALESCE(SUM(c), 0) FROM (SELECT COUNT(*) c FROM t_prize_log"
+                + " GROUP BY prize_code ORDER BY c DESC LIMIT 20) t");
+        assertEquals(top20Total, prizeSum, "奖品分布（TOP 20）条数之和与库里对不上");
+    }
+
+    @Test
+    @DisplayName("奖励漏斗：价值按奖励类型分开算，且只统计已发出、体值可解析的那部分")
+    void prizeFunnelValueIsPerPrizeType() {
+        PrizeLogFunnelVO vo = prizeLogService.funnel(new PrizeLogQueryForm());
+        assertFalse(vo.getTypeList().isEmpty(), "t_prize_log 没有数据，本用例无法证明任何事");
+
+        for (PrizeLogFunnelVO.PrizeTypeStatVO type : vo.getTypeList()) {
+            /*
+             * 断言里必须带上同一个 REGEXP：prize_value 是 varchar，
+             * 直接 CAST 的话 MySQL 对解析不了的字符串只给警告并返回 0 ——
+             * 期望值会跟着一起「静默算成 0」，于是漏算和不漏算都能通过，断言就白写了。
+             */
+            Double expected = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(SUM(CAST(prize_value AS DECIMAL(18,4))), 0) FROM t_prize_log"
+                            + " WHERE prize_type = ? AND status = 1"
+                            + " AND prize_value REGEXP '^-?[0-9]+([.][0-9]+)?$'",
+                    Double.class, type.getPrizeType());
+            assertEquals(expected, type.getSuccessValue().doubleValue(), 0.01,
+                    "奖励类型 " + type.getPrizeType() + " 的已发出价值与库里对不上");
+        }
+    }
+
+    @Test
+    @DisplayName("奖励漏斗：失败原因条数之和 = 失败总数（分类超过 10 类时本断言需跟着改）")
+    void prizeFailReasonAddsUp() {
+        long failed = count("SELECT COUNT(*) FROM t_prize_log WHERE status = 2");
+        assertTrue(failed > 0, "库里没有发放失败的记录，本用例无法证明任何事 —— 先造数再跑");
+
+        PrizeLogFunnelVO vo = prizeLogService.funnel(new PrizeLogQueryForm());
+        assertEquals(failed, vo.getFailedCount());
+        assertEquals(failed,
+                vo.getFailReasonList().stream().mapToLong(PrizeLogFunnelVO.FailReasonVO::getFailCount).sum(),
+                "失败原因条数之和与失败总数对不上（原因超过 10 种时 LIMIT 10 会截断，届时本断言需要跟着改）");
     }
 
     private long count(String sql) {

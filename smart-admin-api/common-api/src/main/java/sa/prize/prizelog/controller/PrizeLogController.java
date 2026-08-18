@@ -5,6 +5,7 @@ import sa.prize.prizelog.domain.entity.PrizeLog;
 import sa.prize.prizelog.domain.form.PrizeLogAddForm;
 import sa.prize.prizelog.domain.form.PrizeLogQueryForm;
 import sa.prize.prizelog.domain.form.PrizeLogUpdateForm;
+import sa.prize.prizelog.domain.vo.PrizeLogFunnelVO;
 import sa.prize.prizelog.domain.vo.PrizeLogVO;
 import sa.base.common.util.SmartRequestUtil;
 import sa.consumer.handler.PrizeDispatchHandler;
@@ -55,6 +56,13 @@ public class PrizeLogController {
     @SaCheckPermission("prizeLog:query")
     public ResponseDTO<PageResult<PrizeLogVO>> queryPage(@RequestBody @Valid PrizeLogQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+    @Operation(summary = "奖励漏斗：已发出条数与价值（双口径）、审批积压、卡单、失败原因与一致性体检")
+    @PostMapping("/funnel")
+    @SaCheckPermission("prizeLog:query")
+    public ResponseDTO<PrizeLogFunnelVO> funnel(@RequestBody @Valid PrizeLogQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(queryForm));
     }
 
     @Operation(summary = "添加")

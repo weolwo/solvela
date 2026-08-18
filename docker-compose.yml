@@ -1,0 +1,122 @@
+# SmartAdmin 一键部署：MySQL + Redis + 后端
+#
+#     cp .env.example .env     # 先改掉里面的密码
+#     docker compose up -d
+#     docker compose logs -f app
+#
+# ⚠️ 安全上最要紧的一条：mysql 和 redis 都【没有】ports 映射。
+#    它们只在 compose 创建的内网里对 app 可见，公网上扫不到。
+#    很多人图省事写了 "3306:3306"，机器挂上公网当天就会被爆破 —— 不要加。
+#    真要连库调试，用 SSH 隧道：
+#        ssh -L 3306:127.0.0.1:3306 user@server   # 配合下面注释里的临时 ports
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 里设置}
+      # 给 initdb 脚本一个默认库上下文：t_menu.sql / task.sql / activity.sql / lottery.sql
+      # 这四个脚本自己不带 USE 语句，没有这行会建到错误的库里去
+      MYSQL_DATABASE: smart_admin_v3
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      # 导出脚本来自 MySQL 8.0.26，含 115 处 int(0) 这种已废弃的显示宽度写法
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # ⚠️ 只在【数据卷为空】时执行一次。之后改这些文件不会生效，
+      #    要重新导入必须 docker compose down -v（会删数据，谨慎）。
+      #    文件名前缀决定执行顺序，01 必须最先 —— 它 DROP + CREATE 整个库。
+      - ./数据库SQL脚本/mysql/smart_admin_v3.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./数据库SQL脚本/mysql/t_menu.sql:/docker-entrypoint-initdb.d/02-menu.sql:ro
+      - ./数据库SQL脚本/mysql/task.sql:/docker-entrypoint-initdb.d/03-task.sql:ro
+      - ./数据库SQL脚本/activity.sql:/docker-entrypoint-initdb.d/04-activity.sql:ro
+      - ./数据库SQL脚本/lottery.sql:/docker-entrypoint-initdb.d/05-lottery.sql:ro
+      # 🔴 基线 smart_admin_v3.sql 是旧版导出，后续 DDL 全在 sql-update-log 里。
+      #    不回放这 45 个增量，建出来的库缺 t_activity_display 等表，
+      #    t_smart_job 也只有 15 列（代码要 37 列），启动即报 Unknown column 'job_code'。
+      - ./数据库SQL脚本/mysql/sql-update-log:/sql-update-log:ro
+      - ./deploy/mysql-initdb/99-apply-update-log.sh:/docker-entrypoint-initdb.d/99-apply-update-log.sh:ro
+    healthcheck:
+      # 用 root 密码真连一次，而不是只看端口通 —— initdb 期间端口早就通了，
+      # 但那时库还没建好，app 连上去会一头撞进空库。
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    # 调试用，平时保持注释：
+    # ports:
+    #   - "127.0.0.1:3306:3306"   # 只绑回环，配合 SSH 隧道
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?请在 .env 里设置}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    # ⚠️ noeviction 而不是 allkeys-lru：Redis 里放的是 Sa-Token 会话和分布式锁，
+    #    内存满了宁可写失败报错，也不能让锁被悄悄淘汰 —— 那是超卖类事故的源头。
+    environment:
+      TZ: Asia/Shanghai
+      # 只为让 healthcheck 里的 redis-cli 能取到密码，不传给 redis-server 本身
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: ./smart-admin-api
+      dockerfile: Dockerfile.distroless
+    image: smart-admin:3.0.0-distroless
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy   # 等库真的建好，不是等端口通
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      # 覆盖 prod/sa-base.yaml 里写死的 127.0.0.1 —— 容器里那是它自己
+      SPRING_DATASOURCE_URL: >-
+        jdbc:mysql://mysql:3306/smart_admin_v3?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&allowMultiQueries=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      # 只有这一个对外。上了域名和 HTTPS 之后改成 "127.0.0.1:1024:1024"，
+      # 由 nginx/caddy 反代，别让应用端口直接对公网。
+      - "${APP_PORT:-1024}:1024"
+    volumes:
+      - app-logs:/home/logs
+      - app-upload:/home/smart_admin_v3/upload
+    # 实测：限 1GB 能正常启动，稳态占用 529MB。
+    # 1GB 内存的小机器上 MySQL 也要 ~400MB，三个服务挤一台会 OOM —— 建议 2GB 起。
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORY:-1g}
+
+volumes:
+  mysql-data:
+  redis-data:
+  app-logs:
+  app-upload:

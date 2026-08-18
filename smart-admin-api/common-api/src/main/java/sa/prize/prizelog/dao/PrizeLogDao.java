@@ -62,6 +62,40 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      */
     List<PrizeLogVO> queryList(@Param("queryForm") PrizeLogQueryForm queryForm);
 
+    // ==================== 漏斗统计 ====================
+
+    /**
+     * 漏斗计数 + 审批积压 + 卡单 + 一致性体检，一次扫表算完。
+     *
+     * <p>不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+     * 出现「分项加起来不等于总数」这种自相矛盾。
+     *
+     * <p>刻意不吃 {@code status} / {@code approveStatus} 两个筛选项 ——
+     * 那两个正是漏斗要拆解的维度，跟着筛会让「已发出率」恒为 100%。
+     */
+    java.util.Map<String, Object> selectFunnel(@Param("queryForm") PrizeLogQueryForm queryForm);
+
+    /**
+     * 奖励类型维度：条数与价值双口径。
+     *
+     * <p>价值必须按类型分组 —— 积分、现金、券面额、实物价值不是同一个量纲，
+     * 合成一个「总价值」的那个数字没有任何含义。
+     */
+    List<java.util.Map<String, Object>> selectPrizeTypeStat(@Param("queryForm") PrizeLogQueryForm queryForm);
+
+    /**
+     * 奖品维度分布（发奖量 TOP 20）：哪个奖发得多、哪个奖最容易发不出去。
+     */
+    List<java.util.Map<String, Object>> selectPrizeStat(@Param("queryForm") PrizeLogQueryForm queryForm);
+
+    /**
+     * 失败原因分布（TOP 10），按 {@code fail_reason} 文案原文聚类。
+     *
+     * <p>⚠️ 这张表没有 {@code fail_code} 那样的封闭编码列（对比 t_proposal_record.risk_code），
+     * 所以文案一旦带上具体数值，同一种原因就会裂成多条。已知代价，如实展示原文。
+     */
+    List<java.util.Map<String, Object>> selectFailReasonStat(@Param("queryForm") PrizeLogQueryForm queryForm);
+
             // ----- 物理删除 -----
                 /**
                  * 单个物理删除

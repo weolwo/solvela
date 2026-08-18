@@ -28,3 +28,7 @@ target/
 /smart-admin-web/vite.config.js.timestamp-*.mjs
 /.claude/
 /.agents/
+
+# docker compose 的明文口令文件，只提交 .env.example
+.env
+.env.local
