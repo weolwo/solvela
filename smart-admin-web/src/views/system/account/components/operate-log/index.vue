@@ -80,7 +80,7 @@
   import { operateLogApi } from '/@/api/support/operate-log-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-  import uaparser from 'ua-parser-js';
+  import { UAParser } from 'ua-parser-js';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   const columns = ref([
@@ -166,7 +166,7 @@
         if (!e.userAgent) {
           continue;
         }
-        let ua = uaparser(e.userAgent);
+        let ua = UAParser(e.userAgent);
         e.browser = ua.browser.name;
         e.os = ua.os.name;
         e.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';

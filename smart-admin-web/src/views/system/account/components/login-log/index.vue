@@ -71,7 +71,7 @@
   import { onMounted, onUnmounted, reactive, ref } from 'vue';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-  import uaparser from 'ua-parser-js';
+  import { UAParser } from 'ua-parser-js';
   import { LOGIN_RESULT_ENUM } from '/@/constants/support/login-log-const';
   import { loginLogApi } from '/@/api/support/login-log-api';
   import { smartSentry } from '/@/lib/smart-sentry';
@@ -154,7 +154,7 @@
         if (!e.userAgent) {
           continue;
         }
-        let ua = uaparser(e.userAgent);
+        let ua = UAParser(e.userAgent);
         e.browser = ua.browser.name;
         e.os = ua.os.name;
         e.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';

@@ -62,7 +62,7 @@
   import * as Diff from 'diff';
   import * as Diff2Html from 'diff2html';
   import 'diff2html/bundles/css/diff2html.min.css';
-  import uaparser from 'ua-parser-js';
+  import { UAParser } from 'ua-parser-js';
   import { nextTick, reactive, ref, watch } from 'vue';
   import { dataTracerApi } from '/@/api/support/data-tracer-api';
   import { PAGE_SIZE, PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -112,7 +112,7 @@
           continue;
         }
         // e.content = e.content.replaceAll('<br/>','；');
-        let ua = uaparser(e.userAgent);
+        let ua = UAParser(e.userAgent);
         e.browser = ua.browser.name;
         e.os = ua.os.name;
         e.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';

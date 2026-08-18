@@ -63,7 +63,7 @@
   import { noticeApi } from '/@/api/business/oa/notice-api';
   import { PAGE_SIZE, PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import DepartmentTreeSelect from '/@/components/system/department-tree-select/index.vue';
-  import uaparser from 'ua-parser-js';
+  import { UAParser } from 'ua-parser-js';
 
   const props = defineProps({
     noticeId: {
@@ -122,7 +122,7 @@
       return '';
     }
 
-    let ua = uaparser(userAgent);
+    let ua = UAParser(userAgent);
     let browser = ua.browser.name;
     let os = ua.os.name;
     return browser + '/' + os + '/' + (ua.device.vendor ? ua.device.vendor + ua.device.model : '');

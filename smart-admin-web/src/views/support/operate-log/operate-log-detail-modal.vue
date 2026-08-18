@@ -65,7 +65,7 @@
   import { operateLogApi } from '/@/api/support/operate-log-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import uaparser from 'ua-parser-js';
+  import { UAParser } from 'ua-parser-js';
 
   defineExpose({
     show,
@@ -102,7 +102,7 @@
       SmartLoading.show();
       let res = await operateLogApi.detail(operateLogId);
       detail = Object.assign(detail, res.data);
-      let ua = uaparser(res.data.userAgent);
+      let ua = UAParser(res.data.userAgent);
       detail.browser = ua.browser.name;
       detail.os = ua.os.name;
       detail.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';
