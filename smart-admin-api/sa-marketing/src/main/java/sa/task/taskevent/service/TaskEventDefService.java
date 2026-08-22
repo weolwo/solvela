@@ -22,7 +22,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import sa.base.common.constant.TenantConst;
 
 /**
  * 任务事件注册表 Service（配置态）。
@@ -94,7 +93,6 @@ public class TaskEventDefService {
             return ResponseDTO.userErrorParam("事件编码已存在：" + addForm.getEventCode());
         }
         TaskEvent entity = SmartBeanUtil.copy(addForm, TaskEvent.class);
-        entity.setTenantId(TenantConst.DEFAULT_TENANT_ID);
         applyDefaults(entity);
         taskEventDao.insert(entity);
         return ResponseDTO.ok();

@@ -20,9 +20,6 @@ public class PromotionConfigVO {
     @Schema(description = "配置ID")
     private Long id;
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "优惠配置名称")
     private String promoName;
 

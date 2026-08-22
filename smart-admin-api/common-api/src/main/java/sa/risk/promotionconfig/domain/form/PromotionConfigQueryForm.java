@@ -18,9 +18,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class PromotionConfigQueryForm extends PageParam {
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "优惠配置名称")
     private String promoName;
 

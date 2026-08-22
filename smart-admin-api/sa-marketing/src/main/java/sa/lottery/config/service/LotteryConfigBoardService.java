@@ -138,7 +138,6 @@ public class LotteryConfigBoardService {
                                             Map<String, Object> recordStat, LocalDateTime dbNow) {
         LotteryConfigBoardVO vo = new LotteryConfigBoardVO();
         vo.setId(config.getId());
-        vo.setTenantId(config.getTenantId());
         vo.setActivityCode(config.getActivityCode());
         vo.setLotteryCode(config.getLotteryCode());
         vo.setLotteryName(config.getLotteryName());

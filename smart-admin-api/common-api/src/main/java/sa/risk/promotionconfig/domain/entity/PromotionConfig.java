@@ -27,11 +27,6 @@ public class PromotionConfig {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 优惠配置名称
      */
     private String promoName;

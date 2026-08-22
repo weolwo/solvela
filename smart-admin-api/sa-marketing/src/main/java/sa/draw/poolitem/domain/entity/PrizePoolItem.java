@@ -24,11 +24,6 @@ public class PrizePoolItem {
     private Long id;
 
     /**
-     * 租户id
-     */
-    private String tenantId;
-
-    /**
      * 归属活动编码
      */
     private String activityCode;

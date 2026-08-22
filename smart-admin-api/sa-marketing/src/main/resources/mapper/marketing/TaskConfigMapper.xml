@@ -5,7 +5,6 @@
     <resultMap id="TaskConfigVO" type="sa.task.taskconfig.domain.vo.TaskConfigVO">
             <result column="id" property="id" />
             <result column="activity_code" property="activityCode" />
-            <result column="tenant_id" property="tenantId" />
             <result column="task_name" property="taskName" />
             <result column="template_code" property="templateCode" />
             <result column="trigger_event" property="triggerEvent" />
@@ -29,7 +28,6 @@
     <sql id="base_columns">
                 id, 
                 activity_code, 
-                tenant_id, 
                 task_name, 
                 template_code, 
                 trigger_event, 
@@ -52,9 +50,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.taskName != null">
                             AND task_name = #{queryForm.taskName}
                         </if>

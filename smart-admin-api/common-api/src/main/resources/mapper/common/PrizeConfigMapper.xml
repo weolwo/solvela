@@ -4,7 +4,6 @@
 
     <resultMap id="PrizeConfigVO" type="sa.prize.prizeconfig.domain.vo.PrizeConfigVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="activity_code" property="activityCode" />
             <result column="promotion_config_id" property="promotionConfigId" />
             <result column="prize_type" property="prizeType" />
@@ -24,7 +23,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 activity_code, 
                 promotion_config_id, 
                 prize_type, 
@@ -44,9 +42,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.activityCode != null">
                             AND activity_code = #{queryForm.activityCode}
                         </if>

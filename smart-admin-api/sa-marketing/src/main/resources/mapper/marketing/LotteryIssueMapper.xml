@@ -4,7 +4,6 @@
 
     <resultMap id="LotteryIssueVO" type="sa.lottery.issue.domain.vo.LotteryIssueVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
             <result column="sold_count" property="soldCount" />
@@ -27,7 +26,6 @@
 
     <sql id="base_columns">
                 i.id,
-                i.tenant_id,
                 i.lottery_code,
                 i.issue_no,
                 i.sold_count,
@@ -113,9 +111,6 @@
     -->
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND i.tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.lotteryCode != null">
                             AND i.lottery_code = #{queryForm.lotteryCode}
                         </if>
@@ -199,7 +194,7 @@
         口径与列表完全同源：复用同两个表达式，所以点卡片筛出来的行数
         必然等于卡片上的数字。
 
-        只吃 tenantId / lotteryCode 两个条件，刻意不吃 status / saleState / overdueOnly ——
+        只吃 lotteryCode 一个条件，刻意不吃 status / saleState / overdueOnly ——
         卡片本身就是筛选入口，若它再跟着筛选结果变，点一下「逾期」之后
         其余三张卡片全部归零，就没法用它们互相对照了。
     -->
@@ -213,9 +208,6 @@
             COALESCE(SUM(<include refid="today_draw_expr"/>), 0)           AS todayDrawCount
         <include refid="base_from"/>
         <where>
-            <if test="queryForm.tenantId != null">
-                AND i.tenant_id = #{queryForm.tenantId}
-            </if>
             <if test="queryForm.lotteryCode != null">
                 AND i.lottery_code = #{queryForm.lotteryCode}
             </if>

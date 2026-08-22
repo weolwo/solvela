@@ -170,9 +170,9 @@
    * 字段与后端两个 Form 一一对应，多一个都不留：
    *   AddForm    = lotteryCode / issueNo / saleStartTime / saleEndTime / planDrawTime
    *   UpdateForm = id / saleStartTime / saleEndTime / planDrawTime
-   * 原先这里还有 tenantId / soldCount / settleTime / winningNumber 四项，
+   * 原先这里还有 租户id / soldCount / settleTime / winningNumber 四项，
    * 后端一个都不收（见两个 Form 的类注释），填了纯属白填。
-   * 其中 tenantId 与 soldCount 当时还是必填 —— 强迫运营填两个会被丢弃的值。
+   * 其中 租户id 与 soldCount 当时还是必填 —— 强迫运营填两个会被丢弃的值。
    */
   const formDefault = {
     id: undefined, //id

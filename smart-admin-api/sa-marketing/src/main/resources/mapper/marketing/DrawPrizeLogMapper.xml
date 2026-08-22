@@ -4,7 +4,6 @@
 
     <resultMap id="DrawPrizeLogVO" type="sa.draw.drawlog.domain.vo.DrawPrizeLogVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="trace_id" property="traceId" />
             <result column="activity_code" property="activityCode" />
             <result column="pool_code" property="poolCode" />
@@ -19,7 +18,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 trace_id, 
                 activity_code, 
                 pool_code, 
@@ -45,9 +43,6 @@
         由调用方各自套 &lt;where&gt;，它会自动吃掉多余的前导 AND。
     -->
     <sql id="funnel_conditions">
-        <if test="queryForm.tenantId != null">
-            AND tenant_id = #{queryForm.tenantId}
-        </if>
         <if test="queryForm.traceId != null">
             AND trace_id = #{queryForm.traceId}
         </if>
@@ -101,9 +96,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.traceId != null">
                             AND trace_id = #{queryForm.traceId}
                         </if>

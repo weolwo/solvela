@@ -18,9 +18,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class LotteryConfigQueryForm extends PageParam {
 
-    @Schema(description = "租户id")
-    private String tenantId;
-
     @Schema(description = "活动编码")
     private String activityCode;
 

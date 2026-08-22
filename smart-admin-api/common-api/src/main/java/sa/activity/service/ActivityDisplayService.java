@@ -67,13 +67,12 @@ public class ActivityDisplayService {
     }
 
     /**
-     * 按活动编码保存。租户从活动上带过来，前端不用传也篡改不了。
+     * 按活动编码保存。活动 ID 从活动上带过来，前端不用传也篡改不了。
      */
     @Transactional(rollbackFor = Exception.class)
     public ActivityDisplay saveByCode(String activityCode, ActivityDisplay form, RequestUser user) {
         ActivityConfig activity = requireActivity(activityCode);
         form.setActivityId(activity.getId());
-        form.setTenantId(activity.getTenantId());
         return save(form, user);
     }
 

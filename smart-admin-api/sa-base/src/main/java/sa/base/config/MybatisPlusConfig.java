@@ -7,8 +7,6 @@ import com.baomidou.mybatisplus.core.metadata.TableInfo;
 import com.baomidou.mybatisplus.extension.injector.methods.InsertBatchSomeColumn;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
-import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
-import sa.base.common.tenant.SmartTenantLineHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -31,17 +29,14 @@ public class MybatisPlusConfig {
     /**
      * MyBatis-Plus 拦截器链。
      *
-     * <p>🔴 <b>顺序不能调换：租户必须在分页之前。</b>
-     * 分页拦截器会把原 SQL 包成 {@code SELECT COUNT(*) FROM (原SQL)} 并改写 limit；
-     * 如果它先跑，租户拦截器拿到的就是被包装过的 SQL，改写位置会错 ——
-     * 表现是<b>分页总数按全租户算、当前页数据却按单租户查</b>，
-     * 页码点到后面就是空白页，而且不报任何错。
-     * MyBatis-Plus 官方文档对这个顺序有明确要求。
+     * <p>曾经这里还挂着 {@code TenantLineInnerInterceptor}（v3.71.0 启用）。
+     * v3.73.0 起<b>整个租户维度被删除</b>：全库 27 张表的 {@code tenant_id} 实测
+     * 一行非默认值都没有，系统从来就是单租户跑的，那一列与那套拦截器只是空转。
+     * 将来真要做多租户，重新加回来是一次索引重建，比长期维护一个永远为真的过滤条件划算。
      */
     @Bean
     public MybatisPlusInterceptor paginationInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-        interceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new SmartTenantLineHandler()));
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         return interceptor;
     }

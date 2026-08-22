@@ -18,9 +18,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class TaskTemplateQueryForm extends PageParam {
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "模板编码")
     private String templateCode;
 

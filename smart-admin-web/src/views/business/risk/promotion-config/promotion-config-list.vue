@@ -26,11 +26,8 @@
       <a-form-item label="创建时间" class="smart-query-form-item">
         <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
       </a-form-item>
-      <!-- 租户ID 与三个防刷次数：按具体次数精确匹配的检索几乎用不上，收进「更多」里 -->
+      <!-- 三个防刷次数：按具体次数精确匹配的检索几乎用不上，收进「更多」里 -->
       <template v-if="showMoreQuery">
-        <a-form-item label="租户ID" class="smart-query-form-item">
-          <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-        </a-form-item>
         <a-form-item label="单会员ID限制" class="smart-query-form-item">
           <a-input style="width: 200px" v-model:value="queryForm.identifyLimit" placeholder="按次数精确匹配，-1 为不限" />
         </a-form-item>
@@ -170,7 +167,6 @@
     <a-drawer :title="`优惠配置详情 · ${detail.promoName || ''}`" :width="720" :open="detailVisible" @close="detailVisible = false">
       <a-descriptions title="基本信息" bordered size="small" :column="2" class="mb-6">
         <a-descriptions-item label="配置ID">{{ detail.id }}</a-descriptions-item>
-        <a-descriptions-item label="租户ID">{{ detail.tenantId }}</a-descriptions-item>
         <a-descriptions-item label="配置名称" :span="2">{{ detail.promoName }}</a-descriptions-item>
         <a-descriptions-item label="资产类型">
           <a-tag :color="prizeTypeOf(detail.prizeType).color">{{ prizeTypeOf(detail.prizeType).desc }}</a-tag>
@@ -334,12 +330,7 @@
       width: 90,
     },
     // ↓ 以下默认隐藏：已并进上面的派生列，需要时在列设置里调出。
-    //   租户ID/创建人/更新人/更新时间不在这里标 —— DEFAULT_HIDDEN_COLUMNS 已统一收口
-    {
-      title: '租户ID',
-      dataIndex: 'tenantId',
-      ellipsis: true,
-    },
+    //   创建人/更新人/更新时间不在这里标 —— DEFAULT_HIDDEN_COLUMNS 已统一收口
     {
       title: '总库存',
       dataIndex: 'totalQuota',
@@ -412,7 +403,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户ID
     promoName: undefined, //优惠配置名称
     prizeType: undefined, //资产类型：SCORE / BALANCE / COUPON / PHYSICAL
     createTime: [], //创建时间

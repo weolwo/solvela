@@ -297,11 +297,6 @@
       ellipsis: true,
     },
     {
-      title: '租户id',
-      dataIndex: 'tenantId',
-      ellipsis: true,
-    },
-    {
       title: '活动编码',
       dataIndex: 'activityCode',
       width: 160,

@@ -9,9 +9,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="任务名称" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.taskName" placeholder="任务名称" />
       </a-form-item>
@@ -231,11 +228,6 @@
       ellipsis: true,
     },
     {
-      title: '租户ID',
-      dataIndex: 'tenantId',
-      ellipsis: true,
-    },
-    {
       title: '任务名称',
       dataIndex: 'taskName',
       ellipsis: true,
@@ -336,7 +328,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户ID
     taskName: undefined, //任务名称
     templateCode: undefined, //模板Code
     activityCode: undefined, //活动编码

@@ -19,9 +19,6 @@ public class DrawPrizeLogVO {
     @Schema(description = "id")
     private Long id;
 
-    @Schema(description = "租户id")
-    private String tenantId;
-
     @Schema(description = "请求ID")
     private String traceId;
 

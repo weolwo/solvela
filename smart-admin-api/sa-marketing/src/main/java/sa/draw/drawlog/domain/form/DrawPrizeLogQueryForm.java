@@ -18,9 +18,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class DrawPrizeLogQueryForm extends PageParam {
 
-    @Schema(description = "租户id")
-    private String tenantId;
-
     @Schema(description = "请求ID")
     private String traceId;
 

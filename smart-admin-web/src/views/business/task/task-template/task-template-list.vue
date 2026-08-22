@@ -9,9 +9,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-      </a-form-item>
       <a-form-item label="模板编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.templateCode" placeholder="模板编码" />
       </a-form-item>
@@ -156,11 +153,6 @@
       ellipsis: true,
     },
     {
-      title: '租户ID',
-      dataIndex: 'tenantId',
-      ellipsis: true,
-    },
-    {
       title: '模板编码',
       dataIndex: 'templateCode',
       ellipsis: true,
@@ -225,7 +217,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户ID
     templateCode: undefined, //模板编码
     templateName: undefined, //模板名称
     taskType: undefined, //流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)

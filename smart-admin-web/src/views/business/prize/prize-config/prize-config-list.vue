@@ -267,7 +267,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户ID
     activityCode: undefined, //活动编码
     prizeCode: undefined, //奖品编码
     prizeLevel: undefined, //奖品级别

@@ -27,11 +27,6 @@ public class ProposalRecord {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 提案单号，服务端生成，对外唯一标识
      */
     private String tradeNo;

@@ -44,7 +44,7 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      * 不拆成四条 count：分四次执行会拿到四个不同的 NOW()，
      * 出现「卡片说售卖中 3 期、点进去只有 2 期」这种自相矛盾。
      *
-     * 只吃 tenantId / lotteryCode，其余筛选条件刻意不参与，理由见 mapper 注释。
+     * 只吃 lotteryCode，其余筛选条件刻意不参与，理由见 mapper 注释。
      */
     LotteryIssueOverviewVO overview(@Param("queryForm") LotteryIssueQueryForm queryForm);
 

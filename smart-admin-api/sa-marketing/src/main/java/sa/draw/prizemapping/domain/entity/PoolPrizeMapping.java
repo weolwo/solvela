@@ -27,11 +27,6 @@ public class PoolPrizeMapping {
     private Long id;
 
     /**
-     * 租户id
-     */
-    private String tenantId;
-
-    /**
      * 奖池编码
      */
     private String poolCode;

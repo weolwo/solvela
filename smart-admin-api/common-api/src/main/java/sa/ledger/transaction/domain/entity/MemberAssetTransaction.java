@@ -27,11 +27,6 @@ public class MemberAssetTransaction {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 会员号：关联键（v3.71.0 换键）。查询、join、对账一律用它。
      */
     private Long memberId;

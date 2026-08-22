@@ -133,7 +133,7 @@ public class MemberWalletService {
         // 1. 查钱包与自愈
         MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(proposal.getMemberId(), assetType.name());
         if (wallet == null) {
-            wallet = initMemberWallet(proposal.getMemberId(), proposal.getTenantId(), assetType);
+            wallet = initMemberWallet(proposal.getMemberId(), assetType);
         }
 
         // 2. 状态校验 (调用充血模型)
@@ -177,7 +177,6 @@ public class MemberWalletService {
         }
 
         MemberAssetTransaction txn = new MemberAssetTransaction();
-        txn.setTenantId(wallet.getTenantId());
         txn.setMemberId(memberId);
         txn.setMemberName(memberName);
         txn.setAssetType(assetType.name());
@@ -202,7 +201,7 @@ public class MemberWalletService {
         String memberName = memberService.requireMemberName(memberId);
         MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
         if (wallet == null) {
-            wallet = initMemberWallet(memberId, null, assetType);
+            wallet = initMemberWallet(memberId, assetType);
         }
         wallet.checkAvailable();
         BigDecimal balanceAfter = wallet.calculateAfterBalance(amount);
@@ -213,7 +212,6 @@ public class MemberWalletService {
         }
 
         MemberAssetTransaction txn = new MemberAssetTransaction();
-        txn.setTenantId(wallet.getTenantId());
         txn.setMemberId(memberId);
         txn.setMemberName(memberName);
         txn.setAssetType(assetType.name());
@@ -228,7 +226,6 @@ public class MemberWalletService {
 
     private MemberAssetTransaction buildTransaction(ProposalRecord proposal, PrizeTypeEnum assetType, BigDecimal amount, BigDecimal balanceAfter) {
         MemberAssetTransaction txn = new MemberAssetTransaction();
-        txn.setTenantId(proposal.getTenantId());
         txn.setMemberId(proposal.getMemberId());
         // 展示快照取提案上的那一份，不再查一次会员表：提案落库时已经把「当时那个账号」记下来了
         txn.setMemberName(proposal.getMemberName());
@@ -246,9 +243,8 @@ public class MemberWalletService {
     /**
      * 辅助方法：用户钱包初始化兜底（按资产类型初始化对应账户行）
      */
-    private MemberWallet initMemberWallet(Long memberId, String tenantId, PrizeTypeEnum assetType) {
+    private MemberWallet initMemberWallet(Long memberId, PrizeTypeEnum assetType) {
         MemberWallet wallet = new MemberWallet();
-        wallet.setTenantId(tenantId);
         wallet.setMemberId(memberId);
         wallet.setAssetType(assetType.name());
         wallet.setBalance(BigDecimal.ZERO);

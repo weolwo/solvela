@@ -31,11 +31,6 @@ public class TaskConfig {
     private String activityCode;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 任务名称
      */
     private String taskName;

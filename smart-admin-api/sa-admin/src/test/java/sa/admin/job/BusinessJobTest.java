@@ -111,13 +111,9 @@ class BusinessJobTest {
                 // member_id 是 NOT NULL 的关联键（v3.71.0）：漏了会以
                 // 「Field 'member_id' doesn't have a default value」整条被拒。
                 // 这里只造券、不造会员：本用例验的是收口 SQL 的 WHERE 边界，不 join 会员表
-                "INSERT INTO t_member_coupon (tenant_id, member_id, member_name, coupon_code, coupon_type,"
+                "INSERT INTO t_member_coupon (member_id, member_name, coupon_code, coupon_type,"
                         + " coupon_name, status, source_type, source_biz_id, valid_start_time, valid_end_time)"
-                        // 🔴 租户必须落 TenantConst.DEFAULT_TENANT_ID('taozi')，不能再写哨兵值 '0'：
-                        // v3.70.0 之后默认租户改名、v3.71.0 之后租户拦截器会给每条查询追加
-                        // tenant_id = 'taozi'，造数落 '0' 的行 DAO <b>一条都查不到</b> ——
-                        // 表现是「待收口条数 = 0」，用例失败，但库里其实插进去了。
-                        + " VALUES ('taozi', ?, ?, 'JOB_TEST', 'CASH', '收口用例造的券', ?, 'TEST', ?,"
+                        + " VALUES (?, ?, 'JOB_TEST', 'CASH', '收口用例造的券', ?, 'TEST', ?,"
                         + " DATE_SUB(now(), INTERVAL 1 DAY), DATE_ADD(now(), INTERVAL ? MINUTE))",
                 fakeMemberId(memberName), memberName, status,
                 memberName + "-" + System.nanoTime(), minutesFromNow);
@@ -205,10 +201,9 @@ class BusinessJobTest {
         jdbcTemplate.update(
                 // 🔴 刻意<b>不写</b> member_name：任务记录是状态表，那一列已被 v3.71.1 放开为可空、
                 // 由 v3.72.0 删除，代码侧也不再写它。这里跟着不写，本用例才能跨过那次删列继续跑。
-                "INSERT INTO t_task_record (tenant_id, member_id, task_config_id, activity_code,"
+                "INSERT INTO t_task_record (member_id, task_config_id, activity_code,"
                         + " period_key, valid_start_time, valid_end_time, status, rule_snapshot, prize_snapshot)"
-                        // 租户同上：落 'taozi'，否则租户拦截器会把这些行整批挡在 DAO 之外
-                        + " VALUES ('taozi', ?, 0, 'JOB_TEST', ?, DATE_SUB(now(), INTERVAL 1 DAY),"
+                        + " VALUES (?, 0, 'JOB_TEST', ?, DATE_SUB(now(), INTERVAL 1 DAY),"
                         + " DATE_ADD(now(), INTERVAL ? MINUTE), ?, '{}', '[]')",
                 fakeMemberId(memberName),
                 memberName + "-" + System.nanoTime(), minutesFromNow, status);

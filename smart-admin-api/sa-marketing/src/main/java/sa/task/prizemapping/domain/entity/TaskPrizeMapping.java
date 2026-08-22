@@ -26,11 +26,6 @@ public class TaskPrizeMapping {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 任务配置ID
      */
     private Long taskConfigId;

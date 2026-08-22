@@ -16,7 +16,6 @@ public abstract class BaseBizEvent implements Serializable {
     private String eventId;       // 事件唯一标识
     private String category;      // 事件大类：PRIZE(奖励), TASK(任务), MEMBER(会员)
     private String eventType;     // 具体子类：LOTTERY_WIN, TASK_ASSIGN, MEMBER_UPGRADE
-    private String tenantId;      // 租户
     private LocalDateTime eventTime; // 发生时间
     private String remark;        // 备注
 }

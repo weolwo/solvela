@@ -4,7 +4,6 @@
 
     <resultMap id="ProposalRecordVO" type="sa.risk.proposal.domain.vo.ProposalRecordVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="trade_no" property="tradeNo" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
@@ -32,7 +31,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 trade_no, 
                 member_id,
                 member_name,
@@ -60,9 +58,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.memberId != null">
                             AND member_id = #{queryForm.memberId}
                         </if>
@@ -115,9 +110,6 @@
         而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
     -->
     <sql id="funnel_conditions">
-        <if test="queryForm.tenantId != null">
-            AND tenant_id = #{queryForm.tenantId}
-        </if>
         <if test="queryForm.memberId != null">
             AND member_id = #{queryForm.memberId}
         </if>

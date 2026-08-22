@@ -19,9 +19,6 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = false)
 public class TaskConfigQueryForm extends PageParam {
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "任务名称")
     private String taskName;
 

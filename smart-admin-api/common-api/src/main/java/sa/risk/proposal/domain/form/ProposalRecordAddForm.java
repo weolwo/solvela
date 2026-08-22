@@ -18,9 +18,6 @@ import lombok.Data;
 @Data
 public class ProposalRecordAddForm {
 
-    @Schema(description = "租户ID，不传落库取默认值 '0'")
-    private String tenantId;
-
     // 单号由提案域自己发（saveProposal 里生成），调用方不该也不能指定 —— 它是本域对外的凭证。
     // 这里若保留 @NotBlank，将来任何 Controller 暴露提案创建接口都会被误挡在门外
     @Schema(description = "提案单号，服务端生成，调用方无需传入", accessMode = Schema.AccessMode.READ_ONLY)

@@ -4,7 +4,6 @@
 
     <resultMap id="PrizeLogVO" type="sa.prize.prizelog.domain.vo.PrizeLogVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="prize_code" property="prizeCode" />
@@ -29,7 +28,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 member_id,
                 member_name,
                 prize_code, 
@@ -79,9 +77,6 @@
         追加 status=2，本片段自带 &lt;where&gt; 会让追加的条件落在外面。由调用方各自套。
     -->
     <sql id="funnel_conditions">
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.memberId != null">
                             AND member_id = #{queryForm.memberId}
                         </if>

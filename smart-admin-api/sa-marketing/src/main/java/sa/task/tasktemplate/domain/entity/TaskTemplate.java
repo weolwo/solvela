@@ -26,11 +26,6 @@ public class TaskTemplate {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 模板编码
      */
     private String templateCode;

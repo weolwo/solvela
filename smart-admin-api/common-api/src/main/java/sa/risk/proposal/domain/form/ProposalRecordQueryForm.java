@@ -19,9 +19,6 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = false)
 public class ProposalRecordQueryForm extends PageParam {
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     /**
      * 会员号（精确匹配，走 member_id 索引）。
      *

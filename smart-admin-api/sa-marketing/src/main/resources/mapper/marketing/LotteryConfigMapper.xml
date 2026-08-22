@@ -4,7 +4,6 @@
 
     <resultMap id="LotteryConfigVO" type="sa.lottery.config.domain.vo.LotteryConfigVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="activity_code" property="activityCode" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="lottery_name" property="lotteryName" />
@@ -20,7 +19,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 activity_code, 
                 lottery_code, 
                 lottery_name, 
@@ -36,9 +34,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.activityCode != null">
                             AND activity_code = #{queryForm.activityCode}
                         </if>

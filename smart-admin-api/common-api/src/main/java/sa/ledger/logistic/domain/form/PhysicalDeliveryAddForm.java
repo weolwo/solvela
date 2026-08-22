@@ -16,9 +16,6 @@ import lombok.Data;
 @Data
 public class PhysicalDeliveryAddForm {
 
-    @Schema(description = "租户ID，不传落库取默认值 '0'")
-    private String tenantId;
-
     /**
      * 会员号 —— 关联键。调用方只需给它，账号快照由服务端查会员表补
      * （见 {@code MemberService.requireMemberName}），这样快照与会员号<b>不可能对不上</b>。

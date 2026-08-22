@@ -21,10 +21,6 @@ public class PoolPrizeMappingAddForm {
     @NotNull(message = "id 不能为空")
     private Long id;
 
-    @Schema(description = "租户id", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户id 不能为空")
-    private String tenantId;
-
     @Schema(description = "奖池编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "奖池编码 不能为空")
     private String poolCode;

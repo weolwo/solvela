@@ -49,7 +49,6 @@ public class CouponAssetHandler implements IAssetHandler{
         }
 
         MemberCoupon coupon = new MemberCoupon();
-        coupon.setTenantId(proposal.getTenantId());
         coupon.setMemberId(proposal.getMemberId());
         // 展示快照直接沿用提案上的那一份，不再查会员表：提案落库时已经把「当时那个账号」记下来了
         coupon.setMemberName(proposal.getMemberName());

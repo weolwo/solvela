@@ -287,7 +287,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户id
     activityCode: undefined, //活动编码
     activityName: undefined, //活动名称
     activityType: undefined, //活动类型：BASIC / DRAW / TASK / LOTTERY

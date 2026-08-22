@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import sa.base.common.constant.TenantConst;
 
 /**
  * 任务配置表 Service
@@ -254,7 +253,6 @@ public class TaskConfigService {
     private List<TaskPrizeMapping> buildMappingList(TaskConfigWizardSubmitForm form, Long taskConfigId) {
         return form.getPrizeMappingList().stream().map(item -> {
             TaskPrizeMapping mapping = new TaskPrizeMapping();
-            mapping.setTenantId(TenantConst.DEFAULT_TENANT_ID);
             mapping.setTaskConfigId(taskConfigId);
             mapping.setStageLevel(item.getStageLevel());
             mapping.setStageCondition(JsonUtils.toJson(Map.of(KEY_STAGE_TARGET, item.getStageCondition())));

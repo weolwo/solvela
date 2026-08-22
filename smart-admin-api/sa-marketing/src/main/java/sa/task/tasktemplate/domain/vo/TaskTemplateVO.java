@@ -19,9 +19,6 @@ public class TaskTemplateVO {
     @Schema(description = "id")
     private Long id;
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "模板编码")
     private String templateCode;
 

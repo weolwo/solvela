@@ -4,7 +4,6 @@
 
     <resultMap id="MemberWalletVO" type="sa.ledger.wallet.domain.vo.MemberWalletVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="asset_type" property="assetType" />
@@ -19,7 +18,6 @@
 
     <sql id="base_columns">
                 id,
-                tenant_id,
                 member_id,
                 asset_type,
                 balance,
@@ -33,14 +31,11 @@
 
     <!--
         ⚠️ 列一律带 w. 前缀：列表查询 join 了 t_member，而两张表都有
-        tenant_id / status / create_time / create_by / update_time —— 不加前缀
+        status / create_time / create_by / update_time —— 不加前缀
         MySQL 直接报 Column 'status' in field list is ambiguous。
     -->
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND w.tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.memberId != null">
                             AND w.member_id = #{queryForm.memberId}
                         </if>
@@ -83,7 +78,6 @@
     -->
     <sql id="list_columns">
                 w.id,
-                w.tenant_id,
                 w.member_id,
                 m.member_name,
                 w.asset_type,

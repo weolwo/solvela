@@ -4,7 +4,6 @@
 
     <resultMap id="TaskRecordVO" type="sa.task.record.domain.vo.TaskRecordVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="task_config_id" property="taskConfigId" />
@@ -26,7 +25,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 member_id, 
                 task_config_id, 
                 activity_code, 
@@ -58,9 +56,6 @@
         而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
     -->
     <sql id="funnel_conditions">
-        <if test="queryForm.tenantId != null">
-            AND tenant_id = #{queryForm.tenantId}
-        </if>
         <if test="queryForm.memberId != null">
             AND member_id = #{queryForm.memberId}
         </if>
@@ -135,7 +130,7 @@
         走 idx_t_tsk_flw_stat(create_time, flow_type, discard_code)。
 
         筛选条件只挑流水表<b>确实有</b>的那几列对齐：
-          · tenant_id / member_id 直接对应；
+          · member_id 直接对应；
           · activity_code 流水表没有，经 task_config_id 关联配置表取（用 LEFT JOIN：
             task_config_id=0 是「还没匹配到任何配置就被拒」的哨兵值，INNER JOIN 会把它整类吃掉。
             不过一旦按活动筛，丢掉这类无归属流水本来就是对的）；
@@ -153,9 +148,6 @@
         </if>
         <where>
             AND f.flow_type = 2
-            <if test="queryForm.tenantId != null">
-                AND f.tenant_id = #{queryForm.tenantId}
-            </if>
             <if test="queryForm.memberId != null">
                 AND f.member_id = #{queryForm.memberId}
             </if>
@@ -175,14 +167,11 @@
 
     <!--
         ⚠️ 列一律带 r. 前缀：列表查询 join 了 t_member，而两张表都有
-        tenant_id / status / create_by / create_time / update_by / update_time / member_id ——
+        status / create_by / create_time / update_by / update_time / member_id ——
         不加前缀 MySQL 直接报 Column 'status' in where clause is ambiguous。
     -->
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND r.tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.memberId != null">
                             AND r.member_id = #{queryForm.memberId}
                         </if>
@@ -218,7 +207,6 @@
     -->
     <sql id="list_columns">
                 r.id,
-                r.tenant_id,
                 r.member_id,
                 m.member_name,
                 r.task_config_id,
@@ -271,7 +259,7 @@
     <!-- ==================== 运行态（v3.44.0，方案 §4.4） ==================== -->
 
     <select id="selectByUniqueKey" resultType="sa.task.record.domain.entity.TaskRecord">
-        SELECT id, tenant_id, member_id, task_config_id, activity_code, period_key,
+        SELECT id, member_id, task_config_id, activity_code, period_key,
                valid_start_time, valid_end_time, current_metric, version, status,
                progress_data, rule_snapshot, prize_snapshot, complete_time,
                create_by, create_time, update_by, update_time
@@ -287,7 +275,7 @@
       按 id 倒序：轮次依次创建，id 最大的就是最新一轮。
     -->
     <select id="selectLatestRoundByPeriod" resultType="sa.task.record.domain.entity.TaskRecord">
-        SELECT id, tenant_id, member_id, task_config_id, activity_code, period_key,
+        SELECT id, member_id, task_config_id, activity_code, period_key,
                valid_start_time, valid_end_time, current_metric, version, status,
                progress_data, rule_snapshot, prize_snapshot, complete_time,
                create_by, create_time, update_by, update_time

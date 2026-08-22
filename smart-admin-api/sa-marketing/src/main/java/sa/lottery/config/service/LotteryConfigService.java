@@ -45,7 +45,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import sa.base.common.constant.TenantConst;
 
 /**
  * 彩票配置 Service
@@ -312,7 +311,6 @@ public class LotteryConfigService {
                 .eq(LotteryPrizeRule::getLotteryCode, form.getLotteryCode()).remove();
         for (LotteryWorkbenchRuleForm rule : ruleList) {
             LotteryPrizeRule entity = new LotteryPrizeRule();
-            entity.setTenantId(TenantConst.DEFAULT_TENANT_ID);
             entity.setLotteryCode(form.getLotteryCode());
             entity.setPrizeLevel(rule.getPrizeLevel());
             MatchRuleEnum matchRule = MatchRuleEnum.resolve(rule.getMatchRule());

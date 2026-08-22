@@ -19,9 +19,6 @@ public class LotteryRecordVO {
     @Schema(description = "id")
     private Long id;
 
-    @Schema(description = "租户id")
-    private String tenantId;
-
     @Schema(description = "彩票编码")
     private String lotteryCode;
 

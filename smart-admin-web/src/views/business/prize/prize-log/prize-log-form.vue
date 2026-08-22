@@ -148,7 +148,6 @@
   }
 
   const formDefault = {
-    tenantId: '0',
     memberId: undefined,
     activityCode: undefined,
     prizeCode: undefined,
@@ -247,7 +246,6 @@
     form.prizeLevel = prize.prizeLevel ?? 0;
     // prize_value 在奖品配置里是 decimal，流水表里是 varchar，统一转字符串再送
     form.prizeValue = prize.prizeValue == null ? undefined : String(prize.prizeValue);
-    form.tenantId = prize.tenantId || '0';
   }
 
   // ---------------------------- 显示 / 提交 ----------------------------

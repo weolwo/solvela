@@ -17,7 +17,7 @@ import { DEFAULT_HIDDEN_COLUMNS } from '/@/constants/support/table-id-const';
  * 优先级：页面显式声明 > 全局默认隐藏名单 > 显示。
  *
  * 为什么需要这个：代码生成器产出的列表页会把表里每个字段都列出来，
- * 包含租户id、创建人、更新人、更新时间这类审计字段 ——
+ * 包含创建人、更新人、更新时间这类审计字段 ——
  * 十几列铺开，运营真正要看的业务字段反而被挤到屏幕外。
  */
 function resolveDefaultShowFlag(column) {

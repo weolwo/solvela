@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
  * 只要注解还在，字段就会被无条件拼进 INSERT，此处不填得到的 null 会被<b>显式写入</b>，
  * 反而把 DDL 的 DEFAULT CURRENT_TIMESTAMP 挡掉 —— 实测已在 t_task_prize_mapping 留下 create_time 为 NULL 的行。
  *
- * 若将来需要自动填充**非时间**字段（如租户ID、操作人），在此扩展即可。
+ * 若将来需要自动填充**非时间**字段（如操作人），在此扩展即可。
  *
  * @author zhoumingfa
  */

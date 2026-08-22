@@ -41,7 +41,6 @@ public class PhysicalAssetHandler implements IAssetHandler {
     @Override
     public ResponseDTO dispatch(ProposalRecord proposal) {
         PhysicalDelivery delivery = new PhysicalDelivery();
-        delivery.setTenantId(proposal.getTenantId());
         delivery.setMemberId(proposal.getMemberId());
         // 展示快照沿用提案上的那一份（履约单是单据，记的是「中奖当时那个账号」）
         delivery.setMemberName(proposal.getMemberName());

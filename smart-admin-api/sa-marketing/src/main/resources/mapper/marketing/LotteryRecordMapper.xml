@@ -4,7 +4,6 @@
 
     <resultMap id="LotteryRecordVO" type="sa.lottery.record.domain.vo.LotteryRecordVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
             <result column="sequence_no" property="sequenceNo" />
@@ -25,7 +24,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 lottery_code, 
                 issue_no, 
                 sequence_no, 
@@ -54,9 +52,6 @@
         而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
     -->
     <sql id="funnel_conditions">
-        <if test="queryForm.tenantId != null">
-            AND tenant_id = #{queryForm.tenantId}
-        </if>
         <if test="queryForm.lotteryCode != null">
             AND lottery_code = #{queryForm.lotteryCode}
         </if>
@@ -134,9 +129,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.lotteryCode != null">
                             AND lottery_code = #{queryForm.lotteryCode}
                         </if>

@@ -19,9 +19,6 @@ import sa.base.common.util.SmartCodeUtil;
 @Data
 public class PrizePoolConfigAddForm {
 
-    @Schema(description = "租户id，不传落库取默认值 '0'")
-    private String tenantId;
-
     @Schema(description = "归属活动编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "活动编码 不能为空")
     @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "活动" + SmartCodeUtil.BIZ_CODE_MESSAGE)

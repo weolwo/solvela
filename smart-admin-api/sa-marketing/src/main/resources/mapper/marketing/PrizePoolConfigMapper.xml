@@ -4,7 +4,6 @@
 
     <resultMap id="PrizePoolConfigVO" type="sa.draw.poolconfig.domain.vo.PrizePoolConfigVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="activity_code" property="activityCode" />
             <result column="pool_code" property="poolCode" />
             <result column="pool_name" property="poolName" />
@@ -20,7 +19,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 activity_code, 
                 pool_code, 
                 pool_name,
@@ -36,9 +34,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.activityCode != null">
                             AND activity_code = #{queryForm.activityCode}
                         </if>

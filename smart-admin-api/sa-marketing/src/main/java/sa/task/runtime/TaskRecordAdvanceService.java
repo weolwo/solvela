@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import sa.base.common.constant.TenantConst;
 
 /**
  * 单个任务配置的进度推进 —— <b>运行态的核心，也是唯一写库的地方</b>。
@@ -351,7 +350,6 @@ public class TaskRecordAdvanceService {
      */
     private TaskRecord buildRecord(TaskConfig config, TaskEventContext ctx, String periodKey) {
         TaskRecord record = new TaskRecord();
-        record.setTenantId(TenantConst.DEFAULT_TENANT_ID);
         // 任务记录是状态表：只落关联键，不留账号快照（会员改名后快照会和主表长期不一致）
         record.setMemberId(ctx.memberId());
         record.setTaskConfigId(config.getId());
@@ -394,7 +392,6 @@ public class TaskRecordAdvanceService {
 
     private TaskRecordFlow buildFlow(TaskConfig config, TaskEventContext ctx) {
         TaskRecordFlow flow = new TaskRecordFlow();
-        flow.setTenantId(TenantConst.DEFAULT_TENANT_ID);
         // 流水是单据：关联键 + 展示快照都落
         flow.setMemberId(ctx.memberId());
         flow.setMemberName(ctx.memberName());

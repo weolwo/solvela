@@ -17,10 +17,6 @@ import lombok.Data;
 @Data
 public class LotteryRecordAddForm {
 
-    @Schema(description = "租户id", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户id 不能为空")
-    private String tenantId;
-
     @Schema(description = "彩票编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "彩票编码 不能为空")
     private String lotteryCode;

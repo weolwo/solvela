@@ -26,11 +26,6 @@ public class DrawPrizeLog {
     private Long id;
 
     /**
-     * 租户id
-     */
-    private String tenantId;
-
-    /**
      * 请求ID
      */
     private String traceId;

@@ -24,10 +24,6 @@ import java.util.Map;
  * <p>🔴 <b>查询一律走 member_id / member_name 的索引</b>，不要在这里加按昵称模糊搜之类的方法：
  * {@code nickname} 上没有索引，而且它<b>不是</b>唯一的（DDL 注释原文「任何地方都不许拿它做关联键」）。
  *
- * <p>租户条件由 {@code TenantLineInnerInterceptor} 自动追加（{@code t_member} 在
- * {@code TenantConst.TENANT_TABLES} 白名单里），所以这里不写 {@code tenant_id}，
- * 写了反而会和拦截器追加的条件重复。
- *
  * @Date 2026-08-22
  */
 @Mapper

@@ -21,9 +21,6 @@ import sa.enums.ActivityTypeEnum;
 @Data
 public class ActivityConfigAddForm {
 
-    @Schema(description = "租户id，不传落库取默认值 '0'")
-    private String tenantId;
-
     @Schema(description = "活动编码：10 位大写字母+数字，全局唯一", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "活动编码 不能为空")
     @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "活动" + SmartCodeUtil.BIZ_CODE_MESSAGE)

@@ -28,11 +28,6 @@ public class MemberWallet {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 会员号：全链路关联键（v3.71.0 换键）。
      *
      * <p>🔴 这里<b>刻意没有 memberName</b>。钱包是状态表（余额被反复 UPDATE），

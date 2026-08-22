@@ -4,7 +4,6 @@
 
     <resultMap id="PromotionConfigVO" type="sa.risk.promotionconfig.domain.vo.PromotionConfigVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="promo_name" property="promoName" />
             <result column="prize_type" property="prizeType" />
             <result column="total_quota" property="totalQuota" />
@@ -32,7 +31,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 promo_name, 
                 prize_type, 
                 total_quota, 
@@ -60,9 +58,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.promoName != null">
                             AND promo_name = #{queryForm.promoName}
                         </if>

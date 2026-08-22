@@ -131,7 +131,6 @@ public class PrizePoolBoardService {
                                         Map<Long, PrizePoolItem> itemMap, List<PoolPrizeMapping> mappings) {
         PrizePoolBoardVO vo = new PrizePoolBoardVO();
         vo.setId(pool.getId());
-        vo.setTenantId(pool.getTenantId());
         vo.setActivityCode(pool.getActivityCode());
         vo.setPoolCode(pool.getPoolCode());
         vo.setPoolName(pool.getPoolName());

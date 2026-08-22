@@ -20,9 +20,6 @@ public class MemberWalletVO {
     @Schema(description = "id")
     private Long id;
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "会员号")
     private Long memberId;
 

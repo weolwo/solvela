@@ -18,9 +18,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class MemberWalletQueryForm extends PageParam {
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     /**
      * 会员号。
      *

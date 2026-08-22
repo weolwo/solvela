@@ -160,9 +160,6 @@
   <!---------- 查询表单form begin ----------->
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
-      <a-form-item label="租户ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
-      </a-form-item>
       <!-- 查询键是会员号：member_name 只是展示快照，且身上没有索引 -->
       <a-form-item label="会员号" class="smart-query-form-item">
         <a-input-number style="width: 200px" v-model:value="queryForm.memberId" placeholder="会员号" :controls="false" :precision="0" />
@@ -299,11 +296,6 @@
       ellipsis: true,
     },
     {
-      title: '租户ID',
-      dataIndex: 'tenantId',
-      ellipsis: true,
-    },
-    {
       title: '提案单号',
       dataIndex: 'tradeNo',
       ellipsis: true,
@@ -414,7 +406,6 @@
   // ---------------------------- 查询数据表单和方法 ----------------------------
 
   const queryFormState = {
-    tenantId: undefined, //租户ID
     memberId: undefined, //会员号（关联键）
     updateTime: [], //更新时间
     updateTimeBegin: undefined, //更新时间 开始

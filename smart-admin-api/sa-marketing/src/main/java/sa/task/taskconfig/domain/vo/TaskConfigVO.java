@@ -22,9 +22,6 @@ public class TaskConfigVO {
     @Schema(description = "活动编码")
     private String activityCode;
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "任务名称")
     private String taskName;
 

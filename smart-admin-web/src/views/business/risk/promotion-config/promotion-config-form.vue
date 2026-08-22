@@ -31,9 +31,6 @@
           <a-form-item label="状态" name="status">
             <a-select v-model:value="form.status" :options="PROMOTION_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
           </a-form-item>
-          <a-form-item label="租户ID" name="tenantId">
-            <a-input v-model:value="form.tenantId" placeholder="不填落库取默认值 0" />
-          </a-form-item>
         </a-collapse-panel>
 
         <!-- ② 预算与库存：按资产类型二选一 -->
@@ -223,7 +220,6 @@
 
   const formDefault = {
     id: undefined, //配置ID
-    tenantId: undefined, //租户ID
     promoName: undefined, //优惠配置名称
     prizeType: undefined, //资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)
     totalQuota: undefined, //总库存(个数)：-1为不限制(适用于券/实物)
@@ -268,7 +264,6 @@
       promoName: 'base',
       prizeType: 'base',
       status: 'base',
-      tenantId: 'base',
       totalQuota: 'budget',
       totalAmount: 'budget',
       reviewLevel: 'review',

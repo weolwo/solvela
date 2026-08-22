@@ -27,11 +27,6 @@ public class TaskRecord {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 会员号：全链路关联键（v3.71.0 换键），唯一键 uk_t_tsk_rec_mbr_cfg_prd 的最左列。
      *
      * <p>🔴 这里<b>刻意没有 memberName</b>。任务记录是状态表（进度被反复 UPDATE），

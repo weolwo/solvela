@@ -26,8 +26,6 @@ public class TaskEvent {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String tenantId;
-
     /**
      * 事件编码：DAILY_SIGN / ORDER_PAID / GOODS_SHARE
      */

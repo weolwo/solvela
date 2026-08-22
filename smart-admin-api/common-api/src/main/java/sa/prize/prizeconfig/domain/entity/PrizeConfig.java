@@ -27,11 +27,6 @@ public class PrizeConfig {
     private Long id;
 
     /**
-     * 租户ID
-     */
-    private String tenantId;
-
-    /**
      * 活动编码
      */
     private String activityCode;

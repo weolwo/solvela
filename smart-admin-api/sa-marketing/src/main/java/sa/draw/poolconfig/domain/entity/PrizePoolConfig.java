@@ -27,11 +27,6 @@ public class PrizePoolConfig {
     private Long id;
 
     /**
-     * 租户id
-     */
-    private String tenantId;
-
-    /**
      * 活动编码
      */
     private String activityCode;

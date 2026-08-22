@@ -4,7 +4,6 @@
 
     <resultMap id="PhysicalDeliveryVO" type="sa.ledger.logistic.domain.vo.PhysicalDeliveryVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="proposal_id" property="proposalId" />
@@ -23,7 +22,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 member_id,
                 member_name,
                 proposal_id, 

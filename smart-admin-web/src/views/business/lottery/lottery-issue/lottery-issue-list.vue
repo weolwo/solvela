@@ -40,7 +40,7 @@
 
   <!---------- 查询表单form begin ----------->
   <!--
-    去掉了原先的「租户id」输入框：t_lottery_issue.tenant_id 恒为 DDL 默认值 '0'
+    去掉了原先的「租户id」输入框：租户维度已于 v3.73.0 整体删除
     （新建表单里根本没有这个字段），筛它永远只有两种结果 —— 全部或全空。
     「创建时间」换成「计划开奖时间」：期号的创建顺序对运营没有意义，先建的未必先开奖。
   -->
@@ -305,12 +305,6 @@
       title: '开奖状态',
       dataIndex: 'status',
       width: 100,
-    },
-    {
-      title: '租户id',
-      dataIndex: 'tenantId',
-      width: 100,
-      ellipsis: true,
     },
     {
       title: '创建人',

@@ -20,9 +20,6 @@ public class PrizePoolConfigVO {
     @Schema(description = "id")
     private Long id;
 
-    @Schema(description = "租户id")
-    private String tenantId;
-
     @Schema(description = "活动编码")
     private String activityCode;
 

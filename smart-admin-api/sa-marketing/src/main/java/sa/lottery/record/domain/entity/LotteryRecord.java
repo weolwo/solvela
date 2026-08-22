@@ -26,11 +26,6 @@ public class LotteryRecord {
     private Long id;
 
     /**
-     * 租户id
-     */
-    private String tenantId;
-
-    /**
      * 彩票编码
      */
     private String lotteryCode;

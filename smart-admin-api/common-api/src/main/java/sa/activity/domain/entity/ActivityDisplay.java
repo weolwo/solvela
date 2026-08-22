@@ -30,8 +30,6 @@ public class ActivityDisplay {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String tenantId;
-
     private Long activityId;
 
     /**

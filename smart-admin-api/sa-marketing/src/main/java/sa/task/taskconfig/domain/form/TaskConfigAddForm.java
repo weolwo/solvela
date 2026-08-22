@@ -21,10 +21,6 @@ public class TaskConfigAddForm {
     @NotBlank(message = "活动编码 不能为空")
     private String activityCode;
 
-    @Schema(description = "租户ID", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户ID 不能为空")
-    private String tenantId;
-
     @Schema(description = "任务名称", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "任务名称 不能为空")
     private String taskName;

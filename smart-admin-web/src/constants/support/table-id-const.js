@@ -23,7 +23,7 @@ let businessMarketingInitTableId = 50000;
 /**
  * 「列设置」里默认不勾选的列。
  *
- * 代码生成器产出的列表页会把表里每个字段都列出来，其中租户id、创建人、更新人、更新时间
+ * 代码生成器产出的列表页会把表里每个字段都列出来，其中创建人、更新人、更新时间
  * 这类审计字段几乎没人看，却把真正要看的业务字段挤到屏幕外。
  *
  * ⚠️ 只是<b>默认</b>不显示，不是删除 —— 运营在「列设置」里随时能勾回来，且勾选结果按
@@ -33,7 +33,6 @@ let businessMarketingInitTableId = 50000;
  * 隐藏它的代价远大于省下的那点宽度。
  */
 export const DEFAULT_HIDDEN_COLUMNS = [
-  'tenantId', //租户id，单租户运行期间恒为 0
   'createBy', //创建人
   'updateBy', //更新人
   'updateTime', //更新时间（创建时间保留）

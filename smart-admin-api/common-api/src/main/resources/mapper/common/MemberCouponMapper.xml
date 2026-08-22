@@ -4,7 +4,6 @@
 
     <resultMap id="MemberCouponVO" type="sa.ledger.coupon.domain.vo.MemberCouponVO">
             <result column="id" property="id" />
-            <result column="tenant_id" property="tenantId" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="coupon_code" property="couponCode" />
@@ -24,7 +23,6 @@
 
     <sql id="base_columns">
                 id, 
-                tenant_id, 
                 member_id,
                 member_name,
                 coupon_code, 
@@ -44,9 +42,6 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
-                        </if>
                         <if test="queryForm.memberId != null">
                             AND member_id = #{queryForm.memberId}
                         </if>

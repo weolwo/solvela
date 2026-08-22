@@ -20,9 +20,6 @@ public class ProposalRecordVO {
     @Schema(description = "id")
     private Long id;
 
-    @Schema(description = "租户ID")
-    private String tenantId;
-
     @Schema(description = "提案单号，服务端生成，对外唯一标识")
     private String tradeNo;
 

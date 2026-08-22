@@ -133,7 +133,6 @@
    */
   const formDefault = {
     id: undefined, //id
-    tenantId: undefined, //租户id
     activityCode: undefined, //活动编码，只读
     poolCode: undefined, //奖池编码，只读（被坑位映射与抽奖流水引用）
     poolName: undefined, //奖池名称

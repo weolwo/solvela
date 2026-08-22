@@ -16,10 +16,6 @@ import lombok.Data;
 @Data
 public class DrawPrizeLogAddForm {
 
-    @Schema(description = "租户id", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "租户id 不能为空")
-    private String tenantId;
-
     @Schema(description = "请求ID", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "请求ID 不能为空")
     private String traceId;

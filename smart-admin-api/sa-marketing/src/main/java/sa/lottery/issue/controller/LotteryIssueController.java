@@ -40,7 +40,7 @@ public class LotteryIssueController {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
-    @Operation(summary = "巡检概览：逾期未开奖/售卖中/已售罄/今日计划开奖。只吃 tenantId 与 lotteryCode 两个条件")
+    @Operation(summary = "巡检概览：逾期未开奖/售卖中/已售罄/今日计划开奖。只吃 lotteryCode 一个条件")
     @PostMapping("/overview")
     @SaCheckPermission("lotteryIssue:query")
     public ResponseDTO<LotteryIssueOverviewVO> overview(@RequestBody @Valid LotteryIssueQueryForm queryForm) {

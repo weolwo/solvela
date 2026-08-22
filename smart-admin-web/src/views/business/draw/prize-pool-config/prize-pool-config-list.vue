@@ -309,12 +309,6 @@
       width: 240,
     },
     {
-      title: '租户id',
-      dataIndex: 'tenantId',
-      width: 100,
-      ellipsis: true,
-    },
-    {
       title: '创建时间',
       dataIndex: 'createTime',
       width: 170,

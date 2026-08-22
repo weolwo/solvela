@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import sa.base.common.constant.TenantConst;
 
 /**
  * 领号的落库动作，单独成一个 Bean。
@@ -61,7 +60,6 @@ public class TicketPersistService {
         LocalDateTime now = lotteryIssueDao.selectDbNow();
 
         LotteryRecord record = new LotteryRecord();
-        record.setTenantId(TenantConst.DEFAULT_TENANT_ID);
         record.setLotteryCode(config.getLotteryCode());
         record.setIssueNo(issue.getIssueNo());
         record.setSequenceNo((int) sequenceNo);

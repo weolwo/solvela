@@ -18,7 +18,7 @@
     </resultMap>
 
     <sql id="entity_columns">
-        id, tenant_id, event_code, event_name, metric_source, payload_schema,
+        id, event_code, event_name, metric_source, payload_schema,
         biz_id_required, is_high_frequency, discard_log_flag, remark, status,
         create_by, create_time, update_by, update_time
     </sql>

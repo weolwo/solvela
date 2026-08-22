@@ -17,9 +17,6 @@ import sa.base.common.util.SmartCodeUtil;
 @Data
 public class TaskTemplateAddForm {
 
-    @Schema(description = "租户ID，不传落库取默认值 '0'")
-    private String tenantId;
-
     @Schema(description = "模板编码：10 位大写字母+数字，全局唯一", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "模板编码 不能为空")
     @Pattern(regexp = SmartCodeUtil.BIZ_CODE_REGEX, message = "模板" + SmartCodeUtil.BIZ_CODE_MESSAGE)
