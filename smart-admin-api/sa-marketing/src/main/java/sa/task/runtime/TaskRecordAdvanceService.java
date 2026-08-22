@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import sa.base.common.constant.TenantConst;
 
 /**
  * 单个任务配置的进度推进 —— <b>运行态的核心，也是唯一写库的地方</b>。
@@ -59,7 +60,6 @@ public class TaskRecordAdvanceService {
     private final TaskProgressStrategyFactory strategyFactory;
     private final TaskPrizeDispatcher taskPrizeDispatcher;
 
-    private static final String DEFAULT_TENANT_ID = "0";
 
     /**
      * 任务未配置结束时间时的兜底过期时间。
@@ -350,7 +350,7 @@ public class TaskRecordAdvanceService {
      */
     private TaskRecord buildRecord(TaskConfig config, TaskEventContext ctx, String periodKey) {
         TaskRecord record = new TaskRecord();
-        record.setTenantId(DEFAULT_TENANT_ID);
+        record.setTenantId(TenantConst.DEFAULT_TENANT_ID);
         record.setMemberName(ctx.memberName());
         record.setTaskConfigId(config.getId());
         record.setActivityCode(config.getActivityCode());
@@ -392,7 +392,7 @@ public class TaskRecordAdvanceService {
 
     private TaskRecordFlow buildFlow(TaskConfig config, TaskEventContext ctx) {
         TaskRecordFlow flow = new TaskRecordFlow();
-        flow.setTenantId(DEFAULT_TENANT_ID);
+        flow.setTenantId(TenantConst.DEFAULT_TENANT_ID);
         flow.setMemberName(ctx.memberName());
         flow.setTaskConfigId(config.getId());
         flow.setEventCode(ctx.eventCode());

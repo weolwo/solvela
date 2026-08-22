@@ -22,7 +22,7 @@ SET NAMES utf8mb4;
 -- 联调建议：先用 0 把配置搭起来，再改成 1 验证结构锁是否按预期拦截
 INSERT INTO `t_activity_config` (`tenant_id`, `activity_code`, `activity_name`, `activity_type`, `status`, `start_time`,
                                  `end_time`, `create_by`)
-VALUES ('0', '12278CBYW7', '618 年中狂欢抽奖', 'DRAW', 0, '2026-06-01 00:00:00', '2026-12-31 23:59:59', 'seed')
+VALUES ('taozi', '12278CBYW7', '618 年中狂欢抽奖', 'DRAW', 0, '2026-06-01 00:00:00', '2026-12-31 23:59:59', 'seed')
 ON DUPLICATE KEY UPDATE `activity_name` = VALUES(`activity_name`),
                         `activity_type` = VALUES(`activity_type`),
                         `start_time`    = VALUES(`start_time`),

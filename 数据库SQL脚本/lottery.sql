@@ -1,3 +1,15 @@
+-- ⚠️⚠️ 本文件<b>不是权威定义</b>。权威是 mysql/schema-baseline.sql（从真库导出、空库验证过）。
+--
+-- 保留它是为了那些<b>解释「为什么这么设计」的注释</b> —— 基线是机器导出的，只有结构没有理由。
+-- 计划：等各模块开发完工后，把设计注释搬进 docs/营销中台-会话交接文档.md，
+--       然后删掉本文件，只留基线。
+--
+-- 🔴 在那之前，改表结构必须<b>同时</b>改基线和本文件，并跑一次漂移检查：
+--       cd 数据库SQL脚本/tools && java -cp <mysql-connector.jar> CheckModuleDrift.java
+--    2026-08-22 首次跑这个检查时，分域文件已经漂了 11 张表 —— 其中
+--    t_task_record 缺 version、t_task_template 缺 status 是<b>很久以前</b>就漂的，
+--    一直没人发现。靠纪律维护两份定义是不成立的，所以才有这个检查。
+--
 -- =======================================================
 -- 1. 彩票基础配置表 (纯粹玩法基建，0资产耦合，0密钥明文)
 -- =======================================================
@@ -5,7 +17,7 @@ DROP TABLE IF EXISTS `t_lottery_config`;
 CREATE TABLE `t_lottery_config`
 (
     `id`              bigint         NOT NULL AUTO_INCREMENT comment '主键id',
-    `tenant_id`       varchar(16)    NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`       varchar(16)    NOT NULL DEFAULT 'taozi' comment '租户id',
     `activity_code`   varchar(32)    NOT NULL COMMENT '活动编码',
     `lottery_code`    varchar(32)    NOT NULL COMMENT '彩票编码',
     `lottery_name`    varchar(128)   NOT NULL COMMENT '彩票名称',
@@ -30,32 +42,25 @@ CREATE TABLE `t_lottery_config`
 -- 2. 彩票期号配置表 (极简生命周期，0混淆盐值冗余)
 -- =======================================================
 DROP TABLE IF EXISTS `t_lottery_issue`;
-CREATE TABLE `t_lottery_issue`
-(
-    `id`                bigint      NOT NULL AUTO_INCREMENT comment '主键id',
-    `tenant_id`         varchar(16) NOT NULL DEFAULT '0' comment '租户id',
-    `lottery_code`      varchar(32) NOT NULL COMMENT '彩票编码',
-    `issue_no`          varchar(32) NOT NULL COMMENT '期号',
-
-    -- 【发号游标锚点】
-    `sold_count`        int         NOT NULL DEFAULT 0 COMMENT '已售/已派发数量',
-
-    -- 【售卖周期】
-    `sale_start_time`   datetime    NOT NULL COMMENT '售卖开始时间',
-    `sale_end_time`     datetime    NOT NULL COMMENT '售卖结束时间',
-
-    -- 【单次开奖控制】(MVP 版本：一期只开一次，干净利落)
-    `settle_time`       datetime             DEFAULT NULL COMMENT '开奖时间',
-    `winning_number`    varchar(32)          DEFAULT NULL COMMENT '开奖号码',
-    `status`            tinyint     NOT NULL DEFAULT '0' COMMENT '状态: 0-待开奖, 1-部分开奖, 2-已开奖',
-
-    `create_by`         varchar(32)          DEFAULT NULL comment '创建人',
-    `create_time`       datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`         varchar(32)          DEFAULT NULL comment '更新人',
-    `update_time`       datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_issue_no` (`lottery_code`, `issue_no`)
-) COMMENT ='期号配置';
+CREATE TABLE `t_lottery_issue` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键id',
+  `tenant_id` varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
+  `lottery_code` varchar(32) NOT NULL COMMENT '彩票编码',
+  `issue_no` varchar(32) NOT NULL COMMENT '期号',
+  `sold_count` int NOT NULL DEFAULT '0' COMMENT '已售/已派发数量',
+  `sale_start_time` datetime NOT NULL COMMENT '售卖开始时间',
+  `sale_end_time` datetime NOT NULL COMMENT '售卖结束时间',
+  `plan_draw_time` datetime DEFAULT NULL COMMENT '计划开奖时间：对外承诺的开奖时刻，与实际执行的 settle_time 区分',
+  `settle_time` datetime DEFAULT NULL COMMENT '开奖时间',
+  `winning_number` varchar(32) DEFAULT NULL COMMENT '开奖号码',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态: 0-待开奖, 1-部分开奖, 2-已开奖',
+  `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_issue_no` (`lottery_code`,`issue_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='期号配置';
 
 
 -- =======================================================
@@ -65,7 +70,7 @@ DROP TABLE IF EXISTS `t_lottery_prize_rule`;
 CREATE TABLE `t_lottery_prize_rule`
 (
     `id`                  bigint         NOT NULL AUTO_INCREMENT comment '主键id',
-    `tenant_id`           varchar(16)    NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`           varchar(16)    NOT NULL DEFAULT 'taozi' comment '租户id',
     `lottery_code`        varchar(32)    NOT NULL COMMENT '彩票编码',
 
     -- 【核心匹配逻辑】
@@ -88,37 +93,31 @@ CREATE TABLE `t_lottery_prize_rule`
 -- 4. 用户购彩记录表 (极速反查，100% 自证清白)
 -- =======================================================
 DROP TABLE IF EXISTS `t_lottery_record`;
-CREATE TABLE `t_lottery_record`
-(
-    `id`            bigint       NOT NULL AUTO_INCREMENT comment '主键id',
-    `tenant_id`     varchar(16)  NOT NULL DEFAULT '0' comment '租户id',
-    `lottery_code`  varchar(32)  NOT NULL COMMENT '彩票编码',
-    `issue_no`      varchar(32)  NOT NULL COMMENT '期号',
-
-    -- 【魔法发号印记】
-    `sequence_no`   int          NOT NULL COMMENT 'FPE算号基数',
-    `ticket_number` varchar(32)  NOT NULL COMMENT '彩票号码',
-
-    -- 【用户与溯源】
-    `member_name`   varchar(64)           DEFAULT NULL COMMENT '会员唯一标识',
-    `obtain_time`   datetime              DEFAULT NULL COMMENT '领号时间',
-
-    -- 【核销状态】
-    `win_status`    tinyint      NOT NULL DEFAULT 0 COMMENT '中奖状态: 0-未开奖, 1-未中奖, 2-已中奖',
-    `prize_level`   int                   DEFAULT NULL COMMENT '奖励等级',
-    `security_sign` varchar(32) NOT NULL COMMENT '防篡改签名',
-
-    `create_by`     varchar(32)          DEFAULT NULL comment '创建人',
-    `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`     varchar(32)          DEFAULT NULL comment '更新人',
-    `update_time`   datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
-    PRIMARY KEY (`id`),
-
-    -- 【核心业务索引】
-    UNIQUE KEY `uk_issue_ticket` (`lottery_code`, `issue_no`, `ticket_number`),
-    KEY `idx_member` (`member_name`, `issue_no`),
-    KEY `idx_status` (`issue_no`, `win_status`)
-) COMMENT ='用户号码记录';
+CREATE TABLE `t_lottery_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键id',
+  `tenant_id` varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `lottery_code` varchar(32) NOT NULL COMMENT '彩票编码',
+  `issue_no` varchar(32) NOT NULL COMMENT '期号',
+  `sequence_no` int NOT NULL COMMENT 'FPE算号基数',
+  `ticket_number` varchar(32) NOT NULL COMMENT '彩票号码',
+  `member_name` varchar(64) DEFAULT NULL COMMENT '会员唯一标识',
+  `obtain_time` datetime DEFAULT NULL COMMENT '领号时间',
+  `win_status` tinyint NOT NULL DEFAULT '0' COMMENT '中奖状态: 0-未开奖, 1-未中奖, 2-已中奖',
+  `prize_level` int NOT NULL DEFAULT '99' COMMENT '奖励等级：1..N 为中奖奖级(数字越小奖越大)，99-未中奖/未开奖',
+  `prize_code` varchar(64) DEFAULT NULL COMMENT '中奖奖品编码：核销时从规则表快照，防规则被改后历史中奖结果漂移',
+  `dispatch_status` tinyint NOT NULL DEFAULT '0' COMMENT '派发状态：0-待派发/无需派发, 1-已投递, 2-投递失败',
+  `security_sign` varchar(32) NOT NULL COMMENT '防篡改签名',
+  `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_issue_ticket` (`lottery_code`,`issue_no`,`ticket_number`),
+  KEY `idx_status` (`issue_no`,`win_status`),
+  KEY `idx_dispatch` (`issue_no`,`dispatch_status`),
+  KEY `idx_member` (`member_id`,`issue_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户号码记录';
 
 -- =======================================================
 -- 💥 t_lottery_number_pool (彩票号池表) 已永久移除 

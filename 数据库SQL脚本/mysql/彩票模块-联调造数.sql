@@ -23,7 +23,7 @@ SET NAMES utf8mb4;
 -- 核对时开发库只有 DRAW(12278CBYW7) 与 TASK(WLO9SMXDKD) 两条，LOTTERY 一条都没有，下拉会是空的。
 INSERT INTO `t_activity_config` (`tenant_id`, `activity_code`, `activity_name`, `activity_type`, `status`,
                                  `start_time`, `end_time`, `create_by`)
-VALUES ('0', 'LTQ7M3XKD8', '618仲夏夜幸运号', 'LOTTERY', 0, '2026-07-01 00:00:00', '2026-12-31 23:59:59', 'seed')
+VALUES ('taozi', 'LTQ7M3XKD8', '618仲夏夜幸运号', 'LOTTERY', 0, '2026-07-01 00:00:00', '2026-12-31 23:59:59', 'seed')
 ON DUPLICATE KEY UPDATE `activity_name` = VALUES(`activity_name`),
                         `activity_type` = VALUES(`activity_type`);
 

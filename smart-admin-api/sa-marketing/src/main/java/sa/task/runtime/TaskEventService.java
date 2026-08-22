@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import sa.base.common.constant.TenantConst;
 
 /**
  * 任务事件入口与编排：<b>上游埋点唯一的进入口</b>。
@@ -80,7 +81,6 @@ public class TaskEventService {
         this.taskEventExecutor = taskEventExecutor;
     }
 
-    private static final String DEFAULT_TENANT_ID = "0";
 
     /**
      * 并发冲突的重试次数（STREAK 乐观锁冲突 + 任务记录被并发创建，见 {@link TaskConcurrentModifyException}）。
@@ -278,7 +278,7 @@ public class TaskEventService {
     private void saveRejectedFlow(TaskEventContext ctx) {
         try {
             TaskRecordFlow flow = new TaskRecordFlow();
-            flow.setTenantId(DEFAULT_TENANT_ID);
+            flow.setTenantId(TenantConst.DEFAULT_TENANT_ID);
             flow.setMemberName(ctx.memberName());
             flow.setTaskConfigId(TaskConst.FLOW_CONFIG_ID_NONE);
             flow.setEventCode(ctx.eventCode());

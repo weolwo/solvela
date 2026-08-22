@@ -1,9 +1,21 @@
+-- ⚠️⚠️ 本文件<b>不是权威定义</b>。权威是 mysql/schema-baseline.sql（从真库导出、空库验证过）。
+--
+-- 保留它是为了那些<b>解释「为什么这么设计」的注释</b> —— 基线是机器导出的，只有结构没有理由。
+-- 计划：等各模块开发完工后，把设计注释搬进 docs/营销中台-会话交接文档.md，
+--       然后删掉本文件，只留基线。
+--
+-- 🔴 在那之前，改表结构必须<b>同时</b>改基线和本文件，并跑一次漂移检查：
+--       cd 数据库SQL脚本/tools && java -cp <mysql-connector.jar> CheckModuleDrift.java
+--    2026-08-22 首次跑这个检查时，分域文件已经漂了 11 张表 —— 其中
+--    t_task_record 缺 version、t_task_template 缺 status 是<b>很久以前</b>就漂的，
+--    一直没人发现。靠纪律维护两份定义是不成立的，所以才有这个检查。
+--
 -- 1. 活动主表 (大促容器)
 DROP TABLE IF EXISTS `t_activity_config`;
 CREATE TABLE `t_activity_config`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16) NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`     varchar(16) NOT NULL DEFAULT 'taozi' comment '租户id',
     `activity_code` varchar(32) NOT NULL COMMENT '活动编码：10位大写字母+数字，全局唯一',
     `activity_name` varchar(64) NOT NULL COMMENT '活动名称',
     `activity_type` varchar(32) NOT NULL COMMENT '活动类型：BASIC-基础活动(仅外壳,不挂玩法) / DRAW-奖池抽奖 / TASK-任务驱动 / LOTTERY-FPE彩票',
@@ -24,7 +36,7 @@ DROP TABLE IF EXISTS `t_prize_pool_item`;
 CREATE TABLE `t_prize_pool_item`
 (
     `id`             bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`      varchar(16)    NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`      varchar(16)    NOT NULL DEFAULT 'taozi' comment '租户id',
     `activity_code`  varchar(32)    NOT NULL COMMENT '活动编码',
     `prize_code`     varchar(64)    NOT NULL COMMENT '奖品编码',
     `user_max_count` int            NOT NULL DEFAULT '-1' COMMENT '单人限领次数: -1不限, 1表示每人最多中一次',
@@ -46,7 +58,7 @@ DROP TABLE IF EXISTS `t_prize_pool_config`;
 CREATE TABLE `t_prize_pool_config`
 (
     `id`              bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`       varchar(16)    NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`       varchar(16)    NOT NULL DEFAULT 'taozi' comment '租户id',
     `activity_code`   varchar(32)    NOT NULL COMMENT '活动编码',
     `pool_code`       varchar(32)    NOT NULL COMMENT '奖池编码：10位大写字母+数字，全局唯一 (如: H88JHKJFNE)',
     `pool_name`       varchar(128)   NOT NULL COMMENT '奖池名称',
@@ -70,7 +82,7 @@ DROP TABLE IF EXISTS `t_pool_prize_mapping`;
 CREATE TABLE `t_pool_prize_mapping`
 (
     `id`            bigint        NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16)   NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`     varchar(16)   NOT NULL DEFAULT 'taozi' comment '租户id',
     `pool_code`     varchar(32)   NOT NULL COMMENT '奖池编码',
     `prize_item_id` bigint        NOT NULL COMMENT '奖项id',
     `probability`   decimal(8, 4) NOT NULL DEFAULT 0.0000 COMMENT '中奖概率(万分位)',
@@ -90,7 +102,8 @@ DROP TABLE IF EXISTS `t_draw_prize_log`;
 CREATE TABLE `t_draw_prize_log`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16) NOT NULL DEFAULT '0' comment '租户id',
+    `tenant_id`     varchar(16) NOT NULL DEFAULT 'taozi' comment '租户id',
+    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
     `trace_id`      varchar(64) NOT NULL COMMENT '请求ID',
     `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
     `pool_code`     varchar(32) NOT NULL COMMENT '奖池编码',
@@ -103,5 +116,5 @@ CREATE TABLE `t_draw_prize_log`
 
     `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
     PRIMARY KEY (`id`),
-    KEY `idx_mem_act` (`member_name`, `activity_code`)
+    KEY `idx_mem_act` (`member_id`, `activity_code`)
 ) COMMENT ='抽奖记录';

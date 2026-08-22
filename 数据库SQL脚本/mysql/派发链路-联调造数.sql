@@ -28,7 +28,7 @@ INSERT INTO `t_promotion_config` (`tenant_id`, `promo_name`, `prize_type`, `tota
                                   `used_amount`, `review_level`, `first_review_threshold`, `second_review_threshold`,
                                   `single_max_quota`, `single_max_amount`, `limit_period`, `identify_limit`,
                                   `phone_limit`, `ip_limit`, `device_limit`, `fingerprint_limit`, `status`)
-VALUES ('0', '联调-积分池', 'SCORE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
+VALUES ('taozi', '联调-积分池', 'SCORE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
        ('0', '联调-现金池', 'BALANCE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
        ('0', '联调-优惠券池', 'COUPON', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
        ('0', '联调-实物池', 'PHYSICAL', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 100000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1);

@@ -1,3 +1,15 @@
+-- ⚠️⚠️ 本文件<b>不是权威定义</b>。权威是 mysql/schema-baseline.sql（从真库导出、空库验证过）。
+--
+-- 保留它是为了那些<b>解释「为什么这么设计」的注释</b> —— 基线是机器导出的，只有结构没有理由。
+-- 计划：等各模块开发完工后，把设计注释搬进 docs/营销中台-会话交接文档.md，
+--       然后删掉本文件，只留基线。
+--
+-- 🔴 在那之前，改表结构必须<b>同时</b>改基线和本文件，并跑一次漂移检查：
+--       cd 数据库SQL脚本/tools && java -cp <mysql-connector.jar> CheckModuleDrift.java
+--    2026-08-22 首次跑这个检查时，分域文件已经漂了 11 张表 —— 其中
+--    t_task_record 缺 version、t_task_template 缺 status 是<b>很久以前</b>就漂的，
+--    一直没人发现。靠纪律维护两份定义是不成立的，所以才有这个检查。
+--
 -- ============================================================================
 -- 会员域 DDL
 -- ============================================================================
@@ -6,6 +18,45 @@
 -- 流水(t_member_asset_transaction)、任务(t_task_record)、提案(t_proposal_record)、
 -- 履约(t_physical_delivery)、商城(t_mall_*) 全部依赖它。所以单独成文件，
 -- 与 activity.sql / lottery.sql / mall.sql 平级。
+--
+-- ----------------------------------------------------------------------------
+-- 关于 tenant_id：从「惰性占位」转正为「真实字段」
+-- ----------------------------------------------------------------------------
+-- 现状盘点（实测）：库中 25 张表带 tenant_id，共 9317 行，<b>tenant_id <> '0' 的行数 = 0</b>；
+-- MybatisPlusConfig 里只有分页拦截器、没有租户拦截器；Mapper 里那句
+-- `AND tenant_id = #{queryForm.tenantId}` 在 <if> 中，前端从不传，永不生效。
+-- 也就是说它一直是个占位符 —— 既没进索引，也没进任何过滤条件。
+--
+-- 现在把它转正，做两件事：
+--   ① 默认租户从无意义的 '0' 改成 <b>'taozi'</b>，让它看起来就是个真实租户而不是"未启用"
+--   ② 唯一索引带上 tenant_id —— 这是<b>语义正确性</b>问题，不是性能优化，见下
+--
+-- 【索引加不加 tenant_id，分三种情况，不要一刀切】
+--
+--   ✅ <b>唯一索引：必须加</b>。这是语义问题。
+--      uk_mbr_phone_hash(phone_hash) 的含义是「全平台一个手机号只能一个账号」；
+--      改成 (tenant_id, phone_hash) 才是「每个租户内一个手机号一个账号」。
+--      ⚠️ 这是<b>行为变更</b>：加了之后，同一个人可以在不同租户各注册一个账号。
+--         多租户系统通常就该这样（租户之间是不同的品牌/客户），但如果业务上要求
+--         「一个手机号全平台唯一」，那就<b>不能加</b>。这条要按业务拍板，不是技术决定。
+--
+--   ✅ <b>按租户扫描的列表索引：加</b>，放最左。
+--      后台会员列表是 `WHERE tenant_id=? AND status=? ORDER BY create_time`，
+--      tenant_id 不在最左的话，多租户后这个索引就等于没有。
+--
+--   ❌ <b>全局唯一键的点查索引：不加</b>。
+--      member_id 由全局发号器产生、跨租户唯一，`WHERE member_id=?` 已经唯一定位，
+--      再加 tenant_id 只是给每个索引项白搭 6 字节、零收益。
+--      风控类索引（同 IP 撞库）更是<b>刻意跨租户</b>查才有意义。
+--
+-- 【切换默认租户的执行顺序，别搞反】
+--   1. ALTER 所有表的 DEFAULT '0' → 'taozi'（INSTANT，毫秒级）
+--   2. UPDATE 全部存量：`UPDATE t_xxx SET tenant_id='taozi' WHERE tenant_id='0'`
+--   3. 改代码里硬编码的 "0" 与 DEFAULT_TENANT_ID 常量（实测 ~18 处 setTenantId）
+--   🔴 1、2 必须在<b>同一个维护窗口</b>内做完。'0' 和 'taozi' 两种值共存的中间态
+--      是最危险的 —— 一旦此时启用了租户拦截器，老数据会集体"消失"。
+--   💡 大小写：项目里 varchar 字典值惯例是全大写（PHYSICAL/NORMAL/LIFETIME）。
+--      想对齐就用 'TAOZI'，想保留原样就 'taozi' —— 只要<b>全库一致</b>，选哪个都行。
 --
 -- ----------------------------------------------------------------------------
 -- 标识体系：三个字段，各司其职
@@ -59,14 +110,20 @@ CREATE TABLE `t_member`
 (
     -- 🔴 刻意<b>不是</b> AUTO_INCREMENT，由应用层发号。理由见「附一：会员号怎么发」
     `member_id`        bigint      NOT NULL COMMENT '会员号：10位数字(1000000000~9999999999)。全链路关联键+迁移锚点，永不可变',
-    `tenant_id`        varchar(16) NOT NULL DEFAULT '0' COMMENT '租户id',
+    `tenant_id`        varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
 
     -- ---------- 账号：微信号风格，给人用 ----------
     -- 规则见「附三：member_name 规则」。注册时系统自动生成一个，用户后续可改（限频）。
     -- 🔴 显式指定 ci 排序规则：微信号 ZhangSan 与 zhangsan 必须视为同一个账号。
     --    不写死的话，将来有人把库改成 _bin/_cs 排序规则，唯一约束会静默放过大小写变体，
     --    于是出现两个肉眼看着一模一样的账号 —— 客服根本没法处理。
-    `member_name`      varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL
+    -- 🔴 用 utf8mb4_0900_ai_ci 而<b>不是</b> utf8mb4_general_ci：
+    --    本库默认就是 0900_ai_ci（十张存量表的 member_name 全是它），它本身已经是
+    --    大小写不敏感（ci），完全满足上面的诉求。而写成 general_ci 会与存量表<b>不一致</b>，
+    --    迁移时的 `JOIN ... ON m.member_name = x.member_name` 会直接抛
+    --    「Illegal mix of collations」—— 排序规则不一致的两列<b>不能直接比较</b>。
+    --    这类错误只在跨表 JOIN 时才暴露，建表当下完全看不出来。
+    `member_name`      varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL
                                    COMMENT '账号：微信号风格，字母开头6~20位[A-Za-z][A-Za-z0-9_-]。全局唯一(大小写不敏感)，用户可改',
     `name_update_time` datetime             DEFAULT NULL COMMENT '上次修改账号的时间：改名限频判据(建议一年一次)。为空表示从未改过',
 
@@ -119,8 +176,8 @@ CREATE TABLE `t_member`
     `register_source`  varchar(32) NOT NULL DEFAULT 'UNKNOWN' COMMENT '注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT...',
     `register_ip`      varchar(64)          DEFAULT NULL COMMENT '注册IP：批量注册的识别依据',
     `invite_id`        bigint               DEFAULT NULL COMMENT '邀请人member_id：没有邀请体系时恒为空，留着比事后加表便宜',
-    `last_login_time`  datetime             DEFAULT NULL COMMENT '最后登录时间：活跃度统计与沉默用户召回',
-    `last_login_ip`    varchar(64)          DEFAULT NULL COMMENT '最后登录IP',
+    -- 🔴 last_login_time / last_login_ip 已移出本表，见 t_member_login_log。
+    --    主表是<b>热读表</b>（每次鉴权都读），不能挂高频写字段。
 
     `remark`           varchar(255)         DEFAULT NULL COMMENT '运营备注',
 
@@ -132,15 +189,15 @@ CREATE TABLE `t_member`
     PRIMARY KEY (`member_id`),
     -- 账号全局唯一。排序规则是 ci，所以天然大小写不敏感
     -- 🔴 注销后<b>不释放</b>账号（与手机号相反），理由见「附四」
-    UNIQUE KEY `uk_mbr_name` (`member_name`),
+    UNIQUE KEY `uk_mbr_name` (`tenant_id`, `member_name`),
     -- 一个手机号一个账号。注销时 phone_hash 置 NULL 释放号码
     -- ——MySQL 的 UNIQUE 允许多个 NULL，这正是我们要的行为
-    UNIQUE KEY `uk_mbr_phone_hash` (`phone_hash`),
-    UNIQUE KEY `uk_mbr_email_hash` (`email_hash`),
+    UNIQUE KEY `uk_mbr_phone_hash` (`tenant_id`, `phone_hash`),
+    UNIQUE KEY `uk_mbr_email_hash` (`tenant_id`, `email_hash`),
     -- 后台会员列表默认按注册时间倒序 + 按状态筛选
-    KEY `idx_mbr_status_time` (`status`, `create_time`),
+    KEY `idx_mbr_status_time` (`tenant_id`, `status`, `create_time`),
     -- 渠道效果报表
-    KEY `idx_mbr_source_time` (`register_source`, `create_time`),
+    KEY `idx_mbr_source_time` (`tenant_id`, `register_source`, `create_time`),
     KEY `idx_mbr_invite` (`invite_id`)
 ) COMMENT ='会员主表';
 
@@ -171,7 +228,7 @@ DROP TABLE IF EXISTS `t_member_verify`;
 CREATE TABLE `t_member_verify`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`     varchar(16) NOT NULL DEFAULT '0' COMMENT '租户id',
+    `tenant_id`     varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `member_id`     bigint      NOT NULL COMMENT '会员号',
 
     -- 同样是密文 + hash 双写：hash 用于「同一身份证不许注册多个账号」的唯一约束。
@@ -189,32 +246,223 @@ CREATE TABLE `t_member_verify`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_mbr_vrf_member` (`member_id`),
     -- 一张身份证只能实名一个账号（羊毛党最常见的手法就是一人多号）
-    UNIQUE KEY `uk_mbr_vrf_idcard` (`id_card_hash`)
+    UNIQUE KEY `uk_mbr_vrf_idcard` (`tenant_id`, `id_card_hash`)
 ) COMMENT ='会员实名信息（敏感，与主表分离）';
 
 
 -- ============================================================================
--- 3. t_member_id_seq  会员号发号序列
+-- 3. t_member_login_log  会员登录日志
+-- ============================================================================
+--
+-- 【为什么把 last_login_* 从主表挪出来】
+--   「行锁」这个说法要稍微修一下：每次登录锁的是<b>会员自己那一行</b>，
+--   用户之间不争锁，所以不是经典的锁竞争。但挪出来仍然是对的，理由更硬：
+--
+--   ① 🔴 <b>update_time 的语义会被彻底污染</b>（最实际的一条）。
+--      主表的 update_time 挂着 ON UPDATE CURRENT_TIMESTAMP，
+--      每登录一次就被刷新一次 —— 于是「这个会员资料最后修改于何时」这个信息
+--      <b>永久丢失</b>，运营看到「刚更新过」其实只是这人登录了一下。
+--      按登录量算，这列几乎立刻退化成 last_login_time 的副本。
+--   ② <b>热读表被高频写弄脏</b>。主表每次鉴权都要读，是常驻 Buffer Pool 的热页；
+--      高频 UPDATE 让这些页反复变脏，推高 checkpoint 与刷盘压力。
+--   ③ <b>改一个 datetime 要重写整行</b>。InnoDB 是行级存储，主表 22 列
+--      还带着几个 varchar(255) 密文，undo log 和 row 格式 binlog 都按整行走 ——
+--      写放大很可观，主从延迟也跟着涨。
+--   ④ 真正会争锁的场景确实存在：用户登录的<b>同时</b>运营在后台冻结/改备注这个会员，
+--      那就是实打实的行锁冲突。频率不高，但一旦发生就是登录接口卡住。
+--
+-- 【为什么不复用已有的 t_login_log】
+--   🔴 <b>装不下</b>：那张表的 user_id 是 `int`，上限 2,147,483,647，
+--      而会员号范围是 1,000,000,000 ~ 9,999,999,999 ——
+--      只有约 1/9 的会员号能塞进去，其余全部溢出。这是硬阻塞。
+--   即使 ALTER 成 bigint，也还有两条不该混：
+--     · 量级差几个数量级。员工登录一天几十条，会员一天可能几万到几十万条，
+--       混一张表后员工的登录审计会被会员数据彻底淹没。
+--     · 那张表的列宽是 SmartAdmin 原始设计：user_name/login_ip/login_ip_region
+--       都是 varchar(1000)，remark varchar(2000)，user_agent 是 text。
+--       员工量级无所谓，会员量级下这些宽列会让表膨胀得非常快。
+--   所以另起一张，列宽按会员量级重新收紧。
+--
+-- 【只 INSERT，不 UPDATE】
+--   这张表天生 append-only：没有 UPDATE 就没有行锁、没有 MVCC 版本链、
+--   没有页分裂。顺带白捡安全审计能力（异地登录、设备变更、失败追踪）。
+--
+-- 【那「最后登录时间」和「沉默用户召回」怎么办】
+--   · 详情页看最后登录：`WHERE member_id=? ORDER BY id DESC LIMIT 1`，
+--     走 idx_mbr_log_member 前缀 + 主键倒序，单条查询毫秒级。
+--   · 沉默用户召回（30天没登录的人）：这是<b>离线分析</b>，不是在线查询。
+--     用定时任务按月聚合成结果表，或直接在报表库跑。
+--     🔴 不要为了一个离线需求，在在线登录链路上加一次写 —— 那正是刚被挪走的东西。
+--
+-- 【必须配清理，否则它会无限涨】
+--   会员登录日志是全库增长最快的表。挂 t_smart_job 定期删（如保留 6 个月），
+--   或按月建分区直接 DROP PARTITION（分区删远快于 DELETE，且不产生大事务）。
+--   ⚠️ 会员注销时按个保法应清除其日志；若因审计需要保留，至少把 login_ip 抹掉。
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `t_member_login_log`;
+CREATE TABLE `t_member_login_log`
+(
+    `id`           bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
+    `tenant_id`    varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
+    -- 🔴 bigint，不是 int。会员号是 10 位数字，t_login_log 的 int 装不下
+    `member_id`    bigint      NOT NULL COMMENT '会员号',
+
+    -- ---------- 客户端环境：拆解存储，不存原始 UA ----------
+    -- 39 = IPv6 标准文本最长（8组4位hex + 7个冒号）。IPv4-mapped 形式更短，够用。
+    -- ⚠️ X-Forwarded-For 可能是一条 IP 链（"1.2.3.4, 5.6.7.8, ..."），
+    --    取值时必须只取真实客户端那一个，别把整条链塞进来 —— 否则超长静默截断
+    `client_ip`    varchar(39)          DEFAULT NULL COMMENT '客户端IP（兼容IPv6，39位足够）',
+    `ip_region`    varchar(64)          DEFAULT NULL COMMENT 'IP归属地（ip2region 解析，SmartIpUtil 已有）',
+    -- 拆成三列而不是存 varchar(512) 原始 UA：原始 UA 无法聚合统计（"iOS占比多少"答不了），
+    -- 而且千万行量级下那一列就是纯粹的存储负担
+    `device_type`  varchar(16)          DEFAULT NULL COMMENT '设备端：APP/H5/WECHAT/PC',
+    `os_name`      varchar(32)          DEFAULT NULL COMMENT '操作系统：iOS/Android/Windows',
+    `browser_name` varchar(32)          DEFAULT NULL COMMENT '浏览器：Chrome/Safari',
+
+    -- ---------- 行为结果 ----------
+    -- 🔴 取值与既有 t_login_log.login_result <b>正好相反</b>（那边 0-成功 1-失败）。
+    --    这里跟随本项目 status 列的通行口径（1 = 正常/成功，见 t_member.status、
+    --    t_mall_commodity.status），因为<b>列名不同</b>，不会被误当成同一个字典。
+    --    但写代码时别照抄 LoginService 里那套 login_result 的判断，会正好搞反。
+    `status`       tinyint     NOT NULL DEFAULT 1 COMMENT '状态：0-失败, 1-成功, 2-登出。⚠️与t_login_log.login_result取值相反',
+    `remark`       varchar(128)         DEFAULT NULL COMMENT '提示信息：成功可为空，失败写具体原因',
+
+    -- ---------- 链路追踪 ----------
+    -- 项目已有 LogTraceFilter（MDC key "traceId"，组件扫描 "sa" 覆盖得到，确认生效）。
+    -- 自生成的是 Long.toHexString(...)，最长 16 字符；但它<b>也接受请求头传入</b>，
+    -- ⚠️ 那就是用户可控输入 —— 入库前必须截断到 64，否则超长时非严格模式静默截断
+    `trace_id`     varchar(64)          DEFAULT NULL COMMENT '全链路追踪ID，对应 LogTraceFilter 的 MDC traceId',
+
+    -- 🔴 没有单独的 login_time：create_time 就是登录时间（铁律 9，多一列就是多一个时钟源）。
+    --    NOT NULL 是刻意的防线：铁律 9 记着「@TableField(fill) 把 null 显式写进去，
+    --    实测让整列 create_time 变 NULL」那次事故 —— 日志没有时间就等于没有日志
+    `create_time`  datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间（即登录时间）',
+
+    -- 🔴 主键是 (id, create_time) 而不是 (id)：
+    --    <b>分区表的每一个唯一索引（主键也算）都必须包含分区键</b>，这是 MySQL 的硬约束，
+    --    不满足会直接建表失败：「A PRIMARY KEY must include all columns in the table's
+    --    partitioning function」。所以按 create_time 分区就必须把它并进主键。
+    --    AUTO_INCREMENT 仍然合法 —— 它只要求自增列是某个索引的<b>第一列</b>，id 在最左，满足。
+    PRIMARY KEY (`id`, `create_time`),
+    -- 查某人最后一次登录：WHERE member_id=? ORDER BY id DESC LIMIT 1
+    -- ✅ 单列就够，<b>不要写成 (member_id, id)</b> —— InnoDB 二级索引隐式带主键，
+    --    同一 member_id 内天然按 id 有序。20万行实测两者 EXPLAIN 完全一致
+    --    （type=ref, key_len=8, Backward index scan, 无 filesort），索引体积一字节不差
+    KEY `idx_mbr_log_member` (`member_id`),
+    -- 按租户+时间统计/清理。tenant_id 放最左：这是典型的"按租户扫一段时间"查询
+    KEY `idx_mbr_log_time` (`tenant_id`, `create_time`),
+    -- 风控：同一 IP 短时间大量登录 = 撞库或批量注册。
+    -- 刻意<b>不带 tenant_id</b> —— 黑产会跨租户打，跨租户查才看得见
+    KEY `idx_mbr_log_ip` (`client_ip`, `create_time`)
+) COMMENT ='会员登录日志（append-only，按月分区）'
+-- ----------------------------------------------------------------------------
+-- 按月 RANGE 分区：清理靠 DROP PARTITION，不靠 DELETE
+-- ----------------------------------------------------------------------------
+-- 为什么建表时就要做：分区<b>不能</b>用 ALTER 给已有大表"补上"而不重建 ——
+-- 那是一次全表 COPY，几千万行时锁表几十分钟。建表时定好，成本为零。
+--
+-- 用 RANGE COLUMNS(create_time) 而不是 RANGE(TO_DAYS(create_time))：
+--   COLUMNS 形式直接拿 datetime 比较，边界值一眼能读懂，同样支持分区裁剪；
+--   TO_DAYS() 那种写法边界是一串看不懂的整数，运维加分区时极易写错。
+--
+-- 🔴 pmax 是兜底，<b>不是</b>让你不用维护分区：
+--   没有 pmax → 超出范围的 INSERT 直接报错，登录日志写不进去；
+--   有了 pmax → 不报错，但数据全堆进这一个分区，DROP 不掉，<b>静默劣化</b>。
+--   所以两件事都要做：① 定时任务提前 3 个月 REORGANIZE 出新分区；
+--   ② <b>监控 pmax 的行数，> 0 就告警</b> —— 那说明分区维护已经掉队了。
+--
+-- 加新分区（注意是 REORGANIZE 而非 ADD，因为 pmax 占着 MAXVALUE）：
+--   ALTER TABLE t_member_login_log REORGANIZE PARTITION pmax INTO (
+--     PARTITION p202703 VALUES LESS THAN ('2027-04-01'),
+--     PARTITION pmax    VALUES LESS THAN (MAXVALUE));
+--
+-- 删旧分区（保留 6 个月，秒级，不产生大事务、不写 undo、binlog 只有一条 DDL）：
+--   ALTER TABLE t_member_login_log DROP PARTITION p202601;
+--   —— 对比 DELETE：删几百万行会撑爆 undo log、主从延迟飙升、还留一堆碎片空洞。
+--
+-- ⚠️ 代价要知道：分区表的索引是<b>本地索引</b>（每个分区各有一份）。
+--    `WHERE member_id=?` 不带 create_time，无法分区裁剪，要扫<b>所有分区</b>的索引。
+--    分区越多这个放大越明显 —— 这正是「按月 + 只留 6 个月」的原因：
+--    分区数控制在个位数，放大可接受；要是按天分区留两年，那就是 730 次索引查找。
+-- ----------------------------------------------------------------------------
+PARTITION BY RANGE COLUMNS (`create_time`) (
+    PARTITION p202608 VALUES LESS THAN ('2026-09-01'),
+    PARTITION p202609 VALUES LESS THAN ('2026-10-01'),
+    PARTITION p202610 VALUES LESS THAN ('2026-11-01'),
+    PARTITION p202611 VALUES LESS THAN ('2026-12-01'),
+    PARTITION p202612 VALUES LESS THAN ('2027-01-01'),
+    PARTITION p202701 VALUES LESS THAN ('2027-02-01'),
+    PARTITION pmax    VALUES LESS THAN (MAXVALUE)
+);
+
+-- ⚠️ 本表三条索引里，只有 idx_mbr_log_time 带了 tenant_id，另两条<b>刻意不带</b>：
+--    · idx_mbr_log_time(tenant_id, create_time) —— 「按租户扫一段时间」是典型的
+--      统计/清理查询，tenant_id 必须在最左，否则多租户后这索引等于没有。
+--    · idx_mbr_log_member(member_id) —— member_id 由全局发号器产生、<b>跨租户唯一</b>，
+--      已经能唯一定位，再加 tenant_id 只是每个索引项白搭 6 字节。
+--    · idx_mbr_log_ip(client_ip, create_time) —— 撞库检测<b>刻意要跨租户查</b>：
+--      黑产会同时打多个租户，加了 tenant_id 反而把这条线索切断了。
+--    完整取舍规则见文件顶部「关于 tenant_id」一节。
+--
+-- ⚠️ device_type / os_name / browser_name 需要一个 UA 解析器，而<b>项目里没有</b>：
+--    hutool（带 UserAgentUtil）已于 2026-08-08 整体移除，现有 LoginService 只是
+--    request.getHeader(USER_AGENT) 原样存。所以要自己写一个轻量解析放
+--    sa-base/common/util，别为此把 hutool 引回来（交接文档「六条必知」#6）。
+--    🔴 解析不出来时落 'UNKNOWN'，<b>不要落 NULL</b> —— 否则「各端占比」这类统计
+--       会出现一个谁也说不清的黑洞，而 UNKNOWN 至少是个能追的信号。
+
+-- ⚠️ 本表刻意没有 update_time：它是纯 append 的日志，行写完就不再改。
+--    铁律 9 要求「新建表把这两列写全」针对的是<b>业务表</b>——
+--    给一张永不更新的日志表挂 ON UPDATE，是给一个不存在的动作留位置。
+--    铁律 9 的自查脚本只筛「有 update_time 却缺 ON UPDATE」的表，本表不在其列。
+
+
+-- ============================================================================
+-- 4. t_member_id_seq  会员号发号序列
 -- ============================================================================
 --
 -- 只有一行。用它替代 AUTO_INCREMENT，理由见「附一」。
--- 取号一条语句拿到，避免两条语句之间的竞态：
---   UPDATE t_member_id_seq SET next_seq = LAST_INSERT_ID(next_seq + 1) WHERE id = 1;
---   SELECT LAST_INSERT_ID();   -- 同连接内取回，天然并发安全
 --
--- ⚠️ 每注册一个用户打一次这行，是个热点行。日注册量到万级以上就要改号段模式
---    （一次取 1000 个缓存在内存里，用完再取）。现在不必，但别忘了它会热。
+-- 【号段模式：一次批发 step 个，在 JVM 里零售】
+--   这张表<b>只有一行</b>，是全库最典型的热点行 —— 每注册一个用户就打它一次的话，
+--   所有注册请求会在这一行上排成一条串行队列，并发注册直接被它卡死。
+--
+--   所以不逐个取，一次取一整段：
+--     UPDATE t_member_id_seq SET next_seq = LAST_INSERT_ID(next_seq + step) WHERE id = 1;
+--     SELECT LAST_INSERT_ID();      -- 同连接内取回，无竞态。返回的是本段的【上界】
+--   得到的段是 [返回值 - step, 返回值)，交给 JVM 内的 AtomicLong 零售。
+--   step=1000 时，注册 1000 个人才打一次库 —— 热点行问题直接消失。
+--
+--   🔴 <b>重启会丢弃当前段没用完的号</b>，这是号段模式唯一的代价，而在这里
+--      <b>完全无害</b>：对外的会员号经过 Feistel 置换（见附一），本来就是跳着走的，
+--      内部序号 500 和 501 映射出来的会员号毫无关系。少用掉几百个内部序号，
+--      在 90 亿的容量里连零头都算不上，外部更是一点都看不出来。
+--
+--   ✅ <b>多实例天然安全</b>：UPDATE 是原子的，两个实例并发执行会各拿各的段，
+--      不可能重叠。不需要分布式锁。
+--
+--   ❌ <b>不要做双 buffer 预取</b>。那是百万级日注册量才需要的东西。
+--      按日注册 1 万算，一天也只取 10 次段，每次几毫秒 —— 用尽时同步取一次
+--      完全可以接受。上双 buffer 只是徒增一个需要维护的异步分支。
+--
+--   ⚠️ next_seq <b>只能前进，绝不能回退</b>。回退会重新发出已经用掉的号，
+--      主键冲突还算好的，最坏是两个人共用一个会员号。
+--      运维手工改这张表前先想清楚这一条。
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS `t_member_id_seq`;
 CREATE TABLE `t_member_id_seq`
 (
     `id`          tinyint NOT NULL DEFAULT 1 COMMENT '恒为1，本表只有一行',
-    `next_seq`    bigint  NOT NULL DEFAULT 0 COMMENT '内部自增序号（不是会员号！经置换后才是会员号）',
+    -- 语义是「水位」而非「下一个号」：已经批发出去的内部序号到此为止，
+    -- 下一段从这里开始。不是会员号！经 Feistel 置换后才是会员号
+    `next_seq`    bigint  NOT NULL DEFAULT 0 COMMENT '内部序号分配水位（已批发到此），只增不减',
+    -- 走配置更灵活：低频环境调小减少重启浪费，高并发调大减少打库次数
+    `step`        int     NOT NULL DEFAULT 1000 COMMENT '号段大小：一次批发多少个内部序号',
     `update_time` datetime         DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`)
-) COMMENT ='会员号发号序列（单行）';
+) COMMENT ='会员号发号序列（单行，号段模式）';
 
-INSERT INTO `t_member_id_seq` (`id`, `next_seq`) VALUES (1, 0)
+INSERT INTO `t_member_id_seq` (`id`, `next_seq`, `step`) VALUES (1, 0, 1000)
 ON DUPLICATE KEY UPDATE `id` = `id`;
 
 

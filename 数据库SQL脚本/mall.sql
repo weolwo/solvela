@@ -1,3 +1,17 @@
+-- ℹ️ 本文件的 7 张表<b>尚未部署到任何数据库</b>，所以此刻<b>它就是权威定义</b>。
+--    一旦部署进库并重新导出 mysql/schema-baseline.sql，权威就移交给基线，
+--    本文件降级为「带设计注释的可读视图」，与其它分域文件一致。
+--
+-- 保留它是为了那些<b>解释「为什么这么设计」的注释</b> —— 基线是机器导出的，只有结构没有理由。
+-- 计划：等各模块开发完工后，把设计注释搬进 docs/营销中台-会话交接文档.md，
+--       然后删掉本文件，只留基线。
+--
+-- 🔴 在那之前，改表结构必须<b>同时</b>改基线和本文件，并跑一次漂移检查：
+--       cd 数据库SQL脚本/tools && java -cp <mysql-connector.jar> CheckModuleDrift.java
+--    2026-08-22 首次跑这个检查时，分域文件已经漂了 11 张表 —— 其中
+--    t_task_record 缺 version、t_task_template 缺 status 是<b>很久以前</b>就漂的，
+--    一直没人发现。靠纪律维护两份定义是不成立的，所以才有这个检查。
+--
 -- ============================================================================
 -- 积分商城 DDL
 -- ============================================================================
@@ -9,7 +23,9 @@
 --     member_level / vip_level），初版 DDL 里的 vip_rules 是空转字段，已删
 --
 -- 与既有中台的关系（这决定了很多字段为什么长这样）：
---   · 会员标识全系统统一是 `member_name varchar(64)`，没有 member_id
+--   · 会员标识是 `member_id bigint`（10位数字，见 member.sql）。
+--     单据类表额外冗余一列 member_name 作<b>展示快照</b>（不建索引），
+--     后台看订单不用 join 会员表就能认出是谁；状态类表只留 member_id。
 --   · 扣积分走 t_member_wallet + t_member_asset_transaction。后者有
 --     UNIQUE(biz_ref_id, asset_type)，下单时把 biz_ref_id 传 order_no，
 --     **重复扣款天然幂等，不要另造去重表**
@@ -106,7 +122,7 @@ DROP TABLE IF EXISTS `t_mall_category`;
 CREATE TABLE `t_mall_category`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`     varchar(16) NOT NULL DEFAULT '0' COMMENT '租户id',
+    `tenant_id`     varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `parent_id`     bigint      NOT NULL DEFAULT 0 COMMENT '父级id：0-顶级分类。业务上限死两级',
 
     `category_name` varchar(50) NOT NULL COMMENT '分类名称：如 数码3C / 虚拟权益',
@@ -146,7 +162,7 @@ DROP TABLE IF EXISTS `t_mall_commodity`;
 CREATE TABLE `t_mall_commodity`
 (
     `id`              bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`       varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户id',
+    `tenant_id`       varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     -- 铁律 8：对外唯一标识。自增 id 各环境不同，一旦被 C 端楼层配置/履约单引用就锁死了迁移
     `commodity_code`  varchar(32)    NOT NULL COMMENT '商品编码：10位大写字母+数字，全局唯一，创建后不可改',
     `category_id`     bigint         NOT NULL COMMENT '分类id',
@@ -245,7 +261,7 @@ DROP TABLE IF EXISTS `t_mall_sku`;
 CREATE TABLE `t_mall_sku`
 (
     `id`               bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`        varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户id',
+    `tenant_id`        varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `commodity_id`     bigint         NOT NULL COMMENT '关联 t_mall_commodity.id',
     -- 铁律 8。t_proposal_record.asset_ref 的注释原文就是「资产引用：券模/SKU」——
     -- 履约链路本就按编码引用 SKU，只有自增 id 是接不进去的
@@ -314,9 +330,17 @@ DROP TABLE IF EXISTS `t_mall_order`;
 CREATE TABLE `t_mall_order`
 (
     `id`               bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`        varchar(16)    NOT NULL DEFAULT '0' COMMENT '租户id',
+    `tenant_id`        varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `order_no`         varchar(32)    NOT NULL COMMENT '订单号：服务端生成，对外唯一标识，同时作为扣积分的幂等键',
-    `member_name`      varchar(64)    NOT NULL COMMENT '会员名（全系统统一标识，没有 member_id）',
+    -- 关联键。全局发号器产生、跨租户唯一、永不可变，见 member.sql
+    `member_id`        bigint         NOT NULL COMMENT '会员号：关联键',
+    -- 🔴 展示快照，<b>不是</b>关联键，刻意<b>不建索引</b>。
+    --    订单是「单据」——写完就不再改的历史记录，所以这里记的应当是<b>下单当时</b>那个账号，
+    --    而不是这人现在叫什么（微信号一年可改一次）。审计要回答的是「当时是谁」。
+    --    这和本表已有的 commodity_name / sku_attrs 快照是同一个模式。
+    --    不建索引也是一道防线：谁写了 `WHERE member_name=?` 会立刻表现为慢查询被发现；
+    --    一旦给它建了索引，关联键就会悄悄退回 member_name，改名断链的问题原样复活。
+    `member_name`      varchar(32)             DEFAULT NULL COMMENT '下单时的会员账号【展示快照，非关联键，不要用于查询】',
 
     -- ---------- 商品引用 ----------
     `commodity_id`     bigint         NOT NULL COMMENT '商品id',
@@ -390,7 +414,7 @@ CREATE TABLE `t_mall_order`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_mall_ord_no` (`order_no`),
     -- C端「我的兑换」
-    KEY `idx_mall_ord_member` (`member_name`, `create_time`),
+    KEY `idx_mall_ord_member` (`member_id`, `create_time`),
     -- 🔴 超时释放 job 的扫描索引。没有它，job 每分钟全表扫一遍订单表
     KEY `idx_mall_ord_expire` (`status`, `expire_time`),
     -- 运营台按商品查兑换明细 / 对账
@@ -405,7 +429,7 @@ CREATE TABLE `t_mall_order`
 -- ============================================================================
 --
 -- 【为什么不直接 count 订单表】
---   `select count(*) from t_mall_order where member_name=? and commodity_id=?`
+--   `select count(*) from t_mall_order where member_id=? and commodity_id=?`
 --   在并发下有竞态：两个请求同时读到 count=0，双双通过校验。
 --   限兑 1 件的爆款商品，这个洞会被刷。
 --
@@ -431,8 +455,8 @@ DROP TABLE IF EXISTS `t_mall_exchange_limit`;
 CREATE TABLE `t_mall_exchange_limit`
 (
     `id`           bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`    varchar(16) NOT NULL DEFAULT '0' COMMENT '租户id',
-    `member_name`  varchar(64) NOT NULL COMMENT '会员名',
+    `tenant_id`    varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
+    `member_id`    bigint      NOT NULL COMMENT '会员号：关联键',
     `commodity_id` bigint      NOT NULL COMMENT '商品id',
     `period_key`   varchar(32) NOT NULL DEFAULT 'NONE' COMMENT '周期标识：NONE(终身) / 20260819(日) / 2026W34(周) / 202608(月)。取值口径对齐 t_task_record.period_key',
     `used_count`   int         NOT NULL DEFAULT 0 COMMENT '该周期内已兑件数',
@@ -441,7 +465,7 @@ CREATE TABLE `t_mall_exchange_limit`
     `update_time`  datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     -- 这条唯一索引就是限兑的正确性来源，不是性能优化
-    UNIQUE KEY `uk_mall_lmt_mbr_cmd_prd` (`member_name`, `commodity_id`, `period_key`)
+    UNIQUE KEY `uk_mall_lmt_mbr_cmd_prd` (`member_id`, `commodity_id`, `period_key`)
 ) COMMENT ='商城-会员限兑计数';
 
 
@@ -495,8 +519,8 @@ DROP TABLE IF EXISTS `t_mall_address`;
 CREATE TABLE `t_mall_address`
 (
     `id`             bigint       NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`      varchar(16)  NOT NULL DEFAULT '0' COMMENT '租户id',
-    `member_name`    varchar(64)  NOT NULL COMMENT '会员名',
+    `tenant_id`      varchar(16)  NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
+    `member_id`      bigint       NOT NULL COMMENT '会员号：关联键',
 
     -- 密文三件套。可逆加密(AES-GCM/SM4)，密钥走配置中心，与库分开保管
     `receiver_name`  varchar(255) NOT NULL COMMENT '收件人姓名【密文】',
@@ -514,7 +538,7 @@ CREATE TABLE `t_mall_address`
     `update_by`      varchar(64)           DEFAULT NULL COMMENT '更新人',
     `update_time`    datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    KEY `idx_mall_addr_member` (`member_name`, `is_default`)
+    KEY `idx_mall_addr_member` (`member_id`, `is_default`)
 ) COMMENT ='商城-会员收货地址簿';
 
 
@@ -538,7 +562,7 @@ CREATE TABLE `t_mall_address`
 --   出现同一商品的好几行，而用户根本记不得自己当初点的是哪个规格。
 --
 -- 【🔴 取消收藏必须物理删，不能软删】
---   软删 + UNIQUE(member_name, commodity_id) 会在「收藏 → 取消 → 再收藏」时
+--   软删 + UNIQUE(member_id, commodity_id) 会在「收藏 → 取消 → 再收藏」时
 --   撞上那条被软删的行报唯一键冲突。收藏没有任何历史价值，删了就是删了。
 --   （本模块其它表也都没有 deleted_flag，口径一致。）
 --
@@ -557,8 +581,8 @@ DROP TABLE IF EXISTS `t_mall_favorite`;
 CREATE TABLE `t_mall_favorite`
 (
     `id`           bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`    varchar(16) NOT NULL DEFAULT '0' COMMENT '租户id',
-    `member_name`  varchar(64) NOT NULL COMMENT '会员名',
+    `tenant_id`    varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
+    `member_id`    bigint      NOT NULL COMMENT '会员号：关联键',
     `commodity_id` bigint      NOT NULL COMMENT '商品id（商品粒度，不是SKU粒度）',
 
     -- 本表的行只有插入和删除，不存在更新。update_time 仍按铁律 9 写全，
@@ -567,9 +591,9 @@ CREATE TABLE `t_mall_favorite`
     `update_time`  datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     -- 防重复收藏。前端连点两次是常态，靠这条索引兜住
-    UNIQUE KEY `uk_mall_fav_mbr_cmd` (`member_name`, `commodity_id`),
+    UNIQUE KEY `uk_mall_fav_mbr_cmd` (`member_id`, `commodity_id`),
     -- C端「我的收藏」按时间倒序
-    KEY `idx_mall_fav_mbr_time` (`member_name`, `create_time`),
+    KEY `idx_mall_fav_mbr_time` (`member_id`, `create_time`),
     -- 详情页收藏数 + 后台需求信号报表
     KEY `idx_mall_fav_cmd` (`commodity_id`)
 ) COMMENT ='商城-商品收藏';

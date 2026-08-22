@@ -23,23 +23,21 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_general_ci
-      # 导出脚本来自 MySQL 8.0.26，含 115 处 int(0) 这种已废弃的显示宽度写法
+      # 旧基线（MySQL 8.0.26 导出）含 115 处 int(0) 这类已废弃写法，需要放宽 sql-mode。
+      # 新基线是从 8.4 现导的，零处废弃语法 —— 这行留着只为兼容手工导入老脚本的场景。
       - --sql-mode=NO_ENGINE_SUBSTITUTION
     volumes:
       - mysql-data:/var/lib/mysql
       # ⚠️ 只在【数据卷为空】时执行一次。之后改这些文件不会生效，
       #    要重新导入必须 docker compose down -v（会删数据，谨慎）。
-      #    文件名前缀决定执行顺序，01 必须最先 —— 它 DROP + CREATE 整个库。
-      - ./数据库SQL脚本/mysql/smart_admin_v3.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./数据库SQL脚本/mysql/t_menu.sql:/docker-entrypoint-initdb.d/02-menu.sql:ro
-      - ./数据库SQL脚本/mysql/task.sql:/docker-entrypoint-initdb.d/03-task.sql:ro
-      - ./数据库SQL脚本/activity.sql:/docker-entrypoint-initdb.d/04-activity.sql:ro
-      - ./数据库SQL脚本/lottery.sql:/docker-entrypoint-initdb.d/05-lottery.sql:ro
-      # 🔴 基线 smart_admin_v3.sql 是旧版导出，后续 DDL 全在 sql-update-log 里。
-      #    不回放这 45 个增量，建出来的库缺 t_activity_display 等表，
-      #    t_smart_job 也只有 15 列（代码要 37 列），启动即报 Unknown column 'job_code'。
-      - ./数据库SQL脚本/mysql/sql-update-log:/sql-update-log:ro
-      - ./deploy/mysql-initdb/99-apply-update-log.sh:/docker-entrypoint-initdb.d/99-apply-update-log.sh:ro
+      #    文件名前缀决定执行顺序。
+      #
+      # 2026-08-22 起只需两个基线文件。此前这里挂 5 个 schema 文件 + 一个回放
+      # 45 个增量脚本的 shell —— 那套流水线的问题是「建出来的库对不对」取决于
+      # 增量有没有全、顺序对不对，而增量里有 17 个含种子数据（光菜单就横跨 8 个文件）。
+      # 现在两个基线都是从真库现导 + 空库验证过的，见 数据库SQL脚本/mysql/README.md。
+      - ./数据库SQL脚本/mysql/schema-baseline.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./数据库SQL脚本/mysql/data-baseline.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
     healthcheck:
       # 用 root 密码真连一次，而不是只看端口通 —— initdb 期间端口早就通了，
       # 但那时库还没建好，app 连上去会一头撞进空库。

@@ -51,6 +51,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import sa.base.common.constant.TenantConst;
 
 /**
  * 奖池配置 Service
@@ -343,7 +344,7 @@ public class PrizePoolConfigService {
             for (int i = 0; i < pool.getPrizeMappingList().size(); i++) {
                 DrawWorkbenchMappingForm mapping = pool.getPrizeMappingList().get(i);
                 PoolPrizeMapping entity = new PoolPrizeMapping();
-                entity.setTenantId("0");
+                entity.setTenantId(TenantConst.DEFAULT_TENANT_ID);
                 entity.setPoolCode(pool.getPoolCode());
                 entity.setPrizeItemId(dbItemMap.get(mapping.getPrizeCode()).getId());
                 entity.setProbability(mapping.getProbability());
