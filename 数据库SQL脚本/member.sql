@@ -20,43 +20,21 @@
 -- 与 activity.sql / lottery.sql / mall.sql 平级。
 --
 -- ----------------------------------------------------------------------------
--- 关于 tenant_id：从「惰性占位」转正为「真实字段」
+-- 关于 tenant_id：<b>本项目已彻底删除这个维度</b>（v3.73.0）
 -- ----------------------------------------------------------------------------
--- 现状盘点（实测）：库中 25 张表带 tenant_id，共 9317 行，<b>tenant_id <> '0' 的行数 = 0</b>；
--- MybatisPlusConfig 里只有分页拦截器、没有租户拦截器；Mapper 里那句
--- `AND tenant_id = #{queryForm.tenantId}` 在 <if> 中，前端从不传，永不生效。
--- 也就是说它一直是个占位符 —— 既没进索引，也没进任何过滤条件。
+-- 本文件早先的版本花了很大篇幅讨论「唯一索引要不要带 tenant_id」。那些讨论已经作废：
+-- v3.73.0 把全库 27 张表的 tenant_id 一并 DROP 了。
 --
--- 现在把它转正，做两件事：
---   ① 默认租户从无意义的 '0' 改成 <b>'taozi'</b>，让它看起来就是个真实租户而不是"未启用"
---   ② 唯一索引带上 tenant_id —— 这是<b>语义正确性</b>问题，不是性能优化，见下
+-- 删的依据是实测而不是偏好：27 张表 12,095 行，<b>tenant_id <> 'taozi' 的行数 = 0</b>。
+-- 这一列自始至终只有一个取值，租户拦截器每条 SQL 追加的条件<b>恒为真</b>，
+-- 却要长期维护「拦截器顺序」「JOIN 时条件落 ON 还是 WHERE」「新表记得进白名单」
+-- 这一整套机制 —— 为一件从未发生的事付常驻成本。
 --
--- 【索引加不加 tenant_id，分三种情况，不要一刀切】
---
---   ✅ <b>唯一索引：必须加</b>。这是语义问题。
---      uk_mbr_phone_hash(phone_hash) 的含义是「全平台一个手机号只能一个账号」；
---      改成 (tenant_id, phone_hash) 才是「每个租户内一个手机号一个账号」。
---      ⚠️ 这是<b>行为变更</b>：加了之后，同一个人可以在不同租户各注册一个账号。
---         多租户系统通常就该这样（租户之间是不同的品牌/客户），但如果业务上要求
---         「一个手机号全平台唯一」，那就<b>不能加</b>。这条要按业务拍板，不是技术决定。
---
---   ✅ <b>按租户扫描的列表索引：加</b>，放最左。
---      后台会员列表是 `WHERE tenant_id=? AND status=? ORDER BY create_time`，
---      tenant_id 不在最左的话，多租户后这个索引就等于没有。
---
---   ❌ <b>全局唯一键的点查索引：不加</b>。
---      member_id 由全局发号器产生、跨租户唯一，`WHERE member_id=?` 已经唯一定位，
---      再加 tenant_id 只是给每个索引项白搭 6 字节、零收益。
---      风控类索引（同 IP 撞库）更是<b>刻意跨租户</b>查才有意义。
---
--- 【切换默认租户的执行顺序，别搞反】
---   1. ALTER 所有表的 DEFAULT '0' → 'taozi'（INSTANT，毫秒级）
---   2. UPDATE 全部存量：`UPDATE t_xxx SET tenant_id='taozi' WHERE tenant_id='0'`
---   3. 改代码里硬编码的 "0" 与 DEFAULT_TENANT_ID 常量（实测 ~18 处 setTenantId）
---   🔴 1、2 必须在<b>同一个维护窗口</b>内做完。'0' 和 'taozi' 两种值共存的中间态
---      是最危险的 —— 一旦此时启用了租户拦截器，老数据会集体"消失"。
---   💡 大小写：项目里 varchar 字典值惯例是全大写（PHYSICAL/NORMAL/LIFETIME）。
---      想对齐就用 'TAOZI'，想保留原样就 'taozi' —— 只要<b>全库一致</b>，选哪个都行。
+-- 🔴 <b>所以本文件里的表一律不带 tenant_id，新建表也不要加。</b>
+--    将来真要做多租户，那是一次有准备的改造（27 张表 ADD COLUMN + 唯一索引重建 +
+--    重新引入拦截器），而最贵的部分是「那时表里已有的数据归属哪个租户」——
+--    要人来拍板，不是加一列就完事。取舍与执行细节见
+--    sql-update-log/v3.73.0.sql 与交接文档 §13.4。
 --
 -- ----------------------------------------------------------------------------
 -- 标识体系：三个字段，各司其职
@@ -110,7 +88,6 @@ CREATE TABLE `t_member`
 (
     -- 🔴 刻意<b>不是</b> AUTO_INCREMENT，由应用层发号。理由见「附一：会员号怎么发」
     `member_id`        bigint      NOT NULL COMMENT '会员号：10位数字(1000000000~9999999999)。全链路关联键+迁移锚点，永不可变',
-    `tenant_id`        varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
 
     -- ---------- 账号：微信号风格，给人用 ----------
     -- 规则见「附三：member_name 规则」。注册时系统自动生成一个，用户后续可改（限频）。
@@ -189,15 +166,15 @@ CREATE TABLE `t_member`
     PRIMARY KEY (`member_id`),
     -- 账号全局唯一。排序规则是 ci，所以天然大小写不敏感
     -- 🔴 注销后<b>不释放</b>账号（与手机号相反），理由见「附四」
-    UNIQUE KEY `uk_mbr_name` (`tenant_id`, `member_name`),
+    UNIQUE KEY `uk_mbr_name` (`member_name`),
     -- 一个手机号一个账号。注销时 phone_hash 置 NULL 释放号码
     -- ——MySQL 的 UNIQUE 允许多个 NULL，这正是我们要的行为
-    UNIQUE KEY `uk_mbr_phone_hash` (`tenant_id`, `phone_hash`),
-    UNIQUE KEY `uk_mbr_email_hash` (`tenant_id`, `email_hash`),
+    UNIQUE KEY `uk_mbr_phone_hash` (`phone_hash`),
+    UNIQUE KEY `uk_mbr_email_hash` (`email_hash`),
     -- 后台会员列表默认按注册时间倒序 + 按状态筛选
-    KEY `idx_mbr_status_time` (`tenant_id`, `status`, `create_time`),
+    KEY `idx_mbr_status_time` (`status`, `create_time`),
     -- 渠道效果报表
-    KEY `idx_mbr_source_time` (`tenant_id`, `register_source`, `create_time`),
+    KEY `idx_mbr_source_time` (`register_source`, `create_time`),
     KEY `idx_mbr_invite` (`invite_id`)
 ) COMMENT ='会员主表';
 
@@ -228,7 +205,6 @@ DROP TABLE IF EXISTS `t_member_verify`;
 CREATE TABLE `t_member_verify`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`     varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `member_id`     bigint      NOT NULL COMMENT '会员号',
 
     -- 同样是密文 + hash 双写：hash 用于「同一身份证不许注册多个账号」的唯一约束。
@@ -246,7 +222,7 @@ CREATE TABLE `t_member_verify`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_mbr_vrf_member` (`member_id`),
     -- 一张身份证只能实名一个账号（羊毛党最常见的手法就是一人多号）
-    UNIQUE KEY `uk_mbr_vrf_idcard` (`tenant_id`, `id_card_hash`)
+    UNIQUE KEY `uk_mbr_vrf_idcard` (`id_card_hash`)
 ) COMMENT ='会员实名信息（敏感，与主表分离）';
 
 
@@ -303,7 +279,6 @@ DROP TABLE IF EXISTS `t_member_login_log`;
 CREATE TABLE `t_member_login_log`
 (
     `id`           bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`    varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     -- 🔴 bigint，不是 int。会员号是 10 位数字，t_login_log 的 int 装不下
     `member_id`    bigint      NOT NULL COMMENT '会员号',
 
@@ -349,10 +324,9 @@ CREATE TABLE `t_member_login_log`
     --    同一 member_id 内天然按 id 有序。20万行实测两者 EXPLAIN 完全一致
     --    （type=ref, key_len=8, Backward index scan, 无 filesort），索引体积一字节不差
     KEY `idx_mbr_log_member` (`member_id`),
-    -- 按租户+时间统计/清理。tenant_id 放最左：这是典型的"按租户扫一段时间"查询
-    KEY `idx_mbr_log_time` (`tenant_id`, `create_time`),
-    -- 风控：同一 IP 短时间大量登录 = 撞库或批量注册。
-    -- 刻意<b>不带 tenant_id</b> —— 黑产会跨租户打，跨租户查才看得见
+    -- 按时间统计/清理（保留日志、按段删旧数据）
+    KEY `idx_mbr_log_time` (`create_time`),
+    -- 风控：同一 IP 短时间大量登录 = 撞库或批量注册
     KEY `idx_mbr_log_ip` (`client_ip`, `create_time`)
 ) COMMENT ='会员登录日志（append-only，按月分区）'
 -- ----------------------------------------------------------------------------
@@ -395,15 +369,6 @@ PARTITION BY RANGE COLUMNS (`create_time`) (
     PARTITION pmax    VALUES LESS THAN (MAXVALUE)
 );
 
--- ⚠️ 本表三条索引里，只有 idx_mbr_log_time 带了 tenant_id，另两条<b>刻意不带</b>：
---    · idx_mbr_log_time(tenant_id, create_time) —— 「按租户扫一段时间」是典型的
---      统计/清理查询，tenant_id 必须在最左，否则多租户后这索引等于没有。
---    · idx_mbr_log_member(member_id) —— member_id 由全局发号器产生、<b>跨租户唯一</b>，
---      已经能唯一定位，再加 tenant_id 只是每个索引项白搭 6 字节。
---    · idx_mbr_log_ip(client_ip, create_time) —— 撞库检测<b>刻意要跨租户查</b>：
---      黑产会同时打多个租户，加了 tenant_id 反而把这条线索切断了。
---    完整取舍规则见文件顶部「关于 tenant_id」一节。
---
 -- ⚠️ device_type / os_name / browser_name 需要一个 UA 解析器，而<b>项目里没有</b>：
 --    hutool（带 UserAgentUtil）已于 2026-08-08 整体移除，现有 LoginService 只是
 --    request.getHeader(USER_AGENT) 原样存。所以要自己写一个轻量解析放

@@ -17,7 +17,6 @@ DROP TABLE IF EXISTS `t_lottery_config`;
 CREATE TABLE `t_lottery_config`
 (
     `id`              bigint         NOT NULL AUTO_INCREMENT comment '主键id',
-    `tenant_id`       varchar(16)    NOT NULL DEFAULT 'taozi' comment '租户id',
     `activity_code`   varchar(32)    NOT NULL COMMENT '活动编码',
     `lottery_code`    varchar(32)    NOT NULL COMMENT '彩票编码',
     `lottery_name`    varchar(128)   NOT NULL COMMENT '彩票名称',
@@ -44,7 +43,6 @@ CREATE TABLE `t_lottery_config`
 DROP TABLE IF EXISTS `t_lottery_issue`;
 CREATE TABLE `t_lottery_issue` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键id',
-  `tenant_id` varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
   `lottery_code` varchar(32) NOT NULL COMMENT '彩票编码',
   `issue_no` varchar(32) NOT NULL COMMENT '期号',
   `sold_count` int NOT NULL DEFAULT '0' COMMENT '已售/已派发数量',
@@ -70,7 +68,6 @@ DROP TABLE IF EXISTS `t_lottery_prize_rule`;
 CREATE TABLE `t_lottery_prize_rule`
 (
     `id`                  bigint         NOT NULL AUTO_INCREMENT comment '主键id',
-    `tenant_id`           varchar(16)    NOT NULL DEFAULT 'taozi' comment '租户id',
     `lottery_code`        varchar(32)    NOT NULL COMMENT '彩票编码',
 
     -- 【核心匹配逻辑】
@@ -95,13 +92,12 @@ CREATE TABLE `t_lottery_prize_rule`
 DROP TABLE IF EXISTS `t_lottery_record`;
 CREATE TABLE `t_lottery_record` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键id',
-  `tenant_id` varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
   `member_id` bigint NOT NULL COMMENT '会员号：关联键',
   `lottery_code` varchar(32) NOT NULL COMMENT '彩票编码',
   `issue_no` varchar(32) NOT NULL COMMENT '期号',
   `sequence_no` int NOT NULL COMMENT 'FPE算号基数',
   `ticket_number` varchar(32) NOT NULL COMMENT '彩票号码',
-  `member_name` varchar(64) DEFAULT NULL COMMENT '会员唯一标识',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
   `obtain_time` datetime DEFAULT NULL COMMENT '领号时间',
   `win_status` tinyint NOT NULL DEFAULT '0' COMMENT '中奖状态: 0-未开奖, 1-未中奖, 2-已中奖',
   `prize_level` int NOT NULL DEFAULT '99' COMMENT '奖励等级：1..N 为中奖奖级(数字越小奖越大)，99-未中奖/未开奖',

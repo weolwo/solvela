@@ -20,9 +20,9 @@ SET NAMES utf8mb4;
 -- ---------- 1. 抽奖活动 ----------
 -- status：0-未开始（可自由增删奖项/奖池）, 1-上线（触发服务端结构锁）, 2-下线
 -- 联调建议：先用 0 把配置搭起来，再改成 1 验证结构锁是否按预期拦截
-INSERT INTO `t_activity_config` (`tenant_id`, `activity_code`, `activity_name`, `activity_type`, `status`, `start_time`,
+INSERT INTO `t_activity_config` (`activity_code`, `activity_name`, `activity_type`, `status`, `start_time`,
                                  `end_time`, `create_by`)
-VALUES ('taozi', '12278CBYW7', '618 年中狂欢抽奖', 'DRAW', 0, '2026-06-01 00:00:00', '2026-12-31 23:59:59', 'seed')
+VALUES ('12278CBYW7', '618 年中狂欢抽奖', 'DRAW', 0, '2026-06-01 00:00:00', '2026-12-31 23:59:59', 'seed')
 ON DUPLICATE KEY UPDATE `activity_name` = VALUES(`activity_name`),
                         `activity_type` = VALUES(`activity_type`),
                         `start_time`    = VALUES(`start_time`),
@@ -34,7 +34,7 @@ DELETE
 FROM `t_prize_config`
 WHERE `activity_code` = '12278CBYW7';
 
-INSERT INTO `t_prize_config` (`tenant_id`, `activity_code`, `promotion_config_id`, `prize_type`, `prize_name`,
+INSERT INTO `t_prize_config` (`activity_code`, `promotion_config_id`, `prize_type`, `prize_name`,
                               `prize_code`, `prize_level`, `prize_value`, `approve_mode`, `sort_weight`, `status`,
                               `create_by`)
 VALUES

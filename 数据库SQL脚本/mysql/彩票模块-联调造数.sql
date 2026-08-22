@@ -21,9 +21,9 @@ SET NAMES utf8mb4;
 -- ---------- 1. 彩票类活动 ----------
 -- 彩票工作台的活动下拉只拉 activity_type='LOTTERY'。
 -- 核对时开发库只有 DRAW(12278CBYW7) 与 TASK(WLO9SMXDKD) 两条，LOTTERY 一条都没有，下拉会是空的。
-INSERT INTO `t_activity_config` (`tenant_id`, `activity_code`, `activity_name`, `activity_type`, `status`,
+INSERT INTO `t_activity_config` (`activity_code`, `activity_name`, `activity_type`, `status`,
                                  `start_time`, `end_time`, `create_by`)
-VALUES ('taozi', 'LTQ7M3XKD8', '618仲夏夜幸运号', 'LOTTERY', 0, '2026-07-01 00:00:00', '2026-12-31 23:59:59', 'seed')
+VALUES ('LTQ7M3XKD8', '618仲夏夜幸运号', 'LOTTERY', 0, '2026-07-01 00:00:00', '2026-12-31 23:59:59', 'seed')
 ON DUPLICATE KEY UPDATE `activity_name` = VALUES(`activity_name`),
                         `activity_type` = VALUES(`activity_type`);
 
@@ -36,7 +36,7 @@ ON DUPLICATE KEY UPDATE `activity_name` = VALUES(`activity_name`),
 -- ⚠️ promotion_config_id 必须指向真实存在且 prize_type 一致的优惠配置，
 --    否则发奖时会被判「资产配置异常」；服务端在 PrizeConfigService 里也会重校验两者类型一致。
 --    现有配置：1=SCORE 积分池 / 2=BALANCE 现金池 / 3=COUPON 优惠券池 / 4=PHYSICAL 实物池。
-INSERT INTO `t_prize_config` (`tenant_id`, `activity_code`, `promotion_config_id`, `prize_type`, `prize_name`,
+INSERT INTO `t_prize_config` (`activity_code`, `promotion_config_id`, `prize_type`, `prize_name`,
                               `prize_code`, `prize_level`, `prize_value`, `approve_mode`, `sort_weight`, `status`, `create_by`)
 VALUES
     -- 一等奖：实物，approve_mode=1 人工审批（大额实物不该自动发货）

@@ -24,14 +24,14 @@ DELETE
 FROM `t_promotion_config`
 WHERE `promo_name` LIKE '联调-%';
 
-INSERT INTO `t_promotion_config` (`tenant_id`, `promo_name`, `prize_type`, `total_quota`, `used_quota`, `total_amount`,
+INSERT INTO `t_promotion_config` (`promo_name`, `prize_type`, `total_quota`, `used_quota`, `total_amount`,
                                   `used_amount`, `review_level`, `first_review_threshold`, `second_review_threshold`,
                                   `single_max_quota`, `single_max_amount`, `limit_period`, `identify_limit`,
                                   `phone_limit`, `ip_limit`, `device_limit`, `fingerprint_limit`, `status`)
-VALUES ('taozi', '联调-积分池', 'SCORE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
-       ('0', '联调-现金池', 'BALANCE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
-       ('0', '联调-优惠券池', 'COUPON', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
-       ('0', '联调-实物池', 'PHYSICAL', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 100000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1);
+VALUES ('联调-积分池', 'SCORE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
+       ('联调-现金池', 'BALANCE', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
+       ('联调-优惠券池', 'COUPON', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 10000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1),
+       ('联调-实物池', 'PHYSICAL', -1, 0, -1.0000, 0.0000, 0, 0.0000, 0.0000, 1, 100000.0000, 'LIFETIME', -1, -1, -1, -1, -1, 1);
 
 -- ---------- 2. 把奖品按资产类型挂到对应的优惠配置上 ----------
 UPDATE `t_prize_config` c

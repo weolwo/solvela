@@ -23,7 +23,6 @@ SET NAMES utf8mb4;
 DROP TABLE IF EXISTS `t_task_template`;
 CREATE TABLE `t_task_template` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `tenant_id` varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
   `template_code` varchar(64) NOT NULL COMMENT '模板编码',
   `template_name` varchar(128) NOT NULL COMMENT '模板名称',
   `task_type` varchar(32) NOT NULL COMMENT '流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)',
@@ -44,7 +43,6 @@ CREATE TABLE `t_task_config`
 (
     `id`              bigint       NOT NULL AUTO_INCREMENT comment 'id',
     `activity_code`   varchar(16)  NOT NULL COMMENT '活动编码',
-    `tenant_id`       varchar(16)  NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
     `task_name`       varchar(128) NOT NULL COMMENT '任务名称',
     `template_code`   varchar(64)  NOT NULL COMMENT '模板Code',
     `trigger_event`   varchar(64)  NOT NULL COMMENT '触发事件：ORDER_PAID(支付), MEMBER_REGISTER(注册), DAILY_SIGN(签到), PAGE_VIEW(浏览), CUSTOM(自定义)',
@@ -76,7 +74,6 @@ DROP TABLE IF EXISTS `t_promotion_config`;
 CREATE TABLE `t_promotion_config`
 (
     `id`                      bigint         NOT NULL AUTO_INCREMENT COMMENT '配置ID',
-    `tenant_id`               varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
     `promo_name`              varchar(128)   NOT NULL COMMENT '优惠配置名称',
     `prize_type`              varchar(32)    NOT NULL COMMENT '资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)',
 
@@ -115,7 +112,6 @@ DROP TABLE IF EXISTS `t_prize_config`;
 CREATE TABLE `t_prize_config`
 (
     `id`                  bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`           varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
     `activity_code`       varchar(32)    NOT NULL COMMENT '归属活动编码：10位大写字母+数字',
     `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
     `prize_type`          varchar(32)    NOT NULL COMMENT '资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM',
@@ -139,7 +135,6 @@ DROP TABLE IF EXISTS `t_task_prize_mapping`;
 CREATE TABLE `t_task_prize_mapping`
 (
     `id`              bigint      NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`       varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
     `task_config_id`  bigint      NOT NULL COMMENT '任务配置ID',
     -- 达标条件
     `stage_condition` json        NOT NULL COMMENT '阶段达标条件：如 {"min": 10, "max": 99} 或 {"action": "share"}',
@@ -164,215 +159,175 @@ CREATE TABLE `t_task_prize_mapping`
 -- ==========================================
 
 DROP TABLE IF EXISTS `t_task_record`;
-CREATE TABLE `t_task_record`
-(
-    `id`               bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`        varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `member_name`      varchar(64)    NULL COMMENT '会员名【已弃用：关联键是 member_id，本列由 v3.72.0 删除】',
-    `task_config_id`   bigint         NOT NULL COMMENT '任务配置ID',
-    `activity_code`    varchar(32)    NOT NULL COMMENT '活动编码',
-    `period_key`       varchar(32)    NOT NULL DEFAULT 'NONE' COMMENT '业务期数标识(防重用)：NONE, 日期(20260402)',
-    `valid_start_time` datetime       NOT NULL COMMENT '开始时间',
-    `valid_end_time`   datetime       NOT NULL COMMENT '过期时间',
-    `current_metric`   decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '当前进度值：如已签到 3.0000 天',
-    `version`         int          NOT NULL DEFAULT 0 COMMENT '乐观锁版本号（v3.44.0）',
-
-    `status`           tinyint        NULL     DEFAULT '0' COMMENT '状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期',
-    `progress_data`    json                    DEFAULT NULL COMMENT '进度详情',
-    `rule_snapshot`    json           NOT NULL COMMENT '接取任务时的规则快照',
-    `prize_snapshot`   json           NOT NULL COMMENT '接取任务时的奖励快照',
-    `complete_time`    datetime                DEFAULT NULL COMMENT '达标时间',
-
-    `create_by`        varchar(64)             DEFAULT NULL COMMENT '创建人',
-    `create_time`      datetime                DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`        varchar(64)             DEFAULT NULL COMMENT '更新人',
-    `update_time`      datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_t_tsk_rec_mbr_cfg_prd` (`member_id`, `task_config_id`, `period_key`),
-    KEY `idx_t_tsk_rec_mbr_sts` (`member_id`, `status`),
-    KEY `idx_t_tsk_rec_expire` (`status`, `valid_end_time`)
-) COMMENT ='任务记录表';
+CREATE TABLE `t_task_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `task_config_id` bigint NOT NULL COMMENT '任务配置ID',
+  `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
+  `period_key` varchar(32) NOT NULL DEFAULT 'NONE' COMMENT '业务期数标识(防重用)：NONE / 日期(20260402) / 周(2026W14)；limit_count>1 时第2轮起带后缀(20260402#2)',
+  `valid_start_time` datetime NOT NULL COMMENT '开始时间',
+  `valid_end_time` datetime NOT NULL COMMENT '过期时间',
+  `current_metric` decimal(18,4) NOT NULL DEFAULT '0.0000' COMMENT '当前进度值：如已签到 3.0000 天',
+  `version` int NOT NULL DEFAULT '0' COMMENT '乐观锁版本号：仅 STREAK 的读-改-写路径使用，累加型走条件更新不需要它',
+  `status` tinyint DEFAULT '0' COMMENT '状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期',
+  `progress_data` json DEFAULT NULL COMMENT '进度详情',
+  `rule_snapshot` json NOT NULL COMMENT '接取任务时的规则快照',
+  `prize_snapshot` json NOT NULL COMMENT '接取任务时的奖励快照',
+  `complete_time` datetime DEFAULT NULL COMMENT '达标时间',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_tsk_rec_mbr_cfg_prd` (`member_id`,`task_config_id`,`period_key`),
+  KEY `idx_t_tsk_rec_expire` (`status`,`valid_end_time`),
+  KEY `idx_t_tsk_rec_mbr_sts` (`member_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='任务记录表';
 
 DROP TABLE IF EXISTS `t_proposal_record`;
-CREATE TABLE `t_proposal_record`
-(
-    `id`                  bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`           varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `trade_no`            varchar(32)    NOT NULL COMMENT '提案单号，服务端生成，对外唯一标识',
-    `member_name`         varchar(64)    NOT NULL COMMENT '会员名',
-    -- 发什么（账务域词汇，不含任何上游业务概念）
-    `asset_type`          varchar(16)    NOT NULL COMMENT 'SCORE/BALANCE/COUPON/PHYSICAL',
-    `asset_ref`           varchar(64)             DEFAULT NULL COMMENT '资产引用：券模/SKU，值类资产为空',
-    -- 展示名由营销侧下传：账务侧发券/发货要用，而它不能回头查 t_prize_log（依赖方向是营销->账务单向的）
-    `asset_name`          varchar(128)            DEFAULT NULL COMMENT '资产展示名（券名/商品名）：由营销侧传入，避免账务域反查营销域',
-    `amount`              decimal(13, 4) NOT NULL COMMENT '发放金额/积分数',
-    `quantity`            int            NOT NULL DEFAULT 1 COMMENT '发放数量，扣 used_quota 用',
-    -- 从哪来（只认单号，不认上游的业务语义）；取值由 ProposalSourceResolver 从活动类型推导
-    `source_type`         varchar(32)    NOT NULL COMMENT '来源：TASK(任务), DRAW(抽奖), LOTTERY(彩票), MANUAL(人工)',
-    `source_biz_id`       varchar(64)    NOT NULL COMMENT '来源单号',
-    -- 预算与风控归属
-    `promotion_config_id` bigint         NOT NULL COMMENT '优惠配置ID',
-    `status`              int            NOT NULL DEFAULT 0 COMMENT '0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截',
-    `remark`              varchar(255)            DEFAULT NULL COMMENT '执行失败/风控拦截原因，或调用方传入的场景说明',
-    -- 拦截分类与 remark 并存：remark 是给人读的话术（会改、会带数值），risk_code 是给漏斗聚类的封闭取值
-    `risk_code`           varchar(32)             DEFAULT NULL COMMENT '风控拦截分类(给漏斗聚类)：SINGLE_MAX_AMOUNT_LIMIT/USER_FREQUENCY_LIMIT/GLOBAL_BUDGET_LIMIT，仅 status=80 有值',
-    -- 审批字段不变 ...
-    `first_reviewer`      varchar(64)             DEFAULT NULL COMMENT '一审人',
-    `first_review_time`   datetime                DEFAULT NULL COMMENT '一审时间',
-    `second_reviewer`     varchar(64)             DEFAULT NULL COMMENT '二审人',
-    `second_review_time`  datetime                DEFAULT NULL COMMENT '二审时间',
-    `review_comment`      varchar(255)            DEFAULT NULL COMMENT '审核意见/驳回理由',
-
-    `create_by`           varchar(64)             DEFAULT NULL COMMENT '创建人',
-    `create_time`         datetime                DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`           varchar(64)             DEFAULT NULL COMMENT '更新人',
-    `update_time`         datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_trade_no` (`trade_no`),
-    UNIQUE KEY `uk_prop_source` (`source_type`, `asset_type`, `source_biz_id`),
-    KEY `idx_prop_cfg_sts` (`promotion_config_id`, `status`),
-    KEY `idx_prop_member` (`member_id`, `create_time`),
-    -- 提案漏斗按「时间范围 + 状态 + 拦截分类」聚合，create_time 放最左（统计查询都带时间范围）
-    KEY `idx_prop_risk_stat` (`create_time`, `status`, `risk_code`)
-) COMMENT ='提案表';
+CREATE TABLE `t_proposal_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `trade_no` varchar(32) NOT NULL COMMENT '提案单号，服务端生成，对外唯一标识',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
+  `asset_type` varchar(16) NOT NULL COMMENT 'SCORE/BALANCE/COUPON/PHYSICAL',
+  `asset_ref` varchar(64) DEFAULT NULL COMMENT '资产引用：券模/SKU，值类资产为空',
+  `asset_name` varchar(128) DEFAULT NULL COMMENT '资产展示名（券名/商品名）：由营销侧传入，避免账务域反查营销域',
+  `amount` decimal(13,4) NOT NULL COMMENT '发放金额/积分数',
+  `quantity` int NOT NULL DEFAULT '1' COMMENT '发放数量，扣 used_quota 用',
+  `source_type` varchar(32) NOT NULL COMMENT '来源：TASK(任务), DRAW(抽奖), LOTTERY(彩票), MANUAL(人工)',
+  `source_biz_id` varchar(64) NOT NULL COMMENT '来源单号',
+  `promotion_config_id` bigint NOT NULL COMMENT '优惠配置ID',
+  `status` int NOT NULL DEFAULT '0' COMMENT '0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截',
+  `remark` varchar(255) DEFAULT NULL COMMENT '执行失败/风控拦截原因，或调用方传入的场景说明',
+  `risk_code` varchar(32) DEFAULT NULL COMMENT '风控拦截分类(给漏斗聚类)：SINGLE_MAX_AMOUNT_LIMIT/USER_FREQUENCY_LIMIT/GLOBAL_BUDGET_LIMIT，仅 status=80 有值',
+  `first_reviewer` varchar(64) DEFAULT NULL COMMENT '一审人',
+  `first_review_time` datetime DEFAULT NULL COMMENT '一审时间',
+  `second_reviewer` varchar(64) DEFAULT NULL COMMENT '二审人',
+  `second_review_time` datetime DEFAULT NULL COMMENT '二审时间',
+  `review_comment` varchar(255) DEFAULT NULL COMMENT '审核意见/驳回理由',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_trade_no` (`trade_no`),
+  UNIQUE KEY `uk_prop_source` (`source_type`,`asset_type`,`source_biz_id`),
+  KEY `idx_prop_cfg_sts` (`promotion_config_id`,`status`),
+  KEY `idx_prop_risk_stat` (`create_time`,`status`,`risk_code`),
+  KEY `idx_prop_member` (`member_id`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='提案表';
 
 DROP TABLE IF EXISTS `t_prize_log`;
-CREATE TABLE `t_prize_log`
-(
-    `id`                  bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`           varchar(16)  NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `member_name`         varchar(64)  NOT NULL COMMENT '会员名',
-    `prize_code`          varchar(64)  NOT NULL COMMENT '奖品编码',
-    `activity_code`       varchar(32)  NOT NULL COMMENT '活动编码',
-    `prize_level`         int                   DEFAULT 0 COMMENT '奖品级别',
-    `prize_name`          varchar(128) NOT NULL COMMENT '奖品名称',
-    `prize_type`          varchar(32)  NOT NULL COMMENT '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL',
-    `prize_value`         varchar(128) NOT NULL COMMENT '奖励体值(积分数/券ID)',
-    `fail_reason`         varchar(128) NULL     DEFAULT NULL COMMENT '异常原因：发奖失败时才有值',
--- ================= 【新增】风控与审批字段 =================
-    `approve_status`      tinyint      NOT NULL DEFAULT 0 COMMENT '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回',
-    `approve_by`          varchar(64)           DEFAULT NULL COMMENT '审批人',
-    `approve_time`        datetime              DEFAULT NULL COMMENT '审批时间',
-    `valid_until`        datetime              DEFAULT NULL COMMENT '过期时间',
-    -- =========================================================
-    `status`              tinyint      NULL     DEFAULT 0 COMMENT '执行状态：0-等待, 1-成功, 2-失败',
-    `external_biz_no`     varchar(128)          DEFAULT NULL COMMENT '外部单号',
-    `remark`              varchar(255)          DEFAULT NULL COMMENT '异常原因',
-
-    `create_by`           varchar(64)           DEFAULT NULL COMMENT '创建人',
-    `create_time`         datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`           varchar(64)           DEFAULT NULL COMMENT '更新人',
-    `update_time`         datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    -- 跨系统防重：PrizeDispatchHandler 靠捕获 DuplicateKeyException 拦重复派发，缺了这个索引防重就是空转
-    UNIQUE KEY `uk_external_biz` (`external_biz_no`),
-    KEY `idx_prize_log_` (`member_id`, `activity_code`)
-) COMMENT ='奖励记录表';
+CREATE TABLE `t_prize_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
+  `prize_code` varchar(64) NOT NULL COMMENT '奖品编码',
+  `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
+  `prize_level` int DEFAULT '0' COMMENT '奖品级别',
+  `prize_name` varchar(128) NOT NULL COMMENT '奖品名称',
+  `prize_type` varchar(32) NOT NULL COMMENT '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL',
+  `prize_value` varchar(128) NOT NULL COMMENT '奖励体值(积分数/券ID)',
+  `fail_reason` varchar(128) DEFAULT NULL COMMENT '异常原因：发奖失败时才有值',
+  `approve_status` tinyint NOT NULL DEFAULT '0' COMMENT '审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回',
+  `approve_by` varchar(64) DEFAULT NULL COMMENT '审批人',
+  `approve_time` datetime DEFAULT NULL COMMENT '审批时间',
+  `valid_until` datetime DEFAULT NULL COMMENT '过期时间',
+  `status` tinyint DEFAULT '0' COMMENT '执行状态：0-等待, 1-成功, 2-失败',
+  `external_biz_no` varchar(128) DEFAULT NULL COMMENT '外部单号',
+  `remark` varchar(255) DEFAULT NULL COMMENT '异常原因',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_external_biz` (`external_biz_no`),
+  KEY `idx_prize_log_` (`member_id`,`activity_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='奖励记录表';
 
 -- ==========================================
 -- 四、 资产账务与实例域 (Ledger & Asset Instances)
 -- ==========================================
 
 DROP TABLE IF EXISTS `t_member_wallet`;
-CREATE TABLE `t_member_wallet`
-(
-    `id`            bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`     varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `member_name`   varchar(64)    NULL COMMENT '会员名【已弃用：关联键是 member_id，本列由 v3.72.0 删除】',
-    `asset_type`    varchar(32)    NOT NULL COMMENT '资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典',
-    `balance`       decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '余额',
-    `status`        tinyint        NULL     DEFAULT '1' COMMENT '状态：0-冻结, 1-正常',
-    `version`       int            NOT NULL DEFAULT '0' COMMENT '乐观锁版本号',
-
-    `create_by`     varchar(64)             DEFAULT NULL COMMENT '创建人',
-    `create_time`   datetime                DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`     varchar(64)             DEFAULT NULL COMMENT '更新人',
-    `update_time`   datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_member_asset` (`member_id`, `asset_type`)
-) COMMENT ='会员钱包表（一行一种资产，扩展新资产只需新增 asset_type 取值，无需加字段）';
+CREATE TABLE `t_member_wallet` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `asset_type` varchar(32) NOT NULL COMMENT '资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典',
+  `balance` decimal(18,4) NOT NULL DEFAULT '0.0000' COMMENT '余额',
+  `status` tinyint DEFAULT '1' COMMENT '状态：0-冻结, 1-正常',
+  `version` int NOT NULL DEFAULT '0' COMMENT '乐观锁版本号',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_member_asset` (`member_id`,`asset_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员钱包表（一行一种资产，扩展新资产只需新增 asset_type 取值，无需加字段）';
 
 DROP TABLE IF EXISTS `t_member_asset_transaction`;
-CREATE TABLE `t_member_asset_transaction`
-(
-    `id`               bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`        varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `member_name`      varchar(64)    NOT NULL COMMENT '会员名',
-    `asset_type`       varchar(32)    NOT NULL COMMENT '资产类型：SCORE, BALANCE',
-    `transaction_type` tinyint        NOT NULL COMMENT '资金流向：1-收入, 2-支出',
-    `change_amount`    decimal(18, 4) NOT NULL COMMENT '变动绝对值',
-    `balance_after`    decimal(18, 4) NOT NULL COMMENT '变动后最新余额',
-    `biz_type`         varchar(64)    NOT NULL COMMENT '业务类型：TASK_PRIZE, CONSUME, MANUAL_ADJUST',
-    `biz_ref_id`       varchar(64)    NOT NULL COMMENT '关联外部业务ID(如 prize_code)',
-    `remark`           varchar(255)            DEFAULT NULL COMMENT 'C端展示摘要',
-
-    `create_by`        varchar(64)             DEFAULT NULL COMMENT '创建人',
-    `create_time`      datetime                DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`        varchar(64)             DEFAULT NULL COMMENT '更新人',
-    `update_time`      datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    KEY `idx_t_biz_mbr_ast_txn_time` (`member_id`, `asset_type`, `create_time`),
-    UNIQUE KEY `uk_t_biz_mbr_ast_txn_ref` (`biz_ref_id`, `asset_type`)
-) COMMENT ='交易明细表';
+CREATE TABLE `t_member_asset_transaction` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
+  `asset_type` varchar(32) NOT NULL COMMENT '资产类型：SCORE, BALANCE',
+  `transaction_type` tinyint NOT NULL COMMENT '资金流向：1-收入, 2-支出',
+  `change_amount` decimal(18,4) NOT NULL COMMENT '变动绝对值',
+  `balance_after` decimal(18,4) NOT NULL COMMENT '变动后最新余额',
+  `biz_type` varchar(64) NOT NULL COMMENT '业务类型：TASK_PRIZE, CONSUME, MANUAL_ADJUST',
+  `biz_ref_id` varchar(64) NOT NULL COMMENT '关联外部业务ID(如 prize_code)',
+  `remark` varchar(255) DEFAULT NULL COMMENT 'C端展示摘要',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_biz_mbr_ast_txn_ref` (`biz_ref_id`,`asset_type`),
+  KEY `idx_t_biz_mbr_ast_txn_time` (`member_id`,`asset_type`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='交易明细表';
 
 DROP TABLE IF EXISTS `t_member_coupon`;
-CREATE TABLE `t_member_coupon`
-(
-    `id`               bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`        varchar(16)  NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `member_name`      varchar(64)  NOT NULL COMMENT '会员名',
-    `coupon_code`      varchar(64)  NOT NULL COMMENT '券模编码',
-    `coupon_type`      varchar(16)  NOT NULL COMMENT '券类型',
-    `coupon_name`      varchar(128) NOT NULL COMMENT '券名称',
-    `status`           tinyint      NOT NULL DEFAULT 0 COMMENT '状态：0-未使用, 1-已使用, 2-已过期, 3-已作废',
-
-    -- 【核心溯源】：只认单据，不认活动！
-    `source_type`      varchar(32)  NOT NULL COMMENT '来源：DRAW, TASK, MANUAL_SEND',
-    `source_biz_id`    varchar(64)  NOT NULL COMMENT '关联单号',
-
-    `valid_start_time` datetime     NOT NULL COMMENT '有效期开始',
-    `valid_end_time`   datetime     NOT NULL COMMENT '有效期结束',
-    `used_time`        datetime              DEFAULT NULL COMMENT '核销时间',
-
-    `create_by`        varchar(64)           DEFAULT NULL COMMENT '创建人',
-    `create_time`      datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`        varchar(64)           DEFAULT NULL COMMENT '更新人',
-    `update_time`      datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    -- 优化索引：通常运营或系统需要根据会员查询其名下有效的券
-    KEY `idx_mbr_sts` (`member_id`, `status`),
-    KEY `idx_source` (`source_type`, `source_biz_id`)
-) COMMENT ='会员优惠券';
+CREATE TABLE `t_member_coupon` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
+  `coupon_code` varchar(64) NOT NULL COMMENT '券模编码',
+  `coupon_type` varchar(16) NOT NULL COMMENT '券类型',
+  `coupon_name` varchar(128) NOT NULL COMMENT '券名称',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0-未使用, 1-已使用, 2-已过期, 3-已作废',
+  `source_type` varchar(32) NOT NULL COMMENT '来源：DRAW, TASK, MANUAL_SEND',
+  `source_biz_id` varchar(64) NOT NULL COMMENT '关联单号',
+  `valid_start_time` datetime NOT NULL COMMENT '有效期开始',
+  `valid_end_time` datetime NOT NULL COMMENT '有效期结束',
+  `used_time` datetime DEFAULT NULL COMMENT '核销时间',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_source` (`source_type`,`source_biz_id`),
+  KEY `idx_mbr_sts` (`member_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员优惠券';
 
 DROP TABLE IF EXISTS `t_physical_delivery`;
-CREATE TABLE `t_physical_delivery`
-(
-    `id`                bigint       NOT NULL AUTO_INCREMENT comment 'id',
-    `tenant_id`         varchar(16)  NOT NULL DEFAULT 'taozi' COMMENT '租户ID',
-    `member_id`     bigint      NOT NULL COMMENT '会员号：关联键（v3.71.0 换键）',
-    `member_name`       varchar(64)  NOT NULL COMMENT '会员名',
-    `proposal_id`       bigint       NOT NULL COMMENT '发奖提案ID',
-    `source_type`       varchar(64)  NOT NULL COMMENT '来源类型',
-
-    -- 中奖时用户还没填地址，履约单先落、收件信息后补（详见 v3.37.0.sql）
-    `receiver_name`     varchar(64)  NULL DEFAULT NULL COMMENT '收件人姓名：中奖时未知，由用户后续补填',
-    `receiver_phone`    varchar(32)  NULL DEFAULT NULL COMMENT '收件人电话：中奖时未知，由用户后续补填',
-    `receiver_address`  varchar(255) NULL DEFAULT NULL COMMENT '收件详细地址：中奖时未知，由用户后续补填',
-    `logistics_company` varchar(64)           DEFAULT NULL COMMENT '物流公司',
-    `logistics_no`      varchar(128)          DEFAULT NULL COMMENT '物流单号',
-    `status`            tinyint      NULL     DEFAULT 0 COMMENT '状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回',
-
-    `create_by`         varchar(64)           DEFAULT NULL COMMENT '创建人',
-    `create_time`       datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by`         varchar(64)           DEFAULT NULL COMMENT '更新人',
-    `update_time`       datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    KEY `idx_delivery_status` (`status`, `create_time`),
-    UNIQUE KEY `uk_t_biz_phy_dlv_prop_pool` (`proposal_id`, `source_type`)
-) COMMENT ='发货物流表';
+CREATE TABLE `t_physical_delivery` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
+  `proposal_id` bigint NOT NULL COMMENT '发奖提案ID',
+  `source_type` varchar(64) NOT NULL COMMENT '来源类型',
+  `receiver_name` varchar(64) DEFAULT NULL COMMENT '收件人姓名：中奖时未知，由用户后续补填',
+  `receiver_phone` varchar(32) DEFAULT NULL COMMENT '收件人电话：中奖时未知，由用户后续补填',
+  `receiver_address` varchar(255) DEFAULT NULL COMMENT '收件详细地址：中奖时未知，由用户后续补填',
+  `logistics_company` varchar(64) DEFAULT NULL COMMENT '物流公司',
+  `logistics_no` varchar(128) DEFAULT NULL COMMENT '物流单号',
+  `status` tinyint DEFAULT '0' COMMENT '状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_biz_phy_dlv_prop_pool` (`proposal_id`,`source_type`),
+  KEY `idx_delivery_status` (`status`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='发货物流表';

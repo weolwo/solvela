@@ -122,7 +122,6 @@ DROP TABLE IF EXISTS `t_mall_category`;
 CREATE TABLE `t_mall_category`
 (
     `id`            bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`     varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `parent_id`     bigint      NOT NULL DEFAULT 0 COMMENT '父级id：0-顶级分类。业务上限死两级',
 
     `category_name` varchar(50) NOT NULL COMMENT '分类名称：如 数码3C / 虚拟权益',
@@ -162,7 +161,6 @@ DROP TABLE IF EXISTS `t_mall_commodity`;
 CREATE TABLE `t_mall_commodity`
 (
     `id`              bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`       varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     -- 铁律 8：对外唯一标识。自增 id 各环境不同，一旦被 C 端楼层配置/履约单引用就锁死了迁移
     `commodity_code`  varchar(32)    NOT NULL COMMENT '商品编码：10位大写字母+数字，全局唯一，创建后不可改',
     `category_id`     bigint         NOT NULL COMMENT '分类id',
@@ -261,7 +259,6 @@ DROP TABLE IF EXISTS `t_mall_sku`;
 CREATE TABLE `t_mall_sku`
 (
     `id`               bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`        varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `commodity_id`     bigint         NOT NULL COMMENT '关联 t_mall_commodity.id',
     -- 铁律 8。t_proposal_record.asset_ref 的注释原文就是「资产引用：券模/SKU」——
     -- 履约链路本就按编码引用 SKU，只有自增 id 是接不进去的
@@ -330,9 +327,8 @@ DROP TABLE IF EXISTS `t_mall_order`;
 CREATE TABLE `t_mall_order`
 (
     `id`               bigint         NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`        varchar(16)    NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `order_no`         varchar(32)    NOT NULL COMMENT '订单号：服务端生成，对外唯一标识，同时作为扣积分的幂等键',
-    -- 关联键。全局发号器产生、跨租户唯一、永不可变，见 member.sql
+    -- 关联键。全局发号器产生、全局唯一、永不可变，见 member.sql
     `member_id`        bigint         NOT NULL COMMENT '会员号：关联键',
     -- 🔴 展示快照，<b>不是</b>关联键，刻意<b>不建索引</b>。
     --    订单是「单据」——写完就不再改的历史记录，所以这里记的应当是<b>下单当时</b>那个账号，
@@ -455,7 +451,6 @@ DROP TABLE IF EXISTS `t_mall_exchange_limit`;
 CREATE TABLE `t_mall_exchange_limit`
 (
     `id`           bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`    varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `member_id`    bigint      NOT NULL COMMENT '会员号：关联键',
     `commodity_id` bigint      NOT NULL COMMENT '商品id',
     `period_key`   varchar(32) NOT NULL DEFAULT 'NONE' COMMENT '周期标识：NONE(终身) / 20260819(日) / 2026W34(周) / 202608(月)。取值口径对齐 t_task_record.period_key',
@@ -519,7 +514,6 @@ DROP TABLE IF EXISTS `t_mall_address`;
 CREATE TABLE `t_mall_address`
 (
     `id`             bigint       NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`      varchar(16)  NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `member_id`      bigint       NOT NULL COMMENT '会员号：关联键',
 
     -- 密文三件套。可逆加密(AES-GCM/SM4)，密钥走配置中心，与库分开保管
@@ -581,7 +575,6 @@ DROP TABLE IF EXISTS `t_mall_favorite`;
 CREATE TABLE `t_mall_favorite`
 (
     `id`           bigint      NOT NULL AUTO_INCREMENT COMMENT 'id',
-    `tenant_id`    varchar(16) NOT NULL DEFAULT 'taozi' COMMENT '租户id：默认租户 taozi',
     `member_id`    bigint      NOT NULL COMMENT '会员号：关联键',
     `commodity_id` bigint      NOT NULL COMMENT '商品id（商品粒度，不是SKU粒度）',
 

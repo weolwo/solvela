@@ -20,9 +20,9 @@ SET NAMES utf8mb4;
 
 -- ---------- 1. 任务类活动 ----------
 -- 任务向导的活动下拉只拉 activity_type='TASK'，库里一个都没有的话下拉是空的。
-INSERT INTO `t_activity_config` (`tenant_id`, `activity_code`, `activity_name`, `activity_type`, `status`, `start_time`,
+INSERT INTO `t_activity_config` (`activity_code`, `activity_name`, `activity_type`, `status`, `start_time`,
                                  `end_time`, `create_by`)
-VALUES ('taozi', 'WLO9SMXDKD', '新人成长营', 'TASK', 0, '2026-06-01 00:00:00', '2026-12-31 23:59:59', 'seed')
+VALUES ('WLO9SMXDKD', '新人成长营', 'TASK', 0, '2026-06-01 00:00:00', '2026-12-31 23:59:59', 'seed')
 ON DUPLICATE KEY UPDATE `activity_name` = VALUES(`activity_name`),
                         `activity_type` = VALUES(`activity_type`);
 
