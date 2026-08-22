@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>积分商城 · 商品发布原型</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/customParseFormat.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/weekday.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/localeData.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/weekOfYear.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/weekYear.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/advancedFormat.js"></script>
+  <script src="https://unpkg.com/dayjs/plugin/quarterOfYear.js"></script>
+  <script>
+    dayjs.extend(window.dayjs_plugin_customParseFormat);
+    dayjs.extend(window.dayjs_plugin_weekday);
+    dayjs.extend(window.dayjs_plugin_localeData);
+    dayjs.extend(window.dayjs_plugin_weekOfYear);
+    dayjs.extend(window.dayjs_plugin_weekYear);
+    dayjs.extend(window.dayjs_plugin_advancedFormat);
+    dayjs.extend(window.dayjs_plugin_quarterOfYear);
+  </script>
+
+  <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@4.2.6/dist/reset.css" />
+  <script src="https://unpkg.com/ant-design-vue@4.2.6/dist/antd.min.js"></script>
+
+  <style>
+    body { background-color: #f1f5f9; color: #334155; margin: 0; padding-bottom: 88px; }
+    [v-cloak] { display: none; }
+
+    .section-title { font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 18px; }
+    .section-title::before { content: ''; display: block; width: 4px; height: 16px; border-radius: 2px; background-color: #3b82f6; }
+
+    /* 左侧锚点导航：长表单必须能一眼看到"还差哪块没填" */
+    .anchor-nav { position: sticky; top: 88px; }
+    .anchor-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .18s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .anchor-item:hover { background: #f1f5f9; }
+    .anchor-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+
+    .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 14px 24px; box-shadow: 0 -2px 12px rgba(15,23,42,.08); display: flex; align-items: center; justify-content: space-between; z-index: 999; }
+
+    .spec-box { background: #f8fafc; border: 1px dashed #cbd5e1; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; transition: all .2s; }
+    .spec-box:hover { border-color: #3b82f6; background: #f8fbff; }
+
+    /* 图片占位：真实实现里换成 FileThumb + 素材选择器 */
+    .img-slot { width: 104px; height: 104px; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; cursor: pointer; background: #fafcff; transition: all .2s; position: relative; overflow: hidden; }
+    .img-slot:hover { border-color: #3b82f6; color: #3b82f6; }
+    .img-slot.filled { border-style: solid; border-color: #bfdbfe; background: linear-gradient(135deg,#dbeafe,#eff6ff); color: #1d4ed8; }
+    .img-del { position: absolute; top: 2px; right: 4px; color: #ef4444; font-size: 12px; cursor: pointer; background: rgba(255,255,255,.9); border-radius: 4px; padding: 0 4px; }
+
+    .batch-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+    /* C端预览 */
+    .phone { width: 320px; margin: 0 auto; border: 8px solid #1e293b; border-radius: 28px; overflow: hidden; background: #fff; }
+    .phone-body { height: 520px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+<div id="app" v-cloak></div>
+
+<!--
+  🔴 模板放进 x-template，不写在 #app 里（in-DOM 模板）。见交接文档 §0 铁律 6。
+  in-DOM 模板会被浏览器把属性名强制小写：
+    · :dataSource → :datasource，antd 收不到数据，表格恒为空；
+    · #bodyCell   → #bodycell，而 Vue 不 camelize 插槽名，
+      表现是自定义列整片渲染成空白，且不报任何错。
+  这两处上一版原型都命中了。x-template 里 <script> 内容按纯文本存储、不做 HTML 解析，
+  驼峰原样保留，一次堵死整类问题，不用逐个属性打地鼠。
+-->
+<script type="text/x-template" id="app-template">
+  <!-- ============ 顶栏 ============ -->
+  <div class="bg-white px-6 py-3 shadow-sm sticky top-0 z-50 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-slate-400 cursor-pointer text-sm">← 返回商品列表</span>
+      <a-divider type="vertical"></a-divider>
+      <span class="text-lg font-bold text-slate-800">{{ isEdit ? '编辑商品' : '发布新商品' }}</span>
+      <a-tag v-if="form.status === 2" color="default">草稿</a-tag>
+      <a-tag v-else-if="form.status === 1" color="success">已上架</a-tag>
+      <a-tag v-else color="warning">已下架</a-tag>
+    </div>
+    <div class="flex items-center gap-4">
+      <!-- 编辑态只是为了让原型能演示「编码不可改 + 已售/锁定只读列」这两条约束 -->
+      <div class="flex items-center gap-2 text-xs text-slate-400">
+        <span>模拟编辑态</span>
+        <a-switch v-model:checked="isEdit" size="small"></a-switch>
+      </div>
+      <a-button size="small" @click="previewOpen = true">👁 C端预览</a-button>
+    </div>
+  </div>
+
+  <div class="max-w-[1360px] mx-auto px-6 py-5 flex gap-5 items-start">
+
+    <!-- ============ 左侧锚点导航 ============ -->
+    <div class="w-44 shrink-0 anchor-nav">
+      <a-card :bordered="false" class="shadow-sm" :body-style="{ padding: '8px' }">
+        <div v-for="s in sections" :key="s.key"
+             class="anchor-item" :class="{ active: activeSection === s.key }"
+             @click="scrollTo(s.key)">
+          <span>{{ s.label }}</span>
+          <a-badge v-if="errorCountOf(s.key) > 0" :count="errorCountOf(s.key)" :number-style="{ backgroundColor: '#ef4444' }"></a-badge>
+          <span v-else class="text-emerald-500 text-xs">✓</span>
+        </div>
+      </a-card>
+      <div class="mt-3 px-2 text-xs text-slate-400 leading-relaxed">
+        积分商城，不是电商。<br>没有购物车、没有满减、没有会员等级差异化定价。
+      </div>
+    </div>
+
+    <!-- ============ 主表单 ============ -->
+    <div class="flex-1 min-w-0">
+      <a-form :model="form" layout="vertical">
+
+        <!-- ---------- 1. 基础信息 ---------- -->
+        <a-card :bordered="false" class="shadow-sm mb-5" id="sec-base">
+          <div class="section-title">1. 基础信息</div>
+          <a-row :gutter="20">
+            <a-col :span="12">
+              <a-form-item label="商品名称" required
+                           :validate-status="form.commodityName ? '' : 'error'"
+                           :help="form.commodityName ? '' : '必填'">
+                <a-input v-model:value="form.commodityName" placeholder="最多 60 字" show-count :maxlength="60"></a-input>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12">
+              <!-- 铁律 8：10位大写字母+数字，全局唯一，创建后不可改。
+                   三处落点：① AddForm 挂 @Pattern ② Service 判重给人话提示 ③ 前端规则+生成按钮+编辑态禁用 -->
+              <a-form-item label="商品编码" required
+                           :validate-status="codeValid ? '' : 'error'"
+                           :help="codeValid ? '10位大写字母+数字，全局唯一。创建后不可修改' : '格式必须是 10 位大写字母或数字'">
+                <a-input-group compact>
+                  <a-input v-model:value="form.commodityCode" :disabled="isEdit"
+                           style="width: calc(100% - 88px)" placeholder="如 H88JHKJFNE"
+                           @change="form.commodityCode = (form.commodityCode || '').toUpperCase()"></a-input>
+                  <a-button style="width:88px" :disabled="isEdit" @click="genCode">生成</a-button>
+                </a-input-group>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12">
+              <a-form-item label="所属分类" required
+                           :validate-status="form.categoryId ? '' : 'error'"
+                           :help="form.categoryId ? '' : '必填'">
+                <a-cascader v-model:value="categoryPath" :options="categoryOptions"
+                            placeholder="请选择分类（最多两级）" @change="onCategoryChange"></a-cascader>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12">
+              <!-- 取值对齐 sa.enums.PrizeTypeEnum。类型一对齐，
+                   sa/ledger/handler 下现成的履约 handler 直接就能用 -->
+              <a-form-item label="商品类型" required>
+                <a-radio-group v-model:value="form.commodityType" button-style="solid">
+                  <a-radio-button value="PHYSICAL">📦 实物</a-radio-button>
+                  <a-radio-button value="COUPON">🎟️ 优惠券</a-radio-button>
+                  <a-radio-button value="BALANCE">💰 现金红包</a-radio-button>
+                </a-radio-group>
+                <div class="text-xs text-slate-400 mt-1">{{ typeHint }}</div>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12" v-if="form.commodityType === 'COUPON'">
+              <!-- 上一版 DDL 写着「虚拟商品发卡密」，却没有任何字段能存"发哪张券" -->
+              <a-form-item label="关联券模" required
+                           :validate-status="form.assetRef ? '' : 'error'"
+                           :help="form.assetRef ? '' : '优惠券商品必须指定发放哪张券'">
+                <a-select v-model:value="form.assetRef" :options="couponOptions" placeholder="选择券模板"></a-select>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="24">
+              <a-form-item label="一句话卖点">
+                <a-input v-model:value="form.commodityIntro" placeholder="展示在商品名下方，如：限量 200 份，兑完即止" :maxlength="255"></a-input>
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-card>
+
+        <!-- ---------- 2. 定价与规格 ---------- -->
+        <a-card :bordered="false" class="shadow-sm mb-5" id="sec-sku">
+          <div class="section-title">2. 定价与规格</div>
+
+          <a-row :gutter="20">
+            <a-col :span="8">
+              <a-form-item label="支付方式" required>
+                <a-radio-group v-model:value="form.payType" @change="onPayTypeChange">
+                  <a-radio :value="1">纯积分</a-radio>
+                  <a-radio :value="2">积分 + 现金</a-radio>
+                </a-radio-group>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="划线原价">
+                <a-input-number v-model:value="form.originalPrice" :min="0" :precision="2" style="width:100%" addon-before="￥"></a-input-number>
+                <div class="text-xs text-slate-400 mt-1">仅前端展示「价值￥199」，可留 0</div>
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-alert v-if="form.payType === 2" type="warning" show-icon class="mb-4"
+                   message="积分+现金的订单要等支付回调，中间会悬挂锁定库存"
+                   description="下单后 30 分钟未支付将由定时任务自动取消并释放库存。纯积分订单是同步扣的，不存在这个悬挂期。"></a-alert>
+
+          <!-- 规格维度 -->
+          <div class="mb-4 pl-3 border-l-2 border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-medium text-slate-700">规格维度</span>
+              <span class="text-xs text-slate-400">不加任何规格 = 单规格商品，下方仍会生成一行 SKU</span>
+            </div>
+
+            <div v-for="(spec, index) in specList" :key="index" class="spec-box">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-slate-500 shrink-0">规格名</span>
+                  <a-input v-model:value="spec.name" placeholder="如 颜色 / 容量" style="width: 180px" size="small"></a-input>
+                </div>
+                <a-button type="text" danger size="small" @click="removeSpec(index)">移除</a-button>
+              </div>
+              <div class="flex items-center flex-wrap gap-2">
+                <span class="text-sm text-slate-500 shrink-0">规格值</span>
+                <a-tag v-for="(val, vIndex) in spec.values" :key="vIndex" closable color="processing"
+                       @close="removeSpecValue(index, vIndex)">{{ val }}</a-tag>
+                <a-input v-model:value="spec.tempValue" placeholder="输入后回车" size="small" style="width: 130px"
+                         @pressEnter="addSpecValue(index)"></a-input>
+              </div>
+            </div>
+
+            <div class="flex gap-3 mt-2">
+              <a-button type="dashed" size="small" @click="addSpec">+ 添加规格</a-button>
+              <a-button type="primary" size="small" @click="generateSkuTable">⬇ 生成/刷新 SKU 表</a-button>
+              <span class="text-xs text-slate-400 self-center">刷新会保留已填过的价格与库存</span>
+            </div>
+          </div>
+
+          <!-- 批量设置：SKU 一多，逐格填是最耗时的一步 -->
+          <div class="batch-bar">
+            <span class="text-sm font-medium text-slate-600">批量设置</span>
+            <a-input-number v-model:value="batch.points" :min="0" placeholder="积分" style="width:110px" size="small"></a-input-number>
+            <a-input-number v-model:value="batch.cash" :min="0" :precision="2" placeholder="现金" style="width:110px" size="small" :disabled="form.payType === 1"></a-input-number>
+            <a-input-number v-model:value="batch.stock" :min="0" placeholder="库存" style="width:110px" size="small"></a-input-number>
+            <a-button type="primary" ghost size="small" @click="applyBatch">
+              应用到{{ selectedRowKeys.length ? ('选中 ' + selectedRowKeys.length + ' 项') : '全部' }}
+            </a-button>
+            <span class="text-xs text-slate-400">不勾选任何行 = 应用到全部；留空的项不覆盖</span>
+          </div>
+
+          <a-table :dataSource="skuList" :columns="skuColumns" :pagination="false" size="small" bordered
+                   rowKey="rowKey"
+                   :rowSelection="{ selectedRowKeys, onChange: (keys) => selectedRowKeys = keys }">
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.dataIndex === 'attrs'">
+                <span v-if="isSingleSku" class="text-slate-400">单规格</span>
+                <a-tag v-else v-for="(v, k) in record.skuAttrs" :key="k" color="blue">{{ k }}: {{ v }}</a-tag>
+              </template>
+
+              <template v-else-if="column.dataIndex === 'skuCode'">
+                <a-input v-model:value="record.skuCode" size="small" :disabled="isEdit"
+                         @change="record.skuCode = (record.skuCode || '').toUpperCase()"
+                         :status="bizCodeRegex.test(record.skuCode || '') ? '' : 'error'"></a-input>
+              </template>
+
+              <template v-else-if="column.dataIndex === 'skuCoverFileId'">
+                <div class="img-slot" style="width:44px;height:44px;font-size:11px"
+                     :class="{ filled: record.skuCoverFileId }" @click="pickSkuImage(record)">
+                  <span v-if="record.skuCoverFileId">#{{ record.skuCoverFileId }}</span>
+                  <span v-else>+</span>
+                </div>
+              </template>
+
+              <template v-else-if="column.dataIndex === 'skuPointsPrice'">
+                <a-input-number v-model:value="record.skuPointsPrice" :min="0" size="small" style="width:100%"
+                                :placeholder="'继承 ' + (form.pointsPrice || 0)"></a-input-number>
+              </template>
+
+              <template v-else-if="column.dataIndex === 'skuCashPrice'">
+                <a-input-number v-model:value="record.skuCashPrice" :min="0" :precision="2" size="small" style="width:100%"
+                                :disabled="form.payType === 1"></a-input-number>
+              </template>
+
+              <template v-else-if="column.dataIndex === 'totalStock'">
+                <a-input-number v-model:value="record.totalStock" :min="0" size="small" style="width:100%"></a-input-number>
+              </template>
+
+              <!-- 编辑态才有意义的只读列。total_stock 恒为运营投放量，
+                   补货直接改它 —— 不像旧模型那样卖一件减一件、事后看不出投放量 -->
+              <template v-else-if="column.dataIndex === 'soldCount'">
+                <span class="text-slate-500">{{ record.soldCount }}</span>
+              </template>
+              <template v-else-if="column.dataIndex === 'lockedStock'">
+                <span class="text-amber-600">{{ record.lockedStock }}</span>
+              </template>
+              <template v-else-if="column.dataIndex === 'available'">
+                <span :class="availableOf(record) > 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'">
+                  {{ availableOf(record) }}
+                </span>
+              </template>
+
+              <template v-else-if="column.dataIndex === 'skuStatus'">
+                <a-switch :checked="record.skuStatus === 1" size="small"
+                          @change="(c) => record.skuStatus = c ? 1 : 0"></a-switch>
+              </template>
+            </template>
+          </a-table>
+
+          <div class="text-xs text-slate-400 mt-2">
+            可用库存 = 总库存 − 锁定 − 已售，由数据库虚拟列算，不落地写入。
+            扣减靠单行条件 UPDATE 防超卖，<b>不需要乐观锁版本号</b>。
+          </div>
+        </a-card>
+
+        <!-- ---------- 3. 图文详情 ---------- -->
+        <a-card :bordered="false" class="shadow-sm mb-5" id="sec-media">
+          <div class="section-title">3. 图文详情</div>
+
+          <a-alert type="info" show-icon class="mb-4"
+                   message="商品图直接在这里上传，不走素材库选择器"
+                   description="商品图又多又杂、复用率接近零，混进素材库会把运营的策展空间冲垮。所以上传后归到 MALL_COMMODITY 分类，素材库列表固定排除该分类——两边在运营视角下互不干扰。但底层仍是同一套文件模块：t_file_relation 照常登记，删除守卫、孤儿清理、存储介质切换全部照常生效。管理端显示统一走 FileThumb（登录态的下载接口带不了 token）。">
+          </a-alert>
+
+          <a-form-item label="封面主图（建议 800×800）" required
+                       :validate-status="form.coverFileId ? '' : 'error'"
+                       :help="form.coverFileId ? '' : '必填'">
+            <div class="img-slot" :class="{ filled: form.coverFileId }" @click="pickCover">
+              <template v-if="form.coverFileId">
+                <span class="img-del" @click.stop="form.coverFileId = null">✕</span>
+                <span class="text-2xl">🖼</span>
+                <span class="text-xs mt-1">file_id: {{ form.coverFileId }}</span>
+              </template>
+              <template v-else>
+                <span class="text-2xl">+</span>
+                <span class="text-xs mt-1">选择主图</span>
+              </template>
+            </div>
+          </a-form-item>
+
+          <a-form-item label="轮播图册（最多 8 张，可拖动排序）">
+            <div class="flex flex-wrap gap-3">
+              <div v-for="(fid, i) in form.bannerFileIds" :key="fid" class="img-slot filled">
+                <span class="img-del" @click="form.bannerFileIds.splice(i, 1)">✕</span>
+                <span class="text-2xl">🖼</span>
+                <span class="text-xs mt-1">#{{ fid }}</span>
+                <span class="text-[10px] text-slate-400">sort {{ i }}</span>
+              </div>
+              <div v-if="form.bannerFileIds.length < 8" class="img-slot" @click="addBanner">
+                <span class="text-2xl">+</span>
+                <span class="text-xs mt-1">添加</span>
+              </div>
+            </div>
+            <div class="text-xs text-slate-400 mt-2">
+              轮播图不单独建表，复用 <code>t_file_relation(biz_type='MALL_COMMODITY', biz_id, sort)</code>
+              —— 那张表的 sort 列注释原文就是「附件顺序，轮播图必需」。
+            </div>
+            <div class="text-xs text-amber-600 mt-1">
+              ⚠ 保存时要 confirm 的是<b>完整引用集合</b>：主图 + 轮播 + 每个 SKU 的图 + 富文本内嵌图。
+              漏掉 SKU 图是最常见的一处（当前这单商品共 {{ referencedFileIds.length }} 个 file_id）。
+            </div>
+          </a-form-item>
+
+          <a-form-item label="图文详情">
+            <a-textarea v-model:value="form.detailContent" :rows="5"
+                        placeholder="富文本 HTML。真实实现接项目的编辑器，禁止 base64 内联图片"></a-textarea>
+          </a-form-item>
+
+          <a-form-item label="兑换须知">
+            <a-textarea v-model:value="form.exchangeNotice" :rows="3" :maxlength="1024" show-count
+                        placeholder="券的核销方式与有效期 / 实物的发货时效与售后口径。C端下单页固定展示"></a-textarea>
+            <div class="text-xs text-slate-400 mt-1">{{ noticeHint }}</div>
+          </a-form-item>
+        </a-card>
+
+        <!-- ---------- 4. 兑换限制 ---------- -->
+        <a-card :bordered="false" class="shadow-sm mb-5" id="sec-limit">
+          <div class="section-title">4. 兑换限制与上架</div>
+          <a-row :gutter="20">
+            <a-col :span="8">
+              <!-- 取值对齐 t_promotion_config.limit_period 已有的字典，不新造一套 -->
+              <a-form-item label="限兑周期">
+                <a-select v-model:value="form.limitPeriod" :options="periodOptions"></a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="周期内限兑件数">
+                <a-input-number v-model:value="form.limitCount" :min="0" style="width:100%"></a-input-number>
+                <div class="text-xs text-slate-400 mt-1">0 = 不限制</div>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="首页推荐">
+                <a-switch :checked="form.isHome === 1" @change="(c) => form.isHome = c ? 1 : 0"></a-switch>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="16">
+              <a-form-item label="兑换时间段">
+                <a-range-picker v-model:value="timeRange" show-time style="width:100%"
+                                value-format="YYYY-MM-DD HH:mm:ss"></a-range-picker>
+                <div class="text-xs text-slate-400 mt-1">
+                  留空 = 长期在线。落库时写哨兵值 1970-01-01 / 2099-12-31，不写 NULL——
+                  可空的话查询要写 <code>(start_time IS NULL OR ...)</code>，那个 OR 走不了索引。
+                </div>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="排序权重">
+                <a-input-number v-model:value="form.sort" :min="0" style="width:100%"></a-input-number>
+                <div class="text-xs text-slate-400 mt-1">从小到大</div>
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-alert v-if="form.limitCount > 0" type="success" show-icon
+                   :message="'限兑规则：每个会员 ' + periodLabel + ' 最多兑换 ' + form.limitCount + ' 件'"
+                   description="并发正确性靠 t_mall_exchange_limit 的唯一索引 (member_name, commodity_id, period_key) + 条件 UPDATE 保证，不是 count 订单表——两个请求同时读到 count=0 会双双通过。">
+          </a-alert>
+        </a-card>
+
+      </a-form>
+    </div>
+  </div>
+
+  <!-- ============ 吸底操作栏 ============ -->
+  <div class="sticky-footer">
+    <div class="text-sm">
+      <span v-if="errors.length === 0" class="text-emerald-600">✓ 校验通过，共 {{ skuList.length }} 个 SKU，总库存 {{ totalStock }}</span>
+      <span v-else class="text-red-500 cursor-pointer" @click="showErrors">
+        ⚠ {{ errors.length }} 项待完善，点击查看
+      </span>
+    </div>
+    <div class="flex gap-3">
+      <a-button size="large" style="width:120px" @click="submit(2)">存为草稿</a-button>
+      <a-button type="primary" size="large" style="width:180px" @click="submit(1)">提交并上架</a-button>
+    </div>
+  </div>
+
+  <!-- ============ C端预览 ============ -->
+  <a-drawer v-model:open="previewOpen" title="C端效果预览" width="420" placement="right">
+    <div class="phone">
+      <div class="phone-body">
+        <div class="h-52 bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-slate-400">
+          <span v-if="form.coverFileId">主图 file_id: {{ form.coverFileId }}</span>
+          <span v-else>未设置主图</span>
+        </div>
+        <div class="p-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-orange-500">{{ previewPoints }}</span>
+            <span class="text-sm text-orange-500">积分</span>
+            <span v-if="form.payType === 2" class="text-sm text-orange-500">+ ￥{{ previewCash }}</span>
+            <span v-if="form.originalPrice > 0" class="text-xs text-slate-400 line-through ml-1">￥{{ form.originalPrice }}</span>
+          </div>
+          <div class="mt-2 font-medium text-slate-800">{{ form.commodityName || '未命名商品' }}</div>
+          <div class="text-xs text-slate-400 mt-1">{{ form.commodityIntro }}</div>
+          <div class="flex items-center gap-2 mt-3 text-xs">
+            <a-tag color="orange" v-if="form.limitCount > 0">{{ periodLabel }}限 {{ form.limitCount }} 件</a-tag>
+            <a-tag color="blue">{{ typeLabel }}</a-tag>
+            <span class="text-slate-400">已兑 {{ mockSold }} 件</span>
+          </div>
+          <a-divider style="margin:14px 0"></a-divider>
+          <div v-if="!isSingleSku">
+            <div v-for="spec in validSpecs" :key="spec.name" class="mb-3">
+              <div class="text-xs text-slate-500 mb-1">{{ spec.name }}</div>
+              <div class="flex flex-wrap gap-2">
+                <span v-for="v in spec.values" :key="v"
+                      class="px-2 py-1 text-xs rounded border border-slate-200 bg-slate-50">{{ v }}</span>
+              </div>
+            </div>
+            <a-divider style="margin:14px 0"></a-divider>
+          </div>
+          <div class="text-xs text-slate-500 font-medium mb-1">兑换须知</div>
+          <div class="text-xs text-slate-400 whitespace-pre-wrap">{{ form.exchangeNotice || '（未填写）' }}</div>
+        </div>
+      </div>
+      <div class="bg-orange-500 text-white text-center py-3 text-sm font-medium">立即兑换</div>
+    </div>
+  </a-drawer>
+
+  <!-- ============ 提交预览 ============ -->
+  <a-modal v-model:open="jsonOpen" title="提交给后端的 payload" width="820px" :footer="null">
+    <div class="bg-slate-900 text-emerald-400 p-4 rounded font-mono text-xs whitespace-pre-wrap max-h-[460px] overflow-y-auto">{{ jsonPayload }}</div>
+    <div class="mt-3 text-xs text-slate-500 leading-relaxed">
+      后端拆两步：基础信息 → <code>t_mall_commodity</code>，循环 skuList → <code>t_mall_sku</code>。<br>
+      🔴 保存后还有两步不能漏：<br>
+      ① <code>fileAssetService.confirm(referencedFileIds, 'MALL_COMMODITY', id)</code>
+      —— payload 里那个 <code>referencedFileIds</code> 已经把主图/轮播/SKU图收齐了，
+      富文本内嵌图由后端再用 <code>RichTextImageExtractor</code> 补进去。<b>传完整集合，不是增量。</b><br>
+      ② 编码判重（唯一索引只是兜底，直接抛 SQL 异常对运营不友好）。
+    </div>
+  </a-modal>
+</script>
+
+<script>
+  const { createApp, ref, computed, reactive, onMounted, onUnmounted } = Vue;
+
+  // 铁律 8 的唯一真源在后端 SmartCodeUtil，前端同源常量在 constants/regular-const.js 的 regular.bizCode
+  const BIZ_CODE_REGEX = /^[A-Z0-9]{10}$/;
+  const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+  // 铁律 3：消除魔法值
+  const STATUS = { OFF: 0, ON: 1, DRAFT: 2 };
+  const PAY_TYPE = { POINTS_ONLY: 1, POINTS_CASH: 2 };
+
+  const App = {
+    template: '#app-template',
+    setup() {
+      const isEdit = ref(false);
+      const previewOpen = ref(false);
+      const jsonOpen = ref(false);
+      const jsonPayload = ref('');
+      const activeSection = ref('sec-base');
+
+      const sections = [
+        { key: 'sec-base',  label: '基础信息' },
+        { key: 'sec-sku',   label: '定价与规格' },
+        { key: 'sec-media', label: '图文详情' },
+        { key: 'sec-limit', label: '兑换限制' }
+      ];
+
+      const genBizCode = () => Array.from({ length: 10 },
+        () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+
+      const form = reactive({
+        commodityCode: genBizCode(),
+        commodityName: '极客定制纯棉短袖T恤',
+        categoryId: null,
+        commodityType: 'PHYSICAL',
+        assetRef: null,
+        commodityIntro: '限量 200 份，兑完即止',
+        coverFileId: null,
+        bannerFileIds: [],
+        detailContent: '',
+        exchangeNotice: '',
+        payType: PAY_TYPE.POINTS_ONLY,
+        originalPrice: 199.00,
+        pointsPrice: 5000,
+        cashPrice: 0,
+        limitPeriod: 'LIFETIME',
+        limitCount: 1,
+        isHome: 0,
+        sort: 0,
+        status: STATUS.DRAFT
+      });
+
+      const timeRange = ref([]);
+      const categoryPath = ref([]);
+
+      const categoryOptions = [
+        { value: 1, label: '数码3C', children: [{ value: 11, label: '手机配件' }, { value: 12, label: '智能穿戴' }] },
+        { value: 2, label: '生活百货', children: [{ value: 21, label: '家居' }, { value: 22, label: '服饰' }] },
+        { value: 3, label: '虚拟权益', children: [{ value: 31, label: '视频会员' }, { value: 32, label: '话费充值' }] }
+      ];
+      const couponOptions = [
+        { value: 'CPN10YUAN01', label: '满100减10元券' },
+        { value: 'CPNFREESHIP', label: '包邮券' },
+        { value: 'CPNVIPMONTH', label: '会员月卡券' }
+      ];
+      const periodOptions = [
+        { value: 'LIFETIME', label: '终身' },
+        { value: 'DAILY',    label: '每日' },
+        { value: 'WEEKLY',   label: '每周' },
+        { value: 'MONTHLY',  label: '每月' }
+      ];
+
+      // ---------------- 规格与 SKU ----------------
+      const specList = ref([
+        { name: '颜色', values: ['星空黑', '钛金灰'], tempValue: '' },
+        { name: '尺码', values: ['L', 'XL'], tempValue: '' }
+      ]);
+      const skuList = ref([]);
+      const selectedRowKeys = ref([]);
+      const batch = reactive({ points: null, cash: null, stock: null });
+
+      const validSpecs = computed(() =>
+        specList.value.filter(s => (s.name || '').trim() !== '' && s.values.length > 0));
+      const isSingleSku = computed(() => validSpecs.value.length === 0);
+
+      const addSpec = () => specList.value.push({ name: '', values: [], tempValue: '' });
+      const removeSpec = (i) => { specList.value.splice(i, 1); generateSkuTable(); };
+      const addSpecValue = (i) => {
+        const v = (specList.value[i].tempValue || '').trim();
+        if (v && !specList.value[i].values.includes(v)) specList.value[i].values.push(v);
+        specList.value[i].tempValue = '';
+      };
+      const removeSpecValue = (si, vi) => { specList.value[si].values.splice(vi, 1); };
+
+      const attrsKey = (attrs) => JSON.stringify(attrs);
+
+      /**
+       * 🔴 与上一版原型的关键差异：validSpecs 为空时**不清空表格**，而是兜底生成一行
+       * skuAttrs = {} 的单规格 SKU。
+       * 上一版直接 `skuList = []; return;`，导致无规格商品（如「10元话费券」）
+       * 根本填不了价格和库存，提交出去 skuList 是空数组，后端拿不到任何定价。
+       * DDL 注释一直写着「无规格商品填 {}」——前端从来没生成过这一行。
+       */
+      const generateSkuTable = () => {
+        const specs = validSpecs.value;
+        const combos = specs.length === 0
+          ? [{}]
+          : specs.reduce((acc, cur) => {
+              const out = [];
+              acc.forEach(item => cur.values.forEach(v => out.push({ ...item, [cur.name]: v })));
+              return out;
+            }, [{}]);
+
+        const old = skuList.value;
+        skuList.value = combos.map((attrs, idx) => {
+          const prev = old.find(o => attrsKey(o.skuAttrs) === attrsKey(attrs));
+          return prev ? prev : {
+            rowKey: attrsKey(attrs) + '#' + idx,
+            skuCode: genBizCode(),
+            skuAttrs: attrs,
+            skuCoverFileId: null,
+            skuPointsPrice: form.pointsPrice,
+            skuCashPrice: form.payType === PAY_TYPE.POINTS_ONLY ? 0 : 0,
+            totalStock: 100,
+            lockedStock: 0,
+            soldCount: 0,
+            skuStatus: 1,
+            sort: idx
+          };
+        });
+        selectedRowKeys.value = [];
+      };
+
+      const availableOf = (r) => (r.totalStock || 0) - (r.lockedStock || 0) - (r.soldCount || 0);
+
+      const applyBatch = () => {
+        const targets = selectedRowKeys.value.length
+          ? skuList.value.filter(r => selectedRowKeys.value.includes(r.rowKey))
+          : skuList.value;
+        targets.forEach(r => {
+          if (batch.points !== null && batch.points !== undefined) r.skuPointsPrice = batch.points;
+          if (batch.cash !== null && batch.cash !== undefined && form.payType === PAY_TYPE.POINTS_CASH) r.skuCashPrice = batch.cash;
+          if (batch.stock !== null && batch.stock !== undefined) r.totalStock = batch.stock;
+        });
+        antd.message.success('已应用到 ' + targets.length + ' 个 SKU');
+      };
+
+      const skuColumns = computed(() => {
+        const cols = [
+          { title: '规格', dataIndex: 'attrs', width: 200 },
+          { title: 'SKU编码', dataIndex: 'skuCode', width: 140 },
+          { title: '图', dataIndex: 'skuCoverFileId', width: 60, align: 'center' },
+          { title: '所需积分', dataIndex: 'skuPointsPrice', width: 120 }
+        ];
+        if (form.payType === PAY_TYPE.POINTS_CASH) {
+          cols.push({ title: '所需现金', dataIndex: 'skuCashPrice', width: 120 });
+        }
+        cols.push({ title: '总库存', dataIndex: 'totalStock', width: 110 });
+        if (isEdit.value) {
+          cols.push({ title: '锁定', dataIndex: 'lockedStock', width: 70, align: 'center' });
+          cols.push({ title: '已售', dataIndex: 'soldCount', width: 70, align: 'center' });
+          cols.push({ title: '可用', dataIndex: 'available', width: 70, align: 'center' });
+        }
+        cols.push({ title: '启用', dataIndex: 'skuStatus', width: 70, align: 'center' });
+        return cols;
+      });
+
+      const totalStock = computed(() => skuList.value.reduce((s, r) => s + (r.totalStock || 0), 0));
+
+      // ---------------- 图片 ----------------
+      // 真实实现是商品表单内的上传组件（落 MALL_COMMODITY 分类），不是素材库选择器：
+      // 商品图复用率接近零，混进素材库会把运营的策展空间冲垮
+      let mockFileId = 1000;
+      const pickCover = () => { form.coverFileId = ++mockFileId; };
+      const addBanner = () => { form.bannerFileIds.push(++mockFileId); };
+      const pickSkuImage = (r) => { r.skuCoverFileId = ++mockFileId; };
+
+      /**
+       * 本次保存引用到的全部 fileId —— confirm 要的就是这个完整集合，不是增量。
+       * 照抄 ActivityDisplayService.collectReferencedFileIds() 的四个来源。
+       * 🔴 SKU 图是最容易漏的一处：它藏在 skuList 里，写 confirm 时很容易只收主表那几个。
+       */
+      const referencedFileIds = computed(() => {
+        const ids = new Set();
+        if (form.coverFileId) ids.add(form.coverFileId);
+        form.bannerFileIds.forEach(id => ids.add(id));
+        skuList.value.forEach(r => { if (r.skuCoverFileId) ids.add(r.skuCoverFileId); });
+        // 富文本内嵌图：后端用 RichTextImageExtractor + resolveFileIds 解析 detailContent
+        return Array.from(ids);
+      });
+
+      // ---------------- 校验 ----------------
+      // 铁律 2：前端校验只是防呆，后端必须服务端重算一遍（防绕过页面直接 POST）
+      const codeValid = computed(() => BIZ_CODE_REGEX.test(form.commodityCode || ''));
+
+      const errors = computed(() => {
+        const e = [];
+        if (!form.commodityName) e.push({ sec: 'sec-base', msg: '商品名称未填' });
+        if (!codeValid.value)    e.push({ sec: 'sec-base', msg: '商品编码格式不对（10位大写字母+数字）' });
+        if (!form.categoryId)    e.push({ sec: 'sec-base', msg: '未选择分类' });
+        if (form.commodityType === 'COUPON' && !form.assetRef) e.push({ sec: 'sec-base', msg: '优惠券商品未指定券模' });
+        if (!skuList.value.length) e.push({ sec: 'sec-sku', msg: '还没有生成 SKU' });
+        skuList.value.forEach(r => {
+          if (!BIZ_CODE_REGEX.test(r.skuCode || '')) e.push({ sec: 'sec-sku', msg: 'SKU 编码格式不对' });
+          if (!r.skuPointsPrice && r.skuPointsPrice !== 0) e.push({ sec: 'sec-sku', msg: '有 SKU 未填积分' });
+          if (form.payType === PAY_TYPE.POINTS_CASH && !r.skuCashPrice && r.skuCashPrice !== 0) {
+            e.push({ sec: 'sec-sku', msg: '有 SKU 未填现金' });
+          }
+        });
+        const codes = skuList.value.map(r => r.skuCode);
+        if (new Set(codes).size !== codes.length) e.push({ sec: 'sec-sku', msg: 'SKU 编码有重复' });
+        if (!form.coverFileId) e.push({ sec: 'sec-media', msg: '未设置封面主图' });
+        if (form.commodityType === 'COUPON' && !form.exchangeNotice) {
+          e.push({ sec: 'sec-media', msg: '券类商品建议填写核销说明' });
+        }
+        return e;
+      });
+
+      const errorCountOf = (sec) => errors.value.filter(e => e.sec === sec).length;
+
+      const showErrors = () => {
+        antd.Modal.warning({
+          title: '还有 ' + errors.value.length + ' 项待完善',
+          content: errors.value.map(e => '· ' + e.msg).join('\n'),
+          okText: '去修改',
+          onOk: () => scrollTo(errors.value[0].sec)
+        });
+      };
+
+      // ---------------- 交互 ----------------
+      const scrollTo = (key) => {
+        const el = document.getElementById(key);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
+      const onScroll = () => {
+        for (let i = sections.length - 1; i >= 0; i--) {
+          const el = document.getElementById(sections[i].key);
+          if (el && el.getBoundingClientRect().top <= 140) { activeSection.value = sections[i].key; return; }
+        }
+        activeSection.value = sections[0].key;
+      };
+
+      const genCode = () => { form.commodityCode = genBizCode(); };
+
+      const onCategoryChange = (path) => { form.categoryId = path && path.length ? path[path.length - 1] : null; };
+
+      // 纯积分时把现金清零：只 disabled 不清零的话，脏值照样进 payload
+      const onPayTypeChange = () => {
+        if (form.payType === PAY_TYPE.POINTS_ONLY) {
+          form.cashPrice = 0;
+          skuList.value.forEach(r => r.skuCashPrice = 0);
+        }
+      };
+
+      const typeHint = computed(() => ({
+        PHYSICAL: '走 t_physical_delivery 发货，需要收货地址',
+        COUPON:   '走 t_member_coupon 发券，需指定券模',
+        BALANCE:  '走 t_member_wallet 直接入账'
+      }[form.commodityType]));
+
+      const typeLabel = computed(() => ({ PHYSICAL: '实物', COUPON: '优惠券', BALANCE: '现金红包' }[form.commodityType]));
+      const periodLabel = computed(() => (periodOptions.find(p => p.value === form.limitPeriod) || {}).label);
+      const noticeHint = computed(() => form.commodityType === 'COUPON'
+        ? '券类商品务必写清核销方式和有效期——这是客诉最集中的地方'
+        : '实物建议写明发货时效与售后口径');
+
+      const previewPoints = computed(() => {
+        const v = skuList.value.map(r => r.skuPointsPrice).filter(x => x || x === 0);
+        return v.length ? Math.min(...v) : (form.pointsPrice || 0);
+      });
+      const previewCash = computed(() => {
+        const v = skuList.value.map(r => r.skuCashPrice).filter(x => x || x === 0);
+        return v.length ? Math.min(...v) : 0;
+      });
+      const mockSold = computed(() => skuList.value.reduce((s, r) => s + (r.soldCount || 0), 0));
+
+      // ---------------- 提交 ----------------
+      const submit = (targetStatus) => {
+        if (targetStatus === STATUS.ON && errors.value.length) { showErrors(); return; }
+        form.status = targetStatus;
+
+        const payload = {
+          commodityCode: form.commodityCode,
+          commodityName: form.commodityName,
+          categoryId: form.categoryId,
+          commodityType: form.commodityType,
+          assetRef: form.commodityType === 'COUPON' ? form.assetRef : null,
+          commodityIntro: form.commodityIntro,
+          coverFileId: form.coverFileId,
+          bannerFileIds: form.bannerFileIds,
+          // confirm 用的完整引用集合（主图 + 轮播 + SKU图）。富文本内嵌图由后端解析后并入
+          referencedFileIds: referencedFileIds.value,
+          detailContent: form.detailContent,
+          exchangeNotice: form.exchangeNotice,
+          payType: form.payType,
+          originalPrice: form.originalPrice,
+          pointsPrice: form.pointsPrice,
+          cashPrice: form.payType === PAY_TYPE.POINTS_ONLY ? 0 : form.cashPrice,
+          limitPeriod: form.limitPeriod,
+          limitCount: form.limitCount,
+          // 留空 = 长期在线，落库写哨兵值而不是 NULL
+          startTime: timeRange.value && timeRange.value[0] ? timeRange.value[0] : '1970-01-01 00:00:00',
+          endTime:   timeRange.value && timeRange.value[1] ? timeRange.value[1] : '2099-12-31 23:59:59',
+          isHome: form.isHome,
+          sort: form.sort,
+          status: form.status,
+          skuList: skuList.value.map((r, i) => ({
+            skuCode: r.skuCode,
+            skuAttrs: r.skuAttrs,               // 无规格就是 {}
+            skuCoverFileId: r.skuCoverFileId,
+            skuPointsPrice: r.skuPointsPrice,
+            skuCashPrice: form.payType === PAY_TYPE.POINTS_ONLY ? 0 : r.skuCashPrice,
+            totalStock: r.totalStock,           // locked/sold 由服务端维护，不接受前端传入
+            skuStatus: r.skuStatus,
+            sort: i
+          }))
+        };
+
+        jsonPayload.value = JSON.stringify(payload, null, 2);
+        jsonOpen.value = true;
+      };
+
+      onMounted(() => {
+        categoryPath.value = [2, 22];
+        form.categoryId = 22;
+        form.exchangeNotice = '· 兑换后 3 个工作日内发货\n· 非质量问题不支持退换\n· 积分一经扣除不可退回';
+        generateSkuTable();
+        window.addEventListener('scroll', onScroll, { passive: true });
+      });
+      onUnmounted(() => window.removeEventListener('scroll', onScroll));
+
+      return {
+        isEdit, previewOpen, jsonOpen, jsonPayload, sections, activeSection,
+        form, timeRange, categoryPath, categoryOptions, couponOptions, periodOptions,
+        specList, validSpecs, isSingleSku, addSpec, removeSpec, addSpecValue, removeSpecValue,
+        skuList, skuColumns, generateSkuTable, selectedRowKeys, batch, applyBatch, availableOf, totalStock,
+        pickCover, addBanner, pickSkuImage, referencedFileIds,
+        codeValid, errors, errorCountOf, showErrors, bizCodeRegex: BIZ_CODE_REGEX,
+        scrollTo, genCode, onCategoryChange, onPayTypeChange,
+        typeHint, typeLabel, periodLabel, noticeHint, previewPoints, previewCash, mockSold,
+        submit
+      };
+    }
+  };
+
+  createApp(App).use(antd).mount('#app');
+</script>
+</body>
+</html>
