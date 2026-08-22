@@ -34,9 +34,25 @@ DELETE f FROM t_task_record_flow f
 DELETE r FROM t_task_record r
     JOIN t_member m ON m.member_id = r.member_id
  WHERE m.member_name LIKE 'p0_%';
--- 测试会员本身也一起清：TaskRuntimeP0AcceptanceTest 每个用例都会往 t_member 插一行
--- （关联键必须真实存在），不清的话跑几十轮就是几十个测试会员。
-DELETE FROM t_member WHERE member_name LIKE 'p0_%';
+-- 测试会员：只删<b>已经没有任何业务行引用</b>的那些。
+-- 🔴 不能无脑 DELETE ... WHERE member_name LIKE 'p0_%'：实测库里 988 个 p0_ 会员
+--    身上挂着 6955 行业务数据（钱包/流水/券/提案/任务记录/发奖流水，历史几轮验收留下的）。
+--    直接删会员会让这些行的 member_id 指向一个不存在的会员 ——
+--    正是 v3.71.0 花了一整轮才消灭掉的那种「查不到主人的账」，而且当场不报错。
+--    上面两条 DELETE 已经清掉本模块的记录与流水，剩下的引用属于账务/发奖域，
+--    要清得连它们一起清（那是另一件事，见交接文档 §13.5.1 末尾）。
+DELETE m FROM t_member m
+ WHERE m.member_name LIKE 'p0_%'
+   AND NOT EXISTS (SELECT 1 FROM t_task_record              x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_task_record_flow         x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_prize_log                x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_proposal_record          x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_member_wallet            x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_member_asset_transaction x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_member_coupon            x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_physical_delivery        x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_draw_prize_log           x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_lottery_record           x WHERE x.member_id = m.member_id);
 DELETE FROM t_task_prize_mapping WHERE task_config_id IN
     (SELECT id FROM (SELECT id FROM t_task_config WHERE task_name LIKE 'P0验收-%') t);
 DELETE FROM t_task_config   WHERE task_name LIKE 'P0验收-%';
