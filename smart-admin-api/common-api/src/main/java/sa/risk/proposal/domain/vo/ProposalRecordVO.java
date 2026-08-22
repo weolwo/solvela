@@ -26,7 +26,14 @@ public class ProposalRecordVO {
     @Schema(description = "提案单号，服务端生成，对外唯一标识")
     private String tradeNo;
 
-    @Schema(description = "会员名")
+    @Schema(description = "会员号")
+    private Long memberId;
+
+    /**
+     * 账号 —— <b>落库时的展示快照</b>，不是会员当前的账号。
+     * 会员改名之后这里仍是改名前的值，这是刻意的：单据回答的是「当时是谁」。
+     */
+    @Schema(description = "会员账号（下单当时的快照）")
     private String memberName;
 
     @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL")

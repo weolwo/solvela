@@ -37,8 +37,8 @@ public class LotteryRecordAddForm {
     @NotBlank(message = "彩票号码 不能为空")
     private String ticketNumber;
 
-    @Schema(description = "会员名")
-    private String memberName;
+    @Schema(description = "会员号")
+    private Long memberId;
 
     @Schema(description = "领取时间")
     private LocalDateTime obtainTime;

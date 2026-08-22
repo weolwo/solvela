@@ -75,9 +75,9 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
     // ==================== 运行态（v3.44.0，方案 §4.4） ====================
 
     /**
-     * 按唯一键取记录（member_name + task_config_id + period_key，对齐 uk_t_tsk_rec_mbr_cfg_prd）
+     * 按唯一键取记录（member_id + task_config_id + period_key，对齐 uk_t_tsk_rec_mbr_cfg_prd）
      */
-    TaskRecord selectByUniqueKey(@Param("memberName") String memberName,
+    TaskRecord selectByUniqueKey(@Param("memberId") Long memberId,
                                  @Param("taskConfigId") Long taskConfigId,
                                  @Param("periodKey") String periodKey);
 
@@ -89,7 +89,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      *
      * @return 该周期还没有任何记录时返回 null
      */
-    TaskRecord selectLatestRoundByPeriod(@Param("memberName") String memberName,
+    TaskRecord selectLatestRoundByPeriod(@Param("memberId") Long memberId,
                                          @Param("taskConfigId") Long taskConfigId,
                                          @Param("basePeriodKey") String basePeriodKey);
 

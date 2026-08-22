@@ -26,7 +26,9 @@ public class FrequencyRiskFilter implements IRiskFilter{
     @Override
     public RiskResult doFilter(RiskContext context) {
         PromotionConfig config = context.getConfig();
-        String uid = context.getRequest().getMemberName();
+        // 🔴 频次 key 必须用 member_id：账号可改，改名之后同一个人换一个 key 重新计数，
+        //    「单人限领」当场归零 —— 这正是薅羊毛要的效果，而且计数看上去完全正常
+        Long uid = context.getRequest().getMemberId();
         Long promoId = config.getId();
 
         // 如果未配置单人频次限制，直接放行
@@ -37,7 +39,7 @@ public class FrequencyRiskFilter implements IRiskFilter{
         // ==========================================
         // 核心：基于 Redis 的滑动/固定窗口限流
         // ==========================================
-        // 缓存 Key 示例: risk:freq:DAILY:promo_1001:uid_zhangsan
+        // 缓存 Key 示例: risk:freq:DAILY:promo_1001:5579345309
         String redisKey = String.format("risk:freq:%s:promo_%d:%s", config.getLimitPeriod(), promoId, uid);
 
         // 【工业级写法】：使用 Redis 的 INCR 命令保证原子性累加

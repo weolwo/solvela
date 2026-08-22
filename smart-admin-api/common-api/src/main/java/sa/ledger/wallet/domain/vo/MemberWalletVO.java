@@ -23,7 +23,14 @@ public class MemberWalletVO {
     @Schema(description = "租户ID")
     private String tenantId;
 
-    @Schema(description = "会员名")
+    @Schema(description = "会员号")
+    private Long memberId;
+
+    /**
+     * 账号，join {@code t_member} 取的<b>当前值</b>，不是快照 —— 钱包表里没有这一列。
+     * 会员被注销/清理时可能为空，前端要能接受空值。
+     */
+    @Schema(description = "会员账号（取自会员主表的当前值）")
     private String memberName;
 
     @Schema(description = "资产类型：SCORE-积分, BALANCE-现金")

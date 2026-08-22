@@ -32,9 +32,17 @@ public class TaskRecord {
     private String tenantId;
 
     /**
-     * 会员名
+     * 会员号：全链路关联键（v3.71.0 换键），唯一键 uk_t_tsk_rec_mbr_cfg_prd 的最左列。
+     *
+     * <p>🔴 这里<b>刻意没有 memberName</b>。任务记录是状态表（进度被反复 UPDATE），
+     * 存一份账号快照只会和 {@code t_member} 长期不一致。要显示名字就 join 会员表取当前值
+     * （见 {@code TaskRecordMapper.queryPage}）；发奖事件里的展示名由事件上下文带过来
+     * （见 {@code TaskPrizeDispatcher}），都不需要在这张表上冗余一份。
+     *
+     * <p>对应的 {@code member_name} 列由 v3.72.0 删除；v3.71.1 已先把它放开为可空，
+     * 否则这里少写一个字段就会撞上「NOT NULL 且无默认值」，任务记录一条都建不出来。
      */
-    private String memberName;
+    private Long memberId;
 
     /**
      * 任务配置ID

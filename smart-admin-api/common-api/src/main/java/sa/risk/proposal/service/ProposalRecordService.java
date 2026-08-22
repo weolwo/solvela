@@ -14,6 +14,7 @@ import sa.base.common.util.SmartCodeUtil;
 import sa.base.common.util.SmartPageUtil;
 import sa.enums.ProposalSourceTypeEnum;
 import sa.ledger.engine.AssetDispatchEngine;
+import sa.member.service.MemberService;
 import sa.risk.engine.RiskBlockCode;
 import sa.risk.engine.RiskChainEngine;
 import sa.risk.engine.RiskContext;
@@ -53,6 +54,12 @@ public class ProposalRecordService {
     private final RiskChainEngine riskChainEngine;
 
     private final AssetDispatchEngine assetDispatchEngine;
+
+    /**
+     * 只用来把会员号翻成<b>展示快照</b>。提案是单据，落库时要记下「当时那个账号」；
+     * 顺带做存在性校验 —— 关联键指向一个查不到的会员，等于凭空造出一张无主提案。
+     */
+    private final MemberService memberService;
 
     /**
      * 提案单号前缀
@@ -278,7 +285,10 @@ public class ProposalRecordService {
         ProposalRecord record = new ProposalRecord();
         // 单号由提案域自己生成，不采信调用方传值：它是本域对外的凭证，交易号的唯一性必须由发号方保证
         record.setTradeNo(SmartCodeUtil.generateTradeNo(TRADE_NO_PREFIX));
-        record.setMemberName(req.getMemberName());
+        // 关联键取调用方传的会员号；展示快照由服务端查会员表补 ——
+        // 让调用方自己传名字的话，名字与会员号迟早会对不上，而且对不上时不报错
+        record.setMemberId(req.getMemberId());
+        record.setMemberName(memberService.requireMemberName(req.getMemberId()));
 
         // 发什么：assetType 决定下发走哪个策略，assetRef 指向具体资产（值类资产为空）
         record.setAssetType(req.getAssetType());

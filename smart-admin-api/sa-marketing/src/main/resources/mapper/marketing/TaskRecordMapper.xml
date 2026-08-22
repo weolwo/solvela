@@ -5,6 +5,7 @@
     <resultMap id="TaskRecordVO" type="sa.task.record.domain.vo.TaskRecordVO">
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="task_config_id" property="taskConfigId" />
             <result column="activity_code" property="activityCode" />
@@ -26,7 +27,7 @@
     <sql id="base_columns">
                 id, 
                 tenant_id, 
-                member_name, 
+                member_id, 
                 task_config_id, 
                 activity_code, 
                 period_key, 
@@ -60,8 +61,8 @@
         <if test="queryForm.tenantId != null">
             AND tenant_id = #{queryForm.tenantId}
         </if>
-        <if test="queryForm.memberName != null">
-            AND member_name = #{queryForm.memberName}
+        <if test="queryForm.memberId != null">
+            AND member_id = #{queryForm.memberId}
         </if>
         <if test="queryForm.activityCode != null">
             AND activity_code = #{queryForm.activityCode}
@@ -96,7 +97,7 @@
     <select id="selectFunnel" resultType="java.util.Map">
         SELECT
             COUNT(*)                                                      AS totalCount,
-            COUNT(DISTINCT member_name)                                   AS memberCount,
+            COUNT(DISTINCT member_id)                                     AS memberCount,
             COALESCE(SUM(status = 0), 0)                                  AS runningCount,
             COALESCE(SUM(status = 1), 0)                                  AS completedCount,
             COALESCE(SUM(status = 2), 0)                                  AS dispatchedCount,
@@ -118,7 +119,7 @@
     <select id="selectTaskStat" resultType="java.util.Map">
         SELECT task_config_id                                          AS taskConfigId,
                COUNT(*)                                                AS recordCount,
-               COUNT(DISTINCT member_name)                             AS memberCount,
+               COUNT(DISTINCT member_id)                               AS memberCount,
                COALESCE(SUM(status IN (1, 2)), 0)                      AS reachedCount,
                COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0) AS staleRunningCount
         FROM t_task_record
@@ -134,7 +135,7 @@
         走 idx_t_tsk_flw_stat(create_time, flow_type, discard_code)。
 
         筛选条件只挑流水表<b>确实有</b>的那几列对齐：
-          · tenant_id / member_name 直接对应；
+          · tenant_id / member_id 直接对应；
           · activity_code 流水表没有，经 task_config_id 关联配置表取（用 LEFT JOIN：
             task_config_id=0 是「还没匹配到任何配置就被拒」的哨兵值，INNER JOIN 会把它整类吃掉。
             不过一旦按活动筛，丢掉这类无归属流水本来就是对的）；
@@ -155,8 +156,8 @@
             <if test="queryForm.tenantId != null">
                 AND f.tenant_id = #{queryForm.tenantId}
             </if>
-            <if test="queryForm.memberName != null">
-                AND f.member_name = #{queryForm.memberName}
+            <if test="queryForm.memberId != null">
+                AND f.member_id = #{queryForm.memberId}
             </if>
             <if test="queryForm.activityCode != null">
                 AND c.activity_code = #{queryForm.activityCode}
@@ -172,51 +173,87 @@
         ORDER BY discardCount DESC
     </select>
 
+    <!--
+        ⚠️ 列一律带 r. 前缀：列表查询 join 了 t_member，而两张表都有
+        tenant_id / status / create_by / create_time / update_by / update_time / member_id ——
+        不加前缀 MySQL 直接报 Column 'status' in where clause is ambiguous。
+    -->
     <sql id="query_conditions">
         <where>
                         <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
+                            AND r.tenant_id = #{queryForm.tenantId}
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND r.member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.activityCode != null">
-                            AND activity_code = #{queryForm.activityCode}
+                            AND r.activity_code = #{queryForm.activityCode}
                         </if>
                         <if test="queryForm.validStartTimeBegin != null">
-                            AND valid_start_time &gt;= #{queryForm.validStartTimeBegin}
+                            AND r.valid_start_time &gt;= #{queryForm.validStartTimeBegin}
                         </if>
                         <if test="queryForm.validStartTimeEnd != null">
                             <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
-                            AND valid_start_time &lt; DATE_ADD(#{queryForm.validStartTimeEnd}, INTERVAL 1 DAY)
+                            AND r.valid_start_time &lt; DATE_ADD(#{queryForm.validStartTimeEnd}, INTERVAL 1 DAY)
                         </if>
                         <if test="queryForm.status != null">
-                            AND status = #{queryForm.status}
+                            AND r.status = #{queryForm.status}
                         </if>
                         <if test="queryForm.completeTimeBegin != null">
-                            AND complete_time &gt;= #{queryForm.completeTimeBegin}
+                            AND r.complete_time &gt;= #{queryForm.completeTimeBegin}
                         </if>
                         <if test="queryForm.completeTimeEnd != null">
                             <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
-                            AND complete_time &lt; DATE_ADD(#{queryForm.completeTimeEnd}, INTERVAL 1 DAY)
+                            AND r.complete_time &lt; DATE_ADD(#{queryForm.completeTimeEnd}, INTERVAL 1 DAY)
                         </if>
         </where>
     </sql>
 
+    <!--
+        列表页要显示会员账号，而任务记录表<b>没有</b>这一列（状态表不留快照，见 TaskRecord 类注释），
+        所以 join 会员主表取当前值。
+
+        🔴 必须 LEFT JOIN：会员被清理/注销后 t_member 查不到，INNER JOIN 会让这个人的任务记录
+        整片从列表里消失 —— 记录还在库里、页面上却看不见，而且不报错。
+    -->
+    <sql id="list_columns">
+                r.id,
+                r.tenant_id,
+                r.member_id,
+                m.member_name,
+                r.task_config_id,
+                r.activity_code,
+                r.period_key,
+                r.valid_start_time,
+                r.valid_end_time,
+                r.current_metric,
+                r.status,
+                r.progress_data,
+                r.rule_snapshot,
+                r.prize_snapshot,
+                r.complete_time,
+                r.create_by,
+                r.create_time,
+                r.update_by,
+                r.update_time
+    </sql>
+
     <select id="queryPage" resultMap="TaskRecordVO">
         SELECT
-        <include refid="base_columns"/>
-        FROM t_task_record
+        <include refid="list_columns"/>
+        FROM t_task_record r
+        LEFT JOIN t_member m ON m.member_id = r.member_id
         <include refid="query_conditions"/>
-        ORDER BY create_time DESC
+        ORDER BY r.create_time DESC
     </select>
 
     <select id="queryList" resultMap="TaskRecordVO">
         SELECT
-        <include refid="base_columns"/>
-        FROM t_task_record
+        <include refid="list_columns"/>
+        FROM t_task_record r
+        LEFT JOIN t_member m ON m.member_id = r.member_id
         <include refid="query_conditions"/>
-        ORDER BY create_time DESC
+        ORDER BY r.create_time DESC
     </select>
 
                 <delete id="batchDelete">
@@ -234,12 +271,12 @@
     <!-- ==================== 运行态（v3.44.0，方案 §4.4） ==================== -->
 
     <select id="selectByUniqueKey" resultType="sa.task.record.domain.entity.TaskRecord">
-        SELECT id, tenant_id, member_name, task_config_id, activity_code, period_key,
+        SELECT id, tenant_id, member_id, task_config_id, activity_code, period_key,
                valid_start_time, valid_end_time, current_metric, version, status,
                progress_data, rule_snapshot, prize_snapshot, complete_time,
                create_by, create_time, update_by, update_time
         FROM t_task_record
-        WHERE member_name = #{memberName}
+        WHERE member_id = #{memberId}
           AND task_config_id = #{taskConfigId}
           AND period_key = #{periodKey}
     </select>
@@ -250,12 +287,12 @@
       按 id 倒序：轮次依次创建，id 最大的就是最新一轮。
     -->
     <select id="selectLatestRoundByPeriod" resultType="sa.task.record.domain.entity.TaskRecord">
-        SELECT id, tenant_id, member_name, task_config_id, activity_code, period_key,
+        SELECT id, tenant_id, member_id, task_config_id, activity_code, period_key,
                valid_start_time, valid_end_time, current_metric, version, status,
                progress_data, rule_snapshot, prize_snapshot, complete_time,
                create_by, create_time, update_by, update_time
         FROM t_task_record
-        WHERE member_name = #{memberName}
+        WHERE member_id = #{memberId}
           AND task_config_id = #{taskConfigId}
           AND (period_key = #{basePeriodKey} OR period_key LIKE CONCAT(#{basePeriodKey}, '#%'))
         ORDER BY id DESC

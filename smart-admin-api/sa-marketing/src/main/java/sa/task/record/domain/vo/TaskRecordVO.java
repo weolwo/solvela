@@ -23,7 +23,14 @@ public class TaskRecordVO {
     @Schema(description = "租户ID")
     private String tenantId;
 
-    @Schema(description = "会员名")
+    @Schema(description = "会员号")
+    private Long memberId;
+
+    /**
+     * 账号 —— join {@code t_member} 取的<b>当前值</b>（本表是状态表，不留快照）。
+     * 会员被清理/注销时可能为空，前端要能接受空值。
+     */
+    @Schema(description = "会员账号（取自会员主表的当前值）")
     private String memberName;
 
     @Schema(description = "任务配置ID")

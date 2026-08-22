@@ -5,6 +5,7 @@
     <resultMap id="MemberAssetTransactionVO" type="sa.ledger.transaction.domain.vo.MemberAssetTransactionVO">
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="asset_type" property="assetType" />
             <result column="transaction_type" property="transactionType" />
@@ -22,7 +23,8 @@
     <sql id="base_columns">
                 id, 
                 tenant_id, 
-                member_name, 
+                member_id,
+                member_name,
                 asset_type, 
                 transaction_type, 
                 change_amount, 
@@ -41,8 +43,8 @@
                         <if test="queryForm.tenantId != null">
                             AND tenant_id = #{queryForm.tenantId}
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.assetType != null">
                             AND asset_type = #{queryForm.assetType}
@@ -121,7 +123,7 @@
     <select id="selectStat" resultType="java.util.Map">
         SELECT
             COUNT(*)                                          AS txCount,
-            COUNT(DISTINCT member_name)                       AS memberCount,
+            COUNT(DISTINCT member_id)                       AS memberCount,
             COALESCE(SUM(biz_type = 'MANUAL_ADJUST'), 0)      AS manualAdjustCount,
             COALESCE(SUM(balance_after &lt; 0), 0)           AS negativeBalanceCount,
             COALESCE(SUM(change_amount &lt;= 0), 0)          AS nonPositiveChangeCount
@@ -161,7 +163,7 @@
     <select id="selectBizTypeStat" resultType="java.util.Map">
         SELECT biz_type                   AS bizType,
                COUNT(*)                   AS txCount,
-               COUNT(DISTINCT member_name) AS memberCount
+               COUNT(DISTINCT member_id) AS memberCount
         FROM t_member_asset_transaction
         <where><include refid="stat_window"/></where>
         GROUP BY biz_type

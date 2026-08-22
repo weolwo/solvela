@@ -5,6 +5,7 @@
     <resultMap id="PhysicalDeliveryVO" type="sa.ledger.logistic.domain.vo.PhysicalDeliveryVO">
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="proposal_id" property="proposalId" />
             <result column="source_type" property="sourceType" />
@@ -23,7 +24,8 @@
     <sql id="base_columns">
                 id, 
                 tenant_id, 
-                member_name, 
+                member_id,
+                member_name,
                 proposal_id, 
                 source_type, 
                 receiver_name, 
@@ -40,8 +42,8 @@
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.proposalId != null">
                             AND proposal_id = #{queryForm.proposalId}
@@ -111,7 +113,7 @@
     <!-- 本期新增的履约单 -->
     <select id="selectNewStat" resultType="java.util.Map">
         SELECT COUNT(*)                    AS newCount,
-               COUNT(DISTINCT member_name) AS newMemberCount
+               COUNT(DISTINCT member_id) AS newMemberCount
         FROM t_physical_delivery
         <where><include refid="stat_window"/></where>
     </select>

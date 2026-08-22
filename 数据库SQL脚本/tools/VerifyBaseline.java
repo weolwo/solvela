@@ -6,9 +6,10 @@ import java.util.*;
  * 在空库上执行基线，然后比对<b>实际结构</b>（information_schema）而不是 SHOW CREATE TABLE 文本。
  * 文本比对不可靠：MySQL 会省略可从上下文推断的 CHARACTER SET，导致语义相同的两张表文本不同。
  */
-public class VerifyBaseline2 {
-    static final String BASE = "jdbc:mysql://127.0.0.1:3306/%s?useSSL=false"
-            + "&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true";
+public class VerifyBaseline {
+    static final String BASE = """
+            jdbc:mysql://127.0.0.1:3306/%s?useSSL=false\
+            &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true""";
 
     record Col(String name, String type, String nullable, String def, String collation, String extra) {}
     record Idx(String name, String cols, boolean unique) {}
@@ -85,11 +86,14 @@ public class VerifyBaseline2 {
     }
 
     static Map<String, List<Col>> cols(Statement s, String schema) throws SQLException {
+        String sql = """
+                SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT,
+                       COLLATION_NAME, EXTRA
+                  FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = '%s'
+                 ORDER BY TABLE_NAME, ORDINAL_POSITION""".formatted(schema);
         Map<String, List<Col>> m = new TreeMap<>();
-        try (ResultSet r = s.executeQuery(
-                "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, "
-              + "COLLATION_NAME, EXTRA FROM information_schema.COLUMNS "
-              + "WHERE TABLE_SCHEMA='" + schema + "' ORDER BY TABLE_NAME, ORDINAL_POSITION")) {
+        try (ResultSet r = s.executeQuery(sql)) {
             while (r.next())
                 m.computeIfAbsent(r.getString(1), k -> new ArrayList<>()).add(new Col(
                         r.getString(2), r.getString(3), r.getString(4),
@@ -99,12 +103,16 @@ public class VerifyBaseline2 {
     }
 
     static Map<String, List<Idx>> idxs(Statement s, String schema) throws SQLException {
+        String sql = """
+                SELECT TABLE_NAME, INDEX_NAME,
+                       GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX),
+                       MAX(NON_UNIQUE) = 0
+                  FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = '%s'
+                 GROUP BY TABLE_NAME, INDEX_NAME
+                 ORDER BY TABLE_NAME, INDEX_NAME""".formatted(schema);
         Map<String, List<Idx>> m = new TreeMap<>();
-        try (ResultSet r = s.executeQuery(
-                "SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX), "
-              + "MAX(NON_UNIQUE)=0 FROM information_schema.STATISTICS "
-              + "WHERE TABLE_SCHEMA='" + schema + "' GROUP BY TABLE_NAME, INDEX_NAME "
-              + "ORDER BY TABLE_NAME, INDEX_NAME")) {
+        try (ResultSet r = s.executeQuery(sql)) {
             while (r.next())
                 m.computeIfAbsent(r.getString(1), k -> new ArrayList<>())
                  .add(new Idx(r.getString(2), r.getString(3), r.getBoolean(4)));

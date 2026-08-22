@@ -115,25 +115,25 @@ public class DrawStockService {
      *               否则回滚会去减另一个桶的计数：本桶的计数永远退不回来，
      *               用户白白损失一次限领额度。
      */
-    public StockDeductResult deduct(String activityCode, long prizeItemId, String memberName,
+    public StockDeductResult deduct(String activityCode, long prizeItemId, long memberId,
                                     int userMaxCount, DrawPeriodResolver.Period period) {
         Long code = redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 DEDUCT_LUA,
                 RScript.ReturnType.LONG,
                 List.of(DrawCacheKey.stock(activityCode, prizeItemId),
-                        DrawCacheKey.userCount(activityCode, prizeItemId, period.bucket(), memberName)),
+                        DrawCacheKey.userCount(activityCode, prizeItemId, period.bucket(), memberId)),
                 String.valueOf(userMaxCount), String.valueOf(period.ttlSeconds()));
         return StockDeductResult.ofLuaCode(code);
     }
 
-    public void rollback(String activityCode, long prizeItemId, String memberName,
+    public void rollback(String activityCode, long prizeItemId, long memberId,
                          DrawPeriodResolver.Period period) {
         redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 ROLLBACK_LUA,
                 RScript.ReturnType.LONG,
                 List.of(DrawCacheKey.stock(activityCode, prizeItemId),
-                        DrawCacheKey.userCount(activityCode, prizeItemId, period.bucket(), memberName)));
+                        DrawCacheKey.userCount(activityCode, prizeItemId, period.bucket(), memberId)));
     }
 }

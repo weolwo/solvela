@@ -24,6 +24,7 @@ import sa.draw.runtime.domain.DrawExecuteVO;
 import sa.domain.event.UserPrizeEvent;
 import sa.enums.PrizeTypeEnum;
 import sa.ledger.wallet.service.MemberWalletService;
+import sa.member.service.MemberService;
 import sa.prize.prizeconfig.domain.entity.PrizeConfig;
 import sa.prize.prizeconfig.service.PrizeConfigService;
 import org.redisson.api.RRateLimiter;
@@ -91,6 +92,11 @@ public class DrawExecuteService {
     private final RedissonClient redissonClient;
     private final PrizeConfigService prizeConfigService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    /**
+     * 会员号 -> 账号。一次抽奖只查一次，结果沿调用链传下去：
+     * 白名单判定、流水快照、派发事件三处都要用，各查一次就是三次往返。
+     */
+    private final MemberService memberService;
 
     private static final Integer POOL_STATUS_OPEN = 1;
     private static final int UNLIMITED = -1;
@@ -126,9 +132,14 @@ public class DrawExecuteService {
             }
         }
 
+        // 会员号必须真实存在；顺带把账号取回来，后面白名单判定、流水快照、派发事件都要用。
+        // 一次请求只查这一次，不在每个用到名字的地方各查一次。
+        String memberName = memberService.requireMemberName(form.getMemberId());
+
         // 2. 防刷限流（单用户单活动）
+        // 🔴 限流 key 用会员号：账号可改，改完就是一个全新的 key，限流当场归零
         RRateLimiter limiter = redissonClient.getRateLimiter(
-                DrawCacheKey.rateLimit(form.getActivityCode(), form.getMemberName()));
+                DrawCacheKey.rateLimit(form.getActivityCode(), form.getMemberId()));
         if (limiter.trySetRate(RateType.OVERALL, RATE_LIMIT_PER_INTERVAL, RATE_LIMIT_INTERVAL_SECONDS, RateIntervalUnit.SECONDS)) {
             limiter.expire(RATE_LIMITER_TTL);
         }
@@ -188,12 +199,14 @@ public class DrawExecuteService {
         DrawPeriodResolver.Period period = resolvePeriod(pool, itemMap);
 
         // 6. 纯函数判定 + 双层扣减 + 落流水（sealed + 模式匹配消费）
-        return switch (DrawEngine.draw(snapshot, form.getMemberName())) {
+        // ⚠️ 白名单仍按<b>账号</b>匹配：t_prize_pool_item.white_list 里存的是运营手填的账号。
+        //    这意味着白名单用户改名之后名单会失效 —— 已知缺口，等会员域收口后连同配置一起改成会员号。
+        return switch (DrawEngine.draw(snapshot, memberName)) {
             case DrawResult.Hit(DrawPrizeSnapshot prize, DrawResult.HitSource source) ->
-                    settle(form, traceId, snapshot, itemMap, prize, source, period);
+                    settle(form, memberName, traceId, snapshot, itemMap, prize, source, period);
             case DrawResult.NoStock(String candidateCode) -> {
                 // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
-                saveLog(form, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
+                saveLog(form, memberName, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
                 yield ResponseDTO.ok(DrawExecuteVO.ofMiss("手慢了，奖品已被抽完"));
             }
         };
@@ -203,7 +216,7 @@ public class DrawExecuteService {
      * 中奖后发布派发事件：AFTER_COMMIT 投递到 consumer -> risk -> ledger 公共链路
      * traceId 作为 sourceBizId，配合 t_prize_log 唯一索引做跨系统防重
      */
-    private void publishPrizeEvent(DrawExecuteForm form, String traceId, String prizeCode) {
+    private void publishPrizeEvent(DrawExecuteForm form, String memberName, String traceId, String prizeCode) {
         PrizeConfig prizeConfig = prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), prizeCode);
         if (prizeConfig == null) {
             log.error("[抽奖派发] 奖品配置不存在，跳过派发: {}", prizeCode);
@@ -212,7 +225,8 @@ public class DrawExecuteService {
         UserPrizeEvent event = UserPrizeEvent.builder()
                 .sourceBizId(traceId)
                 .activityCode(form.getActivityCode())
-                .memberName(form.getMemberName())
+                .memberId(form.getMemberId())
+                .memberName(memberName)
                 .prizeCode(prizeCode)
                 .prizeType(prizeConfig.getPrizeType())
                 .prizeValue(prizeConfig.getPrizeValue() == null ? null : prizeConfig.getPrizeValue().toPlainString())
@@ -224,13 +238,14 @@ public class DrawExecuteService {
     /**
      * 结算：Lua 预扣 -> DB 条件更新兜底 -> 失败降级兜底奖项 -> 落流水
      */
-    private ResponseDTO<DrawExecuteVO> settle(DrawExecuteForm form, String traceId, DrawPoolSnapshot snapshot,
+    private ResponseDTO<DrawExecuteVO> settle(DrawExecuteForm form, String memberName, String traceId,
+                                              DrawPoolSnapshot snapshot,
                                               Map<Long, PrizePoolItem> itemMap,
                                               DrawPrizeSnapshot candidate, DrawResult.HitSource source,
                                               DrawPeriodResolver.Period period) {
         if (tryDeduct(form, itemMap, candidate, period)) {
-            saveLog(form, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
-            publishPrizeEvent(form, traceId, candidate.prizeCode());
+            saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
+            publishPrizeEvent(form, memberName, traceId, candidate.prizeCode());
             return ResponseDTO.ok(DrawExecuteVO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name()));
         }
 
@@ -238,15 +253,15 @@ public class DrawExecuteService {
         DrawPrizeSnapshot fallback = snapshot.fallbackPrize();
         if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId()
                 && tryDeduct(form, itemMap, fallback, period)) {
-            saveLog(form, traceId, fallback.prizeItemId(), fallback.prizeCode(), LOG_STATUS_HIT,
+            saveLog(form, memberName, traceId, fallback.prizeItemId(), fallback.prizeCode(), LOG_STATUS_HIT,
                     DrawResult.HitSource.FALLBACK_DEGRADE.name());
-            publishPrizeEvent(form, traceId, fallback.prizeCode());
+            publishPrizeEvent(form, memberName, traceId, fallback.prizeCode());
             return ResponseDTO.ok(DrawExecuteVO.ofHit(fallback.prizeItemId(), fallback.prizeCode(),
                     DrawResult.HitSource.FALLBACK_DEGRADE.name()));
         }
 
         // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
-        saveLog(form, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_NO_STOCK, "预扣失败且兜底不可用");
+        saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_NO_STOCK, "预扣失败且兜底不可用");
         return ResponseDTO.ok(DrawExecuteVO.ofMiss("手慢了，奖品已被抽完"));
     }
 
@@ -286,10 +301,10 @@ public class DrawExecuteService {
         int userMax = item == null || item.getUserMaxCount() == null ? UNLIMITED : item.getUserMaxCount();
 
         StockDeductResult redisResult = drawStockService.deduct(
-                form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), userMax, period);
+                form.getActivityCode(), prize.prizeItemId(), form.getMemberId(), userMax, period);
         if (!redisResult.success()) {
-            log.info("[抽奖预扣拒绝] member={}, prizeItemId={}, reason={}",
-                    form.getMemberName(), prize.prizeItemId(), redisResult.message());
+            log.info("[抽奖预扣拒绝] memberId={}, prizeItemId={}, reason={}",
+                    form.getMemberId(), prize.prizeItemId(), redisResult.message());
             return false;
         }
 
@@ -297,24 +312,26 @@ public class DrawExecuteService {
             int rows = prizePoolItemDao.increaseUsedStock(prize.prizeItemId());
             if (rows == 0) {
                 // Redis 与 DB 不一致（如缓存被误预热），以 DB 为准并补偿
-                drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), period);
+                drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberId(), period);
                 log.warn("[抽奖DB兜底拒绝] prizeItemId={}, Redis已回滚", prize.prizeItemId());
                 return false;
             }
             return true;
         } catch (RuntimeException e) {
-            drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberName(), period);
+            drawStockService.rollback(form.getActivityCode(), prize.prizeItemId(), form.getMemberId(), period);
             throw e;
         }
     }
 
-    private void saveLog(DrawExecuteForm form, String traceId, Long prizeItemId, String prizeCode,
+    private void saveLog(DrawExecuteForm form, String memberName, String traceId, Long prizeItemId, String prizeCode,
                          int status, String remark) {
         DrawPrizeLog logEntity = new DrawPrizeLog();
         logEntity.setTraceId(traceId);
         logEntity.setActivityCode(form.getActivityCode());
         logEntity.setPoolCode(form.getPoolCode());
-        logEntity.setMemberName(form.getMemberName());
+        logEntity.setMemberId(form.getMemberId());
+        // 抽奖流水是单据：账号只作展示快照落库
+        logEntity.setMemberName(memberName);
         logEntity.setPrizeItemId(prizeItemId == null ? 0L : prizeItemId);
         logEntity.setPrizeCode(prizeCode);
         logEntity.setStatus(status);

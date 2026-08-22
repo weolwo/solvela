@@ -8,8 +8,9 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="会员名" name="memberName">
-        <a-input style="width: 100%" v-model:value="form.memberName" placeholder="会员名" />
+      <!-- 收会员号：账号快照由服务端查会员表补，前端传名字反而会和会员号对不上 -->
+      <a-form-item label="会员号" name="memberId">
+        <a-input-number style="width: 100%" v-model:value="form.memberId" placeholder="会员号" :controls="false" :precision="0" />
       </a-form-item>
       <a-form-item label="发奖提案ID" name="proposalId">
         <a-input-number style="width: 100%" v-model:value="form.proposalId" placeholder="发奖提案ID" />
@@ -85,7 +86,7 @@
 
   const formDefault = {
     id: undefined, //id
-    memberName: undefined, //会员名
+    memberId: undefined, //会员号（关联键）
     proposalId: undefined, //发奖提案ID
     sourceType: undefined, //来源类型
     receiverName: undefined, //收件人姓名
@@ -99,7 +100,7 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    memberName: [{ required: true, message: '会员名 必填' }],
+    memberId: [{ required: true, message: '会员号 必填' }],
     proposalId: [{ required: true, message: '发奖提案ID 必填' }],
     sourceType: [{ required: true, message: '来源类型 必填' }],
     receiverName: [{ required: true, message: '收件人姓名 必填' }],

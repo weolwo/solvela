@@ -46,7 +46,12 @@ public class TicketSignService {
     private String masterSecret;
 
     /**
-     * 生成签名。四要素任一被改动，签名都对不上
+     * 生成签名。五要素任一被改动，签名都对不上。
+     *
+     * <p>🔴 <b>末位刻意仍是 memberName（账号快照），没有跟着 v3.71.0 换成 member_id</b>：
+     * 签名口径一改，<b>所有存量号码的验真会集体失败</b>，客服那边表现为「记录被篡改」。
+     * 而 {@code t_lottery_record.member_name} 是写完就不再变的快照
+     * （会员改名不会回头改它），拿它当签名要素本身是自洽的 —— 换成会员号并不会更安全。
      */
     public String sign(String lotteryCode, String issueNo, long sequenceNo, String ticketNumber, String memberName) {
         if (masterSecret == null || masterSecret.isBlank()) {

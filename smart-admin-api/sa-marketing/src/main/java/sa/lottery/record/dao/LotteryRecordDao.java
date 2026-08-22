@@ -73,7 +73,7 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
      */
     List<LotteryRecord> selectMyTickets(@Param("lotteryCode") String lotteryCode,
                                         @Param("issueNo") String issueNo,
-                                        @Param("memberName") String memberName);
+                                        @Param("memberId") Long memberId);
 
     /**
      * 按一条奖级规则认领中奖记录（开奖核销的核心动作）。

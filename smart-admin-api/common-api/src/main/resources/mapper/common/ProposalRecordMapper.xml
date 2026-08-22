@@ -6,6 +6,7 @@
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
             <result column="trade_no" property="tradeNo" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="asset_type" property="assetType" />
             <result column="asset_ref" property="assetRef" />
@@ -33,7 +34,8 @@
                 id, 
                 tenant_id, 
                 trade_no, 
-                member_name, 
+                member_id,
+                member_name,
                 asset_type, 
                 asset_ref,
                 asset_name,
@@ -61,8 +63,8 @@
                         <if test="queryForm.tenantId != null">
                             AND tenant_id = #{queryForm.tenantId}
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.updateTimeBegin != null">
                             AND update_time &gt;= #{queryForm.updateTimeBegin}
@@ -116,8 +118,8 @@
         <if test="queryForm.tenantId != null">
             AND tenant_id = #{queryForm.tenantId}
         </if>
-        <if test="queryForm.memberName != null">
-            AND member_name = #{queryForm.memberName}
+        <if test="queryForm.memberId != null">
+            AND member_id = #{queryForm.memberId}
         </if>
         <if test="queryForm.updateTimeBegin != null">
             AND update_time &gt;= #{queryForm.updateTimeBegin}
@@ -176,7 +178,7 @@
     <select id="selectFunnel" resultType="java.util.Map">
         SELECT
             COUNT(*)                                                   AS totalCount,
-            COUNT(DISTINCT member_name)                                AS memberCount,
+            COUNT(DISTINCT member_id)                                AS memberCount,
             COALESCE(SUM(status = 0), 0)                               AS waitingCount,
             COALESCE(SUM(status = 10), 0)                              AS firstReviewCount,
             COALESCE(SUM(status = 11), 0)                              AS secondReviewCount,
@@ -334,6 +336,7 @@
     <select id="selectStuckDispatchSample" resultType="java.util.Map">
         SELECT trade_no                                        AS tradeNo,
                status                                          AS status,
+               member_id                                       AS memberId,
                member_name                                     AS memberName,
                TIMESTAMPDIFF(MINUTE, update_time, #{now})      AS stuckMinutes
         FROM t_proposal_record

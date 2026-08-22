@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import sa.member.service.MemberService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +49,9 @@ import java.util.Set;
 public class PhysicalDeliveryService {
 
     private final PhysicalDeliveryDao physicalDeliveryDao;
+
+    /** 会员号 -> 账号：履约单要落展示快照，导入还要按账号反查会员号 */
+    private final MemberService memberService;
 
     /**
      * 分页查询
@@ -161,6 +165,10 @@ public class PhysicalDeliveryService {
      */
     public ResponseDTO<String> add(PhysicalDeliveryAddForm addForm) {
         PhysicalDelivery physicalDelivery = SmartBeanUtil.copy(addForm, PhysicalDelivery.class);
+        // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
+        // ⚠️ 这一句不能省：member_name 仍是 NOT NULL 且无默认值，
+        //    漏了会以「Field 'member_name' doesn't have a default value」整条被拒。
+        physicalDelivery.setMemberName(memberService.requireMemberName(addForm.getMemberId()));
         physicalDeliveryDao.insert(physicalDelivery);
         return ResponseDTO.ok();
     }
@@ -226,7 +234,7 @@ public class PhysicalDeliveryService {
             String rowNo = rowLabel(i);
 
             if (SmartStringUtil.isBlank(row.memberName())) {
-                errorList.add(rowNo + "「会员名」不能为空");
+                errorList.add(rowNo + "「会员账号」不能为空");
             }
             if (row.proposalId() == null) {
                 errorList.add(rowNo + "「发奖提案ID」不能为空");
@@ -238,6 +246,21 @@ public class PhysicalDeliveryService {
             if (row.proposalId() != null && SmartStringUtil.isNotBlank(row.sourceType())
                     && !fileKeySet.add(uniqueKey(row.proposalId(), row.sourceType()))) {
                 errorList.add(rowNo + "与文件中其它行的「发奖提案ID + 来源类型」重复");
+            }
+        }
+
+        // 账号 -> 会员号：Excel 里运营填的是账号（没人记得住 10 位会员号），
+        // 而落库的关联键是 member_id，必须在这里换一次。
+        // 🔴 一次批量查完，不逐行点查：一次导入几百行就是几百次往返。
+        // 🔴 查不到的账号必须逐行报错退回，不能跳过、更不能置空 ——
+        //    换键之前一个拼错的账号会静默生成一张永远查不到主人的履约单，
+        //    这次正好把那个口子一起堵上。
+        Map<String, Long> memberIdMap = memberService.mapMemberIdByNames(
+                dataList.stream().map(PhysicalDeliveryImportForm::memberName).toList());
+        for (int i = 0; i < dataList.size(); i++) {
+            String rowMemberName = dataList.get(i).memberName();
+            if (SmartStringUtil.isNotBlank(rowMemberName) && !memberIdMap.containsKey(rowMemberName)) {
+                errorList.add(rowLabel(i) + "「会员账号」" + rowMemberName + " 不存在");
             }
         }
 
@@ -261,6 +284,8 @@ public class PhysicalDeliveryService {
             // 逐个 set 而不是 SmartBeanUtil.copy：导入表单是 record，访问器叫 memberName() 不叫
             // getMemberName()，Spring BeanUtils 认 JavaBean getter，拷过去会是一个空对象
             PhysicalDelivery entity = new PhysicalDelivery();
+            entity.setMemberId(memberIdMap.get(row.memberName()));
+            // 账号同时作为展示快照落库（履约单是单据，记的是「导入当时那个账号」）
             entity.setMemberName(row.memberName());
             entity.setProposalId(row.proposalId());
             entity.setSourceType(row.sourceType());

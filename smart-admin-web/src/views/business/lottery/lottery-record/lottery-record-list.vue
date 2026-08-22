@@ -142,7 +142,7 @@
         <a-input style="width: 150px" v-model:value="queryForm.ticketNumber" placeholder="精确查号" @pressEnter="onSearch" />
       </a-form-item>
       <a-form-item label="会员名" class="smart-query-form-item">
-        <a-input style="width: 150px" v-model:value="queryForm.memberName" placeholder="会员名" @pressEnter="onSearch" />
+        <a-input-number style="width: 150px" v-model:value="queryForm.memberId" placeholder="会员号" :controls="false" :precision="0" @pressEnter="onSearch" />
       </a-form-item>
       <a-form-item label="中奖状态" class="smart-query-form-item">
         <a-select style="width: 130px" v-model:value="queryForm.winStatus" :options="WIN_STATUS_OPTIONS" placeholder="全部" allowClear @change="onSearch" />
@@ -272,7 +272,8 @@
    */
   const columns = [
     { title: '号码', dataIndex: 'ticketNumber', width: 150 },
-    { title: '会员', dataIndex: 'memberName', width: 150, ellipsis: true },
+    { title: '会员号', dataIndex: 'memberId', width: 130, ellipsis: true },
+    { title: '会员账号', dataIndex: 'memberName', width: 140, ellipsis: true },
     { title: '玩法 / 期号', dataIndex: 'lotteryCode', width: 200 },
     { title: '中奖状态', dataIndex: 'winStatus', width: 110 },
     { title: '奖级 / 奖品', dataIndex: 'prizeLevel', width: 160 },
@@ -345,7 +346,7 @@
     lotteryCode: undefined,
     issueNo: undefined,
     ticketNumber: undefined,
-    memberName: undefined,
+    memberId: undefined,
     winStatus: undefined,
     createTime: [],
     createTimeBegin: undefined,

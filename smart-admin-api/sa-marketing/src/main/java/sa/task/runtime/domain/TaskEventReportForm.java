@@ -2,6 +2,7 @@ package sa.task.runtime.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -21,9 +22,14 @@ public class TaskEventReportForm {
     @NotBlank(message = "事件编码不能为空")
     private String eventCode;
 
-    @Schema(description = "会员名", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "会员名不能为空")
-    private String memberName;
+    /**
+     * 会员号（关联键）。v3.71.0 之前这里收的是账号 —— 账号可改，
+     * 改完这个人的任务进度会从头开始算，而且不报错。
+     * 流水上的账号快照由服务端查会员表补，上游不用传。
+     */
+    @Schema(description = "会员号", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "会员号不能为空")
+    private Long memberId;
 
     /**
      * 幂等键。
@@ -46,8 +52,8 @@ public class TaskEventReportForm {
     /**
      * 该会员是不是新会员，由上游告知。
      *
-     * <p>🔴 <b>营销域不拥有会员数据</b>（库里只有钱包/流水/券，全以 {@code member_name} 字符串为键，
-     * 没有注册时间、没有会员档案），而且「新会员」的定义本就属于会员域的业务概念
+     * <p>🔴 <b>营销域不拥有会员数据</b>（v3.71.0 起有了 {@code t_member}，但营销域只认
+     * {@code member_id} 这个关联键，不读会员档案），而且「新会员」的定义本就属于会员域的业务概念
      * （注册 7 天内？首单前？各家不同），不该由任务引擎去猜。
      *
      * <p>⚠️ <b>不传的后果</b>：目标人群配了「新会员」或「老会员」的任务会

@@ -17,7 +17,12 @@ import sa.base.sonicexcel.annotation.SonicTitle;
  */
 public record PhysicalDeliveryImportForm(
 
-        @SonicTitle("会员名") String memberName,
+        /**
+         * 会员账号（不是会员号）。运营记得住的是账号，所以表头收账号，
+         * 由 {@code PhysicalDeliveryService.importAdd} 批量换成关联键 {@code member_id}；
+         * 换不到的账号<b>逐行报错退回</b>，不会静默生成一张无主履约单。
+         */
+        @SonicTitle("会员账号") String memberName,
 
         @SonicTitle("发奖提案ID") Long proposalId,
 

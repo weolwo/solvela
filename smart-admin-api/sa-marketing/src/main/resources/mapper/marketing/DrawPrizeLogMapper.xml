@@ -8,6 +8,7 @@
             <result column="trace_id" property="traceId" />
             <result column="activity_code" property="activityCode" />
             <result column="pool_code" property="poolCode" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="prize_item_id" property="prizeItemId" />
             <result column="prize_code" property="prizeCode" />
@@ -22,7 +23,8 @@
                 trace_id, 
                 activity_code, 
                 pool_code, 
-                member_name, 
+                member_id,
+                member_name,
                 prize_item_id, 
                 prize_code, 
                 status, 
@@ -59,8 +61,8 @@
             <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
             AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
         </if>
-        <if test="queryForm.memberName != null">
-            AND member_name = #{queryForm.memberName}
+        <if test="queryForm.memberId != null">
+            AND member_id = #{queryForm.memberId}
         </if>
         <if test="queryForm.poolCode != null">
             AND pool_code = #{queryForm.poolCode}
@@ -79,7 +81,7 @@
             COALESCE(SUM(status = 0), 0)                          AS missCount,
             COALESCE(SUM(status = 2), 0)                          AS noStockCount,
             COALESCE(SUM(status = 3), 0)                          AS errorCount,
-            COUNT(DISTINCT member_name)                           AS memberCount
+            COUNT(DISTINCT member_id)                           AS memberCount
         FROM t_draw_prize_log
         <where><include refid="funnel_conditions"/></where>
     </select>
@@ -115,8 +117,8 @@
                             <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
                             AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.poolCode != null">
                             AND pool_code = #{queryForm.poolCode}

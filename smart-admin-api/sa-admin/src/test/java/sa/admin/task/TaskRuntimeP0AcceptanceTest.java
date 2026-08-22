@@ -99,13 +99,28 @@ class TaskRuntimeP0AcceptanceTest {
     private static final LocalDateTime DAY_9 = LocalDateTime.of(2026, 4, 9, 10, 0);
 
     /**
-     * 每个用例用独立会员名，互不干扰；重跑前清掉自己的数据
+     * 每个用例用独立会员，互不干扰；重跑前清掉自己的数据。
+     *
+     * <p>🔴 v3.71.0 之后关联键是 {@code member_id}，而且 {@code report()} 会校验
+     * 「这个会员号真实存在」—— 所以这里必须<b>真的往 t_member 插一行</b>，
+     * 不能像以前那样随手编一个字符串。编一个不存在的会员号，测出来的是
+     * 「校验有没有生效」，而不是任务链路对不对。
      */
+    private long memberId;
+
+    /** 该会员的账号，仅用于落进流水的展示快照 */
     private String member;
 
     @BeforeEach
     void setUp() {
-        member = "p0_" + System.nanoTime();
+        long nano = System.nanoTime();
+        // 10 位会员号，与 MemberIdCodec 的值域一致；测试自己造号不走发号器，
+        // 免得把发号器的号段消耗在测试上
+        memberId = 1_000_000_000L + Math.floorMod(nano, 8_000_000_000L);
+        member = "p0_" + nano;
+        jdbcTemplate.update(
+                "INSERT INTO t_member (member_id, member_name, nickname) VALUES (?, ?, ?)",
+                memberId, member, member);
     }
 
     // ==================== 工具 ====================
@@ -120,7 +135,7 @@ class TaskRuntimeP0AcceptanceTest {
     }
 
     private TaskEventContext event(String eventCode, String bizId, String amount, LocalDateTime time) {
-        return new TaskEventContext(eventCode, member, bizId,
+        return new TaskEventContext(eventCode, memberId, member, bizId,
                 amount == null ? null : new BigDecimal(amount), time, null, Map.of("from", "P0AcceptanceTest"));
     }
 
@@ -128,7 +143,7 @@ class TaskRuntimeP0AcceptanceTest {
     private List<TaskRecord> recordsOf(Long taskConfigId) {
         return taskRecordDao.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecord>()
-                        .eq(TaskRecord::getMemberName, member)
+                        .eq(TaskRecord::getMemberId, memberId)
                         .eq(TaskRecord::getTaskConfigId, taskConfigId)
                         .orderByAsc(TaskRecord::getId));
     }
@@ -136,7 +151,7 @@ class TaskRuntimeP0AcceptanceTest {
     private TaskRecord recordOf(Long taskConfigId) {
         List<TaskRecord> list = taskRecordDao.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecord>()
-                        .eq(TaskRecord::getMemberName, member)
+                        .eq(TaskRecord::getMemberId, memberId)
                         .eq(TaskRecord::getTaskConfigId, taskConfigId));
         return list.isEmpty() ? null : list.get(0);
     }
@@ -144,18 +159,19 @@ class TaskRuntimeP0AcceptanceTest {
     private List<TaskRecordFlow> flowsOf(Long taskConfigId) {
         return taskRecordFlowDao.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecordFlow>()
-                        .eq(TaskRecordFlow::getMemberName, member)
+                        .eq(TaskRecordFlow::getMemberId, memberId)
                         .eq(TaskRecordFlow::getTaskConfigId, taskConfigId)
                         .orderByAsc(TaskRecordFlow::getId));
     }
 
     private List<PrizeLog> prizeLogsOf() {
         return jdbcTemplate.query(
-                "SELECT id, member_name, prize_code, prize_name, external_biz_no, status, fail_reason"
-                        + " FROM t_prize_log WHERE member_name = ? ORDER BY id",
+                "SELECT id, member_id, member_name, prize_code, prize_name, external_biz_no, status, fail_reason"
+                        + " FROM t_prize_log WHERE member_id = ? ORDER BY id",
                 (rs, i) -> {
                     PrizeLog log = new PrizeLog();
                     log.setId(rs.getLong("id"));
+                    log.setMemberId(rs.getLong("member_id"));
                     log.setMemberName(rs.getString("member_name"));
                     log.setPrizeCode(rs.getString("prize_code"));
                     log.setPrizeName(rs.getString("prize_name"));
@@ -163,7 +179,7 @@ class TaskRuntimeP0AcceptanceTest {
                     log.setStatus(rs.getInt("status"));
                     log.setFailReason(rs.getString("fail_reason"));
                     return log;
-                }, member);
+                }, memberId);
     }
 
     /**
@@ -415,7 +431,7 @@ class TaskRuntimeP0AcceptanceTest {
     void p1_unregisteredEventIsRejected() {
         TaskEventReportForm form = new TaskEventReportForm();
         form.setEventCode("NOT_REGISTERED_XYZ");
-        form.setMemberName(member);
+        form.setMemberId(memberId);
 
         ResponseDTO<String> result = taskEventService.report(form);
         assertFalse(result.getOk(), "未注册的事件必须被拒 —— 上游拼错一个字母时，"
@@ -437,7 +453,7 @@ class TaskRuntimeP0AcceptanceTest {
 
         TaskEventReportForm without = new TaskEventReportForm();
         without.setEventCode("ORDER_PAID");
-        without.setMemberName(member);
+        without.setMemberId(memberId);
         ResponseDTO<String> rejected = taskEventService.report(without);
         assertFalse(rejected.getOk(), "订单类事件不带单号时服务端只能按事件日兜底，"
                 + "那意味着一天只算一笔 —— 必须拒绝而不是默默兜底");
@@ -446,7 +462,7 @@ class TaskRuntimeP0AcceptanceTest {
         // 带上单号就该放行 —— 证明拒绝的是「缺单号」，不是这个事件本身不可用
         TaskEventReportForm with = new TaskEventReportForm();
         with.setEventCode("ORDER_PAID");
-        with.setMemberName(member);
+        with.setMemberId(memberId);
         with.setEventBizId("order-p1-001");
         assertTrue(taskEventService.report(with).getOk());
     }
@@ -460,7 +476,7 @@ class TaskRuntimeP0AcceptanceTest {
 
         TaskEventReportForm form = new TaskEventReportForm();
         form.setEventCode("ORDER_AMOUNT");
-        form.setMemberName(member);
+        form.setMemberId(memberId);
         form.setEventBizId("order-metric-001");
         // 刻意不设 amount，只给 payload
         form.setPayload(Map.of("orderId", "order-metric-001", "payAmount", 200));
@@ -526,7 +542,7 @@ class TaskRuntimeP0AcceptanceTest {
      * 带会员属性的事件（人群过滤用）
      */
     private TaskEventContext audienceEvent(String bizId, Boolean isNewMember) {
-        return new TaskEventContext("AUDIENCE_TEST", member, bizId, null, DAY_1, isNewMember,
+        return new TaskEventContext("AUDIENCE_TEST", memberId, member, bizId, null, DAY_1, isNewMember,
                 Map.of("from", "P0AcceptanceTest"));
     }
 
@@ -614,7 +630,7 @@ class TaskRuntimeP0AcceptanceTest {
         String basePeriod = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", DAY_1);
 
         // 第 1 轮：周期键是裸键（不带 #1）—— 存量记录兼容的关键
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "r1", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r1", null, DAY_1, null, Map.of()));
         List<TaskRecord> after1 = recordsOf(config.getId());
         assertEquals(1, after1.size());
         assertEquals(basePeriod, after1.get(0).getPeriodKey(),
@@ -622,7 +638,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertTrue(after1.get(0).getStatus() >= TaskConst.RECORD_STATUS_COMPLETED, "目标为1，一个事件即达标");
 
         // 第 2 轮：新记录，周期键带 #2
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "r2", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r2", null, DAY_1, null, Map.of()));
         List<TaskRecord> after2 = recordsOf(config.getId());
         assertEquals(2, after2.size(), "第 2 轮应新开一条记录");
         assertTrue(after2.stream().anyMatch(r -> (basePeriod + "#2").equals(r.getPeriodKey())),
@@ -630,7 +646,7 @@ class TaskRuntimeP0AcceptanceTest {
                         + after2.stream().map(TaskRecord::getPeriodKey).toList());
 
         // 第 3 轮：超出上限
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "r3", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r3", null, DAY_1, null, Map.of()));
         assertEquals(2, recordsOf(config.getId()).size(), "超出上限不该再开新记录");
 
         TaskRecordFlow last = flowsOf(config.getId()).get(2);
@@ -645,12 +661,12 @@ class TaskRuntimeP0AcceptanceTest {
         TaskConfig config = configOf(TASK_ROUNDS);
 
         // DAY_1 用满 2 轮
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "d1r1", null, DAY_1, null, Map.of()));
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "d1r2", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d1r1", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d1r2", null, DAY_1, null, Map.of()));
         assertEquals(2, recordsOf(config.getId()).size(), "前提确认：第一天已用满 2 轮");
 
         // DAY_2 应该能重新开始
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", member, "d2r1", null, DAY_2, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d2r1", null, DAY_2, null, Map.of()));
         List<TaskRecord> all = recordsOf(config.getId());
         assertEquals(3, all.size(), "换一天应重新计轮");
 

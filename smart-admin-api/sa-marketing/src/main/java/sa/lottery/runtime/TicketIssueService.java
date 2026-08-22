@@ -12,6 +12,7 @@ import sa.lottery.issue.domain.entity.LotteryIssue;
 import sa.lottery.issue.manager.LotteryIssueManager;
 import sa.lottery.runtime.domain.TicketObtainForm;
 import sa.lottery.runtime.domain.TicketObtainVO;
+import sa.member.service.MemberService;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
@@ -46,7 +47,7 @@ import java.time.LocalDateTime;
  * {@link #obtain} 后续要挂 {@code @ScriptFunction} 暴露给 QLExpress。
  * QLExpress 本身是能传对象的，这里选平铺参数纯粹是为了<b>规则脚本的可读性</b>：
  * <pre>
- * ticket = obtainTicket('RMAAUK45TG', '2026_MID_01', memberName);   // 一行说清
+ * ticket = obtainTicket('RMAAUK45TG', '2026_MID_01', memberId);   // 一行说清
  * </pre>
  * 比让规则作者先 new 一个 Form、再逐个 setter 要顺手得多。
  * 若上游已经持有现成的上下文对象、更愿意整个传进来，加一个收 Form 的重载即可，
@@ -68,6 +69,11 @@ public class TicketIssueService {
     private final TicketSignService ticketSignService;
     private final FpeCipherFactory fpeCipherFactory;
     private final RedissonClient redissonClient;
+    /**
+     * 会员号 -> 账号。一次领号只查一次：记录上的展示快照与签名要素都用它，
+     * 顺带把「会员号根本不存在」挡在发号之前 —— 号一旦发出去就收不回来了。
+     */
+    private final MemberService memberService;
 
     private static final Integer CONFIG_STATUS_ONLINE = 1;
 
@@ -100,7 +106,7 @@ public class TicketIssueService {
      * <b>核心实现只有下面那一份，这里只做拆包</b> —— 两个入口的行为不可能漂移。
      */
     public ResponseDTO<TicketObtainVO> obtain(TicketObtainForm form) {
-        return obtain(form.getLotteryCode(), form.getIssueNo(), form.getMemberName(), form.getRequestId());
+        return obtain(form.getLotteryCode(), form.getIssueNo(), form.getMemberId(), form.getRequestId());
     }
 
     /**
@@ -114,10 +120,10 @@ public class TicketIssueService {
      *
      * @param lotteryCode 彩票编码
      * @param issueNo     期号
-     * @param memberName  会员唯一标识
+     * @param memberId    会员号（关联键）。账号快照由本方法查会员表取，调用方不用传
      * @param requestId   幂等键，可为空；传了则同一个 requestId 只会发出一个号码
      */
-    public ResponseDTO<TicketObtainVO> obtain(String lotteryCode, String issueNo, String memberName, String requestId) {
+    public ResponseDTO<TicketObtainVO> obtain(String lotteryCode, String issueNo, Long memberId, String requestId) {
         // 1. 幂等防重
         if (StringUtils.isNotBlank(requestId)) {
             boolean first = redissonClient.getBucket(LotteryCacheKey.request(requestId), StringCodec.INSTANCE)
@@ -127,8 +133,13 @@ public class TicketIssueService {
             }
         }
 
+        // 会员号必须真实存在；顺带取回账号 —— 它既是记录上的展示快照，也是签名要素。
+        // 一次领号只查一次，不在用到名字的每个地方各查一次。
+        String memberName = memberService.requireMemberName(memberId);
+
         // 2. 防刷限流
-        RRateLimiter limiter = redissonClient.getRateLimiter(LotteryCacheKey.rateLimit(lotteryCode, memberName));
+        // 🔴 限流 key 用会员号：账号可改，改完就是一个全新的 key，限流当场归零
+        RRateLimiter limiter = redissonClient.getRateLimiter(LotteryCacheKey.rateLimit(lotteryCode, memberId));
         if (limiter.trySetRate(RateType.OVERALL, RATE_LIMIT_PER_INTERVAL, RATE_LIMIT_INTERVAL_SECONDS, RateIntervalUnit.SECONDS)) {
             limiter.expire(RATE_LIMITER_TTL);
         }
@@ -177,7 +188,7 @@ public class TicketIssueService {
             String securitySign = ticketSignService.sign(lotteryCode, issueNo, sequenceNo, ticketNumber, memberName);
             try {
                 return ResponseDTO.ok(ticketPersistService.persist(
-                        config, issue, memberName, sequenceNo, ticketNumber, securitySign));
+                        config, issue, memberId, memberName, sequenceNo, ticketNumber, securitySign));
             } catch (DuplicateKeyException e) {
                 // 双射保证了这不该发生。真发生说明 Redis 游标与 DB 不一致（如误清了 Redis），
                 // 不静默吞：告警 + 换游标重试，重试耗尽则如实报错

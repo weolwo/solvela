@@ -16,8 +16,11 @@ SET NAMES utf8mb4;
 --
 -- 🔴 执行前置（缺一不可，请逐条确认）：
 --   ① v3.71.0 已执行且全量对账通过（每行的 member_id 都能正确指回 t_member）
---   ② 十张表对应的 Entity / Form / VO / Mapper XML <b>已全部切到 memberId</b>
---   ③ 已上线并<b>观察至少一个版本</b>，确认没有任何地方还在读 member_name
+--   ② <b>v3.71.1 已执行</b>（状态类两张表的 member_name 放开 NOT NULL）——
+--      它是「代码不再写 member_name」的前置，漏了这一步新代码根本插不进数据，
+--      压根轮不到执行本文件
+--   ③ 十张表对应的 Entity / Form / VO / Mapper XML <b>已全部切到 memberId</b>
+--   ④ 已上线并<b>观察至少一个版本</b>，确认没有任何地方还在读 member_name
 --
 --   ⚠️ 判据不是「grep 不到 memberName 了」。MyBatis 的 XML、SmartBeanUtil.copy 的
 --      同名拷贝、以及前端传上来的 queryForm 字段都可能间接引用到它，

@@ -2,6 +2,7 @@ package sa.lottery.runtime.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -26,9 +27,13 @@ public class TicketObtainForm {
     @NotBlank(message = "期号 不能为空")
     private String issueNo;
 
-    @Schema(description = "会员唯一标识", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "会员标识 不能为空")
-    private String memberName;
+    /**
+     * 会员号（关联键）。v3.71.0 之前这里收的是账号 —— 账号可改，改完这个人
+     * 已领的号码就查不出来了，而且不报错。展示用的账号由服务端查会员表取。
+     */
+    @Schema(description = "会员号", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "会员号 不能为空")
+    private Long memberId;
 
     /**
      * 幂等键。调用方传了才启用防重 —— 这是「网络重试防重」，

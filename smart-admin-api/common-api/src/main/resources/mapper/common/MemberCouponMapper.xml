@@ -5,6 +5,7 @@
     <resultMap id="MemberCouponVO" type="sa.ledger.coupon.domain.vo.MemberCouponVO">
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="coupon_code" property="couponCode" />
             <result column="coupon_type" property="couponType" />
@@ -24,7 +25,8 @@
     <sql id="base_columns">
                 id, 
                 tenant_id, 
-                member_name, 
+                member_id,
+                member_name,
                 coupon_code, 
                 coupon_type, 
                 coupon_name, 
@@ -45,8 +47,8 @@
                         <if test="queryForm.tenantId != null">
                             AND tenant_id = #{queryForm.tenantId}
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.couponCode != null">
                             AND coupon_code = #{queryForm.couponCode}
@@ -125,7 +127,7 @@
     <select id="selectIssuedStat" resultType="java.util.Map">
         SELECT
             COUNT(*)                                     AS issuedCount,
-            COUNT(DISTINCT member_name)                  AS issuedMemberCount,
+            COUNT(DISTINCT member_id)                  AS issuedMemberCount,
             COALESCE(SUM(status = 1), 0)                 AS issuedUsedCount
         FROM t_member_coupon
         <where><include refid="stat_window_issued"/></where>
@@ -138,7 +140,7 @@
     <select id="selectUsedStat" resultType="java.util.Map">
         SELECT
             COUNT(*)                        AS usedCount,
-            COUNT(DISTINCT member_name)     AS usedMemberCount
+            COUNT(DISTINCT member_id)     AS usedMemberCount
         FROM t_member_coupon
         <where><include refid="stat_window_used"/></where>
     </select>
@@ -183,7 +185,7 @@
         SELECT coupon_code                                                   AS couponCode,
                MIN(coupon_name)                                              AS couponName,
                COUNT(*)                                                      AS issuedCount,
-               COUNT(DISTINCT member_name)                                   AS memberCount,
+               COUNT(DISTINCT member_id)                                   AS memberCount,
                COALESCE(SUM(status = 1), 0)                                  AS usedCount,
                COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0)   AS staleCount
         FROM t_member_coupon

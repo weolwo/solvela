@@ -67,6 +67,7 @@ public class LotteryDispatchBatchService {
                     // 跨域幂等键：配合 t_prize_log.uk_external_biz，事件重投也不会重复发奖
                     .sourceBizId(String.valueOf(record.getId()))
                     .activityCode(config.getActivityCode())
+                    .memberId(record.getMemberId())
                     .memberName(record.getMemberName())
                     .prizeCode(record.getPrizeCode())
                     .prizeType(prize.getPrizeType())

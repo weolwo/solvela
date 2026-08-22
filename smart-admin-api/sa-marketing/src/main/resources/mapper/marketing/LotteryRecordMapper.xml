@@ -9,6 +9,7 @@
             <result column="issue_no" property="issueNo" />
             <result column="sequence_no" property="sequenceNo" />
             <result column="ticket_number" property="ticketNumber" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="obtain_time" property="obtainTime" />
             <result column="win_status" property="winStatus" />
@@ -29,7 +30,8 @@
                 issue_no, 
                 sequence_no, 
                 ticket_number, 
-                member_name, 
+                member_id,
+                member_name,
                 obtain_time, 
                 win_status, 
                 prize_level, 
@@ -64,8 +66,8 @@
         <if test="queryForm.ticketNumber != null">
             AND ticket_number = #{queryForm.ticketNumber}
         </if>
-        <if test="queryForm.memberName != null">
-            AND member_name = #{queryForm.memberName}
+        <if test="queryForm.memberId != null">
+            AND member_id = #{queryForm.memberId}
         </if>
         <if test="queryForm.createTimeBegin != null">
             AND create_time &gt;= #{queryForm.createTimeBegin}
@@ -94,7 +96,7 @@
             COALESCE(SUM(win_status = 0), 0)                              AS waitCount,
             COALESCE(SUM(win_status = 1), 0)                              AS loseCount,
             COALESCE(SUM(win_status = 2), 0)                              AS winCount,
-            COUNT(DISTINCT member_name)                                   AS memberCount,
+            COUNT(DISTINCT member_id)                                   AS memberCount,
             COALESCE(SUM(win_status = 2 AND dispatch_status = 0), 0)      AS dispatchWaitCount,
             COALESCE(SUM(win_status = 2 AND dispatch_status = 1), 0)      AS dispatchedCount,
             COALESCE(SUM(win_status = 2 AND dispatch_status = 2), 0)      AS dispatchFailedCount,
@@ -124,7 +126,7 @@
     -->
     <select id="selectStatByLottery" resultType="java.util.Map">
         SELECT lottery_code                            AS lotteryCode,
-               COUNT(DISTINCT member_name)             AS memberCount,
+               COUNT(DISTINCT member_id)             AS memberCount,
                COALESCE(SUM(win_status = 2), 0)        AS winCount
         FROM t_lottery_record
         GROUP BY lottery_code
@@ -154,8 +156,8 @@
                         <if test="queryForm.winStatus != null">
                             AND win_status = #{queryForm.winStatus}
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.prizeLevel != null">
                             AND prize_level = #{queryForm.prizeLevel}
@@ -200,7 +202,7 @@
         SELECT *
         FROM t_lottery_record
         WHERE lottery_code = #{lotteryCode}
-          AND member_name = #{memberName}
+          AND member_id = #{memberId}
         <if test="issueNo != null and issueNo != ''">
           AND issue_no = #{issueNo}
         </if>

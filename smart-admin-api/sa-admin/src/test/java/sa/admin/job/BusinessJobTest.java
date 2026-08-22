@@ -95,13 +95,32 @@ class BusinessJobTest {
      * <p>只填 NOT NULL 的列，其余走默认值 —— 这里要证明的是 WHERE 条件的边界，
      * 不是券本身长什么样。
      */
+    /**
+     * 造数用的会员号：由账号推一个稳定的 10 位数，<b>不落 t_member</b>。
+     *
+     * <p>本文件验的是两个收口任务的 WHERE 边界，SQL 里不 join 会员表，
+     * 所以不需要真实会员；不造会员也就不会在库里留下一堆测试会员。
+     * 需要真实会员的用例（走 report 入口那种）见 TaskRuntimeP0AcceptanceTest。
+     */
+    private long fakeMemberId(String memberName) {
+        return 1_000_000_000L + Math.floorMod(memberName.hashCode(), 8_000_000_000L);
+    }
+
     private void insertCoupon(String memberName, int status, int minutesFromNow) {
         jdbcTemplate.update(
-                "INSERT INTO t_member_coupon (tenant_id, member_name, coupon_code, coupon_type,"
+                // member_id 是 NOT NULL 的关联键（v3.71.0）：漏了会以
+                // 「Field 'member_id' doesn't have a default value」整条被拒。
+                // 这里只造券、不造会员：本用例验的是收口 SQL 的 WHERE 边界，不 join 会员表
+                "INSERT INTO t_member_coupon (tenant_id, member_id, member_name, coupon_code, coupon_type,"
                         + " coupon_name, status, source_type, source_biz_id, valid_start_time, valid_end_time)"
-                        + " VALUES ('0', ?, 'JOB_TEST', 'CASH', '收口用例造的券', ?, 'TEST', ?,"
+                        // 🔴 租户必须落 TenantConst.DEFAULT_TENANT_ID('taozi')，不能再写哨兵值 '0'：
+                        // v3.70.0 之后默认租户改名、v3.71.0 之后租户拦截器会给每条查询追加
+                        // tenant_id = 'taozi'，造数落 '0' 的行 DAO <b>一条都查不到</b> ——
+                        // 表现是「待收口条数 = 0」，用例失败，但库里其实插进去了。
+                        + " VALUES ('taozi', ?, ?, 'JOB_TEST', 'CASH', '收口用例造的券', ?, 'TEST', ?,"
                         + " DATE_SUB(now(), INTERVAL 1 DAY), DATE_ADD(now(), INTERVAL ? MINUTE))",
-                memberName, status, memberName + "-" + System.nanoTime(), minutesFromNow);
+                fakeMemberId(memberName), memberName, status,
+                memberName + "-" + System.nanoTime(), minutesFromNow);
     }
 
     @Test
@@ -184,11 +203,15 @@ class BusinessJobTest {
      */
     private void insertTaskRecord(String memberName, int status, int minutesFromNow) {
         jdbcTemplate.update(
-                "INSERT INTO t_task_record (tenant_id, member_name, task_config_id, activity_code,"
+                // 🔴 刻意<b>不写</b> member_name：任务记录是状态表，那一列已被 v3.71.1 放开为可空、
+                // 由 v3.72.0 删除，代码侧也不再写它。这里跟着不写，本用例才能跨过那次删列继续跑。
+                "INSERT INTO t_task_record (tenant_id, member_id, task_config_id, activity_code,"
                         + " period_key, valid_start_time, valid_end_time, status, rule_snapshot, prize_snapshot)"
-                        + " VALUES ('0', ?, 0, 'JOB_TEST', ?, DATE_SUB(now(), INTERVAL 1 DAY),"
+                        // 租户同上：落 'taozi'，否则租户拦截器会把这些行整批挡在 DAO 之外
+                        + " VALUES ('taozi', ?, 0, 'JOB_TEST', ?, DATE_SUB(now(), INTERVAL 1 DAY),"
                         + " DATE_ADD(now(), INTERVAL ? MINUTE), ?, '{}', '[]')",
-                memberName, memberName + "-" + System.nanoTime(), minutesFromNow, status);
+                fakeMemberId(memberName),
+                memberName + "-" + System.nanoTime(), minutesFromNow, status);
     }
 
     @Test
@@ -215,13 +238,13 @@ class BusinessJobTest {
         int rows = taskRecordDao.expireRecordBatch(now, 100000);
         assertEquals(expirableBefore + 2, rows, "收口影响的行数与「待收口」对不上");
         assertEquals(1, count("SELECT COUNT(*) FROM t_task_record"
-                        + " WHERE member_name = 'jobTaskDone' AND status = 1"),
+                        + " WHERE member_id = " + fakeMemberId("jobTaskDone") + " AND status = 1"),
                 "已完成的记录被收口任务动了 —— 用户已经达标，动它等于把奖吞掉");
         assertEquals(1, count("SELECT COUNT(*) FROM t_task_record"
-                        + " WHERE member_name = 'jobTaskPrized' AND status = 2"),
+                        + " WHERE member_id = " + fakeMemberId("jobTaskPrized") + " AND status = 2"),
                 "已发奖的记录被收口任务动了");
         assertEquals(1, count("SELECT COUNT(*) FROM t_task_record"
-                        + " WHERE member_name = 'jobTaskRunning' AND status = 0"),
+                        + " WHERE member_id = " + fakeMemberId("jobTaskRunning") + " AND status = 0"),
                 "还没到期的记录被收口了");
         assertEquals(0, taskRecordDao.expireRecordBatch(now, 100000), "第二次执行还在改行，说明不幂等");
     }
@@ -242,7 +265,7 @@ class BusinessJobTest {
         List<Map<String, Object>> samples = proposalRecordDao.selectStuckDispatchSample(now, minutes, 10);
         assertEquals(Math.min(10L, expected), samples.size(), "样本条数不对");
         if (!samples.isEmpty()) {
-            assertEquals(java.util.Set.of("tradeNo", "status", "memberName", "stuckMinutes"),
+            assertEquals(java.util.Set.of("tradeNo", "status", "memberId", "memberName", "stuckMinutes"),
                     samples.get(0).keySet(),
                     "SQL 别名与 Job 读取的 key 对不上：日志里会打出一串 null");
             long previous = Long.MAX_VALUE;

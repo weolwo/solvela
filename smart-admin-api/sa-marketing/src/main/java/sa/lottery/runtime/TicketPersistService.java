@@ -55,7 +55,7 @@ public class TicketPersistService {
      * 恒有 {@code 游标 >= sold_count}；硬上限认游标，sold_count 只用于展示与对账。
      */
     @Transactional(rollbackFor = Exception.class)
-    public TicketObtainVO persist(LotteryConfig config, LotteryIssue issue, String memberName,
+    public TicketObtainVO persist(LotteryConfig config, LotteryIssue issue, Long memberId, String memberName,
                                   long sequenceNo, String ticketNumber, String securitySign) {
         // 时间取数据库时钟，不用 JVM 的 LocalDateTime.now()（铁律 9：只认数据库一个时钟）
         LocalDateTime now = lotteryIssueDao.selectDbNow();
@@ -66,6 +66,8 @@ public class TicketPersistService {
         record.setIssueNo(issue.getIssueNo());
         record.setSequenceNo((int) sequenceNo);
         record.setTicketNumber(ticketNumber);
+        record.setMemberId(memberId);
+        // 账号只作展示快照 —— 同时它还是 security_sign 的签名要素，见 LotteryRecord.memberName
         record.setMemberName(memberName);
         record.setObtainTime(now);
         record.setWinStatus(WIN_STATUS_WAIT);

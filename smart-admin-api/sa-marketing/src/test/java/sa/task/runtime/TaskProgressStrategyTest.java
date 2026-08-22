@@ -56,7 +56,7 @@ class TaskProgressStrategyTest {
     private TaskRecord record(String metric, String progressData) {
         TaskRecord record = new TaskRecord();
         record.setId(1024L);
-        record.setMemberName("tester");
+        record.setMemberId(5579345309L);
         record.setTaskConfigId(1L);
         record.setCurrentMetric(new BigDecimal(metric));
         record.setProgressData(progressData);
@@ -66,7 +66,7 @@ class TaskProgressStrategyTest {
     }
 
     private TaskEventContext event(LocalDateTime time, String amountValue) {
-        return new TaskEventContext("DAILY_SIGN", "tester", "biz-1",
+        return new TaskEventContext("DAILY_SIGN", 5579345309L, "tester", "biz-1",
                 amountValue == null ? null : new BigDecimal(amountValue), time, null, Map.of());
     }
 

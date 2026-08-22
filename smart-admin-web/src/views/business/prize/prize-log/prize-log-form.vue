@@ -32,8 +32,9 @@
     </a-alert>
 
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }" :wrapper-col="{ span: 17 }">
-      <a-form-item label="会员名" name="memberName">
-        <a-input v-model:value="form.memberName" placeholder="补发给谁，需与会员系统一致" allow-clear />
+      <!-- 收会员号：账号可改，按名字补发迟早补给错的人 -->
+      <a-form-item label="会员号" name="memberId">
+        <a-input-number style="width: 100%" v-model:value="form.memberId" placeholder="补发给谁，填 10 位会员号" :controls="false" :precision="0" />
       </a-form-item>
 
       <a-form-item label="归属活动" name="activityCode">
@@ -148,7 +149,7 @@
 
   const formDefault = {
     tenantId: '0',
-    memberName: undefined,
+    memberId: undefined,
     activityCode: undefined,
     prizeCode: undefined,
     prizeName: undefined,
@@ -166,7 +167,7 @@
   const form = reactive({ ...formDefault });
 
   const rules = {
-    memberName: [{ required: true, message: '会员名 必填' }],
+    memberId: [{ required: true, message: '会员号 必填' }],
     activityCode: [{ required: true, message: '归属活动 必选' }],
     prizeCode: [{ required: true, message: '奖品 必选' }],
     prizeValue: [{ required: true, message: '奖励体值 必填' }],

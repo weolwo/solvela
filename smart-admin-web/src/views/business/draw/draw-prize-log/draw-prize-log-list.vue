@@ -138,7 +138,7 @@
         />
       </a-form-item>
       <a-form-item label="会员名" class="smart-query-form-item">
-        <a-input style="width: 160px" v-model:value="queryForm.memberName" placeholder="会员名" @pressEnter="onSearch" />
+        <a-input-number style="width: 160px" v-model:value="queryForm.memberId" placeholder="会员号" :controls="false" :precision="0" @pressEnter="onSearch" />
       </a-form-item>
       <a-form-item label="状态" class="smart-query-form-item">
         <a-select style="width: 140px" v-model:value="queryForm.status" :options="DRAW_STATUS_OPTIONS" placeholder="全部" allowClear @change="onSearch" />
@@ -248,7 +248,8 @@
    * id / 租户id / 奖项ID 不再单列：奖项ID 并进奖品列，其余排查时走接口。
    */
   const columns = [
-    { title: '会员', dataIndex: 'memberName', width: 160, ellipsis: true },
+    { title: '会员号', dataIndex: 'memberId', width: 130, ellipsis: true },
+    { title: '会员账号', dataIndex: 'memberName', width: 140, ellipsis: true },
     { title: '奖池 / 活动', dataIndex: 'poolCode', width: 220 },
     { title: '状态', dataIndex: 'status', width: 100 },
     { title: '奖品', dataIndex: 'prizeCode', width: 180 },
@@ -308,7 +309,7 @@
   const queryFormState = {
     activityCode: undefined,
     poolCode: undefined,
-    memberName: undefined,
+    memberId: undefined,
     traceId: undefined,
     status: undefined,
     createTime: [],

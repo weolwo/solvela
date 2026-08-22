@@ -213,7 +213,8 @@
 
         <a-card size="small" title="Top 获奖用户" class="panel fill-card">
           <div v-if="!topMembers.length" class="dim center">暂无数据</div>
-          <div v-for="(m, idx) in topMembers" :key="m.memberName" class="line-item">
+          <!-- key 用会员号：账号可改、也可能重复出现，拿它当 key 会导致列表错位 -->
+          <div v-for="(m, idx) in topMembers" :key="m.memberId" class="line-item">
             <span class="rank" :class="{ top: idx < 3 }">{{ idx + 1 }}</span>
             <span class="line-text mono">{{ m.memberName }}</span>
             <span class="dim">{{ num(m.count) }}次</span>

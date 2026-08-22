@@ -38,8 +38,8 @@ public class TicketQueryService {
      * 我的号码。issueNo 为空则返回该玩法下的全部期。
      * 排序由 SQL 保证：奖级升序（一等奖在前、未中奖的 99 沉底），同奖级按最新在前
      */
-    public ResponseDTO<List<LotteryRecord>> myTickets(String lotteryCode, String issueNo, String memberName) {
-        return ResponseDTO.ok(lotteryRecordDao.selectMyTickets(lotteryCode, issueNo, memberName));
+    public ResponseDTO<List<LotteryRecord>> myTickets(String lotteryCode, String issueNo, Long memberId) {
+        return ResponseDTO.ok(lotteryRecordDao.selectMyTickets(lotteryCode, issueNo, memberId));
     }
 
     /**
@@ -84,7 +84,9 @@ public class TicketQueryService {
                     record.getId(), ticketNumber);
             return ResponseDTO.ok("🔴 记录存在但签名校验失败，数据可能被篡改，请人工核查（记录ID " + record.getId() + "）");
         }
+        // 归属显示的是<b>领号当时的账号快照</b>；会员号才是这张票真正的归属键
         return ResponseDTO.ok("✅ 号码真实有效：归属 " + record.getMemberName()
+                + "(" + record.getMemberId() + ")"
                 + "，游标 " + record.getSequenceNo() + "，领取于 " + record.getObtainTime());
     }
 }

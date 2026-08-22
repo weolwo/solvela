@@ -179,7 +179,7 @@
   <a-form class="smart-query-form">
     <a-row class="smart-query-form-row">
       <a-form-item label="会员名" class="smart-query-form-item">
-        <a-input style="width: 160px" v-model:value="queryForm.memberName" placeholder="会员名" allow-clear />
+        <a-input-number style="width: 160px" v-model:value="queryForm.memberId" placeholder="会员号" :controls="false" :precision="0" />
       </a-form-item>
       <a-form-item label="活动编码" class="smart-query-form-item">
         <a-input style="width: 160px" v-model:value="queryForm.activityCode" placeholder="活动编码" allow-clear />
@@ -360,7 +360,8 @@
   import { prizeIcon } from '/@/constants/business/lottery/lottery-const';
 
   const columns = ref([
-    { title: '会员名', dataIndex: 'memberName', width: 120, ellipsis: true },
+    { title: '会员号', dataIndex: 'memberId', width: 130, ellipsis: true },
+    { title: '会员账号', dataIndex: 'memberName', width: 120, ellipsis: true },
     { title: '奖品名称', dataIndex: 'prizeName', width: 140, ellipsis: true },
     { title: '类型', dataIndex: 'prizeType', width: 110 },
     { title: '价值', dataIndex: 'prizeValue', width: 90 },
@@ -375,7 +376,7 @@
   ]);
 
   const queryFormState = {
-    memberName: undefined,
+    memberId: undefined,
     activityCode: undefined,
     prizeCode: undefined,
     approveStatus: undefined,

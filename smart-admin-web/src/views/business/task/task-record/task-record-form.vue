@@ -8,8 +8,9 @@
 <template>
   <a-modal :title="form.id ? '编辑' : '添加'" :width="800" :open="visibleFlag" @cancel="onClose" :maskClosable="false" :destroyOnClose="true">
     <a-form ref="formRef" :model="form" :rules="rules" :label-col="{ span: 5 }">
-      <a-form-item label="会员名" name="memberName">
-        <a-input style="width: 100%" v-model:value="form.memberName" placeholder="会员名" />
+      <!-- 收会员号：任务记录是状态表，不存账号 -->
+      <a-form-item label="会员号" name="memberId">
+        <a-input-number style="width: 100%" v-model:value="form.memberId" placeholder="会员号" :controls="false" :precision="0" />
       </a-form-item>
       <a-form-item label="任务配置ID" name="taskConfigId">
         <a-input-number style="width: 100%" v-model:value="form.taskConfigId" placeholder="任务配置ID" />
@@ -91,7 +92,7 @@
 
   const formDefault = {
     id: undefined, //id
-    memberName: undefined, //会员名
+    memberId: undefined, //会员号（关联键）
     taskConfigId: undefined, //任务配置ID
     activityCode: undefined, //活动编码
     periodKey: undefined, //业务期数标识(防重用)：NONE, 日期(20260402)
@@ -108,7 +109,7 @@
   let form = reactive({ ...formDefault });
 
   const rules = {
-    memberName: [{ required: true, message: '会员名 必填' }],
+    memberId: [{ required: true, message: '会员号 必填' }],
     taskConfigId: [{ required: true, message: '任务配置ID 必填' }],
     activityCode: [{ required: true, message: '活动编码 必填' }],
     periodKey: [{ required: true, message: '业务期数标识 必填' }],

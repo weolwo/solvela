@@ -14,6 +14,7 @@ import sa.prize.prizelog.domain.form.PrizeLogQueryForm;
 import sa.prize.prizelog.domain.vo.PrizeLogFunnelVO;
 import sa.prize.prizelog.domain.vo.PrizeLogVO;
 
+import sa.member.service.MemberService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -32,6 +33,9 @@ import java.util.Map;
 public class PrizeLogService {
 
     private final PrizeLogDao prizeLogDao;
+
+    /** 会员号 -> 账号：发奖流水要落展示快照 */
+    private final MemberService memberService;
 
     private static final int RATE_SCALE = 4;
 
@@ -197,6 +201,9 @@ public class PrizeLogService {
      */
     public ResponseDTO<String> add(PrizeLogAddForm addForm) {
         PrizeLog prizeLog = SmartBeanUtil.copy(addForm, PrizeLog.class);
+        // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
+        // ⚠️ member_name 仍是 NOT NULL 且无默认值，漏了这一句整条 INSERT 会被拒。
+        prizeLog.setMemberName(memberService.requireMemberName(addForm.getMemberId()));
         prizeLogDao.insert(prizeLog);
         return ResponseDTO.ok();
     }

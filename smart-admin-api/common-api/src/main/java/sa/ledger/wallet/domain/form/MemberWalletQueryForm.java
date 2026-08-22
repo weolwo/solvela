@@ -21,8 +21,15 @@ public class MemberWalletQueryForm extends PageParam {
     @Schema(description = "租户ID")
     private String tenantId;
 
-    @Schema(description = "会员名")
-    private String memberName;
+    /**
+     * 会员号。
+     *
+     * <p>🔴 这里<b>不能</b>再收账号：钱包表已经没有 member_name 列了，
+     * 而单据类那几张表虽然还留着，那是<b>展示快照且身上没有任何索引</b> ——
+     * 拿它做查询条件必是全表扫。按账号找人请先经 {@code MemberService} 换成会员号。
+     */
+    @Schema(description = "会员号")
+    private Long memberId;
 
     @Schema(description = "资产类型：SCORE-积分, BALANCE-现金")
     private String assetType;

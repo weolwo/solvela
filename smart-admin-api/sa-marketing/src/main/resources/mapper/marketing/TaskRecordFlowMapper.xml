@@ -5,6 +5,7 @@
     <resultMap id="TaskRecordFlow" type="sa.task.recordflow.domain.entity.TaskRecordFlow">
         <result column="id" property="id"/>
         <result column="tenant_id" property="tenantId"/>
+        <result column="member_id" property="memberId" />
         <result column="member_name" property="memberName"/>
         <result column="task_config_id" property="taskConfigId"/>
         <result column="record_id" property="recordId"/>
@@ -23,7 +24,7 @@
     </resultMap>
 
     <sql id="base_columns">
-        id, tenant_id, member_name, task_config_id, record_id, event_code, event_biz_id,
+        id, tenant_id, member_id, member_name, task_config_id, record_id, event_code, event_biz_id,
         flow_type, delta_metric, after_metric, discard_code, discard_reason, event_payload,
         create_by, create_time, update_by, update_time
     </sql>

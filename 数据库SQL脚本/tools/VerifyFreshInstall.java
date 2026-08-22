@@ -10,8 +10,9 @@ import java.util.*;
  * 那 49 个版本文件才真正只剩历史价值。
  */
 public class VerifyFreshInstall {
-    static final String BASE = "jdbc:mysql://127.0.0.1:3306/%s?useSSL=false"
-            + "&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true";
+    static final String BASE = """
+            jdbc:mysql://127.0.0.1:3306/%s?useSSL=false\
+            &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true""";
     static final String ROOT = "D:/workspace/smart-admin/数据库SQL脚本/mysql/";
     static final String PROBE = "_fresh_probe";
 

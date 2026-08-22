@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import sa.base.common.domain.ResponseDTO;
 import sa.base.common.util.JsonUtils;
+import sa.member.service.MemberService;
 import sa.task.constant.TaskConst;
 import sa.task.constant.TaskDiscardCode;
 import sa.task.record.dao.TaskRecordDao;
@@ -56,6 +57,11 @@ public class TaskEventService {
     private final TaskRecordFlowDao taskRecordFlowDao;
     private final TaskRecordAdvanceService taskRecordAdvanceService;
     private final TaskEventDefService taskEventDefService;
+    /**
+     * 会员号 -> 账号。整条事件链只在 {@link #normalize} 里查这一次，
+     * 之后靠 {@code TaskEventContext} 往下传 —— 事件是高频入口，不能每落一条流水就查一次库。
+     */
+    private final MemberService memberService;
     private final AsyncTaskExecutor taskEventExecutor;
 
     /**
@@ -71,6 +77,7 @@ public class TaskEventService {
                             TaskRecordFlowDao taskRecordFlowDao,
                             TaskRecordAdvanceService taskRecordAdvanceService,
                             TaskEventDefService taskEventDefService,
+                            MemberService memberService,
                             @Qualifier(TaskEventExecutorConfig.TASK_EVENT_EXECUTOR)
                             AsyncTaskExecutor taskEventExecutor) {
         this.taskConfigDao = taskConfigDao;
@@ -78,6 +85,7 @@ public class TaskEventService {
         this.taskRecordFlowDao = taskRecordFlowDao;
         this.taskRecordAdvanceService = taskRecordAdvanceService;
         this.taskEventDefService = taskEventDefService;
+        this.memberService = memberService;
         this.taskEventExecutor = taskEventExecutor;
     }
 
@@ -105,8 +113,8 @@ public class TaskEventService {
         //    立刻收到 400 远比「返回 200 但任务永远不动」好排查。
         TaskEvent eventDef = taskEventDefService.getEnabledByCode(form.getEventCode());
         if (eventDef == null) {
-            log.warn("[任务事件] 未注册或已停用的事件被拒。eventCode={}, member={}",
-                    form.getEventCode(), form.getMemberName());
+            log.warn("[任务事件] 未注册或已停用的事件被拒。eventCode={}, memberId={}",
+                    form.getEventCode(), form.getMemberId());
             return ResponseDTO.userErrorParam("未注册或已停用的事件编码：" + form.getEventCode());
         }
 
@@ -115,8 +123,8 @@ public class TaskEventService {
         //    之后就再也分不清「上游传了」还是「服务端兜底的」。
         //    对订单类事件放过兜底 = 一天只算一笔，是资损级的错，不能只靠文档约定。
         if (Integer.valueOf(1).equals(eventDef.getBizIdRequired()) && StringUtils.isBlank(form.getEventBizId())) {
-            log.warn("[任务事件] 缺少必需的幂等单号被拒。eventCode={}, member={}",
-                    form.getEventCode(), form.getMemberName());
+            log.warn("[任务事件] 缺少必需的幂等单号被拒。eventCode={}, memberId={}",
+                    form.getEventCode(), form.getMemberId());
             return ResponseDTO.userErrorParam(
                     "事件 " + form.getEventCode() + " 必须携带 eventBizId（上游业务单号），否则无法防重");
         }
@@ -125,8 +133,8 @@ public class TaskEventService {
         try {
             taskEventExecutor.execute(() -> handleSafely(ctx));
         } catch (TaskRejectedException e) {
-            log.error("[任务事件] 线程池队列已满，事件被拒。eventCode={}, member={}, eventBizId={}",
-                    ctx.eventCode(), ctx.memberName(), ctx.eventBizId());
+            log.error("[任务事件] 线程池队列已满，事件被拒。eventCode={}, memberId={}, eventBizId={}",
+                    ctx.eventCode(), ctx.memberId(), ctx.eventBizId());
             saveRejectedFlow(ctx);
             return ResponseDTO.userErrorParam("任务事件处理繁忙，请稍后重试");
         }
@@ -144,12 +152,12 @@ public class TaskEventService {
         TaskEvent eventDef = taskEventDefService.getEnabledByCode(ctx.eventCode());
         if (eventDef == null) {
             log.warn("[任务事件] 未注册或已停用的事件，整批丢弃。eventCode={}, member={}",
-                    ctx.eventCode(), ctx.memberName());
+                    ctx.eventCode(), ctx.memberId());
             return List.of();
         }
         List<TaskConfig> configs = findSubscribedConfigs(ctx);
         if (configs.isEmpty()) {
-            log.debug("[任务事件] 没有任务订阅该事件。eventCode={}, member={}", ctx.eventCode(), ctx.memberName());
+            log.debug("[任务事件] 没有任务订阅该事件。eventCode={}, memberId={}", ctx.eventCode(), ctx.memberId());
             return List.of();
         }
         return configs.stream().map(config -> advanceWithRetry(config, ctx, eventDef)).toList();
@@ -166,7 +174,7 @@ public class TaskEventService {
             handle(ctx);
         } catch (RuntimeException e) {
             log.error("[任务事件] 处理异常。eventCode={}, member={}, eventBizId={}",
-                    ctx.eventCode(), ctx.memberName(), ctx.eventBizId(), e);
+                    ctx.eventCode(), ctx.memberId(), ctx.eventBizId(), e);
         }
     }
 
@@ -184,16 +192,16 @@ public class TaskEventService {
                 return taskRecordAdvanceService.advance(config, ctx, eventDef);
             } catch (TaskConcurrentModifyException e) {
                 log.info("[任务推进] 并发冲突，第 {}/{} 次重试。taskConfigId={}, member={}, 原因={}",
-                        attempt, MAX_RETRY_ATTEMPTS, config.getId(), ctx.memberName(), e.getMessage());
+                        attempt, MAX_RETRY_ATTEMPTS, config.getId(), ctx.memberId(), e.getMessage());
             } catch (RuntimeException e) {
                 // 单个任务配置出错不影响同一事件命中的其它任务 —— 这正是「每任务一个事务」的意义
                 log.error("[任务推进] 失败。taskConfigId={}, member={}, eventBizId={}",
-                        config.getId(), ctx.memberName(), ctx.eventBizId(), e);
+                        config.getId(), ctx.memberId(), ctx.eventBizId(), e);
                 return new TaskAdvanceResult.Discarded("推进异常：" + e.getMessage());
             }
         }
         log.error("[任务推进] 并发冲突重试 {} 次仍失败。taskConfigId={}, member={}",
-                MAX_RETRY_ATTEMPTS, config.getId(), ctx.memberName());
+                MAX_RETRY_ATTEMPTS, config.getId(), ctx.memberId());
         return new TaskAdvanceResult.Discarded("并发冲突重试耗尽（CONCURRENT_RETRY_EXHAUSTED）");
     }
 
@@ -229,7 +237,10 @@ public class TaskEventService {
         String eventBizId = TaskPeriodResolver.resolveEventBizId(form.getEventBizId(), eventTime);
         return new TaskEventContext(
                 form.getEventCode(),
-                form.getMemberName(),
+                form.getMemberId(),
+                // 会员号必须真实存在；顺带取回账号，落进流水当展示快照。
+                // 整条事件链只在这里查一次会员表，后面全靠 ctx 传。
+                memberService.requireMemberName(form.getMemberId()),
                 eventBizId,
                 resolveAmount(form, eventDef),
                 eventTime,
@@ -279,6 +290,7 @@ public class TaskEventService {
         try {
             TaskRecordFlow flow = new TaskRecordFlow();
             flow.setTenantId(TenantConst.DEFAULT_TENANT_ID);
+            flow.setMemberId(ctx.memberId());
             flow.setMemberName(ctx.memberName());
             flow.setTaskConfigId(TaskConst.FLOW_CONFIG_ID_NONE);
             flow.setEventCode(ctx.eventCode());

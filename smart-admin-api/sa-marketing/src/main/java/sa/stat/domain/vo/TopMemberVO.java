@@ -18,7 +18,14 @@ import java.math.BigDecimal;
 @Data
 public class TopMemberVO {
 
-    @Schema(description = "会员名")
+    @Schema(description = "会员号")
+    private Long memberId;
+
+    /**
+     * 账号：{@code t_prize_log} 上的<b>展示快照</b>（同一会员号理论上可能有新旧两种，SQL 取其一）。
+     * 排行榜的分组键是 {@code memberId}，不是这个字段。
+     */
+    @Schema(description = "会员账号（发奖当时的快照）")
     private String memberName;
 
     @Schema(description = "获奖次数（发奖记录条数）")

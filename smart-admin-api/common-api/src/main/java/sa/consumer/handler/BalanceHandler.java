@@ -51,7 +51,7 @@ public class BalanceHandler implements IPrizeHandler {
             if (prizeConfig == null) {
                 return ResponseDTO.userErrorParam("奖品配置不存在");
             }
-            req.setMemberName(prizeLog.getMemberName());
+            req.setMemberId(prizeLog.getMemberId());
             req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
             // 现金是值类资产：金额即全部信息，assetRef 留空
             req.setAssetType(PrizeTypeEnum.BALANCE.name());

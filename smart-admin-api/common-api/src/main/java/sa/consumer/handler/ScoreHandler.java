@@ -68,7 +68,7 @@ public class ScoreHandler implements IPrizeHandler {
         }
 
         ProposalRecordAddForm req = new ProposalRecordAddForm();
-        req.setMemberName(prizeLog.getMemberName());
+        req.setMemberId(prizeLog.getMemberId());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
         // 积分是值类资产：金额即全部信息，assetRef 留空
         req.setAssetType(PrizeTypeEnum.SCORE.name());

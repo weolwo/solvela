@@ -27,8 +27,16 @@ public class UserPrizeEvent extends BaseBizEvent implements Serializable {
     private String activityCode;  // 追踪用：活动/彩票编码
 
     // ================== 3. 用户信息 ==================
-    private Long memberId;        // 用户ID单靠 memberName 不安全，容易重名或改名
-    private String memberName;    // 中奖人名 (作为冗余展示用)
+    /**
+     * 会员号 —— <b>关联键</b>。下游（发奖流水/提案/钱包/券/履约单）全部按它落库。
+     * v3.71.0 之前这个字段一直没人赋值，真正在用的是下面那个 memberName；换键之后反过来。
+     */
+    private Long memberId;
+    /**
+     * 账号 —— <b>展示快照</b>，随事件一起下传，供单据落「当时是谁」。
+     * 🔴 不要拿它做任何关联或判等：它可改，改完就对不上了。
+     */
+    private String memberName;
 
     // ================== 4. 资产明细信息 ==================
     private String prizeType;     // 奖品类型 (SCORE, BALANCE, COUPON)

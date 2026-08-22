@@ -25,8 +25,18 @@ SET NAMES utf8mb4;
 -- -------------------------------------------------------------------------------------
 -- 〇、清场（可重复执行的前提）
 -- -------------------------------------------------------------------------------------
-DELETE FROM t_task_record_flow WHERE member_name LIKE 'p0_%';
-DELETE FROM t_task_record      WHERE member_name LIKE 'p0_%';
+-- ⚠️ v3.71.0 换键之后，这两张表的归属键是 member_id；t_task_record 更是连 member_name
+--    这一列都不再写（v3.72.0 会删掉它）。所以清场必须 join 会员表按账号前缀找人，
+--    照着旧写法删是「一行都删不掉、也不报错」—— 重跑用例时看到的是上一轮的残留数据。
+DELETE f FROM t_task_record_flow f
+    JOIN t_member m ON m.member_id = f.member_id
+ WHERE m.member_name LIKE 'p0_%';
+DELETE r FROM t_task_record r
+    JOIN t_member m ON m.member_id = r.member_id
+ WHERE m.member_name LIKE 'p0_%';
+-- 测试会员本身也一起清：TaskRuntimeP0AcceptanceTest 每个用例都会往 t_member 插一行
+-- （关联键必须真实存在），不清的话跑几十轮就是几十个测试会员。
+DELETE FROM t_member WHERE member_name LIKE 'p0_%';
 DELETE FROM t_task_prize_mapping WHERE task_config_id IN
     (SELECT id FROM (SELECT id FROM t_task_config WHERE task_name LIKE 'P0验收-%') t);
 DELETE FROM t_task_config   WHERE task_name LIKE 'P0验收-%';
@@ -221,20 +231,30 @@ WHERE c.task_name LIKE 'P0验收-%'
 GROUP BY c.id, c.task_name, c.trigger_event, c.limit_type, c.status, task_type
 ORDER BY c.sort_weight;
 
+-- ⚠️ 下面这些核对查询一律<b>先 join t_member 定位会员号</b>，再按 member_id 查。
+--    单据类表虽然还留着 member_name 快照，但它身上没有索引、而且会员改名后就对不上；
+--    状态类（t_task_record / t_member_wallet）连这一列都不再写。
+-- SET @mids := (SELECT GROUP_CONCAT(member_id) FROM t_member WHERE member_name LIKE 'p0_%');
+
 -- 判据 1/3：进度与流水
--- SELECT id, member_name, task_config_id, period_key, current_metric, version, status, progress_data
--- FROM t_task_record WHERE member_name LIKE 'p0_%' ORDER BY id;
--- SELECT id, member_name, task_config_id, record_id, event_biz_id, flow_type,
---        delta_metric, after_metric, discard_reason
--- FROM t_task_record_flow WHERE member_name LIKE 'p0_%' ORDER BY id;
+-- SELECT r.id, m.member_name, r.task_config_id, r.period_key, r.current_metric, r.version, r.status, r.progress_data
+-- FROM t_task_record r JOIN t_member m ON m.member_id = r.member_id
+-- WHERE m.member_name LIKE 'p0_%' ORDER BY r.id;
+-- SELECT f.id, m.member_name, f.task_config_id, f.record_id, f.event_biz_id, f.flow_type,
+--        f.delta_metric, f.after_metric, f.discard_reason
+-- FROM t_task_record_flow f JOIN t_member m ON m.member_id = f.member_id
+-- WHERE m.member_name LIKE 'p0_%' ORDER BY f.id;
 
 -- 判据 2：阶梯必须有 2 行发奖流水，且 external_biz_no 形如 {recordId}:{stage}
--- SELECT id, member_name, prize_code, prize_name, external_biz_no, status, approve_status, fail_reason
--- FROM t_prize_log WHERE member_name LIKE 'p0_%' ORDER BY id;
+-- SELECT l.id, m.member_name, l.prize_code, l.prize_name, l.external_biz_no, l.status, l.approve_status, l.fail_reason
+-- FROM t_prize_log l JOIN t_member m ON m.member_id = l.member_id
+-- WHERE m.member_name LIKE 'p0_%' ORDER BY l.id;
 
 -- 资产落账
--- SELECT member_name, asset_type, balance FROM t_member_wallet WHERE member_name LIKE 'p0_%';
--- SELECT member_name, coupon_code, coupon_name, valid_start_time, valid_end_time
--- FROM t_member_coupon WHERE member_name LIKE 'p0_%';
--- SELECT id, member_name, asset_type, amount, source_type, source_biz_id, status, remark
--- FROM t_proposal_record WHERE member_name LIKE 'p0_%' ORDER BY id;
+-- SELECT m.member_name, w.asset_type, w.balance
+-- FROM t_member_wallet w JOIN t_member m ON m.member_id = w.member_id WHERE m.member_name LIKE 'p0_%';
+-- SELECT m.member_name, c.coupon_code, c.coupon_name, c.valid_start_time, c.valid_end_time
+-- FROM t_member_coupon c JOIN t_member m ON m.member_id = c.member_id WHERE m.member_name LIKE 'p0_%';
+-- SELECT p.id, m.member_name, p.asset_type, p.amount, p.source_type, p.source_biz_id, p.status, p.remark
+-- FROM t_proposal_record p JOIN t_member m ON m.member_id = p.member_id
+-- WHERE m.member_name LIKE 'p0_%' ORDER BY p.id;

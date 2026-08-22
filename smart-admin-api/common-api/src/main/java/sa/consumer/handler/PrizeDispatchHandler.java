@@ -200,6 +200,8 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
 
         // --- 1. 来自 Event 的动态数据 (用户相关) ---
         log.setTenantId(event.getTenantId());
+        // 关联键与展示快照一起落：memberId 是查询/对账用的键，memberName 是「中奖当时那个账号」
+        log.setMemberId(event.getMemberId());
         log.setMemberName(event.getMemberName());
         log.setExternalBizNo(event.getSourceBizId());
         log.setActivityCode(event.getActivityCode());

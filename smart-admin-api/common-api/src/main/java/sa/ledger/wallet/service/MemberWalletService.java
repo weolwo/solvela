@@ -21,6 +21,7 @@ import sa.ledger.wallet.domain.entity.MemberWallet;
 import sa.ledger.wallet.domain.form.MemberWalletQueryForm;
 import sa.ledger.wallet.domain.vo.MemberWalletStatVO;
 import sa.ledger.wallet.domain.vo.MemberWalletVO;
+import sa.member.service.MemberService;
 import sa.risk.proposal.domain.entity.ProposalRecord;
 
 import java.math.BigDecimal;
@@ -46,6 +47,11 @@ public class MemberWalletService {
 
     private final MemberWalletDao memberWalletDao;
     private final MemberAssetTransactionDao memberAssetTransactionDao;
+    /**
+     * 只用来取流水上的<b>账号展示快照</b>。钱包本身只认 member_id，
+     * 不需要名字；是流水（单据类）要把「当时那个账号」记下来。
+     */
+    private final MemberService memberService;
 
     /**
      * 钱包统计：用户手上现在有多少资产（存量，全量），以及这段时间变动了多少（跟时间范围走）。
@@ -125,9 +131,9 @@ public class MemberWalletService {
         }
 
         // 1. 查钱包与自愈
-        MemberWallet wallet = memberWalletDao.getByMemberNameAndAssetType(proposal.getMemberName(), assetType.name());
+        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(proposal.getMemberId(), assetType.name());
         if (wallet == null) {
-            wallet = initMemberWallet(proposal.getMemberName(), proposal.getTenantId(), assetType);
+            wallet = initMemberWallet(proposal.getMemberId(), proposal.getTenantId(), assetType);
         }
 
         // 2. 状态校验 (调用充血模型)
@@ -150,12 +156,15 @@ public class MemberWalletService {
      * 通用扣减（抽奖门票/积分消耗等场景）：乐观锁 + 余额充足双重条件，失败抛业务异常
      */
     @Transactional(rollbackFor = Exception.class)
-    public void executeWalletDeduct(String memberName, PrizeTypeEnum assetType, BigDecimal amount,
+    public void executeWalletDeduct(Long memberId, PrizeTypeEnum assetType, BigDecimal amount,
                                     String bizType, String bizRefId, String remark) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
-        MemberWallet wallet = memberWalletDao.getByMemberNameAndAssetType(memberName, assetType.name());
+        // 会员必须真实存在：关联键指向一个查不到的会员，等于凭空造出一笔无主流水，
+        // 而且当场不报错。顺带把账号取回来做流水上的展示快照。
+        String memberName = memberService.requireMemberName(memberId);
+        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
         if (wallet == null || wallet.getBalance() == null || wallet.getBalance().compareTo(amount) < 0) {
             throw new BusinessException(BizErrorCode.BALANCE_NOT_ENOUGH);
         }
@@ -169,6 +178,7 @@ public class MemberWalletService {
 
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setTenantId(wallet.getTenantId());
+        txn.setMemberId(memberId);
         txn.setMemberName(memberName);
         txn.setAssetType(assetType.name());
         txn.setTransactionType(2); // 2-支出
@@ -184,14 +194,15 @@ public class MemberWalletService {
      * 通用退还/入账（抽奖无货退门票等补偿场景）：钱包不存在时自愈初始化
      */
     @Transactional(rollbackFor = Exception.class)
-    public void executeWalletRefund(String memberName, PrizeTypeEnum assetType, BigDecimal amount,
+    public void executeWalletRefund(Long memberId, PrizeTypeEnum assetType, BigDecimal amount,
                                     String bizType, String bizRefId, String remark) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
-        MemberWallet wallet = memberWalletDao.getByMemberNameAndAssetType(memberName, assetType.name());
+        String memberName = memberService.requireMemberName(memberId);
+        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
         if (wallet == null) {
-            wallet = initMemberWallet(memberName, null, assetType);
+            wallet = initMemberWallet(memberId, null, assetType);
         }
         wallet.checkAvailable();
         BigDecimal balanceAfter = wallet.calculateAfterBalance(amount);
@@ -203,6 +214,7 @@ public class MemberWalletService {
 
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setTenantId(wallet.getTenantId());
+        txn.setMemberId(memberId);
         txn.setMemberName(memberName);
         txn.setAssetType(assetType.name());
         txn.setTransactionType(1); // 1-收入
@@ -217,6 +229,8 @@ public class MemberWalletService {
     private MemberAssetTransaction buildTransaction(ProposalRecord proposal, PrizeTypeEnum assetType, BigDecimal amount, BigDecimal balanceAfter) {
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setTenantId(proposal.getTenantId());
+        txn.setMemberId(proposal.getMemberId());
+        // 展示快照取提案上的那一份，不再查一次会员表：提案落库时已经把「当时那个账号」记下来了
         txn.setMemberName(proposal.getMemberName());
         txn.setAssetType(assetType.name());
         txn.setTransactionType(1); // 1-收入
@@ -232,10 +246,10 @@ public class MemberWalletService {
     /**
      * 辅助方法：用户钱包初始化兜底（按资产类型初始化对应账户行）
      */
-    private MemberWallet initMemberWallet(String memberName, String tenantId, PrizeTypeEnum assetType) {
+    private MemberWallet initMemberWallet(Long memberId, String tenantId, PrizeTypeEnum assetType) {
         MemberWallet wallet = new MemberWallet();
         wallet.setTenantId(tenantId);
-        wallet.setMemberName(memberName);
+        wallet.setMemberId(memberId);
         wallet.setAssetType(assetType.name());
         wallet.setBalance(BigDecimal.ZERO);
         wallet.setStatus(1); // 1-正常
@@ -245,7 +259,7 @@ public class MemberWalletService {
             memberWalletDao.insert(wallet);
         } catch (DuplicateKeyException e) {
             // 防止高并发下同时初始化，如果报冲突，重新查一次即可
-            wallet = memberWalletDao.getByMemberNameAndAssetType(memberName, assetType.name());
+            wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
         }
         return wallet;
     }

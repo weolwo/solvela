@@ -21,8 +21,9 @@ public class WalletAssetHandler extends AbstractAssetHandler {
 
     @Override
     protected String getLockKey(ProposalRecord proposal) {
-        // 钱包一行一种资产，锁细化到 会员+资产类型，不同资产互不阻塞
-        return "lock:wallet_update:" + proposal.getMemberName() + ":" + PrizeTypeEnum.BALANCE.name();
+        // 钱包一行一种资产，锁细化到 会员+资产类型，不同资产互不阻塞。
+        // 🔴 锁键必须用 member_id，理由同 ScoreAssetHandler：账号可改，改完两个请求会落到两把锁上。
+        return "lock:wallet_update:" + proposal.getMemberId() + ":" + PrizeTypeEnum.BALANCE.name();
     }
 
     @Override

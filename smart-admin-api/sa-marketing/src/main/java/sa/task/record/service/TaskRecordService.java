@@ -20,6 +20,7 @@ import sa.task.taskconfig.domain.entity.TaskConfig;
 import sa.task.taskconfig.manager.TaskConfigManager;
 import org.springframework.stereotype.Service;
 
+import sa.member.service.MemberService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -41,6 +42,9 @@ import java.util.stream.Collectors;
 public class TaskRecordService {
 
     private final TaskRecordDao taskRecordDao;
+
+    /** 只用来校验会员号真实存在（状态表不留账号快照） */
+    private final MemberService memberService;
     private final TaskConfigManager taskConfigManager;
 
     /**
@@ -201,6 +205,9 @@ public class TaskRecordService {
      */
     public ResponseDTO<String> add(TaskRecordAddForm addForm) {
         TaskRecord taskRecord = SmartBeanUtil.copy(addForm, TaskRecord.class);
+        // 任务记录是状态表，不留账号快照；但会员号必须真实存在 ——
+        // 关联键指向一个查不到的会员，列表里会是一行没有名字的孤儿记录，且当场不报错
+        memberService.requireExists(addForm.getMemberId());
         taskRecordDao.insert(taskRecord);
         return ResponseDTO.ok();
     }

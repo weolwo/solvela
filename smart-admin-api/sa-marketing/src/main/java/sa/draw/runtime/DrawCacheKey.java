@@ -31,8 +31,8 @@ public final class DrawCacheKey {
      * <p>⚠️ 周期段插在会员名<b>之前</b>：运维按活动清理计数的扫描模式
      * {@code draw:user:{活动}:*} 因此仍然有效（见「抽奖模块-联调造数.sql」的清场说明）。
      */
-    public static String userCount(String activityCode, long prizeItemId, String periodBucket, String memberName) {
-        return PREFIX + "user:" + activityCode + ":" + prizeItemId + ":" + periodBucket + ":" + memberName;
+    public static String userCount(String activityCode, long prizeItemId, String periodBucket, long memberId) {
+        return PREFIX + "user:" + activityCode + ":" + prizeItemId + ":" + periodBucket + ":" + memberId;
     }
 
     /**
@@ -45,7 +45,7 @@ public final class DrawCacheKey {
     /**
      * 单用户防刷限流器（按活动）
      */
-    public static String rateLimit(String activityCode, String memberName) {
-        return PREFIX + "rate:" + activityCode + ":" + memberName;
+    public static String rateLimit(String activityCode, long memberId) {
+        return PREFIX + "rate:" + activityCode + ":" + memberId;
     }
 }

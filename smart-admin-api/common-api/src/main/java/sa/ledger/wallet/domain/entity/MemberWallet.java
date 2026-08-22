@@ -33,9 +33,17 @@ public class MemberWallet {
     private String tenantId;
 
     /**
-     * 会员名
+     * 会员号：全链路关联键（v3.71.0 换键）。
+     *
+     * <p>🔴 这里<b>刻意没有 memberName</b>。钱包是状态表（余额被反复 UPDATE），
+     * 存一份账号快照只会和 {@code t_member} 长期不一致 —— 用户改了名，
+     * 钱包里永远是老名字，反而更难认。要显示名字就 join 会员表取<b>当前值</b>，
+     * 见 {@code MemberWalletMapper.queryPage}。
+     *
+     * <p>对应的 {@code member_name} 列由 v3.72.0 删除；v3.71.1 已先把它放开为可空，
+     * 否则这里少写一个字段就会撞上「NOT NULL 且无默认值」，整表插不进去。
      */
-    private String memberName;
+    private Long memberId;
 
     /**
      * 资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典

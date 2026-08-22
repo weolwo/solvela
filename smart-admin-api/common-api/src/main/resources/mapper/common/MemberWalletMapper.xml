@@ -5,6 +5,7 @@
     <resultMap id="MemberWalletVO" type="sa.ledger.wallet.domain.vo.MemberWalletVO">
             <result column="id" property="id" />
             <result column="tenant_id" property="tenantId" />
+            <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
             <result column="asset_type" property="assetType" />
             <result column="balance" property="balance" />
@@ -19,7 +20,7 @@
     <sql id="base_columns">
                 id,
                 tenant_id,
-                member_name,
+                member_id,
                 asset_type,
                 balance,
                 status,
@@ -30,22 +31,27 @@
                 update_time
     </sql>
 
+    <!--
+        ⚠️ 列一律带 w. 前缀：列表查询 join 了 t_member，而两张表都有
+        tenant_id / status / create_time / create_by / update_time —— 不加前缀
+        MySQL 直接报 Column 'status' in field list is ambiguous。
+    -->
     <sql id="query_conditions">
         <where>
                         <if test="queryForm.tenantId != null">
-                            AND tenant_id = #{queryForm.tenantId}
+                            AND w.tenant_id = #{queryForm.tenantId}
                         </if>
-                        <if test="queryForm.memberName != null">
-                            AND member_name = #{queryForm.memberName}
+                        <if test="queryForm.memberId != null">
+                            AND w.member_id = #{queryForm.memberId}
                         </if>
                         <if test="queryForm.assetType != null">
-                            AND asset_type = #{queryForm.assetType}
+                            AND w.asset_type = #{queryForm.assetType}
                         </if>
                         <if test="queryForm.status != null">
-                            AND status = #{queryForm.status}
+                            AND w.status = #{queryForm.status}
                         </if>
                         <if test="queryForm.createTimeBegin != null">
-                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                            AND w.create_time &gt;= #{queryForm.createTimeBegin}
                         </if>
                         <!--
                             ⚠️ 结束日必须用 &lt; 次日零点：createTimeEnd 是 LocalDate，
@@ -53,7 +59,7 @@
                             原先的 &lt;= 会把结束日当天开的钱包整天筛掉，且没有任何报错。
                         -->
                         <if test="queryForm.createTimeEnd != null">
-                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+                            AND w.create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
                         </if>
         </where>
     </sql>
@@ -67,26 +73,51 @@
                     WHERE id = #{id} AND version = #{version} AND balance &gt;= #{amount}
     </update>
 
+    <!--
+        列表页要显示会员账号，而钱包表<b>没有</b>这一列（状态表不留快照，见 MemberWallet 类注释），
+        所以 join 会员主表取当前值。
+
+        🔴 必须是 LEFT JOIN，不能用 INNER JOIN：会员被清理/注销后 t_member 可能查不到，
+        INNER JOIN 会让这一行钱包<b>从列表里消失</b> —— 余额还在库里，页面上却看不见，
+        而且不报错。账务数据宁可名字显示为空，也不能整行不见。
+    -->
+    <sql id="list_columns">
+                w.id,
+                w.tenant_id,
+                w.member_id,
+                m.member_name,
+                w.asset_type,
+                w.balance,
+                w.status,
+                w.version,
+                w.create_by,
+                w.create_time,
+                w.update_by,
+                w.update_time
+    </sql>
+
     <select id="queryPage" resultMap="MemberWalletVO">
         SELECT
-        <include refid="base_columns"/>
-        FROM t_member_wallet
+        <include refid="list_columns"/>
+        FROM t_member_wallet w
+        LEFT JOIN t_member m ON m.member_id = w.member_id
         <include refid="query_conditions"/>
-        ORDER BY create_time DESC
+        ORDER BY w.create_time DESC
     </select>
 
     <select id="queryList" resultMap="MemberWalletVO">
         SELECT
-        <include refid="base_columns"/>
-        FROM t_member_wallet
+        <include refid="list_columns"/>
+        FROM t_member_wallet w
+        LEFT JOIN t_member m ON m.member_id = w.member_id
         <include refid="query_conditions"/>
-        ORDER BY create_time DESC
+        ORDER BY w.create_time DESC
     </select>
-    <select id="getByMemberNameAndAssetType" resultType="sa.ledger.wallet.domain.entity.MemberWallet">
+    <select id="getByMemberIdAndAssetType" resultType="sa.ledger.wallet.domain.entity.MemberWallet">
         SELECT
         <include refid="base_columns"/>
         FROM t_member_wallet
-        WHERE member_name = #{memberName} AND asset_type = #{assetType}
+        WHERE member_id = #{memberId} AND asset_type = #{assetType}
     </select>
 
     <!--
@@ -113,7 +144,7 @@
     <select id="selectStat" resultType="java.util.Map">
         SELECT
             COUNT(*)                                                  AS walletCount,
-            COUNT(DISTINCT member_name)                               AS memberCount,
+            COUNT(DISTINCT member_id)                                 AS memberCount,
             COALESCE(SUM(status = 0), 0)                              AS frozenCount,
             COALESCE(SUM(balance &lt; 0), 0)                         AS negativeBalanceCount,
             COALESCE(SUM(status = 0 AND balance &gt; 0), 0)          AS frozenWithBalanceCount

@@ -17,8 +17,9 @@ import java.util.*;
  */
 public class DumpSeedData {
 
-    static final String URL = "jdbc:mysql://127.0.0.1:3306/smart_admin_v3?useSSL=false"
-            + "&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai";
+    static final String URL = """
+            jdbc:mysql://127.0.0.1:3306/smart_admin_v3?useSSL=false\
+            &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai""";
 
     /**
      * 种子表 = 「代码依赖它才能跑」的配置数据。

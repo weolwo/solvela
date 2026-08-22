@@ -19,8 +19,9 @@ import java.util.*;
  */
 public class CheckModuleDrift {
 
-    static final String BASE = "jdbc:mysql://127.0.0.1:3306/%s?useSSL=false"
-            + "&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true";
+    static final String BASE = """
+            jdbc:mysql://127.0.0.1:3306/%s?useSSL=false\
+            &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true""";
     static final String ROOT = "D:/workspace/smart-admin/数据库SQL脚本/";
 
     static final String[] MODULE_FILES = {
@@ -132,11 +133,14 @@ public class CheckModuleDrift {
     }
 
     static Map<String, List<Col>> cols(Statement s, String schema) throws SQLException {
+        String sql = """
+                SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT,
+                       COLLATION_NAME, EXTRA
+                  FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = '%s'
+                 ORDER BY TABLE_NAME, ORDINAL_POSITION""".formatted(schema);
         Map<String, List<Col>> m = new TreeMap<>();
-        try (ResultSet r = s.executeQuery(
-                "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, "
-              + "COLLATION_NAME, EXTRA FROM information_schema.COLUMNS "
-              + "WHERE TABLE_SCHEMA='" + schema + "' ORDER BY TABLE_NAME, ORDINAL_POSITION")) {
+        try (ResultSet r = s.executeQuery(sql)) {
             while (r.next())
                 m.computeIfAbsent(r.getString(1), k -> new ArrayList<>()).add(new Col(
                         r.getString(2), r.getString(3), r.getString(4),
@@ -146,12 +150,16 @@ public class CheckModuleDrift {
     }
 
     static Map<String, List<Idx>> idxs(Statement s, String schema) throws SQLException {
+        String sql = """
+                SELECT TABLE_NAME, INDEX_NAME,
+                       GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX),
+                       MAX(NON_UNIQUE) = 0
+                  FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = '%s'
+                 GROUP BY TABLE_NAME, INDEX_NAME
+                 ORDER BY TABLE_NAME, INDEX_NAME""".formatted(schema);
         Map<String, List<Idx>> m = new TreeMap<>();
-        try (ResultSet r = s.executeQuery(
-                "SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX), "
-              + "MAX(NON_UNIQUE)=0 FROM information_schema.STATISTICS "
-              + "WHERE TABLE_SCHEMA='" + schema + "' GROUP BY TABLE_NAME, INDEX_NAME "
-              + "ORDER BY TABLE_NAME, INDEX_NAME")) {
+        try (ResultSet r = s.executeQuery(sql)) {
             while (r.next())
                 m.computeIfAbsent(r.getString(1), k -> new ArrayList<>())
                  .add(new Idx(r.getString(2), r.getString(3), r.getBoolean(4)));

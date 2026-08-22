@@ -19,9 +19,13 @@ public class PhysicalDeliveryAddForm {
     @Schema(description = "租户ID，不传落库取默认值 '0'")
     private String tenantId;
 
-    @Schema(description = "会员名", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "会员名 不能为空")
-    private String memberName;
+    /**
+     * 会员号 —— 关联键。调用方只需给它，账号快照由服务端查会员表补
+     * （见 {@code MemberService.requireMemberName}），这样快照与会员号<b>不可能对不上</b>。
+     */
+    @Schema(description = "会员号", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "会员号 不能为空")
+    private Long memberId;
 
     @Schema(description = "发奖提案ID", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "发奖提案ID 不能为空")

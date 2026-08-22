@@ -55,13 +55,13 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
     List<MemberWalletVO> queryList(@Param("queryForm") MemberWalletQueryForm queryForm);
 
     /**
-     * 根据会员名 + 资产类型查询钱包账户（一行一种资产）
+     * 根据会员号 + 资产类型查询钱包账户（一行一种资产），走 uk_member_asset。
      *
-     * @param memberName 会员名
-     * @param assetType  资产类型 PrizeTypeEnum
+     * @param memberId  会员号（关联键，v3.71.0 起）
+     * @param assetType 资产类型 PrizeTypeEnum
      * @return 钱包账户
      */
-    MemberWallet getByMemberNameAndAssetType(@Param("memberName") String memberName, @Param("assetType") String assetType);
+    MemberWallet getByMemberIdAndAssetType(@Param("memberId") Long memberId, @Param("assetType") String assetType);
 
     /*
      * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。

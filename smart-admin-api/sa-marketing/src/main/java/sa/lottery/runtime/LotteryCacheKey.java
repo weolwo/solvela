@@ -45,7 +45,7 @@ public final class LotteryCacheKey {
      * 单用户防刷限流器（按彩票玩法）。
      * 注意这是防刷，不是业务限购 —— 限购由上游业务负责，本模块允许同一用户合法领任意多张。
      */
-    public static String rateLimit(String lotteryCode, String memberName) {
-        return PREFIX + "rate:" + lotteryCode + ":" + memberName;
+    public static String rateLimit(String lotteryCode, long memberId) {
+        return PREFIX + "rate:" + lotteryCode + ":" + memberId;
     }
 }

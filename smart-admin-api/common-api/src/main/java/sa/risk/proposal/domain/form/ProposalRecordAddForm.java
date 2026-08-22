@@ -26,9 +26,13 @@ public class ProposalRecordAddForm {
     @Schema(description = "提案单号，服务端生成，调用方无需传入", accessMode = Schema.AccessMode.READ_ONLY)
     private String tradeNo;
 
-    @Schema(description = "会员名", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "会员名 不能为空")
-    private String memberName;
+    /**
+     * 会员号 —— 关联键。调用方只需给它，账号快照由服务端查会员表补
+     * （见 {@code MemberService.requireMemberName}），这样快照与会员号<b>不可能对不上</b>。
+     */
+    @Schema(description = "会员号", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "会员号 不能为空")
+    private Long memberId;
 
     @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "SCORE/BALANCE/COUPON/PHYSICAL 不能为空")

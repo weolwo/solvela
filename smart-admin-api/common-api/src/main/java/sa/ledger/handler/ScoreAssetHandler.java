@@ -31,8 +31,10 @@ public class ScoreAssetHandler extends AbstractAssetHandler {
 
     @Override
     protected String getLockKey(ProposalRecord proposal) {
-        // 锁细化到 会员+资产类型：同一个人的积分与现金互不阻塞
-        return "lock:wallet_update:" + proposal.getMemberName() + ":" + PrizeTypeEnum.SCORE.name();
+        // 锁细化到 会员+资产类型：同一个人的积分与现金互不阻塞。
+        // 🔴 锁键必须用 member_id：账号可改，改名之后同一个人的两个请求会落到两把不同的锁上，
+        // 而钱包行还是同一行 —— 并发保护当场失效，且完全没有报错。
+        return "lock:wallet_update:" + proposal.getMemberId() + ":" + PrizeTypeEnum.SCORE.name();
     }
 
     @Override

@@ -64,7 +64,7 @@ public class PhysicalPrizeHandler implements IPrizeHandler {
         }
 
         ProposalRecordAddForm req = new ProposalRecordAddForm();
-        req.setMemberName(prizeLog.getMemberName());
+        req.setMemberId(prizeLog.getMemberId());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
         req.setAssetType(PrizeTypeEnum.PHYSICAL.name());
         // 实物是实例类资产：必须指明发哪个 SKU。当前用 prize_code 占位，

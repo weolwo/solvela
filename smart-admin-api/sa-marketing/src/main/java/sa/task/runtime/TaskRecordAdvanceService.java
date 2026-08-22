@@ -104,8 +104,8 @@ public class TaskRecordAdvanceService {
             taskRecordFlowDao.insert(flow);
         } catch (DuplicateKeyException e) {
             // 撞 uk_t_tsk_flw_evt = 该事件对该任务配置已处理过。这是幂等生效，不是错误
-            log.debug("[任务推进] 幂等命中，跳过。taskConfigId={}, member={}, eventBizId={}",
-                    config.getId(), ctx.memberName(), ctx.eventBizId());
+            log.debug("[任务推进] 幂等命中，跳过。taskConfigId={}, memberId={}, eventBizId={}",
+                    config.getId(), ctx.memberId(), ctx.eventBizId());
             return new TaskAdvanceResult.Duplicated(ctx.eventBizId());
         }
 
@@ -170,8 +170,9 @@ public class TaskRecordAdvanceService {
 
         // ========== ④ 阶梯发奖：本次跨过的档位 ==========
         record.setCurrentMetric(after);
+        // 账号快照由上下文传给派发器：任务记录上没有这一列，而派发事件要带上展示名
         Integer highestReached = taskPrizeDispatcher.dispatchReachedStages(
-                record, config.getActivityCode(), before, after);
+                record, ctx.memberName(), config.getActivityCode(), before, after);
 
         // ========== ⑤ 达标闸门 ==========
         boolean completed = strategy.isCompleted(after, rule) && isHighestStageReached(config, highestReached);
@@ -181,8 +182,8 @@ public class TaskRecordAdvanceService {
             if (rows > 0) {
                 // 最高档的奖已在上一步投递（防重由 uk_external_biz 保证），可以直接流转到「已发奖」
                 taskRecordDao.markDispatched(record.getId());
-                log.info("[任务达标] recordId={}, member={}, taskConfigId={}, metric={}",
-                        record.getId(), ctx.memberName(), config.getId(), after.toPlainString());
+                log.info("[任务达标] recordId={}, memberId={}, taskConfigId={}, metric={}",
+                        record.getId(), ctx.memberId(), config.getId(), after.toPlainString());
             }
         }
 
@@ -284,7 +285,7 @@ public class TaskRecordAdvanceService {
         }
 
         TaskRecord latest = taskRecordDao.selectLatestRoundByPeriod(
-                ctx.memberName(), config.getId(), basePeriodKey);
+                ctx.memberId(), config.getId(), basePeriodKey);
         if (latest == null) {
             return new RoundResolution(TaskPeriodResolver.withRound(basePeriodKey, 1), null, null);
         }
@@ -323,7 +324,7 @@ public class TaskRecordAdvanceService {
      * </ul>
      */
     private TaskRecord getOrCreateRecord(TaskConfig config, TaskEventContext ctx, String periodKey) {
-        TaskRecord existing = taskRecordDao.selectByUniqueKey(ctx.memberName(), config.getId(), periodKey);
+        TaskRecord existing = taskRecordDao.selectByUniqueKey(ctx.memberId(), config.getId(), periodKey);
         if (existing != null) {
             return existing;
         }
@@ -332,8 +333,8 @@ public class TaskRecordAdvanceService {
             taskRecordDao.insert(record);
             return record;
         } catch (DuplicateKeyException e) {
-            throw new TaskConcurrentModifyException("任务记录已被并发创建，换新事务重试。member="
-                    + ctx.memberName() + ", taskConfigId=" + config.getId() + ", periodKey=" + periodKey);
+            throw new TaskConcurrentModifyException("任务记录已被并发创建，换新事务重试。memberId="
+                    + ctx.memberId() + ", taskConfigId=" + config.getId() + ", periodKey=" + periodKey);
         }
     }
 
@@ -341,7 +342,7 @@ public class TaskRecordAdvanceService {
      * 首次接取时建记录。
      *
      * <p>⚠️ 建实体前已对照过表里的 NOT NULL 且无默认值列
-     * （member_name / task_config_id / activity_code / valid_start_time / valid_end_time /
+     * （member_id / task_config_id / activity_code / valid_start_time / valid_end_time /
      * rule_snapshot / prize_snapshot），全部显式赋值 ——
      * 该模式在本项目已复发 5 次，MyBatis-Plus 省略 null 字段 + MySQL 严格模式会直接拒绝插入。
      *
@@ -351,7 +352,8 @@ public class TaskRecordAdvanceService {
     private TaskRecord buildRecord(TaskConfig config, TaskEventContext ctx, String periodKey) {
         TaskRecord record = new TaskRecord();
         record.setTenantId(TenantConst.DEFAULT_TENANT_ID);
-        record.setMemberName(ctx.memberName());
+        // 任务记录是状态表：只落关联键，不留账号快照（会员改名后快照会和主表长期不一致）
+        record.setMemberId(ctx.memberId());
         record.setTaskConfigId(config.getId());
         record.setActivityCode(config.getActivityCode());
         record.setPeriodKey(periodKey);
@@ -393,6 +395,8 @@ public class TaskRecordAdvanceService {
     private TaskRecordFlow buildFlow(TaskConfig config, TaskEventContext ctx) {
         TaskRecordFlow flow = new TaskRecordFlow();
         flow.setTenantId(TenantConst.DEFAULT_TENANT_ID);
+        // 流水是单据：关联键 + 展示快照都落
+        flow.setMemberId(ctx.memberId());
         flow.setMemberName(ctx.memberName());
         flow.setTaskConfigId(config.getId());
         flow.setEventCode(ctx.eventCode());

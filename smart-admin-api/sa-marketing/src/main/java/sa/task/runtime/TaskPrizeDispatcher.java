@@ -53,7 +53,7 @@ public class TaskPrizeDispatcher {
      *
      * @return 本次已达标的最高档位；一个都没跨过返回 null
      */
-    public Integer dispatchReachedStages(TaskRecord record, String activityCode,
+    public Integer dispatchReachedStages(TaskRecord record, String memberName, String activityCode,
                                          BigDecimal metricBefore, BigDecimal metricAfter) {
         List<TaskPrizeMapping> mappings = taskPrizeMappingManager.lambdaQuery()
                 .eq(TaskPrizeMapping::getTaskConfigId, record.getTaskConfigId())
@@ -87,7 +87,7 @@ public class TaskPrizeDispatcher {
             if (reachedBefore) {
                 continue;
             }
-            if (publishStagePrize(record, activityCode, mapping)) {
+            if (publishStagePrize(record, memberName, activityCode, mapping)) {
                 dispatched.add(mapping.getStageLevel());
             }
         }
@@ -105,7 +105,8 @@ public class TaskPrizeDispatcher {
      * 只传 recordId 的话，阶梯任务第二档起会被 {@code PrizeDispatchHandler} 的
      * {@code catch (DuplicateKeyException)} 当作重复派发静默吞掉，零并发下必现。
      */
-    private boolean publishStagePrize(TaskRecord record, String activityCode, TaskPrizeMapping mapping) {
+    private boolean publishStagePrize(TaskRecord record, String memberName, String activityCode,
+                                      TaskPrizeMapping mapping) {
         PrizeConfig prizeConfig = prizeConfigService.getByActivityCodeAndPrizeCode(activityCode, mapping.getPrizeCode());
         if (prizeConfig == null) {
             log.error("[任务发奖] 奖品配置不存在，跳过派发。activityCode={}, prizeCode={}, recordId={}, stage={}",
@@ -116,7 +117,9 @@ public class TaskPrizeDispatcher {
         UserPrizeEvent event = UserPrizeEvent.builder()
                 .sourceBizId(TaskConst.buildSourceBizId(record.getId(), mapping.getStageLevel()))
                 .activityCode(activityCode)
-                .memberName(record.getMemberName())
+                // 关联键取记录上的 member_id；展示名由上下文传进来 —— 任务记录是状态表，没有账号快照
+                .memberId(record.getMemberId())
+                .memberName(memberName)
                 .prizeCode(mapping.getPrizeCode())
                 .prizeType(prizeConfig.getPrizeType())
                 .prizeValue(resolvePrizeValue(mapping, prizeConfig))

@@ -49,8 +49,8 @@ public class LotteryTicketController {
     @SaCheckPermission("lotteryTicket:query")
     public ResponseDTO<List<LotteryRecord>> myTickets(@RequestParam String lotteryCode,
                                                       @RequestParam(required = false) String issueNo,
-                                                      @RequestParam String memberName) {
-        return ticketQueryService.myTickets(lotteryCode, issueNo, memberName);
+                                                      @RequestParam Long memberId) {
+        return ticketQueryService.myTickets(lotteryCode, issueNo, memberId);
     }
 
     @Operation(summary = "号码验真：反解游标 + 校验签名，供客服核对用户出示的号码")

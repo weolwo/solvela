@@ -166,7 +166,7 @@ public class ActivityConfigService {
      * 删除守卫，两层：
      *
      * <p><b>第一层：上线过的活动永不可删</b>。t_prize_log.activity_code 是 NOT NULL 且建了
-     * (member_name, activity_code) 索引 —— 发奖流水就是按活动编码追溯的，
+     * (member_id, activity_code) 索引 —— 发奖流水就是按活动编码追溯的，
      * 删掉活动等于把资损追溯链路断在源头。运营口中的「删除」，绝大多数场景是「建错了」，
      * 那种活动一定还没上线过；真正跑过的活动只该下线，不该消失。
      *

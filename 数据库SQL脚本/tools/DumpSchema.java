@@ -13,8 +13,9 @@ import java.util.*;
  */
 public class DumpSchema {
 
-    static final String URL = "jdbc:mysql://127.0.0.1:3306/smart_admin_v3?useSSL=false"
-            + "&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai";
+    static final String URL = """
+            jdbc:mysql://127.0.0.1:3306/smart_admin_v3?useSSL=false\
+            &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai""";
 
     /** 手工备份表等垃圾，不进基线 */
     static final List<String> EXCLUDE_PREFIX = List.of("t_menu_26", "t_menu_2608");
@@ -60,9 +61,11 @@ public class DumpSchema {
              Statement s = c.createStatement()) {
 
             List<String> all = new ArrayList<>();
-            try (ResultSet r = s.executeQuery(
-                    "SELECT TABLE_NAME FROM information_schema.TABLES "
-                  + "WHERE TABLE_SCHEMA='smart_admin_v3' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME")) {
+            try (ResultSet r = s.executeQuery("""
+                    SELECT TABLE_NAME
+                      FROM information_schema.TABLES
+                     WHERE TABLE_SCHEMA = 'smart_admin_v3' AND TABLE_TYPE = 'BASE TABLE'
+                     ORDER BY TABLE_NAME""")) {
                 while (r.next()) all.add(r.getString(1));
             }
             List<String> excluded = new ArrayList<>();

@@ -136,8 +136,9 @@
       <a-form-item label="租户ID" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.tenantId" placeholder="租户ID" />
       </a-form-item>
-      <a-form-item label="会员名" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.memberName" placeholder="会员名" />
+      <!-- 查询键是会员号：member_name 只是展示快照，且身上没有索引 -->
+      <a-form-item label="会员号" class="smart-query-form-item">
+        <a-input-number style="width: 200px" v-model:value="queryForm.memberId" placeholder="会员号" :controls="false" :precision="0" />
       </a-form-item>
       <a-form-item label="活动编码" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.activityCode" placeholder="活动编码" />
@@ -309,7 +310,13 @@
       ellipsis: true,
     },
     {
-      title: '会员名',
+      title: '会员号',
+      dataIndex: 'memberId',
+      width: 130,
+      ellipsis: true,
+    },
+    {
+      title: '会员账号',
       dataIndex: 'memberName',
       ellipsis: true,
     },
@@ -400,7 +407,7 @@
 
   const queryFormState = {
     tenantId: undefined, //租户ID
-    memberName: undefined, //会员名
+    memberId: undefined, //会员号（关联键）
     activityCode: undefined, //活动编码
     validStartTime: [], //开始时间
     validStartTimeBegin: undefined, //开始时间 开始

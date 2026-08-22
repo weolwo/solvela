@@ -5,7 +5,9 @@
     <!--
       ══ 口径（已与 docs/首页图表-口径确认清单.md 对齐，改这里必须同步那份文档）══
 
-      「参与」= 参与人数，按 member_name 去重（不是人次）。三种玩法各自的定义：
+      「参与」= 参与人数，按 member_id 去重（不是人次）。三种玩法各自的定义：
+      ⚠️ v3.71.0 起去重键是 member_id 而不是 member_name —— 后者可改，改名之后
+         同一个人会被算成两个人，而这里的数字看上去仍然完全正常。
 
         DRAW    t_draw_prize_log 全量。**库存不足(status=2)也算参与** ——
                 有「谢谢参与」兜底，用户确实参与了，所以不按 status 过滤。
@@ -33,7 +35,7 @@
     <select id="participationTrend" resultType="sa.stat.domain.vo.ParticipationTrendVO">
         SELECT DATE_FORMAT(t.create_time, '%Y-%m-%d') AS statDate,
                t.activity_type                        AS activityType,
-               COUNT(DISTINCT t.member_name)          AS memberCount
+               COUNT(DISTINCT t.member_id)            AS memberCount
         FROM (
             <include refid="participationUnion"/>
         ) t
@@ -44,7 +46,7 @@
     <!-- 各玩法类型参与人数 -->
     <select id="participationByType" resultType="sa.stat.domain.vo.ParticipationByTypeVO">
         SELECT t.activity_type               AS activityType,
-               COUNT(DISTINCT t.member_name) AS memberCount
+               COUNT(DISTINCT t.member_id) AS memberCount
         FROM (
             <include refid="participationUnion"/>
         ) t
@@ -54,12 +56,12 @@
 
     <!--
       三种玩法的参与明细。
-      用 UNION ALL 而不是 UNION：去重交给外层的 COUNT(DISTINCT member_name)，
+      用 UNION ALL 而不是 UNION：去重交给外层的 COUNT(DISTINCT member_id)，
       这里提前去重既没必要、又会丢掉 activity_type 维度。
     -->
     <sql id="participationUnion">
         -- 抽奖：全量计入（含未中奖、库存不足）
-        SELECT d.member_name, d.create_time, 'DRAW' AS activity_type
+        SELECT d.member_id, d.create_time, 'DRAW' AS activity_type
         FROM t_draw_prize_log d
         JOIN t_activity_config a ON a.activity_code = d.activity_code
         WHERE d.create_time &gt;= #{fromTime}
@@ -68,18 +70,17 @@
         UNION ALL
 
         -- 彩票：一注一行，靠外层 DISTINCT 收敛成人数
-        SELECT r.member_name, r.create_time, 'LOTTERY' AS activity_type
+        SELECT r.member_id, r.create_time, 'LOTTERY' AS activity_type
         FROM t_lottery_record r
         JOIN t_lottery_config c ON c.lottery_code = r.lottery_code
         JOIN t_activity_config a ON a.activity_code = c.activity_code
         WHERE r.create_time &gt;= #{fromTime}
-          AND r.member_name IS NOT NULL
           AND a.status != 2
 
         UNION ALL
 
         -- 任务：只算有效推进（flow_type = 1），被丢弃的事件不算参与
-        SELECT f.member_name, f.create_time, 'TASK' AS activity_type
+        SELECT f.member_id, f.create_time, 'TASK' AS activity_type
         FROM t_task_record_flow f
         JOIN t_task_config tc ON tc.id = f.task_config_id
         JOIN t_activity_config a ON a.activity_code = tc.activity_code
@@ -219,7 +220,7 @@
     <select id="drawStat" resultType="sa.stat.domain.vo.GameplayVO$DrawStatItem">
         SELECT status                        AS status,
                COUNT(*)                      AS count,
-               COUNT(DISTINCT member_name)   AS memberCount
+               COUNT(DISTINCT member_id)     AS memberCount
         FROM t_draw_prize_log
         WHERE activity_code = #{activityCode}
         GROUP BY status
@@ -245,7 +246,7 @@
     <select id="taskOptionList" resultType="sa.stat.domain.vo.GameplayVO$TaskOption">
         SELECT t.id        AS taskConfigId,
                t.task_name AS taskName,
-               (SELECT COUNT(DISTINCT r.member_name) FROM t_task_record r
+               (SELECT COUNT(DISTINCT r.member_id) FROM t_task_record r
                  WHERE r.task_config_id = t.id) AS memberCount
         FROM t_task_config t
         WHERE t.activity_code = #{activityCode}
@@ -260,8 +261,8 @@
       ⚠️ stage_condition 是 JSON，target 取 $.target。JSON_UNQUOTE 必须有：
          不去引号的话 CAST('"3"' AS DECIMAL) 在 MySQL 里会得到 0 —— 静默算错，不报错。
 
-      🔴 <b>必须 COUNT(DISTINCT member_name)，不能 COUNT(*)</b>。
-         周期型任务是「每人每周期一条记录」（uk 是 member_name + task_config_id + period_key），
+      🔴 <b>必须 COUNT(DISTINCT member_id)，不能 COUNT(*)</b>。
+         周期型任务是「每人每周期一条记录」（uk 是 member_id + task_config_id + period_key），
          用 COUNT(*) 数的是记录数而不是人数，而漏斗第一层 joinedCount 数的是人数 ——
          两个单位混在一张漏斗里，下层会比上层还宽。
          实测就撞上了：task_config_id=50 接取 12 人，而 COUNT(*) 口径下第一档「到达」18，
@@ -271,7 +272,7 @@
         SELECT m.stage_level AS stageLevel,
                CAST(JSON_UNQUOTE(JSON_EXTRACT(m.stage_condition, '$.target')) AS DECIMAL(18,4)) AS target,
                m.prize_code  AS prizeCode,
-               (SELECT COUNT(DISTINCT r.member_name) FROM t_task_record r
+               (SELECT COUNT(DISTINCT r.member_id) FROM t_task_record r
                  WHERE r.task_config_id = m.task_config_id
                    AND r.current_metric &gt;=
                        CAST(JSON_UNQUOTE(JSON_EXTRACT(m.stage_condition, '$.target')) AS DECIMAL(18,4))
@@ -286,7 +287,7 @@
     </select>
 
     <select id="taskJoinedCount" resultType="java.lang.Integer">
-        SELECT COUNT(DISTINCT member_name) FROM t_task_record WHERE task_config_id = #{taskConfigId}
+        SELECT COUNT(DISTINCT member_id) FROM t_task_record WHERE task_config_id = #{taskConfigId}
     </select>
 
     <!-- ───────── 板块四：事件健康度 ───────── -->
@@ -320,13 +321,22 @@
 
     <!-- ───────── 板块五：用户维度 ───────── -->
 
+    <!--
+      ⚠️ 分组键是 member_id，展示名取 MIN(member_name) 的<b>快照</b>，不 join 会员表。
+      两点理由：
+        · 按 member_name 分组的话，改过名的人会裂成两行，各自都不完整 —— 而且看不出来；
+        · 展示名不 join t_member 取当前值，是为了和这张表其余列的口径一致
+          （t_prize_log 是单据，回答的是「当时是谁」）。同一个 member_id 的快照理论上
+          可能有新旧两种，MIN() 取其一，仅用于展示。
+    -->
     <select id="topMembers" resultType="sa.stat.domain.vo.TopMemberVO">
-        SELECT member_name AS memberName,
-               COUNT(*)    AS count,
+        SELECT member_id        AS memberId,
+               MIN(member_name) AS memberName,
+               COUNT(*)         AS count,
                COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue
         FROM t_prize_log
         WHERE create_time &gt;= #{fromTime}
-        GROUP BY member_name
+        GROUP BY member_id
         ORDER BY issuedValue DESC, count DESC
         LIMIT #{limit}
     </select>

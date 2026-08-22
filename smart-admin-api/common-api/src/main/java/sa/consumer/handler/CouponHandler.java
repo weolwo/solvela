@@ -61,7 +61,7 @@ public class CouponHandler implements IPrizeHandler {
         }
 
         ProposalRecordAddForm req = new ProposalRecordAddForm();
-        req.setMemberName(prizeLog.getMemberName());
+        req.setMemberId(prizeLog.getMemberId());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
         req.setAssetType(PrizeTypeEnum.COUPON.name());
         // 券是实例类资产：光有面额发不出来，必须指明发哪张券模。
