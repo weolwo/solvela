@@ -134,7 +134,7 @@
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
+  import { promotionConfigApi } from '/src/api/business/risk/promotion-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import {
     LIMIT_PERIOD_OPTIONS,
@@ -144,7 +144,7 @@
     REVIEW_LEVEL_ENUM,
     REVIEW_LEVEL_OPTIONS,
     UNLIMITED,
-  } from '/@/constants/business/risk/promotion-config/promotion-config-const';
+  } from '/src/constants/business/risk/promotion-config-const';
 
   // ------------------------ 事件 ------------------------
 

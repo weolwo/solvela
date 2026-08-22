@@ -151,14 +151,14 @@
 <script setup>
   import { computed, reactive, ref, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
-  import { taskPrizeMappingApi } from '/@/api/business/prize/task-prize-mapping/task-prize-mapping-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { taskPrizeMappingApi } from '/src/api/business/prize/task-prize-mapping-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import { PRIZE_MODE_ENUM, prizeModeOf } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
-  import { CONFIG_STATUS_OPTIONS, configStatusOf } from '/@/constants/business/task/task-config/task-config-const';
+  import { PRIZE_MODE_ENUM, prizeModeOf } from '/src/constants/business/prize/task-prize-mapping-const';
+  import { CONFIG_STATUS_OPTIONS, configStatusOf } from '/src/constants/business/task/task-config-const';
 
   const router = useRouter();
 

@@ -239,8 +239,8 @@
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { prizePoolItemApi } from '/@/api/business/draw/prize-pool-item/prize-pool-item-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { prizePoolItemApi } from '/src/api/business/draw/prize-pool-item-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { prizeIcon } from '/@/constants/business/lottery/lottery-const';

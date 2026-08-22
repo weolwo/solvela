@@ -72,10 +72,10 @@
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
-  import { ACTIVITY_STATUS_LIST, ACTIVITY_TYPE_LIST } from '/@/constants/business/activity/activity-config/activity-config-const';
+  import { ACTIVITY_STATUS_LIST, ACTIVITY_TYPE_LIST } from '/src/constants/business/activity/activity-config-const';
 
   // 取值对齐后端 ActivityTypeEnum / t_activity_config.status，唯一真源在常量文件（铁律 3）
   const activityTypeOptions = ACTIVITY_TYPE_LIST.map((t) => ({ value: t.value, label: `${t.icon} ${t.desc}` }));

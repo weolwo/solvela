@@ -30,10 +30,10 @@ public class PhysicalDeliveryQueryForm extends PageParam {
     @Schema(description = "会员号")
     private Long memberId;
 
-    @Schema(description = "发奖提案ID")
-    private Long proposalId;
+    @Schema(description = "来源单号：PROPOSAL 存提案ID / MALL 存订单号")
+    private String sourceBizId;
 
-    @Schema(description = "来源类型")
+    @Schema(description = "来源类型：PROPOSAL / MALL")
     private String sourceType;
 
     @Schema(description = "物流单号")

@@ -181,7 +181,7 @@
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { memberWalletApi } from '/@/api/business/ledger/member-wallet/member-wallet-api';
+  import { memberWalletApi } from '/src/api/business/ledger/member-wallet-api';
   import StatPanel from '/@/components/business/stat-panel/index.vue';
   import { money, num } from '/@/lib/stat-format';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -195,7 +195,7 @@
     assetTypeOf,
     assetUnitOf,
     walletStatusOf,
-  } from '/@/constants/business/ledger/member-wallet/member-wallet-const';
+  } from '/src/constants/business/ledger/member-wallet-const';
 
   // ---------------------------- 统计面板 ----------------------------
 

@@ -338,8 +338,8 @@
   import { localRead, localRemove, localSave } from '/@/utils/local-util';
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import SmartRichEditor from '/@/components/framework/wangeditor/index.vue';
   import SchemaFormRenderer from './SchemaFormRenderer.vue';

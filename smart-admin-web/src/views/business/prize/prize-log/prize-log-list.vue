@@ -343,7 +343,7 @@
     QuestionCircleOutlined,
   } from '@ant-design/icons-vue';
   import PrizeLogForm from './prize-log-form.vue';
-  import { prizeLogApi } from '/@/api/business/prize/prize-log/prize-log-api';
+  import { prizeLogApi } from '/src/api/business/prize/prize-log-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -356,7 +356,7 @@
     dispatchStatusOf,
     prizeTypeOf,
     prizeValueUnitOf,
-  } from '/@/constants/business/prize/prize-log/prize-log-const';
+  } from '/src/constants/business/prize/prize-log-const';
   import { prizeIcon } from '/@/constants/business/lottery/lottery-const';
 
   const columns = ref([

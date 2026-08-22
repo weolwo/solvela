@@ -117,9 +117,9 @@
 <script setup>
   import { computed, onMounted, reactive, ref, watch } from 'vue';
   import { Empty, message } from 'ant-design-vue';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
-  import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
-  import { PRIZE_TYPE_OPTIONS } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
+  import { promotionConfigApi } from '/src/api/business/risk/promotion-config-api';
+  import { PRIZE_TYPE_OPTIONS } from '/src/constants/business/prize/prize-config-const';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   const props = defineProps({

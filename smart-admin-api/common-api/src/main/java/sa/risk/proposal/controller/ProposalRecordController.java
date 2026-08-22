@@ -64,7 +64,7 @@ public class ProposalRecordController {
      *   · 「新建」按钮会造出 status=0 的提案 —— 正常链路只落 10/30/80 三种初始状态，
      *     0 是绕过风控与预算直接插库的产物，不会被任何流程推进，也没人会发现；
      *     提案漏斗里那条"有 N 条提案停在等待中"的告警，来源就是这个按钮；
-     *   · delete 是物理删除，而 t_physical_delivery.proposal_id 和
+     *   · delete 是物理删除，而 t_physical_delivery.source_biz_id 和
      *     t_member_asset_transaction.biz_ref_id 都指着它 —— 删掉提案，
      *     下游的履约单和流水就成了无源之水，出账查不到依据。
      *

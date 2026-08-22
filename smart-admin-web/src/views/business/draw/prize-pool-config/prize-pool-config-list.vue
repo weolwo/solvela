@@ -244,14 +244,14 @@
   import { message, Modal } from 'ant-design-vue';
   import { QuestionCircleOutlined, StopOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { prizePoolConfigApi } from '/@/api/business/draw/prize-pool-config/prize-pool-config-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { prizePoolConfigApi } from '/src/api/business/draw/prize-pool-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import PrizePoolConfigForm from './prize-pool-config-form.vue';
-  import { POOL_STATUS_ENUM, POOL_STATUS_OPTIONS, poolStatusOf, resetPeriodOf } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
+  import { POOL_STATUS_ENUM, POOL_STATUS_OPTIONS, poolStatusOf, resetPeriodOf } from '/src/constants/business/draw/prize-pool-config-const';
 
   const router = useRouter();
 

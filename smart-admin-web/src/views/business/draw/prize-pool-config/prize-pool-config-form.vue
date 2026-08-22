@@ -80,9 +80,9 @@
   import { message } from 'ant-design-vue';
   import { useRouter } from 'vue-router';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { prizePoolConfigApi } from '/@/api/business/draw/prize-pool-config/prize-pool-config-api';
+  import { prizePoolConfigApi } from '/src/api/business/draw/prize-pool-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { RESET_PERIOD_OPTIONS } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
+  import { RESET_PERIOD_OPTIONS } from '/src/constants/business/draw/prize-pool-config-const';
 
   const router = useRouter();
 

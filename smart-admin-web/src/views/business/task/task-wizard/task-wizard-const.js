@@ -8,8 +8,8 @@
  * @Date:      2026-07-19
  */
 
-import { TASK_TYPE_ENUM, TASK_TYPE_OPTIONS } from '/@/constants/business/task/task-template/task-template-const';
-import { PRIZE_MODE_ENUM, PRIZE_MODE_OPTIONS } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
+import { TASK_TYPE_ENUM, TASK_TYPE_OPTIONS } from '/src/constants/business/task/task-template-const';
+import { PRIZE_MODE_ENUM, PRIZE_MODE_OPTIONS } from '/src/constants/business/prize/task-prize-mapping-const';
 import {
   TASK_GROUP_ENUM,
   TASK_GROUP_OPTIONS,
@@ -17,7 +17,7 @@ import {
   LIMIT_TYPE_OPTIONS,
   TARGET_AUDIENCE_ENUM,
   TARGET_AUDIENCE_OPTIONS,
-} from '/@/constants/business/task/task-config/task-config-const';
+} from '/src/constants/business/task/task-config-const';
 
 // ---------------------------- 页面路由（与菜单配置的「路由地址」保持一致） ----------------------------
 

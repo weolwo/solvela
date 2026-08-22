@@ -1,15 +1,16 @@
 package sa.member.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import sa.base.common.domain.PageResult;
 import sa.base.common.exception.BusinessException;
+import sa.base.common.util.SmartPageUtil;
 import sa.member.dao.MemberDao;
+import sa.member.domain.form.MemberQueryForm;
+import sa.member.domain.vo.MemberVO;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 会员标识解析 —— 关联键（{@code member_id}）与账号（{@code member_name}）之间的唯一翻译入口。
@@ -41,6 +42,16 @@ import java.util.Set;
 public class MemberService {
 
     private final MemberDao memberDao;
+
+
+    /**
+     * 分页查询
+     */
+    public PageResult<MemberVO> queryPage(MemberQueryForm queryForm) {
+        Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
+        List<MemberVO> list = memberDao.queryPage(page, queryForm);
+        return SmartPageUtil.convert2PageResult(page, list);
+    }
 
     /**
      * 会员号 → 账号。查不到返回 null。

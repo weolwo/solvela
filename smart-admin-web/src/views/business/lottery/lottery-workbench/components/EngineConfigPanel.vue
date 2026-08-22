@@ -287,8 +287,8 @@
   import { computed, reactive, ref, watch } from 'vue';
   import { message, Empty } from 'ant-design-vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { lotteryWorkbenchApi } from '/@/api/business/lottery/lottery-workbench/lottery-workbench-api';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
+  import { lotteryWorkbenchApi } from '/src/api/business/lottery/lottery-workbench-api';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { MIN_NUMBER_LENGTH, MAX_NUMBER_LENGTH, MATCH_RULE_OPTIONS, prizeIcon } from '/@/constants/business/lottery/lottery-const';
 

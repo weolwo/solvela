@@ -134,8 +134,9 @@
       <a-form-item label="会员号" class="smart-query-form-item">
         <a-input-number style="width: 200px" v-model:value="queryForm.memberId" placeholder="会员号" :controls="false" :precision="0" />
       </a-form-item>
-      <a-form-item label="发奖提案ID" class="smart-query-form-item">
-        <a-input style="width: 200px" v-model:value="queryForm.proposalId" placeholder="发奖提案ID" />
+      <!-- 来源单号：PROPOSAL 存提案ID / MALL 存订单号，所以是字符串不是数字 -->
+      <a-form-item label="来源单号" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="queryForm.sourceBizId" placeholder="来源单号" />
       </a-form-item>
       <a-form-item label="来源类型" class="smart-query-form-item">
         <a-input style="width: 200px" v-model:value="queryForm.sourceType" placeholder="来源类型" />
@@ -290,7 +291,7 @@
   import StatPanel from '/@/components/business/stat-panel/index.vue';
   import { backlogTone, barPercent, num, percent, waitedText } from '/@/lib/stat-format';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { physicalDeliveryApi } from '/@/api/business/ledger/physical-delivery/physical-delivery-api';
+  import { physicalDeliveryApi } from '/src/api/business/ledger/physical-delivery-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -301,7 +302,7 @@
     DELIVERY_STATUS_ENUM,
     DELIVERY_STATUS_OPTIONS,
     deliveryStatusOf
-  } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
+  } from '/src/constants/business/ledger/physical-delivery-const';
 
   // ---------------------------- 统计面板 ----------------------------
 
@@ -345,8 +346,8 @@
       ellipsis: true,
     },
     {
-      title: '发奖提案ID',
-      dataIndex: 'proposalId',
+      title: '来源单号',
+      dataIndex: 'sourceBizId',
       ellipsis: true,
     },
     {
@@ -416,7 +417,7 @@
 
   const queryFormState = {
     memberId: undefined, //会员号（关联键）
-    proposalId: undefined, //发奖提案ID
+    sourceBizId: undefined, //来源单号
     sourceType: undefined, //来源类型
     logisticsNo: undefined, //物流单号
     status: undefined, //状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回

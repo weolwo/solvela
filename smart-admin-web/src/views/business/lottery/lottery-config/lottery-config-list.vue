@@ -275,8 +275,8 @@
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
   import { StopOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
-  import { lotteryWorkbenchApi } from '/@/api/business/lottery/lottery-workbench/lottery-workbench-api';
+  import { lotteryConfigApi } from '/src/api/business/lottery/lottery-config-api';
+  import { lotteryWorkbenchApi } from '/src/api/business/lottery/lottery-workbench-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';

@@ -195,7 +195,7 @@
   import { PlusOutlined } from '@ant-design/icons-vue';
   import { cloneDeep, isEqual } from 'lodash';
   import Decimal from 'decimal.js';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   // ---------------------------- Props / Emits ----------------------------

@@ -119,12 +119,12 @@
 <script setup>
   import { computed, nextTick, reactive, ref } from 'vue';
   import { message } from 'ant-design-vue';
-  import { prizeLogApi } from '/@/api/business/prize/prize-log/prize-log-api';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { prizeLogApi } from '/src/api/business/prize/prize-log-api';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { PRIZE_TYPE_ENUM } from '/@/constants/business/prize/prize-config/prize-config-const';
-  import { APPROVE_STATUS_ENUM, DISPATCH_STATUS_ENUM } from '/@/constants/business/prize/prize-log/prize-log-const';
+  import { PRIZE_TYPE_ENUM } from '/src/constants/business/prize/prize-config-const';
+  import { APPROVE_STATUS_ENUM, DISPATCH_STATUS_ENUM } from '/src/constants/business/prize/prize-log-const';
 
   const emits = defineEmits(['reloadList']);
 

@@ -560,7 +560,7 @@ INSERT INTO `t_serial_number` (`serial_number_id`, `business_name`, `format`, `r
 (2, '合同编号', 'HT[yyyy][mm][dd][nnnnn]-CX', 'none', 1, 1, '', 9, '2026-03-19 22:41:45', '2026-03-19 14:41:44', '2021-08-12 20:40:37');
 
 -- -----------------------------------------------------------------------------------
--- t_file_category  文件分类。代码按 category_code 引用，缺了直接抛异常（6 行）
+-- t_file_category  文件分类。代码按 category_code 引用，缺了直接抛异常（7 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_file_category`;
 INSERT INTO `t_file_category` (`category_id`, `category_code`, `category_name`, `category_tag`, `sort`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
@@ -569,7 +569,8 @@ INSERT INTO `t_file_category` (`category_id`, `category_code`, `category_name`, 
 (3, 'HELP_DOC', '帮助中心', '系统', 30, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
 (4, 'FEEDBACK', '意见反馈', '系统', 40, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
 (6, 'ACTIVITY', '活动素材', '营销', 5, NULL, '2026-08-10 10:20:21', NULL, '2026-08-10 10:20:21'),
-(7, 'CONTENT', '正文配图', '营销', 6, NULL, '2026-08-10 11:01:30', NULL, '2026-08-10 11:01:30');
+(7, 'CONTENT', '正文配图', '营销', 6, NULL, '2026-08-10 11:01:30', NULL, '2026-08-10 11:01:30'),
+(8, 'MALL_COMMODITY', '商城商品图', '商城', 100, NULL, '2026-08-22 11:18:13', NULL, '2026-08-22 11:18:13');
 
 -- -----------------------------------------------------------------------------------
 -- t_smart_job  定时任务定义。缺了任务不会注册（9 行）
@@ -584,7 +585,7 @@ INSERT INTO `t_smart_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `jo
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
 (10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-08-23 03:10:00', '2026-08-19 03:10:00', 2, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8220, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-08-22 15:08:02', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
 (11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-08-23 03:20:00', '2026-08-19 03:20:00', 2, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8221, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-08-22 15:08:02', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-08-22 18:20:00', '2026-08-22 18:10:00', 7, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-08-22 18:10:00', 8225, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-08-22 18:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-08-22 19:20:00', '2026-08-22 18:20:00', 8, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-08-22 18:10:00', 8226, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-08-22 19:18:05', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
 -- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）

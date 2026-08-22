@@ -222,7 +222,7 @@
 <script setup>
   import { computed, reactive, ref, onMounted } from 'vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { memberCouponApi } from '/@/api/business/ledger/member-coupon/member-coupon-api';
+  import { memberCouponApi } from '/src/api/business/ledger/member-coupon-api';
   import StatPanel from '/@/components/business/stat-panel/index.vue';
   import { barPercent, num, percent } from '/@/lib/stat-format';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -230,7 +230,7 @@
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-  import { COUPON_STATUS_OPTIONS, couponStatusOf } from '/@/constants/business/ledger/member-coupon/member-coupon-const';
+  import { COUPON_STATUS_OPTIONS, couponStatusOf } from '/src/constants/business/ledger/member-coupon-const';
 
   // ---------------------------- 统计面板 ----------------------------
 

@@ -141,9 +141,9 @@
   import { message, Modal } from 'ant-design-vue';
   import { onBeforeRouteLeave, useRoute } from 'vue-router';
   import { CloudUploadOutlined } from '@ant-design/icons-vue';
-  import { lotteryWorkbenchApi } from '/@/api/business/lottery/lottery-workbench/lottery-workbench-api';
-  import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { lotteryWorkbenchApi } from '/src/api/business/lottery/lottery-workbench-api';
+  import { lotteryConfigApi } from '/src/api/business/lottery/lottery-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { LOTTERY_STATUS_ENUM } from '/@/constants/business/lottery/lottery-const';
   import EngineConfigPanel from './components/EngineConfigPanel.vue';

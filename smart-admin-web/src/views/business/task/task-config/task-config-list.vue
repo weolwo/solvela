@@ -196,15 +196,15 @@
   import { useRoute, useRouter } from 'vue-router';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { taskConfigApi } from '/@/api/business/task/task-config/task-config-api';
+  import { taskConfigApi } from '/src/api/business/task/task-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { taskApi } from '/@/api/business/task/task-api';
-  import { taskPrizeMappingApi } from '/@/api/business/prize/task-prize-mapping/task-prize-mapping-api';
+  import { taskPrizeMappingApi } from '/src/api/business/prize/task-prize-mapping-api';
   import { toEventOptions } from '../task-wizard/task-wizard-const';
-  import { prizeModeOf } from '/@/constants/business/prize/task-prize-mapping/task-prize-mapping-const';
+  import { prizeModeOf } from '/src/constants/business/prize/task-prize-mapping-const';
   import {
     CONFIG_STATUS_ENUM,
     CONFIG_STATUS_OPTIONS,
@@ -212,7 +212,7 @@
     limitTypeOf,
     targetAudienceOf,
     taskGroupOf,
-  } from '/@/constants/business/task/task-config/task-config-const';
+  } from '/src/constants/business/task/task-config-const';
 
   // ---------------------------- 表格列 ----------------------------
 

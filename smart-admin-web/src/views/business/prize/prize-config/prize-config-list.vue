@@ -157,7 +157,7 @@
   import { reactive, ref, onMounted } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -169,7 +169,7 @@
     PRIZE_STATUS_OPTIONS,
     isPrizeEnabled,
     prizeTypeOf,
-  } from '/@/constants/business/prize/prize-config/prize-config-const';
+  } from '/src/constants/business/prize/prize-config-const';
 
   // ---------------------------- 表格列 ----------------------------
 

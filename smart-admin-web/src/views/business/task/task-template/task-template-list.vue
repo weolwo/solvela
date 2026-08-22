@@ -125,7 +125,7 @@
   import { reactive, ref, onMounted } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { taskTemplateApi } from '/@/api/business/task/task-template/task-template-api';
+  import { taskTemplateApi } from '/src/api/business/task/task-template-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -137,7 +137,7 @@
     TEMPLATE_STATUS_ENUM,
     TEMPLATE_STATUS_OPTIONS,
     taskTypeOf,
-  } from '/@/constants/business/task/task-template/task-template-const';
+  } from '/src/constants/business/task/task-template-const';
 
   // 与菜单里「任务模板设计」的路由地址保持一致
   const TASK_TEMPLATE_DESIGNER_PATH = '/business/task/task-template-designer';

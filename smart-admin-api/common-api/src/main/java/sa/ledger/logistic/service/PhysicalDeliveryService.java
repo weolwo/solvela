@@ -236,16 +236,22 @@ public class PhysicalDeliveryService {
             if (SmartStringUtil.isBlank(row.memberName())) {
                 errorList.add(rowNo + "「会员账号」不能为空");
             }
-            if (row.proposalId() == null) {
-                errorList.add(rowNo + "「发奖提案ID」不能为空");
+            if (SmartStringUtil.isBlank(row.sourceBizId())) {
+                errorList.add(rowNo + "「来源单号」不能为空");
             }
             if (SmartStringUtil.isBlank(row.sourceType())) {
                 errorList.add(rowNo + "「来源类型」不能为空");
             }
+            // 🔴 收件三项要落进密文列，上限由密文列宽反推（算式见 PiiCipher.cipherTextLength）。
+            //    这里逐行拦，是因为再往下就是 MySQL 非严格模式的<b>静默截断</b> ——
+            //    表现是「导入成功了，但那几行读出来解密失败」，而且那几行救不回来。
+            checkPiiLength(errorList, rowNo, "收件人姓名", row.receiverName(), RECEIVER_NAME_MAX);
+            checkPiiLength(errorList, rowNo, "收件人电话", row.receiverPhone(), RECEIVER_PHONE_MAX);
+            checkPiiLength(errorList, rowNo, "收件详细地址", row.receiverAddress(), RECEIVER_ADDRESS_MAX);
             // 文件内自查重：同一批里出现两行同键，逐行插入时才炸就说不清是哪两行冲突了
-            if (row.proposalId() != null && SmartStringUtil.isNotBlank(row.sourceType())
-                    && !fileKeySet.add(uniqueKey(row.proposalId(), row.sourceType()))) {
-                errorList.add(rowNo + "与文件中其它行的「发奖提案ID + 来源类型」重复");
+            if (SmartStringUtil.isNotBlank(row.sourceBizId()) && SmartStringUtil.isNotBlank(row.sourceType())
+                    && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errorList.add(rowNo + "与文件中其它行的「来源单号 + 来源类型」重复");
             }
         }
 
@@ -264,14 +270,14 @@ public class PhysicalDeliveryService {
             }
         }
 
-        // 与库内已有履约单查重：撞唯一键 uk_t_biz_phy_dlv_prop_pool 的行，
+        // 与库内已有履约单查重：撞唯一键 uk_t_biz_phy_dlv_src 的行，
         // 说明这单已经存在，该走「回填模式」而不是新增
         Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
-                .map(r -> new Object[]{r.proposalId(), r.sourceType()}).toList());
+                .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
         for (int i = 0; i < dataList.size(); i++) {
             PhysicalDeliveryImportForm row = dataList.get(i);
-            if (row.proposalId() != null && SmartStringUtil.isNotBlank(row.sourceType())
-                    && existMap.containsKey(uniqueKey(row.proposalId(), row.sourceType()))) {
+            if (SmartStringUtil.isNotBlank(row.sourceBizId()) && SmartStringUtil.isNotBlank(row.sourceType())
+                    && existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
                 errorList.add(rowLabel(i) + "对应的履约单已存在，请改用「回填物流」模式");
             }
         }
@@ -287,7 +293,7 @@ public class PhysicalDeliveryService {
             entity.setMemberId(memberIdMap.get(row.memberName()));
             // 账号同时作为展示快照落库（履约单是单据，记的是「导入当时那个账号」）
             entity.setMemberName(row.memberName());
-            entity.setProposalId(row.proposalId());
+            entity.setSourceBizId(row.sourceBizId());
             entity.setSourceType(row.sourceType());
             entity.setReceiverName(row.receiverName());
             entity.setReceiverPhone(row.receiverPhone());
@@ -324,15 +330,15 @@ public class PhysicalDeliveryService {
             PhysicalDeliveryShipImportForm row = dataList.get(i);
             String rowNo = rowLabel(i);
 
-            if (row.proposalId() == null) {
-                errorList.add(rowNo + "「发奖提案ID」不能为空");
+            if (SmartStringUtil.isBlank(row.sourceBizId())) {
+                errorList.add(rowNo + "「来源单号」不能为空");
             }
             if (SmartStringUtil.isBlank(row.sourceType())) {
                 errorList.add(rowNo + "「来源类型」不能为空");
             }
-            if (row.proposalId() != null && SmartStringUtil.isNotBlank(row.sourceType())
-                    && !fileKeySet.add(uniqueKey(row.proposalId(), row.sourceType()))) {
-                errorList.add(rowNo + "与文件中其它行的「发奖提案ID + 来源类型」重复");
+            if (SmartStringUtil.isNotBlank(row.sourceBizId()) && SmartStringUtil.isNotBlank(row.sourceType())
+                    && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errorList.add(rowNo + "与文件中其它行的「来源单号 + 来源类型」重复");
             }
             // 状态列为空表示"这次不改状态"，只回填单号；填了就必须是合法值（模板里是下拉，正常填不错）
             if (row.status() != null && DeliveryStatusEnum.resolve(row.status()) == null) {
@@ -345,12 +351,12 @@ public class PhysicalDeliveryService {
         }
 
         Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
-                .map(r -> new Object[]{r.proposalId(), r.sourceType()}).toList());
+                .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
         for (int i = 0; i < dataList.size(); i++) {
             PhysicalDeliveryShipImportForm row = dataList.get(i);
-            if (row.proposalId() != null && SmartStringUtil.isNotBlank(row.sourceType())
-                    && !existMap.containsKey(uniqueKey(row.proposalId(), row.sourceType()))) {
-                errorList.add(rowLabel(i) + "找不到对应的履约单（发奖提案ID + 来源类型）");
+            if (SmartStringUtil.isNotBlank(row.sourceBizId()) && SmartStringUtil.isNotBlank(row.sourceType())
+                    && !existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errorList.add(rowLabel(i) + "找不到对应的履约单（来源单号 + 来源类型）");
             }
         }
 
@@ -359,7 +365,7 @@ public class PhysicalDeliveryService {
         }
 
         for (PhysicalDeliveryShipImportForm row : dataList) {
-            PhysicalDelivery exist = existMap.get(uniqueKey(row.proposalId(), row.sourceType()));
+            PhysicalDelivery exist = existMap.get(uniqueKey(row.sourceBizId(), row.sourceType()));
 
             PhysicalDelivery update = new PhysicalDelivery();
             update.setId(exist.getId());
@@ -377,37 +383,60 @@ public class PhysicalDeliveryService {
     }
 
     /**
-     * 按 (proposal_id, source_type) 捞出这批 key 命中的履约单。
+     * 按 (source_biz_id, source_type) 捞出这批 key 命中的履约单。
      *
      * <p>用两个 IN 粗筛再在内存里按复合键收敛：MyBatis-Plus 表达复合键 IN 很别扭，
      * 而导入本来就是几百行量级，粗筛多带回来一些完全无所谓。
      */
-    private Map<String, PhysicalDelivery> loadExisting(List<Object[]> keyList) {
-        Set<Long> proposalIdSet = new HashSet<>();
+    private Map<String, PhysicalDelivery> loadExisting(List<String[]> keyList) {
+        Set<String> sourceBizIdSet = new HashSet<>();
         Set<String> sourceTypeSet = new HashSet<>();
-        for (Object[] key : keyList) {
-            if (key[0] != null) {
-                proposalIdSet.add((Long) key[0]);
+        for (String[] key : keyList) {
+            if (SmartStringUtil.isNotBlank(key[0])) {
+                sourceBizIdSet.add(key[0]);
             }
-            if (key[1] != null) {
-                sourceTypeSet.add((String) key[1]);
+            if (SmartStringUtil.isNotBlank(key[1])) {
+                sourceTypeSet.add(key[1]);
             }
         }
-        if (proposalIdSet.isEmpty() || sourceTypeSet.isEmpty()) {
+        if (sourceBizIdSet.isEmpty() || sourceTypeSet.isEmpty()) {
             return Map.of();
         }
 
         List<PhysicalDelivery> list = physicalDeliveryDao.selectList(new LambdaQueryWrapper<PhysicalDelivery>()
-                .in(PhysicalDelivery::getProposalId, proposalIdSet)
+                .in(PhysicalDelivery::getSourceBizId, sourceBizIdSet)
                 .in(PhysicalDelivery::getSourceType, sourceTypeSet));
 
         Map<String, PhysicalDelivery> map = new HashMap<>();
-        list.forEach(e -> map.put(uniqueKey(e.getProposalId(), e.getSourceType()), e));
+        list.forEach(e -> map.put(uniqueKey(e.getSourceBizId(), e.getSourceType()), e));
         return map;
     }
 
-    private String uniqueKey(Long proposalId, String sourceType) {
-        return proposalId + "|" + sourceType;
+    private String uniqueKey(String sourceBizId, String sourceType) {
+        return sourceBizId + "|" + sourceType;
+    }
+
+    /**
+     * 收件信息的明文长度上限 —— <b>由密文列宽反推出来的，不是拍脑袋定的</b>。
+     *
+     * <p>三列都加密落库，密文长度 = 3(前缀) + base64(12 + 明文字节数 + 16)。
+     * 按 UTF-8 中文每字 3 字节算：
+     * <pre>
+     *   姓名 40 字 (120B) -> 密文 203 ≤ varchar(255)
+     *   电话 30 位 ( 30B) -> 密文  83 ≤ varchar(255)
+     *   地址 100 字(300B) -> 密文 443 ≤ varchar(512)
+     * </pre>
+     * 与 {@code PhysicalDeliveryAddForm} / {@code PhysicalDeliveryUpdateForm} 上的
+     * {@code @Size} 是同一组数字，改一处要改三处，算式见 {@code PiiCipher.cipherTextLength}。
+     */
+    private static final int RECEIVER_NAME_MAX = 40;
+    private static final int RECEIVER_PHONE_MAX = 30;
+    private static final int RECEIVER_ADDRESS_MAX = 100;
+
+    private void checkPiiLength(List<String> errorList, String rowNo, String label, String value, int max) {
+        if (value != null && value.length() > max) {
+            errorList.add(rowNo + "「" + label + "」超长（最多 " + max + " 个字，当前 " + value.length() + "）");
+        }
     }
 
     /**

@@ -330,12 +330,12 @@
   import { reactive, ref, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { poolPrizeMappingApi } from '/@/api/business/draw/pool-prize-mapping/pool-prize-mapping-api';
-  import { prizePoolConfigApi } from '/@/api/business/draw/prize-pool-config/prize-pool-config-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { poolPrizeMappingApi } from '/src/api/business/draw/pool-prize-mapping-api';
+  import { prizePoolConfigApi } from '/src/api/business/draw/prize-pool-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { POOL_STATUS_ENUM } from '/@/constants/business/draw/prize-pool-config/prize-pool-config-const';
+  import { POOL_STATUS_ENUM } from '/src/constants/business/draw/prize-pool-config-const';
   import { prizeIcon } from '/@/constants/business/lottery/lottery-const';
 
   const router = useRouter();

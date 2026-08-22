@@ -223,7 +223,7 @@
   import { localRead, localRemove, localSave } from '/@/utils/local-util';
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
-  import { taskTemplateApi } from '/@/api/business/task/task-template/task-template-api';
+  import { taskTemplateApi } from '/src/api/business/task/task-template-api';
   import { useRoute } from 'vue-router';
 
   const route = useRoute();

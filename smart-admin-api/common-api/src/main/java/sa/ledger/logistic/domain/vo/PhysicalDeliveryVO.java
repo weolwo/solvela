@@ -29,19 +29,28 @@ public class PhysicalDeliveryVO {
     @Schema(description = "会员账号（下单当时的快照）")
     private String memberName;
 
-    @Schema(description = "发奖提案ID")
-    private Long proposalId;
+    @Schema(description = "来源单号：PROPOSAL 存提案ID / MALL 存订单号")
+    private String sourceBizId;
 
-    @Schema(description = "来源类型")
+    @Schema(description = "来源类型：PROPOSAL / MALL")
     private String sourceType;
 
-    @Schema(description = "收件人姓名")
+    /*
+     * 收件三项库里是密文，这里是<b>解密后的明文</b>（resultMap 上挂了 PiiTypeHandler）。
+     *
+     * ⚠️ 刻意<b>不脱敏</b>：运营台这个页面的用途就是发货 —— 看不到完整地址就没法干活，
+     * 也没法把单子导给物流商。加密防的是<b>静态泄露</b>（库被脱、备份被拷、DBA 直接 select），
+     * 不是防有应用权限的人。
+     * 「谁能看到完整收件信息」是权限点的问题，不是加密能解决的 —— 那件事还没做，
+     * 见交接文档 §13.8。
+     */
+    @Schema(description = "收件人姓名（库中密文，接口返回明文）")
     private String receiverName;
 
-    @Schema(description = "收件人电话")
+    @Schema(description = "收件人电话（库中密文，接口返回明文）")
     private String receiverPhone;
 
-    @Schema(description = "收件详细地址")
+    @Schema(description = "收件详细地址（库中密文，接口返回明文）")
     private String receiverAddress;
 
     @Schema(description = "物流公司")

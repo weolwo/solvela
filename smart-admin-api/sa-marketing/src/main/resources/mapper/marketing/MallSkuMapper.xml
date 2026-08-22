@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.mall.sku.dao.MallSkuDao">
+
+    <resultMap id="MallSkuVO" type="sa.mall.sku.domain.vo.MallSkuVO">
+            <result column="id" property="id" />
+            <result column="commodity_id" property="commodityId" />
+            <result column="sku_code" property="skuCode" />
+            <result column="sku_attrs" property="skuAttrs" />
+            <result column="sku_cover_file_id" property="skuCoverFileId" />
+            <result column="sku_points_price" property="skuPointsPrice" />
+            <result column="sku_cash_price" property="skuCashPrice" />
+            <result column="total_stock" property="totalStock" />
+            <result column="locked_stock" property="lockedStock" />
+            <result column="sold_count" property="soldCount" />
+            <result column="available_stock" property="availableStock" />
+            <result column="sku_status" property="skuStatus" />
+            <result column="sort" property="sort" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                commodity_id, 
+                sku_code, 
+                sku_attrs, 
+                sku_cover_file_id, 
+                sku_points_price, 
+                sku_cash_price, 
+                total_stock, 
+                locked_stock, 
+                sold_count, 
+                available_stock, 
+                sku_status, 
+                sort, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MallSkuVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_mall_sku
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MallSkuVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_mall_sku
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+
+</mapper>

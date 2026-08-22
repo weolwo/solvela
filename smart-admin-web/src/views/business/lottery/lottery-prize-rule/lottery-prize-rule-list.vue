@@ -265,8 +265,8 @@
   import { reactive, ref, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { lotteryPrizeRuleApi } from '/@/api/business/lottery/lottery-prize-rule/lottery-prize-rule-api';
-  import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
+  import { lotteryPrizeRuleApi } from '/src/api/business/lottery/lottery-prize-rule-api';
+  import { lotteryConfigApi } from '/src/api/business/lottery/lottery-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { lotteryStatusOf, prizeIcon } from '/@/constants/business/lottery/lottery-const';

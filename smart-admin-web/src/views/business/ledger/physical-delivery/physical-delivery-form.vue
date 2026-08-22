@@ -12,8 +12,8 @@
       <a-form-item label="会员号" name="memberId">
         <a-input-number style="width: 100%" v-model:value="form.memberId" placeholder="会员号" :controls="false" :precision="0" />
       </a-form-item>
-      <a-form-item label="发奖提案ID" name="proposalId">
-        <a-input-number style="width: 100%" v-model:value="form.proposalId" placeholder="发奖提案ID" />
+      <a-form-item label="来源单号" name="sourceBizId">
+        <a-input style="width: 100%" v-model:value="form.sourceBizId" placeholder="PROPOSAL 填提案ID / MALL 填订单号" />
       </a-form-item>
       <a-form-item label="来源类型" name="sourceType">
         <a-input style="width: 100%" v-model:value="form.sourceType" placeholder="来源类型" />
@@ -51,9 +51,9 @@
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { physicalDeliveryApi } from '/@/api/business/ledger/physical-delivery/physical-delivery-api';
+  import { physicalDeliveryApi } from '/src/api/business/ledger/physical-delivery-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { DELIVERY_STATUS_OPTIONS } from '/@/constants/business/ledger/physical-delivery/physical-delivery-const';
+  import { DELIVERY_STATUS_OPTIONS } from '/src/constants/business/ledger/physical-delivery-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -87,7 +87,7 @@
   const formDefault = {
     id: undefined, //id
     memberId: undefined, //会员号（关联键）
-    proposalId: undefined, //发奖提案ID
+    sourceBizId: undefined, //来源单号
     sourceType: undefined, //来源类型
     receiverName: undefined, //收件人姓名
     receiverPhone: undefined, //收件人电话
@@ -101,7 +101,7 @@
 
   const rules = {
     memberId: [{ required: true, message: '会员号 必填' }],
-    proposalId: [{ required: true, message: '发奖提案ID 必填' }],
+    sourceBizId: [{ required: true, message: '来源单号 必填' }],
     sourceType: [{ required: true, message: '来源类型 必填' }],
     receiverName: [{ required: true, message: '收件人姓名 必填' }],
     receiverPhone: [{ required: true, message: '收件人电话 必填' }],

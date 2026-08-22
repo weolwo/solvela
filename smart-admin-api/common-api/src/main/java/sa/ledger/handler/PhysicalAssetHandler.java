@@ -44,7 +44,9 @@ public class PhysicalAssetHandler implements IAssetHandler {
         delivery.setMemberId(proposal.getMemberId());
         // 展示快照沿用提案上的那一份（履约单是单据，记的是「中奖当时那个账号」）
         delivery.setMemberName(proposal.getMemberName());
-        delivery.setProposalId(proposal.getId());
+        // 来源单号：本链路存提案 ID。这一列原先叫 proposal_id(bigint)，
+        // 泛化成字符串单号之后，商城兑换实物才能以 source_type='MALL' + 订单号 走同一张表。
+        delivery.setSourceBizId(String.valueOf(proposal.getId()));
         delivery.setSourceType(SOURCE_TYPE_PROPOSAL);
         delivery.setStatus(STATUS_PENDING_DELIVERY);
         // receiver_name / receiver_phone / receiver_address 刻意不设：

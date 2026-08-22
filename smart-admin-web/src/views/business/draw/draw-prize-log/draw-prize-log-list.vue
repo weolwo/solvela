@@ -231,13 +231,13 @@
 <script setup>
   import { computed, reactive, ref, watch, onMounted } from 'vue';
   import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
-  import { drawPrizeLogApi } from '/@/api/business/draw/draw-prize-log/draw-prize-log-api';
-  import { prizePoolConfigApi } from '/@/api/business/draw/prize-pool-config/prize-pool-config-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { drawPrizeLogApi } from '/src/api/business/draw/draw-prize-log-api';
+  import { prizePoolConfigApi } from '/src/api/business/draw/prize-pool-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-  import { DRAW_STATUS_ENUM, DRAW_STATUS_OPTIONS, drawStatusOf } from '/@/constants/business/draw/draw-prize-log/draw-prize-log-const';
+  import { DRAW_STATUS_ENUM, DRAW_STATUS_OPTIONS, drawStatusOf } from '/src/constants/business/draw/draw-prize-log-const';
   import { prizeIcon } from '/@/constants/business/lottery/lottery-const';
 
   // 与抽奖工作台同源：活动下拉只取抽奖类活动

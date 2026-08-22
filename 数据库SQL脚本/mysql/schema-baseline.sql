@@ -26,7 +26,7 @@ SET NAMES utf8mb4;
 --   🔴 只改迁移不改基线 = 新环境和老环境结构不一样，而且没人会发现。
 --
 -- 生成时间：2026-08-22
--- 表数量：75 张
+-- 表数量：82 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -956,11 +956,11 @@ CREATE TABLE `t_physical_delivery` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `member_id` bigint NOT NULL COMMENT '会员号：关联键',
   `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
-  `proposal_id` bigint NOT NULL COMMENT '发奖提案ID',
+  `source_biz_id` varchar(64) NOT NULL COMMENT '来源单号：PROPOSAL 存提案ID / MALL 存订单号。只认单号，不认上游业务',
   `source_type` varchar(64) NOT NULL COMMENT '来源类型',
-  `receiver_name` varchar(64) DEFAULT NULL COMMENT '收件人姓名：中奖时未知，由用户后续补填',
-  `receiver_phone` varchar(32) DEFAULT NULL COMMENT '收件人电话：中奖时未知，由用户后续补填',
-  `receiver_address` varchar(255) DEFAULT NULL COMMENT '收件详细地址：中奖时未知，由用户后续补填',
+  `receiver_name` varchar(255) DEFAULT NULL COMMENT '收件人姓名【密文】：中奖时未知，由用户后续补填',
+  `receiver_phone` varchar(255) DEFAULT NULL COMMENT '收件人电话【密文】：中奖时未知，由用户后续补填',
+  `receiver_address` varchar(512) DEFAULT NULL COMMENT '收件详细地址【密文】：中奖时未知，由用户后续补填',
   `logistics_company` varchar(64) DEFAULT NULL COMMENT '物流公司',
   `logistics_no` varchar(128) DEFAULT NULL COMMENT '物流单号',
   `status` tinyint DEFAULT '0' COMMENT '状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回',
@@ -969,7 +969,7 @@ CREATE TABLE `t_physical_delivery` (
   `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_t_biz_phy_dlv_prop_pool` (`proposal_id`,`source_type`),
+  UNIQUE KEY `uk_t_biz_phy_dlv_src` (`source_biz_id`,`source_type`),
   KEY `idx_delivery_status` (`status`,`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='发货物流表';
 
@@ -1434,4 +1434,172 @@ CREATE TABLE `t_lottery_number_pool` (
   UNIQUE KEY `uk_lottery_num` (`lottery_code`,`ticket_number`),
   KEY `idx_number_pool_member` (`sequence_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='彩票号码池';
+
+
+-- =====================================================================================
+-- 积分商城（7 张）
+-- =====================================================================================
+
+DROP TABLE IF EXISTS `t_mall_category`;
+CREATE TABLE `t_mall_category` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `parent_id` bigint NOT NULL DEFAULT '0' COMMENT '父级id：0-顶级分类。业务上限死两级',
+  `category_name` varchar(50) NOT NULL COMMENT '分类名称：如 数码3C / 虚拟权益',
+  `icon_file_id` bigint DEFAULT NULL COMMENT '分类图标 file_id（C端宫格导航用）',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序：从小到大',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-禁用, 1-启用',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mall_cat_parent_name` (`parent_id`,`category_name`),
+  KEY `idx_mall_cat_status_sort` (`status`,`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-商品分类';
+
+DROP TABLE IF EXISTS `t_mall_commodity`;
+CREATE TABLE `t_mall_commodity` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `commodity_code` varchar(32) NOT NULL COMMENT '商品编码：10位大写字母+数字，全局唯一，创建后不可改',
+  `category_id` bigint NOT NULL COMMENT '分类id',
+  `commodity_type` varchar(32) NOT NULL DEFAULT 'PHYSICAL' COMMENT '商品类型：PHYSICAL-实物(走t_physical_delivery), COUPON-优惠券(走t_member_coupon), BALANCE-现金/红包(走钱包入账)',
+  `asset_ref` varchar(64) DEFAULT NULL COMMENT '资产引用：COUPON 存券模编码，PHYSICAL 为空。语义对齐 t_proposal_record.asset_ref',
+  `commodity_name` varchar(128) NOT NULL COMMENT '商品名称',
+  `commodity_intro` varchar(255) DEFAULT NULL COMMENT '副标题/一句话卖点',
+  `cover_file_id` bigint NOT NULL COMMENT '封面主图 file_id（建议 800x800）',
+  `detail_content` mediumtext COMMENT '图文详情，富文本HTML。禁止 base64 内联图片（对齐 t_activity_display.rule_content）',
+  `exchange_notice` varchar(1024) DEFAULT NULL COMMENT '兑换须知：券的核销说明、实物的发货时效等。C端下单页固定展示',
+  `pay_type` tinyint NOT NULL DEFAULT '1' COMMENT '支付方式：1-纯积分, 2-积分+现金',
+  `original_price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '划线原价：仅前端展示「价值￥199」，纯积分商品可留 0',
+  `points_price` int NOT NULL DEFAULT '0' COMMENT '基准兑换积分',
+  `cash_price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '基准兑换现金：pay_type=1 时恒为 0',
+  `limit_period` varchar(32) NOT NULL DEFAULT 'LIFETIME' COMMENT '限兑周期：LIFETIME-终身, DAILY-每日, WEEKLY-每周, MONTHLY-每月',
+  `limit_count` int NOT NULL DEFAULT '0' COMMENT '周期内单会员限兑件数：0-不限制',
+  `start_time` datetime NOT NULL DEFAULT '1970-01-01 00:00:00' COMMENT '上架开始时间：默认值代表不限。不是秒杀场次',
+  `end_time` datetime NOT NULL DEFAULT '2099-12-31 23:59:59' COMMENT '上架结束时间：默认值代表不限。不是秒杀场次',
+  `status` tinyint NOT NULL DEFAULT '2' COMMENT '状态：0-下架, 1-上架, 2-草稿。新建默认落草稿',
+  `is_home` tinyint NOT NULL DEFAULT '0' COMMENT '是否首页推荐：0-否, 1-是',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序权重：从小到大',
+  `sold_count` int NOT NULL DEFAULT '0' COMMENT '累计已兑件数（各SKU之和的冗余，用于列表按热销排序）',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mall_cmd_code` (`commodity_code`),
+  KEY `idx_mall_cmd_cat_status_sort` (`category_id`,`status`,`sort`),
+  KEY `idx_mall_cmd_home` (`is_home`,`status`,`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-商品主表';
+
+DROP TABLE IF EXISTS `t_mall_sku`;
+CREATE TABLE `t_mall_sku` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `commodity_id` bigint NOT NULL COMMENT '关联 t_mall_commodity.id',
+  `sku_code` varchar(32) NOT NULL COMMENT 'SKU编码：10位大写字母+数字，全局唯一',
+  `sku_attrs` json NOT NULL COMMENT '规格组合：{"颜色":"星空灰","尺码":"XL"}。无规格商品填 {}',
+  `sku_cover_file_id` bigint DEFAULT NULL COMMENT '该规格专属图 file_id：C端切换规格时换主图，为空则用商品封面',
+  `sku_points_price` int DEFAULT NULL COMMENT '本规格所需积分：为空则继承 t_mall_commodity.points_price',
+  `sku_cash_price` decimal(10,2) DEFAULT NULL COMMENT '本规格所需现金：为空则继承 t_mall_commodity.cash_price',
+  `total_stock` int NOT NULL DEFAULT '0' COMMENT '总库存：运营投放量，恒定不变，补货改这里',
+  `locked_stock` int NOT NULL DEFAULT '0' COMMENT '锁定库存：已下单未履约（仅 pay_type=2 会悬挂）',
+  `sold_count` int NOT NULL DEFAULT '0' COMMENT '已售数量：履约成功累加',
+  `available_stock` int GENERATED ALWAYS AS (((`total_stock` - `locked_stock`) - `sold_count`)) VIRTUAL COMMENT '可用库存（虚拟列，勿写入）',
+  `sku_status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mall_sku_code` (`sku_code`),
+  KEY `idx_mall_sku_cmd` (`commodity_id`,`sku_status`,`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-SKU与库存';
+
+DROP TABLE IF EXISTS `t_mall_order`;
+CREATE TABLE `t_mall_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `order_no` varchar(32) NOT NULL COMMENT '订单号：服务端生成，对外唯一标识，同时作为扣积分的幂等键',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '下单时的会员账号【展示快照，非关联键，不要用于查询】',
+  `commodity_id` bigint NOT NULL COMMENT '商品id',
+  `commodity_code` varchar(32) NOT NULL COMMENT '商品编码（跨环境稳定的那个）',
+  `sku_id` bigint NOT NULL COMMENT 'SKUid',
+  `sku_code` varchar(32) NOT NULL COMMENT 'SKU编码',
+  `commodity_type` varchar(32) NOT NULL COMMENT '商品类型快照：PHYSICAL / COUPON / BALANCE，履约分派靠它',
+  `asset_ref` varchar(64) DEFAULT NULL COMMENT '资产引用快照：券模编码等',
+  `commodity_name` varchar(128) NOT NULL COMMENT '商品名称快照',
+  `cover_file_id` bigint DEFAULT NULL COMMENT '封面图快照 file_id',
+  `sku_attrs` json NOT NULL COMMENT '规格快照',
+  `quantity` int NOT NULL DEFAULT '1' COMMENT '兑换件数',
+  `points_price` int NOT NULL DEFAULT '0' COMMENT '单件积分单价快照',
+  `cash_price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '单件现金单价快照',
+  `pay_points` int NOT NULL DEFAULT '0' COMMENT '实付积分合计',
+  `pay_cash` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '实付现金合计',
+  `address_id` bigint DEFAULT NULL COMMENT '收货地址id(软引用t_mall_address)，仅PHYSICAL有值。收件信息快照在t_physical_delivery，不在本表',
+  `status` int NOT NULL DEFAULT '0' COMMENT '状态：0-待支付, 10-待履约, 20-履约中, 30-已完成, 40-已取消, 50-已退款, 60-履约失败',
+  `expire_time` datetime DEFAULT NULL COMMENT '待支付超时时间：到点由 job 取消并释放锁定库存。纯积分订单为空',
+  `pay_time` datetime DEFAULT NULL COMMENT '支付/扣分完成时间',
+  `finish_time` datetime DEFAULT NULL COMMENT '履约完成时间',
+  `cancel_time` datetime DEFAULT NULL COMMENT '取消时间',
+  `source_type` varchar(32) NOT NULL DEFAULT 'NORMAL' COMMENT '订单来源：NORMAL-日常兑换, FLASH_SALE-限时抢购场次',
+  `source_biz_id` varchar(64) DEFAULT NULL COMMENT '来源单号：FLASH_SALE 时存场次编码，NORMAL 为空',
+  `fulfill_ref_id` varchar(64) DEFAULT NULL COMMENT '履约单引用：发货单id / 券id',
+  `fail_reason` varchar(255) DEFAULT NULL COMMENT '履约失败原因（status=60 时有值）',
+  `remark` varchar(255) DEFAULT NULL COMMENT '用户备注 / 运营备注',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mall_ord_no` (`order_no`),
+  KEY `idx_mall_ord_member` (`member_id`,`create_time`),
+  KEY `idx_mall_ord_expire` (`status`,`expire_time`),
+  KEY `idx_mall_ord_cmd` (`commodity_id`,`status`,`create_time`),
+  KEY `idx_mall_ord_source` (`source_type`,`source_biz_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-兑换订单';
+
+DROP TABLE IF EXISTS `t_mall_exchange_limit`;
+CREATE TABLE `t_mall_exchange_limit` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `commodity_id` bigint NOT NULL COMMENT '商品id',
+  `period_key` varchar(32) NOT NULL DEFAULT 'NONE' COMMENT '周期标识：NONE(终身) / 20260819(日) / 2026W34(周) / 202608(月)。取值口径对齐 t_task_record.period_key',
+  `used_count` int NOT NULL DEFAULT '0' COMMENT '该周期内已兑件数',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mall_lmt_mbr_cmd_prd` (`member_id`,`commodity_id`,`period_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-会员限兑计数';
+
+DROP TABLE IF EXISTS `t_mall_address`;
+CREATE TABLE `t_mall_address` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `receiver_name` varchar(255) NOT NULL COMMENT '收件人姓名【密文】',
+  `receiver_phone` varchar(255) NOT NULL COMMENT '收件人电话【密文】',
+  `detail_address` varchar(512) NOT NULL COMMENT '详细门牌地址【密文】',
+  `province` varchar(32) DEFAULT NULL COMMENT '省【明文，可统计】',
+  `city` varchar(32) DEFAULT NULL COMMENT '市【明文，可统计】',
+  `district` varchar(32) DEFAULT NULL COMMENT '区/县【明文，可统计】',
+  `is_default` tinyint NOT NULL DEFAULT '0' COMMENT '是否默认地址：0-否, 1-是。设默认时先把该会员其余行置0',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_mall_addr_member` (`member_id`,`is_default`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-会员收货地址簿';
+
+DROP TABLE IF EXISTS `t_mall_favorite`;
+CREATE TABLE `t_mall_favorite` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `commodity_id` bigint NOT NULL COMMENT '商品id（商品粒度，不是SKU粒度）',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mall_fav_mbr_cmd` (`member_id`,`commodity_id`),
+  KEY `idx_mall_fav_mbr_time` (`member_id`,`create_time`),
+  KEY `idx_mall_fav_cmd` (`commodity_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-商品收藏';
 

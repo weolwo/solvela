@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 import lombok.Data;
+import sa.base.common.crypto.PiiTypeHandler;
 
 /**
  * 发货物流表 实体类
@@ -15,8 +16,13 @@ import lombok.Data;
  * @Copyright weolwo
  */
 
+/**
+ * 🔴 {@code autoResultMap = true} 不能删：收件三列挂了 {@link PiiTypeHandler}，
+ * 而 MyBatis-Plus <b>只在写的时候用 typeHandler，读的时候要靠 autoResultMap 才会用</b>。
+ * 少了它的表现是「存进去是密文，查出来还是密文」，且不报任何错。
+ */
 @Data
-@TableName("t_physical_delivery")
+@TableName(value = "t_physical_delivery", autoResultMap = true)
 public class PhysicalDelivery {
 
     /**
@@ -43,28 +49,42 @@ public class PhysicalDelivery {
     private String memberName;
 
     /**
-     * 发奖提案ID
+     * 来源单号 —— <b>只认单号，不认上游是什么业务</b>。
+     *
+     * <p>原先这一列叫 {@code proposal_id bigint}，写死了「履约单必然来自发奖提案」。
+     * 商城兑换实物压根没有提案 ID，那种形态下这张表<b>根本插不进去</b>
+     * （唯一键含 proposal_id 且 NOT NULL），实物商品也就落不了发货单。
+     *
+     * <p>泛化之后语义反而更正：本表本来就有 {@code source_type}，
+     * 与 {@code t_proposal_record} / {@code t_member_coupon} / {@code t_mall_order}
+     * 那几张表「(source_type, source_biz_id) 定位上游」的口径完全一致。
+     *
+     * <p>取值：{@code PROPOSAL} 存提案 ID，{@code MALL} 存商城订单号。
      */
-    private Long proposalId;
+    private String sourceBizId;
 
     /**
-     * 来源类型
+     * 来源类型：PROPOSAL-发奖提案 / MALL-商城兑换。与 sourceBizId 一起构成唯一键
      */
     private String sourceType;
 
     /**
-     * 收件人姓名
+     * 收件人姓名【<b>密文落库</b>，见 {@link PiiTypeHandler}】。
+     * 中奖时未知，由用户后续补填 —— 所以可空，不是忘了加约束。
      */
+    @TableField(typeHandler = PiiTypeHandler.class)
     private String receiverName;
 
     /**
-     * 收件人电话
+     * 收件人电话【<b>密文落库</b>】
      */
+    @TableField(typeHandler = PiiTypeHandler.class)
     private String receiverPhone;
 
     /**
-     * 收件详细地址
+     * 收件详细地址【<b>密文落库</b>】
      */
+    @TableField(typeHandler = PiiTypeHandler.class)
     private String receiverAddress;
 
     /**

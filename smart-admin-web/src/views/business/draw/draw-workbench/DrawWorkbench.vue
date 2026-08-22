@@ -85,7 +85,7 @@
   import { onBeforeRouteLeave } from 'vue-router';
   import { CloudUploadOutlined } from '@ant-design/icons-vue';
   import { drawWorkbenchApi } from '/@/api/business/draw/draw-workbench-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import PrizeItemLibrary from './components/PrizeItemLibrary.vue';
   import PoolProbabilityEngine from './components/PoolProbabilityEngine.vue';

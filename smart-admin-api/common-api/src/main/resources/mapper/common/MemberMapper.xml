@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.member.dao.MemberDao">
+
+    <resultMap id="MemberVO" type="sa.member.domain.vo.MemberVO">
+            <result column="member_id" property="memberId" />
+            <result column="member_name" property="memberName" />
+            <result column="name_update_time" property="nameUpdateTime" />
+            <result column="nickname" property="nickname" />
+            <result column="avatar_file_id" property="avatarFileId" />
+            <result column="gender" property="gender" />
+            <result column="birthday" property="birthday" />
+            <result column="phone" property="phone" />
+            <result column="phone_hash" property="phoneHash" />
+            <result column="email" property="email" />
+            <result column="email_hash" property="emailHash" />
+            <result column="password" property="password" />
+            <result column="status" property="status" />
+            <result column="register_source" property="registerSource" />
+            <result column="register_ip" property="registerIp" />
+            <result column="invite_id" property="inviteId" />
+            <result column="remark" property="remark" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                member_id, 
+                member_name, 
+                name_update_time, 
+                nickname, 
+                avatar_file_id, 
+                gender, 
+                birthday, 
+                phone, 
+                phone_hash, 
+                email, 
+                email_hash, 
+                password, 
+                status, 
+                register_source, 
+                register_ip, 
+                invite_id, 
+                remark, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.memberName != null">
+                            AND member_name = #{queryForm.memberName}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.registerSource != null">
+                            AND register_source = #{queryForm.registerSource}
+                        </if>
+                        <if test="queryForm.inviteId != null">
+                            AND invite_id = #{queryForm.inviteId}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <if test="queryForm.createTimeEnd != null">
+                            AND create_time &lt;= #{queryForm.createTimeEnd}
+                        </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MemberVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_member
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MemberVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_member
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+
+</mapper>

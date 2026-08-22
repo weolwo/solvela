@@ -52,9 +52,9 @@
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { taskRecordApi } from '/@/api/business/task/task-record/task-record-api';
+  import { taskRecordApi } from '/src/api/business/task/task-record-api';
   import { smartSentry } from '/@/lib/smart-sentry';
-  import { RECORD_STATUS_OPTIONS } from '/@/constants/business/task/task-record/task-record-const';
+  import { RECORD_STATUS_OPTIONS } from '/src/constants/business/task/task-record-const';
   import SmartEnumSelect from '/@/components/framework/smart-enum-select/index.vue';
 
   // ------------------------ 事件 ------------------------

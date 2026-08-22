@@ -6,11 +6,19 @@
             <result column="id" property="id" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
-            <result column="proposal_id" property="proposalId" />
+            <result column="source_biz_id" property="sourceBizId" />
             <result column="source_type" property="sourceType" />
-            <result column="receiver_name" property="receiverName" />
-            <result column="receiver_phone" property="receiverPhone" />
-            <result column="receiver_address" property="receiverAddress" />
+            <!--
+                🔴 这三列在库里是密文，必须挂 PiiTypeHandler 才会解密。
+                列表页走的是这个 resultMap，<b>不吃实体上的 @TableField 注解</b> ——
+                漏了 typeHandler 的表现是页面上一片 P1:xxxxx，而且不报任何错。
+            -->
+            <result column="receiver_name" property="receiverName"
+                    typeHandler="sa.base.common.crypto.PiiTypeHandler" />
+            <result column="receiver_phone" property="receiverPhone"
+                    typeHandler="sa.base.common.crypto.PiiTypeHandler" />
+            <result column="receiver_address" property="receiverAddress"
+                    typeHandler="sa.base.common.crypto.PiiTypeHandler" />
             <result column="logistics_company" property="logisticsCompany" />
             <result column="logistics_no" property="logisticsNo" />
             <result column="status" property="status" />
@@ -24,7 +32,7 @@
                 id, 
                 member_id,
                 member_name,
-                proposal_id, 
+                source_biz_id, 
                 source_type, 
                 receiver_name, 
                 receiver_phone, 
@@ -43,8 +51,8 @@
                         <if test="queryForm.memberId != null">
                             AND member_id = #{queryForm.memberId}
                         </if>
-                        <if test="queryForm.proposalId != null">
-                            AND proposal_id = #{queryForm.proposalId}
+                        <if test="queryForm.sourceBizId != null">
+                            AND source_biz_id = #{queryForm.sourceBizId}
                         </if>
                         <if test="queryForm.sourceType != null">
                             AND source_type = #{queryForm.sourceType}

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sa.mall.order.dao.MallOrderDao">
+
+    <resultMap id="MallOrderVO" type="sa.mall.order.domain.vo.MallOrderVO">
+            <result column="id" property="id" />
+            <result column="order_no" property="orderNo" />
+            <result column="member_id" property="memberId" />
+            <result column="member_name" property="memberName" />
+            <result column="commodity_id" property="commodityId" />
+            <result column="commodity_code" property="commodityCode" />
+            <result column="sku_id" property="skuId" />
+            <result column="sku_code" property="skuCode" />
+            <result column="commodity_type" property="commodityType" />
+            <result column="asset_ref" property="assetRef" />
+            <result column="commodity_name" property="commodityName" />
+            <result column="cover_file_id" property="coverFileId" />
+            <result column="sku_attrs" property="skuAttrs" />
+            <result column="quantity" property="quantity" />
+            <result column="points_price" property="pointsPrice" />
+            <result column="cash_price" property="cashPrice" />
+            <result column="pay_points" property="payPoints" />
+            <result column="pay_cash" property="payCash" />
+            <result column="address_id" property="addressId" />
+            <result column="status" property="status" />
+            <result column="expire_time" property="expireTime" />
+            <result column="pay_time" property="payTime" />
+            <result column="finish_time" property="finishTime" />
+            <result column="cancel_time" property="cancelTime" />
+            <result column="source_type" property="sourceType" />
+            <result column="source_biz_id" property="sourceBizId" />
+            <result column="fulfill_ref_id" property="fulfillRefId" />
+            <result column="fail_reason" property="failReason" />
+            <result column="remark" property="remark" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                order_no, 
+                member_id, 
+                member_name, 
+                commodity_id, 
+                commodity_code, 
+                sku_id, 
+                sku_code, 
+                commodity_type, 
+                asset_ref, 
+                commodity_name, 
+                cover_file_id, 
+                sku_attrs, 
+                quantity, 
+                points_price, 
+                cash_price, 
+                pay_points, 
+                pay_cash, 
+                address_id, 
+                status, 
+                expire_time, 
+                pay_time, 
+                finish_time, 
+                cancel_time, 
+                source_type, 
+                source_biz_id, 
+                fulfill_ref_id, 
+                fail_reason, 
+                remark, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.orderNo != null">
+                            AND order_no = #{queryForm.orderNo}
+                        </if>
+                        <if test="queryForm.memberName != null">
+                            AND member_name = #{queryForm.memberName}
+                        </if>
+                        <if test="queryForm.commodityCode != null">
+                            AND commodity_code = #{queryForm.commodityCode}
+                        </if>
+                        <if test="queryForm.commodityType != null">
+                            AND commodity_type = #{queryForm.commodityType}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MallOrderVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_mall_order
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MallOrderVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_mall_order
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+
+</mapper>

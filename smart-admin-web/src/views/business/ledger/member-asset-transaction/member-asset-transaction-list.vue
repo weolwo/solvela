@@ -189,7 +189,7 @@
 <script setup>
   import { reactive, ref, onMounted } from 'vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { memberAssetTransactionApi } from '/@/api/business/ledger/member-asset-transaction/member-asset-transaction-api';
+  import { memberAssetTransactionApi } from '/src/api/business/ledger/member-asset-transaction-api';
   import StatPanel from '/@/components/business/stat-panel/index.vue';
   import { barPercent, money, num } from '/@/lib/stat-format';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
@@ -203,7 +203,7 @@
     assetTypeOf,
     assetUnitOf,
     transactionTypeOf,
-  } from '/@/constants/business/ledger/member-asset-transaction/member-asset-transaction-const';
+  } from '/src/constants/business/ledger/member-asset-transaction-const';
 
   // ---------------------------- 统计面板 ----------------------------
 

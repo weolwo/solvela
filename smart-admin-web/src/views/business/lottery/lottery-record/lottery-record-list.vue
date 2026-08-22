@@ -251,9 +251,9 @@
 <script setup>
   import { reactive, ref, watch, onMounted } from 'vue';
   import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
-  import { lotteryRecordApi } from '/@/api/business/lottery/lottery-record/lottery-record-api';
-  import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
-  import { lotteryIssueApi } from '/@/api/business/lottery/lottery-issue/lottery-issue-api';
+  import { lotteryRecordApi } from '/src/api/business/lottery/lottery-record-api';
+  import { lotteryConfigApi } from '/src/api/business/lottery/lottery-config-api';
+  import { lotteryIssueApi } from '/src/api/business/lottery/lottery-issue-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';

@@ -31,8 +31,14 @@ public class FileCategoryService {
      *
      * <p><b>刻意放在代码里而不是加一个 {@code system_flag} 列</b>：既然引用关系本来就在代码侧，
      * 真相源留在这里比留在一个可能被手工 UPDATE 掉的 DB 标记里更可靠，而且零列开销。
+     *
+     * <p>{@code MALL_COMMODITY} 是商城商品图专属分类（随 mall.sql 建表一起播种）。
+     * 商品图不走素材库选图器，而是在商品表单里直接上传、落这个分类 ——
+     * 运营看到的是两个互不干扰的图片空间，底层仍是同一套存储与生命周期。
+     * 🔴 它必须在这份名单里：删掉这个分类，历史商品图会全部变成孤儿。
      */
-    public static final Set<String> SYSTEM_CODES = Set.of("COMMON", "NOTICE", "HELP_DOC", "FEEDBACK");
+    public static final Set<String> SYSTEM_CODES =
+            Set.of("COMMON", "NOTICE", "HELP_DOC", "FEEDBACK", "MALL_COMMODITY");
 
     @Resource
     private FileCategoryDao fileCategoryDao;

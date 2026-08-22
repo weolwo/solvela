@@ -315,11 +315,11 @@ CREATE TABLE `t_physical_delivery` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `member_id` bigint NOT NULL COMMENT '会员号：关联键',
   `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
-  `proposal_id` bigint NOT NULL COMMENT '发奖提案ID',
+  `source_biz_id` varchar(64) NOT NULL COMMENT '来源单号：PROPOSAL 存提案ID / MALL 存订单号。只认单号，不认上游业务',
   `source_type` varchar(64) NOT NULL COMMENT '来源类型',
-  `receiver_name` varchar(64) DEFAULT NULL COMMENT '收件人姓名：中奖时未知，由用户后续补填',
-  `receiver_phone` varchar(32) DEFAULT NULL COMMENT '收件人电话：中奖时未知，由用户后续补填',
-  `receiver_address` varchar(255) DEFAULT NULL COMMENT '收件详细地址：中奖时未知，由用户后续补填',
+  `receiver_name` varchar(255) DEFAULT NULL COMMENT '收件人姓名【密文】：中奖时未知，由用户后续补填',
+  `receiver_phone` varchar(255) DEFAULT NULL COMMENT '收件人电话【密文】：中奖时未知，由用户后续补填',
+  `receiver_address` varchar(512) DEFAULT NULL COMMENT '收件详细地址【密文】：中奖时未知，由用户后续补填',
   `logistics_company` varchar(64) DEFAULT NULL COMMENT '物流公司',
   `logistics_no` varchar(128) DEFAULT NULL COMMENT '物流单号',
   `status` tinyint DEFAULT '0' COMMENT '状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回',
@@ -328,6 +328,6 @@ CREATE TABLE `t_physical_delivery` (
   `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_t_biz_phy_dlv_prop_pool` (`proposal_id`,`source_type`),
+  UNIQUE KEY `uk_t_biz_phy_dlv_src` (`source_biz_id`,`source_type`),
   KEY `idx_delivery_status` (`status`,`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='发货物流表';

@@ -301,7 +301,7 @@
   import { computed, ref, watch } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import { QuestionCircleOutlined } from '@ant-design/icons-vue';
-  import { lotteryIssueApi } from '/@/api/business/lottery/lottery-issue/lottery-issue-api';
+  import { lotteryIssueApi } from '/src/api/business/lottery/lottery-issue-api';
   import { smartSentry } from '/@/lib/smart-sentry';
 
   const props = defineProps({

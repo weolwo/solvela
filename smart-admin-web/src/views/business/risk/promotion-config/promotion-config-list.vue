@@ -214,7 +214,7 @@
   import { reactive, ref, onMounted } from 'vue';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
+  import { promotionConfigApi } from '/src/api/business/risk/promotion-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -230,7 +230,7 @@
     prizeTypeOf,
     promotionStatusOf,
     reviewLevelOf,
-  } from '/@/constants/business/risk/promotion-config/promotion-config-const';
+  } from '/src/constants/business/risk/promotion-config-const';
 
   // ---------------------------- 查询区展开 ----------------------------
 

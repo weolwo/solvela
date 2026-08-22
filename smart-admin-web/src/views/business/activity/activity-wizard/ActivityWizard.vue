@@ -194,8 +194,8 @@
   import { computed, onMounted, reactive, ref, watch } from 'vue';
   import { message } from 'ant-design-vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
-  import { ACTIVITY_TYPE_LIST, activityTypeMeta, hasGameplay } from '/@/constants/business/activity/activity-config/activity-config-const';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
+  import { ACTIVITY_TYPE_LIST, activityTypeMeta, hasGameplay } from '/src/constants/business/activity/activity-config-const';
   import { regular } from '/@/constants/regular-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import DrawWorkbench from '/@/views/business/draw/draw-workbench/DrawWorkbench.vue';

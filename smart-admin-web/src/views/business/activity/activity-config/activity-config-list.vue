@@ -190,7 +190,7 @@
   import { message, Modal } from 'ant-design-vue';
   import { useRouter } from 'vue-router';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -205,7 +205,7 @@
     activityTypeMeta,
     hasGameplay,
     isActivityEnabled,
-  } from '/@/constants/business/activity/activity-config/activity-config-const';
+  } from '/src/constants/business/activity/activity-config-const';
 
   // ⚠️ 与 t_menu 里登记的 path 保持一致（v3.42.0.sql），写错不会报错、只会白屏
   const ACTIVITY_WIZARD_PATH = '/activity/activity-wizard';

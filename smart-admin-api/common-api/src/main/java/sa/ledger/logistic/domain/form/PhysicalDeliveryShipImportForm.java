@@ -11,7 +11,7 @@ import sa.enums.DeliveryStatusEnum;
  * 发货物流表 —— <b>回填模式</b>导入表单。
  *
  * <p>履约单本来就是发奖链路生成的，运营的日常动作是「线下发完货，把单号批量填回来」，
- * 所以这条路径按唯一键 {@code (proposal_id, source_type)} 匹配<b>已存在</b>的单子做更新，
+ * 所以这条路径按唯一键 {@code (source_biz_id, source_type)} 匹配<b>已存在</b>的单子做更新，
  * 匹配不到的行直接报错退回，绝不顺手新建 —— 凭一张 Excel 凭空造出履约单，
  * 意味着绕过了提案与预算，属于资损口子。
  *
@@ -23,7 +23,13 @@ import sa.enums.DeliveryStatusEnum;
  */
 public record PhysicalDeliveryShipImportForm(
 
-        @SonicTitle("发奖提案ID") Long proposalId,
+        /**
+         * 来源单号。原先是「发奖提案ID」(Long)，随 t_physical_delivery 泛化成字符串单号 ——
+         * 商城兑换的履约单没有提案 ID，填的是订单号。
+         * ⚠️ forceText：订单号是「看起来像数字但不是数值」的典型，不强制文本会被 Excel
+         * 吃掉前导 0 或转成科学计数法，回填时就匹配不上了。
+         */
+        @SonicTitle(value = "来源单号", forceText = true) String sourceBizId,
 
         @SonicTitle("来源类型") String sourceType,
 

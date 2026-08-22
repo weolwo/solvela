@@ -18,7 +18,7 @@
 <script setup>
   import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
   import echarts from '/@/lib/echarts';
-  import { PRIZE_TYPE_ENUM } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import { PRIZE_TYPE_ENUM } from '/src/constants/business/prize/prize-config-const';
   import { ASSET_COLOR, ASSET_ORDER, CHROME, axisStyle, legendStyle, splitLineStyle, tooltipStyle } from './dashboard-theme';
 
   const props = defineProps({

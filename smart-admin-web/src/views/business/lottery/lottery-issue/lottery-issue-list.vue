@@ -239,8 +239,8 @@
   import { message, Modal } from 'ant-design-vue';
   import { StopOutlined, QuestionCircleOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { lotteryIssueApi } from '/@/api/business/lottery/lottery-issue/lottery-issue-api';
-  import { lotteryConfigApi } from '/@/api/business/lottery/lottery-config/lottery-config-api';
+  import { lotteryIssueApi } from '/src/api/business/lottery/lottery-issue-api';
+  import { lotteryConfigApi } from '/src/api/business/lottery/lottery-config-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';

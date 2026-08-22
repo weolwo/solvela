@@ -195,13 +195,13 @@
   import { message } from 'ant-design-vue';
   import { DeleteOutlined, PictureOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { prizeConfigApi } from '/@/api/business/prize/prize-config/prize-config-api';
-  import { activityConfigApi } from '/@/api/business/activity/activity-config/activity-config-api';
-  import { promotionConfigApi } from '/@/api/business/risk/promotion-config/promotion-config-api';
+  import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
+  import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
+  import { promotionConfigApi } from '/src/api/business/risk/promotion-config-api';
   import { smartSentry } from '/@/lib/smart-sentry';
   import { regular } from '/@/constants/regular-const';
   import ImageField from '/@/components/support/image-field/index.vue';
-  import { PRIZE_STATUS_ENUM, PRIZE_TYPE_OPTIONS } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import { PRIZE_STATUS_ENUM, PRIZE_TYPE_OPTIONS } from '/src/constants/business/prize/prize-config-const';
 
   // 审批模式：对齐 t_prize_config.approve_mode，与列表页的开关同一套取值
   const APPROVE_MODE_AUTO = 0;

@@ -271,7 +271,7 @@
 <script setup>
   import { computed, reactive, ref, watch, onMounted } from 'vue';
   import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
-  import { proposalRecordApi } from '/@/api/business/risk/proposal-record/proposal-record-api';
+  import { proposalRecordApi } from '/src/api/business/risk/proposal-record-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
@@ -285,7 +285,7 @@
     assetUnitOf,
     proposalSourceTypeOf,
     proposalStatusOf,
-  } from '/@/constants/business/risk/proposal-record/proposal-record-const';
+  } from '/src/constants/business/risk/proposal-record-const';
 
   // ---------------------------- 表格列 ----------------------------
 

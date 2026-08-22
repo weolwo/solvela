@@ -283,15 +283,15 @@
   import { DownOutlined, QuestionCircleOutlined, RightOutlined } from '@ant-design/icons-vue';
   import { message, Modal } from 'ant-design-vue';
   import { SmartLoading } from '/@/components/framework/smart-loading';
-  import { taskRecordApi } from '/@/api/business/task/task-record/task-record-api';
+  import { taskRecordApi } from '/src/api/business/task/task-record-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
-  import { RECORD_STATUS_ENUM, RECORD_STATUS_OPTIONS, recordStatusOf } from '/@/constants/business/task/task-record/task-record-const';
+  import { RECORD_STATUS_ENUM, RECORD_STATUS_OPTIONS, recordStatusOf } from '/src/constants/business/task/task-record-const';
   import TaskRecordForm from './task-record-form.vue';
   import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-  import { taskEventApi } from '/@/api/business/task/task-event/task-event-api';
+  import { taskEventApi } from '/src/api/business/task/task-event-api';
 
   // ---------------------------- 表格列 ----------------------------
 

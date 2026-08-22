@@ -1,6 +1,16 @@
--- ℹ️ 本文件的 7 张表<b>尚未部署到任何数据库</b>，所以此刻<b>它就是权威定义</b>。
---    一旦部署进库并重新导出 mysql/schema-baseline.sql，权威就移交给基线，
---    本文件降级为「带设计注释的可读视图」，与其它分域文件一致。
+-- ⚠️ 必须保留这一行，且必须在所有语句之前。
+-- 缺了它，mysql 客户端会用默认连接字符集（本项目 Docker 环境里是 latin1）解释本文件的 UTF-8 中文，
+-- 逐字节转存进 utf8mb4 列 —— 中文全部变成乱码；中文列注释较长的建表语句还会撞上列注释
+-- 1024 字符上限直接失败（v3.47.0 曾因此中断整批升级，排查成本远高于这四行）。
+SET NAMES utf8mb4;
+
+-- ⚠️ 本文件<b>不再是权威定义</b>。7 张表已于 2026-08-22 建进开发库并重新导出基线，
+--    权威已移交 mysql/schema-baseline.sql；本文件与其它分域文件一样，
+--    降级为「带设计注释的可读视图」。
+--
+-- 🔴 <b>DROP TABLE IF EXISTS 已经不再无害</b>：库里现在真的有这些表。
+--    重跑本文件 = 把商城数据整片删掉重建。要改结构请直接改库、再重新导出基线
+--    （流程见 mysql/README.md），不要靠重跑这个文件。
 --
 -- 保留它是为了那些<b>解释「为什么这么设计」的注释</b> —— 基线是机器导出的，只有结构没有理由。
 -- 计划：等各模块开发完工后，把设计注释搬进 docs/营销中台-会话交接文档.md，
@@ -630,16 +640,19 @@ CREATE TABLE `t_mall_favorite`
 -- 附：落地时必须一起做的三件事（DDL 之外，漏了会静默出问题）
 -- ============================================================================
 --
--- ① t_physical_delivery 的 proposal_id 泛化成 source_biz_id，见 §4 的说明。
---    不改的话实物商品**根本落不了发货单**。
---    🔴 同一次改造里把它的收件三列一起加密，口径对齐 t_mall_address：
---         receiver_name  varchar(64)  → varchar(255) 密文
---         receiver_phone varchar(32)  → varchar(255) 密文
---         receiver_address varchar(255) → varchar(512) 密文
---    只加密地址簿、不加密发货单等于没加密 —— 收件信息最终<b>都会落到发货单上</b>，
---    而发货单才是运营天天打开、还要导出给物流商的那张表，暴露面比地址簿大得多。
---    存量明文行要用密钥跑一次批量加密迁移，迁移脚本自己也要走配置里的密钥，
---    别在脚本里硬编码。
+-- ① ~~t_physical_delivery 的 proposal_id 泛化成 source_biz_id~~ —— <b>2026-08-22 已完成</b>。
+--    唯一键已换成 uk_t_biz_phy_dlv_src(source_biz_id, source_type)，
+--    商城以 source_type='MALL' + 订单号写入即可，运营的发货台/物流导入完全复用。
+--    收件三列也在同一次改造里加密了：
+--         receiver_name    varchar(64)  -> varchar(255) 密文
+--         receiver_phone   varchar(32)  -> varchar(255) 密文
+--         receiver_address varchar(255) -> varchar(512) 密文
+--    实现是 sa-base 的 PiiCipher(AES-256-GCM) + PiiTypeHandler，钉在 JDBC 边界上，
+--    写入路径没有「忘记加密」这个选项。
+--    🔴 <b>t_mall_address 的三列密文必须用同一套</b>（同一个 PiiTypeHandler、同一把密钥）——
+--       两边各写一套加密，将来「同一个地址在两张表里对不上」这种问题会非常难查。
+--    ⚠️ 明文长度上限由密文列宽反推（姓名 40 / 电话 30 / 地址 100），
+--       t_mall_address 的列宽定义要按同一套算式来，算式见 PiiCipher.cipherTextLength。
 --
 -- ② 超时释放 job：挂到既有的 t_smart_job 上，扫
 --      `where status = 0 and expire_time <= now()`（走 idx_mall_ord_expire）

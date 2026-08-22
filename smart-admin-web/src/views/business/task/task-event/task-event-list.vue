@@ -190,7 +190,7 @@
   // vue3-json-viewer 2.4.x 起 CSS 产物改名：dist/index.css -> dist/vue3-json-viewer.css
   // ⚠️ 别信它 package.json 里的 style 字段，那里写的 dist/style.css 文件根本不存在
   import 'vue3-json-viewer/dist/vue3-json-viewer.css';
-  import { taskEventApi } from '/@/api/business/task/task-event/task-event-api';
+  import { taskEventApi } from '/src/api/business/task/task-event-api';
   import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
   import { smartSentry } from '/@/lib/smart-sentry';
   import TableOperator from '/@/components/support/table-operator/index.vue';

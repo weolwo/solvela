@@ -235,7 +235,7 @@
   import PrizeTrendChart from './prize-trend-chart.vue';
   import GameplayPanel from './gameplay-panel.vue';
   import { marketingStatApi } from '/@/api/business/stat/marketing-stat-api';
-  import { PRIZE_TYPE_ENUM } from '/@/constants/business/prize/prize-config/prize-config-const';
+  import { PRIZE_TYPE_ENUM } from '/src/constants/business/prize/prize-config-const';
   import { ASSET_COLOR, STATUS } from './dashboard-theme';
   import { smartSentry } from '/@/lib/smart-sentry';
 
