@@ -7,6 +7,7 @@ import sa.scriptengine.domain.ExecutableScript;
 import sa.scriptengine.spi.EngineContext;
 import sa.scriptengine.spi.ScriptEngine;
 import sa.scriptengine.spi.ScriptEvaluator;
+import sa.scriptengine.spi.ScriptScene;
 
 /**
  * 脚本引擎默认门面实现。
@@ -53,6 +54,28 @@ public class DefaultScriptEngine implements ScriptEngine {
                     "脚本 [%s] 返回值类型不匹配! 期望: %s, 实际: %s",
                     script.name(), returnType.getSimpleName(), result.getClass().getSimpleName()));
         }
+        return (T) result;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T evaluate(ScriptScene scene, ExecutableScript script, EngineContext context, Class<T> returnType) {
+        Assert.notNull(scene, "ScriptScene must not be null");
+        Assert.notNull(returnType, "ReturnType class must not be null");
+        // 交叉校验：挡住「场景改了返回类型、调用方没跟上」的漂移
+        if (!returnType.equals(scene.getReturnType())) {
+            throw new BusinessException(String.format(
+                    "调用方声明的返回类型与场景契约不一致。场景 [%s] 要求: %s, 调用方写的: %s",
+                    scene.getTitle(), scene.getReturnType().getSimpleName(), returnType.getSimpleName()));
+        }
+
+        // 执行前：必填变量缺失在这里就炸，报的是变量名，不是脚本内部的空指针
+        scene.validateInput(context);
+
+        Object result = this.evaluate(script, context);
+
+        // 执行后：null 也算违约 —— 「忘了写 return」伪装成「判定不通过」是最难发现的故障
+        scene.validateOutput(script.name(), result);
         return (T) result;
     }
 

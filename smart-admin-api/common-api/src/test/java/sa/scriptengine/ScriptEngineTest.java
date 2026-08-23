@@ -19,15 +19,20 @@ import sa.scriptengine.spi.ScriptDomain;
 import sa.scriptengine.spi.ScriptEngine;
 import sa.scriptengine.spi.ScriptEvaluator;
 import sa.scriptengine.spi.ScriptFunctionHandler;
+import sa.scriptengine.spi.ScriptScene;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -255,7 +260,154 @@ public class ScriptEngineTest {
     }
 
     // =====================================================================
-    // 7. 语法报错
+    // 7. 场景契约
+    // =====================================================================
+
+    /** 造一份满足 POOL_ENTRY 契约的上下文 */
+    private EngineContext poolEntryContext() {
+        return EngineContext.create()
+                .bind("memberId", 8848L)
+                .bind("activityCode", "ACT_2026")
+                .bind("poolCode", "VIP_POOL");
+    }
+
+    @Test
+    @DisplayName("按场景执行：契约齐全时正常返回")
+    void scene_evaluation_passes_when_contract_is_satisfied() {
+        Boolean result = scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                ExecutableScript.trusted("draw/vip_entry", "return memberId > 0 && poolCode == \"VIP_POOL\";"),
+                poolEntryContext(),
+                Boolean.class);
+
+        assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("缺必填变量在执行前就失败，报的是变量名而不是脚本里的空指针")
+    void missing_required_variable_fails_before_execution() {
+        EngineContext incomplete = EngineContext.create()
+                .bind("memberId", 8848L);   // 少了 activityCode / poolCode
+
+        BusinessException e = assertThrows(BusinessException.class, () -> scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                ExecutableScript.trusted("draw/vip_entry", "return true;"),
+                incomplete,
+                Boolean.class));
+
+        assertTrue(e.getMessage().contains("activityCode"),
+                "报错要点名缺了哪个变量，实际: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("必填变量类型不符直接拒绝，不做数值宽松转换")
+    void required_variable_type_mismatch_is_rejected() {
+        EngineContext wrongType = EngineContext.create()
+                .bind("memberId", "8848")   // 契约要求 Long，这里给了 String
+                .bind("activityCode", "ACT_2026")
+                .bind("poolCode", "VIP_POOL");
+
+        BusinessException e = assertThrows(BusinessException.class, () -> scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                ExecutableScript.trusted("draw/vip_entry", "return true;"),
+                wrongType,
+                Boolean.class));
+
+        assertTrue(e.getMessage().contains("memberId") && e.getMessage().contains("Long"));
+    }
+
+    @Test
+    @DisplayName("可选变量缺失不影响执行")
+    void optional_variable_may_be_absent() {
+        // TASK_RULE 的 isNewMember / target 是可选的，不绑也应该能跑
+        EngineContext context = EngineContext.create()
+                .bind("memberId", 1L)
+                .bind("eventCode", "DAILY_SIGN")
+                .bind("amount", BigDecimal.ZERO)
+                .bind("eventTime", LocalDateTime.now())
+                .bind("currentMetric", new BigDecimal("7"))
+                .bind("payload", Map.of());
+
+        Boolean result = scriptEngine.evaluate(
+                ScriptScene.TASK_RULE,
+                ExecutableScript.trusted("task/streak", "return currentMetric >= 7;"),
+                context,
+                Boolean.class);
+
+        assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("QL 语义备忘：最后一个表达式的值就是返回值，不写 return 也有返回值")
+    void qlexpress_returns_the_value_of_the_last_expression() {
+        // 这条不是我们的设计，是 QLExpress 4.x 的语言语义，写下来是为了防止
+        // 「以为漏写 return 就会返回 null」这个错误判断再次发生
+        Boolean result = scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                ExecutableScript.trusted("draw/implicit_return", "memberId > 0;"),
+                poolEntryContext(),
+                Boolean.class);
+
+        assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("🔴 分支没覆盖全导致无返回值时明确报错，而不是静默当成「判定不通过」")
+    void uncovered_branch_without_return_is_reported_instead_of_silently_false() {
+        BusinessException e = assertThrows(BusinessException.class, () -> scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                // 只在 if 里 return 了，memberId >= 0 时整段脚本什么都不返回。
+                // 这是 QL 下真正会产生 null 的形态，比「漏写 return」隐蔽得多：
+                // 平时测试用的账号刚好走 if 分支，上线换个人就静默变成「不准入」
+                ExecutableScript.trusted("draw/uncovered_branch", """
+                        if (memberId < 0) {
+                            return true;
+                        }"""),
+                poolEntryContext(),
+                Boolean.class));
+
+        assertTrue(e.getMessage().contains("没有返回值"),
+                "要明确指出脚本没有返回值，实际: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("脚本返回值类型不符场景契约时失败")
+    void return_type_violating_scene_contract_is_rejected() {
+        BusinessException e = assertThrows(BusinessException.class, () -> scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                ExecutableScript.trusted("draw/wrong_type", "return \"yes\";"),
+                poolEntryContext(),
+                Boolean.class));
+
+        assertTrue(e.getMessage().contains("返回值类型不匹配"));
+    }
+
+    @Test
+    @DisplayName("调用方声明的返回类型与场景不一致时立刻失败，挡住场景改动后的调用方漂移")
+    void caller_return_type_must_match_scene_contract() {
+        BusinessException e = assertThrows(BusinessException.class, () -> scriptEngine.evaluate(
+                ScriptScene.POOL_ENTRY,
+                ExecutableScript.trusted("draw/vip_entry", "return true;"),
+                poolEntryContext(),
+                String.class));
+
+        assertTrue(e.getMessage().contains("与场景契约不一致"));
+    }
+
+    @Test
+    @DisplayName("场景契约的变量清单不为空，且必填项都有描述（前端补全依赖它）")
+    void every_scene_declares_usable_params() {
+        for (ScriptScene scene : ScriptScene.values()) {
+            assertFalse(scene.getParams().isEmpty(), scene + " 没有声明任何变量");
+            assertNotNull(scene.getReturnType(), scene + " 没有声明返回类型");
+            scene.getParams().forEach(param -> assertTrue(
+                    param.description() != null && !param.description().isBlank(),
+                    scene + "." + param.name() + " 缺描述，前端补全会是空的"));
+        }
+    }
+
+    // =====================================================================
+    // 8. 语法报错
     // =====================================================================
 
     @Test

@@ -16,8 +16,13 @@ import sa.scriptengine.controller.form.ScriptTestForm;
 import sa.scriptengine.core.EngineFunctionRegistry;
 import sa.scriptengine.domain.ExecutableScript;
 import sa.scriptengine.domain.ScriptCheckResultVO;
+import sa.scriptengine.domain.ScriptSceneDocDTO;
 import sa.scriptengine.spi.EngineContext;
 import sa.scriptengine.spi.ScriptEngine;
+import sa.scriptengine.spi.ScriptScene;
+
+import java.util.Arrays;
+import java.util.List;
 
 @RestController
 @Tag(name = SwaggerTagConst.Support.SCRIPT_DOC)
@@ -33,6 +38,30 @@ public class ScriptEngineController {
     @GetMapping("/view")
     public ResponseDTO<?> view() {
         return ResponseDTO.ok(engineFunctionRegistry.exportDocs());
+    }
+
+    @Operation(summary = "【用户】脚本引擎-场景契约查询，编辑器据此补全变量名")
+    @GetMapping("/scene/view")
+    public ResponseDTO<List<ScriptSceneDocDTO>> sceneView() {
+        return ResponseDTO.ok(Arrays.stream(ScriptScene.values()).map(scene -> {
+            ScriptSceneDocDTO doc = new ScriptSceneDocDTO();
+            doc.setScene(scene.name());
+            doc.setTitle(scene.getTitle());
+            doc.setDomain(scene.getDomain().name());
+            doc.setDomainTitle(scene.getDomain().getTitle());
+            doc.setDescription(scene.getDescription());
+            doc.setReturnType(scene.getReturnType().getSimpleName());
+            doc.setParams(scene.getParams().stream().map(param -> {
+                ScriptSceneDocDTO.Param item = new ScriptSceneDocDTO.Param();
+                item.setName(param.name());
+                item.setType(param.type().getSimpleName());
+                item.setRequired(param.required());
+                item.setDescription(param.description());
+                item.setSignature(param.signature());
+                return item;
+            }).toList());
+            return doc;
+        }).toList());
     }
 
     @Operation(summary = "【用户】脚本引擎-语法校验，不执行")
