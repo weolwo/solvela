@@ -34,23 +34,23 @@
              和被本轮摘掉的阿里系 cn.idev.excel:fastexcel 毫无关系）。
              读写两个 artifact 从 0.20.0 起统一版本号，一起升。 -->
         <dhatim-fastexcel.version>0.20.2</dhatim-fastexcel.version>
-        <awssdk-s3.version>2.50.2</awssdk-s3.version>
+        <awssdk-s3.version>2.54.0</awssdk-s3.version>
         <mysql-connector-j.version>26.7.0</mysql-connector-j.version>
         <velocity-engine-core.version>2.4.1</velocity-engine-core.version>
         <velocity-tools.version>3.1</velocity-tools.version>
-        <sa-token.version>1.45.0</sa-token.version>
+        <sa-token.version>1.46.0</sa-token.version>
         <ip2region.version>3.3.7</ip2region.version>
-        <bcprov.version>1.85</bcprov.version>
-        <redisson.version>4.6.1</redisson.version>
+        <bcprov.version>1.85.2</bcprov.version>
+        <redisson.version>4.7.0</redisson.version>
         <snakeyaml.version>2.6</snakeyaml.version>
         <freemarker.version>2.3.34</freemarker.version>
         <jsoup.version>1.23.1</jsoup.version>
         <tika.version>3.3.2</tika.version>
-        <httpcomponents.version>5.6.3</httpcomponents.version>
+        <httpcomponents.version>5.6.4</httpcomponents.version>
         <qlexpress.version>4.1.3</qlexpress.version>
         <!-- BOM import 只继承 dependencyManagement 不继承 properties，处理器路径需要显式版本 -->
         <lombok.version>1.18.46</lombok.version>
-        <knife4j-baizhukui.version>5.2.1</knife4j-baizhukui.version>
+        <knife4j-baizhukui.version>5.3.1</knife4j-baizhukui.version>
     </properties>
 
     <dependencyManagement>
@@ -317,7 +317,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.15.0</version>
                 <configuration>
                     <compilerArgument>-parameters</compilerArgument>
                     <source>25</source>
