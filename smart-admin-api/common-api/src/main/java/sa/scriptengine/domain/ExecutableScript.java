@@ -5,32 +5,32 @@ import org.springframework.util.Assert;
 /**
  * 一段可执行的脚本。
  *
- * @param name      脚本标识，只用于日志与报错定位（例如 "task/sign_streak_7"）
- * @param content   脚本内容
- * @param cacheable 是否允许底层引擎缓存它的编译产物。
- *                  <p><b>这个开关是防 OOM 的关键。</b>QLExpress 4.x 的编译缓存以脚本原文为 key
- *                  且没有容量上限。项目内 git 管理的脚本数量有限、内容稳定，缓存收益极高；
- *                  而在线试跑、前端临时拼装这类<b>内容随机</b>的脚本一旦进了缓存就再也出不来，
- *                  必须用 {@link #ofAdHoc} 关掉。
+ * <p>没有 {@code of(...)} 这样的短名默认工厂：{@link #trusted} 与 {@link #untrusted}
+ * 的差别有内存与安全后果，必须在每个调用点显式选择，不能靠"哪个名字短就用哪个"决定。
+ *
+ * @param name    脚本标识，只用于日志与报错定位（例如 "task/sign_streak_7"）
+ * @param content 脚本内容
+ * @param source  内容来源，见 {@link ScriptSource}
  */
-public record ExecutableScript(String name, String content, boolean cacheable) {
+public record ExecutableScript(String name, String content, ScriptSource source) {
 
     public ExecutableScript {
         Assert.hasText(name, "脚本名称不能为空！请务必提供明确的规则标识以供排查！");
         Assert.hasText(content, "脚本内容不能为空！");
+        Assert.notNull(source, "脚本来源不能为空！必须显式声明 TRUSTED 或 UNTRUSTED");
     }
 
     /**
-     * 常规脚本：内容来自项目内受控的脚本文件，开启编译缓存
+     * 受控脚本：内容来自项目内 git 管理的脚本文件
      */
-    public static ExecutableScript of(String name, String content) {
-        return new ExecutableScript(name, content, true);
+    public static ExecutableScript trusted(String name, String content) {
+        return new ExecutableScript(name, content, ScriptSource.TRUSTED);
     }
 
     /**
-     * 临时脚本：内容不受控（在线试跑、动态拼装），关闭编译缓存
+     * 不受控脚本：内容由请求直接决定（在线试跑、动态拼装）
      */
-    public static ExecutableScript ofAdHoc(String name, String content) {
-        return new ExecutableScript(name, content, false);
+    public static ExecutableScript untrusted(String name, String content) {
+        return new ExecutableScript(name, content, ScriptSource.UNTRUSTED);
     }
 }

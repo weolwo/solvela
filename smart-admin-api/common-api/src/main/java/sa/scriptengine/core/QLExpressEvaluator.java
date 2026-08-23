@@ -13,6 +13,7 @@ import sa.base.common.exception.BusinessException;
 import sa.base.common.exception.EngineScriptException;
 import sa.scriptengine.domain.EngineFunctionMeta;
 import sa.scriptengine.domain.ExecutableScript;
+import sa.scriptengine.domain.ScriptSource;
 import sa.scriptengine.spi.EngineContext;
 import sa.scriptengine.spi.ScriptEvaluator;
 
@@ -71,7 +72,10 @@ public class QLExpressEvaluator implements ScriptEvaluator {
         // 必须命中 execute(String, Map, QLOptions) 这个重载。
         // execute(String, Object, QLOptions) 是把对象当「属性根」用的，
         // 传 EngineContext 进去的话 bind() 的变量在脚本里一个都取不到。
-        Map<String, Object> variables = new HashMap<>(engineContext.getVariables());
+        //
+        // 🔴 只喂 getScriptVariables()：内部数据通道（traceId / 操作人 / 幂等键等）
+        //    绝不能流进脚本可见的变量表。整个 EngineContext 走 attachments 给 Java 函数用。
+        Map<String, Object> variables = new HashMap<>(engineContext.getScriptVariables());
         try {
             return runner.execute(script.content(), variables, buildOptions(script, engineContext)).getResult();
         } catch (QLTimeoutException e) {
@@ -131,9 +135,20 @@ public class QLExpressEvaluator implements ScriptEvaluator {
                 .precise(properties.isPrecise())
                 // 脚本内部定义的变量不回写宿主上下文，跑完即销毁
                 .polluteUserContext(false)
-                .cache(script.cacheable())
+                .cache(isCacheable(script))
                 .attachments(attachments)
                 .build();
+    }
+
+    /**
+     * 由「脚本来源」这个业务事实推导出「本引擎要不要缓存编译产物」这个实现决策。
+     *
+     * <p>这个映射是 <b>QLExpress 独有的</b>，所以它住在这里而不是 {@code ExecutableScript} 上：
+     * QL 的编译缓存以脚本原文为 key 且无容量上限，UNTRUSTED 内容的 key 基数无界，
+     * 进去就再也出不来。换成别的引擎，同一个 {@link ScriptSource} 完全可以推导出别的结论。
+     */
+    private boolean isCacheable(ExecutableScript script) {
+        return script.source() == ScriptSource.TRUSTED;
     }
 
     /**
