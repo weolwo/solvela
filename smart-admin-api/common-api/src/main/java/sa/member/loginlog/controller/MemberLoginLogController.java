@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import sa.base.common.domain.PageResult;
 import sa.base.common.domain.ResponseDTO;
-import sa.member.domain.form.MemberLoginLogQueryForm;
+import sa.member.loginlog.domain.form.MemberLoginLogQueryForm;
+import sa.member.loginlog.domain.vo.MemberLoginLogStatVO;
 import sa.member.loginlog.domain.vo.MemberLoginLogVO;
 import sa.member.loginlog.service.MemberLoginLogService;
 
@@ -30,12 +31,23 @@ public class MemberLoginLogController {
 
     private final MemberLoginLogService Service;
 
-    @Operation(summary = "分页查询")
+    @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("memberLoginLog:query")
     public ResponseDTO<PageResult<MemberLoginLogVO>> queryPage(@RequestBody @Valid MemberLoginLogQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
 
+
+    /**
+     * 统计。与分页查询收同一个表单 —— 顶部筛选改了统计跟着变，看的是同一批数据。
+     * 默认（不传任何条件）由前端传当天的起止日期。
+     */
+    @Operation(summary = "登录统计：与列表同一套筛选条件 @author weolwo")
+    @PostMapping("/queryStat")
+    @SaCheckPermission("memberLoginLog:query")
+    public ResponseDTO<MemberLoginLogStatVO> queryStat(@RequestBody @Valid MemberLoginLogQueryForm queryForm) {
+        return Service.queryStat(queryForm);
+    }
 }

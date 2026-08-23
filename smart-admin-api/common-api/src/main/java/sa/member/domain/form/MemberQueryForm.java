@@ -18,8 +18,18 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class MemberQueryForm extends PageParam {
 
-    @Schema(description = "账号：微信号风格，字母开头6~20位[A-Za-z][A-Za-z0-9_-]。全局唯一(大小写不敏感)，用户可改")
+    @Schema(description = "会员号：精确匹配")
+    private Long memberId;
+
+    /** 模糊匹配。列表页那个输入框是「搜索」，精确等于的话运营得把账号一字不差地打出来 */
+    @Schema(description = "账号：模糊匹配")
     private String memberName;
+
+    @Schema(description = "昵称：模糊匹配")
+    private String nickname;
+
+    @Schema(description = "性别：0-未知, 1-男, 2-女")
+    private Integer gender;
 
     @Schema(description = "状态：1-正常, 2-冻结(风控/违规), 3-已注销")
     private Integer status;

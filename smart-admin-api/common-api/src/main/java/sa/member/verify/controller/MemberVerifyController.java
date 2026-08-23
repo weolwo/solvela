@@ -32,7 +32,7 @@ public class MemberVerifyController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("memberVerify:query")
     public ResponseDTO<PageResult<MemberVerifyVO>> queryPage(@RequestBody @Valid MemberVerifyQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }

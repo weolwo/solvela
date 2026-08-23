@@ -4,8 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import sa.member.domain.form.MemberLoginLogQueryForm;
+import sa.member.loginlog.domain.form.MemberLoginLogQueryForm;
 import sa.member.loginlog.domain.entity.MemberLoginLog;
+import sa.member.loginlog.domain.vo.MemberLoginLogStatVO;
 import sa.member.loginlog.domain.vo.MemberLoginLogVO;
 
 import java.util.List;
@@ -28,6 +29,11 @@ public interface MemberLoginLogDao extends BaseMapper<MemberLoginLog> {
      * @return 列表数据
      */
     List<MemberLoginLogVO> queryPage(Page<?> page, @Param("queryForm") MemberLoginLogQueryForm queryForm);
+
+    /**
+     * 统计：一趟 SQL 出全部指标，条件与列表复用同一段 query_conditions
+     */
+    MemberLoginLogStatVO queryStat(@Param("queryForm") MemberLoginLogQueryForm queryForm);
 
     /**
      * 列表查询 (无分页)

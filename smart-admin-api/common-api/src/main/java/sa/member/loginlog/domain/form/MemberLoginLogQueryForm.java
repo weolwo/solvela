@@ -1,4 +1,4 @@
-package sa.member.domain.form;
+package sa.member.loginlog.domain.form;
 
 import sa.base.common.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,8 +18,15 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class MemberLoginLogQueryForm extends PageParam {
 
-    @Schema(description = "会员号")
+    @Schema(description = "会员号：精确匹配")
     private Long memberId;
+
+    /**
+     * 账号，模糊匹配。运营查登录记录时说得出口的是账号，不是 10 位会员号 ——
+     * 只提供 memberId 查询的话，每次都得先去会员列表翻一次号码。
+     */
+    @Schema(description = "账号：模糊匹配")
+    private String memberName;
 
     @Schema(description = "客户端IP（兼容IPv6，39位足够）")
     private String clientIp;

@@ -1,6 +1,8 @@
 package sa.member.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -101,7 +103,11 @@ public class Member {
 
     /**
      * 运营备注
+     *
+     * <p>{@code ALWAYS}：运营清空备注时必须真的写回 null。默认的 NOT_NULL 策略会把这条 set
+     * 从 update 语句里静默去掉 —— 表现是点了清空、提示保存成功、刷新后备注又回来了。
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String remark;
 
     /**

@@ -3,10 +3,17 @@ package sa.member.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 import sa.base.common.domain.PageResult;
+import sa.base.common.domain.RequestUser;
+import sa.base.common.domain.ResponseDTO;
 import sa.base.common.exception.BusinessException;
 import sa.base.common.util.SmartPageUtil;
+import sa.member.constant.MemberConst;
 import sa.member.dao.MemberDao;
+import sa.member.domain.entity.Member;
+import sa.member.manager.MemberManager;
 import sa.member.domain.form.MemberQueryForm;
 import sa.member.domain.vo.MemberVO;
 
@@ -42,6 +49,7 @@ import java.util.*;
 public class MemberService {
 
     private final MemberDao memberDao;
+    private final MemberManager memberManager;
 
 
     /**
@@ -51,6 +59,63 @@ public class MemberService {
         Page<?> page = SmartPageUtil.convert2PageQuery(queryForm);
         List<MemberVO> list = memberDao.queryPage(page, queryForm);
         return SmartPageUtil.convert2PageResult(page, list);
+    }
+
+    /**
+     * 冻结 / 解冻。
+     *
+     * <p><b>只在「正常」与「冻结」之间切</b>：已注销是终态，注销会把 phone_hash 置 NULL
+     * 以释放号码，那个动作不可逆 —— 从注销改回正常只会得到一个登录不了、也没法找回的账号。
+     * 前端把已注销那行的开关禁掉了，这里是真正的约束。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> updateStatus(Long memberId, Integer status, RequestUser user) {
+        if (status == null
+                || (status != MemberConst.STATUS_NORMAL && status != MemberConst.STATUS_FROZEN)) {
+            return ResponseDTO.userErrorParam("只能在「正常」与「冻结」之间切换");
+        }
+        Member member = memberManager.getById(memberId);
+        if (member == null) {
+            return ResponseDTO.userErrorParam("会员不存在");
+        }
+        if (MemberConst.STATUS_CANCELLED == nullToZero(member.getStatus())) {
+            return ResponseDTO.userErrorParam("该会员已注销，注销是终态，不能改回其它状态");
+        }
+        Member update = new Member();
+        update.setMemberId(memberId);
+        update.setStatus(status);
+        update.setUpdateBy(user == null ? null : user.getUserName());
+        memberDao.updateById(update);
+        return ResponseDTO.ok();
+    }
+
+    /**
+     * 保存运营备注（列表里点一下就能改的那个）。
+     *
+     * <p>单独一个接口而不是复用一个「更新会员」的大接口：备注是运营唯一有权改的字段，
+     * 开一个能改整行的口子，等于把昵称、状态、注册来源也一并暴露给了这个入口。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> updateRemark(Long memberId, String remark, RequestUser user) {
+        Member member = memberManager.getById(memberId);
+        if (member == null) {
+            return ResponseDTO.userErrorParam("会员不存在");
+        }
+        String trimmed = StringUtils.trimToNull(remark);
+        if (trimmed != null && trimmed.length() > MemberConst.MAX_REMARK_LENGTH) {
+            return ResponseDTO.userErrorParam("备注最长 " + MemberConst.MAX_REMARK_LENGTH + " 字");
+        }
+        Member update = new Member();
+        update.setMemberId(memberId);
+        // 清空备注要真的写回 null，所以这一列在实体上挂了 updateStrategy = ALWAYS
+        update.setRemark(trimmed);
+        update.setUpdateBy(user == null ? null : user.getUserName());
+        memberDao.updateById(update);
+        return ResponseDTO.ok();
+    }
+
+    private static int nullToZero(Integer value) {
+        return value == null ? 0 : value;
     }
 
     /**

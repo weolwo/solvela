@@ -22,6 +22,16 @@ public class MemberLoginLogVO {
     @Schema(description = "会员号")
     private Long memberId;
 
+    /**
+     * 账号 / 昵称：join 出来的展示字段。
+     * 列表里只显示 10 位会员号的话，运营认不出这是谁 —— 而登录日志的用途正是「看这个人的行为」。
+     */
+    @Schema(description = "账号")
+    private String memberName;
+
+    @Schema(description = "昵称")
+    private String nickname;
+
     @Schema(description = "客户端IP（兼容IPv6，39位足够）")
     private String clientIp;
 
