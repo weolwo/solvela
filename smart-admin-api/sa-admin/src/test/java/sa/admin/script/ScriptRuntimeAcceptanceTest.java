@@ -8,9 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import sa.base.common.exception.BusinessException;
+import sa.scriptengine.domain.entity.ScriptRef;
 import sa.scriptengine.domain.vo.ScriptRefVO;
 import sa.scriptengine.domain.vo.ScriptVO;
 import sa.scriptengine.loader.ScriptFileLoader;
+import sa.scriptengine.manager.ScriptRefManager;
 import sa.scriptengine.runtime.ScriptRuntime;
 import sa.scriptengine.service.ScriptQueryService;
 import sa.scriptengine.service.ScriptRefService;
@@ -58,6 +60,9 @@ class ScriptRuntimeAcceptanceTest {
 
     @Autowired
     private ScriptQueryService scriptQueryService;
+
+    @Autowired
+    private ScriptRefManager scriptRefManager;
 
     @AfterEach
     void cleanUp() {
@@ -193,6 +198,37 @@ class ScriptRuntimeAcceptanceTest {
         scriptRefService.bind(ScriptRefPoint.PRIZE_POOL_ENTRY, FAKE_POOL_CODE, POOL_SCRIPT, "acceptance-test");
 
         assertEquals(baseline + 1, scriptQueryService.detail(POOL_SCRIPT).getRefCount());
+    }
+
+    // =====================================================================
+    // 启动期引用完整性
+    // =====================================================================
+
+    @Test
+    @DisplayName("🔴 悬空引用会让应用拒绝启动，且报错点名是哪个对象挂了哪个不存在的脚本")
+    void dangling_ref_makes_startup_fail() {
+        // 直接插一条指向不存在脚本的引用，模拟「脚本文件被删了但没摘除挂载」
+        ScriptRef dangling = new ScriptRef();
+        dangling.setScriptCode("draw/deleted_by_someone");
+        dangling.setRefType(ScriptRefPoint.PRIZE_POOL_ENTRY.getRefType());
+        dangling.setRefId(FAKE_POOL_CODE);
+        dangling.setRefSlot(ScriptRefPoint.PRIZE_POOL_ENTRY.getRefSlot());
+        dangling.setStatus(1);
+        scriptRefManager.save(dangling);
+
+        try {
+            // 直接调加载器的启动流程，等价于应用重启
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> scriptFileLoader.afterSingletonsInstantiated());
+
+            assertTrue(e.getMessage().contains("悬空"), "实际: " + e.getMessage());
+            assertTrue(e.getMessage().contains("draw/deleted_by_someone"), "要点名是哪个脚本");
+            assertTrue(e.getMessage().contains(FAKE_POOL_CODE), "要点名是哪个业务对象");
+        } finally {
+            scriptRefManager.removeById(dangling.getId());
+            // 恢复加载器状态，别影响后面的用例
+            scriptFileLoader.afterSingletonsInstantiated();
+        }
     }
 
     private EngineContext poolContext(String poolCode) {

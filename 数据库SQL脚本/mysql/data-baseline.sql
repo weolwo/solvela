@@ -30,7 +30,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- -----------------------------------------------------------------------------------
--- t_menu  菜单树。没有它后台登录进去是空白（326 行）
+-- t_menu  菜单树。没有它后台登录进去是空白（329 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_menu`;
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
@@ -360,7 +360,10 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (542, '添加', 3, 487, NULL, NULL, NULL, 1, 'mallFavorite:add', 'mallFavorite:add', NULL, 487, 0, NULL, 0, 1, 0, 1, 1, '2026-08-22 16:42:37', NULL, '2026-08-23 05:08:51'),
 (543, '更新', 3, 487, NULL, NULL, NULL, 1, 'mallFavorite:update', 'mallFavorite:update', NULL, 487, 0, NULL, 0, 1, 0, 1, 1, '2026-08-22 16:42:37', NULL, '2026-08-23 05:08:51'),
 (544, '删除', 3, 487, NULL, NULL, NULL, 1, 'mallFavorite:delete', 'mallFavorite:delete', NULL, 487, 0, NULL, 0, 1, 0, 1, 1, '2026-08-22 16:42:37', NULL, '2026-08-23 05:08:51'),
-(552, '脚本管理', 2, 50, 26, '/support/script/script-list', '/support/script/script-list.vue', 1, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-23 10:09:13', NULL, '2026-08-23 10:09:13');
+(552, '脚本管理', 2, 50, 26, '/support/script/script-list', '/support/script/script-list.vue', 1, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-23 10:09:13', NULL, '2026-08-23 10:09:13'),
+(553, '查询', 3, 552, NULL, NULL, NULL, 1, 'script:query', 'script:query', NULL, 552, 0, NULL, 0, 1, 0, 0, 1, '2026-08-23 14:27:15', NULL, '2026-08-23 14:27:15'),
+(554, '挂载脚本', 3, 552, NULL, NULL, NULL, 1, 'script:bind', 'script:bind', NULL, 552, 0, NULL, 0, 1, 0, 0, 1, '2026-08-23 14:27:15', NULL, '2026-08-23 14:27:15'),
+(555, '在线试跑', 3, 552, NULL, NULL, NULL, 1, 'script:test', 'script:test', NULL, 552, 0, NULL, 0, 1, 0, 0, 1, '2026-08-23 14:27:15', NULL, '2026-08-23 14:27:15');
 
 -- -----------------------------------------------------------------------------------
 -- t_role  角色（5 行）
@@ -374,7 +377,7 @@ INSERT INTO `t_role` (`role_id`, `role_name`, `role_code`, `remark`, `update_tim
 (37, '财务', NULL, '', '2019-08-30 09:31:16', '2019-08-30 09:31:16');
 
 -- -----------------------------------------------------------------------------------
--- t_role_menu  角色-菜单授权（136 行）
+-- t_role_menu  角色-菜单授权（139 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_role_menu`;
 INSERT INTO `t_role_menu` (`role_menu_id`, `role_id`, `menu_id`, `update_time`, `create_time`) VALUES
@@ -513,7 +516,10 @@ INSERT INTO `t_role_menu` (`role_menu_id`, `role_id`, `menu_id`, `update_time`, 
 (1183, 1, 300, '2026-03-20 16:03:25', '2026-03-20 16:03:25'),
 (1184, 1, 151, '2026-03-20 16:03:25', '2026-03-20 16:03:25'),
 (1185, 1, 302, '2026-03-20 16:03:25', '2026-03-20 16:03:25'),
-(1187, 1, 552, '2026-08-23 10:09:13', '2026-08-23 10:09:13');
+(1187, 1, 552, '2026-08-23 10:09:13', '2026-08-23 10:09:13'),
+(1188, 1, 553, '2026-08-23 14:27:15', '2026-08-23 14:27:15'),
+(1189, 1, 554, '2026-08-23 14:27:15', '2026-08-23 14:27:15'),
+(1190, 1, 555, '2026-08-23 14:27:15', '2026-08-23 14:27:15');
 
 -- -----------------------------------------------------------------------------------
 -- t_role_employee  角色-员工（11 行）
@@ -641,7 +647,7 @@ INSERT INTO `t_smart_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `jo
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
 (10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-08-24 03:10:00', '2026-08-23 03:10:00', 3, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-08-23 03:10:00', 8274, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-08-23 03:10:01', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
 (11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-08-24 03:20:00', '2026-08-23 03:20:00', 3, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-08-23 03:20:00', 8276, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-08-23 03:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-08-23 18:10:00', '2026-08-23 18:00:00', 129, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-08-23 18:00:00', 8349, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-08-23 18:00:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-08-23 22:30:00', '2026-08-23 22:20:00', 155, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-08-23 22:20:00', 8375, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-08-23 22:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
 -- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）

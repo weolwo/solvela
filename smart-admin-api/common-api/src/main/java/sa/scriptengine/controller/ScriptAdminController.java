@@ -1,5 +1,6 @@
 package sa.scriptengine.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,6 +34,10 @@ import java.util.List;
  * <p>🔴 <b>没有新增/编辑/删除脚本的接口，这是设计而不是遗漏</b>：
  * 脚本内容的权威在 {@code resources/scripts/} 下的文件，改脚本必须走 git + 发版。
  * 这里只提供「看」和「挂在哪」。
+ *
+ * <p>权限分两档：读用 {@code script:query}，<b>挂载/摘除单列 {@code script:bind}</b>。
+ * 分开是因为这两件事的后果完全不同 —— 挂一个脚本等于改变某个奖池/活动的线上判定逻辑，
+ * 和「看一眼有哪些脚本」不该是同一个权限。
  */
 @RestController
 @Tag(name = SwaggerTagConst.Support.SCRIPT_DOC)
@@ -45,30 +50,35 @@ public class ScriptAdminController {
     private final ScriptRefService scriptRefService;
 
     @Operation(summary = "【用户】脚本-列表（只读，权威在项目文件里）")
+    @SaCheckPermission("script:query")
     @GetMapping("/list")
     public ResponseDTO<List<ScriptVO>> list() {
         return ResponseDTO.ok(scriptQueryService.listAll());
     }
 
     @Operation(summary = "【用户】脚本-详情，含内容与引用它的业务对象")
+    @SaCheckPermission("script:query")
     @GetMapping("/detail")
     public ResponseDTO<ScriptVO> detail(@RequestParam String scriptCode) {
         return ResponseDTO.ok(scriptQueryService.detail(scriptCode));
     }
 
     @Operation(summary = "【用户】脚本-改这个脚本会影响哪些业务对象")
+    @SaCheckPermission("script:query")
     @GetMapping("/refs")
     public ResponseDTO<List<ScriptRefVO>> refs(@RequestParam String scriptCode) {
         return ResponseDTO.ok(scriptRefService.findRefsOfScript(scriptCode));
     }
 
     @Operation(summary = "【用户】脚本-某个业务对象身上挂了哪些脚本")
+    @SaCheckPermission("script:query")
     @GetMapping("/refs/owner")
     public ResponseDTO<List<ScriptRefVO>> refsOfOwner(@RequestParam String refType, @RequestParam String refId) {
         return ResponseDTO.ok(scriptRefService.findRefsOfOwner(refType, refId));
     }
 
     @Operation(summary = "【用户】脚本-可挂载点清单，前端下拉用")
+    @SaCheckPermission("script:query")
     @GetMapping("/ref/point/list")
     public ResponseDTO<List<ScriptRefPointVO>> refPoints() {
         return ResponseDTO.ok(Arrays.stream(ScriptRefPoint.values()).map(point -> {
@@ -84,6 +94,7 @@ public class ScriptAdminController {
     }
 
     @Operation(summary = "【用户】脚本-挂载到业务对象")
+    @SaCheckPermission("script:bind")
     @PostMapping("/ref/bind")
     public ResponseDTO<String> bind(@RequestBody @Valid ScriptBindForm form) {
         RequestUser user = SmartRequestUtil.getRequestUser();
@@ -93,6 +104,7 @@ public class ScriptAdminController {
     }
 
     @Operation(summary = "【用户】脚本-摘除挂载")
+    @SaCheckPermission("script:bind")
     @PostMapping("/ref/unbind/{refPoint}/{refId}")
     public ResponseDTO<String> unbind(@PathVariable String refPoint, @PathVariable String refId) {
         scriptRefService.unbind(toPoint(refPoint), refId);

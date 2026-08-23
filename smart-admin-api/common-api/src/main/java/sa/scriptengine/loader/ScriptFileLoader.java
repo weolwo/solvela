@@ -10,8 +10,11 @@ import org.springframework.stereotype.Component;
 import sa.base.common.util.JsonUtils;
 import sa.scriptengine.domain.ExecutableScript;
 import sa.scriptengine.domain.entity.Script;
+import sa.scriptengine.domain.entity.ScriptRef;
 import sa.scriptengine.manager.ScriptManager;
+import sa.scriptengine.manager.ScriptRefManager;
 import sa.scriptengine.spi.ScriptEngine;
+import sa.scriptengine.spi.ScriptRefPoint;
 import sa.scriptengine.spi.ScriptScene;
 
 import java.io.IOException;
@@ -22,16 +25,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 启动期把 {@code resources/scripts/} 下的脚本文件加载进来。
  *
- * <p>四件事，顺序不能变：
+ * <p>五件事，顺序不能变：
  * <ol>
  *   <li><b>扫描 + 解析文件头</b> —— 格式不对、场景不存在、目录放错，直接抛；</li>
  *   <li><b>语法校验</b> —— 调 {@code ScriptEngine.check()}，<b>一个脚本语法错，整个应用起不来</b>；</li>
  *   <li><b>同步进 t_script</b> —— 按 content_hash 判断有没有变，变了才写、version +1；</li>
+ *   <li><b>引用完整性校验</b> —— 还有业务对象挂着的脚本，文件不许消失；</li>
  *   <li><b>常驻内存</b> —— 运行期按 script_code 取，不查库。</li>
  * </ol>
  *
@@ -54,6 +59,8 @@ public class ScriptFileLoader implements SmartInitializingSingleton {
 
     private final ScriptManager scriptManager;
 
+    private final ScriptRefManager scriptRefManager;
+
     /** script_code -> 可执行体。运行期只读这里，不查库 */
     private final Map<String, ExecutableScript> cache = new LinkedHashMap<>();
 
@@ -65,6 +72,7 @@ public class ScriptFileLoader implements SmartInitializingSingleton {
         List<ScriptFile> scriptFiles = scanAndParse();
         checkSyntax(scriptFiles);
         syncToDatabase(scriptFiles);
+        checkRefIntegrity(scriptFiles);
         fillCache(scriptFiles);
         logSummary(scriptFiles);
     }
@@ -197,6 +205,46 @@ public class ScriptFileLoader implements SmartInitializingSingleton {
         if (inserted > 0 || updated > 0) {
             log.info("[ScriptEngine] t_script 同步完成：新增 {} 条，更新 {} 条", inserted, updated);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // ④ 引用完整性：挂着的脚本，文件不许消失
+    // ------------------------------------------------------------------
+
+    /**
+     * 校验 {@code t_script_ref} 里每一条启用中的引用，指向的脚本文件都还在。
+     *
+     * <p><b>为什么是启动失败而不是打条 WARN：</b>一条悬空引用的含义是
+     * 「某个奖池/活动/任务模板挂着一个已经不存在的脚本」——
+     * 它不会立刻出事，而是等到某天真有用户触发那个奖池时才抛异常。
+     * 这套系统别的地方都是「能在启动期发现就绝不留到运行期」，这里没有理由破例。
+     *
+     * <p>报错会列出<b>全部</b>悬空引用与处理方式，而不是只报第一条。
+     */
+    private void checkRefIntegrity(List<ScriptFile> scriptFiles) {
+        Set<String> alive = scriptFiles.stream().map(ScriptFile::scriptCode).collect(Collectors.toSet());
+
+        List<ScriptRef> dangling = scriptRefManager.lambdaQuery()
+                .eq(ScriptRef::getStatus, 1)
+                .list().stream()
+                .filter(ref -> !alive.contains(ref.getScriptCode()))
+                .toList();
+
+        if (dangling.isEmpty()) {
+            return;
+        }
+        String detail = dangling.stream()
+                .map(ref -> String.format("  %s [%s] 挂着 [%s]，但该脚本文件已不存在",
+                        ScriptRefPoint.of(ref.getRefType(), ref.getRefSlot())
+                                .map(ScriptRefPoint::getTitle).orElse(ref.getRefType() + "/" + ref.getRefSlot()),
+                        ref.getRefId(), ref.getScriptCode()))
+                .collect(Collectors.joining(System.lineSeparator()));
+        throw new IllegalStateException("""
+                存在悬空的脚本引用，应用拒绝启动（否则这些业务对象会在真被触发时才报错）：
+                %s
+
+                处理方式二选一：把脚本文件加回 resources/scripts/，或在「脚本管理」页摘除这些挂载。"""
+                .formatted(detail));
     }
 
     private Script toEntity(ScriptFile file, Script target, int version) {
