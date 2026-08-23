@@ -232,6 +232,21 @@ smart:
       #    刻意不给默认密钥：给了就会有人忘了配，然后用一个全世界都知道的密钥把用户地址加密进库。
       #    四个环境的串刻意不同：拿测试库的备份不该能解开生产的数据。
       secret-key: "Rt5bJyN8xVqL3wZcE1oKdS7mUaH6pGfI9nTrB4My"
+# 动态脚本引擎
+script:
+  # 底层引擎实现，目前仅 qlexpress
+  engine: qlexpress
+  # 单次脚本执行超时(ms)。注意这是「假超时」：只能中断脚本自身的指令循环，
+  # 无法中断已进入 Java 函数的 HTTP/DB 调用，耗时操作必须在 Java 侧自己控超时。
+  timeout-millis: 3000
+  # 小数运算是否走 BigDecimal。涉及金额与积分，保持开启。
+  precise: true
+  # 是否允许脚本反射调用任意 Java 成员。打开等于把 RCE 面暴露给脚本内容，
+  # 任何环境都不要改成 true。系统能力一律通过 @ScriptFunction 白名单暴露。
+  allow-java-reflect: false
+  # 慢脚本日志阈值(ms)
+  slow-log-millis: 200
+
 # 彩票中台 —— 部署本环境前必须放开下面的配置
 #
 # FPE 发号主密钥，派生规则 key = HMAC-SHA256(master-secret, lotteryCode + "|" + issueNo)。

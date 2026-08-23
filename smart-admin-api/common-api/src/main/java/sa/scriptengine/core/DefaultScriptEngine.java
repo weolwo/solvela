@@ -1,50 +1,41 @@
 package sa.scriptengine.core;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.Assert;
 import sa.base.common.exception.BusinessException;
-import sa.base.common.exception.EngineScriptException;
-import sa.scriptengine.domain.EngineFunctionMeta;
 import sa.scriptengine.domain.ExecutableScript;
 import sa.scriptengine.spi.EngineContext;
 import sa.scriptengine.spi.ScriptEngine;
 import sa.scriptengine.spi.ScriptEvaluator;
-import org.springframework.util.Assert;
 
 /**
- * 默认脚本执行器
+ * 脚本引擎默认门面实现。
+ *
+ * <p>只依赖 {@link ScriptEvaluator} 这个 SPI，不认识任何具体引擎。
  */
 @Slf4j
 public class DefaultScriptEngine implements ScriptEngine {
-    // 依赖倒置：只依赖 SPI 接口，绝不依赖具体的 QLExpress！
+
     private final ScriptEvaluator evaluator;
 
     public DefaultScriptEngine(ScriptEvaluator evaluator) {
         Assert.notNull(evaluator, "ScriptEvaluator must not be null");
         this.evaluator = evaluator;
-        log.info("🚀 ScriptEngine initialized with [{}] evaluator.", evaluator.name());
+        log.info("[ScriptEngine] 门面装配完成，底层实现：{}", evaluator.name());
     }
 
+    /**
+     * 执行脚本。
+     *
+     * <p>这里<b>不做语法预校验</b>：校验属于脚本入库/加载环节，放在执行路径上等于每次调用
+     * 都多走一遍解析，高频场景下白白吃掉性能，还会把编译缓存越撑越大。
+     * 需要校验请显式调用 {@link #check}。
+     */
     @Override
     public Object evaluate(ExecutableScript script, EngineContext context) {
-        Assert.hasText(script.getContent(), "script must not be empty");
-        Assert.notNull(context, "RuleContext must not be null");
-        Object result = null;
-        try {
-            boolean checked = evaluator.checkScript(script);
-            if (checked) {
-                result = evaluator.evaluate(script, context);
-            }
-            // 委托给底层 SPI 执行
-        } catch (Exception e) {
-            String message = e.getMessage();
-            if (e instanceof EngineScriptException eg) {
-                message = eg.getScriptErrorDetail();
-            }
-            log.error(" script execution failed! Script: \n{},{}", script.getName(), message);
-            // 异常收敛：绝不把底层引擎的 ParseException 漏给上层
-            throw new BusinessException("脚本执行异常，请检查语法或联系管理员！");
-        }
-        return result;
+        Assert.notNull(script, "ExecutableScript must not be null");
+        Assert.notNull(context, "EngineContext must not be null");
+        return evaluator.evaluate(script, context);
     }
 
     @Override
@@ -57,22 +48,22 @@ public class DefaultScriptEngine implements ScriptEngine {
             return null;
         }
 
-        // 严谨的类型边界校验
-        if (!returnType.isAssignableFrom(result.getClass())) {
-            throw new BusinessException(
-                    String.format("规则执行结果类型不匹配! 期望: %s, 实际: %s",
-                            returnType.getSimpleName(), result.getClass().getSimpleName())
-            );
+        if (!returnType.isInstance(result)) {
+            throw new BusinessException(String.format(
+                    "脚本 [%s] 返回值类型不匹配! 期望: %s, 实际: %s",
+                    script.name(), returnType.getSimpleName(), result.getClass().getSimpleName()));
         }
         return (T) result;
     }
 
-    // 提供给内部的注册入口
-    public void registerFunction(EngineFunctionMeta functionMeta) {
-        try {
-            evaluator.registerFunction(functionMeta);
-        } catch (Exception e) {
-            log.error("Failed to register function: {}", functionMeta.getFunctionName(), e);
-        }
+    @Override
+    public void check(ExecutableScript script) {
+        Assert.notNull(script, "ExecutableScript must not be null");
+        evaluator.check(script);
+    }
+
+    @Override
+    public void clearCompileCache() {
+        evaluator.clearCompileCache();
     }
 }
