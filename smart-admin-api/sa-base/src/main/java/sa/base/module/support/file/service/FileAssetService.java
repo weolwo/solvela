@@ -563,6 +563,23 @@ public class FileAssetService {
     // ------------------------------------------------------------------ 读取
 
     /**
+     * 某个业务对象<b>按 sort 排好序</b>的引用文件 id。
+     *
+     * <p>给「引用顺序本身就是业务数据」的场景用 —— 目前是商品轮播图：
+     * {@code confirm} 写入时以入参顺序落 sort，这里原样读回来，图册就不需要单独一张表。
+     *
+     * <p>只为登记引用而 confirm 的那些图（封面、正文内嵌图）不必走这个方法，它们的顺序没有含义。
+     */
+    public List<Long> listBizFileIds(String bizType, Long bizId) {
+        if (bizType == null || bizId == null) {
+            return List.of();
+        }
+        return fileRelationDao.listByBiz(bizType, bizId).stream()
+                .map(FileRelationEntity::getFileId)
+                .toList();
+    }
+
+    /**
      * 取文件记录，不存在或已删除直接抛。
      */
     public FileEntity requireFile(Long fileId) {

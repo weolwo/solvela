@@ -31,21 +31,21 @@ public class MallOrderController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("mallOrder:query")
     public ResponseDTO<PageResult<MallOrderVO>> queryPage(@RequestBody @Valid MallOrderQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission("mallOrder:add")
     public ResponseDTO<String> add(@RequestBody @Valid MallOrderAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("mallOrder:update")
     public ResponseDTO<String> update(@RequestBody @Valid MallOrderUpdateForm updateForm) {
         return Service.update(updateForm);
     }

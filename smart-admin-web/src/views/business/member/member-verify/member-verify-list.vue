@@ -114,12 +114,12 @@
             ellipsis: true,
         },
         {
-            title: '真实姓名密文',
+            title: '真实姓名',
             dataIndex: 'realName',
             ellipsis: true,
         },
         {
-            title: '身份证号密文',
+            title: '身份证号',
             dataIndex: 'idCard',
             ellipsis: true,
         },

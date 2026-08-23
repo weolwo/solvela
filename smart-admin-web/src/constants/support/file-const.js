@@ -38,6 +38,13 @@ export const FILE_CATEGORY_CODE = {
   // 富文本编辑器里随手插的正文配图。单独一个分类纯粹是为了素材库别乱：
   // 运营挑主视觉时不想在一堆正文截图里翻
   CONTENT: 'CONTENT',
+  /**
+   * 商城商品图。**必须走这个分类**，不能落 ACTIVITY/COMMON：
+   * 1000 个商品 ×（主图 + 轮播 + N 个 SKU 图）是上万张一次性图片，
+   * 倒进素材库会把运营的策展空间冲垮（素材库列表按 category_tag='商城' 排除它们）。
+   * 但引用关系照常写 t_file_relation，删除守卫和孤儿清理全部照常生效。
+   */
+  MALL_COMMODITY: 'MALL_COMMODITY',
 };
 
 export default {

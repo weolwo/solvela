@@ -140,7 +140,7 @@
             ellipsis: true,
         },
         {
-            title: '浏览器：Chrome/Safari',
+            title: '浏览器',
             dataIndex: 'browserName',
             ellipsis: true,
         },

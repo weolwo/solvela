@@ -1,6 +1,8 @@
 package sa.mall.commodity.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
@@ -42,7 +44,12 @@ public class MallCommodity {
 
     /**
      * 资产引用：COUPON 存券模编码，PHYSICAL 为空。语义对齐 t_proposal_record.asset_ref
+     *
+     * <p>本类里带 {@code ALWAYS} 的都是<b>可空且能被运营清空</b>的列：商品类型从 COUPON
+     * 改回 PHYSICAL 时 assetRef 必须真的变回 null，副标题/兑换须知/图文详情同理。
+     * 默认的 NOT_NULL 策略会把这类 set 从 update 语句里静默去掉 —— 表现是「删不掉」。
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String assetRef;
 
     /**
@@ -53,6 +60,7 @@ public class MallCommodity {
     /**
      * 副标题/一句话卖点
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String commodityIntro;
 
     /**
@@ -63,11 +71,13 @@ public class MallCommodity {
     /**
      * 图文详情，富文本HTML。禁止 base64 内联图片（对齐 t_activity_display.rule_content）
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String detailContent;
 
     /**
      * 兑换须知：券的核销说明、实物的发货时效等。C端下单页固定展示
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String exchangeNotice;
 
     /**

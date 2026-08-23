@@ -32,7 +32,7 @@ public class MallSkuController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("mallSku:query")
     public ResponseDTO<PageResult<MallSkuVO>> queryPage(@RequestBody @Valid MallSkuQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }

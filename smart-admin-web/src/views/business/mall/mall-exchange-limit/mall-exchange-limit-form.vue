@@ -24,7 +24,7 @@
         <a-form-item label="商品id"  name="commodityId">
           <a-input-number style="width: 100%" v-model:value="form.commodityId" placeholder="商品id" />
         </a-form-item>
-        <a-form-item label="周期标识：NONE(终身) / 20260819(日) / 2026W34(周) / 202608(月)。取值口径对齐 t_task_record.period_key"  name="periodKey">
+        <a-form-item label="周期标识"  name="periodKey">
           <a-input style="width: 100%" v-model:value="form.periodKey" placeholder="周期标识：NONE(终身) / 20260819(日) / 2026W34(周) / 202608(月)。取值口径对齐 t_task_record.period_key" />
         </a-form-item>
         <a-form-item label="该周期内已兑件数"  name="usedCount">

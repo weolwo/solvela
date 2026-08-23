@@ -110,7 +110,7 @@
             ellipsis: true,
         },
         {
-            title: '详细门牌地址',
+            title: '详细地址',
             dataIndex: 'detailAddress',
             ellipsis: true,
         },

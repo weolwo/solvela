@@ -149,17 +149,17 @@
             ellipsis: true,
         },
         {
-            title: '状态：1-正常, 2-冻结(风控/违规), 3-已注销',
+            title: '状态',
             dataIndex: 'status',
             ellipsis: true,
         },
         {
-            title: '注册来源渠道',
+            title: '注册来源',
             dataIndex: 'registerSource',
             ellipsis: true,
         },
         {
-            title: '注册IP：批量注册的识别依据',
+            title: '注册IP',
             dataIndex: 'registerIp',
             ellipsis: true,
         },

@@ -1,6 +1,8 @@
 package sa.mall.sku.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
@@ -42,17 +44,25 @@ public class MallSku {
 
     /**
      * 该规格专属图 file_id：C端切换规格时换主图，为空则用商品封面
+     *
+     * <p>{@code ALWAYS}：这三列（专属图、两个继承价）的 null 是<b>有业务含义的</b> ——
+     * 「清空专属图，改用商品封面」「取消覆盖价，改回继承主表」。
+     * 默认的 NOT_NULL 策略会把这类「清空」从 SQL 里悄悄抹掉，表现是运营点了移除、
+     * 保存成功、刷新后图又回来了。
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long skuCoverFileId;
 
     /**
      * 本规格所需积分：为空则继承 t_mall_commodity.points_price
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer skuPointsPrice;
 
     /**
      * 本规格所需现金：为空则继承 t_mall_commodity.cash_price
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private BigDecimal skuCashPrice;
 
     /**
@@ -72,7 +82,13 @@ public class MallSku {
 
     /**
      * 可用库存（虚拟列，勿写入）
+     *
+     * <p>这是 MySQL 的 GENERATED ALWAYS 列，写它会直接报错。
+     * 默认的 NOT_NULL 策略只是「碰巧」不写 —— 只要哪天有人把查出来的实体原样 updateById
+     * （回显后改一个字段再存回去是最自然的写法），availableStock 就是非 null 的，
+     * 整条 update 当场失败。NEVER 是把这条堵死，不是保险。
      */
+    @TableField(value = "available_stock", insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
     private Integer availableStock;
 
     /**

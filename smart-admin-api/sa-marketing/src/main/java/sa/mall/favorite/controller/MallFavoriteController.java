@@ -32,7 +32,7 @@ public class MallFavoriteController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("mallFavorite:query")
     public ResponseDTO<PageResult<MallFavoriteVO>> queryPage(@RequestBody @Valid MallFavoriteQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }

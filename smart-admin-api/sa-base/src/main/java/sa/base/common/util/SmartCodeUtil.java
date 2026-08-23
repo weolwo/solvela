@@ -78,6 +78,10 @@ public class SmartCodeUtil {
         public static final char TASK_TEMPLATE = 'T';
         /** 彩票玩法 Lottery */
         public static final char LOTTERY = 'L';
+        /** 商城商品 Mall commodity */
+        public static final char MALL_COMMODITY = 'M';
+        /** 商城 SKU */
+        public static final char MALL_SKU = 'S';
     }
 
     /**

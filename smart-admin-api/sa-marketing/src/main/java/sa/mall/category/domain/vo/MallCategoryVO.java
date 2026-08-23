@@ -34,6 +34,13 @@ public class MallCategoryVO {
     @Schema(description = "状态：0-禁用, 1-启用")
     private Integer status;
 
+    /**
+     * 该分类下的商品数。列表里直接显示出来，运营点删除之前就知道会不会被拦 ——
+     * 不显示的话，删除守卫的拒绝提示对他来说是突然冒出来的。
+     */
+    @Schema(description = "该分类下的商品数")
+    private Integer commodityCount;
+
     @Schema(description = "创建人")
     private String createBy;
 

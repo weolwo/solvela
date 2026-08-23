@@ -1,300 +1,299 @@
 <!--
   * 商城-商品分类
   *
+  * 树表而不是平铺列表：分类是两级结构，平铺的话「手机配件」和「数码3C」并排出现，
+  * 看不出谁挂在谁下面 —— 而 C 端宫格导航正是按这个层级渲染的。
+  *
+  * 不分页：两级、量级在几十，分页会把「父在第 2 页、子在第 1 页」这种拼不出树的情况带进来。
+  *
   * @Author:    weolwo
   * @Date:      2026-08-22 19:28:16
   * @Copyright  weolwo
 -->
 <template>
-    <!---------- 查询表单form begin ----------->
-    <a-form class="smart-query-form">
-        <a-row class="smart-query-form-row">
-            <a-form-item label="分类名称" class="smart-query-form-item">
-                <a-input style="width: 200px" v-model:value="queryForm.categoryName" placeholder="分类名称：如 数码3C / 虚拟权益" />
-            </a-form-item>
-            <a-form-item label="创建人" class="smart-query-form-item">
-                <a-input style="width: 200px" v-model:value="queryForm.createBy" placeholder="创建人" />
-            </a-form-item>
-            <a-form-item class="smart-query-form-item">
-                <a-button type="primary" @click="onSearch">
-                    <template #icon>
-                        <SearchOutlined />
-                    </template>
-                    查询
-                </a-button>
-                <a-button @click="resetQuery" class="smart-margin-left10">
-                    <template #icon>
-                        <ReloadOutlined />
-                    </template>
-                    重置
-                </a-button>
-            </a-form-item>
-        </a-row>
-    </a-form>
-    <!---------- 查询表单form end ----------->
+  <a-form class="smart-query-form">
+    <a-row class="smart-query-form-row">
+      <a-form-item label="分类名称" class="smart-query-form-item">
+        <a-input style="width: 200px" v-model:value="keyword" placeholder="支持模糊搜索" allow-clear @press-enter="onSearch" />
+      </a-form-item>
+      <a-form-item label="状态" class="smart-query-form-item">
+        <a-select style="width: 120px" v-model:value="statusFilter" :options="CATEGORY_STATUS_OPTIONS" placeholder="全部" allow-clear />
+      </a-form-item>
+      <a-form-item class="smart-query-form-item">
+        <a-button type="primary" @click="onSearch">
+          <template #icon>
+            <SearchOutlined />
+          </template>
+          查询
+        </a-button>
+        <a-button @click="resetQuery" class="smart-margin-left10">
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+          重置
+        </a-button>
+      </a-form-item>
+    </a-row>
+  </a-form>
 
-    <a-card size="small" :bordered="false" :hoverable="true">
-        <!---------- 表格操作行 begin ----------->
-        <a-row class="smart-table-btn-block">
-            <div class="smart-table-operate-block">
-                <a-button @click="showForm" type="primary" size="small">
-                    <template #icon>
-                        <PlusOutlined />
-                    </template>
-                    新建
-                </a-button>
-                <a-button @click="confirmBatchDelete" type="primary" danger size="small" :disabled="selectedRowKeyList.length == 0">
-                    <template #icon>
-                        <DeleteOutlined />
-                    </template>
-                    批量删除
-                </a-button>
-            </div>
-            <div class="smart-table-setting-block">
-                <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
-            </div>
-        </a-row>
-        <!---------- 表格操作行 end ----------->
+  <a-card size="small" :bordered="false" :hoverable="true">
+    <a-row class="smart-table-btn-block">
+      <div class="smart-table-operate-block">
+        <a-button type="primary" size="small" @click="showBatchForm()">
+          <template #icon>
+            <PlusOutlined />
+          </template>
+          新建分类
+        </a-button>
+        <a-button size="small" @click="expandAll">{{ expandedRowKeys.length ? '全部收起' : '全部展开' }}</a-button>
+      </div>
+      <div class="smart-table-setting-block">
+        <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
+      </div>
+    </a-row>
 
-        <!---------- 表格 begin ----------->
-        <a-table
-            size="small"
-            :scroll="{ y: 800 }"
-            :dataSource="tableData"
-            :columns="columns"
-            rowKey="id"
-            bordered
-            :loading="tableLoading"
-            :pagination="false"
-            :row-selection="{ selectedRowKeys: selectedRowKeyList, onChange: onSelectChange }"
-        >
-            <template #bodyCell="{ text, record, column }">
+    <a-table
+      size="small"
+      row-key="id"
+      bordered
+      :data-source="treeData"
+      :columns="columns"
+      :loading="tableLoading"
+      :pagination="false"
+      :expanded-row-keys="expandedRowKeys"
+      @expand="onExpand"
+    >
+      <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'categoryName'">
+          <div class="category-cell">
+            <FileThumb v-if="record.iconFileId" :file-id="record.iconFileId" :height="28" />
+            <span v-else class="icon-placeholder">—</span>
+            <span>{{ record.categoryName }}</span>
+            <a-tag v-if="!record.parentId" color="blue">一级</a-tag>
+          </div>
+        </template>
 
+        <template v-else-if="column.dataIndex === 'commodityCount'">
+          <!-- 直接显示出来，运营点删除之前就知道会不会被拦 -->
+          <span :class="record.commodityCount > 0 ? '' : 'cell-muted'">{{ record.commodityCount || 0 }}</span>
+        </template>
 
-                <template v-if="column.dataIndex === 'action'">
-                    <div class="smart-table-operate">
-                        <a-button @click="showForm(record)" type="link">编辑</a-button>
-                        <a-button @click="onDelete(record)" danger type="link">删除</a-button>
-                    </div>
-                </template>
-            </template>
-        </a-table>
-        <!---------- 表格 end ----------->
+        <template v-else-if="column.dataIndex === 'status'">
+          <a-switch
+            :checked="text === CATEGORY_STATUS_ENUM.ENABLED.value"
+            checked-children="启用"
+            un-checked-children="停用"
+            @change="(checked) => onToggleStatus(record, checked)"
+          />
+        </template>
 
-        <div class="smart-query-table-page">
-            <a-pagination
-                showSizeChanger
-                showQuickJumper
-                show-less-items
-                :pageSizeOptions="PAGE_SIZE_OPTIONS"
-                :defaultPageSize="queryForm.pageSize"
-                v-model:current="queryForm.pageNum"
-                v-model:pageSize="queryForm.pageSize"
-                :total="total"
-                @change="queryData"
-                @showSizeChange="queryData"
-                :show-total="(total) => `共${total}条`"
-            />
-        </div>
+        <template v-else-if="column.dataIndex === 'action'">
+          <div class="smart-table-operate">
+            <!-- 二级分类下面不能再挂分类，所以只有一级才有「加子分类」。
+                 走批量表单：一个一级分类下往往要一次加好几个子分类 -->
+            <a-button v-if="!record.parentId" type="link" @click="showBatchForm(record.id)">加子分类</a-button>
+            <a-button type="link" @click="showForm(record)">编辑</a-button>
+            <a-button danger type="link" @click="onDelete(record)">删除</a-button>
+          </div>
+        </template>
+      </template>
+    </a-table>
+  </a-card>
 
-        <MallCategoryForm  ref="formRef" @reloadList="queryData"/>
-
-    </a-card>
+  <MallCategoryForm ref="formRef" @reloadList="queryData" />
 </template>
+
 <script setup>
-    import { reactive, ref, onMounted } from 'vue';
-    import { message, Modal } from 'ant-design-vue';
-    import { SmartLoading } from '/@/components/framework/smart-loading';
-    import { mallCategoryApi } from '/@/api/business/mall/mall-category-api';
-    import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
-    import { smartSentry } from '/@/lib/smart-sentry';
-    import TableOperator from '/@/components/support/table-operator/index.vue';
-    import MallCategoryForm from './mall-category-form.vue';
+  import { computed, onMounted, ref } from 'vue';
+  import { message, Modal } from 'ant-design-vue';
+  import { SmartLoading } from '/@/components/framework/smart-loading';
+  import { mallCategoryApi } from '/@/api/business/mall/mall-category-api';
+  import { CATEGORY_STATUS_ENUM, CATEGORY_STATUS_OPTIONS } from '/@/constants/business/mall/mall-category-const';
+  import { smartSentry } from '/@/lib/smart-sentry';
+  import TableOperator from '/@/components/support/table-operator/index.vue';
+  import FileThumb from '/@/components/support/file-thumb/index.vue';
+  import MallCategoryForm from './mall-category-form.vue';
 
-    // ---------------------------- 表格列 ----------------------------
+  const columns = ref([
+    { title: '分类名称', dataIndex: 'categoryName', width: 300 },
+    { title: '商品数', dataIndex: 'commodityCount', width: 90 },
+    { title: '排序', dataIndex: 'sort', width: 80 },
+    { title: '状态', dataIndex: 'status', width: 100 },
+    { title: '创建人', dataIndex: 'createBy', width: 120, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', width: 170, ellipsis: true },
+    { title: '操作', dataIndex: 'action', width: 200, fixed: 'right' },
+  ]);
 
-    const columns = ref([
-        {
-            title: 'id',
-            dataIndex: 'id',
-            ellipsis: true,
-        },
-        {
-            title: '父级',
-            dataIndex: 'parentId',
-            ellipsis: true,
-        },
-        {
-            title: '分类名称',
-            dataIndex: 'categoryName',
-            ellipsis: true,
-        },
-        {
-            title: '分类图标',
-            dataIndex: 'iconFileId',
-            ellipsis: true,
-        },
-        {
-            title: '排序',
-            dataIndex: 'sort',
-            ellipsis: true,
-        },
-        {
-            title: '状态',
-            dataIndex: 'status',
-            ellipsis: true,
-        },
-        {
-            title: '创建人',
-            dataIndex: 'createBy',
-            ellipsis: true,
-        },
-        {
-            title: '创建时间',
-            dataIndex: 'createTime',
-            ellipsis: true,
-        },
-        {
-            title: '更新人',
-            dataIndex: 'updateBy',
-            ellipsis: true,
-        },
-        {
-            title: '更新时间',
-            dataIndex: 'updateTime',
-            ellipsis: true,
-        },
-        {
-            title: '操作',
-            dataIndex: 'action',
-            fixed: 'right',
-            width: 90,
-        },
-    ]);
+  const keyword = ref(undefined);
+  const statusFilter = ref(undefined);
+  const tableLoading = ref(false);
+  const flatList = ref([]);
+  const expandedRowKeys = ref([]);
 
-    // ---------------------------- 查询数据表单和方法 ----------------------------
+  /**
+   * 拼两级树。只认一层 children，不做递归 —— 递归反而会把「运营手滑建出的三级」渲染出来，
+   * 让一个本该被服务端拦下的错误看起来是正常的。
+   */
+  const treeData = computed(() => {
+    const kw = (keyword.value || '').trim();
+    const matched = (c) =>
+      (!kw || (c.categoryName || '').includes(kw)) &&
+      (statusFilter.value === undefined || statusFilter.value === null || c.status === statusFilter.value);
 
-    const queryFormState = {
-        categoryName: undefined, //分类名称：如 数码3C / 虚拟权益
-        createBy: undefined, //创建人
-        pageNum: 1,
-        pageSize: 10,
-    };
-    // 查询表单form
-    const queryForm = reactive({ ...queryFormState });
-    // 表格加载loading
-    const tableLoading = ref(false);
-    // 表格数据
-    const tableData = ref([]);
-    // 总数
-    const total = ref(0);
+    const roots = flatList.value.filter((c) => !c.parentId);
+    const childrenOf = (id) => flatList.value.filter((c) => c.parentId === id);
 
-    // 重置查询条件
-    function resetQuery() {
-        let pageSize = queryForm.pageSize;
-        Object.assign(queryForm, queryFormState);
-        queryForm.pageSize = pageSize;
-        queryData();
+    const result = [];
+    roots.forEach((root) => {
+      const children = childrenOf(root.id).filter(matched);
+      // 父级自己不匹配但有匹配的子级时，父级仍要出现 —— 否则那些子级就没有挂载点了
+      if (matched(root) || children.length) {
+        result.push(children.length ? { ...root, children } : { ...root });
+      }
+    });
+    return result;
+  });
+
+  async function queryData() {
+    tableLoading.value = true;
+    try {
+      const res = await mallCategoryApi.queryAll();
+      flatList.value = res.data || [];
+      // 默认全展开：两级、几十条，收起来反而要多点一次才看得到子分类
+      expandedRowKeys.value = flatList.value.filter((c) => !c.parentId).map((c) => c.id);
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      tableLoading.value = false;
     }
+  }
 
-    // 搜索
-    function onSearch(){
-      queryForm.pageNum = 1;
+  onMounted(queryData);
+
+  function onSearch() {
+    // 树是前端按 flatList 现算的，搜索不用回服务端
+    expandedRowKeys.value = flatList.value.filter((c) => !c.parentId).map((c) => c.id);
+  }
+
+  function resetQuery() {
+    keyword.value = undefined;
+    statusFilter.value = undefined;
+    onSearch();
+  }
+
+  function onExpand(expanded, record) {
+    if (expanded) {
+      expandedRowKeys.value = [...expandedRowKeys.value, record.id];
+    } else {
+      expandedRowKeys.value = expandedRowKeys.value.filter((k) => k !== record.id);
+    }
+  }
+
+  function expandAll() {
+    expandedRowKeys.value = expandedRowKeys.value.length ? [] : flatList.value.filter((c) => !c.parentId).map((c) => c.id);
+  }
+
+  // ---------------------------- 新建 / 编辑 ----------------------------
+
+  const formRef = ref();
+
+  /**
+   * 新建与编辑<b>共用同一个弹窗</b>：编辑态就是「只有一行、且那一行锁定行数」的同一张表。
+   * 拆成两个组件的话，运营点「编辑」会跳出一个和刚才新建时完全不一样的界面。
+   *
+   * 两处都把全量分类传过去 —— 上级下拉、重名判断、「有没有子分类」都从它算，
+   * 弹窗不必再查一次。
+   */
+  function showForm(record) {
+    formRef.value.showEdit(record, flatList.value);
+  }
+
+  /**
+   * 新建是批量的：分类结构基本是「建一次就不怎么动」的东西，而那一次往往要一口气
+   * 把整棵树搭出来。只填一行的话它就等价于单条新建，不多花任何操作。
+   */
+  function showBatchForm(presetParentId) {
+    formRef.value.show(flatList.value, presetParentId);
+  }
+
+  // ---------------------------- 启用 / 停用 ----------------------------
+
+  async function onToggleStatus(record, checked) {
+    const status = checked ? CATEGORY_STATUS_ENUM.ENABLED.value : CATEGORY_STATUS_ENUM.DISABLED.value;
+    const childCount = flatList.value.filter((c) => c.parentId === record.id).length;
+    // 停用一级分类会连带让它的子分类在 C 端不可见，点之前该知道波及多大
+    if (!checked && childCount > 0) {
+      Modal.confirm({
+        title: '确认停用？',
+        content: `停用「${record.categoryName}」后，它下面 ${childCount} 个子分类在 C 端也会一并不可见。`,
+        okText: '停用',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: () => requestStatus(record, status),
+      });
+      return;
+    }
+    await requestStatus(record, status);
+  }
+
+  async function requestStatus(record, status) {
+    SmartLoading.show();
+    try {
+      await mallCategoryApi.updateStatus(record.id, status);
+      message.success(status === CATEGORY_STATUS_ENUM.ENABLED.value ? '已启用' : '已停用');
       queryData();
+    } catch (e) {
+      smartSentry.captureError(e);
+      // 服务端拒绝时（如上级已停用）要把开关拨回去 —— 重查即可
+      queryData();
+    } finally {
+      SmartLoading.hide();
     }
+  }
 
-    // 查询数据
-    async function queryData() {
-        tableLoading.value = true;
-        try {
-            let queryResult = await mallCategoryApi.queryPage(queryForm);
-            tableData.value = queryResult.data.list;
-            total.value = queryResult.data.total;
-        } catch (e) {
-            smartSentry.captureError(e);
-        } finally {
-            tableLoading.value = false;
-        }
+  // ---------------------------- 删除 ----------------------------
+
+  function onDelete(record) {
+    const childCount = flatList.value.filter((c) => c.parentId === record.id).length;
+    let hint = '';
+    if (childCount > 0) {
+      hint = `它下面还有 ${childCount} 个子分类，需要先处理它们。`;
+    } else if (record.commodityCount > 0) {
+      hint = `它下面还有 ${record.commodityCount} 个商品，需要先把商品移到别的分类。`;
     }
+    Modal.confirm({
+      title: '提示',
+      content: `确定删除分类「${record.categoryName}」吗？${hint}不想用了也可以改为停用。`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => requestDelete(record),
+    });
+  }
 
-
-    onMounted(queryData);
-
-    // ---------------------------- 添加/修改 ----------------------------
-    const formRef = ref();
-
-    function showForm(data) {
-        formRef.value.show(data);
+  async function requestDelete(record) {
+    SmartLoading.show();
+    try {
+      await mallCategoryApi.delete(record.id);
+      message.success('删除成功');
+      queryData();
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      SmartLoading.hide();
     }
-
-    // ---------------------------- 单个删除 ----------------------------
-    //确认删除
-    function onDelete(data){
-        Modal.confirm({
-            title: '提示',
-            content: '确定要删除选吗?',
-            okText: '删除',
-            okType: 'danger',
-            onOk() {
-                requestDelete(data);
-            },
-            cancelText: '取消',
-            onCancel() {},
-        });
-    }
-
-    //请求删除
-    async function requestDelete(data){
-        SmartLoading.show();
-        try {
-            let deleteForm = {
-                goodsIdList: selectedRowKeyList.value,
-            };
-            await mallCategoryApi.delete(data.id);
-            message.success('删除成功');
-            queryData();
-        } catch (e) {
-            smartSentry.captureError(e);
-        } finally {
-            SmartLoading.hide();
-        }
-    }
-
-    // ---------------------------- 批量删除 ----------------------------
-
-    // 选择表格行
-    const selectedRowKeyList = ref([]);
-
-    function onSelectChange(selectedRowKeys) {
-        selectedRowKeyList.value = selectedRowKeys;
-    }
-
-    // 批量删除
-    function confirmBatchDelete() {
-        Modal.confirm({
-            title: '提示',
-            content: '确定要批量删除这些数据吗?',
-            okText: '删除',
-            okType: 'danger',
-            onOk() {
-                requestBatchDelete();
-            },
-            cancelText: '取消',
-            onCancel() {},
-        });
-    }
-
-    //请求批量删除
-    async function requestBatchDelete() {
-        try {
-            SmartLoading.show();
-            await mallCategoryApi.batchDelete(selectedRowKeyList.value);
-            message.success('删除成功');
-            queryData();
-        } catch (e) {
-            smartSentry.captureError(e);
-        } finally {
-            SmartLoading.hide();
-        }
-    }
+  }
 </script>
+
+<style scoped lang="less">
+  .category-cell {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .icon-placeholder,
+  .cell-muted {
+    color: #cbd5e1;
+  }
+</style>

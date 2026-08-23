@@ -6,12 +6,12 @@
             <result column="id" property="id" />
             <result column="commodity_code" property="commodityCode" />
             <result column="category_id" property="categoryId" />
+            <result column="category_name" property="categoryName" />
             <result column="commodity_type" property="commodityType" />
             <result column="asset_ref" property="assetRef" />
             <result column="commodity_name" property="commodityName" />
             <result column="commodity_intro" property="commodityIntro" />
             <result column="cover_file_id" property="coverFileId" />
-            <result column="detail_content" property="detailContent" />
             <result column="exchange_notice" property="exchangeNotice" />
             <result column="pay_type" property="payType" />
             <result column="original_price" property="originalPrice" />
@@ -25,72 +25,109 @@
             <result column="is_home" property="isHome" />
             <result column="sort" property="sort" />
             <result column="sold_count" property="soldCount" />
+            <result column="sku_count" property="skuCount" />
+            <result column="total_stock" property="totalStock" />
+            <result column="available_stock" property="availableStock" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
             <result column="update_by" property="updateBy" />
             <result column="update_time" property="updateTime" />
     </resultMap>
 
+    <!--
+      刻意<b>不含 detail_content</b>：那是 mediumtext 的富文本正文，一行可能几十 KB，
+      一页 10 条就是几百 KB 白白传给列表页 —— 而列表根本不渲染它。
+      要正文走 detail 接口。
+    -->
     <sql id="base_columns">
-                id, 
-                commodity_code, 
-                category_id, 
-                commodity_type, 
-                asset_ref, 
-                commodity_name, 
-                commodity_intro, 
-                cover_file_id, 
-                detail_content, 
-                exchange_notice, 
-                pay_type, 
-                original_price, 
-                points_price, 
-                cash_price, 
-                limit_period, 
-                limit_count, 
-                start_time, 
-                end_time, 
-                status, 
-                is_home, 
-                sort, 
-                sold_count, 
-                create_by, 
-                create_time, 
-                update_by, 
-                update_time
+                c.id,
+                c.commodity_code,
+                c.category_id,
+                c.commodity_type,
+                c.asset_ref,
+                c.commodity_name,
+                c.commodity_intro,
+                c.cover_file_id,
+                c.exchange_notice,
+                c.pay_type,
+                c.original_price,
+                c.points_price,
+                c.cash_price,
+                c.limit_period,
+                c.limit_count,
+                c.start_time,
+                c.end_time,
+                c.status,
+                c.is_home,
+                c.sort,
+                c.sold_count,
+                c.create_by,
+                c.create_time,
+                c.update_by,
+                c.update_time
     </sql>
 
     <sql id="query_conditions">
         <where>
-                        <if test="queryForm.commodityCode != null">
-                            AND commodity_code = #{queryForm.commodityCode}
+                        <if test="queryForm.commodityCode != null and queryForm.commodityCode != ''">
+                            AND c.commodity_code = #{queryForm.commodityCode}
                         </if>
-                        <if test="queryForm.commodityType != null">
-                            AND commodity_type = #{queryForm.commodityType}
+                        <if test="queryForm.categoryId != null">
+                            AND c.category_id = #{queryForm.categoryId}
                         </if>
-                        <if test="queryForm.commodityName != null">
-                            AND commodity_name = #{queryForm.commodityName}
+                        <if test="queryForm.status != null">
+                            AND c.status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.commodityType != null and queryForm.commodityType != ''">
+                            AND c.commodity_type = #{queryForm.commodityType}
+                        </if>
+                        <!-- 搜索框走模糊：精确等于的话运营得把商品名一字不差地打出来 -->
+                        <if test="queryForm.commodityName != null and queryForm.commodityName != ''">
+                            AND c.commodity_name LIKE CONCAT('%', #{queryForm.commodityName}, '%')
                         </if>
                         <if test="queryForm.payType != null">
-                            AND pay_type = #{queryForm.payType}
+                            AND c.pay_type = #{queryForm.payType}
                         </if>
         </where>
     </sql>
 
+    <!--
+      分类名与 SKU 聚合<b>都走子查询，FROM 里只留 t_mall_commodity 一张表</b>。
+
+      分类名本可以 LEFT JOIN 拿，但那样 FROM 里就有两张表，而 t_mall_category 同样有
+      sort / status / create_time 这几个同名列 —— MyBatis-Plus 的分页排序（PageParam.sortItemList）
+      是把 `ORDER BY <列名>` 直接拼在语句尾巴上的，不带表前缀。前端哪天给列表加个
+      「按排序权重排」，拼出来的就是 `ORDER BY sort`，MySQL 直接报 Column 'sort' in order
+      clause is ambiguous。这类失败只在启用排序时才出现，改动与故障隔着很远。
+
+      SKU 聚合走子查询而不是 LEFT JOIN t_mall_sku + GROUP BY：
+      后者会让主表的每一行按 SKU 数量膨胀，再靠 GROUP BY 收回来 —— 分页的 limit 作用在
+      膨胀后的结果集上，「每页 10 条」会变成不确定的条数。子查询里的聚合走 idx_mall_sku_cmd，
+      商品量级下开销可以忽略。
+    -->
+    <sql id="sku_aggregation">
+                (SELECT COUNT(1) FROM t_mall_sku s WHERE s.commodity_id = c.id) AS sku_count,
+                (SELECT IFNULL(SUM(s.total_stock), 0) FROM t_mall_sku s WHERE s.commodity_id = c.id) AS total_stock,
+                (SELECT IFNULL(SUM(s.available_stock), 0) FROM t_mall_sku s WHERE s.commodity_id = c.id) AS available_stock,
+                (SELECT cat.category_name FROM t_mall_category cat WHERE cat.id = c.category_id) AS category_name
+    </sql>
+
     <select id="queryPage" resultMap="MallCommodityVO">
         SELECT
-        <include refid="base_columns"/>
-        FROM t_mall_commodity
+        <include refid="base_columns"/>,
+        <include refid="sku_aggregation"/>
+        FROM t_mall_commodity c
         <include refid="query_conditions"/>
-        ORDER BY create_time DESC
+        ORDER BY c.sort ASC, c.create_time DESC
     </select>
 
     <select id="queryList" resultMap="MallCommodityVO">
         SELECT
-        <include refid="base_columns"/>
-        FROM t_mall_commodity
+        <include refid="base_columns"/>,
+        <include refid="sku_aggregation"/>
+        FROM t_mall_commodity c
         <include refid="query_conditions"/>
-        ORDER BY create_time DESC
+        ORDER BY c.sort ASC, c.create_time DESC
     </select>
 
                 <delete id="batchDelete">

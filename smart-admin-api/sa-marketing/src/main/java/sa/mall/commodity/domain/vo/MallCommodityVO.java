@@ -26,6 +26,10 @@ public class MallCommodityVO {
     @Schema(description = "分类id")
     private Long categoryId;
 
+    /** join 出来的展示字段。列表里显示「分类id 7」没有人看得懂 */
+    @Schema(description = "分类名称")
+    private String categoryName;
+
     @Schema(description = "商品类型：PHYSICAL-实物(走t_physical_delivery), COUPON-优惠券(走t_member_coupon), BALANCE-现金/红包(走钱包入账)")
     private String commodityType;
 
@@ -40,9 +44,6 @@ public class MallCommodityVO {
 
     @Schema(description = "封面主图 file_id（建议 800x800）")
     private Long coverFileId;
-
-    @Schema(description = "图文详情，富文本HTML。禁止 base64 内联图片（对齐 t_activity_display.rule_content）")
-    private String detailContent;
 
     @Schema(description = "兑换须知：券的核销说明、实物的发货时效等。C端下单页固定展示")
     private String exchangeNotice;
@@ -82,6 +83,24 @@ public class MallCommodityVO {
 
     @Schema(description = "累计已兑件数（各SKU之和的冗余，用于列表按热销排序）")
     private Integer soldCount;
+
+    // ---------- 以下由 SKU 表聚合而来，只用于列表展示 ----------
+    //
+    // 放在 SQL 里聚合而不是查出商品再逐个查 SKU：一页 10 个商品就是 10 次额外查询，
+    // 而运营翻页是很频繁的动作。
+
+    @Schema(description = "规格数量")
+    private Integer skuCount;
+
+    @Schema(description = "总库存：各SKU投放量之和")
+    private Integer totalStock;
+
+    /**
+     * 可用库存合计。运营在列表上最需要的一眼信息就是这个 ——
+     * 「投了 100 件，现在还剩几件能兑」，不用点进去逐个规格看。
+     */
+    @Schema(description = "可用库存：各SKU可用量之和")
+    private Integer availableStock;
 
     @Schema(description = "创建人")
     private String createBy;

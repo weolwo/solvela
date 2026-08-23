@@ -34,21 +34,21 @@ public class MallAddressController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission(":query")
+    @SaCheckPermission("mallAddress:query")
     public ResponseDTO<PageResult<MallAddressVO>> queryPage(@RequestBody @Valid MallAddressQueryForm queryForm) {
         return ResponseDTO.ok(Service.queryPage(queryForm));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission(":add")
+    @SaCheckPermission("mallAddress:add")
     public ResponseDTO<String> add(@RequestBody @Valid MallAddressAddForm addForm) {
         return Service.add(addForm);
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission(":update")
+    @SaCheckPermission("mallAddress:update")
     public ResponseDTO<String> update(@RequestBody @Valid MallAddressUpdateForm updateForm) {
         return Service.update(updateForm);
     }

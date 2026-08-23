@@ -126,7 +126,7 @@
             ellipsis: true,
         },
         {
-            title: '会员号：关联键',
+            title: '会员号',
             dataIndex: 'memberId',
             ellipsis: true,
         },
