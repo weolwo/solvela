@@ -37,9 +37,6 @@ public class ActivityConfigVO {
     @Schema(description = "活动结束时间")
     private LocalDateTime endTime;
 
-    @Schema(description = "规则脚本id")
-    private String scriptId;
-
     @Schema(description = "创建人")
     private String createBy;
 

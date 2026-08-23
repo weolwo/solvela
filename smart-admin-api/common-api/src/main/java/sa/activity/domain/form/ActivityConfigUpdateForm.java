@@ -49,7 +49,4 @@ public class ActivityConfigUpdateForm {
     @NotNull(message = "活动结束时间 不能为空")
     private LocalDateTime endTime;
 
-    @Schema(description = "规则脚本id")
-    private String scriptId;
-
 }

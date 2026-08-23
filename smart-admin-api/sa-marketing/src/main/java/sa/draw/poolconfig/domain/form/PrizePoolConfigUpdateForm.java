@@ -11,9 +11,11 @@ import lombok.Data;
  *
  * <p>生成器原本还开放了 drawMode / scriptId / status 三个字段，已全部移除：
  * <ul>
- *   <li><b>drawMode / scriptId</b>：后端从未读取过这两个字段（全仓库 grep 确认）。
- *       选「按库存比例」照样按概率抽、填了脚本 id 也不会有任何前置校验 ——
- *       是两个假开关，留着只会让人以为配了就生效；</li>
+ *   <li><b>drawMode</b>：后端从未读取过（全仓库 grep 确认）。选「按库存比例」照样按概率抽 ——
+ *       是个假开关，留着只会让人以为配了就生效；</li>
+ *   <li><b>scriptId</b>：同样从未被读取。2026-08-23 起该列已从 {@code t_prize_pool_config} 删除，
+ *       奖池的准入脚本改为挂在 {@code t_script_ref} 上（挂载点 {@code PRIZE_POOL_ENTRY}），
+ *       走 {@code ScriptRuntime} 执行；</li>
  *   <li><b>status</b>：奖池开关的唯一入口是 {@code offline} / {@code online} 两个接口。
  *       它们有并发闸门（{@code WHERE status = #{from}}），两个运营同时点时第二个人会拿到
  *       「状态已被其他人变更」而不是静默覆盖。走这个表单改 status 则两样都没有 ——

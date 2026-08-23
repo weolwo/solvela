@@ -34,9 +34,6 @@ public class TaskTemplateVO {
     @Schema(description = "前端渲染规则")
     private String uiSchema;
 
-    @Schema(description = "QLExpress脚本")
-    private String ruleScript;
-
     @Schema(description = "状态：0-禁用, 1-启用")
     private Integer status;
 

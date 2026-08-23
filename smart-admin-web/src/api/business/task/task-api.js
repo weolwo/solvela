@@ -58,7 +58,7 @@ export const taskApi = {
   },
 
   /**
-   * 保存任务模板设计器（uiSchema + ruleScript，归属后端 tasktemplate 模块）  @author  alaric
+   * 保存任务模板设计器（uiSchema，归属后端 tasktemplate 模块）  @author  alaric
    */
   saveTaskTemplate: (param) => {
     return postRequest('/taskTemplate/save', param);

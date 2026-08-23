@@ -138,7 +138,8 @@
     poolName: undefined, //奖池名称
     // 重置周期：奖项「单人限领次数」的归零粒度，运行态由 DrawPeriodResolver 消费
     resetPeriod: undefined,
-    // drawMode / scriptId 刻意不提交：后端从未读取过，是两个假开关
+    // drawMode 刻意不提交：后端从未读取过，是个假开关。
+    // scriptId 已于 2026-08-23 随列一起删除，奖池准入脚本改挂 t_script_ref
     activityName: undefined, //只读展示用，不提交
   };
 

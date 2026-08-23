@@ -56,11 +56,6 @@ public class ActivityConfig {
     private LocalDateTime endTime;
 
     /**
-     * 规则脚本id
-     */
-    private String scriptId;
-
-    /**
      * 创建人
      */
     private String createBy;

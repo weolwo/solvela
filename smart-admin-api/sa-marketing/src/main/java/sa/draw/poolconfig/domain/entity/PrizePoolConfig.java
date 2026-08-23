@@ -52,11 +52,6 @@ public class PrizePoolConfig {
     private Integer drawMode;
 
     /**
-     * 进入该奖池的前置脚本
-     */
-    private String scriptId;
-
-    /**
      * 0关闭，1开启
      */
     private Integer status;

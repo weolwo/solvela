@@ -40,9 +40,6 @@ public class PrizePoolConfigAddForm {
     @Schema(description = "抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)")
     private Integer drawMode;
 
-    @Schema(description = "进入该奖池的前置脚本")
-    private String scriptId;
-
     @Schema(description = "0关闭，1开启")
     private Integer status;
 

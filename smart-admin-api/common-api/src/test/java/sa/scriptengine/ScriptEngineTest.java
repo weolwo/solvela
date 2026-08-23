@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -40,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 脚本引擎的行为固化测试。
  *
- * <p>钉住的是八组<b>契约</b>，每一组对应一个真实踩过或差点踩到的坑：
+ * <p>钉住的是九组<b>契约</b>，每一组对应一个真实踩过或差点踩到的坑：
  * <ol>
  *   <li>bind 进去的变量脚本里取得到 —— 重构前走错了 execute 重载，这条是不成立的；</li>
  *   <li>函数名带域前缀，跨域不可能撞名；</li>
@@ -49,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li>Java 函数里抛的业务异常原样冒上来，不被反射层包住；</li>
  *   <li>隔离策略下脚本碰不到未经白名单暴露的 Java 成员；</li>
  *   <li><b>脚本来源必须显式声明</b>，且只影响引擎内部优化、不影响执行语义；</li>
+ *   <li><b>check 只验语法不验函数存在性</b> —— 脚本加载器的时序自由度依赖这一条；</li>
  *   <li>语法错误带得出行号。</li>
  * </ol>
  * 这些都不依赖 Spring 容器，纯 POJO 装配即可复现。
@@ -407,7 +409,29 @@ public class ScriptEngineTest {
     }
 
     // =====================================================================
-    // 8. 语法报错
+    // 8. check 的边界（决定了脚本加载器能不能在函数绑定之前跑）
+    // =====================================================================
+
+    @Test
+    @DisplayName("check 只验语法，不验函数是否已注册")
+    void check_validates_syntax_only_not_function_existence() {
+        // 这条决定了 ScriptFileLoader 的时序自由度：如果 check 会解析函数，
+        // 那它就必须严格排在 EngineFunctionScanner 之后，而 SmartInitializingSingleton
+        // 之间的先后顺序是不保证的 —— 那样这套加载机制就会依赖一个没人写下来的巧合。
+        assertDoesNotThrow(() -> scriptEngine.check(
+                ExecutableScript.trusted("test/unknown_fn", "return no_such_function(1, 2);")));
+    }
+
+    @Test
+    @DisplayName("check 不执行脚本，所以副作用不会发生")
+    void check_does_not_execute() {
+        // member_boom() 一执行就抛业务异常；check 不抛，说明它确实没跑
+        assertDoesNotThrow(() -> scriptEngine.check(
+                ExecutableScript.trusted("test/no_exec", "return member_boom();")));
+    }
+
+    // =====================================================================
+    // 9. 语法报错
     // =====================================================================
 
     @Test

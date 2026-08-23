@@ -10,7 +10,6 @@
             <result column="status" property="status" />
             <result column="start_time" property="startTime" />
             <result column="end_time" property="endTime" />
-            <result column="script_id" property="scriptId" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
             <result column="update_by" property="updateBy" />
@@ -25,7 +24,6 @@
                 status, 
                 start_time, 
                 end_time, 
-                script_id, 
                 create_by, 
                 create_time, 
                 update_by, 

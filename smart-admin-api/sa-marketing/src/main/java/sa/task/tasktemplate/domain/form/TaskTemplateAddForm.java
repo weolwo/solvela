@@ -37,8 +37,4 @@ public class TaskTemplateAddForm {
     @NotBlank(message = "前端渲染规则 不能为空")
     private String uiSchema;
 
-    @Schema(description = "QLExpress脚本", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "QLExpress脚本 不能为空")
-    private String ruleScript;
-
 }

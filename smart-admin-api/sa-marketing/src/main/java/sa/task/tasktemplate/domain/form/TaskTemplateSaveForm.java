@@ -38,7 +38,4 @@ public class TaskTemplateSaveForm {
     @NotNull(message = "ui_schema 不能为空")
     private Map<String, Object> uiSchema;
 
-    @Schema(description = "QLExpress 判定脚本", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "rule_script 不能为空")
-    private String ruleScript;
 }

@@ -51,11 +51,6 @@ public class TaskTemplate {
     private String uiSchema;
 
     /**
-     * QLExpress脚本
-     */
-    private String ruleScript;
-
-    /**
      * 状态：0-禁用, 1-启用
      */
     private Integer status;

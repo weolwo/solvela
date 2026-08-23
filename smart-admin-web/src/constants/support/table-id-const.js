@@ -37,7 +37,6 @@ export const DEFAULT_HIDDEN_COLUMNS = [
   'updateBy', //更新人
   'updateTime', //更新时间（创建时间保留）
   'deletedFlag', //删除标记
-  'scriptId', //规则脚本id，运营看不懂也用不到
   'ext', //扩展 JSON，展开是一坨字符串
 ];
 

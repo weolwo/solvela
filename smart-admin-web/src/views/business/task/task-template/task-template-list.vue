@@ -181,12 +181,6 @@
       ellipsis: true,
     },
     {
-      title: 'QLExpress脚本',
-      dataIndex: 'ruleScript',
-      showFlag: false,
-      ellipsis: true,
-    },
-    {
       title: '创建人',
       dataIndex: 'createBy',
       ellipsis: true,

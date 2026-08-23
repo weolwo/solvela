@@ -100,34 +100,21 @@
             </a-space>
           </a-flex>
 
+          <!-- 规则脚本已不在这里编辑，说明放在最显眼的位置，免得有人到处找 -->
+          <a-alert type="info" show-icon class="mb-3">
+            <template #message>规则脚本不在这里编辑了</template>
+            <template #description>
+              脚本内容的权威在项目文件 <code>resources/scripts/</code> 下，走 git 管理 + 发版，后台不提供编辑。
+              要把脚本挂到本模板上，请去
+              <a v-if="scriptPageAvailable" @click="goScriptPage">脚本管理</a>
+              <b v-else>系统配置 → 脚本管理</b>
+              页，挂载点选「任务模板 - 完成判定规则」，业务对象编码填本模板的编码。
+            </template>
+          </a-alert>
+
           <!-- 手风琴面板：编辑器区域 -->
           <a-collapse v-model:activeKey="activePanels" class="bg-white">
-            <!-- 1. Rule Script 编辑器 -->
-            <a-collapse-panel key="script">
-              <template #header>
-                <a-space>
-                  <span class="font-medium">底层规则脚本 rule_script</span>
-                  <a-tag color="orange">运营不可见</a-tag>
-                </a-space>
-              </template>
-              <template #extra>
-                <a-space @click.stop>
-                  <a-select v-model:value="scriptLanguage" :options="LANGUAGE_OPTIONS" size="small" style="width: 140px" title="语言" />
-                  <a-divider type="vertical" />
-                  <a-button type="link" size="small" @click="isScriptLarge = !isScriptLarge">
-                    {{ isScriptLarge ? '收缩视图' : '放大视图' }}
-                  </a-button>
-                </a-space>
-              </template>
-              <SmartCodeEditor
-                v-model:value="designer.ruleScript"
-                :language="scriptLanguage"
-                :theme="currentTheme"
-                :height="isScriptLarge ? EDITOR_HEIGHT_LARGE : EDITOR_HEIGHT_NORMAL"
-              />
-            </a-collapse-panel>
-
-            <!-- 2. UI Schema 编辑器 -->
+            <!-- 1. UI Schema 编辑器 -->
             <a-collapse-panel key="schema">
               <template #header>
                 <a-space>
@@ -224,9 +211,19 @@
   import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
   import { taskApi } from '/@/api/business/task/task-api';
   import { taskTemplateApi } from '/src/api/business/task/task-template-api';
-  import { useRoute } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
 
   const route = useRoute();
+  const router = useRouter();
+
+  // 脚本管理页是按菜单动态注册的，没有该菜单权限的人这条路由压根不存在。
+  // 直接给链接会把人送到 404，所以先判断一次：不可用就退化成纯文字指路。
+  const SCRIPT_PAGE_PATH = '/support/script/script-list';
+  const scriptPageAvailable = computed(() => router.resolve(SCRIPT_PAGE_PATH).name !== '404');
+
+  function goScriptPage() {
+    router.push(SCRIPT_PAGE_PATH);
+  }
   import { smartSentry } from '/@/lib/smart-sentry';
   import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
   import SmartCodeEditor from '/@/components/business/code-editor/SmartCodeEditor.vue';
@@ -246,7 +243,6 @@
   const activePanels = ref([]);
 
   // 放大视图控制
-  const isScriptLarge = ref(false);
   const isSchemaLarge = ref(false);
 
   // 主题切换
@@ -255,7 +251,6 @@
 
   // 两个编辑器各自的高亮语言，可在面板右上角切换。
   // 默认值按内容类型给：规则脚本是 QLExpress（Java 风格语法），ui_schema 是 JSON
-  const scriptLanguage = ref('java');
   const schemaLanguage = ref('json');
   // height 直接进 style，写成带 px 的字符串（SmartCodeEditor 内部也会兜底补 px）
   const EDITOR_HEIGHT_NORMAL = '300px';
@@ -288,15 +283,6 @@
     taskType: TASK_TYPE_OPTIONS[1].value,
   };
   const DEFAULT_UI_SCHEMA_TEXT = JSON.stringify(DEFAULT_UI_SCHEMA, null, 2);
-  const DEFAULT_RULE_SCRIPT = [
-    '// 事件: DAILY_SIGN；向导 rule_config 中的参数（如 targetDays、allowRepair）作为变量注入',
-    "if (event.type != 'DAILY_SIGN') return false;",
-    '// 连续性判定: 昨日未签且未补签则重置进度',
-    'if (!ctx.signedYesterday && !ctx.repaired) { record.currentMetric = 0; }',
-    'record.currentMetric = record.currentMetric + 1;',
-    'return record.currentMetric >= targetDays;',
-  ].join('\n');
-
   const designer = reactive({
     base: {
       // 编码留空，onMounted 拉一个服务端生成的；也可手输已有编码来覆盖那个模板
@@ -305,7 +291,6 @@
       taskType: DEFAULT_TEMPLATE.taskType,
       triggerEvent: undefined,
     },
-    ruleScript: DEFAULT_RULE_SCRIPT,
     uiSchemaText: DEFAULT_UI_SCHEMA_TEXT,
     previewValues: {},
   });
@@ -318,7 +303,6 @@
   const currentSnapshot = computed(() =>
     JSON.stringify({
       base: designer.base,
-      ruleScript: designer.ruleScript,
       uiSchemaText: designer.uiSchemaText,
     })
   );
@@ -385,7 +369,6 @@
         taskType: d.taskType,
         triggerEvent: d.triggerEvent || undefined,
       });
-      designer.ruleScript = d.ruleScript || '';
       // ui_schema 接口下发的是字符串，编辑器要的是格式化后的文本；
       // 解析不了就原样放进去，让人在编辑器里看到真实内容而不是一句报错
       designer.uiSchemaText = formatSchemaText(d.uiSchema);
@@ -477,7 +460,6 @@
       const templateDto = {
         ...designer.base,
         uiSchema: schemaParse.value.schema,
-        ruleScript: designer.ruleScript,
       };
       const res = await taskApi.saveTaskTemplate(templateDto);
       // 保存成功后重置脏标记基准，并清掉本地草稿（内容已在服务端）
@@ -534,7 +516,6 @@
   function writeDraft() {
     const draft = {
       base: { ...designer.base },
-      ruleScript: designer.ruleScript,
       uiSchemaText: designer.uiSchemaText,
       savedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     };
@@ -568,7 +549,6 @@
   function restoreDraft() {
     const draft = pendingDraft.value;
     Object.assign(designer.base, draft.base);
-    designer.ruleScript = draft.ruleScript;
     designer.uiSchemaText = draft.uiSchemaText;
     pendingDraft.value = null;
     message.success('草稿已恢复，确认无误后请点「保存模板」提交到服务端');

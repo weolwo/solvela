@@ -708,7 +708,6 @@ class TaskRuntimeP0AcceptanceTest {
         form.setTemplateName("契约校验用-" + code);
         form.setTaskType(taskType);
         form.setTriggerEvent("DAILY_SIGN");
-        form.setRuleScript("// 契约校验用例");
         form.setUiSchema(Map.of("version", 1, "params", params));
         return form;
     }

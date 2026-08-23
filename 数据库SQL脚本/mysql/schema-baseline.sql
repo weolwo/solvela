@@ -25,8 +25,8 @@ SET NAMES utf8mb4;
 --   然后重新跑一次 DumpSchema 覆盖本文件，用 git diff 核对是否与预期一致。
 --   🔴 只改迁移不改基线 = 新环境和老环境结构不一样，而且没人会发现。
 --
--- 生成时间：2026-08-22
--- 表数量：82 张
+-- 生成时间：2026-08-23
+-- 表数量：84 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -1050,7 +1050,6 @@ CREATE TABLE `t_activity_config` (
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0-未开始, 1-上线, 2-下线',
   `start_time` datetime NOT NULL COMMENT '活动开始时间',
   `end_time` datetime NOT NULL COMMENT '活动结束时间',
-  `script_id` varchar(32) DEFAULT NULL COMMENT '规则脚本id',
   `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
@@ -1138,7 +1137,6 @@ CREATE TABLE `t_prize_pool_config` (
   `pool_name` varchar(128) NOT NULL COMMENT '奖池名称',
   `reset_period` varchar(32) NOT NULL DEFAULT 'DAY' COMMENT '重置周期，天，周，月，活动期间',
   `draw_mode` tinyint DEFAULT '1' COMMENT '抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)',
-  `script_id` varchar(64) DEFAULT NULL COMMENT '进入该奖池的前置脚本',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT '0关闭，1开启',
   `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1212,7 +1210,6 @@ CREATE TABLE `t_task_template` (
   `task_type` varchar(32) NOT NULL COMMENT '流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)',
   `trigger_event` varchar(32) DEFAULT NULL COMMENT '默认触发事件：模板建议值，向导中可覆盖',
   `ui_schema` json NOT NULL COMMENT '前端渲染规则',
-  `rule_script` text NOT NULL COMMENT 'QLExpress脚本',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-禁用, 1-启用',
   `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1434,6 +1431,50 @@ CREATE TABLE `t_lottery_number_pool` (
   UNIQUE KEY `uk_lottery_num` (`lottery_code`,`ticket_number`),
   KEY `idx_number_pool_member` (`sequence_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='彩票号码池';
+
+
+-- =====================================================================================
+-- 脚本引擎（2 张）
+-- =====================================================================================
+
+DROP TABLE IF EXISTS `t_script`;
+CREATE TABLE `t_script` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `script_code` varchar(64) NOT NULL COMMENT '脚本唯一编码，由文件相对路径去掉后缀推导，如 task/streak_sign_7d',
+  `script_name` varchar(128) NOT NULL COMMENT '脚本名称，来自文件头 @name',
+  `domain` varchar(32) NOT NULL COMMENT '业务域，对应 ScriptDomain 枚举。由 scene 推导，不单独声明',
+  `scene` varchar(32) NOT NULL COMMENT '场景，对应 ScriptScene 枚举，来自文件头 @scene。决定入参与返回值契约',
+  `file_path` varchar(255) NOT NULL COMMENT 'classpath 下的路径，如 scripts/task/streak_sign_7d.ql',
+  `content` mediumtext NOT NULL COMMENT '脚本内容。只读镜像：权威在文件，启动时由加载器覆盖写入，改这里不生效',
+  `content_hash` varchar(64) NOT NULL COMMENT 'content 的 SHA-256，加载器据此判断内容是否变化',
+  `version` int NOT NULL DEFAULT '1' COMMENT '版本号，内容变化时 +1',
+  `params_schema` json DEFAULT NULL COMMENT '入参契约快照，由 ScriptScene.getParams() 生成，供前端渲染',
+  `return_type` varchar(32) NOT NULL COMMENT '返回值类型，由 ScriptScene 决定',
+  `description` varchar(500) DEFAULT NULL COMMENT '用途说明，来自文件头 @desc',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_script_code` (`script_code`),
+  KEY `idx_script_scene` (`scene`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='脚本注册表。文件的只读镜像，权威在 common-api/src/main/resources/scripts/，无 create_by/update_by 是因为这张表只由加载器写';
+
+DROP TABLE IF EXISTS `t_script_ref`;
+CREATE TABLE `t_script_ref` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `script_code` varchar(64) NOT NULL COMMENT '引用的脚本编码，关联 t_script.script_code',
+  `ref_type` varchar(32) NOT NULL COMMENT '引用方类型：TASK_TEMPLATE / PRIZE_POOL / ACTIVITY，见 ScriptRefPoint 枚举',
+  `ref_id` varchar(64) NOT NULL COMMENT '引用方业务编码（template_code / pool_code / activity_code），不用自增id',
+  `ref_slot` varchar(32) NOT NULL COMMENT '挂载槽位：RULE / ENTRY 等。同一个业务对象可以挂多个不同用途的脚本',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
+  `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_script_ref_point` (`ref_type`,`ref_id`,`ref_slot`),
+  KEY `idx_script_ref_code` (`script_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='脚本引用关系表。存在的唯一理由：回答「改这个脚本会影响哪些业务对象」';
 
 
 -- =====================================================================================

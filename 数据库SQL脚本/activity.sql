@@ -18,23 +18,21 @@ SET NAMES utf8mb4;
 --
 -- 1. 活动主表 (大促容器)
 DROP TABLE IF EXISTS `t_activity_config`;
-CREATE TABLE `t_activity_config`
-(
-    `id`            bigint      NOT NULL AUTO_INCREMENT comment 'id',
-    `activity_code` varchar(32) NOT NULL COMMENT '活动编码：10位大写字母+数字，全局唯一',
-    `activity_name` varchar(64) NOT NULL COMMENT '活动名称',
-    `activity_type` varchar(32) NOT NULL COMMENT '活动类型：BASIC-基础活动(仅外壳,不挂玩法) / DRAW-奖池抽奖 / TASK-任务驱动 / LOTTERY-FPE彩票',
-    `status`        tinyint     NOT NULL DEFAULT 0 COMMENT '状态：0-未开始, 1-上线, 2-下线',
-    `start_time`    datetime    NOT NULL COMMENT '活动开始时间',
-    `end_time`      datetime    NOT NULL COMMENT '活动结束时间',
-    `script_id`     varchar(32)          DEFAULT NULL COMMENT '规则脚本id',
-    `create_by`     varchar(32)          DEFAULT NULL comment '创建人',
-    `create_time`   datetime             DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`     varchar(32)          DEFAULT NULL comment '更新人',
-    `update_time`   datetime             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_act_code` (`activity_code`)
-) COMMENT ='活动配置';
+CREATE TABLE `t_activity_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
+  `activity_name` varchar(64) NOT NULL COMMENT '活动名称',
+  `activity_type` varchar(32) NOT NULL COMMENT '活动类型：BASIC-基础活动(仅外壳,不挂玩法) / DRAW-奖池抽奖 / TASK-任务驱动 / LOTTERY-FPE彩票',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0-未开始, 1-上线, 2-下线',
+  `start_time` datetime NOT NULL COMMENT '活动开始时间',
+  `end_time` datetime NOT NULL COMMENT '活动结束时间',
+  `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_act_code` (`activity_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='活动配置';
 
 -- 2. 活动全局奖项库 (全局风控与白名单)
 DROP TABLE IF EXISTS `t_prize_pool_item`;
@@ -59,26 +57,21 @@ CREATE TABLE `t_prize_pool_item`
 
 -- 3. 奖池配置表 (多池支持与抽奖门票)
 DROP TABLE IF EXISTS `t_prize_pool_config`;
-CREATE TABLE `t_prize_pool_config`
-(
-    `id`              bigint         NOT NULL AUTO_INCREMENT comment 'id',
-    `activity_code`   varchar(32)    NOT NULL COMMENT '活动编码',
-    `pool_code`       varchar(32)    NOT NULL COMMENT '奖池编码：10位大写字母+数字，全局唯一 (如: H88JHKJFNE)',
-    `pool_name`       varchar(128)   NOT NULL COMMENT '奖池名称',
-    -- ⚠️ cost_asset_type / cost_value 已于 v3.64.0 移除：
-    -- 抽一次消耗什么、消耗多少属于业务规则，和「去哪个奖池抽」一样由上游算完再调进来，
-    -- 不是抽奖引擎该决定的事（同 t_lottery_config：彩票模块从一开始就没有消耗字段）。
-    `reset_period`    varchar(32)    NOT NULL DEFAULT 'DAY' COMMENT '重置周期，天，周，月，活动期间',
-    `draw_mode`       tinyint        NULL     DEFAULT 1 COMMENT '抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)',
-    `script_id`       varchar(64)             DEFAULT NULL COMMENT '进入该奖池的前置脚本',
-    `status`          tinyint        NOT NULL DEFAULT 1 comment '0关闭，1开启',
-    `create_by`       varchar(32)             DEFAULT NULL comment '创建人',
-    `create_time`     datetime                DEFAULT CURRENT_TIMESTAMP comment '创建时间',
-    `update_by`       varchar(32)             DEFAULT NULL comment '更新人',
-    `update_time`     datetime                DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP comment '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pool_code` (`pool_code`)
-) COMMENT ='奖池配置';
+CREATE TABLE `t_prize_pool_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
+  `pool_code` varchar(32) NOT NULL COMMENT '奖池唯一编码 (如: VIP_POOL)',
+  `pool_name` varchar(128) NOT NULL COMMENT '奖池名称',
+  `reset_period` varchar(32) NOT NULL DEFAULT 'DAY' COMMENT '重置周期，天，周，月，活动期间',
+  `draw_mode` tinyint DEFAULT '1' COMMENT '抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '0关闭，1开启',
+  `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_pool_code` (`pool_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='奖池配置';
 
 -- 4. 奖池转盘格子映射表 (纯概率配置)
 DROP TABLE IF EXISTS `t_pool_prize_mapping`;

@@ -252,11 +252,6 @@
       ellipsis: true,
     },
     {
-      title: '规则脚本id',
-      dataIndex: 'scriptId',
-      ellipsis: true,
-    },
-    {
       title: '创建人',
       dataIndex: 'createBy',
       ellipsis: true,

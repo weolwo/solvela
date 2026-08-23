@@ -51,6 +51,7 @@ public class DumpSchema {
         GROUPS.put("营销 - 彩票", List.of(
             "t_lottery_config","t_lottery_issue","t_lottery_prize_rule",
             "t_lottery_record","t_lottery_number_pool"));
+        GROUPS.put("脚本引擎", List.of("t_script","t_script_ref"));
         GROUPS.put("积分商城", List.of(
             "t_mall_category","t_mall_commodity","t_mall_sku","t_mall_order",
             "t_mall_exchange_limit","t_mall_address","t_mall_favorite"));

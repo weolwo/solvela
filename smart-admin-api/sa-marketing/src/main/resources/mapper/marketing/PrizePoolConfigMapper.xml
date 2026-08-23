@@ -9,7 +9,6 @@
             <result column="pool_name" property="poolName" />
             <result column="reset_period" property="resetPeriod" />
             <result column="draw_mode" property="drawMode" />
-            <result column="script_id" property="scriptId" />
             <result column="status" property="status" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
@@ -24,7 +23,6 @@
                 pool_name,
                 reset_period,
                 draw_mode, 
-                script_id, 
                 status, 
                 create_by, 
                 create_time, 

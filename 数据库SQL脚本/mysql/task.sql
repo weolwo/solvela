@@ -28,7 +28,6 @@ CREATE TABLE `t_task_template` (
   `task_type` varchar(32) NOT NULL COMMENT '流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)',
   `trigger_event` varchar(32) DEFAULT NULL COMMENT '默认触发事件：模板建议值，向导中可覆盖',
   `ui_schema` json NOT NULL COMMENT '前端渲染规则',
-  `rule_script` text NOT NULL COMMENT 'QLExpress脚本',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-禁用, 1-启用',
   `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

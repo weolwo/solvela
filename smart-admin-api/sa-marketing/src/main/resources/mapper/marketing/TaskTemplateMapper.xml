@@ -9,7 +9,6 @@
             <result column="task_type" property="taskType" />
             <result column="trigger_event" property="triggerEvent" />
             <result column="ui_schema" property="uiSchema" />
-            <result column="rule_script" property="ruleScript" />
             <result column="status" property="status" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
@@ -24,7 +23,6 @@
                 task_type,
                 trigger_event,
                 ui_schema,
-                rule_script, 
                 status,
                 create_by, 
                 create_time, 
