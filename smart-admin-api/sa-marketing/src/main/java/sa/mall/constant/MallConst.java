@@ -52,6 +52,35 @@ public final class MallConst {
     /** 积分 + 现金 */
     public static final int PAY_TYPE_POINTS_CASH = 2;
 
+    // ------------------------------------------------------------------ 订单状态
+
+    /**
+     * 取值是<b>跳跃的（0/10/20/...）</b>，不是连续序号 —— DDL 里就是这么定的，
+     * 留出空档是为了将来插入中间态（比如「待发货」）时不用重排既有值。
+     * 所以任何地方都别写 {@code status < 30} 这种范围判断，只能逐个比。
+     */
+    public static final int ORDER_STATUS_UNPAID = 0;
+    public static final int ORDER_STATUS_PENDING = 10;
+    public static final int ORDER_STATUS_FULFILLING = 20;
+    public static final int ORDER_STATUS_FINISHED = 30;
+    public static final int ORDER_STATUS_CANCELLED = 40;
+    public static final int ORDER_STATUS_REFUNDED = 50;
+    public static final int ORDER_STATUS_FAILED = 60;
+
+    // ------------------------------------------------------------------ 订单来源
+
+    public static final String ORDER_SOURCE_NORMAL = "NORMAL";
+    /** 限时抢购场次。秒杀模块还没做，这个值先留着 —— DDL 已经写进注释了 */
+    public static final String ORDER_SOURCE_FLASH_SALE = "FLASH_SALE";
+
+    /**
+     * 排行榜默认取多少条。榜单是给人看的，前十已经能回答「哪些商品最受欢迎」；
+     * 再长运营也不会逐条看，反而把页面撑得很高。
+     */
+    public static final int RANK_TOP_N = 10;
+
+    public static final int MAX_RANK_TOP_N = 50;
+
     // ------------------------------------------------------------------ 限兑周期
 
     /** 取值对齐 t_promotion_config.limit_period，别新造一套 */

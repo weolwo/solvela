@@ -12,23 +12,19 @@ export const mallOrderApi = {
   /**
    * 分页查询  @author  weolwo
    */
-  queryPage : (param) => {
+  queryPage: (param) => {
     return postRequest('/mallOrder/queryPage', param);
   },
 
   /**
-   * 增加  @author  weolwo
+   * 统计 + 兑换商品排行。收的是<b>和列表同一个查询表单</b> ——
+   * 顶部筛选改了统计跟着变，两套条件的话运营会看到「统计说 100 单、列表只有 3 条」  @author  weolwo
    */
-  add: (param) => {
-      return postRequest('/mallOrder/add', param);
+  queryStat: (param) => {
+    return postRequest('/mallOrder/queryStat', param);
   },
 
-  /**
-   * 修改  @author  weolwo
-   */
-  update: (param) => {
-      return postRequest('/mallOrder/update', param);
-  },
+
 
 
 

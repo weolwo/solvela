@@ -1,18 +1,9 @@
 package sa.mall.address.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.LocalDateTime;
-import lombok.Data;
 
-/**
- * 商城-会员收货地址簿 列表VO
- *
- * @Author weolwo
- * @Date 2026-08-22 19:25:03
- * @Copyright weolwo
- */
-
-@Data
 public class MallAddressVO {
 
 

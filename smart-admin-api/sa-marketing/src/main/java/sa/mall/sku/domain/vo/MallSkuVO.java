@@ -23,6 +23,29 @@ public class MallSkuVO {
     @Schema(description = "关联 t_mall_commodity.id")
     private Long commodityId;
 
+    // ---------- join 出来的商品信息：只看 SKU 编码认不出这是哪个商品的哪个规格 ----------
+
+    @Schema(description = "商品名称")
+    private String commodityName;
+
+    @Schema(description = "商品编码")
+    private String commodityCode;
+
+    @Schema(description = "商品封面 file_id")
+    private Long coverFileId;
+
+    @Schema(description = "商品状态：0-下架, 1-上架, 2-草稿")
+    private Integer commodityStatus;
+
+    @Schema(description = "商品基准积分（SKU 未覆盖时的实际售价）")
+    private Integer basePointsPrice;
+
+    @Schema(description = "分类id")
+    private Long categoryId;
+
+    @Schema(description = "分类名称")
+    private String categoryName;
+
     @Schema(description = "SKU编码：10位大写字母+数字，全局唯一")
     private String skuCode;
 

@@ -1,17 +1,19 @@
 package sa.mall.favorite.dao;
 
-        import java.util.List;
-        import sa.mall.favorite.domain.entity.MallFavorite;
-        import sa.mall.favorite.domain.form.MallFavoriteQueryForm;
-        import sa.mall.favorite.domain.vo.MallFavoriteVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import sa.mall.favorite.domain.entity.MallFavorite;
+import sa.mall.favorite.domain.vo.MallFavoriteRankVO;
+import sa.mall.favorite.domain.vo.MallFavoriteStatVO;
+
 import java.util.List;
 
 /**
  * 商城-商品收藏 Dao
+ *
+ * <p><b>没有分页明细查询</b>：一条收藏记录是「某人收藏了某商品」，逐条看没有运营价值 ——
+ * 运营要回答的是「哪些商品最多人想要」。所以这里只有三段聚合。
  *
  * @Author weolwo
  * @Date 2026-08-22 19:34:44
@@ -21,20 +23,17 @@ import java.util.List;
 public interface MallFavoriteDao extends BaseMapper<MallFavorite> {
 
     /**
-     * 分页查询
-     *
-     * @param page 分页参数
-     * @param queryForm 查询表单
-     * @return 列表数据
+     * 总量统计：收藏总数 / 被收藏商品数 / 有收藏行为的会员数
      */
-    List<MallFavoriteVO> queryPage(Page<?> page, @Param("queryForm") MallFavoriteQueryForm queryForm);
+    MallFavoriteStatVO queryStat();
 
     /**
-     * 列表查询 (无分页)
-     *
-     * @param queryForm 查询表单
-     * @return 列表数据
+     * 收藏排行（按收藏数）
      */
-    List<MallFavoriteVO> queryList(@Param("queryForm") MallFavoriteQueryForm queryForm);
+    List<MallFavoriteRankVO> queryRank(@Param("topN") int topN);
 
+    /**
+     * 「想要但买不到」：有人收藏，而商品已下架或可用库存为 0
+     */
+    List<MallFavoriteRankVO> queryUnavailableRank(@Param("topN") int topN);
 }
