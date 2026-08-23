@@ -72,6 +72,22 @@ export const DEVICE_TYPE_OPTIONS = [
   { value: 'PC', label: 'PC' },
 ];
 
+/**
+ * 实名认证状态。**只有「认证中」能被审核** —— 已认证的再点一次会把 verify_time
+ * 刷成今天，而那个时间是合规审计要回答「什么时候通过的」的依据。
+ */
+export const VERIFY_STATUS_ENUM = {
+  NONE: { value: 0, desc: '未认证', color: 'default' },
+  PENDING: { value: 1, desc: '认证中', color: 'processing' },
+  VERIFIED: { value: 2, desc: '已认证', color: 'green' },
+  FAILED: { value: 3, desc: '认证失败', color: 'red' },
+};
+
+export const VERIFY_STATUS_OPTIONS = Object.values(VERIFY_STATUS_ENUM).map((item) => ({
+  value: item.value,
+  label: item.desc,
+}));
+
 /** 按枚举取展示文案，取不到就把原值显示出来 —— 不要显示成空白，那会让人以为数据丢了 */
 export function descOf(enumObj, value) {
   const meta = Object.values(enumObj).find((item) => item.value === value);
@@ -86,4 +102,5 @@ export default {
   MEMBER_STATUS_ENUM,
   GENDER_ENUM,
   LOGIN_STATUS_ENUM,
+  VERIFY_STATUS_ENUM,
 };

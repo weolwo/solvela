@@ -44,6 +44,17 @@ public final class MemberConst {
     public static final int LOGIN_STATUS_SUCCESS = 1;
     public static final int LOGIN_STATUS_LOGOUT = 2;
 
+    // ------------------------------------------------------------------ 实名认证状态
+
+    public static final int VERIFY_STATUS_NONE = 0;
+    /** 认证中 —— <b>只有这个状态能被审核</b> */
+    public static final int VERIFY_STATUS_PENDING = 1;
+    public static final int VERIFY_STATUS_VERIFIED = 2;
+    public static final int VERIFY_STATUS_FAILED = 3;
+
+    /** 驳回原因长度上限，对齐 t_member_verify.fail_reason 的 varchar(255) */
+    public static final int MAX_FAIL_REASON_LENGTH = 255;
+
     // ------------------------------------------------------------------ 其它
 
     /** 运营备注长度上限，对齐 t_member.remark 的 varchar(255) */

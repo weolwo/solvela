@@ -1,215 +1,234 @@
 <!--
-  * 会员实名信息（敏感，与主表分离）
+  * 会员实名信息
+  *
+  * 【运营在这个页面只做一件事：审核】通过 / 驳回。
+  * 姓名和身份证是用户提交的，后台改它们没有任何合法用途 ——
+  * 生成器留的那个「能改所有字段」的表单已经删除，后端也没有对应接口。
+  *
+  * 【姓名与身份证在列表里是脱敏的】而且脱敏发生在<b>服务端</b>：
+  * 前端脱敏意味着明文已经过网到浏览器，F12 一开就是全量身份证号。
+  * 要看完整信息只有审核弹窗那一条路，走单独的 detail 接口 + 单独的权限点。
+  *
+  * 【没有按姓名搜索】那一列在库里是密文，SQL 层没法模糊匹配 ——
+  * 真要按姓名找人只能全表解密再比对。检索入口只有账号 / 会员号 / 状态 / 时间。
   *
   * @Author:    weolwo
   * @Date:      2026-08-22 21:00:09
   * @Copyright  weolwo
 -->
 <template>
-    <!---------- 查询表单form begin ----------->
-    <a-form class="smart-query-form">
-        <a-row class="smart-query-form-row">
-            <a-form-item label="会员号" class="smart-query-form-item">
-                <a-input style="width: 200px" v-model:value="queryForm.memberId" placeholder="会员号" />
-            </a-form-item>
-            <a-form-item label="认证状态" class="smart-query-form-item">
-                <a-input style="width: 200px" v-model:value="queryForm.verifyStatus" placeholder="认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败" />
-            </a-form-item>
-            <a-form-item label="创建时间" class="smart-query-form-item">
-                <a-range-picker v-model:value="queryForm.createTime" :presets="defaultTimeRanges" style="width: 200px" @change="onChangeCreateTime" />
-            </a-form-item>
-            <a-form-item class="smart-query-form-item">
-                <a-button type="primary" @click="onSearch">
-                    <template #icon>
-                        <SearchOutlined />
-                    </template>
-                    查询
-                </a-button>
-                <a-button @click="resetQuery" class="smart-margin-left10">
-                    <template #icon>
-                        <ReloadOutlined />
-                    </template>
-                    重置
-                </a-button>
-            </a-form-item>
-        </a-row>
-    </a-form>
-    <!---------- 查询表单form end ----------->
+  <a-form class="smart-query-form">
+    <a-row class="smart-query-form-row">
+      <a-form-item label="账号" class="smart-query-form-item">
+        <a-input style="width: 160px" v-model:value="queryForm.memberName" placeholder="支持模糊搜索" allow-clear @press-enter="onSearch" />
+      </a-form-item>
+      <a-form-item label="会员号" class="smart-query-form-item">
+        <a-input style="width: 150px" v-model:value="queryForm.memberId" placeholder="10 位数字" allow-clear @press-enter="onSearch" />
+      </a-form-item>
+      <a-form-item label="认证状态" class="smart-query-form-item">
+        <a-select style="width: 130px" v-model:value="queryForm.verifyStatus" :options="VERIFY_STATUS_OPTIONS" placeholder="全部" allow-clear />
+      </a-form-item>
+      <a-form-item label="提交时间" class="smart-query-form-item">
+        <a-range-picker v-model:value="createTime" :presets="defaultTimeRanges" style="width: 230px" @change="onChangeCreateTime" />
+      </a-form-item>
+      <a-form-item class="smart-query-form-item">
+        <a-button type="primary" @click="onSearch">
+          <template #icon>
+            <SearchOutlined />
+          </template>
+          查询
+        </a-button>
+        <a-button @click="resetQuery" class="smart-margin-left10">
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+          重置
+        </a-button>
+      </a-form-item>
+    </a-row>
+  </a-form>
 
-    <a-card size="small" :bordered="false" :hoverable="true">
-        <!---------- 表格操作行 begin ----------->
-        <a-row class="smart-table-btn-block">
-            <div class="smart-table-operate-block">
-            </div>
-            <div class="smart-table-setting-block">
-                <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
-            </div>
-        </a-row>
-        <!---------- 表格操作行 end ----------->
+  <a-card size="small" :bordered="false" :hoverable="true">
+    <a-row class="smart-table-btn-block">
+      <div class="smart-table-operate-block">
+        <!-- 待审是这个页面的主任务，给它一个一键筛选 -->
+        <a-button size="small" :type="onlyPending ? 'primary' : 'default'" @click="togglePending">
+          只看待审{{ pendingHint }}
+        </a-button>
+      </div>
+      <div class="smart-table-setting-block">
+        <TableOperator v-model="columns" :tableId="null" :refresh="queryData" />
+      </div>
+    </a-row>
 
-        <!---------- 表格 begin ----------->
-        <a-table
-            size="small"
-            :scroll="{ y: 800 }"
-            :dataSource="tableData"
-            :columns="columns"
-            rowKey="id"
-            bordered
-            :loading="tableLoading"
-            :pagination="false"
-        >
-            <template #bodyCell="{ text, record, column }">
+    <a-table
+      size="small"
+      :scroll="{ x: 1200 }"
+      :dataSource="tableData"
+      :columns="columns"
+      rowKey="id"
+      bordered
+      :loading="tableLoading"
+      :pagination="false"
+    >
+      <template #bodyCell="{ text, record, column }">
+        <template v-if="column.dataIndex === 'memberName'">
+          <div>{{ record.memberName || '—' }}</div>
+          <div class="cell-sub">{{ record.nickname }} · {{ record.memberId }}</div>
+        </template>
 
+        <template v-else-if="column.dataIndex === 'realName'">
+          <!-- 服务端脱敏后的值。要看完整的走审核弹窗 -->
+          <span class="masked">{{ text || '—' }}</span>
+        </template>
 
-                <template v-if="column.dataIndex === 'action'">
-                    <div class="smart-table-operate">
-                    </div>
-                </template>
-            </template>
-        </a-table>
-        <!---------- 表格 end ----------->
+        <template v-else-if="column.dataIndex === 'idCard'">
+          <span class="masked">{{ text || '—' }}</span>
+        </template>
 
-        <div class="smart-query-table-page">
-            <a-pagination
-                showSizeChanger
-                showQuickJumper
-                show-less-items
-                :pageSizeOptions="PAGE_SIZE_OPTIONS"
-                :defaultPageSize="queryForm.pageSize"
-                v-model:current="queryForm.pageNum"
-                v-model:pageSize="queryForm.pageSize"
-                :total="total"
-                @change="queryData"
-                @showSizeChange="queryData"
-                :show-total="(total) => `共${total}条`"
-            />
-        </div>
+        <template v-else-if="column.dataIndex === 'verifyStatus'">
+          <a-tag :color="statusMeta(text).color">{{ statusMeta(text).desc }}</a-tag>
+        </template>
 
-        <MemberVerifyForm  ref="formRef" @reloadList="queryData"/>
+        <template v-else-if="column.dataIndex === 'failReason'">
+          <span v-if="text" class="fail-reason">{{ text }}</span>
+          <span v-else class="cell-sub">—</span>
+        </template>
 
-    </a-card>
+        <template v-else-if="column.dataIndex === 'action'">
+          <div class="smart-table-operate">
+            <a-button type="link" @click="showAudit(record)">
+              {{ record.verifyStatus === VERIFY_STATUS_ENUM.PENDING.value ? '审核' : '查看' }}
+            </a-button>
+          </div>
+        </template>
+      </template>
+    </a-table>
+
+    <div class="smart-query-table-page">
+      <a-pagination
+        showSizeChanger
+        showQuickJumper
+        show-less-items
+        :pageSizeOptions="PAGE_SIZE_OPTIONS"
+        :defaultPageSize="queryForm.pageSize"
+        v-model:current="queryForm.pageNum"
+        v-model:pageSize="queryForm.pageSize"
+        :total="total"
+        @change="queryData"
+        @showSizeChange="queryData"
+        :show-total="(total) => `共${total}条`"
+      />
+    </div>
+  </a-card>
+
+  <MemberVerifyAuditModal ref="auditModalRef" @reloadList="queryData" />
 </template>
+
 <script setup>
-    import { reactive, ref, onMounted } from 'vue';
-    import { message, Modal } from 'ant-design-vue';
-    import { SmartLoading } from '/@/components/framework/smart-loading';
-    import { memberVerifyApi } from '/@/api/business/member/member-verify-api';
-    import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
-    import { smartSentry } from '/@/lib/smart-sentry';
-    import TableOperator from '/@/components/support/table-operator/index.vue';
-    import { defaultTimeRanges } from '/@/lib/default-time-ranges';
-    import MemberVerifyForm from './member-verify-form.vue';
+  import { computed, onMounted, reactive, ref } from 'vue';
+  import { memberVerifyApi } from '/@/api/business/member/member-verify-api';
+  import { PAGE_SIZE_OPTIONS } from '/@/constants/common-const';
+  import { defaultTimeRanges } from '/@/lib/default-time-ranges';
+  import { metaOf, VERIFY_STATUS_ENUM, VERIFY_STATUS_OPTIONS } from '/@/constants/business/member/member-const';
+  import { smartSentry } from '/@/lib/smart-sentry';
+  import TableOperator from '/@/components/support/table-operator/index.vue';
+  import MemberVerifyAuditModal from './member-verify-audit-modal.vue';
 
-    // ---------------------------- 表格列 ----------------------------
+  const columns = ref([
+    { title: '账号 / 会员号', dataIndex: 'memberName', width: 180 },
+    { title: '真实姓名', dataIndex: 'realName', width: 120 },
+    { title: '身份证号', dataIndex: 'idCard', width: 200 },
+    { title: '认证状态', dataIndex: 'verifyStatus', width: 100 },
+    { title: '驳回原因', dataIndex: 'failReason', width: 220, ellipsis: true },
+    { title: '提交时间', dataIndex: 'createTime', width: 170, ellipsis: true },
+    { title: '通过时间', dataIndex: 'verifyTime', width: 170, ellipsis: true },
+    { title: '操作', dataIndex: 'action', width: 90, fixed: 'right' },
+  ]);
 
-    const columns = ref([
-        {
-            title: 'id',
-            dataIndex: 'id',
-            ellipsis: true,
-        },
-        {
-            title: '会员号',
-            dataIndex: 'memberId',
-            ellipsis: true,
-        },
-        {
-            title: '真实姓名',
-            dataIndex: 'realName',
-            ellipsis: true,
-        },
-        {
-            title: '身份证号',
-            dataIndex: 'idCard',
-            ellipsis: true,
-        },
-        {
-            title: '身份证',
-            dataIndex: 'idCardHash',
-            ellipsis: true,
-        },
-        {
-            title: '认证状态',
-            dataIndex: 'verifyStatus',
-            ellipsis: true,
-        },
-        {
-            title: '认证通过时间',
-            dataIndex: 'verifyTime',
-            ellipsis: true,
-        },
-        {
-            title: '认证失败原因',
-            dataIndex: 'failReason',
-            ellipsis: true,
-        },
-        {
-            title: '创建时间',
-            dataIndex: 'createTime',
-            ellipsis: true,
-        },
-        {
-            title: '更新时间',
-            dataIndex: 'updateTime',
-            ellipsis: true,
-        },
-    ]);
+  function statusMeta(value) {
+    return metaOf(VERIFY_STATUS_ENUM, value, VERIFY_STATUS_ENUM.NONE);
+  }
 
-    // ---------------------------- 查询数据表单和方法 ----------------------------
+  // ---------------------------- 查询 ----------------------------
 
-    const queryFormState = {
-        memberId: undefined, //会员号
-        verifyStatus: undefined, //认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败
-        createTime: [], //创建时间
-        createTimeBegin: undefined, //创建时间 开始
-        createTimeEnd: undefined, //创建时间 结束
-        pageNum: 1,
-        pageSize: 10,
-    };
-    // 查询表单form
-    const queryForm = reactive({ ...queryFormState });
-    // 表格加载loading
-    const tableLoading = ref(false);
-    // 表格数据
-    const tableData = ref([]);
-    // 总数
-    const total = ref(0);
+  const queryFormState = {
+    memberId: undefined,
+    memberName: undefined,
+    verifyStatus: undefined,
+    createTimeBegin: undefined,
+    createTimeEnd: undefined,
+    pageNum: 1,
+    pageSize: 10,
+  };
+  const queryForm = reactive({ ...queryFormState });
+  const createTime = ref([]);
+  const tableLoading = ref(false);
+  const tableData = ref([]);
+  const total = ref(0);
 
-    // 重置查询条件
-    function resetQuery() {
-        let pageSize = queryForm.pageSize;
-        Object.assign(queryForm, queryFormState);
-        queryForm.pageSize = pageSize;
-        queryData();
+  const onlyPending = computed(() => queryForm.verifyStatus === VERIFY_STATUS_ENUM.PENDING.value);
+  const pendingHint = computed(() => (onlyPending.value && total.value ? `（${total.value}）` : ''));
+
+  function togglePending() {
+    queryForm.verifyStatus = onlyPending.value ? undefined : VERIFY_STATUS_ENUM.PENDING.value;
+    onSearch();
+  }
+
+  function onChangeCreateTime(dates, dateStrings) {
+    queryForm.createTimeBegin = dateStrings[0] || undefined;
+    queryForm.createTimeEnd = dateStrings[1] || undefined;
+  }
+
+  function resetQuery() {
+    const pageSize = queryForm.pageSize;
+    Object.assign(queryForm, queryFormState);
+    queryForm.pageSize = pageSize;
+    createTime.value = [];
+    queryData();
+  }
+
+  function onSearch() {
+    queryForm.pageNum = 1;
+    queryData();
+  }
+
+  async function queryData() {
+    tableLoading.value = true;
+    try {
+      const res = await memberVerifyApi.queryPage(queryForm);
+      tableData.value = res.data.list;
+      total.value = res.data.total;
+    } catch (e) {
+      smartSentry.captureError(e);
+    } finally {
+      tableLoading.value = false;
     }
+  }
 
-    // 搜索
-    function onSearch(){
-      queryForm.pageNum = 1;
-      queryData();
-    }
+  onMounted(queryData);
 
-    // 查询数据
-    async function queryData() {
-        tableLoading.value = true;
-        try {
-            let queryResult = await memberVerifyApi.queryPage(queryForm);
-            tableData.value = queryResult.data.list;
-            total.value = queryResult.data.total;
-        } catch (e) {
-            smartSentry.captureError(e);
-        } finally {
-            tableLoading.value = false;
-        }
-    }
+  // ---------------------------- 审核 ----------------------------
 
-    function onChangeCreateTime(dates, dateStrings){
-        queryForm.createTimeBegin = dateStrings[0];
-        queryForm.createTimeEnd = dateStrings[1];
-    }
+  const auditModalRef = ref();
 
-
-    onMounted(queryData);
-
-
+  function showAudit(record) {
+    auditModalRef.value.show(record);
+  }
 </script>
+
+<style scoped lang="less">
+  .cell-sub {
+    font-size: 12px;
+    color: #bfbfbf;
+  }
+
+  .masked {
+    font-family: Menlo, Consolas, monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .fail-reason {
+    color: #d97706;
+  }
+</style>

@@ -30,6 +30,11 @@ public interface MemberVerifyDao extends BaseMapper<MemberVerify> {
     List<MemberVerifyVO> queryPage(Page<?> page, @Param("queryForm") MemberVerifyQueryForm queryForm);
 
     /**
+     * 单条详情（明文）。审核弹窗用 —— 让「下发完整证件号」这件事有唯一入口
+     */
+    MemberVerifyVO getDetail(@Param("id") Long id);
+
+    /**
      * 列表查询 (无分页)
      *
      * @param queryForm 查询表单
