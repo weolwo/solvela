@@ -5,8 +5,6 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import io.swagger.v3.oas.models.Operation;
 import sa.base.common.util.SmartStringUtil;
-import sa.base.module.support.apiencrypt.annotation.ApiDecrypt;
-import sa.base.module.support.apiencrypt.annotation.ApiEncrypt;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.web.method.HandlerMethod;
 
@@ -30,22 +28,15 @@ public class SmartOperationCustomizer implements OperationCustomizer {
 
         List<String> noteList = new ArrayList<>();
 
-        // 请求参数加密
-        List<String> encryptBuilderList = new ArrayList<>();
-
-        if (handlerMethod.getMethodAnnotation(ApiDecrypt.class) != null ||
-                handlerMethod.getBeanType().getAnnotation(ApiDecrypt.class) != null) {
-            encryptBuilderList.add("【请求参数加密】");
-        }
-
-        if (handlerMethod.getMethodAnnotation(ApiEncrypt.class) != null ||
-                handlerMethod.getBeanType().getAnnotation(ApiEncrypt.class) != null) {
-            encryptBuilderList.add("【返回结果加密】");
-        }
-
-        if (!encryptBuilderList.isEmpty()) {
-            noteList.add("<br/><font style=\"color:red\" class=\"light-red\">接口安全：" + SmartStringUtil.join(",", encryptBuilderList) + "</font>");
-        }
+        /*
+         * 这里原先还会读 @ApiDecrypt / @ApiEncrypt，在文档上标一行红字
+         * 「接口安全：【请求参数加密】」。2026-08-25 apiencrypt 模块移交 sa-admin 之后删除 ——
+         * sa-base 不能反过来依赖 sa-admin，而这两个注解已经在那边了。
+         *
+         * 只丢了一个<b>装饰性的文档标记</b>，加解密本身照常工作（那是 advice 干的事）。
+         * 真想找回这行标记，让 sa-admin 自己再注册一个 OperationCustomizer 即可 ——
+         * 不值得为它把整个 apiencrypt 拽回 sa-base。
+         */
 
         // 权限
         noteList.addAll(getPermission(handlerMethod));

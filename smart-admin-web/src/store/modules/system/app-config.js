@@ -48,12 +48,6 @@ export const useAppConfigStore = defineStore('appConfig', {
         this[k] = appDefaultConfig[k];
       }
     },
-    showHelpDoc() {
-      this.helpDocExpandFlag = true;
-    },
-    hideHelpDoc() {
-      this.helpDocExpandFlag = false;
-    },
     startFullScreen() {
       this.fullScreenFlag = true;
     },

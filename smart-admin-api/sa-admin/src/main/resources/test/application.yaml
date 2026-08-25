@@ -20,3 +20,23 @@ server:
 spring:
   profiles:
     active: '@profiles.active@'
+
+smart:
+# -------------------------------------------------------------------------
+# SmartJob 定时任务
+# -------------------------------------------------------------------------
+# 🔴 本块原在 sa-base.yaml（2026-08-25 搬过来）。搬的理由：
+#    SmartJobConfig 这个 @ConfigurationProperties 已随 job 模块移交 sa-admin，
+#    放在共享配置里会让 solarx-app 等其它服务背着一堆永远不会生效的键。
+# ⚠️ 定时任务全局只应该有一个执行者。将来若拆出独立 WORKER 节点，
+#    用启动参数分角色（--smart.job.role=ADMIN / WORKER），别两边都跑。
+  job:
+    enabled: true
+    # 任务初始化延迟 默认30秒 可选
+    init-delay: 10
+    # 定时任务执行线程池数量 默认2 可选
+    core-pool-size: 2
+    # 数据库配置检测-开关 默认开启 可选（作用是固定间隔读取数据库配置更新任务，关闭后只能重启服务或通过接口修改定时任务，建议开启）
+    db-refresh-enabled: true
+    # 数据库配置检测-执行间隔 默认120秒 可选
+    db-refresh-interval: 60

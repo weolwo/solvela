@@ -5,7 +5,6 @@ import sa.base.common.code.ErrorCodeRegister;
 import sa.base.common.enumeration.SystemEnvironmentEnum;
 import sa.base.common.util.SmartEnumUtil;
 import sa.base.common.util.SmartIpUtil;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.boot.web.server.context.WebServerInitializedEvent;
 import org.springframework.context.ApplicationListener;
@@ -28,14 +27,8 @@ import org.springframework.util.ClassUtils;
 @Order(value = 1024)
 public class WebServerListener implements ApplicationListener<WebServerInitializedEvent> {
 
-    @Value("${reload.interval-seconds}")
-    private Integer intervalSeconds;
-
     @Override
     public void onApplicationEvent(WebServerInitializedEvent webServerInitializedEvent) {
-        WebServerApplicationContext context = webServerInitializedEvent.getApplicationContext();
-        // 初始化reload
-        initReload(context);
         // 项目信息
         showProjectMessage(webServerInitializedEvent);
     }
@@ -99,19 +92,4 @@ public class WebServerListener implements ApplicationListener<WebServerInitializ
         return url.substring(0, pathStart) + url.substring(pathStart).replaceAll("/{2,}", "/");
     }
 
-    /**
-     * 初始化reload
-     */
-    private void initReload(WebServerApplicationContext applicationContext) {
-//        将applicationContext转换为ConfigurableApplicationContext
-//        ConfigurableApplicationContext configurableApplicationContext = (ConfigurableApplicationContext) applicationContext;
-//
-//
-//        //获取BeanFactory
-//        DefaultListableBeanFactory defaultListableBeanFactory = (DefaultListableBeanFactory) configurableApplicationContext.getAutowireCapableBeanFactory();
-//
-//        //动态注册bean
-//        SmartReloadManager reloadManager = new SmartReloadManager(applicationContext.getBean(ReloadCommand.class), intervalSeconds);
-//        defaultListableBeanFactory.registerSingleton("smartReloadManager", reloadManager);
-    }
 }

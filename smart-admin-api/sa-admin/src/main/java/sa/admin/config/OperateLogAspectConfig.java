@@ -1,7 +1,7 @@
 package sa.admin.config;
 
-import sa.base.module.support.operatelog.core.OperateLogAspect;
-import sa.base.module.support.operatelog.core.OperateLogConfig;
+import sa.admin.module.system.operatelog.core.OperateLogAspect;
+import sa.admin.module.system.operatelog.core.OperateLogConfig;
 import org.springframework.context.annotation.Configuration;
 
 /**

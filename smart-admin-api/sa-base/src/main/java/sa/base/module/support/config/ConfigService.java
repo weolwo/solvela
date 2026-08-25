@@ -11,9 +11,7 @@ import sa.base.common.util.SmartBeanUtil;
 import sa.base.common.util.SmartCollectionUtil;
 import sa.base.common.util.SmartPageUtil;
 import sa.base.common.util.SmartStringUtil;
-import sa.base.constant.ReloadConst;
 import sa.base.module.support.config.domain.*;
-import sa.base.module.support.reload.core.annoation.SmartReload;
 import sa.base.common.util.JsonUtils;
 import org.springframework.stereotype.Service;
 
@@ -42,10 +40,16 @@ public class ConfigService {
     @Resource
     private ConfigDao configDao;
 
-    @SmartReload(ReloadConst.CONFIG_RELOAD)
-    public void configReload(String param) {
-        this.loadConfigCache();
-    }
+    /*
+     * 这里原先有一个 @SmartReload(ReloadConst.CONFIG_RELOAD) 的 configReload()，
+     * 由 support/reload 那套 300 秒轮询的热加载框架定时调用，做全量重载。
+     * 随 reload 模块一起删除（2026-08-25）。
+     *
+     * 删它是安全的：add / updateConfig / updateValueByKey 三条写入路径
+     * <b>本来就</b>各自调用了 refreshConfigCache(configId)，配置改完立即生效，
+     * 从来不依赖那个轮询。轮询唯一多兜住的场景是「有人绕过应用直接改库」——
+     * 那种情况本就该重启或走接口，不值得为它常驻一个后台线程池。
+     */
 
     /**
      * 初始化系统设置缓存

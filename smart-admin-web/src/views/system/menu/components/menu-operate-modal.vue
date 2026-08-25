@@ -48,7 +48,7 @@
           <a-form-item v-if="form.frameFlag" label="外链地址" name="frameUrl">
             <a-input v-model:value="form.frameUrl" placeholder="请输入外链地址" />
           </a-form-item>
-          <a-form-item v-else label="组件地址" name="component" help="比如 商品列表：/business/erp/goods/goods-list.vue">
+          <a-form-item v-else label="组件地址" name="component" help="比如 会员列表：/business/member/member-list.vue">
             <a-input v-model:value="form.component" placeholder="请输入组件地址 默认带有开头/@/views" />
           </a-form-item>
         </template>

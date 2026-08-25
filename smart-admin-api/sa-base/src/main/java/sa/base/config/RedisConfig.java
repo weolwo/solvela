@@ -12,16 +12,11 @@ import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import jakarta.annotation.Resource;
-import sa.base.module.support.cache.CacheService;
-import sa.base.module.support.cache.CaffeineCacheServiceImpl;
-import sa.base.module.support.cache.RedisCacheServiceImpl;
 import sa.base.module.support.redis.CustomRedisCacheManager;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
-import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.*;
@@ -44,8 +39,6 @@ import java.time.Duration;
 public class RedisConfig {
 
     private static final String REDIS_CACHE = "redis";
-
-    private static final String CAFFEINE_CACHE = "caffeine";
 
     public static final String REDIS_CACHE_PREFIX = "cache";
 
@@ -95,11 +88,24 @@ public class RedisConfig {
      * 创建自定义Redis缓存管理器Bean 整合spring-cache
      * Redis连接工厂，用于建立与Redis服务器的连接
      *
-     * @return CacheManager Redis缓存管理器实例
+     * <p>🔴 返回类型写<b>具体类型</b>而不是 {@code CacheManager}，是为了让类型匹配
+     * 与 Bean 创建顺序无关。Spring 在 Bean <b>尚未实例化</b>时，只能从工厂方法的
+     * <b>声明</b>返回类型推断它能满足哪些注入点；声明成宽泛的 {@code CacheManager}，
+     * 按子类型（如 {@code RedisCacheManager}）找的注入点就会匹配不上。
+     *
+     * <p>这条不是纸上谈兵：2026-08-25 删演示模块时，原先「恰好」先一步触发
+     * {@code cacheManager} 实例化的那个 {@code @Cacheable} Bean 没了，
+     * 管理端当场启动失败 —— {@code required a bean of type 'RedisCacheManager'}，
+     * 而报错完全指不到真正的原因（删几个跟缓存无关的业务类，为什么缓存就没了）。
+     * 当时按此类型注入的 {@code RedisCacheServiceImpl} 后来也随 support/cache 一起删了，
+     * 现在容器里已没有这样的注入点 —— <b>但具体返回类型请保留</b>：
+     * 它的成本为零，而换回 {@code CacheManager} 等于把同一个坑重新埋回去。
+     *
+     * @return Redis 缓存管理器实例
      */
     @Bean
     @ConditionalOnProperty(prefix = "spring.cache", name = {"type"}, havingValue = REDIS_CACHE)
-    public CacheManager cacheManager() {
+    public CustomRedisCacheManager cacheManager() {
         // 使用非阻塞模式的缓存写入器，适用于大多数高并发场景
         RedisCacheWriter redisCacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(factory);
 
@@ -116,17 +122,13 @@ public class RedisConfig {
         return new CustomRedisCacheManager(redisCacheWriter, defaultCacheConfig);
     }
 
-    @Bean
-    @ConditionalOnProperty(prefix = "spring.cache", name = {"type"}, havingValue = REDIS_CACHE)
-    public CacheService redisCacheService() {
-        return new RedisCacheServiceImpl();
-    }
+    /*
+     * 这里原先还有 redisCacheService() / caffeineCacheService() 两个 @Bean，
+     * 随 support/cache 模块一起删除（2026-08-25）。那两个 Bean 只服务于后台的
+     * 「手动清缓存」按钮，与 @Cacheable 的运行毫无关系 —— 缓存读写走的是上面的
+     * cacheManager()，不经过它们。
+     */
 
-    @Bean
-    @ConditionalOnProperty(prefix = "spring.cache", name = {"type"}, havingValue = CAFFEINE_CACHE)
-    public CacheService caffeineCacheService() {
-        return new CaffeineCacheServiceImpl();
-    }
     @Bean
     public HashOperations<String, String, Object> hashOperations(RedisTemplate<String, Object> redisTemplate) {
         return redisTemplate.opsForHash();

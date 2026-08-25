@@ -36,10 +36,6 @@ export const appDefaultConfig = {
   breadCrumbFlag: true,
   // 页脚
   footerFlag: true,
-  // 帮助文档
-  helpDocFlag: true,
-  // 帮助文档默认展开
-  helpDocExpandFlag: false,
   // 水印
   watermarkFlag: true,
   // 网站名称

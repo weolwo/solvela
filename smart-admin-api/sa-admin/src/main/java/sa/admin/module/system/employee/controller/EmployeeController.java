@@ -12,7 +12,7 @@ import sa.admin.module.system.employee.service.EmployeeService;
 import sa.base.common.domain.PageResult;
 import sa.base.common.domain.ResponseDTO;
 import sa.base.common.util.SmartRequestUtil;
-import sa.base.module.support.apiencrypt.annotation.ApiDecrypt;
+import sa.admin.module.system.apiencrypt.annotation.ApiDecrypt;
 import sa.base.module.support.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.web.bind.annotation.*;
 

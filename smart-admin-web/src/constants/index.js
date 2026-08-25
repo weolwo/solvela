@@ -8,18 +8,12 @@
  * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
  */
 import menu from './system/menu-const';
-import goods from './business/erp/goods-const';
-import category from './business/erp/category-const';
 import { LOGIN_DEVICE_ENUM } from './system/login-device-const';
 import { FLAG_NUMBER_ENUM, GENDER_ENUM, USER_TYPE_ENUM } from './common-const';
 import { LAYOUT_ENUM } from './layout-const';
 import file from './support/file-const';
-import notice from './business/oa/notice-const';
 import loginLog from './support/login-log-const';
-import enterprise from './business/oa/enterprise-const';
-import message from './business/message/message-const';
 import codeGeneratorConst from './support/code-generator-const';
-import changeLogConst from './support/change-log-const';
 import jobConst from './support/job-const';
 import dictConst from './support/dict-const';
 // 只按需具名引入彩票的两个「状态枚举」，不要 ...lotteryConst 整包展开 ——
@@ -35,14 +29,8 @@ export default {
   LAYOUT_ENUM,
   ...loginLog,
   ...menu,
-  ...goods,
-  ...category,
   ...file,
-  ...notice,
-  ...enterprise,
-  ...message,
   ...codeGeneratorConst,
-  ...changeLogConst,
   ...jobConst,
   ...dictConst,
   LOTTERY_STATUS_ENUM,

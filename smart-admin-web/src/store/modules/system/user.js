@@ -12,7 +12,6 @@ import { defineStore } from 'pinia';
 import localKey from '/@/constants/local-storage-key-const';
 import { HOME_PAGE_NAME } from '/@/constants/system/home-const';
 import { MENU_TYPE_ENUM } from '/@/constants/system/menu-const';
-import { messageApi } from '/@/api/support/message-api';
 import { smartSentry } from '/@/lib/smart-sentry';
 import { localRead, localSave, localRemove } from '/@/utils/local-util';
 
@@ -61,7 +60,6 @@ export const useUserStore = defineStore('userStore', {
     // 缓存
     keepAliveIncludes: [],
     // 未读消息数量
-    unreadMessageCount: 0,
     // 待办工作数
     toBeDoneCount: 0,
   }),
@@ -119,7 +117,6 @@ export const useUserStore = defineStore('userStore', {
       this.token = '';
       this.menuList = [];
       this.tagNav = [];
-      this.unreadMessageCount = 0;
       localRemove(localKey.USER_TOKEN);
       localRemove(localKey.USER_POINTS);
       localRemove(localKey.USER_TAG_NAV);
@@ -127,15 +124,6 @@ export const useUserStore = defineStore('userStore', {
       localRemove(localKey.HOME_QUICK_ENTRY);
       localRemove(localKey.NOTICE_READ);
       localRemove(localKey.TO_BE_DONE);
-    },
-    // 查询未读消息数量
-    async queryUnreadMessageCount() {
-      try {
-        let result = await messageApi.queryUnreadCount();
-        this.unreadMessageCount = result.data;
-      } catch (e) {
-        smartSentry.captureError(e);
-      }
     },
     async queryToBeDoneList() {
       try {
@@ -177,8 +165,6 @@ export const useUserStore = defineStore('userStore', {
       //功能点
       this.pointsList = data.menuList.filter((menu) => menu.menuType === MENU_TYPE_ENUM.POINTS.value && menu.visibleFlag && !menu.disabledFlag);
 
-      // 获取用户未读消息
-      this.queryUnreadMessageCount();
       // 获取待办工作数
       this.queryToBeDoneList();
     },

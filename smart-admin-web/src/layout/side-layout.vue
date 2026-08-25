@@ -82,18 +82,6 @@
       <!--- 回到顶部 -->
       <a-back-top :target="backTopTarget" :visibilityHeight="80" />
     </a-layout>
-    <!-- 右侧帮助文档 help-doc -->
-    <a-layout-sider
-      v-if="helpDocFlag"
-      v-show="helpDocExpandFlag"
-      theme="light"
-      :width="180"
-      class="help-doc-sider"
-      :trigger="null"
-      style="min-height: 100%"
-    >
-      <SideHelpDoc />
-    </a-layout-sider>
   </a-layout>
 </template>
 
@@ -110,7 +98,6 @@
   import IframeIndex from '/@/components/framework/iframe/iframe-index.vue';
   import watermark from '../lib/smart-watermark';
   import { useUserStore } from '/@/store/modules/system/user';
-  import SideHelpDoc from './components/side-help-doc/index.vue';
   import { useRouter } from 'vue-router';
   import { HOME_PAGE_NAME } from '/@/constants/system/home-const';
   import { LAYOUT_ELEMENT_IDS } from '/@/layout/layout-const';
@@ -127,10 +114,6 @@
   const { sideMenuBg } = useSideMenuTheme();
   //是否显示标签页
   const pageTagFlag = computed(() => useAppConfigStore().$state.pageTagFlag);
-  // 是否显示帮助文档
-  const helpDocFlag = computed(() => useAppConfigStore().$state.helpDocFlag);
-  // 是否默认展开帮助文档
-  const helpDocExpandFlag = computed(() => useAppConfigStore().$state.helpDocExpandFlag);
   // 是否显示页脚
   const footerFlag = computed(() => useAppConfigStore().$state.footerFlag);
   // 是否显示水印
@@ -320,21 +303,6 @@
     .side-menu::-webkit-scrollbar-track {
       border-radius: 0;
       background: transparent;
-    }
-
-    .help-doc-sider {
-      flex: 0 !important;
-      min-width: 100px;
-      height: 100vh;
-      max-width: 100px;
-      width: auto !important;
-
-      &.fixed-side {
-        position: fixed;
-        height: 100vh;
-        right: 0;
-        top: 0;
-      }
     }
 
     .virtual-side {

@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import sa.base.common.controller.SupportBaseController;
+import sa.admin.module.system.support.SupportBaseController;
 import sa.base.common.domain.PageResult;
 import sa.base.common.domain.ResponseDTO;
 import sa.base.common.util.SmartRequestUtil;

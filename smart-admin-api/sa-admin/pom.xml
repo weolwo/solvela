@@ -27,6 +27,15 @@
             <artifactId>sa-marketing</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!-- 会员/钱包/券/活动/奖品的领域层。此前是靠 sa-marketing 传递进来的，
+             但自从 common-api 的 15 个后台 controller 搬到本模块之后，
+             本模块<b>直接</b>依赖了它的 service/form/vo —— 直接用到就直接声明，
+             否则哪天 sa-marketing 不再依赖 common-api，这边会毫无征兆地编译不过。 -->
+        <dependency>
+            <groupId>sa</groupId>
+            <artifactId>common-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 本模块大量用 @Data / @Slf4j；此前是靠 sa-base 的 compile 作用域传递白嫖来的，
              sa-base 改成 provided 后不再传递，必须自己声明 -->
         <dependency>
@@ -39,6 +48,18 @@
         <dependency>
             <groupId>org.reflections</groupId>
             <artifactId>reflections</artifactId>
+        </dependency>
+
+        <!-- 代码生成器渲染 .vm 模板用。随 codegenerator 模块从 sa-base 移交过来 ——
+             全项目只有这一个地方用 velocity，放在 sa-base 等于让每个依赖它的服务
+             都背着这两个 jar，而 C 端进程永远不会生成代码。 -->
+        <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity-engine-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.velocity.tools</groupId>
+            <artifactId>velocity-tools-generic</artifactId>
         </dependency>
         <!-- AdminApplicationTest 需要；此前是靠 sa-base 的 compile 作用域传递白嫖来的 -->
         <dependency>

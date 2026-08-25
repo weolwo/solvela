@@ -103,17 +103,6 @@
       <a-form-item :label="$t('setting.watermark')">
         <a-switch @change="changeWatermarkFlag" v-model:checked="formState.watermarkFlag" checked-children="显示" un-checked-children="隐藏" />
       </a-form-item>
-      <a-form-item :label="$t('setting.helpdoc')">
-        <a-switch @change="changeHelpDocFlag" v-model:checked="formState.helpDocFlag" checked-children="显示" un-checked-children="隐藏" />
-      </a-form-item>
-      <a-form-item :label="$t('setting.helpdoc.expand')" v-if="formState.helpDocFlag">
-        <a-switch
-          @change="changeHelpDocExpandFlag"
-          v-model:checked="formState.helpDocExpandFlag"
-          checked-children="默认展开"
-          un-checked-children="默认不展开"
-        />
-      </a-form-item>
       <a-form-item :label="$t('setting.darkmode')">
         <a-switch @change="changeDarkMode" v-model:checked="formState.darkModeFlag" checked-children="开启" un-checked-children="关闭" />
       </a-form-item>
@@ -221,10 +210,6 @@
     breadCrumbFlag: appConfigStore.breadCrumbFlag,
     // 页脚
     footerFlag: appConfigStore.footerFlag,
-    // 帮助文档
-    helpDocFlag: appConfigStore.helpDocFlag,
-    // 帮助文档 默认展开
-    helpDocExpandFlag: appConfigStore.helpDocExpandFlag,
     // 水印
     watermarkFlag: appConfigStore.watermarkFlag,
     //标签页位置
@@ -318,18 +303,6 @@
   function changeFooterFlag(e) {
     appConfigStore.$patch({
       footerFlag: e,
-    });
-  }
-
-  function changeHelpDocFlag(e) {
-    appConfigStore.$patch({
-      helpDocFlag: e,
-    });
-  }
-
-  function changeHelpDocExpandFlag(e) {
-    appConfigStore.$patch({
-      helpDocExpandFlag: e,
     });
   }
 

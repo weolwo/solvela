@@ -613,13 +613,6 @@ INSERT INTO `t_config` (`config_id`, `config_name`, `config_key`, `config_value`
 (1, '万能密码', 'super_password', '1024ok', '执行示例任务2', '2026-03-17 13:18:14', '2021-12-16 23:32:46'),
 (2, '三级等保', 'level3_protect_config', '{\n\t"fileDetectFlag":true,\n\t"loginActiveTimeoutMinutes":30,\n\t"loginFailLockMinutes":30,\n\t"loginFailMaxTimes":3,\n\t"maxUploadFileSizeMb":30,\n\t"passwordComplexityEnabled":true,\n\t"regularChangePasswordMonths":3,\n\t"regularChangePasswordNotAllowRepeatTimes":3,\n\t"twoFactorLoginEnabled":false\n}', 'SmartJob Sample2 update', '2024-09-03 21:49:23', '2024-08-13 11:44:49');
 
--- -----------------------------------------------------------------------------------
--- t_serial_number  单号生成器定义（2 行）
--- -----------------------------------------------------------------------------------
-DELETE FROM `t_serial_number`;
-INSERT INTO `t_serial_number` (`serial_number_id`, `business_name`, `format`, `rule_type`, `init_number`, `step_random_range`, `remark`, `last_number`, `last_time`, `update_time`, `create_time`) VALUES
-(1, '订单编号', 'DK[yyyy][mm][dd]NO[nnnnn]', 'day', 1000, 10, 'DK20201101NO321', 1062, '2026-03-19 22:41:29', '2026-03-19 14:41:29', '2021-02-19 14:37:50'),
-(2, '合同编号', 'HT[yyyy][mm][dd][nnnnn]-CX', 'none', 1, 1, '', 9, '2026-03-19 22:41:45', '2026-03-19 14:41:44', '2021-08-12 20:40:37');
 
 -- -----------------------------------------------------------------------------------
 -- t_file_category  文件分类。代码按 category_code 引用，缺了直接抛异常（7 行）
@@ -664,13 +657,6 @@ INSERT INTO `t_task_event` (`id`, `event_code`, `event_name`, `metric_source`, `
 (17, 'AUDIENCE_TEST', '人群过滤验收', 'NONE', '{"fields": []}', 0, 0, 1, 'P0 验收专用：同一个事件同时命中「限新会员」和「限老会员」两个任务，一次验两个分支', 1, NULL, '2026-08-01 10:14:21', NULL, '2026-08-22 09:49:51'),
 (18, 'ROUND_TEST', '参与轮次验收', 'NONE', '{"fields": []}', 1, 0, 1, 'P0 验收专用：每轮用不同 eventBizId，验 limit_count 轮次推进与用尽', 1, NULL, '2026-08-01 10:14:21', NULL, '2026-08-22 09:49:51');
 
--- -----------------------------------------------------------------------------------
--- t_notice_type  公告类型（2 行）
--- -----------------------------------------------------------------------------------
-DELETE FROM `t_notice_type`;
-INSERT INTO `t_notice_type` (`notice_type_id`, `notice_type_name`, `create_time`, `update_time`) VALUES
-(1, '新闻', '2022-08-16 20:29:15', '2024-09-03 21:44:42'),
-(2, '通知', '2022-08-16 20:29:20', '2022-08-16 20:29:20');
 
 -- -----------------------------------------------------------------------------------
 -- t_code_generator_config  代码生成器配置（开发工具，可选）（31 行）

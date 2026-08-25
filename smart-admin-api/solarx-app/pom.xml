@@ -1,0 +1,176 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ⚠️ 前缀是 solarx 而 parent 仍是 sa-parent，这是【故意】的，不是漏改：
+         老模块（sa-admin / sa-base / sa-marketing / common-api）沿用 SmartAdmin 的 sa- 前缀不动，
+         新模块用自己的品牌前缀。两套前缀在同一个 Maven 反应堆里共存完全正常 ——
+         parent 提供的是 dependencyManagement 与 build 约定，与 groupId 叫什么无关。 -->
+    <parent>
+        <groupId>sa</groupId>
+        <artifactId>sa-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solarx</groupId>
+    <artifactId>solarx-app</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solarx-app</name>
+    <description>solarx C 端应用服务（H5 / 小程序 / App 共用一套接口）</description>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>sa</groupId>
+            <artifactId>sa-base</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 会员、钱包、券、活动、奖品等领域层。
+             ⚠️ 只用它的 service / manager / dao，【它的 controller 全部不装配】——
+             那些是管理端视角的接口（/member/queryPage、/updateStatus…），
+             挂到 C 端端口上就是把后台功能暴露给了用户。过滤规则见 AppApplication。 -->
+        <dependency>
+            <groupId>sa</groupId>
+            <artifactId>common-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>solarx.app.AppApplication</mainClass>
+                    <!-- repackage 默认把 provided 也打进 BOOT-INF/lib，光把 lombok 改成 provided 不够。
+                         spring-boot-starter-parent 自带这条默认配置，本项目走 BOM import 没有继承到。 -->
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- 生产包：把整套 API 文档依赖排出 BOOT-INF/lib（约 5.9MB）。
+             与 sa-admin/pom.xml 的 prod profile 完全同构，改动时两边一起改。
+             编译期这些 jar 仍在 classpath 上，只是不进生产包；运行期由
+             SwaggerConfig 的 @Conditional 与 prod/sa-base.yaml 的 enabled:false 兜底。 -->
+        <profile>
+            <id>prod</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>solarx.app.AppApplication</mainClass>
+                            <excludes>
+                                <exclude>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </exclude>
+                                <!-- knife4j -->
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-core</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.baizhukui</groupId>
+                                    <artifactId>knife4j-openapi3-ui</artifactId>
+                                </exclude>
+                                <!-- springdoc + swagger -->
+                                <exclude>
+                                    <groupId>org.springdoc</groupId>
+                                    <artifactId>springdoc-openapi-starter-common</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>org.springdoc</groupId>
+                                    <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>org.springdoc</groupId>
+                                    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>org.webjars</groupId>
+                                    <artifactId>swagger-ui</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>io.swagger.core.v3</groupId>
+                                    <artifactId>swagger-core-jakarta</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>io.swagger.core.v3</groupId>
+                                    <artifactId>swagger-models-jakarta</artifactId>
+                                </exclude>
+                                <!-- Jackson 2：唯一来源是 swagger-core-jakarta，跟着一起走 -->
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.core</groupId>
+                                    <artifactId>jackson-core</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.core</groupId>
+                                    <artifactId>jackson-databind</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.dataformat</groupId>
+                                    <artifactId>jackson-dataformat-yaml</artifactId>
+                                </exclude>
+                                <exclude>
+                                    <groupId>com.fasterxml.jackson.datatype</groupId>
+                                    <artifactId>jackson-datatype-jsr310</artifactId>
+                                </exclude>
+                            </excludes>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>repackage</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+</project>

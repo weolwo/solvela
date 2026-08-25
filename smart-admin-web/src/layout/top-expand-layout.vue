@@ -81,10 +81,6 @@
       <!---- 回到顶部 --->
       <a-back-top :target="backTopTarget" :visibilityHeight="80" />
     </a-layout>
-    <!-- 右侧帮助文档 help-doc -->
-    <a-layout-sider v-show="helpDocFlag" theme="light" :width="180" class="help-doc-sider" :trigger="null" style="min-height: 100%">
-      <SideHelpDoc />
-    </a-layout-sider>
   </a-layout>
 </template>
 <script setup>
@@ -99,7 +95,6 @@
   import watermark from '../lib/smart-watermark';
   import { useAppConfigStore } from '/@/store/modules/system/app-config';
   import { useUserStore } from '/@/store/modules/system/user';
-  import SideHelpDoc from './components/side-help-doc/index.vue';
   import { useRouter } from 'vue-router';
   import { HOME_PAGE_NAME } from '/@/constants/system/home-const';
   import { theme as antDesignTheme } from 'ant-design-vue';
@@ -110,8 +105,6 @@
   const theme = computed(() => useAppConfigStore().$state.sideMenuTheme);
   //是否显示标签页
   const pageTagFlag = computed(() => useAppConfigStore().$state.pageTagFlag);
-  // 是否显示帮助文档
-  const helpDocFlag = computed(() => useAppConfigStore().$state.helpDocExpandFlag);
   // 是否显示页脚
   const footerFlag = computed(() => useAppConfigStore().$state.footerFlag);
   // 是否显示水印
@@ -283,21 +276,6 @@
     .side-menu::-webkit-scrollbar-track {
       border-radius: 0;
       background: rgba(0, 0, 0, 0.1);
-    }
-
-    .help-doc-sider {
-      flex: 0 !important;
-      min-width: 100px;
-      height: 100vh;
-      max-width: 100px;
-      width: auto !important;
-
-      &.fixed-side {
-        position: fixed;
-        height: 100vh;
-        right: 0;
-        top: 0;
-      }
     }
 
     .virtual-side {

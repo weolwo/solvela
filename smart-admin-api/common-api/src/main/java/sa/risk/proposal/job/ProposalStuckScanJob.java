@@ -3,11 +3,11 @@ package sa.risk.proposal.job;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import sa.base.module.support.job.constant.SmartJobLaneEnum;
-import sa.base.module.support.job.core.JobParam;
-import sa.base.module.support.job.core.SmartJob;
-import sa.base.module.support.job.core.SmartJobContext;
-import sa.base.module.support.job.core.SmartJobHandler;
+import sa.base.module.support.jobspi.constant.SmartJobLaneEnum;
+import sa.base.module.support.jobspi.core.JobParam;
+import sa.base.module.support.jobspi.core.SmartJob;
+import sa.base.module.support.jobspi.core.SmartJobContext;
+import sa.base.module.support.jobspi.core.SmartJobHandler;
 import sa.risk.proposal.dao.ProposalRecordDao;
 
 import java.time.LocalDateTime;

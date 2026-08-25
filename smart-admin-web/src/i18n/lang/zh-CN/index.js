@@ -31,7 +31,5 @@ export default {
   'setting.pagetag': '标签页',
   'setting.pagetag.style': '标签页样式',
   'setting.footer': '页脚',
-  'setting.helpdoc': '帮助文档',
-  'setting.helpdoc.expand': '帮助文档展开',
   'setting.watermark': '水印',
 };

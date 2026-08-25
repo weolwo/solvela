@@ -28,7 +28,6 @@
     <!-- 3、用户操作区域 -->
     <div class="ml-[12px] flex shrink-0 items-center gap-[4px]">
       <!---消息通知--->
-      <HeaderMessage ref="headerMessage" />
       <!---设置--->
       <a-button type="text" @click="showSetting">
         <template #icon><setting-outlined /></template>
@@ -54,7 +53,6 @@
   import { useAppConfigStore } from '/@/store/modules/system/app-config';
   import HeaderAvatar from '../header-user-space/header-avatar.vue';
   import HeaderSetting from '../header-user-space/header-setting.vue';
-  import HeaderMessage from '../header-user-space/header-message.vue';
   import { useSideMenuTheme } from '../side-menu/use-side-menu-theme';
 
   // 设置

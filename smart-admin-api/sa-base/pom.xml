@@ -184,15 +184,11 @@
             <artifactId>commons-io</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.velocity</groupId>
-            <artifactId>velocity-engine-core</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.velocity.tools</groupId>
-            <artifactId>velocity-tools-generic</artifactId>
-        </dependency>
+        <!-- velocity（engine-core + tools-generic）已随代码生成器整体移交 sa-admin。
+             全项目只有代码生成器渲染 .vm 模板时用它，sa-base 移交后一处都不用了
+             （SmartBeanUtil 里只有一句提到 velocity 的注释，不是引用）。
+             留在这里的代价是每个依赖 sa-base 的服务都得背着它 —— solarx-app
+             这种 C 端进程永远不会生成代码。 -->
 
         <dependency>
             <groupId>org.lionsoul</groupId>

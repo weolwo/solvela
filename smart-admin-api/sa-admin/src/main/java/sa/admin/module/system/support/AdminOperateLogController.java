@@ -4,15 +4,15 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import sa.base.common.controller.SupportBaseController;
+import sa.admin.module.system.support.SupportBaseController;
 import sa.base.common.domain.PageResult;
 import sa.base.common.domain.RequestUser;
 import sa.base.common.domain.ResponseDTO;
 import sa.base.common.util.SmartRequestUtil;
 import sa.base.constant.SwaggerTagConst;
-import sa.base.module.support.operatelog.OperateLogService;
-import sa.base.module.support.operatelog.domain.OperateLogQueryForm;
-import sa.base.module.support.operatelog.domain.OperateLogVO;
+import sa.admin.module.system.operatelog.OperateLogService;
+import sa.admin.module.system.operatelog.domain.OperateLogQueryForm;
+import sa.admin.module.system.operatelog.domain.OperateLogVO;
 import org.springframework.web.bind.annotation.*;
 
 /**

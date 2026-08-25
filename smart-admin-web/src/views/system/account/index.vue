@@ -6,7 +6,6 @@
         <a-menu-item v-for="item in menuList" :key="item.menuId">
           <span v-if="item.menuId === 'message'">
             {{ item.menuName }}
-            <a-badge :count="unreadMessageCount" style="margin-left: 10px" />
           </span>
           <span v-if="item.menuId !== 'message'">{{ item.menuName }} </span>
         </a-menu-item>
@@ -45,9 +44,6 @@
   }
 
   // ------------------------- 未读消息数量  -------------------------
-  const unreadMessageCount = computed(() => {
-    return useUserStore().unreadMessageCount;
-  });
 
   // ------------------------- 绑定路由参数  -------------------------
   const route = useRoute();

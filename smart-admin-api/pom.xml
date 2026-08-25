@@ -15,6 +15,9 @@
 		<module>sa-admin</module>
         <module>sa-marketing</module>
         <module>common-api</module>
+        <!-- C 端应用服务，独立启动（1025）。前缀 solarx 与老模块的 sa- 并存是刻意的，
+             见 solarx-app/pom.xml 顶部的说明 -->
+        <module>solarx-app</module>
     </modules>
 
     <properties>
