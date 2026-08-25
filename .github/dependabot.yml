@@ -16,11 +16,11 @@ version: 2
 
 updates:
   # 后端 Maven。
-  # 不用担心漏掉 sa-base / sa-admin / common-api / sa-marketing 四个子模块：
-  # 27 个第三方版本属性全集中在 smart-admin-api/pom.xml 的 properties + dependencyManagement，
+  # 不用担心漏掉 solvela-base / solvela-admin / common-api / solvela-marketing 四个子模块：
+  # 27 个第三方版本属性全集中在 solvela-api/pom.xml 的 properties + dependencyManagement，
   # 子 pom 里的 <version> 只用来钉兄弟模块的 3.0.0。更新落点就是父 pom 这一个文件。
   - package-ecosystem: "maven"
-    directory: "/smart-admin-api"
+    directory: "/solvela-api"
     schedule:
       interval: "weekly"
     target-branch: "upgrade/springboot4"
@@ -37,7 +37,7 @@ updates:
 
   # 管理端前端（Vue3 + Vite），有 package-lock.json
   - package-ecosystem: "npm"
-    directory: "/smart-admin-web"
+    directory: "/solvela-admin-web"
     schedule:
       interval: "weekly"
     target-branch: "upgrade/springboot4"
@@ -48,11 +48,3 @@ updates:
           - "minor"
           - "patch"
 
-  # 移动端 uni-app。⚠️ 这个目录没有 lock 文件，Dependabot 只能改 package.json，
-  # 提上来的 PR 需要人工跑一次安装确认没炸。
-  - package-ecosystem: "npm"
-    directory: "/smart-app"
-    schedule:
-      interval: "weekly"
-    target-branch: "upgrade/springboot4"
-    open-pull-requests-limit: 3

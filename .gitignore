@@ -25,7 +25,7 @@ target/
 
 # vite 重启会生成一批带时间戳的临时配置，按模式整体忽略（原先只钉死了其中一个文件名，
 # 换个时间戳就又冒出来一个未跟踪文件）
-/smart-admin-web/vite.config.js.timestamp-*.mjs
+/solvela-admin-web/vite.config.js.timestamp-*.mjs
 /.claude/
 /.agents/
 

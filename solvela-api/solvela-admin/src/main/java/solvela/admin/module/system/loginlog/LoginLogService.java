@@ -1,0 +1,67 @@
+package solvela.admin.module.system.loginlog;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import solvela.base.common.domain.PageResult;
+import solvela.base.common.domain.ResponseDTO;
+import solvela.base.common.enumeration.UserTypeEnum;
+import solvela.base.common.util.SolvelaPageUtil;
+import solvela.admin.module.system.loginlog.domain.LoginLogEntity;
+import solvela.admin.module.system.loginlog.domain.LoginLogQueryForm;
+import solvela.admin.module.system.loginlog.domain.LoginLogVO;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * 登录日志
+ *
+ * @Author 1024创新实验室-主任: 卓大
+ * @Date 2022/07/22 19:46:23
+ * @Wechat zhuoda1024
+ * @Email lab1024@163.com
+ * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
+ */
+@Service
+@Slf4j
+public class LoginLogService {
+
+    @Resource
+    private LoginLogDao loginLogDao;
+
+    /**
+     * @author 卓大
+     * @description 分页查询
+     */
+    public ResponseDTO<PageResult<LoginLogVO>> queryByPage(LoginLogQueryForm queryForm) {
+        Page page = SolvelaPageUtil.convert2PageQuery(queryForm);
+        List<LoginLogVO> logList = loginLogDao.queryByPage(page, queryForm);
+        PageResult<LoginLogVO> pageResult = SolvelaPageUtil.convert2PageResult(page, logList);
+        return ResponseDTO.ok(pageResult);
+    }
+
+    /**
+     * @author 卓大
+     * @description 添加
+     */
+    public void log(LoginLogEntity loginLogEntity) {
+        try {
+            loginLogDao.insert(loginLogEntity);
+        } catch (Throwable e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
+
+    /**
+     * 查询上一个登录记录
+     *
+     * @author 卓大
+     * @description 查询上一个登录记录
+     */
+    public LoginLogVO queryLastByUserId(Long userId, UserTypeEnum userTypeEnum, LoginLogResultEnum loginLogResultEnum) {
+        return loginLogDao.queryLastByUserId(userId,userTypeEnum.getValue(), loginLogResultEnum.getValue());
+    }
+
+}

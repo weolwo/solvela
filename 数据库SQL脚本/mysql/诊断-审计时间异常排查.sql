@@ -8,7 +8,7 @@ SET NAMES utf8mb4;
 -- 诊断：排查 create_time / update_time 是否被人为写入过异常值
 --
 -- 背景：AddForm / UpdateForm 曾经带着 createTime / updateTime / createBy / updateBy 四个字段，
---       经 SmartBeanUtil.copy 自动拷进实体后随 INSERT/UPDATE 落库，
+--       经 SolvelaBeanUtil.copy 自动拷进实体后随 INSERT/UPDATE 落库，
 --       会覆盖掉 DDL 的 DEFAULT CURRENT_TIMESTAMP / ON UPDATE CURRENT_TIMESTAMP。
 --       该入口已在 36 个 Form DTO 上摘除，本脚本用于核对历史数据。
 --

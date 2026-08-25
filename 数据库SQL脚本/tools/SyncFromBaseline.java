@@ -13,7 +13,7 @@ import java.util.regex.*;
  */
 public class SyncFromBaseline {
 
-    static final String ROOT = "D:/workspace/smart-admin/数据库SQL脚本/";
+    static final String ROOT = "D:/workspace/solvela-admin/数据库SQL脚本/";
 
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {

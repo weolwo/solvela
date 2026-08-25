@@ -1,0 +1,58 @@
+/*
+ * 项目的配置信息
+ *
+ * @Author:    1024创新实验室-主任：卓大
+ * @Date:      2022-09-06 20:53:47
+ * @Wechat:    zhuda1024
+ * @Email:     lab1024@163.com
+ * @Copyright  1024创新实验室 （ https://1024lab.net ），Since 2012
+ */
+import { defineStore } from 'pinia';
+import { appDefaultConfig } from '/@/config/app-config';
+import localStorageKeyConst from '/@/constants/local-storage-key-const';
+import { solvelaSentry } from '/@/lib/solvela-sentry';
+import { localRead } from '/@/utils/local-util';
+
+let state = {
+  ...appDefaultConfig
+};
+
+let appConfigStr = localRead(localStorageKeyConst.APP_CONFIG);
+let language = appDefaultConfig.language;
+if (appConfigStr) {
+  try {
+    state = JSON.parse(appConfigStr);
+    language = state.language;
+  } catch (e) {
+    solvelaSentry.captureError(e);
+  }
+}
+
+/**
+ * 获取初始化的语言
+ */
+export const getInitializedLanguage = function () {
+  return language;
+};
+
+export const useAppConfigStore = defineStore('appConfig', {
+  state: () => ({
+    // 读取config下的默认配置
+    ...state,
+    // 全屏
+    fullScreenFlag: false,
+  }),
+  actions: {
+    reset() {
+      for (const k in appDefaultConfig) {
+        this[k] = appDefaultConfig[k];
+      }
+    },
+    startFullScreen() {
+      this.fullScreenFlag = true;
+    },
+    exitFullScreen() {
+      this.fullScreenFlag = false;
+    },
+  },
+});

@@ -34,12 +34,12 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 
 ### 已确认的产品决策
 
-| 决策 | 结论 | 影响 |
-|---|---|---|
-| 框架命名 | **SonicExcel**，不跟随 `Smart*` 前缀，为将来独立开源留口子 | 见 §2.3 |
-| Excel 水印 | **直接砍掉** —— 拿到文件的人只觉得碍事。**注意：这是产品决策，不是引擎不支持**（`addImage` 是有的） | `exportExcelWithWatermark` 与 `Watermark` / `CustomWaterMarkHandler` 内部类整体删除；`EnterpriseController` 改调普通导出，接口路径与出入参不变，**前端零改动** |
-| 水印删除后的审计线索 | **靠现有操作日志承接，不拼文件名、不加新代码** | `OperateLogAspect` 的切点是 `@within(...) \|\| @annotation(...)`，而 `EnterpriseController` 的 `@OperateLog` 打在**类上** —— `exportExcel` 本就被覆盖，操作人 / 时间 / IP / 入参已入库。**零改动** |
-| 模板填充（`fill`） | **不做，风险关闭** —— 中台没有发票/合同这类票据打印需求；真出现走**导出 PDF**，不走 Excel 模板 | 这是 v1 §9 里唯一可能让整个方案翻盘的因素，现已排除 |
+| 决策                 | 结论                                                                                                | 影响                                                                                                                                                                                               |
+|----------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 框架命名             | **SonicExcel**，不跟随 `Solvela*` 前缀，为将来独立开源留口子                                        | 见 §2.3                                                                                                                                                                                            |
+| Excel 水印           | **直接砍掉** —— 拿到文件的人只觉得碍事。**注意：这是产品决策，不是引擎不支持**（`addImage` 是有的） | `exportExcelWithWatermark` 与 `Watermark` / `CustomWaterMarkHandler` 内部类整体删除；`EnterpriseController` 改调普通导出，接口路径与出入参不变，**前端零改动**                                     |
+| 水印删除后的审计线索 | **靠现有操作日志承接，不拼文件名、不加新代码**                                                      | `OperateLogAspect` 的切点是 `@within(...) \|\| @annotation(...)`，而 `EnterpriseController` 的 `@OperateLog` 打在**类上** —— `exportExcel` 本就被覆盖，操作人 / 时间 / IP / 入参已入库。**零改动** |
+| 模板填充（`fill`）   | **不做，风险关闭** —— 中台没有发票/合同这类票据打印需求；真出现走**导出 PDF**，不走 Excel 模板      | 这是 v1 §9 里唯一可能让整个方案翻盘的因素，现已排除                                                                                                                                                |
 
 ---
 
@@ -88,17 +88,17 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 
 ### 2.1 现存使用面（全部）
 
-| 位置 | 用法 | 迁移后 |
-|---|---|---|
-| `SmartExcelUtil#exportExcel` | 一次性 `Collection` 导出 | 保留签名，内部换引擎 |
-| `SmartExcelUtil#exportExcelWithWatermark` | POI 注入 sheet 背景图 | **整体删除** |
-| `GoodsService#importGoods` | `doReadSync()` 全量读 List | 换 `SonicExcel.read(path, ...)`，顺带拿到行级错误 |
-| `GoodsExcelVO` / `GoodsImportForm` / `EnterpriseExcelVO` | 仅 `@ExcelProperty("中文名")` | 换 `@SonicTitle`，一对一平移 |
-| `GoodsService#getAllGoods` | **手写字典/枚举翻译拼 VO** | 用 converter 收走，见 §5.3 |
+| 位置                                                     | 用法                          | 迁移后                                            |
+|----------------------------------------------------------|-------------------------------|---------------------------------------------------|
+| `SolvelaExcelUtil#exportExcel`                           | 一次性 `Collection` 导出      | 保留签名，内部换引擎                              |
+| `SolvelaExcelUtil#exportExcelWithWatermark`              | POI 注入 sheet 背景图         | **整体删除**                                      |
+| `GoodsService#importGoods`                               | `doReadSync()` 全量读 List    | 换 `SonicExcel.read(path, ...)`，顺带拿到行级错误 |
+| `GoodsExcelVO` / `GoodsImportForm` / `EnterpriseExcelVO` | 仅 `@ExcelProperty("中文名")` | 换 `@SonicTitle`，一对一平移                      |
+| `GoodsService#getAllGoods`                               | **手写字典/枚举翻译拼 VO**    | 用 converter 收走，见 §5.3                        |
 
 ### 2.2 依赖收益账（**第③档完成后的实测结果**）
 
-对比 `sa-admin` 完整 runtime classpath 在改造前后的差集（在 500a9aaa 建临时 worktree 各跑一次
+对比 `solvela-admin` 完整 runtime classpath 在改造前后的差集（在 500a9aaa 建临时 worktree 各跑一次
 `dependency:build-classpath`，逐 jar 量尺寸）：**214 个 jar → 204 个，净减 18.66 MB**。
 
 | 移除（15 个） | KB |
@@ -141,7 +141,7 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 ### 2.3 包结构
 
 ```
-sa-base/src/main/java/sa/base/sonicexcel/
+solvela-base/src/main/java/sa/base/sonicexcel/
 ├── SonicExcel.java                 门面（唯一入口）
 ├── SonicExcelConfiguration.java    与 Spring 的唯一接线点：StAX 隔离 / BeanFactory / profile
 ├── SonicExcelSettings.java         框架级开关（严格元数据模式）
@@ -175,23 +175,23 @@ sa-base/src/main/java/sa/base/sonicexcel/
 │   ├── SonicErrorPolicy.java  SonicRowError.java  SonicReadResult.java
 └── SonicExcelException.java
 
-sa-base/src/main/java/sa/base/module/support/dict/excel/   ← 业务侧（D2）
+solvela-base/src/main/java/sa/base/module/support/dict/excel/   ← 业务侧（D2）
 ├── SonicDictConverter.java         依赖 DictService，不进框架目录
 └── SonicDict.java                  @SonicDict("GOODS_PLACE")
 
-sa-base/src/main/java/sa/base/common/excel/
-├── SonicEnumConverter.java         依赖 SmartEnumUtil / BaseEnum，同样是项目侧
+solvela-base/src/main/java/sa/base/common/excel/
+├── SonicEnumConverter.java         依赖 SolvelaEnumUtil / BaseEnum，同样是项目侧
 ├── SonicEnumOptionProvider.java    复用 @SonicEnum 给模板生成下拉选项
 └── SonicEnum.java                  @SonicEnum(GoodsStatusEnum.class)
 
-sa-admin/.../module/business/goods/excel/
+solvela-admin/.../module/business/goods/excel/
 └── GoodsCategoryConverter.java     依赖 CategoryQueryService
 ```
 
 **转换器的归属规则：与它包装的组件同模块。** 框架目录 `sonicexcel/` 里一个业务依赖都没有，
 将来要独立开源，整个目录搬走即可。
 
-✅ **D1 已定案：包放 `sa.base.sonicexcel`，与 `common` 平级。**
+✅ **D1 已定案：包放 `solvela.base.sonicexcel`，与 `common` 平级。**
 将来拆子模块独立开源时，一整个目录搬走即可，不用从 `common` 里往外挑文件。
 
 ### 2.4 底层引擎尽调（实测结论，实施前必读）
@@ -237,7 +237,7 @@ org.dhatim:fastexcel-reader:0.20.2              40 KB
 
 ```
                       ┌──────────────────────────────────────────┐
-业务代码              │  SmartExcelUtil（HTTP 协议防腐层，§10）    │
+业务代码              │  SolvelaExcelUtil（HTTP 协议防腐层，§10）    │
                       │  · 下载头/文件名编码  · 探活  · 临时文件    │
                       └───────────────┬──────────────────────────┘
                                       │
@@ -361,13 +361,14 @@ public record SonicContext(int rowIndex, int columnIndex, String title,
 ### 5.3 转换器的实例化策略（**本设计最关键的一条**）
 
 **阿里系与我们最实质的差异点。** EasyExcel 的 `Converter` 同样靠反射无参构造实例化，够不到 Spring 容器 ——
-这就是为什么 [GoodsService.java:196](../smart-admin-api/sa-admin/src/main/java/sa/admin/module/business/goods/service/GoodsService.java) 到今天还在手写字典翻译：
+这就是为什么 [GoodsService.java:196](../solvela-api/solvela-admin/src/main/java/sa/admin/module/business/goods/service/GoodsService.java)
+到今天还在手写字典翻译：
 
 ```java
 .place(Arrays.stream(e.getPlace().split(","))
         .map(code -> dictService.getDictDataLabel("GOODS_PLACE", code))
         .collect(Collectors.joining(",")))
-.goodsStatus(SmartEnumUtil.getEnumDescByValue(e.getGoodsStatus(), GoodsStatusEnum.class))
+.goodsStatus(SolvelaEnumUtil.getEnumDescByValue(e.getGoodsStatus(), GoodsStatusEnum.class))
 .categoryName(categoryQueryService.queryCategoryName(e.getCategoryId()))
 ```
 
@@ -386,7 +387,7 @@ public record SonicContext(int rowIndex, int columnIndex, String title,
 ✅ **D2 已定案：字典转换器放业务侧。**
 
 - `sonicexcel/converter/builtin` **只放 JDK 级**的内置转换器：枚举、Y/N、BigDecimal 精度。这些不依赖任何业务组件。
-- `SonicDictConverter` + `@SonicDict` 放业务包 **`sa.base.module.support.dict.excel`**，
+- `SonicDictConverter` + `@SonicDict` 放业务包 **`solvela.base.module.support.dict.excel`**，
   与 `DictService` 同模块 —— 独立开源时框架目录不用拆，业务侧那份留在项目里。
 
 ### 5.4 访问器：`LambdaMetafactory` 主路径
@@ -702,7 +703,7 @@ Excel 常带成千上万个"看起来是空的"行。读端必须**过滤全空�
 
 ### 9.1 🔴 拆除 aalto-xml 的 SPI 全局劫持
 
-**风险已被实测证实，不是理论。** 扫描 sa-admin 全部 **214 个 runtime jar**，
+**风险已被实测证实，不是理论。** 扫描 solvela-admin 全部 **214 个 runtime jar**，
 引用 `javax/xml/stream/XMLInputFactory` 的有 8 个：
 
 ```
@@ -758,9 +759,9 @@ System.setProperty("javax.xml.stream.XMLEventFactory",  "com.sun.xml.internal.st
 
 ---
 
-## 10. Web 适配层：`SmartExcelUtil` 升级为 HTTP 协议防腐层
+## 10. Web 适配层：`SolvelaExcelUtil` 升级为 HTTP 协议防腐层
 
-框架只认 `OutputStream` / `Path`；HTTP 相关的脏活全归 `SmartExcelUtil`。
+框架只认 `OutputStream` / `Path`；HTTP 相关的脏活全归 `SolvelaExcelUtil`。
 
 ### 10.1 职责
 
@@ -845,12 +846,12 @@ try {
 
 ## 12. 落地分档（每档可独立回滚，沿用 hutool 那轮的节奏）
 
-| 档 | 内容 | 可回滚点 | 依赖变化 |
-|---|---|---|---|
-| **①** ✅ **已完成 2026-08-08** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；**2 个导出 VO 平移**；`SmartExcelUtil#exportExcel` 切换成"先攒 byte[] 再落头"；**删除水印全部代码**，`EnterpriseController` 改调普通导出。35 条测试全绿 | 注解层保留 EasyExcel 可并行 | 引入 dhatim writer，POI 暂留 |
-| **②** ✅ **已完成 2026-08-08** | 读引擎（`Path` 入参 + 入口体检 + 临时文件闭环）+ 转换器 Spring 解析落地；`GoodsImportForm` **改成 record**；`GoodsService#importGoods` 改造成带行级错误回显；`getAllGoods` 的三处翻译全部收进 converter。累计 100 条测试全绿 | 导入可临时切回旧实现 | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
-| **③** ✅ **已完成 2026-08-08** | 摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`（连带 xmlbeans / ehcache / JAXB / commons-math3 等 15 个 jar）；测试回读改用 fastexcel-reader，迁移语义测试退化为固定快照 | git revert 单 commit | **实测 −18.66 MB** |
-| **④** ✅ **已完成 2026-08-08** | 列宽按数据自适应、CSV 通道、错误报告导出、导入模板 + 下拉校验。累计 215 条测试全绿 | 纯新增 | 无 |
+| 档                             | 内容                                                                                                                                                                                                                                           | 可回滚点                    | 依赖变化                                                    |
+|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|-------------------------------------------------------------|
+| **①** ✅ **已完成 2026-08-08** | `SonicStaxIsolation` + 元数据层 + 写引擎（含 inline strings 红线、flush、滚 Sheet）；**2 个导出 VO 平移**；`SolvelaExcelUtil#exportExcel` 切换成"先攒 byte[] 再落头"；**删除水印全部代码**，`EnterpriseController` 改调普通导出。35 条测试全绿 | 注解层保留 EasyExcel 可并行 | 引入 dhatim writer，POI 暂留                                |
+| **②** ✅ **已完成 2026-08-08** | 读引擎（`Path` 入参 + 入口体检 + 临时文件闭环）+ 转换器 Spring 解析落地；`GoodsImportForm` **改成 record**；`GoodsService#importGoods` 改造成带行级错误回显；`getAllGoods` 的三处翻译全部收进 converter。累计 100 条测试全绿                   | 导入可临时切回旧实现        | 引入 dhatim reader（带 aalto，StAX 隔离此时开始真正起作用） |
+| **③** ✅ **已完成 2026-08-08** | 摘掉 `cn.idev.excel:fastexcel` + `poi` + `poi-ooxml`（连带 xmlbeans / ehcache / JAXB / commons-math3 等 15 个 jar）；测试回读改用 fastexcel-reader，迁移语义测试退化为固定快照                                                                 | git revert 单 commit        | **实测 −18.66 MB**                                          |
+| **④** ✅ **已完成 2026-08-08** | 列宽按数据自适应、CSV 通道、错误报告导出、导入模板 + 下拉校验。累计 215 条测试全绿                                                                                                                                                             | 纯新增                      | 无                                                          |
 
 每档一个 commit，message 沿用现有风格（`SonicExcel 第①档：…（−xMB）`）。
 
@@ -879,18 +880,18 @@ try {
 
 ## 14. 决策清单
 
-| # | 问题 | 状态 |
-|---|---|---|
-| ~~D1~~ | ~~包路径~~ | **已定：`sa.base.sonicexcel`，与 `common` 平级**（§2.3） |
-| ~~D2~~ | ~~字典转换器放哪~~ | **已定：业务侧 `support.dict.excel`；框架 builtin 只留 JDK 级**（§5.3） |
-| ~~D3~~ | ~~水印删除后的审计线索~~ | **已定：靠现有 `@OperateLog` 承接，零改动**（§1.2） |
-| ~~D10~~ | ~~字典转换器的导入方向~~ | **已落地 2026-08-08**：新增 `DICT_DATA_LABEL` 独立缓存 + `DictManager#listDictDataByLabel`，见 §16 |
-| ~~D4~~ | ~~CSV 导出通道~~ | **已落地（第④档）**，见 §7.7 |
-| ~~D5~~ | ~~sharedStrings vs inline~~ | **已定：强制 inline，且底层无开关，走 `inlineString()`**（§7.6） |
-| ~~D6~~ | ~~reader 是否落临时文件~~ | **已定：不落盘、整个进堆 → 读侧强制 `Path` 入参**（§8.5） |
-| ~~D7~~ | ~~导出中途异常的响应契约~~ | **已定：小数据先缓冲、大数据流式抛异常**（§10.3） |
-| ~~D8~~ | ~~导入 DTO 是否强制包装类型~~ | **已定：dev/test 抛异常、prod warn**（§4.2） |
-| ~~D9~~ | ~~模板填充要不要做~~ | **已定：不做，票据类走 PDF**（§1.2） |
+| #       | 问题                          | 状态                                                                                               |
+|---------|-------------------------------|----------------------------------------------------------------------------------------------------|
+| ~~D1~~  | ~~包路径~~                    | **已定：`solvela.base.sonicexcel`，与 `common` 平级**（§2.3）                                      |
+| ~~D2~~  | ~~字典转换器放哪~~            | **已定：业务侧 `support.dict.excel`；框架 builtin 只留 JDK 级**（§5.3）                            |
+| ~~D3~~  | ~~水印删除后的审计线索~~      | **已定：靠现有 `@OperateLog` 承接，零改动**（§1.2）                                                |
+| ~~D10~~ | ~~字典转换器的导入方向~~      | **已落地 2026-08-08**：新增 `DICT_DATA_LABEL` 独立缓存 + `DictManager#listDictDataByLabel`，见 §16 |
+| ~~D4~~  | ~~CSV 导出通道~~              | **已落地（第④档）**，见 §7.7                                                                       |
+| ~~D5~~  | ~~sharedStrings vs inline~~   | **已定：强制 inline，且底层无开关，走 `inlineString()`**（§7.6）                                   |
+| ~~D6~~  | ~~reader 是否落临时文件~~     | **已定：不落盘、整个进堆 → 读侧强制 `Path` 入参**（§8.5）                                          |
+| ~~D7~~  | ~~导出中途异常的响应契约~~    | **已定：小数据先缓冲、大数据流式抛异常**（§10.3）                                                  |
+| ~~D8~~  | ~~导入 DTO 是否强制包装类型~~ | **已定：dev/test 抛异常、prod warn**（§4.2）                                                       |
+| ~~D9~~  | ~~模板填充要不要做~~          | **已定：不做，票据类走 PDF**（§1.2）                                                               |
 
 ---
 
@@ -949,7 +950,7 @@ if (!listener.getErrors().isEmpty()) { ... }               // ⑥ 结果只能�
 **SonicExcel**（3 行）：
 
 ```java
-Path tmp = SmartExcelUtil.toTempFile(file);
+Path tmp = SolvelaExcelUtil.toTempFile(file);
 try (Stream<GoodsImportForm> rows = SonicExcel.read(tmp, GoodsImportForm.class).doRead()) {
     rows.gather(Gatherers.windowFixed(1000)).forEach(goodsService::insertBatch);
 }

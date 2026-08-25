@@ -14,7 +14,7 @@ import java.util.*;
 public class DumpSchema {
 
     static final String URL = """
-            jdbc:mysql://127.0.0.1:3306/smart_admin_v3?useSSL=false\
+            jdbc:mysql://127.0.0.1:3306/solvela?useSSL=false\
             &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai""";
 
     /** 手工备份表等垃圾，不进基线 */
@@ -23,12 +23,12 @@ public class DumpSchema {
     /** 按业务域分组，让基线文件本身可读 */
     static final LinkedHashMap<String, List<String>> GROUPS = new LinkedHashMap<>();
     static {
-        GROUPS.put("系统底座（上游 SmartAdmin）", List.of(
+        GROUPS.put("系统底座（上游 Solvela）", List.of(
             "t_employee","t_department","t_position","t_role","t_role_employee","t_role_menu",
             "t_role_data_scope","t_menu","t_login_log","t_login_fail","t_password_log",
             "t_operate_log","t_data_tracer","t_change_log","t_heart_beat_record",
             "t_config","t_dict","t_dict_data","t_serial_number","t_serial_number_record",
-            "t_smart_job","t_smart_job_log","t_reload_item","t_reload_result",
+            "t_solvela_job","t_solvela_job_log","t_reload_item","t_reload_result",
             "t_table_column","t_code_generator_config","t_mail_template"));
         GROUPS.put("办公 / 内容", List.of(
             "t_notice","t_notice_type","t_notice_view_record","t_notice_visible_range",
@@ -65,7 +65,7 @@ public class DumpSchema {
             try (ResultSet r = s.executeQuery("""
                     SELECT TABLE_NAME
                       FROM information_schema.TABLES
-                     WHERE TABLE_SCHEMA = 'smart_admin_v3' AND TABLE_TYPE = 'BASE TABLE'
+                     WHERE TABLE_SCHEMA = 'solvela' AND TABLE_TYPE = 'BASE TABLE'
                      ORDER BY TABLE_NAME""")) {
                 while (r.next()) all.add(r.getString(1));
             }
@@ -88,7 +88,7 @@ public class DumpSchema {
 SET NAMES utf8mb4;
 
 -- =====================================================================================
--- smart_admin_v3 全量表结构基线（只有结构，没有数据）
+-- solvela 全量表结构基线（只有结构，没有数据）
 --
 -- 🔴 <b>新环境部署：执行本文件即可，不需要再翻 sql-update-log。</b>
 --
@@ -154,7 +154,7 @@ SET NAMES utf8mb4;
                 System.exit(1);
             }
 
-            Path p = Path.of("D:/workspace/smart-admin/数据库SQL脚本/mysql/schema-baseline.sql");
+            Path p = Path.of("D:/workspace/solvela-admin/数据库SQL脚本/mysql/schema-baseline.sql");
             Files.write(p, out.toString().getBytes(StandardCharsets.UTF_8));
             System.out.println("已生成 " + p);
             System.out.println("  表数量 " + written + " 张，排除 " + excluded.size() + " 张备份表: " + excluded);

@@ -1,6 +1,6 @@
 ### 数据库脚本
 
-默认数据库为 Mysql，若为其他数据库，请关注：[SmartAdmin其他数据库](https://smartadmin.vip/views/other/china-db/)
+默认数据库为 Mysql，若为其他数据库，请关注：[Solvela其他数据库](https://smartadmin.vip/views/other/china-db/)
 
 ---
 
@@ -34,13 +34,13 @@ mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子�
 
 在它出现之前（2026-08-22 之前），「新环境要执行哪些 SQL」这个问题**没有答案**：
 
-| 建表语句在哪 | 张数 |
-|---|---|
-| `mysql/smart_admin_v3.sql`（上游 SmartAdmin 基线，**已于 2026-08-22 删除**） | 44 |
-| `activity.sql` / `lottery.sql` / `mysql/task.sql` | 21 |
-| `member.sql` / `mall.sql` | 11 |
-| **只在 `sql-update-log/` 的某个版本文件里**（该目录已删除） | **3** |
-| **任何文件里都没有** | **3** |
+| 建表语句在哪                                                              | 张数  |
+|---------------------------------------------------------------------------|-------|
+| `mysql/smart_admin_v3.sql`（上游 Solvela 基线，**已于 2026-08-22 删除**） | 44    |
+| `activity.sql` / `lottery.sql` / `mysql/task.sql`                         | 21    |
+| `member.sql` / `mall.sql`                                                 | 11    |
+| **只在 `sql-update-log/` 的某个版本文件里**（该目录已删除）               | **3** |
+| **任何文件里都没有**                                                      | **3** |
 
 最后两行是致命的：`t_activity_display` / `t_file_category` / `t_file_relation` 得翻 49 个版本文件才找得到；
 而 `t_task_event` / `t_task_record_flow` / `t_lottery_number_pool` **在整个仓库里根本没有建表语句** ——

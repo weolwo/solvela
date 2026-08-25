@@ -5,7 +5,7 @@
  Source Server Type    : MySQL
  Source Server Version : 80408 (8.4.8)
  Source Host           : 192.168.1.5:3306
- Source Schema         : smart_admin_v3
+ Source Schema         : solvela
 
  Target Server Type    : MySQL
  Target Server Version : 80408 (8.4.8)

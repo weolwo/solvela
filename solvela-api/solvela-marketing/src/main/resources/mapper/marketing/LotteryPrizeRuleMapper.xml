@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.lottery.prizerule.dao.LotteryPrizeRuleDao">
+
+    <resultMap id="LotteryPrizeRuleVO" type="solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleVO">
+            <result column="id" property="id" />
+            <result column="lottery_code" property="lotteryCode" />
+            <result column="prize_level" property="prizeLevel" />
+            <result column="match_rule" property="matchRule" />
+            <result column="match_length" property="matchLength" />
+            <result column="prize_code" property="prizeCode" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                lottery_code, 
+                prize_level, 
+                match_rule, 
+                match_length, 
+                prize_code, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.lotteryCode != null">
+                            AND lottery_code = #{queryForm.lotteryCode}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <if test="queryForm.createTimeEnd != null">
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+                        </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="LotteryPrizeRuleVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_lottery_prize_rule
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="LotteryPrizeRuleVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_lottery_prize_rule
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+                <delete id="batchDelete">
+                    delete from t_lottery_prize_rule
+                    where id in
+                    <foreach collection="idList" open="(" close=")" separator="," item="item">
+                        #{item}
+                    </foreach>
+                </delete>
+                <delete id="deleteById">
+                    delete from t_lottery_prize_rule
+                        where id = #{id}
+                </delete>
+
+</mapper>

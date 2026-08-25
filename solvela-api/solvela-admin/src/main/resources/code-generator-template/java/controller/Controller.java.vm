@@ -1,0 +1,71 @@
+package ${packageName};
+
+#foreach ($importClass in $importPackageList)
+$importClass
+#end
+import solvela.base.common.domain.ResponseDTO;
+import solvela.base.common.domain.PageResult;
+import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+/**
+ * ${basic.description} Controller
+ *
+ * @Author ${basic.backendAuthor}
+ * @Date ${basic.backendDate}
+ * @Copyright ${basic.copyright}
+ */
+@RequiredArgsConstructor
+@RestController
+@Tag(name = "${basic.description}")
+@RequestMapping("/${name.lowerCamel}")
+public class ${name.upperCamel}Controller {
+
+    private final ${name.upperCamel}Service Service;
+
+    @Operation(summary = "分页查询")
+    @PostMapping("/queryPage")
+    @SaCheckPermission(":query")
+    public ResponseDTO<PageResult<${name.upperCamel}VO>> queryPage(@RequestBody @Valid ${name.upperCamel}QueryForm queryForm) {
+        return ResponseDTO.ok(Service.queryPage(queryForm));
+    }
+
+#if($insertAndUpdate.isSupportInsertAndUpdate)
+    @Operation(summary = "添加")
+    @PostMapping("/add")
+    @SaCheckPermission(":add")
+    public ResponseDTO<String> add(@RequestBody @Valid ${name.upperCamel}AddForm addForm) {
+        return Service.add(addForm);
+    }
+
+    @Operation(summary = "更新")
+    @PostMapping("/update")
+    @SaCheckPermission(":update")
+    public ResponseDTO<String> update(@RequestBody @Valid ${name.upperCamel}UpdateForm updateForm) {
+        return Service.update(updateForm);
+    }
+#end
+
+#if($deleteInfo.isSupportDelete)
+    #if($deleteInfo.deleteEnum == "Batch" || $deleteInfo.deleteEnum == "SingleAndBatch")
+    @Operation(summary = "批量删除")
+    @PostMapping("/batchDelete")
+    @SaCheckPermission(":delete")
+    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<${primaryKeyJavaType}> idList) {
+        return Service.batchDelete(idList);
+    }
+    #end
+
+    #if($deleteInfo.deleteEnum == "Single" || $deleteInfo.deleteEnum == "SingleAndBatch")
+    @Operation(summary = "单个删除")
+    @GetMapping("/delete/{${primaryKeyFieldName}}")
+    @SaCheckPermission(":delete")
+    public ResponseDTO<String> batchDelete(@PathVariable ${primaryKeyJavaType} ${primaryKeyFieldName}) {
+        return Service.delete(${primaryKeyFieldName});
+    }
+    #end
+#end
+}

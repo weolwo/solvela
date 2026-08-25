@@ -153,8 +153,8 @@
             </a-col>
 
             <a-col :span="12">
-              <!-- 取值对齐 sa.enums.PrizeTypeEnum。类型一对齐，
-                   sa/ledger/handler 下现成的履约 handler 直接就能用 -->
+                <!-- 取值对齐 solvela.enums.PrizeTypeEnum。类型一对齐，
+                     sa/ledger/handler 下现成的履约 handler 直接就能用 -->
               <a-form-item label="商品类型" required>
                 <a-radio-group v-model:value="form.commodityType" button-style="solid">
                   <a-radio-button value="PHYSICAL">📦 实物</a-radio-button>
@@ -496,7 +496,7 @@
 <script>
   const { createApp, ref, computed, reactive, onMounted, onUnmounted } = Vue;
 
-  // 铁律 8 的唯一真源在后端 SmartCodeUtil，前端同源常量在 constants/regular-const.js 的 regular.bizCode
+  // 铁律 8 的唯一真源在后端 SolvelaCodeUtil，前端同源常量在 constants/regular-const.js 的 regular.bizCode
   const BIZ_CODE_REGEX = /^[A-Z0-9]{10}$/;
   const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 

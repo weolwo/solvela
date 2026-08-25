@@ -260,7 +260,7 @@ CREATE TABLE `t_member_verify`
 --   即使 ALTER 成 bigint，也还有两条不该混：
 --     · 量级差几个数量级。员工登录一天几十条，会员一天可能几万到几十万条，
 --       混一张表后员工的登录审计会被会员数据彻底淹没。
---     · 那张表的列宽是 SmartAdmin 原始设计：user_name/login_ip/login_ip_region
+--     · 那张表的列宽是 Solvela 原始设计：user_name/login_ip/login_ip_region
 --       都是 varchar(1000)，remark varchar(2000)，user_agent 是 text。
 --       员工量级无所谓，会员量级下这些宽列会让表膨胀得非常快。
 --   所以另起一张，列宽按会员量级重新收紧。
@@ -277,7 +277,7 @@ CREATE TABLE `t_member_verify`
 --     🔴 不要为了一个离线需求，在在线登录链路上加一次写 —— 那正是刚被挪走的东西。
 --
 -- 【必须配清理，否则它会无限涨】
---   会员登录日志是全库增长最快的表。挂 t_smart_job 定期删（如保留 6 个月），
+--   会员登录日志是全库增长最快的表。挂 t_solvela_job 定期删（如保留 6 个月），
 --   或按月建分区直接 DROP PARTITION（分区删远快于 DELETE，且不产生大事务）。
 --   ⚠️ 会员注销时按个保法应清除其日志；若因审计需要保留，至少把 login_ip 抹掉。
 -- ----------------------------------------------------------------------------
@@ -293,7 +293,7 @@ CREATE TABLE `t_member_login_log`
     -- ⚠️ X-Forwarded-For 可能是一条 IP 链（"1.2.3.4, 5.6.7.8, ..."），
     --    取值时必须只取真实客户端那一个，别把整条链塞进来 —— 否则超长静默截断
     `client_ip`    varchar(39)          DEFAULT NULL COMMENT '客户端IP（兼容IPv6，39位足够）',
-    `ip_region`    varchar(64)          DEFAULT NULL COMMENT 'IP归属地（ip2region 解析，SmartIpUtil 已有）',
+    `ip_region` varchar(64) DEFAULT NULL COMMENT 'IP归属地（ip2region 解析，SolvelaIpUtil 已有）',
     -- 拆成三列而不是存 varchar(512) 原始 UA：原始 UA 无法聚合统计（"iOS占比多少"答不了），
     -- 而且千万行量级下那一列就是纯粹的存储负担
     `device_type`  varchar(16)          DEFAULT NULL COMMENT '设备端：APP/H5/WECHAT/PC',
@@ -378,7 +378,7 @@ PARTITION BY RANGE COLUMNS (`create_time`) (
 -- ⚠️ device_type / os_name / browser_name 需要一个 UA 解析器，而<b>项目里没有</b>：
 --    hutool（带 UserAgentUtil）已于 2026-08-08 整体移除，现有 LoginService 只是
 --    request.getHeader(USER_AGENT) 原样存。所以要自己写一个轻量解析放
---    sa-base/common/util，别为此把 hutool 引回来（交接文档「六条必知」#6）。
+--    solvela-base/common/util，别为此把 hutool 引回来（交接文档「六条必知」#6）。
 --    🔴 解析不出来时落 'UNKNOWN'，<b>不要落 NULL</b> —— 否则「各端占比」这类统计
 --       会出现一个谁也说不清的黑洞，而 UNKNOWN 至少是个能追的信号。
 
@@ -723,6 +723,6 @@ ON DUPLICATE KEY UPDATE `id` = `id`;
 --
 -- 自查（新建表后跑一次，铁律 9）：
 --   SELECT table_name FROM information_schema.columns
---    WHERE table_schema='smart_admin_v3' AND column_name='update_time'
+--    WHERE table_schema='solvela' AND column_name='update_time'
 --      AND extra NOT LIKE '%on update%';
 -- ============================================================================

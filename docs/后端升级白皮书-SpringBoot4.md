@@ -2,7 +2,7 @@
 
 > 分支：`upgrade/springboot4`（从 `task` 拉出）
 > 日期：2026-08-02
-> 范围：`smart-admin-api/` 全部四个模块（sa-base / common-api / sa-marketing / sa-admin）
+> 范围：`solvela-api/` 全部四个模块（solvela-base / common-api / solvela-marketing / solvela-admin）
 > 验证状态：全模块编译通过 · 单测 73/73 全绿 · **真实启动成功（10.051s，日志无 ERROR）** · 登录/验证码/Swagger 接口实测 200
 > · sa-token 新 Redis DAO 读路径实测通 · ip2region 新旧数据布局逐字段核对 · 前端 `vite build` 通过
 
@@ -68,37 +68,38 @@ commons-* 全系、poi 5.5.1、bcprov 1.85、velocity、freemarker、p6spy、ref
 
 ### 2.1 删除的未使用依赖
 
-| 依赖 | 判定证据 |
-|---|---|
-| `net.1024lab:smartdb` 1.2.0 | 源码零引用 `sa.smartdb`，jar 停留在 2021 年 |
-| `concurrentlinkedhashmap-lru` 1.4.2 | 源码零引用 |
-| `poi-ooxml-full` 5.5.1 | 零引用 `org.openxmlformats`，且拖着 xmlbeans 全量 schema，**21MB** |
-| `poi-scratchpad` 5.5.1 | HSLF/HWPF/HSSF 一处没用，**4MB** |
-| `redisson-spring-data-27`（depMgmt） | 从未被任何模块声明，死条目 |
+| 依赖                                    | 判定证据                                                                                                                                            |
+|-----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `net.1024lab:smartdb` 1.2.0             | 源码零引用 `smartdb`，jar 停留在 2021 年                                                                                                            |
+| `concurrentlinkedhashmap-lru` 1.4.2     | 源码零引用                                                                                                                                          |
+| `poi-ooxml-full` 5.5.1                  | 零引用 `org.openxmlformats`，且拖着 xmlbeans 全量 schema，**21MB**                                                                                  |
+| `poi-scratchpad` 5.5.1                  | HSLF/HWPF/HSSF 一处没用，**4MB**                                                                                                                    |
+| `redisson-spring-data-27`（depMgmt）    | 从未被任何模块声明，死条目                                                                                                                          |
 | `springdoc-openapi.version`（property） | 属性声明了但没有 dependency 引用。中途换官方 springdoc 时复活过，**最终又删了** —— 改用 baizhukui fork 后 springdoc 版本完全由它传递决定（见 §4.1） |
 
 ### 2.2 结构性修正
 
 **① common-api 的 227 行 pom 删到 66 行。**
-它把 sa-base 的 40 条依赖整段抄了一遍，而它第一条就是 `depend on sa-base` ——
+它把 solvela-base 的 40 条依赖整段抄了一遍，而它第一条就是 `depend on solvela-base` ——
 那些依赖全是 compile 作用域，本来就传递过来。抄的那份对 classpath 零影响
-（`mybatis-plus-extension` 就没抄，一直靠传递用着），只是让"这里到底用了什么"完全看不出来。
-现在只留 `dependency:analyze` 认定的 7 条直接依赖，与 sa-marketing 的写法对齐。
+（`mybatis-plus-extension` 就没抄，一直靠传递用着），只是让"这里到底用了什么"完全看不出来。 现在只留 `dependency:analyze` 认定的
+7 条直接依赖，与 solvela-marketing 的写法对齐。
 
 **② poi 版本错配修复。**
 原先显式声明 `poi` 5.5.1，而 `poi-ooxml` 是 fastexcel 传递进来的 **5.4.1** —— POI 要求两者同版本，
 这是个潜伏故障。修法有个坑：只在 depMgmt 里声明 `poi-ooxml` 是不够的，
 `poi` 会按 Maven「同深度先声明者胜」被 fastexcel 拽回 5.4.1，**必须把 `poi` 核心一起管起来**。
 
-**③ 依赖归位。** `qlexpress4` 只有 common-api 用（从 sa-base 挪走）；`reflections` 只有 sa-admin 用（从 sa-base 挪走）。
+**③ 依赖归位。** `qlexpress4` 只有 common-api 用（从 solvela-base 挪走）；`reflections` 只有 solvela-admin 用（从
+solvela-base 挪走）。
 
 **④ 版本 pin 与依赖声明分离。** `snakeyaml` / `commons-compress` 源码零直接引用，
 从 `<dependencies>` 移除、**版本 pin 保留在 dependencyManagement**，实测树上仍是 2.6 / 1.28.0，无降版本。
 
 ### 2.4 传递依赖瘦身（第三轮，2026-08-02）
 
-`dependency:analyze` 层面已无可删（sa-base 剩余 13 条 unused 全是 starter / 驱动 / 运行期装配的误报，
-common-api 与 sa-marketing 已无该告警）。剩下的空间在**传递依赖**：
+`dependency:analyze` 层面已无可删（solvela-base 剩余 13 条 unused 全是 starter / 驱动 / 运行期装配的误报， common-api 与
+solvela-marketing 已无该告警）。剩下的空间在 **传递依赖**：
 
 | 排除项 | 从哪来 | 依据 | 省 |
 |---|---|---|---|
@@ -125,7 +126,7 @@ common-api 与 sa-marketing 已无该告警）。剩下的空间在**传递依�
 
 ### 2.3 收益
 
-fat jar 少了约 27MB；`dependency:analyze` 的 unused-declared 告警从 60 条（sa-base 21 + common-api 39）降到个位数。
+fat jar 少了约 27MB；`dependency:analyze` 的 unused-declared 告警从 60 条（solvela-base 21 + common-api 39）降到个位数。
 
 ---
 
@@ -212,13 +213,13 @@ spring:
 > 把下面五处耦合点全摘了，后来改用 baizhukui fork 恢复 `/doc.html`，五处又全部还原。
 > **以代码为准**，别照着「已摘除」去改。
 
-| 位置 | 中途摘除的内容 | 最终状态 |
-|---|---|---|
-| `WebServerListener` 启动横幅 | "knife4j地址: /doc.html" → "OpenAPI文档: /v3/api-docs" | ✅ 已还原，横幅仍打 `/doc.html` |
-| `MvcConfig.addResourceHandlers`（在 **sa-admin**，不在 sa-base） | 删掉 `/doc.html` 的静态资源映射 | ✅ 已还原；`/webjars/**` 全程保留 |
-| `SwaggerConfig.SWAGGER_WHITELIST` | 删掉 `/doc.html` | ✅ 已还原，`/doc.html` 在免登录白名单里 |
-| `SwaggerConfig` 注释 | 删掉 "如果使用knife4j则不需要" | ✅ 仍在（该说明重新成立） |
-| 四个 profile 的 yaml | 删掉整段 `knife4j:` 配置块 | ✅ 已还原，dev/test/pre/prod **四个都有**（见 §4.1 注意事项 3） |
+| 位置                                                                       | 中途摘除的内容                                         | 最终状态                                                        |
+|----------------------------------------------------------------------------|--------------------------------------------------------|-----------------------------------------------------------------|
+| `WebServerListener` 启动横幅                                               | "knife4j地址: /doc.html" → "OpenAPI文档: /v3/api-docs" | ✅ 已还原，横幅仍打 `/doc.html`                                 |
+| `MvcConfig.addResourceHandlers`（在 **solvela-admin**，不在 solvela-base） | 删掉 `/doc.html` 的静态资源映射                        | ✅ 已还原；`/webjars/**` 全程保留                               |
+| `SwaggerConfig.SWAGGER_WHITELIST`                                          | 删掉 `/doc.html`                                       | ✅ 已还原，`/doc.html` 在免登录白名单里                         |
+| `SwaggerConfig` 注释                                                       | 删掉 "如果使用knife4j则不需要"                         | ✅ 仍在（该说明重新成立）                                       |
+| 四个 profile 的 yaml                                                       | 删掉整段 `knife4j:` 配置块                             | ✅ 已还原，dev/test/pre/prod **四个都有**（见 §4.1 注意事项 3） |
 
 ### 3.6 第三方 API
 
@@ -255,8 +256,8 @@ Jackson 2 **仍然存在**，但来源变成了 `springdoc-openapi-starter-webmv
 **为什么不能硬扛**：springdoc 2.7.0 的自动配置引用的是 Boot 3 的类，强行覆盖 springdoc 版本到 3.x
 只会把问题从"编译期"推到"启动期 NoClassDefFoundError"。
 
-**第一版方案**：换回官方 `springdoc-openapi-starter-webmvc-ui` 3.1.0。
-项目里对 springdoc 的使用（`SwaggerConfig` / `SmartOperationCustomizer` / `SchemaEnumPropertyCustomizer`）
+**第一版方案**：换回官方 `springdoc-openapi-starter-webmvc-ui` 3.1.0。 项目里对 springdoc 的使用（`SwaggerConfig` /
+`SolvelaOperationCustomizer` / `SchemaEnumPropertyCustomizer`）
 都是 `org.springdoc.core.*` 公共 API，一行没改就过了。代价是 UI 退回 Swagger UI，失去 `/doc.html`。
 
 **最终方案（2026-08-02 修正）**：改用社区适配 Boot 4 的
@@ -451,7 +452,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 ### 6.2 已评估并决定「不做」（记录理由，避免下次重复讨论）
 
 4. **不改用第三方 IP 查询 API（如 ipdata）**。本地 ip2region 方案完全可用，且 API 方案在本项目是退步：
-   - **调用量对不上**：`SmartIpUtil.getRegion()` 挂在登录、**每条操作日志**、数据追踪三个切面上
+    - **调用量对不上**：`SolvelaIpUtil.getRegion()` 挂在登录、 **每条操作日志**、数据追踪三个切面上
      （`OperateLogAspect` / `DataTracerService` / `LoginService`），每个后台写操作都会打一次，
      免费额度 1500 次/天几个活跃运营就用光。
    - **把外部网络调用塞进登录链路**，多一个延迟来源与故障点；本地查表是微秒级、零失败。
@@ -482,7 +483,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 9. **前端 lint 是彻底卸掉的状态**。若要恢复，需要写 `eslint.config.js`（flat config，eslint 9 起不认 eslintrc）、
    从 stylelint 配置里摘掉已废弃的 `stylelint-config-prettier`，并补上 `lint` 脚本 ——
    不要只把包装回来，那样仍然跑不起来。
-10. `smart-admin-web/postcss.config.cjs` 的 `plugins` 是空对象（Tailwind v4 走 vite 插件），文件可删。
+10. `solvela-admin-web/postcss.config.cjs` 的 `plugins` 是空对象（Tailwind v4 走 vite 插件），文件可删。
 11. `uuid` 依赖的唯一使用者是 `src/components/framework/text-ellipsis/index.vue`，而该组件全项目无人引用；
     删组件即可连带卸掉 uuid，或把那行换成原生 `crypto.randomUUID()`。
 12. `smart-app/`（uni-app）那套 eslint 8 链同样闲置无脚本，本轮按要求未动。
@@ -495,18 +496,18 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 `create_time` 收口、首页图表等提交，以 `git log task..upgrade/springboot4` 为准），
 **前端清理与后端升级是分开的**，可按需 revert 或 cherry-pick：
 
-| # | 提交 | 内容 | 可否单独摘出 |
-|---|---|---|---|
-| 1 | 前端依赖瘦身 | 仅 `smart-admin-web/`，卸 v-viewer 与失效的 eslint/stylelint 链 | ✅ 与后端无耦合，可单独摘到 `task` |
-| 2 | 后端升级 Spring Boot 4 | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） | ❌ 本轮的地基 |
-| 3 | 白皮书版本号订正 | 纯文档 | ✅ |
-| 4 | 清掉 knife4j 全部残留（`e7b425f4`） | 横幅 / MvcConfig / 白名单 / 四个 yaml | 依赖 #2；**后被 `ca4e4701` 整体还原，见下方 🔴** |
-| 5 | 收口遗留排期项 | ip2region 3.3.7、tika 3.3.2、sa-token Redis DAO 换官方、前端死注释 | 依赖 #2 |
-| 6 | ip2region 数据格式归一化 | `SmartIpUtil` 按 xdb 文件头版本自适应 | 依赖 #5 |
+| # | 提交                                | 内容                                                                         | 可否单独摘出                                     |
+|---|-------------------------------------|------------------------------------------------------------------------------|--------------------------------------------------|
+| 1 | 前端依赖瘦身                        | 仅 `solvela-admin-web/`，卸 v-viewer 与失效的 eslint/stylelint 链            | ✅ 与后端无耦合，可单独摘到 `task`               |
+| 2 | 后端升级 Spring Boot 4              | 依赖清理 + Boot 4 迁移。两阶段在同一提交里（都改了同一批 pom，无法干净拆分） | ❌ 本轮的地基                                    |
+| 3 | 白皮书版本号订正                    | 纯文档                                                                       | ✅                                               |
+| 4 | 清掉 knife4j 全部残留（`e7b425f4`） | 横幅 / MvcConfig / 白名单 / 四个 yaml                                        | 依赖 #2；**后被 `ca4e4701` 整体还原，见下方 🔴** |
+| 5 | 收口遗留排期项                      | ip2region 3.3.7、tika 3.3.2、sa-token Redis DAO 换官方、前端死注释           | 依赖 #2                                          |
+| 6 | ip2region 数据格式归一化            | `SolvelaIpUtil` 按 xdb 文件头版本自适应                                      | 依赖 #5                                          |
 
 > 🔴 **改用 baizhukui fork 的那次改动藏在一个前端提交里**：`ca4e4701`「前端体积优化：产物 26MB → 19.4MB」
-> 同时改了 **9 个后端文件**（根 pom / sa-base pom / `MvcConfig` / `SwaggerConfig` / `WebServerListener` /
-> 四个 profile 的 `sa-base.yaml`），提交信息里一个字都没提。
+> 同时改了 **9 个后端文件**（根 pom / solvela-base pom / `MvcConfig` / `SwaggerConfig` / `WebServerListener` /
+> 四个 profile 的 `solvela-base.yaml`），提交信息里一个字都没提。
 > 这正是本白皮书 §3.5、§5.2、§6.1、§6.3 一度与代码对不上的原因 ——
 > **要 revert 前端瘦身就会连带把 `/doc.html` 一起 revert 掉**，两者在同一个提交里，无法干净拆分。
 > 教训：跨端改动不要混进单端提交，否则历史里查不到、文档也不会跟着更新。

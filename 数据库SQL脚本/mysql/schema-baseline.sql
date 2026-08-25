@@ -2,7 +2,7 @@
 SET NAMES utf8mb4;
 
 -- =====================================================================================
--- smart_admin_v3 全量表结构基线（只有结构，没有数据）
+-- solvela 全量表结构基线（只有结构，没有数据）
 --
 -- 🔴 <b>新环境部署：执行本文件即可，不需要再翻 sql-update-log。</b>
 --
@@ -35,7 +35,7 @@ SET NAMES utf8mb4;
 
 
 -- =====================================================================================
--- 系统底座（上游 SmartAdmin）（27 张）
+-- 系统底座（上游 Solvela）（27 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_employee`;
@@ -289,12 +289,13 @@ CREATE TABLE `t_dict_data` (
   PRIMARY KEY (`dict_data_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='字典数据表';
 
-DROP TABLE IF EXISTS `t_smart_job`;
-CREATE TABLE `t_smart_job` (
+DROP TABLE IF EXISTS `t_solvela_job`;
+CREATE TABLE `t_solvela_job`
+(
   `job_id` int NOT NULL AUTO_INCREMENT COMMENT '任务id',
   `job_code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '任务编码：10位大写字母+数字，全局唯一',
   `job_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '任务名称',
-  `handler_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行器名称，对应 @SmartJobHandler#name()',
+  `handler_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行器名称，对应 @SolvelaJobHandler#name()',
   `job_group` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'BUSINESS' COMMENT '分组：SYSTEM/DATA/ACTIVITY/OPS/BUSINESS',
   `trigger_type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '触发类型',
   `trigger_value` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '触发配置',
@@ -334,12 +335,13 @@ CREATE TABLE `t_smart_job` (
   KEY `idx_next_trigger` (`app_env`,`enabled_flag`,`deleted_flag`,`next_trigger_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC COMMENT='定时任务配置 @listen';
 
-DROP TABLE IF EXISTS `t_smart_job_log`;
-CREATE TABLE `t_smart_job_log` (
+DROP TABLE IF EXISTS `t_solvela_job_log`;
+CREATE TABLE `t_solvela_job_log`
+(
   `log_id` bigint NOT NULL AUTO_INCREMENT,
   `job_id` int NOT NULL COMMENT '任务id',
   `job_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '任务名称',
-  `app_env` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'dev' COMMENT '环境标识：冗余列，避免日志表扫描每秒 join t_smart_job',
+  `app_env` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'dev' COMMENT '环境标识：冗余列，避免日志表扫描每秒 join t_solvela_job',
   `trace_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '链路追踪id',
   `trigger_source` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'SCHEDULE' COMMENT '触发来源：SCHEDULE 定时 / MANUAL 手动。无 RETRY —— 重试继承原值，靠 retry_seq 区分',
   `trigger_time` datetime NOT NULL COMMENT '本次调度的原定触发时刻（不是执行时刻）',
@@ -540,7 +542,7 @@ CREATE TABLE `t_member_login_log` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `member_id` bigint NOT NULL COMMENT '会员号',
   `client_ip` varchar(39) DEFAULT NULL COMMENT '客户端IP（兼容IPv6，39位足够）',
-  `ip_region` varchar(64) DEFAULT NULL COMMENT 'IP归属地（ip2region 解析，SmartIpUtil 已有）',
+  `ip_region` varchar(64) DEFAULT NULL COMMENT 'IP归属地（ip2region 解析，SolvelaIpUtil 已有）',
   `device_type` varchar(16) DEFAULT NULL COMMENT '设备端：APP/H5/WECHAT/PC',
   `os_name` varchar(32) DEFAULT NULL COMMENT '操作系统：iOS/Android/Windows',
   `browser_name` varchar(32) DEFAULT NULL COMMENT '浏览器：Chrome/Safari',

@@ -9,7 +9,7 @@ import java.util.*;
  *
  * <p><b>为什么需要它</b>：schema-baseline.sql 只有结构。而系统能不能跑起来还依赖一批
  * 配置类数据：没有 t_menu / t_role_menu 后台就是一片空白；没有 t_file_category 的内置分类，
- * 代码里按 code 引用的地方直接抛异常；没有 t_smart_job 三个定时任务不会注册。
+ * 代码里按 code 引用的地方直接抛异常；没有 t_solvela_job 三个定时任务不会注册。
  * 这些数据原先分散在 sql-update-log 的 17 个版本文件里（光 t_menu 就横跨 8 个文件）。
  *
  * <p>把它们收敛成一个文件之后，「新环境部署」= schema-baseline.sql + data-baseline.sql，
@@ -18,7 +18,7 @@ import java.util.*;
 public class DumpSeedData {
 
     static final String URL = """
-            jdbc:mysql://127.0.0.1:3306/smart_admin_v3?useSSL=false\
+            jdbc:mysql://127.0.0.1:3306/solvela?useSSL=false\
             &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai""";
 
     /**
@@ -41,7 +41,7 @@ public class DumpSeedData {
         SEED.put("t_config",                "系统配置");
         SEED.put("t_serial_number",         "单号生成器定义");
         SEED.put("t_file_category",         "文件分类。代码按 category_code 引用，缺了直接抛异常");
-        SEED.put("t_smart_job",             "定时任务定义。缺了任务不会注册");
+        SEED.put("t_solvela_job",             "定时任务定义。缺了任务不会注册");
         SEED.put("t_task_event",            "任务事件定义（v3.47.0 灌入）");
         SEED.put("t_notice_type",           "公告类型");
         SEED.put("t_code_generator_config", "代码生成器配置（开发工具，可选）");
@@ -58,7 +58,7 @@ public class DumpSeedData {
 SET NAMES utf8mb4;
 
 -- =====================================================================================
--- smart_admin_v3 系统种子数据
+-- solvela 系统种子数据
 --
 -- 🔴 <b>新环境部署第 2 步</b>：先执行 schema-baseline.sql（建结构），再执行本文件（灌数据）。
 --    两个文件跑完，系统就能登录并正常使用。
@@ -129,7 +129,7 @@ SET FOREIGN_KEY_CHECKS = 0;
                 for (String t : empty) out.append("--   ").append(t).append('\n');
             }
 
-            Path p = Path.of("D:/workspace/smart-admin/数据库SQL脚本/mysql/data-baseline.sql");
+            Path p = Path.of("D:/workspace/solvela-admin/数据库SQL脚本/mysql/data-baseline.sql");
             Files.write(p, out.toString().getBytes(StandardCharsets.UTF_8));
             System.out.println("generated " + p);
             System.out.println("  seed tables=" + (SEED.size() - empty.size()) + "  rows=" + totalRows

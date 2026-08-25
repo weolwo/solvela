@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.lottery.issue.dao.LotteryIssueDao">
+
+    <resultMap id="LotteryIssueVO" type="solvela.lottery.issue.domain.vo.LotteryIssueVO">
+            <result column="id" property="id" />
+            <result column="lottery_code" property="lotteryCode" />
+            <result column="issue_no" property="issueNo" />
+            <result column="sold_count" property="soldCount" />
+            <result column="sale_start_time" property="saleStartTime" />
+            <result column="sale_end_time" property="saleEndTime" />
+            <result column="plan_draw_time" property="planDrawTime" />
+            <result column="settle_time" property="settleTime" />
+            <result column="winning_number" property="winningNumber" />
+            <result column="status" property="status" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+            <result column="lottery_name" property="lotteryName" />
+            <result column="activity_code" property="activityCode" />
+            <result column="total_count" property="totalCount" />
+            <result column="sale_state" property="saleState" />
+            <result column="overdue" property="overdue" />
+    </resultMap>
+
+    <sql id="base_columns">
+                i.id,
+                i.lottery_code,
+                i.issue_no,
+                i.sold_count,
+                i.sale_start_time,
+                i.sale_end_time,
+                i.plan_draw_time,
+                i.settle_time,
+                i.winning_number,
+                i.status,
+                i.create_by,
+                i.create_time,
+                i.update_by,
+                i.update_time
+    </sql>
+
+    <!--
+        列表数据源。玩法名与发行上限走 join 现取，不在期号表里冗余一份 ——
+        冗余就意味着两处可改、迟早不一致（同 increaseSoldCount 的理由）。
+
+        必须是 LEFT JOIN：玩法配置被删掉之后，那些期号仍然要在列表里露头，
+        而且正是最该被看见的那几条。INNER JOIN 会让它们凭空消失，
+        运营只会以为「期号没了」，而不是「玩法没了」。
+    -->
+    <sql id="base_from">
+        FROM t_lottery_issue i
+        LEFT JOIN t_lottery_config c ON c.lottery_code = i.lottery_code
+    </sql>
+
+    <!--
+        售卖态：「这一期现在还能不能领号」的结论。
+
+        判定顺序逐条对齐运行态 TicketIssueService#obtain，两边必须一起改：
+          玩法上线 → 期号待开奖 → 未到开始 → 已过结束 → 售罄
+        顺序不能调换。售罄判定放在窗口之后，是为了让一个「还没开售」的期
+        不会因为 sold_count 恰好达标（比如上期数据迁移过来）就被显示成售罄。
+
+        边界与运行态严格一致：运行态用 now.isBefore(start) / now.isAfter(end)，
+        都是严格不等号，所以这里用 &lt; 与 &gt; 而不是 &lt;= / &gt;=，
+        恰好等于起止时刻的那一秒算「在售」。
+
+        时间一律用 NOW()：全系统只认数据库一个时钟（铁律 9/10）。
+        MySQL 保证同一条语句内 NOW() 取值恒定，不会出现一行算在窗口内、下一行算在窗口外。
+
+        c.lottery_code IS NULL 是 LEFT JOIN 落空（玩法配置已被删），
+        与「未上线」一并归到 4-玩法不可售：两种情况下运行态都发不出号，对运营是同一个结论。
+    -->
+    <sql id="sale_state_expr">
+        CASE
+            WHEN c.lottery_code IS NULL OR c.status &lt;&gt; 1 THEN 4
+            WHEN i.status &lt;&gt; 0 THEN 3
+            WHEN i.sale_start_time IS NOT NULL AND NOW() &lt; i.sale_start_time THEN 0
+            WHEN i.sale_end_time IS NOT NULL AND NOW() &gt; i.sale_end_time THEN 2
+            WHEN i.sold_count &gt;= c.total_count THEN 5
+            ELSE 1
+        END
+    </sql>
+
+    <!--
+        逾期未开奖：对外承诺的开奖时刻已过，却还没开完奖。
+
+        status &lt;&gt; 2 而不是 = 0：核销中（1）的期同样算逾期 ——
+        开奖跑到一半中断、卡在 1 上不动，是比「压根没点开奖」更需要被看见的故障。
+    -->
+    <sql id="overdue_expr">
+        (i.plan_draw_time IS NOT NULL AND i.plan_draw_time &lt; NOW() AND i.status &lt;&gt; 2)
+    </sql>
+
+    <!--
+        今日计划开奖：今天要干的活儿。同样由数据库判定「今天是哪天」——
+        让前端算出今天的起止时刻再传区间，等于又引一个时钟源，
+        客户端时区偏一格筛出来的就是昨天或明天的活儿。
+        概览卡片与列表筛选共用这一份，两边数字必然对得上。
+    -->
+    <sql id="today_draw_expr">
+        (i.plan_draw_time IS NOT NULL AND DATE(i.plan_draw_time) = CURDATE() AND i.status &lt;&gt; 2)
+    </sql>
+
+    <!--
+        ⚠️ saleState / overdue 的筛选条件在 WHERE 里重复了一遍表达式，而不是 HAVING 引用别名。
+        MySQL 的 HAVING 虽然能引别名，但 MyBatis-Plus 分页插件生成 count 语句时会替换 select 项，
+        别名随之消失，count 会直接报错、总条数与列表对不上。
+        表达式本身只有 sale_state_expr / overdue_expr 一份定义，重复的是引用不是逻辑。
+    -->
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.lotteryCode != null">
+                            AND i.lottery_code = #{queryForm.lotteryCode}
+                        </if>
+                        <!-- 期号是给人看的可读标识（如 2026_MID_01），运营习惯记个前缀就来搜，
+                             精确匹配等于「记不全就查不到」，所以用 LIKE -->
+                        <if test="queryForm.issueNo != null and queryForm.issueNo != ''">
+                            AND i.issue_no LIKE CONCAT('%', #{queryForm.issueNo}, '%')
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND i.status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.saleState != null">
+                            AND <include refid="sale_state_expr"/> = #{queryForm.saleState}
+                        </if>
+                        <if test="queryForm.overdueOnly != null and queryForm.overdueOnly">
+                            AND <include refid="overdue_expr"/>
+                        </if>
+                        <if test="queryForm.todayDrawOnly != null and queryForm.todayDrawOnly">
+                            AND <include refid="today_draw_expr"/>
+                        </if>
+                        <if test="queryForm.planDrawTimeBegin != null">
+                            AND i.plan_draw_time &gt;= #{queryForm.planDrawTimeBegin}
+                        </if>
+                        <if test="queryForm.planDrawTimeEnd != null">
+                            AND i.plan_draw_time &lt;= #{queryForm.planDrawTimeEnd}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND i.create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <if test="queryForm.createTimeEnd != null">
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND i.create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+                        </if>
+        </where>
+    </sql>
+
+    <!--
+        排序换成「逾期的顶到最前，其次按计划开奖时间由近及远」，不再按 create_time。
+        创建顺序对运营没有意义 —— 先建的期未必先开奖；而这一页要回答的是
+        「接下来该处理哪一期」，那就该让最该处理的排在第一行。
+        plan_draw_time 可能为空（老数据），IS NULL 排在最后，兜底再按 create_time 保证顺序稳定。
+    -->
+    <sql id="list_order">
+        ORDER BY <include refid="overdue_expr"/> DESC,
+                 i.plan_draw_time IS NULL,
+                 i.plan_draw_time ASC,
+                 i.create_time DESC
+    </sql>
+
+    <select id="queryPage" resultMap="LotteryIssueVO">
+        SELECT
+        <include refid="base_columns"/>,
+        c.lottery_name AS lottery_name,
+        c.activity_code AS activity_code,
+        c.total_count AS total_count,
+        <include refid="sale_state_expr"/> AS sale_state,
+        <include refid="overdue_expr"/> AS overdue
+        <include refid="base_from"/>
+        <include refid="query_conditions"/>
+        <include refid="list_order"/>
+    </select>
+
+    <select id="queryList" resultMap="LotteryIssueVO">
+        SELECT
+        <include refid="base_columns"/>,
+        c.lottery_name AS lottery_name,
+        c.activity_code AS activity_code,
+        c.total_count AS total_count,
+        <include refid="sale_state_expr"/> AS sale_state,
+        <include refid="overdue_expr"/> AS overdue
+        <include refid="base_from"/>
+        <include refid="query_conditions"/>
+        <include refid="list_order"/>
+    </select>
+
+    <!--
+        顶部四张卡片。一次扫表算完四个数，不是四条 count ——
+        四条各查一次不但慢，还会因为分别执行而拿到不同的 NOW()，
+        出现「售卖中 3 期，但点进去只有 2 期」这种自相矛盾。
+
+        口径与列表完全同源：复用同两个表达式，所以点卡片筛出来的行数
+        必然等于卡片上的数字。
+
+        只吃 lotteryCode 一个条件，刻意不吃 status / saleState / overdueOnly ——
+        卡片本身就是筛选入口，若它再跟着筛选结果变，点一下「逾期」之后
+        其余三张卡片全部归零，就没法用它们互相对照了。
+    -->
+    <select id="overview" resultType="solvela.lottery.issue.domain.vo.LotteryIssueOverviewVO">
+        <!-- COALESCE 不能省：一行都没匹配到时 SUM 返回 NULL 而不是 0，
+             卡片上会显示成空白而不是「0」，看起来像接口挂了 -->
+        SELECT
+            COALESCE(SUM(<include refid="overdue_expr"/>), 0)              AS overdueCount,
+            COALESCE(SUM(<include refid="sale_state_expr"/> = 1), 0)       AS onSaleCount,
+            COALESCE(SUM(<include refid="sale_state_expr"/> = 5), 0)       AS soldOutCount,
+            COALESCE(SUM(<include refid="today_draw_expr"/>), 0)           AS todayDrawCount
+        <include refid="base_from"/>
+        <where>
+            <if test="queryForm.lotteryCode != null">
+                AND i.lottery_code = #{queryForm.lotteryCode}
+            </if>
+        </where>
+    </select>
+
+                <!-- 批量物理删除已移除：期号是一期期建的，没有批量删的场景。
+                     列表页原先那个「批量删除」已换成批量停售（改售卖结束时间），见 LotteryIssueService.batchStopSale -->
+                <delete id="deleteById">
+                    delete from t_lottery_issue
+                        where id = #{id}
+                </delete>
+
+    <select id="selectDbNow" resultType="java.time.LocalDateTime">
+        SELECT NOW()
+    </select>
+
+    <!--
+        已发数 +1。total_count 挂在 t_lottery_config 上（一个活动可以有多个玩法，
+        每个玩法自己的发行规格），所以这里 join 过去取，不在期号表里冗余存一份 ——
+        冗余就意味着两处可改、迟早不一致。
+        WHERE sold_count < total_count 是防超发的 DB 兜底闸门。
+    -->
+    <update id="increaseSoldCount">
+        UPDATE t_lottery_issue i
+        JOIN t_lottery_config c ON c.lottery_code = i.lottery_code
+        SET i.sold_count = i.sold_count + 1
+        WHERE i.id = #{id}
+          AND i.sold_count &lt; c.total_count
+    </update>
+
+    <!-- 抢开奖闸门：WHERE status 是并发保护，不是多余条件 -->
+    <update id="startSettle">
+        UPDATE t_lottery_issue
+        SET status = #{to},
+            winning_number = #{winningNumber}
+        WHERE id = #{id}
+          AND status = #{from}
+    </update>
+
+    <!--
+        核销完成。settle_time 用 NOW() 显式赋值：
+        该列没有 ON UPDATE CURRENT_TIMESTAMP 兜底，不写就永远是 NULL。
+        用 NOW() 而非 Java 时间，保证全系统仍只有数据库一个时钟（铁律 9）。
+    -->
+    <update id="finishSettle">
+        UPDATE t_lottery_issue
+        SET status = #{to},
+            settle_time = NOW()
+        WHERE id = #{id}
+          AND status = #{from}
+    </update>
+
+</mapper>

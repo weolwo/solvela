@@ -13,7 +13,7 @@ public class VerifyFreshInstall {
     static final String BASE = """
             jdbc:mysql://127.0.0.1:3306/%s?useSSL=false\
             &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true""";
-    static final String ROOT = "D:/workspace/smart-admin/数据库SQL脚本/mysql/";
+    static final String ROOT = "D:/workspace/solvela-admin/数据库SQL脚本/mysql/";
     static final String PROBE = "_fresh_probe";
 
     public static void main(String[] a) throws Exception {
@@ -47,7 +47,7 @@ public class VerifyFreshInstall {
                 {"t_role_menu",     "1",   "角色菜单授权：为 0 则任何角色都看不到菜单"},
                 {"t_employee",      "1",   "员工账号：为 0 无法登录"},
                 {"t_file_category", "4",   "文件分类：代码按 code 引用 COMMON/NOTICE/HELP_DOC/FEEDBACK"},
-                {"t_smart_job",     "1",   "定时任务定义：为 0 则任务不会注册"},
+                {"t_solvela_job",     "1",   "定时任务定义：为 0 则任务不会注册"},
                 {"t_dict_data",     "1",   "字典项"},
                 {"t_task_event",    "1",   "任务事件定义"},
                 {"t_serial_number", "1",   "单号生成器定义"},

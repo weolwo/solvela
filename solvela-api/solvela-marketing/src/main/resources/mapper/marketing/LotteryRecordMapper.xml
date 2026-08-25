@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.lottery.record.dao.LotteryRecordDao">
+
+    <resultMap id="LotteryRecordVO" type="solvela.lottery.record.domain.vo.LotteryRecordVO">
+            <result column="id" property="id" />
+            <result column="lottery_code" property="lotteryCode" />
+            <result column="issue_no" property="issueNo" />
+            <result column="sequence_no" property="sequenceNo" />
+            <result column="ticket_number" property="ticketNumber" />
+            <result column="member_id" property="memberId" />
+            <result column="member_name" property="memberName" />
+            <result column="obtain_time" property="obtainTime" />
+            <result column="win_status" property="winStatus" />
+            <result column="prize_level" property="prizeLevel" />
+            <result column="prize_code" property="prizeCode" />
+            <result column="dispatch_status" property="dispatchStatus" />
+            <result column="security_sign" property="securitySign" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                lottery_code, 
+                issue_no, 
+                sequence_no, 
+                ticket_number, 
+                member_id,
+                member_name,
+                obtain_time, 
+                win_status, 
+                prize_level, 
+                prize_code, 
+                dispatch_status, 
+                security_sign, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <!--
+        漏斗统计的筛选条件：与列表共用同一批条件，但<b>刻意不吃 winStatus / prizeLevel</b>。
+        那两个正是漏斗要拆解的维度 —— 若跟着筛，点「只看已中奖」之后漏斗会变成
+        「中奖率 100%」，几个数字互相之间就没法对照了。
+
+        ⚠️ 不套 &lt;where&gt;，只给裸条件片段：奖级分布那条查询还要在同一个 &lt;where&gt; 里
+        追加 win_status=2，本片段自带 &lt;where&gt; 会让追加的条件落在外面，
+        而所有筛选项为空时还会拼出一句悬空的 AND。由调用方各自套。
+    -->
+    <sql id="funnel_conditions">
+        <if test="queryForm.lotteryCode != null">
+            AND lottery_code = #{queryForm.lotteryCode}
+        </if>
+        <if test="queryForm.issueNo != null">
+            AND issue_no = #{queryForm.issueNo}
+        </if>
+        <if test="queryForm.ticketNumber != null">
+            AND ticket_number = #{queryForm.ticketNumber}
+        </if>
+        <if test="queryForm.memberId != null">
+            AND member_id = #{queryForm.memberId}
+        </if>
+        <if test="queryForm.createTimeBegin != null">
+            AND create_time &gt;= #{queryForm.createTimeBegin}
+        </if>
+        <if test="queryForm.createTimeEnd != null">
+            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+        </if>
+    </sql>
+
+    <!--
+        漏斗计数 + 派发状态 + 一致性体检，一次扫表算完。
+        不拆成多条 count：多次执行不但慢，还可能落在不同数据快照上，
+        出现「分项加起来不等于总数」这种自相矛盾。
+
+        末尾四个是数据一致性检查，专门用来发现被手工改坏的记录
+        （本页的 add/update 接口已下掉，但历史脏数据仍可能在）：
+          - winButNoPrize   ：中了奖却没有奖品编码，派奖时会找不到发什么
+          - winButLevelNone ：中了奖但奖级是 99（未中奖占位），用户端排序会把它沉底
+          - loseButHasLevel ：没中奖却带着有效奖级，与 win_status 自相矛盾
+          - noSign          ：防篡改签名为空，这张号码无法自证真伪
+    -->
+    <select id="selectFunnel" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                      AS totalCount,
+            COALESCE(SUM(win_status = 0), 0)                              AS waitCount,
+            COALESCE(SUM(win_status = 1), 0)                              AS loseCount,
+            COALESCE(SUM(win_status = 2), 0)                              AS winCount,
+            COUNT(DISTINCT member_id)                                   AS memberCount,
+            COALESCE(SUM(win_status = 2 AND dispatch_status = 0), 0)      AS dispatchWaitCount,
+            COALESCE(SUM(win_status = 2 AND dispatch_status = 1), 0)      AS dispatchedCount,
+            COALESCE(SUM(win_status = 2 AND dispatch_status = 2), 0)      AS dispatchFailedCount,
+            COALESCE(SUM(win_status = 2 AND (prize_code IS NULL OR prize_code = '')), 0) AS winButNoPrize,
+            COALESCE(SUM(win_status = 2 AND prize_level = 99), 0)         AS winButLevelNone,
+            COALESCE(SUM(win_status &lt;&gt; 2 AND prize_level &lt;&gt; 99), 0) AS loseButHasLevel,
+            COALESCE(SUM(security_sign IS NULL OR security_sign = ''), 0) AS noSign
+        FROM t_lottery_record
+        <where><include refid="funnel_conditions"/></where>
+    </select>
+
+    <!-- 奖级分布：只统计已中奖的行。未中奖行的 prize_level 是 99 占位，不是奖级 -->
+    <select id="selectPrizeLevelStat" resultType="java.util.Map">
+        SELECT prize_level AS prizeLevel, prize_code AS prizeCode, COUNT(*) AS winCount
+        FROM t_lottery_record
+        <where>
+            AND win_status = 2
+            <include refid="funnel_conditions"/>
+        </where>
+        GROUP BY prize_level, prize_code
+        ORDER BY prize_level ASC
+    </select>
+
+    <!--
+        按玩法汇总参与人数与中奖注数，供彩票玩法一览一次取全 ——
+        逐个玩法查一次在玩法多起来之后就是 N+1。
+    -->
+    <select id="selectStatByLottery" resultType="java.util.Map">
+        SELECT lottery_code                            AS lotteryCode,
+               COUNT(DISTINCT member_id)             AS memberCount,
+               COALESCE(SUM(win_status = 2), 0)        AS winCount
+        FROM t_lottery_record
+        GROUP BY lottery_code
+    </select>
+
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.lotteryCode != null">
+                            AND lottery_code = #{queryForm.lotteryCode}
+                        </if>
+                        <if test="queryForm.issueNo != null">
+                            AND issue_no = #{queryForm.issueNo}
+                        </if>
+                        <if test="queryForm.ticketNumber != null">
+                            AND ticket_number = #{queryForm.ticketNumber}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <if test="queryForm.createTimeEnd != null">
+                            <!-- 结束日含当天：这里是 LocalDate，绑进来是当天零点，写 &lt;= 会把结束日整天静默筛掉 -->
+                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+                        </if>
+                        <if test="queryForm.winStatus != null">
+                            AND win_status = #{queryForm.winStatus}
+                        </if>
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
+                        </if>
+                        <if test="queryForm.prizeLevel != null">
+                            AND prize_level = #{queryForm.prizeLevel}
+                        </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="LotteryRecordVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_lottery_record
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="LotteryRecordVO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_lottery_record
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <!--
+        某期已发出的最大游标，供 Redis 游标冷启动回源。
+        走 uk_issue_ticket(lottery_code, issue_no, ticket_number) 的前缀，索引可用。
+        ⚠️ 是 MAX 不是 COUNT：发号失败会留下空洞（游标消耗了但记录没落库），
+        COUNT 在有空洞时偏低，回填后必然重发已发过的号码。
+    -->
+    <select id="selectMaxSequenceNo" resultType="java.lang.Long">
+        SELECT MAX(sequence_no)
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+    </select>
+
+    <!--
+        我的号码。prize_level 未中奖/未开奖恒为 99（v3.40 起 NOT NULL DEFAULT 99），
+        所以这里可以直接 ORDER BY prize_level ASC —— 若它是 NULL，MySQL 会把 NULL 排到最前面、正好排反。
+    -->
+    <select id="selectMyTickets" resultType="solvela.lottery.record.domain.entity.LotteryRecord">
+        SELECT *
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND member_id = #{memberId}
+        <if test="issueNo != null and issueNo != ''">
+          AND issue_no = #{issueNo}
+        </if>
+        ORDER BY prize_level ASC, id DESC
+    </select>
+
+    <!--
+        按一条奖级规则认领中奖记录。
+
+        ⚠️ win_status = 0 是「奖级互斥」的实现，不是可有可无的条件：
+        按 prizeLevel 升序依次执行，高奖级先把票认走并改掉 win_status，
+        低奖级就再也匹配不到它。这等价于 Java 侧 TicketMatcher 的「命中即止」，
+        两边必须保持一致 —— 改任何一边都要同步另一边。
+
+        ⚠️ 匹配一律用字符串比较（RIGHT/LEFT/=），绝不能转成数字：
+        号码带前导零，09102 与 9102 不是一回事。
+
+        LIMIT 分批：十万级记录一次性 UPDATE 会撑爆 undo log 与锁等待。
+    -->
+    <update id="claimByRule">
+        UPDATE t_lottery_record
+        SET win_status = 2,
+            prize_level = #{prizeLevel},
+            prize_code = #{prizeCode}
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+          AND win_status = 0
+        <choose>
+            <when test="matchRule == 'EXACT'">
+                AND ticket_number = #{winningNumber}
+            </when>
+            <when test="matchRule == 'TAIL'">
+                AND RIGHT(ticket_number, #{matchLength}) = RIGHT(#{winningNumber}, #{matchLength})
+            </when>
+            <when test="matchRule == 'HEAD'">
+                AND LEFT(ticket_number, #{matchLength}) = LEFT(#{winningNumber}, #{matchLength})
+            </when>
+            <otherwise>
+                <!-- 非法规则一条都不认领，而不是不加条件把全表认走 -->
+                AND 1 = 0
+            </otherwise>
+        </choose>
+        LIMIT #{limit}
+    </update>
+
+    <!-- 全部奖级认领完后，剩下的判未中奖。prize_level 落 99 见 LotteryConst.PRIZE_LEVEL_NONE -->
+    <update id="markNoWin">
+        UPDATE t_lottery_record
+        SET win_status = 1,
+            prize_level = 99
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+          AND win_status = 0
+        LIMIT #{limit}
+    </update>
+
+    <select id="selectPendingDispatch" resultType="solvela.lottery.record.domain.entity.LotteryRecord">
+        SELECT *
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+          AND win_status = 2
+          AND dispatch_status = 0
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <!-- AND dispatch_status = 0：避免并发下重复标记，也让返回行数能真实反映本次投递量 -->
+    <update id="markDispatched">
+        UPDATE t_lottery_record
+        SET dispatch_status = 1
+        WHERE dispatch_status = 0
+          AND id IN
+        <foreach collection="idList" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="settleSummary" resultType="java.util.Map">
+        SELECT COUNT(*)                                        AS total,
+               SUM(win_status = 0)                             AS pending,
+               SUM(win_status = 1)                             AS lose,
+               SUM(win_status = 2)                             AS win,
+               SUM(win_status = 2 AND dispatch_status = 0)     AS waitDispatch,
+               SUM(win_status = 2 AND dispatch_status = 1)     AS dispatched
+        FROM t_lottery_record
+        WHERE lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+    </select>
+
+</mapper>

@@ -22,7 +22,7 @@ public class CheckModuleDrift {
     static final String BASE = """
             jdbc:mysql://127.0.0.1:3306/%s?useSSL=false\
             &serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&allowMultiQueries=true""";
-    static final String ROOT = "D:/workspace/smart-admin/数据库SQL脚本/";
+    static final String ROOT = "D:/workspace/solvela-admin/数据库SQL脚本/";
 
     static final String[] MODULE_FILES = {
             "activity.sql", "lottery.sql", "mall.sql", "member.sql", "mysql/task.sql"

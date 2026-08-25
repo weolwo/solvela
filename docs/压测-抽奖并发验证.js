@@ -3,7 +3,7 @@
  *
  * 使用方法（后端 + Redis + MySQL 均已启动）：
  *   1. 浏览器登录后台，DevTools -> Network 任意请求头里复制 Authorization 的值（形如 Bearer xxxxx）
- *      鉴权头对齐 sa-base.yaml：token-name=Authorization、token-prefix=Bearer
+ *      鉴权头对齐 solvela-base.yaml：token-name=Authorization、token-prefix=Bearer
  *   2. 拿到活动编码与奖池编码（编码是 10 位随机码，不可硬编码）：
  *      SELECT activity_code FROM t_activity_config WHERE activity_type = 'DRAW';
  *      SELECT pool_code, pool_name FROM t_prize_pool_config WHERE activity_code = '<活动编码>';
@@ -27,11 +27,11 @@ if (!token || !activityCode || !poolCode) {
 }
 
 const HOST = '127.0.0.1';
-const PORT = 1024; // SmartAdmin 后端默认端口，按实际修改
+const PORT = 1024; // Solvela 后端默认端口，按实际修改
 const ACTIVITY_CODE = activityCode;
 const POOL_CODE = poolCode;
 
-// 鉴权头必须与 sa-base.yaml 的 sa-token 配置一致：token-name=Authorization、token-prefix=Bearer
+// 鉴权头必须与 solvela-base.yaml 的 sa-token 配置一致：token-name=Authorization、token-prefix=Bearer
 // （前端 lib/axios.js 也是这么发的）。粘贴时带不带 Bearer 都兼容，这里统一补齐。
 const AUTH_HEADER = 'Authorization';
 const AUTH_VALUE = /^Bearer\s+/i.test(token.trim()) ? token.trim() : `Bearer ${token.trim()}`;

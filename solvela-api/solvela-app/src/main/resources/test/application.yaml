@@ -1,0 +1,32 @@
+#############################################################################################################
+#                                                                                                           #
+# 本文件是 solvela-app 的独有配置，通用配置在 solvela-base 的 solvela-base.yaml 里（数据库、Redis、sa-token、文件…）。   #
+# 此处的配置会覆盖 solvela-base.yaml 中的同名项，合并逻辑见类：YamlProcessor.java                                   #
+#                                                                                                           #
+#############################################################################################################
+
+# 项目配置: 名称、日志目录
+project:
+  name: solvela-app
+  log-directory: /home/project/solvela/test/log
+
+# 项目端口和url根路径
+# 11025 与 solvela-admin 测试环境的 11024 成对（生产是 1025 / 1024）
+server:
+  port: 11025
+  servlet:
+    context-path: /
+
+# -------------------------------------------------------------------------
+# 这里原先有一段 solvela.job（role: NONE），用来阻止本进程执行定时任务。
+# 2026-08-25 job 模块整体移交 solvela-admin 之后已经删除 —— 本服务的 classpath 上
+# 根本没有调度器、执行池和任何 SolvelaJob 实现类，不存在"会不会跑"的问题了。
+# 从"靠配置约束"变成"物理上不具备"，这才是想要的形态。
+#
+# ⚠️ solvela-base 只保留了 jobspi（SolvelaJob 接口 / @SolvelaJobHandler 等 6 个 SPI 类），
+#    是给业务模块实现任务用的，本身不含任何执行逻辑。
+# -------------------------------------------------------------------------
+# 环境
+spring:
+  profiles:
+    active: '@profiles.active@'

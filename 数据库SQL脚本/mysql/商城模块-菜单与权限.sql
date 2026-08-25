@@ -16,7 +16,7 @@ SET NAMES utf8mb4;
 --   （menu_id 463~497，2026-08-22 基线导出之后手工建的），本脚本不会重复创建它们。
 --
 -- 【为什么 ① 是必须的】
---   本项目的路由是**从菜单表生成的**（smart-admin-web/src/router/index.js: buildRoutes）：
+--   本项目的路由是**从菜单表生成的**（solvela-admin-web/src/router/index.js: buildRoutes）：
 --   一个页面在 t_menu 里没有记录，前端就压根没有那条路由 —— 列表页点「新建商品」
 --   router.push 过去只会得到 404。
 --

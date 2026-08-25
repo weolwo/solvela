@@ -16,7 +16,7 @@ public class VerifyBaseline {
 
     public static void main(String[] a) throws Exception {
         String sql = Files.readString(Path.of(
-                "D:/workspace/smart-admin/数据库SQL脚本/mysql/schema-baseline.sql"));
+                "D:/workspace/solvela-admin/数据库SQL脚本/mysql/schema-baseline.sql"));
         List<String> stmts = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         for (String raw : sql.split("\n")) {
@@ -43,11 +43,11 @@ public class VerifyBaseline {
         }
         System.out.println("baseline on empty db: ok=" + ok + " fail=" + fail);
 
-        try (Connection c = DriverManager.getConnection(String.format(BASE, "smart_admin_v3"), "root", "root");
+        try (Connection c = DriverManager.getConnection(String.format(BASE, "solvela"), "root", "root");
              Statement s = c.createStatement()) {
 
-            Map<String, List<Col>> srcC = cols(s, "smart_admin_v3"), dstC = cols(s, "_baseline_probe");
-            Map<String, List<Idx>> srcI = idxs(s, "smart_admin_v3"), dstI = idxs(s, "_baseline_probe");
+            Map<String, List<Col>> srcC = cols(s, "solvela"), dstC = cols(s, "_baseline_probe");
+            Map<String, List<Idx>> srcI = idxs(s, "solvela"), dstI = idxs(s, "_baseline_probe");
 
             List<String> tabs = new ArrayList<>(dstC.keySet());
             Collections.sort(tabs);

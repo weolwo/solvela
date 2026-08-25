@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.ledger.wallet.dao.MemberWalletDao">
+
+    <resultMap id="MemberWalletVO" type="solvela.ledger.wallet.domain.vo.MemberWalletVO">
+            <result column="id" property="id" />
+            <result column="member_id" property="memberId" />
+            <result column="member_name" property="memberName" />
+            <result column="asset_type" property="assetType" />
+            <result column="balance" property="balance" />
+            <result column="status" property="status" />
+            <result column="version" property="version" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id,
+                member_id,
+                asset_type,
+                balance,
+                status,
+                version,
+                create_by,
+                create_time,
+                update_by,
+                update_time
+    </sql>
+
+    <!--
+        ⚠️ 列一律带 w. 前缀：列表查询 join 了 t_member，而两张表都有
+        status / create_time / create_by / update_time —— 不加前缀
+        MySQL 直接报 Column 'status' in field list is ambiguous。
+    -->
+    <sql id="query_conditions">
+        <where>
+                        <if test="queryForm.memberId != null">
+                            AND w.member_id = #{queryForm.memberId}
+                        </if>
+                        <if test="queryForm.assetType != null">
+                            AND w.asset_type = #{queryForm.assetType}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND w.status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND w.create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <!--
+                            ⚠️ 结束日必须用 &lt; 次日零点：createTimeEnd 是 LocalDate，
+                            绑进来是当天 00:00:00，而 create_time 带时分秒 ——
+                            原先的 &lt;= 会把结束日当天开的钱包整天筛掉，且没有任何报错。
+                        -->
+                        <if test="queryForm.createTimeEnd != null">
+                            AND w.create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+                        </if>
+        </where>
+    </sql>
+    <update id="addBalanceWithVersion">
+        UPDATE t_member_wallet SET balance = balance + #{amount}, version = version + 1
+                    WHERE id = #{id} AND version = #{version}
+    </update>
+    <!-- 扣减：乐观锁 + 余额充足双重条件，杜绝扣成负数 -->
+    <update id="deductBalanceWithVersion">
+        UPDATE t_member_wallet SET balance = balance - #{amount}, version = version + 1
+                    WHERE id = #{id} AND version = #{version} AND balance &gt;= #{amount}
+    </update>
+
+    <!--
+        列表页要显示会员账号，而钱包表<b>没有</b>这一列（状态表不留快照，见 MemberWallet 类注释），
+        所以 join 会员主表取当前值。
+
+        🔴 必须是 LEFT JOIN，不能用 INNER JOIN：会员被清理/注销后 t_member 可能查不到，
+        INNER JOIN 会让这一行钱包<b>从列表里消失</b> —— 余额还在库里，页面上却看不见，
+        而且不报错。账务数据宁可名字显示为空，也不能整行不见。
+    -->
+    <sql id="list_columns">
+                w.id,
+                w.member_id,
+                m.member_name,
+                w.asset_type,
+                w.balance,
+                w.status,
+                w.version,
+                w.create_by,
+                w.create_time,
+                w.update_by,
+                w.update_time
+    </sql>
+
+    <select id="queryPage" resultMap="MemberWalletVO">
+        SELECT
+        <include refid="list_columns"/>
+        FROM t_member_wallet w
+        LEFT JOIN t_member m ON m.member_id = w.member_id
+        <include refid="query_conditions"/>
+        ORDER BY w.create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MemberWalletVO">
+        SELECT
+        <include refid="list_columns"/>
+        FROM t_member_wallet w
+        LEFT JOIN t_member m ON m.member_id = w.member_id
+        <include refid="query_conditions"/>
+        ORDER BY w.create_time DESC
+    </select>
+    <select id="getByMemberIdAndAssetType" resultType="solvela.ledger.wallet.domain.entity.MemberWallet">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_member_wallet
+        WHERE member_id = #{memberId} AND asset_type = #{assetType}
+    </select>
+
+    <!--
+        原先这里有 batchDelete / deleteById 两条 DELETE FROM，已随写接口一起移除（v3.69.0）：
+        账务与审计流水删掉就再也查不回来，事后连「少了什么」都不知道。
+    -->
+
+    <!--
+        钱包总计与体检。⚠️ <b>刻意不带时间窗，统计的是全量</b>：
+        钱包表是存量表 —— 一个会员一种资产一行，只有一个当前余额，没有历史切片。
+        「今天的总余额」这个说法本身就不成立：按 create_time 筛出来的是「今天新开的钱包」，
+        那几个账户的余额加起来既不是今天发出去的钱、也不是用户现在手上的钱，
+        是一个什么都不回答的数字。
+
+        本页的「本期变动」走交易明细表（MemberAssetTransactionDao.selectAssetFlowStat），
+        不在这里另写一份 —— 同一个口径两处实现早晚会漂成两个对不上的数。
+
+        两个体检项：
+          - negativeBalanceCount  ：余额为负。扣减走 deductBalanceWithVersion
+            （条件里带 balance >= amount），正常扣不出负数
+          - frozenWithBalanceCount：账户被冻结但里面还有钱。钱在账上，用户取不出也用不了，
+            冻结久了就是客诉 —— 这个数没人主动查就一直不会有人发现
+    -->
+    <select id="selectStat" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                  AS walletCount,
+            COUNT(DISTINCT member_id)                                 AS memberCount,
+            COALESCE(SUM(status = 0), 0)                              AS frozenCount,
+            COALESCE(SUM(balance &lt; 0), 0)                         AS negativeBalanceCount,
+            COALESCE(SUM(status = 0 AND balance &gt; 0), 0)          AS frozenWithBalanceCount
+        FROM t_member_wallet
+    </select>
+
+    <!--
+        按资产类型的余额存量。⚠️ 余额必须按 asset_type 分组：
+        积分和现金不是同一个量纲，加出来的「总资产」没有任何含义。
+    -->
+    <select id="selectAssetBalanceStat" resultType="java.util.Map">
+        SELECT asset_type                                                        AS assetType,
+               COUNT(*)                                                          AS walletCount,
+               COALESCE(SUM(balance), 0)                                         AS totalBalance,
+               COALESCE(SUM(CASE WHEN status = 0 THEN balance END), 0)           AS frozenBalance
+        FROM t_member_wallet
+        GROUP BY asset_type
+        ORDER BY asset_type
+    </select>
+
+</mapper>

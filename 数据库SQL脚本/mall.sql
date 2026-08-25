@@ -46,7 +46,7 @@ SET NAMES utf8mb4;
 --
 -- 遵循的工程铁律（见 docs/营销中台-会话交接文档.md §0）：
 --   铁律 3  状态/类型一律具名常量，DDL 注释即字典的唯一真源
---   铁律 8  对外标识用 10 位大写字母+数字业务编码，唯一真源 SmartCodeUtil
+--   铁律 8  对外标识用 10 位大写字母+数字业务编码，唯一真源 SolvelaCodeUtil
 --   铁律 9  create_time / update_time 只认数据库时钟，代码里不许填；
 --           实体上**不要**加 @TableField(fill = ...)，加了会把 null 显式写进去
 --
@@ -176,7 +176,7 @@ CREATE TABLE `t_mall_commodity`
     `category_id`     bigint         NOT NULL COMMENT '分类id',
 
     -- ---------- 商品性质：决定走哪条履约通道 ----------
-    -- 取值对齐 sa.enums.PrizeTypeEnum，不含 SCORE（积分换积分无意义）
+    -- 取值对齐 solvela.enums.PrizeTypeEnum，不含 SCORE（积分换积分无意义）
     `commodity_type`  varchar(32)    NOT NULL DEFAULT 'PHYSICAL' COMMENT '商品类型：PHYSICAL-实物(走t_physical_delivery), COUPON-优惠券(走t_member_coupon), BALANCE-现金/红包(走钱包入账)',
     -- PHYSICAL 为空；COUPON 存券模编码；BALANCE 存面额来源标识
     `asset_ref`       varchar(64)             DEFAULT NULL COMMENT '资产引用：COUPON 存券模编码，PHYSICAL 为空。语义对齐 t_proposal_record.asset_ref',
@@ -647,14 +647,14 @@ CREATE TABLE `t_mall_favorite`
 --         receiver_name    varchar(64)  -> varchar(255) 密文
 --         receiver_phone   varchar(32)  -> varchar(255) 密文
 --         receiver_address varchar(255) -> varchar(512) 密文
---    实现是 sa-base 的 PiiCipher(AES-256-GCM) + PiiTypeHandler，钉在 JDBC 边界上，
+--    实现是 solvela-base 的 PiiCipher(AES-256-GCM) + PiiTypeHandler，钉在 JDBC 边界上，
 --    写入路径没有「忘记加密」这个选项。
 --    🔴 <b>t_mall_address 的三列密文必须用同一套</b>（同一个 PiiTypeHandler、同一把密钥）——
 --       两边各写一套加密，将来「同一个地址在两张表里对不上」这种问题会非常难查。
 --    ⚠️ 明文长度上限由密文列宽反推（姓名 40 / 电话 30 / 地址 100），
 --       t_mall_address 的列宽定义要按同一套算式来，算式见 PiiCipher.cipherTextLength。
 --
--- ② 超时释放 job：挂到既有的 t_smart_job 上，扫
+-- ② 超时释放 job：挂到既有的 t_solvela_job 上，扫
 --      `where status = 0 and expire_time <= now()`（走 idx_mall_ord_expire）
 --    对每单：取消订单 → 释放 locked_stock → 回滚 t_mall_exchange_limit.used_count。
 --    🔴 三步要在一个事务里，且**必须拆到独立 Bean**（铁律 11：@Transactional
@@ -678,7 +678,7 @@ CREATE TABLE `t_mall_favorite`
 --
 -- 自查（新建表后跑一次，铁律 9）：
 --   SELECT table_name FROM information_schema.columns
---    WHERE table_schema='smart_admin_v3' AND column_name='update_time'
+--    WHERE table_schema='solvela' AND column_name='update_time'
 --      AND extra NOT LIKE '%on update%';
 -- ============================================================================
 

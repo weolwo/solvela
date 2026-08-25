@@ -1,4 +1,4 @@
-# SmartAdmin 一键部署：MySQL + Redis + 后端
+# Solvela 一键部署：MySQL + Redis + 后端
 #
 #     cp .env.example .env     # 先改掉里面的密码
 #     docker compose up -d
@@ -18,7 +18,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 里设置}
       # 给 initdb 脚本一个默认库上下文：t_menu.sql / task.sql / activity.sql / lottery.sql
       # 这四个脚本自己不带 USE 语句，没有这行会建到错误的库里去
-      MYSQL_DATABASE: smart_admin_v3
+      MYSQL_DATABASE: solvela
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
@@ -80,9 +80,9 @@ services:
 
   app:
     build:
-      context: ./smart-admin-api
+      context: ./solvela-api
       dockerfile: Dockerfile.distroless
-    image: smart-admin:3.0.0-distroless
+    image: solvela-admin:3.0.0-distroless
     restart: unless-stopped
     depends_on:
       mysql:
@@ -91,9 +91,9 @@ services:
         condition: service_healthy
     environment:
       TZ: Asia/Shanghai
-      # 覆盖 prod/sa-base.yaml 里写死的 127.0.0.1 —— 容器里那是它自己
+      # 覆盖 prod/solvela-base.yaml 里写死的 127.0.0.1 —— 容器里那是它自己
       SPRING_DATASOURCE_URL: >-
-        jdbc:mysql://mysql:3306/smart_admin_v3?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&allowMultiQueries=true
+        jdbc:mysql://mysql:3306/solvela?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&allowMultiQueries=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
@@ -105,7 +105,7 @@ services:
       - "${APP_PORT:-1024}:1024"
     volumes:
       - app-logs:/home/logs
-      - app-upload:/home/smart_admin_v3/upload
+      - app-upload:/home/solvela/upload
     # 实测：限 1GB 能正常启动，稳态占用 529MB。
     # 1GB 内存的小机器上 MySQL 也要 ~400MB，三个服务挤一台会 OOM —— 建议 2GB 起。
     deploy:
