@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.8",
-    "less": "~4.8.1",
+    "less": "~4.9.0",
     "prettier": "~3.9.6",
     "rollup-plugin-visualizer": "^7.0.1",
     "terser": "~5.49.0",
