@@ -1,4 +1,4 @@
-package solvela.prize.prizeconfig.domain.form;
+package solvela.admin.module.prize.prizeconfig.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;

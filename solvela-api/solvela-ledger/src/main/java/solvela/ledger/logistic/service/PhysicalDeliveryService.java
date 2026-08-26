@@ -14,12 +14,12 @@ import solvela.base.sonicexcel.error.SonicReadResult;
 import solvela.enums.DeliveryStatusEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.PhysicalDelivery;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
+import solvela.ledger.logistic.domain.command.PhysicalDeliveryAddCommand;
 import solvela.ledger.logistic.domain.excel.PhysicalDeliveryImportRow;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.ledger.logistic.domain.excel.PhysicalDeliveryShipImportRow;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
+import solvela.ledger.logistic.domain.command.PhysicalDeliveryUpdateCommand;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
@@ -168,7 +168,7 @@ public class PhysicalDeliveryService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PhysicalDeliveryAddForm addForm) {
+    public ResponseDTO<String> add(PhysicalDeliveryAddCommand addForm) {
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(addForm, PhysicalDelivery.class);
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
         // ⚠️ 这一句不能省：member_name 仍是 NOT NULL 且无默认值，
@@ -182,7 +182,7 @@ public class PhysicalDeliveryService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(PhysicalDeliveryUpdateForm updateForm) {
+    public ResponseDTO<String> update(PhysicalDeliveryUpdateCommand updateForm) {
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(updateForm, PhysicalDelivery.class);
         physicalDeliveryDao.updateById(physicalDelivery);
         return ResponseDTO.ok();
@@ -431,7 +431,7 @@ public class PhysicalDeliveryService {
      *   电话 30 位 ( 30B) -> 密文  83 ≤ varchar(255)
      *   地址 100 字(300B) -> 密文 443 ≤ varchar(512)
      * </pre>
-     * 与 {@code PhysicalDeliveryAddForm} / {@code PhysicalDeliveryUpdateForm} 上的
+     * 与 {@code PhysicalDeliveryAddCommand} / {@code PhysicalDeliveryUpdateCommand} 上的
      * {@code @Size} 是同一组数字，改一处要改三处，算式见 {@code PiiCipher.cipherTextLength}。
      */
     private static final int RECEIVER_NAME_MAX = 40;

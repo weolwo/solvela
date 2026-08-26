@@ -1,30 +1,32 @@
-package solvela.activity.domain.form;
+package solvela.activity.domain.command;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 
 import lombok.Data;
 
 /**
- * 活动配置 更新表单
+ * 更新活动的<b>领域命令</b>。与管理端的 {@code ActivityConfigUpdateCommand} 形状一致，但职责不同：
  *
- * @Author weolwo
- * @Date 2026-04-18 19:31:49
- * @Copyright weolwo
+ * <ul>
+ *   <li>Form 是 HTTP 请求体：{@code @Schema} 描述接口文档、{@code @NotNull} 等校验
+ *       前端传没传、传得对不对 —— 这些都跟着某个端的页面走；</li>
+ *   <li>Command 是领域入参：service 对它做的是<b>业务不变量</b>校验
+ *       （编码是否重复、状态能否流转、关联配置是否匹配），与谁调用无关。</li>
+ * </ul>
+ *
+ * <p>合成一个的代价：C 端将来若要写入，得构造一个带管理端校验规则的表单；
+ * 而共享层也会一直依赖 springdoc 与 jakarta.validation 这些 HTTP 层的概念。
+ *
+ * <p>分层说明见 {@code MemberWalletQuery}。
  */
 
 @Data
-public class ActivityConfigUpdateForm {
+public class ActivityConfigUpdateCommand {
 
-    @Schema(description = "id", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "id 不能为空")
     private Long id;
 
-    @Schema(description = "活动名称", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "活动名称 不能为空")
+    /** 活动名称 */
     private String activityName;
 
     /*
@@ -40,15 +42,12 @@ public class ActivityConfigUpdateForm {
      * 服务端会校验「当前必须是 BASIC」+「下游玩法表为空」两条。
      */
 
-    @Schema(description = "状态：0-未开始, 1-上线, 2-下线")
     private Integer status;
 
-    @Schema(description = "活动开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "活动开始时间 不能为空")
+    /** 活动开始时间 */
     private LocalDateTime startTime;
 
-    @Schema(description = "活动结束时间", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "活动结束时间 不能为空")
+    /** 活动结束时间 */
     private LocalDateTime endTime;
 
 }

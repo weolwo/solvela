@@ -10,9 +10,9 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizeconfig.dao.PrizeConfigDao;
 import solvela.prize.PrizeConfig;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
+import solvela.prize.prizeconfig.domain.command.PrizeConfigAddCommand;
 import solvela.prize.prizeconfig.domain.query.PrizeConfigQuery;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
+import solvela.prize.prizeconfig.domain.command.PrizeConfigUpdateCommand;
 import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.risk.PromotionConfig;
@@ -119,7 +119,7 @@ public class PrizeConfigService {
      * 添加
      * 奖品编码允许手工输入，故服务端必须重校验格式与唯一性
      */
-    public ResponseDTO<String> add(PrizeConfigAddForm addForm) {
+    public ResponseDTO<String> add(PrizeConfigAddCommand addForm) {
         if (!SolvelaCodeUtil.isValidBizCode(addForm.getPrizeCode())) {
             return ResponseDTO.userErrorParam("奖品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
@@ -158,7 +158,7 @@ public class PrizeConfigService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(PrizeConfigUpdateForm updateForm) {
+    public ResponseDTO<String> update(PrizeConfigUpdateCommand updateForm) {
         // 编辑同样要校验：改类型不改配置（或反过来）都会造成错配
         if (updateForm.getPromotionConfigId() != null && StringUtils.isNotBlank(updateForm.getPrizeType())) {
             String matchError = checkPromotionConfigMatch(updateForm.getPromotionConfigId(), updateForm.getPrizeType());

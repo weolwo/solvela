@@ -1,4 +1,4 @@
-package solvela.risk.promotionconfig.domain.form;
+package solvela.admin.module.risk.promotionconfig.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

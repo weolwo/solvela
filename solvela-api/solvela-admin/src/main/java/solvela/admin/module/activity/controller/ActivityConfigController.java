@@ -1,12 +1,15 @@
 package solvela.admin.module.activity.controller;
 
-import solvela.activity.domain.form.ActivityConfigAddForm;
+import solvela.admin.module.activity.domain.form.ActivityConfigAddForm;
+import solvela.activity.domain.command.ActivityConfigAddCommand;
 import solvela.admin.module.activity.domain.form.ActivityConfigQueryForm;
 import solvela.activity.domain.query.ActivityConfigQuery;
-import solvela.activity.domain.form.ActivityConfigUpdateForm;
+import solvela.admin.module.activity.domain.form.ActivityConfigUpdateForm;
+import solvela.activity.domain.command.ActivityConfigUpdateCommand;
 import solvela.admin.module.activity.domain.form.ActivityStatusUpdateForm;
 import solvela.admin.module.activity.domain.form.ActivityTypeUpgradeForm;
-import solvela.activity.domain.form.ActivityWizardCreateForm;
+import solvela.admin.module.activity.domain.form.ActivityWizardCreateForm;
+import solvela.activity.domain.command.ActivityWizardCreateCommand;
 import solvela.admin.module.activity.domain.vo.ActivityConfigVO;
 import solvela.activity.domain.dto.ActivityConfigDTO;
 import solvela.activity.domain.dto.ActivityDeleteCheckDTO;
@@ -91,21 +94,27 @@ public class ActivityConfigController {
     @PostMapping("/add")
     @SaCheckPermission("activityConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid ActivityConfigAddForm addForm) {
-        return activityConfigService.add(addForm);
+        return activityConfigService.add(SolvelaBeanUtil.copy(addForm, ActivityConfigAddCommand.class));
     }
 
     @Operation(summary = "创建向导第一步：建活动 + 随手建的若干奖品，一次事务落库")
     @PostMapping("/wizard/create")
     @SaCheckPermission("activityConfig:add")
     public ResponseDTO<String> wizardCreate(@RequestBody @Valid ActivityWizardCreateForm form) {
-        return activityConfigService.wizardCreate(form);
+        ActivityWizardCreateCommand command = SolvelaBeanUtil.copy(form, ActivityWizardCreateCommand.class);
+        // 🔴 嵌套集合必须显式转换。BeanUtils.copyProperties 在泛型擦除后只看到两边都是 List，
+        // 会把 Form 的 List 引用直接塞进 Command 的字段 —— 编译通过、序列化正常，
+        // 直到 service 取出元素当 WizardPrizeCommand 用才 ClassCastException
+        command.setPrizeList(SolvelaBeanUtil.copyList(
+                form.getPrizeList(), ActivityWizardCreateCommand.WizardPrizeCommand.class));
+        return activityConfigService.wizardCreate(command);
     }
 
     @Operation(summary = "更新（不含活动类型，类型创建后不可改）")
     @PostMapping("/update")
     @SaCheckPermission("activityConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid ActivityConfigUpdateForm updateForm) {
-        return activityConfigService.update(updateForm);
+        return activityConfigService.update(SolvelaBeanUtil.copy(updateForm, ActivityConfigUpdateCommand.class));
     }
 
     @Operation(summary = "活动上下线（单个开关与批量操作共用）；上线前校验玩法完备度")

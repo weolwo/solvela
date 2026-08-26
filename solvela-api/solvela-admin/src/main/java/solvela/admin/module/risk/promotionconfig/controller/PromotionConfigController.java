@@ -2,10 +2,12 @@ package solvela.admin.module.risk.promotionconfig.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.risk.PromotionConfig;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
+import solvela.admin.module.risk.promotionconfig.domain.form.PromotionConfigAddForm;
+import solvela.risk.promotionconfig.domain.command.PromotionConfigAddCommand;
 import solvela.admin.module.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
 import solvela.risk.promotionconfig.domain.query.PromotionConfigQuery;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
+import solvela.admin.module.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
+import solvela.risk.promotionconfig.domain.command.PromotionConfigUpdateCommand;
 import solvela.risk.promotionconfig.domain.dto.PromotionConfigOptionDTO;
 import solvela.admin.module.risk.promotionconfig.domain.vo.PromotionConfigVO;
 import solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO;
@@ -58,14 +60,14 @@ public class PromotionConfigController {
     @PostMapping("/add")
     @SaCheckPermission("promotionConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid PromotionConfigAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, PromotionConfigAddCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @SaCheckPermission("promotionConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PromotionConfigUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, PromotionConfigUpdateCommand.class));
     }
 
     @Operation(summary = "批量删除")

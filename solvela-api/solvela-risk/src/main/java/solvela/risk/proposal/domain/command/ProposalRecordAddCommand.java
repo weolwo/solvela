@@ -1,7 +1,5 @@
 package solvela.risk.proposal.domain.command;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,11 +32,9 @@ public class ProposalRecordAddCommand {
      * 会员号 —— 关联键。调用方只需给它，账号快照由服务端查会员表补
      * （见 {@code MemberService.requireMemberName}），这样快照与会员号<b>不可能对不上</b>。
      */
-    @NotNull(message = "会员号 不能为空")
     private Long memberId;
 
     /** SCORE/BALANCE/COUPON/PHYSICAL */
-    @NotBlank(message = "SCORE/BALANCE/COUPON/PHYSICAL 不能为空")
     private String assetType;
 
     /** 资产引用：券模/SKU，值类资产为空 */
@@ -48,22 +44,18 @@ public class ProposalRecordAddCommand {
     private String assetName;
 
     /** 发放金额/积分数 */
-    @NotNull(message = "发放金额/积分数 不能为空")
     private BigDecimal amount;
 
     /** 发放数量，扣 used_quota 用；不传按 1 计 */
     private Integer quantity;
 
     /** 来源：TASK(任务), DRAW(抽奖), MANUAL(人工) */
-    @NotBlank(message = "来源：TASK(任务), DRAW(抽奖), MANUAL(人工) 不能为空")
     private String sourceType;
 
     /** 来源单号(task_record_id 或 draw_log_trace_id) */
-    @NotBlank(message = "来源单号(task_record_id 或 draw_log_trace_id) 不能为空")
     private String sourceBizId;
 
     /** 优惠配置ID */
-    @NotNull(message = "优惠配置ID 不能为空")
     private Long promotionConfigId;
 
     /** 状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截 */

@@ -4,10 +4,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.dao.ActivityConfigDao;
 import solvela.activity.ActivityConfig;
-import solvela.activity.domain.form.ActivityConfigAddForm;
+import solvela.activity.domain.command.ActivityConfigAddCommand;
 import solvela.activity.domain.query.ActivityConfigQuery;
-import solvela.activity.domain.form.ActivityConfigUpdateForm;
-import solvela.activity.domain.form.ActivityWizardCreateForm;
+import solvela.activity.domain.command.ActivityConfigUpdateCommand;
+import solvela.activity.domain.command.ActivityWizardCreateCommand;
 import solvela.activity.domain.dto.ActivityConfigDTO;
 import solvela.activity.domain.dto.ActivityDeleteCheckDTO;
 import solvela.activity.domain.dto.ActivityRefItem;
@@ -21,7 +21,7 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.enums.ActivityTypeEnum;
 import solvela.exception.BusinessException;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
+import solvela.prize.prizeconfig.domain.command.PrizeConfigAddCommand;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeConfig;
@@ -241,7 +241,7 @@ public class ActivityConfigService {
      * 添加
      * 活动编码允许手工输入，故服务端必须重校验格式与唯一性（表上虽有唯一索引，但直接抛 SQL 异常对运营不友好）
      */
-    public ResponseDTO<String> add(ActivityConfigAddForm addForm) {
+    public ResponseDTO<String> add(ActivityConfigAddCommand addForm) {
         if (!SolvelaCodeUtil.isValidBizCode(addForm.getActivityCode())) {
             return ResponseDTO.userErrorParam("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
@@ -268,7 +268,7 @@ public class ActivityConfigService {
      * 先验完再插，插入阶段就只剩真正的 DB 异常，那种异常抛出去正好由 @Transactional 回滚。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> wizardCreate(ActivityWizardCreateForm form) {
+    public ResponseDTO<String> wizardCreate(ActivityWizardCreateCommand form) {
         // ---------- 1. 活动校验 ----------
         if (!SolvelaCodeUtil.isValidBizCode(form.getActivityCode())) {
             return ResponseDTO.userErrorParam("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
@@ -278,10 +278,10 @@ public class ActivityConfigService {
         }
 
         // ---------- 2. 奖品全量预校验（插入前一次验完） ----------
-        List<ActivityWizardCreateForm.WizardPrizeForm> prizeList =
+        List<ActivityWizardCreateCommand.WizardPrizeCommand> prizeList =
                 form.getPrizeList() == null ? List.of() : form.getPrizeList();
         Set<String> batchCodes = new HashSet<>();
-        for (ActivityWizardCreateForm.WizardPrizeForm prize : prizeList) {
+        for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
             if (!SolvelaCodeUtil.isValidBizCode(prize.getPrizeCode())) {
                 return ResponseDTO.userErrorParam("奖品「" + prize.getPrizeName() + "」的" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
             }
@@ -303,8 +303,8 @@ public class ActivityConfigService {
         activityConfig.setStatus(STATUS_NOT_START);
         activityConfigDao.insert(activityConfig);
 
-        for (ActivityWizardCreateForm.WizardPrizeForm prize : prizeList) {
-            PrizeConfigAddForm addForm = SolvelaBeanUtil.copy(prize, PrizeConfigAddForm.class);
+        for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
+            PrizeConfigAddCommand addForm = SolvelaBeanUtil.copy(prize, PrizeConfigAddCommand.class);
             addForm.setActivityCode(form.getActivityCode());
             ResponseDTO<String> res = prizeConfigService.add(addForm);
             if (!res.getOk()) {
@@ -320,7 +320,7 @@ public class ActivityConfigService {
     /**
      * 更新（不含活动类型）
      *
-     * <p>ActivityConfigUpdateForm 里没有 activityType 字段，SolvelaBeanUtil.copy 后该字段为 null，
+     * <p>ActivityConfigUpdateCommand 里没有 activityType 字段，SolvelaBeanUtil.copy 后该字段为 null，
      * MyBatis-Plus 默认 NOT_NULL 策略会把它排除在 SET 之外 —— 类型天然不会被改。
      *
      * <p>但这里<b>再显式置一次 null</b>，不是冗余：那层保护依赖的是「Form 里没这个字段」+
@@ -328,7 +328,7 @@ public class ActivityConfigService {
      * 保护会<b>静默失效</b>。本项目已经吃过「只改 handler 不够、注解也得摘」那种亏（铁律 9），
      * 教训就是别把正确性寄托在 ORM 的默认行为上。
      */
-    public ResponseDTO<String> update(ActivityConfigUpdateForm updateForm) {
+    public ResponseDTO<String> update(ActivityConfigUpdateCommand updateForm) {
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(updateForm, ActivityConfig.class);
         activityConfig.setActivityType(null);
         activityConfig.setActivityCode(null);

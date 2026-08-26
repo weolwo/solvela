@@ -12,7 +12,8 @@ import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.web.CurrentUser;
 import solvela.consumer.handler.PrizeDispatchHandler;
-import solvela.prize.prizelog.domain.form.PrizeLogAddForm;
+import solvela.admin.module.prize.prizelog.domain.form.PrizeLogAddForm;
+import solvela.prize.prizelog.domain.command.PrizeLogAddCommand;
 import solvela.admin.module.prize.prizelog.domain.form.PrizeLogQueryForm;
 import solvela.prize.prizelog.domain.query.PrizeLogQuery;
 import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
@@ -70,7 +71,7 @@ public class PrizeLogController {
     @PostMapping("/add")
     @SaCheckPermission("prizeLog:add")
     public ResponseDTO<String> add(@RequestBody @Valid PrizeLogAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, PrizeLogAddCommand.class));
     }
 
     /*

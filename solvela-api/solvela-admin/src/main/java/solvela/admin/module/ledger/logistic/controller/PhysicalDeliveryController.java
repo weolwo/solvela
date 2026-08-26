@@ -14,11 +14,13 @@ import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.base.sonicexcel.SolvelaExcelUtil;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
+import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
+import solvela.ledger.logistic.domain.command.PhysicalDeliveryAddCommand;
 import solvela.ledger.logistic.domain.excel.PhysicalDeliveryImportRow;
 import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
 import solvela.ledger.logistic.domain.excel.PhysicalDeliveryShipImportRow;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
+import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
+import solvela.ledger.logistic.domain.command.PhysicalDeliveryUpdateCommand;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
 import solvela.admin.module.ledger.logistic.domain.vo.PhysicalDeliveryVO;
 import solvela.admin.module.ledger.stat.domain.form.LedgerStatForm;
@@ -67,14 +69,14 @@ public class PhysicalDeliveryController {
     @PostMapping("/add")
     @SaCheckPermission("physicalDelivery:add")
     public ResponseDTO<String> add(@RequestBody @Valid PhysicalDeliveryAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, PhysicalDeliveryAddCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @SaCheckPermission("physicalDelivery:update")
     public ResponseDTO<String> update(@RequestBody @Valid PhysicalDeliveryUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, PhysicalDeliveryUpdateCommand.class));
     }
 
     @Operation(summary = "批量删除")

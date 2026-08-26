@@ -2,10 +2,12 @@ package solvela.admin.module.prize.prizeconfig.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.prize.PrizeConfig;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
+import solvela.admin.module.prize.prizeconfig.domain.form.PrizeConfigAddForm;
+import solvela.prize.prizeconfig.domain.command.PrizeConfigAddCommand;
 import solvela.admin.module.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import solvela.prize.prizeconfig.domain.query.PrizeConfigQuery;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
+import solvela.admin.module.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
+import solvela.prize.prizeconfig.domain.command.PrizeConfigUpdateCommand;
 import solvela.admin.module.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
 import solvela.admin.module.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
@@ -65,7 +67,7 @@ public class PrizeConfigController {
     @PostMapping("/add")
     @SaCheckPermission("prizeConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid PrizeConfigAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, PrizeConfigAddCommand.class));
     }
 
     @Operation(summary = "奖品启用/禁用（单个开关与批量禁用共用）")
@@ -79,7 +81,7 @@ public class PrizeConfigController {
     @PostMapping("/update")
     @SaCheckPermission("prizeConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PrizeConfigUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, PrizeConfigUpdateCommand.class));
     }
 
     @Operation(summary = "批量删除")

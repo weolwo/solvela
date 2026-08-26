@@ -9,7 +9,7 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.prize.PrizeLog;
-import solvela.prize.prizelog.domain.form.PrizeLogAddForm;
+import solvela.prize.prizelog.domain.command.PrizeLogAddCommand;
 import solvela.prize.prizelog.domain.query.PrizeLogQuery;
 import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
 import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
@@ -202,7 +202,7 @@ public class PrizeLogService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PrizeLogAddForm addForm) {
+    public ResponseDTO<String> add(PrizeLogAddCommand addForm) {
         PrizeLog prizeLog = SolvelaBeanUtil.copy(addForm, PrizeLog.class);
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
         // ⚠️ member_name 仍是 NOT NULL 且无默认值，漏了这一句整条 INSERT 会被拒。

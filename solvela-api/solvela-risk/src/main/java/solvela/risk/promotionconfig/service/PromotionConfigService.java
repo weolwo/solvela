@@ -10,9 +10,9 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
 import solvela.risk.PromotionConfig;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
+import solvela.risk.promotionconfig.domain.command.PromotionConfigAddCommand;
 import solvela.risk.promotionconfig.domain.query.PromotionConfigQuery;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
+import solvela.risk.promotionconfig.domain.command.PromotionConfigUpdateCommand;
 import solvela.risk.promotionconfig.domain.dto.PromotionConfigOptionDTO;
 import solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO;
 import org.springframework.stereotype.Service;
@@ -80,7 +80,7 @@ public class PromotionConfigService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PromotionConfigAddForm addForm) {
+    public ResponseDTO<String> add(PromotionConfigAddCommand addForm) {
         PromotionConfig promotionConfig = SolvelaBeanUtil.copy(addForm, PromotionConfig.class);
         promotionConfigDao.insert(promotionConfig);
         return ResponseDTO.ok();
@@ -90,7 +90,7 @@ public class PromotionConfigService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(PromotionConfigUpdateForm updateForm) {
+    public ResponseDTO<String> update(PromotionConfigUpdateCommand updateForm) {
         PromotionConfig promotionConfig = SolvelaBeanUtil.copy(updateForm, PromotionConfig.class);
         promotionConfigDao.updateById(promotionConfig);
         return ResponseDTO.ok();
