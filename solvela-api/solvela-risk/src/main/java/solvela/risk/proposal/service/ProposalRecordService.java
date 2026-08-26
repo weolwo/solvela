@@ -384,9 +384,9 @@ public class ProposalRecordService {
 
         // ---- 来源维度 ----
         long unknownSourceCount = 0L;
-        List<ProposalFunnelVO.SourceStatVO> sourceList = new ArrayList<>();
+        List<ProposalFunnelVO.SourceStatDTO> sourceList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectSourceStat(queryForm)) {
-            ProposalFunnelVO.SourceStatVO item = new ProposalFunnelVO.SourceStatVO();
+            ProposalFunnelVO.SourceStatDTO item = new ProposalFunnelVO.SourceStatDTO();
             String sourceType = stat.get("sourceType") == null ? null : String.valueOf(stat.get("sourceType"));
             ProposalSourceTypeEnum sourceEnum = sourceType == null ? null : ProposalSourceTypeEnum.resolve(sourceType);
             long count = toLong(stat.get("proposalCount"));

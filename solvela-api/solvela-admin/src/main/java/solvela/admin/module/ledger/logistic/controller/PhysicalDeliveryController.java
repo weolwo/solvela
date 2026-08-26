@@ -19,9 +19,10 @@ import solvela.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
 import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
-import solvela.ledger.logistic.domain.vo.PhysicalDeliveryStatVO;
+import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
 import solvela.admin.module.ledger.logistic.domain.vo.PhysicalDeliveryVO;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.admin.module.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.logistic.service.PhysicalDeliveryService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -58,8 +59,9 @@ public class PhysicalDeliveryController {
     @Operation(summary = "发货统计：本期新增（默认当天）+ 待发货积压与收件信息体检（积压是全量）")
     @PostMapping("/stat")
     @SaCheckPermission("physicalDelivery:query")
-    public ResponseDTO<PhysicalDeliveryStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(form));
+    public ResponseDTO<PhysicalDeliveryStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(
+                SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
     }
 
     @Operation(summary = "添加")

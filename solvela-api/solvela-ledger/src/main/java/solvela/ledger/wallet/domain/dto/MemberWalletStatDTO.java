@@ -1,4 +1,4 @@
-package solvela.ledger.wallet.domain.vo;
+package solvela.ledger.wallet.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -6,31 +6,31 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.Data;
-import solvela.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 
 /**
- * 钱包统计：用户手上<b>现在</b>一共有多少资产，以及这段时间<b>变动了多少</b>。
+ * 钱包统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
  *
- * <h3>为什么这一页的「余额」不跟时间范围走</h3>
- * 钱包表是<b>存量表</b>：一个会员一种资产一行，只有一个当前余额，没有历史切片。
- * 「今天的总余额」这个说法本身就不成立 —— 按 {@code create_time} 去筛，
- * 筛出来的是「今天新开的钱包」，那几个账户的余额加起来既不是今天发出去的钱，
- * 也不是用户现在手上的钱，是一个<b>什么都不回答</b>的数字。
+ * <h3>为什么这里和列表查询的处理不一样</h3>
+ * 列表的 VO 是「某个端决定给出去哪些字段」——{@code MemberWalletDTO} 里有乐观锁版本号和
+ * 运营账号，C 端一个都不该看到，所以必须在端上投影一层。
+ * 而统计的产物是<b>算出来的结果</b>（含 {@code issueList} 这种给运营看的体检人话），
+ * 它本来就不是任何一个端的响应体形状；C 端将来要看自己的资产汇总，会是另一套指标，
+ * 不是这份的子集。为它复制一份字段完全相同的 VO，是纯仪式。
  *
- * <p>所以这一页把两件事明确分开：
- * <ul>
- *   <li><b>资产存量</b>（{@link #assetList}）：全量，不受时间范围影响 —— 用户手上现在有多少；</li>
- *   <li><b>本期变动</b>（{@link #flowList}）：跟时间范围走，数据来自交易明细表 ——
- *       这段时间进出了多少、净增净减多少。</li>
- * </ul>
- * 「本期变动」直接复用交易明细页的那条 SQL，不在钱包这边另写一份：
- * 同一个口径出现两处实现，早晚会漂成两个对不上的数。
+ * <h3>而且那层装配会引入一个静默故障</h3>
+ * 本类含嵌套 List（如 {@code assetList}）。{@code SolvelaBeanUtil.copy} 底层是
+ * Spring 的 {@code BeanUtils.copyProperties}：泛型擦除后两边属性都是原始类型 {@code List}，
+ * 它会判定可赋值，于是<b>把 DTO 的 List 引用直接塞进 VO 的字段</b>。
+ * 编译通过，Jackson 序列化出来字段还一模一样，看起来完全正常 ——
+ * 直到有人取出元素做强转才 ClassCastException。
+ * 「看起来对」的错误比编译失败危险得多，不值得为一层没有收益的装配去冒。
  *
- * @Author alaric
- * @Date 2026-08-18
+ * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
+ * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
  */
 @Data
-public class MemberWalletStatVO {
+public class MemberWalletStatDTO {
 
     // ---------------- 资产存量（全量，不受时间范围影响） ----------------
 
@@ -44,7 +44,7 @@ public class MemberWalletStatVO {
     private Long frozenCount;
 
     @Schema(description = "资产维度存量，余额按资产类型分开算")
-    private List<AssetBalanceVO> assetList;
+    private List<AssetBalanceDTO> assetList;
 
     // ---------------- 本期变动（跟时间范围走，数据来自交易明细表） ----------------
 
@@ -52,7 +52,7 @@ public class MemberWalletStatVO {
      * 与交易明细页共用同一个 VO 与同一条 SQL —— 那边改口径，这边自动跟着改。
      */
     @Schema(description = "本期资产变动：收入/支出/净额，按资产类型分开算")
-    private List<MemberAssetTransactionStatVO.AssetFlowVO> flowList;
+    private List<MemberAssetTransactionStatDTO.AssetFlowDTO> flowList;
 
     @Schema(description = "数据一致性体检告警")
     private List<String> issueList;
@@ -62,7 +62,7 @@ public class MemberWalletStatVO {
      * 积分和现金加出来的那个数没有任何含义。
      */
     @Data
-    public static class AssetBalanceVO {
+    public static class AssetBalanceDTO {
 
         @Schema(description = "资产类型：SCORE/BALANCE")
         private String assetType;

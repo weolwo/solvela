@@ -20,8 +20,8 @@ import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
-import solvela.ledger.logistic.domain.vo.PhysicalDeliveryStatVO;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 import static solvela.ledger.stat.LedgerStatSupport.rate;
 import static solvela.ledger.stat.LedgerStatSupport.toLong;
@@ -85,8 +85,8 @@ public class PhysicalDeliveryService {
      * <p>待发货拆成两类：收件信息没补全的（想发也发不了，要催用户）和地址齐了等发货的
      * （运营今天真正能干的活）。实物是三段式履约，status=0 里天然混着这两种。
      */
-    public PhysicalDeliveryStatVO stat(LedgerStatForm form) {
-        PhysicalDeliveryStatVO vo = new PhysicalDeliveryStatVO();
+    public PhysicalDeliveryStatDTO stat(LedgerStatQuery form) {
+        PhysicalDeliveryStatDTO vo = new PhysicalDeliveryStatDTO();
 
         Map<String, Object> newRow = physicalDeliveryDao.selectNewStat(form);
         vo.setNewCount(toLong(newRow.get("newCount")));
@@ -122,9 +122,9 @@ public class PhysicalDeliveryService {
         vo.setDeliveredRate(rate(delivered + signed, total - discarded));
 
         // ---- 来源分布 ----
-        List<PhysicalDeliveryStatVO.SourceStatVO> sourceList = new ArrayList<>();
+        List<PhysicalDeliveryStatDTO.SourceStatDTO> sourceList = new ArrayList<>();
         for (Map<String, Object> stat : physicalDeliveryDao.selectSourceStat()) {
-            PhysicalDeliveryStatVO.SourceStatVO item = new PhysicalDeliveryStatVO.SourceStatVO();
+            PhysicalDeliveryStatDTO.SourceStatDTO item = new PhysicalDeliveryStatDTO.SourceStatDTO();
             long count = toLong(stat.get("deliveryCount"));
             item.setSourceType(toStr(stat, "sourceType"));
             item.setDeliveryCount(count);

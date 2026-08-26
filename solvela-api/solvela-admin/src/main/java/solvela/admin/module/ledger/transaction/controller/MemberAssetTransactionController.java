@@ -15,9 +15,10 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionDTO;
 import solvela.ledger.transaction.domain.query.MemberAssetTransactionQuery;
 import solvela.base.domain.ResponseDTO;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.admin.module.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.admin.module.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
-import solvela.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 import solvela.admin.module.ledger.transaction.domain.vo.MemberAssetTransactionVO;
 import solvela.ledger.transaction.service.MemberAssetTransactionService;
 
@@ -48,8 +49,9 @@ public class MemberAssetTransactionController {
     @Operation(summary = "交易统计：按资产类型的收支与净额、业务类型分布、账务体检（时间范围默认当天）")
     @PostMapping("/stat")
     @SaCheckPermission("memberAssetTransaction:query")
-    public ResponseDTO<MemberAssetTransactionStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(form));
+    public ResponseDTO<MemberAssetTransactionStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(
+                SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
     }
 
     /*

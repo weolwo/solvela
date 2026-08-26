@@ -203,7 +203,7 @@ class FunnelStatTest {
                 vo.getAssetList().stream().mapToLong(ProposalFunnelVO.AssetStatVO::getProposalCount).sum(),
                 "资产分布条数之和不等于总数");
         assertEquals(vo.getTotalCount(),
-                vo.getSourceList().stream().mapToLong(ProposalFunnelVO.SourceStatVO::getProposalCount).sum(),
+                vo.getSourceList().stream().mapToLong(ProposalFunnelVO.SourceStatDTO::getProposalCount).sum(),
                 "来源分布条数之和不等于总数");
         assertEquals(vo.getFirstReviewCount() + vo.getSecondReviewCount(), vo.getPendingReviewCount());
     }

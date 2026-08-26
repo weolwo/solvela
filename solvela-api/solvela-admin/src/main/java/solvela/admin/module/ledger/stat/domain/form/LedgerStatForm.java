@@ -1,4 +1,4 @@
-package solvela.ledger.stat.domain.form;
+package solvela.admin.module.ledger.stat.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

@@ -1,4 +1,4 @@
-package solvela.ledger.coupon.domain.vo;
+package solvela.ledger.coupon.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -8,33 +8,28 @@ import java.util.List;
 import lombok.Data;
 
 /**
- * 优惠券统计：这段时间<b>发了多少张</b>、<b>核销了多少张</b>，以及手上还压着多少张。
+ * 会员券统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
  *
- * <h3>发放和核销是两个口径，绝对不能用同一个时间窗</h3>
- * 发放按 {@code create_time}，核销按 {@code used_time}。
- * 如果用同一个窗口算「今日核销率 = 今日核销 / 今日发放」，得到的数字必然接近 0 ——
- * 今天刚发出去的券当然还没来得及用。那个数字不是「核销率低」，而是<b>口径本身就错了</b>，
- * 而它错得很像真的：一个 2% 的核销率看上去就是一条正常的业务结论。
+ * <h3>为什么这里和列表查询的处理不一样</h3>
+ * 列表的 VO 是「某个端决定给出去哪些字段」——{@code MemberWalletDTO} 里有乐观锁版本号和
+ * 运营账号，C 端一个都不该看到，所以必须在端上投影一层。
+ * 而统计的产物是<b>算出来的结果</b>（含 {@code issueList} 这种给运营看的体检人话），
+ * 它本来就不是任何一个端的响应体形状；C 端将来要看自己的资产汇总，会是另一套指标，
+ * 不是这份的子集。为它复制一份字段完全相同的 VO，是纯仪式。
  *
- * <p>所以这里给三组各自独立的数：
- * <ol>
- *   <li><b>本期发放</b>：时间窗落在 {@code create_time} 上；</li>
- *   <li><b>本期核销</b>：时间窗落在 {@code used_time} 上 —— 今天核销的券可能是上个月发的；</li>
- *   <li><b>券库存</b>：<b>不受时间范围影响</b>，是全量。压着多少张没用的券是个存量问题，
- *       限制在今天只会把它藏起来。</li>
- * </ol>
+ * <h3>而且那层装配会引入一个静默故障</h3>
+ * 本类含嵌套 List（如 {@code assetList}）。{@code SolvelaBeanUtil.copy} 底层是
+ * Spring 的 {@code BeanUtils.copyProperties}：泛型擦除后两边属性都是原始类型 {@code List}，
+ * 它会判定可赋值，于是<b>把 DTO 的 List 引用直接塞进 VO 的字段</b>。
+ * 编译通过，Jackson 序列化出来字段还一模一样，看起来完全正常 ——
+ * 直到有人取出元素做强转才 ClassCastException。
+ * 「看起来对」的错误比编译失败危险得多，不值得为一层没有收益的装配去冒。
  *
- * <h3>一个没人查就发现不了的数字</h3>
- * <b>已过有效期却仍是「未使用」</b>：全工程<b>没有任何地方</b>把券置为 2-已过期
- * （没有这样的定时任务，也没有任何 Java 代码写这个状态）。这些券不会自己收口，
- * 用户端会一直看到一张永远用不了的券，而按状态统计时它们还一直算在「未使用」里 ——
- * 也就是说「未使用」这个数本身是虚高的。
- *
- * @Author alaric
- * @Date 2026-08-18
+ * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
+ * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
  */
 @Data
-public class MemberCouponStatVO {
+public class MemberCouponStatDTO {
 
     // ---------------- 本期发放（时间窗落在 create_time） ----------------
 
@@ -103,10 +98,10 @@ public class MemberCouponStatVO {
     // ---------------- 分布 ----------------
 
     @Schema(description = "券模维度分布（按本期发放量降序，TOP 10）")
-    private List<CouponStatVO> couponList;
+    private List<CouponStatDTO> couponList;
 
     @Schema(description = "来源维度分布（本期发放）")
-    private List<SourceStatVO> sourceList;
+    private List<SourceStatDTO> sourceList;
 
     @Schema(description = "数据一致性体检告警")
     private List<String> issueList;
@@ -115,7 +110,7 @@ public class MemberCouponStatVO {
      * 一种券模在本期的发放与核销。
      */
     @Data
-    public static class CouponStatVO {
+    public static class CouponStatDTO {
 
         @Schema(description = "券模编码")
         private String couponCode;
@@ -149,7 +144,7 @@ public class MemberCouponStatVO {
      * 但这一列同样没有枚举约束，所以原样回显取值，不做归类。
      */
     @Data
-    public static class SourceStatVO {
+    public static class SourceStatDTO {
 
         @Schema(description = "来源类型原值")
         private String sourceType;

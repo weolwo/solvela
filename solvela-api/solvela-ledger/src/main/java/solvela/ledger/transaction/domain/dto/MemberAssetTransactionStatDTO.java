@@ -1,4 +1,4 @@
-package solvela.ledger.transaction.domain.vo;
+package solvela.ledger.transaction.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -8,28 +8,28 @@ import java.util.List;
 import lombok.Data;
 
 /**
- * 交易明细统计：这段时间里<b>钱是怎么进出的</b>。
+ * 资产流水统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
  *
- * <p>这张表是账务域唯一的资金流水，钱包余额的每一次变动都在这里留了一行。
- * 但原先的页面只有一张流水表，翻十页也答不出财务每天要问的：
- * 今天净发出去多少、钱都花在哪个业务上、有没有人在手工调账。
+ * <h3>为什么这里和列表查询的处理不一样</h3>
+ * 列表的 VO 是「某个端决定给出去哪些字段」——{@code MemberWalletDTO} 里有乐观锁版本号和
+ * 运营账号，C 端一个都不该看到，所以必须在端上投影一层。
+ * 而统计的产物是<b>算出来的结果</b>（含 {@code issueList} 这种给运营看的体检人话），
+ * 它本来就不是任何一个端的响应体形状；C 端将来要看自己的资产汇总，会是另一套指标，
+ * 不是这份的子集。为它复制一份字段完全相同的 VO，是纯仪式。
  *
- * <h3>三条必须守住的口径</h3>
- * <ol>
- *   <li><b>金额一律按 asset_type 分开</b>：积分和现金不是同一个量纲，
- *       加出来的那个「总金额」没有任何含义；</li>
- *   <li><b>方向只看 transaction_type</b>：{@code change_amount} 存的是<b>绝对值</b>，
- *       收入和支出在数值上都是正数，把它们直接 SUM 出来的数字既不是收入也不是支出；</li>
- *   <li><b>业务分布只给笔数，不给金额</b>：同一个 biz_type 下可能既有积分又有现金，
- *       要给金额就得再按资产类型拆一层，页面上会宽到没法看。
- *       这是刻意的取舍 —— 与其给一个跨量纲相加的假金额，不如只给笔数。</li>
- * </ol>
+ * <h3>而且那层装配会引入一个静默故障</h3>
+ * 本类含嵌套 List（如 {@code assetList}）。{@code SolvelaBeanUtil.copy} 底层是
+ * Spring 的 {@code BeanUtils.copyProperties}：泛型擦除后两边属性都是原始类型 {@code List}，
+ * 它会判定可赋值，于是<b>把 DTO 的 List 引用直接塞进 VO 的字段</b>。
+ * 编译通过，Jackson 序列化出来字段还一模一样，看起来完全正常 ——
+ * 直到有人取出元素做强转才 ClassCastException。
+ * 「看起来对」的错误比编译失败危险得多，不值得为一层没有收益的装配去冒。
  *
- * @Author alaric
- * @Date 2026-08-18
+ * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
+ * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
  */
 @Data
-public class MemberAssetTransactionStatVO {
+public class MemberAssetTransactionStatDTO {
 
     @Schema(description = "时间范围内的流水笔数")
     private Long txCount;
@@ -45,10 +45,10 @@ public class MemberAssetTransactionStatVO {
     private Long manualAdjustCount;
 
     @Schema(description = "资产维度收支，金额按资产类型分开算")
-    private List<AssetFlowVO> assetList;
+    private List<AssetFlowDTO> assetList;
 
     @Schema(description = "业务类型分布（TOP 10），只给笔数")
-    private List<BizTypeStatVO> bizTypeList;
+    private List<BizTypeStatDTO> bizTypeList;
 
     @Schema(description = "数据一致性体检告警")
     private List<String> issueList;
@@ -57,7 +57,7 @@ public class MemberAssetTransactionStatVO {
      * 一种资产在时间范围内的收支。<b>只在同一 assetType 内可加。</b>
      */
     @Data
-    public static class AssetFlowVO {
+    public static class AssetFlowDTO {
 
         @Schema(description = "资产类型：SCORE/BALANCE")
         private String assetType;
@@ -91,7 +91,7 @@ public class MemberAssetTransactionStatVO {
      * 所以这里原样回显取值，不做归类、也不用「其它」把它盖住。
      */
     @Data
-    public static class BizTypeStatVO {
+    public static class BizTypeStatDTO {
 
         @Schema(description = "业务类型原值")
         private String bizType;

@@ -15,10 +15,11 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.admin.module.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.wallet.domain.dto.MemberWalletDTO;
 import solvela.ledger.wallet.domain.query.MemberWalletQuery;
-import solvela.ledger.wallet.domain.vo.MemberWalletStatVO;
+import solvela.ledger.wallet.domain.dto.MemberWalletStatDTO;
 import solvela.ledger.wallet.service.MemberWalletService;
 
 /**
@@ -54,14 +55,18 @@ public class MemberWalletController {
     }
 
     /**
-     * 统计口径与交易明细页共用一段 SQL，尚未按 Query/DTO 改造 —— 见类注释里的分层说明。
-     * 改造它要连带动 transaction 子域（{@code MemberAssetTransactionStatVO.AssetFlowVO}），
-     * 所以单独排一轮，不跟分页查询混在一起。
+     * 统计的<b>入参</b>按分层转换（Form → Query），<b>出参直接返回 DTO</b>，
+     * 没有像列表那样再装配一层 VO —— 这是刻意的，理由见 {@code MemberWalletStatDTO} 的类注释：
+     * 统计产物是「算出来的结果」，不是某个端的响应体形状。
+     *
+     * <p>钱包统计的「本期变动」一段与交易明细页共用 SQL 和转换函数，
+     * 所以它的出参里嵌着 {@code MemberAssetTransactionStatDTO.AssetFlowDTO}。
      */
     @Operation(summary = "钱包统计：资产存量（全量）+ 本期变动（默认当天，取自交易明细）")
     @PostMapping("/stat")
     @SaCheckPermission("memberWallet:query")
-    public ResponseDTO<MemberWalletStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(form));
+    public ResponseDTO<MemberWalletStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(
+                SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
     }
 }

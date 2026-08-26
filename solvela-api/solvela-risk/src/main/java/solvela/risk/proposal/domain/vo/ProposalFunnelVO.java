@@ -107,7 +107,7 @@ public class ProposalFunnelVO {
     private List<AssetStatVO> assetList;
 
     @Schema(description = "来源维度分布，按提案数降序")
-    private List<SourceStatVO> sourceList;
+    private List<SourceStatDTO> sourceList;
 
     @Schema(description = "风控拦截原因分布（TOP 10）")
     private List<BlockReasonVO> blockReasonList;
@@ -148,7 +148,7 @@ public class ProposalFunnelVO {
      * 一个来源的提案与到账情况
      */
     @Data
-    public static class SourceStatVO {
+    public static class SourceStatDTO {
 
         @Schema(description = "来源编码：TASK/DRAW/LOTTERY/MANUAL")
         private String sourceType;

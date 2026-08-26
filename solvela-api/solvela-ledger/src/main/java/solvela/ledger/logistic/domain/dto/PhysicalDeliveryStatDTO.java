@@ -1,4 +1,4 @@
-package solvela.ledger.logistic.domain.vo;
+package solvela.ledger.logistic.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -8,29 +8,28 @@ import java.util.List;
 import lombok.Data;
 
 /**
- * 发货物流统计：今天新增了多少履约单，以及<b>手上到底积压着多少单没发出去</b>。
+ * 实物履约统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
  *
- * <h3>积压必须看全量，不能跟着「今天」走</h3>
- * 「今日新增」跟时间范围走是对的；但<b>待发货积压是存量</b> ——
- * 把它限制在今天，压了三天的那些单子会正好从页面上消失，
- * 而那恰恰是这个页面唯一需要有人动手的东西。所以积压那一组数字明确标注为全量。
+ * <h3>为什么这里和列表查询的处理不一样</h3>
+ * 列表的 VO 是「某个端决定给出去哪些字段」——{@code MemberWalletDTO} 里有乐观锁版本号和
+ * 运营账号，C 端一个都不该看到，所以必须在端上投影一层。
+ * 而统计的产物是<b>算出来的结果</b>（含 {@code issueList} 这种给运营看的体检人话），
+ * 它本来就不是任何一个端的响应体形状；C 端将来要看自己的资产汇总，会是另一套指标，
+ * 不是这份的子集。为它复制一份字段完全相同的 VO，是纯仪式。
  *
- * <h3>「待发货」里有两种，性质完全不同</h3>
- * 实物是三段式履约（见 {@code PhysicalAssetHandler}）：中奖时用户还没填地址，
- * 履约单先落、收件信息后补。所以 status=0 同时装着两类单子：
- * <ul>
- *   <li><b>收件信息还没补全</b> —— 想发也发不了，要去催用户，不是运营的锅；</li>
- *   <li><b>地址齐了等发货</b> —— 这才是今天该发出去的活。</li>
- * </ul>
- * 光看一个「待发货 N 单」分不出这两种，运营只能一单一单点开看。
- * 这两个数是本页最有用的东西，{@code DeliveryStatusEnum} 的类注释也早就写明了
- * 「要区分得看 receiver_address 是否为空，不是靠状态」。
+ * <h3>而且那层装配会引入一个静默故障</h3>
+ * 本类含嵌套 List（如 {@code assetList}）。{@code SolvelaBeanUtil.copy} 底层是
+ * Spring 的 {@code BeanUtils.copyProperties}：泛型擦除后两边属性都是原始类型 {@code List}，
+ * 它会判定可赋值，于是<b>把 DTO 的 List 引用直接塞进 VO 的字段</b>。
+ * 编译通过，Jackson 序列化出来字段还一模一样，看起来完全正常 ——
+ * 直到有人取出元素做强转才 ClassCastException。
+ * 「看起来对」的错误比编译失败危险得多，不值得为一层没有收益的装配去冒。
  *
- * @Author alaric
- * @Date 2026-08-18
+ * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
+ * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
  */
 @Data
-public class PhysicalDeliveryStatVO {
+public class PhysicalDeliveryStatDTO {
 
     // ---------------- 本期新增（时间窗落在 create_time） ----------------
 
@@ -97,7 +96,7 @@ public class PhysicalDeliveryStatVO {
     private BigDecimal deliveredRate;
 
     @Schema(description = "来源维度分布（全量），按履约单数降序")
-    private List<SourceStatVO> sourceList;
+    private List<SourceStatDTO> sourceList;
 
     @Schema(description = "数据一致性体检告警")
     private List<String> issueList;
@@ -108,7 +107,7 @@ public class PhysicalDeliveryStatVO {
      * <p>{@code source_type} 这一列同样没有枚举约束，原样回显取值，不做归类。
      */
     @Data
-    public static class SourceStatVO {
+    public static class SourceStatDTO {
 
         @Schema(description = "来源类型原值")
         private String sourceType;

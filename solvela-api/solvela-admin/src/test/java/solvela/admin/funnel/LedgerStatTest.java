@@ -8,17 +8,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.ledger.coupon.dao.MemberCouponDao;
-import solvela.ledger.coupon.domain.vo.MemberCouponStatVO;
+import solvela.ledger.coupon.domain.dto.MemberCouponStatDTO;
 import solvela.ledger.coupon.service.MemberCouponService;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
-import solvela.ledger.logistic.domain.vo.PhysicalDeliveryStatVO;
+import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
 import solvela.ledger.logistic.service.PhysicalDeliveryService;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.transaction.dao.MemberAssetTransactionDao;
-import solvela.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 import solvela.ledger.transaction.service.MemberAssetTransactionService;
 import solvela.ledger.wallet.dao.MemberWalletDao;
-import solvela.ledger.wallet.domain.vo.MemberWalletStatVO;
+import solvela.ledger.wallet.domain.dto.MemberWalletStatDTO;
 import solvela.ledger.wallet.service.MemberWalletService;
 
 import java.math.BigDecimal;
@@ -82,7 +82,7 @@ class LedgerStatTest {
     @Test
     @DisplayName("四个面板：SQL 别名与 Service 读取的 key 完全一致（拼错一个字母就会静默变 0）")
     void statKeysMatch() {
-        LedgerStatForm form = allTime();
+        LedgerStatQuery form = allTime();
 
         Map<String, Object> tx = transactionDao.selectStat(form);
         assertNotNull(tx, "聚合查询空表也会有一行，不该返回 null");
@@ -148,8 +148,8 @@ class LedgerStatTest {
         LocalDate dbToday = jdbcTemplate.queryForObject("SELECT CURDATE()", LocalDate.class);
         assertNotNull(dbToday);
 
-        LedgerStatForm empty = new LedgerStatForm();
-        LedgerStatForm today = new LedgerStatForm();
+        LedgerStatQuery empty = new LedgerStatQuery();
+        LedgerStatQuery today = new LedgerStatQuery();
         today.setStatDateBegin(dbToday);
         today.setStatDateEnd(dbToday);
 
@@ -180,7 +180,7 @@ class LedgerStatTest {
         long expected = count("SELECT COUNT(*) FROM t_member_asset_transaction WHERE DATE(create_time) = '"
                 + latest + "'");
 
-        LedgerStatForm form = new LedgerStatForm();
+        LedgerStatQuery form = new LedgerStatQuery();
         form.setStatDateBegin(latest);
         form.setStatDateEnd(latest);
         assertEquals(expected, toLong(transactionDao.selectStat(form).get("txCount")),
@@ -193,20 +193,20 @@ class LedgerStatTest {
     @Test
     @DisplayName("存量指标不随时间范围变化：券库存 / 发货积压 / 钱包余额都是全量口径")
     void stockMetricsIgnoreDateRange() {
-        MemberCouponStatVO couponToday = couponService.stat(new LedgerStatForm());
-        MemberCouponStatVO couponAll = couponService.stat(allTime());
+        MemberCouponStatDTO couponToday = couponService.stat(new LedgerStatQuery());
+        MemberCouponStatDTO couponAll = couponService.stat(allTime());
         assertEquals(couponAll.getStockTotalCount(), couponToday.getStockTotalCount(),
                 "券库存跟着时间范围变了：压着多少张没用的券是存量问题，限制在今天只会把它藏起来");
         assertEquals(couponAll.getStaleUnusedCount(), couponToday.getStaleUnusedCount());
 
-        PhysicalDeliveryStatVO deliveryToday = deliveryService.stat(new LedgerStatForm());
-        PhysicalDeliveryStatVO deliveryAll = deliveryService.stat(allTime());
+        PhysicalDeliveryStatDTO deliveryToday = deliveryService.stat(new LedgerStatQuery());
+        PhysicalDeliveryStatDTO deliveryAll = deliveryService.stat(allTime());
         assertEquals(deliveryAll.getPendingCount(), deliveryToday.getPendingCount(),
                 "待发货积压跟着时间范围变了：压了三天的单子会正好从页面上消失，"
                         + "而那恰恰是这个页面唯一需要有人动手的东西");
 
-        MemberWalletStatVO walletToday = walletService.stat(new LedgerStatForm());
-        MemberWalletStatVO walletAll = walletService.stat(allTime());
+        MemberWalletStatDTO walletToday = walletService.stat(new LedgerStatQuery());
+        MemberWalletStatDTO walletAll = walletService.stat(allTime());
         assertEquals(walletAll.getWalletCount(), walletToday.getWalletCount(),
                 "钱包账户数跟着时间范围变了：钱包表是存量表，按 create_time 筛出来的是「今天新开的钱包」");
     }
@@ -219,7 +219,7 @@ class LedgerStatTest {
         long dbTotal = count("SELECT COUNT(*) FROM t_member_coupon");
         assertTrue(dbTotal > 0, "t_member_coupon 没有数据，本用例无法证明任何事 —— 先造数再跑");
 
-        MemberCouponStatVO vo = couponService.stat(allTime());
+        MemberCouponStatDTO vo = couponService.stat(allTime());
         assertEquals(dbTotal, vo.getStockTotalCount());
         assertEquals(vo.getStockTotalCount(),
                 vo.getStockUnusedCount() + vo.getStockUsedCount()
@@ -243,7 +243,7 @@ class LedgerStatTest {
         long dbTotal = count("SELECT COUNT(*) FROM t_physical_delivery");
         assertTrue(dbTotal > 0, "t_physical_delivery 没有数据，本用例无法证明任何事 —— 先造数再跑");
 
-        PhysicalDeliveryStatVO vo = deliveryService.stat(allTime());
+        PhysicalDeliveryStatDTO vo = deliveryService.stat(allTime());
         assertEquals(dbTotal, vo.getTotalCount());
         /*
          * ⚠️ -1 是页面「删除」写进去的软作废状态，DDL 列注释和 DeliveryStatusEnum 里都没有它。
@@ -259,7 +259,7 @@ class LedgerStatTest {
         assertEquals(vo.getPendingCount(), vo.getPendingNoAddressCount() + vo.getPendingReadyCount(),
                 "待发货没有被完整拆成「缺收件信息」和「可直接发」两类");
         assertEquals(dbTotal,
-                vo.getSourceList().stream().mapToLong(PhysicalDeliveryStatVO.SourceStatVO::getDeliveryCount).sum(),
+                vo.getSourceList().stream().mapToLong(PhysicalDeliveryStatDTO.SourceStatDTO::getDeliveryCount).sum(),
                 "来源分布条数之和不等于总数");
     }
 
@@ -269,10 +269,10 @@ class LedgerStatTest {
         long dbTotal = count("SELECT COUNT(*) FROM t_member_asset_transaction");
         assertTrue(dbTotal > 0, "t_member_asset_transaction 没有数据，本用例无法证明任何事 —— 先造数再跑");
 
-        MemberAssetTransactionStatVO vo = transactionService.stat(allTime());
+        MemberAssetTransactionStatDTO vo = transactionService.stat(allTime());
         assertEquals(dbTotal, vo.getTxCount());
 
-        for (MemberAssetTransactionStatVO.AssetFlowVO asset : vo.getAssetList()) {
+        for (MemberAssetTransactionStatDTO.AssetFlowDTO asset : vo.getAssetList()) {
             Double income = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(change_amount), 0) FROM t_member_asset_transaction"
                             + " WHERE asset_type = ? AND transaction_type = 1", Double.class, asset.getAssetType());
@@ -297,13 +297,13 @@ class LedgerStatTest {
         long dbTotal = count("SELECT COUNT(*) FROM t_member_wallet");
         assertTrue(dbTotal > 0, "t_member_wallet 没有数据，本用例无法证明任何事 —— 先造数再跑");
 
-        MemberWalletStatVO vo = walletService.stat(allTime());
+        MemberWalletStatDTO vo = walletService.stat(allTime());
         assertEquals(dbTotal, vo.getWalletCount());
         assertEquals(dbTotal,
-                vo.getAssetList().stream().mapToLong(MemberWalletStatVO.AssetBalanceVO::getWalletCount).sum(),
+                vo.getAssetList().stream().mapToLong(MemberWalletStatDTO.AssetBalanceDTO::getWalletCount).sum(),
                 "资产维度账户数之和不等于钱包总数");
 
-        for (MemberWalletStatVO.AssetBalanceVO asset : vo.getAssetList()) {
+        for (MemberWalletStatDTO.AssetBalanceDTO asset : vo.getAssetList()) {
             Double expected = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(balance), 0) FROM t_member_wallet WHERE asset_type = ?",
                     Double.class, asset.getAssetType());
@@ -319,8 +319,8 @@ class LedgerStatTest {
      * <p>结束日取明天，避免时区差把今天的数据挡在窗口外 —— 本用例要的是「全量」，
      * 不是「精确到某一天」，边界宽一点不影响结论。
      */
-    private LedgerStatForm allTime() {
-        LedgerStatForm form = new LedgerStatForm();
+    private LedgerStatQuery allTime() {
+        LedgerStatQuery form = new LedgerStatQuery();
         form.setStatDateBegin(LocalDate.of(2000, 1, 1));
         form.setStatDateEnd(LocalDate.now().plusDays(1));
         return form;

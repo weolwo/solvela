@@ -7,7 +7,7 @@ import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 import java.util.List;
 
@@ -43,7 +43,7 @@ public interface PhysicalDeliveryDao extends BaseMapper<PhysicalDelivery> {
     /**
      * 本期新增的履约单（时间窗落在 {@code create_time}）
      */
-    java.util.Map<String, Object> selectNewStat(@Param("form") LedgerStatForm form);
+    java.util.Map<String, Object> selectNewStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 履约状态与积压体检。<b>刻意不带时间窗，统计的是全量</b>：

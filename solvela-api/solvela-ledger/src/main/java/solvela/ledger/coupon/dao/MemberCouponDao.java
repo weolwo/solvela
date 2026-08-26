@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 import java.util.List;
 
@@ -45,7 +45,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
     /**
      * 本期发放（时间窗落在 {@code create_time}）：张数、会员数、这批券里已用掉的张数。
      */
-    java.util.Map<String, Object> selectIssuedStat(@Param("form") LedgerStatForm form);
+    java.util.Map<String, Object> selectIssuedStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 本期核销（时间窗落在 {@code used_time}）。
@@ -54,7 +54,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      * 用同一个窗口算「今日核销 / 今日发放」会得到一个必然接近 0 的比率，
      * 而它错得很像一条正常的业务结论。
      */
-    java.util.Map<String, Object> selectUsedStat(@Param("form") LedgerStatForm form);
+    java.util.Map<String, Object> selectUsedStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 券库存与一致性体检。<b>刻意不带时间窗，统计的是全量</b>：
@@ -65,12 +65,12 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
     /**
      * 券模维度分布（本期发放量 TOP 10）
      */
-    List<java.util.Map<String, Object>> selectCouponStat(@Param("form") LedgerStatForm form);
+    List<java.util.Map<String, Object>> selectCouponStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 来源维度分布（本期发放）
      */
-    List<java.util.Map<String, Object>> selectSourceStat(@Param("form") LedgerStatForm form);
+    List<java.util.Map<String, Object>> selectSourceStat(@Param("form") LedgerStatQuery form);
 
     // ==================== 过期收口（couponExpire 定时任务） ====================
 

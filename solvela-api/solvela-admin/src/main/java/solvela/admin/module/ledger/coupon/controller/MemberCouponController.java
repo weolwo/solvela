@@ -16,10 +16,11 @@ import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
 import solvela.ledger.coupon.domain.query.MemberCouponQuery;
 import solvela.base.domain.ResponseDTO;
 import solvela.admin.module.ledger.coupon.domain.form.MemberCouponQueryForm;
-import solvela.ledger.coupon.domain.vo.MemberCouponStatVO;
+import solvela.ledger.coupon.domain.dto.MemberCouponStatDTO;
 import solvela.admin.module.ledger.coupon.domain.vo.MemberCouponVO;
 import solvela.ledger.coupon.service.MemberCouponService;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.admin.module.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 /**
  * 会员优惠券 Controller
@@ -48,8 +49,9 @@ public class MemberCouponController {
     @Operation(summary = "优惠券统计：本期发放与本期核销（两个口径）、券库存与过期体检（时间范围默认当天）")
     @PostMapping("/stat")
     @SaCheckPermission("memberCoupon:query")
-    public ResponseDTO<MemberCouponStatVO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(form));
+    public ResponseDTO<MemberCouponStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
+        return ResponseDTO.ok(Service.stat(
+                SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
     }
 
     /*

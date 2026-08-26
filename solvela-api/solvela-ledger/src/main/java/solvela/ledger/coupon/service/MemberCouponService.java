@@ -8,8 +8,8 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
 import solvela.ledger.coupon.domain.query.MemberCouponQuery;
-import solvela.ledger.coupon.domain.vo.MemberCouponStatVO;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.coupon.domain.dto.MemberCouponStatDTO;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,8 +50,8 @@ public class MemberCouponService {
      * <p>券库存那一组<b>刻意不带时间窗</b>：压着多少张没用的券是存量问题，
      * 限制在今天只会把它藏起来。
      */
-    public MemberCouponStatVO stat(LedgerStatForm form) {
-        MemberCouponStatVO vo = new MemberCouponStatVO();
+    public MemberCouponStatDTO stat(LedgerStatQuery form) {
+        MemberCouponStatDTO vo = new MemberCouponStatDTO();
 
         // ---- 本期发放 ----
         Map<String, Object> issued = memberCouponDao.selectIssuedStat(form);
@@ -80,9 +80,9 @@ public class MemberCouponService {
         vo.setExpiringSoonCount(toLong(stock.get("expiringSoonCount")));
 
         // ---- 券模分布 ----
-        List<MemberCouponStatVO.CouponStatVO> couponList = new ArrayList<>();
+        List<MemberCouponStatDTO.CouponStatDTO> couponList = new ArrayList<>();
         for (Map<String, Object> row : memberCouponDao.selectCouponStat(form)) {
-            MemberCouponStatVO.CouponStatVO item = new MemberCouponStatVO.CouponStatVO();
+            MemberCouponStatDTO.CouponStatDTO item = new MemberCouponStatDTO.CouponStatDTO();
             long count = toLong(row.get("issuedCount"));
             long usedInBatch = toLong(row.get("usedCount"));
             item.setCouponCode(toStr(row, "couponCode"));
@@ -97,9 +97,9 @@ public class MemberCouponService {
         vo.setCouponList(couponList);
 
         // ---- 来源分布 ----
-        List<MemberCouponStatVO.SourceStatVO> sourceList = new ArrayList<>();
+        List<MemberCouponStatDTO.SourceStatDTO> sourceList = new ArrayList<>();
         for (Map<String, Object> row : memberCouponDao.selectSourceStat(form)) {
-            MemberCouponStatVO.SourceStatVO item = new MemberCouponStatVO.SourceStatVO();
+            MemberCouponStatDTO.SourceStatDTO item = new MemberCouponStatDTO.SourceStatDTO();
             long count = toLong(row.get("issuedCount"));
             item.setSourceType(toStr(row, "sourceType"));
             item.setIssuedCount(count);

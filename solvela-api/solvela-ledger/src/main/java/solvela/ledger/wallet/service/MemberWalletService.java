@@ -11,16 +11,16 @@ import solvela.base.domain.PageResult;
 import solvela.exception.BusinessException;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.enums.PrizeTypeEnum;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.transaction.dao.MemberAssetTransactionDao;
 import solvela.ledger.MemberAssetTransaction;
-import solvela.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 import solvela.ledger.transaction.service.MemberAssetTransactionService;
 import solvela.ledger.wallet.dao.MemberWalletDao;
 import solvela.ledger.MemberWallet;
 import solvela.ledger.wallet.domain.dto.MemberWalletDTO;
 import solvela.ledger.wallet.domain.query.MemberWalletQuery;
-import solvela.ledger.wallet.domain.vo.MemberWalletStatVO;
+import solvela.ledger.wallet.domain.dto.MemberWalletStatDTO;
 import solvela.member.service.MemberService;
 import solvela.risk.ProposalRecord;
 
@@ -63,8 +63,8 @@ public class MemberWalletService {
      * <p>「本期变动」直接调交易明细页的那条 SQL（{@code selectAssetFlowStat}），
      * 不在钱包这边另写一份：同一个口径两处实现，早晚会漂成两个对不上的数。
      */
-    public MemberWalletStatVO stat(LedgerStatForm form) {
-        MemberWalletStatVO vo = new MemberWalletStatVO();
+    public MemberWalletStatDTO stat(LedgerStatQuery form) {
+        MemberWalletStatDTO vo = new MemberWalletStatDTO();
 
         Map<String, Object> row = memberWalletDao.selectStat();
         vo.setWalletCount(toLong(row.get("walletCount")));
@@ -72,9 +72,9 @@ public class MemberWalletService {
         vo.setFrozenCount(toLong(row.get("frozenCount")));
 
         // ---- 资产存量：余额只在同一资产类型内可加 ----
-        List<MemberWalletStatVO.AssetBalanceVO> assetList = new ArrayList<>();
+        List<MemberWalletStatDTO.AssetBalanceDTO> assetList = new ArrayList<>();
         for (Map<String, Object> stat : memberWalletDao.selectAssetBalanceStat()) {
-            MemberWalletStatVO.AssetBalanceVO item = new MemberWalletStatVO.AssetBalanceVO();
+            MemberWalletStatDTO.AssetBalanceDTO item = new MemberWalletStatDTO.AssetBalanceDTO();
             long walletCount = toLong(stat.get("walletCount"));
             BigDecimal totalBalance = toDecimal(stat.get("totalBalance"));
             item.setAssetType(toStr(stat, "assetType"));
@@ -88,7 +88,7 @@ public class MemberWalletService {
         vo.setAssetList(assetList);
 
         // ---- 本期变动：复用交易明细页的 SQL 与转换 ----
-        List<MemberAssetTransactionStatVO.AssetFlowVO> flowList = new ArrayList<>();
+        List<MemberAssetTransactionStatDTO.AssetFlowDTO> flowList = new ArrayList<>();
         for (Map<String, Object> stat : memberAssetTransactionDao.selectAssetFlowStat(form)) {
             flowList.add(MemberAssetTransactionService.toAssetFlow(stat));
         }

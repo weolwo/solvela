@@ -5,11 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
-import solvela.ledger.stat.domain.form.LedgerStatForm;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.transaction.dao.MemberAssetTransactionDao;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionDTO;
 import solvela.ledger.transaction.domain.query.MemberAssetTransactionQuery;
-import solvela.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
+import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -48,9 +48,9 @@ public class MemberAssetTransactionService {
      * 本接口<b>刻意不吃页面上的列表筛选</b>：它要回答的是「整体发生了什么」，
      * 跟着某个会员名筛之后就不再是概览了。
      */
-    public MemberAssetTransactionStatVO stat(LedgerStatForm form) {
+    public MemberAssetTransactionStatDTO stat(LedgerStatQuery form) {
         Map<String, Object> row = memberAssetTransactionDao.selectStat(form);
-        MemberAssetTransactionStatVO vo = new MemberAssetTransactionStatVO();
+        MemberAssetTransactionStatDTO vo = new MemberAssetTransactionStatDTO();
 
         long txCount = toLong(row.get("txCount"));
         long manualAdjust = toLong(row.get("manualAdjustCount"));
@@ -59,16 +59,16 @@ public class MemberAssetTransactionService {
         vo.setManualAdjustCount(manualAdjust);
 
         // ---- 按资产类型的收支：金额只在同一 assetType 内可加 ----
-        List<MemberAssetTransactionStatVO.AssetFlowVO> assetList = new ArrayList<>();
+        List<MemberAssetTransactionStatDTO.AssetFlowDTO> assetList = new ArrayList<>();
         for (Map<String, Object> stat : memberAssetTransactionDao.selectAssetFlowStat(form)) {
             assetList.add(toAssetFlow(stat));
         }
         vo.setAssetList(assetList);
 
         // ---- 业务类型分布：只给笔数 ----
-        List<MemberAssetTransactionStatVO.BizTypeStatVO> bizTypeList = new ArrayList<>();
+        List<MemberAssetTransactionStatDTO.BizTypeStatDTO> bizTypeList = new ArrayList<>();
         for (Map<String, Object> stat : memberAssetTransactionDao.selectBizTypeStat(form)) {
-            MemberAssetTransactionStatVO.BizTypeStatVO item = new MemberAssetTransactionStatVO.BizTypeStatVO();
+            MemberAssetTransactionStatDTO.BizTypeStatDTO item = new MemberAssetTransactionStatDTO.BizTypeStatDTO();
             long count = toLong(stat.get("txCount"));
             item.setBizType(toStr(stat, "bizType"));
             item.setTxCount(count);
@@ -105,8 +105,8 @@ public class MemberAssetTransactionService {
      * 把一行「按资产类型的收支」转成 VO。钱包页面的「今日变动」复用同一份 SQL，
      * 也复用这个转换 —— 两处各转一次，早晚会在某个字段上漂。
      */
-    public static MemberAssetTransactionStatVO.AssetFlowVO toAssetFlow(Map<String, Object> stat) {
-        MemberAssetTransactionStatVO.AssetFlowVO item = new MemberAssetTransactionStatVO.AssetFlowVO();
+    public static MemberAssetTransactionStatDTO.AssetFlowDTO toAssetFlow(Map<String, Object> stat) {
+        MemberAssetTransactionStatDTO.AssetFlowDTO item = new MemberAssetTransactionStatDTO.AssetFlowDTO();
         BigDecimal income = toDecimal(stat.get("incomeAmount"));
         BigDecimal expense = toDecimal(stat.get("expenseAmount"));
         item.setAssetType(toStr(stat, "assetType"));
