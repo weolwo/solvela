@@ -5,9 +5,9 @@ import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
-import solvela.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
-import solvela.draw.drawlog.domain.vo.DrawFunnelVO;
-import solvela.draw.drawlog.domain.vo.DrawPrizeLogVO;
+import solvela.draw.drawlog.domain.query.DrawPrizeLogQuery;
+import solvela.draw.drawlog.domain.dto.DrawFunnelDTO;
+import solvela.draw.drawlog.domain.dto.DrawPrizeLogDTO;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import org.springframework.stereotype.Service;
@@ -50,9 +50,9 @@ public class DrawPrizeLogService {
     /**
      * 分页查询
      */
-    public PageResult<DrawPrizeLogVO> queryPage(DrawPrizeLogQueryForm queryForm) {
+    public PageResult<DrawPrizeLogDTO> queryPage(DrawPrizeLogQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<DrawPrizeLogVO> list = drawPrizeLogDao.queryPage(page, queryForm);
+        List<DrawPrizeLogDTO> list = drawPrizeLogDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -63,9 +63,9 @@ public class DrawPrizeLogService {
      * 其中<b>库存不足率</b>最该被盯住 —— 它不是「没中奖」，而是「系统没东西可给」，
      * 对用户体验的含义完全不同，偏高就说明奖池缺货或兜底失效。
      */
-    public DrawFunnelVO funnel(DrawPrizeLogQueryForm queryForm) {
+    public DrawFunnelDTO funnel(DrawPrizeLogQuery queryForm) {
         Map<String, Object> row = drawPrizeLogDao.selectFunnel(queryForm);
-        DrawFunnelVO vo = new DrawFunnelVO();
+        DrawFunnelDTO vo = new DrawFunnelDTO();
         long total = toLong(row.get("totalCount"));
         long hit = toLong(row.get("hitCount"));
         long noStock = toLong(row.get("noStockCount"));
@@ -89,9 +89,9 @@ public class DrawPrizeLogService {
                 : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, codes).list().stream()
                         .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
 
-        List<DrawFunnelVO.PrizeHitVO> prizeHitList = new ArrayList<>();
+        List<DrawFunnelDTO.PrizeHitVO> prizeHitList = new ArrayList<>();
         for (Map<String, Object> h : hits) {
-            DrawFunnelVO.PrizeHitVO item = new DrawFunnelVO.PrizeHitVO();
+            DrawFunnelDTO.PrizeHitVO item = new DrawFunnelDTO.PrizeHitVO();
             String code = String.valueOf(h.get("prizeCode"));
             long count = toLong(h.get("hitCount"));
             item.setPrizeCode(code);

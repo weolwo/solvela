@@ -2,18 +2,25 @@ package solvela.admin.module.draw.poolconfig.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.draw.PrizePoolConfig;
-import solvela.draw.poolconfig.domain.vo.PrizePoolBoardResultVO;
+import solvela.draw.poolconfig.domain.dto.PrizePoolBoardResultDTO;
 import solvela.draw.poolconfig.service.PrizePoolBoardService;
-import solvela.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
-import solvela.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
-import solvela.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
-import solvela.draw.poolconfig.domain.form.PrizePoolConfigUpdateForm;
-import solvela.draw.poolconfig.domain.vo.DrawWorkbenchVO;
-import solvela.draw.poolconfig.domain.vo.PrizePoolConfigVO;
+import solvela.admin.module.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
+import solvela.draw.poolconfig.domain.command.DrawWorkbenchSaveCommand;
+import solvela.admin.module.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
+import solvela.draw.poolconfig.domain.command.PrizePoolConfigAddCommand;
+import solvela.admin.module.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
+import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
+import solvela.admin.module.draw.poolconfig.domain.form.PrizePoolConfigUpdateForm;
+import solvela.draw.poolconfig.domain.command.PrizePoolConfigUpdateCommand;
+import solvela.draw.poolconfig.domain.dto.DrawWorkbenchDTO;
+import solvela.admin.module.draw.poolconfig.domain.vo.PrizePoolConfigVO;
+import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
 import solvela.draw.poolconfig.service.PrizePoolConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,14 +50,15 @@ public class PrizePoolConfigController {
     @PostMapping("/queryPage")
     @SaCheckPermission("prizePoolConfig:query")
     public ResponseDTO<PageResult<PrizePoolConfigVO>> queryPage(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<PrizePoolConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizePoolConfigQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizePoolConfigVO.class));
     }
 
     @Operation(summary = "奖池一览：可编辑字段 + 坑位/概率/限领搭配的体检结论，列表页主视图")
     @PostMapping("/board")
     @SaCheckPermission("prizePoolConfig:query")
-    public ResponseDTO<PrizePoolBoardResultVO> board(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
-        return ResponseDTO.ok(prizePoolBoardService.board(queryForm));
+    public ResponseDTO<PrizePoolBoardResultDTO> board(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
+        return ResponseDTO.ok(prizePoolBoardService.board(SolvelaBeanUtil.copy(queryForm, PrizePoolConfigQuery.class)));
     }
 
     @Operation(summary = "生成奖池编码（10位大写字母+数字，已判重）")
@@ -63,7 +71,7 @@ public class PrizePoolConfigController {
     @Operation(summary = "抽奖工作台聚合回显（与聚合保存入参同构）")
     @GetMapping("/workbench/detail")
     @SaCheckPermission("prizePoolConfig:query")
-    public ResponseDTO<DrawWorkbenchVO> workbenchDetail(@RequestParam String activityCode) {
+    public ResponseDTO<DrawWorkbenchDTO> workbenchDetail(@RequestParam String activityCode) {
         return Service.workbenchDetail(activityCode);
     }
 
@@ -71,14 +79,16 @@ public class PrizePoolConfigController {
     @PostMapping("/workbench/save")
     @SaCheckPermission("prizePoolConfig:workbench:save")
     public ResponseDTO<String> workbenchSave(@RequestBody @Valid DrawWorkbenchSaveForm saveForm) {
-        return Service.workbenchSave(saveForm);
+        // 🔴 用 deepCopy 而不是 copy：本表单有两层嵌套（poolList -> mappingList），
+        // 浅拷贝会因泛型不兼容<b>跳过</b>这些集合，结果是"保存成功但奖池一个没建"
+        return Service.workbenchSave(SolvelaBeanUtil.deepCopy(saveForm, DrawWorkbenchSaveCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @SaCheckPermission("prizePoolConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PrizePoolConfigUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, PrizePoolConfigUpdateCommand.class));
     }
 
     /*

@@ -5,8 +5,8 @@ import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.prizemapping.dao.PoolPrizeMappingDao;
-import solvela.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
-import solvela.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
+import solvela.draw.prizemapping.domain.query.PoolPrizeMappingQuery;
+import solvela.draw.prizemapping.domain.dto.PoolPrizeMappingDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -49,9 +49,9 @@ public class PoolPrizeMappingService {
      * 页面主视图走 {@link DrawPoolAnalysisService#analysis} 的按池分组结果，
      * 这个接口留给需要看某条映射原始字段（含创建人、创建时间）的排查场景。
      */
-    public PageResult<PoolPrizeMappingVO> queryPage(PoolPrizeMappingQueryForm queryForm) {
+    public PageResult<PoolPrizeMappingDTO> queryPage(PoolPrizeMappingQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<PoolPrizeMappingVO> list = poolPrizeMappingDao.queryPage(page, queryForm);
+        List<PoolPrizeMappingDTO> list = poolPrizeMappingDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 }

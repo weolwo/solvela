@@ -3,8 +3,8 @@ package solvela.draw.poolconfig.dao;
         import java.util.List;
 
         import solvela.draw.PrizePoolConfig;
-        import solvela.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
-        import solvela.draw.poolconfig.domain.vo.PrizePoolConfigVO;
+        import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
+        import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface PrizePoolConfigDao extends BaseMapper<PrizePoolConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<PrizePoolConfigVO> queryPage(Page<?> page, @Param("queryForm") PrizePoolConfigQueryForm queryForm);
+    List<PrizePoolConfigDTO> queryPage(Page<?> page, @Param("queryForm") PrizePoolConfigQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface PrizePoolConfigDao extends BaseMapper<PrizePoolConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<PrizePoolConfigVO> queryList(@Param("queryForm") PrizePoolConfigQueryForm queryForm);
+    List<PrizePoolConfigDTO> queryList(@Param("queryForm") PrizePoolConfigQuery queryForm);
 
     /**
      * 条件更新奖池开关，返回影响行数。

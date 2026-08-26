@@ -6,10 +6,10 @@ import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.base.json.JsonUtils;
 import solvela.draw.PrizePoolItem;
-import solvela.draw.poolitem.domain.form.PrizePoolItemQueryForm;
-import solvela.draw.poolitem.domain.vo.PrizeItemIssueVO;
-import solvela.draw.poolitem.domain.vo.PrizeItemStockResultVO;
-import solvela.draw.poolitem.domain.vo.PrizeItemStockVO;
+import solvela.draw.poolitem.domain.query.PrizePoolItemQuery;
+import solvela.draw.poolitem.domain.dto.PrizeItemIssueDTO;
+import solvela.draw.poolitem.domain.dto.PrizeItemStockResultDTO;
+import solvela.draw.poolitem.domain.dto.PrizeItemStockDTO;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
 import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
@@ -77,7 +77,7 @@ public class PrizeItemStockService {
      * <p>分页在内存里做：奖项数是配置级的量，先算全量再切页，
      * 也让「概览统计的是筛选后的全量」天然成立。
      */
-    public PrizeItemStockResultVO stockBoard(PrizePoolItemQueryForm queryForm) {
+    public PrizeItemStockResultDTO stockBoard(PrizePoolItemQuery queryForm) {
         List<PrizePoolItem> items = prizePoolItemManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
                         PrizePoolItem::getActivityCode, queryForm.getActivityCode())
@@ -92,7 +92,7 @@ public class PrizeItemStockService {
                 .collect(Collectors.groupingBy(PoolPrizeMapping::getPrizeItemId,
                         Collectors.mapping(PoolPrizeMapping::getPoolCode, Collectors.toList())));
 
-        List<PrizeItemStockVO> all = new ArrayList<>();
+        List<PrizeItemStockDTO> all = new ArrayList<>();
         for (PrizePoolItem item : items) {
             all.add(analyseOne(item, prizeMap, activityMap, poolsByItem));
         }
@@ -103,12 +103,12 @@ public class PrizeItemStockService {
 
         // 排序即优先级：有危险告警的（含口径漂移）置顶，其次消耗率高的 —— 快抽空的先看见
         all.sort(Comparator
-                .comparing((PrizeItemStockVO v) -> v.getIssueList().stream()
+                .comparing((PrizeItemStockDTO v) -> v.getIssueList().stream()
                         .anyMatch(i -> "DANGER".equals(i.getLevel())) ? 0 : 1)
                 .thenComparing(v -> v.getUsedRate() == null ? BigDecimal.ZERO : v.getUsedRate(),
                         Comparator.reverseOrder()));
 
-        PrizeItemStockResultVO result = new PrizeItemStockResultVO();
+        PrizeItemStockResultDTO result = new PrizeItemStockResultDTO();
         result.setItemCount(all.size());
         result.setSoldOutCount((int) all.stream()
                 .filter(v -> v.getRemainStockDb() != null && v.getRemainStockDb() <= 0).count());
@@ -127,7 +127,7 @@ public class PrizeItemStockService {
         return result;
     }
 
-    private List<PrizeItemStockVO> page(List<PrizeItemStockVO> all, Long pageNum, Long pageSize) {
+    private List<PrizeItemStockDTO> page(List<PrizeItemStockDTO> all, Long pageNum, Long pageSize) {
         long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
         int from = (int) Math.min((num - 1) * size, all.size());
@@ -135,10 +135,10 @@ public class PrizeItemStockService {
         return all.subList(from, to);
     }
 
-    private PrizeItemStockVO analyseOne(PrizePoolItem item, Map<String, PrizeConfig> prizeMap,
+    private PrizeItemStockDTO analyseOne(PrizePoolItem item, Map<String, PrizeConfig> prizeMap,
                                         Map<String, ActivityConfig> activityMap,
                                         Map<Long, List<String>> poolsByItem) {
-        PrizeItemStockVO vo = new PrizeItemStockVO();
+        PrizeItemStockDTO vo = new PrizeItemStockDTO();
         vo.setId(item.getId());
         vo.setActivityCode(item.getActivityCode());
         vo.setPrizeCode(item.getPrizeCode());
@@ -173,7 +173,7 @@ public class PrizeItemStockService {
             int drift = cached - remainDb;
             vo.setStockDrift(drift);
             if (drift != 0) {
-                vo.getIssueList().add(PrizeItemIssueVO.danger("STOCK_DRIFT",
+                vo.getIssueList().add(PrizeItemIssueDTO.danger("STOCK_DRIFT",
                         "库存口径漂移：Redis 剩余 " + cached + "，DB 剩余 " + remainDb
                                 + "（差 " + drift + "）。运行态按 Redis 预扣，DB 只是兜底对账 —— "
                                 + (drift > 0 ? "Redis 偏多可能导致超发" : "Redis 偏少会让奖品提前抽不到")));
@@ -182,14 +182,14 @@ public class PrizeItemStockService {
 
         PrizeConfig prize = prizeMap.get(item.getPrizeCode());
         if (prize == null) {
-            vo.getIssueList().add(PrizeItemIssueVO.danger("PRIZE_MISSING",
+            vo.getIssueList().add(PrizeItemIssueDTO.danger("PRIZE_MISSING",
                     "奖品「" + item.getPrizeCode() + "」不在资产大库：中奖后派奖会报『奖品配置不存在』，用户拿不到东西"));
         } else {
             vo.setPrizeName(prize.getPrizeName());
             vo.setPrizeType(prize.getPrizeType());
             vo.setPrizeValue(prize.getPrizeValue());
             if (!PRIZE_STATUS_ENABLED.equals(prize.getStatus())) {
-                vo.getIssueList().add(PrizeItemIssueVO.danger("PRIZE_DISABLED",
+                vo.getIssueList().add(PrizeItemIssueDTO.danger("PRIZE_DISABLED",
                         "奖品「" + prize.getPrizeName() + "」已停用，派奖链路会拒绝发放"));
             }
             if (prize.getPrizeValue() != null) {
@@ -205,24 +205,24 @@ public class PrizeItemStockService {
         // 库存账目本身的自洽性。used_stock 本不该被人手改 —— 原先的 CRUD 表单却能直接填它
         if (!unlimited) {
             if (used > item.getTotalStock()) {
-                vo.getIssueList().add(PrizeItemIssueVO.danger("USED_EXCEEDS_TOTAL",
+                vo.getIssueList().add(PrizeItemIssueDTO.danger("USED_EXCEEDS_TOTAL",
                         "已出 " + used + " 超过总库存 " + item.getTotalStock() + "：库存账目已经错乱，等于已经超发"));
             } else if (remainDb != null && remainDb <= 0) {
-                vo.getIssueList().add(PrizeItemIssueVO.warn("SOLD_OUT",
+                vo.getIssueList().add(PrizeItemIssueDTO.warn("SOLD_OUT",
                         "已抽空：命中本奖项的请求会降级到兜底，所在奖池没有兜底则直接返回「手慢了，奖品已被抽完」"));
             } else if (vo.getUsedRate() != null
                     && BigDecimal.ONE.subtract(vo.getUsedRate()).compareTo(LOW_STOCK_THRESHOLD) < 0) {
-                vo.getIssueList().add(PrizeItemIssueVO.warn("LOW_STOCK",
+                vo.getIssueList().add(PrizeItemIssueDTO.warn("LOW_STOCK",
                         "剩余不足 10%（还剩 " + remainDb + " 个）：按当前消耗速度很快会抽空，需要补货或调低概率"));
             }
         }
         if (used < 0) {
-            vo.getIssueList().add(PrizeItemIssueVO.danger("USED_NEGATIVE",
+            vo.getIssueList().add(PrizeItemIssueDTO.danger("USED_NEGATIVE",
                     "已出数量为负（" + used + "）：库存账目异常，回滚补偿可能执行了多次"));
         }
 
         if (vo.getPoolCodeList().isEmpty()) {
-            vo.getIssueList().add(PrizeItemIssueVO.warn("NOT_REFERENCED",
+            vo.getIssueList().add(PrizeItemIssueDTO.warn("NOT_REFERENCED",
                     "没有任何奖池的坑位引用它：这个奖项配了但永远抽不到"));
         }
 

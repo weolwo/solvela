@@ -1,11 +1,15 @@
 package solvela.admin.module.draw.poolitem.controller;
 
-import solvela.draw.poolitem.domain.form.PrizePoolItemQueryForm;
-import solvela.draw.poolitem.domain.vo.PrizeItemStockResultVO;
-import solvela.draw.poolitem.domain.vo.PrizePoolItemVO;
+import solvela.admin.module.draw.poolitem.domain.form.PrizePoolItemQueryForm;
+import solvela.draw.poolitem.domain.query.PrizePoolItemQuery;
+import solvela.draw.poolitem.domain.dto.PrizeItemStockResultDTO;
+import solvela.admin.module.draw.poolitem.domain.vo.PrizePoolItemVO;
+import solvela.draw.poolitem.domain.dto.PrizePoolItemDTO;
 import solvela.draw.poolitem.service.PrizeItemStockService;
 import solvela.draw.poolitem.service.PrizePoolItemService;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,13 +55,14 @@ public class PrizePoolItemController {
     @PostMapping("/queryPage")
     @SaCheckPermission("prizePoolItem:query")
     public ResponseDTO<PageResult<PrizePoolItemVO>> queryPage(@RequestBody @Valid PrizePoolItemQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<PrizePoolItemDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizePoolItemQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizePoolItemVO.class));
     }
 
     @Operation(summary = "库存看板：Redis/DB 双口径剩余、消耗率、售罄预警、跨奖池引用与体检告警")
     @PostMapping("/stockBoard")
     @SaCheckPermission("prizePoolItem:query")
-    public ResponseDTO<PrizeItemStockResultVO> stockBoard(@RequestBody @Valid PrizePoolItemQueryForm queryForm) {
-        return ResponseDTO.ok(prizeItemStockService.stockBoard(queryForm));
+    public ResponseDTO<PrizeItemStockResultDTO> stockBoard(@RequestBody @Valid PrizePoolItemQueryForm queryForm) {
+        return ResponseDTO.ok(prizeItemStockService.stockBoard(SolvelaBeanUtil.copy(queryForm, PrizePoolItemQuery.class)));
     }
 }

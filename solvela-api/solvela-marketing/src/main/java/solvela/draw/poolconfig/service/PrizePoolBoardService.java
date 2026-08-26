@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.draw.PrizePoolConfig;
-import solvela.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
-import solvela.draw.poolconfig.domain.vo.PoolConfigIssueVO;
-import solvela.draw.poolconfig.domain.vo.PrizePoolBoardResultVO;
-import solvela.draw.poolconfig.domain.vo.PrizePoolBoardVO;
+import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
+import solvela.draw.poolconfig.domain.dto.PoolConfigIssueDTO;
+import solvela.draw.poolconfig.domain.dto.PrizePoolBoardResultDTO;
+import solvela.draw.poolconfig.domain.dto.PrizePoolBoardDTO;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
 import solvela.draw.PrizePoolItem;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
@@ -74,7 +74,7 @@ public class PrizePoolBoardService {
      * <p>分页在内存里做：奖池是配置级的量（一个活动几个池），先算全量再切页最简单，
      * 也让「概览统计的是筛选后的全量」天然成立。
      */
-    public PrizePoolBoardResultVO board(PrizePoolConfigQueryForm queryForm) {
+    public PrizePoolBoardResultDTO board(PrizePoolConfigQuery queryForm) {
         List<PrizePoolConfig> pools = prizePoolConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
                         PrizePoolConfig::getActivityCode, queryForm.getActivityCode())
@@ -92,7 +92,7 @@ public class PrizePoolBoardService {
         Map<String, List<PoolPrizeMapping>> mappingByPool = poolPrizeMappingManager.lambdaQuery().list().stream()
                 .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode));
 
-        List<PrizePoolBoardVO> all = new ArrayList<>();
+        List<PrizePoolBoardDTO> all = new ArrayList<>();
         for (PrizePoolConfig pool : pools) {
             all.add(analyseOne(pool, activityMap, itemMap,
                     mappingByPool.getOrDefault(pool.getPoolCode(), List.of())));
@@ -104,22 +104,22 @@ public class PrizePoolBoardService {
 
         // 排序即优先级：不能抽的排最前（配了却用不了最该先修），其次有告警的，最后按创建时间倒序
         all.sort(Comparator
-                .comparing((PrizePoolBoardVO v) -> Boolean.TRUE.equals(v.getDrawable()) ? 1 : 0)
+                .comparing((PrizePoolBoardDTO v) -> Boolean.TRUE.equals(v.getDrawable()) ? 1 : 0)
                 .thenComparing(v -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(PrizePoolBoardVO::getCreateTime,
+                .thenComparing(PrizePoolBoardDTO::getCreateTime,
                         Comparator.nullsLast(Comparator.reverseOrder())));
 
-        PrizePoolBoardResultVO result = new PrizePoolBoardResultVO();
+        PrizePoolBoardResultDTO result = new PrizePoolBoardResultDTO();
         result.setPoolCount(all.size());
         result.setDrawableCount((int) all.stream().filter(v -> Boolean.TRUE.equals(v.getDrawable())).count());
-        result.setDangerCount(all.stream().mapToInt(PrizePoolBoardVO::getDangerCount).sum());
-        result.setWarnCount(all.stream().mapToInt(PrizePoolBoardVO::getWarnCount).sum());
+        result.setDangerCount(all.stream().mapToInt(PrizePoolBoardDTO::getDangerCount).sum());
+        result.setWarnCount(all.stream().mapToInt(PrizePoolBoardDTO::getWarnCount).sum());
         result.setTotal((long) all.size());
         result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<PrizePoolBoardVO> page(List<PrizePoolBoardVO> all, Long pageNum, Long pageSize) {
+    private List<PrizePoolBoardDTO> page(List<PrizePoolBoardDTO> all, Long pageNum, Long pageSize) {
         long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
         int from = (int) Math.min((num - 1) * size, all.size());
@@ -127,9 +127,9 @@ public class PrizePoolBoardService {
         return all.subList(from, to);
     }
 
-    private PrizePoolBoardVO analyseOne(PrizePoolConfig pool, Map<String, ActivityConfig> activityMap,
+    private PrizePoolBoardDTO analyseOne(PrizePoolConfig pool, Map<String, ActivityConfig> activityMap,
                                         Map<Long, PrizePoolItem> itemMap, List<PoolPrizeMapping> mappings) {
-        PrizePoolBoardVO vo = new PrizePoolBoardVO();
+        PrizePoolBoardDTO vo = new PrizePoolBoardDTO();
         vo.setId(pool.getId());
         vo.setActivityCode(pool.getActivityCode());
         vo.setPoolCode(pool.getPoolCode());
@@ -141,7 +141,7 @@ public class PrizePoolBoardService {
 
         ActivityConfig activity = activityMap.get(pool.getActivityCode());
         if (activity == null) {
-            vo.getIssueList().add(PoolConfigIssueVO.danger("ACTIVITY_MISSING",
+            vo.getIssueList().add(PoolConfigIssueDTO.danger("ACTIVITY_MISSING",
                     "所属活动 " + pool.getActivityCode() + " 不存在：这个奖池挂在一个已被删除的活动上，永远不会被抽到"));
         } else {
             vo.setActivityName(activity.getActivityName());
@@ -183,10 +183,10 @@ public class PrizePoolBoardService {
 
         // ---- 体检 ----
         if (mappings.isEmpty()) {
-            vo.getIssueList().add(PoolConfigIssueVO.danger("POOL_EMPTY",
+            vo.getIssueList().add(PoolConfigIssueDTO.danger("POOL_EMPTY",
                     "奖池一个坑位都没有：抽奖时快照构造直接抛「奖池快照不能为空」，本池不可用。请到抽奖工作台配置奖项"));
         } else if (!closed) {
-            vo.getIssueList().add(PoolConfigIssueVO.danger("PROBABILITY_NOT_CLOSED",
+            vo.getIssueList().add(PoolConfigIssueDTO.danger("PROBABILITY_NOT_CLOSED",
                     "概率总和为 " + sum.toPlainString() + "%，未闭环到 100%："
                             + "抽奖时快照构造会抛异常且执行链路未捕获，本奖池的每一次抽奖请求都会直接报错"));
         }
@@ -196,11 +196,11 @@ public class PrizePoolBoardService {
          * 运营看到「奖池已关闭」和「活动没上线」要做的事完全不同。
          */
         if (activityOnline && !poolOpen) {
-            vo.getIssueList().add(PoolConfigIssueVO.warn("POOL_CLOSED_WHILE_ONLINE",
+            vo.getIssueList().add(PoolConfigIssueDTO.warn("POOL_CLOSED_WHILE_ONLINE",
                     "活动已上线但本奖池处于关闭状态：用户抽奖会被拒绝（奖池未开启）。若是有意停用可忽略"));
         }
         if (!activityOnline && poolOpen && activity != null) {
-            vo.getIssueList().add(PoolConfigIssueVO.warn("ONLINE_BUT_ACTIVITY_OFFLINE",
+            vo.getIssueList().add(PoolConfigIssueDTO.warn("ONLINE_BUT_ACTIVITY_OFFLINE",
                     "奖池已开启但活动未上线：用户仍然进不来。要真正开放需要先上线活动"));
         }
 
@@ -210,12 +210,12 @@ public class PrizePoolBoardService {
          */
         boolean periodic = DrawPeriodResolver.needsClock(pool.getResetPeriod());
         if (periodic && limitedItemCount == 0 && !mappings.isEmpty()) {
-            vo.getIssueList().add(PoolConfigIssueVO.warn("RESET_PERIOD_USELESS",
+            vo.getIssueList().add(PoolConfigIssueDTO.warn("RESET_PERIOD_USELESS",
                     "配置了「" + resetPeriodText(pool.getResetPeriod()) + "」重置，但池内没有任何奖项设置单人限领次数："
                             + "重置周期重置的是限领计数，没有限领就没有计数要重置，这个配置当前不产生任何效果"));
         }
         if (!periodic && limitedItemCount > 0) {
-            vo.getIssueList().add(PoolConfigIssueVO.warn("LIMIT_NEVER_RESETS",
+            vo.getIssueList().add(PoolConfigIssueDTO.warn("LIMIT_NEVER_RESETS",
                     "池内有 " + limitedItemCount + " 个奖项设置了单人限领，但重置周期是「活动期间」："
                             + "用户在整个活动内中够次数后将永不恢复。限量大奖可以这么配，日常玩法通常应选按天/周/月"));
         }

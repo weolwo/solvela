@@ -5,8 +5,8 @@ import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.poolitem.dao.PrizePoolItemDao;
-import solvela.draw.poolitem.domain.form.PrizePoolItemQueryForm;
-import solvela.draw.poolitem.domain.vo.PrizePoolItemVO;
+import solvela.draw.poolitem.domain.query.PrizePoolItemQuery;
+import solvela.draw.poolitem.domain.dto.PrizePoolItemDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -46,9 +46,9 @@ public class PrizePoolItemService {
      * 页面主视图走 {@link PrizeItemStockService#stockBoard}，
      * 这个接口留给需要看某个奖项原始字段（含 version、创建时间）的排查场景。
      */
-    public PageResult<PrizePoolItemVO> queryPage(PrizePoolItemQueryForm queryForm) {
+    public PageResult<PrizePoolItemDTO> queryPage(PrizePoolItemQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<PrizePoolItemVO> list = prizePoolItemDao.queryPage(page, queryForm);
+        List<PrizePoolItemDTO> list = prizePoolItemDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 }

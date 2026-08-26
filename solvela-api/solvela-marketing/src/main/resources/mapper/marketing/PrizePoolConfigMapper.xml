@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.draw.poolconfig.dao.PrizePoolConfigDao">
 
-    <resultMap id="PrizePoolConfigVO" type="solvela.draw.poolconfig.domain.vo.PrizePoolConfigVO">
+    <resultMap id="PrizePoolConfigDTO" type="solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO">
             <result column="id" property="id" />
             <result column="activity_code" property="activityCode" />
             <result column="pool_code" property="poolCode" />
@@ -54,7 +54,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="PrizePoolConfigVO">
+    <select id="queryPage" resultMap="PrizePoolConfigDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_prize_pool_config
@@ -62,7 +62,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="PrizePoolConfigVO">
+    <select id="queryList" resultMap="PrizePoolConfigDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_prize_pool_config

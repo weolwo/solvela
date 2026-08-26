@@ -3,8 +3,8 @@ package solvela.draw.prizemapping.dao;
         import java.util.List;
 
         import solvela.draw.PoolPrizeMapping;
-        import solvela.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
-        import solvela.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
+        import solvela.draw.prizemapping.domain.query.PoolPrizeMappingQuery;
+        import solvela.draw.prizemapping.domain.dto.PoolPrizeMappingDTO;
         import solvela.base.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface PoolPrizeMappingDao extends CustomizedBaseMapper<PoolPrizeMappi
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<PoolPrizeMappingVO> queryPage(Page<?> page, @Param("queryForm") PoolPrizeMappingQueryForm queryForm);
+    List<PoolPrizeMappingDTO> queryPage(Page<?> page, @Param("queryForm") PoolPrizeMappingQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface PoolPrizeMappingDao extends CustomizedBaseMapper<PoolPrizeMappi
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<PoolPrizeMappingVO> queryList(@Param("queryForm") PoolPrizeMappingQueryForm queryForm);
+    List<PoolPrizeMappingDTO> queryList(@Param("queryForm") PoolPrizeMappingQuery queryForm);
 
             // ----- 物理删除 -----
                 /**

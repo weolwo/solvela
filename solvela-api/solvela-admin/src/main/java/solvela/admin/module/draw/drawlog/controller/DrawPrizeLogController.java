@@ -1,13 +1,17 @@
 package solvela.admin.module.draw.drawlog.controller;
 
-import solvela.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
-import solvela.draw.drawlog.domain.vo.DrawFunnelVO;
-import solvela.draw.drawlog.domain.vo.DrawPrizeLogVO;
+import solvela.admin.module.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
+import solvela.draw.drawlog.domain.query.DrawPrizeLogQuery;
+import solvela.draw.drawlog.domain.dto.DrawFunnelDTO;
+import solvela.admin.module.draw.drawlog.domain.vo.DrawPrizeLogVO;
+import solvela.draw.drawlog.domain.dto.DrawPrizeLogDTO;
 import solvela.draw.drawlog.service.DrawPrizeLogService;
 import solvela.draw.runtime.DrawExecuteService;
 import solvela.draw.runtime.domain.DrawExecuteForm;
 import solvela.draw.runtime.domain.DrawExecuteVO;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,13 +60,14 @@ public class DrawPrizeLogController {
     @PostMapping("/queryPage")
     @SaCheckPermission("drawPrizeLog:query")
     public ResponseDTO<PageResult<DrawPrizeLogVO>> queryPage(@RequestBody @Valid DrawPrizeLogQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<DrawPrizeLogDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, DrawPrizeLogQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, DrawPrizeLogVO.class));
     }
 
     @Operation(summary = "抽奖转化漏斗：中奖率、库存不足率、参与人数、奖品发放分布")
     @PostMapping("/funnel")
     @SaCheckPermission("drawPrizeLog:query")
-    public ResponseDTO<DrawFunnelVO> funnel(@RequestBody @Valid DrawPrizeLogQueryForm queryForm) {
-        return ResponseDTO.ok(Service.funnel(queryForm));
+    public ResponseDTO<DrawFunnelDTO> funnel(@RequestBody @Valid DrawPrizeLogQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, DrawPrizeLogQuery.class)));
     }
 }

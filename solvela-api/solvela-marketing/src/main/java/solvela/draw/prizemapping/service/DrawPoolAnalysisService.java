@@ -8,11 +8,11 @@ import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
 import solvela.draw.PrizePoolItem;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
 import solvela.draw.PoolPrizeMapping;
-import solvela.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
-import solvela.draw.prizemapping.domain.vo.DrawPoolAnalysisResultVO;
-import solvela.draw.prizemapping.domain.vo.DrawPoolAnalysisVO;
-import solvela.draw.prizemapping.domain.vo.DrawPoolIssueVO;
-import solvela.draw.prizemapping.domain.vo.DrawPoolSlotVO;
+import solvela.draw.prizemapping.domain.query.PoolPrizeMappingQuery;
+import solvela.draw.prizemapping.domain.dto.DrawPoolAnalysisResultDTO;
+import solvela.draw.prizemapping.domain.dto.DrawPoolAnalysisDTO;
+import solvela.draw.prizemapping.domain.dto.DrawPoolIssueDTO;
+import solvela.draw.prizemapping.domain.dto.DrawPoolSlotDTO;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
 import solvela.draw.runtime.DrawStockService;
 import solvela.prize.PrizeConfig;
@@ -81,7 +81,7 @@ public class DrawPoolAnalysisService {
      * <p>分页在内存里做：奖池数是配置级的量（一个活动几个池），
      * 先算全量再切页最简单，也让「概览统计的是筛选后的全量」天然成立。
      */
-    public DrawPoolAnalysisResultVO analysis(PoolPrizeMappingQueryForm queryForm) {
+    public DrawPoolAnalysisResultDTO analysis(PoolPrizeMappingQuery queryForm) {
         // ---- 1. 备料，之后不再碰数据库 ----
         List<PrizePoolConfig> pools = prizePoolConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
@@ -127,7 +127,7 @@ public class DrawPoolAnalysisService {
         Map<String, List<PoolPrizeMapping>> grouped = mappings.stream()
                 .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode, LinkedHashMap::new, Collectors.toList()));
 
-        List<DrawPoolAnalysisVO> all = new ArrayList<>();
+        List<DrawPoolAnalysisDTO> all = new ArrayList<>();
         for (PrizePoolConfig pool : pools) {
             all.add(analyseOne(pool.getPoolCode(), pool,
                     grouped.getOrDefault(pool.getPoolCode(), List.of()),
@@ -141,30 +141,30 @@ public class DrawPoolAnalysisService {
 
         // ---- 2. 排序即优先级：未闭环（现在就在报错）> 有危险告警 > 已上线 ----
         all.sort(Comparator
-                .comparing((DrawPoolAnalysisVO v) -> Boolean.TRUE.equals(v.getProbabilityClosed()) ? 1 : 0)
+                .comparing((DrawPoolAnalysisDTO v) -> Boolean.TRUE.equals(v.getProbabilityClosed()) ? 1 : 0)
                 .thenComparing(v -> v.getDangerCount() > 0 ? 0 : 1)
                 .thenComparing(v -> Integer.valueOf(1).equals(v.getActivityStatus()) ? 0 : 1)
-                .thenComparing(DrawPoolAnalysisVO::getPoolCode));
+                .thenComparing(DrawPoolAnalysisDTO::getPoolCode));
 
         if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
             all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).collect(Collectors.toList());
         }
 
-        DrawPoolAnalysisResultVO result = new DrawPoolAnalysisResultVO();
+        DrawPoolAnalysisResultDTO result = new DrawPoolAnalysisResultDTO();
         result.setPoolCount(all.size());
         result.setSlotCount(all.stream().mapToInt(v -> v.getSlotList().size()).sum());
-        result.setDangerCount(all.stream().mapToInt(DrawPoolAnalysisVO::getDangerCount).sum());
-        result.setWarnCount(all.stream().mapToInt(DrawPoolAnalysisVO::getWarnCount).sum());
+        result.setDangerCount(all.stream().mapToInt(DrawPoolAnalysisDTO::getDangerCount).sum());
+        result.setWarnCount(all.stream().mapToInt(DrawPoolAnalysisDTO::getWarnCount).sum());
         result.setBrokenPoolCount((int) all.stream()
                 .filter(v -> !Boolean.TRUE.equals(v.getProbabilityClosed())).count());
-        result.setTotalExpectedCostPerDraw(all.stream().map(DrawPoolAnalysisVO::getExpectedCostPerDraw)
+        result.setTotalExpectedCostPerDraw(all.stream().map(DrawPoolAnalysisDTO::getExpectedCostPerDraw)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         result.setTotal((long) all.size());
         result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<DrawPoolAnalysisVO> page(List<DrawPoolAnalysisVO> all, Long pageNum, Long pageSize) {
+    private List<DrawPoolAnalysisDTO> page(List<DrawPoolAnalysisDTO> all, Long pageNum, Long pageSize) {
         long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
         int from = (int) Math.min((num - 1) * size, all.size());
@@ -172,16 +172,16 @@ public class DrawPoolAnalysisService {
         return all.subList(from, to);
     }
 
-    private DrawPoolAnalysisVO analyseOne(String poolCode, PrizePoolConfig pool, List<PoolPrizeMapping> mappings,
+    private DrawPoolAnalysisDTO analyseOne(String poolCode, PrizePoolConfig pool, List<PoolPrizeMapping> mappings,
                                           Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap,
                                           Map<String, ActivityConfig> activityMap) {
-        DrawPoolAnalysisVO vo = new DrawPoolAnalysisVO();
+        DrawPoolAnalysisDTO vo = new DrawPoolAnalysisDTO();
         vo.setPoolCode(poolCode);
         vo.setIssueList(new ArrayList<>());
 
         String activityCode = null;
         if (pool == null) {
-            vo.getIssueList().add(DrawPoolIssueVO.danger("POOL_MISSING",
+            vo.getIssueList().add(DrawPoolIssueDTO.danger("POOL_MISSING",
                     "奖池配置不存在（编码 " + poolCode + "），这些坑位映射是孤儿数据：抽奖找不到奖池，配置也无处修改"));
         } else {
             vo.setPoolName(pool.getPoolName());
@@ -199,7 +199,7 @@ public class DrawPoolAnalysisService {
                 .sorted(Comparator.comparing(m -> m.getSortWeight() == null ? Integer.MAX_VALUE : m.getSortWeight()))
                 .collect(Collectors.toList());
 
-        List<DrawPoolSlotVO> slots = new ArrayList<>();
+        List<DrawPoolSlotDTO> slots = new ArrayList<>();
         BigDecimal acc = BigDecimal.ZERO;
         BigDecimal expectedCost = BigDecimal.ZERO;
         // 仍有库存的坑位概率之和 —— 「现在抽一次真能拿到东西的概率」
@@ -208,7 +208,7 @@ public class DrawPoolAnalysisService {
         int fallbackCount = 0;
 
         for (PoolPrizeMapping mapping : sorted) {
-            DrawPoolSlotVO slot = new DrawPoolSlotVO();
+            DrawPoolSlotDTO slot = new DrawPoolSlotDTO();
             slot.setId(mapping.getId());
             slot.setSortWeight(mapping.getSortWeight());
             slot.setPrizeItemId(mapping.getPrizeItemId());
@@ -225,17 +225,17 @@ public class DrawPoolAnalysisService {
             slot.setRangeMax(acc);
 
             if (prob.signum() < 0) {
-                slot.getIssueList().add(DrawPoolIssueVO.danger("PROBABILITY_NEGATIVE",
+                slot.getIssueList().add(DrawPoolIssueDTO.danger("PROBABILITY_NEGATIVE",
                         "概率为负数 " + prob.toPlainString() + "，会把后续坑位的命中区间整体推乱"));
             } else if (prob.signum() == 0 && !Boolean.TRUE.equals(slot.getFallback())) {
-                slot.getIssueList().add(DrawPoolIssueVO.warn("PROBABILITY_ZERO",
+                slot.getIssueList().add(DrawPoolIssueDTO.warn("PROBABILITY_ZERO",
                         "概率为 0 且不是兜底奖项：这个坑位永远不会被抽中"));
             }
 
             PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
             boolean slotHasStock = false;
             if (item == null) {
-                slot.getIssueList().add(DrawPoolIssueVO.danger("ITEM_MISSING",
+                slot.getIssueList().add(DrawPoolIssueDTO.danger("ITEM_MISSING",
                         "奖项 id " + mapping.getPrizeItemId() + " 不存在：抽奖时会直接返回「奖池配置异常：奖项已被删除」"));
             } else {
                 slot.setPrizeCode(item.getPrizeCode());
@@ -260,12 +260,12 @@ public class DrawPoolAnalysisService {
                          * 而兜底通常占着最大那块概率，它一空，受影响的是绝大多数请求。
                          */
                         if (Boolean.TRUE.equals(slot.getFallback())) {
-                            slot.getIssueList().add(DrawPoolIssueVO.danger("FALLBACK_SOLD_OUT",
+                            slot.getIssueList().add(DrawPoolIssueDTO.danger("FALLBACK_SOLD_OUT",
                                     "兜底奖项自己已经抽空：兜底是库存不足时的最后一道降级，它没库存意味着降级也失败。"
                                             + "本坑位概率 " + prob.toPlainString() + "%，加上其他缺货奖项降级过来的请求，"
                                             + "这部分用户全部会收到「手慢了，奖品已被抽完」"));
                         } else {
-                            slot.getIssueList().add(DrawPoolIssueVO.warn("SOLD_OUT",
+                            slot.getIssueList().add(DrawPoolIssueDTO.warn("SOLD_OUT",
                                     "库存已耗尽：命中本坑位的请求会降级到兜底奖项，没有兜底则返回「手慢了，奖品已被抽完」"));
                         }
                     }
@@ -276,7 +276,7 @@ public class DrawPoolAnalysisService {
                     Integer cached = drawStockService.getRemainStock(activityCode, item.getId());
                     slot.setRemainStockCache(cached);
                     if (cached != null && remainDb != null && cached.intValue() != remainDb.intValue()) {
-                        slot.getIssueList().add(DrawPoolIssueVO.danger("STOCK_DRIFT",
+                        slot.getIssueList().add(DrawPoolIssueDTO.danger("STOCK_DRIFT",
                                 "库存口径漂移：Redis 剩余 " + cached + "，DB 剩余 " + remainDb
                                         + "。运行态按 Redis 预扣，两者不一致意味着缓存被误预热或回滚失败，可能超发或少发"));
                     }
@@ -284,7 +284,7 @@ public class DrawPoolAnalysisService {
 
                 PrizeConfig prize = prizeMap.get(item.getPrizeCode());
                 if (prize == null) {
-                    slot.getIssueList().add(DrawPoolIssueVO.danger("PRIZE_MISSING",
+                    slot.getIssueList().add(DrawPoolIssueDTO.danger("PRIZE_MISSING",
                             "奖品「" + item.getPrizeCode() + "」不在资产大库：派奖时会报『奖品配置不存在』，用户中了奖拿不到东西"));
                 } else {
                     slot.setPrizeName(prize.getPrizeName());
@@ -321,18 +321,18 @@ public class DrawPoolAnalysisService {
         boolean closed = !slots.isEmpty() && acc.subtract(HUNDRED).abs().compareTo(PROBABILITY_EPSILON) <= 0;
         vo.setProbabilityClosed(closed);
         if (slots.isEmpty()) {
-            vo.getIssueList().add(DrawPoolIssueVO.danger("POOL_EMPTY",
+            vo.getIssueList().add(DrawPoolIssueDTO.danger("POOL_EMPTY",
                     "奖池一个坑位都没有：抽奖时快照构造直接抛「奖池快照不能为空」，本池不可用"));
         } else if (!closed) {
-            vo.getIssueList().add(DrawPoolIssueVO.danger("PROBABILITY_NOT_CLOSED",
+            vo.getIssueList().add(DrawPoolIssueDTO.danger("PROBABILITY_NOT_CLOSED",
                     "概率总和为 " + acc.toPlainString() + "%，未闭环到 100%："
                             + "抽奖时快照构造会抛异常且执行链路未捕获，本奖池的每一次抽奖请求都会直接报错"));
         }
         if (fallbackCount > 1) {
-            vo.getIssueList().add(DrawPoolIssueVO.danger("MULTI_FALLBACK",
+            vo.getIssueList().add(DrawPoolIssueDTO.danger("MULTI_FALLBACK",
                     "配置了 " + fallbackCount + " 个兜底奖项：引擎只认坑位顺序里的第一个，其余的静默失效"));
         } else if (fallbackCount == 0 && !slots.isEmpty()) {
-            vo.getIssueList().add(DrawPoolIssueVO.warn("NO_FALLBACK",
+            vo.getIssueList().add(DrawPoolIssueDTO.warn("NO_FALLBACK",
                     "没有兜底奖项：命中的奖项一旦无库存就直接返回「手慢了，奖品已被抽完」，没有降级余地"));
         }
 
@@ -352,13 +352,13 @@ public class DrawPoolAnalysisService {
                 boolean fallbackAlive = Boolean.TRUE.equals(fallbackHasStock);
                 String gapText = gap.stripTrailingZeros().toPlainString();
                 if (!fallbackAlive) {
-                    vo.getIssueList().add(DrawPoolIssueVO.danger("NO_STOCK_EXPOSURE",
+                    vo.getIssueList().add(DrawPoolIssueDTO.danger("NO_STOCK_EXPOSURE",
                             "约 " + gapText + "% 的抽奖请求会直接失败："
                                     + "这部分概率对应的奖项已抽空，而"
                                     + (fallbackCount == 0 ? "本池没有兜底奖项" : "兜底奖项自己也没有库存了")
                                     + "，用户会收到「手慢了，奖品已被抽完」"));
                 } else {
-                    vo.getIssueList().add(DrawPoolIssueVO.warn("STOCK_DEGRADED",
+                    vo.getIssueList().add(DrawPoolIssueDTO.warn("STOCK_DEGRADED",
                             "约 " + gapText + "% 的抽奖请求要靠兜底接住：这部分概率对应的奖项已抽空，"
                                     + "命中后会降级发兜底奖品。兜底一旦也抽空，这部分就变成纯失败"));
                 }
