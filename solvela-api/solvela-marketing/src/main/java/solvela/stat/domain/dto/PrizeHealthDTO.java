@@ -1,4 +1,4 @@
-package solvela.stat.domain.vo;
+package solvela.stat.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -23,7 +23,7 @@ import java.util.List;
  * @Date 2026-08-03
  */
 @Data
-public class PrizeHealthVO {
+public class PrizeHealthDTO {
 
     @Schema(description = "统计口径：全局 or 某活动。activityCode 为空时是全局")
     private String activityCode;

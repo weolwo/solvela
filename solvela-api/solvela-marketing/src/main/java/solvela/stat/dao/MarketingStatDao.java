@@ -1,13 +1,13 @@
 package solvela.stat.dao;
 
-import solvela.stat.domain.vo.EventHealthVO;
-import solvela.stat.domain.vo.GameplayVO;
-import solvela.stat.domain.vo.OverviewVO;
-import solvela.stat.domain.vo.ParticipationByTypeVO;
-import solvela.stat.domain.vo.ParticipationTrendVO;
-import solvela.stat.domain.vo.PrizeHealthVO;
-import solvela.stat.domain.vo.TaskFunnelVO;
-import solvela.stat.domain.vo.TopMemberVO;
+import solvela.stat.domain.dto.EventHealthDTO;
+import solvela.stat.domain.dto.GameplayDTO;
+import solvela.stat.domain.dto.OverviewDTO;
+import solvela.stat.domain.dto.ParticipationByTypeDTO;
+import solvela.stat.domain.dto.ParticipationTrendDTO;
+import solvela.stat.domain.dto.PrizeHealthDTO;
+import solvela.stat.domain.dto.TaskFunnelDTO;
+import solvela.stat.domain.dto.TopMemberDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,54 +32,54 @@ public interface MarketingStatDao {
      *
      * @param fromTime 起始时间（含）
      */
-    List<ParticipationTrendVO> participationTrend(@Param("fromTime") LocalDateTime fromTime);
+    List<ParticipationTrendDTO> participationTrend(@Param("fromTime") LocalDateTime fromTime);
 
     /**
      * 各玩法类型参与人数
      *
      * @param fromTime 起始时间（含）
      */
-    List<ParticipationByTypeVO> participationByType(@Param("fromTime") LocalDateTime fromTime);
+    List<ParticipationByTypeDTO> participationByType(@Param("fromTime") LocalDateTime fromTime);
 
     // ───────── 板块一：活动总览 ─────────
 
     /** 全部活动，按创建时间倒序。玩法数与完备度不在 SQL 里算，走 ActivityRefProvider */
-    List<OverviewVO.ActivityCard> activityCardList();
+    List<OverviewDTO.ActivityCard> activityCardList();
 
     /**
      * 逾期未开奖：已过计划开奖时刻但仍未开奖（status &lt;&gt; 2）。
      * 属客诉级异常，比任何参与量指标都该优先展示。
      */
-    List<OverviewVO.OverdueIssue> overdueIssueList();
+    List<OverviewDTO.OverdueIssue> overdueIssueList();
 
     // ───────── 板块二：发奖健康度 ─────────
 
     /** 发奖汇总：条数三态 + 待审积压 + 已发出价值。activityCode 为空则统计全局 */
-    PrizeHealthVO prizeSummary(@Param("activityCode") String activityCode);
+    PrizeHealthDTO prizeSummary(@Param("activityCode") String activityCode);
 
     /** 按资产类型拆分的条数与价值 */
-    List<PrizeHealthVO.AssetItem> prizeByAsset(@Param("activityCode") String activityCode);
+    List<PrizeHealthDTO.AssetItem> prizeByAsset(@Param("activityCode") String activityCode);
 
     /** 失败原因 TOP 10 */
-    List<PrizeHealthVO.FailReason> prizeFailReasonTop(@Param("activityCode") String activityCode);
+    List<PrizeHealthDTO.FailReason> prizeFailReasonTop(@Param("activityCode") String activityCode);
 
     /** 发出价值趋势：按天 × 资产类型 */
-    List<PrizeHealthVO.TrendItem> prizeTrend(@Param("activityCode") String activityCode,
+    List<PrizeHealthDTO.TrendItem> prizeTrend(@Param("activityCode") String activityCode,
                                              @Param("fromTime") LocalDateTime fromTime);
 
     // ───────── 板块三：玩法运行态 ─────────
 
     /** 抽奖状态分布 */
-    List<GameplayVO.DrawStatItem> drawStat(@Param("activityCode") String activityCode);
+    List<GameplayDTO.DrawStatItem> drawStat(@Param("activityCode") String activityCode);
 
     /** 该活动下所有彩票玩法的期号 */
-    List<GameplayVO.LotteryIssueItem> lotteryIssueList(@Param("activityCode") String activityCode);
+    List<GameplayDTO.LotteryIssueItem> lotteryIssueList(@Param("activityCode") String activityCode);
 
     /** 该活动下的任务列表（带参与人数），供前端选一个看漏斗 */
-    List<GameplayVO.TaskOption> taskOptionList(@Param("activityCode") String activityCode);
+    List<GameplayDTO.TaskOption> taskOptionList(@Param("activityCode") String activityCode);
 
     /** 任务阶梯档位与到达人数 */
-    List<TaskFunnelVO.StageItem> taskFunnelStages(@Param("taskConfigId") Long taskConfigId);
+    List<TaskFunnelDTO.StageItem> taskFunnelStages(@Param("taskConfigId") Long taskConfigId);
 
     /** 任务接取人数（有记录的人数） */
     Integer taskJoinedCount(@Param("taskConfigId") Long taskConfigId);
@@ -93,10 +93,10 @@ public interface MarketingStatDao {
     List<java.util.Map<String, Object>> eventFlowTypeCount(@Param("fromTime") LocalDateTime fromTime);
 
     /** 丢弃原因聚类（按 discard_code，不是自由文本的 discard_reason） */
-    List<EventHealthVO.DiscardItem> discardStat(@Param("fromTime") LocalDateTime fromTime);
+    List<EventHealthDTO.DiscardItem> discardStat(@Param("fromTime") LocalDateTime fromTime);
 
     // ───────── 板块五：用户维度 ─────────
 
     /** Top 获奖用户，按已发出价值降序 */
-    List<TopMemberVO> topMembers(@Param("fromTime") LocalDateTime fromTime, @Param("limit") int limit);
+    List<TopMemberDTO> topMembers(@Param("fromTime") LocalDateTime fromTime, @Param("limit") int limit);
 }

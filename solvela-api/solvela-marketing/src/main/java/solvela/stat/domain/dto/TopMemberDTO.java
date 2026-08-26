@@ -1,4 +1,4 @@
-package solvela.stat.domain.vo;
+package solvela.stat.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -16,7 +16,7 @@ import java.math.BigDecimal;
  * @Date 2026-08-03
  */
 @Data
-public class TopMemberVO {
+public class TopMemberDTO {
 
     @Schema(description = "会员号")
     private Long memberId;

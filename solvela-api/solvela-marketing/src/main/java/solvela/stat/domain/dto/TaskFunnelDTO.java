@@ -1,4 +1,4 @@
-package solvela.stat.domain.vo;
+package solvela.stat.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -19,7 +19,7 @@ import java.util.List;
  * @Date 2026-08-03
  */
 @Data
-public class TaskFunnelVO {
+public class TaskFunnelDTO {
 
     @Schema(description = "任务配置ID")
     private Long taskConfigId;

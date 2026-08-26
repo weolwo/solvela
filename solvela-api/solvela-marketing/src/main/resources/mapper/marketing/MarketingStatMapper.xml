@@ -32,7 +32,7 @@
     -->
 
     <!-- 参与趋势：按天 × 玩法类型 -->
-    <select id="participationTrend" resultType="solvela.stat.domain.vo.ParticipationTrendVO">
+    <select id="participationTrend" resultType="solvela.stat.domain.dto.ParticipationTrendDTO">
         SELECT DATE_FORMAT(t.create_time, '%Y-%m-%d') AS statDate,
                t.activity_type                        AS activityType,
                COUNT(DISTINCT t.member_id)            AS memberCount
@@ -44,7 +44,7 @@
     </select>
 
     <!-- 各玩法类型参与人数 -->
-    <select id="participationByType" resultType="solvela.stat.domain.vo.ParticipationByTypeVO">
+    <select id="participationByType" resultType="solvela.stat.domain.dto.ParticipationByTypeDTO">
         SELECT t.activity_type               AS activityType,
                COUNT(DISTINCT t.member_id) AS memberCount
         FROM (
@@ -123,7 +123,7 @@
          每加一种玩法都要回来改这段 SQL，正是那个 SPI 当初要消灭的东西。
       ⚠️ status 原样返回，两态判定（!= 2 为启用）在 Service 里做一次，不在 SQL 里也判一遍。
     -->
-    <select id="activityCardList" resultType="solvela.stat.domain.vo.OverviewVO$ActivityCard">
+    <select id="activityCardList" resultType="solvela.stat.domain.dto.OverviewDTO$ActivityCard">
         SELECT activity_code AS activityCode,
                activity_name AS activityName,
                activity_type AS activityType,
@@ -140,7 +140,7 @@
       status: 0-销售中 1-开奖中 2-已开奖，所以判据是 &lt;&gt; 2 而不是 = 0
       —— 卡在「开奖中」同样是没开出来，漏掉它就漏掉了最需要人介入的那种。
     -->
-    <select id="overdueIssueList" resultType="solvela.stat.domain.vo.OverviewVO$OverdueIssue">
+    <select id="overdueIssueList" resultType="solvela.stat.domain.dto.OverviewDTO$OverdueIssue">
         SELECT i.lottery_code   AS lotteryCode,
                c.activity_code  AS activityCode,
                c.lottery_name   AS lotteryName,
@@ -162,7 +162,7 @@
          保证它们出自同一次扫描、同一份快照 —— 分开查会在并发写入时凑不平，
          而「加不平的 KPI」正是本项目在原型上栽过的那一跤。
     -->
-    <select id="prizeSummary" resultType="solvela.stat.domain.vo.PrizeHealthVO">
+    <select id="prizeSummary" resultType="solvela.stat.domain.dto.PrizeHealthDTO">
         SELECT COUNT(*)                  AS total,
                SUM(status = 1)           AS successCount,
                SUM(status = 2)           AS failedCount,
@@ -176,7 +176,7 @@
         <include refid="activityCodeFilter"/>
     </select>
 
-    <select id="prizeByAsset" resultType="solvela.stat.domain.vo.PrizeHealthVO$AssetItem">
+    <select id="prizeByAsset" resultType="solvela.stat.domain.dto.PrizeHealthDTO$AssetItem">
         SELECT prize_type AS prizeType,
                COUNT(*)   AS count,
                COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue
@@ -187,7 +187,7 @@
         ORDER BY COUNT(*) DESC
     </select>
 
-    <select id="prizeFailReasonTop" resultType="solvela.stat.domain.vo.PrizeHealthVO$FailReason">
+    <select id="prizeFailReasonTop" resultType="solvela.stat.domain.dto.PrizeHealthDTO$FailReason">
         SELECT fail_reason AS failReason,
                COUNT(*)    AS count
         FROM t_prize_log
@@ -198,7 +198,7 @@
         LIMIT 10
     </select>
 
-    <select id="prizeTrend" resultType="solvela.stat.domain.vo.PrizeHealthVO$TrendItem">
+    <select id="prizeTrend" resultType="solvela.stat.domain.dto.PrizeHealthDTO$TrendItem">
         SELECT DATE_FORMAT(create_time, '%Y-%m-%d') AS statDate,
                prize_type                           AS prizeType,
                COALESCE(SUM(<include refid="issuedValueExpr"/>), 0) AS issuedValue
@@ -217,7 +217,7 @@
       ⚠️ 库存水位不在这里查 —— 真实剩余在 Redis 的 draw:stock:*，
          t_prize_pool_item.used_stock 是最终一致性兜底，读 DB 会偏小（压测第 3 轮踩过）。
     -->
-    <select id="drawStat" resultType="solvela.stat.domain.vo.GameplayVO$DrawStatItem">
+    <select id="drawStat" resultType="solvela.stat.domain.dto.GameplayDTO$DrawStatItem">
         SELECT status                        AS status,
                COUNT(*)                      AS count,
                COUNT(DISTINCT member_id)     AS memberCount
@@ -227,7 +227,7 @@
         ORDER BY status
     </select>
 
-    <select id="lotteryIssueList" resultType="solvela.stat.domain.vo.GameplayVO$LotteryIssueItem">
+    <select id="lotteryIssueList" resultType="solvela.stat.domain.dto.GameplayDTO$LotteryIssueItem">
         SELECT i.lottery_code   AS lotteryCode,
                c.lottery_name   AS lotteryName,
                i.issue_no       AS issueNo,
@@ -243,7 +243,7 @@
         ORDER BY i.plan_draw_time DESC, i.issue_no DESC
     </select>
 
-    <select id="taskOptionList" resultType="solvela.stat.domain.vo.GameplayVO$TaskOption">
+    <select id="taskOptionList" resultType="solvela.stat.domain.dto.GameplayDTO$TaskOption">
         SELECT t.id        AS taskConfigId,
                t.task_name AS taskName,
                (SELECT COUNT(DISTINCT r.member_id) FROM t_task_record r
@@ -268,7 +268,7 @@
          实测就撞上了：task_config_id=50 接取 12 人，而 COUNT(*) 口径下第一档「到达」18，
          漏斗直接倒过来。两个数各自都没算错，错在放进了同一张图。
     -->
-    <select id="taskFunnelStages" resultType="solvela.stat.domain.vo.TaskFunnelVO$StageItem">
+    <select id="taskFunnelStages" resultType="solvela.stat.domain.dto.TaskFunnelDTO$StageItem">
         SELECT m.stage_level AS stageLevel,
                CAST(JSON_UNQUOTE(JSON_EXTRACT(m.stage_condition, '$.target')) AS DECIMAL(18,4)) AS target,
                m.prize_code  AS prizeCode,
@@ -308,7 +308,7 @@
       走覆盖索引 idx_t_tsk_flw_stat(create_time, flow_type, discard_code)。
       discardDesc 与 needsAttention 不在 SQL 里拼，由 Service 查 TaskDiscardCode 枚举补。
     -->
-    <select id="discardStat" resultType="solvela.stat.domain.vo.EventHealthVO$DiscardItem">
+    <select id="discardStat" resultType="solvela.stat.domain.dto.EventHealthDTO$DiscardItem">
         SELECT discard_code AS discardCode,
                COUNT(*)     AS count
         FROM t_task_record_flow
@@ -329,7 +329,7 @@
           （t_prize_log 是单据，回答的是「当时是谁」）。同一个 member_id 的快照理论上
           可能有新旧两种，MIN() 取其一，仅用于展示。
     -->
-    <select id="topMembers" resultType="solvela.stat.domain.vo.TopMemberVO">
+    <select id="topMembers" resultType="solvela.stat.domain.dto.TopMemberDTO">
         SELECT member_id        AS memberId,
                MIN(member_name) AS memberName,
                COUNT(*)         AS count,

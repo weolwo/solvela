@@ -1,19 +1,19 @@
-package solvela.stat.domain.vo;
+package solvela.stat.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
- * 参与趋势：某天某玩法类型的参与人数
+ * 各玩法类型参与人数
+ *
+ * <p>⚠️ 刻意不叫「占比」：同一个人既玩抽奖又做任务时，各类型各自去重后相加
+ * 会把他算两次，各项之和大于实际总人数。前端用柱状图而不是饼图，不承诺占比语义。
  *
  * @Author weolwo
  * @Date 2026-08-02
  */
 @Data
-public class ParticipationTrendVO {
-
-    @Schema(description = "日期 yyyy-MM-dd")
-    private String statDate;
+public class ParticipationByTypeDTO {
 
     @Schema(description = "玩法类型：DRAW / TASK / LOTTERY")
     private String activityType;
