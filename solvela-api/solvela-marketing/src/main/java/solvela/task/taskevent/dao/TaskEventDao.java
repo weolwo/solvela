@@ -2,7 +2,7 @@ package solvela.task.taskevent.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import solvela.task.taskevent.domain.entity.TaskEvent;
+import solvela.task.TaskEvent;
 import solvela.task.taskevent.domain.form.TaskEventQueryForm;
 import solvela.task.taskevent.domain.vo.TaskEventVO;
 import org.apache.ibatis.annotations.Mapper;

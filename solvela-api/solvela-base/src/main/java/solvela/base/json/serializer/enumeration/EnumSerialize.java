@@ -2,7 +2,7 @@ package solvela.base.json.serializer.enumeration;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotationsInside;
 import tools.jackson.databind.annotation.JsonSerialize;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

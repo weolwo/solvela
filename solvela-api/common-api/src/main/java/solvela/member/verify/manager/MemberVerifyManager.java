@@ -1,6 +1,6 @@
 package solvela.member.verify.manager;
 
-import solvela.member.verify.domain.entity.MemberVerify;
+import solvela.member.MemberVerify;
 import solvela.member.verify.dao.MemberVerifyDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

@@ -3,7 +3,7 @@ package solvela.base.validation.enumeration;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 import java.util.List;
 import java.util.stream.Collectors;

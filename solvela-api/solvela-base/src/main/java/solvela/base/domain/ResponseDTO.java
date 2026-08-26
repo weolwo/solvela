@@ -3,8 +3,8 @@ package solvela.base.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.code.ErrorCode;
-import solvela.base.code.UserErrorCode;
+import solvela.code.ErrorCode;
+import solvela.code.UserErrorCode;
 import solvela.base.enumeration.DataTypeEnum;
 import solvela.base.swagger.SchemaEnum;
 import org.apache.commons.lang3.StringUtils;

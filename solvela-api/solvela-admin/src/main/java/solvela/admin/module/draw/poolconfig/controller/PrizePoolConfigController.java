@@ -1,7 +1,7 @@
 package solvela.admin.module.draw.poolconfig.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.draw.poolconfig.domain.entity.PrizePoolConfig;
+import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.domain.vo.PrizePoolBoardResultVO;
 import solvela.draw.poolconfig.service.PrizePoolBoardService;
 import solvela.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;

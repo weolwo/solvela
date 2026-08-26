@@ -2,7 +2,7 @@ package solvela.task.taskconfig.dao;
 
         import java.util.List;
 
-        import solvela.task.taskconfig.domain.entity.TaskConfig;
+        import solvela.task.TaskConfig;
         import solvela.task.taskconfig.domain.form.TaskConfigQueryForm;
         import solvela.task.taskconfig.domain.vo.TaskConfigVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

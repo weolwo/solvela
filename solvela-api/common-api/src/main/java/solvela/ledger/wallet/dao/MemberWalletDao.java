@@ -2,7 +2,7 @@ package solvela.ledger.wallet.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import solvela.ledger.wallet.domain.entity.MemberWallet;
+import solvela.ledger.MemberWallet;
 import solvela.ledger.wallet.domain.form.MemberWalletQueryForm;
 import solvela.ledger.wallet.domain.vo.MemberWalletVO;
 import org.apache.ibatis.annotations.Mapper;

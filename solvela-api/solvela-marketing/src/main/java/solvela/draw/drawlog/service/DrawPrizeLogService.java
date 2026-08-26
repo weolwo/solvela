@@ -8,7 +8,7 @@ import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 import solvela.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
 import solvela.draw.drawlog.domain.vo.DrawFunnelVO;
 import solvela.draw.drawlog.domain.vo.DrawPrizeLogVO;
-import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
+import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import org.springframework.stereotype.Service;
 

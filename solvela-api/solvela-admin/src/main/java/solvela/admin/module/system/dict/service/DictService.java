@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;

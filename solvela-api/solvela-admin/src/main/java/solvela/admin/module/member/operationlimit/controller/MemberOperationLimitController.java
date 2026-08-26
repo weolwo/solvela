@@ -15,8 +15,8 @@ import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;
 import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
 import solvela.member.operationlimit.constant.MemberOperationUnlockTypeEnum;
-import solvela.member.operationlimit.domain.entity.MemberOperationLimit;
-import solvela.member.operationlimit.domain.form.MemberOperationUnlockForm;
+import solvela.member.MemberOperationLimit;
+import solvela.admin.module.member.operationlimit.domain.form.MemberOperationUnlockForm;
 import solvela.member.operationlimit.service.MemberOperationLimitService;
 
 import java.util.List;

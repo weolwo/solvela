@@ -1,6 +1,6 @@
 package solvela.mall.favorite.manager;
 
-import solvela.mall.favorite.domain.entity.MallFavorite;
+import solvela.mall.MallFavorite;
 import solvela.mall.favorite.dao.MallFavoriteDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

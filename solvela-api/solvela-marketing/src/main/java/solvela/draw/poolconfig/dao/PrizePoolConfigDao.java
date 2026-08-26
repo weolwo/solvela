@@ -2,7 +2,7 @@ package solvela.draw.poolconfig.dao;
 
         import java.util.List;
 
-        import solvela.draw.poolconfig.domain.entity.PrizePoolConfig;
+        import solvela.draw.PrizePoolConfig;
         import solvela.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
         import solvela.draw.poolconfig.domain.vo.PrizePoolConfigVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

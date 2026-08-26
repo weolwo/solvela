@@ -1,6 +1,6 @@
 package solvela.base.module.file.service;
 
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.module.file.constant.FileStatusEnum;
 import solvela.base.module.file.config.FileImageProperties;
 import solvela.base.module.file.domain.ImageVariant;

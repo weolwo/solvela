@@ -8,7 +8,7 @@ import solvela.member.operationlimit.constant.MemberOperationLimitStatusEnum;
 import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
 import solvela.member.operationlimit.constant.MemberOperationUnlockTypeEnum;
 import solvela.member.operationlimit.dao.MemberOperationLimitDao;
-import solvela.member.operationlimit.domain.entity.MemberOperationLimit;
+import solvela.member.MemberOperationLimit;
 
 import java.time.LocalDateTime;
 import java.util.List;

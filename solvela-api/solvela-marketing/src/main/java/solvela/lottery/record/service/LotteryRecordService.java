@@ -9,7 +9,7 @@ import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.record.domain.form.LotteryRecordQueryForm;
 import solvela.lottery.record.domain.vo.LotteryRecordFunnelVO;
 import solvela.lottery.record.domain.vo.LotteryRecordVO;
-import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
+import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import org.springframework.stereotype.Service;
 

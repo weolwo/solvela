@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import solvela.activity.domain.entity.ActivityDisplay;
+import solvela.activity.ActivityDisplay;
 import solvela.activity.service.ActivityDisplayService;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;

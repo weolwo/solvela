@@ -3,7 +3,7 @@ package solvela.task.taskconfig.manager;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import solvela.task.taskconfig.dao.TaskConfigDao;
-import solvela.task.taskconfig.domain.entity.TaskConfig;
+import solvela.task.TaskConfig;
 import org.springframework.stereotype.Service;
 /**
  * 任务配置表  Manager

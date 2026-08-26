@@ -1,7 +1,7 @@
 package solvela.ledger.transaction.manager;
 
 import solvela.ledger.transaction.dao.MemberAssetTransactionDao;
-import solvela.ledger.transaction.domain.entity.MemberAssetTransaction;
+import solvela.ledger.MemberAssetTransaction;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

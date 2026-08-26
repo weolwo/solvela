@@ -13,7 +13,7 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.base.sonicexcel.error.SonicReadResult;
 import solvela.enums.DeliveryStatusEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
-import solvela.ledger.logistic.domain.entity.PhysicalDelivery;
+import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;

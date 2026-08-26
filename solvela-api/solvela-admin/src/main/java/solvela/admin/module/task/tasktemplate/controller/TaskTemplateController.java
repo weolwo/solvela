@@ -1,7 +1,7 @@
 package solvela.admin.module.task.tasktemplate.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.task.tasktemplate.domain.entity.TaskTemplate;
+import solvela.task.TaskTemplate;
 import solvela.task.tasktemplate.domain.form.TaskTemplateAddForm;
 import solvela.task.tasktemplate.domain.form.TaskTemplateQueryForm;
 import solvela.task.tasktemplate.domain.form.TaskTemplateSaveForm;

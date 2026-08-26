@@ -1,6 +1,6 @@
 package solvela.mall.address.manager;
 
-import solvela.mall.address.domain.entity.MallAddress;
+import solvela.mall.MallAddress;
 import solvela.mall.address.dao.MallAddressDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

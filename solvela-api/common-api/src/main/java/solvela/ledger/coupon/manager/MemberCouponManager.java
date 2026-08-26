@@ -1,6 +1,6 @@
 package solvela.ledger.coupon.manager;
 
-import solvela.ledger.coupon.domain.entity.MemberCoupon;
+import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

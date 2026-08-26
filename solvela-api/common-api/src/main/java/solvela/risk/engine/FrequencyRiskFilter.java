@@ -2,7 +2,7 @@ package solvela.risk.engine;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 

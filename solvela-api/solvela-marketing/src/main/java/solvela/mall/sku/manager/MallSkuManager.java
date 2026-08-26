@@ -1,7 +1,7 @@
 package solvela.mall.sku.manager;
 
 import solvela.mall.sku.dao.MallSkuDao;
-import solvela.mall.sku.domain.entity.MallSku;
+import solvela.mall.MallSku;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

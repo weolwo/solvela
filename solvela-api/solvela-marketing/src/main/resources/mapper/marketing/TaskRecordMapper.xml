@@ -258,7 +258,7 @@
 
     <!-- ==================== 运行态（v3.44.0，方案 §4.4） ==================== -->
 
-    <select id="selectByUniqueKey" resultType="solvela.task.record.domain.entity.TaskRecord">
+    <select id="selectByUniqueKey" resultType="solvela.task.TaskRecord">
         SELECT id, member_id, task_config_id, activity_code, period_key,
                valid_start_time, valid_end_time, current_metric, version, status,
                progress_data, rule_snapshot, prize_snapshot, complete_time,
@@ -274,7 +274,7 @@
       第 1 轮是裸键、第 2 轮起是「基础键#N」，所以两种形态都要匹配。
       按 id 倒序：轮次依次创建，id 最大的就是最新一轮。
     -->
-    <select id="selectLatestRoundByPeriod" resultType="solvela.task.record.domain.entity.TaskRecord">
+    <select id="selectLatestRoundByPeriod" resultType="solvela.task.TaskRecord">
         SELECT id, member_id, task_config_id, activity_code, period_key,
                valid_start_time, valid_end_time, current_metric, version, status,
                progress_data, rule_snapshot, prize_snapshot, complete_time,

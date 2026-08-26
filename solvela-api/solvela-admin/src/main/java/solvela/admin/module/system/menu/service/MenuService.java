@@ -9,7 +9,7 @@ import solvela.admin.module.system.menu.domain.form.MenuBaseForm;
 import solvela.admin.module.system.menu.domain.form.MenuUpdateForm;
 import solvela.admin.module.system.menu.domain.vo.MenuTreeVO;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
-import solvela.base.code.SystemErrorCode;
+import solvela.code.SystemErrorCode;
 import solvela.base.domain.RequestUrlVO;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;

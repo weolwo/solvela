@@ -1,6 +1,6 @@
 package solvela.ledger.logistic.manager;
 
-import solvela.ledger.logistic.domain.entity.PhysicalDelivery;
+import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

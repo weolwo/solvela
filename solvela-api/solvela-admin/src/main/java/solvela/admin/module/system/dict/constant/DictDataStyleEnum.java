@@ -1,7 +1,7 @@
 package solvela.admin.module.system.dict.constant;
 
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 字典回显样式 枚举

@@ -2,7 +2,7 @@ package solvela.draw.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.draw.poolitem.domain.entity.PrizePoolItem;
+import solvela.draw.PrizePoolItem;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;

@@ -2,7 +2,7 @@ package solvela.risk.proposal.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import solvela.risk.proposal.domain.entity.ProposalRecord;
+import solvela.risk.ProposalRecord;
 import solvela.risk.proposal.domain.form.ProposalRecordQueryForm;
 import solvela.risk.proposal.domain.vo.ProposalRecordVO;
 import org.apache.ibatis.annotations.Mapper;

@@ -8,9 +8,9 @@ import solvela.ledger.handler.IAssetHandler;
 import solvela.ledger.strategy.AssetStrategyFactory;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 import solvela.risk.proposal.dao.ProposalRecordDao;
-import solvela.risk.proposal.domain.entity.ProposalRecord;
+import solvela.risk.ProposalRecord;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;

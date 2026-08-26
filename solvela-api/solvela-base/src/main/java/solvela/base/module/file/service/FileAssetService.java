@@ -8,7 +8,7 @@ import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.RequestUser;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.module.file.constant.FileStatusEnum;
 import solvela.base.module.file.config.FileImageProperties;
 import solvela.base.module.file.dao.FileCategoryDao;

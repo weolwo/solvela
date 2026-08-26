@@ -1,6 +1,6 @@
 package solvela.draw.prizemapping.manager;
 
-import solvela.draw.prizemapping.domain.entity.PoolPrizeMapping;
+import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.dao.PoolPrizeMappingDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

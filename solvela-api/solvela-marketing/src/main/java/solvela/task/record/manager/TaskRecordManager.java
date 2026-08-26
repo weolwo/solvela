@@ -3,7 +3,7 @@ package solvela.task.record.manager;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import solvela.task.record.dao.TaskRecordDao;
-import solvela.task.record.domain.entity.TaskRecord;
+import solvela.task.TaskRecord;
 import org.springframework.stereotype.Service;
 /**
  * 任务记录表  Manager

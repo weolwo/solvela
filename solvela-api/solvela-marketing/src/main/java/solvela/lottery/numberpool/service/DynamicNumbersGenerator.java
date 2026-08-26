@@ -2,7 +2,7 @@ package solvela.lottery.numberpool.service;
 
 import solvela.base.util.SolvelaRandomUtil;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 
 import java.util.*;
 

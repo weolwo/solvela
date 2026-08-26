@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import solvela.member.domain.entity.Member;
+import solvela.member.Member;
 import solvela.member.domain.form.MemberQueryForm;
 import solvela.member.domain.vo.MemberVO;
 

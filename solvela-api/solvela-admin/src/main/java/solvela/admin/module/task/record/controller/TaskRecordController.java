@@ -1,7 +1,7 @@
 package solvela.admin.module.task.record.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.task.record.domain.entity.TaskRecord;
+import solvela.task.TaskRecord;
 import solvela.task.record.domain.form.TaskRecordAddForm;
 import solvela.task.record.domain.form.TaskRecordQueryForm;
 import solvela.task.record.domain.form.TaskRecordStatusUpdateForm;

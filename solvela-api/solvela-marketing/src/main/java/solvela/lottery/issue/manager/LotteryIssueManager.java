@@ -1,6 +1,6 @@
 package solvela.lottery.issue.manager;
 
-import solvela.lottery.issue.domain.entity.LotteryIssue;
+import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.dao.LotteryIssueDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

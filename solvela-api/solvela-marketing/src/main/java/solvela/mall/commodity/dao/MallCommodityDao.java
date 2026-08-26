@@ -2,7 +2,7 @@ package solvela.mall.commodity.dao;
 
 import java.util.List;
 
-import solvela.mall.commodity.domain.entity.MallCommodity;
+import solvela.mall.MallCommodity;
 import solvela.mall.commodity.domain.form.MallCommodityQueryForm;
 import solvela.mall.commodity.domain.vo.MallCommodityVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

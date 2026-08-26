@@ -2,7 +2,7 @@ package solvela.ledger.logistic.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import solvela.ledger.logistic.domain.entity.PhysicalDelivery;
+import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
 import solvela.ledger.logistic.domain.vo.PhysicalDeliveryVO;
 import org.apache.ibatis.annotations.Mapper;

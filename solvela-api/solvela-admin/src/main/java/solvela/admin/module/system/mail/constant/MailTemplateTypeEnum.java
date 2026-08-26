@@ -2,7 +2,7 @@ package solvela.admin.module.system.mail.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 邮件模板类型

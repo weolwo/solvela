@@ -8,7 +8,7 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.task.constant.TaskConst;
 import solvela.task.prizemapping.dao.TaskPrizeMappingDao;
-import solvela.task.prizemapping.domain.entity.TaskPrizeMapping;
+import solvela.task.TaskPrizeMapping;
 import solvela.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
 import solvela.task.prizemapping.domain.vo.TaskPrizeMappingVO;
 import solvela.task.runtime.domain.TaskRuleConfig;

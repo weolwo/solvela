@@ -2,7 +2,7 @@ package solvela.base.module.config;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 系统配置常量类

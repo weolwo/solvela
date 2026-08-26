@@ -1,7 +1,7 @@
 package solvela.ledger.wallet.manager;
 
 import solvela.ledger.wallet.dao.MemberWalletDao;
-import solvela.ledger.wallet.domain.entity.MemberWallet;
+import solvela.ledger.MemberWallet;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

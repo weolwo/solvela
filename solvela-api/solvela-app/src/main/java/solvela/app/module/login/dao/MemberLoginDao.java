@@ -3,7 +3,7 @@ package solvela.app.module.login.dao;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import solvela.member.domain.entity.Member;
+import solvela.member.Member;
 
 /**
  * 会员登录专用查询。

@@ -1,6 +1,6 @@
 package solvela.draw.drawlog.manager;
 
-import solvela.draw.drawlog.domain.entity.DrawPrizeLog;
+import solvela.draw.DrawPrizeLog;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

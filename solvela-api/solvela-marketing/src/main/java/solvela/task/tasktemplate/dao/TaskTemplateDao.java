@@ -2,7 +2,7 @@ package solvela.task.tasktemplate.dao;
 
         import java.util.List;
 
-        import solvela.task.tasktemplate.domain.entity.TaskTemplate;
+        import solvela.task.TaskTemplate;
         import solvela.task.tasktemplate.domain.form.TaskTemplateQueryForm;
         import solvela.task.tasktemplate.domain.vo.TaskTemplateVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

@@ -5,7 +5,7 @@ import tools.jackson.databind.BeanProperty;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.SerializationContext;
 import solvela.base.constant.StringConst;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.base.util.SolvelaStringUtil;
 

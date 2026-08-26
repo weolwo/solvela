@@ -1,6 +1,6 @@
 package solvela.lottery.config.manager;
 
-import solvela.lottery.config.domain.entity.LotteryConfig;
+import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.dao.LotteryConfigDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

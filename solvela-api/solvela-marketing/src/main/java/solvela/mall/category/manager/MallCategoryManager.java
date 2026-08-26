@@ -1,7 +1,7 @@
 package solvela.mall.category.manager;
 
 import solvela.mall.category.dao.MallCategoryDao;
-import solvela.mall.category.domain.entity.MallCategory;
+import solvela.mall.MallCategory;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

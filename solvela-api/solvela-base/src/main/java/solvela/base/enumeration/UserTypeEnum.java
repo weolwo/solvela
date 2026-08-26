@@ -1,5 +1,7 @@
 package solvela.base.enumeration;
 
+import solvela.enums.BaseEnum;
+
 /**
  * 用户类型
  *

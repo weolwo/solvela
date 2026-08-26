@@ -1,7 +1,7 @@
 package solvela.base.listener;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.code.ErrorCodeRegister;
+import solvela.code.ErrorCodeRegister;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.base.util.SolvelaIpUtil;

@@ -3,7 +3,7 @@ package solvela.base.module.file.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import solvela.base.domain.RequestUser;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.module.file.dao.FileCategoryDao;
 import solvela.base.module.file.dao.FileDao;
 import solvela.base.module.file.domain.entity.FileCategoryEntity;

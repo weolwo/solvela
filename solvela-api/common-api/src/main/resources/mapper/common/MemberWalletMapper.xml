@@ -107,7 +107,7 @@
         <include refid="query_conditions"/>
         ORDER BY w.create_time DESC
     </select>
-    <select id="getByMemberIdAndAssetType" resultType="solvela.ledger.wallet.domain.entity.MemberWallet">
+    <select id="getByMemberIdAndAssetType" resultType="solvela.ledger.MemberWallet">
         SELECT
         <include refid="base_columns"/>
         FROM t_member_wallet

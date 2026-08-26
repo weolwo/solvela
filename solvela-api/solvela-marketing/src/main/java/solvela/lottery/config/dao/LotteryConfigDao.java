@@ -2,7 +2,7 @@ package solvela.lottery.config.dao;
 
         import java.util.List;
 
-        import solvela.lottery.config.domain.entity.LotteryConfig;
+        import solvela.lottery.LotteryConfig;
         import solvela.lottery.config.domain.form.LotteryConfigQueryForm;
         import solvela.lottery.config.domain.vo.LotteryConfigVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

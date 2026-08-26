@@ -2,7 +2,7 @@ package solvela.admin.module.system.job.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 执行记录的触发来源。

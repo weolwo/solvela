@@ -2,7 +2,7 @@ package solvela.lottery.issue.dao;
 
         import java.util.List;
 
-        import solvela.lottery.issue.domain.entity.LotteryIssue;
+        import solvela.lottery.LotteryIssue;
         import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
         import solvela.lottery.issue.domain.vo.LotteryIssueOverviewVO;
         import solvela.lottery.issue.domain.vo.LotteryIssueVO;

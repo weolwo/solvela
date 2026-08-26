@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.task.recordflow.dao.TaskRecordFlowDao">
 
-    <resultMap id="TaskRecordFlow" type="solvela.task.recordflow.domain.entity.TaskRecordFlow">
+    <resultMap id="TaskRecordFlow" type="solvela.task.TaskRecordFlow">
         <result column="id" property="id"/>
         <result column="member_id" property="memberId" />
         <result column="member_name" property="memberName"/>

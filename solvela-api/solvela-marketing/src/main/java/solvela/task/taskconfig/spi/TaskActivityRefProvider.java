@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import solvela.activity.domain.vo.ActivityRefItem;
 import solvela.activity.spi.ActivityRefProvider;
 import solvela.enums.ActivityTypeEnum;
-import solvela.task.taskconfig.domain.entity.TaskConfig;
+import solvela.task.TaskConfig;
 import solvela.task.taskconfig.manager.TaskConfigManager;
 import org.springframework.stereotype.Component;
 

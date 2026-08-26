@@ -1,7 +1,7 @@
 package solvela.base.module.redis;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import org.redisson.api.RBucket;
 import org.redisson.api.RIdGenerator;
 import org.redisson.api.RLock;

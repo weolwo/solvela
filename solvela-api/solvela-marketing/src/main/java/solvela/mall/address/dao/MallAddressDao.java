@@ -2,7 +2,7 @@ package solvela.mall.address.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import solvela.mall.address.domain.entity.MallAddress;
+import solvela.mall.MallAddress;
 
 /**
  * 商城-会员收货地址簿 Dao

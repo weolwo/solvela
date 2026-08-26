@@ -2,7 +2,7 @@ package solvela.scriptengine.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import solvela.scriptengine.domain.entity.Script;
+import solvela.scriptengine.Script;
 
 /**
  * 脚本注册表 Dao

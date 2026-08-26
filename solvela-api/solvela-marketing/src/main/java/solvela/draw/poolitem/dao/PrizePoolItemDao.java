@@ -2,7 +2,7 @@ package solvela.draw.poolitem.dao;
 
         import java.util.List;
 
-        import solvela.draw.poolitem.domain.entity.PrizePoolItem;
+        import solvela.draw.PrizePoolItem;
         import solvela.draw.poolitem.domain.form.PrizePoolItemQueryForm;
         import solvela.draw.poolitem.domain.vo.PrizePoolItemVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

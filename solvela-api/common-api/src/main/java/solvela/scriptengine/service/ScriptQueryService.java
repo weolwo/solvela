@@ -2,9 +2,9 @@ package solvela.scriptengine.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import solvela.base.exception.BusinessException;
-import solvela.scriptengine.domain.entity.Script;
-import solvela.scriptengine.domain.entity.ScriptRef;
+import solvela.exception.BusinessException;
+import solvela.scriptengine.Script;
+import solvela.scriptengine.ScriptRef;
 import solvela.scriptengine.domain.vo.ScriptVO;
 import solvela.scriptengine.manager.ScriptManager;
 import solvela.scriptengine.manager.ScriptRefManager;

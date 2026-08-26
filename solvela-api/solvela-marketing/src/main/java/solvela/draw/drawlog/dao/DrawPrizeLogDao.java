@@ -2,7 +2,7 @@ package solvela.draw.drawlog.dao;
 
         import java.util.List;
 
-        import solvela.draw.drawlog.domain.entity.DrawPrizeLog;
+        import solvela.draw.DrawPrizeLog;
         import solvela.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
         import solvela.draw.drawlog.domain.vo.DrawPrizeLogVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

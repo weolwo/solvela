@@ -2,7 +2,7 @@ package solvela.admin.module.system.operatelog;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
-import solvela.base.code.UserErrorCode;
+import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;

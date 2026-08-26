@@ -2,7 +2,7 @@ package solvela.base.sonicexcel.converter;
 
 import solvela.base.sonicexcel.annotation.SonicEnum;
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.base.sonicexcel.SonicExcelException;
 import solvela.base.sonicexcel.converter.SonicContext;

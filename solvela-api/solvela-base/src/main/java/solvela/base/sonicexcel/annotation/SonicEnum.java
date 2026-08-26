@@ -1,6 +1,6 @@
 package solvela.base.sonicexcel.annotation;
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

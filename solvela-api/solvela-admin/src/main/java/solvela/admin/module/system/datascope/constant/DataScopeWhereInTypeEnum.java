@@ -1,7 +1,7 @@
 package solvela.admin.module.system.datascope.constant;
 
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 数据范围 sql where

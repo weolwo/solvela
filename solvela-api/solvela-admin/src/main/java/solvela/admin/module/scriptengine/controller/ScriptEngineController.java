@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.exception.EngineScriptException;
+import solvela.exception.EngineScriptException;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.scriptengine.controller.form.ScriptTestForm;
 import solvela.scriptengine.core.EngineFunctionRegistry;

@@ -1,7 +1,7 @@
 package solvela.admin.module.risk.promotionconfig.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;

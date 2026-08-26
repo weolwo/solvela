@@ -2,7 +2,7 @@ package solvela.base.sonicexcel.option;
 
 import solvela.base.sonicexcel.annotation.SonicEnum;
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 import solvela.base.sonicexcel.SonicExcelException;
 import solvela.base.sonicexcel.converter.SonicContext;
 import solvela.base.sonicexcel.option.SonicOptionProvider;

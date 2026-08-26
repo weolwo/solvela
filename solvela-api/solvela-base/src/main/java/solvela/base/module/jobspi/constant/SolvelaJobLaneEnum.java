@@ -2,7 +2,7 @@ package solvela.base.module.jobspi.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 执行车道：快慢任务的物理隔离维度。

@@ -2,7 +2,7 @@ package solvela.scriptengine.core;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.Assert;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.scriptengine.domain.ExecutableScript;
 import solvela.scriptengine.spi.EngineContext;
 import solvela.scriptengine.spi.ScriptEngine;

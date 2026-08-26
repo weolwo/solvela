@@ -1,7 +1,7 @@
 package solvela.admin.module.system.securityprotect.service;
 
 import jakarta.annotation.Resource;
-import solvela.base.crypto.PasswordCipher;
+import solvela.crypto.PasswordCipher;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaStringUtil;

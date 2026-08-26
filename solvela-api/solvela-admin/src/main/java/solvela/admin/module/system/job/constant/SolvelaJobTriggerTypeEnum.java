@@ -2,7 +2,7 @@ package solvela.admin.module.system.job.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * job 任务触发类型。

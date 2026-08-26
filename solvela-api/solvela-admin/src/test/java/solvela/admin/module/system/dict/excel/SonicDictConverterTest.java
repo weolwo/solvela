@@ -1,6 +1,6 @@
 package solvela.admin.module.system.dict.excel;
 
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.sonicexcel.SolvelaExcelUtil;
 import solvela.admin.module.system.dict.service.DictService;
 import solvela.base.sonicexcel.SonicExcel;

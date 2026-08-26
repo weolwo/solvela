@@ -2,7 +2,7 @@ package solvela.ledger.transaction.dao;
 
         import java.util.List;
 
-        import solvela.ledger.transaction.domain.entity.MemberAssetTransaction;
+        import solvela.ledger.MemberAssetTransaction;
         import solvela.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
         import solvela.ledger.transaction.domain.vo.MemberAssetTransactionVO;
         import solvela.ledger.stat.domain.form.LedgerStatForm;

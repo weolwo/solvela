@@ -1,7 +1,7 @@
 package solvela.mall.exchangelimit.manager;
 
 import solvela.mall.exchangelimit.dao.MallExchangeLimitDao;
-import solvela.mall.exchangelimit.domain.entity.MallExchangeLimit;
+import solvela.mall.MallExchangeLimit;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

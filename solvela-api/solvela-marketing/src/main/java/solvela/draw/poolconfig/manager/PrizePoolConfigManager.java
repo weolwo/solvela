@@ -1,7 +1,7 @@
 package solvela.draw.poolconfig.manager;
 
 import solvela.draw.poolconfig.dao.PrizePoolConfigDao;
-import solvela.draw.poolconfig.domain.entity.PrizePoolConfig;
+import solvela.draw.PrizePoolConfig;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaContentDispositionUtil;
 import solvela.base.web.CurrentUser;
 import solvela.base.config.FileConfig;

@@ -11,6 +11,9 @@
     <description>solvela project</description>
 
 	<modules>
+        <!-- 领域词汇（entity / 业务枚举 / 错误码 / 领域异常 / PII 加解密）。
+             不依赖任何其它自研模块，必须排在最前 -->
+        <module>solvela-model</module>
         <module>solvela-base</module>
         <module>solvela-admin</module>
         <module>solvela-marketing</module>

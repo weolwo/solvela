@@ -3,7 +3,7 @@ package solvela.mall.favorite.dao;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.mall.favorite.domain.entity.MallFavorite;
+import solvela.mall.MallFavorite;
 import solvela.mall.favorite.domain.vo.MallFavoriteRankVO;
 import solvela.mall.favorite.domain.vo.MallFavoriteStatVO;
 

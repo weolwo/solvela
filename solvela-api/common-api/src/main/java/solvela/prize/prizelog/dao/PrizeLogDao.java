@@ -2,7 +2,7 @@ package solvela.prize.prizelog.dao;
 
         import java.util.List;
 
-        import solvela.prize.prizelog.domain.entity.PrizeLog;
+        import solvela.prize.PrizeLog;
         import solvela.prize.prizelog.domain.form.PrizeLogQueryForm;
         import solvela.prize.prizelog.domain.vo.PrizeLogVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

@@ -2,7 +2,7 @@ package solvela.base.module.file.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 文件生命周期状态。

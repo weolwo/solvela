@@ -7,7 +7,7 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.lottery.issue.dao.LotteryIssueDao;
 import solvela.lottery.issue.manager.LotteryIssueManager;
 import solvela.lottery.config.service.LotteryConfigService;
-import solvela.lottery.issue.domain.entity.LotteryIssue;
+import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.domain.form.LotteryIssueAddForm;
 import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
 import solvela.lottery.issue.domain.form.LotteryIssueUpdateForm;

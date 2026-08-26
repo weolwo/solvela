@@ -2,7 +2,7 @@ package solvela.mall.exchangelimit.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import solvela.mall.exchangelimit.domain.entity.MallExchangeLimit;
+import solvela.mall.MallExchangeLimit;
 
 /**
  * 商城-会员限兑计数 Dao

@@ -8,7 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageParam;
 import solvela.base.domain.PageResult;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 
 import java.util.ArrayList;
 import java.util.List;

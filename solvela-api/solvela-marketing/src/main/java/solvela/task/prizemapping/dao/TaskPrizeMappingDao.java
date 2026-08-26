@@ -2,7 +2,7 @@ package solvela.task.prizemapping.dao;
 
         import java.util.List;
 
-        import solvela.task.prizemapping.domain.entity.TaskPrizeMapping;
+        import solvela.task.TaskPrizeMapping;
         import solvela.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
         import solvela.task.prizemapping.domain.vo.TaskPrizeMappingVO;
         import solvela.base.dao.CustomizedBaseMapper;

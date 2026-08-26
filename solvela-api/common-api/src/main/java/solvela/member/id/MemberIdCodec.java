@@ -1,7 +1,7 @@
 package solvela.member.id;
 
 import org.springframework.stereotype.Component;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

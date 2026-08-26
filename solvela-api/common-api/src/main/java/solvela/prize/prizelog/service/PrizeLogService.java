@@ -8,7 +8,7 @@ import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
-import solvela.prize.prizelog.domain.entity.PrizeLog;
+import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.domain.form.PrizeLogAddForm;
 import solvela.prize.prizelog.domain.form.PrizeLogQueryForm;
 import solvela.prize.prizelog.domain.vo.PrizeLogFunnelVO;

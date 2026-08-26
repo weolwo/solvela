@@ -1,7 +1,7 @@
 package solvela.lottery.prizerule.manager;
 
 import solvela.lottery.prizerule.dao.LotteryPrizeRuleDao;
-import solvela.lottery.prizerule.domain.entity.LotteryPrizeRule;
+import solvela.lottery.LotteryPrizeRule;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

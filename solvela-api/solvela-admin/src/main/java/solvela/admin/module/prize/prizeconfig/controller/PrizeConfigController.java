@@ -1,7 +1,7 @@
 package solvela.admin.module.prize.prizeconfig.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
+import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;

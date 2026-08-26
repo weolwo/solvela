@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>solvela-model</artifactId>
+    <name>solvela-model</name>
+
+    <!--
+      领域数据结构：entity（对应表）+ 业务枚举。多端共用的「词汇表」。
+
+      【为什么单独一个模块，而不是 common-api 里的一个包】
+      因为要的是<b>依赖上的约束</b>，不是目录上的约定。约定靠人守，半年后必然破；
+      模块的依赖列表是编译器守的。这里刻意<b>不引</b> spring-web / servlet-api：
+      谁想在 entity 上写 @RequestBody 或塞一个 HttpServletResponse 参数，IDE 补全不出来、
+      编译直接失败 —— 而不是等 code review 有没有人注意到。
+
+      【依赖方向】
+      本模块<b>不依赖 solvela-base</b>，反过来 base 依赖它 —— 领域词汇在下，技术底座在上。
+      为此把这些从 base 下沉了进来：错误码（code/）、领域异常（exception/）、
+      PII 加解密与密码哈希（crypto/）、BaseEnum。它们本来就是领域概念，
+      放在「技术底座」里只是历史原因。
+
+      整个依赖树只有 5 个直接依赖，全都不含 servlet / spring-web，
+      所以开头那条保证是<b>编译器在守</b>，不是注释在守。
+
+      【什么不该进来】
+      form / vo —— 它们是某个端的请求体/响应体形状，跟着前端页面改；
+      放进来会诱导 C 端复用 admin 的 VO，而 admin 的 VO 里带着手机号、运营备注、审核状态。
+    -->
+
+    <dependencies>
+        <!-- entity 的 @TableName/@TableId，以及 PiiTypeHandler 继承的 BaseTypeHandler。
+             刻意只引 core，不引 mybatis-plus 的 spring-boot-starter ——
+             starter 会把整套自动配置和 spring-boot 拉进来，那不是 model 该知道的东西 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-core</artifactId>
+        </dependency>
+
+        <!-- PiiCipher / PiiHasher 是 @Component + @Value。spring-context 不含 web -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!-- PasswordCipher 的 Argon2 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+        <!-- PiiCipher 的 @Slf4j。只要门面，实现由使用方（base 的 logback）提供 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- ErrorCodeRangeContainer 用了 ImmutablePair -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <!-- 测试依赖必须锁在 test 作用域，理由同其它模块 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

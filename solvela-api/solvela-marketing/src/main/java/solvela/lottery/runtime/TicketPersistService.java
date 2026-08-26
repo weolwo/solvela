@@ -1,12 +1,12 @@
 package solvela.lottery.runtime;
 
 import lombok.RequiredArgsConstructor;
-import solvela.lottery.config.domain.entity.LotteryConfig;
+import solvela.lottery.LotteryConfig;
 import solvela.lottery.constant.LotteryConst;
 import solvela.lottery.issue.dao.LotteryIssueDao;
-import solvela.lottery.issue.domain.entity.LotteryIssue;
+import solvela.lottery.LotteryIssue;
 import solvela.lottery.record.dao.LotteryRecordDao;
-import solvela.lottery.record.domain.entity.LotteryRecord;
+import solvela.lottery.LotteryRecord;
 import solvela.lottery.runtime.domain.TicketObtainVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

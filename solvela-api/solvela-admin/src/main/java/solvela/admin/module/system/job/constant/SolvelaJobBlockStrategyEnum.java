@@ -2,7 +2,7 @@ package solvela.admin.module.system.job.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 阻塞策略：上一次还没跑完时，本次怎么办。

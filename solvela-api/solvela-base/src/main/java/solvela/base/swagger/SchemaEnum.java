@@ -1,6 +1,6 @@
 package solvela.base.swagger;
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

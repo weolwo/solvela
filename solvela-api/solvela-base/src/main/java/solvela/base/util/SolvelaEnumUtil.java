@@ -1,6 +1,6 @@
 package solvela.base.util;
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 import solvela.base.util.SolvelaCollectionUtil;
 import org.apache.commons.lang3.StringUtils;
 

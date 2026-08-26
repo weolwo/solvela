@@ -2,7 +2,7 @@ package solvela.ledger.coupon.dao;
 
         import java.util.List;
 
-        import solvela.ledger.coupon.domain.entity.MemberCoupon;
+        import solvela.ledger.MemberCoupon;
         import solvela.ledger.coupon.domain.form.MemberCouponQueryForm;
         import solvela.ledger.coupon.domain.vo.MemberCouponVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

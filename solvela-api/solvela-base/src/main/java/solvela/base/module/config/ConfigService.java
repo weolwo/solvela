@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.code.UserErrorCode;
+import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;

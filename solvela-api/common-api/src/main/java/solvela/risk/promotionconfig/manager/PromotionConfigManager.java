@@ -1,6 +1,6 @@
 package solvela.risk.promotionconfig.manager;
 
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

@@ -8,7 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.ResponseDTO;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;
-import solvela.task.recordflow.domain.entity.TaskRecordFlow;
+import solvela.task.TaskRecordFlow;
 import solvela.task.runtime.domain.TaskEventReportForm;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -1,7 +1,7 @@
 package solvela.admin.module.task.taskconfig.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.task.taskconfig.domain.entity.TaskConfig;
+import solvela.task.TaskConfig;
 import solvela.task.taskconfig.domain.form.TaskConfigAddForm;
 import solvela.task.taskconfig.domain.form.TaskConfigQueryForm;
 import solvela.task.taskconfig.domain.form.TaskConfigUpdateForm;

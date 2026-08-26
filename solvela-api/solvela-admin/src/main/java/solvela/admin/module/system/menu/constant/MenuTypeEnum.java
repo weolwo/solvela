@@ -1,7 +1,7 @@
 package solvela.admin.module.system.menu.constant;
 
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 菜单类型枚举

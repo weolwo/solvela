@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.member.loginlog.domain.entity.MemberLoginLog;
+import solvela.member.MemberLoginLog;
 
 /**
  * 会员登录日志（append-only，按月分区）  Manager

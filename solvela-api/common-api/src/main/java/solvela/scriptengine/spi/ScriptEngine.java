@@ -1,6 +1,6 @@
 package solvela.scriptengine.spi;
 
-import solvela.base.exception.EngineScriptException;
+import solvela.exception.EngineScriptException;
 import solvela.scriptengine.domain.ExecutableScript;
 
 /**
@@ -28,7 +28,7 @@ public interface ScriptEngine {
      * 参数给调用方编译期类型安全，二者不一致时立刻失败 —— 这正好挡住
      * 「几个月后改了场景的返回类型，但调用方还按老类型接」这种漂移。
      *
-     * @throws solvela.base.exception.BusinessException 必填变量缺失、类型不符、脚本无返回值
+     * @throws solvela.exception.BusinessException 必填变量缺失、类型不符、脚本无返回值
      */
     <T> T evaluate(ScriptScene scene, ExecutableScript executableScript, EngineContext context, Class<T> returnType);
 

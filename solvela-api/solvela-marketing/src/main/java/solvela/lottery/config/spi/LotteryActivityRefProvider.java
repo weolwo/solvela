@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import solvela.activity.domain.vo.ActivityRefItem;
 import solvela.activity.spi.ActivityRefProvider;
 import solvela.enums.ActivityTypeEnum;
-import solvela.lottery.config.domain.entity.LotteryConfig;
+import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.manager.LotteryConfigManager;
 import solvela.lottery.config.service.LotteryConfigService;
-import solvela.lottery.issue.domain.entity.LotteryIssue;
+import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.manager.LotteryIssueManager;
 import org.springframework.stereotype.Component;
 

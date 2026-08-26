@@ -6,8 +6,8 @@ import solvela.anno.AssetStrategy;
 import solvela.base.domain.ResponseDTO;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
-import solvela.ledger.logistic.domain.entity.PhysicalDelivery;
-import solvela.risk.proposal.domain.entity.ProposalRecord;
+import solvela.ledger.PhysicalDelivery;
+import solvela.risk.ProposalRecord;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 

@@ -1,7 +1,7 @@
 package solvela.risk.proposal.manager;
 
 import solvela.risk.proposal.dao.ProposalRecordDao;
-import solvela.risk.proposal.domain.entity.ProposalRecord;
+import solvela.risk.ProposalRecord;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

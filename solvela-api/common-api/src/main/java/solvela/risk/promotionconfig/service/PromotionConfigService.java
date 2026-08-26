@@ -9,7 +9,7 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;

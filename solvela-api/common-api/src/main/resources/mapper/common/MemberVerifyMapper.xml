@@ -16,9 +16,9 @@
             <result column="member_name" property="memberName" />
             <result column="nickname" property="nickname" />
             <result column="real_name" property="realName"
-                    typeHandler="solvela.base.crypto.PiiTypeHandler"/>
+                    typeHandler="solvela.crypto.PiiTypeHandler"/>
             <result column="id_card" property="idCard"
-                    typeHandler="solvela.base.crypto.PiiTypeHandler"/>
+                    typeHandler="solvela.crypto.PiiTypeHandler"/>
             <result column="verify_status" property="verifyStatus" />
             <result column="verify_time" property="verifyTime" />
             <result column="fail_reason" property="failReason" />

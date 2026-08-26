@@ -2,7 +2,7 @@ package solvela.member.operationlimit.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 解冻方式，对齐 {@code t_member_operation_limit.unlock_type}。

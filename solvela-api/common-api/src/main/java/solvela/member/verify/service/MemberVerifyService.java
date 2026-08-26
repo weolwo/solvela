@@ -12,7 +12,7 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.member.constant.MemberConst;
 import solvela.member.verify.MemberVerifyMask;
 import solvela.member.verify.dao.MemberVerifyDao;
-import solvela.member.verify.domain.entity.MemberVerify;
+import solvela.member.MemberVerify;
 import solvela.member.verify.domain.form.MemberVerifyQueryForm;
 import solvela.member.verify.domain.vo.MemberVerifyDetailVO;
 import solvela.member.verify.domain.vo.MemberVerifyVO;

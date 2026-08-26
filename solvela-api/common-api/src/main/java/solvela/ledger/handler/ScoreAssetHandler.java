@@ -4,10 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.wallet.service.MemberWalletService;
-import solvela.risk.proposal.domain.entity.ProposalRecord;
+import solvela.risk.ProposalRecord;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 

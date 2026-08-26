@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.ResponseDTO;
-import solvela.lottery.record.domain.entity.LotteryRecord;
+import solvela.lottery.LotteryRecord;
 import solvela.lottery.runtime.domain.TicketObtainForm;
 import solvela.lottery.runtime.domain.TicketObtainVO;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -1,6 +1,6 @@
 package solvela.prize.prizelog.manager;
 
-import solvela.prize.prizelog.domain.entity.PrizeLog;
+import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

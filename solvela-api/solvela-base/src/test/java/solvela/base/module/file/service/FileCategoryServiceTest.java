@@ -1,6 +1,6 @@
 package solvela.base.module.file.service;
 
-import solvela.base.exception.BusinessException;
+import solvela.exception.BusinessException;
 import solvela.base.module.file.dao.FileCategoryDao;
 import solvela.base.module.file.dao.FileDao;
 import solvela.base.module.file.domain.entity.FileCategoryEntity;

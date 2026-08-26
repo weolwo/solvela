@@ -1,7 +1,7 @@
 package solvela.admin.module.lottery.issue.controller;
 
 import solvela.base.domain.ValidateList;
-import solvela.lottery.issue.domain.entity.LotteryIssue;
+import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.domain.form.LotteryIssueAddForm;
 import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
 import solvela.lottery.issue.domain.form.LotteryIssueUpdateForm;

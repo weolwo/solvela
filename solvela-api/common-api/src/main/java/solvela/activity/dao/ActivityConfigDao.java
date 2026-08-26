@@ -2,7 +2,7 @@ package solvela.activity.dao;
 
         import java.util.List;
 
-        import solvela.activity.domain.entity.ActivityConfig;
+        import solvela.activity.ActivityConfig;
         import solvela.activity.domain.form.ActivityConfigQueryForm;
         import solvela.activity.domain.vo.ActivityConfigVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

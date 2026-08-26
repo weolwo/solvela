@@ -1,20 +1,20 @@
 package solvela.lottery.prizerule.service;
 
 import lombok.RequiredArgsConstructor;
-import solvela.lottery.config.domain.entity.LotteryConfig;
+import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.manager.LotteryConfigManager;
 import solvela.lottery.constant.LotteryConst;
 import solvela.lottery.engine.MatchRuleEnum;
 import solvela.lottery.engine.PrizeRuleProbability;
 import solvela.lottery.engine.PrizeRuleProbability.RuleMask;
-import solvela.lottery.prizerule.domain.entity.LotteryPrizeRule;
+import solvela.lottery.LotteryPrizeRule;
 import solvela.lottery.prizerule.domain.form.LotteryPrizeRuleQueryForm;
 import solvela.lottery.prizerule.domain.vo.LotteryPrizeAnalysisResultVO;
 import solvela.lottery.prizerule.domain.vo.LotteryPrizeAnalysisVO;
 import solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleAnalysisVO;
 import solvela.lottery.prizerule.domain.vo.PrizeRuleIssueVO;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
-import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
+import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;

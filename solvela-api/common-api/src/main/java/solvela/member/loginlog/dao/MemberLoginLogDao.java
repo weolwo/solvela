@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import solvela.member.loginlog.domain.form.MemberLoginLogQueryForm;
-import solvela.member.loginlog.domain.entity.MemberLoginLog;
+import solvela.member.MemberLoginLog;
 import solvela.member.loginlog.domain.vo.MemberLoginLogStatVO;
 import solvela.member.loginlog.domain.vo.MemberLoginLogVO;
 

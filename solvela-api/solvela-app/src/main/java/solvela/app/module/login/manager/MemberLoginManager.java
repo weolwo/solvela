@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import solvela.member.domain.entity.Member;
+import solvela.member.Member;
 import solvela.app.constant.AppCacheConst;
 import solvela.app.module.login.dao.MemberLoginDao;
 import solvela.app.module.login.domain.RequestMember;

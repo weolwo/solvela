@@ -1,7 +1,7 @@
 package solvela.member.manager;
 
 import solvela.member.dao.MemberDao;
-import solvela.member.domain.entity.Member;
+import solvela.member.Member;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

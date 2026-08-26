@@ -1,6 +1,6 @@
 package solvela.risk.engine;
 
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 
 import java.math.BigDecimal;
 

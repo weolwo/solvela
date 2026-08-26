@@ -1,7 +1,7 @@
 package solvela.activity.manager;
 
 import solvela.activity.dao.ActivityConfigDao;
-import solvela.activity.domain.entity.ActivityConfig;
+import solvela.activity.ActivityConfig;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

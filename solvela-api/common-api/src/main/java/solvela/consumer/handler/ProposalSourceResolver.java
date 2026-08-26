@@ -2,7 +2,7 @@ package solvela.consumer.handler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.activity.domain.entity.ActivityConfig;
+import solvela.activity.ActivityConfig;
 import solvela.activity.service.ActivityConfigService;
 import solvela.enums.ActivityTypeEnum;
 import solvela.enums.ProposalSourceTypeEnum;

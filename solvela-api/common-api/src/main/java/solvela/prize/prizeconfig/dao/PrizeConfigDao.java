@@ -2,7 +2,7 @@ package solvela.prize.prizeconfig.dao;
 
         import java.util.List;
 
-        import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
+        import solvela.prize.PrizeConfig;
         import solvela.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
         import solvela.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

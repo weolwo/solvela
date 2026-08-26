@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.mall.category.domain.entity.MallCategory;
+import solvela.mall.MallCategory;
 import solvela.mall.category.domain.form.MallCategoryQueryForm;
 import solvela.mall.category.domain.vo.MallCategoryVO;
 

@@ -1,6 +1,6 @@
 package solvela.mall.commodity.manager;
 
-import solvela.mall.commodity.domain.entity.MallCommodity;
+import solvela.mall.MallCommodity;
 import solvela.mall.commodity.dao.MallCommodityDao;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;

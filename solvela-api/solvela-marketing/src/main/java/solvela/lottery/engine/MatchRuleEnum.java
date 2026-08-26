@@ -2,7 +2,7 @@ package solvela.lottery.engine;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 奖级匹配规则，对齐 t_lottery_prize_rule.match_rule

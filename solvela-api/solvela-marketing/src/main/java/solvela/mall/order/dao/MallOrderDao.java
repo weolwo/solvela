@@ -2,7 +2,7 @@ package solvela.mall.order.dao;
 
         import java.util.List;
 
-        import solvela.mall.order.domain.entity.MallOrder;
+        import solvela.mall.MallOrder;
         import solvela.mall.order.domain.form.MallOrderQueryForm;
         import solvela.mall.order.domain.vo.MallOrderRankVO;
         import solvela.mall.order.domain.vo.MallOrderStatVO;

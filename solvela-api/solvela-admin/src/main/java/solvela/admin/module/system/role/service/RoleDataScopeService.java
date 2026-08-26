@@ -5,7 +5,7 @@ import solvela.admin.module.system.role.domain.entity.RoleDataScopeEntity;
 import solvela.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleDataScopeVO;
 import solvela.admin.module.system.role.manager.RoleDataScopeManager;
-import solvela.base.code.UserErrorCode;
+import solvela.code.UserErrorCode;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;

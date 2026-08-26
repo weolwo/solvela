@@ -15,7 +15,7 @@ import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;
 import solvela.member.verify.domain.form.MemberVerifyQueryForm;
-import solvela.member.verify.domain.form.MemberVerifyRejectForm;
+import solvela.admin.module.member.verify.domain.form.MemberVerifyRejectForm;
 import solvela.member.verify.domain.vo.MemberVerifyDetailVO;
 import solvela.member.verify.domain.vo.MemberVerifyVO;
 import solvela.member.verify.service.MemberVerifyService;

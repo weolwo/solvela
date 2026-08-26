@@ -1,17 +1,17 @@
 package solvela.draw.poolconfig.service;
 
 import lombok.RequiredArgsConstructor;
-import solvela.activity.domain.entity.ActivityConfig;
+import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
-import solvela.draw.poolconfig.domain.entity.PrizePoolConfig;
+import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
 import solvela.draw.poolconfig.domain.vo.PoolConfigIssueVO;
 import solvela.draw.poolconfig.domain.vo.PrizePoolBoardResultVO;
 import solvela.draw.poolconfig.domain.vo.PrizePoolBoardVO;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
-import solvela.draw.poolitem.domain.entity.PrizePoolItem;
+import solvela.draw.PrizePoolItem;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
-import solvela.draw.prizemapping.domain.entity.PoolPrizeMapping;
+import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
 import solvela.draw.runtime.DrawPeriodResolver;
 import org.apache.commons.lang3.StringUtils;

@@ -2,7 +2,7 @@ package solvela.draw.prizemapping.dao;
 
         import java.util.List;
 
-        import solvela.draw.prizemapping.domain.entity.PoolPrizeMapping;
+        import solvela.draw.PoolPrizeMapping;
         import solvela.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
         import solvela.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
         import solvela.base.dao.CustomizedBaseMapper;

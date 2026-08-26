@@ -15,7 +15,7 @@ import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;
 import solvela.member.domain.form.MemberQueryForm;
-import solvela.member.domain.form.MemberRemarkForm;
+import solvela.admin.module.member.domain.form.MemberRemarkForm;
 import solvela.member.domain.vo.MemberVO;
 import solvela.member.service.MemberService;
 
@@ -24,7 +24,7 @@ import solvela.member.service.MemberService;
  *
  * <p><b>没有新增接口</b>：会员是 C 端自己注册出来的，后台凭空造一个会员会绕过注册链路的
  * 手机号校验、发号器、钱包初始化 —— 造出来的是一个数据不全、登录不了的壳。
- * 生成器留下的 MemberAddForm / MemberUpdateForm 没有对应的接口，就是这个原因。
+ * 生成器曾留下一对 Add/Update 表单，因为没有也不该有对应接口，已随本轮清理删除。
  *
  * <p>后台能改的只有两样：<b>状态</b>（冻结/解冻，风控动作）和<b>运营备注</b>。
  * 各开一个窄接口，而不是一个能改整行的大接口。

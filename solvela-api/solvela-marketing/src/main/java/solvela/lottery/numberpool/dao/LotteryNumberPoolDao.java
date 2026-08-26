@@ -2,7 +2,7 @@ package solvela.lottery.numberpool.dao;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.base.dao.CustomizedBaseMapper;
-import solvela.lottery.numberpool.domain.entity.LotteryNumberPool;
+import solvela.lottery.LotteryNumberPool;
 import solvela.lottery.numberpool.domain.form.LotteryNumberPoolQueryForm;
 import solvela.lottery.numberpool.domain.vo.LotteryNumberPoolVO;
 import org.apache.ibatis.annotations.Param;

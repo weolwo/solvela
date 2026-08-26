@@ -1,6 +1,6 @@
 package solvela.admin.module.system.codegenerator.constant;
 
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 删除类型

@@ -1,7 +1,7 @@
 package solvela.mall.order.manager;
 
 import solvela.mall.order.dao.MallOrderDao;
-import solvela.mall.order.domain.entity.MallOrder;
+import solvela.mall.MallOrder;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;

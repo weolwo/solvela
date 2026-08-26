@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.member.verify.domain.entity.MemberVerify;
+import solvela.member.MemberVerify;
 import solvela.member.verify.domain.form.MemberVerifyQueryForm;
 import solvela.member.verify.domain.vo.MemberVerifyVO;
 

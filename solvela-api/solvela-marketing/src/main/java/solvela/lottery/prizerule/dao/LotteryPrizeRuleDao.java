@@ -2,7 +2,7 @@ package solvela.lottery.prizerule.dao;
 
         import java.util.List;
 
-        import solvela.lottery.prizerule.domain.entity.LotteryPrizeRule;
+        import solvela.lottery.LotteryPrizeRule;
         import solvela.lottery.prizerule.domain.form.LotteryPrizeRuleQueryForm;
         import solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

@@ -3,7 +3,7 @@ package solvela.admin.module.system.job.constant;
 import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 任务配置预设档位。

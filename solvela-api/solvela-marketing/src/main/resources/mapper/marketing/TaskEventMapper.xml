@@ -42,14 +42,14 @@
         ORDER BY status DESC, id ASC
     </select>
 
-    <select id="selectByEventCode" resultType="solvela.task.taskevent.domain.entity.TaskEvent">
+    <select id="selectByEventCode" resultType="solvela.task.TaskEvent">
         SELECT
         <include refid="entity_columns"/>
         FROM t_task_event
         WHERE event_code = #{eventCode}
     </select>
 
-    <select id="selectEnabledList" resultType="solvela.task.taskevent.domain.entity.TaskEvent">
+    <select id="selectEnabledList" resultType="solvela.task.TaskEvent">
         SELECT
         <include refid="entity_columns"/>
         FROM t_task_event

@@ -2,7 +2,7 @@ package solvela.admin.module.system.job.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 /**
  * 错过调度（misfire）策略：{@code now - next_trigger_time} 超过阈值时怎么办。

@@ -2,7 +2,7 @@ package solvela.risk.promotionconfig.dao;
 
         import java.util.List;
 
-        import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+        import solvela.risk.PromotionConfig;
         import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
         import solvela.risk.promotionconfig.domain.vo.PromotionConfigVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

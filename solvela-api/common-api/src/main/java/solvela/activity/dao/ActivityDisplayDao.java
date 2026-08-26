@@ -2,7 +2,7 @@ package solvela.activity.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import solvela.activity.domain.entity.ActivityDisplay;
+import solvela.activity.ActivityDisplay;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

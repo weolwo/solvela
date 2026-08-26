@@ -18,7 +18,7 @@ import java.util.List;
  * 生成器产出的那四个方法只是 {@code SolvelaBeanUtil.copy} + DAO 调用，一条校验都没有，
  * 而这张表存的是<b>库存</b>，是全模块最不能随手写的数据：
  * <ul>
- *   <li>{@code PrizePoolItemAddForm} / {@code UpdateForm} 都开放了 <b>{@code usedStock}</b> ——
+ *   <li>生成器那对 Add/Update 表单都开放了 <b>{@code usedStock}</b> ——
  *       跨奖池累计已出数量、库存对账的基准。工作台落库处明写「used_stock/version 永不接受前端值」，
  *       这条路径却照单全收。手改一个数，DB 账目当场错乱，
  *       而运行态真正用来预扣的 Redis 剩余量根本不会跟着变，两个口径就此漂移；</li>

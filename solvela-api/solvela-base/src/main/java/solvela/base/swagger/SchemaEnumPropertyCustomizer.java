@@ -2,7 +2,8 @@ package solvela.base.swagger;
 
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.oas.models.media.Schema;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
+import solvela.base.util.SolvelaCaseFormat;
 import solvela.base.validation.enumeration.CheckEnum;
 import org.springdoc.core.customizers.PropertyCustomizer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -48,7 +49,7 @@ public class SchemaEnumPropertyCustomizer implements PropertyCustomizer {
             if (ctxAnnotation.annotationType().equals(SchemaEnum.class)) {
                 description.append(((SchemaEnum) ctxAnnotation).desc());
                 Class<? extends BaseEnum> clazz = ((SchemaEnum) ctxAnnotation).value();
-                description.append(BaseEnum.getInfo(clazz));
+                description.append(enumDoc(clazz));
             }
         }
 
@@ -58,4 +59,56 @@ public class SchemaEnumPropertyCustomizer implements PropertyCustomizer {
         return schema;
     }
 
+    /**
+     * 把枚举渲染成前端可直接粘贴的 TS 常量，拼进 swagger 的字段描述里。
+     *
+     * <p>原先挂在 {@code BaseEnum} 接口上，但那让一个<b>领域词汇的接口</b>依赖了
+     * 大小写转换工具，进而挡住了 BaseEnum 下沉到 solvela-model。
+     * 它本来就只有这一个调用方，而且干的是「生成接口文档」的活 —— 属于 swagger 定制器。
+     */
+    private static String enumDoc(Class<? extends BaseEnum> clazz) {
+        BaseEnum[] enums = clazz.getEnumConstants();
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("{\n");
+        for (int i = 0; i < enums.length; i++) {
+            BaseEnum e = enums[i];
+            // 拼接外层的 Key (比如: NORMAL: { )
+            sb.append("\t").append(e.toString()).append(": {");
+
+            // 拼接 value (如果是字符串，包上单引号)
+            sb.append("value: ");
+            if (e.getValue() instanceof String) {
+                sb.append("'").append(e.getValue()).append("'");
+            } else {
+                sb.append(e.getValue());
+            }
+            sb.append(", ");
+
+            // 拼接 desc (描述通常都是字符串，包上单引号)
+            sb.append("desc: ");
+            if (e.getDesc() instanceof String) {
+                sb.append("'").append(e.getDesc()).append("'");
+            } else {
+                sb.append(e.getDesc());
+            }
+
+            sb.append("}");
+            // 如果不是最后一个，加个逗号
+            if (i < enums.length - 1) {
+                sb.append(",");
+            }
+            sb.append("\n");
+        }
+        sb.append("}");
+
+        // 还原他原本的 HTML 替换逻辑
+        String enumStr = sb.toString();
+        enumStr = enumStr.replace("\t", "&nbsp;&nbsp;");
+        enumStr = enumStr.replace("\n", "<br>");
+
+        // 拼接 export const 开头
+        String prefix = "  <br>  export const " + SolvelaCaseFormat.UPPER_CAMEL.to(SolvelaCaseFormat.UPPER_UNDERSCORE, clazz.getSimpleName()) + " = <br> ";
+        return prefix + enumStr + " <br>";
+    }
 }

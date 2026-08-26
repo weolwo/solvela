@@ -190,7 +190,7 @@
         我的号码。prize_level 未中奖/未开奖恒为 99（v3.40 起 NOT NULL DEFAULT 99），
         所以这里可以直接 ORDER BY prize_level ASC —— 若它是 NULL，MySQL 会把 NULL 排到最前面、正好排反。
     -->
-    <select id="selectMyTickets" resultType="solvela.lottery.record.domain.entity.LotteryRecord">
+    <select id="selectMyTickets" resultType="solvela.lottery.LotteryRecord">
         SELECT *
         FROM t_lottery_record
         WHERE lottery_code = #{lotteryCode}
@@ -251,7 +251,7 @@
         LIMIT #{limit}
     </update>
 
-    <select id="selectPendingDispatch" resultType="solvela.lottery.record.domain.entity.LotteryRecord">
+    <select id="selectPendingDispatch" resultType="solvela.lottery.LotteryRecord">
         SELECT *
         FROM t_lottery_record
         WHERE lottery_code = #{lotteryCode}

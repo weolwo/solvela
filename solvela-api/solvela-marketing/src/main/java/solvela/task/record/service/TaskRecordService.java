@@ -8,7 +8,7 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.task.record.dao.TaskRecordDao;
-import solvela.task.record.domain.entity.TaskRecord;
+import solvela.task.TaskRecord;
 import solvela.task.record.domain.form.TaskRecordAddForm;
 import solvela.task.record.domain.form.TaskRecordQueryForm;
 import solvela.task.record.domain.form.TaskRecordStatusUpdateForm;
@@ -16,7 +16,7 @@ import solvela.task.record.domain.form.TaskRecordUpdateForm;
 import solvela.task.record.domain.vo.TaskRecordFunnelVO;
 import solvela.task.record.domain.vo.TaskRecordVO;
 import solvela.task.constant.TaskDiscardCode;
-import solvela.task.taskconfig.domain.entity.TaskConfig;
+import solvela.task.TaskConfig;
 import solvela.task.taskconfig.manager.TaskConfigManager;
 import org.springframework.stereotype.Service;
 

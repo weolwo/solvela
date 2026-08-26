@@ -2,7 +2,7 @@ package solvela.task.record.dao;
 
         import java.util.List;
 
-        import solvela.task.record.domain.entity.TaskRecord;
+        import solvela.task.TaskRecord;
         import solvela.task.record.domain.form.TaskRecordQueryForm;
         import solvela.task.record.domain.vo.TaskRecordVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

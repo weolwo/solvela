@@ -1,7 +1,7 @@
 package solvela.risk.engine;
 
 import lombok.Data;
-import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
+import solvela.risk.PromotionConfig;
 import solvela.risk.proposal.domain.form.ProposalRecordAddForm;
 
 @Data

@@ -2,7 +2,7 @@ package solvela.mall.sku.dao;
 
         import java.util.List;
 
-        import solvela.mall.sku.domain.entity.MallSku;
+        import solvela.mall.MallSku;
         import solvela.mall.sku.domain.form.MallSkuQueryForm;
         import solvela.mall.sku.domain.vo.MallSkuVO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

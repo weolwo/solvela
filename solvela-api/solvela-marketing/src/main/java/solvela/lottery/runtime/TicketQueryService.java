@@ -3,12 +3,12 @@ package solvela.lottery.runtime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.ResponseDTO;
-import solvela.lottery.config.domain.entity.LotteryConfig;
+import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.engine.FpeCipher;
 import solvela.lottery.engine.FpeCipherFactory;
 import solvela.lottery.record.dao.LotteryRecordDao;
-import solvela.lottery.record.domain.entity.LotteryRecord;
+import solvela.lottery.LotteryRecord;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

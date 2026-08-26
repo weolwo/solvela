@@ -2,7 +2,7 @@ package solvela.risk.engine;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.enumeration.BaseEnum;
+import solvela.enums.BaseEnum;
 
 import java.util.Arrays;
 

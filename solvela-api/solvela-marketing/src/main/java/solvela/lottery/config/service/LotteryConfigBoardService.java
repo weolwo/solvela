@@ -1,18 +1,18 @@
 package solvela.lottery.config.service;
 
 import lombok.RequiredArgsConstructor;
-import solvela.activity.domain.entity.ActivityConfig;
+import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
-import solvela.lottery.config.domain.entity.LotteryConfig;
+import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.domain.form.LotteryConfigQueryForm;
 import solvela.lottery.config.domain.vo.LotteryConfigBoardResultVO;
 import solvela.lottery.config.domain.vo.LotteryConfigBoardVO;
 import solvela.lottery.config.domain.vo.LotteryConfigIssueVO;
 import solvela.lottery.config.manager.LotteryConfigManager;
 import solvela.lottery.issue.dao.LotteryIssueDao;
-import solvela.lottery.issue.domain.entity.LotteryIssue;
+import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.manager.LotteryIssueManager;
-import solvela.lottery.prizerule.domain.entity.LotteryPrizeRule;
+import solvela.lottery.LotteryPrizeRule;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import org.apache.commons.lang3.StringUtils;
