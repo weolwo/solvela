@@ -102,9 +102,9 @@ public class ActivityConfigController {
     @SaCheckPermission("activityConfig:add")
     public ResponseDTO<String> wizardCreate(@RequestBody @Valid ActivityWizardCreateForm form) {
         ActivityWizardCreateCommand command = SolvelaBeanUtil.copy(form, ActivityWizardCreateCommand.class);
-        // 🔴 嵌套集合必须显式转换。BeanUtils.copyProperties 在泛型擦除后只看到两边都是 List，
-        // 会把 Form 的 List 引用直接塞进 Command 的字段 —— 编译通过、序列化正常，
-        // 直到 service 取出元素当 WizardPrizeCommand 用才 ClassCastException
+        // 🔴 嵌套集合必须显式转换。BeanUtils.copyProperties 会解析泛型，发现
+        // List<WizardPrizeForm> 与 List<WizardPrizeCommand> 不兼容后直接<b>跳过</b>该属性 ——
+        // 既不报错也不转换，prizeList 会留在 null，表现是"向导提交了但奖品一个没建"
         command.setPrizeList(SolvelaBeanUtil.copyList(
                 form.getPrizeList(), ActivityWizardCreateCommand.WizardPrizeCommand.class));
         return activityConfigService.wizardCreate(command);

@@ -20,11 +20,13 @@ import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
  *
  * <h3>而且那层装配会引入一个静默故障</h3>
  * 本类含嵌套 List（如 {@code assetList}）。{@code SolvelaBeanUtil.copy} 底层是
- * Spring 的 {@code BeanUtils.copyProperties}：泛型擦除后两边属性都是原始类型 {@code List}，
- * 它会判定可赋值，于是<b>把 DTO 的 List 引用直接塞进 VO 的字段</b>。
- * 编译通过，Jackson 序列化出来字段还一模一样，看起来完全正常 ——
- * 直到有人取出元素做强转才 ClassCastException。
- * 「看起来对」的错误比编译失败危险得多，不值得为一层没有收益的装配去冒。
+ * Spring 的 {@code BeanUtils.copyProperties}，它会解析泛型：发现
+ * {@code List<AssetFlowDTO>} 与 {@code List<AssetFlowVO>} 不兼容后<b>直接跳过该属性</b>，
+ * 既不报错也不转换 —— 目标字段留在 {@code null}。
+ * 编译通过、接口照常返回，只是那一段数据<b>凭空消失了</b>，
+ * 而前端拿到 null 往往只是少显示一块，没人会立刻发现。
+ * 要做这层装配就必须用 {@code SolvelaBeanUtil.deepCopy} 或逐层 {@code copyList}；
+ * 为一层没有收益的装配去冒这个险不值得。
  *
  * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
  * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。

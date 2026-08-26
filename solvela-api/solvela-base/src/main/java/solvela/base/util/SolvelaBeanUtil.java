@@ -4,6 +4,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.springframework.beans.BeanUtils;
+import solvela.base.json.JsonUtils;
 import org.springframework.util.ReflectionUtils;
 
 import java.beans.PropertyDescriptor;
@@ -101,6 +102,30 @@ public class SolvelaBeanUtil {
      * @param <K>
      * @return
      */
+    /**
+     * <b>深拷贝</b>到目标类型：用 Jackson 走一遍序列化/反序列化，嵌套集合与嵌套对象
+     * 都会按目标类型<b>逐层重建</b>。
+     *
+     * <h3>什么时候必须用它而不是 {@link #copy}</h3>
+     * {@link #copy} 底层是 Spring 的 {@code BeanUtils.copyProperties}，只做浅拷贝。
+     * 它会解析泛型：发现 {@code List<A>} 与 {@code List<B>} 不兼容后<b>直接跳过该属性</b>，
+     * 既不报错也不转换 —— 目标字段留在 {@code null}。
+     * 表现极其隐蔽：编译通过、接口照常返回，只是那一段数据凭空消失了。
+     * 行为由 {@code SolvelaBeanUtilCopyTest} 钉住。
+     *
+     * <p>所以：<b>目标类型含嵌套的自定义对象或集合时，一律用本方法</b>；
+     * 只有确认两边都是扁平结构（基本类型、String、日期、同类型集合）才用 copy。
+     *
+     * <p>代价是一次 JSON 往返，比 copy 慢一个量级。用在配置保存这类低频写入路径上
+     * 完全够用；分页列表那种一次几十条的装配仍应走 copy。
+     */
+    public static <T> T deepCopy(Object source, Class<T> target) {
+        if (source == null || target == null) {
+            return null;
+        }
+        return JsonUtils.getMapper().convertValue(source, target);
+    }
+
     public static <T, K> List<K> copyList(List<T> source, Class<K> target) {
         if (null == source || source.isEmpty()) {
             return Collections.emptyList();
