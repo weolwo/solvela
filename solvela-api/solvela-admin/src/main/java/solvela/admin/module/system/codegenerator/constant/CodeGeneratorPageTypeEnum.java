@@ -1,6 +1,6 @@
 package solvela.admin.module.system.codegenerator.constant;
 
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 页面类型

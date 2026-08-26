@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;
 import solvela.task.recordflow.domain.entity.TaskRecordFlow;
 import solvela.task.runtime.domain.TaskEventReportForm;

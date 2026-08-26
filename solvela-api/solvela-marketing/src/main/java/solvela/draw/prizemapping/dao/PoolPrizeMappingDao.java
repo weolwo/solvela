@@ -5,7 +5,7 @@ package solvela.draw.prizemapping.dao;
         import solvela.draw.prizemapping.domain.entity.PoolPrizeMapping;
         import solvela.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
         import solvela.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
-        import solvela.base.common.dao.CustomizedBaseMapper;
+        import solvela.base.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

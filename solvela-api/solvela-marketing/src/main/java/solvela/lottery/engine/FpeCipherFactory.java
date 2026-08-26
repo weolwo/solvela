@@ -1,7 +1,7 @@
 package solvela.lottery.engine;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

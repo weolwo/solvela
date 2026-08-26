@@ -11,7 +11,7 @@ import solvela.admin.module.system.department.domain.form.DepartmentUpdateForm;
 import solvela.admin.module.system.department.domain.vo.DepartmentTreeVO;
 import solvela.admin.module.system.department.domain.vo.DepartmentVO;
 import solvela.admin.module.system.department.service.DepartmentService;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

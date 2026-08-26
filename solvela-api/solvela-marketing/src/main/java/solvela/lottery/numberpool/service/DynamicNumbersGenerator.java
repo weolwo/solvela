@@ -1,8 +1,8 @@
 package solvela.lottery.numberpool.service;
 
-import solvela.base.common.util.SolvelaRandomUtil;
+import solvela.base.util.SolvelaRandomUtil;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 
 import java.util.*;
 

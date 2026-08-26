@@ -1,8 +1,8 @@
 package solvela.base.config;
 
-import solvela.base.common.domain.SystemEnvironment;
-import solvela.base.common.enumeration.SystemEnvironmentEnum;
-import solvela.base.common.util.SolvelaEnumUtil;
+import solvela.base.domain.SystemEnvironment;
+import solvela.base.enumeration.SystemEnvironmentEnum;
+import solvela.base.util.SolvelaEnumUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

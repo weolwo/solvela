@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.log;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RList;
 import org.redisson.api.RedissonClient;

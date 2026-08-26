@@ -2,10 +2,10 @@ package solvela.admin.module.system.login.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.enumeration.GenderEnum;
-import solvela.base.common.enumeration.UserTypeEnum;
-import solvela.base.common.swagger.SchemaEnum;
+import solvela.base.domain.RequestUser;
+import solvela.base.enumeration.GenderEnum;
+import solvela.base.enumeration.UserTypeEnum;
+import solvela.base.swagger.SchemaEnum;
 
 import java.io.Serializable;
 

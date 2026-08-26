@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.activity.domain.entity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.json.JsonUtils;
 import solvela.draw.poolitem.domain.entity.PrizePoolItem;
 import solvela.draw.poolitem.domain.form.PrizePoolItemQueryForm;
 import solvela.draw.poolitem.domain.vo.PrizeItemIssueVO;

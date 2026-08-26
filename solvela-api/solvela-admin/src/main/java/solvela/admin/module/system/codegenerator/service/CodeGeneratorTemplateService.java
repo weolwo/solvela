@@ -1,14 +1,14 @@
 package solvela.admin.module.system.codegenerator.service;
 
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCaseFormat;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCaseFormat;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaDateFormatterEnum;
-import solvela.base.common.util.SolvelaLocalDateUtil;
-import solvela.base.common.util.SolvelaRandomUtil;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaDateFormatterEnum;
+import solvela.base.util.SolvelaLocalDateUtil;
+import solvela.base.util.SolvelaRandomUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.codegenerator.domain.entity.CodeGeneratorConfigEntity;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.*;
@@ -20,7 +20,7 @@ import solvela.admin.module.system.codegenerator.service.variable.front.ConstVar
 import solvela.admin.module.system.codegenerator.service.variable.front.FormVariableService;
 import solvela.admin.module.system.codegenerator.service.variable.front.ListVariableService;
 import solvela.admin.module.system.codegenerator.util.CodeGeneratorTool;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.json.JsonUtils;
 import org.apache.velocity.Template;
 import org.apache.velocity.app.Velocity;
 import org.apache.velocity.app.VelocityEngine;

@@ -4,9 +4,9 @@ import cn.dev33.satoken.annotation.SaIgnore;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.annoation.NoNeedLogin;
-import solvela.base.common.domain.RequestUrlVO;
-import solvela.base.common.util.SolvelaCollectionUtil;
+import solvela.base.annotation.AllowAnonymous;
+import solvela.base.domain.RequestUrlVO;
+import solvela.base.util.SolvelaCollectionUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerMethod;
@@ -78,8 +78,8 @@ public class UrlConfig {
             if (null != ignore) {
                 continue;
             }
-            NoNeedLogin noNeedLogin = method.getAnnotation(NoNeedLogin.class);
-            if (null != noNeedLogin) {
+            AllowAnonymous allowAnonymous = method.getAnnotation(AllowAnonymous.class);
+            if (null != allowAnonymous) {
                 continue;
             }
             Set<String> urlSet = entry.getValue();
@@ -122,18 +122,18 @@ public class UrlConfig {
      * @return
      */
     @Bean
-    public List<String> noNeedLoginUrlList(Map<Method, Set<String>> methodUrlMap) {
-        List<String> noNeedLoginUrlList = new ArrayList<>();
+    public List<String> allowAnonymousUrlList(Map<Method, Set<String>> methodUrlMap) {
+        List<String> allowAnonymousUrlList = new ArrayList<>();
         for (Map.Entry<Method, Set<String>> entry : methodUrlMap.entrySet()) {
             Method method = entry.getKey();
-            NoNeedLogin noNeedLogin = method.getAnnotation(NoNeedLogin.class);
-            if (null == noNeedLogin) {
+            AllowAnonymous allowAnonymous = method.getAnnotation(AllowAnonymous.class);
+            if (null == allowAnonymous) {
                 continue;
             }
-            noNeedLoginUrlList.addAll(entry.getValue());
+            allowAnonymousUrlList.addAll(entry.getValue());
         }
-        log.info("不需要登录的URL：{}", noNeedLoginUrlList);
-        return noNeedLoginUrlList;
+        log.info("不需要登录的URL：{}", allowAnonymousUrlList);
+        return allowAnonymousUrlList;
     }
 
 

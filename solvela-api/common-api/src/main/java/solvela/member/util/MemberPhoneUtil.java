@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  *
  * <h3>规范形式</h3>
  * 11 位裸号码，不带国家码、不带任何分隔符：{@code 13800000000}。
- * 落库的密文（{@link solvela.base.common.crypto.PiiCipher}）存的也是这一形式 ——
+ * 落库的密文（{@link solvela.base.crypto.PiiCipher}）存的也是这一形式 ——
  * 密文和摘要必须来自同一个字符串，否则「解密出来的号」和「能登录的号」会是两个东西。
  *
  * <p>⚠️ 只支持中国大陆号码。要做港澳台/海外时，规范形式得改成 E.164（{@code +8613800000000}），

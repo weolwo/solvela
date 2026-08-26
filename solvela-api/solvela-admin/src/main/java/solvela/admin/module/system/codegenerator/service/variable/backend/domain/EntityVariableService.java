@@ -1,6 +1,6 @@
 package solvela.admin.module.system.codegenerator.service.variable.backend.domain;
 
-import solvela.base.common.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaCollectionUtil;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeField;
 import solvela.admin.module.system.codegenerator.service.variable.CodeGenerateBaseVariableService;

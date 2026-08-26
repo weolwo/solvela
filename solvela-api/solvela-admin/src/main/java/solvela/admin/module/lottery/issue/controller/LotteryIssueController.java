@@ -1,6 +1,6 @@
 package solvela.admin.module.lottery.issue.controller;
 
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.ValidateList;
 import solvela.lottery.issue.domain.entity.LotteryIssue;
 import solvela.lottery.issue.domain.form.LotteryIssueAddForm;
 import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
@@ -10,8 +10,8 @@ import solvela.lottery.issue.domain.vo.LotteryIssueVO;
 import solvela.lottery.issue.service.LotteryIssueService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

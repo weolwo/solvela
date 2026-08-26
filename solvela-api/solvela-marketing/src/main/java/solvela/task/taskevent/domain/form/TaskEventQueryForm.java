@@ -3,7 +3,7 @@ package solvela.task.taskevent.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import solvela.base.common.domain.PageParam;
+import solvela.base.domain.PageParam;
 
 /**
  * 任务事件注册表 查询表单

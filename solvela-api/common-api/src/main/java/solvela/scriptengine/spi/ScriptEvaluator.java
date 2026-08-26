@@ -1,6 +1,6 @@
 package solvela.scriptengine.spi;
 
-import solvela.base.common.exception.EngineScriptException;
+import solvela.base.exception.EngineScriptException;
 import solvela.scriptengine.domain.EngineFunctionMeta;
 import solvela.scriptengine.domain.ExecutableScript;
 

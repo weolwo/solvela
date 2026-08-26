@@ -1,6 +1,6 @@
 package solvela.admin.module.system.operatelog.domain;
 
-import solvela.base.common.domain.PageParam;
+import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 

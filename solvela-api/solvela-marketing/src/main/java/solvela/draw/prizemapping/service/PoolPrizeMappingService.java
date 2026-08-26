@@ -2,8 +2,8 @@ package solvela.draw.prizemapping.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.prizemapping.dao.PoolPrizeMappingDao;
 import solvela.draw.prizemapping.domain.form.PoolPrizeMappingQueryForm;
 import solvela.draw.prizemapping.domain.vo.PoolPrizeMappingVO;

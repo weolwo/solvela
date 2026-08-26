@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import solvela.admin.module.system.menu.constant.MenuPermsTypeEnum;
 import solvela.admin.module.system.menu.constant.MenuTypeEnum;
-import solvela.base.common.swagger.SchemaEnum;
-import solvela.base.common.validator.enumeration.CheckEnum;
+import solvela.base.swagger.SchemaEnum;
+import solvela.base.validation.enumeration.CheckEnum;
 import org.hibernate.validator.constraints.Length;
 
 /**

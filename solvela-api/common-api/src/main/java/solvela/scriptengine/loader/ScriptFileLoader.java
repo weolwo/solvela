@@ -7,7 +7,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.stereotype.Component;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.json.JsonUtils;
 import solvela.scriptengine.domain.ExecutableScript;
 import solvela.scriptengine.domain.entity.Script;
 import solvela.scriptengine.domain.entity.ScriptRef;

@@ -1,8 +1,8 @@
 package solvela.admin.module.system.codegenerator.service.variable.backend;
 
-import solvela.base.common.util.SolvelaCaseFormat;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaEnumUtil;
+import solvela.base.util.SolvelaCaseFormat;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaEnumUtil;
 import solvela.admin.module.system.codegenerator.constant.CodeDeleteEnum;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeInsertAndUpdateField;
@@ -57,7 +57,7 @@ public class ControllerVariableService extends CodeGenerateBaseVariableService {
             CodeDeleteEnum codeDeleteEnum = SolvelaEnumUtil.getEnumByValue(form.getDeleteInfo().getDeleteEnum(), CodeDeleteEnum.class);
             if (codeDeleteEnum == CodeDeleteEnum.BATCH || codeDeleteEnum == CodeDeleteEnum.SINGLE_AND_BATCH) {
                 //2、批量删除的话，要导入ValidateList
-                packageSet.add("import solvela.base.common.domain.ValidateList;");
+                packageSet.add("import solvela.base.domain.ValidateList;");
             }
 
             if (codeDeleteEnum == CodeDeleteEnum.SINGLE || codeDeleteEnum == CodeDeleteEnum.SINGLE_AND_BATCH) {

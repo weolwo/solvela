@@ -1,10 +1,9 @@
 package solvela.admin.module.system.job.api.domain;
 
-import solvela.base.module.support.jobspi.core.SolvelaJobHandler;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.common.json.serializer.enumeration.EnumSerialize;
-import solvela.base.common.swagger.SchemaEnum;
+import solvela.base.json.serializer.enumeration.EnumSerialize;
+import solvela.base.swagger.SchemaEnum;
 import solvela.admin.module.system.job.constant.SolvelaJobTriggerTypeEnum;
 
 import java.time.LocalDateTime;

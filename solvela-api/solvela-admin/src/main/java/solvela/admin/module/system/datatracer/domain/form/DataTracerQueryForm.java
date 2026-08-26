@@ -3,8 +3,8 @@ package solvela.admin.module.system.datatracer.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import solvela.base.common.domain.PageParam;
-import solvela.base.common.swagger.SchemaEnum;
+import solvela.base.domain.PageParam;
+import solvela.base.swagger.SchemaEnum;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 
 /**

@@ -1,7 +1,7 @@
 package solvela.admin.module.system.codegenerator.util;
 
-import solvela.base.common.util.SolvelaCaseFormat;
-import solvela.base.common.constant.StringConst;
+import solvela.base.util.SolvelaCaseFormat;
+import solvela.base.constant.StringConst;
 
 /**
  * 代码生成 velocity 工具类

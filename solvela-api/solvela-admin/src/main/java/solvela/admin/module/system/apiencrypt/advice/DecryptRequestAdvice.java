@@ -3,7 +3,7 @@ package solvela.admin.module.system.apiencrypt.advice;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.apiencrypt.annotation.ApiDecrypt;
 import solvela.admin.module.system.apiencrypt.domain.ApiEncryptForm;
 import solvela.admin.module.system.apiencrypt.service.ApiEncryptService;

@@ -2,8 +2,8 @@ package solvela.ledger.engine;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.ledger.handler.IAssetHandler;
 import solvela.ledger.strategy.AssetStrategyFactory;
 import solvela.prize.prizelog.dao.PrizeLogDao;

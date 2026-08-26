@@ -48,7 +48,7 @@ public final class SonicExcel {
      * 把整个 xlsx 读成堆里的 byte[] —— 100MB 的上传文件在读第一行之前就先吃掉 100MB 连续堆内存。
      * 从 API 层面掐断这种"假流式"误用，比在文档里写一句提醒可靠得多。
      *
-     * <p>上传文件怎么落盘、怎么保证删干净，见 {@link solvela.base.common.util.SolvelaExcelUtil}。
+     * <p>上传文件怎么落盘、怎么保证删干净，见 {@link solvela.base.sonicexcel.SolvelaExcelUtil}。
      */
     public static <T> SonicSheetReader<T> read(Path file, Class<T> head) {
         return new SonicSheetReader<>(file, head);

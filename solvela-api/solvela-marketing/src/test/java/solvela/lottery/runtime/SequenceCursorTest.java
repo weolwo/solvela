@@ -1,6 +1,6 @@
 package solvela.lottery.runtime;
 
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 import solvela.lottery.engine.FpeCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

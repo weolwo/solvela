@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
-import solvela.base.common.util.SolvelaCodeUtil;
+import solvela.base.util.SolvelaCodeUtil;
 
 import java.util.Map;
 

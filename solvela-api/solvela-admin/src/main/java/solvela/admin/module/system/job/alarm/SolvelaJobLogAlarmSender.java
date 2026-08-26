@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.alarm;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;

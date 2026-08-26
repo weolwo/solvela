@@ -2,12 +2,12 @@ package solvela.prize.prizeconfig.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCodeUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCodeUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizeconfig.dao.PrizeConfigDao;
 import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;

@@ -2,7 +2,7 @@ package solvela.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 期号状态，对齐 t_lottery_issue.status

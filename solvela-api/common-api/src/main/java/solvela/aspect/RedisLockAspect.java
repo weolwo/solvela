@@ -2,8 +2,8 @@ package solvela.aspect;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.annoation.RedisLock;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.annotation.RedisLock;
+import solvela.base.util.SolvelaStringUtil;
 import org.apache.logging.log4j.util.Strings;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;

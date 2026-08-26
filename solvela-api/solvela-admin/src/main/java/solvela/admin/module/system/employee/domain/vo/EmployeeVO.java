@@ -2,8 +2,8 @@ package solvela.admin.module.system.employee.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.common.enumeration.GenderEnum;
-import solvela.base.common.swagger.SchemaEnum;
+import solvela.base.enumeration.GenderEnum;
+import solvela.base.swagger.SchemaEnum;
 
 import java.time.LocalDateTime;
 import java.util.List;

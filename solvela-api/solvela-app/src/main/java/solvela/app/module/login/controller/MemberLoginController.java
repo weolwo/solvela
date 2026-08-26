@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.base.common.annoation.NoNeedLogin;
-import solvela.base.common.constant.RequestHeaderConst;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
-import solvela.base.common.util.SolvelaServletUtil;
+import solvela.base.annotation.AllowAnonymous;
+import solvela.base.constant.RequestHeaderConst;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.SolvelaServletUtil;
 import solvela.app.config.StpMemberUtil;
 import solvela.app.module.login.domain.RequestMember;
 import solvela.app.module.login.domain.form.MemberLoginForm;
@@ -37,7 +37,7 @@ public class MemberLoginController {
 
     private final MemberLoginService memberLoginService;
 
-    @NoNeedLogin
+    @AllowAnonymous
     @PostMapping
     @Operation(summary = "手机号密码登录")
     public ResponseDTO<MemberLoginResultVO> login(@Valid @RequestBody MemberLoginForm loginForm, HttpServletRequest request) {
@@ -51,7 +51,7 @@ public class MemberLoginController {
     /**
      * 取当前登录态。前端刷新页面时用它恢复用户信息，返回结构与登录接口一致。
      *
-     * <p>⚠️ 刻意<b>不</b>加 {@code @NoNeedLogin}：没登录就该收到「登录失效」，
+     * <p>⚠️ 刻意<b>不</b>加 {@code @AllowAnonymous}：没登录就该收到「登录失效」，
      * 让前端走统一的跳登录逻辑，而不是收到一个 data 为 null 的成功响应再自己判断。
      */
     @GetMapping("/getLoginInfo")

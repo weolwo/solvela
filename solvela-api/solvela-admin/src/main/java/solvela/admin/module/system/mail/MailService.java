@@ -1,8 +1,8 @@
 package solvela.admin.module.system.mail;
 
 
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaRandomUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaRandomUtil;
 import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -10,9 +10,9 @@ import jakarta.annotation.Resource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.SystemEnvironment;
-import solvela.base.common.util.SolvelaTemplateUtil;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.SystemEnvironment;
+import solvela.base.util.SolvelaTemplateUtil;
 import solvela.admin.module.system.mail.constant.MailTemplateCodeEnum;
 import solvela.admin.module.system.mail.constant.MailTemplateTypeEnum;
 import solvela.admin.module.system.mail.domain.MailTemplateEntity;

@@ -1,6 +1,6 @@
 package solvela.admin.module.risk.promotionconfig.controller;
 
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.ValidateList;
 import solvela.risk.promotionconfig.domain.entity.PromotionConfig;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
@@ -10,8 +10,8 @@ import solvela.risk.promotionconfig.domain.vo.PromotionConfigVO;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

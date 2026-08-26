@@ -1,7 +1,7 @@
 package solvela.admin.module.system.job.core;
 
-import solvela.base.module.support.jobspi.core.SolvelaJobHandler;
-import solvela.base.module.support.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJobHandler;
+import solvela.base.module.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.repository.SolvelaJobDao;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;

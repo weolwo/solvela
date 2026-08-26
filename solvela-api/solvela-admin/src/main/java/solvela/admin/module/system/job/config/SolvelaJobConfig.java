@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.config;
 
-import solvela.base.module.support.jobspi.core.SolvelaJobHandler;
 import lombok.Data;
 import solvela.admin.module.system.job.constant.SolvelaJobRoleEnum;
 import org.springframework.boot.context.properties.ConfigurationProperties;

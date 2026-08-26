@@ -5,10 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import solvela.activity.dao.ActivityDisplayDao;
 import solvela.activity.domain.entity.ActivityConfig;
 import solvela.activity.domain.entity.ActivityDisplay;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.exception.BusinessException;
-import solvela.base.module.support.file.service.FileAssetService;
-import solvela.base.module.support.file.service.RichTextImageExtractor;
+import solvela.base.domain.RequestUser;
+import solvela.base.exception.BusinessException;
+import solvela.base.module.file.service.FileAssetService;
+import solvela.base.module.file.service.RichTextImageExtractor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

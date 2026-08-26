@@ -3,7 +3,7 @@ package solvela.admin.module.system.employee.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import solvela.base.common.domain.PageParam;
+import solvela.base.domain.PageParam;
 import org.hibernate.validator.constraints.Length;
 
 import java.util.List;

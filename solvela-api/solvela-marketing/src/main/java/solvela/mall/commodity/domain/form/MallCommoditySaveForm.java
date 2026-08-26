@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import solvela.base.common.util.SolvelaCodeUtil;
+import solvela.base.util.SolvelaCodeUtil;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

@@ -511,6 +511,29 @@ CREATE TABLE `t_member` (
   KEY `idx_mbr_invite` (`invite_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员主表';
 
+DROP TABLE IF EXISTS `t_member_operation_limit`;
+CREATE TABLE `t_member_operation_limit`
+(
+    `id`             bigint   NOT NULL AUTO_INCREMENT COMMENT '自增id',
+    `member_id`      bigint   NOT NULL COMMENT '会员号：关联键',
+    `operation_type` int      NOT NULL COMMENT '受限操作：1-登录, 2-修改密码。见 MemberOperationTypeEnum',
+    `lock_time`      datetime NOT NULL COMMENT '冻结开始时间',
+    `expire_time`    datetime NOT NULL COMMENT '自动到期时间：到点即视为解除，不依赖回写',
+    `unlock_time`    datetime          DEFAULT NULL COMMENT '实际解冻时间：status=1 时必填',
+    `unlock_type`    tinyint           DEFAULT NULL COMMENT '解冻方式：1-自动到期, 2-重置密码, 3-人工。status=0 时为 NULL',
+    `operator`       varchar(64)       DEFAULT NULL COMMENT '人工解冻的操作人：unlock_type=3 时必填，用于追溯',
+    `status`         tinyint  NOT NULL DEFAULT '0' COMMENT '状态：0-冻结中, 1-已解冻',
+    `reason`         varchar(128)      DEFAULT NULL COMMENT '触发原因：给客服看的人话，如「连续登录失败」',
+    `remark`         varchar(256)      DEFAULT NULL COMMENT '备注',
+    `create_time`    datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`    datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY              `idx_mbr_limit_active` (`member_id`, `operation_type`, `status`),
+    KEY              `idx_mbr_limit_expire` (`status`, `expire_time`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci COMMENT ='会员操作限制（功能级、带到期、可解冻）';
+
 DROP TABLE IF EXISTS `t_member_verify`;
 CREATE TABLE `t_member_verify` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',

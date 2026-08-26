@@ -2,7 +2,7 @@ package solvela.mall.favorite.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.mall.constant.MallConst;
 import solvela.mall.favorite.dao.MallFavoriteDao;
 import solvela.mall.favorite.domain.vo.MallFavoriteStatVO;

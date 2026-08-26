@@ -1,6 +1,6 @@
 package solvela.base.constant;
 
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 登录设备类型

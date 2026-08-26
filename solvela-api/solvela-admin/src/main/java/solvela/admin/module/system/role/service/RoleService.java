@@ -8,9 +8,9 @@ import solvela.admin.module.system.role.domain.entity.RoleEntity;
 import solvela.admin.module.system.role.domain.form.RoleAddForm;
 import solvela.admin.module.system.role.domain.form.RoleUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
+import solvela.base.code.UserErrorCode;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

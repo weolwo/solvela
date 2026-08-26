@@ -1,7 +1,7 @@
 package solvela.ledger.handler;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.risk.proposal.domain.entity.ProposalRecord;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;

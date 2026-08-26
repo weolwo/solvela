@@ -2,8 +2,8 @@ package solvela.task.runtime;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.json.JsonUtils;
 import solvela.member.service.MemberService;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;

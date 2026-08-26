@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.repository.domain;
 
-import solvela.base.module.support.jobspi.core.SolvelaJobHandler;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;

@@ -1,7 +1,7 @@
 package solvela.base.listener;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.SolvelaIpUtil;
+import solvela.base.util.SolvelaIpUtil;
 import org.apache.commons.io.FileUtils;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
 import org.springframework.boot.context.logging.LoggingApplicationListener;

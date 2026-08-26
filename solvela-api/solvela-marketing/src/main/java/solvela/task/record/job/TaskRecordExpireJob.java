@@ -3,11 +3,11 @@ package solvela.task.record.job;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import solvela.base.module.support.jobspi.constant.SolvelaJobLaneEnum;
-import solvela.base.module.support.jobspi.core.JobParam;
-import solvela.base.module.support.jobspi.core.SolvelaJob;
-import solvela.base.module.support.jobspi.core.SolvelaJobContext;
-import solvela.base.module.support.jobspi.core.SolvelaJobHandler;
+import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
+import solvela.base.module.jobspi.core.JobParam;
+import solvela.base.module.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJobContext;
+import solvela.base.module.jobspi.core.SolvelaJobHandler;
 import solvela.task.record.dao.TaskRecordDao;
 
 import java.time.LocalDateTime;

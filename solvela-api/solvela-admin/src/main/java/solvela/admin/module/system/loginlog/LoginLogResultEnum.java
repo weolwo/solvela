@@ -1,6 +1,6 @@
 package solvela.admin.module.system.loginlog;
 
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 登录类型

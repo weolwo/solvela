@@ -3,8 +3,8 @@ package solvela.admin.module.system.codegenerator.domain.model;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import solvela.base.common.swagger.SchemaEnum;
-import solvela.base.common.validator.enumeration.CheckEnum;
+import solvela.base.swagger.SchemaEnum;
+import solvela.base.validation.enumeration.CheckEnum;
 import solvela.admin.module.system.codegenerator.constant.CodeGeneratorPageTypeEnum;
 
 import java.util.List;

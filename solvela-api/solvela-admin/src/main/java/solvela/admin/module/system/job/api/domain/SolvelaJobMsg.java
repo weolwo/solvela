@@ -3,7 +3,7 @@ package solvela.admin.module.system.job.api.domain;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 定时任务 发布/订阅消息对象

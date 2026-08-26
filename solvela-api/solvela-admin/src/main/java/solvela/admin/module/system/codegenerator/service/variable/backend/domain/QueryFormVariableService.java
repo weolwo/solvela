@@ -1,8 +1,8 @@
 package solvela.admin.module.system.codegenerator.service.variable.backend.domain;
 
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaEnumUtil;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaEnumUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.codegenerator.constant.CodeQueryFieldQueryTypeEnum;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeField;
@@ -96,8 +96,8 @@ public class QueryFormVariableService extends CodeGenerateBaseVariableService {
                         break;
                     }
 
-                    packageList.add("import solvela.base.common.swagger.SchemaEnum;");
-                    packageList.add("import solvela.base.common.validator.enumeration.CheckEnum;");
+                    packageList.add("import solvela.base.swagger.SchemaEnum;");
+                    packageList.add("import solvela.base.validation.enumeration.CheckEnum;");
                     packageList.add("import " + form.getBasic().getJavaPackageName() + ".constant." + codeField.getEnumName() + ";");
 
                     //enum check
@@ -113,7 +113,7 @@ public class QueryFormVariableService extends CodeGenerateBaseVariableService {
                     if (SolvelaStringUtil.isNotEmpty(codeField.getDict())) {
                         finalFieldMap.put("dict", "\n    @JsonDeserialize(using = DictDataDeserializer.class)");
                         packageList.add("import tools.jackson.databind.annotation.JsonDeserialize;");
-                        packageList.add("import solvela.base.common.json.deserializer.DictDataDeserializer;");
+                        packageList.add("import solvela.base.json.deserializer.DictDataDeserializer;");
                     }
                     finalFieldMap.put("javaType", "String");
                 default:

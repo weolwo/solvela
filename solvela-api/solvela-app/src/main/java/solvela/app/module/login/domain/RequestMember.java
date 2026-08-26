@@ -2,8 +2,8 @@ package solvela.app.module.login.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.enumeration.UserTypeEnum;
+import solvela.base.domain.RequestUser;
+import solvela.base.enumeration.UserTypeEnum;
 
 import java.io.Serializable;
 

@@ -2,8 +2,8 @@ package solvela.draw.drawlog.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 import solvela.draw.drawlog.domain.form.DrawPrizeLogQueryForm;
 import solvela.draw.drawlog.domain.vo.DrawFunnelVO;

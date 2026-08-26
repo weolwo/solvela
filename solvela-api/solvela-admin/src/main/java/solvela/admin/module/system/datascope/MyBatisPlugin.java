@@ -3,9 +3,9 @@ package solvela.admin.module.system.datascope;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.datascope.domain.DataScopeSqlConfig;
 import solvela.admin.module.system.datascope.service.DataScopeSqlConfigService;
-import solvela.base.common.domain.DataScopePlugin;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.mapping.*;
+import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
 import org.apache.ibatis.plugin.Plugin;
@@ -31,7 +31,7 @@ import java.util.HashMap;
  */
 @Intercepts({@Signature(type = org.apache.ibatis.executor.Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})})
 @Component
-public class MyBatisPlugin extends DataScopePlugin {
+public class MyBatisPlugin implements Interceptor {
 
     @Resource
     private ApplicationContext applicationContext;

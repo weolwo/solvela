@@ -2,8 +2,8 @@ package solvela.ledger.wallet.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.exception.BusinessException;
+import solvela.base.code.UserErrorCode;
+import solvela.base.exception.BusinessException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

@@ -2,8 +2,8 @@ package solvela.draw.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.json.JsonUtils;
 import tools.jackson.core.type.TypeReference;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 import solvela.draw.drawlog.domain.entity.DrawPrizeLog;

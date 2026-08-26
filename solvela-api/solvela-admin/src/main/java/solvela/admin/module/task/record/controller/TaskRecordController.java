@@ -1,6 +1,6 @@
 package solvela.admin.module.task.record.controller;
 
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.ValidateList;
 import solvela.task.record.domain.entity.TaskRecord;
 import solvela.task.record.domain.form.TaskRecordAddForm;
 import solvela.task.record.domain.form.TaskRecordQueryForm;
@@ -11,8 +11,8 @@ import solvela.task.record.domain.vo.TaskRecordVO;
 import solvela.task.record.service.TaskRecordService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

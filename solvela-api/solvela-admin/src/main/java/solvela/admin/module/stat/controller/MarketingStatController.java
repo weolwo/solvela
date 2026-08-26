@@ -4,7 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.stat.domain.vo.EventHealthVO;
 import solvela.stat.domain.vo.GameplayVO;
 import solvela.stat.domain.vo.OverviewVO;

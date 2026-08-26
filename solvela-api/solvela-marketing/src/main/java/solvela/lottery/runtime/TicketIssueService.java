@@ -2,7 +2,7 @@ package solvela.lottery.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.lottery.config.domain.entity.LotteryConfig;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.engine.FpeCipher;

@@ -1,7 +1,7 @@
 package solvela.lottery.runtime;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 import solvela.lottery.record.domain.entity.LotteryRecord;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

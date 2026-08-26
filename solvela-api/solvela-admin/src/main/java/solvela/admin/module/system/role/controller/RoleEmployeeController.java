@@ -11,8 +11,8 @@ import solvela.admin.module.system.role.domain.form.RoleEmployeeQueryForm;
 import solvela.admin.module.system.role.domain.form.RoleEmployeeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleSelectedVO;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

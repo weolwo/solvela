@@ -2,7 +2,7 @@ package solvela.task.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 import java.util.Arrays;
 

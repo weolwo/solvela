@@ -1,8 +1,8 @@
 package solvela.admin.module.system.codegenerator.service.variable;
 
-import solvela.base.common.util.SolvelaCaseFormat;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaCaseFormat;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.codegenerator.constant.CodeFrontComponentEnum;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeField;

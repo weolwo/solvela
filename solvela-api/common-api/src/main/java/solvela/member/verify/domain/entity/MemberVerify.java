@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import solvela.base.common.crypto.PiiTypeHandler;
+import solvela.base.crypto.PiiTypeHandler;
 
 import java.time.LocalDateTime;
 

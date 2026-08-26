@@ -10,7 +10,7 @@ import solvela.admin.module.system.role.domain.form.RoleAddForm;
 import solvela.admin.module.system.role.domain.form.RoleUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.service.RoleService;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

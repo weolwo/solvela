@@ -3,8 +3,8 @@ package ${packageName};
 #foreach ($importClass in $importPackageList)
 $importClass
 #end
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

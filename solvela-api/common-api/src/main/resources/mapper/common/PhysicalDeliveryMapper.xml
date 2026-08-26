@@ -14,11 +14,11 @@
                 漏了 typeHandler 的表现是页面上一片 P1:xxxxx，而且不报任何错。
             -->
             <result column="receiver_name" property="receiverName"
-                    typeHandler="solvela.base.common.crypto.PiiTypeHandler"/>
+                    typeHandler="solvela.base.crypto.PiiTypeHandler"/>
             <result column="receiver_phone" property="receiverPhone"
-                    typeHandler="solvela.base.common.crypto.PiiTypeHandler"/>
+                    typeHandler="solvela.base.crypto.PiiTypeHandler"/>
             <result column="receiver_address" property="receiverAddress"
-                    typeHandler="solvela.base.common.crypto.PiiTypeHandler"/>
+                    typeHandler="solvela.base.crypto.PiiTypeHandler"/>
             <result column="logistics_company" property="logisticsCompany" />
             <result column="logistics_no" property="logisticsNo" />
             <result column="status" property="status" />

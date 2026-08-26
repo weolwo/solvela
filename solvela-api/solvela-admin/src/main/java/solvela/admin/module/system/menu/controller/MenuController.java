@@ -11,9 +11,9 @@ import solvela.admin.module.system.menu.domain.form.MenuUpdateForm;
 import solvela.admin.module.system.menu.domain.vo.MenuTreeVO;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.admin.module.system.menu.service.MenuService;
-import solvela.base.common.domain.RequestUrlVO;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
+import solvela.base.domain.RequestUrlVO;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

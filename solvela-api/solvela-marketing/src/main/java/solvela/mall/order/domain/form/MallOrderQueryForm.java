@@ -1,6 +1,6 @@
 package solvela.mall.order.domain.form;
 
-import solvela.base.common.domain.PageParam;
+import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 

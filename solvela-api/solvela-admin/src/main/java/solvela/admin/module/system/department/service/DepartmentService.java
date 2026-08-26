@@ -9,9 +9,9 @@ import solvela.admin.module.system.department.domain.vo.DepartmentTreeVO;
 import solvela.admin.module.system.department.domain.vo.DepartmentVO;
 import solvela.admin.module.system.department.manager.DepartmentCacheManager;
 import solvela.admin.module.system.employee.dao.EmployeeDao;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
+import solvela.base.code.UserErrorCode;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

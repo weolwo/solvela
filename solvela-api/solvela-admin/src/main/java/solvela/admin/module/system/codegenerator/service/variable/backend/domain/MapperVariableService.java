@@ -1,6 +1,6 @@
 package solvela.admin.module.system.codegenerator.service.variable.backend.domain;
 
-import solvela.base.common.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.system.codegenerator.constant.CodeQueryFieldQueryTypeEnum;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeQueryField;

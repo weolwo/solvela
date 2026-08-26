@@ -3,7 +3,7 @@ package solvela.ledger.handler;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.logistic.domain.entity.PhysicalDelivery;

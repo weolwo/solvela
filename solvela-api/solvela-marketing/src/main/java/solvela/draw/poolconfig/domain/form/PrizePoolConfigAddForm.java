@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 import lombok.Data;
-import solvela.base.common.util.SolvelaCodeUtil;
+import solvela.base.util.SolvelaCodeUtil;
 
 /**
  * 奖池配置 新建表单

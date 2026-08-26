@@ -1,6 +1,6 @@
 package solvela.member.verify;
 
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaStringUtil;
 
 /**
  * 实名信息脱敏。

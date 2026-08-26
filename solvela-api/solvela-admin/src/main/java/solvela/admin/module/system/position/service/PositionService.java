@@ -8,11 +8,11 @@ import solvela.admin.module.system.position.domain.form.PositionAddForm;
 import solvela.admin.module.system.position.domain.form.PositionQueryForm;
 import solvela.admin.module.system.position.domain.form.PositionUpdateForm;
 import solvela.admin.module.system.position.domain.vo.PositionVO;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

@@ -2,8 +2,8 @@ package solvela.lottery.record.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.lottery.constant.LotteryConst;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.record.domain.form.LotteryRecordQueryForm;

@@ -1,6 +1,6 @@
 package solvela.base.sonicexcel;
 
-import solvela.base.common.util.SolvelaExcelUtil;
+import solvela.base.sonicexcel.SolvelaExcelUtil;
 import solvela.base.sonicexcel.annotation.SonicTitle;
 import solvela.base.sonicexcel.error.SonicErrorPolicy;
 import solvela.base.sonicexcel.error.SonicReadResult;

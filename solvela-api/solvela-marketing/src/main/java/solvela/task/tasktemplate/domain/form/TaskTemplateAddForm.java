@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
-import solvela.base.common.util.SolvelaCodeUtil;
+import solvela.base.util.SolvelaCodeUtil;
 
 /**
  * 任务模板表 新建表单

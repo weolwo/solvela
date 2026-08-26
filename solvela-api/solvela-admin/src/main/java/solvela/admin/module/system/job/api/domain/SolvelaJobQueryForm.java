@@ -2,9 +2,9 @@ package solvela.admin.module.system.job.api.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.common.domain.PageParam;
-import solvela.base.common.swagger.SchemaEnum;
-import solvela.base.common.validator.enumeration.CheckEnum;
+import solvela.base.domain.PageParam;
+import solvela.base.swagger.SchemaEnum;
+import solvela.base.validation.enumeration.CheckEnum;
 import solvela.admin.module.system.job.constant.SolvelaJobTriggerTypeEnum;
 import org.hibernate.validator.constraints.Length;
 

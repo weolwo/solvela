@@ -1,8 +1,8 @@
 package solvela.admin.module.system.codegenerator.service.variable.backend.domain;
 
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.codegenerator.constant.CodeFrontComponentEnum;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeField;
@@ -89,8 +89,8 @@ public class UpdateFormVariableService extends CodeGenerateBaseVariableService {
 
             // 枚举
             if (SolvelaStringUtil.isNotEmpty(codeField.getEnumName())) {
-                packageList.add("import solvela.base.common.swagger.SchemaEnum;");
-                packageList.add("import solvela.base.common.validator.enumeration.CheckEnum;");
+                packageList.add("import solvela.base.swagger.SchemaEnum;");
+                packageList.add("import solvela.base.validation.enumeration.CheckEnum;");
                 packageList.add("import " + form.getBasic().getJavaPackageName() + ".constant." + codeField.getEnumName() + ";");
 
                 //enum check
@@ -120,14 +120,14 @@ public class UpdateFormVariableService extends CodeGenerateBaseVariableService {
             if (SolvelaStringUtil.isNotEmpty(codeField.getDict())) {
                 finalFieldMap.put("dict", "\n    @JsonDeserialize(using = DictDataDeserializer.class)");
                 packageList.add("import tools.jackson.databind.annotation.JsonDeserialize;");
-                packageList.add("import solvela.base.common.json.deserializer.DictDataDeserializer;");
+                packageList.add("import solvela.base.json.deserializer.DictDataDeserializer;");
             }
 
             //文件上传
             if (CodeFrontComponentEnum.FILE_UPLOAD.equalsValue(field.getFrontComponent())) {
                 finalFieldMap.put("file", "\n    @JsonDeserialize(using = FileKeyVoDeserializer.class)");
                 packageList.add("import tools.jackson.databind.annotation.JsonDeserialize;");
-                packageList.add("import solvela.base.common.json.deserializer.FileKeyVoDeserializer;");
+                packageList.add("import solvela.base.json.deserializer.FileKeyVoDeserializer;");
             }
 
             packageList.add(getJavaPackageName(codeField.getJavaType()));

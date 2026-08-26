@@ -1,8 +1,8 @@
 package solvela.ledger.logistic.domain.form;
 
-import solvela.base.common.excel.SonicEnum;
-import solvela.base.common.excel.SonicEnumConverter;
-import solvela.base.common.excel.SonicEnumOptionProvider;
+import solvela.base.sonicexcel.annotation.SonicEnum;
+import solvela.base.sonicexcel.converter.SonicEnumConverter;
+import solvela.base.sonicexcel.option.SonicEnumOptionProvider;
 import solvela.base.sonicexcel.annotation.SonicOptions;
 import solvela.base.sonicexcel.annotation.SonicTitle;
 import solvela.enums.DeliveryStatusEnum;

@@ -1,10 +1,9 @@
 package solvela.admin.module.system.job.core;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
-import solvela.base.module.support.jobspi.constant.SolvelaJobLaneEnum;
+import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 

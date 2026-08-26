@@ -1,6 +1,6 @@
 package solvela.admin.module.task.taskconfig.controller;
 
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.ValidateList;
 import solvela.task.taskconfig.domain.entity.TaskConfig;
 import solvela.task.taskconfig.domain.form.TaskConfigAddForm;
 import solvela.task.taskconfig.domain.form.TaskConfigQueryForm;
@@ -13,8 +13,8 @@ import solvela.task.taskconfig.domain.vo.TaskConfigVO;
 import solvela.task.taskconfig.service.TaskConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

@@ -3,7 +3,7 @@ package solvela.consumer.handler;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.PrizeStrategy;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.enums.PrizeTypeEnum;
 import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;

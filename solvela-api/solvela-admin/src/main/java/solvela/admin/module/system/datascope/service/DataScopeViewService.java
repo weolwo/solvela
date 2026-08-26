@@ -9,8 +9,8 @@ import solvela.admin.module.system.employee.domain.entity.EmployeeEntity;
 import solvela.admin.module.system.role.dao.RoleDataScopeDao;
 import solvela.admin.module.system.role.dao.RoleEmployeeDao;
 import solvela.admin.module.system.role.domain.entity.RoleDataScopeEntity;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaEnumUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaEnumUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;

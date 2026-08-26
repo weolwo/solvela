@@ -1,7 +1,7 @@
 package solvela.admin.module.system.datascope.constant;
 
 
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 
 /**

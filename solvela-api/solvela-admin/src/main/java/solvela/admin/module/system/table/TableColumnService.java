@@ -1,12 +1,12 @@
 package solvela.admin.module.system.table;
 
 import jakarta.annotation.Resource;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaCollectionUtil;
+import solvela.base.domain.RequestUser;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaCollectionUtil;
 import solvela.admin.module.system.table.domain.TableColumnEntity;
 import solvela.admin.module.system.table.domain.TableColumnUpdateForm;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.json.JsonUtils;
 import org.springframework.stereotype.Service;
 
 /**

@@ -8,7 +8,7 @@ import solvela.admin.module.system.employee.domain.entity.EmployeeEntity;
 import solvela.admin.module.system.role.dao.RoleEmployeeDao;
 import solvela.admin.module.system.role.domain.entity.RoleEmployeeEntity;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
-import solvela.base.common.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaCollectionUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

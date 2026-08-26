@@ -2,7 +2,7 @@ package solvela.task.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.json.JsonUtils;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
 import solvela.task.constant.TaskTypeEnum;

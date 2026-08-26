@@ -2,11 +2,11 @@ package solvela.admin.module.system.job.bootstrap;
 
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
-import solvela.base.module.support.jobspi.constant.SolvelaJobLaneEnum;
-import solvela.base.module.support.jobspi.core.SolvelaJob;
-import solvela.base.module.support.jobspi.core.SolvelaJobContext;
-import solvela.base.module.support.jobspi.core.JobParam;
-import solvela.base.module.support.jobspi.core.SolvelaJobHandler;
+import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
+import solvela.base.module.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJobContext;
+import solvela.base.module.jobspi.core.JobParam;
+import solvela.base.module.jobspi.core.SolvelaJobHandler;
 import solvela.admin.module.system.job.repository.SolvelaJobRepository;
 import org.springframework.stereotype.Component;
 

@@ -9,7 +9,7 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleDataScopeVO;
 import solvela.admin.module.system.role.service.RoleDataScopeService;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

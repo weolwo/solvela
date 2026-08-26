@@ -3,7 +3,7 @@ package solvela.admin.module.system.datatracer.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 数据业务类型

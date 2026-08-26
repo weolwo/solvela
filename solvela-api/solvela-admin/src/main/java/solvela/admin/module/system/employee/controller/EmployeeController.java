@@ -9,11 +9,11 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.employee.domain.form.*;
 import solvela.admin.module.system.employee.domain.vo.EmployeeVO;
 import solvela.admin.module.system.employee.service.EmployeeService;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
 import solvela.admin.module.system.apiencrypt.annotation.ApiDecrypt;
-import solvela.base.module.support.securityprotect.service.Level3ProtectConfigService;
+import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

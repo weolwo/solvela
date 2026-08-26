@@ -3,10 +3,10 @@ package ${packageName};
 #foreach ($importClass in $importPackageList)
 $importClass
 #end
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaPageUtil;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;

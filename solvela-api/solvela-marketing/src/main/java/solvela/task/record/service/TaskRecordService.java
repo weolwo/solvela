@@ -2,11 +2,11 @@ package solvela.task.record.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.task.record.dao.TaskRecordDao;
 import solvela.task.record.domain.entity.TaskRecord;
 import solvela.task.record.domain.form.TaskRecordAddForm;

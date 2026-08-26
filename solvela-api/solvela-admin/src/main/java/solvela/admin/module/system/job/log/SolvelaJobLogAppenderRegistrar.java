@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.log;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import jakarta.annotation.PreDestroy;

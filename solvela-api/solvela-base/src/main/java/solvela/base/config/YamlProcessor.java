@@ -1,7 +1,7 @@
 package solvela.base.config;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaStringUtil;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.boot.env.YamlPropertySourceLoader;

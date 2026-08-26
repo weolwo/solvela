@@ -15,36 +15,36 @@ import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
 import solvela.admin.module.system.role.service.RoleMenuService;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.constant.RequestHeaderConst;
-import solvela.base.common.constant.StringConst;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.UserPermission;
-import solvela.base.common.enumeration.UserTypeEnum;
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaEnumUtil;
-import solvela.base.common.util.SolvelaIpUtil;
-import solvela.base.common.util.SolvelaRandomUtil;
-import solvela.base.common.util.SolvelaServletUtil;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.code.UserErrorCode;
+import solvela.base.constant.RequestHeaderConst;
+import solvela.base.constant.StringConst;
+import solvela.base.crypto.PasswordCipher;
+import solvela.base.domain.RequestUser;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.UserPermission;
+import solvela.base.enumeration.UserTypeEnum;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaEnumUtil;
+import solvela.base.util.SolvelaIpUtil;
+import solvela.base.util.SolvelaRandomUtil;
+import solvela.base.web.SolvelaServletUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.base.constant.LoginDeviceEnum;
 import solvela.base.constant.RedisKeyConst;
 import solvela.admin.module.system.apiencrypt.service.ApiEncryptService;
-import solvela.base.module.support.config.ConfigKeyEnum;
-import solvela.base.module.support.config.ConfigService;
+import solvela.base.module.config.ConfigKeyEnum;
+import solvela.base.module.config.ConfigService;
 import solvela.admin.module.system.loginlog.LoginLogResultEnum;
 import solvela.admin.module.system.loginlog.LoginLogService;
 import solvela.admin.module.system.loginlog.domain.LoginLogEntity;
 import solvela.admin.module.system.loginlog.domain.LoginLogVO;
 import solvela.admin.module.system.mail.MailService;
 import solvela.admin.module.system.mail.constant.MailTemplateCodeEnum;
-import solvela.base.module.support.redis.RedisService;
-import solvela.base.module.support.securityprotect.domain.LoginFailEntity;
-import solvela.base.module.support.securityprotect.service.Level3ProtectConfigService;
-import solvela.base.module.support.securityprotect.service.SecurityLoginService;
-import solvela.base.module.support.securityprotect.service.SecurityPasswordService;
-import org.springframework.beans.factory.annotation.Value;
+import solvela.base.module.redis.RedisService;
+import solvela.admin.module.system.securityprotect.domain.LoginFailEntity;
+import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
+import solvela.admin.module.system.securityprotect.service.SecurityLoginService;
+import solvela.admin.module.system.securityprotect.service.SecurityPasswordService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -163,7 +163,7 @@ public class LoginService implements StpInterface {
             }
 
             // 密码错误
-            if (!SecurityPasswordService.matchesPwd(employeeService.generateSaltPassword(requestPassword, employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
+            if (!PasswordCipher.matches(employeeService.generateSaltPassword(requestPassword, employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
                 // 记录登录失败
                 saveLoginLog(employeeEntity, ip, userAgent, "密码错误", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
                 // 记录等级保护次数

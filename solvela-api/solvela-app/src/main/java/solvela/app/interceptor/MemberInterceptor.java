@@ -10,12 +10,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
-import solvela.base.common.annoation.NoNeedLogin;
-import solvela.base.common.code.SystemErrorCode;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
-import solvela.base.common.util.SolvelaResponseUtil;
+import solvela.base.annotation.AllowAnonymous;
+import solvela.base.code.SystemErrorCode;
+import solvela.base.code.UserErrorCode;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.SolvelaResponseUtil;
 import solvela.app.config.StpMemberUtil;
 import solvela.app.module.login.domain.RequestMember;
 import solvela.app.module.login.service.MemberLoginService;
@@ -67,7 +67,7 @@ public class MemberInterceptor implements HandlerInterceptor {
             // 🔴 免登录接口也要把已登录用户的身份放进上下文：
             // 活动详情这类接口「登录与否都能看，但登录了要额外返回我的参与记录」，
             // 如果这里直接 return true，接口里就永远拿不到当前会员，只能再写一套解析。
-            if (handlerMethod.getMethodAnnotation(NoNeedLogin.class) != null) {
+            if (handlerMethod.getMethodAnnotation(AllowAnonymous.class) != null) {
                 setContext(requestMember);
                 return true;
             }

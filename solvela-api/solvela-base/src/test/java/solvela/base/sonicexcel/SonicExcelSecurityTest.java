@@ -1,6 +1,6 @@
 package solvela.base.sonicexcel;
 
-import solvela.base.common.util.SolvelaExcelUtil;
+import solvela.base.sonicexcel.SolvelaExcelUtil;
 import solvela.base.sonicexcel.annotation.SonicTitle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

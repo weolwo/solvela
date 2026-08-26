@@ -3,11 +3,11 @@ package solvela.member.loginlog.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.member.loginlog.domain.form.MemberLoginLogQueryForm;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.member.loginlog.domain.vo.MemberLoginLogStatVO;
 import solvela.member.loginlog.domain.vo.MemberLoginLogVO;
 

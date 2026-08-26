@@ -1,9 +1,8 @@
 package solvela.admin.module.system.job.core;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.SolvelaIpUtil;
+import solvela.base.util.SolvelaIpUtil;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
 import solvela.admin.module.system.job.constant.SolvelaJobBlockStrategyEnum;
 import solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum;

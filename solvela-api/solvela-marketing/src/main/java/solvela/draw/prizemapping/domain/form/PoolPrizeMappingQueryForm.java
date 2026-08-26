@@ -1,7 +1,7 @@
 package solvela.draw.prizemapping.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import solvela.base.common.domain.PageParam;
+import solvela.base.domain.PageParam;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 

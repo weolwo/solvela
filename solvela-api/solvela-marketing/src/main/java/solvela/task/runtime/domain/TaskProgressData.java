@@ -1,7 +1,7 @@
 package solvela.task.runtime.domain;
 
 import tools.jackson.core.type.TypeReference;
-import solvela.base.common.util.JsonUtils;
+import solvela.base.json.JsonUtils;
 import solvela.task.constant.TaskConst;
 
 import java.util.ArrayList;

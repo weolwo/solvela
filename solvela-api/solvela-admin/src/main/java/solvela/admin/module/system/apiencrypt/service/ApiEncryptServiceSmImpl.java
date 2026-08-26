@@ -1,7 +1,7 @@
 package solvela.admin.module.system.apiencrypt.service;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.constant.StringConst;
+import solvela.base.constant.StringConst;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.stereotype.Service;
 

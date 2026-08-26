@@ -10,9 +10,9 @@ import solvela.admin.module.system.position.domain.form.PositionQueryForm;
 import solvela.admin.module.system.position.domain.form.PositionUpdateForm;
 import solvela.admin.module.system.position.domain.vo.PositionVO;
 import solvela.admin.module.system.position.service.PositionService;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.ValidateList;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

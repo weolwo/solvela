@@ -1,10 +1,10 @@
 package solvela.base.listener;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.code.ErrorCodeRegister;
-import solvela.base.common.enumeration.SystemEnvironmentEnum;
-import solvela.base.common.util.SolvelaEnumUtil;
-import solvela.base.common.util.SolvelaIpUtil;
+import solvela.base.code.ErrorCodeRegister;
+import solvela.base.enumeration.SystemEnvironmentEnum;
+import solvela.base.util.SolvelaEnumUtil;
+import solvela.base.util.SolvelaIpUtil;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.boot.web.server.context.WebServerInitializedEvent;
 import org.springframework.context.ApplicationListener;

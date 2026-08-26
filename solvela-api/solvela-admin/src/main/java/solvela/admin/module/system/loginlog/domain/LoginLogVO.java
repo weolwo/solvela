@@ -2,8 +2,8 @@ package solvela.admin.module.system.loginlog.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.common.enumeration.UserTypeEnum;
-import solvela.base.common.swagger.SchemaEnum;
+import solvela.base.enumeration.UserTypeEnum;
+import solvela.base.swagger.SchemaEnum;
 import solvela.admin.module.system.loginlog.LoginLogResultEnum;
 
 import java.time.LocalDateTime;

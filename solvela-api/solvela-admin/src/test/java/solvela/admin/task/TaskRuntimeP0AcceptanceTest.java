@@ -1,6 +1,6 @@
 package solvela.admin.task;
 
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.prize.prizelog.domain.entity.PrizeLog;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;

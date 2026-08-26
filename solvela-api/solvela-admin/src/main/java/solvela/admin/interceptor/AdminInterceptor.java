@@ -10,12 +10,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.login.domain.RequestEmployee;
 import solvela.admin.module.system.login.service.LoginService;
-import solvela.base.common.annoation.NoNeedLogin;
-import solvela.base.common.code.SystemErrorCode;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
-import solvela.base.common.util.SolvelaResponseUtil;
+import solvela.base.annotation.AllowAnonymous;
+import solvela.base.code.SystemErrorCode;
+import solvela.base.code.UserErrorCode;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.SolvelaResponseUtil;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -65,8 +65,8 @@ public class AdminInterceptor implements HandlerInterceptor {
             // --------------- 第二步： 校验 登录 ---------------
 
             Method method = ((HandlerMethod) handler).getMethod();
-            NoNeedLogin noNeedLogin = ((HandlerMethod) handler).getMethodAnnotation(NoNeedLogin.class);
-            if (noNeedLogin != null) {
+            AllowAnonymous allowAnonymous = ((HandlerMethod) handler).getMethodAnnotation(AllowAnonymous.class);
+            if (allowAnonymous != null) {
                 updateActiveTimeout(requestEmployee);
                 SolvelaRequestUtil.setRequestUser(requestEmployee);
                 return true;

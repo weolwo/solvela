@@ -1,6 +1,6 @@
 package solvela.consumer.handler;
 
-import solvela.base.common.domain.ResponseDTO;
+import solvela.base.domain.ResponseDTO;
 import solvela.prize.prizelog.domain.entity.PrizeLog;
 
 public interface IPrizeHandler {

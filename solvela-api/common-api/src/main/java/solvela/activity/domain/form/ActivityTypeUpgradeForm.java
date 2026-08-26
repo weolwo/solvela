@@ -3,7 +3,7 @@ package solvela.activity.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import solvela.base.common.validator.enumeration.CheckEnum;
+import solvela.base.validation.enumeration.CheckEnum;
 import solvela.enums.ActivityTypeEnum;
 
 /**

@@ -28,7 +28,7 @@ public class AppMvcConfig implements WebMvcConfigurer {
      * 公开文件由管理端进程（1024，见 {@code file.storage.public-url-prefix}）或 CDN 提供。
      * 哪天要让本服务也发图，先想清楚「C 端上传」的配额与审核，别顺手加一条白名单。
      *
-     * <p>🔴 免登录的<b>业务</b>接口不靠白名单，靠方法上的 {@code @NoNeedLogin} ——
+     * <p>🔴 免登录的<b>业务</b>接口不靠白名单，靠方法上的 {@code @AllowAnonymous} ——
      * 白名单是按路径前缀匹配的，加一条就可能连带放行未来新增的同前缀接口；
      * 注解则是一个方法一个决定，改错了 code review 看得见。
      */

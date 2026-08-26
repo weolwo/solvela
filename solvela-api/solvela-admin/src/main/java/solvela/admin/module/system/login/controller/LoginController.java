@@ -1,7 +1,7 @@
 package solvela.admin.module.system.login.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import solvela.base.common.util.SolvelaServletUtil;
+import solvela.base.web.SolvelaServletUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -12,11 +12,11 @@ import solvela.admin.module.system.login.domain.LoginForm;
 import solvela.admin.module.system.login.domain.LoginResultVO;
 import solvela.admin.module.system.login.service.LoginService;
 import solvela.admin.util.AdminRequestUtil;
-import solvela.base.common.annoation.NoNeedLogin;
-import solvela.base.common.constant.RequestHeaderConst;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
-import solvela.base.module.support.securityprotect.service.Level3ProtectConfigService;
+import solvela.base.annotation.AllowAnonymous;
+import solvela.base.constant.RequestHeaderConst;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
+import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,7 +38,7 @@ public class LoginController {
     @Resource
     private Level3ProtectConfigService level3ProtectConfigService;
 
-    @NoNeedLogin
+    @AllowAnonymous
     @PostMapping("/login")
     @Operation(summary = "登录 @author 卓大")
     public ResponseDTO<LoginResultVO> login(@Valid @RequestBody LoginForm loginForm, HttpServletRequest request) {
@@ -61,7 +61,8 @@ public class LoginController {
     public ResponseDTO<String> logout() {
         return loginService.logout(SolvelaRequestUtil.getRequestUser());
     }
-    @NoNeedLogin
+
+    @AllowAnonymous
     @GetMapping("/login/sendEmailCode/{loginName}")
     @Operation(summary = "获取邮箱登录验证码 @author 卓大")
     public ResponseDTO<String> sendEmailCode(@PathVariable String loginName) {
@@ -69,7 +70,7 @@ public class LoginController {
     }
 
 
-    @NoNeedLogin
+    @AllowAnonymous
     @GetMapping("/login/getTwoFactorLoginFlag")
     @Operation(summary = "获取双因子登录标识 @author 卓大")
     public ResponseDTO<Boolean> getTwoFactorLoginFlag() {

@@ -1,6 +1,6 @@
 package solvela.scriptengine.spi;
 
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 import solvela.scriptengine.domain.ScriptParam;
 
 import java.math.BigDecimal;

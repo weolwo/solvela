@@ -17,17 +17,18 @@ import solvela.admin.module.system.position.dao.PositionDao;
 import solvela.admin.module.system.position.domain.entity.PositionEntity;
 import solvela.admin.module.system.role.dao.RoleEmployeeDao;
 import solvela.admin.module.system.role.domain.vo.RoleEmployeeVO;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.constant.StringConst;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.enumeration.UserTypeEnum;
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaPageUtil;
-import solvela.base.common.util.SolvelaRandomUtil;
-import solvela.base.module.support.securityprotect.service.SecurityPasswordService;
+import solvela.base.code.UserErrorCode;
+import solvela.base.constant.StringConst;
+import solvela.base.crypto.PasswordCipher;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.RequestUser;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.enumeration.UserTypeEnum;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.util.SolvelaRandomUtil;
+import solvela.admin.module.system.securityprotect.service.SecurityPasswordService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -146,7 +147,7 @@ public class EmployeeService {
         // 设置密码 随机密码
         String randomPassword = securityPasswordService.randomPassword();
         String generateSaltPassword = this.generateSaltPassword(randomPassword, employeeUid);
-        entity.setLoginPwd(SecurityPasswordService.getEncryptPwd(generateSaltPassword));
+        entity.setLoginPwd(PasswordCipher.encode(generateSaltPassword));
 
         // 保存数据
         entity.setDeletedFlag(Boolean.FALSE);
@@ -347,7 +348,7 @@ public class EmployeeService {
         }
 
         // 校验原始密码
-        if (!SecurityPasswordService.matchesPwd(this.generateSaltPassword(updatePasswordForm.getOldPassword(), employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
+        if (!PasswordCipher.matches(this.generateSaltPassword(updatePasswordForm.getOldPassword(), employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
             return ResponseDTO.userErrorParam("原密码有误，请重新输入");
         }
 
@@ -369,7 +370,7 @@ public class EmployeeService {
         }
 
         // 更新密码
-        String newEncryptPassword = SecurityPasswordService.getEncryptPwd(this.generateSaltPassword(updatePasswordForm.getNewPassword(), employeeEntity.getEmployeeUid()));
+        String newEncryptPassword = PasswordCipher.encode(this.generateSaltPassword(updatePasswordForm.getNewPassword(), employeeEntity.getEmployeeUid()));
         EmployeeEntity updateEntity = new EmployeeEntity();
         updateEntity.setEmployeeId(employeeId);
         updateEntity.setLoginPwd(newEncryptPassword);
@@ -415,7 +416,7 @@ public class EmployeeService {
 
         String password = securityPasswordService.randomPassword();
         String saltPassword = this.generateSaltPassword(password, employeeEntity.getEmployeeUid());
-        employeeDao.updatePassword(employeeId, SecurityPasswordService.getEncryptPwd(saltPassword));
+        employeeDao.updatePassword(employeeId, PasswordCipher.encode(saltPassword));
         return ResponseDTO.ok(password);
     }
 

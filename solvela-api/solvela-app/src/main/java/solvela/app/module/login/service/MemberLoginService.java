@@ -5,18 +5,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
-import solvela.base.common.code.UserErrorCode;
-import solvela.base.common.constant.RequestHeaderConst;
-import solvela.base.common.constant.StringConst;
-import solvela.base.common.crypto.PiiHasher;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.enumeration.UserTypeEnum;
-import solvela.base.common.util.SolvelaIpUtil;
-import solvela.base.common.util.SolvelaServletUtil;
-import solvela.base.common.util.SolvelaStringUtil;
-import solvela.base.module.support.securityprotect.domain.LoginFailEntity;
-import solvela.base.module.support.securityprotect.service.SecurityLoginService;
-import solvela.base.module.support.securityprotect.service.SecurityPasswordService;
+import solvela.base.code.UserErrorCode;
+import solvela.base.constant.RequestHeaderConst;
+import solvela.base.constant.StringConst;
+import solvela.base.crypto.PiiHasher;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.enumeration.UserTypeEnum;
+import solvela.base.util.SolvelaIpUtil;
+import solvela.base.web.SolvelaServletUtil;
+import solvela.base.util.SolvelaStringUtil;
+import solvela.base.crypto.PasswordCipher;
+import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
+import solvela.member.operationlimit.domain.entity.MemberOperationLimit;
+import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.constant.MemberConst;
 import solvela.member.domain.entity.Member;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
@@ -29,6 +30,7 @@ import solvela.app.module.login.domain.vo.MemberLoginResultVO;
 import solvela.app.module.login.domain.form.MemberLoginForm;
 import solvela.app.module.login.manager.MemberLoginManager;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
@@ -52,26 +54,20 @@ public class MemberLoginService {
      * 拿号段跑一遍就能筛出「哪些手机号是这个平台的用户」，这本身就是可以卖钱的数据，
      * 也是后续撞库、精准诈骗的输入。牺牲的那点体验，用「注册」入口的引导去补。
      *
-     * <p>⚠️ <b>这道防线并不严密，别当它是密闭的</b>：密码错误时会追加等保的
-     * 「还可以再尝试 N 次」倒计时，而手机号不存在时没有这一句 —— 对方据此仍能分辨
-     * 账号是否存在。保留倒计时是<b>刻意的取舍</b>：去掉它，用户会在毫无预警的情况下
-     * 被锁 30 分钟，而这条投诉的量级远大于枚举风险。真要堵死，得给不存在的手机号
-     * 也伪造一份计数（按 IP + 手机号维度），那是风控模块的事，不是登录接口的事。
+     * <p>⚠️ <b>这道防线并不严密，别当它是密闭的</b>：连续输错到触发限制时，返回的是
+     * 「请 N 分钟后重试」而不是这一句，而不存在的手机号<b>永远</b>只会得到这一句 ——
+     * 对方据此仍能分辨账号是否存在，只是成本从「一次请求」抬到了「连错 5 次」。
+     * 保留这个差异是<b>刻意的取舍</b>：抹掉它，用户会在毫无预警的情况下被限住，
+     * 而这条投诉的量级远大于枚举风险。真要堵死，得给不存在的手机号也伪造一份计数
+     * （按 IP + 手机号维度），那是风控模块的事，不是登录接口的事。
      */
     private static final String LOGIN_FAIL_MSG = "手机号或密码错误";
 
     /**
-     * {@code SecurityLoginService} 返回的提示里带的固定开头，需要在这里剥掉。
-     *
-     * <p>那是<b>员工端措辞</b>（会员没有「登录名」这个概念），而且我们自己已经说过一遍
-     * 「手机号或密码错误」了 —— 不剥的话用户看到的是
-     * 「手机号或密码错误，登录名或密码错误！连续登录失败…」，一句话里两个错误提示。
-     *
-     * <p>⚠️ 这是 solvela-base 里 {@code SecurityLoginService.LOGIN_FAIL_MSG} 的<b>私有常量副本</b>，
-     * 那边改了这里会静默失配（表现是提示又变回两句），但影响仅限文案。
-     * 之所以不改 solvela-base：那个常量是管理端在用的，为 C 端的措辞去动它是本末倒置。
+     * 被限制时的提示。<b>必须说清楚「还要等多久」和「怎么提前恢复」</b> ——
+     * 只说「操作过于频繁」的后果是用户反复重试（把计数越刷越满）然后打客服电话。
      */
-    private static final String SECURITY_TIP_PREFIX = "登录名或密码错误！";
+    private static final String LOGIN_LOCKED_MSG = "连续登录失败次数过多，请 %d 分钟后重试；需要提前恢复请联系客服";
 
     /** 未传 deviceType 时的默认值。本服务第一个接入方是 H5 */
     private static final String DEFAULT_DEVICE_TYPE = "H5";
@@ -85,7 +81,7 @@ public class MemberLoginService {
     private final MemberLoginDao memberLoginDao;
     private final MemberLoginLogDao memberLoginLogDao;
     private final MemberLoginManager memberLoginManager;
-    private final SecurityLoginService securityLoginService;
+    private final MemberOperationLimitService memberOperationLimitService;
     private final PiiHasher piiHasher;
 
     /**
@@ -127,13 +123,16 @@ public class MemberLoginService {
             return ResponseDTO.error(UserErrorCode.ACCOUNT_FROZEN);
         }
 
-        // --------------- 第四步：等保 —— 连续失败锁定 ---------------
-        // 复用管理端那套（t_login_fail 按 user_type 区分），会员用 UserTypeEnum.MEMBER。
-        ResponseDTO<LoginFailEntity> loginFailCheck = securityLoginService.checkLogin(member.getMemberId(), UserTypeEnum.MEMBER);
-        if (!loginFailCheck.getOk()) {
+        // --------------- 第四步：风控 —— 连续失败限制 ---------------
+        // 会员端自己一套（t_member_operation_limit + Redis 计数），不再走员工端的三级等保：
+        // 那套锁的是账号，而会员的手机号是可猜、可泄露的 —— 等于给了别人一个把你挡在门外的开关。
+        MemberOperationLimit activeLimit =
+                memberOperationLimitService.getActiveLimit(member.getMemberId(), MemberOperationTypeEnum.LOGIN);
+        if (activeLimit != null) {
+            String lockedMsg = buildLockedMsg(activeLimit);
             saveLoginLog(member.getMemberId(), ip, loginForm.getDeviceType(),
-                    MemberConst.LOGIN_STATUS_FAIL, loginFailCheck.getMsg());
-            return ResponseDTO.error(loginFailCheck);
+                    MemberConst.LOGIN_STATUS_FAIL, lockedMsg);
+            return ResponseDTO.error(UserErrorCode.PARAM_ERROR, lockedMsg);
         }
 
         // --------------- 第五步：验密码 ---------------
@@ -145,21 +144,22 @@ public class MemberLoginService {
                     MemberConst.LOGIN_STATUS_FAIL, "未设置登录密码");
             return ResponseDTO.userErrorParam("该账号未设置密码，请使用短信验证码登录");
         }
-        if (!SecurityPasswordService.matchesPwd(loginForm.getPassword(), member.getPassword())) {
-            String failTip = securityLoginService.recordLoginFail(
-                    member.getMemberId(), UserTypeEnum.MEMBER, member.getMemberName(), loginFailCheck.getData());
+        if (!PasswordCipher.matches(loginForm.getPassword(), member.getPassword())) {
+            MemberOperationLimit triggered = memberOperationLimitService.recordFail(
+                    member.getMemberId(), MemberOperationTypeEnum.LOGIN, "连续登录失败");
             saveLoginLog(member.getMemberId(), ip, loginForm.getDeviceType(),
                     MemberConst.LOGIN_STATUS_FAIL, LOGIN_FAIL_MSG);
-            // failTip 形如「连续登录失败3次，账号将锁定30分钟！您还可以再尝试2次！」，
-            // 为空说明没开这项等保配置（loginFailMaxTimes < 1）
-            return ResponseDTO.error(UserErrorCode.PARAM_ERROR, buildFailMsg(failTip));
+            // triggered != null 表示这一次失败刚好把人限制住了，直接告诉他要等多久，
+            // 而不是让他再点一次才发现被限 —— 后者是投诉的主要来源
+            return ResponseDTO.error(UserErrorCode.PARAM_ERROR,
+                    triggered == null ? LOGIN_FAIL_MSG : buildLockedMsg(triggered));
         }
 
         // --------------- 第六步：签发 token ---------------
         String deviceType = resolveDeviceType(loginForm.getDeviceType());
         StpMemberUtil.login(buildLoginId(member.getMemberId()), deviceType);
 
-        securityLoginService.removeLoginFail(member.getMemberId(), UserTypeEnum.MEMBER);
+        memberOperationLimitService.clearFail(member.getMemberId(), MemberOperationTypeEnum.LOGIN);
         // 资料可能在上次缓存之后被后台改过，登录是重建缓存最自然的时机
         memberLoginManager.clearRequestMemberCache(member.getMemberId());
         saveLoginLog(member.getMemberId(), ip, deviceType, MemberConst.LOGIN_STATUS_SUCCESS, null);
@@ -248,14 +248,11 @@ public class MemberLoginService {
      * 另一条文案（「您已连续登录失败N次，账号锁定M分钟…」），它不该被动到 ——
      * 用 startsWith 而不是「按第一个感叹号切」正是为了这个，后者会把锁定提示切成空串。
      */
-    private String buildFailMsg(String securityTip) {
-        if (SolvelaStringUtil.isEmpty(securityTip)) {
-            return LOGIN_FAIL_MSG;
-        }
-        String tip = securityTip.startsWith(SECURITY_TIP_PREFIX)
-                ? securityTip.substring(SECURITY_TIP_PREFIX.length())
-                : securityTip;
-        return LOGIN_FAIL_MSG + "，" + tip;
+    private String buildLockedMsg(MemberOperationLimit limit) {
+        // 向上取整到分钟：剩 10 秒时说「请 0 分钟后重试」比不说还糟
+        long minutes = Math.max(1, (long) Math.ceil(
+                Duration.between(LocalDateTime.now(), limit.getExpireTime()).toSeconds() / 60.0));
+        return String.format(LOGIN_LOCKED_MSG, minutes);
     }
 
     private String resolveDeviceType(String deviceType) {

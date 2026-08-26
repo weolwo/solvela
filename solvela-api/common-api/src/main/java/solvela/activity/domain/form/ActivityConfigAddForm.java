@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 import lombok.Data;
-import solvela.base.common.util.SolvelaCodeUtil;
-import solvela.base.common.validator.enumeration.CheckEnum;
+import solvela.base.util.SolvelaCodeUtil;
+import solvela.base.validation.enumeration.CheckEnum;
 import solvela.enums.ActivityTypeEnum;
 
 /**

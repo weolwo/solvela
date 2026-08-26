@@ -7,7 +7,7 @@ import solvela.admin.module.system.job.bootstrap.SolvelaJobBootstrapInitializer;
 import solvela.admin.module.system.job.alarm.SolvelaJobAlarmSender;
 import solvela.admin.module.system.job.alarm.SolvelaJobLogAlarmSender;
 import solvela.admin.module.system.job.constant.SolvelaJobRoleEnum;
-import solvela.base.module.support.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJob;
 import solvela.admin.module.system.job.core.SolvelaJobHandlerRegistry;
 import solvela.admin.module.system.job.core.SolvelaJobLaneExecutePool;
 import solvela.admin.module.system.job.core.SolvelaJobRunner;
@@ -25,8 +25,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
 
 /**
  * 定时任务装配。

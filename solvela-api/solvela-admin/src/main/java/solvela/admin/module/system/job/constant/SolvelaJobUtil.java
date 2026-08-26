@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.constant;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import org.springframework.scheduling.support.CronExpression;
 
 import java.lang.management.ManagementFactory;

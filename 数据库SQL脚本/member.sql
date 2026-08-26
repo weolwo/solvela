@@ -438,6 +438,75 @@ ON DUPLICATE KEY UPDATE `id` = `id`;
 
 
 -- ============================================================================
+-- 5. t_member_operation_limit  会员操作限制（功能级、带到期、可解冻）
+-- ============================================================================
+--
+-- 【和 t_member.status 是两回事，别混】
+--   t_member.status = FROZEN 是<b>账号级</b>封禁：后台人工操作、无到期、整个账号不能用。
+--   本表是<b>功能级</b>限制：风控自动触发、有到期、只挡住 operation_type 指的那一个操作。
+--   客服接到「我被冻结了」的工单，第一步是分清这两者 —— 否则会出现
+--   「解了半天还是进不去」（解了功能限制，账号还封着）。
+--
+-- 【为什么不复用 t_login_fail】
+--   那张表是员工端三级等保在用，策略挂在 t_config.level3_protect_config 这个全局开关上。
+--   会员端沿用它有两个问题：
+--     ① 运营调一次等保会同时改掉 C 端风控强度，两边互相误伤；
+--     ② 它的语义是「锁账号」。员工账号在内网、数量有限，锁得起；会员的手机号是
+--        <b>可猜、可泄露</b>的（订单、分享链接都可能带出去），锁账号等于给了任何人
+--        一个「把别人挡在门外」的开关 —— 防御功能本身变成了拒绝服务的武器。
+--   所以 C 端自己一套：只限功能不封号、有到期、能自助等、能找客服。
+--
+-- 【为什么表里没有 fail_count】
+--   连续失败的计数在 Redis（key: {env}:member:operation-limit:fail:{type}:{memberId}，
+--   固定窗口 TTL），只有<b>真正触发限制</b>时才往本表 insert 一行。
+--   把计数也塞进表，意味着每一次输错密码都要 upsert 一行 —— 会员量级下这是写热点，
+--   而且拿别人手机号狂刷就能直接制造数据库压力。
+--   代价：Redis 挂了计数清零，退化成「不限制」。这是刻意选的失败方向 ——
+--   风控组件故障时不应该把正常用户挡在外面。
+--
+-- 【为什么是 append-only，不是一人一行】
+--   表里带了 unlock_time / unlock_type / operator，说明<b>解冻过程本身要留痕</b>。
+--   做成 (member_id, operation_type) 唯一键、解冻就地改状态的话，同一个人第二次被限制时
+--   会覆盖掉上一次的解冻记录 —— 而客服恰恰需要「这人半年被限过几次、每次谁解的」。
+--   「当前是否受限」不靠唯一键保证，靠查询条件保证：
+--     status = 0 AND expire_time > NOW()
+--   两个条件缺一不可：只看 status，已过期但没回写的行会被当成还锁着（用户白等）；
+--   只看 expire_time，客服刚解掉的行会被当成还锁着（客服白解）。
+--
+-- 【status 列是给人看的，不是给代码看的】
+--   到期是靠 expire_time 判定的，不依赖任何回写动作 —— 定时任务漏跑不影响业务。
+--   回写（settleExpired）只为让报表和客服列表不用自己算过期。
+DROP TABLE IF EXISTS `t_member_operation_limit`;
+CREATE TABLE `t_member_operation_limit`
+(
+    `id`             bigint   NOT NULL AUTO_INCREMENT COMMENT '自增id',
+    `member_id`      bigint   NOT NULL COMMENT '会员号：关联键',
+    `operation_type` int      NOT NULL COMMENT '受限操作：1-登录, 2-修改密码。见 MemberOperationTypeEnum',
+    `lock_time`      datetime NOT NULL COMMENT '冻结开始时间',
+    `expire_time`    datetime NOT NULL COMMENT '自动到期时间：到点即视为解除，不依赖回写',
+    `unlock_time`    datetime          DEFAULT NULL COMMENT '实际解冻时间：status=1 时必填',
+    `unlock_type`    tinyint           DEFAULT NULL COMMENT '解冻方式：1-自动到期, 2-重置密码, 3-人工。status=0 时为 NULL',
+    `operator`       varchar(64)       DEFAULT NULL COMMENT '人工解冻的操作人：unlock_type=3 时必填，用于追溯',
+    `status`         tinyint  NOT NULL DEFAULT '0' COMMENT '状态：0-冻结中, 1-已解冻',
+    `reason`         varchar(128)      DEFAULT NULL COMMENT '触发原因：给客服看的人话，如「连续登录失败」',
+    `remark`         varchar(256)      DEFAULT NULL COMMENT '备注',
+    `create_time`    datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`    datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY              `idx_mbr_limit_active` (`member_id`, `operation_type`, `status`),
+    KEY              `idx_mbr_limit_expire` (`status`, `expire_time`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci COMMENT ='会员操作限制（功能级、带到期、可解冻）';
+--
+-- idx_mbr_limit_active：登录路径上每次都要查「当前有没有生效中的限制」，
+--   (member_id, operation_type, status) 三列走完只剩极少行，再过滤 expire_time。
+-- idx_mbr_limit_expire：给 settleExpired 的批量回写用，(status, expire_time)
+--   能让它只扫「冻结中且已过期」那一小段，不会随历史行增长而变慢。
+-- ============================================================================
+
+
+-- ============================================================================
 -- 附一：会员号怎么发 —— 10位数字，不重复，且不泄露注册量
 -- ============================================================================
 --

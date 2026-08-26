@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 import lombok.Data;
-import solvela.base.common.crypto.PiiTypeHandler;
+import solvela.base.crypto.PiiTypeHandler;
 
 /**
  * 发货物流表 实体类

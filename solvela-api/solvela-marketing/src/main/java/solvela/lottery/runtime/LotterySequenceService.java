@@ -2,7 +2,7 @@ package solvela.lottery.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;

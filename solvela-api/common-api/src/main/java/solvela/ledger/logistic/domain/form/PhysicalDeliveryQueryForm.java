@@ -3,7 +3,7 @@ package solvela.ledger.logistic.domain.form;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import solvela.base.common.domain.PageParam;
+import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
 

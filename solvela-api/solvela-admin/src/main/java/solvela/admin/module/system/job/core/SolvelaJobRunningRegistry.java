@@ -1,6 +1,6 @@
 package solvela.admin.module.system.job.core;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;

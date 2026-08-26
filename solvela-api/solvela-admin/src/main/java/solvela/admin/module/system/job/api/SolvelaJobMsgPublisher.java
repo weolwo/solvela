@@ -1,8 +1,7 @@
 package solvela.admin.module.system.job.api;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.common.util.SolvelaRandomUtil;
+import solvela.base.util.SolvelaRandomUtil;
 import solvela.admin.module.system.job.api.domain.SolvelaJobMsg;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
 import org.redisson.api.RTopic;

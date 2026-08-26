@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="solvela.base.module.support.file.dao.FileDao">
+<mapper namespace="solvela.base.module.file.dao.FileDao">
 
     <!--
       档⑤ 起 FileVO 的属性名与 DB 列名完全对齐（storageKey / originalName），别名已撤除。
@@ -24,7 +24,7 @@
     </sql>
 
     <!-- 分页查询 -->
-    <select id="queryPage" resultType="solvela.base.module.support.file.domain.vo.FileVO">
+    <select id="queryPage" resultType="solvela.base.module.file.domain.vo.FileVO">
         SELECT
         <include refid="voColumns"/>,
         <!-- 引用数直接在列表里给出来，省得为「这张图在不在用」逐个点开详情。
@@ -77,13 +77,13 @@
         </if>
     </select>
 
-    <select id="getByFileKey" resultType="solvela.base.module.support.file.domain.vo.FileVO">
+    <select id="getByFileKey" resultType="solvela.base.module.file.domain.vo.FileVO">
         SELECT
         <include refid="voColumns"/>
         FROM t_file WHERE t_file.storage_key = #{fileKey} AND t_file.deleted_flag = 0
     </select>
 
-    <select id="selectByFileKeyList" resultType="solvela.base.module.support.file.domain.vo.FileVO">
+    <select id="selectByFileKeyList" resultType="solvela.base.module.file.domain.vo.FileVO">
         SELECT
         <include refid="voColumns"/>
         FROM t_file WHERE t_file.deleted_flag = 0 AND t_file.storage_key IN

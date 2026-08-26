@@ -1,8 +1,8 @@
 package solvela.admin.util;
 
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.base.common.domain.RequestUser;
-import solvela.base.common.util.SolvelaRequestUtil;
+import solvela.base.domain.RequestUser;
+import solvela.base.web.SolvelaRequestUtil;
 
 /**
  * admin 端的请求工具类

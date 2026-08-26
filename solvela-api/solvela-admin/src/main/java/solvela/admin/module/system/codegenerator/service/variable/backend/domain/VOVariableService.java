@@ -1,8 +1,8 @@
 package solvela.admin.module.system.codegenerator.service.variable.backend.domain;
 
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaStringUtil;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
 import solvela.admin.module.system.codegenerator.domain.model.CodeField;
 import solvela.admin.module.system.codegenerator.domain.model.CodeTableField;
@@ -71,7 +71,7 @@ public class VOVariableService extends CodeGenerateBaseVariableService {
 
             // 枚举
             if (SolvelaStringUtil.isNotEmpty(codeField.getEnumName())) {
-                packageList.add("import solvela.base.common.swagger.SchemaEnum;");
+                packageList.add("import solvela.base.swagger.SchemaEnum;");
                 packageList.add("import " + form.getBasic().getJavaPackageName() + ".constant." + codeField.getEnumName() + ";");
 
                 finalFieldMap.put("apiModelProperty", "@SchemaEnum(value = " + codeField.getEnumName() + ".class, desc = \"" + codeField.getLabel() + "\")");
@@ -88,7 +88,7 @@ public class VOVariableService extends CodeGenerateBaseVariableService {
             if (isFile(field.getColumnName(), form)) {
                 finalFieldMap.put("file", "\n    @JsonSerialize(using = FileKeyVoSerializer.class)");
                 packageList.add("import tools.jackson.databind.annotation.JsonSerialize;");
-                packageList.add("import solvela.base.common.json.serializer.FileKeyVoSerializer;");
+                packageList.add("import solvela.base.json.serializer.FileKeyVoSerializer;");
             }
 
             packageList.add(getJavaPackageName(codeField.getJavaType()));

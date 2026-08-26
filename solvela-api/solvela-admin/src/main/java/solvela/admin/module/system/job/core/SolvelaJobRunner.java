@@ -1,13 +1,10 @@
 package solvela.admin.module.system.job.core;
 
-import solvela.base.module.support.jobspi.core.SolvelaJobContext;
-import solvela.base.module.support.jobspi.core.SolvelaJobCancelledException;
-import solvela.base.module.support.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJobContext;
+import solvela.base.module.jobspi.core.SolvelaJobCancelledException;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum;
-import solvela.base.module.support.jobspi.constant.SolvelaJobLaneEnum;
-import solvela.admin.module.system.job.repository.SolvelaJobDao;
-import solvela.admin.module.system.job.repository.SolvelaJobLogDao;
+import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
 import solvela.admin.module.system.job.repository.SolvelaJobRepository;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobLogEntity;
@@ -16,7 +13,6 @@ import org.slf4j.MDC;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 

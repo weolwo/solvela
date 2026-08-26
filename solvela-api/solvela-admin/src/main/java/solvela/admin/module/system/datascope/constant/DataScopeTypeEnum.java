@@ -1,6 +1,6 @@
 package solvela.admin.module.system.datascope.constant;
 
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 数据范围 类型

@@ -1,6 +1,5 @@
 package solvela.admin.module.system.job.bootstrap;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
 import solvela.admin.module.system.job.constant.SolvelaJobPresetEnum;

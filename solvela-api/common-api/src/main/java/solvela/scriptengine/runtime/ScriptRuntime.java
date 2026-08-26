@@ -3,7 +3,7 @@ package solvela.scriptengine.runtime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import solvela.base.common.exception.BusinessException;
+import solvela.base.exception.BusinessException;
 import solvela.scriptengine.domain.ExecutableScript;
 import solvela.scriptengine.domain.entity.ScriptRef;
 import solvela.scriptengine.loader.ScriptFileLoader;

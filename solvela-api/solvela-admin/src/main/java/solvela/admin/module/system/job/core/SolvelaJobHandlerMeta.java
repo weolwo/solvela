@@ -1,8 +1,8 @@
 package solvela.admin.module.system.job.core;
 
-import solvela.base.module.support.jobspi.core.SolvelaJob;
-import solvela.base.module.support.jobspi.core.JobParam;
-import solvela.base.module.support.jobspi.constant.SolvelaJobLaneEnum;
+import solvela.base.module.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.JobParam;
+import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
 
 /**
  * 一个定时任务执行器的注册信息。

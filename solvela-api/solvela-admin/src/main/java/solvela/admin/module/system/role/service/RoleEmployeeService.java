@@ -14,12 +14,12 @@ import solvela.admin.module.system.role.domain.form.RoleEmployeeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleSelectedVO;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.manager.RoleEmployeeManager;
-import solvela.base.common.constant.StringConst;
-import solvela.base.common.domain.PageResult;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
-import solvela.base.common.util.SolvelaCollectionUtil;
-import solvela.base.common.util.SolvelaPageUtil;
+import solvela.base.constant.StringConst;
+import solvela.base.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaCollectionUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

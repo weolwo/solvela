@@ -2,8 +2,8 @@ package solvela.admin.module.system.repeatsubmit;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
-import solvela.base.common.exception.BusinessException;
-import solvela.admin.module.system.repeatsubmit.annoation.RepeatSubmit;
+import solvela.base.exception.BusinessException;
+import solvela.admin.module.system.repeatsubmit.annotation.RepeatSubmit;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;

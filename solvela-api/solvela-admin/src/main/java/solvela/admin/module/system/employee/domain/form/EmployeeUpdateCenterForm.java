@@ -4,10 +4,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
-import solvela.base.common.enumeration.GenderEnum;
-import solvela.base.common.swagger.SchemaEnum;
-import solvela.base.common.util.SolvelaVerificationUtil;
-import solvela.base.common.validator.enumeration.CheckEnum;
+import solvela.base.enumeration.GenderEnum;
+import solvela.base.swagger.SchemaEnum;
+import solvela.base.util.SolvelaVerificationUtil;
+import solvela.base.validation.enumeration.CheckEnum;
 import org.hibernate.validator.constraints.Length;
 
 /**

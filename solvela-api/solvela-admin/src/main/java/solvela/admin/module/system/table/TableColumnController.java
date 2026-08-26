@@ -5,10 +5,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.admin.module.system.support.SupportBaseController;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaRequestUtil;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.web.SolvelaRequestUtil;
 import solvela.base.constant.SwaggerTagConst;
-import solvela.admin.module.system.repeatsubmit.annoation.RepeatSubmit;
+import solvela.admin.module.system.repeatsubmit.annotation.RepeatSubmit;
 import solvela.admin.module.system.table.domain.TableColumnUpdateForm;
 import org.springframework.web.bind.annotation.*;
 

@@ -1,7 +1,7 @@
 package solvela.admin.module.system.menu.constant;
 
 
-import solvela.base.common.enumeration.BaseEnum;
+import solvela.base.enumeration.BaseEnum;
 
 /**
  * 权限类型

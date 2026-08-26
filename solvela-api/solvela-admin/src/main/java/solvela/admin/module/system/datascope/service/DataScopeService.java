@@ -5,8 +5,8 @@ import solvela.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
 import solvela.admin.module.system.datascope.domain.DataScopeAndViewTypeVO;
 import solvela.admin.module.system.datascope.domain.DataScopeDTO;
 import solvela.admin.module.system.datascope.domain.DataScopeViewTypeVO;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.util.SolvelaBeanUtil;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;

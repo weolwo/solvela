@@ -1,6 +1,6 @@
 package solvela.admin.module.draw.poolconfig.controller;
 
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.ValidateList;
 import solvela.draw.poolconfig.domain.entity.PrizePoolConfig;
 import solvela.draw.poolconfig.domain.vo.PrizePoolBoardResultVO;
 import solvela.draw.poolconfig.service.PrizePoolBoardService;
@@ -13,8 +13,8 @@ import solvela.draw.poolconfig.domain.vo.PrizePoolConfigVO;
 import solvela.draw.poolconfig.service.PrizePoolConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

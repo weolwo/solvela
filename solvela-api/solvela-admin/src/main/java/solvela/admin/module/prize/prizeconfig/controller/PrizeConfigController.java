@@ -1,6 +1,6 @@
 package solvela.admin.module.prize.prizeconfig.controller;
 
-import solvela.base.common.domain.ValidateList;
+import solvela.base.domain.ValidateList;
 import solvela.prize.prizeconfig.domain.entity.PrizeConfig;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
@@ -10,8 +10,8 @@ import solvela.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.common.domain.ResponseDTO;
-import solvela.base.common.domain.PageResult;
+import solvela.base.domain.ResponseDTO;
+import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;

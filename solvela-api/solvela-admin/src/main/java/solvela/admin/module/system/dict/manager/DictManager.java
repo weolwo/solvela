@@ -1,7 +1,7 @@
 package solvela.admin.module.system.dict.manager;
 
 import jakarta.annotation.Resource;
-import solvela.base.common.util.SolvelaBeanUtil;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.constant.CacheKeyConst;
 import solvela.admin.module.system.dict.dao.DictDao;
 import solvela.admin.module.system.dict.dao.DictDataDao;
