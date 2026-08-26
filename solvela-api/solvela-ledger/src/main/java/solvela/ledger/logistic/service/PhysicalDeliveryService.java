@@ -15,10 +15,10 @@ import solvela.enums.DeliveryStatusEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
+import solvela.ledger.logistic.domain.excel.PhysicalDeliveryImportRow;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
+import solvela.ledger.logistic.domain.excel.PhysicalDeliveryShipImportRow;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
@@ -222,7 +222,7 @@ public class PhysicalDeliveryService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO<String> importAdd(MultipartFile file) {
-        SonicReadResult<PhysicalDeliveryImportForm> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryImportForm.class);
+        SonicReadResult<PhysicalDeliveryImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryImportRow.class);
         if (result.hasError()) {
             return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
         }
@@ -230,12 +230,12 @@ public class PhysicalDeliveryService {
             return ResponseDTO.userErrorParam("数据为空");
         }
 
-        List<PhysicalDeliveryImportForm> dataList = result.data();
+        List<PhysicalDeliveryImportRow> dataList = result.data();
         List<String> errorList = new ArrayList<>();
         Set<String> fileKeySet = new HashSet<>();
 
         for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryImportForm row = dataList.get(i);
+            PhysicalDeliveryImportRow row = dataList.get(i);
             String rowNo = rowLabel(i);
 
             if (SolvelaStringUtil.isBlank(row.memberName())) {
@@ -267,7 +267,7 @@ public class PhysicalDeliveryService {
         //    换键之前一个拼错的账号会静默生成一张永远查不到主人的履约单，
         //    这次正好把那个口子一起堵上。
         Map<String, Long> memberIdMap = memberService.mapMemberIdByNames(
-                dataList.stream().map(PhysicalDeliveryImportForm::memberName).toList());
+                dataList.stream().map(PhysicalDeliveryImportRow::memberName).toList());
         for (int i = 0; i < dataList.size(); i++) {
             String rowMemberName = dataList.get(i).memberName();
             if (SolvelaStringUtil.isNotBlank(rowMemberName) && !memberIdMap.containsKey(rowMemberName)) {
@@ -280,7 +280,7 @@ public class PhysicalDeliveryService {
         Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
                 .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
         for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryImportForm row = dataList.get(i);
+            PhysicalDeliveryImportRow row = dataList.get(i);
             if (SolvelaStringUtil.isNotBlank(row.sourceBizId()) && SolvelaStringUtil.isNotBlank(row.sourceType())
                     && existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
                 errorList.add(rowLabel(i) + "对应的履约单已存在，请改用「回填物流」模式");
@@ -291,7 +291,7 @@ public class PhysicalDeliveryService {
             return ResponseDTO.userErrorParam(describe(errorList));
         }
 
-        for (PhysicalDeliveryImportForm row : dataList) {
+        for (PhysicalDeliveryImportRow row : dataList) {
             // 逐个 set 而不是 SolvelaBeanUtil.copy：导入表单是 record，访问器叫 memberName() 不叫
             // getMemberName()，Spring BeanUtils 认 JavaBean getter，拷过去会是一个空对象
             PhysicalDelivery entity = new PhysicalDelivery();
@@ -319,7 +319,7 @@ public class PhysicalDeliveryService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO<String> importShip(MultipartFile file) {
-        SonicReadResult<PhysicalDeliveryShipImportForm> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryShipImportForm.class);
+        SonicReadResult<PhysicalDeliveryShipImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryShipImportRow.class);
         if (result.hasError()) {
             return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
         }
@@ -327,12 +327,12 @@ public class PhysicalDeliveryService {
             return ResponseDTO.userErrorParam("数据为空");
         }
 
-        List<PhysicalDeliveryShipImportForm> dataList = result.data();
+        List<PhysicalDeliveryShipImportRow> dataList = result.data();
         List<String> errorList = new ArrayList<>();
         Set<String> fileKeySet = new HashSet<>();
 
         for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryShipImportForm row = dataList.get(i);
+            PhysicalDeliveryShipImportRow row = dataList.get(i);
             String rowNo = rowLabel(i);
 
             if (SolvelaStringUtil.isBlank(row.sourceBizId())) {
@@ -358,7 +358,7 @@ public class PhysicalDeliveryService {
         Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
                 .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
         for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryShipImportForm row = dataList.get(i);
+            PhysicalDeliveryShipImportRow row = dataList.get(i);
             if (SolvelaStringUtil.isNotBlank(row.sourceBizId()) && SolvelaStringUtil.isNotBlank(row.sourceType())
                     && !existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
                 errorList.add(rowLabel(i) + "找不到对应的履约单（来源单号 + 来源类型）");
@@ -369,7 +369,7 @@ public class PhysicalDeliveryService {
             return ResponseDTO.userErrorParam(describe(errorList));
         }
 
-        for (PhysicalDeliveryShipImportForm row : dataList) {
+        for (PhysicalDeliveryShipImportRow row : dataList) {
             PhysicalDelivery exist = existMap.get(uniqueKey(row.sourceBizId(), row.sourceType()));
 
             PhysicalDelivery update = new PhysicalDelivery();

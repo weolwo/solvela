@@ -6,7 +6,7 @@ import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import solvela.admin.module.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
 import solvela.prize.prizeconfig.domain.query.PrizeConfigQuery;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
-import solvela.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
+import solvela.admin.module.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
 import solvela.admin.module.prize.prizeconfig.domain.vo.PrizeConfigVO;
 import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
@@ -72,7 +72,7 @@ public class PrizeConfigController {
     @PostMapping("/updateStatus")
     @SaCheckPermission("prizeConfig:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid PrizeStatusUpdateForm form) {
-        return Service.updateStatus(form);
+        return Service.updateStatus(form.getIdList(), form.getStatus());
     }
 
     @Operation(summary = "更新")

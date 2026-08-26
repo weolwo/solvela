@@ -8,7 +8,7 @@ import solvela.enums.PrizeTypeEnum;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeLog;
-import solvela.risk.proposal.domain.form.ProposalRecordAddForm;
+import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.proposal.service.ProposalRecordService;
 import org.springframework.stereotype.Service;
 
@@ -60,7 +60,7 @@ public class CouponHandler implements IPrizeHandler {
             return ResponseDTO.userErrorParam("奖品配置不存在");
         }
 
-        ProposalRecordAddForm req = new ProposalRecordAddForm();
+        ProposalRecordAddCommand req = new ProposalRecordAddCommand();
         req.setMemberId(prizeLog.getMemberId());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
         req.setAssetType(PrizeTypeEnum.COUPON.name());

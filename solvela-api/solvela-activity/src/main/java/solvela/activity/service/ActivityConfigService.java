@@ -7,8 +7,6 @@ import solvela.activity.ActivityConfig;
 import solvela.activity.domain.form.ActivityConfigAddForm;
 import solvela.activity.domain.query.ActivityConfigQuery;
 import solvela.activity.domain.form.ActivityConfigUpdateForm;
-import solvela.activity.domain.form.ActivityStatusUpdateForm;
-import solvela.activity.domain.form.ActivityTypeUpgradeForm;
 import solvela.activity.domain.form.ActivityWizardCreateForm;
 import solvela.activity.domain.dto.ActivityConfigDTO;
 import solvela.activity.domain.dto.ActivityDeleteCheckDTO;
@@ -352,18 +350,18 @@ public class ActivityConfigService {
      * （对齐 `LotteryConfigService.offline()` 的既定取舍）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> updateStatus(ActivityStatusUpdateForm form) {
-        if (!STATUS_ONLINE.equals(form.getStatus()) && !STATUS_OFFLINE.equals(form.getStatus())) {
+    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+        if (!STATUS_ONLINE.equals(status) && !STATUS_OFFLINE.equals(status)) {
             return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 2-禁用");
         }
-        List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(form.getIdList());
+        List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(idList);
         if (SolvelaCollectionUtil.isEmpty(activityList)) {
             return ResponseDTO.userErrorParam("活动不存在");
         }
 
         // 启用：逐个校验完备度。任一不通过则整批拒绝并点名是哪个活动 ——
         // 部分成功会让运营以为「都启用了」，而实际有几个没启，这种结果比整批失败更难排查
-        if (STATUS_ONLINE.equals(form.getStatus())) {
+        if (STATUS_ONLINE.equals(status)) {
             for (ActivityConfig activity : activityList) {
                 String notReady = checkConfigured(activity);
                 if (notReady != null) {
@@ -376,7 +374,7 @@ public class ActivityConfigService {
         for (ActivityConfig activity : activityList) {
             ActivityConfig update = new ActivityConfig();
             update.setId(activity.getId());
-            update.setStatus(form.getStatus());
+            update.setStatus(status);
             activityConfigDao.updateById(update);
         }
         return ResponseDTO.ok();
@@ -391,8 +389,8 @@ public class ActivityConfigService {
      * 升级成 DRAW 后正好成为抽奖的资产大库，不但不冲突，反而顺理成章。
      * 而玩法类之间互转、或降级回 BASIC，都会遗弃已配好的玩法配置，一律拒绝。
      */
-    public ResponseDTO<String> upgradeType(ActivityTypeUpgradeForm upgradeForm) {
-        ActivityConfig activity = activityConfigDao.selectById(upgradeForm.getId());
+    public ResponseDTO<String> upgradeType(Long id, String targetType) {
+        ActivityConfig activity = activityConfigDao.selectById(id);
         if (activity == null) {
             return ResponseDTO.userErrorParam("活动不存在");
         }
@@ -400,7 +398,7 @@ public class ActivityConfigService {
             return ResponseDTO.userErrorParam(
                     "只有基础活动可以升级玩法；玩法类活动之间不可互转，也不可降级回基础活动 —— 那会遗弃已配好的玩法配置。");
         }
-        ActivityTypeEnum target = ActivityTypeEnum.resolve(upgradeForm.getTargetType());
+        ActivityTypeEnum target = ActivityTypeEnum.resolve(targetType);
         if (target == null || !target.isGameplay()) {
             return ResponseDTO.userErrorParam("升级目标必须是 DRAW / TASK / LOTTERY 之一");
         }

@@ -13,7 +13,6 @@ import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
 import solvela.prize.prizeconfig.domain.query.PrizeConfigQuery;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
-import solvela.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
 import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.risk.PromotionConfig;
@@ -142,14 +141,14 @@ public class PrizeConfigService {
      * <p>禁用不做任何校验 —— 出问题时能立刻停掉一个奖品是运营最需要的能力；
      * 已被奖池/奖级引用的奖品禁用后不再发放，但历史流水不受影响。
      */
-    public ResponseDTO<String> updateStatus(PrizeStatusUpdateForm form) {
-        if (!STATUS_ENABLED.equals(form.getStatus()) && !STATUS_DISABLED.equals(form.getStatus())) {
+    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+        if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
             return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 0-禁用");
         }
-        for (Long id : form.getIdList()) {
+        for (Long id : idList) {
             PrizeConfig update = new PrizeConfig();
             update.setId(id);
-            update.setStatus(form.getStatus());
+            update.setStatus(status);
             prizeConfigDao.updateById(update);
         }
         return ResponseDTO.ok();

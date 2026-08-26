@@ -12,7 +12,7 @@ import java.util.Arrays;
  * <p>🔴 <b>为什么新建这个枚举而不用 {@link EventTypeEnum}</b>：
  * 四个 {@code @PrizeStrategy} handler 此前都硬编码 {@code EventTypeEnum.LOTTERY_DRAW}，
  * 于是<b>任务发出去的奖在提案表里被记成「彩票抽奖」</b>，抽奖发的也一样。
- * 而 DDL 注释与 {@code ProposalRecordAddForm} 的 {@code @Schema} 写的一直是
+ * 而 DDL 注释与 {@code ProposalRecordAddCommand} 的 {@code @Schema} 写的一直是
  * {@code TASK / DRAW / MANUAL} —— <b>代码与契约从第一天起就对不上</b>，
  * 只是提案表的来源字段没人拿来做判据，所以一直没暴露。
  * {@code EventTypeEnum} 的取值（LOTTERY_DRAW / TASK_ASSIGN / MEMBER_UPGRADE）

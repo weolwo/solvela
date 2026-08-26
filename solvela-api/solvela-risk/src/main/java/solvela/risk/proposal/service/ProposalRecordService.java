@@ -23,7 +23,7 @@ import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
 import solvela.risk.proposal.dao.ProposalRecordDao;
 import solvela.risk.ProposalRecord;
-import solvela.risk.proposal.domain.form.ProposalRecordAddForm;
+import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
 import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
@@ -87,7 +87,7 @@ public class ProposalRecordService {
     private static final long MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO addProposal(ProposalRecordAddForm req) {
+    public ResponseDTO addProposal(ProposalRecordAddCommand req) {
         log.info(">>>> [风控提案域] 收到提案申请，来源: {}, 单号: {}", req.getSourceType(), req.getSourceBizId());
 
         // 1. 获取底层资产（优惠）配置
@@ -283,7 +283,7 @@ public class ProposalRecordService {
      *
      * @param riskCode 风控拦截分类，仅 status=80 时传值；其余场景传 null
      */
-    private ProposalRecord saveProposal(ProposalRecordAddForm req, PromotionConfig config,
+    private ProposalRecord saveProposal(ProposalRecordAddCommand req, PromotionConfig config,
                                         int status, String remark, String riskCode) {
         ProposalRecord record = new ProposalRecord();
         // 单号由提案域自己生成，不采信调用方传值：它是本域对外的凭证，交易号的唯一性必须由发号方保证

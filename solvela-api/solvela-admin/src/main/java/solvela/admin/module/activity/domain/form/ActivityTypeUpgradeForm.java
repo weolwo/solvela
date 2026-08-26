@@ -1,4 +1,4 @@
-package solvela.activity.domain.form;
+package solvela.admin.module.activity.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;

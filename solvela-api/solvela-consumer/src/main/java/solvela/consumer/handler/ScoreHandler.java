@@ -8,7 +8,7 @@ import solvela.enums.PrizeTypeEnum;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeLog;
-import solvela.risk.proposal.domain.form.ProposalRecordAddForm;
+import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.proposal.service.ProposalRecordService;
 import org.springframework.stereotype.Service;
 
@@ -67,7 +67,7 @@ public class ScoreHandler implements IPrizeHandler {
             return ResponseDTO.userErrorParam("奖品配置不存在");
         }
 
-        ProposalRecordAddForm req = new ProposalRecordAddForm();
+        ProposalRecordAddCommand req = new ProposalRecordAddCommand();
         req.setMemberId(prizeLog.getMemberId());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
         // 积分是值类资产：金额即全部信息，assetRef 留空

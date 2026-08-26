@@ -4,8 +4,8 @@ import solvela.activity.domain.form.ActivityConfigAddForm;
 import solvela.admin.module.activity.domain.form.ActivityConfigQueryForm;
 import solvela.activity.domain.query.ActivityConfigQuery;
 import solvela.activity.domain.form.ActivityConfigUpdateForm;
-import solvela.activity.domain.form.ActivityStatusUpdateForm;
-import solvela.activity.domain.form.ActivityTypeUpgradeForm;
+import solvela.admin.module.activity.domain.form.ActivityStatusUpdateForm;
+import solvela.admin.module.activity.domain.form.ActivityTypeUpgradeForm;
 import solvela.activity.domain.form.ActivityWizardCreateForm;
 import solvela.admin.module.activity.domain.vo.ActivityConfigVO;
 import solvela.activity.domain.dto.ActivityConfigDTO;
@@ -112,14 +112,14 @@ public class ActivityConfigController {
     @PostMapping("/updateStatus")
     @SaCheckPermission("activityConfig:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid ActivityStatusUpdateForm form) {
-        return activityConfigService.updateStatus(form);
+        return activityConfigService.updateStatus(form.getIdList(), form.getStatus());
     }
 
     @Operation(summary = "升级活动类型：仅 BASIC → DRAW/TASK/LOTTERY，且下游玩法表必须为空")
     @PostMapping("/upgradeType")
     @SaCheckPermission("activityConfig:update")
     public ResponseDTO<String> upgradeType(@RequestBody @Valid ActivityTypeUpgradeForm upgradeForm) {
-        return activityConfigService.upgradeType(upgradeForm);
+        return activityConfigService.upgradeType(upgradeForm.getId(), upgradeForm.getTargetType());
     }
 
     @Operation(summary = "批量删除")

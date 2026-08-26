@@ -8,7 +8,7 @@ import solvela.enums.PrizeTypeEnum;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeLog;
-import solvela.risk.proposal.domain.form.ProposalRecordAddForm;
+import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.proposal.service.ProposalRecordService;
 import org.springframework.stereotype.Service;
 
@@ -46,7 +46,7 @@ public class BalanceHandler implements IPrizeHandler {
             }
 
             // 2. 构建资金入账请求 (把营销单号传给财务底层，做跨域幂等)
-            ProposalRecordAddForm req = new ProposalRecordAddForm();
+            ProposalRecordAddCommand req = new ProposalRecordAddCommand();
             PrizeConfig prizeConfig = prizeConfigService.getByPrizeCode(prizeLog.getPrizeCode());
             if (prizeConfig == null) {
                 return ResponseDTO.userErrorParam("奖品配置不存在");
