@@ -100,28 +100,10 @@
         写 &lt;= 会把结束日当天的流水整天筛掉。
     -->
     <sql id="stat_window">
-        AND create_time &gt;= COALESCE(
-        #{form.statDateBegin,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        )
-        AND
-        create_time
-        &lt;
-        DATE_ADD
-        (
-        COALESCE
-        (
-        #{form.statDateEnd,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        ),
-        INTERVAL
-        1
-        DAY
-        )
+        <![CDATA[
+        AND create_time >= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+        AND create_time < DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+        ]]>
     </sql>
 
     <!--

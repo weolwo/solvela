@@ -99,28 +99,10 @@
         结束日用 &lt; 次日零点，写 &lt;= 会把结束日当天发的券整天筛掉。
     -->
     <sql id="stat_window_issued">
-        AND create_time &gt;= COALESCE(
-        #{form.statDateBegin,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        )
-        AND
-        create_time
-        &lt;
-        DATE_ADD
-        (
-        COALESCE
-        (
-        #{form.statDateEnd,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        ),
-        INTERVAL
-        1
-        DAY
-        )
+        <![CDATA[
+        AND create_time >= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+        AND create_time < DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+        ]]>
     </sql>
 
     <!--
@@ -130,28 +112,10 @@
         而它错得很像真的（看上去就是一条「核销率偏低」的正常业务结论）。
     -->
     <sql id="stat_window_used">
-        AND used_time &gt;= COALESCE(
-        #{form.statDateBegin,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        )
-        AND
-        used_time
-        &lt;
-        DATE_ADD
-        (
-        COALESCE
-        (
-        #{form.statDateEnd,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        ),
-        INTERVAL
-        1
-        DAY
-        )
+        <![CDATA[
+        AND used_time >= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+        AND used_time < DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+        ]]>
     </sql>
 
     <!--

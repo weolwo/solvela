@@ -114,28 +114,10 @@
         结束日用 &lt; 次日零点，写 &lt;= 会把结束日当天新建的履约单整天筛掉。
     -->
     <sql id="stat_window">
-        AND create_time &gt;= COALESCE(
-        #{form.statDateBegin,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        )
-        AND
-        create_time
-        &lt;
-        DATE_ADD
-        (
-        COALESCE
-        (
-        #{form.statDateEnd,jdbcType=DATE},
-        CURDATE
-        (
-        )
-        ),
-        INTERVAL
-        1
-        DAY
-        )
+        <![CDATA[
+        AND create_time >= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+        AND create_time < DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+        ]]>
     </sql>
 
     <!-- 本期新增的履约单 -->
