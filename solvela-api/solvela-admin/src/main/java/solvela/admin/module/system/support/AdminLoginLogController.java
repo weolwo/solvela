@@ -8,7 +8,7 @@ import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.loginlog.LoginLogService;
 import solvela.admin.module.system.loginlog.domain.LoginLogQueryForm;
@@ -43,7 +43,7 @@ public class AdminLoginLogController extends SupportBaseController {
     @Operation(summary = "分页查询当前登录人信息 @author 善逸")
     @PostMapping("/loginLog/page/query/login")
     public ResponseDTO<PageResult<LoginLogVO>> queryByPageLogin(@RequestBody LoginLogQueryForm queryForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         queryForm.setUserId(requestUser.getUserId());
         queryForm.setUserType(requestUser.getUserType().getValue());
         return loginLogService.queryByPage(queryForm);

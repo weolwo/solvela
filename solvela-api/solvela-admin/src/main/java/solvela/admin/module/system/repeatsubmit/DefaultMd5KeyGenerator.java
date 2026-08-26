@@ -3,7 +3,7 @@ package solvela.admin.module.system.repeatsubmit;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import solvela.base.json.JsonUtils;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.base.constant.RedisKeyConst;
 import org.aspectj.lang.JoinPoint;
@@ -21,7 +21,7 @@ public class DefaultMd5KeyGenerator implements RepeatSubmitKeyGenerator {
     public String createKey(JoinPoint point, HttpServletRequest request) {
 
         String url = request.getRequestURL().toString();
-        Long userId = SolvelaRequestUtil.getRequestUserId();
+        Long userId = CurrentUser.idOrNull();
         String reqParams = argsArrayToString(point.getArgs());
         String md5 = md5Hex(SolvelaStringUtil.join(":", userId, url, reqParams));
         // 唯一标识

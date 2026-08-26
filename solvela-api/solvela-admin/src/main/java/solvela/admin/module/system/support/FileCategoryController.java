@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.entity.FileCategoryEntity;
 import solvela.base.module.file.domain.vo.FileCategoryVO;
@@ -44,14 +44,14 @@ public class FileCategoryController extends SupportBaseController {
     @PostMapping("/file/category/add")
     @SaCheckPermission("support:file:query")
     public ResponseDTO<FileCategoryEntity> add(@RequestBody @Valid FileCategoryEntity form) {
-        return ResponseDTO.ok(fileCategoryService.add(form, SolvelaRequestUtil.getRequestUser()));
+        return ResponseDTO.ok(fileCategoryService.add(form, CurrentUser.orNull()));
     }
 
     @Operation(summary = "更新文件分类 @author 1024")
     @PostMapping("/file/category/update")
     @SaCheckPermission("support:file:query")
     public ResponseDTO<String> update(@RequestBody @Valid FileCategoryEntity form) {
-        fileCategoryService.update(form, SolvelaRequestUtil.getRequestUser());
+        fileCategoryService.update(form, CurrentUser.orNull());
         return ResponseDTO.ok();
     }
 
@@ -73,7 +73,7 @@ public class FileCategoryController extends SupportBaseController {
     @PostMapping("/file/category/reorder")
     @SaCheckPermission("support:file:query")
     public ResponseDTO<String> reorder(@RequestBody List<Long> orderedIds) {
-        fileCategoryService.reorder(orderedIds, SolvelaRequestUtil.getRequestUser());
+        fileCategoryService.reorder(orderedIds, CurrentUser.orNull());
         return ResponseDTO.ok();
     }
 }

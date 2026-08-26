@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.member.verify.domain.form.MemberVerifyQueryForm;
 import solvela.member.verify.domain.form.MemberVerifyRejectForm;
 import solvela.member.verify.domain.vo.MemberVerifyDetailVO;
@@ -65,7 +65,7 @@ public class MemberVerifyController {
     @GetMapping("/approve/{id}")
     @SaCheckPermission("memberVerify:audit")
     public ResponseDTO<String> approve(@PathVariable Long id) {
-        return memberVerifyService.approve(id, SolvelaRequestUtil.getRequestUser());
+        return memberVerifyService.approve(id, CurrentUser.orNull());
     }
 
     /**
@@ -77,6 +77,6 @@ public class MemberVerifyController {
     @SaCheckPermission("memberVerify:audit")
     public ResponseDTO<String> reject(@RequestBody @Valid MemberVerifyRejectForm rejectForm) {
         return memberVerifyService.reject(rejectForm.getId(), rejectForm.getFailReason(),
-                SolvelaRequestUtil.getRequestUser());
+                CurrentUser.orNull());
     }
 }

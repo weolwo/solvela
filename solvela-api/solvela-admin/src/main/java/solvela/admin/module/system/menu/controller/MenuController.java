@@ -13,7 +13,7 @@ import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.admin.module.system.menu.service.MenuService;
 import solvela.base.domain.RequestUrlVO;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,7 +38,7 @@ public class MenuController {
     @PostMapping("/menu/add")
     @SaCheckPermission("system:menu:addProposal")
     public ResponseDTO<String> addMenu(@RequestBody @Valid MenuAddForm menuAddForm) {
-        menuAddForm.setCreateUserId(SolvelaRequestUtil.getRequestUserId());
+        menuAddForm.setCreateUserId(CurrentUser.idOrNull());
         return menuService.addMenu(menuAddForm);
     }
 
@@ -46,7 +46,7 @@ public class MenuController {
     @PostMapping("/menu/update")
     @SaCheckPermission("system:menu:update")
     public ResponseDTO<String> updateMenu(@RequestBody @Valid MenuUpdateForm menuUpdateForm) {
-        menuUpdateForm.setUpdateUserId(SolvelaRequestUtil.getRequestUserId());
+        menuUpdateForm.setUpdateUserId(CurrentUser.idOrNull());
         return menuService.updateMenu(menuUpdateForm);
     }
 
@@ -54,7 +54,7 @@ public class MenuController {
     @GetMapping("/menu/batchDelete")
     @SaCheckPermission("system:menu:batchDelete")
     public ResponseDTO<String> batchDeleteMenu(@RequestParam("menuIdList") List<Long> menuIdList) {
-        return menuService.batchDeleteMenu(menuIdList, SolvelaRequestUtil.getRequestUserId());
+        return menuService.batchDeleteMenu(menuIdList, CurrentUser.idOrNull());
     }
 
     @Operation(summary = "查询菜单列表 @author 卓大")

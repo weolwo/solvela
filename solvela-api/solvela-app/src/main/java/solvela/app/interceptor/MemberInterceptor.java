@@ -14,7 +14,7 @@ import solvela.base.annotation.AllowAnonymous;
 import solvela.base.code.SystemErrorCode;
 import solvela.base.code.UserErrorCode;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.web.SolvelaResponseUtil;
 import solvela.app.config.StpMemberUtil;
 import solvela.app.module.login.domain.RequestMember;
@@ -107,16 +107,13 @@ public class MemberInterceptor implements HandlerInterceptor {
         if (requestMember == null) {
             return;
         }
-        SolvelaRequestUtil.setRequestUser(requestMember);
+        CurrentUser.bind(requestMember);
         // 有登录态才续期。active-timeout 当前全局是 -1（不冻结），这行现在是空操作，
         // 但哪天会员端要单独设「30 天不活跃就要重新登录」，它就是那个开关生效的地方。
         StpMemberUtil.updateLastActiveToNow();
     }
 
-    @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
-        // 🔴 必须清。Tomcat 线程是复用的，不清就会把上一个请求的会员身份
-        // 泄漏给下一个请求 —— 表现是「偶发地看到别人的数据」，几乎无法复现。
-        SolvelaRequestUtil.remove();
-    }
+    // 曾经这里有一个 afterCompletion 手动清理 ThreadLocal，注释写着「不清就会把上一个请求的
+    // 会员身份泄漏给下一个请求」。现在身份绑在 RequestScopeFilter 打开的 ScopedValue 作用域里，
+    // doFilter 一返回就失效 —— 那个事故类别被结构性地消灭了，没有可以忘记清理的东西。
 }

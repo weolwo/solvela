@@ -15,7 +15,7 @@ import solvela.admin.util.AdminRequestUtil;
 import solvela.base.annotation.AllowAnonymous;
 import solvela.base.constant.RequestHeaderConst;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -59,7 +59,7 @@ public class LoginController {
     @Operation(summary = "退出登录  @author 卓大")
     @GetMapping("/login/logout")
     public ResponseDTO<String> logout() {
-        return loginService.logout(SolvelaRequestUtil.getRequestUser());
+        return loginService.logout(CurrentUser.orNull());
     }
 
     @AllowAnonymous

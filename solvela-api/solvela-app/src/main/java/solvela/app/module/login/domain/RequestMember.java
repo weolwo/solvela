@@ -8,7 +8,7 @@ import solvela.base.enumeration.UserTypeEnum;
 import java.io.Serializable;
 
 /**
- * 当前请求的会员身份，由 {@code MemberInterceptor} 放进 {@code SolvelaRequestUtil} 的 ThreadLocal。
+ * 当前请求的会员身份，由 {@code MemberInterceptor} 绑进 {@code CurrentUser} 的请求作用域。
  *
  * <p>对应管理端的 {@code RequestEmployee}，但<b>没有权限相关字段</b>：会员没有角色、
  * 没有菜单、没有数据范围 —— C 端的授权边界是「只能操作自己的数据」，靠每个 service

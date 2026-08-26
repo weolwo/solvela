@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import solvela.base.annotation.AllowAnonymous;
 import solvela.base.constant.RequestHeaderConst;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.web.SolvelaServletUtil;
 import solvela.app.config.StpMemberUtil;
 import solvela.app.module.login.domain.RequestMember;
@@ -57,7 +57,7 @@ public class MemberLoginController {
     @GetMapping("/getLoginInfo")
     @Operation(summary = "获取当前登录会员信息")
     public ResponseDTO<MemberLoginResultVO> getLoginInfo() {
-        RequestMember requestMember = (RequestMember) SolvelaRequestUtil.getRequestUser();
+        RequestMember requestMember = (RequestMember) CurrentUser.orNull();
 
         MemberLoginResultVO result = new MemberLoginResultVO();
         result.setMemberId(requestMember.getMemberId());
@@ -72,6 +72,6 @@ public class MemberLoginController {
     @GetMapping("/logout")
     @Operation(summary = "退出登录")
     public ResponseDTO<String> logout() {
-        return memberLoginService.logout((RequestMember) SolvelaRequestUtil.getRequestUser());
+        return memberLoginService.logout((RequestMember) CurrentUser.orNull());
     }
 }

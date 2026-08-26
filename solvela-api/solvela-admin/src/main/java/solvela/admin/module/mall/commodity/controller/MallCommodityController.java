@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.domain.ValidateList;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.mall.commodity.domain.form.MallCommodityQueryForm;
 import solvela.mall.commodity.domain.form.MallCommoditySaveForm;
 import solvela.mall.commodity.domain.vo.MallCommodityDetailVO;
@@ -87,14 +87,14 @@ public class MallCommodityController {
     @PostMapping("/save")
     @SaCheckPermission("mallCommodity:update")
     public ResponseDTO<Long> save(@RequestBody @Valid MallCommoditySaveForm saveForm) {
-        return mallCommodityService.save(saveForm, SolvelaRequestUtil.getRequestUser());
+        return mallCommodityService.save(saveForm, CurrentUser.orNull());
     }
 
     @Operation(summary = "上架/下架 @author weolwo")
     @GetMapping("/updateStatus/{id}/{status}")
     @SaCheckPermission("mallCommodity:update")
     public ResponseDTO<String> updateStatus(@PathVariable Long id, @PathVariable Integer status) {
-        return mallCommodityService.updateStatus(id, status, SolvelaRequestUtil.getRequestUser());
+        return mallCommodityService.updateStatus(id, status, CurrentUser.orNull());
     }
 
     @Operation(summary = "批量删除 @author weolwo")

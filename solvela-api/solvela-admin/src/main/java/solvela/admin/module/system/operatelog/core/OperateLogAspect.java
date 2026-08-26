@@ -11,7 +11,7 @@ import solvela.base.constant.StringConst;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaIpUtil;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.admin.module.system.operatelog.OperateLogDao;
 import solvela.admin.module.system.operatelog.domain.OperateLogEntity;
 import solvela.base.json.JsonUtils;
@@ -227,7 +227,7 @@ public abstract class OperateLogAspect {
     private void submitLog(final JoinPoint joinPoint, final Throwable e, Object responseDTO) {
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
         //设置用户信息
-        RequestUser user = SolvelaRequestUtil.getRequestUser();
+        RequestUser user = CurrentUser.orNull();
         if (user == null) {
             return;
         }

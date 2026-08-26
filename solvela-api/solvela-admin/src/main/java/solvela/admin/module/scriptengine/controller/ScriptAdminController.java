@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.exception.BusinessException;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.scriptengine.domain.form.ScriptBindForm;
 import solvela.scriptengine.domain.vo.ScriptRefPointVO;
@@ -97,7 +97,7 @@ public class ScriptAdminController {
     @SaCheckPermission("script:bind")
     @PostMapping("/ref/bind")
     public ResponseDTO<String> bind(@RequestBody @Valid ScriptBindForm form) {
-        RequestUser user = SolvelaRequestUtil.getRequestUser();
+        RequestUser user = CurrentUser.orNull();
         scriptRefService.bind(toPoint(form.getRefPoint()), form.getRefId(), form.getScriptCode(),
                 user == null ? null : user.getUserName());
         return ResponseDTO.ok();

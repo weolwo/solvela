@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.member.domain.form.MemberQueryForm;
 import solvela.member.domain.form.MemberRemarkForm;
 import solvela.member.domain.vo.MemberVO;
@@ -55,7 +55,7 @@ public class MemberController {
     @GetMapping("/updateStatus/{memberId}/{status}")
     @SaCheckPermission("member:update")
     public ResponseDTO<String> updateStatus(@PathVariable Long memberId, @PathVariable Integer status) {
-        return memberService.updateStatus(memberId, status, SolvelaRequestUtil.getRequestUser());
+        return memberService.updateStatus(memberId, status, CurrentUser.orNull());
     }
 
     /**
@@ -69,6 +69,6 @@ public class MemberController {
     @SaCheckPermission("member:update")
     public ResponseDTO<String> updateRemark(@RequestBody @Valid MemberRemarkForm remarkForm) {
         return memberService.updateRemark(remarkForm.getMemberId(), remarkForm.getRemark(),
-                SolvelaRequestUtil.getRequestUser());
+                CurrentUser.orNull());
     }
 }

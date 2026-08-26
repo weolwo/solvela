@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import solvela.activity.domain.entity.ActivityDisplay;
 import solvela.activity.service.ActivityDisplayService;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,6 +62,6 @@ public class ActivityDisplayController {
     @SaCheckPermission("activityConfig:update")
     public ResponseDTO<ActivityDisplay> save(@PathVariable String activityCode,
                                              @RequestBody @Valid ActivityDisplay form) {
-        return ResponseDTO.ok(activityDisplayService.saveByCode(activityCode, form, SolvelaRequestUtil.getRequestUser()));
+        return ResponseDTO.ok(activityDisplayService.saveByCode(activityCode, form, CurrentUser.orNull()));
     }
 }

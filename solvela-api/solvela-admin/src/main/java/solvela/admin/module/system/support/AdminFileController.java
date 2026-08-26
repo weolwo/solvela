@@ -7,7 +7,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.form.FileMetaUpdateForm;
 import solvela.base.module.file.domain.form.FileQueryForm;
@@ -63,7 +63,7 @@ public class AdminFileController extends SupportBaseController {
     @SaCheckPermission("support:file:query")
     public ResponseDTO<String> updateMeta(@RequestBody @Valid FileMetaUpdateForm form) {
         fileAssetService.updateMeta(form.getFileId(), form.getOriginalName(), form.getTags(),
-                SolvelaRequestUtil.getRequestUser());
+                CurrentUser.orNull());
         return ResponseDTO.ok();
     }
 
@@ -78,7 +78,7 @@ public class AdminFileController extends SupportBaseController {
     @GetMapping("/file/delete/{fileId}")
     @SaCheckPermission("support:file:query")
     public ResponseDTO<String> delete(@PathVariable Long fileId) {
-        fileAssetService.delete(fileId, SolvelaRequestUtil.getRequestUser());
+        fileAssetService.delete(fileId, CurrentUser.orNull());
         return ResponseDTO.ok();
     }
 

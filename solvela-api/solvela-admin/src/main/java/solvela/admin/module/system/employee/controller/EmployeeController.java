@@ -11,7 +11,7 @@ import solvela.admin.module.system.employee.domain.vo.EmployeeVO;
 import solvela.admin.module.system.employee.service.EmployeeService;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.admin.module.system.apiencrypt.annotation.ApiDecrypt;
 import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.web.bind.annotation.*;
@@ -60,14 +60,14 @@ public class EmployeeController {
     @Operation(summary = "更新员工个人中心信息 @author 善逸")
     @PostMapping("/employee/update/center")
     public ResponseDTO<String> updateCenter(@Valid @RequestBody EmployeeUpdateCenterForm updateCenterForm) {
-        updateCenterForm.setEmployeeId(SolvelaRequestUtil.getRequestUserId());
+        updateCenterForm.setEmployeeId(CurrentUser.idOrNull());
         return employeeService.updateCenter(updateCenterForm);
     }
 
     @Operation(summary = "更新登录人头像 @author 善逸")
     @PostMapping("/employee/update/avatar")
     public ResponseDTO<String> updateAvatar(@Valid @RequestBody EmployeeUpdateAvatarForm employeeUpdateAvatarForm) {
-        employeeUpdateAvatarForm.setEmployeeId(SolvelaRequestUtil.getRequestUserId());
+        employeeUpdateAvatarForm.setEmployeeId(CurrentUser.idOrNull());
         return employeeService.updateAvatar(employeeUpdateAvatarForm);
     }
 
@@ -96,8 +96,8 @@ public class EmployeeController {
     @PostMapping("/employee/update/password")
     @ApiDecrypt
     public ResponseDTO<String> updatePassword(@Valid @RequestBody EmployeeUpdatePasswordForm updatePasswordForm) {
-        updatePasswordForm.setEmployeeId(SolvelaRequestUtil.getRequestUserId());
-        return employeeService.updatePassword(SolvelaRequestUtil.getRequestUser(), updatePasswordForm);
+        updatePasswordForm.setEmployeeId(CurrentUser.idOrNull());
+        return employeeService.updatePassword(CurrentUser.orNull(), updatePasswordForm);
     }
 
     @Operation(summary = "获取密码复杂度 @author 卓大")

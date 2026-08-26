@@ -2,7 +2,7 @@ package solvela.admin.util;
 
 import solvela.admin.module.system.login.domain.RequestEmployee;
 import solvela.base.domain.RequestUser;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 
 /**
  * admin 端的请求工具类
@@ -17,7 +17,7 @@ public final class AdminRequestUtil {
 
 
     public static RequestEmployee getRequestUser() {
-        return (RequestEmployee) SolvelaRequestUtil.getRequestUser();
+        return (RequestEmployee) CurrentUser.orNull();
     }
 
     public static Long getRequestUserId() {

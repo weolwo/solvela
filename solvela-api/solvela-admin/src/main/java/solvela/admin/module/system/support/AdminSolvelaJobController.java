@@ -7,7 +7,7 @@ import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.job.api.SolvelaJobService;
 import solvela.admin.module.system.job.api.domain.*;
@@ -42,7 +42,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @PostMapping("/job/execute")
     @RepeatSubmit
     public ResponseDTO<String> execute(@RequestBody @Valid SolvelaJobExecuteForm executeForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         executeForm.setUpdateName(requestUser.getUserName());
         return jobService.execute(executeForm);
     }
@@ -63,7 +63,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @PostMapping("/job/add")
     @RepeatSubmit
     public ResponseDTO<String> addJob(@RequestBody @Valid SolvelaJobAddForm addForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         addForm.setUpdateName(requestUser.getUserName());
         return jobService.addJob(addForm);
     }
@@ -72,7 +72,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @PostMapping("/job/update")
     @RepeatSubmit
     public ResponseDTO<String> updateJob(@RequestBody @Valid SolvelaJobUpdateForm updateForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         updateForm.setUpdateName(requestUser.getUserName());
         return jobService.updateJob(updateForm);
     }
@@ -81,7 +81,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @PostMapping("/job/update/enabled")
     @RepeatSubmit
     public ResponseDTO<String> updateJobEnabled(@RequestBody @Valid SolvelaJobEnabledUpdateForm updateForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         updateForm.setUpdateName(requestUser.getUserName());
         return jobService.updateJobEnabled(updateForm);
     }
@@ -90,7 +90,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @GetMapping("/job/delete")
     @RepeatSubmit
     public ResponseDTO<String> deleteJob(@RequestParam Integer jobId) {
-        return jobService.deleteJob(jobId, SolvelaRequestUtil.getRequestUser());
+        return jobService.deleteJob(jobId, CurrentUser.orNull());
     }
 
     @Operation(summary = "定时任务-执行记录-分页查询 @huke")
@@ -115,7 +115,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @GetMapping("/job/log/rerun")
     @RepeatSubmit
     public ResponseDTO<String> rerun(@RequestParam Long logId) {
-        return jobService.rerun(logId, SolvelaRequestUtil.getRequestUser().getUserName());
+        return jobService.rerun(logId, CurrentUser.orNull().getUserName());
     }
 
     /**
@@ -126,7 +126,7 @@ public class AdminSolvelaJobController extends SupportBaseController {
     @GetMapping("/job/log/terminate")
     @RepeatSubmit
     public ResponseDTO<String> terminate(@RequestParam Long logId) {
-        return jobService.terminate(logId, SolvelaRequestUtil.getRequestUser().getUserName());
+        return jobService.terminate(logId, CurrentUser.orNull().getUserName());
     }
 
     /**

@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.consumer.handler.PrizeDispatchHandler;
 import solvela.prize.prizelog.domain.form.PrizeLogAddForm;
 import solvela.prize.prizelog.domain.form.PrizeLogQueryForm;
@@ -37,14 +37,14 @@ public class PrizeLogController {
     @GetMapping("/approve/{id}")
     @SaCheckPermission("prizeLog:approve")
     public ResponseDTO<String> approveDispatch(@PathVariable Long id) {
-        return prizeDispatchHandler.approveDispatch(id, SolvelaRequestUtil.getRequestUser().getUserName());
+        return prizeDispatchHandler.approveDispatch(id, CurrentUser.orNull().getUserName());
     }
 
     @Operation(summary = "发奖审批驳回")
     @GetMapping("/reject/{id}")
     @SaCheckPermission("prizeLog:approve")
     public ResponseDTO<String> rejectDispatch(@PathVariable Long id, @RequestParam(required = false) String reason) {
-        return prizeDispatchHandler.rejectDispatch(id, SolvelaRequestUtil.getRequestUser().getUserName(), reason);
+        return prizeDispatchHandler.rejectDispatch(id, CurrentUser.orNull().getUserName(), reason);
     }
 
     @Operation(summary = "分页查询")

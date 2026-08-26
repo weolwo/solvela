@@ -8,7 +8,7 @@ import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.operatelog.OperateLogService;
 import solvela.admin.module.system.operatelog.domain.OperateLogQueryForm;
@@ -48,7 +48,7 @@ public class AdminOperateLogController extends SupportBaseController {
     @Operation(summary = "分页查询当前登录人信息 @author 善逸")
     @PostMapping("/operateLog/page/query/login")
     public ResponseDTO<PageResult<OperateLogVO>> queryByPageLogin(@RequestBody OperateLogQueryForm queryForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         queryForm.setOperateUserId(requestUser.getUserId());
         queryForm.setOperateUserType(requestUser.getUserType().getValue());
         return operateLogService.queryByPage(queryForm);

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
 import solvela.member.operationlimit.constant.MemberOperationUnlockTypeEnum;
 import solvela.member.operationlimit.domain.entity.MemberOperationLimit;
@@ -74,7 +74,7 @@ public class MemberOperationLimitController {
         }
         // 操作人落到 operator 列：这一列存在的唯一理由就是事后能追到人，
         // 取当前登录员工而不是让前端传，避免被改
-        String operator = SolvelaRequestUtil.getRequestUser().getUserName();
+        String operator = CurrentUser.orNull().getUserName();
         boolean unlocked = memberOperationLimitService.unlock(
                 form.getMemberId(), type, MemberOperationUnlockTypeEnum.MANUAL, operator, form.getRemark());
         return unlocked ? ResponseDTO.ok("已解冻") : ResponseDTO.ok("该会员当前没有生效中的限制");

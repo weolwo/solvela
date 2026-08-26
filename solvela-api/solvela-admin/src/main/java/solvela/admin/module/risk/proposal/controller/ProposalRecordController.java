@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.risk.proposal.domain.form.ProposalRecordQueryForm;
 import solvela.risk.proposal.domain.vo.ProposalFunnelVO;
 import solvela.risk.proposal.domain.vo.ProposalRecordVO;
@@ -47,14 +47,14 @@ public class ProposalRecordController {
     @GetMapping("/approve/{id}")
     @SaCheckPermission("proposalRecord:approve")
     public ResponseDTO<String> approve(@PathVariable Long id, @RequestParam(required = false) String comment) {
-        return Service.approve(id, SolvelaRequestUtil.getRequestUser().getUserName(), comment);
+        return Service.approve(id, CurrentUser.orNull().getUserName(), comment);
     }
 
     @Operation(summary = "提案审批驳回")
     @GetMapping("/reject/{id}")
     @SaCheckPermission("proposalRecord:approve")
     public ResponseDTO<String> reject(@PathVariable Long id, @RequestParam(required = false) String comment) {
-        return Service.reject(id, SolvelaRequestUtil.getRequestUser().getUserName(), comment);
+        return Service.reject(id, CurrentUser.orNull().getUserName(), comment);
     }
 
     /*

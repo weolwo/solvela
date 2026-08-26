@@ -11,7 +11,7 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.util.SolvelaIpUtil;
 import solvela.base.dao.SolvelaPageUtil;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.admin.module.system.datatracer.constant.DataTracerConst;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 import solvela.admin.module.system.datatracer.dao.DataTracerDao;
@@ -158,7 +158,7 @@ public class DataTracerService {
      * 保存数据变动记录
      */
     public void addTrace(DataTracerForm tracerForm) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         this.addTrace(tracerForm, requestUser);
     }
 
@@ -184,7 +184,7 @@ public class DataTracerService {
      * 批量保存数据变动记录
      */
     public void addTraceList(List<DataTracerForm> tracerFormList) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         this.addTraceList(tracerFormList, requestUser);
     }
 

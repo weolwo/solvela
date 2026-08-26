@@ -9,7 +9,7 @@ import solvela.base.domain.RequestUser;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.exception.BusinessException;
 import solvela.base.util.SolvelaContentDispositionUtil;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.config.FileConfig;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.entity.FileEntity;
@@ -61,7 +61,7 @@ public class FileController extends SupportBaseController {
     public ResponseDTO<FileUploadVO> upload(@RequestParam MultipartFile file,
                                             @RequestParam(required = false) Integer folder,
                                             @RequestParam(required = false) String categoryCode) {
-        RequestUser requestUser = SolvelaRequestUtil.getRequestUser();
+        RequestUser requestUser = CurrentUser.orNull();
         FileEntity entity = (categoryCode == null || categoryCode.isBlank())
                 ? fileAssetService.upload(file, Long.valueOf(requireFolder(folder)), requestUser)
                 : fileAssetService.upload(file, categoryCode, requestUser);

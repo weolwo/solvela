@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.domain.ValidateList;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.mall.category.domain.form.MallCategoryBatchSaveForm;
 import solvela.mall.category.domain.form.MallCategoryQueryForm;
 import solvela.mall.category.domain.form.MallCategorySaveForm;
@@ -73,7 +73,7 @@ public class MallCategoryController {
     @PostMapping("/save")
     @SaCheckPermission("mallCategory:update")
     public ResponseDTO<Long> save(@RequestBody @Valid MallCategorySaveForm saveForm) {
-        return mallCategoryService.save(saveForm, SolvelaRequestUtil.getRequestUser());
+        return mallCategoryService.save(saveForm, CurrentUser.orNull());
     }
 
     /**
@@ -86,14 +86,14 @@ public class MallCategoryController {
     @PostMapping("/batchSave")
     @SaCheckPermission("mallCategory:add")
     public ResponseDTO<Integer> batchSave(@RequestBody @Valid MallCategoryBatchSaveForm batchSaveForm) {
-        return mallCategoryService.batchSave(batchSaveForm, SolvelaRequestUtil.getRequestUser());
+        return mallCategoryService.batchSave(batchSaveForm, CurrentUser.orNull());
     }
 
     @Operation(summary = "启用/停用 @author weolwo")
     @GetMapping("/updateStatus/{id}/{status}")
     @SaCheckPermission("mallCategory:update")
     public ResponseDTO<String> updateStatus(@PathVariable Long id, @PathVariable Integer status) {
-        return mallCategoryService.updateStatus(id, status, SolvelaRequestUtil.getRequestUser());
+        return mallCategoryService.updateStatus(id, status, CurrentUser.orNull());
     }
 
     @Operation(summary = "批量删除 @author weolwo")

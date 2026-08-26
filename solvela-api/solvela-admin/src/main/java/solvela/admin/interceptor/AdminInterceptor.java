@@ -14,7 +14,7 @@ import solvela.base.annotation.AllowAnonymous;
 import solvela.base.code.SystemErrorCode;
 import solvela.base.code.UserErrorCode;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.web.SolvelaResponseUtil;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -68,7 +68,7 @@ public class AdminInterceptor implements HandlerInterceptor {
             AllowAnonymous allowAnonymous = ((HandlerMethod) handler).getMethodAnnotation(AllowAnonymous.class);
             if (allowAnonymous != null) {
                 updateActiveTimeout(requestEmployee);
-                SolvelaRequestUtil.setRequestUser(requestEmployee);
+                CurrentUser.bind(requestEmployee);
                 return true;
             }
 
@@ -83,7 +83,7 @@ public class AdminInterceptor implements HandlerInterceptor {
 
             // --------------- 第三步： 校验 权限 ---------------
 
-            SolvelaRequestUtil.setRequestUser(requestEmployee);
+            CurrentUser.bind(requestEmployee);
             if (SaAnnotationStrategy.instance.isAnnotationPresent.apply(method, SaIgnore.class)) {
                 return true;
             }
@@ -133,9 +133,6 @@ public class AdminInterceptor implements HandlerInterceptor {
     }
 
 
-    @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        // 清除上下文
-        SolvelaRequestUtil.remove();
-    }
+    // 不再需要 afterCompletion 清理上下文：身份绑在 RequestScopeFilter 打开的
+    // ScopedValue 作用域里，doFilter 一返回就自动失效，异常路径也一样。
 }

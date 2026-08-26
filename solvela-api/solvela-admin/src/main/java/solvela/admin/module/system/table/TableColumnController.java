@@ -6,7 +6,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.ResponseDTO;
-import solvela.base.web.SolvelaRequestUtil;
+import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.repeatsubmit.annotation.RepeatSubmit;
 import solvela.admin.module.system.table.domain.TableColumnUpdateForm;
@@ -32,19 +32,19 @@ public class TableColumnController extends SupportBaseController {
     @PostMapping("/tableColumn/update")
     @RepeatSubmit
     public ResponseDTO<String> updateTableColumn(@RequestBody @Valid TableColumnUpdateForm updateForm) {
-        return tableColumnService.updateTableColumns(SolvelaRequestUtil.getRequestUser(), updateForm);
+        return tableColumnService.updateTableColumns(CurrentUser.orNull(), updateForm);
     }
 
     @Operation(summary = "恢复默认（删除） @author 卓大")
     @GetMapping("/tableColumn/delete/{tableId}")
     @RepeatSubmit
     public ResponseDTO<String> deleteTableColumn(@PathVariable Integer tableId) {
-        return tableColumnService.deleteTableColumn(SolvelaRequestUtil.getRequestUser(), tableId);
+        return tableColumnService.deleteTableColumn(CurrentUser.orNull(), tableId);
     }
 
     @Operation(summary = "查询表格列 @author 卓大")
     @GetMapping("/tableColumn/getColumns/{tableId}")
     public ResponseDTO<String> getColumns(@PathVariable Integer tableId) {
-        return ResponseDTO.ok(tableColumnService.getTableColumns(SolvelaRequestUtil.getRequestUser(), tableId));
+        return ResponseDTO.ok(tableColumnService.getTableColumns(CurrentUser.orNull(), tableId));
     }
 }
