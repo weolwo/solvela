@@ -1,7 +1,7 @@
 package solvela.task.taskconfig.spi;
 
 import lombok.RequiredArgsConstructor;
-import solvela.activity.domain.vo.ActivityRefItem;
+import solvela.activity.domain.dto.ActivityRefItem;
 import solvela.activity.spi.ActivityRefProvider;
 import solvela.enums.ActivityTypeEnum;
 import solvela.task.TaskConfig;

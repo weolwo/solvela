@@ -7,8 +7,8 @@ import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import solvela.member.Member;
-import solvela.member.domain.form.MemberQueryForm;
-import solvela.member.domain.vo.MemberVO;
+import solvela.member.domain.query.MemberQuery;
+import solvela.member.domain.dto.MemberDTO;
 
 import java.util.Collection;
 import java.util.List;
@@ -42,7 +42,7 @@ public interface MemberDao extends BaseMapper<Member> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MemberVO> queryPage(Page<?> page, @Param("queryForm") MemberQueryForm queryForm);
+    List<MemberDTO> queryPage(Page<?> page, @Param("queryForm") MemberQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -50,7 +50,7 @@ public interface MemberDao extends BaseMapper<Member> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MemberVO> queryList(@Param("queryForm") MemberQueryForm queryForm);
+    List<MemberDTO> queryList(@Param("queryForm") MemberQuery queryForm);
 
     /**
      * 按会员号取账号（主键点查）。查不到返回 null。

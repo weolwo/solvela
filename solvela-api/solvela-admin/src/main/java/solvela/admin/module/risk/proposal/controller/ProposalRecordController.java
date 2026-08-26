@@ -6,12 +6,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.web.CurrentUser;
-import solvela.risk.proposal.domain.form.ProposalRecordQueryForm;
-import solvela.risk.proposal.domain.vo.ProposalFunnelVO;
-import solvela.risk.proposal.domain.vo.ProposalRecordVO;
+import solvela.admin.module.risk.proposal.domain.form.ProposalRecordQueryForm;
+import solvela.risk.proposal.domain.query.ProposalRecordQuery;
+import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
+import solvela.admin.module.risk.proposal.domain.vo.ProposalRecordVO;
+import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
 import solvela.risk.proposal.service.ProposalRecordService;
 
 /**
@@ -33,14 +37,15 @@ public class ProposalRecordController {
     @PostMapping("/queryPage")
     @SaCheckPermission("proposalRecord:query")
     public ResponseDTO<PageResult<ProposalRecordVO>> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<ProposalRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, ProposalRecordVO.class));
     }
 
     @Operation(summary = "提案漏斗：到账率、审批积压、下发卡单、资产/来源分布与流程体检")
     @PostMapping("/funnel")
     @SaCheckPermission("proposalRecord:query")
-    public ResponseDTO<ProposalFunnelVO> funnel(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.funnel(queryForm));
+    public ResponseDTO<ProposalFunnelDTO> funnel(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class)));
     }
 
     @Operation(summary = "提案审批通过（财务视角；一审通过后按 review_level 决定进二审还是直接放行下发）")

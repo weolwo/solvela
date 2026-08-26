@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.prize.prizelog.dao.PrizeLogDao">
 
-    <resultMap id="PrizeLogVO" type="solvela.prize.prizelog.domain.vo.PrizeLogVO">
+    <resultMap id="PrizeLogDTO" type="solvela.prize.prizelog.domain.dto.PrizeLogDTO">
         <result column="id" property="id"/>
         <result column="member_id" property="memberId"/>
         <result column="member_name" property="memberName"/>
@@ -235,7 +235,7 @@
         LIMIT 10
     </select>
 
-    <select id="queryPage" resultMap="PrizeLogVO">
+    <select id="queryPage" resultMap="PrizeLogDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_prize_log
@@ -243,7 +243,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="PrizeLogVO">
+    <select id="queryList" resultMap="PrizeLogDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_prize_log

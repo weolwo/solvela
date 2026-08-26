@@ -13,9 +13,9 @@ import solvela.member.constant.MemberConst;
 import solvela.member.verify.MemberVerifyMask;
 import solvela.member.verify.dao.MemberVerifyDao;
 import solvela.member.MemberVerify;
-import solvela.member.verify.domain.form.MemberVerifyQueryForm;
-import solvela.member.verify.domain.vo.MemberVerifyDetailVO;
-import solvela.member.verify.domain.vo.MemberVerifyVO;
+import solvela.member.verify.domain.query.MemberVerifyQuery;
+import solvela.member.verify.domain.dto.MemberVerifyDetailDTO;
+import solvela.member.verify.domain.dto.MemberVerifyDTO;
 import solvela.member.verify.manager.MemberVerifyManager;
 
 import java.time.LocalDateTime;
@@ -48,9 +48,9 @@ public class MemberVerifyService {
     /**
      * 分页查询。<b>姓名与身份证在这里被脱敏</b>，明文不出这个方法。
      */
-    public PageResult<MemberVerifyVO> queryPage(MemberVerifyQueryForm queryForm) {
+    public PageResult<MemberVerifyDTO> queryPage(MemberVerifyQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MemberVerifyVO> list = memberVerifyDao.queryPage(page, queryForm);
+        List<MemberVerifyDTO> list = memberVerifyDao.queryPage(page, queryForm);
         list.forEach(MemberVerifyService::mask);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
@@ -61,12 +61,12 @@ public class MemberVerifyService {
      *
      * <p>它和列表分开，是为了让「下发完整证件号」成为一个可以单独授权、单独审计的动作。
      */
-    public ResponseDTO<MemberVerifyDetailVO> detail(Long id) {
-        MemberVerifyVO row = memberVerifyDao.getDetail(id);
+    public ResponseDTO<MemberVerifyDetailDTO> detail(Long id) {
+        MemberVerifyDTO row = memberVerifyDao.getDetail(id);
         if (row == null) {
             return ResponseDTO.userErrorParam("实名记录不存在");
         }
-        MemberVerifyDetailVO vo = new MemberVerifyDetailVO();
+        MemberVerifyDetailDTO vo = new MemberVerifyDetailDTO();
         vo.setId(row.getId());
         vo.setMemberId(row.getMemberId());
         vo.setMemberName(row.getMemberName());
@@ -138,7 +138,7 @@ public class MemberVerifyService {
         return MemberConst.VERIFY_STATUS_PENDING == nullToZero(verify.getVerifyStatus()) ? verify : null;
     }
 
-    private static void mask(MemberVerifyVO vo) {
+    private static void mask(MemberVerifyDTO vo) {
         vo.setRealName(MemberVerifyMask.maskName(vo.getRealName()));
         vo.setIdCard(MemberVerifyMask.maskIdCard(vo.getIdCard()));
     }

@@ -16,7 +16,7 @@ import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.scriptengine.controller.form.ScriptTestForm;
 import solvela.scriptengine.core.EngineFunctionRegistry;
 import solvela.scriptengine.domain.ExecutableScript;
-import solvela.scriptengine.domain.ScriptCheckResultVO;
+import solvela.admin.module.scriptengine.domain.vo.ScriptCheckResultVO;
 import solvela.scriptengine.domain.ScriptSceneDocDTO;
 import solvela.scriptengine.spi.EngineContext;
 import solvela.scriptengine.spi.ScriptEngine;

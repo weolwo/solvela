@@ -10,9 +10,9 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.domain.form.PrizeLogAddForm;
-import solvela.prize.prizelog.domain.form.PrizeLogQueryForm;
-import solvela.prize.prizelog.domain.vo.PrizeLogFunnelVO;
-import solvela.prize.prizelog.domain.vo.PrizeLogVO;
+import solvela.prize.prizelog.domain.query.PrizeLogQuery;
+import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
+import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
 
 import solvela.member.service.MemberService;
 
@@ -52,9 +52,9 @@ public class PrizeLogService {
     /**
      * 分页查询
      */
-    public PageResult<PrizeLogVO> queryPage(PrizeLogQueryForm queryForm) {
+    public PageResult<PrizeLogDTO> queryPage(PrizeLogQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<PrizeLogVO> list = prizeLogDao.queryPage(page, queryForm);
+        List<PrizeLogDTO> list = prizeLogDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -68,9 +68,9 @@ public class PrizeLogService {
      * <p>⚠️ 措辞一律用「已发出」而不是「已发放/已到账」：营销域只知道自己把发奖指令发出去了，
      * 钱有没有真到用户手上是账务域的事。
      */
-    public PrizeLogFunnelVO funnel(PrizeLogQueryForm queryForm) {
+    public PrizeLogFunnelDTO funnel(PrizeLogQuery queryForm) {
         Map<String, Object> row = prizeLogDao.selectFunnel(queryForm);
-        PrizeLogFunnelVO vo = new PrizeLogFunnelVO();
+        PrizeLogFunnelDTO vo = new PrizeLogFunnelDTO();
 
         long total = toLong(row.get("totalCount"));
         long success = toLong(row.get("successCount"));
@@ -101,9 +101,9 @@ public class PrizeLogService {
         vo.setStuckWaitingCount(stuckWaiting);
 
         // ---- 奖励类型维度：条数与价值双口径 ----
-        List<PrizeLogFunnelVO.PrizeTypeStatVO> typeList = new ArrayList<>();
+        List<PrizeLogFunnelDTO.PrizeTypeStatVO> typeList = new ArrayList<>();
         for (Map<String, Object> stat : prizeLogDao.selectPrizeTypeStat(queryForm)) {
-            PrizeLogFunnelVO.PrizeTypeStatVO item = new PrizeLogFunnelVO.PrizeTypeStatVO();
+            PrizeLogFunnelDTO.PrizeTypeStatVO item = new PrizeLogFunnelDTO.PrizeTypeStatVO();
             long logCount = toLong(stat.get("logCount"));
             long typeSuccess = toLong(stat.get("successCount"));
             long badValue = toLong(stat.get("badValueCount"));
@@ -120,9 +120,9 @@ public class PrizeLogService {
         vo.setTypeList(typeList);
 
         // ---- 奖品维度分布 ----
-        List<PrizeLogFunnelVO.PrizeStatVO> prizeList = new ArrayList<>();
+        List<PrizeLogFunnelDTO.PrizeStatVO> prizeList = new ArrayList<>();
         for (Map<String, Object> stat : prizeLogDao.selectPrizeStat(queryForm)) {
-            PrizeLogFunnelVO.PrizeStatVO item = new PrizeLogFunnelVO.PrizeStatVO();
+            PrizeLogFunnelDTO.PrizeStatVO item = new PrizeLogFunnelDTO.PrizeStatVO();
             long logCount = toLong(stat.get("logCount"));
             long prizeSuccess = toLong(stat.get("successCount"));
             item.setPrizeCode(stat.get("prizeCode") == null ? null : String.valueOf(stat.get("prizeCode")));
@@ -139,9 +139,9 @@ public class PrizeLogService {
         vo.setPrizeList(prizeList);
 
         // ---- 失败原因分布 ----
-        List<PrizeLogFunnelVO.FailReasonVO> failReasonList = new ArrayList<>();
+        List<PrizeLogFunnelDTO.FailReasonVO> failReasonList = new ArrayList<>();
         for (Map<String, Object> stat : prizeLogDao.selectFailReasonStat(queryForm)) {
-            PrizeLogFunnelVO.FailReasonVO item = new PrizeLogFunnelVO.FailReasonVO();
+            PrizeLogFunnelDTO.FailReasonVO item = new PrizeLogFunnelDTO.FailReasonVO();
             long count = toLong(stat.get("failCount"));
             item.setFailReason(stat.get("failReason") == null ? null : String.valueOf(stat.get("failReason")));
             item.setFailCount(count);

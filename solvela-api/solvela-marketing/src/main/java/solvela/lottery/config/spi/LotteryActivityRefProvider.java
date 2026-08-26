@@ -1,7 +1,7 @@
 package solvela.lottery.config.spi;
 
 import lombok.RequiredArgsConstructor;
-import solvela.activity.domain.vo.ActivityRefItem;
+import solvela.activity.domain.dto.ActivityRefItem;
 import solvela.activity.spi.ActivityRefProvider;
 import solvela.enums.ActivityTypeEnum;
 import solvela.lottery.LotteryConfig;

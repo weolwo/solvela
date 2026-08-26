@@ -4,10 +4,10 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.member.loginlog.domain.form.MemberLoginLogQueryForm;
+import solvela.member.loginlog.domain.query.MemberLoginLogQuery;
 import solvela.member.MemberLoginLog;
-import solvela.member.loginlog.domain.vo.MemberLoginLogStatVO;
-import solvela.member.loginlog.domain.vo.MemberLoginLogVO;
+import solvela.member.loginlog.domain.dto.MemberLoginLogStatDTO;
+import solvela.member.loginlog.domain.dto.MemberLoginLogDTO;
 
 import java.util.List;
 
@@ -28,12 +28,12 @@ public interface MemberLoginLogDao extends BaseMapper<MemberLoginLog> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MemberLoginLogVO> queryPage(Page<?> page, @Param("queryForm") MemberLoginLogQueryForm queryForm);
+    List<MemberLoginLogDTO> queryPage(Page<?> page, @Param("queryForm") MemberLoginLogQuery queryForm);
 
     /**
      * 统计：一趟 SQL 出全部指标，条件与列表复用同一段 query_conditions
      */
-    MemberLoginLogStatVO queryStat(@Param("queryForm") MemberLoginLogQueryForm queryForm);
+    MemberLoginLogStatDTO queryStat(@Param("queryForm") MemberLoginLogQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -41,6 +41,6 @@ public interface MemberLoginLogDao extends BaseMapper<MemberLoginLog> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MemberLoginLogVO> queryList(@Param("queryForm") MemberLoginLogQueryForm queryForm);
+    List<MemberLoginLogDTO> queryList(@Param("queryForm") MemberLoginLogQuery queryForm);
 
 }

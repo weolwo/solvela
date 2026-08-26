@@ -5,11 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
-import solvela.member.loginlog.domain.form.MemberLoginLogQueryForm;
+import solvela.member.loginlog.domain.query.MemberLoginLogQuery;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
 import solvela.base.domain.ResponseDTO;
-import solvela.member.loginlog.domain.vo.MemberLoginLogStatVO;
-import solvela.member.loginlog.domain.vo.MemberLoginLogVO;
+import solvela.member.loginlog.domain.dto.MemberLoginLogStatDTO;
+import solvela.member.loginlog.domain.dto.MemberLoginLogDTO;
 
 import java.util.List;
 
@@ -29,9 +29,9 @@ public class MemberLoginLogService {
     /**
      * 分页查询
      */
-    public PageResult<MemberLoginLogVO> queryPage(MemberLoginLogQueryForm queryForm) {
+    public PageResult<MemberLoginLogDTO> queryPage(MemberLoginLogQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MemberLoginLogVO> list = memberLoginLogDao.queryPage(page, queryForm);
+        List<MemberLoginLogDTO> list = memberLoginLogDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -40,17 +40,17 @@ public class MemberLoginLogService {
      * 统计。<b>与列表共用同一套查询条件</b> —— 顶部筛选改了统计跟着变，
      * 两套条件的话运营会看到「统计说 100 次、列表只有 3 条」然后不知道信哪个。
      */
-    public ResponseDTO<MemberLoginLogStatVO> queryStat(MemberLoginLogQueryForm queryForm) {
-        MemberLoginLogStatVO stat = memberLoginLogDao.queryStat(queryForm);
+    public ResponseDTO<MemberLoginLogStatDTO> queryStat(MemberLoginLogQuery queryForm) {
+        MemberLoginLogStatDTO stat = memberLoginLogDao.queryStat(queryForm);
         // 一条记录都没有时 SUM() 返回 null，直接下发会让前端把「0 次」渲染成空白
         return ResponseDTO.ok(stat == null ? emptyStat() : normalize(stat));
     }
 
-    private MemberLoginLogStatVO emptyStat() {
-        return normalize(new MemberLoginLogStatVO());
+    private MemberLoginLogStatDTO emptyStat() {
+        return normalize(new MemberLoginLogStatDTO());
     }
 
-    private MemberLoginLogStatVO normalize(MemberLoginLogStatVO stat) {
+    private MemberLoginLogStatDTO normalize(MemberLoginLogStatDTO stat) {
         stat.setTotalCount(nullToZero(stat.getTotalCount()));
         stat.setSuccessCount(nullToZero(stat.getSuccessCount()));
         stat.setFailCount(nullToZero(stat.getFailCount()));

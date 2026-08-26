@@ -60,8 +60,7 @@ public class PhysicalDeliveryController {
     @PostMapping("/stat")
     @SaCheckPermission("physicalDelivery:query")
     public ResponseDTO<PhysicalDeliveryStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(
-                SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
+        return ResponseDTO.ok(Service.stat(SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
     }
 
     @Operation(summary = "添加")

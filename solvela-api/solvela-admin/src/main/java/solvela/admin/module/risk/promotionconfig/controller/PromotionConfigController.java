@@ -3,14 +3,18 @@ package solvela.admin.module.risk.promotionconfig.controller;
 import solvela.base.domain.ValidateList;
 import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
+import solvela.admin.module.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
+import solvela.risk.promotionconfig.domain.query.PromotionConfigQuery;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
-import solvela.risk.promotionconfig.domain.vo.PromotionConfigOptionVO;
-import solvela.risk.promotionconfig.domain.vo.PromotionConfigVO;
+import solvela.risk.promotionconfig.domain.dto.PromotionConfigOptionDTO;
+import solvela.admin.module.risk.promotionconfig.domain.vo.PromotionConfigVO;
+import solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,13 +43,14 @@ public class PromotionConfigController {
     @PostMapping("/queryPage")
     @SaCheckPermission("promotionConfig:query")
     public ResponseDTO<PageResult<PromotionConfigVO>> queryPage(@RequestBody @Valid PromotionConfigQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<PromotionConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PromotionConfigQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PromotionConfigVO.class));
     }
 
     @Operation(summary = "优惠配置下拉列表（全量启用中，前端按 prizeType 分组做级联）")
     @GetMapping("/optionList")
     @SaCheckPermission("promotionConfig:query")
-    public ResponseDTO<List<PromotionConfigOptionVO>> queryOptionList() {
+    public ResponseDTO<List<PromotionConfigOptionDTO>> queryOptionList() {
         return Service.queryOptionList();
     }
 

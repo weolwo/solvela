@@ -1,6 +1,6 @@
 package solvela.activity.spi;
 
-import solvela.activity.domain.vo.ActivityRefItem;
+import solvela.activity.domain.dto.ActivityRefItem;
 import solvela.enums.ActivityTypeEnum;
 
 import java.util.List;

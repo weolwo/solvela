@@ -3,8 +3,8 @@ package solvela.risk.proposal.dao;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.risk.ProposalRecord;
-import solvela.risk.proposal.domain.form.ProposalRecordQueryForm;
-import solvela.risk.proposal.domain.vo.ProposalRecordVO;
+import solvela.risk.proposal.domain.query.ProposalRecordQuery;
+import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -27,7 +27,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<ProposalRecordVO> queryPage(Page<?> page, @Param("queryForm") ProposalRecordQueryForm queryForm);
+    List<ProposalRecordDTO> queryPage(Page<?> page, @Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 条件流转提案状态：只有当前状态等于 fromStatus 才会更新
@@ -66,7 +66,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<ProposalRecordVO> queryList(@Param("queryForm") ProposalRecordQueryForm queryForm);
+    List<ProposalRecordDTO> queryList(@Param("queryForm") ProposalRecordQuery queryForm);
 
     // ==================== 漏斗统计 ====================
 
@@ -77,7 +77,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * 出现「分项加起来不等于总数」这种自相矛盾。
      * 刻意不吃 status 条件 —— 它正是漏斗要拆解的维度。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") ProposalRecordQueryForm queryForm);
+    java.util.Map<String, Object> selectFunnel(@Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 按资产类型汇总条数与金额。
@@ -85,12 +85,12 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * <p>⚠️ 金额<b>必须</b>按 asset_type 分组：积分、现金、券张数、实物件数不是同一个量纲，
      * 合成一个「总金额」的那个数字没有任何含义。
      */
-    List<java.util.Map<String, Object>> selectAssetStat(@Param("queryForm") ProposalRecordQueryForm queryForm);
+    List<java.util.Map<String, Object>> selectAssetStat(@Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 按来源汇总提案数与到账数：哪种玩法在花钱、哪种玩法的奖最容易发不出去。
      */
-    List<java.util.Map<String, Object>> selectSourceStat(@Param("queryForm") ProposalRecordQueryForm queryForm);
+    List<java.util.Map<String, Object>> selectSourceStat(@Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 风控拦截原因分布（TOP 10）。
@@ -98,7 +98,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * <p>只能按 remark 这个自由文本聚类 —— {@code RiskResult.code} 没有落库。
      * 文案一改统计就会裂开，这是已知的脆弱点（对照 t_task_record_flow.discard_code 的做法）。
      */
-    List<java.util.Map<String, Object>> selectBlockReasonStat(@Param("queryForm") ProposalRecordQueryForm queryForm);
+    List<java.util.Map<String, Object>> selectBlockReasonStat(@Param("queryForm") ProposalRecordQuery queryForm);
 
     // ==================== 卡单扫描（proposalStuckScan 定时任务） ====================
 

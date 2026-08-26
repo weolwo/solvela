@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.risk.promotionconfig.dao.PromotionConfigDao">
 
-    <resultMap id="PromotionConfigVO" type="solvela.risk.promotionconfig.domain.vo.PromotionConfigVO">
+    <resultMap id="PromotionConfigDTO" type="solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO">
         <result column="id" property="id"/>
         <result column="promo_name" property="promoName"/>
         <result column="prize_type" property="prizeType"/>
@@ -86,7 +86,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="PromotionConfigVO">
+    <select id="queryPage" resultMap="PromotionConfigDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_promotion_config
@@ -94,7 +94,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="PromotionConfigVO">
+    <select id="queryList" resultMap="PromotionConfigDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_promotion_config

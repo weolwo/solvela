@@ -9,8 +9,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.exception.BusinessException;
 import solvela.scriptengine.ScriptRef;
-import solvela.scriptengine.domain.vo.ScriptRefVO;
-import solvela.scriptengine.domain.vo.ScriptVO;
+import solvela.scriptengine.domain.dto.ScriptRefDTO;
+import solvela.scriptengine.domain.dto.ScriptDTO;
 import solvela.scriptengine.loader.ScriptFileLoader;
 import solvela.scriptengine.manager.ScriptRefManager;
 import solvela.scriptengine.runtime.ScriptRuntime;
@@ -132,8 +132,8 @@ class ScriptRuntimeAcceptanceTest {
 
         scriptRefService.bind(ScriptRefPoint.PRIZE_POOL_ENTRY, FAKE_POOL_CODE, POOL_SCRIPT, "acceptance-test");
 
-        List<ScriptRefVO> refs = scriptRefService.findRefsOfScript(POOL_SCRIPT);
-        ScriptRefVO mine = refs.stream()
+        List<ScriptRefDTO> refs = scriptRefService.findRefsOfScript(POOL_SCRIPT);
+        ScriptRefDTO mine = refs.stream()
                 .filter(ref -> FAKE_POOL_CODE.equals(ref.getRefId()))
                 .findFirst().orElseThrow(() -> new AssertionError("挂上去了却查不到引用"));
 
@@ -174,7 +174,7 @@ class ScriptRuntimeAcceptanceTest {
     @Test
     @DisplayName("脚本列表带得出域/场景中文名与引用数 —— 管理页的表格全靠这些字段")
     void script_list_carries_display_fields() {
-        ScriptVO pool = scriptQueryService.listAll().stream()
+        ScriptDTO pool = scriptQueryService.listAll().stream()
                 .filter(vo -> POOL_SCRIPT.equals(vo.getScriptCode()))
                 .findFirst().orElseThrow(() -> new AssertionError("样例脚本没进 t_script"));
 
@@ -190,7 +190,7 @@ class ScriptRuntimeAcceptanceTest {
     @Test
     @DisplayName("脚本详情带内容，且引用数随挂载实时变化")
     void script_detail_carries_content_and_live_ref_count() {
-        ScriptVO before = scriptQueryService.detail(POOL_SCRIPT);
+        ScriptDTO before = scriptQueryService.detail(POOL_SCRIPT);
         assertNotNull(before.getContent(), "详情必须带内容，抽屉里要展示");
         assertTrue(before.getContent().contains("@scene"), "带的应该是含文件头的原文");
         int baseline = before.getRefCount();

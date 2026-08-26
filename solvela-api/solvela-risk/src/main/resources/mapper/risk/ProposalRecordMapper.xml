@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.risk.proposal.dao.ProposalRecordDao">
 
-    <resultMap id="ProposalRecordVO" type="solvela.risk.proposal.domain.vo.ProposalRecordVO">
+    <resultMap id="ProposalRecordDTO" type="solvela.risk.proposal.domain.dto.ProposalRecordDTO">
         <result column="id" property="id"/>
         <result column="trade_no" property="tradeNo"/>
         <result column="member_id" property="memberId"/>
@@ -252,7 +252,7 @@
         LIMIT 10
     </select>
 
-    <select id="queryPage" resultMap="ProposalRecordVO">
+    <select id="queryPage" resultMap="ProposalRecordDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_proposal_record
@@ -260,7 +260,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="ProposalRecordVO">
+    <select id="queryList" resultMap="ProposalRecordDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_proposal_record

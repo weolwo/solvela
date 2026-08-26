@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import solvela.exception.BusinessException;
 import solvela.scriptengine.Script;
 import solvela.scriptengine.ScriptRef;
-import solvela.scriptengine.domain.vo.ScriptVO;
+import solvela.scriptengine.domain.dto.ScriptDTO;
 import solvela.scriptengine.manager.ScriptManager;
 import solvela.scriptengine.manager.ScriptRefManager;
 import solvela.scriptengine.spi.ScriptDomain;
@@ -30,16 +30,16 @@ public class ScriptQueryService {
 
     private final ScriptRefManager scriptRefManager;
 
-    public List<ScriptVO> listAll() {
+    public List<ScriptDTO> listAll() {
         Map<String, Long> refCounts = scriptRefManager.list().stream()
                 .collect(Collectors.groupingBy(ScriptRef::getScriptCode, Collectors.counting()));
         return scriptManager.list().stream()
                 .map(script -> toVO(script, refCounts.getOrDefault(script.getScriptCode(), 0L).intValue(), false))
-                .sorted(java.util.Comparator.comparing(ScriptVO::getScriptCode))
+                .sorted(java.util.Comparator.comparing(ScriptDTO::getScriptCode))
                 .toList();
     }
 
-    public ScriptVO detail(String scriptCode) {
+    public ScriptDTO detail(String scriptCode) {
         Script script = scriptManager.lambdaQuery()
                 .eq(Script::getScriptCode, scriptCode)
                 .oneOpt()
@@ -50,8 +50,8 @@ public class ScriptQueryService {
         return toVO(script, (int) refCount, true);
     }
 
-    private ScriptVO toVO(Script script, int refCount, boolean withContent) {
-        ScriptVO vo = new ScriptVO();
+    private ScriptDTO toVO(Script script, int refCount, boolean withContent) {
+        ScriptDTO vo = new ScriptDTO();
         vo.setScriptCode(script.getScriptCode());
         vo.setScriptName(script.getScriptName());
         vo.setDomain(script.getDomain());

@@ -19,8 +19,8 @@ import solvela.base.web.CurrentUser;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.scriptengine.domain.form.ScriptBindForm;
 import solvela.admin.module.scriptengine.domain.vo.ScriptRefPointVO;
-import solvela.scriptengine.domain.vo.ScriptRefVO;
-import solvela.scriptengine.domain.vo.ScriptVO;
+import solvela.scriptengine.domain.dto.ScriptRefDTO;
+import solvela.scriptengine.domain.dto.ScriptDTO;
 import solvela.scriptengine.service.ScriptQueryService;
 import solvela.scriptengine.service.ScriptRefService;
 import solvela.scriptengine.spi.ScriptRefPoint;
@@ -52,28 +52,28 @@ public class ScriptAdminController {
     @Operation(summary = "【用户】脚本-列表（只读，权威在项目文件里）")
     @SaCheckPermission("script:query")
     @GetMapping("/list")
-    public ResponseDTO<List<ScriptVO>> list() {
+    public ResponseDTO<List<ScriptDTO>> list() {
         return ResponseDTO.ok(scriptQueryService.listAll());
     }
 
     @Operation(summary = "【用户】脚本-详情，含内容与引用它的业务对象")
     @SaCheckPermission("script:query")
     @GetMapping("/detail")
-    public ResponseDTO<ScriptVO> detail(@RequestParam String scriptCode) {
+    public ResponseDTO<ScriptDTO> detail(@RequestParam String scriptCode) {
         return ResponseDTO.ok(scriptQueryService.detail(scriptCode));
     }
 
     @Operation(summary = "【用户】脚本-改这个脚本会影响哪些业务对象")
     @SaCheckPermission("script:query")
     @GetMapping("/refs")
-    public ResponseDTO<List<ScriptRefVO>> refs(@RequestParam String scriptCode) {
+    public ResponseDTO<List<ScriptRefDTO>> refs(@RequestParam String scriptCode) {
         return ResponseDTO.ok(scriptRefService.findRefsOfScript(scriptCode));
     }
 
     @Operation(summary = "【用户】脚本-某个业务对象身上挂了哪些脚本")
     @SaCheckPermission("script:query")
     @GetMapping("/refs/owner")
-    public ResponseDTO<List<ScriptRefVO>> refsOfOwner(@RequestParam String refType, @RequestParam String refId) {
+    public ResponseDTO<List<ScriptRefDTO>> refsOfOwner(@RequestParam String refType, @RequestParam String refId) {
         return ResponseDTO.ok(scriptRefService.findRefsOfOwner(refType, refId));
     }
 

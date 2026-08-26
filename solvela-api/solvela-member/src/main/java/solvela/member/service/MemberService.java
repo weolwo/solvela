@@ -14,8 +14,8 @@ import solvela.member.constant.MemberConst;
 import solvela.member.dao.MemberDao;
 import solvela.member.Member;
 import solvela.member.manager.MemberManager;
-import solvela.member.domain.form.MemberQueryForm;
-import solvela.member.domain.vo.MemberVO;
+import solvela.member.domain.query.MemberQuery;
+import solvela.member.domain.dto.MemberDTO;
 
 import java.util.*;
 
@@ -55,9 +55,9 @@ public class MemberService {
     /**
      * 分页查询
      */
-    public PageResult<MemberVO> queryPage(MemberQueryForm queryForm) {
+    public PageResult<MemberDTO> queryPage(MemberQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MemberVO> list = memberDao.queryPage(page, queryForm);
+        List<MemberDTO> list = memberDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 

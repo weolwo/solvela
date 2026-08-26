@@ -11,10 +11,10 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizeconfig.dao.PrizeConfigDao;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
+import solvela.prize.prizeconfig.domain.query.PrizeConfigQuery;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
 import solvela.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
-import solvela.prize.prizeconfig.domain.vo.PrizeConfigVO;
+import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
@@ -58,21 +58,21 @@ public class PrizeConfigService {
     /**
      * 查询活动下启用中的奖品：供抽奖工作台「从资产大库引入奖项」抽屉选择
      */
-    public List<PrizeConfigVO> queryEnabledList(String activityCode) {
+    public List<PrizeConfigDTO> queryEnabledList(String activityCode) {
         List<PrizeConfig> list = prizeConfigManager.lambdaQuery()
                 .eq(PrizeConfig::getActivityCode, activityCode)
                 .eq(PrizeConfig::getStatus, STATUS_ENABLED)
                 .orderByAsc(PrizeConfig::getSortWeight)
                 .list();
-        return SolvelaBeanUtil.copyList(list, PrizeConfigVO.class);
+        return SolvelaBeanUtil.copyList(list, PrizeConfigDTO.class);
     }
 
     /**
      * 分页查询
      */
-    public PageResult<PrizeConfigVO> queryPage(PrizeConfigQueryForm queryForm) {
+    public PageResult<PrizeConfigDTO> queryPage(PrizeConfigQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<PrizeConfigVO> list = prizeConfigDao.queryPage(page, queryForm);
+        List<PrizeConfigDTO> list = prizeConfigDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 

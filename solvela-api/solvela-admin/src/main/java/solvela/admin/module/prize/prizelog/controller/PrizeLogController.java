@@ -6,14 +6,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.web.CurrentUser;
 import solvela.consumer.handler.PrizeDispatchHandler;
 import solvela.prize.prizelog.domain.form.PrizeLogAddForm;
-import solvela.prize.prizelog.domain.form.PrizeLogQueryForm;
-import solvela.prize.prizelog.domain.vo.PrizeLogFunnelVO;
-import solvela.prize.prizelog.domain.vo.PrizeLogVO;
+import solvela.admin.module.prize.prizelog.domain.form.PrizeLogQueryForm;
+import solvela.prize.prizelog.domain.query.PrizeLogQuery;
+import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
+import solvela.admin.module.prize.prizelog.domain.vo.PrizeLogVO;
+import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
 import solvela.prize.prizelog.service.PrizeLogService;
 
 /**
@@ -51,14 +55,15 @@ public class PrizeLogController {
     @PostMapping("/queryPage")
     @SaCheckPermission("prizeLog:query")
     public ResponseDTO<PageResult<PrizeLogVO>> queryPage(@RequestBody @Valid PrizeLogQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<PrizeLogDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizeLogQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizeLogVO.class));
     }
 
     @Operation(summary = "奖励漏斗：已发出条数与价值（双口径）、审批积压、卡单、失败原因与一致性体检")
     @PostMapping("/funnel")
     @SaCheckPermission("prizeLog:query")
-    public ResponseDTO<PrizeLogFunnelVO> funnel(@RequestBody @Valid PrizeLogQueryForm queryForm) {
-        return ResponseDTO.ok(Service.funnel(queryForm));
+    public ResponseDTO<PrizeLogFunnelDTO> funnel(@RequestBody @Valid PrizeLogQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, PrizeLogQuery.class)));
     }
 
     @Operation(summary = "添加")

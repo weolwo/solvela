@@ -11,13 +11,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.web.CurrentUser;
-import solvela.member.verify.domain.form.MemberVerifyQueryForm;
+import solvela.admin.module.member.verify.domain.form.MemberVerifyQueryForm;
+import solvela.member.verify.domain.query.MemberVerifyQuery;
 import solvela.admin.module.member.verify.domain.form.MemberVerifyRejectForm;
-import solvela.member.verify.domain.vo.MemberVerifyDetailVO;
-import solvela.member.verify.domain.vo.MemberVerifyVO;
+import solvela.member.verify.domain.dto.MemberVerifyDetailDTO;
+import solvela.admin.module.member.verify.domain.vo.MemberVerifyVO;
+import solvela.member.verify.domain.dto.MemberVerifyDTO;
 import solvela.member.verify.service.MemberVerifyService;
 
 /**
@@ -47,7 +51,8 @@ public class MemberVerifyController {
     @PostMapping("/queryPage")
     @SaCheckPermission("memberVerify:query")
     public ResponseDTO<PageResult<MemberVerifyVO>> queryPage(@RequestBody @Valid MemberVerifyQueryForm queryForm) {
-        return ResponseDTO.ok(memberVerifyService.queryPage(queryForm));
+        PageResult<MemberVerifyDTO> page = memberVerifyService.queryPage(SolvelaBeanUtil.copy(queryForm, MemberVerifyQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberVerifyVO.class));
     }
 
     /**
@@ -57,7 +62,7 @@ public class MemberVerifyController {
     @Operation(summary = "实名详情（明文，审核弹窗用） @author weolwo")
     @GetMapping("/detail/{id}")
     @SaCheckPermission("memberVerify:detail")
-    public ResponseDTO<MemberVerifyDetailVO> detail(@PathVariable Long id) {
+    public ResponseDTO<MemberVerifyDetailDTO> detail(@PathVariable Long id) {
         return memberVerifyService.detail(id);
     }
 

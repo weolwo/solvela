@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import solvela.exception.BusinessException;
 import solvela.scriptengine.ScriptRef;
-import solvela.scriptengine.domain.vo.ScriptRefVO;
+import solvela.scriptengine.domain.dto.ScriptRefDTO;
 import solvela.scriptengine.loader.ScriptFile;
 import solvela.scriptengine.loader.ScriptFileLoader;
 import solvela.scriptengine.manager.ScriptRefManager;
@@ -95,7 +95,7 @@ public class ScriptRefService {
     /**
      * 🌟 <b>改这个脚本会影响谁。</b>整套引用表就是为这个方法存在的。
      */
-    public List<ScriptRefVO> findRefsOfScript(String scriptCode) {
+    public List<ScriptRefDTO> findRefsOfScript(String scriptCode) {
         return scriptRefManager.lambdaQuery()
                 .eq(ScriptRef::getScriptCode, scriptCode)
                 .list().stream()
@@ -106,7 +106,7 @@ public class ScriptRefService {
     /**
      * 某个业务对象身上挂了哪些脚本
      */
-    public List<ScriptRefVO> findRefsOfOwner(String refType, String refId) {
+    public List<ScriptRefDTO> findRefsOfOwner(String refType, String refId) {
         return scriptRefManager.lambdaQuery()
                 .eq(ScriptRef::getRefType, refType)
                 .eq(ScriptRef::getRefId, refId)
@@ -115,8 +115,8 @@ public class ScriptRefService {
                 .toList();
     }
 
-    private ScriptRefVO toVO(ScriptRef ref) {
-        ScriptRefVO vo = new ScriptRefVO();
+    private ScriptRefDTO toVO(ScriptRef ref) {
+        ScriptRefDTO vo = new ScriptRefDTO();
         vo.setId(ref.getId());
         vo.setScriptCode(ref.getScriptCode());
         vo.setRefType(ref.getRefType());

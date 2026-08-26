@@ -5,14 +5,14 @@ import lombok.RequiredArgsConstructor;
 import solvela.activity.dao.ActivityConfigDao;
 import solvela.activity.ActivityConfig;
 import solvela.activity.domain.form.ActivityConfigAddForm;
-import solvela.activity.domain.form.ActivityConfigQueryForm;
+import solvela.activity.domain.query.ActivityConfigQuery;
 import solvela.activity.domain.form.ActivityConfigUpdateForm;
 import solvela.activity.domain.form.ActivityStatusUpdateForm;
 import solvela.activity.domain.form.ActivityTypeUpgradeForm;
 import solvela.activity.domain.form.ActivityWizardCreateForm;
-import solvela.activity.domain.vo.ActivityConfigVO;
-import solvela.activity.domain.vo.ActivityDeleteCheckVO;
-import solvela.activity.domain.vo.ActivityRefItem;
+import solvela.activity.domain.dto.ActivityConfigDTO;
+import solvela.activity.domain.dto.ActivityDeleteCheckDTO;
+import solvela.activity.domain.dto.ActivityRefItem;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.activity.spi.ActivityRefProvider;
 import solvela.base.domain.PageResult;
@@ -101,7 +101,7 @@ public class ActivityConfigService {
      * 绕过页面直接 POST 依然进得来。这是刻意的 —— 给活动延期是正常运营操作，
      * 过期只该是提醒，不该是硬拦。
      */
-    public List<ActivityConfigVO> queryOptionList(String activityType, Boolean includeInactive) {
+    public List<ActivityConfigDTO> queryOptionList(String activityType, Boolean includeInactive) {
         boolean keepAll = Boolean.TRUE.equals(includeInactive);
         List<ActivityConfig> list = activityConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(activityType), ActivityConfig::getActivityType, activityType)
@@ -109,7 +109,7 @@ public class ActivityConfigService {
                 .ge(!keepAll, ActivityConfig::getEndTime, LocalDateTime.now())
                 .orderByDesc(ActivityConfig::getId)
                 .list();
-        return SolvelaBeanUtil.copyList(list, ActivityConfigVO.class);
+        return SolvelaBeanUtil.copyList(list, ActivityConfigDTO.class);
     }
 
     /**
@@ -160,10 +160,10 @@ public class ActivityConfigService {
     /**
      * 删除前检查：能不能删 + 下游引用明细。
      */
-    public ActivityDeleteCheckVO checkDeletable(Long id) {
+    public ActivityDeleteCheckDTO checkDeletable(Long id) {
         ActivityConfig activity = activityConfigDao.selectById(id);
         if (activity == null) {
-            return ActivityDeleteCheckVO.reject("活动不存在", List.of());
+            return ActivityDeleteCheckDTO.reject("活动不存在", List.of());
         }
         return checkDeletable(activity);
     }
@@ -179,21 +179,21 @@ public class ActivityConfigService {
      * <p><b>第二层：有下游引用则拒绝</b>，并把明细给运营看，让他知道该去哪儿清理。
      * 不做级联删除 —— 下游挂着发奖流水与资产账务。
      */
-    private ActivityDeleteCheckVO checkDeletable(ActivityConfig activity) {
+    private ActivityDeleteCheckDTO checkDeletable(ActivityConfig activity) {
         if (!STATUS_NOT_START.equals(activity.getStatus())) {
             String statusDesc = STATUS_ONLINE.equals(activity.getStatus()) ? "上线中" : "已下线";
-            return ActivityDeleteCheckVO.reject(
+            return ActivityDeleteCheckDTO.reject(
                     "该活动" + statusDesc + "，已产生或可能已产生发奖记录，不允许删除；如需停止请将其下线。",
                     List.of());
         }
         List<ActivityRefItem> refs = countRefs(activity);
         if (SolvelaCollectionUtil.isEmpty(refs)) {
-            return ActivityDeleteCheckVO.ok();
+            return ActivityDeleteCheckDTO.ok();
         }
         String detail = refs.stream()
                 .map(r -> r.bizName() + " " + r.count() + " 个")
                 .collect(Collectors.joining(" / "));
-        return ActivityDeleteCheckVO.reject("该活动下已配置 " + detail + "，请先清理后再删除。", refs);
+        return ActivityDeleteCheckDTO.reject("该活动下已配置 " + detail + "，请先清理后再删除。", refs);
     }
 
     /**
@@ -226,9 +226,9 @@ public class ActivityConfigService {
     /**
      * 分页查询
      */
-    public PageResult<ActivityConfigVO> queryPage(ActivityConfigQueryForm queryForm) {
+    public PageResult<ActivityConfigDTO> queryPage(ActivityConfigQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<ActivityConfigVO> list = activityConfigDao.queryPage(page, queryForm);
+        List<ActivityConfigDTO> list = activityConfigDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -434,7 +434,7 @@ public class ActivityConfigService {
         }
         List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(idList);
         for (ActivityConfig activity : activityList) {
-            ActivityDeleteCheckVO check = checkDeletable(activity);
+            ActivityDeleteCheckDTO check = checkDeletable(activity);
             if (!check.deletable()) {
                 return ResponseDTO.userErrorParam("「" + activity.getActivityName() + "」" + check.reason());
             }
@@ -455,7 +455,7 @@ public class ActivityConfigService {
             return ResponseDTO.ok();
         }
         // 前端已经调过 checkDeletable，这里再拦一次 —— 前端校验只是防呆（铁律 2）
-        ActivityDeleteCheckVO check = checkDeletable(activity);
+        ActivityDeleteCheckDTO check = checkDeletable(activity);
         if (!check.deletable()) {
             return ResponseDTO.userErrorParam(check.reason());
         }

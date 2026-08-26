@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.member.dao.MemberDao">
 
-    <resultMap id="MemberVO" type="solvela.member.domain.vo.MemberVO">
+    <resultMap id="MemberDTO" type="solvela.member.domain.dto.MemberDTO">
         <result column="member_id" property="memberId"/>
         <result column="member_name" property="memberName"/>
         <result column="name_update_time" property="nameUpdateTime"/>
@@ -89,7 +89,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="MemberVO">
+    <select id="queryPage" resultMap="MemberDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_member
@@ -97,7 +97,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="MemberVO">
+    <select id="queryList" resultMap="MemberDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_member

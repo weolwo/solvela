@@ -10,7 +10,7 @@
 
       这里解密出来的是明文，Service 会在下发前脱敏；只有详情接口才把明文放出去。
     -->
-    <resultMap id="MemberVerifyVO" type="solvela.member.verify.domain.vo.MemberVerifyVO">
+    <resultMap id="MemberVerifyDTO" type="solvela.member.verify.domain.dto.MemberVerifyDTO">
         <result column="id" property="id"/>
         <result column="member_id" property="memberId"/>
         <result column="member_name" property="memberName"/>
@@ -85,7 +85,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="MemberVerifyVO">
+    <select id="queryPage" resultMap="MemberVerifyDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="member_columns"/>
@@ -94,7 +94,7 @@
         ORDER BY v.create_time DESC
     </select>
 
-    <select id="queryList" resultMap="MemberVerifyVO">
+    <select id="queryList" resultMap="MemberVerifyDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="member_columns"/>
@@ -104,7 +104,7 @@
     </select>
 
     <!-- 审核弹窗用：单条、明文。走单独的语句是为了让「下发完整证件号」这件事有唯一入口 -->
-    <select id="getDetail" resultMap="MemberVerifyVO">
+    <select id="getDetail" resultMap="MemberVerifyDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="member_columns"/>

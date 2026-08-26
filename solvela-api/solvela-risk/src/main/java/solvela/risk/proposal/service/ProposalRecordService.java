@@ -24,9 +24,9 @@ import solvela.risk.promotionconfig.service.PromotionConfigService;
 import solvela.risk.proposal.dao.ProposalRecordDao;
 import solvela.risk.ProposalRecord;
 import solvela.risk.proposal.domain.form.ProposalRecordAddForm;
-import solvela.risk.proposal.domain.form.ProposalRecordQueryForm;
-import solvela.risk.proposal.domain.vo.ProposalFunnelVO;
-import solvela.risk.proposal.domain.vo.ProposalRecordVO;
+import solvela.risk.proposal.domain.query.ProposalRecordQuery;
+import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
+import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -317,9 +317,9 @@ public class ProposalRecordService {
     /**
      * 分页查询
      */
-    public PageResult<ProposalRecordVO> queryPage(ProposalRecordQueryForm queryForm) {
+    public PageResult<ProposalRecordDTO> queryPage(ProposalRecordQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<ProposalRecordVO> list = proposalRecordDao.queryPage(page, queryForm);
+        List<ProposalRecordDTO> list = proposalRecordDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -332,9 +332,9 @@ public class ProposalRecordService {
      * <p>最后一个是本页独有的：下发是在提案事务提交后同步调起的，进程中途退出就没有第二次机会，
      * 而全工程没有任何重试/补偿的定时任务 —— 卡住的提案会一直停在 30/40，没人查就发现不了。
      */
-    public ProposalFunnelVO funnel(ProposalRecordQueryForm queryForm) {
+    public ProposalFunnelDTO funnel(ProposalRecordQuery queryForm) {
         Map<String, Object> row = proposalRecordDao.selectFunnel(queryForm);
-        ProposalFunnelVO vo = new ProposalFunnelVO();
+        ProposalFunnelDTO vo = new ProposalFunnelDTO();
 
         long total = toLong(row.get("totalCount"));
         long firstReview = toLong(row.get("firstReviewCount"));
@@ -369,9 +369,9 @@ public class ProposalRecordService {
         vo.setStuckDispatchCount(stuckDispatch);
 
         // ---- 资产维度：金额按 asset_type 分开算，绝不合并 ----
-        List<ProposalFunnelVO.AssetStatVO> assetList = new ArrayList<>();
+        List<ProposalFunnelDTO.AssetStatVO> assetList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectAssetStat(queryForm)) {
-            ProposalFunnelVO.AssetStatVO item = new ProposalFunnelVO.AssetStatVO();
+            ProposalFunnelDTO.AssetStatVO item = new ProposalFunnelDTO.AssetStatVO();
             item.setAssetType(stat.get("assetType") == null ? null : String.valueOf(stat.get("assetType")));
             item.setProposalCount(toLong(stat.get("proposalCount")));
             item.setSuccessCount(toLong(stat.get("successCount")));
@@ -384,9 +384,9 @@ public class ProposalRecordService {
 
         // ---- 来源维度 ----
         long unknownSourceCount = 0L;
-        List<ProposalFunnelVO.SourceStatDTO> sourceList = new ArrayList<>();
+        List<ProposalFunnelDTO.SourceStatDTO> sourceList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectSourceStat(queryForm)) {
-            ProposalFunnelVO.SourceStatDTO item = new ProposalFunnelVO.SourceStatDTO();
+            ProposalFunnelDTO.SourceStatDTO item = new ProposalFunnelDTO.SourceStatDTO();
             String sourceType = stat.get("sourceType") == null ? null : String.valueOf(stat.get("sourceType"));
             ProposalSourceTypeEnum sourceEnum = sourceType == null ? null : ProposalSourceTypeEnum.resolve(sourceType);
             long count = toLong(stat.get("proposalCount"));
@@ -407,9 +407,9 @@ public class ProposalRecordService {
 
         // ---- 风控拦截原因：按 risk_code 聚类，文案改了统计也不会裂 ----
         long blockAttention = 0L;
-        List<ProposalFunnelVO.BlockReasonVO> blockReasonList = new ArrayList<>();
+        List<ProposalFunnelDTO.BlockReasonVO> blockReasonList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectBlockReasonStat(queryForm)) {
-            ProposalFunnelVO.BlockReasonVO item = new ProposalFunnelVO.BlockReasonVO();
+            ProposalFunnelDTO.BlockReasonVO item = new ProposalFunnelDTO.BlockReasonVO();
             String code = stat.get("riskCode") == null ? null : String.valueOf(stat.get("riskCode"));
             String sampleRemark = stat.get("sampleRemark") == null ? null : String.valueOf(stat.get("sampleRemark"));
             RiskBlockCode blockCode = code == null ? null : RiskBlockCode.resolve(code);

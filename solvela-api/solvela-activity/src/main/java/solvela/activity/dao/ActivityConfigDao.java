@@ -3,8 +3,8 @@ package solvela.activity.dao;
 import java.util.List;
 
 import solvela.activity.ActivityConfig;
-import solvela.activity.domain.form.ActivityConfigQueryForm;
-import solvela.activity.domain.vo.ActivityConfigVO;
+import solvela.activity.domain.query.ActivityConfigQuery;
+import solvela.activity.domain.dto.ActivityConfigDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -27,7 +27,7 @@ public interface ActivityConfigDao extends BaseMapper<ActivityConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<ActivityConfigVO> queryPage(Page<?> page, @Param("queryForm") ActivityConfigQueryForm queryForm);
+    List<ActivityConfigDTO> queryPage(Page<?> page, @Param("queryForm") ActivityConfigQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -35,7 +35,7 @@ public interface ActivityConfigDao extends BaseMapper<ActivityConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<ActivityConfigVO> queryList(@Param("queryForm") ActivityConfigQueryForm queryForm);
+    List<ActivityConfigDTO> queryList(@Param("queryForm") ActivityConfigQuery queryForm);
 
     // ----- 物理删除 -----
 

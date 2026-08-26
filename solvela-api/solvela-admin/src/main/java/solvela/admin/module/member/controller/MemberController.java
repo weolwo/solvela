@@ -11,12 +11,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.web.CurrentUser;
-import solvela.member.domain.form.MemberQueryForm;
+import solvela.admin.module.member.domain.form.MemberQueryForm;
+import solvela.member.domain.query.MemberQuery;
 import solvela.admin.module.member.domain.form.MemberRemarkForm;
-import solvela.member.domain.vo.MemberVO;
+import solvela.admin.module.member.domain.vo.MemberVO;
+import solvela.member.domain.dto.MemberDTO;
 import solvela.member.service.MemberService;
 
 /**
@@ -45,7 +49,8 @@ public class MemberController {
     @PostMapping("/queryPage")
     @SaCheckPermission("member:query")
     public ResponseDTO<PageResult<MemberVO>> queryPage(@RequestBody @Valid MemberQueryForm queryForm) {
-        return ResponseDTO.ok(memberService.queryPage(queryForm));
+        PageResult<MemberDTO> page = memberService.queryPage(SolvelaBeanUtil.copy(queryForm, MemberQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberVO.class));
     }
 
     /**

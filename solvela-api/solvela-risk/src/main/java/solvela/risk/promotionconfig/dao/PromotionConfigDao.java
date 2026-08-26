@@ -3,8 +3,8 @@ package solvela.risk.promotionconfig.dao;
 import java.util.List;
 
 import solvela.risk.PromotionConfig;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
-import solvela.risk.promotionconfig.domain.vo.PromotionConfigVO;
+import solvela.risk.promotionconfig.domain.query.PromotionConfigQuery;
+import solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -30,7 +30,7 @@ public interface PromotionConfigDao extends BaseMapper<PromotionConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<PromotionConfigVO> queryPage(Page<?> page, @Param("queryForm") PromotionConfigQueryForm queryForm);
+    List<PromotionConfigDTO> queryPage(Page<?> page, @Param("queryForm") PromotionConfigQuery queryForm);
 
     /**
      * 预算/数量原子预扣：把「够不够」的判断压进 UPDATE 的 WHERE 里，一条 SQL 完成校验+扣减
@@ -59,7 +59,7 @@ public interface PromotionConfigDao extends BaseMapper<PromotionConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<PromotionConfigVO> queryList(@Param("queryForm") PromotionConfigQueryForm queryForm);
+    List<PromotionConfigDTO> queryList(@Param("queryForm") PromotionConfigQuery queryForm);
 
     // ----- 物理删除 -----
 

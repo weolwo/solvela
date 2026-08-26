@@ -1,18 +1,22 @@
 package solvela.admin.module.activity.controller;
 
 import solvela.activity.domain.form.ActivityConfigAddForm;
-import solvela.activity.domain.form.ActivityConfigQueryForm;
+import solvela.admin.module.activity.domain.form.ActivityConfigQueryForm;
+import solvela.activity.domain.query.ActivityConfigQuery;
 import solvela.activity.domain.form.ActivityConfigUpdateForm;
 import solvela.activity.domain.form.ActivityStatusUpdateForm;
 import solvela.activity.domain.form.ActivityTypeUpgradeForm;
 import solvela.activity.domain.form.ActivityWizardCreateForm;
-import solvela.activity.domain.vo.ActivityConfigVO;
-import solvela.activity.domain.vo.ActivityDeleteCheckVO;
+import solvela.admin.module.activity.domain.vo.ActivityConfigVO;
+import solvela.activity.domain.dto.ActivityConfigDTO;
+import solvela.activity.domain.dto.ActivityDeleteCheckDTO;
 import solvela.activity.service.ActivityConfigService;
 import solvela.base.domain.ValidateList;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,7 +52,8 @@ public class ActivityConfigController {
     @PostMapping("/queryPage")
     @SaCheckPermission("activityConfig:query")
     public ResponseDTO<PageResult<ActivityConfigVO>> queryPage(@RequestBody @Valid ActivityConfigQueryForm queryForm) {
-        return ResponseDTO.ok(activityConfigService.queryPage(queryForm));
+        PageResult<ActivityConfigDTO> page = activityConfigService.queryPage(SolvelaBeanUtil.copy(queryForm, ActivityConfigQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, ActivityConfigVO.class));
     }
 
     @Operation(summary = "活动下拉列表（按类型过滤；includeInactive=true 时连已下线/已过期一并返回）")
@@ -57,7 +62,8 @@ public class ActivityConfigController {
     public ResponseDTO<List<ActivityConfigVO>> queryOptionList(
             @RequestParam(required = false) String activityType,
             @RequestParam(required = false, defaultValue = "false") Boolean includeInactive) {
-        return ResponseDTO.ok(activityConfigService.queryOptionList(activityType, includeInactive));
+        return ResponseDTO.ok(SolvelaBeanUtil.copyList(
+                activityConfigService.queryOptionList(activityType, includeInactive), ActivityConfigVO.class));
     }
 
     @Operation(summary = "批量查询「是否已配置玩法」，供活动列表页一次算完")
@@ -70,7 +76,7 @@ public class ActivityConfigController {
     @Operation(summary = "删除前检查：是否可删 + 下游引用明细")
     @GetMapping("/checkDeletable/{id}")
     @SaCheckPermission("activityConfig:query")
-    public ResponseDTO<ActivityDeleteCheckVO> checkDeletable(@PathVariable Long id) {
+    public ResponseDTO<ActivityDeleteCheckDTO> checkDeletable(@PathVariable Long id) {
         return ResponseDTO.ok(activityConfigService.checkDeletable(id));
     }
 

@@ -11,10 +11,10 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
 import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigAddForm;
-import solvela.risk.promotionconfig.domain.form.PromotionConfigQueryForm;
+import solvela.risk.promotionconfig.domain.query.PromotionConfigQuery;
 import solvela.risk.promotionconfig.domain.form.PromotionConfigUpdateForm;
-import solvela.risk.promotionconfig.domain.vo.PromotionConfigOptionVO;
-import solvela.risk.promotionconfig.domain.vo.PromotionConfigVO;
+import solvela.risk.promotionconfig.domain.dto.PromotionConfigOptionDTO;
+import solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -36,9 +36,9 @@ public class PromotionConfigService {
     /**
      * 分页查询
      */
-    public PageResult<PromotionConfigVO> queryPage(PromotionConfigQueryForm queryForm) {
+    public PageResult<PromotionConfigDTO> queryPage(PromotionConfigQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<PromotionConfigVO> list = promotionConfigDao.queryPage(page, queryForm);
+        List<PromotionConfigDTO> list = promotionConfigDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -57,14 +57,14 @@ public class PromotionConfigService {
      * 刻意不做服务端按类型过滤：配置总量本来就不大，前端一次拉全量、按 prizeType 分组缓存，
      * 运营切换奖品类型时本地过滤即可，省掉来回打接口。
      */
-    public ResponseDTO<List<PromotionConfigOptionVO>> queryOptionList() {
+    public ResponseDTO<List<PromotionConfigOptionDTO>> queryOptionList() {
         List<PromotionConfig> list = promotionConfigDao.selectList(
                 Wrappers.<PromotionConfig>lambdaQuery()
                         .eq(PromotionConfig::getStatus, STATUS_ENABLED)
                         .orderByAsc(PromotionConfig::getPrizeType)
                         .orderByAsc(PromotionConfig::getId));
-        List<PromotionConfigOptionVO> optionList = list.stream()
-                .map(item -> new PromotionConfigOptionVO(
+        List<PromotionConfigOptionDTO> optionList = list.stream()
+                .map(item -> new PromotionConfigOptionDTO(
                         item.getId(),
                         item.getPromoName(),
                         item.getPrizeType(),

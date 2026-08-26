@@ -3,14 +3,18 @@ package solvela.admin.module.prize.prizeconfig.controller;
 import solvela.base.domain.ValidateList;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigAddForm;
-import solvela.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
+import solvela.admin.module.prize.prizeconfig.domain.form.PrizeConfigQueryForm;
+import solvela.prize.prizeconfig.domain.query.PrizeConfigQuery;
 import solvela.prize.prizeconfig.domain.form.PrizeConfigUpdateForm;
 import solvela.prize.prizeconfig.domain.form.PrizeStatusUpdateForm;
-import solvela.prize.prizeconfig.domain.vo.PrizeConfigVO;
+import solvela.admin.module.prize.prizeconfig.domain.vo.PrizeConfigVO;
+import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,14 +43,15 @@ public class PrizeConfigController {
     @PostMapping("/queryPage")
     @SaCheckPermission("prizeConfig:query")
     public ResponseDTO<PageResult<PrizeConfigVO>> queryPage(@RequestBody @Valid PrizeConfigQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<PrizeConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizeConfigQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizeConfigVO.class));
     }
 
     @Operation(summary = "查询活动下启用中的奖品（抽奖工作台资产大库抽屉用）")
     @GetMapping("/optionList")
     @SaCheckPermission("prizeConfig:query")
     public ResponseDTO<List<PrizeConfigVO>> queryEnabledList(@RequestParam String activityCode) {
-        return ResponseDTO.ok(Service.queryEnabledList(activityCode));
+        return ResponseDTO.ok(SolvelaBeanUtil.copyList(Service.queryEnabledList(activityCode), PrizeConfigVO.class));
     }
 
     @Operation(summary = "生成奖品编码（10位大写字母+数字，已判重）")
