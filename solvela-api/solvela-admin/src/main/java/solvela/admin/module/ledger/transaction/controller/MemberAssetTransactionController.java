@@ -9,12 +9,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.ledger.transaction.domain.dto.MemberAssetTransactionDTO;
+import solvela.ledger.transaction.domain.query.MemberAssetTransactionQuery;
 import solvela.base.domain.ResponseDTO;
 import solvela.ledger.stat.domain.form.LedgerStatForm;
-import solvela.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
+import solvela.admin.module.ledger.transaction.domain.form.MemberAssetTransactionQueryForm;
 import solvela.ledger.transaction.domain.vo.MemberAssetTransactionStatVO;
-import solvela.ledger.transaction.domain.vo.MemberAssetTransactionVO;
+import solvela.admin.module.ledger.transaction.domain.vo.MemberAssetTransactionVO;
 import solvela.ledger.transaction.service.MemberAssetTransactionService;
 
 /**
@@ -36,7 +40,9 @@ public class MemberAssetTransactionController {
     @PostMapping("/queryPage")
     @SaCheckPermission("memberAssetTransaction:query")
     public ResponseDTO<PageResult<MemberAssetTransactionVO>> queryPage(@RequestBody @Valid MemberAssetTransactionQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        MemberAssetTransactionQuery query = SolvelaBeanUtil.copy(queryForm, MemberAssetTransactionQuery.class);
+        PageResult<MemberAssetTransactionDTO> page = Service.queryPage(query);
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberAssetTransactionVO.class));
     }
 
     @Operation(summary = "交易统计：按资产类型的收支与净额、业务类型分布、账务体检（时间范围默认当天）")

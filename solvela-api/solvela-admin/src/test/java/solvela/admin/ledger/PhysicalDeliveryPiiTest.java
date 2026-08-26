@@ -12,8 +12,8 @@ import solvela.crypto.PiiCipher;
 import solvela.base.domain.PageResult;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.PhysicalDelivery;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
-import solvela.ledger.logistic.domain.vo.PhysicalDeliveryVO;
+import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
+import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.ledger.logistic.service.PhysicalDeliveryService;
 
 import java.util.List;
@@ -96,13 +96,13 @@ class PhysicalDeliveryPiiTest {
             assertEquals(ADDRESS, loaded.getReceiverAddress());
 
             // ---------- ③ 列表 VO：必须是明文（漏了 resultMap 的 typeHandler 会在这里挂） ----------
-            PhysicalDeliveryQueryForm queryForm = new PhysicalDeliveryQueryForm();
+            PhysicalDeliveryQuery queryForm = new PhysicalDeliveryQuery();
             queryForm.setSourceBizId(sourceBizId);
             queryForm.setPageNum(1L);
             queryForm.setPageSize(10L);
-            PageResult<PhysicalDeliveryVO> page = physicalDeliveryService.queryPage(queryForm);
+            PageResult<PhysicalDeliveryDTO> page = physicalDeliveryService.queryPage(queryForm);
             assertEquals(1, page.getList().size(), "按来源单号没查到刚插的那条");
-            PhysicalDeliveryVO vo = page.getList().get(0);
+            PhysicalDeliveryDTO vo = page.getList().get(0);
             assertEquals(NAME, vo.getReceiverName());
             assertEquals(PHONE, vo.getReceiverPhone());
             assertEquals(ADDRESS, vo.getReceiverAddress());

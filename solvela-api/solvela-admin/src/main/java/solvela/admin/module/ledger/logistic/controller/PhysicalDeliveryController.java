@@ -6,17 +6,21 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
+import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.base.sonicexcel.SolvelaExcelUtil;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryImportForm;
-import solvela.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
+import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryQueryForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryShipImportForm;
 import solvela.ledger.logistic.domain.form.PhysicalDeliveryUpdateForm;
 import solvela.ledger.logistic.domain.vo.PhysicalDeliveryStatVO;
-import solvela.ledger.logistic.domain.vo.PhysicalDeliveryVO;
+import solvela.admin.module.ledger.logistic.domain.vo.PhysicalDeliveryVO;
 import solvela.ledger.stat.domain.form.LedgerStatForm;
 import solvela.ledger.logistic.service.PhysicalDeliveryService;
 import org.springframework.web.bind.annotation.*;
@@ -44,7 +48,11 @@ public class PhysicalDeliveryController {
     @PostMapping("/queryPage")
     @SaCheckPermission("physicalDelivery:query")
     public ResponseDTO<PageResult<PhysicalDeliveryVO>> queryPage(@RequestBody @Valid PhysicalDeliveryQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PhysicalDeliveryQuery query = SolvelaBeanUtil.copy(queryForm, PhysicalDeliveryQuery.class);
+        PageResult<PhysicalDeliveryDTO> page = Service.queryPage(query);
+        // 🔴 DTO 里是解密后的收件人姓名/电话/地址。这里是「给不给、给多少」的唯一决策点，
+        // 管理端有 physicalDelivery:query 权限才走得到，所以按明文给全量
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PhysicalDeliveryVO.class));
     }
 
     @Operation(summary = "发货统计：本期新增（默认当天）+ 待发货积压与收件信息体检（积压是全量）")

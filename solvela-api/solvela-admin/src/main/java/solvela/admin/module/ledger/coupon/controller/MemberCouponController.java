@@ -9,11 +9,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
+import solvela.ledger.coupon.domain.query.MemberCouponQuery;
 import solvela.base.domain.ResponseDTO;
-import solvela.ledger.coupon.domain.form.MemberCouponQueryForm;
+import solvela.admin.module.ledger.coupon.domain.form.MemberCouponQueryForm;
 import solvela.ledger.coupon.domain.vo.MemberCouponStatVO;
-import solvela.ledger.coupon.domain.vo.MemberCouponVO;
+import solvela.admin.module.ledger.coupon.domain.vo.MemberCouponVO;
 import solvela.ledger.coupon.service.MemberCouponService;
 import solvela.ledger.stat.domain.form.LedgerStatForm;
 
@@ -36,7 +40,9 @@ public class MemberCouponController {
     @PostMapping("/queryPage")
     @SaCheckPermission("memberCoupon:query")
     public ResponseDTO<PageResult<MemberCouponVO>> queryPage(@RequestBody @Valid MemberCouponQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        MemberCouponQuery query = SolvelaBeanUtil.copy(queryForm, MemberCouponQuery.class);
+        PageResult<MemberCouponDTO> page = Service.queryPage(query);
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberCouponVO.class));
     }
 
     @Operation(summary = "优惠券统计：本期发放与本期核销（两个口径）、券库存与过期体检（时间范围默认当天）")

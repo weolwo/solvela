@@ -31,9 +31,40 @@
              但自从 common-api 的 15 个后台 controller 搬到本模块之后，
              本模块<b>直接</b>依赖了它的 service/form/vo —— 直接用到就直接声明，
              否则哪天 solvela-marketing 不再依赖 common-api，这边会毫无征兆地编译不过。 -->
+        <!-- 管理端是全域控制台，七个域都要。这里"全都依赖"是事实而非偷懒 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>common-api</artifactId>
+            <artifactId>solvela-activity</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-consumer</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-ledger</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-prize</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-risk</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-scriptengine</artifactId>
             <version>3.0.0</version>
         </dependency>
         <!-- 本模块大量用 @Data / @Slf4j；此前是靠 solvela-base 的 compile 作用域传递白嫖来的，

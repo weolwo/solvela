@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>solvela-consumer</artifactId>
+    <name>solvela-consumer</name>
+
+    <!--
+      事件消费与编排：把业务事件路由到各域的处理器。位于依赖链末端。
+
+      【为什么是一个模块，而不是 common-api 里的一个包】
+      同一个 jar 里的包之间可以随手互相引用，编译器不拦、code review 也未必看得出来 ——
+      风控与账务此前就是这样长出了一个双向环，直到按域拆模块才暴露。
+      模块的依赖列表是编译器在守的：本模块的 pom 里没写的东西，这里<b>引不进来</b>。
+
+      <p>另一个看法：将来若真拆成独立服务，这些 dependency 就是那时的 RPC 调用方向。
+      现在把方向定对，比那时再来理顺便宜得多。
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-activity</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-prize</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-risk</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-scriptengine</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

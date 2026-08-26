@@ -11,15 +11,23 @@
     <description>solvela project</description>
 
 	<modules>
-        <!-- 领域词汇（entity / 业务枚举 / 错误码 / 领域异常 / PII 加解密）。
-             不依赖任何其它自研模块，必须排在最前 -->
+        <!-- 顺序即依赖方向：上面的不认识下面的。maven 会强制它 —— 写反了直接报循环依赖 -->
         <module>solvela-model</module>
         <module>solvela-base</module>
-        <module>solvela-admin</module>
+
+        <!-- 业务域。按域拆而不是按"将来谁用"拆：prize 横跨活动侧与资产侧，
+             硬塞进任何一端都会造出新的环 -->
+        <module>solvela-member</module>
+        <module>solvela-scriptengine</module>
+        <module>solvela-risk</module>
+        <module>solvela-prize</module>
+        <module>solvela-ledger</module>
+        <module>solvela-activity</module>
+        <module>solvela-consumer</module>
+
+        <!-- 玩法与端 -->
         <module>solvela-marketing</module>
-        <module>common-api</module>
-        <!-- C 端应用服务，独立启动（1025）。前缀 solvela 与老模块的 sa- 并存是刻意的，
-             见 solvela-app/pom.xml 顶部的说明 -->
+        <module>solvela-admin</module>
         <module>solvela-app</module>
     </modules>
 

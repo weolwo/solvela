@@ -2,7 +2,7 @@ package solvela.lottery.settle;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.domain.event.UserPrizeEvent;
+import solvela.event.UserPrizeEvent;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.LotteryRecord;

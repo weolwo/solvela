@@ -1,0 +1,51 @@
+package solvela.admin.module.ledger.logistic.domain.form;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import solvela.base.domain.PageParam;
+
+import java.time.LocalDate;
+
+/**
+ * 发货物流表 分页查询表单
+ *
+ * @Author weolwo
+ * @Date 2026-04-19 00:03:01
+ * @Copyright weolwo
+ */
+
+@Data
+@EqualsAndHashCode(callSuper = false)
+public class PhysicalDeliveryQueryForm extends PageParam {
+
+    /**
+     * 会员号（精确匹配，走 member_id 索引）。
+     *
+     * <p>🔴 这里<b>刻意不再收账号</b>：v3.71.0 之后 {@code member_name} 只是展示快照、
+     * 身上没有任何索引，拿它当查询条件必是全表扫；而它又是可改的，
+     * 用户改名之后按旧名字查等于查不到 —— 「不报错，只是查不到了」正是这次换键要消灭的。
+     * 后台要按账号找人，先经 {@code MemberService.getMemberId} 换成会员号。
+     */
+    @Schema(description = "会员号")
+    private Long memberId;
+
+    @Schema(description = "来源单号：PROPOSAL 存提案ID / MALL 存订单号")
+    private String sourceBizId;
+
+    @Schema(description = "来源类型：PROPOSAL / MALL")
+    private String sourceType;
+
+    @Schema(description = "物流单号")
+    private String logisticsNo;
+
+    @Schema(description = "状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回")
+    private Integer status;
+
+    @Schema(description = "创建时间")
+    private LocalDate createTimeBegin;
+
+    @Schema(description = "创建时间")
+    private LocalDate createTimeEnd;
+
+}

@@ -17,9 +17,30 @@
          抽奖引擎用到的 switch 模式匹配需要 21+，实际正是靠 25 才编得过。 -->
 
     <dependencies>
+        <!-- 活动系统的依赖边界：只有这三个域。刻意<b>没有</b>
+             risk / consumer / scriptengine / ledger —— pom 里没写就引不进来，
+             这比「约定不要引」可靠。
+
+             曾经这里还有一条 solvela-ledger，因为 DrawExecuteService 里挂着一行
+             {@code import MemberWalletService}。查下去发现<b>那行根本没被用到</b> ——
+             活动系统事实上一直是无状态的，只是一个未使用的 import 让整个模块
+             白背了一个域的依赖。删掉它，边界就与设计一致了。
+
+             ⚠️ 将来活动要发资产，走事件或 SPI（参考 risk.spi.AssetDispatcher），
+             不要把这条依赖加回来。 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>common-api</artifactId>
+            <artifactId>solvela-activity</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-prize</artifactId>
             <version>3.0.0</version>
         </dependency>
         <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->

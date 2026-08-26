@@ -2,7 +2,7 @@ package solvela.task.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.domain.event.UserPrizeEvent;
+import solvela.event.UserPrizeEvent;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.task.constant.TaskConst;

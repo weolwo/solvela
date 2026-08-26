@@ -33,9 +33,12 @@
              ⚠️ 只用它的 service / manager / dao，【它的 controller 全部不装配】——
              那些是管理端视角的接口（/member/queryPage、/updateStatus…），
              挂到 C 端端口上就是把后台功能暴露给了用户。过滤规则见 AppApplication。 -->
+        <!-- C 端目前只做登录，所以只依赖会员域。
+             将来接"我的钱包/我的券"时再加 solvela-ledger —— 那时加的每一行都是一次明确决策，
+             而不是像以前依赖 common-api 那样，一次性把所有域都拿到手 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>common-api</artifactId>
+            <artifactId>solvela-member</artifactId>
             <version>3.0.0</version>
         </dependency>
 

@@ -10,7 +10,6 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.mall.constant.MallConst;
 import solvela.mall.order.dao.MallOrderDao;
 import solvela.mall.order.domain.form.MallOrderQueryForm;
-import solvela.mall.order.domain.vo.MallOrderRankVO;
 import solvela.mall.order.domain.vo.MallOrderStatVO;
 import solvela.mall.order.domain.vo.MallOrderVO;
 import solvela.member.service.MemberService;

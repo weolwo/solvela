@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.member.loginlog.dao.MemberLoginLogDao">
+
+    <resultMap id="MemberLoginLogVO" type="solvela.member.loginlog.domain.vo.MemberLoginLogVO">
+        <result column="id" property="id"/>
+        <result column="member_id" property="memberId"/>
+        <result column="member_name" property="memberName"/>
+        <result column="nickname" property="nickname"/>
+        <result column="client_ip" property="clientIp"/>
+        <result column="ip_region" property="ipRegion"/>
+        <result column="device_type" property="deviceType"/>
+        <result column="os_name" property="osName"/>
+        <result column="browser_name" property="browserName"/>
+        <result column="status" property="status"/>
+        <result column="remark" property="remark"/>
+        <result column="trace_id" property="traceId"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!--
+      带 l. 前缀：查询条件里为了「按账号搜」用到了 EXISTS 子查询，那里面出现了 t_member m，
+      不加前缀的话 member_id 在两张表都有，MySQL 直接报 ambiguous。
+    -->
+    <sql id="base_columns">
+        l.id,
+                l.member_id,
+                l.client_ip,
+                l.ip_region,
+                l.device_type,
+                l.os_name,
+                l.browser_name,
+                l.status,
+                l.remark,
+                l.trace_id,
+                l.create_time
+    </sql>
+
+    <!--
+      账号与昵称走子查询而不是 LEFT JOIN：登录日志是 append-only 的大表且按月分区，
+      JOIN 会让优化器在分区裁剪之后还要再驱动一次会员表；而列表一页只有几十行，
+      逐行点查主键的代价可以忽略。更重要的是 FROM 里只留一张表，
+      MyBatis-Plus 的分页排序（不带表前缀地拼 ORDER BY）不会撞上 ambiguous。
+    -->
+    <sql id="member_columns">
+            (SELECT m.member_name FROM t_member m WHERE m.member_id = l.member_id)
+            AS member_name,
+                (SELECT m.nickname FROM t_member m WHERE m.member_id = l.member_id) AS nickname
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+            <if test="queryForm.memberId != null">
+                AND l.member_id = #{queryForm.memberId}
+            </if>
+            <!-- 运营说得出口的是账号，不是 10 位会员号 -->
+            <if test="queryForm.memberName != null and queryForm.memberName != ''">
+                AND EXISTS (SELECT 1 FROM t_member m
+                WHERE m.member_id = l.member_id
+                AND m.member_name LIKE CONCAT('%', #{queryForm.memberName}, '%'))
+            </if>
+            <if test="queryForm.clientIp != null and queryForm.clientIp != ''">
+                AND l.client_ip = #{queryForm.clientIp}
+            </if>
+            <if test="queryForm.createTimeBegin != null">
+                AND l.create_time &gt;= #{queryForm.createTimeBegin}
+            </if>
+            <!--
+              🔴 结束日期要用「< 次日零点」，不能用「<= 当天」。
+              createTimeEnd 是 LocalDate，绑进 datetime 列是当天 00:00:00 ——
+              「统计今天」写成 <= 的话结果恒为 0，而且不报错。
+            -->
+            <if test="queryForm.createTimeEnd != null">
+                AND l.create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+            </if>
+            <if test="queryForm.status != null">
+                AND l.status = #{queryForm.status}
+            </if>
+            <if test="queryForm.deviceType != null and queryForm.deviceType != ''">
+                AND l.device_type = #{queryForm.deviceType}
+            </if>
+            <if test="queryForm.traceId != null and queryForm.traceId != ''">
+                AND l.trace_id = #{queryForm.traceId}
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MemberLoginLogVO">
+        SELECT
+        <include refid="base_columns"/>,
+        <include refid="member_columns"/>
+        FROM t_member_login_log l
+        <include refid="query_conditions"/>
+        ORDER BY l.create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MemberLoginLogVO">
+        SELECT
+        <include refid="base_columns"/>,
+        <include refid="member_columns"/>
+        FROM t_member_login_log l
+        <include refid="query_conditions"/>
+        ORDER BY l.create_time DESC
+    </select>
+
+    <!--
+      统计：一趟 SQL 出全部指标，不要每个指标查一次。
+      条件复用 query_conditions，所以顶部筛选改了统计跟着变 —— 统计和列表看的是同一批数据，
+      这是它有意义的前提；两套条件的话运营会看到「统计说 100 次，列表只有 3 条」。
+
+      COUNT(DISTINCT ...) 而不是 COUNT(*)：独立会员数才是「今天有多少人登录」，
+      COUNT(*) 是「登录了多少次」，一个人刷 20 次会让后者严重虚高。
+    -->
+    <select id="queryStat" resultType="solvela.member.loginlog.domain.vo.MemberLoginLogStatVO">
+        SELECT
+        COUNT(1) AS totalCount,
+        SUM(CASE WHEN l.status = 1 THEN 1 ELSE 0 END) AS successCount,
+        SUM(CASE WHEN l.status = 0 THEN 1 ELSE 0 END) AS failCount,
+        COUNT(DISTINCT l.member_id) AS memberCount,
+        COUNT(DISTINCT CASE WHEN l.status = 1 THEN l.member_id END) AS successMemberCount,
+        COUNT(DISTINCT l.client_ip) AS ipCount
+        FROM t_member_login_log l
+        <include refid="query_conditions"/>
+    </select>
+
+
+</mapper>
