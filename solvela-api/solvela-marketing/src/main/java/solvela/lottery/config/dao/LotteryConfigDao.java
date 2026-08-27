@@ -3,8 +3,8 @@ package solvela.lottery.config.dao;
         import java.util.List;
 
         import solvela.lottery.LotteryConfig;
-        import solvela.lottery.config.domain.form.LotteryConfigQueryForm;
-        import solvela.lottery.config.domain.vo.LotteryConfigVO;
+        import solvela.lottery.config.domain.query.LotteryConfigQuery;
+        import solvela.lottery.config.domain.dto.LotteryConfigDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface LotteryConfigDao extends BaseMapper<LotteryConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryConfigVO> queryPage(Page<?> page, @Param("queryForm") LotteryConfigQueryForm queryForm);
+    List<LotteryConfigDTO> queryPage(Page<?> page, @Param("queryForm") LotteryConfigQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface LotteryConfigDao extends BaseMapper<LotteryConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryConfigVO> queryList(@Param("queryForm") LotteryConfigQueryForm queryForm);
+    List<LotteryConfigDTO> queryList(@Param("queryForm") LotteryConfigQuery queryForm);
 
     /**
      * 状态条件流转，做并发闸门用。

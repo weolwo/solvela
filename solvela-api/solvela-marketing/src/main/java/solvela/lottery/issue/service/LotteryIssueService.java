@@ -8,11 +8,11 @@ import solvela.lottery.issue.dao.LotteryIssueDao;
 import solvela.lottery.issue.manager.LotteryIssueManager;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.LotteryIssue;
-import solvela.lottery.issue.domain.form.LotteryIssueAddForm;
-import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
-import solvela.lottery.issue.domain.form.LotteryIssueUpdateForm;
-import solvela.lottery.issue.domain.vo.LotteryIssueOverviewVO;
-import solvela.lottery.issue.domain.vo.LotteryIssueVO;
+import solvela.lottery.issue.domain.command.LotteryIssueAddCommand;
+import solvela.lottery.issue.domain.query.LotteryIssueQuery;
+import solvela.lottery.issue.domain.command.LotteryIssueUpdateCommand;
+import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
+import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.ResponseDTO;
@@ -44,9 +44,9 @@ public class LotteryIssueService {
     /**
      * 分页查询
      */
-    public PageResult<LotteryIssueVO> queryPage(LotteryIssueQueryForm queryForm) {
+    public PageResult<LotteryIssueDTO> queryPage(LotteryIssueQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<LotteryIssueVO> list = lotteryIssueDao.queryPage(page, queryForm);
+        List<LotteryIssueDTO> list = lotteryIssueDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -56,14 +56,14 @@ public class LotteryIssueService {
      * 口径与列表的派生字段共用同一份 SQL 表达式，所以点卡片筛出来的行数
      * 必然等于卡片上的数字 —— 两处各写一套统计逻辑迟早对不上。
      */
-    public LotteryIssueOverviewVO overview(LotteryIssueQueryForm queryForm) {
+    public LotteryIssueOverviewDTO overview(LotteryIssueQuery queryForm) {
         return lotteryIssueDao.overview(queryForm);
     }
 
     /**
      * 添加
      */
-    public ResponseDTO<String> add(LotteryIssueAddForm addForm) {
+    public ResponseDTO<String> add(LotteryIssueAddCommand addForm) {
         if (lotteryConfigService.getByLotteryCode(addForm.getLotteryCode()) == null) {
             return ResponseDTO.userErrorParam("彩票玩法不存在：" + addForm.getLotteryCode());
         }
@@ -88,7 +88,7 @@ public class LotteryIssueService {
      * 改动它们等于换了一套加密映射：已发号码再也反解不回游标、签名全部失效、
      * 新号码还可能与历史号码重复。所以这两个字段一律忽略前端传值，只允许改时间。
      */
-    public ResponseDTO<String> update(LotteryIssueUpdateForm updateForm) {
+    public ResponseDTO<String> update(LotteryIssueUpdateCommand updateForm) {
         LotteryIssue existed = lotteryIssueDao.selectById(updateForm.getId());
         if (existed == null) {
             return ResponseDTO.userErrorParam("期号不存在");

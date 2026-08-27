@@ -1,10 +1,14 @@
 package solvela.admin.module.lottery.record.controller;
 
-import solvela.lottery.record.domain.form.LotteryRecordQueryForm;
-import solvela.lottery.record.domain.vo.LotteryRecordFunnelVO;
-import solvela.lottery.record.domain.vo.LotteryRecordVO;
+import solvela.admin.module.lottery.record.domain.form.LotteryRecordQueryForm;
+import solvela.lottery.record.domain.query.LotteryRecordQuery;
+import solvela.lottery.record.domain.dto.LotteryRecordFunnelDTO;
+import solvela.admin.module.lottery.record.domain.vo.LotteryRecordVO;
+import solvela.lottery.record.domain.dto.LotteryRecordDTO;
 import solvela.lottery.record.service.LotteryRecordService;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,14 +49,15 @@ public class LotteryRecordController {
     @PostMapping("/queryPage")
     @SaCheckPermission("lotteryRecord:query")
     public ResponseDTO<PageResult<LotteryRecordVO>> queryPage(@RequestBody @Valid LotteryRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<LotteryRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryRecordQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryRecordVO.class));
     }
 
     @Operation(summary = "购彩漏斗：中奖率、奖级分布、派发状态与数据一致性体检")
     @PostMapping("/funnel")
     @SaCheckPermission("lotteryRecord:query")
-    public ResponseDTO<LotteryRecordFunnelVO> funnel(@RequestBody @Valid LotteryRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.funnel(queryForm));
+    public ResponseDTO<LotteryRecordFunnelDTO> funnel(@RequestBody @Valid LotteryRecordQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, LotteryRecordQuery.class)));
     }
 
 }

@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.lottery.LotteryConfig;
-import solvela.lottery.config.domain.form.LotteryConfigQueryForm;
-import solvela.lottery.config.domain.vo.LotteryConfigBoardResultVO;
-import solvela.lottery.config.domain.vo.LotteryConfigBoardVO;
-import solvela.lottery.config.domain.vo.LotteryConfigIssueVO;
+import solvela.lottery.config.domain.query.LotteryConfigQuery;
+import solvela.lottery.config.domain.dto.LotteryConfigBoardResultDTO;
+import solvela.lottery.config.domain.dto.LotteryConfigBoardDTO;
+import solvela.lottery.config.domain.dto.LotteryConfigIssueDTO;
 import solvela.lottery.config.manager.LotteryConfigManager;
 import solvela.lottery.issue.dao.LotteryIssueDao;
 import solvela.lottery.LotteryIssue;
@@ -71,7 +71,7 @@ public class LotteryConfigBoardService {
 
     private static final int RATE_SCALE = 4;
 
-    public LotteryConfigBoardResultVO board(LotteryConfigQueryForm queryForm) {
+    public LotteryConfigBoardResultDTO board(LotteryConfigQuery queryForm) {
         List<LotteryConfig> configs = lotteryConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
                         LotteryConfig::getActivityCode, queryForm.getActivityCode())
@@ -94,7 +94,7 @@ public class LotteryConfigBoardService {
         // 售卖窗口的判定取数据库时钟，与运行态领号用的是同一个（铁律 9/10）
         LocalDateTime dbNow = lotteryIssueDao.selectDbNow();
 
-        List<LotteryConfigBoardVO> all = new ArrayList<>();
+        List<LotteryConfigBoardDTO> all = new ArrayList<>();
         for (LotteryConfig config : configs) {
             all.add(analyseOne(config, activityMap,
                     issueMap.getOrDefault(config.getLotteryCode(), List.of()),
@@ -108,24 +108,24 @@ public class LotteryConfigBoardService {
 
         // 排序即优先级：已上线且有危险告警的排最前 —— 那是正在流血的
         all.sort(Comparator
-                .comparing((LotteryConfigBoardVO v) -> v.getDangerCount() > 0 ? 0 : 1)
+                .comparing((LotteryConfigBoardDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
                 .thenComparing(v -> STATUS_ONLINE.equals(v.getStatus()) ? 0 : 1)
-                .thenComparing(LotteryConfigBoardVO::getSoldTotal, Comparator.reverseOrder()));
+                .thenComparing(LotteryConfigBoardDTO::getSoldTotal, Comparator.reverseOrder()));
 
-        LotteryConfigBoardResultVO result = new LotteryConfigBoardResultVO();
+        LotteryConfigBoardResultDTO result = new LotteryConfigBoardResultDTO();
         result.setLotteryCount(all.size());
         result.setSellableCount((int) all.stream()
                 .filter(v -> STATUS_ONLINE.equals(v.getStatus()) && v.getDangerCount() == 0
                         && v.getWaitIssueCount() > 0).count());
-        result.setDangerCount(all.stream().mapToInt(LotteryConfigBoardVO::getDangerCount).sum());
-        result.setWarnCount(all.stream().mapToInt(LotteryConfigBoardVO::getWarnCount).sum());
-        result.setTotalSold(all.stream().mapToLong(LotteryConfigBoardVO::getSoldTotal).sum());
+        result.setDangerCount(all.stream().mapToInt(LotteryConfigBoardDTO::getDangerCount).sum());
+        result.setWarnCount(all.stream().mapToInt(LotteryConfigBoardDTO::getWarnCount).sum());
+        result.setTotalSold(all.stream().mapToLong(LotteryConfigBoardDTO::getSoldTotal).sum());
         result.setTotal((long) all.size());
         result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<LotteryConfigBoardVO> page(List<LotteryConfigBoardVO> all, Long pageNum, Long pageSize) {
+    private List<LotteryConfigBoardDTO> page(List<LotteryConfigBoardDTO> all, Long pageNum, Long pageSize) {
         long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
         int from = (int) Math.min((num - 1) * size, all.size());
@@ -133,10 +133,10 @@ public class LotteryConfigBoardService {
         return all.subList(from, to);
     }
 
-    private LotteryConfigBoardVO analyseOne(LotteryConfig config, Map<String, ActivityConfig> activityMap,
+    private LotteryConfigBoardDTO analyseOne(LotteryConfig config, Map<String, ActivityConfig> activityMap,
                                             List<LotteryIssue> issues, long ruleCount,
                                             Map<String, Object> recordStat, LocalDateTime dbNow) {
-        LotteryConfigBoardVO vo = new LotteryConfigBoardVO();
+        LotteryConfigBoardDTO vo = new LotteryConfigBoardDTO();
         vo.setId(config.getId());
         vo.setActivityCode(config.getActivityCode());
         vo.setLotteryCode(config.getLotteryCode());
@@ -203,16 +203,16 @@ public class LotteryConfigBoardService {
          * 否则号码发出去了、开奖时却无奖可发，而那时号码已经在用户手里。
          */
         if (ruleCount == 0) {
-            vo.getIssueList().add(LotteryConfigIssueVO.danger("NO_PRIZE_RULE",
+            vo.getIssueList().add(LotteryConfigIssueDTO.danger("NO_PRIZE_RULE",
                     online ? "已上线却没有配置任何奖级规则：号码发出去了，开奖时无奖可发"
                             : "尚未配置奖级规则，无法上线：号码发出去了却无奖可发，补救代价远高于此刻配好"));
         }
 
         if (online && issues.isEmpty()) {
-            vo.getIssueList().add(LotteryConfigIssueVO.danger("NO_ISSUE",
+            vo.getIssueList().add(LotteryConfigIssueDTO.danger("NO_ISSUE",
                     "已上线但一个期号都没有：用户点领号会被拒（期号不存在），玩法等于开着门却没有货"));
         } else if (online && sellableNow == 0) {
-            vo.getIssueList().add(LotteryConfigIssueVO.warn("NO_SELLABLE_ISSUE",
+            vo.getIssueList().add(LotteryConfigIssueDTO.warn("NO_SELLABLE_ISSUE",
                     "已上线但当前没有任何期号处于可领号状态：所有期号要么还没开售、要么已停售、要么已开奖。"
                             + "用户现在领不到号"));
         }
@@ -226,13 +226,13 @@ public class LotteryConfigBoardService {
          */
         if (vo.getSpaceUsage() != null && space > 0) {
             if (config.getTotalCount() != null && config.getTotalCount() > space) {
-                vo.getIssueList().add(LotteryConfigIssueVO.danger("SPACE_OVERFLOW",
+                vo.getIssueList().add(LotteryConfigIssueDTO.danger("SPACE_OVERFLOW",
                         "单期发行上限 " + config.getTotalCount() + " 超过 " + config.getNumberLength()
                                 + " 位号码的空间 " + space + "：超出部分永远发不出来"));
             } else if (vo.getSpaceUsage().compareTo(SPACE_WARN_THRESHOLD) >= 0) {
                 String pct = vo.getSpaceUsage().multiply(BigDecimal.valueOf(100))
                         .setScale(1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
-                vo.getIssueList().add(LotteryConfigIssueVO.warn("SPACE_ALMOST_FULL",
+                vo.getIssueList().add(LotteryConfigIssueDTO.warn("SPACE_ALMOST_FULL",
                         "号码空间已占用 " + pct + "%（发行上限 " + config.getTotalCount()
                                 + " / 空间 " + space + "）。"
                                 + (Boolean.TRUE.equals(vo.getParamsFrozen())

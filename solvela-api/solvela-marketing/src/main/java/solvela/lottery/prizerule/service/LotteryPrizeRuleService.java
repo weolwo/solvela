@@ -3,8 +3,8 @@ package solvela.lottery.prizerule.service;
 import java.util.List;
 
 import solvela.lottery.prizerule.dao.LotteryPrizeRuleDao;
-import solvela.lottery.prizerule.domain.form.LotteryPrizeRuleQueryForm;
-import solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleVO;
+import solvela.lottery.prizerule.domain.query.LotteryPrizeRuleQuery;
+import solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleDTO;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -48,9 +48,9 @@ public class LotteryPrizeRuleService {
      * 页面主视图走 {@link LotteryPrizeAnalysisService#analysis} 的按玩法分组结果，
      * 这个接口保留下来是给排查用的 —— 需要看某条规则的原始字段（含创建人、创建时间）时。
      */
-    public PageResult<LotteryPrizeRuleVO> queryPage(LotteryPrizeRuleQueryForm queryForm) {
+    public PageResult<LotteryPrizeRuleDTO> queryPage(LotteryPrizeRuleQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<LotteryPrizeRuleVO> list = lotteryPrizeRuleDao.queryPage(page, queryForm);
+        List<LotteryPrizeRuleDTO> list = lotteryPrizeRuleDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 }

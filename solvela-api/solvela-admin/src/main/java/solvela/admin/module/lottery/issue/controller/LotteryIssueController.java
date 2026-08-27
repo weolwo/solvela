@@ -2,15 +2,21 @@ package solvela.admin.module.lottery.issue.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.lottery.LotteryIssue;
-import solvela.lottery.issue.domain.form.LotteryIssueAddForm;
-import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
-import solvela.lottery.issue.domain.form.LotteryIssueUpdateForm;
-import solvela.lottery.issue.domain.vo.LotteryIssueOverviewVO;
-import solvela.lottery.issue.domain.vo.LotteryIssueVO;
+import solvela.admin.module.lottery.issue.domain.form.LotteryIssueAddForm;
+import solvela.lottery.issue.domain.command.LotteryIssueAddCommand;
+import solvela.admin.module.lottery.issue.domain.form.LotteryIssueQueryForm;
+import solvela.lottery.issue.domain.query.LotteryIssueQuery;
+import solvela.admin.module.lottery.issue.domain.form.LotteryIssueUpdateForm;
+import solvela.lottery.issue.domain.command.LotteryIssueUpdateCommand;
+import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
+import solvela.admin.module.lottery.issue.domain.vo.LotteryIssueVO;
+import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
 import solvela.lottery.issue.service.LotteryIssueService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,28 +44,29 @@ public class LotteryIssueController {
     @PostMapping("/queryPage")
     @SaCheckPermission("lotteryIssue:query")
     public ResponseDTO<PageResult<LotteryIssueVO>> queryPage(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<LotteryIssueDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryIssueQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryIssueVO.class));
     }
 
     @Operation(summary = "巡检概览：逾期未开奖/售卖中/已售罄/今日计划开奖。只吃 lotteryCode 一个条件")
     @PostMapping("/overview")
     @SaCheckPermission("lotteryIssue:query")
-    public ResponseDTO<LotteryIssueOverviewVO> overview(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
-        return ResponseDTO.ok(Service.overview(queryForm));
+    public ResponseDTO<LotteryIssueOverviewDTO> overview(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
+        return ResponseDTO.ok(Service.overview(SolvelaBeanUtil.copy(queryForm, LotteryIssueQuery.class)));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
     @SaCheckPermission("lotteryIssue:add")
     public ResponseDTO<String> add(@RequestBody @Valid LotteryIssueAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, LotteryIssueAddCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @SaCheckPermission("lotteryIssue:update")
     public ResponseDTO<String> update(@RequestBody @Valid LotteryIssueUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, LotteryIssueUpdateCommand.class));
     }
 
     @Operation(summary = "停售：把售卖结束时间提前到此刻，立刻停止发号。想恢复售卖走编辑改回未来时刻")

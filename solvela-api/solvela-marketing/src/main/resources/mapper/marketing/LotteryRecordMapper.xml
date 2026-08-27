@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.lottery.record.dao.LotteryRecordDao">
 
-    <resultMap id="LotteryRecordVO" type="solvela.lottery.record.domain.vo.LotteryRecordVO">
+    <resultMap id="LotteryRecordDTO" type="solvela.lottery.record.domain.dto.LotteryRecordDTO">
             <result column="id" property="id" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
@@ -157,7 +157,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="LotteryRecordVO">
+    <select id="queryPage" resultMap="LotteryRecordDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_lottery_record
@@ -165,7 +165,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="LotteryRecordVO">
+    <select id="queryList" resultMap="LotteryRecordDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_lottery_record

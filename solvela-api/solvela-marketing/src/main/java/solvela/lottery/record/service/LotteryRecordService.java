@@ -6,9 +6,9 @@ import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.lottery.constant.LotteryConst;
 import solvela.lottery.record.dao.LotteryRecordDao;
-import solvela.lottery.record.domain.form.LotteryRecordQueryForm;
-import solvela.lottery.record.domain.vo.LotteryRecordFunnelVO;
-import solvela.lottery.record.domain.vo.LotteryRecordVO;
+import solvela.lottery.record.domain.query.LotteryRecordQuery;
+import solvela.lottery.record.domain.dto.LotteryRecordFunnelDTO;
+import solvela.lottery.record.domain.dto.LotteryRecordDTO;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import org.springframework.stereotype.Service;
@@ -55,9 +55,9 @@ public class LotteryRecordService {
     /**
      * 分页查询
      */
-    public PageResult<LotteryRecordVO> queryPage(LotteryRecordQueryForm queryForm) {
+    public PageResult<LotteryRecordDTO> queryPage(LotteryRecordQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<LotteryRecordVO> list = lotteryRecordDao.queryPage(page, queryForm);
+        List<LotteryRecordDTO> list = lotteryRecordDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -68,9 +68,9 @@ public class LotteryRecordService {
      * <b>中了奖的到底发出去没有</b>。最后一个是本页独有的价值 ——
      * 中奖只是第一步，奖品要经派发链路真正到用户手上才算完。
      */
-    public LotteryRecordFunnelVO funnel(LotteryRecordQueryForm queryForm) {
+    public LotteryRecordFunnelDTO funnel(LotteryRecordQuery queryForm) {
         Map<String, Object> row = lotteryRecordDao.selectFunnel(queryForm);
-        LotteryRecordFunnelVO vo = new LotteryRecordFunnelVO();
+        LotteryRecordFunnelDTO vo = new LotteryRecordFunnelDTO();
 
         long total = toLong(row.get("totalCount"));
         long wait = toLong(row.get("waitCount"));
@@ -136,9 +136,9 @@ public class LotteryRecordService {
                 : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, codes).list().stream()
                         .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
 
-        List<LotteryRecordFunnelVO.PrizeLevelStatVO> levelList = new ArrayList<>();
+        List<LotteryRecordFunnelDTO.PrizeLevelStatVO> levelList = new ArrayList<>();
         for (Map<String, Object> stat : stats) {
-            LotteryRecordFunnelVO.PrizeLevelStatVO item = new LotteryRecordFunnelVO.PrizeLevelStatVO();
+            LotteryRecordFunnelDTO.PrizeLevelStatVO item = new LotteryRecordFunnelDTO.PrizeLevelStatVO();
             Object levelValue = stat.get("prizeLevel");
             item.setPrizeLevel(levelValue == null ? null : ((Number) levelValue).intValue());
             String code = stat.get("prizeCode") == null ? null : String.valueOf(stat.get("prizeCode"));

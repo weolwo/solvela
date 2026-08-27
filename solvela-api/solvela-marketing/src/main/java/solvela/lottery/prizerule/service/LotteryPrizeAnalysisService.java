@@ -8,11 +8,11 @@ import solvela.lottery.engine.MatchRuleEnum;
 import solvela.lottery.engine.PrizeRuleProbability;
 import solvela.lottery.engine.PrizeRuleProbability.RuleMask;
 import solvela.lottery.LotteryPrizeRule;
-import solvela.lottery.prizerule.domain.form.LotteryPrizeRuleQueryForm;
-import solvela.lottery.prizerule.domain.vo.LotteryPrizeAnalysisResultVO;
-import solvela.lottery.prizerule.domain.vo.LotteryPrizeAnalysisVO;
-import solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleAnalysisVO;
-import solvela.lottery.prizerule.domain.vo.PrizeRuleIssueVO;
+import solvela.lottery.prizerule.domain.query.LotteryPrizeRuleQuery;
+import solvela.lottery.prizerule.domain.dto.LotteryPrizeAnalysisResultDTO;
+import solvela.lottery.prizerule.domain.dto.LotteryPrizeAnalysisDTO;
+import solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleAnalysisDTO;
+import solvela.lottery.prizerule.domain.dto.PrizeRuleIssueDTO;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
@@ -89,7 +89,7 @@ public class LotteryPrizeAnalysisService {
      * 分页在内存里做：筛选后的玩法数是配置级的量，先算全量再切页最简单，
      * 也让「概览统计的是筛选后的全量」这件事天然成立。
      */
-    public LotteryPrizeAnalysisResultVO analysis(LotteryPrizeRuleQueryForm queryForm) {
+    public LotteryPrizeAnalysisResultDTO analysis(LotteryPrizeRuleQuery queryForm) {
         // ---- 1. 三次查询把料备齐，之后不再碰数据库 ----
         List<LotteryPrizeRule> ruleList = lotteryPrizeRuleManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getLotteryCode()),
@@ -109,7 +109,7 @@ public class LotteryPrizeAnalysisService {
         Map<String, List<LotteryPrizeRule>> grouped = ruleList.stream()
                 .collect(Collectors.groupingBy(LotteryPrizeRule::getLotteryCode, LinkedHashMap::new, Collectors.toList()));
 
-        List<LotteryPrizeAnalysisVO> all = new ArrayList<>();
+        List<LotteryPrizeAnalysisDTO> all = new ArrayList<>();
         for (Map.Entry<String, List<LotteryPrizeRule>> entry : grouped.entrySet()) {
             all.add(analyseOne(entry.getKey(), entry.getValue(), configMap.get(entry.getKey()), prizeMap));
         }
@@ -117,28 +117,28 @@ public class LotteryPrizeAnalysisService {
         // ---- 3. 排序：有危险告警的置顶，其次已上线的，最后按预计赔付从高到低 ----
         // 排序即优先级：已上线 + 有 DANGER 的玩法是真在流血，必须第一眼看见
         all.sort(Comparator
-                .comparing((LotteryPrizeAnalysisVO v) -> v.getDangerCount() > 0 ? 0 : 1)
+                .comparing((LotteryPrizeAnalysisDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
                 .thenComparing(v -> LOTTERY_STATUS_ONLINE.equals(v.getLotteryStatus()) ? 0 : 1)
-                .thenComparing(LotteryPrizeAnalysisVO::getTotalExpectedCost, Comparator.reverseOrder()));
+                .thenComparing(LotteryPrizeAnalysisDTO::getTotalExpectedCost, Comparator.reverseOrder()));
 
         if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
             all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).collect(Collectors.toList());
         }
 
         // ---- 4. 概览按筛选后的全量算，再切页 ----
-        LotteryPrizeAnalysisResultVO result = new LotteryPrizeAnalysisResultVO();
+        LotteryPrizeAnalysisResultDTO result = new LotteryPrizeAnalysisResultDTO();
         result.setLotteryCount(all.size());
         result.setRuleCount(all.stream().mapToInt(v -> v.getRuleList().size()).sum());
-        result.setDangerCount(all.stream().mapToInt(LotteryPrizeAnalysisVO::getDangerCount).sum());
-        result.setWarnCount(all.stream().mapToInt(LotteryPrizeAnalysisVO::getWarnCount).sum());
-        result.setTotalExpectedCost(all.stream().map(LotteryPrizeAnalysisVO::getTotalExpectedCost)
+        result.setDangerCount(all.stream().mapToInt(LotteryPrizeAnalysisDTO::getDangerCount).sum());
+        result.setWarnCount(all.stream().mapToInt(LotteryPrizeAnalysisDTO::getWarnCount).sum());
+        result.setTotalExpectedCost(all.stream().map(LotteryPrizeAnalysisDTO::getTotalExpectedCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         result.setTotal((long) all.size());
         result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<LotteryPrizeAnalysisVO> page(List<LotteryPrizeAnalysisVO> all, Long pageNum, Long pageSize) {
+    private List<LotteryPrizeAnalysisDTO> page(List<LotteryPrizeAnalysisDTO> all, Long pageNum, Long pageSize) {
         long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
         int from = (int) Math.min((num - 1) * size, all.size());
@@ -149,15 +149,15 @@ public class LotteryPrizeAnalysisService {
     /**
      * 单个玩法的分析。
      */
-    private LotteryPrizeAnalysisVO analyseOne(String lotteryCode, List<LotteryPrizeRule> rules,
+    private LotteryPrizeAnalysisDTO analyseOne(String lotteryCode, List<LotteryPrizeRule> rules,
                                               LotteryConfig config, Map<String, PrizeConfig> prizeMap) {
-        LotteryPrizeAnalysisVO vo = new LotteryPrizeAnalysisVO();
+        LotteryPrizeAnalysisDTO vo = new LotteryPrizeAnalysisDTO();
         vo.setLotteryCode(lotteryCode);
         vo.setIssueList(new ArrayList<>());
 
         if (config == null) {
             // 玩法配置不存在：号码长度未知，整套概率模型无从谈起，只能如实报「算不了」
-            vo.getIssueList().add(PrizeRuleIssueVO.danger("LOTTERY_MISSING",
+            vo.getIssueList().add(PrizeRuleIssueDTO.danger("LOTTERY_MISSING",
                     "玩法配置不存在（彩票编码 " + lotteryCode + "）。这批奖级规则挂在一个不存在的玩法上，"
                             + "既不会被开奖用到，也无法计算中奖率"));
         } else {
@@ -185,14 +185,14 @@ public class LotteryPrizeAnalysisService {
                 .collect(Collectors.groupingBy(LotteryPrizeRule::getPrizeCode, Collectors.counting()));
         Set<Integer> seenLevels = new HashSet<>();
 
-        List<LotteryPrizeRuleAnalysisVO> ruleVOList = new ArrayList<>();
+        List<LotteryPrizeRuleAnalysisDTO> ruleVOList = new ArrayList<>();
         BigDecimal totalNetRate = BigDecimal.ZERO;
         BigDecimal totalWinCount = BigDecimal.ZERO;
         BigDecimal totalCost = BigDecimal.ZERO;
 
         for (int i = 0; i < sorted.size(); i++) {
             LotteryPrizeRule rule = sorted.get(i);
-            LotteryPrizeRuleAnalysisVO rvo = new LotteryPrizeRuleAnalysisVO();
+            LotteryPrizeRuleAnalysisDTO rvo = new LotteryPrizeRuleAnalysisDTO();
             rvo.setId(rule.getId());
             rvo.setPrizeLevel(rule.getPrizeLevel());
             rvo.setMatchRule(rule.getMatchRule());
@@ -215,7 +215,7 @@ public class LotteryPrizeAnalysisService {
                     // 净中奖率为 0 却不是「永不命中」，说明它被更高奖级完全吃掉了 ——
                     // 这是最隐蔽的一种坏配置：字段全都合法，开奖时那一级一张票都认领不到
                     if (net.signum() == 0 && !mask.never()) {
-                        rvo.getIssueList().add(PrizeRuleIssueVO.danger("LEVEL_UNREACHABLE",
+                        rvo.getIssueList().add(PrizeRuleIssueDTO.danger("LEVEL_UNREACHABLE",
                                 "该奖级永远认领不到票：它的匹配条件已被更高奖级完全覆盖。"
                                         + "开奖按奖级升序逐级认领、一张票只中最高一级，轮到本级时符合条件的票已被取走"));
                     }
@@ -265,32 +265,32 @@ public class LotteryPrizeAnalysisService {
      * <p>每条告警都要说清「为什么这是问题」而不只是「哪里不对」——
      * 运营看到「匹配长度 6 > 号码长度 5」并不知道后果，看到「这条规则永远不可能命中」才知道。
      */
-    private void checkRule(LotteryPrizeRuleAnalysisVO rvo, LotteryPrizeRule rule, MatchRuleEnum matchRule,
+    private void checkRule(LotteryPrizeRuleAnalysisDTO rvo, LotteryPrizeRule rule, MatchRuleEnum matchRule,
                            LotteryConfig config, Map<String, PrizeConfig> prizeMap,
                            Map<String, Long> prizeCodeCount, Set<Integer> seenLevels) {
-        List<PrizeRuleIssueVO> issues = rvo.getIssueList();
+        List<PrizeRuleIssueDTO> issues = rvo.getIssueList();
 
         // 奖级 99 被「未中奖」占用：用户端按 prize_level 升序排「我的号码」，冲突后无法区分
         if (rule.getPrizeLevel() != null && rule.getPrizeLevel() == LotteryConst.PRIZE_LEVEL_NONE) {
-            issues.add(PrizeRuleIssueVO.danger("LEVEL_RESERVED",
+            issues.add(PrizeRuleIssueDTO.danger("LEVEL_RESERVED",
                     "奖级 " + LotteryConst.PRIZE_LEVEL_NONE + " 被「未中奖」占用，用户端无法区分未中奖与本奖级"));
         }
         if (rule.getPrizeLevel() != null && !seenLevels.add(rule.getPrizeLevel())) {
-            issues.add(PrizeRuleIssueVO.danger("LEVEL_DUPLICATED",
+            issues.add(PrizeRuleIssueDTO.danger("LEVEL_DUPLICATED",
                     "奖级 " + rule.getPrizeLevel() + " 配置了多条规则，开奖认领顺序不确定"));
         }
 
         // 规则值非法：开奖时 LotterySettleService 会「跳过并告警」，该奖级静默不发奖
         if (matchRule == null) {
-            issues.add(PrizeRuleIssueVO.danger("MATCH_RULE_INVALID",
+            issues.add(PrizeRuleIssueDTO.danger("MATCH_RULE_INVALID",
                     "匹配规则非法值「" + rule.getMatchRule() + "」，开奖时该奖级会被整条跳过，一张奖也发不出去"));
         } else if (matchRule != MatchRuleEnum.EXACT) {
             Integer len = rule.getMatchLength();
             if (len == null || len <= 0) {
-                issues.add(PrizeRuleIssueVO.danger("MATCH_LENGTH_INVALID",
+                issues.add(PrizeRuleIssueDTO.danger("MATCH_LENGTH_INVALID",
                         "匹配长度为 " + len + "，这条规则永远不可能命中"));
             } else if (config != null && config.getNumberLength() != null && len > config.getNumberLength()) {
-                issues.add(PrizeRuleIssueVO.danger("MATCH_LENGTH_OVERFLOW",
+                issues.add(PrizeRuleIssueDTO.danger("MATCH_LENGTH_OVERFLOW",
                         "匹配长度 " + len + " 超过号码长度 " + config.getNumberLength()
                                 + "，这条规则永远不可能命中"));
             }
@@ -298,26 +298,26 @@ public class LotteryPrizeAnalysisService {
 
         // 奖品链路：中奖了却发不出去，是比不中奖严重得多的事故
         if (StringUtils.isBlank(rule.getPrizeCode())) {
-            issues.add(PrizeRuleIssueVO.danger("PRIZE_MISSING", "未绑定奖品，中奖后无奖可发"));
+            issues.add(PrizeRuleIssueDTO.danger("PRIZE_MISSING", "未绑定奖品，中奖后无奖可发"));
         } else {
             PrizeConfig prize = prizeMap.get(rule.getPrizeCode());
             if (prize == null) {
-                issues.add(PrizeRuleIssueVO.danger("PRIZE_MISSING",
+                issues.add(PrizeRuleIssueDTO.danger("PRIZE_MISSING",
                         "奖品「" + rule.getPrizeCode() + "」在奖品库中不存在，派奖时会报『奖品配置不存在』，用户中了奖拿不到东西"));
             } else {
                 if (!PRIZE_STATUS_ENABLED.equals(prize.getStatus())) {
-                    issues.add(PrizeRuleIssueVO.danger("PRIZE_DISABLED",
+                    issues.add(PrizeRuleIssueDTO.danger("PRIZE_DISABLED",
                             "奖品「" + prize.getPrizeName() + "」已停用，派奖链路会拒绝发放"));
                 }
                 if (config != null && prize.getActivityCode() != null
                         && !prize.getActivityCode().equals(config.getActivityCode())) {
-                    issues.add(PrizeRuleIssueVO.danger("PRIZE_ACTIVITY_MISMATCH",
+                    issues.add(PrizeRuleIssueDTO.danger("PRIZE_ACTIVITY_MISMATCH",
                             "奖品属于活动 " + prize.getActivityCode() + "，而本玩法属于活动 " + config.getActivityCode()
                                     + "，跨活动引用会在派奖时找不到奖品"));
                 }
             }
             if (prizeCodeCount.getOrDefault(rule.getPrizeCode(), 0L) > 1) {
-                issues.add(PrizeRuleIssueVO.warn("PRIZE_DUPLICATED",
+                issues.add(PrizeRuleIssueDTO.warn("PRIZE_DUPLICATED",
                         "同一个奖品被多个奖级绑定，中奖后无法判断该按哪一级的口径统计"));
             }
         }

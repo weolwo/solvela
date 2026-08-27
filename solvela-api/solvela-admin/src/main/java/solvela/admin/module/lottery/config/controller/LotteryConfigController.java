@@ -5,17 +5,23 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.domain.ValidateList;
-import solvela.lottery.config.domain.vo.LotteryConfigBoardResultVO;
+import solvela.lottery.config.domain.dto.LotteryConfigBoardResultDTO;
 import solvela.lottery.config.service.LotteryConfigBoardService;
-import solvela.lottery.config.domain.form.FpePreviewForm;
-import solvela.lottery.config.domain.form.LotteryConfigQueryForm;
-import solvela.lottery.config.domain.form.LotteryWorkbenchSaveForm;
-import solvela.lottery.config.domain.vo.LotteryConfigOptionVO;
-import solvela.lottery.config.domain.vo.LotteryConfigVO;
-import solvela.lottery.config.domain.vo.LotteryWorkbenchVO;
+import solvela.admin.module.lottery.config.domain.form.FpePreviewForm;
+import solvela.lottery.config.domain.command.FpePreviewCommand;
+import solvela.admin.module.lottery.config.domain.form.LotteryConfigQueryForm;
+import solvela.lottery.config.domain.query.LotteryConfigQuery;
+import solvela.admin.module.lottery.config.domain.form.LotteryWorkbenchSaveForm;
+import solvela.lottery.config.domain.command.LotteryWorkbenchSaveCommand;
+import solvela.lottery.config.domain.dto.LotteryConfigOptionDTO;
+import solvela.admin.module.lottery.config.domain.vo.LotteryConfigVO;
+import solvela.lottery.config.domain.dto.LotteryConfigDTO;
+import solvela.lottery.config.domain.dto.LotteryWorkbenchDTO;
 import solvela.lottery.config.service.LotteryConfigService;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,14 +59,15 @@ public class LotteryConfigController {
     @PostMapping("/queryPage")
     @SaCheckPermission("lotteryConfig:query")
     public ResponseDTO<PageResult<LotteryConfigVO>> queryPage(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<LotteryConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryConfigQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryConfigVO.class));
     }
 
     @Operation(summary = "玩法一览：号码空间占用、期号与发号实况、参与人数与体检告警，列表页主视图")
     @PostMapping("/board")
     @SaCheckPermission("lotteryConfig:query")
-    public ResponseDTO<LotteryConfigBoardResultVO> board(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
-        return ResponseDTO.ok(lotteryConfigBoardService.board(queryForm));
+    public ResponseDTO<LotteryConfigBoardResultDTO> board(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
+        return ResponseDTO.ok(lotteryConfigBoardService.board(SolvelaBeanUtil.copy(queryForm, LotteryConfigQuery.class)));
     }
 
     // ==================== 彩票工作台 ====================
@@ -75,14 +82,14 @@ public class LotteryConfigController {
     @Operation(summary = "玩法下拉：按活动过滤，工作台顶部二级切换用")
     @GetMapping("/optionList")
     @SaCheckPermission("lotteryConfig:query")
-    public ResponseDTO<List<LotteryConfigOptionVO>> optionList(@RequestParam String activityCode) {
+    public ResponseDTO<List<LotteryConfigOptionDTO>> optionList(@RequestParam String activityCode) {
         return Service.optionList(activityCode);
     }
 
     @Operation(summary = "工作台聚合回显：lotteryCode 为空表示在该活动下新建玩法，返回带预生成编码的空壳")
     @GetMapping("/workbench/detail")
     @SaCheckPermission("lotteryConfig:query")
-    public ResponseDTO<LotteryWorkbenchVO> workbenchDetail(@RequestParam String activityCode,
+    public ResponseDTO<LotteryWorkbenchDTO> workbenchDetail(@RequestParam String activityCode,
                                                            @RequestParam(required = false) String lotteryCode) {
         return Service.workbenchDetail(activityCode, lotteryCode);
     }
@@ -91,7 +98,9 @@ public class LotteryConfigController {
     @PostMapping("/workbench/save")
     @SaCheckPermission("lotteryConfig:update")
     public ResponseDTO<String> workbenchSave(@RequestBody @Valid LotteryWorkbenchSaveForm form) {
-        return Service.workbenchSave(form);
+        // 🔴 deepCopy：本表单含嵌套集合（prizeRuleList），浅拷贝会因泛型不兼容
+        // 跳过它，表现是"工作台保存成功，但奖励规则一条没建"
+        return Service.workbenchSave(SolvelaBeanUtil.deepCopy(form, LotteryWorkbenchSaveCommand.class));
     }
 
     @Operation(summary = "上线：允许开始发号。上线前必须已配置奖级规则")
@@ -119,7 +128,7 @@ public class LotteryConfigController {
     @PostMapping("/fpe/preview")
     @SaCheckPermission("lotteryConfig:query")
     public ResponseDTO<String> fpePreview(@RequestBody @Valid FpePreviewForm form) {
-        return Service.fpePreview(form);
+        return Service.fpePreview(SolvelaBeanUtil.copy(form, FpePreviewCommand.class));
     }
 
 }

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.lottery.prizerule.dao.LotteryPrizeRuleDao">
 
-    <resultMap id="LotteryPrizeRuleVO" type="solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleVO">
+    <resultMap id="LotteryPrizeRuleDTO" type="solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleDTO">
             <result column="id" property="id" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="prize_level" property="prizeLevel" />
@@ -43,7 +43,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="LotteryPrizeRuleVO">
+    <select id="queryPage" resultMap="LotteryPrizeRuleDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_lottery_prize_rule
@@ -51,7 +51,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="LotteryPrizeRuleVO">
+    <select id="queryList" resultMap="LotteryPrizeRuleDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_lottery_prize_rule

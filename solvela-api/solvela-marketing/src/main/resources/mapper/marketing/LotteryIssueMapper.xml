@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.lottery.issue.dao.LotteryIssueDao">
 
-    <resultMap id="LotteryIssueVO" type="solvela.lottery.issue.domain.vo.LotteryIssueVO">
+    <resultMap id="LotteryIssueDTO" type="solvela.lottery.issue.domain.dto.LotteryIssueDTO">
             <result column="id" property="id" />
             <result column="lottery_code" property="lotteryCode" />
             <result column="issue_no" property="issueNo" />
@@ -160,7 +160,7 @@
                  i.create_time DESC
     </sql>
 
-    <select id="queryPage" resultMap="LotteryIssueVO">
+    <select id="queryPage" resultMap="LotteryIssueDTO">
         SELECT
         <include refid="base_columns"/>,
         c.lottery_name AS lottery_name,
@@ -173,7 +173,7 @@
         <include refid="list_order"/>
     </select>
 
-    <select id="queryList" resultMap="LotteryIssueVO">
+    <select id="queryList" resultMap="LotteryIssueDTO">
         SELECT
         <include refid="base_columns"/>,
         c.lottery_name AS lottery_name,
@@ -198,7 +198,7 @@
         卡片本身就是筛选入口，若它再跟着筛选结果变，点一下「逾期」之后
         其余三张卡片全部归零，就没法用它们互相对照了。
     -->
-    <select id="overview" resultType="solvela.lottery.issue.domain.vo.LotteryIssueOverviewVO">
+    <select id="overview" resultType="solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO">
         <!-- COALESCE 不能省：一行都没匹配到时 SUM 返回 NULL 而不是 0，
              卡片上会显示成空白而不是「0」，看起来像接口挂了 -->
         SELECT

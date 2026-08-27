@@ -9,7 +9,7 @@ import lombok.Data;
  * 任务事件注册表 更新表单。
  *
  * <p>🔴 <b>刻意不定义 {@code eventCode}</b>，让「改编码」的意图在编译期就无处安放 ——
- * 与彩票的 {@code LotteryIssueUpdateForm} 不定义 {@code issueNo} 是同一手法。
+ * 与彩票的 {@code LotteryIssueUpdateCommand} 不定义 {@code issueNo} 是同一手法。
  * 事件编码是 {@code t_task_config.trigger_event} 的引用键，也是上游埋点里硬编码的字符串：
  * 改一次，所有已配好的任务当场收不到事件，而且<b>不会报任何错</b>，只是安静地不动。
  * 真要换编码，正确做法是新注册一个 + 把旧的停用。

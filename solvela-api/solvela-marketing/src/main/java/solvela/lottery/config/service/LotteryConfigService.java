@@ -13,14 +13,14 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.enums.ActivityTypeEnum;
 import solvela.lottery.config.dao.LotteryConfigDao;
 import solvela.lottery.LotteryConfig;
-import solvela.lottery.config.domain.form.FpePreviewForm;
-import solvela.lottery.config.domain.form.LotteryConfigQueryForm;
-import solvela.lottery.config.domain.form.LotteryWorkbenchRuleForm;
-import solvela.lottery.config.domain.form.LotteryWorkbenchSaveForm;
-import solvela.lottery.config.domain.vo.LotteryConfigOptionVO;
-import solvela.lottery.config.domain.vo.LotteryConfigVO;
-import solvela.lottery.config.domain.vo.LotteryWorkbenchRuleVO;
-import solvela.lottery.config.domain.vo.LotteryWorkbenchVO;
+import solvela.lottery.config.domain.command.FpePreviewCommand;
+import solvela.lottery.config.domain.query.LotteryConfigQuery;
+import solvela.lottery.config.domain.command.LotteryWorkbenchRuleCommand;
+import solvela.lottery.config.domain.command.LotteryWorkbenchSaveCommand;
+import solvela.lottery.config.domain.dto.LotteryConfigOptionDTO;
+import solvela.lottery.config.domain.dto.LotteryConfigDTO;
+import solvela.lottery.config.domain.dto.LotteryWorkbenchRuleDTO;
+import solvela.lottery.config.domain.dto.LotteryWorkbenchDTO;
 import solvela.lottery.config.manager.LotteryConfigManager;
 import solvela.lottery.constant.LotteryConst;
 import solvela.lottery.engine.FpeCipherFactory;
@@ -120,9 +120,9 @@ public class LotteryConfigService {
      * 活动是容器，一个活动下可以并存多个玩法（不同的号码长度/发行量就是不同的玩法），
      * 所以顶部是「活动 + 玩法」两级下拉，玩法列表随活动切换而变。
      */
-    public ResponseDTO<List<LotteryConfigOptionVO>> optionList(String activityCode) {
+    public ResponseDTO<List<LotteryConfigOptionDTO>> optionList(String activityCode) {
         return ResponseDTO.ok(queryByActivityCode(activityCode).stream()
-                .map(config -> new LotteryConfigOptionVO(
+                .map(config -> new LotteryConfigOptionDTO(
                         config.getLotteryCode(),
                         config.getLotteryName(),
                         config.getActivityCode(),
@@ -141,7 +141,7 @@ public class LotteryConfigService {
      * lotteryCode 决定具体加载哪一个玩法。lotteryCode 为空表示「在该活动下新建玩法」，
      * 返回一个带预生成编码的空壳而非报错，前端据此进入「从零配置」态。
      */
-    public ResponseDTO<LotteryWorkbenchVO> workbenchDetail(String activityCode, String lotteryCode) {
+    public ResponseDTO<LotteryWorkbenchDTO> workbenchDetail(String activityCode, String lotteryCode) {
         ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
         if (activity == null) {
             return ResponseDTO.userErrorParam("活动不存在：" + activityCode);
@@ -153,7 +153,7 @@ public class LotteryConfigService {
         LotteryConfig config = getByLotteryCode(lotteryCode);
         if (config == null) {
             // 新建玩法态：活动信息已知，预填一个可用编码，运营可直接用也可重新生成
-            return ResponseDTO.ok(new LotteryWorkbenchVO(
+            return ResponseDTO.ok(new LotteryWorkbenchDTO(
                     activity.getActivityCode(), activity.getActivityName(),
                     SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode),
                     null, null, null, null,
@@ -178,9 +178,9 @@ public class LotteryConfigService {
         Map<String, PrizeConfig> prizeMap = prizeConfigService.queryListByActivityCode(config.getActivityCode())
                 .stream().collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
 
-        List<LotteryWorkbenchRuleVO> ruleVOList = ruleList.stream().map(rule -> {
+        List<LotteryWorkbenchRuleDTO> ruleVOList = ruleList.stream().map(rule -> {
             PrizeConfig prize = prizeMap.get(rule.getPrizeCode());
-            return new LotteryWorkbenchRuleVO(
+            return new LotteryWorkbenchRuleDTO(
                     rule.getPrizeLevel(),
                     rule.getMatchRule(),
                     rule.getMatchLength(),
@@ -192,7 +192,7 @@ public class LotteryConfigService {
                     ;
         }).toList();
 
-        return ResponseDTO.ok(new LotteryWorkbenchVO(
+        return ResponseDTO.ok(new LotteryWorkbenchDTO(
                 config.getActivityCode(),
                 activity.getActivityName(),
                 config.getLotteryCode(),
@@ -233,7 +233,7 @@ public class LotteryConfigService {
      * 前端的所有校验都只是 UI 防呆，这里全部服务端重算（铁律 2）
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> workbenchSave(LotteryWorkbenchSaveForm form) {
+    public ResponseDTO<String> workbenchSave(LotteryWorkbenchSaveCommand form) {
         // 1. 活动必须存在且是彩票类
         ActivityConfig activity = activityConfigService.getByActivityCode(form.getActivityCode());
         if (activity == null) {
@@ -276,7 +276,7 @@ public class LotteryConfigService {
         }
 
         // 5. 奖级规则逐条校验
-        List<LotteryWorkbenchRuleForm> ruleList = form.getPrizeRuleList() == null ? List.of() : form.getPrizeRuleList();
+        List<LotteryWorkbenchRuleCommand> ruleList = form.getPrizeRuleList() == null ? List.of() : form.getPrizeRuleList();
         String ruleError = validateRules(ruleList, form);
         if (ruleError != null) {
             return ResponseDTO.userErrorParam(ruleError);
@@ -309,7 +309,7 @@ public class LotteryConfigService {
         // 7. 落库：奖级规则整表重建（子表整体替换语义，与抽奖工作台的坑位映射一致）
         lotteryPrizeRuleManager.lambdaUpdate()
                 .eq(LotteryPrizeRule::getLotteryCode, form.getLotteryCode()).remove();
-        for (LotteryWorkbenchRuleForm rule : ruleList) {
+        for (LotteryWorkbenchRuleCommand rule : ruleList) {
             LotteryPrizeRule entity = new LotteryPrizeRule();
             entity.setLotteryCode(form.getLotteryCode());
             entity.setPrizeLevel(rule.getPrizeLevel());
@@ -327,10 +327,10 @@ public class LotteryConfigService {
     /**
      * 奖级规则校验，返回 null 表示通过
      */
-    private String validateRules(List<LotteryWorkbenchRuleForm> ruleList, LotteryWorkbenchSaveForm form) {
+    private String validateRules(List<LotteryWorkbenchRuleCommand> ruleList, LotteryWorkbenchSaveCommand form) {
         Set<Integer> levels = new HashSet<>();
         Set<String> prizeCodes = new HashSet<>();
-        for (LotteryWorkbenchRuleForm rule : ruleList) {
+        for (LotteryWorkbenchRuleCommand rule : ruleList) {
             if (!levels.add(rule.getPrizeLevel())) {
                 return "奖级重复：" + rule.getPrizeLevel() + " 级配置了多条规则";
             }
@@ -437,7 +437,7 @@ public class LotteryConfigService {
      * 与线上发号<b>共用同一个 FpeCipher 与同一套密钥派生</b>，所见即所得；
      * 但 tweak 用的是演示期号，所以结果只代表「号码长什么样」，不等于某一期的真实号码。
      */
-    public ResponseDTO<String> fpePreview(FpePreviewForm form) {
+    public ResponseDTO<String> fpePreview(FpePreviewCommand form) {
         long domain = (long) Math.pow(10, form.getNumberLength());
         if (form.getSequenceNo() > domain) {
             return ResponseDTO.userErrorParam("游标 " + form.getSequenceNo()
@@ -495,9 +495,9 @@ public class LotteryConfigService {
     /**
      * 分页查询
      */
-    public PageResult<LotteryConfigVO> queryPage(LotteryConfigQueryForm queryForm) {
+    public PageResult<LotteryConfigDTO> queryPage(LotteryConfigQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<LotteryConfigVO> list = lotteryConfigDao.queryPage(page, queryForm);
+        List<LotteryConfigDTO> list = lotteryConfigDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 }

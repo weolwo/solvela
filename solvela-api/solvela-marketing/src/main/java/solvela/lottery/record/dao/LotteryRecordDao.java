@@ -3,8 +3,8 @@ package solvela.lottery.record.dao;
         import java.util.List;
 
         import solvela.lottery.LotteryRecord;
-        import solvela.lottery.record.domain.form.LotteryRecordQueryForm;
-        import solvela.lottery.record.domain.vo.LotteryRecordVO;
+        import solvela.lottery.record.domain.query.LotteryRecordQuery;
+        import solvela.lottery.record.domain.dto.LotteryRecordDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryRecordVO> queryPage(Page<?> page, @Param("queryForm") LotteryRecordQueryForm queryForm);
+    List<LotteryRecordDTO> queryPage(Page<?> page, @Param("queryForm") LotteryRecordQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryRecordVO> queryList(@Param("queryForm") LotteryRecordQueryForm queryForm);
+    List<LotteryRecordDTO> queryList(@Param("queryForm") LotteryRecordQuery queryForm);
 
     /**
      * 漏斗计数 + 派发状态 + 一致性体检，一次扫表算完。
@@ -45,13 +45,13 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
      * 出现「分项加起来不等于总数」这种自相矛盾。
      * 刻意不吃 winStatus / prizeLevel 条件 —— 那两个正是漏斗要拆解的维度。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") LotteryRecordQueryForm queryForm);
+    java.util.Map<String, Object> selectFunnel(@Param("queryForm") LotteryRecordQuery queryForm);
 
     /**
      * 奖级分布，按奖级升序。只统计 win_status=2 的行 ——
      * 未中奖行的 prize_level 是 99 占位，不是奖级。
      */
-    List<java.util.Map<String, Object>> selectPrizeLevelStat(@Param("queryForm") LotteryRecordQueryForm queryForm);
+    List<java.util.Map<String, Object>> selectPrizeLevelStat(@Param("queryForm") LotteryRecordQuery queryForm);
 
     /**
      * 按玩法汇总参与人数与中奖注数，供彩票玩法一览一次性取全部玩法的实况。

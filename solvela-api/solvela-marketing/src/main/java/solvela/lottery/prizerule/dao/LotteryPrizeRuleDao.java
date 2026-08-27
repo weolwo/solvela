@@ -3,8 +3,8 @@ package solvela.lottery.prizerule.dao;
         import java.util.List;
 
         import solvela.lottery.LotteryPrizeRule;
-        import solvela.lottery.prizerule.domain.form.LotteryPrizeRuleQueryForm;
-        import solvela.lottery.prizerule.domain.vo.LotteryPrizeRuleVO;
+        import solvela.lottery.prizerule.domain.query.LotteryPrizeRuleQuery;
+        import solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface LotteryPrizeRuleDao extends BaseMapper<LotteryPrizeRule> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryPrizeRuleVO> queryPage(Page<?> page, @Param("queryForm") LotteryPrizeRuleQueryForm queryForm);
+    List<LotteryPrizeRuleDTO> queryPage(Page<?> page, @Param("queryForm") LotteryPrizeRuleQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface LotteryPrizeRuleDao extends BaseMapper<LotteryPrizeRule> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryPrizeRuleVO> queryList(@Param("queryForm") LotteryPrizeRuleQueryForm queryForm);
+    List<LotteryPrizeRuleDTO> queryList(@Param("queryForm") LotteryPrizeRuleQuery queryForm);
 
             // ----- 物理删除 -----
                 /**

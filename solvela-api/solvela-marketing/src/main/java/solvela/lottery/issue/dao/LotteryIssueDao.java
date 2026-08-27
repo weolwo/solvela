@@ -3,9 +3,9 @@ package solvela.lottery.issue.dao;
         import java.util.List;
 
         import solvela.lottery.LotteryIssue;
-        import solvela.lottery.issue.domain.form.LotteryIssueQueryForm;
-        import solvela.lottery.issue.domain.vo.LotteryIssueOverviewVO;
-        import solvela.lottery.issue.domain.vo.LotteryIssueVO;
+        import solvela.lottery.issue.domain.query.LotteryIssueQuery;
+        import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
+        import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -29,7 +29,7 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryIssueVO> queryPage(Page<?> page, @Param("queryForm") LotteryIssueQueryForm queryForm);
+    List<LotteryIssueDTO> queryPage(Page<?> page, @Param("queryForm") LotteryIssueQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -37,7 +37,7 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<LotteryIssueVO> queryList(@Param("queryForm") LotteryIssueQueryForm queryForm);
+    List<LotteryIssueDTO> queryList(@Param("queryForm") LotteryIssueQuery queryForm);
 
     /**
      * 巡检概览：逾期未开奖 / 售卖中 / 已售罄 / 今日计划开奖，一次扫表算完。
@@ -47,7 +47,7 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      *
      * 只吃 lotteryCode，其余筛选条件刻意不参与，理由见 mapper 注释。
      */
-    LotteryIssueOverviewVO overview(@Param("queryForm") LotteryIssueQueryForm queryForm);
+    LotteryIssueOverviewDTO overview(@Param("queryForm") LotteryIssueQuery queryForm);
 
     /**
      * 数据库当前时间。
