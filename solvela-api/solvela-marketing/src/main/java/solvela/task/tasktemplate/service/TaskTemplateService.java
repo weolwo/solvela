@@ -13,13 +13,12 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.task.constant.TaskTypeEnum;
 import solvela.task.tasktemplate.dao.TaskTemplateDao;
 import solvela.task.TaskTemplate;
-import solvela.task.tasktemplate.domain.form.TaskTemplateAddForm;
-import solvela.task.tasktemplate.domain.form.TaskTemplateQueryForm;
-import solvela.task.tasktemplate.domain.form.TaskTemplateSaveForm;
-import solvela.task.tasktemplate.domain.form.TaskTemplateUpdateForm;
-import solvela.task.tasktemplate.domain.vo.TaskTemplateOptionVO;
-import solvela.task.tasktemplate.domain.form.TaskTemplateStatusUpdateForm;
-import solvela.task.tasktemplate.domain.vo.TaskTemplateVO;
+import solvela.task.tasktemplate.domain.command.TaskTemplateAddCommand;
+import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
+import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
+import solvela.task.tasktemplate.domain.command.TaskTemplateUpdateCommand;
+import solvela.task.tasktemplate.domain.dto.TaskTemplateOptionDTO;
+import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
 import solvela.task.tasktemplate.manager.TaskTemplateManager;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -83,20 +82,20 @@ public class TaskTemplateService {
      * 任务配置向导用的模板列表：ui_schema 以 JSON 对象下发，前端直接喂给 SchemaFormRenderer
      * 单个模板的 ui_schema 脏了不该让整个向导开不了，解析失败的模板跳过并告警
      */
-    public ResponseDTO<List<TaskTemplateOptionVO>> queryOptionList() {
+    public ResponseDTO<List<TaskTemplateOptionDTO>> queryOptionList() {
         // 只给启用中的模板：禁用的意义就是「不再让人拿它建新任务」，
         // 已经用它建好的任务不受影响（运行态按 template_code 取脚本，与这里的候选列表无关）
         List<TaskTemplate> list = taskTemplateManager.lambdaQuery()
                 .eq(TaskTemplate::getStatus, STATUS_ENABLED)
                 .orderByDesc(TaskTemplate::getId)
                 .list();
-        List<TaskTemplateOptionVO> optionList = new ArrayList<>(list.size());
+        List<TaskTemplateOptionDTO> optionList = new ArrayList<>(list.size());
         for (TaskTemplate template : list) {
             Map<String, Object> uiSchema = parseUiSchema(template);
             if (uiSchema == null) {
                 continue;
             }
-            optionList.add(new TaskTemplateOptionVO(
+            optionList.add(new TaskTemplateOptionDTO(
                     template.getTemplateCode(),
                     template.getTemplateName(),
                     template.getTaskType(),
@@ -127,7 +126,7 @@ public class TaskTemplateService {
      *
      * @return true-新建模板，false-覆盖更新了已存在的模板（前端据此区分提示，防止误覆盖线上模板）
      */
-    public ResponseDTO<Boolean> save(TaskTemplateSaveForm saveForm) {
+    public ResponseDTO<Boolean> save(TaskTemplateSaveCommand saveForm) {
         String schemaError = checkUiSchema(saveForm.getUiSchema());
         if (schemaError != null) {
             return ResponseDTO.userErrorParam(schemaError);
@@ -226,9 +225,9 @@ public class TaskTemplateService {
     /**
      * 分页查询
      */
-    public PageResult<TaskTemplateVO> queryPage(TaskTemplateQueryForm queryForm) {
+    public PageResult<TaskTemplateDTO> queryPage(TaskTemplateQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<TaskTemplateVO> list = taskTemplateDao.queryPage(page, queryForm);
+        List<TaskTemplateDTO> list = taskTemplateDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -236,7 +235,7 @@ public class TaskTemplateService {
      * 添加
      * 模板编码允许手工输入，故服务端必须重校验唯一性（格式由 AddForm 的 @Pattern 拦）
      */
-    public ResponseDTO<String> add(TaskTemplateAddForm addForm) {
+    public ResponseDTO<String> add(TaskTemplateAddCommand addForm) {
         if (existsByTemplateCode(addForm.getTemplateCode())) {
             return ResponseDTO.userErrorParam("模板编码已存在：" + addForm.getTemplateCode());
         }
@@ -255,7 +254,7 @@ public class TaskTemplateService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(TaskTemplateUpdateForm updateForm) {
+    public ResponseDTO<String> update(TaskTemplateUpdateCommand updateForm) {
         String error = checkRawUiSchema(updateForm.getTaskType(), updateForm.getUiSchema());
         if (error != null) {
             return ResponseDTO.userErrorParam(error);
@@ -293,14 +292,14 @@ public class TaskTemplateService {
      * ui_schema / rule_script。删掉不会立刻报错，而是让引用它的任务安静地不再推进 ——
      * 禁用则只是不再出现在向导的候选里，存量任务照常跑。
      */
-    public ResponseDTO<String> updateStatus(TaskTemplateStatusUpdateForm form) {
-        if (!STATUS_ENABLED.equals(form.getStatus()) && !STATUS_DISABLED.equals(form.getStatus())) {
+    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+        if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
             return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 0-禁用");
         }
-        for (Long id : form.getIdList()) {
+        for (Long id : idList) {
             TaskTemplate update = new TaskTemplate();
             update.setId(id);
-            update.setStatus(form.getStatus());
+            update.setStatus(status);
             taskTemplateDao.updateById(update);
         }
         return ResponseDTO.ok();
@@ -309,12 +308,12 @@ public class TaskTemplateService {
     /**
      * 模板详情：供模板设计器的编辑态回显 ui_schema / rule_script。
      */
-    public ResponseDTO<TaskTemplateVO> detail(Long id) {
+    public ResponseDTO<TaskTemplateDTO> detail(Long id) {
         TaskTemplate template = taskTemplateDao.selectById(id);
         if (template == null) {
             return ResponseDTO.userErrorParam("任务模板不存在");
         }
-        return ResponseDTO.ok(SolvelaBeanUtil.copy(template, TaskTemplateVO.class));
+        return ResponseDTO.ok(SolvelaBeanUtil.copy(template, TaskTemplateDTO.class));
     }
 
     /**

@@ -1,9 +1,13 @@
 package solvela.admin.module.task.prizemapping.controller;
 
-import solvela.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
-import solvela.task.prizemapping.domain.vo.TaskPrizeMappingVO;
+import solvela.admin.module.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
+import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
+import solvela.admin.module.task.prizemapping.domain.vo.TaskPrizeMappingVO;
+import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
 import solvela.task.prizemapping.service.TaskPrizeMappingService;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +45,7 @@ public class TaskPrizeMappingController {
     @PostMapping("/queryPage")
     @SaCheckPermission("taskPrizeMapping:query")
     public ResponseDTO<PageResult<TaskPrizeMappingVO>> queryPage(@RequestBody @Valid TaskPrizeMappingQueryForm queryForm) {
-        return ResponseDTO.ok(taskPrizeMappingService.queryPage(queryForm));
+        PageResult<TaskPrizeMappingDTO> page = taskPrizeMappingService.queryPage(SolvelaBeanUtil.copy(queryForm, TaskPrizeMappingQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskPrizeMappingVO.class));
     }
 }

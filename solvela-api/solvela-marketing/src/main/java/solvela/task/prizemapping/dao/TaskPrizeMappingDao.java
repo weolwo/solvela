@@ -3,8 +3,8 @@ package solvela.task.prizemapping.dao;
         import java.util.List;
 
         import solvela.task.TaskPrizeMapping;
-        import solvela.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
-        import solvela.task.prizemapping.domain.vo.TaskPrizeMappingVO;
+        import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
+        import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
         import solvela.base.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -30,7 +30,7 @@ public interface TaskPrizeMappingDao extends CustomizedBaseMapper<TaskPrizeMappi
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskPrizeMappingVO> queryPage(Page<?> page, @Param("queryForm") TaskPrizeMappingQueryForm queryForm);
+    List<TaskPrizeMappingDTO> queryPage(Page<?> page, @Param("queryForm") TaskPrizeMappingQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -38,6 +38,6 @@ public interface TaskPrizeMappingDao extends CustomizedBaseMapper<TaskPrizeMappi
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskPrizeMappingVO> queryList(@Param("queryForm") TaskPrizeMappingQueryForm queryForm);
+    List<TaskPrizeMappingDTO> queryList(@Param("queryForm") TaskPrizeMappingQuery queryForm);
 
 }

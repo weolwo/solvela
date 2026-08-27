@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.task.record.dao.TaskRecordDao">
 
-    <resultMap id="TaskRecordVO" type="solvela.task.record.domain.vo.TaskRecordVO">
+    <resultMap id="TaskRecordDTO" type="solvela.task.record.domain.dto.TaskRecordDTO">
             <result column="id" property="id" />
             <result column="member_id" property="memberId" />
             <result column="member_name" property="memberName" />
@@ -226,7 +226,7 @@
                 r.update_time
     </sql>
 
-    <select id="queryPage" resultMap="TaskRecordVO">
+    <select id="queryPage" resultMap="TaskRecordDTO">
         SELECT
         <include refid="list_columns"/>
         FROM t_task_record r
@@ -235,7 +235,7 @@
         ORDER BY r.create_time DESC
     </select>
 
-    <select id="queryList" resultMap="TaskRecordVO">
+    <select id="queryList" resultMap="TaskRecordDTO">
         SELECT
         <include refid="list_columns"/>
         FROM t_task_record r

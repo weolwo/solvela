@@ -2,16 +2,22 @@ package solvela.admin.module.task.record.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.task.TaskRecord;
-import solvela.task.record.domain.form.TaskRecordAddForm;
-import solvela.task.record.domain.form.TaskRecordQueryForm;
-import solvela.task.record.domain.form.TaskRecordStatusUpdateForm;
-import solvela.task.record.domain.form.TaskRecordUpdateForm;
-import solvela.task.record.domain.vo.TaskRecordFunnelVO;
-import solvela.task.record.domain.vo.TaskRecordVO;
+import solvela.admin.module.task.record.domain.form.TaskRecordAddForm;
+import solvela.task.record.domain.command.TaskRecordAddCommand;
+import solvela.admin.module.task.record.domain.form.TaskRecordQueryForm;
+import solvela.task.record.domain.query.TaskRecordQuery;
+import solvela.admin.module.task.record.domain.form.TaskRecordStatusUpdateForm;
+import solvela.admin.module.task.record.domain.form.TaskRecordUpdateForm;
+import solvela.task.record.domain.command.TaskRecordUpdateCommand;
+import solvela.task.record.domain.dto.TaskRecordFunnelDTO;
+import solvela.admin.module.task.record.domain.vo.TaskRecordVO;
+import solvela.task.record.domain.dto.TaskRecordDTO;
 import solvela.task.record.service.TaskRecordService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,35 +45,36 @@ public class TaskRecordController {
     @PostMapping("/queryPage")
     @SaCheckPermission("taskRecord:query")
     public ResponseDTO<PageResult<TaskRecordVO>> queryPage(@RequestBody @Valid TaskRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<TaskRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, TaskRecordQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskRecordVO.class));
     }
 
     @Operation(summary = "任务漏斗：达标率、任务分布、事件丢弃原因与数据一致性体检")
     @PostMapping("/funnel")
     @SaCheckPermission("taskRecord:query")
-    public ResponseDTO<TaskRecordFunnelVO> funnel(@RequestBody @Valid TaskRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.funnel(queryForm));
+    public ResponseDTO<TaskRecordFunnelDTO> funnel(@RequestBody @Valid TaskRecordQueryForm queryForm) {
+        return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, TaskRecordQuery.class)));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
     @SaCheckPermission("taskRecord:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskRecordAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, TaskRecordAddCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @SaCheckPermission("taskRecord:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskRecordUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, TaskRecordUpdateCommand.class));
     }
 
     @Operation(summary = "批量禁用（置为 3-已过期，替代删除）")
     @PostMapping("/updateStatus")
     @SaCheckPermission("taskRecord:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskRecordStatusUpdateForm form) {
-        return Service.updateStatus(form);
+        return Service.updateStatus(form.getIdList(), form.getStatus());
     }
 
     @Operation(summary = "批量删除")

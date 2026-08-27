@@ -9,8 +9,8 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.task.constant.TaskConst;
 import solvela.task.prizemapping.dao.TaskPrizeMappingDao;
 import solvela.task.TaskPrizeMapping;
-import solvela.task.prizemapping.domain.form.TaskPrizeMappingQueryForm;
-import solvela.task.prizemapping.domain.vo.TaskPrizeMappingVO;
+import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
+import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
 import solvela.task.runtime.domain.TaskRuleConfig;
 import org.springframework.stereotype.Service;
 
@@ -41,9 +41,9 @@ public class TaskPrizeMappingService {
     /**
      * 分页查询（带配置体检）
      */
-    public PageResult<TaskPrizeMappingVO> queryPage(TaskPrizeMappingQueryForm queryForm) {
+    public PageResult<TaskPrizeMappingDTO> queryPage(TaskPrizeMappingQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<TaskPrizeMappingVO> list = taskPrizeMappingDao.queryPage(page, queryForm);
+        List<TaskPrizeMappingDTO> list = taskPrizeMappingDao.queryPage(page, queryForm);
         enrich(list);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
@@ -56,17 +56,17 @@ public class TaskPrizeMappingService {
      * {@code TaskPrizeDispatcher} 走同一条解析路径。这里另写一份「差不多的」解析，
      * 迟早会出现「巡检页显示正常、运行态解析不出」的漂移。
      */
-    private void enrich(List<TaskPrizeMappingVO> list) {
+    private void enrich(List<TaskPrizeMappingDTO> list) {
         if (SolvelaCollectionUtil.isEmpty(list)) {
             return;
         }
-        for (TaskPrizeMappingVO vo : list) {
+        for (TaskPrizeMappingDTO vo : list) {
             vo.setStageTarget(TaskRuleConfig.parse(vo.getStageCondition()).decimal(TaskConst.STAGE_KEY_TARGET));
             vo.setPrizeValue(TaskRuleConfig.parse(vo.getPrizeStrategy()).decimal(TaskConst.PRIZE_STRATEGY_KEY_VALUE));
         }
 
         Map<Long, List<TaskPrizeMapping>> ladderMap = loadFullLadders(list);
-        for (TaskPrizeMappingVO vo : list) {
+        for (TaskPrizeMappingDTO vo : list) {
             vo.setIssueList(checkIssues(vo, ladderMap.get(vo.getTaskConfigId())));
         }
     }
@@ -77,9 +77,9 @@ public class TaskPrizeMappingService {
      * <p>「断档」「达标值不递增」是阶梯整体的性质，只看当前页的行会误判 ——
      * 分页正好把一条阶梯切成两半时，两页各自看都像是缺了档。
      */
-    private Map<Long, List<TaskPrizeMapping>> loadFullLadders(List<TaskPrizeMappingVO> list) {
+    private Map<Long, List<TaskPrizeMapping>> loadFullLadders(List<TaskPrizeMappingDTO> list) {
         Set<Long> taskConfigIdSet = list.stream()
-                .map(TaskPrizeMappingVO::getTaskConfigId)
+                .map(TaskPrizeMappingDTO::getTaskConfigId)
                 .collect(Collectors.toSet());
         List<TaskPrizeMapping> all = taskPrizeMappingDao.selectList(
                 Wrappers.<TaskPrizeMapping>lambdaQuery()
@@ -101,7 +101,7 @@ public class TaskPrizeMappingService {
      *
      * @param ladder 该任务的完整阶梯（理论上不会为 null，列表行就是从里面查出来的）
      */
-    private List<String> checkIssues(TaskPrizeMappingVO vo, List<TaskPrizeMapping> ladder) {
+    private List<String> checkIssues(TaskPrizeMappingDTO vo, List<TaskPrizeMapping> ladder) {
         List<String> issues = new ArrayList<>();
 
         // 奖品对不上：PrizeConfigService.getByActivityCodeAndPrizeCode 返回 null 时，

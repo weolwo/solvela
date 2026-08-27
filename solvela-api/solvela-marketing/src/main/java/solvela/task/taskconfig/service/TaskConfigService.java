@@ -14,15 +14,14 @@ import solvela.task.prizemapping.dao.TaskPrizeMappingDao;
 import solvela.task.TaskPrizeMapping;
 import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.TaskConfig;
-import solvela.task.taskconfig.domain.form.TaskConfigAddForm;
-import solvela.task.taskconfig.domain.form.TaskConfigQueryForm;
-import solvela.task.taskconfig.domain.form.TaskConfigStatusUpdateForm;
-import solvela.task.taskconfig.domain.form.TaskConfigUpdateForm;
-import solvela.task.taskconfig.domain.form.TaskConfigWizardConfigForm;
-import solvela.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
-import solvela.task.taskconfig.domain.form.TaskConfigWizardUpdateForm;
-import solvela.task.taskconfig.domain.vo.TaskConfigVO;
-import solvela.task.taskconfig.domain.vo.TaskConfigWizardDetailVO;
+import solvela.task.taskconfig.domain.command.TaskConfigAddCommand;
+import solvela.task.taskconfig.domain.query.TaskConfigQuery;
+import solvela.task.taskconfig.domain.command.TaskConfigUpdateCommand;
+import solvela.task.taskconfig.domain.command.TaskConfigWizardConfigCommand;
+import solvela.task.taskconfig.domain.command.TaskConfigWizardSubmitCommand;
+import solvela.task.taskconfig.domain.command.TaskConfigWizardUpdateCommand;
+import solvela.task.taskconfig.domain.dto.TaskConfigDTO;
+import solvela.task.taskconfig.domain.dto.TaskConfigWizardDetailDTO;
 import solvela.task.TaskTemplate;
 import solvela.task.tasktemplate.service.TaskTemplateService;
 import org.apache.commons.lang3.StringUtils;
@@ -83,8 +82,8 @@ public class TaskConfigService {
      * 前端表单只是第一道防线，服务端按模板 ui_schema 反向校验参数完整性
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<Long> wizardSubmit(TaskConfigWizardSubmitForm form) {
-        TaskConfigWizardConfigForm configForm = form.getTaskConfig();
+    public ResponseDTO<Long> wizardSubmit(TaskConfigWizardSubmitCommand form) {
+        TaskConfigWizardConfigCommand configForm = form.getTaskConfig();
 
         // 1. 模板必须存在
         TaskTemplate template = taskTemplateService.getByTemplateCode(configForm.getTemplateCode());
@@ -130,16 +129,16 @@ public class TaskConfigService {
      * 下线后运行态不再订阅该任务的事件（判据是 status != 3，见 TaskConst.CONFIG_STATUS_OFFLINE），
      * 已在跑的记录按接取时的快照走完，不受影响。
      */
-    public ResponseDTO<String> updateStatus(TaskConfigStatusUpdateForm form) {
-        if (!STATUS_PENDING.equals(form.getStatus())
-                && !STATUS_ACTIVE.equals(form.getStatus())
-                && !STATUS_OFFLINE.equals(form.getStatus())) {
+    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+        if (!STATUS_PENDING.equals(status)
+                && !STATUS_ACTIVE.equals(status)
+                && !STATUS_OFFLINE.equals(status)) {
             return ResponseDTO.userErrorParam("目标状态只能是 1-待生效、2-生效中 或 3-已下线");
         }
-        for (Long id : form.getIdList()) {
+        for (Long id : idList) {
             TaskConfig update = new TaskConfig();
             update.setId(id);
-            update.setStatus(form.getStatus());
+            update.setStatus(status);
             taskConfigDao.updateById(update);
         }
         return ResponseDTO.ok();
@@ -148,13 +147,13 @@ public class TaskConfigService {
     /**
      * 向导回显：主子表一次性返回，结构与提交表单对称，前端拿到就能铺回 5 个步骤。
      */
-    public ResponseDTO<TaskConfigWizardDetailVO> wizardDetail(Long id) {
+    public ResponseDTO<TaskConfigWizardDetailDTO> wizardDetail(Long id) {
         TaskConfig taskConfig = taskConfigDao.selectById(id);
         if (taskConfig == null) {
             return ResponseDTO.userErrorParam("任务配置不存在");
         }
 
-        TaskConfigWizardDetailVO vo = SolvelaBeanUtil.copy(taskConfig, TaskConfigWizardDetailVO.class);
+        TaskConfigWizardDetailDTO vo = SolvelaBeanUtil.copy(taskConfig, TaskConfigWizardDetailDTO.class);
 
         // ruleConfig 里的 taskType 是服务端按模板强制覆写的派生值，不是运营填的参数，回显时剔掉
         Map<String, Object> ruleConfig = parseJsonMap(taskConfig.getRuleConfig());
@@ -174,7 +173,7 @@ public class TaskConfigService {
                         .eq(TaskPrizeMapping::getTaskConfigId, id)
                         .orderByAsc(TaskPrizeMapping::getStageLevel));
         vo.setPrizeMappingList(mappingList.stream().map(item -> {
-            TaskConfigWizardDetailVO.PrizeLadder ladder = new TaskConfigWizardDetailVO.PrizeLadder();
+            TaskConfigWizardDetailDTO.PrizeLadder ladder = new TaskConfigWizardDetailDTO.PrizeLadder();
             ladder.setStageLevel(item.getStageLevel());
             ladder.setPrizeCode(item.getPrizeCode());
             ladder.setPrizeMode(item.getPrizeMode());
@@ -198,13 +197,13 @@ public class TaskConfigService {
      * <p>status 刻意不动：任务可能已经是 3-已下线，保存一次配置不该把它悄悄改回待生效。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<Long> wizardUpdate(TaskConfigWizardUpdateForm form) {
+    public ResponseDTO<Long> wizardUpdate(TaskConfigWizardUpdateCommand form) {
         TaskConfig exist = taskConfigDao.selectById(form.getId());
         if (exist == null) {
             return ResponseDTO.userErrorParam("任务配置不存在");
         }
 
-        TaskConfigWizardConfigForm configForm = form.getTaskConfig();
+        TaskConfigWizardConfigCommand configForm = form.getTaskConfig();
         // 模板可改：按表单传来的模板校验参数。换模板意味着 rule_config 整套按新 ui_schema 重填，
         // 向导那边切模板时已经用新模板的默认值重建了 ruleParams，这里只需照新模板验一遍
         TaskTemplate template = taskTemplateService.getByTemplateCode(configForm.getTemplateCode());
@@ -250,7 +249,7 @@ public class TaskConfigService {
     /**
      * 阶梯表单 -> 子表实体。新增与更新共用，避免两处各写一遍包装格式。
      */
-    private List<TaskPrizeMapping> buildMappingList(TaskConfigWizardSubmitForm form, Long taskConfigId) {
+    private List<TaskPrizeMapping> buildMappingList(TaskConfigWizardSubmitCommand form, Long taskConfigId) {
         return form.getPrizeMappingList().stream().map(item -> {
             TaskPrizeMapping mapping = new TaskPrizeMapping();
             mapping.setTaskConfigId(taskConfigId);
@@ -343,16 +342,16 @@ public class TaskConfigService {
     /**
      * 分页查询
      */
-    public PageResult<TaskConfigVO> queryPage(TaskConfigQueryForm queryForm) {
+    public PageResult<TaskConfigDTO> queryPage(TaskConfigQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<TaskConfigVO> list = taskConfigDao.queryPage(page, queryForm);
+        List<TaskConfigDTO> list = taskConfigDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
     /**
      * 添加
      */
-    public ResponseDTO<String> add(TaskConfigAddForm addForm) {
+    public ResponseDTO<String> add(TaskConfigAddCommand addForm) {
         TaskConfig taskConfig = SolvelaBeanUtil.copy(addForm, TaskConfig.class);
         taskConfigDao.insert(taskConfig);
         return ResponseDTO.ok();
@@ -362,7 +361,7 @@ public class TaskConfigService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(TaskConfigUpdateForm updateForm) {
+    public ResponseDTO<String> update(TaskConfigUpdateCommand updateForm) {
         TaskConfig taskConfig = SolvelaBeanUtil.copy(updateForm, TaskConfig.class);
         taskConfigDao.updateById(taskConfig);
         return ResponseDTO.ok();

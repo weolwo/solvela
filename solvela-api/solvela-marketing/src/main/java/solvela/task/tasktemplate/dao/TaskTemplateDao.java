@@ -3,8 +3,8 @@ package solvela.task.tasktemplate.dao;
         import java.util.List;
 
         import solvela.task.TaskTemplate;
-        import solvela.task.tasktemplate.domain.form.TaskTemplateQueryForm;
-        import solvela.task.tasktemplate.domain.vo.TaskTemplateVO;
+        import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
+        import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface TaskTemplateDao extends BaseMapper<TaskTemplate> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskTemplateVO> queryPage(Page<?> page, @Param("queryForm") TaskTemplateQueryForm queryForm);
+    List<TaskTemplateDTO> queryPage(Page<?> page, @Param("queryForm") TaskTemplateQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface TaskTemplateDao extends BaseMapper<TaskTemplate> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskTemplateVO> queryList(@Param("queryForm") TaskTemplateQueryForm queryForm);
+    List<TaskTemplateDTO> queryList(@Param("queryForm") TaskTemplateQuery queryForm);
 
             // ----- 物理删除 -----
                 /**

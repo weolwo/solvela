@@ -2,18 +2,26 @@ package solvela.admin.module.task.taskconfig.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.task.TaskConfig;
-import solvela.task.taskconfig.domain.form.TaskConfigAddForm;
-import solvela.task.taskconfig.domain.form.TaskConfigQueryForm;
-import solvela.task.taskconfig.domain.form.TaskConfigUpdateForm;
-import solvela.task.taskconfig.domain.form.TaskConfigStatusUpdateForm;
-import solvela.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
-import solvela.task.taskconfig.domain.form.TaskConfigWizardUpdateForm;
-import solvela.task.taskconfig.domain.vo.TaskConfigWizardDetailVO;
-import solvela.task.taskconfig.domain.vo.TaskConfigVO;
+import solvela.admin.module.task.taskconfig.domain.form.TaskConfigAddForm;
+import solvela.task.taskconfig.domain.command.TaskConfigAddCommand;
+import solvela.admin.module.task.taskconfig.domain.form.TaskConfigQueryForm;
+import solvela.task.taskconfig.domain.query.TaskConfigQuery;
+import solvela.admin.module.task.taskconfig.domain.form.TaskConfigUpdateForm;
+import solvela.task.taskconfig.domain.command.TaskConfigUpdateCommand;
+import solvela.admin.module.task.taskconfig.domain.form.TaskConfigStatusUpdateForm;
+import solvela.admin.module.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
+import solvela.task.taskconfig.domain.command.TaskConfigWizardSubmitCommand;
+import solvela.admin.module.task.taskconfig.domain.form.TaskConfigWizardUpdateForm;
+import solvela.task.taskconfig.domain.command.TaskConfigWizardUpdateCommand;
+import solvela.task.taskconfig.domain.dto.TaskConfigWizardDetailDTO;
+import solvela.admin.module.task.taskconfig.domain.vo.TaskConfigVO;
+import solvela.task.taskconfig.domain.dto.TaskConfigDTO;
 import solvela.task.taskconfig.service.TaskConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,34 +49,37 @@ public class TaskConfigController {
     @PostMapping("/queryPage")
     @SaCheckPermission("taskConfig:query")
     public ResponseDTO<PageResult<TaskConfigVO>> queryPage(@RequestBody @Valid TaskConfigQueryForm queryForm) {
-        return ResponseDTO.ok(Service.queryPage(queryForm));
+        PageResult<TaskConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, TaskConfigQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskConfigVO.class));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
     @SaCheckPermission("taskConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskConfigAddForm addForm) {
-        return Service.add(addForm);
+        return Service.add(SolvelaBeanUtil.copy(addForm, TaskConfigAddCommand.class));
     }
 
     @Operation(summary = "任务配置向导提交（主子表：taskConfig + prizeMappingList）")
     @PostMapping("/wizard/submit")
     @SaCheckPermission("taskConfig:wizard:submit")
     public ResponseDTO<Long> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
-        return Service.wizardSubmit(submitForm);
+        // 🔴 deepCopy：向导表单含嵌套（taskConfig 对象 + prizeMappingList 集合），
+        // 浅拷贝会跳过它们，表现是"向导提交成功但任务与奖品映射都没建"
+        return Service.wizardSubmit(SolvelaBeanUtil.deepCopy(submitForm, TaskConfigWizardSubmitCommand.class));
     }
 
     @Operation(summary = "上/下线（列表页批量下线用它，替代删除）")
     @PostMapping("/updateStatus")
     @SaCheckPermission("taskConfig:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskConfigStatusUpdateForm form) {
-        return Service.updateStatus(form);
+        return Service.updateStatus(form.getIdList(), form.getStatus());
     }
 
     @Operation(summary = "任务配置向导回显（主子表一次性返回，供编辑态铺回 5 个步骤）")
     @GetMapping("/wizard/detail/{id}")
     @SaCheckPermission("taskConfig:query")
-    public ResponseDTO<TaskConfigWizardDetailVO> wizardDetail(@PathVariable Long id) {
+    public ResponseDTO<TaskConfigWizardDetailDTO> wizardDetail(@PathVariable Long id) {
         return Service.wizardDetail(id);
     }
 
@@ -76,14 +87,14 @@ public class TaskConfigController {
     @PostMapping("/wizard/update")
     @SaCheckPermission("taskConfig:wizard:submit")
     public ResponseDTO<Long> wizardUpdate(@RequestBody @Valid TaskConfigWizardUpdateForm updateForm) {
-        return Service.wizardUpdate(updateForm);
+        return Service.wizardUpdate(SolvelaBeanUtil.deepCopy(updateForm, TaskConfigWizardUpdateCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @SaCheckPermission("taskConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskConfigUpdateForm updateForm) {
-        return Service.update(updateForm);
+        return Service.update(SolvelaBeanUtil.copy(updateForm, TaskConfigUpdateCommand.class));
     }
 
     @Operation(summary = "批量删除")

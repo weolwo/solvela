@@ -3,8 +3,8 @@ package solvela.task.taskconfig.dao;
         import java.util.List;
 
         import solvela.task.TaskConfig;
-        import solvela.task.taskconfig.domain.form.TaskConfigQueryForm;
-        import solvela.task.taskconfig.domain.vo.TaskConfigVO;
+        import solvela.task.taskconfig.domain.query.TaskConfigQuery;
+        import solvela.task.taskconfig.domain.dto.TaskConfigDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface TaskConfigDao extends BaseMapper<TaskConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskConfigVO> queryPage(Page<?> page, @Param("queryForm") TaskConfigQueryForm queryForm);
+    List<TaskConfigDTO> queryPage(Page<?> page, @Param("queryForm") TaskConfigQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface TaskConfigDao extends BaseMapper<TaskConfig> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskConfigVO> queryList(@Param("queryForm") TaskConfigQueryForm queryForm);
+    List<TaskConfigDTO> queryList(@Param("queryForm") TaskConfigQuery queryForm);
 
             // ----- 物理删除 -----
                 /**

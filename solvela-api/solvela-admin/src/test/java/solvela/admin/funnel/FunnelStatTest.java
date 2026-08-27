@@ -2,17 +2,15 @@ package solvela.admin.funnel;
 
 import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.prize.prizelog.domain.query.PrizeLogQuery;
-import solvela.prize.prizelog.domain.query.PrizeLogQuery;
 import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
 import solvela.prize.prizelog.service.PrizeLogService;
-import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.dao.ProposalRecordDao;
 import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
 import solvela.risk.proposal.service.ProposalRecordService;
 import solvela.task.record.dao.TaskRecordDao;
-import solvela.task.record.domain.form.TaskRecordQueryForm;
-import solvela.task.record.domain.vo.TaskRecordFunnelVO;
+import solvela.task.record.domain.query.TaskRecordQuery;
+import solvela.task.record.domain.dto.TaskRecordFunnelDTO;
 import solvela.task.record.service.TaskRecordService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -98,18 +96,18 @@ class FunnelStatTest {
     @Test
     @DisplayName("任务漏斗：SQL 别名与 Service 读取的 key 完全一致（拼错一个字母就会静默变 0）")
     void taskFunnelKeysMatch() {
-        Map<String, Object> row = taskRecordDao.selectFunnel(new TaskRecordQueryForm());
+        Map<String, Object> row = taskRecordDao.selectFunnel(new TaskRecordQuery());
         assertNotNull(row, "selectFunnel 不该返回 null：它是聚合查询，空表也会有一行");
         assertEquals(TASK_FUNNEL_KEYS, row.keySet(),
                 "SQL 别名与 Service 读取的 key 对不上：多出来的是白算的，少的那个会被兜底成 0");
 
         // 分布查询的列名同样是 key 契约
-        List<Map<String, Object>> taskStat = taskRecordDao.selectTaskStat(new TaskRecordQueryForm());
+        List<Map<String, Object>> taskStat = taskRecordDao.selectTaskStat(new TaskRecordQuery());
         if (!taskStat.isEmpty()) {
             assertEquals(Set.of("taskConfigId", "recordCount", "memberCount", "reachedCount", "staleRunningCount"),
                     taskStat.get(0).keySet());
         }
-        List<Map<String, Object>> discardStat = taskRecordDao.selectDiscardStat(new TaskRecordQueryForm());
+        List<Map<String, Object>> discardStat = taskRecordDao.selectDiscardStat(new TaskRecordQuery());
         if (!discardStat.isEmpty()) {
             assertEquals(Set.of("discardCode", "discardCount"), discardStat.get(0).keySet());
         }
@@ -122,19 +120,19 @@ class FunnelStatTest {
         // 铁律 16：先确认前提成立，否则「全 0 也通过」的空过与真通过分不出来
         assertTrue(dbTotal > 0, "t_task_record 没有数据，本用例无法证明任何事 —— 先造数再跑");
 
-        TaskRecordFunnelVO vo = taskRecordService.funnel(new TaskRecordQueryForm());
+        TaskRecordFunnelDTO vo = taskRecordService.funnel(new TaskRecordQuery());
         assertEquals(dbTotal, vo.getTotalCount());
         assertEquals(vo.getTotalCount(),
                 vo.getRunningCount() + vo.getCompletedCount() + vo.getDispatchedCount() + vo.getExpiredCount(),
                 "四个状态桶之和不等于总数：要么 SQL 漏了一个 status 取值，要么库里有字典外的状态");
 
-        long statSum = vo.getTaskList().stream().mapToLong(TaskRecordFunnelVO.TaskStatVO::getRecordCount).sum();
+        long statSum = vo.getTaskList().stream().mapToLong(TaskRecordFunnelDTO.TaskStatVO::getRecordCount).sum();
         long top20Total = count("SELECT COALESCE(SUM(c), 0) FROM (SELECT COUNT(*) c FROM t_task_record"
                 + " GROUP BY task_config_id ORDER BY c DESC LIMIT 20) t");
         assertEquals(top20Total, statSum, "任务分布（TOP 20）条数之和与库里对不上");
 
         long discardSum = vo.getDiscardList().stream()
-                .mapToLong(TaskRecordFunnelVO.DiscardStatVO::getDiscardCount).sum();
+                .mapToLong(TaskRecordFunnelDTO.DiscardStatVO::getDiscardCount).sum();
         assertEquals(count("SELECT COUNT(*) FROM t_task_record_flow WHERE flow_type = 2"), discardSum,
                 "丢弃分类条数之和与流水表对不上");
         assertEquals(discardSum, vo.getDiscardTotalCount());

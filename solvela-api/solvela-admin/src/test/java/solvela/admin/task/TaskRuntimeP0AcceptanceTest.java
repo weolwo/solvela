@@ -15,10 +15,10 @@ import solvela.task.runtime.domain.TaskAdvanceResult;
 import solvela.task.runtime.domain.TaskEventContext;
 import solvela.task.runtime.domain.TaskEventReportForm;
 import solvela.task.TaskEvent;
-import solvela.task.taskevent.domain.vo.TaskEventOptionVO;
+import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
 import solvela.task.taskevent.service.TaskEventDefService;
 import solvela.task.taskconfig.dao.TaskConfigDao;
-import solvela.task.tasktemplate.domain.form.TaskTemplateSaveForm;
+import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
 import solvela.task.tasktemplate.service.TaskTemplateService;
 import solvela.task.TaskConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -519,7 +519,7 @@ class TaskRuntimeP0AcceptanceTest {
     @Test
     @DisplayName("P1 下拉：新注册的事件无需改前端即可被选到")
     void p1_optionListExposesNewlyRegisteredEvent() {
-        List<TaskEventOptionVO> options = taskEventDefService.optionList();
+        List<TaskEventOptionDTO> options = taskEventDefService.optionList();
         assertFalse(options.isEmpty());
 
         // GOODS_SHARE 是本次新增的事件，只加了一行数据、没动任何前端常量
@@ -527,7 +527,7 @@ class TaskRuntimeP0AcceptanceTest {
                 "新增事件应出现在下拉里 —— 这正是「加事件只改数据」的判据");
 
         // bizIdRequired 要如实下发，好让配置的人当场知道对接方必须传什么
-        TaskEventOptionVO orderPaid = options.stream()
+        TaskEventOptionDTO orderPaid = options.stream()
                 .filter(o -> "ORDER_PAID".equals(o.eventCode())).findFirst().orElse(null);
         assertNotNull(orderPaid);
         assertTrue(orderPaid.bizIdRequired());
@@ -702,8 +702,8 @@ class TaskRuntimeP0AcceptanceTest {
 
     // ==================== 模板契约校验（方案 §4.10） ====================
 
-    private TaskTemplateSaveForm templateForm(String code, String taskType, List<Map<String, Object>> params) {
-        TaskTemplateSaveForm form = new TaskTemplateSaveForm();
+    private TaskTemplateSaveCommand templateForm(String code, String taskType, List<Map<String, Object>> params) {
+        TaskTemplateSaveCommand form = new TaskTemplateSaveCommand();
         form.setTemplateCode(code);
         form.setTemplateName("契约校验用-" + code);
         form.setTaskType(taskType);

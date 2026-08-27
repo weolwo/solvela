@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.task.tasktemplate.dao.TaskTemplateDao">
 
-    <resultMap id="TaskTemplateVO" type="solvela.task.tasktemplate.domain.vo.TaskTemplateVO">
+    <resultMap id="TaskTemplateDTO" type="solvela.task.tasktemplate.domain.dto.TaskTemplateDTO">
             <result column="id" property="id" />
             <result column="template_code" property="templateCode" />
             <result column="template_name" property="templateName" />
@@ -54,7 +54,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="TaskTemplateVO">
+    <select id="queryPage" resultMap="TaskTemplateDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_task_template
@@ -62,7 +62,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="TaskTemplateVO">
+    <select id="queryList" resultMap="TaskTemplateDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_task_template

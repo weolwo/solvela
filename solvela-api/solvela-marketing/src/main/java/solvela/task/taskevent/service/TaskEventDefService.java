@@ -13,11 +13,11 @@ import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.TaskConfig;
 import solvela.task.taskevent.dao.TaskEventDao;
 import solvela.task.TaskEvent;
-import solvela.task.taskevent.domain.form.TaskEventAddForm;
-import solvela.task.taskevent.domain.form.TaskEventQueryForm;
-import solvela.task.taskevent.domain.form.TaskEventUpdateForm;
-import solvela.task.taskevent.domain.vo.TaskEventOptionVO;
-import solvela.task.taskevent.domain.vo.TaskEventVO;
+import solvela.task.taskevent.domain.command.TaskEventAddCommand;
+import solvela.task.taskevent.domain.query.TaskEventQuery;
+import solvela.task.taskevent.domain.command.TaskEventUpdateCommand;
+import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
+import solvela.task.taskevent.domain.dto.TaskEventDTO;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -48,9 +48,9 @@ public class TaskEventDefService {
     private static final int STATUS_ENABLED = 1;
     private static final int STATUS_DISABLED = 0;
 
-    public PageResult<TaskEventVO> queryPage(TaskEventQueryForm queryForm) {
+    public PageResult<TaskEventDTO> queryPage(TaskEventQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<TaskEventVO> list = taskEventDao.queryPage(page, queryForm);
+        List<TaskEventDTO> list = taskEventDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -62,9 +62,9 @@ public class TaskEventDefService {
      * 与 {@code TaskTemplateService.optionList} 对 ui_schema 的处理同一口径：
      * 一行脏数据不该让运营连事件都选不了。
      */
-    public List<TaskEventOptionVO> optionList() {
+    public List<TaskEventOptionDTO> optionList() {
         return taskEventDao.selectEnabledList().stream()
-                .map(e -> new TaskEventOptionVO(
+                .map(e -> new TaskEventOptionDTO(
                         e.getEventCode(),
                         e.getEventName(),
                         e.getMetricSource(),
@@ -86,7 +86,7 @@ public class TaskEventDefService {
         }
     }
 
-    public ResponseDTO<String> add(TaskEventAddForm addForm) {
+    public ResponseDTO<String> add(TaskEventAddCommand addForm) {
         TaskEvent exists = taskEventDao.selectByEventCode(addForm.getEventCode());
         if (exists != null) {
             // 唯一索引只是兜底：直接抛 SQL 异常对运营不友好
@@ -98,7 +98,7 @@ public class TaskEventDefService {
         return ResponseDTO.ok();
     }
 
-    public ResponseDTO<String> update(TaskEventUpdateForm updateForm) {
+    public ResponseDTO<String> update(TaskEventUpdateCommand updateForm) {
         TaskEvent exists = taskEventDao.selectById(updateForm.getId());
         if (exists == null) {
             return ResponseDTO.userErrorParam("事件不存在");

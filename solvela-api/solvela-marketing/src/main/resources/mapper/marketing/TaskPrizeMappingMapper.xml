@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.task.prizemapping.dao.TaskPrizeMappingDao">
 
-    <resultMap id="TaskPrizeMappingVO" type="solvela.task.prizemapping.domain.vo.TaskPrizeMappingVO">
+    <resultMap id="TaskPrizeMappingDTO" type="solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO">
             <result column="id" property="id" />
             <result column="task_config_id" property="taskConfigId" />
             <result column="activity_code" property="activityCode" />
@@ -72,7 +72,7 @@
         ORDER BY tc.activity_code, m.task_config_id, m.stage_level
     </sql>
 
-    <select id="queryPage" resultMap="TaskPrizeMappingVO">
+    <select id="queryPage" resultMap="TaskPrizeMappingDTO">
         SELECT
         <include refid="base_columns"/>
         <include refid="base_from"/>
@@ -80,7 +80,7 @@
         <include refid="base_order"/>
     </select>
 
-    <select id="queryList" resultMap="TaskPrizeMappingVO">
+    <select id="queryList" resultMap="TaskPrizeMappingDTO">
         SELECT
         <include refid="base_columns"/>
         <include refid="base_from"/>

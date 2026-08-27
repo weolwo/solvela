@@ -9,12 +9,11 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.task.record.dao.TaskRecordDao;
 import solvela.task.TaskRecord;
-import solvela.task.record.domain.form.TaskRecordAddForm;
-import solvela.task.record.domain.form.TaskRecordQueryForm;
-import solvela.task.record.domain.form.TaskRecordStatusUpdateForm;
-import solvela.task.record.domain.form.TaskRecordUpdateForm;
-import solvela.task.record.domain.vo.TaskRecordFunnelVO;
-import solvela.task.record.domain.vo.TaskRecordVO;
+import solvela.task.record.domain.command.TaskRecordAddCommand;
+import solvela.task.record.domain.query.TaskRecordQuery;
+import solvela.task.record.domain.command.TaskRecordUpdateCommand;
+import solvela.task.record.domain.dto.TaskRecordFunnelDTO;
+import solvela.task.record.domain.dto.TaskRecordDTO;
 import solvela.task.constant.TaskDiscardCode;
 import solvela.task.TaskConfig;
 import solvela.task.taskconfig.manager.TaskConfigManager;
@@ -57,9 +56,9 @@ public class TaskRecordService {
     /**
      * 分页查询
      */
-    public PageResult<TaskRecordVO> queryPage(TaskRecordQueryForm queryForm) {
+    public PageResult<TaskRecordDTO> queryPage(TaskRecordQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<TaskRecordVO> list = taskRecordDao.queryPage(page, queryForm);
+        List<TaskRecordDTO> list = taskRecordDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -74,9 +73,9 @@ public class TaskRecordService {
      * （没有过期扫描任务，它们永远不会自己收口），以及停在「已完成」没流转到「已发奖」的记录
      * （达标闸门与发奖流转是紧邻的两条 SQL，停在中间说明发奖那步断了）。
      */
-    public TaskRecordFunnelVO funnel(TaskRecordQueryForm queryForm) {
+    public TaskRecordFunnelDTO funnel(TaskRecordQuery queryForm) {
         Map<String, Object> row = taskRecordDao.selectFunnel(queryForm);
-        TaskRecordFunnelVO vo = new TaskRecordFunnelVO();
+        TaskRecordFunnelDTO vo = new TaskRecordFunnelDTO();
 
         long total = toLong(row.get("totalCount"));
         long members = toLong(row.get("memberCount"));
@@ -105,9 +104,9 @@ public class TaskRecordService {
         List<Map<String, Object>> discardStats = taskRecordDao.selectDiscardStat(queryForm);
         long discardTotal = discardStats.stream().mapToLong(s -> toLong(s.get("discardCount"))).sum();
         long discardAttention = 0L;
-        List<TaskRecordFunnelVO.DiscardStatVO> discardList = new ArrayList<>();
+        List<TaskRecordFunnelDTO.DiscardStatVO> discardList = new ArrayList<>();
         for (Map<String, Object> stat : discardStats) {
-            TaskRecordFunnelVO.DiscardStatVO item = new TaskRecordFunnelVO.DiscardStatVO();
+            TaskRecordFunnelDTO.DiscardStatVO item = new TaskRecordFunnelDTO.DiscardStatVO();
             String code = stat.get("discardCode") == null ? null : String.valueOf(stat.get("discardCode"));
             long count = toLong(stat.get("discardCount"));
             TaskDiscardCode discardCode = code == null ? null : TaskDiscardCode.resolve(code);
@@ -176,9 +175,9 @@ public class TaskRecordService {
                 : taskConfigManager.lambdaQuery().in(TaskConfig::getId, configIds).list().stream()
                         .collect(Collectors.toMap(TaskConfig::getId, Function.identity(), (a, b) -> a));
 
-        List<TaskRecordFunnelVO.TaskStatVO> taskList = new ArrayList<>();
+        List<TaskRecordFunnelDTO.TaskStatVO> taskList = new ArrayList<>();
         for (Map<String, Object> stat : taskStats) {
-            TaskRecordFunnelVO.TaskStatVO item = new TaskRecordFunnelVO.TaskStatVO();
+            TaskRecordFunnelDTO.TaskStatVO item = new TaskRecordFunnelDTO.TaskStatVO();
             Object idValue = stat.get("taskConfigId");
             Long configId = idValue == null ? null : ((Number) idValue).longValue();
             long recordCount = toLong(stat.get("recordCount"));
@@ -203,7 +202,7 @@ public class TaskRecordService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(TaskRecordAddForm addForm) {
+    public ResponseDTO<String> add(TaskRecordAddCommand addForm) {
         TaskRecord taskRecord = SolvelaBeanUtil.copy(addForm, TaskRecord.class);
         // 任务记录是状态表，不留账号快照；但会员号必须真实存在 ——
         // 关联键指向一个查不到的会员，列表里会是一行没有名字的孤儿记录，且当场不报错
@@ -216,7 +215,7 @@ public class TaskRecordService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(TaskRecordUpdateForm updateForm) {
+    public ResponseDTO<String> update(TaskRecordUpdateCommand updateForm) {
         TaskRecord taskRecord = SolvelaBeanUtil.copy(updateForm, TaskRecord.class);
         taskRecordDao.updateById(taskRecord);
         return ResponseDTO.ok();
@@ -230,14 +229,14 @@ public class TaskRecordService {
      * 故这里只放行 3，不接受其它值 —— 允许管理端随手把记录改回「进行中」或「已发奖」，
      * 等于给了一条绕过运行态直接改结果的路。
      */
-    public ResponseDTO<String> updateStatus(TaskRecordStatusUpdateForm form) {
-        if (!STATUS_EXPIRED.equals(form.getStatus())) {
+    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+        if (!STATUS_EXPIRED.equals(status)) {
             return ResponseDTO.userErrorParam("任务记录只支持置为 3-已过期（即管理端的「禁用」）");
         }
-        for (Long id : form.getIdList()) {
+        for (Long id : idList) {
             TaskRecord update = new TaskRecord();
             update.setId(id);
-            update.setStatus(form.getStatus());
+            update.setStatus(status);
             taskRecordDao.updateById(update);
         }
         return ResponseDTO.ok();

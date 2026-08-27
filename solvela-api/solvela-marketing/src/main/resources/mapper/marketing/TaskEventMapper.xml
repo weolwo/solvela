@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.task.taskevent.dao.TaskEventDao">
 
-    <resultMap id="TaskEventVO" type="solvela.task.taskevent.domain.vo.TaskEventVO">
+    <resultMap id="TaskEventDTO" type="solvela.task.taskevent.domain.dto.TaskEventDTO">
         <result column="id" property="id"/>
         <result column="event_code" property="eventCode"/>
         <result column="event_name" property="eventName"/>
@@ -23,7 +23,7 @@
         create_by, create_time, update_by, update_time
     </sql>
 
-    <select id="queryPage" resultMap="TaskEventVO">
+    <select id="queryPage" resultMap="TaskEventDTO">
         SELECT id, event_code, event_name, metric_source, payload_schema,
                biz_id_required, is_high_frequency, discard_log_flag, remark, status,
                create_time, update_time

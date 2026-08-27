@@ -5,13 +5,19 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.task.taskevent.domain.form.TaskEventAddForm;
-import solvela.task.taskevent.domain.form.TaskEventQueryForm;
-import solvela.task.taskevent.domain.form.TaskEventUpdateForm;
-import solvela.task.taskevent.domain.vo.TaskEventOptionVO;
-import solvela.task.taskevent.domain.vo.TaskEventVO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.admin.module.task.taskevent.domain.form.TaskEventAddForm;
+import solvela.task.taskevent.domain.command.TaskEventAddCommand;
+import solvela.admin.module.task.taskevent.domain.form.TaskEventQueryForm;
+import solvela.task.taskevent.domain.query.TaskEventQuery;
+import solvela.admin.module.task.taskevent.domain.form.TaskEventUpdateForm;
+import solvela.task.taskevent.domain.command.TaskEventUpdateCommand;
+import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
+import solvela.admin.module.task.taskevent.domain.vo.TaskEventVO;
+import solvela.task.taskevent.domain.dto.TaskEventDTO;
 import solvela.task.taskevent.service.TaskEventDefService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,7 +55,8 @@ public class TaskEventDefController {
     @PostMapping("/queryPage")
     @SaCheckPermission("taskEventDef:query")
     public ResponseDTO<PageResult<TaskEventVO>> queryPage(@RequestBody @Valid TaskEventQueryForm queryForm) {
-        return ResponseDTO.ok(taskEventDefService.queryPage(queryForm));
+        PageResult<TaskEventDTO> page = taskEventDefService.queryPage(SolvelaBeanUtil.copy(queryForm, TaskEventQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskEventVO.class));
     }
 
     /**
@@ -61,7 +68,7 @@ public class TaskEventDefController {
     @Operation(summary = "事件下拉（向导第1步用，只返回启用中的）")
     @GetMapping("/optionList")
     @SaCheckPermission("taskConfig:query")
-    public ResponseDTO<List<TaskEventOptionVO>> optionList() {
+    public ResponseDTO<List<TaskEventOptionDTO>> optionList() {
         return ResponseDTO.ok(taskEventDefService.optionList());
     }
 
@@ -69,14 +76,14 @@ public class TaskEventDefController {
     @PostMapping("/add")
     @SaCheckPermission("taskEventDef:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskEventAddForm addForm) {
-        return taskEventDefService.add(addForm);
+        return taskEventDefService.add(SolvelaBeanUtil.copy(addForm, TaskEventAddCommand.class));
     }
 
     @Operation(summary = "更新（事件编码不可改，UpdateForm 里刻意不定义该字段）")
     @PostMapping("/update")
     @SaCheckPermission("taskEventDef:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskEventUpdateForm updateForm) {
-        return taskEventDefService.update(updateForm);
+        return taskEventDefService.update(SolvelaBeanUtil.copy(updateForm, TaskEventUpdateCommand.class));
     }
 
     @Operation(summary = "删除（仍被任务配置引用时拒绝；建议优先用停用）")

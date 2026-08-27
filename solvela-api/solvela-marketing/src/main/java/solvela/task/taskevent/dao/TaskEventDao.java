@@ -3,8 +3,8 @@ package solvela.task.taskevent.dao;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.task.TaskEvent;
-import solvela.task.taskevent.domain.form.TaskEventQueryForm;
-import solvela.task.taskevent.domain.vo.TaskEventVO;
+import solvela.task.taskevent.domain.query.TaskEventQuery;
+import solvela.task.taskevent.domain.dto.TaskEventDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -19,7 +19,7 @@ import java.util.List;
 @Mapper
 public interface TaskEventDao extends BaseMapper<TaskEvent> {
 
-    List<TaskEventVO> queryPage(Page<?> page, @Param("queryForm") TaskEventQueryForm queryForm);
+    List<TaskEventDTO> queryPage(Page<?> page, @Param("queryForm") TaskEventQuery queryForm);
 
     /**
      * 按编码取（含停用的，由调用方判断状态 —— 停用与不存在要给不同的提示）

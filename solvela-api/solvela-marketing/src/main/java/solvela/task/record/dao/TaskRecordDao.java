@@ -3,8 +3,8 @@ package solvela.task.record.dao;
         import java.util.List;
 
         import solvela.task.TaskRecord;
-        import solvela.task.record.domain.form.TaskRecordQueryForm;
-        import solvela.task.record.domain.vo.TaskRecordVO;
+        import solvela.task.record.domain.query.TaskRecordQuery;
+        import solvela.task.record.domain.dto.TaskRecordDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -28,7 +28,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskRecordVO> queryPage(Page<?> page, @Param("queryForm") TaskRecordQueryForm queryForm);
+    List<TaskRecordDTO> queryPage(Page<?> page, @Param("queryForm") TaskRecordQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -36,7 +36,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<TaskRecordVO> queryList(@Param("queryForm") TaskRecordQueryForm queryForm);
+    List<TaskRecordDTO> queryList(@Param("queryForm") TaskRecordQuery queryForm);
 
     // ==================== 漏斗统计 ====================
 
@@ -47,12 +47,12 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * 出现「分项加起来不等于总数」这种自相矛盾。
      * 刻意不吃 status / completeTime 条件 —— 那两个正是漏斗要拆解的维度。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") TaskRecordQueryForm queryForm);
+    java.util.Map<String, Object> selectFunnel(@Param("queryForm") TaskRecordQuery queryForm);
 
     /**
      * 任务维度分布（接取量 TOP 20），一次查全 —— 逐个任务查一次在任务多起来之后就是 N+1。
      */
-    List<java.util.Map<String, Object>> selectTaskStat(@Param("queryForm") TaskRecordQueryForm queryForm);
+    List<java.util.Map<String, Object>> selectTaskStat(@Param("queryForm") TaskRecordQuery queryForm);
 
     /**
      * 事件丢弃分类分布，查的是 {@code t_task_record_flow}（走 idx_t_tsk_flw_stat）。
@@ -60,7 +60,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * <p>「用户做了事进度却不涨」的答案在这里，而不在记录表里：被丢弃的事件<b>压根没建记录</b>，
      * 记录表怎么翻都看不到它们。
      */
-    List<java.util.Map<String, Object>> selectDiscardStat(@Param("queryForm") TaskRecordQueryForm queryForm);
+    List<java.util.Map<String, Object>> selectDiscardStat(@Param("queryForm") TaskRecordQuery queryForm);
 
             // ----- 物理删除 -----
                 /**
