@@ -30,12 +30,36 @@
             <artifactId>solvela-model</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!--
+        直接依赖 web 栈，<b>不经过 solvela-web</b>。
+        solvela-web 是管理端的 HTTP 层：它带着 sa-token、knife4j 的管理端定制，
+        以及一个一律返回 200 + ResponseDTO 的全局异常处理器 —— 那套契约与本进程冲突。
+        本模块自己写 TraceFilter / ApiExceptionHandler / ClientIp，共十来个类，
+        换来的是「C 端的 HTTP 行为只有一个地方定义」。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
 
         <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-web</artifactId>
-            <version>3.0.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+
+        <!--
+        接口文档。与管理端同一套（knife4j -> springdoc），前端两边看到的形态一致。
+        生产包会把整套文档依赖排出 BOOT-INF/lib（见下面 prod profile 的 excludes，约 5.9MB）。
+
+        本模块<b>不写 @Operation</b>：方法上的 javadoc 就是接口描述，
+        由 therapi 在编译期编进资源、springdoc 在运行期读出来。
+        一份注释同时给读代码的人和看文档的人，不会两份各自过期。
+        -->
+        <dependency>
+            <groupId>com.baizhukui</groupId>
+            <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
+        </dependency>
+
 
         <dependency>
             <groupId>solvela</groupId>
