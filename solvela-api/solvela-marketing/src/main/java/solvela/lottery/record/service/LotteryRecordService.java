@@ -136,9 +136,9 @@ public class LotteryRecordService {
                 : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, codes).list().stream()
                         .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
 
-        List<LotteryRecordFunnelDTO.PrizeLevelStatVO> levelList = new ArrayList<>();
+        List<LotteryRecordFunnelDTO.PrizeLevelStatDTO> levelList = new ArrayList<>();
         for (Map<String, Object> stat : stats) {
-            LotteryRecordFunnelDTO.PrizeLevelStatVO item = new LotteryRecordFunnelDTO.PrizeLevelStatVO();
+            LotteryRecordFunnelDTO.PrizeLevelStatDTO item = new LotteryRecordFunnelDTO.PrizeLevelStatDTO();
             Object levelValue = stat.get("prizeLevel");
             item.setPrizeLevel(levelValue == null ? null : ((Number) levelValue).intValue());
             String code = stat.get("prizeCode") == null ? null : String.valueOf(stat.get("prizeCode"));

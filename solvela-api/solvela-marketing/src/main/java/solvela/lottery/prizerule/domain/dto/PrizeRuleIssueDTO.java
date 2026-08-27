@@ -1,6 +1,5 @@
 package solvela.lottery.prizerule.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -18,13 +17,13 @@ import lombok.Data;
 @AllArgsConstructor
 public class PrizeRuleIssueDTO {
 
-    @Schema(description = "告警编码，供前端做图标/分组，不直接展示")
+    /** 告警编码，供前端做图标/分组，不直接展示 */
     private String code;
 
-    @Schema(description = "严重级别: DANGER-会导致开奖或派奖出错, WARN-配置可疑但能跑")
+    /** 严重级别: DANGER-会导致开奖或派奖出错, WARN-配置可疑但能跑 */
     private String level;
 
-    @Schema(description = "人话说明：发现了什么，以及为什么这是问题")
+    /** 人话说明：发现了什么，以及为什么这是问题 */
     private String message;
 
     public static PrizeRuleIssueDTO danger(String code, String message) {

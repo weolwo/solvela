@@ -1,6 +1,5 @@
 package solvela.prize.prizelog.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -47,10 +46,10 @@ import lombok.Data;
 @Data
 public class PrizeLogFunnelDTO {
 
-    @Schema(description = "发奖记录总数（筛选范围内）")
+    /** 发奖记录总数（筛选范围内） */
     private Long totalCount;
 
-    @Schema(description = "涉及会员数（去重）")
+    /** 涉及会员数（去重） */
     private Long memberCount;
 
     // ---------------- 执行状态分布 ----------------
@@ -58,60 +57,56 @@ public class PrizeLogFunnelDTO {
     /**
      * {@code status=1}。措辞只能是「已发出」：营销域只发出了指令，是否到账要看账务域。
      */
-    @Schema(description = "已发出：status=1")
     private Long successCount;
 
-    @Schema(description = "等待执行：status=0")
+    /** 等待执行：status=0 */
     private Long waitingCount;
 
-    @Schema(description = "发放失败：status=2")
+    /** 发放失败：status=2 */
     private Long failedCount;
 
-    @Schema(description = "已发出率 = 已发出 / 总数。是「指令发出」的比例，不是到账率")
+    /** 已发出率 = 已发出 / 总数。是「指令发出」的比例，不是到账率 */
     private BigDecimal successRate;
 
     // ---------------- 审批分布 ----------------
 
-    @Schema(description = "无需审批：approve_status=0")
+    /** 无需审批：approve_status=0 */
     private Long approveNoneCount;
 
     /**
      * 本页唯一需要人动手处理的东西：{@code approve_mode=1} 的奖品只有审批通过才会派发。
      */
-    @Schema(description = "待审批：approve_status=1")
     private Long approvePendingCount;
 
-    @Schema(description = "已批准：approve_status=2")
+    /** 已批准：approve_status=2 */
     private Long approvePassedCount;
 
-    @Schema(description = "已驳回：approve_status=3")
+    /** 已驳回：approve_status=3 */
     private Long approveRejectedCount;
 
     /**
      * 待审积压里最久的一条已经等了多少分钟。只看条数看不出「挂了六天」。
      */
-    @Schema(description = "最久一条待审批已等待的分钟数，无积压时为 0")
     private Long approveOldestMinutes;
 
     /**
      * {@code status=0} 且 {@code approve_status<>1} 且 30 分钟没动过。
      * 不等于故障：可能是提案在财务审批池里。判断要拿来源单号去提案记录页对。
      */
-    @Schema(description = "卡在等待执行：status=0 且不在等审批，且 30 分钟无更新")
     private Long stuckWaitingCount;
 
     // ---------------- 分布 ----------------
 
-    @Schema(description = "奖励类型维度：条数与价值双口径，价值按类型分开算")
-    private List<PrizeTypeStatVO> typeList;
+    /** 奖励类型维度：条数与价值双口径，价值按类型分开算 */
+    private List<PrizeTypeStatDTO> typeList;
 
-    @Schema(description = "奖品维度分布，按发奖量降序（TOP 20）")
-    private List<PrizeStatVO> prizeList;
+    /** 奖品维度分布，按发奖量降序（TOP 20） */
+    private List<PrizeStatDTO> prizeList;
 
-    @Schema(description = "失败原因分布（TOP 10）")
-    private List<FailReasonVO> failReasonList;
+    /** 失败原因分布（TOP 10） */
+    private List<FailReasonDTO> failReasonList;
 
-    @Schema(description = "数据一致性与流程体检告警")
+    /** 数据一致性与流程体检告警 */
     private List<String> issueList;
 
     /**
@@ -122,37 +117,35 @@ public class PrizeLogFunnelDTO {
      * 实物是<b>价值</b>。DDL 里那句「积分数/券ID」的列注释是早年的，已经和代码对不上了。
      */
     @Data
-    public static class PrizeTypeStatVO {
+    public static class PrizeTypeStatDTO {
 
         /**
          * 只回编码，中文名与单位由前端字典解析 —— 在这里再手写一份就是第二个真相源。
          */
-        @Schema(description = "奖励类型：SCORE/BALANCE/COUPON/PHYSICAL")
         private String prizeType;
 
-        @Schema(description = "记录条数")
+        /** 记录条数 */
         private Long logCount;
 
-        @Schema(description = "已发出条数：status=1")
+        /** 已发出条数：status=1 */
         private Long successCount;
 
-        @Schema(description = "已发出率")
+        /** 已发出率 */
         private BigDecimal successRate;
 
-        @Schema(description = "已发出价值 = SUM(prize_value)，仅统计 status=1 且体值可解析的行")
+        /** 已发出价值 = SUM(prize_value)，仅统计 status=1 且体值可解析的行 */
         private BigDecimal successValue;
 
-        @Schema(description = "在途价值：status=0，指令还没执行完，钱还没出去")
+        /** 在途价值：status=0，指令还没执行完，钱还没出去 */
         private BigDecimal waitingValue;
 
-        @Schema(description = "失败价值：status=2，这部分是用户没拿到的")
+        /** 失败价值：status=2，这部分是用户没拿到的 */
         private BigDecimal failedValue;
 
         /**
          * 体值解析不了的条数。这批行的价值<b>没有</b>计入上面三个金额 ——
          * 不标出来就是静默少算。
          */
-        @Schema(description = "奖励体值不是数字的条数，其价值未计入本行金额")
         private Long badValueCount;
     }
 
@@ -160,33 +153,33 @@ public class PrizeLogFunnelDTO {
      * 一个奖品的发放情况：哪个奖发得多、哪个奖最容易发不出去。
      */
     @Data
-    public static class PrizeStatVO {
+    public static class PrizeStatDTO {
 
-        @Schema(description = "奖品编码")
+        /** 奖品编码 */
         private String prizeCode;
 
-        @Schema(description = "奖品名称（取同组样本；改过名的历史行可能与最新配置不一致）")
+        /** 奖品名称（取同组样本；改过名的历史行可能与最新配置不一致） */
         private String prizeName;
 
-        @Schema(description = "奖励类型")
+        /** 奖励类型 */
         private String prizeType;
 
-        @Schema(description = "记录条数")
+        /** 记录条数 */
         private Long logCount;
 
-        @Schema(description = "已发出条数")
+        /** 已发出条数 */
         private Long successCount;
 
-        @Schema(description = "等待执行条数")
+        /** 等待执行条数 */
         private Long waitingCount;
 
-        @Schema(description = "失败条数")
+        /** 失败条数 */
         private Long failedCount;
 
-        @Schema(description = "待审批条数")
+        /** 待审批条数 */
         private Long pendingCount;
 
-        @Schema(description = "已发出率")
+        /** 已发出率 */
         private BigDecimal successRate;
     }
 
@@ -200,15 +193,15 @@ public class PrizeLogFunnelDTO {
      * 所以这里如实按原文展示，不编造分类。
      */
     @Data
-    public static class FailReasonVO {
+    public static class FailReasonDTO {
 
-        @Schema(description = "失败原因原文；写入侧没写时为 null")
+        /** 失败原因原文；写入侧没写时为 null */
         private String failReason;
 
-        @Schema(description = "条数")
+        /** 条数 */
         private Long failCount;
 
-        @Schema(description = "占全部失败的比例")
+        /** 占全部失败的比例 */
         private BigDecimal failShare;
     }
 }

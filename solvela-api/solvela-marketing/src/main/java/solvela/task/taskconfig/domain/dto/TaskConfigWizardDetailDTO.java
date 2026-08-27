@@ -1,6 +1,5 @@
 package solvela.task.taskconfig.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -28,82 +27,82 @@ import java.util.Map;
 @Data
 public class TaskConfigWizardDetailDTO {
 
-    @Schema(description = "任务配置ID")
+    /** 任务配置ID */
     private Long id;
 
-    @Schema(description = "活动编码（编辑态锁定，不可改）")
+    /** 活动编码（编辑态锁定，不可改） */
     private String activityCode;
 
-    @Schema(description = "模板Code（编辑态锁定，不可改）")
+    /** 模板Code（编辑态锁定，不可改） */
     private String templateCode;
 
-    @Schema(description = "任务名称")
+    /** 任务名称 */
     private String taskName;
 
-    @Schema(description = "触发事件")
+    /** 触发事件 */
     private String triggerEvent;
 
-    @Schema(description = "任务分组")
+    /** 任务分组 */
     private String taskGroup;
 
-    @Schema(description = "目标人群")
+    /** 目标人群 */
     private String targetAudience;
 
-    @Schema(description = "参与频次")
+    /** 参与频次 */
     private String limitType;
 
-    @Schema(description = "限制次数")
+    /** 限制次数 */
     private Integer limitCount;
 
-    @Schema(description = "排序权重")
+    /** 排序权重 */
     private Integer sortWeight;
 
-    @Schema(description = "跳转地址")
+    /** 跳转地址 */
     private String actionUrl;
 
-    @Schema(description = "开始时间")
+    /** 开始时间 */
     private LocalDateTime startTime;
 
-    @Schema(description = "结束时间")
+    /** 结束时间 */
     private LocalDateTime endTime;
 
-    @Schema(description = "任务状态（只读回显，向导不改它）")
+    /** 任务状态（只读回显，向导不改它） */
     private Integer status;
 
-    @Schema(description = "C端任务说明（从 ui_config 摘出）")
+    /** C端任务说明（从 ui_config 摘出） */
     private String taskDesc;
 
-    @Schema(description = "C端规则说明（从 ui_config 摘出）")
+    /** C端规则说明（从 ui_config 摘出） */
     private String ruleDesc;
 
-    @Schema(description = "角标（从 ui_config 摘出）")
+    /** 角标（从 ui_config 摘出） */
     private String badge;
 
-    @Schema(description = "规则参数：ui_schema 里非图片类参数的取值")
+    /** 规则参数：ui_schema 里非图片类参数的取值 */
     private Map<String, Object> ruleConfig;
 
-    @Schema(description = "展示参数：ui_schema 里 image_upload 类参数的取值（已剔除 badge/taskDesc/ruleDesc）")
+    /** 展示参数：ui_schema 里 image_upload 类参数的取值（已剔除 badge/taskDesc/ruleDesc） */
     private Map<String, Object> uiConfig;
 
-    @Schema(description = "奖励阶梯")
+    /** 奖励阶梯 */
     private List<PrizeLadder> prizeMappingList;
 
     @Data
     public static class PrizeLadder {
 
-        @Schema(description = "阶梯层级，从1开始")
+        /** 阶梯层级，从1开始 */
         private Integer stageLevel;
 
-        @Schema(description = "达标条件数值")
+        /** 达标条件数值 */
         private Integer stageCondition;
 
-        @Schema(description = "奖励编码")
+        /** 奖励编码 */
         private String prizeCode;
 
-        @Schema(description = "计算类型")
+        /** 计算类型 */
         private String prizeMode;
 
-        @Schema(description = "奖励额度")
+        /** 奖励额度 */
         private BigDecimal prizeValue;
     }
 }

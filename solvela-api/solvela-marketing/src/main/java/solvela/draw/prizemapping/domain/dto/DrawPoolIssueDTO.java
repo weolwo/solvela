@@ -1,6 +1,5 @@
 package solvela.draw.prizemapping.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -17,13 +16,13 @@ import lombok.Data;
 @AllArgsConstructor
 public class DrawPoolIssueDTO {
 
-    @Schema(description = "告警编码，供前端分组，不直接展示")
+    /** 告警编码，供前端分组，不直接展示 */
     private String code;
 
-    @Schema(description = "严重级别: DANGER-会导致抽奖报错或发不出奖, WARN-配置可疑但能跑")
+    /** 严重级别: DANGER-会导致抽奖报错或发不出奖, WARN-配置可疑但能跑 */
     private String level;
 
-    @Schema(description = "人话说明：发现了什么，以及会导致什么后果")
+    /** 人话说明：发现了什么，以及会导致什么后果 */
     private String message;
 
     public static DrawPoolIssueDTO danger(String code, String message) {

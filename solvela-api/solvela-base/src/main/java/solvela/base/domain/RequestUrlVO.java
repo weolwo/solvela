@@ -1,6 +1,5 @@
 package solvela.base.domain;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -15,12 +14,12 @@ import lombok.Data;
 @Data
 public class RequestUrlVO {
 
-    @Schema(description = "注释说明")
+    /** 注释说明 */
     private String comment;
 
-    @Schema(description = "controller.method")
+    /** controller.method */
     private String name;
 
-    @Schema(description = "url")
+    /** url */
     private String url;
 }

@@ -1,6 +1,5 @@
 package solvela.base.module.file.domain.vo;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.List;
@@ -17,10 +16,10 @@ import java.util.List;
 @Data
 public class FileDetailVO {
 
-    @Schema(description = "文件基础信息")
+    /** 文件基础信息 */
     private FileVO file;
 
-    @Schema(description = "引用它的业务对象")
+    /** 引用它的业务对象 */
     private List<Reference> references;
 
     /**
@@ -33,10 +32,10 @@ public class FileDetailVO {
     @Data
     public static class Reference {
 
-        @Schema(description = "业务类型：ACTIVITY_DISPLAY / NOTICE / ...")
+        /** 业务类型：ACTIVITY_DISPLAY / NOTICE / ... */
         private String bizType;
 
-        @Schema(description = "业务对象ID")
+        /** 业务对象ID */
         private Long bizId;
     }
 }

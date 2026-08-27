@@ -1,6 +1,5 @@
 package solvela.base.module.file.domain.form;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -18,11 +17,11 @@ import java.util.List;
 @Data
 public class FileMetaUpdateForm {
 
-    @Schema(description = "文件ID")
+    /** 文件ID */
     @NotNull(message = "文件ID不能为空")
     private Long fileId;
 
-    @Schema(description = "文件名称（展示用，不影响存储）")
+    /** 文件名称（展示用，不影响存储） */
     private String originalName;
 
     /**
@@ -30,6 +29,5 @@ public class FileMetaUpdateForm {
      * 前后带逗号是为了让检索能精确匹配，否则搜「618」会命中「6180」。
      * 含逗号的标签会被丢弃而不是转义：那会破坏存储结构。
      */
-    @Schema(description = "标签列表")
     private List<String> tags;
 }

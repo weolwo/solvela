@@ -1,6 +1,5 @@
 package solvela.draw.poolconfig.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -14,13 +13,13 @@ import lombok.Data;
 @AllArgsConstructor
 public class PoolConfigIssueDTO {
 
-    @Schema(description = "告警编码")
+    /** 告警编码 */
     private String code;
 
-    @Schema(description = "严重级别: DANGER-抽奖会报错或压根进不来, WARN-配置可疑但能跑")
+    /** 严重级别: DANGER-抽奖会报错或压根进不来, WARN-配置可疑但能跑 */
     private String level;
 
-    @Schema(description = "人话说明：发现了什么，以及会导致什么后果")
+    /** 人话说明：发现了什么，以及会导致什么后果 */
     private String message;
 
     public static PoolConfigIssueDTO danger(String code, String message) {

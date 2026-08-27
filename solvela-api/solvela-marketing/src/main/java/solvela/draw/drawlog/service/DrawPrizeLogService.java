@@ -89,9 +89,9 @@ public class DrawPrizeLogService {
                 : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, codes).list().stream()
                         .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
 
-        List<DrawFunnelDTO.PrizeHitVO> prizeHitList = new ArrayList<>();
+        List<DrawFunnelDTO.PrizeHitDTO> prizeHitList = new ArrayList<>();
         for (Map<String, Object> h : hits) {
-            DrawFunnelDTO.PrizeHitVO item = new DrawFunnelDTO.PrizeHitVO();
+            DrawFunnelDTO.PrizeHitDTO item = new DrawFunnelDTO.PrizeHitDTO();
             String code = String.valueOf(h.get("prizeCode"));
             long count = toLong(h.get("hitCount"));
             item.setPrizeCode(code);

@@ -104,9 +104,9 @@ public class TaskRecordService {
         List<Map<String, Object>> discardStats = taskRecordDao.selectDiscardStat(queryForm);
         long discardTotal = discardStats.stream().mapToLong(s -> toLong(s.get("discardCount"))).sum();
         long discardAttention = 0L;
-        List<TaskRecordFunnelDTO.DiscardStatVO> discardList = new ArrayList<>();
+        List<TaskRecordFunnelDTO.DiscardStatDTO> discardList = new ArrayList<>();
         for (Map<String, Object> stat : discardStats) {
-            TaskRecordFunnelDTO.DiscardStatVO item = new TaskRecordFunnelDTO.DiscardStatVO();
+            TaskRecordFunnelDTO.DiscardStatDTO item = new TaskRecordFunnelDTO.DiscardStatDTO();
             String code = stat.get("discardCode") == null ? null : String.valueOf(stat.get("discardCode"));
             long count = toLong(stat.get("discardCount"));
             TaskDiscardCode discardCode = code == null ? null : TaskDiscardCode.resolve(code);
@@ -175,9 +175,9 @@ public class TaskRecordService {
                 : taskConfigManager.lambdaQuery().in(TaskConfig::getId, configIds).list().stream()
                         .collect(Collectors.toMap(TaskConfig::getId, Function.identity(), (a, b) -> a));
 
-        List<TaskRecordFunnelDTO.TaskStatVO> taskList = new ArrayList<>();
+        List<TaskRecordFunnelDTO.TaskStatDTO> taskList = new ArrayList<>();
         for (Map<String, Object> stat : taskStats) {
-            TaskRecordFunnelDTO.TaskStatVO item = new TaskRecordFunnelDTO.TaskStatVO();
+            TaskRecordFunnelDTO.TaskStatDTO item = new TaskRecordFunnelDTO.TaskStatDTO();
             Object idValue = stat.get("taskConfigId");
             Long configId = idValue == null ? null : ((Number) idValue).longValue();
             long recordCount = toLong(stat.get("recordCount"));

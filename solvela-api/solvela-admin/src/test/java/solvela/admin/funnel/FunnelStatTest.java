@@ -126,13 +126,13 @@ class FunnelStatTest {
                 vo.getRunningCount() + vo.getCompletedCount() + vo.getDispatchedCount() + vo.getExpiredCount(),
                 "四个状态桶之和不等于总数：要么 SQL 漏了一个 status 取值，要么库里有字典外的状态");
 
-        long statSum = vo.getTaskList().stream().mapToLong(TaskRecordFunnelDTO.TaskStatVO::getRecordCount).sum();
+        long statSum = vo.getTaskList().stream().mapToLong(TaskRecordFunnelDTO.TaskStatDTO::getRecordCount).sum();
         long top20Total = count("SELECT COALESCE(SUM(c), 0) FROM (SELECT COUNT(*) c FROM t_task_record"
                 + " GROUP BY task_config_id ORDER BY c DESC LIMIT 20) t");
         assertEquals(top20Total, statSum, "任务分布（TOP 20）条数之和与库里对不上");
 
         long discardSum = vo.getDiscardList().stream()
-                .mapToLong(TaskRecordFunnelDTO.DiscardStatVO::getDiscardCount).sum();
+                .mapToLong(TaskRecordFunnelDTO.DiscardStatDTO::getDiscardCount).sum();
         assertEquals(count("SELECT COUNT(*) FROM t_task_record_flow WHERE flow_type = 2"), discardSum,
                 "丢弃分类条数之和与流水表对不上");
         assertEquals(discardSum, vo.getDiscardTotalCount());
@@ -172,7 +172,7 @@ class FunnelStatTest {
         ProposalFunnelDTO vo = proposalRecordService.funnel(new ProposalRecordQuery());
         assertEquals(blocked, vo.getBlockedCount());
         assertEquals(blocked,
-                vo.getBlockReasonList().stream().mapToLong(ProposalFunnelDTO.BlockReasonVO::getBlockCount).sum(),
+                vo.getBlockReasonList().stream().mapToLong(ProposalFunnelDTO.BlockReasonDTO::getBlockCount).sum(),
                 "拦截原因条数之和与拦截总数对不上（分类超过 10 类时 LIMIT 10 会截断，届时本断言需要跟着改）");
 
         /*
@@ -200,7 +200,7 @@ class FunnelStatTest {
                 "状态桶之和不等于总数：库里出现了 0/10/11/20/30/40/50/60/70/80 之外的状态");
 
         assertEquals(vo.getTotalCount(),
-                vo.getAssetList().stream().mapToLong(ProposalFunnelDTO.AssetStatVO::getProposalCount).sum(),
+                vo.getAssetList().stream().mapToLong(ProposalFunnelDTO.AssetStatDTO::getProposalCount).sum(),
                 "资产分布条数之和不等于总数");
         assertEquals(vo.getTotalCount(),
                 vo.getSourceList().stream().mapToLong(ProposalFunnelDTO.SourceStatDTO::getProposalCount).sum(),
@@ -214,7 +214,7 @@ class FunnelStatTest {
         ProposalFunnelDTO vo = proposalRecordService.funnel(new ProposalRecordQuery());
         assertFalse(vo.getAssetList().isEmpty(), "t_proposal_record 没有数据，本用例无法证明任何事");
 
-        for (ProposalFunnelDTO.AssetStatVO asset : vo.getAssetList()) {
+        for (ProposalFunnelDTO.AssetStatDTO asset : vo.getAssetList()) {
             Double expected = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(amount * quantity), 0) FROM t_proposal_record"
                             + " WHERE asset_type = ? AND status = 50", Double.class, asset.getAssetType());
@@ -268,11 +268,11 @@ class FunnelStatTest {
                         + vo.getApprovePassedCount() + vo.getApproveRejectedCount(),
                 "审批状态桶之和不等于总数：库里出现了 0/1/2/3 之外的 approve_status");
         assertEquals(vo.getTotalCount(),
-                vo.getTypeList().stream().mapToLong(PrizeLogFunnelDTO.PrizeTypeStatVO::getLogCount).sum(),
+                vo.getTypeList().stream().mapToLong(PrizeLogFunnelDTO.PrizeTypeStatDTO::getLogCount).sum(),
                 "奖励类型分布条数之和不等于总数");
 
         long prizeSum = vo.getPrizeList().stream()
-                .mapToLong(PrizeLogFunnelDTO.PrizeStatVO::getLogCount).sum();
+                .mapToLong(PrizeLogFunnelDTO.PrizeStatDTO::getLogCount).sum();
         long top20Total = count("SELECT COALESCE(SUM(c), 0) FROM (SELECT COUNT(*) c FROM t_prize_log"
                 + " GROUP BY prize_code ORDER BY c DESC LIMIT 20) t");
         assertEquals(top20Total, prizeSum, "奖品分布（TOP 20）条数之和与库里对不上");
@@ -284,7 +284,7 @@ class FunnelStatTest {
         PrizeLogFunnelDTO vo = prizeLogService.funnel(new PrizeLogQuery());
         assertFalse(vo.getTypeList().isEmpty(), "t_prize_log 没有数据，本用例无法证明任何事");
 
-        for (PrizeLogFunnelDTO.PrizeTypeStatVO type : vo.getTypeList()) {
+        for (PrizeLogFunnelDTO.PrizeTypeStatDTO type : vo.getTypeList()) {
             /*
              * 断言里必须带上同一个 REGEXP：prize_value 是 varchar，
              * 直接 CAST 的话 MySQL 对解析不了的字符串只给警告并返回 0 ——
@@ -309,7 +309,7 @@ class FunnelStatTest {
         PrizeLogFunnelDTO vo = prizeLogService.funnel(new PrizeLogQuery());
         assertEquals(failed, vo.getFailedCount());
         assertEquals(failed,
-                vo.getFailReasonList().stream().mapToLong(PrizeLogFunnelDTO.FailReasonVO::getFailCount).sum(),
+                vo.getFailReasonList().stream().mapToLong(PrizeLogFunnelDTO.FailReasonDTO::getFailCount).sum(),
                 "失败原因条数之和与失败总数对不上（原因超过 10 种时 LIMIT 10 会截断，届时本断言需要跟着改）");
     }
 

@@ -1,6 +1,5 @@
 package solvela.lottery.config.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Data;
 
@@ -14,28 +13,27 @@ import lombok.Data;
 @Data
 public class LotteryConfigBoardResultDTO {
 
-    @Schema(description = "玩法总数（筛选后）")
+    /** 玩法总数（筛选后） */
     private Integer lotteryCount;
 
     /**
      * 当前真正能领号的玩法数：已上线 + 配了奖级 + 有正在售卖窗口内的待开奖期号。
      * 三者缺一，用户点领号都会被拒。
      */
-    @Schema(description = "当前可领号的玩法数")
     private Integer sellableCount;
 
-    @Schema(description = "DANGER 级告警总数")
+    /** DANGER 级告警总数 */
     private Integer dangerCount;
 
-    @Schema(description = "WARN 级告警总数")
+    /** WARN 级告警总数 */
     private Integer warnCount;
 
-    @Schema(description = "累计已发号数")
+    /** 累计已发号数 */
     private Long totalSold;
 
-    @Schema(description = "当前页的玩法明细")
+    /** 当前页的玩法明细 */
     private List<LotteryConfigBoardDTO> list;
 
-    @Schema(description = "玩法总数，供前端分页")
+    /** 玩法总数，供前端分页 */
     private Long total;
 }

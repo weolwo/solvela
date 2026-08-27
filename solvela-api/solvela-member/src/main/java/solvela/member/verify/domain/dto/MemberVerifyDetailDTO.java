@@ -1,6 +1,5 @@
 package solvela.member.verify.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -21,33 +20,33 @@ import java.time.LocalDateTime;
 @Data
 public class MemberVerifyDetailDTO {
 
-    @Schema(description = "id")
+    /** id */
     private Long id;
 
-    @Schema(description = "会员号")
+    /** 会员号 */
     private Long memberId;
 
-    @Schema(description = "账号")
+    /** 账号 */
     private String memberName;
 
-    @Schema(description = "昵称")
+    /** 昵称 */
     private String nickname;
 
-    @Schema(description = "真实姓名（明文）")
+    /** 真实姓名（明文） */
     private String realName;
 
-    @Schema(description = "身份证号（明文）")
+    /** 身份证号（明文） */
     private String idCard;
 
-    @Schema(description = "认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败")
+    /** 认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败 */
     private Integer verifyStatus;
 
-    @Schema(description = "认证通过时间")
+    /** 认证通过时间 */
     private LocalDateTime verifyTime;
 
-    @Schema(description = "认证失败原因")
+    /** 认证失败原因 */
     private String failReason;
 
-    @Schema(description = "提交时间")
+    /** 提交时间 */
     private LocalDateTime createTime;
 }

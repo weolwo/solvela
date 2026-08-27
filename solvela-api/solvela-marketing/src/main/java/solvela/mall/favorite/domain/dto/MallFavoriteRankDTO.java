@@ -1,6 +1,5 @@
 package solvela.mall.favorite.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -15,30 +14,30 @@ import lombok.Data;
 @Data
 public class MallFavoriteRankDTO {
 
-    @Schema(description = "商品id")
+    /** 商品id */
     private Long commodityId;
 
-    @Schema(description = "商品名称")
+    /** 商品名称 */
     private String commodityName;
 
-    @Schema(description = "商品编码")
+    /** 商品编码 */
     private String commodityCode;
 
-    @Schema(description = "封面图 file_id")
+    /** 封面图 file_id */
     private Long coverFileId;
 
-    @Schema(description = "商品状态：0-下架, 1-上架, 2-草稿")
+    /** 商品状态：0-下架, 1-上架, 2-草稿 */
     private Integer commodityStatus;
 
-    @Schema(description = "基准兑换积分")
+    /** 基准兑换积分 */
     private Integer pointsPrice;
 
-    @Schema(description = "可用库存合计")
+    /** 可用库存合计 */
     private Integer availableStock;
 
-    @Schema(description = "收藏数")
+    /** 收藏数 */
     private Long favoriteCount;
 
-    @Schema(description = "累计已兑件数")
+    /** 累计已兑件数 */
     private Integer soldCount;
 }

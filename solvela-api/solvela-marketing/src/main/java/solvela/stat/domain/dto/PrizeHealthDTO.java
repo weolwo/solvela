@@ -1,6 +1,5 @@
 package solvela.stat.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -25,81 +24,81 @@ import java.util.List;
 @Data
 public class PrizeHealthDTO {
 
-    @Schema(description = "统计口径：全局 or 某活动。activityCode 为空时是全局")
+    /** 统计口径：全局 or 某活动。activityCode 为空时是全局 */
     private String activityCode;
 
-    @Schema(description = "统计天数（趋势用；条数与价值是该活动/全局的全量，不受 days 限制）")
+    /** 统计天数（趋势用；条数与价值是该活动/全局的全量，不受 days 限制） */
     private Integer days;
 
-    @Schema(description = "发奖记录总条数")
+    /** 发奖记录总条数 */
     private Integer total;
 
-    @Schema(description = "成功条数 status=1")
+    /** 成功条数 status=1 */
     private Integer successCount;
 
-    @Schema(description = "失败条数 status=2")
+    /** 失败条数 status=2 */
     private Integer failedCount;
 
-    @Schema(description = "等待条数 status=0（正常只应对应「等人工审批」）")
+    /** 等待条数 status=0（正常只应对应「等人工审批」） */
     private Integer waitingCount;
 
-    @Schema(description = "待审批积压笔数 approve_status=1（营销域审批，不含账务侧）")
+    /** 待审批积压笔数 approve_status=1（营销域审批，不含账务侧） */
     private Integer pendingApproveCount;
 
-    @Schema(description = "待审批最长滞留小时数")
+    /** 待审批最长滞留小时数 */
     private Long maxWaitHours;
 
-    @Schema(description = "已发出价值合计：仅 status=1 计入")
+    /** 已发出价值合计：仅 status=1 计入 */
     private BigDecimal issuedValue;
 
-    @Schema(description = "按资产类型拆开的条数与价值，count 之和等于 total")
+    /** 按资产类型拆开的条数与价值，count 之和等于 total */
     private List<AssetItem> byAssetList;
 
-    @Schema(description = "发奖失败原因 TOP")
+    /** 发奖失败原因 TOP */
     private List<FailReason> failReasonList;
 
-    @Schema(description = "日期轴，已补齐无数据的日期")
+    /** 日期轴，已补齐无数据的日期 */
     private List<String> dateList;
 
-    @Schema(description = "发出价值趋势：日期 × 资产类型，已补 0")
+    /** 发出价值趋势：日期 × 资产类型，已补 0 */
     private List<TrendItem> trendList;
 
     @Data
-    @Schema(description = "按资产类型拆分")
+    /** 按资产类型拆分 */
     public static class AssetItem {
 
-        @Schema(description = "资产类型 SCORE/BALANCE/COUPON/PHYSICAL")
+        /** 资产类型 SCORE/BALANCE/COUPON/PHYSICAL */
         private String prizeType;
 
-        @Schema(description = "记录条数（含成功、失败、等待）")
+        /** 记录条数（含成功、失败、等待） */
         private Integer count;
 
-        @Schema(description = "已发出价值：仅 status=1 计入")
+        /** 已发出价值：仅 status=1 计入 */
         private BigDecimal issuedValue;
     }
 
     @Data
-    @Schema(description = "失败原因")
+    /** 失败原因 */
     public static class FailReason {
 
-        @Schema(description = "失败原因原文")
+        /** 失败原因原文 */
         private String failReason;
 
-        @Schema(description = "条数")
+        /** 条数 */
         private Integer count;
     }
 
     @Data
-    @Schema(description = "价值趋势的一个点")
+    /** 价值趋势的一个点 */
     public static class TrendItem {
 
-        @Schema(description = "日期 yyyy-MM-dd")
+        /** 日期 yyyy-MM-dd */
         private String statDate;
 
-        @Schema(description = "资产类型")
+        /** 资产类型 */
         private String prizeType;
 
-        @Schema(description = "当天该资产已发出价值")
+        /** 当天该资产已发出价值 */
         private BigDecimal issuedValue;
     }
 }

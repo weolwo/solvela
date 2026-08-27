@@ -369,9 +369,9 @@ public class ProposalRecordService {
         vo.setStuckDispatchCount(stuckDispatch);
 
         // ---- 资产维度：金额按 asset_type 分开算，绝不合并 ----
-        List<ProposalFunnelDTO.AssetStatVO> assetList = new ArrayList<>();
+        List<ProposalFunnelDTO.AssetStatDTO> assetList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectAssetStat(queryForm)) {
-            ProposalFunnelDTO.AssetStatVO item = new ProposalFunnelDTO.AssetStatVO();
+            ProposalFunnelDTO.AssetStatDTO item = new ProposalFunnelDTO.AssetStatDTO();
             item.setAssetType(stat.get("assetType") == null ? null : String.valueOf(stat.get("assetType")));
             item.setProposalCount(toLong(stat.get("proposalCount")));
             item.setSuccessCount(toLong(stat.get("successCount")));
@@ -407,9 +407,9 @@ public class ProposalRecordService {
 
         // ---- 风控拦截原因：按 risk_code 聚类，文案改了统计也不会裂 ----
         long blockAttention = 0L;
-        List<ProposalFunnelDTO.BlockReasonVO> blockReasonList = new ArrayList<>();
+        List<ProposalFunnelDTO.BlockReasonDTO> blockReasonList = new ArrayList<>();
         for (Map<String, Object> stat : proposalRecordDao.selectBlockReasonStat(queryForm)) {
-            ProposalFunnelDTO.BlockReasonVO item = new ProposalFunnelDTO.BlockReasonVO();
+            ProposalFunnelDTO.BlockReasonDTO item = new ProposalFunnelDTO.BlockReasonDTO();
             String code = stat.get("riskCode") == null ? null : String.valueOf(stat.get("riskCode"));
             String sampleRemark = stat.get("sampleRemark") == null ? null : String.valueOf(stat.get("sampleRemark"));
             RiskBlockCode blockCode = code == null ? null : RiskBlockCode.resolve(code);

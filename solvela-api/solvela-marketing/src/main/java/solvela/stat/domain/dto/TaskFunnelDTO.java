@@ -1,6 +1,5 @@
 package solvela.stat.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -21,32 +20,32 @@ import java.util.List;
 @Data
 public class TaskFunnelDTO {
 
-    @Schema(description = "任务配置ID")
+    /** 任务配置ID */
     private Long taskConfigId;
 
-    @Schema(description = "任务名称")
+    /** 任务名称 */
     private String taskName;
 
-    @Schema(description = "接取人数：有任务记录的人数（漏斗第一层）")
+    /** 接取人数：有任务记录的人数（漏斗第一层） */
     private Integer joinedCount;
 
-    @Schema(description = "各阶梯档位，按 stage_level 升序")
+    /** 各阶梯档位，按 stage_level 升序 */
     private List<StageItem> stageList;
 
     @Data
-    @Schema(description = "一个阶梯档位")
+    /** 一个阶梯档位 */
     public static class StageItem {
 
-        @Schema(description = "档位序号")
+        /** 档位序号 */
         private Integer stageLevel;
 
-        @Schema(description = "达标条件，取自 stage_condition.target")
+        /** 达标条件，取自 stage_condition.target */
         private BigDecimal target;
 
-        @Schema(description = "该档发什么奖")
+        /** 该档发什么奖 */
         private String prizeCode;
 
-        @Schema(description = "到达人数：current_metric >= target 的人数")
+        /** 到达人数：current_metric >= target 的人数 */
         private Integer reachCount;
     }
 }

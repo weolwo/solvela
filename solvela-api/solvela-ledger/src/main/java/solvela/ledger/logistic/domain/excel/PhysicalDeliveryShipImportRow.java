@@ -15,6 +15,7 @@ import solvela.enums.DeliveryStatusEnum;
  * 表头与解析共用同一个类是刻意的 —— 拆成两份，字段一改就会漂。
  *
  * <p>原名以 Form 结尾会让人以为它和其它写入表单一样该移交端，故改名为 Row。
+ * @param sourceBizId 来源单号。原先是「发奖提案ID」(Long)，随 t_physical_delivery 泛化成字符串单号 —— 商城兑换的履约单没有提案 ID，填的是订单号。 ⚠️ forceText：订单号是「看起来像数字但不是数值」的典型，不强制文本会被 Excel 吃掉前导 0 或转成科学计数法，回填时就匹配不上了。
  */
 public record PhysicalDeliveryShipImportRow(
 

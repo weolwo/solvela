@@ -1,6 +1,5 @@
 package solvela.lottery.issue.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -18,16 +17,16 @@ import lombok.Data;
 @Data
 public class LotteryIssueOverviewDTO {
 
-    @Schema(description = "逾期未开奖：计划开奖时间已过，却还没开完奖")
+    /** 逾期未开奖：计划开奖时间已过，却还没开完奖 */
     private Integer overdueCount;
 
-    @Schema(description = "售卖中：现在真的能领到号的期")
+    /** 售卖中：现在真的能领到号的期 */
     private Integer onSaleCount;
 
-    @Schema(description = "已售罄：已发数达到发行上限")
+    /** 已售罄：已发数达到发行上限 */
     private Integer soldOutCount;
 
-    @Schema(description = "今日计划开奖：计划开奖时间落在今天且尚未开完")
+    /** 今日计划开奖：计划开奖时间落在今天且尚未开完 */
     private Integer todayDrawCount;
 
 }

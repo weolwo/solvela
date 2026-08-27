@@ -1,12 +1,10 @@
 package solvela.base.domain;
 
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import solvela.code.ErrorCode;
 import solvela.code.UserErrorCode;
 import solvela.base.enumeration.DataTypeEnum;
-import solvela.base.swagger.SchemaEnum;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -19,27 +17,26 @@ import org.apache.commons.lang3.StringUtils;
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
 @Data
-@Schema
 public class ResponseDTO<T> {
 
     public static final int OK_CODE = 0;
 
     public static final String OK_MSG = "操作成功";
 
-    @Schema(description = "返回码")
+    /** 返回码 */
     private Integer code;
 
-    @Schema(description = "级别")
+    /** 级别 */
     private String level;
 
     private String msg;
 
     private Boolean ok;
 
-    @Schema(description = "返回数据")
+    /** 返回数据 */
     private T data;
 
-    @SchemaEnum(value = DataTypeEnum.class,desc = "数据类型")
+    /** 数据类型，取值见 {@link DataTypeEnum} */
     private Integer dataType;
 
     public ResponseDTO(Integer code, String level, boolean ok, String msg, T data) {

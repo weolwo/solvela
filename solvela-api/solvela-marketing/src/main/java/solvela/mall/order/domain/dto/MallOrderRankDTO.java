@@ -1,6 +1,5 @@
 package solvela.mall.order.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -14,25 +13,24 @@ import lombok.Data;
 @Data
 public class MallOrderRankDTO {
 
-    @Schema(description = "商品id")
+    /** 商品id */
     private Long commodityId;
 
     /** 商品名取的是<b>订单里的快照</b>：商品改名后，历史订单该显示当时那个名字 */
-    @Schema(description = "商品名称（下单时的快照）")
     private String commodityName;
 
-    @Schema(description = "商品编码")
+    /** 商品编码 */
     private String commodityCode;
 
-    @Schema(description = "兑换件数")
+    /** 兑换件数 */
     private Long quantitySum;
 
-    @Schema(description = "订单数")
+    /** 订单数 */
     private Long orderCount;
 
-    @Schema(description = "兑换人数（按会员号去重）")
+    /** 兑换人数（按会员号去重） */
     private Long memberCount;
 
-    @Schema(description = "消耗积分合计")
+    /** 消耗积分合计 */
     private Long payPointsSum;
 }

@@ -1,6 +1,5 @@
 package solvela.ledger.logistic.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,53 +26,52 @@ import lombok.Data;
  * 要做这层装配就必须用 {@code SolvelaBeanUtil.deepCopy} 或逐层 {@code copyList}；
  * 为一层没有收益的装配去冒这个险不值得。
  *
- * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
- * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
+ * <p>本类<b>直接</b>作为管理端响应体返回，但身上没有 {@code @Schema} ——
+ * 字段说明由 javadoc 提供：therapi 在编译期把这些注释编进 class 旁的资源，
+ * 运行期 springdoc 的 {@code SpringDocJavadocProvider} 读出来当接口文档描述。
+ * 一份注释同时服务读代码的人和看文档的人，不会出现两份说明各自过期。
  */
 @Data
 public class PhysicalDeliveryStatDTO {
 
     // ---------------- 本期新增（时间窗落在 create_time） ----------------
 
-    @Schema(description = "本期新增履约单数")
+    /** 本期新增履约单数 */
     private Long newCount;
 
-    @Schema(description = "本期新增涉及的会员数（去重）")
+    /** 本期新增涉及的会员数（去重） */
     private Long newMemberCount;
 
     // ---------------- 履约状态（全量，不受时间范围影响） ----------------
 
-    @Schema(description = "履约单总数（全量）")
+    /** 履约单总数（全量） */
     private Long totalCount;
 
-    @Schema(description = "待发货（全量）：status=0")
+    /** 待发货（全量）：status=0 */
     private Long pendingCount;
 
     /**
      * 待发货里<b>收件信息还没补全</b>的单数。想发也发不了 —— 要去催用户填地址。
      */
-    @Schema(description = "待发货且收件信息不全（全量）：收件人/电话/地址任一为空")
     private Long pendingNoAddressCount;
 
     /**
      * 待发货里<b>地址齐了、就等发货</b>的单数。这才是运营今天真正能干的活。
      */
-    @Schema(description = "待发货且收件信息齐全（全量）：可以直接发的单")
     private Long pendingReadyCount;
 
     /**
      * 最久的一单待发货已经等了多少分钟。只看条数看不出「压了一周」。
      */
-    @Schema(description = "最久一单待发货已等待的分钟数，无积压时为 0")
     private Long pendingOldestMinutes;
 
-    @Schema(description = "已发货（全量）：status=1")
+    /** 已发货（全量）：status=1 */
     private Long deliveredCount;
 
-    @Schema(description = "已签收（全量）：status=2")
+    /** 已签收（全量）：status=2 */
     private Long signedCount;
 
-    @Schema(description = "异常退回（全量）：status=3，终态，需人工跟进")
+    /** 异常退回（全量）：status=3，终态，需人工跟进 */
     private Long returnedCount;
 
     /**
@@ -84,23 +82,21 @@ public class PhysicalDeliveryStatDTO {
      * 只有前端字典认得它。不单独给它一个桶的话，四个状态桶之和会小于总数，
      * 看的人只会以为统计算错了。
      */
-    @Schema(description = "已作废（全量）：status=-1，页面「删除」的实际效果，是软删除")
     private Long discardedCount;
 
     /**
      * 有效履约单数 = 总数 - 已作废。发货率的分母用它 ——
      * 作废掉的单子是被主动撤回的，不该算成「没发出去」拉低发货率。
      */
-    @Schema(description = "有效履约单数（全量）= 总数 - 已作废")
     private Long validCount;
 
-    @Schema(description = "发货率 = (已发货 + 已签收) / 有效履约单数")
+    /** 发货率 = (已发货 + 已签收) / 有效履约单数 */
     private BigDecimal deliveredRate;
 
-    @Schema(description = "来源维度分布（全量），按履约单数降序")
+    /** 来源维度分布（全量），按履约单数降序 */
     private List<SourceStatDTO> sourceList;
 
-    @Schema(description = "数据一致性体检告警")
+    /** 数据一致性体检告警 */
     private List<String> issueList;
 
     /**
@@ -111,19 +107,19 @@ public class PhysicalDeliveryStatDTO {
     @Data
     public static class SourceStatDTO {
 
-        @Schema(description = "来源类型原值")
+        /** 来源类型原值 */
         private String sourceType;
 
-        @Schema(description = "履约单数（全量）")
+        /** 履约单数（全量） */
         private Long deliveryCount;
 
-        @Schema(description = "其中待发货的单数")
+        /** 其中待发货的单数 */
         private Long pendingCount;
 
-        @Schema(description = "其中已作废的单数：status=-1")
+        /** 其中已作废的单数：status=-1 */
         private Long discardedCount;
 
-        @Schema(description = "发货率 = (已发货 + 已签收) / (履约单数 - 已作废)")
+        /** 发货率 = (已发货 + 已签收) / (履约单数 - 已作废) */
         private BigDecimal deliveredRate;
     }
 }

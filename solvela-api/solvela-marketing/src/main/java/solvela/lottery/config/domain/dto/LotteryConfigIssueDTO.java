@@ -1,6 +1,5 @@
 package solvela.lottery.config.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -14,13 +13,13 @@ import lombok.Data;
 @AllArgsConstructor
 public class LotteryConfigIssueDTO {
 
-    @Schema(description = "告警编码")
+    /** 告警编码 */
     private String code;
 
-    @Schema(description = "严重级别: DANGER-上不了线或用户领不到号, WARN-需要提前知晓")
+    /** 严重级别: DANGER-上不了线或用户领不到号, WARN-需要提前知晓 */
     private String level;
 
-    @Schema(description = "人话说明：发现了什么，以及会导致什么后果")
+    /** 人话说明：发现了什么，以及会导致什么后果 */
     private String message;
 
     public static LotteryConfigIssueDTO danger(String code, String message) {

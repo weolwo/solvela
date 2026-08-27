@@ -1,6 +1,5 @@
 package solvela.lottery.record.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -23,72 +22,71 @@ import lombok.Data;
 @Data
 public class LotteryRecordFunnelDTO {
 
-    @Schema(description = "号码总数（筛选范围内）")
+    /** 号码总数（筛选范围内） */
     private Long totalCount;
 
-    @Schema(description = "未开奖：win_status=0")
+    /** 未开奖：win_status=0 */
     private Long waitCount;
 
-    @Schema(description = "未中奖：win_status=1")
+    /** 未中奖：win_status=1 */
     private Long loseCount;
 
-    @Schema(description = "已中奖：win_status=2")
+    /** 已中奖：win_status=2 */
     private Long winCount;
 
-    @Schema(description = "中奖率 = 已中奖 / 已开奖（未开奖的不计入分母）")
+    /** 中奖率 = 已中奖 / 已开奖（未开奖的不计入分母） */
     private BigDecimal winRate;
 
-    @Schema(description = "参与人数（去重会员数）")
+    /** 参与人数（去重会员数） */
     private Long memberCount;
 
-    @Schema(description = "人均领号数")
+    /** 人均领号数 */
     private BigDecimal ticketPerMember;
 
     // ---------------- 派发漏斗 ----------------
 
-    @Schema(description = "中奖且待派发：dispatch_status=0")
+    /** 中奖且待派发：dispatch_status=0 */
     private Long dispatchWaitCount;
 
-    @Schema(description = "中奖且已投递：dispatch_status=1")
+    /** 中奖且已投递：dispatch_status=1 */
     private Long dispatchedCount;
 
     /**
      * 中奖但投递失败。用户中了奖却没拿到东西 —— 全模块最该被盯住的数字。
      */
-    @Schema(description = "中奖但投递失败：dispatch_status=2")
     private Long dispatchFailedCount;
 
-    @Schema(description = "奖级分布，按奖级升序（数字越小奖越大）")
-    private List<PrizeLevelStatVO> prizeLevelList;
+    /** 奖级分布，按奖级升序（数字越小奖越大） */
+    private List<PrizeLevelStatDTO> prizeLevelList;
 
-    @Schema(description = "数据一致性体检告警")
+    /** 数据一致性体检告警 */
     private List<String> issueList;
 
     /**
      * 一个奖级的中奖情况
      */
     @Data
-    public static class PrizeLevelStatVO {
+    public static class PrizeLevelStatDTO {
 
-        @Schema(description = "奖级")
+        /** 奖级 */
         private Integer prizeLevel;
 
-        @Schema(description = "奖品编码")
+        /** 奖品编码 */
         private String prizeCode;
 
-        @Schema(description = "奖品名称，奖品已删除时为 null")
+        /** 奖品名称，奖品已删除时为 null */
         private String prizeName;
 
-        @Schema(description = "奖品类型")
+        /** 奖品类型 */
         private String prizeType;
 
-        @Schema(description = "中奖注数")
+        /** 中奖注数 */
         private Long winCount;
 
-        @Schema(description = "占全部中奖的比例")
+        /** 占全部中奖的比例 */
         private BigDecimal winShare;
 
-        @Schema(description = "已发放价值 = 注数 × 单价")
+        /** 已发放价值 = 注数 × 单价 */
         private BigDecimal issuedValue;
     }
 }

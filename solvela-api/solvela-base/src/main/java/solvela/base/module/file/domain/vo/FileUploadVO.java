@@ -1,6 +1,5 @@
 package solvela.base.module.file.domain.vo;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -15,21 +14,21 @@ import lombok.Data;
 @Data
 public class FileUploadVO {
 
-    @Schema(description = "文件id")
+    /** 文件id */
     private Long fileId;
 
-    @Schema(description = "文件名称")
+    /** 文件名称 */
     private String originalName;
 
-    @Schema(description = "fileUrl")
+    /** fileUrl */
     private String fileUrl;
 
-    @Schema(description = "storageKey")
+    /** storageKey */
     private String storageKey;
 
-    @Schema(description = "文件大小")
+    /** 文件大小 */
     private Long fileSize;
 
-    @Schema(description = "扩展名")
+    /** 扩展名 */
     private String extension;
 }

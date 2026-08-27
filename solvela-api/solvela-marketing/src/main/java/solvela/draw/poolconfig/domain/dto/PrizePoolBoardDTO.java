@@ -1,6 +1,5 @@
 package solvela.draw.poolconfig.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,45 +22,45 @@ public class PrizePoolBoardDTO {
 
     // ---------------- 表字段（可编辑，回填表单用） ----------------
 
-    @Schema(description = "id")
+    /** id */
     private Long id;
 
-    @Schema(description = "活动编码")
+    /** 活动编码 */
     private String activityCode;
 
-    @Schema(description = "奖池编码")
+    /** 奖池编码 */
     private String poolCode;
 
-    @Schema(description = "奖池名称")
+    /** 奖池名称 */
     private String poolName;
 
-    @Schema(description = "限领重置周期: DAY/WEEK/MONTH/ACTIVITY")
+    /** 限领重置周期: DAY/WEEK/MONTH/ACTIVITY */
     private String resetPeriod;
 
-    @Schema(description = "奖池开关: 0-关闭, 1-开启")
+    /** 奖池开关: 0-关闭, 1-开启 */
     private Integer status;
 
-    @Schema(description = "创建时间")
+    /** 创建时间 */
     private LocalDateTime createTime;
 
     // ---------------- 派生（查询时算出，非表字段） ----------------
 
-    @Schema(description = "所属活动名称，活动不存在时为 null")
+    /** 所属活动名称，活动不存在时为 null */
     private String activityName;
 
-    @Schema(description = "活动状态: 0-未上线, 1-已上线")
+    /** 活动状态: 0-未上线, 1-已上线 */
     private Integer activityStatus;
 
-    @Schema(description = "坑位数量")
+    /** 坑位数量 */
     private Integer slotCount;
 
-    @Schema(description = "概率总和，必须等于 100 才能正常抽奖")
+    /** 概率总和，必须等于 100 才能正常抽奖 */
     private BigDecimal probabilitySum;
 
-    @Schema(description = "概率是否闭环")
+    /** 概率是否闭环 */
     private Boolean probabilityClosed;
 
-    @Schema(description = "兜底奖项数量")
+    /** 兜底奖项数量 */
     private Integer fallbackCount;
 
     /**
@@ -70,22 +69,20 @@ public class PrizePoolBoardDTO {
      * <p>这个数是判断 {@code reset_period} 有没有意义的唯一依据：
      * 一个都没有的话，重置周期配成什么都不影响任何行为 —— 因为压根没有计数要重置。
      */
-    @Schema(description = "池内配置了单人限领的奖项数")
     private Integer limitedItemCount;
 
     /**
      * 「现在能不能抽」的总结论：活动已上线 + 奖池开启 + 有坑位 + 概率闭环，四者同时成立。
      * 任一不成立，用户点抽奖要么进不来、要么直接报错。
      */
-    @Schema(description = "当前是否可抽：活动上线 + 奖池开启 + 有坑位 + 概率闭环")
     private Boolean drawable;
 
-    @Schema(description = "DANGER 级告警条数")
+    /** DANGER 级告警条数 */
     private Integer dangerCount;
 
-    @Schema(description = "WARN 级告警条数")
+    /** WARN 级告警条数 */
     private Integer warnCount;
 
-    @Schema(description = "体检告警明细")
+    /** 体检告警明细 */
     private List<PoolConfigIssueDTO> issueList;
 }

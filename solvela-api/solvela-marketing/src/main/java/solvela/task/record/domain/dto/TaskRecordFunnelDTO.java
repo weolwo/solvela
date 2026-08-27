@@ -1,6 +1,5 @@
 package solvela.task.record.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -29,85 +28,83 @@ import lombok.Data;
 @Data
 public class TaskRecordFunnelDTO {
 
-    @Schema(description = "接取总数（筛选范围内）")
+    /** 接取总数（筛选范围内） */
     private Long totalCount;
 
-    @Schema(description = "参与人数（去重会员数）")
+    /** 参与人数（去重会员数） */
     private Long memberCount;
 
-    @Schema(description = "人均接取任务数")
+    /** 人均接取任务数 */
     private BigDecimal recordPerMember;
 
-    @Schema(description = "进行中：status=0")
+    /** 进行中：status=0 */
     private Long runningCount;
 
     /**
      * 停在「已完成」的记录数。{@code markCompleted} 与 {@code markDispatched} 是紧邻的两条 SQL，
      * 正常不会停在中间 —— 停住了就说明发奖那一步断了，用户达标了却没拿到奖。
      */
-    @Schema(description = "已完成未发奖：status=1")
     private Long completedCount;
 
-    @Schema(description = "已发奖：status=2")
+    /** 已发奖：status=2 */
     private Long dispatchedCount;
 
-    @Schema(description = "已过期：status=3")
+    /** 已过期：status=3 */
     private Long expiredCount;
 
-    @Schema(description = "达标率 = (已完成 + 已发奖) / 接取总数")
+    /** 达标率 = (已完成 + 已发奖) / 接取总数 */
     private BigDecimal reachRate;
 
     /**
      * 已过有效期却仍是「进行中」。没有过期扫描任务，这些记录永远不会自己收口。
      */
-    @Schema(description = "已过有效期仍在进行中：status=0 且 valid_end_time < now()")
     private Long staleRunningCount;
 
     // ---------------- 事件丢弃（进度不涨的原因就在这里） ----------------
 
-    @Schema(description = "被丢弃的事件总数：t_task_record_flow.flow_type=2")
+    /** 被丢弃的事件总数：t_task_record_flow.flow_type=2 */
     private Long discardTotalCount;
 
-    @Schema(description = "其中需要人介入的丢弃数：AUDIENCE_UNKNOWN / CONFIG_INVALID / POOL_REJECTED")
+    /** 其中需要人介入的丢弃数：AUDIENCE_UNKNOWN / CONFIG_INVALID / POOL_REJECTED */
     private Long discardAttentionCount;
 
-    @Schema(description = "事件丢弃分类分布，按次数降序")
-    private List<DiscardStatVO> discardList;
+    /** 事件丢弃分类分布，按次数降序 */
+    private List<DiscardStatDTO> discardList;
 
-    @Schema(description = "任务维度分布，按接取量降序（TOP 20）")
-    private List<TaskStatVO> taskList;
+    /** 任务维度分布，按接取量降序（TOP 20） */
+    private List<TaskStatDTO> taskList;
 
-    @Schema(description = "数据一致性体检告警")
+    /** 数据一致性体检告警 */
     private List<String> issueList;
 
     /**
      * 一个任务的接取与达标情况
      */
     @Data
-    public static class TaskStatVO {
+    public static class TaskStatDTO {
 
-        @Schema(description = "任务配置ID")
+        /** 任务配置ID */
         private Long taskConfigId;
 
-        @Schema(description = "任务名称，配置已删除时为 null")
+        /** 任务名称，配置已删除时为 null */
         private String taskName;
 
-        @Schema(description = "任务分组")
+        /** 任务分组 */
         private String taskGroup;
 
-        @Schema(description = "接取数")
+        /** 接取数 */
         private Long recordCount;
 
-        @Schema(description = "参与人数")
+        /** 参与人数 */
         private Long memberCount;
 
-        @Schema(description = "达标数：status IN (1, 2)")
+        /** 达标数：status IN (1, 2) */
         private Long reachedCount;
 
-        @Schema(description = "本任务的达标率 = 达标数 / 接取数")
+        /** 本任务的达标率 = 达标数 / 接取数 */
         private BigDecimal reachRate;
 
-        @Schema(description = "已过有效期仍在进行中的条数")
+        /** 已过有效期仍在进行中的条数 */
         private Long staleRunningCount;
     }
 
@@ -115,25 +112,24 @@ public class TaskRecordFunnelDTO {
      * 一类丢弃原因的次数
      */
     @Data
-    public static class DiscardStatVO {
+    public static class DiscardStatDTO {
 
-        @Schema(description = "丢弃分类编码，对齐 TaskDiscardCode；写入侧没写时为 null")
+        /** 丢弃分类编码，对齐 TaskDiscardCode；写入侧没写时为 null */
         private String discardCode;
 
-        @Schema(description = "分类说明")
+        /** 分类说明 */
         private String discardDesc;
 
-        @Schema(description = "次数")
+        /** 次数 */
         private Long discardCount;
 
-        @Schema(description = "占全部丢弃的比例")
+        /** 占全部丢弃的比例 */
         private BigDecimal discardShare;
 
         /**
          * 是否需要人介入。正常业务规则拦截（人群不符、次数用尽…）量再大也不用管，
          * 这一类哪怕只有几条都该去查。判据收在 {@code TaskDiscardCode.needsAttention()} 一处。
          */
-        @Schema(description = "是否需要人介入排查")
         private Boolean needsAttention;
     }
 }

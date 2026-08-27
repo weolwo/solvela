@@ -101,9 +101,9 @@ public class PrizeLogService {
         vo.setStuckWaitingCount(stuckWaiting);
 
         // ---- 奖励类型维度：条数与价值双口径 ----
-        List<PrizeLogFunnelDTO.PrizeTypeStatVO> typeList = new ArrayList<>();
+        List<PrizeLogFunnelDTO.PrizeTypeStatDTO> typeList = new ArrayList<>();
         for (Map<String, Object> stat : prizeLogDao.selectPrizeTypeStat(queryForm)) {
-            PrizeLogFunnelDTO.PrizeTypeStatVO item = new PrizeLogFunnelDTO.PrizeTypeStatVO();
+            PrizeLogFunnelDTO.PrizeTypeStatDTO item = new PrizeLogFunnelDTO.PrizeTypeStatDTO();
             long logCount = toLong(stat.get("logCount"));
             long typeSuccess = toLong(stat.get("successCount"));
             long badValue = toLong(stat.get("badValueCount"));
@@ -120,9 +120,9 @@ public class PrizeLogService {
         vo.setTypeList(typeList);
 
         // ---- 奖品维度分布 ----
-        List<PrizeLogFunnelDTO.PrizeStatVO> prizeList = new ArrayList<>();
+        List<PrizeLogFunnelDTO.PrizeStatDTO> prizeList = new ArrayList<>();
         for (Map<String, Object> stat : prizeLogDao.selectPrizeStat(queryForm)) {
-            PrizeLogFunnelDTO.PrizeStatVO item = new PrizeLogFunnelDTO.PrizeStatVO();
+            PrizeLogFunnelDTO.PrizeStatDTO item = new PrizeLogFunnelDTO.PrizeStatDTO();
             long logCount = toLong(stat.get("logCount"));
             long prizeSuccess = toLong(stat.get("successCount"));
             item.setPrizeCode(stat.get("prizeCode") == null ? null : String.valueOf(stat.get("prizeCode")));
@@ -139,9 +139,9 @@ public class PrizeLogService {
         vo.setPrizeList(prizeList);
 
         // ---- 失败原因分布 ----
-        List<PrizeLogFunnelDTO.FailReasonVO> failReasonList = new ArrayList<>();
+        List<PrizeLogFunnelDTO.FailReasonDTO> failReasonList = new ArrayList<>();
         for (Map<String, Object> stat : prizeLogDao.selectFailReasonStat(queryForm)) {
-            PrizeLogFunnelDTO.FailReasonVO item = new PrizeLogFunnelDTO.FailReasonVO();
+            PrizeLogFunnelDTO.FailReasonDTO item = new PrizeLogFunnelDTO.FailReasonDTO();
             long count = toLong(stat.get("failCount"));
             item.setFailReason(stat.get("failReason") == null ? null : String.valueOf(stat.get("failReason")));
             item.setFailCount(count);

@@ -1,6 +1,5 @@
 package solvela.scriptengine.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -11,45 +10,45 @@ import java.time.LocalDateTime;
 @Data
 public class ScriptDTO {
 
-    @Schema(description = "脚本编码，由文件路径推导")
+    /** 脚本编码，由文件路径推导 */
     private String scriptCode;
 
-    @Schema(description = "脚本名称")
+    /** 脚本名称 */
     private String scriptName;
 
-    @Schema(description = "业务域枚举名")
+    /** 业务域枚举名 */
     private String domain;
 
-    @Schema(description = "业务域中文名")
+    /** 业务域中文名 */
     private String domainTitle;
 
-    @Schema(description = "场景枚举名")
+    /** 场景枚举名 */
     private String scene;
 
-    @Schema(description = "场景中文名")
+    /** 场景中文名 */
     private String sceneTitle;
 
-    @Schema(description = "返回值类型")
+    /** 返回值类型 */
     private String returnType;
 
-    @Schema(description = "用途说明")
+    /** 用途说明 */
     private String description;
 
-    @Schema(description = "classpath 下的文件路径")
+    /** classpath 下的文件路径 */
     private String filePath;
 
-    @Schema(description = "脚本内容（只读）")
+    /** 脚本内容（只读） */
     private String content;
 
-    @Schema(description = "版本号，内容每变一次 +1")
+    /** 版本号，内容每变一次 +1 */
     private Integer version;
 
-    @Schema(description = "被多少个业务对象引用")
+    /** 被多少个业务对象引用 */
     private Integer refCount;
 
-    @Schema(description = "状态：0-停用(文件已删除), 1-启用")
+    /** 状态：0-停用(文件已删除), 1-启用 */
     private Integer status;
 
-    @Schema(description = "更新时间")
+    /** 更新时间 */
     private LocalDateTime updateTime;
 }

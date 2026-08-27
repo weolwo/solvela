@@ -1,6 +1,5 @@
 package solvela.draw.prizemapping.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -18,22 +17,22 @@ import lombok.Data;
 @Data
 public class DrawPoolAnalysisDTO {
 
-    @Schema(description = "奖池编码")
+    /** 奖池编码 */
     private String poolCode;
 
-    @Schema(description = "奖池名称，奖池配置缺失时为 null")
+    /** 奖池名称，奖池配置缺失时为 null */
     private String poolName;
 
-    @Schema(description = "所属活动编码，供跳转工作台深链使用")
+    /** 所属活动编码，供跳转工作台深链使用 */
     private String activityCode;
 
-    @Schema(description = "活动状态: 0-未上线, 1-已上线。已上线且有告警的最该先处理")
+    /** 活动状态: 0-未上线, 1-已上线。已上线且有告警的最该先处理 */
     private Integer activityStatus;
 
-    @Schema(description = "奖池开关: 0-关闭, 1-开启")
+    /** 奖池开关: 0-关闭, 1-开启 */
     private Integer poolStatus;
 
-    @Schema(description = "坑位数量")
+    /** 坑位数量 */
     private Integer slotCount;
 
     /**
@@ -41,20 +40,18 @@ public class DrawPoolAnalysisDTO {
      * {@code IllegalArgumentException}，而抽奖执行路径<b>没有捕获它</b>，
      * 结果是该奖池每一次抽奖请求都直接报错。
      */
-    @Schema(description = "概率总和，必须等于 100")
     private BigDecimal probabilitySum;
 
-    @Schema(description = "概率是否闭环（与 100 的差值在容差内）")
+    /** 概率是否闭环（与 100 的差值在容差内） */
     private Boolean probabilityClosed;
 
-    @Schema(description = "兜底奖项数量，每池最多一个")
+    /** 兜底奖项数量，每池最多一个 */
     private Integer fallbackCount;
 
     /**
      * 抽一次平均要赔多少钱 = Σ(坑位概率 × 奖品单价)。
      * 配概率时最该先看的数，而系统此前没有任何一处显示它。
      */
-    @Schema(description = "单次抽奖期望赔付成本")
     private BigDecimal expectedCostPerDraw;
 
     /**
@@ -65,21 +62,20 @@ public class DrawPoolAnalysisDTO {
      * 命中后只会走降级或直接失败。所以这个数才是奖池的真实健康度：
      * 它掉到 60%，就意味着 40% 的请求要靠兜底接住；兜底也空了，那 40% 就是纯失败。
      */
-    @Schema(description = "有货概率覆盖率：仍有库存的坑位概率之和")
     private BigDecimal availableProbability;
 
-    @Schema(description = "兜底奖项是否还有库存，无兜底时为 null")
+    /** 兜底奖项是否还有库存，无兜底时为 null */
     private Boolean fallbackHasStock;
 
-    @Schema(description = "DANGER 级告警条数")
+    /** DANGER 级告警条数 */
     private Integer dangerCount;
 
-    @Schema(description = "WARN 级告警条数")
+    /** WARN 级告警条数 */
     private Integer warnCount;
 
-    @Schema(description = "奖池维度的体检告警")
+    /** 奖池维度的体检告警 */
     private List<DrawPoolIssueDTO> issueList;
 
-    @Schema(description = "坑位明细，按 sortWeight 升序 —— 顺序即概率区间的累加顺序")
+    /** 坑位明细，按 sortWeight 升序 —— 顺序即概率区间的累加顺序 */
     private List<DrawPoolSlotDTO> slotList;
 }

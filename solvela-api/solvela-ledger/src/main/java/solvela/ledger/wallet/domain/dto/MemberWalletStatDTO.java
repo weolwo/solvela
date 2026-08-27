@@ -1,6 +1,5 @@
 package solvela.ledger.wallet.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,24 +27,26 @@ import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
  * 要做这层装配就必须用 {@code SolvelaBeanUtil.deepCopy} 或逐层 {@code copyList}；
  * 为一层没有收益的装配去冒这个险不值得。
  *
- * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
- * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
+ * <p>本类<b>直接</b>作为管理端响应体返回，但身上没有 {@code @Schema} ——
+ * 字段说明由 javadoc 提供：therapi 在编译期把这些注释编进 class 旁的资源，
+ * 运行期 springdoc 的 {@code SpringDocJavadocProvider} 读出来当接口文档描述。
+ * 一份注释同时服务读代码的人和看文档的人，不会出现两份说明各自过期。
  */
 @Data
 public class MemberWalletStatDTO {
 
     // ---------------- 资产存量（全量，不受时间范围影响） ----------------
 
-    @Schema(description = "钱包账户数（全量）。一个会员一种资产一行，不等于会员数")
+    /** 钱包账户数（全量）。一个会员一种资产一行，不等于会员数 */
     private Long walletCount;
 
-    @Schema(description = "涉及会员数（去重，全量）")
+    /** 涉及会员数（去重，全量） */
     private Long memberCount;
 
-    @Schema(description = "冻结账户数（全量）：status=0")
+    /** 冻结账户数（全量）：status=0 */
     private Long frozenCount;
 
-    @Schema(description = "资产维度存量，余额按资产类型分开算")
+    /** 资产维度存量，余额按资产类型分开算 */
     private List<AssetBalanceDTO> assetList;
 
     // ---------------- 本期变动（跟时间范围走，数据来自交易明细表） ----------------
@@ -53,10 +54,9 @@ public class MemberWalletStatDTO {
     /**
      * 与交易明细页共用同一个 VO 与同一条 SQL —— 那边改口径，这边自动跟着改。
      */
-    @Schema(description = "本期资产变动：收入/支出/净额，按资产类型分开算")
     private List<MemberAssetTransactionStatDTO.AssetFlowDTO> flowList;
 
-    @Schema(description = "数据一致性体检告警")
+    /** 数据一致性体检告警 */
     private List<String> issueList;
 
     /**
@@ -66,23 +66,22 @@ public class MemberWalletStatDTO {
     @Data
     public static class AssetBalanceDTO {
 
-        @Schema(description = "资产类型：SCORE/BALANCE")
+        /** 资产类型：SCORE/BALANCE */
         private String assetType;
 
-        @Schema(description = "账户数")
+        /** 账户数 */
         private Long walletCount;
 
-        @Schema(description = "余额合计（全量）")
+        /** 余额合计（全量） */
         private BigDecimal totalBalance;
 
-        @Schema(description = "人均余额 = 余额合计 / 账户数")
+        /** 人均余额 = 余额合计 / 账户数 */
         private BigDecimal avgBalance;
 
         /**
          * 冻结账户里压着的余额。钱还在账上，但用户取不出来也用不了 ——
          * 冻结久了就是客诉。
          */
-        @Schema(description = "冻结账户中的余额合计")
         private BigDecimal frozenBalance;
     }
 }

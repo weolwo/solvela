@@ -283,6 +283,17 @@
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
         </dependency>
+
+        <!--
+        运行时读 javadoc：与 annotationProcessorPaths 里的 scribe 配对，
+        缺了它 springdoc 的 SpringDocJavadocConfiguration 不会激活（@ConditionalOnClass）。
+        -->
+        <dependency>
+            <groupId>com.github.therapi</groupId>
+            <artifactId>therapi-runtime-javadoc</artifactId>
+            <version>${therapi.version}</version>
+        </dependency>
+
     </dependencies>
 
 

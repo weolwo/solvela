@@ -9,6 +9,8 @@ package solvela.activity.domain.dto;
  *
  * @Author weolwo
  * @Date 2026-07-29
+ * @param bizName 业务名称，可直接展示，如「奖池」「奖品」
+ * @param count   引用数量
  */
 public record ActivityRefItem(
 

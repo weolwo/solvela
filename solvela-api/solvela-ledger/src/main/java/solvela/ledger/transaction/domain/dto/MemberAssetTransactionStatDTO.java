@@ -1,6 +1,5 @@
 package solvela.ledger.transaction.domain.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,32 +26,33 @@ import lombok.Data;
  * 要做这层装配就必须用 {@code SolvelaBeanUtil.deepCopy} 或逐层 {@code copyList}；
  * 为一层没有收益的装配去冒这个险不值得。
  *
- * <p>⚠️ 保留了 {@code @Schema}：本类<b>直接</b>作为管理端响应体，去掉会让接口文档退化。
- * 这是一个明确的例外，不是遗漏 —— 注解只是文档元数据，并不把形状绑到某个端上。
+ * <p>本类<b>直接</b>作为管理端响应体返回，但身上没有 {@code @Schema} ——
+ * 字段说明由 javadoc 提供：therapi 在编译期把这些注释编进 class 旁的资源，
+ * 运行期 springdoc 的 {@code SpringDocJavadocProvider} 读出来当接口文档描述。
+ * 一份注释同时服务读代码的人和看文档的人，不会出现两份说明各自过期。
  */
 @Data
 public class MemberAssetTransactionStatDTO {
 
-    @Schema(description = "时间范围内的流水笔数")
+    /** 时间范围内的流水笔数 */
     private Long txCount;
 
-    @Schema(description = "涉及会员数（去重）")
+    /** 涉及会员数（去重） */
     private Long memberCount;
 
     /**
      * 人工调账笔数。系统自己发的奖不需要人插手，这一类是<b>有人手工改了别人的钱</b>，
      * 量再小也该有人看一眼 —— 财务对账时第一个要查的就是它。
      */
-    @Schema(description = "人工调账笔数：biz_type = MANUAL_ADJUST")
     private Long manualAdjustCount;
 
-    @Schema(description = "资产维度收支，金额按资产类型分开算")
+    /** 资产维度收支，金额按资产类型分开算 */
     private List<AssetFlowDTO> assetList;
 
-    @Schema(description = "业务类型分布（TOP 10），只给笔数")
+    /** 业务类型分布（TOP 10），只给笔数 */
     private List<BizTypeStatDTO> bizTypeList;
 
-    @Schema(description = "数据一致性体检告警")
+    /** 数据一致性体检告警 */
     private List<String> issueList;
 
     /**
@@ -61,25 +61,24 @@ public class MemberAssetTransactionStatDTO {
     @Data
     public static class AssetFlowDTO {
 
-        @Schema(description = "资产类型：SCORE/BALANCE")
+        /** 资产类型：SCORE/BALANCE */
         private String assetType;
 
-        @Schema(description = "收入笔数：transaction_type=1")
+        /** 收入笔数：transaction_type=1 */
         private Long incomeCount;
 
-        @Schema(description = "收入金额")
+        /** 收入金额 */
         private BigDecimal incomeAmount;
 
-        @Schema(description = "支出笔数：transaction_type=2")
+        /** 支出笔数：transaction_type=2 */
         private Long expenseCount;
 
-        @Schema(description = "支出金额")
+        /** 支出金额 */
         private BigDecimal expenseAmount;
 
         /**
          * 净额 = 收入 - 支出。为负说明这段时间用户手上的这种资产是净减少的。
          */
-        @Schema(description = "净额 = 收入金额 - 支出金额，可能为负")
         private BigDecimal netAmount;
     }
 
@@ -95,16 +94,16 @@ public class MemberAssetTransactionStatDTO {
     @Data
     public static class BizTypeStatDTO {
 
-        @Schema(description = "业务类型原值")
+        /** 业务类型原值 */
         private String bizType;
 
-        @Schema(description = "笔数")
+        /** 笔数 */
         private Long txCount;
 
-        @Schema(description = "涉及会员数")
+        /** 涉及会员数 */
         private Long memberCount;
 
-        @Schema(description = "占全部笔数的比例")
+        /** 占全部笔数的比例 */
         private BigDecimal txShare;
     }
 }
