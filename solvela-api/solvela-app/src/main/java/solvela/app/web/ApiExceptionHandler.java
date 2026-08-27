@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import org.slf4j.MDC;
 
 /**
  * 把异常翻成 HTTP 响应。<b>本进程唯一的错误出口。</b>
@@ -102,8 +101,8 @@ public class ApiExceptionHandler {
                 .body(new ApiErrorResponse(error.code(), message, traceId()));
     }
 
-    /** 链路 id 由日志框架的 MDC 提供（见 LogTraceFilter）；没有就留空，不自己造一个。 */
+    /** 链路 id 由 {@link TraceFilter} 绑定；不在请求线程上时为 null，不自己造一个。 */
     private static String traceId() {
-        return MDC.get("traceId");
+        return Trace.id();
     }
 }

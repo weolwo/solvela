@@ -2,7 +2,6 @@ package solvela.app.login;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import solvela.app.auth.AccessToken;
 import solvela.app.auth.MemberAuthDao;
@@ -11,6 +10,7 @@ import solvela.app.auth.MemberPrincipalLoader;
 import solvela.app.auth.TokenStore;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
+import solvela.app.web.Trace;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiHasher;
 import solvela.base.util.SolvelaIpUtil;
@@ -187,7 +187,7 @@ public class LoginService {
             // 与其用几个 indexOf 猜出一堆不可信的值，不如留空 —— 空值至少不会被拿去做统计。
             loginLog.setStatus(status);
             loginLog.setRemark(truncate(remark, REMARK_MAX_LENGTH));
-            loginLog.setTraceId(truncate(MDC.get("traceId"), TRACE_ID_MAX_LENGTH));
+            loginLog.setTraceId(truncate(Trace.id(), TRACE_ID_MAX_LENGTH));
             loginLog.setCreateTime(LocalDateTime.now());
             memberLoginLogDao.insert(loginLog);
         } catch (Exception e) {
