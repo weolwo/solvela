@@ -26,6 +26,14 @@
     -->
 
     <dependencies>
+        <!-- 本模块直接用到 model 的实体 35 处。
+             原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-model</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-base</artifactId>

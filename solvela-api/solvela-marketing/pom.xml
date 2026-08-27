@@ -28,6 +28,22 @@
 
              ⚠️ 将来活动要发资产，走事件或 SPI（参考 risk.spi.AssetDispatcher），
              不要把这条依赖加回来。 -->
+        <!-- 本模块直接用到 model 的实体 135 处。
+             原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-model</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 本模块直接用到 base 的 111 处（ResponseDTO、PageResult、各种 Util）。
+             原来靠传递依赖拿到 —— 一旦上游模块调整，这里会在毫不相关的地方成片编译失败。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-activity</artifactId>
