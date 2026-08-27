@@ -14,7 +14,7 @@ package solvela.lottery.settle.domain;
  * @Author alaric
  * @Date 2026-07-28
  */
-public record SettleResultVO(String issueNo,
+public record SettleResultDTO(String issueNo,
                              String winningNumber,
                              int winCount,
                              int loseCount,

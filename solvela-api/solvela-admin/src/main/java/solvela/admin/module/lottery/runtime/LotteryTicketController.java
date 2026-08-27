@@ -8,9 +8,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.lottery.LotteryRecord;
-import solvela.lottery.runtime.domain.TicketObtainForm;
-import solvela.lottery.runtime.domain.TicketObtainVO;
+import solvela.admin.module.lottery.runtime.domain.form.TicketObtainForm;
+import solvela.lottery.runtime.domain.TicketObtainCommand;
+import solvela.lottery.runtime.domain.TicketObtainDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,8 +44,8 @@ public class LotteryTicketController {
     @Operation(summary = "领号：为用户发一个彩票号码")
     @PostMapping("/obtain")
     @SaCheckPermission("lotteryTicket:query")
-    public ResponseDTO<TicketObtainVO> obtain(@RequestBody @Valid TicketObtainForm form) {
-        return ticketIssueService.obtain(form);
+    public ResponseDTO<TicketObtainDTO> obtain(@RequestBody @Valid TicketObtainForm form) {
+        return ticketIssueService.obtain(SolvelaBeanUtil.copy(form, TicketObtainCommand.class));
     }
 
     @Operation(summary = "我的号码：按奖级升序，未中奖(99)沉底")

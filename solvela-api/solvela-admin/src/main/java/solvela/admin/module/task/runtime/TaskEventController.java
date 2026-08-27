@@ -7,9 +7,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;
 import solvela.task.TaskRecordFlow;
-import solvela.task.runtime.domain.TaskEventReportForm;
+import solvela.admin.module.task.runtime.domain.form.TaskEventReportForm;
+import solvela.task.runtime.domain.TaskEventReportCommand;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,7 +52,7 @@ public class TaskEventController {
     @PostMapping("/report")
     @SaCheckPermission("taskEvent:report")
     public ResponseDTO<String> report(@RequestBody @Valid TaskEventReportForm form) {
-        return taskEventService.report(form);
+        return taskEventService.report(SolvelaBeanUtil.copy(form, TaskEventReportCommand.class));
     }
 
     /**

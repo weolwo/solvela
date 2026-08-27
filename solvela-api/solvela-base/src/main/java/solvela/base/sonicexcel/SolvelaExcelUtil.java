@@ -12,9 +12,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Collection;
 import java.util.function.Function;
 
@@ -86,10 +88,37 @@ public final class SolvelaExcelUtil {
      */
     public static <T> SonicReadResult<T> importExcel(MultipartFile file, Class<T> head,
                                                      Function<SonicSheetReader<T>, SonicSheetReader<T>> config) {
+        try {
+            return importExcel(file.getInputStream(), head, config);
+        } catch (IOException e) {
+            throw new UncheckedIOException("接收上传文件失败", e);
+        }
+    }
+
+    /**
+     * 通用导入的<b>无 Web 依赖</b>版本：只要一段字节流就能导。
+     *
+     * <p>存在的理由是分层，不是省事：{@code MultipartFile} 是 spring-web 的类型，
+     * 一旦出现在共享层的 service 签名上，那个模块就等于宣称「我只能被 HTTP 调用」——
+     * 定时任务、消息消费、其它端想复用同一套导入校验时都得绕路。
+     * 端负责把上传解成流，共享层只认流。
+     *
+     * <p><b>调用方负责关流</b>：这里不 close，因为 {@code MultipartFile.getInputStream()}
+     * 与 servlet 容器持有的流生命周期由容器管，这里替它关反而越界。
+     */
+    public static <T> SonicReadResult<T> importExcel(InputStream in, Class<T> head) {
+        return importExcel(in, head, Function.identity());
+    }
+
+    /**
+     * 带定制的流式导入，见 {@link #importExcel(InputStream, Class)}。
+     */
+    public static <T> SonicReadResult<T> importExcel(InputStream in, Class<T> head,
+                                                     Function<SonicSheetReader<T>, SonicSheetReader<T>> config) {
         Path tmp = null;
         try {
             tmp = SonicTempFiles.create();
-            file.transferTo(tmp);
+            Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
             return config.apply(SonicExcel.read(tmp, head)).doReadAll();
         } catch (IOException e) {
             throw new UncheckedIOException("接收上传文件失败", e);

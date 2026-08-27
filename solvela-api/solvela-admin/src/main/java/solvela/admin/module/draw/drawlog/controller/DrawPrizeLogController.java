@@ -7,8 +7,9 @@ import solvela.admin.module.draw.drawlog.domain.vo.DrawPrizeLogVO;
 import solvela.draw.drawlog.domain.dto.DrawPrizeLogDTO;
 import solvela.draw.drawlog.service.DrawPrizeLogService;
 import solvela.draw.runtime.DrawExecuteService;
-import solvela.draw.runtime.domain.DrawExecuteForm;
-import solvela.draw.runtime.domain.DrawExecuteVO;
+import solvela.admin.module.draw.runtime.domain.form.DrawExecuteForm;
+import solvela.draw.runtime.domain.DrawExecuteCommand;
+import solvela.draw.runtime.domain.DrawExecuteDTO;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -52,8 +53,8 @@ public class DrawPrizeLogController {
     @Operation(summary = "执行抽奖（引擎判定 + Lua预扣 + DB兜底 + 落流水）")
     @PostMapping("/execute")
     @SaCheckPermission("drawPrizeLog:execute")
-    public ResponseDTO<DrawExecuteVO> execute(@RequestBody @Valid DrawExecuteForm executeForm) {
-        return drawExecuteService.execute(executeForm);
+    public ResponseDTO<DrawExecuteDTO> execute(@RequestBody @Valid DrawExecuteForm executeForm) {
+        return drawExecuteService.execute(SolvelaBeanUtil.copy(executeForm, DrawExecuteCommand.class));
     }
 
     @Operation(summary = "分页查询")

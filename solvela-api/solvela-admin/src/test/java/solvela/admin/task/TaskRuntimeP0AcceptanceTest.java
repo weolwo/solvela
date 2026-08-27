@@ -13,7 +13,7 @@ import solvela.task.runtime.TaskEventService;
 import solvela.task.runtime.TaskPeriodResolver;
 import solvela.task.runtime.domain.TaskAdvanceResult;
 import solvela.task.runtime.domain.TaskEventContext;
-import solvela.task.runtime.domain.TaskEventReportForm;
+import solvela.task.runtime.domain.TaskEventReportCommand;
 import solvela.task.TaskEvent;
 import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
 import solvela.task.taskevent.service.TaskEventDefService;
@@ -429,7 +429,7 @@ class TaskRuntimeP0AcceptanceTest {
     @Test
     @DisplayName("P1 注册表：未注册的事件被当场拒绝，而不是丢进线程池里慢慢发现")
     void p1_unregisteredEventIsRejected() {
-        TaskEventReportForm form = new TaskEventReportForm();
+        TaskEventReportCommand form = new TaskEventReportCommand();
         form.setEventCode("NOT_REGISTERED_XYZ");
         form.setMemberId(memberId);
 
@@ -451,7 +451,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertNotNull(def, "前提不成立：ORDER_PAID 未注册，请先执行 v3.47.0.sql");
         assertEquals(1, def.getBizIdRequired().intValue(), "前提不成立：ORDER_PAID 应要求带单号");
 
-        TaskEventReportForm without = new TaskEventReportForm();
+        TaskEventReportCommand without = new TaskEventReportCommand();
         without.setEventCode("ORDER_PAID");
         without.setMemberId(memberId);
         ResponseDTO<String> rejected = taskEventService.report(without);
@@ -460,7 +460,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertTrue(rejected.getMsg().contains("eventBizId"), "错误信息要说清缺什么：" + rejected.getMsg());
 
         // 带上单号就该放行 —— 证明拒绝的是「缺单号」，不是这个事件本身不可用
-        TaskEventReportForm with = new TaskEventReportForm();
+        TaskEventReportCommand with = new TaskEventReportCommand();
         with.setEventCode("ORDER_PAID");
         with.setMemberId(memberId);
         with.setEventBizId("order-p1-001");
@@ -474,7 +474,7 @@ class TaskRuntimeP0AcceptanceTest {
         TaskEvent def = taskEventDefService.getEnabledByCode("ORDER_AMOUNT");
         assertEquals("payAmount", def.getMetricSource(), "前提确认：该事件的计量来源是 payload.payAmount");
 
-        TaskEventReportForm form = new TaskEventReportForm();
+        TaskEventReportCommand form = new TaskEventReportCommand();
         form.setEventCode("ORDER_AMOUNT");
         form.setMemberId(memberId);
         form.setEventBizId("order-metric-001");

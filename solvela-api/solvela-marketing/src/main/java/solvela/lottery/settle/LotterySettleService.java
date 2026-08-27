@@ -12,7 +12,7 @@ import solvela.lottery.issue.manager.LotteryIssueManager;
 import solvela.lottery.LotteryPrizeRule;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
 import solvela.lottery.record.dao.LotteryRecordDao;
-import solvela.lottery.settle.domain.SettleResultVO;
+import solvela.lottery.settle.domain.SettleResultDTO;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -106,7 +106,7 @@ public class LotterySettleService {
      * @param issueId       期号ID
      * @param winningNumber 开奖号码；期号已处于「核销中」时本参数被忽略（号码早已定案）
      */
-    public ResponseDTO<SettleResultVO> settle(Long issueId, String winningNumber) {
+    public ResponseDTO<SettleResultDTO> settle(Long issueId, String winningNumber) {
         LotteryIssue issue = lotteryIssueDao.selectById(issueId);
         if (issue == null) {
             return ResponseDTO.userErrorParam("期号不存在");
@@ -169,7 +169,7 @@ public class LotterySettleService {
         Map<String, Object> summary = lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo());
         log.info("[彩票开奖] 期号 {} 核销完成，开奖号码 {}，中奖 {} 张、未中奖 {} 张", issue.getIssueNo(), finalNumber, claimed, lose);
 
-        return ResponseDTO.ok(new SettleResultVO(issue.getIssueNo(), finalNumber, claimed, lose,
+        return ResponseDTO.ok(new SettleResultDTO(issue.getIssueNo(), finalNumber, claimed, lose,
                 toLong(summary.get("total")), toLong(summary.get("waitDispatch"))));
     }
 

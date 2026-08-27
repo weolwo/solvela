@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.ResponseDTO;
-import solvela.lottery.settle.domain.SettleResultVO;
+import solvela.lottery.settle.domain.SettleResultDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +39,7 @@ public class LotterySettleController {
     @Operation(summary = "执行开奖核销：状态闸门 + 按奖级升序逐级认领。核销中重复调用会接着跑，不会重复认领")
     @PostMapping("/settle")
     @SaCheckPermission("lotteryIssue:update")
-    public ResponseDTO<SettleResultVO> settle(@RequestParam Long issueId,
+    public ResponseDTO<SettleResultDTO> settle(@RequestParam Long issueId,
                                               @RequestParam(required = false) String winningNumber) {
         return lotterySettleService.settle(issueId, winningNumber);
     }

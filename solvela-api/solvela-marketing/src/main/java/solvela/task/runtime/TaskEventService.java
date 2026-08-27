@@ -12,7 +12,7 @@ import solvela.task.recordflow.dao.TaskRecordFlowDao;
 import solvela.task.TaskRecordFlow;
 import solvela.task.runtime.domain.TaskAdvanceResult;
 import solvela.task.runtime.domain.TaskEventContext;
-import solvela.task.runtime.domain.TaskEventReportForm;
+import solvela.task.runtime.domain.TaskEventReportCommand;
 import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.TaskConfig;
 import solvela.task.TaskEvent;
@@ -106,7 +106,7 @@ public class TaskEventService {
      * <p>返回失败只有一种情况：<b>队列打满被拒</b>。这是留给上游的重试信号 ——
      * 选了 AbortPolicy 就必须如实告诉上游「这条我没接住」，否则丢事件会变成静默的。
      */
-    public ResponseDTO<String> report(TaskEventReportForm form) {
+    public ResponseDTO<String> report(TaskEventReportCommand form) {
         // ① 事件必须已注册且启用 —— 注册表是「哪些事件合法」的唯一真源。
         //    不认识的事件当场拒绝，而不是丢进线程池里慢慢发现：上游拼错一个字母时，
         //    立刻收到 400 远比「返回 200 但任务永远不动」好排查。
@@ -231,7 +231,7 @@ public class TaskEventService {
      * <p>事件时间缺省取<b>数据库时钟</b>而不是 {@code LocalDateTime.now()}（铁律 9）——
      * 周期归属由它决定，多实例部署时各节点 JVM 时钟漂移会让同一秒的事件落到不同的天。
      */
-    private TaskEventContext normalize(TaskEventReportForm form, TaskEvent eventDef) {
+    private TaskEventContext normalize(TaskEventReportCommand form, TaskEvent eventDef) {
         LocalDateTime eventTime = form.getEventTime() == null ? taskRecordDao.selectDbNow() : form.getEventTime();
         String eventBizId = TaskPeriodResolver.resolveEventBizId(form.getEventBizId(), eventTime);
         return new TaskEventContext(
@@ -255,7 +255,7 @@ public class TaskEventService {
      * 由注册表决定从哪个字段取金额 —— <b>换计量口径是改一行数据，不是改上游代码</b>，
      * 与「加事件只加一行数据」是同一个取向。
      */
-    private BigDecimal resolveAmount(TaskEventReportForm form, TaskEvent eventDef) {
+    private BigDecimal resolveAmount(TaskEventReportCommand form, TaskEvent eventDef) {
         if (form.getAmount() != null) {
             return form.getAmount();
         }

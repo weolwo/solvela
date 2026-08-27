@@ -30,6 +30,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+
+import java.io.IOException;
 import java.util.Collections;
 
 /**
@@ -117,13 +121,25 @@ public class PhysicalDeliveryController {
     @PostMapping("/importAdd")
     @SaCheckPermission("physicalDelivery:import")
     public ResponseDTO<String> importAdd(@RequestParam MultipartFile file) {
-        return Service.importAdd(file);
+        // 共享层的 service 只认 InputStream —— MultipartFile 是 spring-web 的类型，
+        // 让它出现在 solvela-ledger 的签名上，那个模块就只能被 HTTP 调用了。
+        try (InputStream in = file.getInputStream()) {
+            return Service.importAdd(in);
+        } catch (IOException e) {
+            throw new UncheckedIOException("读取上传文件失败", e);
+        }
     }
 
     @Operation(summary = "导入：回填物流")
     @PostMapping("/importShip")
     @SaCheckPermission("physicalDelivery:import")
     public ResponseDTO<String> importShip(@RequestParam MultipartFile file) {
-        return Service.importShip(file);
+        // 共享层的 service 只认 InputStream —— MultipartFile 是 spring-web 的类型，
+        // 让它出现在 solvela-ledger 的签名上，那个模块就只能被 HTTP 调用了。
+        try (InputStream in = file.getInputStream()) {
+            return Service.importShip(in);
+        } catch (IOException e) {
+            throw new UncheckedIOException("读取上传文件失败", e);
+        }
     }
 }

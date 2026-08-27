@@ -1,4 +1,4 @@
-package solvela.lottery.runtime.domain;
+package solvela.admin.module.lottery.runtime.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

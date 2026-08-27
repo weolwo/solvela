@@ -12,13 +12,13 @@ package solvela.draw.runtime.domain;
  * @Author alaric
  * @Date 2026-07-26
  */
-public record DrawExecuteVO(boolean hit, Long prizeItemId, String prizeCode, String source, String message) {
+public record DrawExecuteDTO(boolean hit, Long prizeItemId, String prizeCode, String source, String message) {
 
-    public static DrawExecuteVO ofHit(long prizeItemId, String prizeCode, String source) {
-        return new DrawExecuteVO(true, prizeItemId, prizeCode, source, "恭喜中奖");
+    public static DrawExecuteDTO ofHit(long prizeItemId, String prizeCode, String source) {
+        return new DrawExecuteDTO(true, prizeItemId, prizeCode, source, "恭喜中奖");
     }
 
-    public static DrawExecuteVO ofMiss(String message) {
-        return new DrawExecuteVO(false, null, null, null, message);
+    public static DrawExecuteDTO ofMiss(String message) {
+        return new DrawExecuteDTO(false, null, null, null, message);
     }
 }

@@ -29,7 +29,7 @@ import java.util.Optional;
  * 新增槽位只需在这里加一个枚举常量。
  *
  * <p>⚠️ 变量清单必须来自<b>调用点真实存在的数据</b>，不能凭想象写。
- * 下面三个场景分别对应 {@code TaskEventContext}、{@code DrawExecuteForm} 和活动准入，
+ * 下面三个场景分别对应 {@code TaskEventContext}、{@code DrawExecuteCommand} 和活动准入，
  * 改动前请先回到调用点确认。
  */
 public enum ScriptScene {
@@ -58,7 +58,7 @@ public enum ScriptScene {
      * 奖池准入判定。
      *
      * <p>决定某个会员这一次能不能进这个奖池（VIP 池、新人池等）。
-     * 变量取自 {@code solvela.draw.runtime.domain.DrawExecuteForm}。
+     * 变量取自 {@code solvela.draw.runtime.domain.DrawExecuteCommand}。
      */
     POOL_ENTRY(ScriptDomain.DRAW, "奖池准入判定", Boolean.class,
             "返回 true 表示允许该会员本次进入此奖池。挂在 t_prize_pool_config 上。",

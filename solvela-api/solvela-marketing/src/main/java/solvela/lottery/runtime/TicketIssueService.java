@@ -10,8 +10,8 @@ import solvela.lottery.engine.FpeCipherFactory;
 import solvela.lottery.issue.dao.LotteryIssueDao;
 import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.manager.LotteryIssueManager;
-import solvela.lottery.runtime.domain.TicketObtainForm;
-import solvela.lottery.runtime.domain.TicketObtainVO;
+import solvela.lottery.runtime.domain.TicketObtainCommand;
+import solvela.lottery.runtime.domain.TicketObtainDTO;
 import solvela.member.service.MemberService;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RRateLimiter;
@@ -105,7 +105,7 @@ public class TicketIssueService {
      * 上游若已经持有一个完整的领号上下文，整个传进来比拆成几个参数顺手。
      * <b>核心实现只有下面那一份，这里只做拆包</b> —— 两个入口的行为不可能漂移。
      */
-    public ResponseDTO<TicketObtainVO> obtain(TicketObtainForm form) {
+    public ResponseDTO<TicketObtainDTO> obtain(TicketObtainCommand form) {
         return obtain(form.getLotteryCode(), form.getIssueNo(), form.getMemberId(), form.getRequestId());
     }
 
@@ -123,7 +123,7 @@ public class TicketIssueService {
      * @param memberId    会员号（关联键）。账号快照由本方法查会员表取，调用方不用传
      * @param requestId   幂等键，可为空；传了则同一个 requestId 只会发出一个号码
      */
-    public ResponseDTO<TicketObtainVO> obtain(String lotteryCode, String issueNo, Long memberId, String requestId) {
+    public ResponseDTO<TicketObtainDTO> obtain(String lotteryCode, String issueNo, Long memberId, String requestId) {
         // 1. 幂等防重
         if (StringUtils.isNotBlank(requestId)) {
             boolean first = redissonClient.getBucket(LotteryCacheKey.request(requestId), StringCodec.INSTANCE)

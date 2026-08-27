@@ -37,14 +37,10 @@ public class PhysicalDeliveryAddCommand {
     private String sourceType;
 
     /*
-     * 🔴 下面三处 @Size 不是 UI 层面的挑剔，是<b>密文列宽的硬约束</b>。
-     * 三列都加密落库，密文长度 = 3(前缀) + base64(12 + 明文字节数 + 16)：
-     *     姓名 40 字符(120B) -> 203  ≤ varchar(255)
-     *     电话 30 字符( 30B) ->  83  ≤ varchar(255)
-     *     地址 100 字符(300B) -> 443 ≤ varchar(512)
-     * 放开上限而不改列宽，后果是 MySQL 非严格模式<b>静默截断密文</b> ——
-     * 表现为「存进去了，读出来解密失败」，而且那一行救不回来。
-     * 改这里或改列宽时，两边一起改，算式见 PiiCipher.cipherTextLength。
+     * 🔴 下面三个字段有<b>密文列宽的硬约束</b>（姓名 40 / 电话 30 / 地址 100 字符）。
+     * 这里刻意没有 {@code @Size} —— 校验注解是端的东西，共享层不挂。
+     * 真正的守卫在 {@code PhysicalDeliveryService.checkPii}，写入前必过，
+     * 算式与后果都写在那个方法的注释里。管理端 Form 上的同名 {@code @Size} 只是提前红框。
      */
     private String receiverName;
 

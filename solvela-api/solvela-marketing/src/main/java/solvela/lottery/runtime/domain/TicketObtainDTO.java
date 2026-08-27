@@ -13,7 +13,7 @@ package solvela.lottery.runtime.domain;
  * @Author alaric
  * @Date 2026-07-28
  */
-public record TicketObtainVO(String lotteryCode,
+public record TicketObtainDTO(String lotteryCode,
                              String issueNo,
                              String ticketNumber,
                              long sequenceNo,

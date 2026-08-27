@@ -3,7 +3,6 @@ package solvela.lottery.record.domain.query;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
-import solvela.base.swagger.SchemaEnum;
 import solvela.base.validation.enumeration.CheckEnum;
 import solvela.enums.TicketStatusEnum;
 
@@ -35,7 +34,6 @@ public class LotteryRecordQuery extends PageParam {
     /** 创建时间 */
     private LocalDate createTimeEnd;
 
-    @SchemaEnum(value = TicketStatusEnum.class, desc = "中奖状态: 0-未开奖, 1-未中奖, 已开奖")
     @CheckEnum(value = TicketStatusEnum.class, message = "中奖状态: 0-未开奖, 1-未中奖, 已开奖 错误")
     private Integer winStatus;
 

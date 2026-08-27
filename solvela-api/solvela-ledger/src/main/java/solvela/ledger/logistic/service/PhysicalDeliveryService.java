@@ -29,7 +29,7 @@ import static solvela.ledger.stat.LedgerStatSupport.toStr;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
+import java.io.InputStream;
 
 import solvela.member.service.MemberService;
 
@@ -169,6 +169,10 @@ public class PhysicalDeliveryService {
      * 添加
      */
     public ResponseDTO<String> add(PhysicalDeliveryAddCommand addForm) {
+        String tooLong = checkPii(addForm.getReceiverName(), addForm.getReceiverPhone(), addForm.getReceiverAddress());
+        if (tooLong != null) {
+            return ResponseDTO.userErrorParam(tooLong);
+        }
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(addForm, PhysicalDelivery.class);
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
         // ⚠️ 这一句不能省：member_name 仍是 NOT NULL 且无默认值，
@@ -183,6 +187,10 @@ public class PhysicalDeliveryService {
      *
      */
     public ResponseDTO<String> update(PhysicalDeliveryUpdateCommand updateForm) {
+        String tooLong = checkPii(updateForm.getReceiverName(), updateForm.getReceiverPhone(), updateForm.getReceiverAddress());
+        if (tooLong != null) {
+            return ResponseDTO.userErrorParam(tooLong);
+        }
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(updateForm, PhysicalDelivery.class);
         physicalDeliveryDao.updateById(physicalDelivery);
         return ResponseDTO.ok();
@@ -221,7 +229,7 @@ public class PhysicalDeliveryService {
      * "成功 470 条失败 30 条"这种半截状态没法让人判断该补哪些行，只能整批退回重来。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> importAdd(MultipartFile file) {
+    public ResponseDTO<String> importAdd(InputStream file) {
         SonicReadResult<PhysicalDeliveryImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryImportRow.class);
         if (result.hasError()) {
             return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
@@ -318,7 +326,7 @@ public class PhysicalDeliveryService {
      * 凭一张 Excel 凭空造单等于绕过提案与预算，是资损口子。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> importShip(MultipartFile file) {
+    public ResponseDTO<String> importShip(InputStream file) {
         SonicReadResult<PhysicalDeliveryShipImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryShipImportRow.class);
         if (result.hasError()) {
             return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
@@ -437,6 +445,37 @@ public class PhysicalDeliveryService {
     private static final int RECEIVER_NAME_MAX = 40;
     private static final int RECEIVER_PHONE_MAX = 30;
     private static final int RECEIVER_ADDRESS_MAX = 100;
+
+    /**
+     * 三个 PII 字段的长度校验，<b>写入前必过</b>，返回 null 表示通过。
+     *
+     * <p>为什么不是 {@code @Size} 而是写在 service 里：这三条是<b>密文列宽的硬约束</b>，
+     * 不是某个页面的输入体验。管理端的 Form 上还留着同样上限的 {@code @Size}，那是为了
+     * 让前端在提交前就红框提示；但只要还有第二个调用方（导入、C 端、定时任务、将来的 RPC），
+     * 靠端上的注解就等于没设防 —— 真正的底线必须在领域这一层。
+     *
+     * <p>放开上限而不改列宽的后果：MySQL 非严格模式下<b>静默截断密文</b>，
+     * 表现为「存进去了，读出来解密失败」，而且那一行救不回来。
+     * 改这里或改列宽时两边一起改，密文长度算式见 {@code PiiCipher.cipherTextLength}：
+     * <pre>
+     *     密文长度 = 3(前缀) + base64(12 + 明文字节数 + 16)
+     *     姓名  40 字符(120B) -> 203  ≤ varchar(255)
+     *     电话  30 字符( 30B) ->  83  ≤ varchar(255)
+     *     地址 100 字符(300B) -> 443 ≤ varchar(512)
+     * </pre>
+     */
+    private String checkPii(String name, String phone, String address) {
+        if (name != null && name.length() > RECEIVER_NAME_MAX) {
+            return "收件人姓名 最多 " + RECEIVER_NAME_MAX + " 个字";
+        }
+        if (phone != null && phone.length() > RECEIVER_PHONE_MAX) {
+            return "收件人电话 最多 " + RECEIVER_PHONE_MAX + " 位";
+        }
+        if (address != null && address.length() > RECEIVER_ADDRESS_MAX) {
+            return "收件详细地址 最多 " + RECEIVER_ADDRESS_MAX + " 个字";
+        }
+        return null;
+    }
 
     private void checkPiiLength(List<String> errorList, String rowNo, String label, String value, int max) {
         if (value != null && value.length() > max) {

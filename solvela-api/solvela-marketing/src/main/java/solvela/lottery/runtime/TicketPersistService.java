@@ -7,7 +7,7 @@ import solvela.lottery.issue.dao.LotteryIssueDao;
 import solvela.lottery.LotteryIssue;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.LotteryRecord;
-import solvela.lottery.runtime.domain.TicketObtainVO;
+import solvela.lottery.runtime.domain.TicketObtainDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,7 +54,7 @@ public class TicketPersistService {
      * 恒有 {@code 游标 >= sold_count}；硬上限认游标，sold_count 只用于展示与对账。
      */
     @Transactional(rollbackFor = Exception.class)
-    public TicketObtainVO persist(LotteryConfig config, LotteryIssue issue, Long memberId, String memberName,
+    public TicketObtainDTO persist(LotteryConfig config, LotteryIssue issue, Long memberId, String memberName,
                                   long sequenceNo, String ticketNumber, String securitySign) {
         // 时间取数据库时钟，不用 JVM 的 LocalDateTime.now()（铁律 9：只认数据库一个时钟）
         LocalDateTime now = lotteryIssueDao.selectDbNow();
@@ -77,7 +77,7 @@ public class TicketPersistService {
 
         lotteryIssueDao.increaseSoldCount(issue.getId());
 
-        return new TicketObtainVO(config.getLotteryCode(), issue.getIssueNo(), ticketNumber,
+        return new TicketObtainDTO(config.getLotteryCode(), issue.getIssueNo(), ticketNumber,
                 sequenceNo, securitySign, now.format(TIME_FORMAT));
     }
 }

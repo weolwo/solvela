@@ -18,8 +18,8 @@ import solvela.draw.PrizePoolItem;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
 import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
-import solvela.draw.runtime.domain.DrawExecuteForm;
-import solvela.draw.runtime.domain.DrawExecuteVO;
+import solvela.draw.runtime.domain.DrawExecuteCommand;
+import solvela.draw.runtime.domain.DrawExecuteDTO;
 import solvela.event.UserPrizeEvent;
 import solvela.member.service.MemberService;
 import solvela.prize.PrizeConfig;
@@ -119,7 +119,7 @@ public class DrawExecuteService {
      * UserPrizeEvent 经 @TransactionalEventListener(AFTER_COMMIT) 在提交后才真正派发，天然防「事务回滚但奖已发」
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<DrawExecuteVO> execute(DrawExecuteForm form) {
+    public ResponseDTO<DrawExecuteDTO> execute(DrawExecuteCommand form) {
         // 1. 幂等防重（调用方传 requestId 即启用）
         if (form.getRequestId() != null && !form.getRequestId().isBlank()) {
             boolean first = redissonClient.getBucket(DrawCacheKey.request(form.getRequestId()), StringCodec.INSTANCE)
@@ -204,7 +204,7 @@ public class DrawExecuteService {
             case DrawResult.NoStock(String candidateCode) -> {
                 // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
                 saveLog(form, memberName, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
-                yield ResponseDTO.ok(DrawExecuteVO.ofMiss("手慢了，奖品已被抽完"));
+                yield ResponseDTO.ok(DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完"));
             }
         };
     }
@@ -213,7 +213,7 @@ public class DrawExecuteService {
      * 中奖后发布派发事件：AFTER_COMMIT 投递到 consumer -> risk -> ledger 公共链路
      * traceId 作为 sourceBizId，配合 t_prize_log 唯一索引做跨系统防重
      */
-    private void publishPrizeEvent(DrawExecuteForm form, String memberName, String traceId, String prizeCode) {
+    private void publishPrizeEvent(DrawExecuteCommand form, String memberName, String traceId, String prizeCode) {
         PrizeConfig prizeConfig = prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), prizeCode);
         if (prizeConfig == null) {
             log.error("[抽奖派发] 奖品配置不存在，跳过派发: {}", prizeCode);
@@ -235,7 +235,7 @@ public class DrawExecuteService {
     /**
      * 结算：Lua 预扣 -> DB 条件更新兜底 -> 失败降级兜底奖项 -> 落流水
      */
-    private ResponseDTO<DrawExecuteVO> settle(DrawExecuteForm form, String memberName, String traceId,
+    private ResponseDTO<DrawExecuteDTO> settle(DrawExecuteCommand form, String memberName, String traceId,
                                               DrawPoolSnapshot snapshot,
                                               Map<Long, PrizePoolItem> itemMap,
                                               DrawPrizeSnapshot candidate, DrawResult.HitSource source,
@@ -243,7 +243,7 @@ public class DrawExecuteService {
         if (tryDeduct(form, itemMap, candidate, period)) {
             saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
             publishPrizeEvent(form, memberName, traceId, candidate.prizeCode());
-            return ResponseDTO.ok(DrawExecuteVO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name()));
+            return ResponseDTO.ok(DrawExecuteDTO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name()));
         }
 
         // 候选奖项扣减失败（并发抢空/超单人限领）-> 降级兜底
@@ -253,13 +253,13 @@ public class DrawExecuteService {
             saveLog(form, memberName, traceId, fallback.prizeItemId(), fallback.prizeCode(), LOG_STATUS_HIT,
                     DrawResult.HitSource.FALLBACK_DEGRADE.name());
             publishPrizeEvent(form, memberName, traceId, fallback.prizeCode());
-            return ResponseDTO.ok(DrawExecuteVO.ofHit(fallback.prizeItemId(), fallback.prizeCode(),
+            return ResponseDTO.ok(DrawExecuteDTO.ofHit(fallback.prizeItemId(), fallback.prizeCode(),
                     DrawResult.HitSource.FALLBACK_DEGRADE.name()));
         }
 
         // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
         saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_NO_STOCK, "预扣失败且兜底不可用");
-        return ResponseDTO.ok(DrawExecuteVO.ofMiss("手慢了，奖品已被抽完"));
+        return ResponseDTO.ok(DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完"));
     }
 
     /**
@@ -292,7 +292,7 @@ public class DrawExecuteService {
     /**
      * 双层扣减：Redis Lua 原子预扣扛并发；DB 条件更新做最终一致性兜底，DB 拒绝则补偿回滚 Redis
      */
-    private boolean tryDeduct(DrawExecuteForm form, Map<Long, PrizePoolItem> itemMap, DrawPrizeSnapshot prize,
+    private boolean tryDeduct(DrawExecuteCommand form, Map<Long, PrizePoolItem> itemMap, DrawPrizeSnapshot prize,
                               DrawPeriodResolver.Period period) {
         PrizePoolItem item = itemMap.get(prize.prizeItemId());
         int userMax = item == null || item.getUserMaxCount() == null ? UNLIMITED : item.getUserMaxCount();
@@ -320,7 +320,7 @@ public class DrawExecuteService {
         }
     }
 
-    private void saveLog(DrawExecuteForm form, String memberName, String traceId, Long prizeItemId, String prizeCode,
+    private void saveLog(DrawExecuteCommand form, String memberName, String traceId, Long prizeItemId, String prizeCode,
                          int status, String remark) {
         DrawPrizeLog logEntity = new DrawPrizeLog();
         logEntity.setTraceId(traceId);
