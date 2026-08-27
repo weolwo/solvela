@@ -1,9 +1,10 @@
 package solvela.risk.engine;
 
+import solvela.base.module.redis.RedisService;
+
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.risk.PromotionConfig;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class FrequencyRiskFilter implements IRiskFilter {
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private RedisService redisService;
 
     @Override
     public int getOrder() {
@@ -42,16 +43,12 @@ public class FrequencyRiskFilter implements IRiskFilter {
         // 缓存 Key 示例: risk:freq:DAILY:promo_1001:5579345309
         String redisKey = String.format("risk:freq:%s:promo_%d:%s", config.getLimitPeriod(), promoId, uid);
 
-        // 【工业级写法】：使用 Redis 的 INCR 命令保证原子性累加
-        Long currentCount = stringRedisTemplate.opsForValue().increment(redisKey);
+        // INCR 与首次 EXPIRE 必须原子完成 —— 分成两条命令时，两者之间一旦中断
+        // 就会留下一个没有 TTL 的计数键，这个用户对这个活动的限流<b>再也不会解除</b>。
+        // 原因见 RedisService.increment 的注释。
+        long currentCount = redisService.increment(redisKey, calculateExpireSeconds(config.getLimitPeriod()));
 
-        if (currentCount != null && currentCount == 1) {
-            // 如果是第一次访问，根据周期设置过期时间
-            long expireSeconds = calculateExpireSeconds(config.getLimitPeriod());
-            stringRedisTemplate.expire(redisKey, expireSeconds, TimeUnit.SECONDS);
-        }
-
-        if (currentCount != null && currentCount > config.getIdentifyLimit()) {
+        if (currentCount > config.getIdentifyLimit()) {
             return RiskResult.reject(RiskBlockCode.USER_FREQUENCY_LIMIT, "您的参与太频繁了，请稍后再试");
         }
 

@@ -132,8 +132,6 @@ public abstract class OperateLogAspect {
             corePoolSize = config.getCorePoolSize();
         }
         taskExecutor = new ThreadPoolTaskExecutor();
-        //线程初始化
-        taskExecutor.initialize();
         // 设置核心线程数
         taskExecutor.setCorePoolSize(corePoolSize);
         // 设置最大线程数
@@ -148,6 +146,15 @@ public abstract class OperateLogAspect {
         taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         // 等待所有任务结束后再关闭线程池
         taskExecutor.setWaitForTasksToCompleteOnShutdown(true);
+
+        // 🔴 initialize() 必须放在<b>所有 setter 之后</b>。
+        //    队列是在 initialize() 里按当时的 queueCapacity 建出来的，之后再调
+        //    setQueueCapacity 只改字段、不换队列 —— 原来的写法把 initialize 放在最前面，
+        //    结果队列一直是默认的<b>无界</b> LinkedBlockingQueue。
+        //    无界队列还有个连带后果：永远不会触发拒绝策略，下面那个 CallerRunsPolicy
+        //    等于没配，操作日志积压时不会给调用方施加背压，只会一路涨到 OOM。
+        //    （setCorePoolSize 之类会转发给已建好的池，所以只有队列这一项静默失效，更难发现。）
+        taskExecutor.initialize();
     }
 
     protected void handleLog(final JoinPoint joinPoint, final Exception e, Object responseDTO) {

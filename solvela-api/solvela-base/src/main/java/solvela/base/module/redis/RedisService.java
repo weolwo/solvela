@@ -14,6 +14,8 @@ import org.springframework.util.CollectionUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import org.springframework.data.redis.core.script.RedisScript;
+
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
@@ -108,18 +110,35 @@ public class RedisService {
      * 一个每 29 分钟试一次密码的脚本能把计数一直累加到锁定，而它其实从没在任一 30 分钟窗口里
      * 超过阈值。这里的语义是<b>固定窗口</b>：第一次失败起算，TTL 到点整个计数清零。
      *
+     * <p>🔴 <b>INCR 与 EXPIRE 必须在同一个脚本里</b>，不能写成两条命令。
+     * INCR 自己是原子的，但「INCR 完再 EXPIRE」这一对不是：两条命令之间应用被 kill、
+     * 连接断开、或 Redis 主从切换，都会留下一个<b>没有 TTL 的计数键</b>。
+     * 那个键此后永不过期，计数只增不减 —— 表现是这个会员/这个活动的限流<b>再也不会解除</b>，
+     * 而且查不出原因：代码看着没问题，数据库里也没有任何限制记录。
+     *
+     * <p>脚本里还多了一层保险：即使键已存在却没有 TTL（历史遗留的坏键），
+     * 也会补上过期时间，让老数据自己愈合。
+     *
      * @param expireSeconds 窗口长度（秒）
      */
     public long increment(String key, long expireSeconds) {
-        Long count = redisValueOperations.increment(key);
-        if (count == null) {
-            return 0L;
-        }
-        if (count == 1L) {
-            this.expire(key, expireSeconds);
-        }
-        return count;
+        Long count = stringRedisTemplate.execute(INCR_WITH_TTL, List.of(key), String.valueOf(expireSeconds));
+        return count == null ? 0L : count;
     }
+
+    /**
+     * INCR + 首次设置 TTL，一次往返、原子完成。
+     *
+     * <p>{@code PTTL} 返回 -1 表示键存在但没有过期时间，-2 表示键不存在。
+     * 新建（返回值 1）或发现没有 TTL 时都补上 —— 后者是为了修复历史上由非原子写法留下的坏键。
+     */
+    private static final RedisScript<Long> INCR_WITH_TTL = RedisScript.of("""
+            local n = redis.call('INCR', KEYS[1])
+            if n == 1 or redis.call('PTTL', KEYS[1]) == -1 then
+                redis.call('EXPIRE', KEYS[1], ARGV[1])
+            end
+            return n
+            """, Long.class);
 
     /**
      * 获取当天剩余的秒数

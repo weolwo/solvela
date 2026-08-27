@@ -171,7 +171,7 @@ public class SolvelaIpUtil {
                 }
             }
         } catch (SocketException e) {
-            e.printStackTrace();
+            log.warn("[IP] 解析失败", e);
         }
         return ipList;
     }
