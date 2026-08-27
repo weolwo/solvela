@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import solvela.base.domain.ResponseDTO;
 import solvela.mall.constant.MallConst;
 import solvela.mall.favorite.dao.MallFavoriteDao;
-import solvela.mall.favorite.domain.vo.MallFavoriteStatVO;
+import solvela.mall.favorite.domain.dto.MallFavoriteStatDTO;
 
 import java.util.List;
 
@@ -28,14 +28,14 @@ public class MallFavoriteService {
 
     private final MallFavoriteDao mallFavoriteDao;
 
-    public ResponseDTO<MallFavoriteStatVO> queryStat(Integer rankTopN) {
+    public ResponseDTO<MallFavoriteStatDTO> queryStat(Integer rankTopN) {
         int topN = rankTopN == null ? MallConst.RANK_TOP_N : rankTopN;
         topN = Math.min(Math.max(topN, 1), MallConst.MAX_RANK_TOP_N);
 
-        MallFavoriteStatVO stat = mallFavoriteDao.queryStat();
+        MallFavoriteStatDTO stat = mallFavoriteDao.queryStat();
         if (stat == null) {
             // 一条收藏都没有时聚合返回 null，直接下发会让前端把「0」渲染成空白
-            stat = new MallFavoriteStatVO();
+            stat = new MallFavoriteStatDTO();
             stat.setTotalCount(0L);
             stat.setCommodityCount(0L);
             stat.setMemberCount(0L);

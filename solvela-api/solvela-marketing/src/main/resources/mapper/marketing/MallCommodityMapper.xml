@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.mall.commodity.dao.MallCommodityDao">
 
-    <resultMap id="MallCommodityVO" type="solvela.mall.commodity.domain.vo.MallCommodityVO">
+    <resultMap id="MallCommodityDTO" type="solvela.mall.commodity.domain.dto.MallCommodityDTO">
             <result column="id" property="id" />
             <result column="commodity_code" property="commodityCode" />
             <result column="category_id" property="categoryId" />
@@ -112,7 +112,7 @@
                 (SELECT cat.category_name FROM t_mall_category cat WHERE cat.id = c.category_id) AS category_name
     </sql>
 
-    <select id="queryPage" resultMap="MallCommodityVO">
+    <select id="queryPage" resultMap="MallCommodityDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="sku_aggregation"/>
@@ -121,7 +121,7 @@
         ORDER BY c.sort ASC, c.create_time DESC
     </select>
 
-    <select id="queryList" resultMap="MallCommodityVO">
+    <select id="queryList" resultMap="MallCommodityDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="sku_aggregation"/>

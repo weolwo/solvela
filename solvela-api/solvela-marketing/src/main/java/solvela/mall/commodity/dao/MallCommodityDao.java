@@ -3,8 +3,8 @@ package solvela.mall.commodity.dao;
 import java.util.List;
 
 import solvela.mall.MallCommodity;
-import solvela.mall.commodity.domain.form.MallCommodityQueryForm;
-import solvela.mall.commodity.domain.vo.MallCommodityVO;
+import solvela.mall.commodity.domain.query.MallCommodityQuery;
+import solvela.mall.commodity.domain.dto.MallCommodityDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -29,7 +29,7 @@ public interface MallCommodityDao extends BaseMapper<MallCommodity> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallCommodityVO> queryPage(Page<?> page, @Param("queryForm") MallCommodityQueryForm queryForm);
+    List<MallCommodityDTO> queryPage(Page<?> page, @Param("queryForm") MallCommodityQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -37,7 +37,7 @@ public interface MallCommodityDao extends BaseMapper<MallCommodity> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallCommodityVO> queryList(@Param("queryForm") MallCommodityQueryForm queryForm);
+    List<MallCommodityDTO> queryList(@Param("queryForm") MallCommodityQuery queryForm);
 
     // ----- 物理删除 -----
 

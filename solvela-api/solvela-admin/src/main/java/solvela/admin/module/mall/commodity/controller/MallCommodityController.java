@@ -11,14 +11,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.domain.ValidateList;
 import solvela.base.web.CurrentUser;
-import solvela.mall.commodity.domain.form.MallCommodityQueryForm;
-import solvela.mall.commodity.domain.form.MallCommoditySaveForm;
-import solvela.mall.commodity.domain.vo.MallCommodityDetailVO;
-import solvela.mall.commodity.domain.vo.MallCommodityVO;
+import solvela.admin.module.mall.commodity.domain.form.MallCommodityQueryForm;
+import solvela.mall.commodity.domain.query.MallCommodityQuery;
+import solvela.admin.module.mall.commodity.domain.form.MallCommoditySaveForm;
+import solvela.mall.commodity.domain.command.MallCommoditySaveCommand;
+import solvela.mall.commodity.domain.dto.MallCommodityDetailDTO;
+import solvela.admin.module.mall.commodity.domain.vo.MallCommodityVO;
+import solvela.mall.commodity.domain.dto.MallCommodityDTO;
 import solvela.mall.commodity.service.MallCommodityService;
 
 import java.util.List;
@@ -46,13 +51,14 @@ public class MallCommodityController {
     @PostMapping("/queryPage")
     @SaCheckPermission("mallCommodity:query")
     public ResponseDTO<PageResult<MallCommodityVO>> queryPage(@RequestBody @Valid MallCommodityQueryForm queryForm) {
-        return ResponseDTO.ok(mallCommodityService.queryPage(queryForm));
+        PageResult<MallCommodityDTO> page = mallCommodityService.queryPage(SolvelaBeanUtil.copy(queryForm, MallCommodityQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallCommodityVO.class));
     }
 
     @Operation(summary = "商品详情：主表+SKU+轮播图，编辑页回显用 @author weolwo")
     @GetMapping("/detail/{id}")
     @SaCheckPermission("mallCommodity:query")
-    public ResponseDTO<MallCommodityDetailVO> detail(@PathVariable Long id) {
+    public ResponseDTO<MallCommodityDetailDTO> detail(@PathVariable Long id) {
         return mallCommodityService.detail(id);
     }
 
@@ -87,7 +93,7 @@ public class MallCommodityController {
     @PostMapping("/save")
     @SaCheckPermission("mallCommodity:update")
     public ResponseDTO<Long> save(@RequestBody @Valid MallCommoditySaveForm saveForm) {
-        return mallCommodityService.save(saveForm, CurrentUser.orNull());
+        return mallCommodityService.save(SolvelaBeanUtil.deepCopy(saveForm, MallCommoditySaveCommand.class), CurrentUser.orNull());
     }
 
     @Operation(summary = "上架/下架 @author weolwo")

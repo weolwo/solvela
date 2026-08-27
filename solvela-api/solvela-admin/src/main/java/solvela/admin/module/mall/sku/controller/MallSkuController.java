@@ -9,10 +9,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
-import solvela.mall.sku.domain.form.MallSkuQueryForm;
-import solvela.mall.sku.domain.vo.MallSkuVO;
+import solvela.base.util.SolvelaBeanUtil;
+import solvela.admin.module.mall.sku.domain.form.MallSkuQueryForm;
+import solvela.mall.sku.domain.query.MallSkuQuery;
+import solvela.admin.module.mall.sku.domain.vo.MallSkuVO;
+import solvela.mall.sku.domain.dto.MallSkuDTO;
 import solvela.mall.sku.service.MallSkuService;
 
 /**
@@ -42,6 +46,7 @@ public class MallSkuController {
     @PostMapping("/queryPage")
     @SaCheckPermission("mallSku:query")
     public ResponseDTO<PageResult<MallSkuVO>> queryPage(@RequestBody @Valid MallSkuQueryForm queryForm) {
-        return ResponseDTO.ok(mallSkuService.queryPage(queryForm));
+        PageResult<MallSkuDTO> page = mallSkuService.queryPage(SolvelaBeanUtil.copy(queryForm, MallSkuQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallSkuVO.class));
     }
 }

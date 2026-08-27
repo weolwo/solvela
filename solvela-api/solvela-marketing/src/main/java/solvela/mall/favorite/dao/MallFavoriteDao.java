@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import solvela.mall.MallFavorite;
-import solvela.mall.favorite.domain.vo.MallFavoriteRankVO;
-import solvela.mall.favorite.domain.vo.MallFavoriteStatVO;
+import solvela.mall.favorite.domain.dto.MallFavoriteRankDTO;
+import solvela.mall.favorite.domain.dto.MallFavoriteStatDTO;
 
 import java.util.List;
 
@@ -25,15 +25,15 @@ public interface MallFavoriteDao extends BaseMapper<MallFavorite> {
     /**
      * 总量统计：收藏总数 / 被收藏商品数 / 有收藏行为的会员数
      */
-    MallFavoriteStatVO queryStat();
+    MallFavoriteStatDTO queryStat();
 
     /**
      * 收藏排行（按收藏数）
      */
-    List<MallFavoriteRankVO> queryRank(@Param("topN") int topN);
+    List<MallFavoriteRankDTO> queryRank(@Param("topN") int topN);
 
     /**
      * 「想要但买不到」：有人收藏，而商品已下架或可用库存为 0
      */
-    List<MallFavoriteRankVO> queryUnavailableRank(@Param("topN") int topN);
+    List<MallFavoriteRankDTO> queryUnavailableRank(@Param("topN") int topN);
 }

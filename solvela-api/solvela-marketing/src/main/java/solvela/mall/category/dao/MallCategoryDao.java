@@ -5,8 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import solvela.mall.MallCategory;
-import solvela.mall.category.domain.form.MallCategoryQueryForm;
-import solvela.mall.category.domain.vo.MallCategoryVO;
+import solvela.mall.category.domain.query.MallCategoryQuery;
+import solvela.mall.category.domain.dto.MallCategoryDTO;
 
 import java.util.List;
 
@@ -27,7 +27,7 @@ public interface MallCategoryDao extends BaseMapper<MallCategory> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallCategoryVO> queryPage(Page<?> page, @Param("queryForm") MallCategoryQueryForm queryForm);
+    List<MallCategoryDTO> queryPage(Page<?> page, @Param("queryForm") MallCategoryQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -35,7 +35,7 @@ public interface MallCategoryDao extends BaseMapper<MallCategory> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallCategoryVO> queryList(@Param("queryForm") MallCategoryQueryForm queryForm);
+    List<MallCategoryDTO> queryList(@Param("queryForm") MallCategoryQuery queryForm);
 
     // ----- 物理删除 -----
 

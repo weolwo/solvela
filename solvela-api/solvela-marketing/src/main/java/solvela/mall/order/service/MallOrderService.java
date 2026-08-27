@@ -9,9 +9,9 @@ import solvela.base.domain.ResponseDTO;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.mall.constant.MallConst;
 import solvela.mall.order.dao.MallOrderDao;
-import solvela.mall.order.domain.form.MallOrderQueryForm;
-import solvela.mall.order.domain.vo.MallOrderStatVO;
-import solvela.mall.order.domain.vo.MallOrderVO;
+import solvela.mall.order.domain.query.MallOrderQuery;
+import solvela.mall.order.domain.dto.MallOrderStatDTO;
+import solvela.mall.order.domain.dto.MallOrderDTO;
 import solvela.member.service.MemberService;
 
 import java.math.BigDecimal;
@@ -40,14 +40,14 @@ public class MallOrderService {
     /**
      * 分页查询。
      */
-    public PageResult<MallOrderVO> queryPage(MallOrderQueryForm queryForm) {
+    public PageResult<MallOrderDTO> queryPage(MallOrderQuery queryForm) {
         if (!resolveMemberId(queryForm)) {
             // 账号查不到对应会员：正确答案是「没有订单」，不是「全部订单」。
             // 不处理的话，运营输错一个字母会看到全量订单，而他以为那是这个人的
             return emptyPage(queryForm);
         }
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MallOrderVO> list = mallOrderDao.queryPage(page, queryForm);
+        List<MallOrderDTO> list = mallOrderDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -55,11 +55,11 @@ public class MallOrderService {
      * 统计 + 兑换商品排行。<b>与列表共用同一套查询条件</b> ——
      * 顶部筛选改了统计跟着变，两套条件的话运营会看到「统计说 100 单、列表只有 3 条」。
      */
-    public ResponseDTO<MallOrderStatVO> queryStat(MallOrderQueryForm queryForm) {
+    public ResponseDTO<MallOrderStatDTO> queryStat(MallOrderQuery queryForm) {
         if (!resolveMemberId(queryForm)) {
             return ResponseDTO.ok(emptyStat());
         }
-        MallOrderStatVO stat = mallOrderDao.queryStat(queryForm);
+        MallOrderStatDTO stat = mallOrderDao.queryStat(queryForm);
         stat = stat == null ? emptyStat() : normalize(stat);
 
         int topN = queryForm.getRankTopN() == null ? MallConst.RANK_TOP_N : queryForm.getRankTopN();
@@ -76,7 +76,7 @@ public class MallOrderService {
      *
      * @return false 表示「填了账号但查无此人」，调用方应当直接返回空结果
      */
-    private boolean resolveMemberId(MallOrderQueryForm queryForm) {
+    private boolean resolveMemberId(MallOrderQuery queryForm) {
         String memberName = StringUtils.trimToNull(queryForm.getMemberName());
         if (memberName == null) {
             return true;
@@ -90,8 +90,8 @@ public class MallOrderService {
     }
 
     /** PageResult 没有静态工厂，手工拼一个空页 */
-    private PageResult<MallOrderVO> emptyPage(MallOrderQueryForm queryForm) {
-        PageResult<MallOrderVO> result = new PageResult<>();
+    private PageResult<MallOrderDTO> emptyPage(MallOrderQuery queryForm) {
+        PageResult<MallOrderDTO> result = new PageResult<>();
         result.setPageNum(queryForm.getPageNum() == null ? 1L : queryForm.getPageNum());
         result.setPageSize(queryForm.getPageSize() == null ? 10L : queryForm.getPageSize());
         result.setTotal(0L);
@@ -101,12 +101,12 @@ public class MallOrderService {
         return result;
     }
 
-    private MallOrderStatVO emptyStat() {
-        return normalize(new MallOrderStatVO());
+    private MallOrderStatDTO emptyStat() {
+        return normalize(new MallOrderStatDTO());
     }
 
     /** SUM/COUNT 在零行时返回 null，直接下发会让前端把「0」渲染成空白 */
-    private MallOrderStatVO normalize(MallOrderStatVO stat) {
+    private MallOrderStatDTO normalize(MallOrderStatDTO stat) {
         stat.setOrderCount(nullToZero(stat.getOrderCount()));
         stat.setMemberCount(nullToZero(stat.getMemberCount()));
         stat.setQuantitySum(nullToZero(stat.getQuantitySum()));

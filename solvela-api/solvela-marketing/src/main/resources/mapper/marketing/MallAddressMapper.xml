@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.mall.address.dao.MallAddressDao">
 
-    <resultMap id="MallAddressVO" type="solvela.mall.address.domain.vo.MallAddressVO">
+    <resultMap id="MallAddressDTO" type="solvela.mall.address.domain.dto.MallAddressDTO">
             <result column="id" property="id" />
             <result column="member_id" property="memberId" />
             <result column="receiver_name" property="receiverName" />
@@ -39,7 +39,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="MallAddressVO">
+    <select id="queryPage" resultMap="MallAddressDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_mall_address
@@ -47,7 +47,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="MallAddressVO">
+    <select id="queryList" resultMap="MallAddressDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_mall_address

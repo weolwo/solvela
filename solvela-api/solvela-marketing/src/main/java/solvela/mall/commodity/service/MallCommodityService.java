@@ -21,12 +21,12 @@ import solvela.mall.MallCategory;
 import solvela.mall.category.manager.MallCategoryManager;
 import solvela.mall.commodity.dao.MallCommodityDao;
 import solvela.mall.MallCommodity;
-import solvela.mall.commodity.domain.form.MallCommodityQueryForm;
-import solvela.mall.commodity.domain.form.MallCommoditySaveForm;
-import solvela.mall.commodity.domain.form.MallCommoditySkuForm;
-import solvela.mall.commodity.domain.vo.MallCommodityDetailVO;
-import solvela.mall.commodity.domain.vo.MallCommoditySkuVO;
-import solvela.mall.commodity.domain.vo.MallCommodityVO;
+import solvela.mall.commodity.domain.query.MallCommodityQuery;
+import solvela.mall.commodity.domain.command.MallCommoditySaveCommand;
+import solvela.mall.commodity.domain.command.MallCommoditySkuCommand;
+import solvela.mall.commodity.domain.dto.MallCommodityDetailDTO;
+import solvela.mall.commodity.domain.dto.MallCommoditySkuDTO;
+import solvela.mall.commodity.domain.dto.MallCommodityDTO;
 import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.constant.MallConst;
 import solvela.mall.MallOrder;
@@ -88,9 +88,9 @@ public class MallCommodityService {
     /**
      * 分页查询
      */
-    public PageResult<MallCommodityVO> queryPage(MallCommodityQueryForm queryForm) {
+    public PageResult<MallCommodityDTO> queryPage(MallCommodityQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MallCommodityVO> list = mallCommodityDao.queryPage(page, queryForm);
+        List<MallCommodityDTO> list = mallCommodityDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -100,13 +100,13 @@ public class MallCommodityService {
      * <p>拆成三个接口的话，编辑页打开要发三个请求，而且「主表回来了、SKU 还没回来」
      * 这一帧里表单是可编辑的 —— 手快的人能在空 SKU 状态下点保存。
      */
-    public ResponseDTO<MallCommodityDetailVO> detail(Long id) {
+    public ResponseDTO<MallCommodityDetailDTO> detail(Long id) {
         MallCommodity commodity = mallCommodityManager.getById(id);
         if (commodity == null) {
             return ResponseDTO.userErrorParam("商品不存在");
         }
 
-        MallCommodityDetailVO vo = new MallCommodityDetailVO();
+        MallCommodityDetailDTO vo = new MallCommodityDetailDTO();
         vo.setId(commodity.getId());
         vo.setCommodityCode(commodity.getCommodityCode());
         vo.setCategoryId(commodity.getCategoryId());
@@ -186,9 +186,9 @@ public class MallCommodityService {
         return mallSkuManager.lambdaQuery().eq(MallSku::getSkuCode, skuCode).exists();
     }
 
-    private List<MallCommoditySkuVO> listSkuVO(Long commodityId) {
+    private List<MallCommoditySkuDTO> listSkuVO(Long commodityId) {
         return listDbSku(commodityId).stream().map(sku -> {
-            MallCommoditySkuVO vo = new MallCommoditySkuVO();
+            MallCommoditySkuDTO vo = new MallCommoditySkuDTO();
             vo.setId(sku.getId());
             vo.setSkuCode(sku.getSkuCode());
             vo.setSkuAttrs(parseSkuAttrs(sku.getSkuAttrs()));
@@ -244,7 +244,7 @@ public class MallCommodityService {
      * 否则运营保存后又点一次保存，会建出第二个商品。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<Long> save(MallCommoditySaveForm form, RequestUser user) {
+    public ResponseDTO<Long> save(MallCommoditySaveCommand form, RequestUser user) {
         // ---------- 1. 主表字段校验 ----------
         MallCategory category = mallCategoryManager.getById(form.getCategoryId());
         if (category == null) {
@@ -306,7 +306,7 @@ public class MallCommodityService {
         }
 
         List<MallSku> dbSkuList = listDbSku(form.getId());
-        List<MallCommoditySkuForm> skuFormList = form.getSkuList() == null
+        List<MallCommoditySkuCommand> skuFormList = form.getSkuList() == null
                 ? new ArrayList<>() : new ArrayList<>(form.getSkuList());
         if (skuFormList.isEmpty()) {
             if (!dbSkuList.isEmpty()) {
@@ -326,7 +326,7 @@ public class MallCommodityService {
         Set<String> attrsKeys = new HashSet<>();
         Set<String> skuCodes = new HashSet<>();
         Set<Long> keepSkuIds = new HashSet<>();
-        for (MallCommoditySkuForm skuForm : skuFormList) {
+        for (MallCommoditySkuCommand skuForm : skuFormList) {
             // 新增行的编码由运营填/前端生成，老行沿用库里的（同样不可改）
             MallSku dbSkuForCode = skuForm.getId() == null ? null : dbSkuMap.get(skuForm.getId());
             String skuCode = dbSkuForCode != null
@@ -436,7 +436,7 @@ public class MallCommodityService {
         // ---------- 5. 落库：SKU 整表 diff ----------
         boolean pointsOnly = form.getPayType() == MallConst.PAY_TYPE_POINTS;
         for (int i = 0; i < skuFormList.size(); i++) {
-            MallCommoditySkuForm skuForm = skuFormList.get(i);
+            MallCommoditySkuCommand skuForm = skuFormList.get(i);
             MallSku sku = new MallSku();
             sku.setCommodityId(commodityId);
             sku.setSkuAttrs(JsonUtils.toJson(skuForm.getSkuAttrs() == null
@@ -481,7 +481,7 @@ public class MallCommodityService {
      *
      * <p>四个来源一个都不能漏，其中<b>各 SKU 的专属图是最容易忘的一处</b>。
      */
-    private void confirmFileRelations(Long commodityId, MallCommoditySaveForm form, List<MallCommoditySkuForm> skuFormList) {
+    private void confirmFileRelations(Long commodityId, MallCommoditySaveCommand form, List<MallCommoditySkuCommand> skuFormList) {
         // 轮播图单独一组：它的顺序是业务数据，回显要按 sort 读回来
         List<Long> bannerIds = new ArrayList<>(new LinkedHashSet<>(
                 form.getBannerFileIds() == null ? List.<Long>of() : form.getBannerFileIds()));
@@ -493,7 +493,7 @@ public class MallCommodityService {
         if (form.getCoverFileId() != null) {
             otherIds.add(form.getCoverFileId());
         }
-        for (MallCommoditySkuForm skuForm : skuFormList) {
+        for (MallCommoditySkuCommand skuForm : skuFormList) {
             if (skuForm.getSkuCoverFileId() != null) {
                 otherIds.add(skuForm.getSkuCoverFileId());
             }
@@ -609,8 +609,8 @@ public class MallCommodityService {
     /**
      * 无规格商品的默认 SKU：规格 {}，价格继承主表，库存 0（运营随后在规格区补货）。
      */
-    private MallCommoditySkuForm defaultSkuForm() {
-        MallCommoditySkuForm skuForm = new MallCommoditySkuForm();
+    private MallCommoditySkuCommand defaultSkuForm() {
+        MallCommoditySkuCommand skuForm = new MallCommoditySkuCommand();
         // 这一行不是运营填的（表单一个规格都没提交），编码只能服务端补
         skuForm.setSkuCode(SolvelaCodeUtil.generateUniqueBizCode(
                 SolvelaCodeUtil.BizCodePrefix.MALL_SKU, this::existsBySkuCode));

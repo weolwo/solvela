@@ -3,8 +3,8 @@ package solvela.mall.sku.dao;
         import java.util.List;
 
         import solvela.mall.MallSku;
-        import solvela.mall.sku.domain.form.MallSkuQueryForm;
-        import solvela.mall.sku.domain.vo.MallSkuVO;
+        import solvela.mall.sku.domain.query.MallSkuQuery;
+        import solvela.mall.sku.domain.dto.MallSkuDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -27,7 +27,7 @@ public interface MallSkuDao extends BaseMapper<MallSku> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallSkuVO> queryPage(Page<?> page, @Param("queryForm") MallSkuQueryForm queryForm);
+    List<MallSkuDTO> queryPage(Page<?> page, @Param("queryForm") MallSkuQuery queryForm);
 
     /**
      * 列表查询 (无分页)
@@ -35,6 +35,6 @@ public interface MallSkuDao extends BaseMapper<MallSku> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallSkuVO> queryList(@Param("queryForm") MallSkuQueryForm queryForm);
+    List<MallSkuDTO> queryList(@Param("queryForm") MallSkuQuery queryForm);
 
 }

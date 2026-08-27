@@ -11,14 +11,20 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.domain.ResponseDTO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.domain.ValidateList;
 import solvela.base.web.CurrentUser;
-import solvela.mall.category.domain.form.MallCategoryBatchSaveForm;
-import solvela.mall.category.domain.form.MallCategoryQueryForm;
-import solvela.mall.category.domain.form.MallCategorySaveForm;
-import solvela.mall.category.domain.vo.MallCategoryVO;
+import solvela.admin.module.mall.category.domain.form.MallCategoryBatchSaveForm;
+import solvela.mall.category.domain.command.MallCategoryBatchSaveCommand;
+import solvela.admin.module.mall.category.domain.form.MallCategoryQueryForm;
+import solvela.mall.category.domain.query.MallCategoryQuery;
+import solvela.admin.module.mall.category.domain.form.MallCategorySaveForm;
+import solvela.mall.category.domain.command.MallCategorySaveCommand;
+import solvela.admin.module.mall.category.domain.vo.MallCategoryVO;
+import solvela.mall.category.domain.dto.MallCategoryDTO;
 import solvela.mall.category.service.MallCategoryService;
 
 import java.util.List;
@@ -45,7 +51,8 @@ public class MallCategoryController {
     @PostMapping("/queryPage")
     @SaCheckPermission("mallCategory:query")
     public ResponseDTO<PageResult<MallCategoryVO>> queryPage(@RequestBody @Valid MallCategoryQueryForm queryForm) {
-        return ResponseDTO.ok(mallCategoryService.queryPage(queryForm));
+        PageResult<MallCategoryDTO> page = mallCategoryService.queryPage(SolvelaBeanUtil.copy(queryForm, MallCategoryQuery.class));
+        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallCategoryVO.class));
     }
 
     /**
@@ -56,14 +63,16 @@ public class MallCategoryController {
     @GetMapping("/queryAll")
     @SaCheckPermission("mallCategory:query")
     public ResponseDTO<List<MallCategoryVO>> queryAll() {
-        return mallCategoryService.queryAll();
+        return ResponseDTO.ok(SolvelaBeanUtil.copyList(
+                mallCategoryService.queryAll().getData(), MallCategoryVO.class));
     }
 
     @Operation(summary = "启用中的分类列表：商品编辑页的分类下拉用 @author weolwo")
     @GetMapping("/enabledList")
     @SaCheckPermission("mallCategory:query")
     public ResponseDTO<List<MallCategoryVO>> enabledList() {
-        return mallCategoryService.queryEnabledList();
+        return ResponseDTO.ok(SolvelaBeanUtil.copyList(
+                mallCategoryService.queryEnabledList().getData(), MallCategoryVO.class));
     }
 
     /**
@@ -73,7 +82,7 @@ public class MallCategoryController {
     @PostMapping("/save")
     @SaCheckPermission("mallCategory:update")
     public ResponseDTO<Long> save(@RequestBody @Valid MallCategorySaveForm saveForm) {
-        return mallCategoryService.save(saveForm, CurrentUser.orNull());
+        return mallCategoryService.save(SolvelaBeanUtil.copy(saveForm, MallCategorySaveCommand.class), CurrentUser.orNull());
     }
 
     /**
@@ -86,7 +95,7 @@ public class MallCategoryController {
     @PostMapping("/batchSave")
     @SaCheckPermission("mallCategory:add")
     public ResponseDTO<Integer> batchSave(@RequestBody @Valid MallCategoryBatchSaveForm batchSaveForm) {
-        return mallCategoryService.batchSave(batchSaveForm, CurrentUser.orNull());
+        return mallCategoryService.batchSave(SolvelaBeanUtil.deepCopy(batchSaveForm, MallCategoryBatchSaveCommand.class), CurrentUser.orNull());
     }
 
     @Operation(summary = "启用/停用 @author weolwo")

@@ -8,7 +8,7 @@
       所以这里没有 queryPage / resultMap，只有三段聚合。
     -->
 
-    <select id="queryStat" resultType="solvela.mall.favorite.domain.vo.MallFavoriteStatVO">
+    <select id="queryStat" resultType="solvela.mall.favorite.domain.dto.MallFavoriteStatDTO">
         SELECT
             COUNT(1)                        AS totalCount,
             COUNT(DISTINCT commodity_id)    AS commodityCount,
@@ -23,7 +23,7 @@
 
       LEFT JOIN 商品表而不是子查询：这里本来就要按商品分组，join 不会让行数膨胀。
     -->
-    <select id="queryRank" resultType="solvela.mall.favorite.domain.vo.MallFavoriteRankVO">
+    <select id="queryRank" resultType="solvela.mall.favorite.domain.dto.MallFavoriteRankDTO">
         SELECT
             f.commodity_id              AS commodityId,
             c.commodity_name            AS commodityName,
@@ -49,7 +49,7 @@
 
       HAVING 而不是 WHERE：可用库存是子查询算出来的聚合值，WHERE 阶段还拿不到。
     -->
-    <select id="queryUnavailableRank" resultType="solvela.mall.favorite.domain.vo.MallFavoriteRankVO">
+    <select id="queryUnavailableRank" resultType="solvela.mall.favorite.domain.dto.MallFavoriteRankDTO">
         SELECT
             f.commodity_id              AS commodityId,
             c.commodity_name            AS commodityName,

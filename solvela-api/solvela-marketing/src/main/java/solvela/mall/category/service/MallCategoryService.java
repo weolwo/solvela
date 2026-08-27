@@ -12,11 +12,11 @@ import solvela.exception.BusinessException;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.mall.category.dao.MallCategoryDao;
 import solvela.mall.MallCategory;
-import solvela.mall.category.domain.form.MallCategoryBatchItemForm;
-import solvela.mall.category.domain.form.MallCategoryBatchSaveForm;
-import solvela.mall.category.domain.form.MallCategoryQueryForm;
-import solvela.mall.category.domain.form.MallCategorySaveForm;
-import solvela.mall.category.domain.vo.MallCategoryVO;
+import solvela.mall.category.domain.command.MallCategoryBatchItemCommand;
+import solvela.mall.category.domain.command.MallCategoryBatchSaveCommand;
+import solvela.mall.category.domain.query.MallCategoryQuery;
+import solvela.mall.category.domain.command.MallCategorySaveCommand;
+import solvela.mall.category.domain.dto.MallCategoryDTO;
 import solvela.mall.category.manager.MallCategoryManager;
 import solvela.mall.MallCommodity;
 import solvela.mall.commodity.manager.MallCommodityManager;
@@ -53,9 +53,9 @@ public class MallCategoryService {
     /**
      * 分页查询
      */
-    public PageResult<MallCategoryVO> queryPage(MallCategoryQueryForm queryForm) {
+    public PageResult<MallCategoryDTO> queryPage(MallCategoryQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MallCategoryVO> list = mallCategoryDao.queryPage(page, queryForm);
+        List<MallCategoryDTO> list = mallCategoryDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
@@ -65,8 +65,8 @@ public class MallCategoryService {
      * <p>不分页是有意的：两级、量级在几十，分页反而会把「父在第 2 页、子在第 1 页」这种
      * 拼不出树的情况带进来。
      */
-    public ResponseDTO<List<MallCategoryVO>> queryAll() {
-        MallCategoryQueryForm queryForm = new MallCategoryQueryForm();
+    public ResponseDTO<List<MallCategoryDTO>> queryAll() {
+        MallCategoryQuery queryForm = new MallCategoryQuery();
         return ResponseDTO.ok(mallCategoryDao.queryList(queryForm));
     }
 
@@ -77,16 +77,16 @@ public class MallCategoryService {
      * 之后，它下面的「手机配件」还留在下拉里 —— 而那是一个挂在不可见父级下的孤儿，
      * C 端根本走不到，商品配上去就等于配了个看不见的分类。
      */
-    public ResponseDTO<List<MallCategoryVO>> queryEnabledList() {
-        MallCategoryQueryForm queryForm = new MallCategoryQueryForm();
+    public ResponseDTO<List<MallCategoryDTO>> queryEnabledList() {
+        MallCategoryQuery queryForm = new MallCategoryQuery();
         queryForm.setStatus(MallConst.CATEGORY_STATUS_ENABLED);
-        List<MallCategoryVO> enabled = mallCategoryDao.queryList(queryForm);
+        List<MallCategoryDTO> enabled = mallCategoryDao.queryList(queryForm);
 
         Set<Long> enabledRootIds = enabled.stream()
                 .filter(c -> isRoot(c.getParentId()))
-                .map(MallCategoryVO::getId)
+                .map(MallCategoryDTO::getId)
                 .collect(Collectors.toSet());
-        List<MallCategoryVO> result = enabled.stream()
+        List<MallCategoryDTO> result = enabled.stream()
                 .filter(c -> isRoot(c.getParentId()) || enabledRootIds.contains(c.getParentId()))
                 .collect(Collectors.toList());
         return ResponseDTO.ok(result);
@@ -107,7 +107,7 @@ public class MallCategoryService {
      * </ol>
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<Long> save(MallCategorySaveForm form, RequestUser user) {
+    public ResponseDTO<Long> save(MallCategorySaveCommand form, RequestUser user) {
         long parentId = form.getParentId() == null ? ROOT_PARENT_ID : form.getParentId();
         String categoryName = StringUtils.trim(form.getCategoryName());
 
@@ -179,9 +179,9 @@ public class MallCategoryService {
      * @return 实际创建的分类数（父 + 子）
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<Integer> batchSave(MallCategoryBatchSaveForm form, RequestUser user) {
+    public ResponseDTO<Integer> batchSave(MallCategoryBatchSaveCommand form, RequestUser user) {
         long parentId = form.getParentId() == null ? ROOT_PARENT_ID : form.getParentId();
-        List<MallCategoryBatchItemForm> itemList = form.getCategoryList();
+        List<MallCategoryBatchItemCommand> itemList = form.getCategoryList();
 
         // ---------- 上级校验 ----------
         boolean underRoot = isRoot(parentId);
@@ -197,13 +197,13 @@ public class MallCategoryService {
 
         // ---------- 层级与数量 ----------
         int total = 0;
-        for (MallCategoryBatchItemForm item : itemList) {
-            List<MallCategoryBatchItemForm> children = childrenOf(item);
+        for (MallCategoryBatchItemCommand item : itemList) {
+            List<MallCategoryBatchItemCommand> children = childrenOf(item);
             if (!underRoot && !children.isEmpty()) {
                 // 本批已经挂在一级分类下了，再带子级就是第三级
                 return ResponseDTO.userErrorParam("分类最多两级：「" + item.getCategoryName() + "」不能再有子分类");
             }
-            for (MallCategoryBatchItemForm child : children) {
+            for (MallCategoryBatchItemCommand child : children) {
                 if (!childrenOf(child).isEmpty()) {
                     return ResponseDTO.userErrorParam("分类最多两级：「" + child.getCategoryName() + "」不能再有子分类");
                 }
@@ -222,7 +222,7 @@ public class MallCategoryService {
         // 而且不知道是哪两行撞了。
         Set<String> existingNames = listChildNames(parentId);
         Set<String> batchNames = new HashSet<>();
-        for (MallCategoryBatchItemForm item : itemList) {
+        for (MallCategoryBatchItemCommand item : itemList) {
             String name = StringUtils.trim(item.getCategoryName());
             if (existingNames.contains(name)) {
                 return ResponseDTO.userErrorParam("同级下已有名为「" + name + "」的分类");
@@ -232,7 +232,7 @@ public class MallCategoryService {
             }
             // 子分类的父是本次新建的，库里不可能已有同名的兄弟，只需查本批内部
             Set<String> childNames = new HashSet<>();
-            for (MallCategoryBatchItemForm child : childrenOf(item)) {
+            for (MallCategoryBatchItemCommand child : childrenOf(item)) {
                 String childName = StringUtils.trim(child.getCategoryName());
                 if (!childNames.add(childName)) {
                     return ResponseDTO.userErrorParam("「" + name + "」下有两个同名的子分类「" + childName + "」");
@@ -244,12 +244,12 @@ public class MallCategoryService {
         String operator = user == null ? null : user.getUserName();
         int created = 0;
         for (int i = 0; i < itemList.size(); i++) {
-            MallCategoryBatchItemForm item = itemList.get(i);
+            MallCategoryBatchItemCommand item = itemList.get(i);
             MallCategory parentEntity = toEntity(item, parentId, i, operator);
             mallCategoryDao.insert(parentEntity);
             created++;
 
-            List<MallCategoryBatchItemForm> children = childrenOf(item);
+            List<MallCategoryBatchItemCommand> children = childrenOf(item);
             for (int j = 0; j < children.size(); j++) {
                 // 这里才拿得到父的自增 id —— 整个嵌套结构就是为了这一行
                 mallCategoryDao.insert(toEntity(children.get(j), parentEntity.getId(), j, operator));
@@ -259,7 +259,7 @@ public class MallCategoryService {
         return ResponseDTO.ok(created);
     }
 
-    private static List<MallCategoryBatchItemForm> childrenOf(MallCategoryBatchItemForm item) {
+    private static List<MallCategoryBatchItemCommand> childrenOf(MallCategoryBatchItemCommand item) {
         return item.getChildren() == null ? List.of() : item.getChildren();
     }
 
@@ -272,7 +272,7 @@ public class MallCategoryService {
                 .collect(Collectors.toSet());
     }
 
-    private MallCategory toEntity(MallCategoryBatchItemForm item, Long parentId, int index, String operator) {
+    private MallCategory toEntity(MallCategoryBatchItemCommand item, Long parentId, int index, String operator) {
         MallCategory entity = new MallCategory();
         entity.setParentId(parentId);
         entity.setCategoryName(StringUtils.trim(item.getCategoryName()));

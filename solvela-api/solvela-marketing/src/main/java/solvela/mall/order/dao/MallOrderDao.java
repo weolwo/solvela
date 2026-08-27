@@ -3,10 +3,10 @@ package solvela.mall.order.dao;
         import java.util.List;
 
         import solvela.mall.MallOrder;
-        import solvela.mall.order.domain.form.MallOrderQueryForm;
-        import solvela.mall.order.domain.vo.MallOrderRankVO;
-        import solvela.mall.order.domain.vo.MallOrderStatVO;
-        import solvela.mall.order.domain.vo.MallOrderVO;
+        import solvela.mall.order.domain.query.MallOrderQuery;
+        import solvela.mall.order.domain.dto.MallOrderRankDTO;
+        import solvela.mall.order.domain.dto.MallOrderStatDTO;
+        import solvela.mall.order.domain.dto.MallOrderDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -30,17 +30,17 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallOrderVO> queryPage(Page<?> page, @Param("queryForm") MallOrderQueryForm queryForm);
+    List<MallOrderDTO> queryPage(Page<?> page, @Param("queryForm") MallOrderQuery queryForm);
 
     /**
      * 统计：一趟 SQL 出全部指标，条件与列表复用同一段 query_condition_items
      */
-    MallOrderStatVO queryStat(@Param("queryForm") MallOrderQueryForm queryForm);
+    MallOrderStatDTO queryStat(@Param("queryForm") MallOrderQuery queryForm);
 
     /**
      * 兑换商品排行（按兑换件数）
      */
-    List<MallOrderRankVO> queryCommodityRank(@Param("queryForm") MallOrderQueryForm queryForm, @Param("topN") int topN);
+    List<MallOrderRankDTO> queryCommodityRank(@Param("queryForm") MallOrderQuery queryForm, @Param("topN") int topN);
 
     /**
      * 列表查询 (无分页)
@@ -48,6 +48,6 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      * @param queryForm 查询表单
      * @return 列表数据
      */
-    List<MallOrderVO> queryList(@Param("queryForm") MallOrderQueryForm queryForm);
+    List<MallOrderDTO> queryList(@Param("queryForm") MallOrderQuery queryForm);
 
 }

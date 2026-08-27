@@ -6,8 +6,8 @@ import org.springframework.stereotype.Service;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.mall.sku.dao.MallSkuDao;
-import solvela.mall.sku.domain.form.MallSkuQueryForm;
-import solvela.mall.sku.domain.vo.MallSkuVO;
+import solvela.mall.sku.domain.query.MallSkuQuery;
+import solvela.mall.sku.domain.dto.MallSkuDTO;
 
 import java.util.List;
 
@@ -30,9 +30,9 @@ public class MallSkuService {
     /**
      * 分页查询
      */
-    public PageResult<MallSkuVO> queryPage(MallSkuQueryForm queryForm) {
+    public PageResult<MallSkuDTO> queryPage(MallSkuQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
-        List<MallSkuVO> list = mallSkuDao.queryPage(page, queryForm);
+        List<MallSkuDTO> list = mallSkuDao.queryPage(page, queryForm);
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 

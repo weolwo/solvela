@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.mall.sku.dao.MallSkuDao">
 
-    <resultMap id="MallSkuVO" type="solvela.mall.sku.domain.vo.MallSkuVO">
+    <resultMap id="MallSkuDTO" type="solvela.mall.sku.domain.dto.MallSkuDTO">
             <result column="id" property="id" />
             <result column="commodity_id" property="commodityId" />
             <result column="commodity_name" property="commodityName" />
@@ -92,7 +92,7 @@
       按创建时间排的话最该看的那几行会淹在几百行中间。
       停用的规格排到最后 —— 它们本来就不卖，缺不缺货不重要。
     -->
-    <select id="queryPage" resultMap="MallSkuVO">
+    <select id="queryPage" resultMap="MallSkuDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="commodity_columns"/>
@@ -102,7 +102,7 @@
         ORDER BY s.sku_status DESC, s.available_stock ASC, s.id ASC
     </select>
 
-    <select id="queryList" resultMap="MallSkuVO">
+    <select id="queryList" resultMap="MallSkuDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="commodity_columns"/>

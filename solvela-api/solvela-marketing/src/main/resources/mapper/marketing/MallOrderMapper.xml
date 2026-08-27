@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.mall.order.dao.MallOrderDao">
 
-    <resultMap id="MallOrderVO" type="solvela.mall.order.domain.vo.MallOrderVO">
+    <resultMap id="MallOrderDTO" type="solvela.mall.order.domain.dto.MallOrderDTO">
             <result column="id" property="id" />
             <result column="order_no" property="orderNo" />
             <result column="member_id" property="memberId" />
@@ -134,7 +134,7 @@
         status NOT IN (0, 40)
     </sql>
 
-    <select id="queryPage" resultMap="MallOrderVO">
+    <select id="queryPage" resultMap="MallOrderDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_mall_order
@@ -142,7 +142,7 @@
         ORDER BY create_time DESC
     </select>
 
-    <select id="queryList" resultMap="MallOrderVO">
+    <select id="queryList" resultMap="MallOrderDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_mall_order
@@ -151,7 +151,7 @@
     </select>
 
     <!-- 一趟 SQL 出全部指标。条件复用 query_conditions，与列表看的是同一批数据 -->
-    <select id="queryStat" resultType="solvela.mall.order.domain.vo.MallOrderStatVO">
+    <select id="queryStat" resultType="solvela.mall.order.domain.dto.MallOrderStatDTO">
         SELECT
             COUNT(1)                                                              AS orderCount,
             COUNT(DISTINCT member_id)                                             AS memberCount,
@@ -173,7 +173,7 @@
       排除待支付与已取消：那些是「想兑但没兑成」，算进热销榜会让一个被大量刷单
       然后全部超时取消的商品冲到榜首。
     -->
-    <select id="queryCommodityRank" resultType="solvela.mall.order.domain.vo.MallOrderRankVO">
+    <select id="queryCommodityRank" resultType="solvela.mall.order.domain.dto.MallOrderRankDTO">
         SELECT
             commodity_id                AS commodityId,
             MAX(commodity_name)         AS commodityName,

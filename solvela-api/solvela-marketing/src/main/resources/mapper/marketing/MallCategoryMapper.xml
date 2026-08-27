@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="solvela.mall.category.dao.MallCategoryDao">
 
-    <resultMap id="MallCategoryVO" type="solvela.mall.category.domain.vo.MallCategoryVO">
+    <resultMap id="MallCategoryDTO" type="solvela.mall.category.domain.dto.MallCategoryDTO">
             <result column="id" property="id" />
             <result column="parent_id" property="parentId" />
             <result column="category_name" property="categoryName" />
@@ -43,7 +43,7 @@
         </where>
     </sql>
 
-    <select id="queryPage" resultMap="MallCategoryVO">
+    <select id="queryPage" resultMap="MallCategoryDTO">
         SELECT
         <include refid="base_columns"/>
         FROM t_mall_category
@@ -61,7 +61,7 @@
         (SELECT COUNT(1) FROM t_mall_commodity mc WHERE mc.category_id = t_mall_category.id) AS commodity_count
     </sql>
 
-    <select id="queryList" resultMap="MallCategoryVO">
+    <select id="queryList" resultMap="MallCategoryDTO">
         SELECT
         <include refid="base_columns"/>,
         <include refid="commodity_count"/>
