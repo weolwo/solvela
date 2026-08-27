@@ -1,4 +1,4 @@
-package solvela.base.web;
+package solvela.web;
 
 import solvela.base.util.SolvelaStringUtil;
 import jakarta.servlet.http.HttpServletRequest;

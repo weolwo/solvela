@@ -1,4 +1,4 @@
-package solvela.base.config;
+package solvela.web.config;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;

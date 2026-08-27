@@ -27,6 +27,9 @@
 
         <!-- 玩法与端 -->
         <module>solvela-marketing</module>
+
+        <!-- HTTP 层。刻意排在业务域之后：域模块不认识它，只有端认识 -->
+        <module>solvela-web</module>
         <module>solvela-admin</module>
         <module>solvela-app</module>
     </modules>

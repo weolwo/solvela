@@ -1,7 +1,6 @@
 package solvela.base.module.file.domain.vo;
 
 import lombok.Data;
-import solvela.base.swagger.SchemaEnum;
 import solvela.base.module.file.constant.FileStatusEnum;
 
 import java.time.LocalDateTime;
@@ -45,7 +44,7 @@ public class FileVO {
     private String storageKind;
 
     /** 生命周期状态 */
-    @SchemaEnum(FileStatusEnum.class)
+    /** 状态，取值见 {@link FileStatusEnum} */
     private Integer status;
 
     /** 标签，前后各带逗号 */

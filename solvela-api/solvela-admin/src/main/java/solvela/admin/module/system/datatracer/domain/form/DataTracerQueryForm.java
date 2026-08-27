@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import solvela.base.domain.PageParam;
-import solvela.base.swagger.SchemaEnum;
+import solvela.web.swagger.SchemaEnum;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 
 /**

@@ -1,4 +1,4 @@
-package solvela.base.swagger;
+package solvela.web.swagger;
 
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.oas.models.media.Schema;

@@ -89,7 +89,7 @@ public class UpdateFormVariableService extends CodeGenerateBaseVariableService {
 
             // 枚举
             if (SolvelaStringUtil.isNotEmpty(codeField.getEnumName())) {
-                packageList.add("import solvela.base.swagger.SchemaEnum;");
+                packageList.add("import solvela.web.swagger.SchemaEnum;");
                 packageList.add("import solvela.base.validation.enumeration.CheckEnum;");
                 packageList.add("import " + form.getBasic().getJavaPackageName() + ".constant." + codeField.getEnumName() + ";");
 

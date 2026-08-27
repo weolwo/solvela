@@ -1,5 +1,7 @@
 package solvela.admin.module.system.securityprotect.service;
 
+import solvela.web.file.MultipartUploadSource;
+
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.Resource;
 import solvela.base.domain.ResponseDTO;
@@ -47,7 +49,7 @@ public class SecurityFileService {
 
         // 文件类型安全检测
         if (level3ProtectConfigService.isFileDetectFlag()) {
-            String fileType = FileMimeTypeUtil.detect(file);
+            String fileType = FileMimeTypeUtil.detect(MultipartUploadSource.of(file));
             if (ALLOWED_MIME_TYPES.stream().noneMatch(allowedType -> FileMimeTypeUtil.matches(fileType, allowedType))) {
                 return ResponseDTO.userErrorParam("禁止上传此文件类型");
             }

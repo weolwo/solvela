@@ -13,7 +13,7 @@ import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.domain.ValidateList;
-import solvela.base.sonicexcel.SolvelaExcelUtil;
+import solvela.web.excel.SolvelaExcelWebUtil;
 import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
 import solvela.ledger.logistic.domain.command.PhysicalDeliveryAddCommand;
 import solvela.ledger.logistic.domain.excel.PhysicalDeliveryImportRow;
@@ -105,7 +105,7 @@ public class PhysicalDeliveryController {
     public void importAddTemplate(HttpServletResponse response) throws IOException {
         // 空数据 = 只有表头（带下拉）的模板；表头由 Form 上的 @SonicTitle 单一来源生成，
         // 不会出现"字段改了模板没改"的漂移
-        SolvelaExcelUtil.exportExcel(response, "发货物流-新增模板.xlsx", "新增履约单",
+        SolvelaExcelWebUtil.exportExcel(response, "发货物流-新增模板.xlsx", "新增履约单",
                 PhysicalDeliveryImportRow.class, Collections.emptyList());
     }
 
@@ -113,7 +113,7 @@ public class PhysicalDeliveryController {
     @GetMapping("/importShipTemplate")
     @SaCheckPermission("physicalDelivery:import")
     public void importShipTemplate(HttpServletResponse response) throws IOException {
-        SolvelaExcelUtil.exportExcel(response, "发货物流-回填模板.xlsx", "回填物流",
+        SolvelaExcelWebUtil.exportExcel(response, "发货物流-回填模板.xlsx", "回填物流",
                 PhysicalDeliveryShipImportRow.class, Collections.emptyList());
     }
 

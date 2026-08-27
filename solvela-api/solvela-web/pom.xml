@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>solvela-web</artifactId>
+    <packaging>jar</packaging>
+
+    <!--
+    HTTP 那一层，只有它认识 servlet / spring-web / sa-token / springdoc。
+
+    存在的理由是<b>让约定变成编译错误</b>：共享层「不认识 HTTP」这条规矩，
+    光靠代码评审守不住 —— 只要 solvela-base 里有 spring-boot-starter-web，
+    任何一个域模块随手 import 一个 HttpServletRequest 都能编过。
+    把这些依赖挪到本模块、共享层只依赖 solvela-base 之后，那一行 import 会直接编译失败。
+
+    反过来也成立：本模块里的东西<b>不该</b>被共享层用。真需要时，
+    做法是像 UploadSource 那样在 base 定一个领域侧的抽象，本模块写适配器。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot4-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baizhukui</groupId>
+            <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,6 +1,6 @@
-package solvela.base.util;
+package solvela.web.util;
 
-import solvela.base.web.SolvelaServletUtil;
+import solvela.web.SolvelaServletUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 

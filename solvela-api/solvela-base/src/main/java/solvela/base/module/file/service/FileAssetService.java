@@ -16,6 +16,7 @@ import solvela.base.module.file.dao.FileDao;
 import solvela.base.module.file.dao.FileRelationDao;
 import solvela.base.module.file.domain.ImageVariant;
 import solvela.base.module.file.domain.entity.FileCategoryEntity;
+import solvela.base.module.file.domain.UploadSource;
 import solvela.base.module.file.domain.entity.FileEntity;
 import solvela.base.module.file.domain.entity.FileRelationEntity;
 import solvela.base.module.file.domain.form.FileQueryForm;
@@ -33,7 +34,6 @@ import org.apache.tika.mime.MimeTypes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -154,12 +154,12 @@ public class FileAssetService {
      * <p><b>刻意不加 {@code @Transactional}</b>：这个方法既写库又写对象存储，而对象存储不参与
      * 数据库事务。加了事务只会制造一种错觉 —— 真正的一致性靠下面的写入顺序和 TEMP 状态保证。
      */
-    public FileEntity upload(MultipartFile file, String categoryCode, RequestUser user) {
+    public FileEntity upload(UploadSource file, String categoryCode, RequestUser user) {
         FileCategoryEntity category = requireCategory(categoryCode);
         FileImageProperties.Rule rule = imageProperties.ruleOf(category.getCategoryCode());
 
         // ── 第一关：大小。必须在读任何字节之前，否则类型嗅探本身就成了攻击面
-        long size = file.getSize();
+        long size = file.size();
         if (size <= 0) {
             throw new BusinessException("上传文件不能为空");
         }
@@ -172,7 +172,7 @@ public class FileAssetService {
                     + rule.getMaxSizeKb() + " KB");
         }
 
-        String originalName = file.getOriginalFilename();
+        String originalName = file.originalName();
         if (originalName == null || originalName.isBlank()) {
             throw new BusinessException("上传文件名称不能为空");
         }
@@ -214,7 +214,7 @@ public class FileAssetService {
         // 反之留下一条指向不存在对象的 TEMP 记录是无害的：到期清理会删掉它，
         // 而删除一个不存在的对象本身是幂等的。
         fileDao.insert(entity);
-        try (InputStream in = file.getInputStream()) {
+        try (InputStream in = file.open()) {
             objectStorage.put(storageKey, in, size, ObjectMeta.of(contentType));
         } catch (IOException | RuntimeException e) {
             fileDao.deleteById(entity.getFileId());
@@ -227,7 +227,7 @@ public class FileAssetService {
      * 按分类 ID 上传。给旧的 {@code /file/upload?folder=N} 接口用 ——
      * 迁移脚本把内置分类的 ID 对齐成了原 {@code folderType} 的值，所以前端不用改。
      */
-    public FileEntity upload(MultipartFile file, Long categoryId, RequestUser user) {
+    public FileEntity upload(UploadSource file, Long categoryId, RequestUser user) {
         FileCategoryEntity category = fileCategoryDao.selectById(categoryId);
         if (category == null) {
             throw new BusinessException("文件分类不存在：" + categoryId);
@@ -757,8 +757,8 @@ public class FileAssetService {
      *
      * <p>读不出来不是错误（格式不认识、文件损坏都可能），只记 debug 日志，宽高留 null。
      */
-    private static void readImageSize(MultipartFile file, FileEntity entity) {
-        try (InputStream in = file.getInputStream();
+    private static void readImageSize(UploadSource file, FileEntity entity) {
+        try (InputStream in = file.open();
              ImageInputStream iis = ImageIO.createImageInputStream(in)) {
             if (iis == null) {
                 return;
@@ -776,7 +776,7 @@ public class FileAssetService {
                 reader.dispose();
             }
         } catch (IOException | RuntimeException e) {
-            log.debug("[File] 读取图片尺寸失败：{}", file.getOriginalFilename(), e);
+            log.debug("[File] 读取图片尺寸失败：{}", file.originalName(), e);
         }
     }
 }

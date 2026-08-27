@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import solvela.base.swagger.SchemaEnum;
+import solvela.web.swagger.SchemaEnum;
 import solvela.base.validation.enumeration.CheckEnum;
 import solvela.admin.module.system.job.constant.SolvelaJobTriggerTypeEnum;
 import org.hibernate.validator.constraints.Length;

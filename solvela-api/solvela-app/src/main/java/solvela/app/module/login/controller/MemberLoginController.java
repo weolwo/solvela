@@ -14,7 +14,7 @@ import solvela.base.annotation.AllowAnonymous;
 import solvela.base.constant.RequestHeaderConst;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;
-import solvela.base.web.SolvelaServletUtil;
+import solvela.web.SolvelaServletUtil;
 import solvela.app.config.StpMemberUtil;
 import solvela.app.module.login.domain.RequestMember;
 import solvela.app.module.login.domain.form.MemberLoginForm;

@@ -50,25 +50,10 @@
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
-        <!-- sa-token start -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot4-starter</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-redis-template</artifactId>
-        </dependency>
         <!-- sa-token end -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -144,11 +129,6 @@
         <dependency>
             <groupId>p6spy</groupId>
             <artifactId>p6spy</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.baizhukui</groupId>
-            <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
         </dependency>
 
         <dependency>
@@ -292,6 +272,16 @@
             <groupId>com.github.therapi</groupId>
             <artifactId>therapi-runtime-javadoc</artifactId>
             <version>${therapi.version}</version>
+        </dependency>
+
+
+        <!--
+        原来是 spring-boot-starter-web 顺带带进来的。摘掉 starter-web 之后必须显式声明：
+        base 里的 JsonUtils、各种序列化器、SonicExcel 的转换都直接用 Jackson。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
         </dependency>
 
     </dependencies>

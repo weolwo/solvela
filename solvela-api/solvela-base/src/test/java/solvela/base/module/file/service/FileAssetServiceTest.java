@@ -27,7 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.mock.web.MockMultipartFile;
+import solvela.base.module.file.domain.UploadSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.InputStream;
@@ -103,8 +103,10 @@ class FileAssetServiceTest {
         }).when(fileDao).insert(any(FileEntity.class));
     }
 
-    private static MockMultipartFile png(String filename) {
-        return new MockMultipartFile("file", filename, "image/png", PNG);
+    private static UploadSource png(String filename) {
+        // 用 UploadSource 而不是 MockMultipartFile：solvela-base 已经不依赖 spring-web 了，
+        // 这个测试正好证明上传链路不需要 servlet 就能跑通。
+        return UploadSource.of(filename, "image/png", PNG);
     }
 
     @Test
@@ -156,7 +158,7 @@ class FileAssetServiceTest {
     @DisplayName("第一关 大小：超限被拒，且一个字节都没写进存储")
     void rejectsOversize() {
         ReflectionTestUtils.setField(service, "maxFileSizeKb", 1L);
-        MockMultipartFile big = new MockMultipartFile("file", "big.png", "image/png", new byte[2048]);
+        UploadSource big = UploadSource.of("big.png", "image/png", new byte[2048]);
 
         assertThatThrownBy(() -> service.upload(big, "BANNER", null))
                 .isInstanceOf(BusinessException.class)
@@ -170,7 +172,7 @@ class FileAssetServiceTest {
     @Test
     @DisplayName("第二关 真实类型：内容不在白名单就拒，哪怕文件名和 Content-Type 都伪装成图片")
     void rejectsDisallowedRealType() {
-        MockMultipartFile fake = new MockMultipartFile("file", "photo.png", "image/png",
+        UploadSource fake = UploadSource.of("photo.png", "image/png",
                 "<html><script>alert(1)</script></html>".getBytes(StandardCharsets.UTF_8));
 
         assertThatThrownBy(() -> service.upload(fake, "BANNER", null))

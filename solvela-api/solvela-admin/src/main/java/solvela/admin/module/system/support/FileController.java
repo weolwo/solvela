@@ -1,5 +1,7 @@
 package solvela.admin.module.system.support;
 
+import solvela.web.file.MultipartUploadSource;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -63,8 +65,8 @@ public class FileController extends SupportBaseController {
                                             @RequestParam(required = false) String categoryCode) {
         RequestUser requestUser = CurrentUser.orNull();
         FileEntity entity = (categoryCode == null || categoryCode.isBlank())
-                ? fileAssetService.upload(file, Long.valueOf(requireFolder(folder)), requestUser)
-                : fileAssetService.upload(file, categoryCode, requestUser);
+                ? fileAssetService.upload(MultipartUploadSource.of(file), Long.valueOf(requireFolder(folder)), requestUser)
+                : fileAssetService.upload(MultipartUploadSource.of(file), categoryCode, requestUser);
         return ResponseDTO.ok(toUploadVO(entity));
     }
 

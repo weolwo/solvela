@@ -2,7 +2,6 @@ package solvela.base.module.file.domain.form;
 
 import lombok.Data;
 import solvela.base.domain.PageParam;
-import solvela.base.swagger.SchemaEnum;
 import solvela.base.validation.enumeration.CheckEnum;
 
 import java.time.LocalDate;

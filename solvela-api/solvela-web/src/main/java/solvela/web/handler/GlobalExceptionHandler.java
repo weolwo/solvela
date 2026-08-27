@@ -1,4 +1,4 @@
-package solvela.base.handler;
+package solvela.web.handler;
 
 import cn.dev33.satoken.exception.NotPermissionException;
 import jakarta.annotation.Resource;

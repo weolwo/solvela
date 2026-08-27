@@ -15,7 +15,7 @@ import solvela.code.SystemErrorCode;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;
-import solvela.base.web.SolvelaResponseUtil;
+import solvela.web.SolvelaResponseUtil;
 import solvela.app.config.StpMemberUtil;
 import solvela.app.module.login.domain.RequestMember;
 import solvela.app.module.login.service.MemberLoginService;

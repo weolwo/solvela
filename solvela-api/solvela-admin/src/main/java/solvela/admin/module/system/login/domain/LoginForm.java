@@ -3,7 +3,7 @@ package solvela.admin.module.system.login.domain;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-import solvela.base.swagger.SchemaEnum;
+import solvela.web.swagger.SchemaEnum;
 import solvela.base.validation.enumeration.CheckEnum;
 import solvela.base.constant.LoginDeviceEnum;
 import org.hibernate.validator.constraints.Length;

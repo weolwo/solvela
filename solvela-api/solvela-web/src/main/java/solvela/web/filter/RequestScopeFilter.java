@@ -1,4 +1,4 @@
-package solvela.base.web.filter;
+package solvela.web.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

@@ -4,8 +4,8 @@ import solvela.base.sonicexcel.SolvelaExcelUtil;
 import solvela.base.sonicexcel.annotation.SonicTitle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -75,9 +75,11 @@ public class SonicExcelSecurityTest {
         // 临时文件泄漏在 K8s 里的后果是 Pod 因 ephemeral-storage 超限被驱逐
         int before = countTempFiles();
 
-        MockMultipartFile broken = new MockMultipartFile("file", "x.xlsx",
-                "application/vnd.ms-excel", "根本不是 Excel".getBytes(StandardCharsets.UTF_8));
-        assertThrows(SonicExcelException.class, () -> SolvelaExcelUtil.importExcel(broken, Row.class));
+        // 走 InputStream 那条重载：MultipartFile 的那一层已经搬去 solvela-web 了，
+        // 而临时文件的生死跟上传是不是走 HTTP 无关 —— 这个测试盯的是 finally 里的删除。
+        byte[] broken = "根本不是 Excel".getBytes(StandardCharsets.UTF_8);
+        assertThrows(SonicExcelException.class,
+                () -> SolvelaExcelUtil.importExcel(new ByteArrayInputStream(broken), Row.class));
 
         assertTrue(countTempFiles() <= before, "解析失败也必须把临时文件删干净");
     }

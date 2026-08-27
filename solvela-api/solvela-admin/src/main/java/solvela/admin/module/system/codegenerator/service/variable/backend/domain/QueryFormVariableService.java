@@ -96,7 +96,7 @@ public class QueryFormVariableService extends CodeGenerateBaseVariableService {
                         break;
                     }
 
-                    packageList.add("import solvela.base.swagger.SchemaEnum;");
+                    packageList.add("import solvela.web.swagger.SchemaEnum;");
                     packageList.add("import solvela.base.validation.enumeration.CheckEnum;");
                     packageList.add("import " + form.getBasic().getJavaPackageName() + ".constant." + codeField.getEnumName() + ";");
 

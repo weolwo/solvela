@@ -5,7 +5,7 @@ import lombok.Data;
 import solvela.base.domain.RequestUser;
 import solvela.base.enumeration.GenderEnum;
 import solvela.base.enumeration.UserTypeEnum;
-import solvela.base.swagger.SchemaEnum;
+import solvela.web.swagger.SchemaEnum;
 
 import java.io.Serializable;
 

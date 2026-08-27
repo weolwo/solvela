@@ -1,4 +1,4 @@
-package solvela.base.swagger;
+package solvela.web.swagger;
 
 import solvela.enums.BaseEnum;
 

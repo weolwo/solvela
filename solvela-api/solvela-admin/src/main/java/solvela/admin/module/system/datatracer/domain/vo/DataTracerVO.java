@@ -3,7 +3,7 @@ package solvela.admin.module.system.datatracer.domain.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import solvela.base.enumeration.UserTypeEnum;
-import solvela.base.swagger.SchemaEnum;
+import solvela.web.swagger.SchemaEnum;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 
 import java.time.LocalDateTime;

@@ -25,6 +25,12 @@
 
         <dependency>
             <groupId>solvela</groupId>
+            <artifactId>solvela-web</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>solvela</groupId>
             <artifactId>solvela-base</artifactId>
             <version>3.0.0</version>
         </dependency>

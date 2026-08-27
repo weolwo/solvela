@@ -1,4 +1,4 @@
-package solvela.base.swagger;
+package solvela.web.swagger;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;

@@ -1,4 +1,4 @@
-package solvela.base.config;
+package solvela.web.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -8,7 +8,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.constant.RequestHeaderConst;
-import solvela.base.swagger.SolvelaOperationCustomizer;
+import solvela.web.swagger.SolvelaOperationCustomizer;
 import solvela.base.constant.SwaggerTagConst;
 import org.apache.commons.lang3.StringUtils;
 import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
@@ -23,6 +23,7 @@ import org.springdoc.core.utils.PropertyResolverUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
+import solvela.base.config.SystemEnvironmentConfig;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;

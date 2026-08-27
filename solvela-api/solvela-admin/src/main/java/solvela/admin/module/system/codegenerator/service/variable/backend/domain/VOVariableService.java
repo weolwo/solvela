@@ -71,7 +71,7 @@ public class VOVariableService extends CodeGenerateBaseVariableService {
 
             // 枚举
             if (SolvelaStringUtil.isNotEmpty(codeField.getEnumName())) {
-                packageList.add("import solvela.base.swagger.SchemaEnum;");
+                packageList.add("import solvela.web.swagger.SchemaEnum;");
                 packageList.add("import " + form.getBasic().getJavaPackageName() + ".constant." + codeField.getEnumName() + ";");
 
                 finalFieldMap.put("apiModelProperty", "@SchemaEnum(value = " + codeField.getEnumName() + ".class, desc = \"" + codeField.getLabel() + "\")");

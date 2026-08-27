@@ -27,7 +27,7 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.base.util.SolvelaIpUtil;
 import solvela.base.util.SolvelaRandomUtil;
-import solvela.base.web.SolvelaServletUtil;
+import solvela.web.SolvelaServletUtil;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.base.constant.LoginDeviceEnum;
 import solvela.base.constant.RedisKeyConst;

@@ -1,7 +1,7 @@
 package solvela.admin.module.system.login.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import solvela.base.web.SolvelaServletUtil;
+import solvela.web.SolvelaServletUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

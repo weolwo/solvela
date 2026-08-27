@@ -15,7 +15,7 @@ import solvela.code.SystemErrorCode;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.web.CurrentUser;
-import solvela.base.web.SolvelaResponseUtil;
+import solvela.web.SolvelaResponseUtil;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;

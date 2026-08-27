@@ -1,4 +1,4 @@
-package solvela.base.config;
+package solvela.web.config;
 
 import cn.dev33.satoken.annotation.SaIgnore;
 import io.swagger.v3.oas.annotations.Operation;

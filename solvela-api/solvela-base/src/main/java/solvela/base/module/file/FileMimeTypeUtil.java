@@ -9,7 +9,7 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.mime.MimeTypes;
-import org.springframework.web.multipart.MultipartFile;
+import solvela.base.module.file.domain.UploadSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,14 +39,14 @@ public final class FileMimeTypeUtil {
      * <p>失败时刻意<b>不抛异常</b>：调用方多为上传链路，
      * 为一次类型探测失败让整个上传 500，比按「未知二进制」处理要糟。
      */
-    public static String detect(MultipartFile file) {
+    public static String detect(UploadSource file) {
         InputStream inputStream = null;
         try {
-            inputStream = file.getInputStream();
+            inputStream = file.open();
             TikaConfig tika = new TikaConfig();
             Metadata metadata = new Metadata();
             // 带上原始文件名：Tika 在字节特征不足以区分时会参考它（如 csv 与 txt）
-            metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getOriginalFilename());
+            metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.originalName());
             TikaInputStream stream = TikaInputStream.get(inputStream);
             MediaType mimetype = tika.getDetector().detect(stream, metadata);
             return mimetype.toString();

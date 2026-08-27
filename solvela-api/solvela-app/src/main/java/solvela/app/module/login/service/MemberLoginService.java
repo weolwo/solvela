@@ -12,7 +12,7 @@ import solvela.crypto.PiiHasher;
 import solvela.base.domain.ResponseDTO;
 import solvela.base.enumeration.UserTypeEnum;
 import solvela.base.util.SolvelaIpUtil;
-import solvela.base.web.SolvelaServletUtil;
+import solvela.web.SolvelaServletUtil;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PasswordCipher;
 import solvela.member.operationlimit.constant.MemberOperationTypeEnum;

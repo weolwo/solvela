@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import solvela.base.enumeration.GenderEnum;
-import solvela.base.swagger.SchemaEnum;
+import solvela.web.swagger.SchemaEnum;
 import solvela.base.util.SolvelaVerificationUtil;
 import solvela.base.validation.enumeration.CheckEnum;
 import org.hibernate.validator.constraints.Length;
