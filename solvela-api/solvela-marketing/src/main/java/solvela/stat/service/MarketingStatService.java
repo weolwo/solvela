@@ -1,5 +1,7 @@
 package solvela.stat.service;
 
+import solvela.base.util.SolvelaEnumUtil;
+import solvela.enums.TaskFlowTypeEnum;
 import solvela.enums.ActivityStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.service.ActivityConfigService;
@@ -40,9 +42,6 @@ public class MarketingStatService {
 
     /** 有参与行为的玩法类型。BASIC 没有参与行为，不出现在图上 */
     private static final List<String> GAMEPLAY_TYPES = List.of("DRAW", "TASK", "LOTTERY");
-
-    private static final int FLOW_TYPE_ADVANCE = 1;
-    private static final int FLOW_TYPE_DISCARD = 2;
 
     private static final int DEFAULT_DAYS = 7;
     private static final int MAX_DAYS = 90;
@@ -224,11 +223,13 @@ public class MarketingStatService {
         vo.setAdvanceCount(0);
         vo.setDiscardCount(0);
         for (Map<String, Object> row : marketingStatDao.eventFlowTypeCount(fromTime)) {
-            int flowType = ((Number) row.get("flowType")).intValue();
+            // 聚合 SQL 返回的是裸 int，在边界上转成枚举再分支
+            TaskFlowTypeEnum flowType = SolvelaEnumUtil.getEnumByValue(
+                    ((Number) row.get("flowType")).intValue(), TaskFlowTypeEnum.class);
             int cnt = ((Number) row.get("cnt")).intValue();
-            if (flowType == FLOW_TYPE_ADVANCE) {
+            if (flowType == TaskFlowTypeEnum.ADVANCE) {
                 vo.setAdvanceCount(cnt);
-            } else if (flowType == FLOW_TYPE_DISCARD) {
+            } else if (flowType == TaskFlowTypeEnum.DISCARD) {
                 vo.setDiscardCount(cnt);
             }
         }

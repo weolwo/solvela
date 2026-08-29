@@ -75,26 +75,6 @@ class EnumMigrationRatchetTest {
             "solvela-marketing/lottery/prizerule/service/LotteryPrizeAnalysisService.java#LOTTERY_STATUS_ONLINE",
             "solvela-marketing/lottery/runtime/TicketIssueService.java#CONFIG_STATUS_ONLINE",
 
-            // ---- t_task_record_flow.flow_type ----
-            "solvela-marketing/stat/service/MarketingStatService.java#FLOW_TYPE_ADVANCE",
-            "solvela-marketing/stat/service/MarketingStatService.java#FLOW_TYPE_DISCARD",
-
-            // ---- t_task_record.status ----
-            "solvela-marketing/task/record/service/TaskRecordService.java#STATUS_EXPIRED",
-
-            // ---- t_task_config.status ----
-            "solvela-marketing/task/taskconfig/service/TaskConfigService.java#STATUS_ACTIVE",
-            "solvela-marketing/task/taskconfig/service/TaskConfigService.java#STATUS_OFFLINE",
-            "solvela-marketing/task/taskconfig/service/TaskConfigService.java#STATUS_PENDING",
-
-            // ---- t_task_event.status ----
-            "solvela-marketing/task/taskevent/service/TaskEventDefService.java#STATUS_DISABLED",
-            "solvela-marketing/task/taskevent/service/TaskEventDefService.java#STATUS_ENABLED",
-
-            // ---- t_task_template.status ----
-            "solvela-marketing/task/tasktemplate/service/TaskTemplateService.java#STATUS_DISABLED",
-            "solvela-marketing/task/tasktemplate/service/TaskTemplateService.java#STATUS_ENABLED",
-
             // ---- t_promotion_config.status ----
             "solvela-risk/risk/promotionconfig/service/PromotionConfigService.java#STATUS_ENABLED");
 

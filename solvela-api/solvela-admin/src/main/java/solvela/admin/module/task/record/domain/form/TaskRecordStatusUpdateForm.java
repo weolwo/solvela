@@ -1,5 +1,6 @@
 package solvela.admin.module.task.record.domain.form;
 
+import solvela.enums.TaskRecordStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -28,5 +29,5 @@ public class TaskRecordStatusUpdateForm {
 
     @Schema(description = "目标状态：当前仅支持 3-已过期（管理端的「禁用」）", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "目标状态 不能为空")
-    private Integer status;
+    private TaskRecordStatusEnum status;
 }

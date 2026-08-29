@@ -1,5 +1,6 @@
 package solvela.task.taskconfig.domain.query;
 
+import solvela.enums.TaskConfigStatusEnum;
 import solvela.base.domain.PageParam;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -33,6 +34,6 @@ public class TaskConfigQuery extends PageParam {
     private String triggerEvent;
 
     /** 任务状态：1-待生效, 2-生效中, 3-已下线（见 TaskConst.CONFIG_STATUS_*） */
-    private Integer status;
+    private TaskConfigStatusEnum status;
 
 }

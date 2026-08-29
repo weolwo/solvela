@@ -1,5 +1,6 @@
 package solvela.task.taskconfig.domain.dto;
 
+import solvela.enums.TaskConfigStatusEnum;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -67,7 +68,7 @@ public class TaskConfigWizardDetailDTO {
     private LocalDateTime endTime;
 
     /** 任务状态（只读回显，向导不改它） */
-    private Integer status;
+    private TaskConfigStatusEnum status;
 
     /** C端任务说明（从 ui_config 摘出） */
     private String taskDesc;

@@ -1,5 +1,6 @@
 package solvela.task.taskevent.domain.query;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
@@ -21,5 +22,5 @@ public class TaskEventQuery extends PageParam {
     private String eventName;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 }

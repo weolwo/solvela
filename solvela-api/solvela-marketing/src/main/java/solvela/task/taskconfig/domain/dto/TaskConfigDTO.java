@@ -1,5 +1,6 @@
 package solvela.task.taskconfig.domain.dto;
 
+import solvela.enums.TaskConfigStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -53,7 +54,7 @@ public class TaskConfigDTO {
     private String uiConfig;
 
     /** 任务状态 1-待生效, 2-生效中, 3-已下线 */
-    private Integer status;
+    private TaskConfigStatusEnum status;
 
     /** 开始时间 */
     private LocalDateTime startTime;

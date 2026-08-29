@@ -1,5 +1,6 @@
 package solvela.admin.module.task.tasktemplate.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -25,5 +26,5 @@ public class TaskTemplateStatusUpdateForm {
 
     @Schema(description = "目标状态：1-启用, 0-禁用", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "目标状态 不能为空")
-    private Integer status;
+    private EnableStatusEnum status;
 }

@@ -1,5 +1,7 @@
 package solvela.task.runtime;
 
+import solvela.enums.TaskRecordStatusEnum;
+import solvela.enums.TaskFlowTypeEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.json.JsonUtils;
@@ -124,7 +126,7 @@ public class TaskRecordAdvanceService {
                 : getOrCreateRecord(config, ctx, round.periodKey());
         flow.setRecordId(record.getId());
 
-        if (!Integer.valueOf(TaskConst.RECORD_STATUS_RUNNING).equals(record.getStatus())) {
+        if (record.getStatus() != TaskRecordStatusEnum.RUNNING) {
             return finishAsDiscard(flow, TaskDiscardCode.RECORD_NOT_RUNNING,
                     "任务记录已不在进行中（status=" + record.getStatus() + "）", logDiscard);
         }
@@ -187,7 +189,7 @@ public class TaskRecordAdvanceService {
         }
 
         // ========== ⑥ 流水补齐终态 ==========
-        flow.setFlowType(TaskConst.FLOW_TYPE_ADVANCE);
+        flow.setFlowType(TaskFlowTypeEnum.ADVANCE);
         flow.setDeltaMetric(delta);
         flow.setAfterMetric(after);
         taskRecordFlowDao.updateById(flow);
@@ -288,7 +290,7 @@ public class TaskRecordAdvanceService {
         if (latest == null) {
             return new RoundResolution(TaskPeriodResolver.withRound(basePeriodKey, 1), null, null);
         }
-        if (Integer.valueOf(TaskConst.RECORD_STATUS_RUNNING).equals(latest.getStatus())) {
+        if (latest.getStatus() == TaskRecordStatusEnum.RUNNING) {
             // 当前这一轮还没走完，继续推它
             return new RoundResolution(latest.getPeriodKey(), latest, null);
         }
@@ -359,7 +361,7 @@ public class TaskRecordAdvanceService {
         record.setValidEndTime(config.getEndTime() == null ? FOREVER : config.getEndTime());
         record.setCurrentMetric(BigDecimal.ZERO);
         record.setVersion(0);
-        record.setStatus(TaskConst.RECORD_STATUS_RUNNING);
+        record.setStatus(TaskRecordStatusEnum.RUNNING);
         record.setProgressData(JsonUtils.toJson(java.util.Map.of()));
         record.setRuleSnapshot(config.getRuleConfig() == null ? "{}" : config.getRuleConfig());
         record.setPrizeSnapshot(buildPrizeSnapshot(config.getId()));
@@ -398,7 +400,7 @@ public class TaskRecordAdvanceService {
         flow.setTaskConfigId(config.getId());
         flow.setEventCode(ctx.eventCode());
         flow.setEventBizId(ctx.eventBizId());
-        flow.setFlowType(TaskConst.FLOW_TYPE_ADVANCE);
+        flow.setFlowType(TaskFlowTypeEnum.ADVANCE);
         flow.setDeltaMetric(BigDecimal.ZERO);
         flow.setAfterMetric(BigDecimal.ZERO);
         flow.setEventPayload(JsonUtils.toJson(ctx.payload()));
@@ -423,7 +425,7 @@ public class TaskRecordAdvanceService {
                     flow.getTaskConfigId(), flow.getEventBizId(), reason);
             return new TaskAdvanceResult.Discarded(reason);
         }
-        flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
+        flow.setFlowType(TaskFlowTypeEnum.DISCARD);
         flow.setDiscardCode(code.getValue());
         flow.setDiscardReason(reason);
         taskRecordFlowDao.updateById(flow);
@@ -443,7 +445,7 @@ public class TaskRecordAdvanceService {
             return new TaskAdvanceResult.Discarded(reason);
         }
         TaskRecordFlow flow = buildFlow(config, ctx);
-        flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
+        flow.setFlowType(TaskFlowTypeEnum.DISCARD);
         flow.setDiscardCode(code.getValue());
         flow.setDiscardReason(reason);
         try {

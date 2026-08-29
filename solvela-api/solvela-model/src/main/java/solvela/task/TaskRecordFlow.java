@@ -1,5 +1,6 @@
 package solvela.task;
 
+import solvela.enums.TaskFlowTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -73,7 +74,7 @@ public class TaskRecordFlow {
     /**
      * 1-进度推进(已生效), 2-事件丢弃(未生效)
      */
-    private Integer flowType;
+    private TaskFlowTypeEnum flowType;
 
     /**
      * 本次增量

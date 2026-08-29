@@ -1,5 +1,6 @@
 package solvela.task.tasktemplate.domain.query;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
 import java.time.LocalDate;
 import lombok.Data;
@@ -26,7 +27,7 @@ public class TaskTemplateQuery extends PageParam {
     private String taskType;
 
     /** 状态：0-禁用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /** 创建时间 */
     private LocalDate createTimeBegin;

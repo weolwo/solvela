@@ -1,5 +1,6 @@
 package solvela.task.taskconfig.service;
 
+import solvela.enums.TaskConfigStatusEnum;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -49,17 +50,6 @@ public class TaskConfigService {
     private final TaskConfigDao taskConfigDao;
     private final TaskPrizeMappingDao taskPrizeMappingDao;
     private final TaskTemplateService taskTemplateService;
-
-    /**
-     * 任务状态：1-待生效
-     */
-    private static final Integer STATUS_PENDING = 1;
-
-    /**
-     * 任务状态：2-生效中 / 3-已下线（对齐 TaskConst.CONFIG_STATUS_*）
-     */
-    private static final Integer STATUS_ACTIVE = 2;
-    private static final Integer STATUS_OFFLINE = 3;
 
     /**
      * image_upload 控件的参数值随 uiConfig 提交，与前端 splitSchemaValues 同一拆分语义
@@ -112,7 +102,7 @@ public class TaskConfigService {
         TaskConfig taskConfig = SolvelaBeanUtil.copy(configForm, TaskConfig.class);
         taskConfig.setRuleConfig(JsonUtils.toJson(ruleConfig));
         taskConfig.setUiConfig(JsonUtils.toJson(uiConfig));
-        taskConfig.setStatus(STATUS_PENDING);
+        taskConfig.setStatus(TaskConfigStatusEnum.PENDING);
         taskConfigDao.insert(taskConfig);
 
         // 5. 子表批量落库（insertBatch 由 CustomizedBaseMapper 提供）
@@ -126,15 +116,12 @@ public class TaskConfigService {
      * 任务配置 上/下线（列表页的批量下线用它）。
      *
      * <p>替代删除：任务记录里存着 task_config_id，删配置会让历史记录指向一条不存在的配置。
-     * 下线后运行态不再订阅该任务的事件（判据是 status != 3，见 TaskConst.CONFIG_STATUS_OFFLINE），
+     * 下线后运行态不再订阅该任务的事件（判据是 status != OFFLINE，见 TaskConfigStatusEnum），
      * 已在跑的记录按接取时的快照走完，不受影响。
      */
-    public void updateStatus(List<Long> idList, Integer status) {
-        if (!STATUS_PENDING.equals(status)
-                && !STATUS_ACTIVE.equals(status)
-                && !STATUS_OFFLINE.equals(status)) {
-            throw new BusinessException("目标状态只能是 1-待生效、2-生效中 或 3-已下线");
-        }
+    public void updateStatus(List<Long> idList, TaskConfigStatusEnum status) {
+        // 原先这里逐个比对三个合法值。入参换成枚举之后，非法值在反序列化阶段就被拒了
+        // （400 / INVALID_ARGUMENT），这段校验没有存在意义。
         for (Long id : idList) {
             TaskConfig update = new TaskConfig();
             update.setId(id);

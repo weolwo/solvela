@@ -1,5 +1,6 @@
 package solvela.task.taskevent.domain.command;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 
 /**
@@ -42,5 +43,5 @@ public class TaskEventAddCommand {
     private String remark;
 
     /** 状态：0-停用, 1-启用，不填按启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 }

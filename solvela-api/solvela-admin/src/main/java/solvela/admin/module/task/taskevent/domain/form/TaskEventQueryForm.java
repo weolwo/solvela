@@ -1,5 +1,6 @@
 package solvela.admin.module.task.taskevent.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -22,5 +23,5 @@ public class TaskEventQueryForm extends PageParam {
     private String eventName;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 }

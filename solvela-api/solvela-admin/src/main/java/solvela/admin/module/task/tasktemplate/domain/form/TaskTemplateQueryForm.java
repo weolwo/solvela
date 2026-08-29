@@ -1,5 +1,6 @@
 package solvela.admin.module.task.tasktemplate.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -28,7 +29,7 @@ public class TaskTemplateQueryForm extends PageParam {
     private String taskType;
 
     @Schema(description = "状态：0-禁用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;

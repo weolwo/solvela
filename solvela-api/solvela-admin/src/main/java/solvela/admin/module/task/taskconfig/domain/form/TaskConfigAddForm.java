@@ -1,5 +1,6 @@
 package solvela.admin.module.task.taskconfig.domain.form;
 
+import solvela.enums.TaskConfigStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -61,7 +62,7 @@ public class TaskConfigAddForm {
     private String uiConfig;
 
     @Schema(description = "任务状态 1-待生效, 2-生效中, 3-已下线")
-    private Integer status;
+    private TaskConfigStatusEnum status;
 
     @Schema(description = "开始时间")
     private LocalDateTime startTime;

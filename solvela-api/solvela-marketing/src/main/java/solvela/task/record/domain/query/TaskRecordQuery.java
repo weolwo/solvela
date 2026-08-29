@@ -1,5 +1,6 @@
 package solvela.task.record.domain.query;
 
+import solvela.enums.TaskRecordStatusEnum;
 import solvela.base.domain.PageParam;
 import java.time.LocalDate;
 import lombok.Data;
@@ -36,7 +37,7 @@ public class TaskRecordQuery extends PageParam {
     private LocalDate validStartTimeEnd;
 
     /** 状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期 */
-    private Integer status;
+    private TaskRecordStatusEnum status;
 
     /** 达标时间 */
     private LocalDate completeTimeBegin;

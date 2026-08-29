@@ -11,66 +11,12 @@ public final class TaskConst {
     private TaskConst() {
     }
 
-    // ==================== t_task_config.status ====================
-
-    /**
-     * 任务配置状态：1-待生效
-     */
-    public static final int CONFIG_STATUS_PENDING = 1;
-
-    /**
-     * 任务配置状态：2-生效中
-     */
-    public static final int CONFIG_STATUS_ACTIVE = 2;
-
-    /**
-     * 任务配置状态：3-已下线
-     *
-     * <p>🔴 <b>运行态的订阅判据是「status != 3 且在时间窗内」，不是「status == 2」。</b>
-     * 读码核实：全工程<b>没有任何地方</b>把 status 从 1 改成 2 ——
-     * {@code TaskConfigService.wizardSubmit} 落的就是 1，也不存在「启用」接口。
-     * 若判 {@code status == 2}，所有任务永远不会被触发，而链路看起来完全正常
-     * （事件收到了、日志也打了、就是一条进度都不涨）——
-     * 这正是铁律 16「前提不成立时通过和空过分不出来」的典型形状。
-     *
-     * <p>另外 DDL 的默认值是 0（注释里没有 0 这个取值），判 {@code != 3} 同时把它当作可用，
-     * 与「活动有没有开始由业务层按起止时间实时算、不是后台开关」的既定口径一致（交接文档 §4.6③）。
-     */
-    public static final int CONFIG_STATUS_OFFLINE = 3;
-
-    // ==================== t_task_record.status ====================
-
-    /**
-     * 任务记录状态：0-进行中（含「低档已发奖、最高档未达标」）
-     */
-    public static final int RECORD_STATUS_RUNNING = 0;
-
-    /**
-     * 任务记录状态：1-已完成（= 最高档达标）
-     */
-    public static final int RECORD_STATUS_COMPLETED = 1;
-
-    /**
-     * 任务记录状态：2-已发奖（= 最高档的奖也发完了，此后不再接受事件）
-     */
-    public static final int RECORD_STATUS_DISPATCHED = 2;
-
-    /**
-     * 任务记录状态：3-已过期
-     */
-    public static final int RECORD_STATUS_EXPIRED = 3;
-
-    // ==================== t_task_record_flow.flow_type ====================
-
-    /**
-     * 流水类型：1-进度推进（已生效）
-     */
-    public static final int FLOW_TYPE_ADVANCE = 1;
-
-    /**
-     * 流水类型：2-事件丢弃（未生效）。discard_reason 必填
-     */
-    public static final int FLOW_TYPE_DISCARD = 2;
+    // 状态与流水类型的取值已迁到 solvela-model 的枚举里：
+    //   t_task_config.status        -> TaskConfigStatusEnum
+    //   t_task_record.status        -> TaskRecordStatusEnum
+    //   t_task_record_flow.flow_type -> TaskFlowTypeEnum
+    // 那三个枚举同时带着「运行态判 != OFFLINE 而不是 == ACTIVE」这类判据说明，
+    // 别再往这里加状态常量。
 
     /**
      * 流水的 task_config_id 哨兵值：事件在<b>匹配到任何任务配置之前</b>就被丢弃时使用

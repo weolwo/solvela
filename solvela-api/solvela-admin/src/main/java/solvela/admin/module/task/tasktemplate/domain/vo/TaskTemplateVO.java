@@ -1,5 +1,6 @@
 package solvela.admin.module.task.tasktemplate.domain.vo;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -35,7 +36,7 @@ public class TaskTemplateVO {
     private String uiSchema;
 
     @Schema(description = "状态：0-禁用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     @Schema(description = "创建人")
     private String createBy;

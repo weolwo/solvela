@@ -1,5 +1,6 @@
 package solvela.task.tasktemplate.service;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,12 +46,6 @@ public class TaskTemplateService {
     private final TaskTemplateManager taskTemplateManager;
 
     /**
-     * 模板状态：1-启用, 0-禁用（对齐 t_task_template.status）
-     */
-    private static final Integer STATUS_ENABLED = 1;
-    private static final Integer STATUS_DISABLED = 0;
-
-    /**
      * ui_schema 里承载卡片展示信息的两个可选字段：模板设计器写在 JSON 里，向导卡片读出来渲染
      */
     private static final String SCHEMA_KEY_ICON = "icon";
@@ -86,7 +81,7 @@ public class TaskTemplateService {
         // 只给启用中的模板：禁用的意义就是「不再让人拿它建新任务」，
         // 已经用它建好的任务不受影响（运行态按 template_code 取脚本，与这里的候选列表无关）
         List<TaskTemplate> list = taskTemplateManager.lambdaQuery()
-                .eq(TaskTemplate::getStatus, STATUS_ENABLED)
+                .eq(TaskTemplate::getStatus, EnableStatusEnum.ENABLED)
                 .orderByDesc(TaskTemplate::getId)
                 .list();
         List<TaskTemplateOptionDTO> optionList = new ArrayList<>(list.size());
@@ -290,10 +285,8 @@ public class TaskTemplateService {
      * ui_schema / rule_script。删掉不会立刻报错，而是让引用它的任务安静地不再推进 ——
      * 禁用则只是不再出现在向导的候选里，存量任务照常跑。
      */
-    public void updateStatus(List<Long> idList, Integer status) {
-        if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
-            throw new BusinessException("目标状态只能是 1-启用 或 0-禁用");
-        }
+    public void updateStatus(List<Long> idList, EnableStatusEnum status) {
+        // 枚举只有两个取值，原先那段「只能是 1 或 0」的运行期校验已无意义
         for (Long id : idList) {
             TaskTemplate update = new TaskTemplate();
             update.setId(id);

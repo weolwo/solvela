@@ -1,5 +1,6 @@
 package solvela.task.tasktemplate.domain.dto;
 
+import solvela.enums.EnableStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -32,7 +33,7 @@ public class TaskTemplateDTO {
     private String uiSchema;
 
     /** 状态：0-禁用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /** 创建人 */
     private String createBy;

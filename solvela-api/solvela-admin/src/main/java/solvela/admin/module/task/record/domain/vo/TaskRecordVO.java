@@ -1,5 +1,6 @@
 package solvela.admin.module.task.record.domain.vo;
 
+import solvela.enums.TaskRecordStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,7 +50,7 @@ public class TaskRecordVO {
     private BigDecimal currentMetric;
 
     @Schema(description = "状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期")
-    private Integer status;
+    private TaskRecordStatusEnum status;
 
     @Schema(description = "进度详情")
     private String progressData;

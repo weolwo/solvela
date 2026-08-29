@@ -1,5 +1,8 @@
 package solvela.admin.task;
 
+import solvela.enums.TaskConfigStatusEnum;
+import solvela.enums.TaskFlowTypeEnum;
+import solvela.enums.TaskRecordStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.exception.BusinessException;
@@ -228,7 +231,7 @@ class TaskRuntimeP0AcceptanceTest {
         }
 
         TaskRecord record = recordOf(config.getId());
-        assertTrue(record.getStatus() >= TaskConst.RECORD_STATUS_COMPLETED,
+        assertTrue(record.getStatus().atLeast(TaskRecordStatusEnum.COMPLETED),
                 "第3次应达标，实际 status=" + record.getStatus());
         assertNotNull(record.getCompleteTime(), "达标时间必须落库（complete_time 没有 ON UPDATE 兜底，要显式写）");
 
@@ -300,7 +303,7 @@ class TaskRuntimeP0AcceptanceTest {
 
         List<TaskRecordFlow> flows = flowsOf(config.getId());
         long advanceCount = flows.stream()
-                .filter(f -> TaskConst.FLOW_TYPE_ADVANCE == f.getFlowType()).count();
+                .filter(f -> TaskFlowTypeEnum.ADVANCE == f.getFlowType()).count();
         assertEquals(1, advanceCount, "推进流水只能有 1 条（uk_t_tsk_flw_evt 挡住后两次）");
         assertEquals(1, flows.size(), "重复事件不该反复写流水");
     }
@@ -351,7 +354,7 @@ class TaskRuntimeP0AcceptanceTest {
                         + record.getCurrentMetric());
 
         long advanceCount = flowsOf(config.getId()).stream()
-                .filter(f -> TaskConst.FLOW_TYPE_ADVANCE == f.getFlowType()).count();
+                .filter(f -> TaskFlowTypeEnum.ADVANCE == f.getFlowType()).count();
         assertEquals(10, advanceCount, "10 个不同事件应各留一条推进流水");
     }
 
@@ -372,7 +375,7 @@ class TaskRuntimeP0AcceptanceTest {
         List<TaskRecordFlow> flows = flowsOf(config.getId());
         assertEquals(1, flows.size());
         TaskRecordFlow flow = flows.get(0);
-        assertEquals(TaskConst.FLOW_TYPE_DISCARD, flow.getFlowType().intValue());
+        assertEquals(TaskFlowTypeEnum.DISCARD, flow.getFlowType());
         assertEquals(TaskDiscardCode.AMOUNT_BELOW_MIN.getValue(), flow.getDiscardCode(),
                 "分类码给大屏聚类用，与人话原因并存");
         assertNotNull(flow.getDiscardReason(), "丢弃原因不能为空 —— 它就是客诉的答案");
@@ -402,7 +405,7 @@ class TaskRuntimeP0AcceptanceTest {
         taskEventService.handle(event("GOODS_SHARE", null, null, DAY_3));
         record = recordOf(config.getId());
         assertEquals(0, new BigDecimal("3").compareTo(record.getCurrentMetric()));
-        assertTrue(record.getStatus() >= TaskConst.RECORD_STATUS_COMPLETED, "连续3天应达标");
+        assertTrue(record.getStatus().atLeast(TaskRecordStatusEnum.COMPLETED), "连续3天应达标");
 
         assertEquals(1, awaitPrizeLogs(1).size());
     }
@@ -574,7 +577,7 @@ class TaskRuntimeP0AcceptanceTest {
 
         List<TaskRecordFlow> blocked = flowsOf(oldOnly.getId());
         assertEquals(1, blocked.size(), "被人群拦下也要留痕");
-        assertEquals(TaskConst.FLOW_TYPE_DISCARD, blocked.get(0).getFlowType().intValue());
+        assertEquals(TaskFlowTypeEnum.DISCARD, blocked.get(0).getFlowType());
         assertEquals(TaskDiscardCode.AUDIENCE_MISMATCH.getValue(), blocked.get(0).getDiscardCode());
         assertTrue(blocked.get(0).getDiscardReason().contains("老会员"),
                 "原因要说清是被哪个人群条件拦的：" + blocked.get(0).getDiscardReason());
@@ -638,7 +641,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertEquals(1, after1.size());
         assertEquals(basePeriod, after1.get(0).getPeriodKey(),
                 "第 1 轮必须是裸周期键，加了 #1 会让存量记录全部失联");
-        assertTrue(after1.get(0).getStatus() >= TaskConst.RECORD_STATUS_COMPLETED, "目标为1，一个事件即达标");
+        assertTrue(after1.get(0).getStatus().atLeast(TaskRecordStatusEnum.COMPLETED), "目标为1，一个事件即达标");
 
         // 第 2 轮：新记录，周期键带 #2
         taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r2", null, DAY_1, null, Map.of()));
@@ -653,7 +656,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertEquals(2, recordsOf(config.getId()).size(), "超出上限不该再开新记录");
 
         TaskRecordFlow last = flowsOf(config.getId()).get(2);
-        assertEquals(TaskConst.FLOW_TYPE_DISCARD, last.getFlowType().intValue());
+        assertEquals(TaskFlowTypeEnum.DISCARD, last.getFlowType());
         assertEquals(TaskDiscardCode.ROUND_LIMIT_EXCEEDED.getValue(), last.getDiscardCode());
         assertTrue(last.getDiscardReason().contains("上限"), last.getDiscardReason());
     }
@@ -699,7 +702,7 @@ class TaskRuntimeP0AcceptanceTest {
 
         List<TaskRecordFlow> flows = flowsOf(config.getId());
         assertEquals(1, flows.size());
-        assertEquals(TaskConst.FLOW_TYPE_ADVANCE, flows.get(0).getFlowType().intValue());
+        assertEquals(TaskFlowTypeEnum.ADVANCE, flows.get(0).getFlowType());
         assertNull(flows.get(0).getDiscardCode(), "推进流水带了分类码，说明写入侧串了");
     }
 
@@ -769,7 +772,7 @@ class TaskRuntimeP0AcceptanceTest {
     @DisplayName("订阅判据：造数落的 status=1 必须能被订阅到 —— 判 status==2 的话所有任务永不触发")
     void subscriptionMatchesPendingStatus() {
         TaskConfig config = configOf(TASK_COUNT);
-        assertEquals(TaskConst.CONFIG_STATUS_PENDING, config.getStatus().intValue(),
+        assertEquals(TaskConfigStatusEnum.PENDING, config.getStatus(),
                 "前提确认：wizardSubmit 落的就是 1-待生效，全工程没有任何地方把它改成 2");
 
         List<TaskAdvanceResult> results = taskEventService.handle(

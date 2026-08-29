@@ -1,5 +1,6 @@
 package solvela.admin.module.task.taskevent.domain.vo;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -42,7 +43,7 @@ public class TaskEventVO {
     private String remark;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     @Schema(description = "创建时间")
     private LocalDateTime createTime;

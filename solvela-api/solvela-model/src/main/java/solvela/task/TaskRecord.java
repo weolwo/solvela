@@ -1,5 +1,6 @@
 package solvela.task;
 
+import solvela.enums.TaskRecordStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -94,7 +95,7 @@ public class TaskRecord {
      * progress_data.dispatchedStages（展示用，非判据）。发奖防重的唯一判据是
      * t_prize_log.uk_external_biz。详见方案 §4.8。
      */
-    private Integer status;
+    private TaskRecordStatusEnum status;
 
     /**
      * 进度详情

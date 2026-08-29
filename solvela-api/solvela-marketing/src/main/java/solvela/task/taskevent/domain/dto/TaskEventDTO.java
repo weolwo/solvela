@@ -1,5 +1,6 @@
 package solvela.task.taskevent.domain.dto;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -40,7 +41,7 @@ public class TaskEventDTO {
     private String remark;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /** 创建时间 */
     private LocalDateTime createTime;

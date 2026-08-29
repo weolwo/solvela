@@ -1,5 +1,6 @@
 package solvela.task;
 
+import solvela.enums.TaskConfigStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -90,7 +91,7 @@ public class TaskConfig {
     /**
      * 任务状态 1-待生效, 2-生效中, 3-已下线
      */
-    private Integer status;
+    private TaskConfigStatusEnum status;
 
     /**
      * 开始时间

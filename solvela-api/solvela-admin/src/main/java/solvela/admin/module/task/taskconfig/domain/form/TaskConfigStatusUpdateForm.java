@@ -1,5 +1,6 @@
 package solvela.admin.module.task.taskconfig.domain.form;
 
+import solvela.enums.TaskConfigStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -25,5 +26,5 @@ public class TaskConfigStatusUpdateForm {
 
     @Schema(description = "目标状态：1-待生效, 2-生效中, 3-已下线", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "目标状态 不能为空")
-    private Integer status;
+    private TaskConfigStatusEnum status;
 }

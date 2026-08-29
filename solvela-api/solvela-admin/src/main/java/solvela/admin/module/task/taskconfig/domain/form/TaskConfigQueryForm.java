@@ -1,5 +1,6 @@
 package solvela.admin.module.task.taskconfig.domain.form;
 
+import solvela.enums.TaskConfigStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -35,6 +36,6 @@ public class TaskConfigQueryForm extends PageParam {
     private String triggerEvent;
 
     @Schema(description = "任务状态：1-待生效, 2-生效中, 3-已下线（见 TaskConst.CONFIG_STATUS_*）")
-    private Integer status;
+    private TaskConfigStatusEnum status;
 
 }

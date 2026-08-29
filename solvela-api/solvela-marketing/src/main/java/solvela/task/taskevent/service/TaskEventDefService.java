@@ -1,5 +1,6 @@
 package solvela.task.taskevent.service;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +46,9 @@ public class TaskEventDefService {
      */
     public static final String METRIC_SOURCE_NONE = "NONE";
 
-    private static final int STATUS_ENABLED = 1;
-    private static final int STATUS_DISABLED = 0;
+    /** 0/1 布尔标记列的取值（bizIdRequired / isHighFrequency / discardLogFlag），与 status 无关 */
+    private static final int FLAG_NO = 0;
+    private static final int FLAG_YES = 1;
 
     public PageResult<TaskEventDTO> queryPage(TaskEventQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
@@ -141,7 +143,7 @@ public class TaskEventDefService {
             return null;
         }
         TaskEvent event = taskEventDao.selectByEventCode(eventCode);
-        return event != null && Integer.valueOf(STATUS_ENABLED).equals(event.getStatus()) ? event : null;
+        return event != null && event.getStatus() == EnableStatusEnum.ENABLED ? event : null;
     }
 
     /**
@@ -152,17 +154,20 @@ public class TaskEventDefService {
         if (StringUtils.isBlank(entity.getMetricSource())) {
             entity.setMetricSource(METRIC_SOURCE_NONE);
         }
+        // ⚠️ 下面三个是 0/1 的布尔标记列，与 status 不是一个概念。
+        //    原先它们借用 STATUS_ENABLED/STATUS_DISABLED 赋值 —— 值恰好一样，语义完全不同，
+        //    status 一旦改成枚举，这种借用就会把两件事绑死。故拆出独立常量。
         if (entity.getBizIdRequired() == null) {
-            entity.setBizIdRequired(STATUS_DISABLED);
+            entity.setBizIdRequired(FLAG_NO);
         }
         if (entity.getIsHighFrequency() == null) {
-            entity.setIsHighFrequency(STATUS_DISABLED);
+            entity.setIsHighFrequency(FLAG_NO);
         }
         if (entity.getDiscardLogFlag() == null) {
-            entity.setDiscardLogFlag(STATUS_ENABLED);
+            entity.setDiscardLogFlag(FLAG_YES);
         }
         if (entity.getStatus() == null) {
-            entity.setStatus(STATUS_ENABLED);
+            entity.setStatus(EnableStatusEnum.ENABLED);
         }
     }
 }

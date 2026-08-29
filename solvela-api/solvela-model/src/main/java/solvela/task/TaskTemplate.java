@@ -1,5 +1,6 @@
 package solvela.task;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -55,7 +56,7 @@ public class TaskTemplate {
     /**
      * 状态：0-禁用, 1-启用
      */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 创建人

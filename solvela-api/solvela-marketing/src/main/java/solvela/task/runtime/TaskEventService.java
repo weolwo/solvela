@@ -1,5 +1,7 @@
 package solvela.task.runtime;
 
+import solvela.enums.TaskFlowTypeEnum;
+import solvela.enums.TaskConfigStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.json.JsonUtils;
@@ -217,7 +219,7 @@ public class TaskEventService {
     private List<TaskConfig> findSubscribedConfigs(TaskEventContext ctx) {
         LambdaQueryWrapper<TaskConfig> query = new LambdaQueryWrapper<TaskConfig>()
                 .eq(TaskConfig::getTriggerEvent, ctx.eventCode())
-                .ne(TaskConfig::getStatus, TaskConst.CONFIG_STATUS_OFFLINE)
+                .ne(TaskConfig::getStatus, TaskConfigStatusEnum.OFFLINE)
                 .and(w -> w.isNull(TaskConfig::getStartTime).or().le(TaskConfig::getStartTime, ctx.eventTime()))
                 .and(w -> w.isNull(TaskConfig::getEndTime).or().ge(TaskConfig::getEndTime, ctx.eventTime()));
         return taskConfigDao.selectList(query);
@@ -291,7 +293,7 @@ public class TaskEventService {
             flow.setTaskConfigId(TaskConst.FLOW_CONFIG_ID_NONE);
             flow.setEventCode(ctx.eventCode());
             flow.setEventBizId(ctx.eventBizId());
-            flow.setFlowType(TaskConst.FLOW_TYPE_DISCARD);
+            flow.setFlowType(TaskFlowTypeEnum.DISCARD);
             flow.setDiscardCode(TaskDiscardCode.POOL_REJECTED.getValue());
             flow.setDeltaMetric(BigDecimal.ZERO);
             flow.setAfterMetric(BigDecimal.ZERO);

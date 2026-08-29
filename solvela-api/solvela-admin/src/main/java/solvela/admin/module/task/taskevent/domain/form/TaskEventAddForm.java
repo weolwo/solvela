@@ -1,5 +1,6 @@
 package solvela.admin.module.task.taskevent.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -49,5 +50,5 @@ public class TaskEventAddForm {
     private String remark;
 
     @Schema(description = "状态：0-停用, 1-启用，不填按启用")
-    private Integer status;
+    private EnableStatusEnum status;
 }

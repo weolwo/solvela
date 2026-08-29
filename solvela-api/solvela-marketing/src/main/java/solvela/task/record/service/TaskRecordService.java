@@ -1,5 +1,6 @@
 package solvela.task.record.service;
 
+import solvela.enums.TaskRecordStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
@@ -45,11 +46,6 @@ public class TaskRecordService {
     /** 只用来校验会员号真实存在（状态表不留账号快照） */
     private final MemberService memberService;
     private final TaskConfigManager taskConfigManager;
-
-    /**
-     * 任务记录状态：3-已过期（对齐 TaskConst.RECORD_STATUS_EXPIRED）
-     */
-    private static final Integer STATUS_EXPIRED = 3;
 
     private static final int RATE_SCALE = 4;
 
@@ -227,9 +223,11 @@ public class TaskRecordService {
      * 故这里只放行 3，不接受其它值 —— 允许管理端随手把记录改回「进行中」或「已发奖」，
      * 等于给了一条绕过运行态直接改结果的路。
      */
-    public void updateStatus(List<Long> idList, Integer status) {
-        if (!STATUS_EXPIRED.equals(status)) {
-            throw new BusinessException("任务记录只支持置为 3-已过期（即管理端的「禁用」）");
+    public void updateStatus(List<Long> idList, TaskRecordStatusEnum status) {
+        // 这条不是「取值合不合法」（那由枚举保证），而是一条业务规则：
+        // 管理端只能把记录置为已过期，不能绕过运行态直接改成已完成/已发奖
+        if (status != TaskRecordStatusEnum.EXPIRED) {
+            throw new BusinessException("任务记录只支持置为「已过期」（即管理端的「禁用」）");
         }
         for (Long id : idList) {
             TaskRecord update = new TaskRecord();
