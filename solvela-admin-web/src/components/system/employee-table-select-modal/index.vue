@@ -134,8 +134,8 @@
     tableLoading.value = true;
     try {
       let res = await employeeApi.queryEmployee(params);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (error) {
       solvelaSentry.captureError(error);
     } finally {

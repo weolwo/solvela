@@ -241,8 +241,8 @@
     tableLoading.value = true;
     try {
       const res = await taskEventApi.queryPage(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -336,12 +336,9 @@
     }
     submitting.value = true;
     try {
-      const res = isEdit.value ? await taskEventApi.update({ ...form }) : await taskEventApi.add({ ...form });
-      if (!res.ok) {
-        // 服务端会给出人话原因（编码重复等），如实透出，不要吞掉
-        message.error(res.msg);
-        return;
-      }
+      // 失败（编码重复等）会以 4xx 抛出来，拦截器已经把服务端那句人话弹给用户了，
+      // 这里只管成功路径
+      await (isEdit.value ? taskEventApi.update({ ...form }) : taskEventApi.add({ ...form }));
       message.success(isEdit.value ? '已保存' : '已注册');
       closeForm();
       await queryData();
@@ -362,12 +359,8 @@
       okType: 'danger',
       onOk: async () => {
         try {
-          const res = await taskEventApi.delete(record.id);
-          if (!res.ok) {
-            // 删除守卫会告诉运营被几个任务引用、以及应该改用「停用」
-            message.error(res.msg);
-            return;
-          }
+          // 删除守卫（被任务引用时拒绝）走 4xx，原因由拦截器弹出
+          await taskEventApi.delete(record.id);
           message.success('删除成功');
           await queryData();
         } catch (e) {

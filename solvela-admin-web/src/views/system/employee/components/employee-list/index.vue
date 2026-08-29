@@ -220,11 +220,11 @@
     try {
       params.departmentId = props.departmentId;
       let res = await employeeApi.queryEmployee(params);
-      for (const item of res.data.list) {
+      for (const item of res.list) {
         item.roleNameList = _.join(item.roleNameList, ',');
       }
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
       // 清除选中
       selectedRowKeys.value = [];
       selectedRows.value = [];
@@ -242,11 +242,11 @@
       params.pageNum = 1;
       params.departmentId = allDepartment ? undefined : props.departmentId;
       let res = await employeeApi.queryEmployee(params);
-      for (const item of res.data.list) {
+      for (const item of res.list) {
         item.roleNameList = _.join(item.roleNameList, ',');
       }
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
       // 清除选中
       selectedRowKeys.value = [];
       selectedRows.value = [];

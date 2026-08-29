@@ -248,8 +248,8 @@
     tableLoading.value = true;
     try {
       const res = await mallSkuApi.queryPage(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -260,7 +260,7 @@
   async function loadCategory() {
     try {
       const res = await mallCategoryApi.enabledList();
-      categoryOptions.value = (res.data || []).map((item) => ({ value: item.id, label: item.categoryName }));
+      categoryOptions.value = (res || []).map((item) => ({ value: item.id, label: item.categoryName }));
     } catch (e) {
       solvelaSentry.captureError(e);
     }

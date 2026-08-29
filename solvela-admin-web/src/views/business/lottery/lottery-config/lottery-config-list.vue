@@ -466,9 +466,9 @@
     try {
       // 走 board 而不是 queryPage：多带号码空间占用、期号发号实况与体检结论
       let queryResult = await lotteryConfigApi.board(queryForm);
-      boardResult.value = queryResult.data || {};
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      boardResult.value = queryResult || {};
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
       // 状态变了的行留在选中列表里没意义，且容易让人对着旧状态再点一次批量禁用
       selectedRowKeyList.value = [];
       selectedRowList.value = [];
@@ -532,7 +532,7 @@
     detailLoading.value = true;
     try {
       const res = await lotteryWorkbenchApi.detail(record.activityCode, record.lotteryCode);
-      detail.value = res.data || {};
+      detail.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -601,7 +601,7 @@
       const res = await lotteryConfigApi.batchOffline(codeList);
       // 服务端回的是「已禁用 N 个，跳过 M 个…」的汇总，原样透出来 ——
       // 批量里混着已下线的玩法是常态，笼统提示一句「操作成功」会掩盖掉失败的那几个
-      message.success(res.data || '操作成功');
+      message.success(res || '操作成功');
       queryData();
     } catch (e) {
       solvelaSentry.captureError(e);

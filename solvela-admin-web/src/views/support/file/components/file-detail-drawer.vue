@@ -137,8 +137,8 @@
     previewSrc.value = '';
     try {
       let res = await fileApi.detail(fileId);
-      detail.file = res.data.file;
-      detail.references = res.data.references || [];
+      detail.file = res.file;
+      detail.references = res.references || [];
       if (isImage.value) {
         // 取不到就留空，抽屉的其余信息（尤其引用列表）照样要能看
         previewSrc.value = await getFilePreviewUrl(fileId).catch(() => '');

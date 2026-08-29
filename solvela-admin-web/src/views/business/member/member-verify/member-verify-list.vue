@@ -195,8 +195,8 @@
     tableLoading.value = true;
     try {
       const res = await memberVerifyApi.queryPage(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

@@ -107,7 +107,7 @@
     try {
       tableLoading.value = true;
       let responseModel = await dataTracerApi.queryList(Object.assign({}, queryForm, { dataId: props.dataId, type: props.type }));
-      for (const e of responseModel.data.list) {
+      for (const e of responseModel.list) {
         if (!e.userAgent) {
           continue;
         }
@@ -117,8 +117,8 @@
         e.os = ua.os.name;
         e.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';
       }
-      const list = responseModel.data.list;
-      total.value = responseModel.data.total;
+      const list = responseModel.list;
+      total.value = responseModel.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);

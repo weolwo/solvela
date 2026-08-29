@@ -45,7 +45,7 @@
 
   async function queryDepartmentTree() {
     let res = await departmentApi.queryDepartmentTree();
-    treeData.value = res.data;
+    treeData.value = res;
   }
 
   function onChange(e) {

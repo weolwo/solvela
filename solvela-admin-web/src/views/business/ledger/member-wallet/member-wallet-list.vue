@@ -208,7 +208,7 @@
   async function loadStat(form) {
     try {
       const res = await memberWalletApi.stat(form);
-      stat.value = res.data || {};
+      stat.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -311,8 +311,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await memberWalletApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

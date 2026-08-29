@@ -46,9 +46,9 @@
   // 查询列表
   async function queryAllRole() {
     let res = await roleApi.queryAll();
-    roleList.value = res.data;
-    if (!_.isEmpty(res.data) && res.data[0].roleId) {
-      selectedKeys.value = [res.data[0].roleId];
+    roleList.value = res;
+    if (!_.isEmpty(res) && res[0].roleId) {
+      selectedKeys.value = [res[0].roleId];
     }
   }
 

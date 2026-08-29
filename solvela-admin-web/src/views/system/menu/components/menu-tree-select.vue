@@ -33,7 +33,7 @@
   let treeData = ref([]);
   async function queryMenuTree() {
     let res = await menuApi.queryMenuTree(true);
-    treeData.value = res.data;
+    treeData.value = res;
   }
 
   onMounted(queryMenuTree);

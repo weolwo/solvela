@@ -379,7 +379,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList(ACTIVITY_TYPE_TASK);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -401,7 +401,7 @@
     eventLoading.value = true;
     try {
       const res = await taskApi.queryEventOptionList();
-      eventOptions.value = toEventOptions(res.data);
+      eventOptions.value = toEventOptions(res);
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -430,7 +430,7 @@
     prizeLoading.value = true;
     try {
       const res = await prizeConfigApi.optionList(activityCode);
-      prizeOptions.value = (res.data || []).map((item) => ({
+      prizeOptions.value = (res || []).map((item) => ({
         value: item.prizeCode,
         label: `${item.prizeName}（${item.prizeCode}）`,
       }));
@@ -465,7 +465,7 @@
     templateLoading.value = true;
     try {
       const res = await taskApi.queryTemplateOptionList();
-      taskTemplates.value = res.data || [];
+      taskTemplates.value = res || [];
       // 默认选中第一个模板；已有选中（如恢复草稿）时不覆盖
       if (!wizardForm.base.templateCode && taskTemplates.value.length > 0) {
         wizardForm.base.templateCode = taskTemplates.value[0].templateCode;
@@ -674,7 +674,7 @@
       const payload = buildSubmitData();
       const res = isEditMode.value ? await taskApi.updateTaskConfig({ ...payload, id: editId.value }) : await taskApi.submitTaskConfig(payload);
       // 成功页展示与跳转定位所需信息，需在表单重置前留存
-      submitResult.taskConfigId = res.data;
+      submitResult.taskConfigId = res;
       submitResult.taskName = wizardForm.base.taskName;
       submitResult.activityLabel = summary.value.activityLabel;
       submitResult.submitted = true;
@@ -682,7 +682,7 @@
       clearTimeout(draftTimer);
       clearDraft();
       // 内嵌时成功页被抑制，改由外壳推进到它自己的完成页
-      emit('saved', { activityCode: wizardForm.base.activityCode, taskConfigId: res.data });
+      emit('saved', { activityCode: wizardForm.base.activityCode, taskConfigId: res });
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -837,7 +837,7 @@
     detailLoading.value = true;
     try {
       const res = await taskApi.queryWizardDetail(id);
-      const d = res.data;
+      const d = res;
       if (!d) {
         message.error('任务配置不存在');
         return;

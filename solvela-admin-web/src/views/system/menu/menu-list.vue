@@ -201,7 +201,7 @@
       tableLoading.value = true;
       let responseModel = await menuApi.queryMenu();
       // 过滤搜索条件
-      const filtedMenuList = filterMenuByQueryForm(responseModel.data, queryForm);
+      const filtedMenuList = filterMenuByQueryForm(responseModel, queryForm);
       // 递归构造树形结构，并付给 TableTree组件
       tableData.value = buildMenuTableTree(filtedMenuList);
     } catch (e) {

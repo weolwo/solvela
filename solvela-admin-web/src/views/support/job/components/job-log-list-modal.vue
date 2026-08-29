@@ -178,7 +178,7 @@
     try {
       SolvelaLoading.show();
       const res = await jobApi.terminateJobLog(record.logId);
-      message.warning(res.msg || '已发出中断信号，请稍后刷新确认');
+      message.warning(res || '已发出中断信号，请稍后刷新确认');
       queryLogList();
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -202,7 +202,7 @@
     try {
       logLoading.value = true;
       const res = await jobApi.queryExecuteLog(logId);
-      logLines.value = res.data || [];
+      logLines.value = res || [];
       currentLogId.value = logId;
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -333,8 +333,8 @@
     try {
       tableLoading.value = true;
       let responseModel = await jobApi.queryJobLog(queryForm);
-      const list = responseModel.data.list;
-      total.value = responseModel.data.total;
+      const list = responseModel.list;
+      total.value = responseModel.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);

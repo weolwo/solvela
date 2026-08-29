@@ -104,7 +104,7 @@
   const roleList = ref([]); //角色列表
   async function queryAllRole() {
     let res = await roleApi.queryAll();
-    roleList.value = res.data;
+    roleList.value = res;
   }
 
   const formRef = ref(); // 组件ref
@@ -181,9 +181,10 @@
 
   async function addEmployee(keepAdding) {
     try {
-      let { data } = await employeeApi.addEmployee(form);
+      // 接口直接返回生成的初始密码字符串，没有信封可以剥
+      const password = await employeeApi.addEmployee(form);
       message.success('添加成功');
-      emit('show-account', form.loginName, data);
+      emit('show-account', form.loginName, password);
       if (keepAdding) {
         reset();
       } else {

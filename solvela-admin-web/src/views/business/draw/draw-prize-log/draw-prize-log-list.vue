@@ -381,8 +381,8 @@
     tableLoading.value = true;
     try {
       const res = await drawPrizeLogApi.queryPage(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -394,7 +394,7 @@
     try {
       // status 服务端刻意忽略：它是漏斗要拆解的维度本身
       const res = await drawPrizeLogApi.funnel(queryForm);
-      funnel.value = res.data || {};
+      funnel.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -429,7 +429,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList(ACTIVITY_TYPE_DRAW, true);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -448,7 +448,7 @@
         pageSize: 200,
         activityCode: queryForm.activityCode || undefined,
       });
-      const list = res.data?.list || [];
+      const list = res?.list || [];
       poolOptions.value = list.map((item) => ({
         value: item.poolCode,
         label: `${item.poolName}（${item.poolCode}）`,

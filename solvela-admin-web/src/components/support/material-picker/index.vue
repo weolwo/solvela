@@ -175,7 +175,7 @@
   async function queryCategoryList() {
     try {
       let res = await fileApi.getCategoryList();
-      categoryList.value = res.data || [];
+      categoryList.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -204,8 +204,8 @@
     loading.value = true;
     try {
       let res = await fileApi.queryPage(queryForm);
-      fileList.value = res.data.list || [];
-      total.value = res.data.total;
+      fileList.value = res.list || [];
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -253,7 +253,7 @@
       // 刚传的图直接选中：上传的动机就是"我要用这张"，还要再点一下是多余的。
       // 但 upload 接口的返回是 FileUploadVO（只有 fileId/fileUrl/originalName 等），
       // 与列表的 FileVO 不同源，所以刷新列表后按 fileId 认领，拿到的才是同一套字段
-      await refreshAndSelect(res.data.fileId);
+      await refreshAndSelect(res.fileId);
     } catch (e) {
       solvelaSentry.captureError(e);
       onError(e);

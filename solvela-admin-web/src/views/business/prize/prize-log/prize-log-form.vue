@@ -185,7 +185,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList();
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -204,7 +204,7 @@
     prizeLoading.value = true;
     try {
       const res = await prizeConfigApi.optionList(activityCode);
-      prizeAllList.value = res.data || [];
+      prizeAllList.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

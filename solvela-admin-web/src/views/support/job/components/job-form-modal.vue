@@ -249,7 +249,7 @@
         presetCode: updateForm.presetCode,
         jitterSeconds: updateForm.jitterSeconds,
       });
-      preview.value = res.data;
+      preview.value = res;
     } catch (e) {
       // 预览失败不该打断填表：静默降级，用户照样能保存（服务端还会再校验一次）
       preview.value = null;
@@ -262,7 +262,7 @@
     try {
       handlerLoading.value = true;
       const res = await jobApi.queryHandlerList();
-      handlerList.value = res.data || [];
+      handlerList.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

@@ -84,7 +84,7 @@ export const useDictStore = defineStore('dict', {
     async refreshData(){
       try{
         const dictRes = await dictApi.getAllDictData();
-        this.initData(dictRes.data);
+        this.initData(dictRes);
       }catch (e){
         solvelaSentry.captureError(e);
       }

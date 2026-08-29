@@ -303,7 +303,7 @@
     promotionLoading.value = true;
     try {
       const res = await promotionConfigApi.optionList();
-      promotionAllList.value = res.data || [];
+      promotionAllList.value = res || [];
     } catch (err) {
       solvelaSentry.captureError(err);
     } finally {
@@ -433,7 +433,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList();
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -459,7 +459,7 @@
     codeGenerating.value = true;
     try {
       const res = await prizeConfigApi.generateCode();
-      form.prizeCode = res.data;
+      form.prizeCode = res;
       formRef.value.clearValidate('prizeCode');
     } catch (err) {
       solvelaSentry.captureError(err);

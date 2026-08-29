@@ -48,7 +48,7 @@
   let menuList = [];
   async function queryMenuTree() {
     let res = await menuApi.queryMenu();
-    menuList = res.data.filter((e) => e.menuType === MENU_TYPE_ENUM.MENU.value || e.menuType === MENU_TYPE_ENUM.CATALOG.value);
+    menuList = res.filter((e) => e.menuType === MENU_TYPE_ENUM.MENU.value || e.menuType === MENU_TYPE_ENUM.CATALOG.value);
     for (const item of menuList) {
       if (item.menuType === MENU_TYPE_ENUM.CATALOG.value) {
         item.disabled = true;

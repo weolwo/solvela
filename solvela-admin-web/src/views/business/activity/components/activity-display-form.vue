@@ -89,8 +89,8 @@
     try {
       let res = await activityDisplayApi.get(props.activityCode);
       // 没配过时后端返回 null，按空表单处理
-      if (res.data) {
-        Object.assign(form, res.data);
+      if (res) {
+        Object.assign(form, res);
       }
     } catch (e) {
       solvelaSentry.captureError(e);

@@ -150,8 +150,8 @@
     try {
       tableLoading.value = true;
       let responseModel = await codeGeneratorApi.queryTableList(queryForm);
-      const list = responseModel.data.list;
-      total.value = responseModel.data.total;
+      const list = responseModel.list;
+      total.value = responseModel.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);

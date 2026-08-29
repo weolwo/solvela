@@ -392,8 +392,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await lotteryIssueApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -470,7 +470,7 @@
       // 概览只吃玩法维度：服务端刻意忽略 status / saleState / overdueOnly，
       // 否则点了「逾期」之后其余三张卡会全部归零，没法互相对照
       const res = await lotteryIssueApi.overview({ lotteryCode: queryForm.lotteryCode, pageNum: 1, pageSize: 1 });
-      overview.value = res.data;
+      overview.value = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -511,7 +511,7 @@
     lotteryLoading.value = true;
     try {
       const res = await lotteryConfigApi.queryPage({ pageNum: 1, pageSize: 200 });
-      lotteryOptions.value = (res.data?.list || []).map((item) => ({
+      lotteryOptions.value = (res?.list || []).map((item) => ({
         value: item.lotteryCode,
         label: `${item.lotteryName}（${item.lotteryCode}）`,
       }));
@@ -601,7 +601,7 @@
       const res = await lotteryIssueApi.batchStopSale(selectedRowKeyList.value);
       // 服务端回的是「已停售 N 期，跳过 M 期」的汇总，原样透出来 ——
       // 批量里混着已停售/已开奖的期是常态，笼统提示一句「操作成功」会把跳过的那几期盖掉
-      message.success(res.data || '操作成功');
+      message.success(res || '操作成功');
       selectedRowKeyList.value = [];
       reload();
     } catch (e) {

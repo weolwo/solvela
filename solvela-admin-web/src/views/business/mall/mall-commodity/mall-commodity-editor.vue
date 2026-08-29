@@ -591,7 +591,7 @@
     categoryLoading.value = true;
     try {
       const res = await mallCategoryApi.enabledList();
-      categoryFlatList.value = res.data || [];
+      categoryFlatList.value = res || [];
       categoryOptions.value = buildCascader(categoryFlatList.value);
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -608,7 +608,7 @@
     codeLoading.value = true;
     try {
       const res = await mallCommodityApi.generateCode();
-      form.commodityCode = res.data;
+      form.commodityCode = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -628,7 +628,7 @@
     loading.value = true;
     try {
       const res = await mallCommodityApi.detail(commodityId.value);
-      const detail = res.data || {};
+      const detail = res || {};
       Object.assign(form, {
         ...buildEmptyForm(),
         ...detail,
@@ -729,11 +729,11 @@
       const res = await mallCommodityApi.save(param);
 
       const created = isCreate.value;
-      commodityId.value = res.data;
+      commodityId.value = res;
 
       if (created) {
         // 地址栏换成编辑态：不换的话刷新会回到「新建」，而运营再点一次保存会建出第二个商品
-        router.replace({ path: route.path, query: { ...route.query, id: res.data } });
+        router.replace({ path: route.path, query: { ...route.query, id: res } });
       }
       // 重新拉一次拿服务端的权威值（编码、SKU 编码、虚拟列库存都是它算的）
       await loadDetail();

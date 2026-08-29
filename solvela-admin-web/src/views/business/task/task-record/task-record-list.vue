@@ -452,7 +452,7 @@
     try {
       // status / completeTime 服务端刻意忽略：它们是漏斗要拆解的维度本身
       const res = await taskRecordApi.funnel(queryForm);
-      funnel.value = res.data || {};
+      funnel.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -463,8 +463,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await taskRecordApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -553,7 +553,7 @@
     expandedPayloadId.value = null;
     try {
       const res = await taskEventApi.queryRecordFlow(record.id);
-      flowList.value = res.data || [];
+      flowList.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

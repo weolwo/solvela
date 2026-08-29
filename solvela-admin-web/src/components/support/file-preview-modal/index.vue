@@ -37,7 +37,7 @@
         SolvelaLoading.show();
         try {
           let res = await fileApi.getUrl(fileItem.storageKey);
-          fileItem.fileUrl = res.data;
+          fileItem.fileUrl = res;
           showFile(fileItem);
         } catch (e) {
           solvelaSentry.captureError(e);

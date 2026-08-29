@@ -40,7 +40,7 @@
     try {
       SolvelaLoading.show();
       let res = await employeeApi.getPasswordComplexityEnabled();
-      passwordComplexityEnabledFlag.value = res.data;
+      passwordComplexityEnabledFlag.value = res;
       tips.value = passwordComplexityEnabledFlag.value ? passwordComplexityEnabledTips : passwordTips;
     } catch (e) {
       solvelaSentry.captureError(e);

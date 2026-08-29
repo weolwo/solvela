@@ -71,7 +71,7 @@
   // 获取系统支持的所有种类的数据范围
   async function getDataScope() {
     let result = await roleApi.getDataScopeList();
-    dataScopeList.value = result.data;
+    dataScopeList.value = result;
 
     selectedDataScopeList.value = [];
 
@@ -87,7 +87,7 @@
   // 获取数据范围根据角色id，并赋予选中状态
   async function getRoleDataScope() {
     let result = await roleApi.getDataScopeByRoleId(selectRoleId.value);
-    let data = result.data;
+    let data = result;
     selectedDataScopeList.value = [];
 
     dataScopeList.value.forEach((item) => {

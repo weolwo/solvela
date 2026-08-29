@@ -312,7 +312,7 @@
     codeGenerating.value = true;
     try {
       const res = await taskApi.generateTemplateCode();
-      designer.base.templateCode = res.data;
+      designer.base.templateCode = res;
       formRef.value?.clearValidate(['base', 'templateCode']);
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -345,7 +345,7 @@
     detailLoading.value = true;
     try {
       const res = await taskTemplateApi.detail(id);
-      const d = res.data;
+      const d = res;
       if (!d) {
         message.error('任务模板不存在');
         return;
@@ -455,7 +455,7 @@
       clearDraft();
       lastSavedAt.value = dayjs().format('HH:mm:ss');
       // 区分新建与覆盖：填了已存在的 templateCode 时明确告知，避免误覆盖线上模板而不自知
-      message.success(res.data ? '模板已创建' : '模板已更新（覆盖了同编码的原有配置）');
+      message.success(res ? '模板已创建' : '模板已更新（覆盖了同编码的原有配置）');
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -555,7 +555,7 @@
     eventLoading.value = true;
     try {
       const res = await taskApi.queryEventOptionList();
-      eventOptions.value = toEventOptions(res.data);
+      eventOptions.value = toEventOptions(res);
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

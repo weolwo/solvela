@@ -158,7 +158,7 @@
     tableLoading.value = true;
     try {
       const res = await mallCategoryApi.queryAll();
-      flatList.value = res.data || [];
+      flatList.value = res || [];
       // 默认全展开：两级、几十条，收起来反而要多点一次才看得到子分类
       expandedRowKeys.value = flatList.value.filter((c) => !c.parentId).map((c) => c.id);
     } catch (e) {

@@ -100,9 +100,9 @@
     let userTableColumnArray = [];
     try {
       let res = await tableColumnApi.getColumns(props.tableId);
-      if (res.data) {
+      if (res) {
         try {
-          userTableColumnArray = JSON.parse(res.data);
+          userTableColumnArray = JSON.parse(res);
         } catch (e1) {
           solvelaSentry.captureError(e1);
         }

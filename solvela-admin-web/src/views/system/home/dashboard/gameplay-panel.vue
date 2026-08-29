@@ -159,7 +159,7 @@
     loading.value = true;
     try {
       const res = await marketingStatApi.gameplay(props.activityCode);
-      Object.assign(data, res.data || {});
+      Object.assign(data, res || {});
       if (data.activityType === 'TASK' && (data.taskOptionList || []).length) {
         selectedTaskId.value = data.taskOptionList[0].taskConfigId;
         await loadFunnel();
@@ -175,7 +175,7 @@
     if (!selectedTaskId.value) return;
     try {
       const res = await marketingStatApi.taskFunnel(selectedTaskId.value);
-      funnelData.value = res.data || {};
+      funnelData.value = res || {};
       // v-if 刚切出来时 DOM 还没挂上，等一帧再画
       await nextTick();
       renderFunnel();

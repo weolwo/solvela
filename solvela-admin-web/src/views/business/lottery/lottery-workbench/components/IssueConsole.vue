@@ -357,7 +357,7 @@
     if (!record || record.status !== 2) return;
     try {
       const res = await lotteryIssueApi.settleSummary(record.id);
-      summary.value = res.data;
+      summary.value = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -369,7 +369,7 @@
     rolling.value = true;
     try {
       const res = await lotteryIssueApi.randomNumber(selectedId.value);
-      winningNumber.value = res.data;
+      winningNumber.value = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -382,7 +382,7 @@
     try {
       // 核销中续跑时号码已定案，传空让服务端用它自己记的那个 —— 避免「中途换号」
       const res = await lotteryIssueApi.settle(selectedId.value, selectedIssue.value.status === 1 ? '' : winningNumber.value);
-      const r = res.data;
+      const r = res;
       message.success(`开奖完成：中奖 ${r.winCount} 张、未中奖 ${r.loseCount} 张`);
       await loadList();
       const current = issueList.value.find((i) => i.id === selectedId.value);
@@ -398,7 +398,7 @@
     dispatching.value = true;
     try {
       const res = await lotteryIssueApi.dispatch(selectedId.value);
-      message.success(`已投递 ${res.data} 条中奖记录到派发链路`);
+      message.success(`已投递 ${res} 条中奖记录到派发链路`);
       const current = issueList.value.find((i) => i.id === selectedId.value);
       await loadSummary(current);
     } catch (e) {
@@ -422,7 +422,7 @@
         pageSize: 200,
         lotteryCode: props.lotteryCode,
       });
-      issueList.value = (res.data.list || []).map((item) => ({ ...item, _editing: false }));
+      issueList.value = (res.list || []).map((item) => ({ ...item, _editing: false }));
       // 选中项在换玩法后可能已不存在，清掉避免右侧面板显示上一个玩法的期号
       if (!issueList.value.some((i) => i.id === selectedId.value)) {
         selectedId.value = null;

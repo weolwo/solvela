@@ -187,7 +187,7 @@
     loading.value = true;
     try {
       const res = await mallFavoriteApi.queryStat(rankTopN.value);
-      Object.assign(stat, res.data || {});
+      Object.assign(stat, res || {});
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

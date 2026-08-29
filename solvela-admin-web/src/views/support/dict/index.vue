@@ -193,11 +193,11 @@
     try {
       tableLoading.value = true;
       let responseData = await dictApi.queryDict(queryForm);
-      const list = responseData.data.list;
+      const list = responseData.list;
       for (let item of list) {
         item.enabled = !item.disabledFlag;
       }
-      total.value = responseData.data.total;
+      total.value = responseData.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);

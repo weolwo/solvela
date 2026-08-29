@@ -324,7 +324,7 @@
     assetLoading.value = true;
     try {
       const res = await prizeConfigApi.optionList(props.activityCode);
-      assetLibrary.value = res.data || [];
+      assetLibrary.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

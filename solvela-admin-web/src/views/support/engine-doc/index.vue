@@ -98,7 +98,7 @@
     try {
       tableLoading.value = true;
       const result = await scriptengineAPI.queryScriptDoc();
-      allData.value = result.data || [];
+      allData.value = result || [];
       domainOptions.value = buildDomainOptions(allData.value);
       filterData();
     } catch (e) {

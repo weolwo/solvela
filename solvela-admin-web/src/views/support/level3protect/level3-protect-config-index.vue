@@ -183,11 +183,11 @@
     SolvelaLoading.show();
     try {
       let res = await level3ProtectApi.getConfig();
-      if (!res.data) {
+      if (!res) {
         message.warn('当前未配置三级等保');
         return;
       }
-      let json = JSON.parse(res.data);
+      let json = JSON.parse(res);
       form.loginFailMaxTimes = json.loginFailMaxTimes;
       form.loginFailLockMinutes = json.loginFailLockMinutes;
       form.loginActiveTimeoutMinutes = json.loginActiveTimeoutMinutes;
@@ -221,8 +221,9 @@
   async function save() {
     SolvelaLoading.show();
     try {
-      let res = await level3ProtectApi.updateConfig(form);
-      message.success(res.msg);
+      // 保存成功没有返回内容（204）
+      await level3ProtectApi.updateConfig(form);
+      message.success('保存成功');
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

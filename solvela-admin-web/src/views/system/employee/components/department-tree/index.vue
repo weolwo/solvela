@@ -89,7 +89,7 @@
   // 查询部门列表并构建 部门树
   async function queryDepartmentTree() {
     let res = await departmentApi.queryAllDepartment();
-    let data = res.data;
+    let data = res;
     departmentList.value = data;
     departmentTreeData.value = buildDepartmentTree(data, DEPARTMENT_PARENT_ID);
 

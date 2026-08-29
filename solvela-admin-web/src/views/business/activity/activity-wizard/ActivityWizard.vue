@@ -277,7 +277,7 @@
     codeLoading.value = true;
     try {
       const res = await activityConfigApi.generateCode();
-      form.activityCode = res.data;
+      form.activityCode = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

@@ -480,9 +480,9 @@
     loading.value = true;
     try {
       const res = await poolPrizeMappingApi.analysis(queryForm);
-      result.value = res.data || {};
-      list.value = res.data?.list || [];
-      total.value = res.data?.total || 0;
+      result.value = res || {};
+      list.value = res?.list || [];
+      total.value = res?.total || 0;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -510,7 +510,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList(ACTIVITY_TYPE_DRAW, true);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -551,7 +551,7 @@
         pageSize: 200,
         activityCode: queryForm.activityCode || undefined,
       });
-      poolOptions.value = (res.data?.list || []).map((item) => ({
+      poolOptions.value = (res?.list || []).map((item) => ({
         value: item.poolCode,
         label: `${item.poolName}（${item.poolCode}）`,
       }));

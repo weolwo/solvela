@@ -76,8 +76,8 @@
       const formData = new FormData();
       formData.append('file', file);
       let res = await fileApi.uploadFileByCategory(formData, props.categoryCode);
-      known.value = { fileId: res.data.fileId, url: res.data.fileUrl };
-      emit('update:fileId', res.data.fileId);
+      known.value = { fileId: res.fileId, url: res.fileUrl };
+      emit('update:fileId', res.fileId);
       onSuccess(res, file);
     } catch (e) {
       solvelaSentry.captureError(e);

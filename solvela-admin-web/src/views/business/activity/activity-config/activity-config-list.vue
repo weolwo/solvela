@@ -331,8 +331,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await activityConfigApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
       await loadConfiguredStatus();
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -354,7 +354,7 @@
     }
     try {
       const res = await activityConfigApi.configuredStatus(codes);
-      configuredMap.value = res.data || {};
+      configuredMap.value = res || {};
     } catch (e) {
       configuredMap.value = {};
       solvelaSentry.captureError(e);

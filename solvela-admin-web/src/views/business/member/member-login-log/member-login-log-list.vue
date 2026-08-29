@@ -211,9 +211,9 @@
     try {
       // 统计和列表同时发，用的是同一份 queryForm —— 它们看的必须是同一批数据
       const [pageRes, statRes] = await Promise.all([memberLoginLogApi.queryPage(queryForm), memberLoginLogApi.queryStat(queryForm)]);
-      tableData.value = pageRes.data.list;
-      total.value = pageRes.data.total;
-      Object.assign(stat, statRes.data || {});
+      tableData.value = pageRes.list;
+      total.value = pageRes.total;
+      Object.assign(stat, statRes || {});
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

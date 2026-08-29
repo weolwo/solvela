@@ -37,7 +37,7 @@
       //获取登录用户信息
       const res = await loginApi.getLoginInfo();
       //更新用户信息到pinia
-      useUserStore().setUserLoginInfo(res.data);
+      useUserStore().setUserLoginInfo(res);
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

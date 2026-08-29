@@ -137,7 +137,7 @@
     try {
       //获取登录用户信息
       const res = await loginApi.getLoginInfo();
-      let data = res.data;
+      let data = res;
       //更新用户信息到pinia
       useUserStore().setUserLoginInfo(data);
       // 当前form展示
@@ -185,7 +185,7 @@
       const formData = new FormData();
       formData.append('file', options.file);
       let res = await fileApi.uploadFile(formData, folder.value);
-      let file = res.data;
+      let file = res;
       avatarUrl.value = file.fileUrl;
       // 更新头像
       let updateAvatarForm = { avatar: file.storageKey };

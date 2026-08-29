@@ -194,13 +194,13 @@
     try {
       tableLoading.value = true;
       let responseData = await dictApi.queryDictData(dictId.value);
-      responseData.data.map((e) => {
+      responseData.map((e) => {
         e.enabled = !e.disabledFlag;
         if (e.dataStyle) {
           e.color = DICT_DATA_STYLE_ENUM[e.dataStyle.toUpperCase()].color;
         }
       });
-      dictDataList.value = responseData.data;
+      dictDataList.value = responseData;
       search();
     } catch (e) {
       solvelaSentry.captureError(e);

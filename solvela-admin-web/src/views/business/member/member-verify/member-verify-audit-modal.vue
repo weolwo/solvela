@@ -111,7 +111,7 @@
     try {
       // 明文在这里才取：列表里没有，DOM 里也翻不出来
       const res = await memberVerifyApi.detail(record.id);
-      Object.assign(detail, res.data || {});
+      Object.assign(detail, res || {});
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

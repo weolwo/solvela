@@ -253,8 +253,8 @@
     try {
       tableLoading.value = true;
       let responseModel = await jobApi.queryJob(queryForm);
-      const list = responseModel.data.list;
-      total.value = responseModel.data.total;
+      const list = responseModel.list;
+      total.value = responseModel.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -269,7 +269,7 @@
   async function queryJobInfo(jobId) {
     try {
       let res = await jobApi.queryJobInfo(jobId);
-      return res.data;
+      return res;
     } catch (e) {
       solvelaSentry.captureError(e);
     }

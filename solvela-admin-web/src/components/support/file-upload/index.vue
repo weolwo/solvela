@@ -134,7 +134,7 @@
       const formData = new FormData();
       formData.append('file', options.file);
       let res = await fileApi.uploadFile(formData, props.folder);
-      let file = res.data;
+      let file = res;
       file.url = file.fileUrl;
       file.name = file.originalName;
       fileList.value.push(file);

@@ -313,7 +313,7 @@
   async function loadStat(form) {
     try {
       const res = await physicalDeliveryApi.stat(form);
-      stat.value = res.data || {};
+      stat.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -453,8 +453,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await physicalDeliveryApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -590,7 +590,7 @@
     SolvelaLoading.show();
     try {
       let res = importMode.value === 'ship' ? await physicalDeliveryApi.importShip(formData) : await physicalDeliveryApi.importAdd(formData);
-      message.success(res.msg);
+      message.success(res);
       hideImportModal();
       queryData();
     } catch (e) {

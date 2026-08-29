@@ -304,8 +304,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await prizeConfigApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

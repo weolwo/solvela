@@ -55,7 +55,7 @@
   async function query() {
     try {
       let resp = await positionApi.queryList();
-      positionList.value = resp.data;
+      positionList.value = resp;
     } catch (e) {
       solvelaSentry.captureError(e);
     }

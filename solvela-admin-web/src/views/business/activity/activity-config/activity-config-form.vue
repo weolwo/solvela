@@ -159,7 +159,7 @@
     codeGenerating.value = true;
     try {
       const res = await activityConfigApi.generateCode();
-      form.activityCode = res.data;
+      form.activityCode = res;
       formRef.value.clearValidate('activityCode');
     } catch (err) {
       solvelaSentry.captureError(err);

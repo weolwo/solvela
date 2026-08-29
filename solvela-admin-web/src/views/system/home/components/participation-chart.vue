@@ -163,7 +163,7 @@
     loading.value = true;
     try {
       const res = await marketingStatApi.participation(days.value);
-      lastData.value = res.data || {};
+      lastData.value = res || {};
       applyData(lastData.value);
     } catch (e) {
       solvelaSentry.captureError(e);

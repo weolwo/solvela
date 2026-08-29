@@ -230,7 +230,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList('LOTTERY');
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -247,7 +247,7 @@
     lotteryLoading.value = true;
     try {
       const res = await lotteryWorkbenchApi.optionList(activityCode);
-      lotteryOptions.value = (res.data || []).map((item) => ({
+      lotteryOptions.value = (res || []).map((item) => ({
         value: item.lotteryCode,
         // 同活动下的多个玩法往往只差在发行规格上，只显示名称运营分不清点开的是哪个
         label: `${item.lotteryName}（${item.numberLength}位 / ${(item.totalCount || 0).toLocaleString()}张）`,
@@ -265,7 +265,7 @@
     detailLoading.value = true;
     try {
       const res = await lotteryWorkbenchApi.detail(activityCode, lotteryCode || '');
-      const vo = res.data || {};
+      const vo = res || {};
       engineRef.value?.setData(vo);
       configured.value = !!vo.configured;
       currentStatus.value = vo.status ?? null;

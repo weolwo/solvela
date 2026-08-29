@@ -283,8 +283,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await taskPrizeMappingApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -307,7 +307,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList('TASK', true);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));

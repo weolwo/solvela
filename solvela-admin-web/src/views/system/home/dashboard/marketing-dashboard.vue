@@ -297,7 +297,7 @@
   async function loadOverview() {
     try {
       const res = await marketingStatApi.overview();
-      Object.assign(overview, res.data || {});
+      Object.assign(overview, res || {});
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -308,7 +308,7 @@
       const res = await marketingStatApi.prizeHealth(selectedCode.value || undefined, 7);
       // 先清再赋：切活动时旧的 byAssetList / failReasonList 不能残留
       Object.keys(prize).forEach((k) => delete prize[k]);
-      Object.assign(prize, res.data || {});
+      Object.assign(prize, res || {});
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -317,8 +317,8 @@
   async function loadCold() {
     try {
       const [eventRes, topRes] = await Promise.all([marketingStatApi.eventHealth(7), marketingStatApi.topMembers(7)]);
-      Object.assign(event, eventRes.data || {});
-      topMembers.value = topRes.data || [];
+      Object.assign(event, eventRes || {});
+      topMembers.value = topRes || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     }

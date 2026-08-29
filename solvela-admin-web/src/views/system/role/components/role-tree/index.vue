@@ -41,7 +41,7 @@
       return;
     }
     let res = await roleMenuApi.getRoleSelectedMenu(selectRoleId.value);
-    let data = res.data;
+    let data = res;
     if (_.isEmpty(roleStore.treeMap)) {
       roleStore.initTreeMap(data.menuTreeList || []);
     }

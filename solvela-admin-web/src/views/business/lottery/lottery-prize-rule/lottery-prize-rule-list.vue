@@ -398,9 +398,9 @@
     try {
       // 概览与明细同一次请求返回，卡片数字与下面列出来的必然一致
       const res = await lotteryPrizeRuleApi.analysis(queryForm);
-      result.value = res.data || {};
-      list.value = res.data?.list || [];
-      total.value = res.data?.total || 0;
+      result.value = res || {};
+      list.value = res?.list || [];
+      total.value = res?.total || 0;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -422,7 +422,7 @@
     lotteryLoading.value = true;
     try {
       const res = await lotteryConfigApi.queryPage({ pageNum: 1, pageSize: 200 });
-      lotteryOptions.value = (res.data?.list || []).map((item) => ({
+      lotteryOptions.value = (res?.list || []).map((item) => ({
         value: item.lotteryCode,
         label: `${item.lotteryName}（${item.lotteryCode}）`,
       }));

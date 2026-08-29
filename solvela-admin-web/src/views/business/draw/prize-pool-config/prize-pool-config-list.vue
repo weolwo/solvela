@@ -406,9 +406,9 @@
     try {
       // 概览与明细同一次请求返回，卡片数字与列表必然一致
       const res = await prizePoolConfigApi.board(queryForm);
-      result.value = res.data || {};
-      tableData.value = res.data?.list || [];
-      total.value = res.data?.total || 0;
+      result.value = res || {};
+      tableData.value = res?.list || [];
+      total.value = res?.total || 0;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -434,7 +434,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList(ACTIVITY_TYPE_DRAW, true);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -530,7 +530,7 @@
       const res = await prizePoolConfigApi.batchOffline(selectedRowKeyList.value);
       // 服务端回的是「已禁用 N 个，跳过 M 个」的汇总，原样透出来 ——
       // 批量里混着本来就已关闭的是常态，笼统一句「操作成功」会把跳过的那几个盖掉
-      message.success(res.data || '操作成功');
+      message.success(res || '操作成功');
       selectedRowKeyList.value = [];
       queryData();
     } catch (e) {

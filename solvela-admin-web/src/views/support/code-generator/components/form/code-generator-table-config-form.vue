@@ -133,10 +133,10 @@
     try {
       SolvelaLoading.show();
       let columnResult = await codeGeneratorApi.getTableColumns(tableInfo.tableName);
-      tableColumns.value = columnResult.data;
+      tableColumns.value = columnResult;
 
       let configResult = await codeGeneratorApi.getConfig(tableInfo.tableName);
-      tableConfig.value = configResult.data;
+      tableConfig.value = configResult;
 
       //基础命名
       basicRef.value.setData(tableConfig.value);

@@ -123,7 +123,7 @@
     lotteryLoading.value = true;
     try {
       const res = await lotteryConfigApi.queryPage({ pageNum: 1, pageSize: 200 });
-      lotteryOptions.value = (res.data?.list || []).map((item) => ({
+      lotteryOptions.value = (res?.list || []).map((item) => ({
         value: item.lotteryCode,
         // 编码同时显示：期号是挂在编码上的，纯中文名对不上
         label: `${item.lotteryName}（${item.lotteryCode}）`,

@@ -58,15 +58,3 @@ export const USER_TYPE_ENUM = {
 
 };
 
-export const DATA_TYPE_ENUM = {
-  NORMAL: {
-    value: 1,
-    desc: '普通',
-  },
-  ENCRYPT: {
-    value: 10,
-    desc: '加密',
-  },
-
-};
-

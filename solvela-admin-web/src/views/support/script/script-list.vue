@@ -195,7 +195,7 @@
     try {
       tableLoading.value = true;
       const res = await scriptApi.list();
-      allData.value = res.data || [];
+      allData.value = res || [];
       domainOptions.value = distinct(allData.value, 'domain', 'domainTitle');
       sceneOptions.value = distinct(allData.value, 'scene', 'sceneTitle');
       filterData();
@@ -240,7 +240,7 @@
     try {
       detailLoading.value = true;
       const res = await scriptApi.detail(record.scriptCode);
-      detail.value = res.data || {};
+      detail.value = res || {};
       await loadRefs();
     } catch (e) {
       solvelaSentry.captureError(e);
@@ -266,7 +266,7 @@
     try {
       refsLoading.value = true;
       const res = await scriptApi.refs(detail.value.scriptCode);
-      refs.value = res.data || [];
+      refs.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -283,7 +283,7 @@
   async function loadRefPoints() {
     try {
       const res = await scriptApi.refPointList();
-      refPoints.value = res.data || [];
+      refPoints.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -354,7 +354,7 @@
   async function loadScenes() {
     try {
       const res = await scriptApi.sceneList();
-      scenes.value = res.data || [];
+      scenes.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     }

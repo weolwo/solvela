@@ -59,15 +59,16 @@ async function getLoginInfo() {
     const res = await loginApi.getLoginInfo();
     const dictRes = await dictApi.getAllDictData();
     //构建系统的路由
-    let menuRouterList = res.data.menuList.filter((e) => e.path || e.frameUrl);
+    let menuRouterList = res.menuList.filter((e) => e.path || e.frameUrl);
     buildRoutes(menuRouterList);
     initVue();
     // 初始化数据字典
-    useDictStore().initData(dictRes.data);
+    useDictStore().initData(dictRes);
     //更新用户信息到pinia
-    useUserStore().setUserLoginInfo(res.data);
+    useUserStore().setUserLoginInfo(res);
   } catch (e) {
-    message.error(e.data ? e.data.msg : e.message);
+    // 拦截器已经把失败归一成 { status, code, message, traceId }
+    message.error(e.message || '加载登录信息失败');
     solvelaSentry.captureError(e);
     initVue();
   }

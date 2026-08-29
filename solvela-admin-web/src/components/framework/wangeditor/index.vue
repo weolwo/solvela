@@ -48,7 +48,7 @@
         const formData = new FormData();
         formData.append('file', file);
         let res = await fileApi.uploadFileByCategory(formData, FILE_CATEGORY_CODE.CONTENT);
-        let data = res.data;
+        let data = res;
         insertFn(data.fileUrl);
       } catch (error) {
         solvelaSentry.captureError(error);

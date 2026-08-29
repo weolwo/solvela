@@ -137,7 +137,7 @@
     try {
       tableLoading.value = true;
       let res = await departmentApi.queryAllDepartment();
-      let data = res.data;
+      let data = res;
 
       data.forEach((e) => {
         idInfoMap.value.set(e.departmentId, e);

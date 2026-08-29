@@ -326,9 +326,9 @@
     try {
       // 概览与明细同一次请求返回，卡片数字与列表必然一致
       const res = await prizePoolItemApi.stockBoard(queryForm);
-      result.value = res.data || {};
-      list.value = res.data?.list || [];
-      total.value = res.data?.total || 0;
+      result.value = res || {};
+      list.value = res?.list || [];
+      total.value = res?.total || 0;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -355,7 +355,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList(ACTIVITY_TYPE_DRAW, true);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));

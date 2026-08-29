@@ -94,13 +94,13 @@
           password: encryptData(loginForm.password),
         });
         const res = await loginApi.login(encryptPasswordForm);
-        localSave(LocalStorageKeyConst.USER_TOKEN, res.data.token ? res.data.token : '');
+        localSave(LocalStorageKeyConst.USER_TOKEN, res.token ? res.token : '');
         message.success('登录成功');
         //更新用户信息到pinia
-        useUserStore().setUserLoginInfo(res.data);
+        useUserStore().setUserLoginInfo(res);
         // 初始化数据字典
         const dictRes = await dictApi.getAllDictData();
-        useDictStore().initData(dictRes.data);
+        useDictStore().initData(dictRes);
         //构建系统的路由
         buildRoutes();
         router.push('/home');
@@ -145,7 +145,7 @@
   async function getTwoFactorLoginFlag() {
     try {
       let result = await loginApi.getTwoFactorLoginFlag();
-      emailCodeShowFlag.value = result.data;
+      emailCodeShowFlag.value = result;
     } catch (e) {
       solvelaSentry.captureError(e);
     }

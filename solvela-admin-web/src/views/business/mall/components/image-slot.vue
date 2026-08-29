@@ -67,8 +67,8 @@
       const formData = new FormData();
       formData.append('file', file);
       const res = await fileApi.uploadFileByCategory(formData, FILE_CATEGORY_CODE.MALL_COMMODITY);
-      known.value = { fileId: res.data.fileId, url: res.data.fileUrl };
-      emit('update:fileId', res.data.fileId);
+      known.value = { fileId: res.fileId, url: res.fileUrl };
+      emit('update:fileId', res.fileId);
       onSuccess(res, file);
     } catch (e) {
       solvelaSentry.captureError(e);

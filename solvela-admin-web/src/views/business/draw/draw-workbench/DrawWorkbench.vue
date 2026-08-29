@@ -141,7 +141,7 @@
     activityLoading.value = true;
     try {
       const res = await activityConfigApi.optionList(ACTIVITY_TYPE_DRAW);
-      activityOptions.value = (res.data || []).map((item) => ({
+      activityOptions.value = (res || []).map((item) => ({
         value: item.activityCode,
         label: `${item.activityName}（${item.activityCode}）`,
       }));
@@ -194,7 +194,7 @@
     detailLoading.value = true;
     try {
       const res = await drawWorkbenchApi.detail(currentActivity.value);
-      const detail = res.data || {};
+      const detail = res || {};
       activityStatus.value = detail.activityStatus;
       isOnline.value = Boolean(detail.online);
       // force-render 下两个 Tab 均已挂载，可直接 setData

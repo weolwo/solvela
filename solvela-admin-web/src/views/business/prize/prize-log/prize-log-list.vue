@@ -425,7 +425,7 @@
     try {
       // status / approveStatus 服务端刻意忽略：它们是漏斗要拆解的维度本身
       const res = await prizeLogApi.funnel(queryForm);
-      funnel.value = res.data || {};
+      funnel.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -435,8 +435,8 @@
     tableLoading.value = true;
     try {
       const res = await prizeLogApi.queryPage(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

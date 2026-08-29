@@ -141,7 +141,7 @@
         templateFile,
         tableName,
       });
-      resultCode.value = result.data;
+      resultCode.value = result;
       nextTick(() => {
         document.querySelectorAll('pre code').forEach((block) => {
           block.setAttribute('highlighted', 'true');

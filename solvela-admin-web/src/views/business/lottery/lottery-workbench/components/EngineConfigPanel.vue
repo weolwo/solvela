@@ -362,7 +362,7 @@
           numberLength: form.numberLength,
           sequenceNo: demoSequence.value,
         });
-        previewNumber.value = res.data;
+        previewNumber.value = res;
       } catch (e) {
         previewNumber.value = '';
         solvelaSentry.captureError(e);
@@ -386,7 +386,7 @@
     }
     try {
       const res = await prizeConfigApi.optionList(form.activityCode);
-      prizeOptions.value = res.data || [];
+      prizeOptions.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -493,7 +493,7 @@
   async function onGenerateCode() {
     try {
       const res = await lotteryWorkbenchApi.generateCode();
-      form.lotteryCode = res.data;
+      form.lotteryCode = res;
       emitChange();
     } catch (e) {
       solvelaSentry.captureError(e);

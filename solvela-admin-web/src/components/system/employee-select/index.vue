@@ -73,7 +73,7 @@
         params.disabledFlag = props.disabledFlag;
       }
       let resp = await employeeApi.queryAll(params);
-      employeeList.value = resp.data;
+      employeeList.value = resp;
     } catch (e) {
       solvelaSentry.captureError(e);
     }

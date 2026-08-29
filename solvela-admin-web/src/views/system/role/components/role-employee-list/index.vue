@@ -125,8 +125,8 @@
       tableLoading.value = true;
       queryForm.roleId = selectRoleId.value;
       let res = await roleApi.queryRoleEmployee(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -167,7 +167,7 @@
 
   async function addRoleEmployee() {
     let res = await roleApi.getRoleAllEmployee(selectRoleId.value);
-    let selectedIdList = res.data.map((e) => e.employeeId) || [];
+    let selectedIdList = res.map((e) => e.employeeId) || [];
     selectEmployeeModal.value.showModal(selectedIdList);
   }
 

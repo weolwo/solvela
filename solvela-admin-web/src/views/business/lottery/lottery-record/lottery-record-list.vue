@@ -392,8 +392,8 @@
     tableLoading.value = true;
     try {
       const res = await lotteryRecordApi.queryPage(queryForm);
-      tableData.value = res.data.list;
-      total.value = res.data.total;
+      tableData.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -405,7 +405,7 @@
     try {
       // winStatus 服务端刻意忽略：它是漏斗要拆解的维度本身
       const res = await lotteryRecordApi.funnel(queryForm);
-      funnel.value = res.data || {};
+      funnel.value = res || {};
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -436,7 +436,7 @@
     lotteryLoading.value = true;
     try {
       const res = await lotteryConfigApi.queryPage({ pageNum: 1, pageSize: 200 });
-      const list = res.data?.list || [];
+      const list = res?.list || [];
       lotteryOptions.value = list.map((item) => ({
         value: item.lotteryCode,
         label: `${item.lotteryName}（${item.lotteryCode}）`,
@@ -462,7 +462,7 @@
         pageSize: 200,
         lotteryCode: queryForm.lotteryCode || undefined,
       });
-      issueOptions.value = (res.data?.list || []).map((item) => ({
+      issueOptions.value = (res?.list || []).map((item) => ({
         value: item.issueNo,
         label: item.issueNo,
       }));

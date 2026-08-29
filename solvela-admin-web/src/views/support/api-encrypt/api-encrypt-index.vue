@@ -72,10 +72,7 @@
         <div v-if="responseEncryptFormStr">请求参数： {{ responseEncryptFormStr }}</div>
       </a-row>
       <a-row class="solvela-query-form-row">
-        <div v-if="responseEncryptStr">返回结果：{{ responseEncryptStr }}</div>
-      </a-row>
-      <a-row class="solvela-query-form-row">
-        <div v-if="responseStr">返回结果 解密：{{ responseStr }}</div>
+        <div v-if="responseStr">返回结果（响应体是密文，拦截器已自动解密）：{{ responseStr }}</div>
       </a-row>
     </a-form>
   </a-card>
@@ -103,10 +100,7 @@
         <div v-if="formEncryptStr">请求参数加密： {{ formEncryptStr }}</div>
       </a-row>
       <a-row class="solvela-query-form-row">
-        <div v-if="responseEncrypt">返回结果：{{ responseEncrypt }}</div>
-      </a-row>
-      <a-row class="solvela-query-form-row">
-        <div v-if="responseDecryptStr">返回结果 解密：{{ responseDecryptStr }}</div>
+        <div v-if="responseDecryptStr">返回结果（响应体是密文，拦截器已自动解密）：{{ responseDecryptStr }}</div>
       </a-row>
     </a-form>
   </a-card>
@@ -128,10 +122,7 @@
         <div v-if="arrayFormEncryptStr">请求参数加密： {{ arrayFormEncryptStr }}</div>
       </a-row>
       <a-row class="solvela-query-form-row">
-        <div v-if="arrayFormResponseEncrypt">返回结果：{{ arrayFormResponseEncrypt }}</div>
-      </a-row>
-      <a-row class="solvela-query-form-row">
-        <div v-if="arrayFormResponseDecryptStr">返回结果 解密：{{ arrayFormResponseDecryptStr }}</div>
+        <div v-if="arrayFormResponseDecryptStr">返回结果（响应体是密文，拦截器已自动解密）：{{ arrayFormResponseDecryptStr }}</div>
       </a-row>
     </a-form>
   </a-card>
@@ -140,6 +131,12 @@
 <script setup>
   import { reactive, ref } from 'vue';
   import { encryptApi } from '/@/api/support/api-encrypt-api';
+  /*
+   * v3.72.0 起响应体<b>整体</b>就是密文，是不是密文看 X-Encrypted 响应头 ——
+   * 以前是塞在信封的 dataType 字段里，而信封已经没有了。
+   * 所以这里不再单独展示「返回密文」：它就是 Network 面板里那个响应体本身，
+   * 拦截器读到那个头之后直接解密，页面拿到的永远是明文。
+   */
   import { encryptData } from '/@/lib/encrypt';
 
   // ---------------------------- 第一种：请求参数加密 ----------------------------
@@ -164,7 +161,7 @@
 
     // 发送请求
     const result = await encryptApi.testRequestEncrypt(requestEncryptForm);
-    requestEncryptResponse.value = JSON.stringify(result.data);
+    requestEncryptResponse.value = JSON.stringify(result);
   }
 
   // ---------------------------- 第二种：返回结果解密 ----------------------------
@@ -175,14 +172,12 @@
   });
 
   const responseEncryptFormStr = ref('');
-  const responseEncryptStr = ref('');
   const responseStr = ref('');
 
   async function testResponseEncrypt() {
     responseEncryptFormStr.value = JSON.stringify(responseEncryptForm);
     const result = await encryptApi.testResponseEncrypt(responseEncryptForm);
-    responseEncryptStr.value = result.encryptData;
-    responseStr.value = JSON.stringify(result.data);
+    responseStr.value = JSON.stringify(result);
   }
 
   // ---------------------------- 第三种：请求加密、返回解密 ----------------------------
@@ -194,15 +189,13 @@
 
   const formStr = ref('');
   const formEncryptStr = ref('');
-  const responseEncrypt = ref('');
   const responseDecryptStr = ref('');
 
   async function testBoth() {
     formStr.value = JSON.stringify(form);
     formEncryptStr.value = encryptData(form);
     const result = await encryptApi.testDecryptAndEncrypt(form);
-    responseEncrypt.value = result.encryptData;
-    responseDecryptStr.value = JSON.stringify(result.data);
+    responseDecryptStr.value = JSON.stringify(result);
   }
 
   // ---------------------------- 第四种：测试数组 ----------------------------
@@ -224,14 +217,12 @@
 
   const arrayFormStr = ref('');
   const arrayFormEncryptStr = ref('');
-  const arrayFormResponseEncrypt = ref('');
   const arrayFormResponseDecryptStr = ref('');
 
   async function testArray() {
     arrayFormStr.value = JSON.stringify(arrayForm);
     arrayFormEncryptStr.value = encryptData(arrayForm);
     const result = await encryptApi.testArray(arrayForm);
-    arrayFormResponseEncrypt.value = result.encryptData;
-    arrayFormResponseDecryptStr.value = JSON.stringify(result.data);
+    arrayFormResponseDecryptStr.value = JSON.stringify(result);
   }
 </script>

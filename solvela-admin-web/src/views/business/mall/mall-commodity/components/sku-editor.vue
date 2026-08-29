@@ -334,7 +334,7 @@
       generating.value = true;
       try {
         const res = await mallCommodityApi.generateSkuCodes(newCount);
-        freshCodes = res.data || [];
+        freshCodes = res || [];
       } catch (e) {
         solvelaSentry.captureError(e);
         return;

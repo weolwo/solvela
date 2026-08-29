@@ -359,7 +359,7 @@
               })),
           }));
         const res = await mallCategoryApi.batchSave({ parentId: parentId.value, categoryList });
-        message.success(`已新建 ${res.data} 个分类`);
+        message.success(`已新建 ${res} 个分类`);
       }
       emits('reloadList');
       onClose();

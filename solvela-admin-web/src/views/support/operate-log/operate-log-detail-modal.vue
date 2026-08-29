@@ -101,8 +101,8 @@
     try {
       SolvelaLoading.show();
       let res = await operateLogApi.detail(operateLogId);
-      detail = Object.assign(detail, res.data);
-      let ua = UAParser(res.data.userAgent);
+      detail = Object.assign(detail, res);
+      let ua = UAParser(res.userAgent);
       detail.browser = ua.browser.name;
       detail.os = ua.os.name;
       detail.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';

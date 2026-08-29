@@ -57,9 +57,11 @@
     </a-row>
     <a-table size="small" :loading="tableLoading" :dataSource="tableData" :columns="columns" bordered rowKey="operateLogId" :pagination="false">
       <template #bodyCell="{ text, record, column }">
+        <!-- 结果列只在失败时有内容：一段 {"code","message"} 的 JSON。成功不再记录返回值 ——
+             信封去掉之后返回值就是业务数据本身，会员列表、余额、手机号会成段落进这张表 -->
         <template v-if="column.dataIndex === 'response'">
-          <a-typography-text v-if="text && text.ok">{{ text ? text.msg : '-' }}</a-typography-text>
-          <a-typography-text v-else type="warning">{{ text ? text.msg : '-' }}</a-typography-text>
+          <a-typography-text v-if="text" type="warning" :title="failureOf(text).code">{{ failureOf(text).message }}</a-typography-text>
+          <a-typography-text v-else type="secondary">-</a-typography-text>
         </template>
 
         <template v-if="column.dataIndex === 'successFlag'">
@@ -191,6 +193,25 @@
     queryForm.endDate = dateStrings[1];
   }
 
+  /**
+   * 失败结果列：库里存的是一段 JSON 文本，不是对象。
+   *
+   * 🔴 上一版模板里直接写 text.ok / text.msg —— 而 response 是 String，
+   * 于是这一列一直渲染的是 undefined，从来没人发现，因为「没有内容」看起来
+   * 和「这次操作没报错」长得一样。
+   *
+   * 存量行是旧信封（{code:30001, msg:...}），一并兼容：读不到 message 就退回 msg。
+   */
+  function failureOf(text) {
+    try {
+      const parsed = JSON.parse(text);
+      return { code: parsed.code, message: parsed.message || parsed.msg || text };
+    } catch (e) {
+      // 不是 JSON 就原样显示，总比显示 undefined 强
+      return { code: '', message: text };
+    }
+  }
+
   const tableLoading = ref(false);
   const tableData = ref([]);
   const total = ref(0);
@@ -211,7 +232,7 @@
       tableLoading.value = true;
       let responseModel = await operateLogApi.queryList(queryForm);
 
-      for (const e of responseModel.data.list) {
+      for (const e of responseModel.list) {
         if (e.response) {
           e.response = JSON.parse(e.response);
         }
@@ -225,8 +246,8 @@
         e.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';
       }
 
-      const list = responseModel.data.list;
-      total.value = responseModel.data.total;
+      const list = responseModel.list;
+      total.value = responseModel.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);

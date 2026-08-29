@@ -326,7 +326,7 @@
     categoryLoading.value = true;
     try {
       let res = await fileApi.getCategoryList();
-      categoryList.value = res.data || [];
+      categoryList.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -433,8 +433,8 @@
     tableLoading.value = true;
     try {
       let res = await fileApi.queryPage(queryForm);
-      fileList.value = res.data.list;
-      total.value = res.data.total;
+      fileList.value = res.list;
+      total.value = res.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -529,7 +529,7 @@
     } catch (e) {
       task.status = 'error';
       // 后端对类型/大小是逐条给人话的，原样带出来才知道这一个为什么没传上去
-      task.error = e?.msg || e?.data?.msg || '上传失败';
+      task.error = e?.message || '上传失败';
       onError(e);
     } finally {
       afterOneUploaded();

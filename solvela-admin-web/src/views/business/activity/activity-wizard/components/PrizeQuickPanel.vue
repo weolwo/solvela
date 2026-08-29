@@ -173,7 +173,7 @@
     promotionLoading.value = true;
     try {
       const res = await promotionConfigApi.optionList();
-      promotionOptions.value = res.data || [];
+      promotionOptions.value = res || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -213,7 +213,7 @@
     // 编码不让运营手打：它是随机码，手打没有意义还容易撞车（铁律 8）
     try {
       const res = await prizeConfigApi.generateCode();
-      draft.prizeCode = res.data;
+      draft.prizeCode = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     }
@@ -309,7 +309,7 @@
     try {
       const res = await prizeConfigApi.optionList(props.activityCode);
       // id 与 promotionConfigId 必须带上：编辑时要用它们回填与提交，丢了就只能新增不能改
-      prizeList.value = (res.data || []).map((p) => ({
+      prizeList.value = (res || []).map((p) => ({
         id: p.id,
         prizeCode: p.prizeCode,
         prizeName: p.prizeName,

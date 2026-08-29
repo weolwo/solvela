@@ -370,8 +370,8 @@
     tableLoading.value = true;
     try {
       let queryResult = await taskConfigApi.queryPage(queryForm);
-      tableData.value = queryResult.data.list;
-      total.value = queryResult.data.total;
+      tableData.value = queryResult.list;
+      total.value = queryResult.total;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -388,7 +388,7 @@
     eventLoading.value = true;
     try {
       const res = await taskApi.queryEventOptionList();
-      eventOptions.value = toEventOptions(res.data);
+      eventOptions.value = toEventOptions(res);
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
@@ -462,7 +462,7 @@
     try {
       // 子表没有「按任务查」的专用接口，借分页接口按 taskConfigId 过滤；单个任务的阶梯撑死几条
       const res = await taskPrizeMappingApi.queryPage({ taskConfigId: record.id, pageNum: 1, pageSize: 50 });
-      detailLadders.value = res.data?.list || [];
+      detailLadders.value = res?.list || [];
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

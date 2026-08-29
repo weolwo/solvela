@@ -150,7 +150,7 @@
       tableLoading.value = true;
       let responseModel = await loginLogApi.queryListLogin(queryForm);
 
-      for (const e of responseModel.data.list) {
+      for (const e of responseModel.list) {
         if (!e.userAgent) {
           continue;
         }
@@ -160,8 +160,8 @@
         e.device = ua.device.vendor ? ua.device.vendor + ua.device.model : '';
       }
 
-      const list = responseModel.data.list;
-      total.value = responseModel.data.total;
+      const list = responseModel.list;
+      total.value = responseModel.total;
       tableData.value = list;
     } catch (e) {
       solvelaSentry.captureError(e);

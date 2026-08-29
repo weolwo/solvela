@@ -461,7 +461,7 @@
     codeGenerating.value = true;
     try {
       const res = await drawWorkbenchApi.generatePoolCode();
-      newPoolCode.value = res.data;
+      newPoolCode.value = res;
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {
