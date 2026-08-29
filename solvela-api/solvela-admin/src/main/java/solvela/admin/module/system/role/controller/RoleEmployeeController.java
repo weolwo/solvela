@@ -12,7 +12,6 @@ import solvela.admin.module.system.role.domain.form.RoleEmployeeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleSelectedVO;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,40 +34,40 @@ public class RoleEmployeeController {
 
     @Operation(summary = "查询某个角色下的员工列表  @author 卓大")
     @PostMapping("/role/employee/queryEmployee")
-    public ResponseDTO<PageResult<EmployeeVO>> queryEmployee(@Valid @RequestBody RoleEmployeeQueryForm roleEmployeeQueryForm) {
+    public PageResult<EmployeeVO> queryEmployee(@Valid @RequestBody RoleEmployeeQueryForm roleEmployeeQueryForm) {
         return roleEmployeeService.queryEmployee(roleEmployeeQueryForm);
     }
 
     @Operation(summary = "获取某个角色下的所有员工列表(无分页)  @author 卓大")
     @GetMapping("/role/employee/getAllEmployeeByRoleId/{roleId}")
-    public ResponseDTO<List<EmployeeVO>> listAllEmployeeRoleId(@PathVariable Long roleId) {
-        return ResponseDTO.ok(roleEmployeeService.getAllEmployeeByRoleId(roleId));
+    public List<EmployeeVO> listAllEmployeeRoleId(@PathVariable Long roleId) {
+        return roleEmployeeService.getAllEmployeeByRoleId(roleId);
     }
 
     @Operation(summary = "从角色成员列表中移除员工 @author 卓大")
     @GetMapping("/role/employee/removeEmployee")
     @RequiresPermission("system:role:employee:delete")
-    public ResponseDTO<String> removeEmployee(Long employeeId, Long roleId) {
-        return roleEmployeeService.removeRoleEmployee(employeeId, roleId);
+    public void removeEmployee(Long employeeId, Long roleId) {
+        roleEmployeeService.removeRoleEmployee(employeeId, roleId);
     }
 
     @Operation(summary = "从角色成员列表中批量移除员工 @author 卓大")
     @PostMapping("/role/employee/batchRemoveRoleEmployee")
     @RequiresPermission("system:role:employee:batch:delete")
-    public ResponseDTO<String> batchRemoveEmployee(@Valid @RequestBody RoleEmployeeUpdateForm updateForm) {
-        return roleEmployeeService.batchRemoveRoleEmployee(updateForm);
+    public void batchRemoveEmployee(@Valid @RequestBody RoleEmployeeUpdateForm updateForm) {
+        roleEmployeeService.batchRemoveRoleEmployee(updateForm);
     }
 
     @Operation(summary = "角色成员列表中批量添加员工 @author 卓大")
     @PostMapping("/role/employee/batchAddRoleEmployee")
     @RequiresPermission("system:role:employee:addProposal")
-    public ResponseDTO<String> addEmployeeList(@Valid @RequestBody RoleEmployeeUpdateForm addForm) {
-        return roleEmployeeService.batchAddRoleEmployee(addForm);
+    public void addEmployeeList(@Valid @RequestBody RoleEmployeeUpdateForm addForm) {
+        roleEmployeeService.batchAddRoleEmployee(addForm);
     }
 
     @Operation(summary = "获取员工所有选中的角色和所有角色 @author 卓大")
     @GetMapping("/role/employee/getRoles/{employeeId}")
-    public ResponseDTO<List<RoleSelectedVO>> getRoleByEmployeeId(@PathVariable Long employeeId) {
-        return ResponseDTO.ok(roleEmployeeService.getRoleInfoListByEmployeeId(employeeId));
+    public List<RoleSelectedVO> getRoleByEmployeeId(@PathVariable Long employeeId) {
+        return roleEmployeeService.getRoleInfoListByEmployeeId(employeeId);
     }
 }

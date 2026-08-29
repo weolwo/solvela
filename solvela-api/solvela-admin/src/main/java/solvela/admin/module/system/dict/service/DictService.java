@@ -3,7 +3,6 @@ package solvela.admin.module.system.dict.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -78,29 +77,27 @@ public class DictService {
     /**
      * 添加
      */
-    public synchronized ResponseDTO<String> add(DictAddForm addForm) {
+    public synchronized void add(DictAddForm addForm) {
         DictEntity existDictCode = dictDao.selectByCode(addForm.getDictCode());
         if (null != existDictCode) {
-            return ResponseDTO.userErrorParam("数据字典编码已经存在！");
+            throw new BusinessException("数据字典编码已经存在！");
         }
 
         DictEntity dictEntity = SolvelaBeanUtil.copy(addForm, DictEntity.class);
         dictDao.insert(dictEntity);
-        return ResponseDTO.ok();
     }
 
     /**
      * 禁用  启用
      */
-    public ResponseDTO<String> updateDisabled(Long dictId) {
+    public void updateDisabled(Long dictId) {
         DictEntity dictEntity = dictDao.selectById(dictId);
         if (dictEntity == null) {
-            return ResponseDTO.userErrorParam("数据不存在");
+            throw new BusinessException("数据不存在");
         }
 
         dictEntity.setDisabledFlag(!dictEntity.getDisabledFlag());
         dictDao.updateById(dictEntity);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -110,15 +107,14 @@ public class DictService {
             @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA, allEntries = true),
             @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
-    public synchronized ResponseDTO<String> update(DictUpdateForm updateForm) {
+    public synchronized void update(DictUpdateForm updateForm) {
         DictEntity existDictCode = dictDao.selectByCode(updateForm.getDictCode());
         if (null != existDictCode && !existDictCode.getDictId().equals(updateForm.getDictId())) {
-            return ResponseDTO.userErrorParam("数据字典编码已经存在！");
+            throw new BusinessException("数据字典编码已经存在！");
         }
 
         DictEntity dictEntity = SolvelaBeanUtil.copy(updateForm, DictEntity.class);
         dictDao.updateById(dictEntity);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -128,13 +124,12 @@ public class DictService {
             @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA, allEntries = true),
             @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
-    public synchronized ResponseDTO<String> batchDelete(List<Long> idList) {
+    public synchronized void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         dictDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -144,13 +139,12 @@ public class DictService {
             @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA, allEntries = true),
             @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
-    public synchronized ResponseDTO<String> delete(Long dictId) {
+    public synchronized void delete(Long dictId) {
         if (null == dictId) {
-            return ResponseDTO.ok();
+            return;
         }
 
         dictDao.deleteById(dictId);
-        return ResponseDTO.ok();
     }
 
 
@@ -201,29 +195,28 @@ public class DictService {
     /**
      * 添加
      */
-    public synchronized ResponseDTO<String> addDictData(DictDataAddForm addForm) {
+    public synchronized void addDictData(DictDataAddForm addForm) {
 
         addForm.setDataValue(SolvelaStringUtil.trim(addForm.getDataValue()));
 
         DictEntity dictEntity = dictDao.selectById(addForm.getDictId());
         if (null == dictEntity) {
-            return ResponseDTO.userErrorParam("数据字典不存在");
+            throw new BusinessException("数据字典不存在");
         }
 
         DictDataEntity existData = dictDataDao.selectByDictIdAndValue(addForm.getDictId(), addForm.getDataValue());
         if (null != existData) {
-            return ResponseDTO.userErrorParam("已存在相同value的数据");
+            throw new BusinessException("已存在相同value的数据");
         }
 
         DictDataEntity dictDataEntity = SolvelaBeanUtil.copy(addForm, DictDataEntity.class);
         dictDataDao.insert(dictDataEntity);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新
      */
-    public synchronized ResponseDTO<String> updateDictData(DictDataUpdateForm updateForm) {
+    public synchronized void updateDictData(DictDataUpdateForm updateForm) {
 
         updateForm.setDataValue(SolvelaStringUtil.trim(updateForm.getDataValue()));
 
@@ -233,45 +226,42 @@ public class DictService {
 
         DictEntity dictEntity = dictDao.selectById(updateForm.getDictId());
         if (null == dictEntity) {
-            return ResponseDTO.userErrorParam("数据字典不存在");
+            throw new BusinessException("数据字典不存在");
         }
 
         DictDataEntity existData = dictDataDao.selectByDictIdAndValue(updateForm.getDictId(), updateForm.getDataValue());
         if (null != existData && !existData.getDictDataId().equals(updateForm.getDictDataId())) {
-            return ResponseDTO.userErrorParam("已存在相同value的数据");
+            throw new BusinessException("已存在相同value的数据");
         }
 
         DictDataEntity dictDataEntity = SolvelaBeanUtil.copy(updateForm, DictDataEntity.class);
         dictDataDao.updateById(dictDataEntity);
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除
      */
-    public synchronized ResponseDTO<String> batchDeleteDictData(List<Long> idList) {
+    public synchronized void batchDeleteDictData(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
         // 清除缓存
         clearDictDataCache(idList);
         // 删除
         dictDataDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public synchronized ResponseDTO<String> deleteDictData(Long dictDataId) {
+    public synchronized void deleteDictData(Long dictDataId) {
         if (null == dictDataId) {
-            return ResponseDTO.ok();
+            return;
         }
         // 清除缓存
         clearDictDataCache(Collections.singletonList(dictDataId));
         // 删除
         dictDataDao.deleteById(dictDataId);
-        return ResponseDTO.ok();
     }
 
 
@@ -298,15 +288,14 @@ public class DictService {
     /**
      * 更新启用/禁用
      */
-    public synchronized ResponseDTO<String> updateDictDataDisabled(Long dictDataId) {
+    public synchronized void updateDictDataDisabled(Long dictDataId) {
         DictDataEntity dictDataEntity = dictDataDao.selectById(dictDataId);
         if (dictDataEntity == null) {
-            return ResponseDTO.userErrorParam("数据不存在");
+            throw new BusinessException("数据不存在");
         }
 
         dictDataEntity.setDisabledFlag(!dictDataEntity.getDisabledFlag());
         dictDataDao.updateById(dictDataEntity);
-        return ResponseDTO.ok();
     }
 
 }

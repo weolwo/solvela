@@ -5,7 +5,6 @@ import solvela.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
 import solvela.admin.module.system.datascope.domain.DataScopeAndViewTypeVO;
 import solvela.admin.module.system.datascope.domain.DataScopeDTO;
 import solvela.admin.module.system.datascope.domain.DataScopeViewTypeVO;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 
@@ -28,14 +27,14 @@ public class DataScopeService {
     /**
      * 获取所有可以进行数据范围配置的信息
      */
-    public ResponseDTO<List<DataScopeAndViewTypeVO>> dataScopeList() {
+    public List<DataScopeAndViewTypeVO> dataScopeList() {
         List<DataScopeDTO> dataScopeList = this.getDataScopeType();
         List<DataScopeAndViewTypeVO> dataScopeAndTypeList = SolvelaBeanUtil.copyList(dataScopeList, DataScopeAndViewTypeVO.class);
         List<DataScopeViewTypeVO> typeList = this.getViewType();
         dataScopeAndTypeList.forEach(e -> {
             e.setViewTypeList(typeList);
         });
-        return ResponseDTO.ok(dataScopeAndTypeList);
+        return dataScopeAndTypeList;
     }
 
     /**

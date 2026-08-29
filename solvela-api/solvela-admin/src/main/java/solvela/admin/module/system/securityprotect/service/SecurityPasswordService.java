@@ -1,9 +1,9 @@
 package solvela.admin.module.system.securityprotect.service;
 
+import solvela.exception.BusinessException;
 import jakarta.annotation.Resource;
 import solvela.crypto.PasswordCipher;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.securityprotect.dao.PasswordLogDao;
 import solvela.admin.module.system.securityprotect.domain.PasswordLogEntity;
@@ -46,47 +46,45 @@ public class SecurityPasswordService {
     /**
      * 校验密码复杂度
      */
-    public ResponseDTO<String> validatePasswordComplexity(String password) {
+    public void validatePasswordComplexity(String password) {
 
         if (SolvelaStringUtil.isEmpty(password)) {
-            return ResponseDTO.userErrorParam(PASSWORD_FORMAT_MSG);
+            throw new BusinessException(PASSWORD_FORMAT_MSG);
         }
 
         // 密码长度必须大于等于8位
         if (password.length() < PASSWORD_LENGTH) {
-            return ResponseDTO.userErrorParam(PASSWORD_FORMAT_MSG);
+            throw new BusinessException(PASSWORD_FORMAT_MSG);
         }
 
         // 无需校验 密码复杂度
         if (!level3ProtectConfigService.isPasswordComplexityEnabled()) {
-            return ResponseDTO.ok();
+            return;
         }
 
         if (!password.matches(PASSWORD_PATTERN)) {
-            return ResponseDTO.userErrorParam(PASSWORD_FORMAT_MSG);
+            throw new BusinessException(PASSWORD_FORMAT_MSG);
         }
 
-        return ResponseDTO.ok();
     }
 
     /**
      * 校验密码重复次数
      */
-    public ResponseDTO<String> validatePasswordRepeatTimes(RequestEmployee requestUser, String newPassword) {
+    public void validatePasswordRepeatTimes(RequestEmployee requestUser, String newPassword) {
 
         // 密码重复次数小于1  无需校验
         if (level3ProtectConfigService.getRegularChangePasswordNotAllowRepeatTimes() < 1) {
-            return ResponseDTO.ok();
+            return;
         }
 
         // 检查最近几次是否有重复密码
         List<String> oldPasswords = passwordLogDao.selectOldPassword(requestUser.getUserType().getValue(), requestUser.getUserId(), level3ProtectConfigService.getRegularChangePasswordNotAllowRepeatTimes());
         boolean isDuplicate = oldPasswords.stream().anyMatch(oldPassword -> PasswordCipher.matches(newPassword, oldPassword));
         if (isDuplicate) {
-            return ResponseDTO.userErrorParam(String.format("与前%d个历史密码重复，请换个密码!", level3ProtectConfigService.getRegularChangePasswordNotAllowRepeatTimes()));
+            throw new BusinessException(String.format("与前%d个历史密码重复，请换个密码!", level3ProtectConfigService.getRegularChangePasswordNotAllowRepeatTimes()));
         }
 
-        return ResponseDTO.ok();
     }
 
     /**

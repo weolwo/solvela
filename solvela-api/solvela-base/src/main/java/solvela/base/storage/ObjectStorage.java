@@ -6,7 +6,7 @@ import java.util.Collection;
 /**
  * 对象存储：<b>只认 {@link StorageKey} 和字节流的纯基础设施层。</b>
  *
- * <p>这一层<b>不认识</b>：{@code MultipartFile}（HTTP 类型）、{@code ResponseDTO}（响应结构）、
+ * <p>这一层<b>不认识</b>：{@code MultipartFile}（HTTP 类型）、{@code HttpStatus}（响应语义）、
  * 业务分类、权限、文件原名。旧的 {@code IFileStorageService} 三样全认识，
  * 后果是它只能被 Controller 调，也没法写单测。
  *

@@ -7,7 +7,6 @@ import jakarta.annotation.Resource;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.operatelog.OperateLogService;
@@ -34,20 +33,20 @@ public class AdminOperateLogController extends SupportBaseController {
     @Operation(summary = "分页查询 @author 罗伊")
     @PostMapping("/operateLog/page/query")
     @RequiresPermission("support:operateLog:query")
-    public ResponseDTO<PageResult<OperateLogVO>> queryByPage(@RequestBody OperateLogQueryForm queryForm) {
+    public PageResult<OperateLogVO> queryByPage(@RequestBody OperateLogQueryForm queryForm) {
         return operateLogService.queryByPage(queryForm);
     }
 
     @Operation(summary = "详情 @author 罗伊")
     @GetMapping("/operateLog/detail/{operateLogId}")
     @RequiresPermission("support:operateLog:detail")
-    public ResponseDTO<OperateLogVO> detail(@PathVariable Long operateLogId) {
+    public OperateLogVO detail(@PathVariable Long operateLogId) {
         return operateLogService.detail(operateLogId);
     }
 
     @Operation(summary = "分页查询当前登录人信息 @author 善逸")
     @PostMapping("/operateLog/page/query/login")
-    public ResponseDTO<PageResult<OperateLogVO>> queryByPageLogin(@RequestBody OperateLogQueryForm queryForm) {
+    public PageResult<OperateLogVO> queryByPageLogin(@RequestBody OperateLogQueryForm queryForm) {
         RequestEmployee requestUser = CurrentEmployee.orNull();
         queryForm.setOperateUserId(requestUser.getUserId());
         queryForm.setOperateUserType(requestUser.getUserType().getValue());

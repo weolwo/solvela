@@ -1,10 +1,10 @@
 package solvela.admin.module.system.codegenerator.service;
 
+import solvela.exception.BusinessException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.util.SolvelaStringUtil;
@@ -138,10 +138,10 @@ public class CodeGeneratorService {
      * @param form
      * @return
      */
-    public synchronized ResponseDTO<String> updateConfig(CodeGeneratorConfigForm form) {
+    public synchronized void updateConfig(CodeGeneratorConfigForm form) {
         long existCount = codeGeneratorDao.countByTableName(form.getTableName());
         if (existCount == 0) {
-            return ResponseDTO.userErrorParam("表不存在，请联系后端查看下数据库");
+            throw new BusinessException("表不存在，请联系后端查看下数据库");
         }
 
         CodeGeneratorConfigEntity codeGeneratorConfigEntity = codeGeneratorConfigDao.selectById(form.getTableName());
@@ -156,13 +156,13 @@ public class CodeGeneratorService {
         if (null != form.getDeleteInfo() && form.getDeleteInfo().getIsSupportDelete() && !form.getDeleteInfo().getIsPhysicallyDeleted()) {
             Optional<TableColumnVO> any = tableColumns.stream().filter(e -> e.getColumnName().equals(CodeGeneratorConstant.DELETED_FLAG)).findAny();
             if (!any.isPresent()) {
-                return ResponseDTO.userErrorParam("表结构中没有假删字段：" + CodeGeneratorConstant.DELETED_FLAG + ",请仔细排查");
+                throw new BusinessException("表结构中没有假删字段：" + CodeGeneratorConstant.DELETED_FLAG + ",请仔细排查");
             }
         }
 
         // 校验表必须有主键
         if (tableColumns.stream().noneMatch(e -> COLUMN_PRIMARY_KEY.equalsIgnoreCase(e.getColumnKey()))) {
-            return ResponseDTO.userErrorParam("表必须有主键，请联系后端查看下数据库表结构");
+            throw new BusinessException("表必须有主键，请联系后端查看下数据库表结构");
         }
 
         codeGeneratorConfigEntity.setTableName(form.getTableName());
@@ -178,7 +178,6 @@ public class CodeGeneratorService {
         } else {
             codeGeneratorConfigDao.insert(codeGeneratorConfigEntity);
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -187,24 +186,24 @@ public class CodeGeneratorService {
      * @param form
      * @return
      */
-    public ResponseDTO<String> preview(CodeGeneratorPreviewForm form) {
+    public String preview(CodeGeneratorPreviewForm form) {
         long existCount = codeGeneratorDao.countByTableName(form.getTableName());
         if (existCount == 0) {
-            return ResponseDTO.userErrorParam("表不存在，请联系后端查看下数据库");
+            throw new BusinessException("表不存在，请联系后端查看下数据库");
         }
 
         CodeGeneratorConfigEntity codeGeneratorConfigEntity = codeGeneratorConfigDao.selectById(form.getTableName());
         if (codeGeneratorConfigEntity == null) {
-            return ResponseDTO.userErrorParam("配置信息不存在，请先进行配置");
+            throw new BusinessException("配置信息不存在，请先进行配置");
         }
 
         List<TableColumnVO> columns = getTableColumns(form.getTableName());
         if (SolvelaCollectionUtil.isEmpty(columns)) {
-            return ResponseDTO.userErrorParam("表没有列信息无法生成");
+            throw new BusinessException("表没有列信息无法生成");
         }
 
         String result = codeGeneratorTemplateService.generate(form.getTableName(), form.getTemplateFile(), codeGeneratorConfigEntity);
-        return ResponseDTO.ok(result);
+        return result;
 
     }
 
@@ -214,27 +213,27 @@ public class CodeGeneratorService {
      * @param tableName
      * @return
      */
-    public ResponseDTO<byte[]> download(String tableName) {
+    public byte[] download(String tableName) {
         if (SolvelaStringUtil.isBlank(tableName)) {
-            return ResponseDTO.userErrorParam("表名不能为空");
+            throw new BusinessException("表名不能为空");
         }
 
         long existCount = codeGeneratorDao.countByTableName(tableName);
         if (existCount == 0) {
-            return ResponseDTO.userErrorParam("表不存在，请联系后端查看下数据库");
+            throw new BusinessException("表不存在，请联系后端查看下数据库");
         }
 
         CodeGeneratorConfigEntity codeGeneratorConfigEntity = codeGeneratorConfigDao.selectById(tableName);
         if (codeGeneratorConfigEntity == null) {
-            return ResponseDTO.userErrorParam("配置信息不存在，请先进行配置");
+            throw new BusinessException("配置信息不存在，请先进行配置");
         }
 
         List<TableColumnVO> columns = getTableColumns(tableName);
         if (SolvelaCollectionUtil.isEmpty(columns)) {
-            return ResponseDTO.userErrorParam("表没有列信息无法生成");
+            throw new BusinessException("表没有列信息无法生成");
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         codeGeneratorTemplateService.zipGeneratedFiles(out, tableName, codeGeneratorConfigEntity);
-        return ResponseDTO.ok(out.toByteArray());
+        return out.toByteArray();
     }
 }

@@ -11,7 +11,6 @@ import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
-import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.web.excel.SolvelaExcelWebUtil;
 import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
@@ -54,51 +53,47 @@ public class PhysicalDeliveryController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("physicalDelivery:query")
-    public ResponseDTO<PageResult<PhysicalDeliveryVO>> queryPage(@RequestBody @Valid PhysicalDeliveryQueryForm queryForm) {
+    public PageResult<PhysicalDeliveryVO> queryPage(@RequestBody @Valid PhysicalDeliveryQueryForm queryForm) {
         PhysicalDeliveryQuery query = SolvelaBeanUtil.copy(queryForm, PhysicalDeliveryQuery.class);
         PageResult<PhysicalDeliveryDTO> page = Service.queryPage(query);
         // 🔴 DTO 里是解密后的收件人姓名/电话/地址。这里是「给不给、给多少」的唯一决策点，
         // 管理端有 physicalDelivery:query 权限才走得到，所以按明文给全量
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PhysicalDeliveryVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, PhysicalDeliveryVO.class);
     }
 
     @Operation(summary = "发货统计：本期新增（默认当天）+ 待发货积压与收件信息体检（积压是全量）")
     @PostMapping("/stat")
     @RequiresPermission("physicalDelivery:query")
-    public ResponseDTO<PhysicalDeliveryStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
+    public PhysicalDeliveryStatDTO stat(@RequestBody @Valid LedgerStatForm form) {
+        return Service.stat(SolvelaBeanUtil.copy(form, LedgerStatQuery.class));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
     @RequiresPermission("physicalDelivery:add")
-    public ResponseDTO<String> add(@RequestBody @Valid PhysicalDeliveryAddForm addForm) {
+    public void add(@RequestBody @Valid PhysicalDeliveryAddForm addForm) {
         Service.add(SolvelaBeanUtil.copy(addForm, PhysicalDeliveryAddCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @RequiresPermission("physicalDelivery:update")
-    public ResponseDTO<String> update(@RequestBody @Valid PhysicalDeliveryUpdateForm updateForm) {
+    public void update(@RequestBody @Valid PhysicalDeliveryUpdateForm updateForm) {
         Service.update(SolvelaBeanUtil.copy(updateForm, PhysicalDeliveryUpdateCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDiscard")
     @RequiresPermission("physicalDelivery:discard")
-    public ResponseDTO<String> batchDiscard(@RequestBody ValidateList<Long> idList) {
+    public void batchDiscard(@RequestBody ValidateList<Long> idList) {
         Service.batchDiscard(idList);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/discard/{id}")
     @RequiresPermission("physicalDelivery:discard")
-    public ResponseDTO<String> discard(@PathVariable Long id) {
+    public void discard(@PathVariable Long id) {
         Service.discard(id);
-        return ResponseDTO.ok();
     }
 
     // ------------------------------------------------------------------ Excel 导入
@@ -124,11 +119,11 @@ public class PhysicalDeliveryController {
     @Operation(summary = "导入：新增履约单")
     @PostMapping("/importAdd")
     @RequiresPermission("physicalDelivery:import")
-    public ResponseDTO<String> importAdd(@RequestParam MultipartFile file) {
+    public String importAdd(@RequestParam MultipartFile file) {
         // 共享层的 service 只认 InputStream —— MultipartFile 是 spring-web 的类型，
         // 让它出现在 solvela-ledger 的签名上，那个模块就只能被 HTTP 调用了。
         try (InputStream in = file.getInputStream()) {
-            return ResponseDTO.okMsg(Service.importAdd(in));
+            return Service.importAdd(in);
         } catch (IOException e) {
             throw new UncheckedIOException("读取上传文件失败", e);
         }
@@ -137,11 +132,11 @@ public class PhysicalDeliveryController {
     @Operation(summary = "导入：回填物流")
     @PostMapping("/importShip")
     @RequiresPermission("physicalDelivery:import")
-    public ResponseDTO<String> importShip(@RequestParam MultipartFile file) {
+    public String importShip(@RequestParam MultipartFile file) {
         // 共享层的 service 只认 InputStream —— MultipartFile 是 spring-web 的类型，
         // 让它出现在 solvela-ledger 的签名上，那个模块就只能被 HTTP 调用了。
         try (InputStream in = file.getInputStream()) {
-            return ResponseDTO.okMsg(Service.importShip(in));
+            return Service.importShip(in);
         } catch (IOException e) {
             throw new UncheckedIOException("读取上传文件失败", e);
         }

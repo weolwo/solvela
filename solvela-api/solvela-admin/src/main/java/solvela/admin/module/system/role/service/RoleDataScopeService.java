@@ -1,12 +1,12 @@
 package solvela.admin.module.system.role.service;
 
+import solvela.exception.BusinessException;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.role.domain.entity.RoleDataScopeEntity;
 import solvela.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleDataScopeVO;
 import solvela.admin.module.system.role.manager.RoleDataScopeManager;
 import solvela.code.UserErrorCode;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,13 +35,13 @@ public class RoleDataScopeService {
      * 获取某个角色的数据范围设置信息
      *
      */
-    public ResponseDTO<List<RoleDataScopeVO>> getRoleDataScopeList(Long roleId) {
+    public List<RoleDataScopeVO> getRoleDataScopeList(Long roleId) {
         List<RoleDataScopeEntity> roleDataScopeEntityList = roleDataScopeManager.getBaseMapper().listByRoleId(roleId);
         if (CollectionUtils.isEmpty(roleDataScopeEntityList)) {
-            return ResponseDTO.ok(new ArrayList<>());
+            return new ArrayList<>();
         }
         List<RoleDataScopeVO> roleDataScopeList = SolvelaBeanUtil.copyList(roleDataScopeEntityList, RoleDataScopeVO.class);
-        return ResponseDTO.ok(roleDataScopeList);
+        return roleDataScopeList;
     }
 
     /**
@@ -49,15 +49,14 @@ public class RoleDataScopeService {
      *
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> updateRoleDataScopeList(RoleDataScopeUpdateForm roleDataScopeUpdateForm) {
+    public void updateRoleDataScopeList(RoleDataScopeUpdateForm roleDataScopeUpdateForm) {
         List<RoleDataScopeUpdateForm.RoleUpdateDataScopeListFormItem> batchSetList = roleDataScopeUpdateForm.getDataScopeItemList();
         if (CollectionUtils.isEmpty(batchSetList)) {
-            return ResponseDTO.error(UserErrorCode.PARAM_ERROR, "缺少配置信息");
+            throw new BusinessException(UserErrorCode.PARAM_ERROR, "缺少配置信息");
         }
         List<RoleDataScopeEntity> roleDataScopeEntityList = SolvelaBeanUtil.copyList(batchSetList, RoleDataScopeEntity.class);
         roleDataScopeEntityList.forEach(e -> e.setRoleId(roleDataScopeUpdateForm.getRoleId()));
         roleDataScopeManager.getBaseMapper().deleteByRoleId(roleDataScopeUpdateForm.getRoleId());
         roleDataScopeManager.saveBatch(roleDataScopeEntityList);
-        return ResponseDTO.ok();
     }
 }

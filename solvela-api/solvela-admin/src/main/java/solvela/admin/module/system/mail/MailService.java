@@ -1,6 +1,7 @@
 package solvela.admin.module.system.mail;
 
 
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.util.SolvelaRandomUtil;
 import freemarker.cache.StringTemplateLoader;
@@ -10,7 +11,6 @@ import jakarta.annotation.Resource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
-import solvela.web.ResponseDTO;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.util.SolvelaTemplateUtil;
 import solvela.admin.module.system.mail.constant.MailTemplateCodeEnum;
@@ -62,15 +62,15 @@ public class MailService {
     /**
      * 使用模板发送邮件
      */
-    public ResponseDTO<String> sendMail(MailTemplateCodeEnum templateCode, Map<String, Object> templateParamsMap, List<String> receiverUserList, List<File> fileList) {
+    public void sendMail(MailTemplateCodeEnum templateCode, Map<String, Object> templateParamsMap, List<String> receiverUserList, List<File> fileList) {
 
         MailTemplateEntity mailTemplateEntity = mailTemplateDao.selectById(templateCode.name().toLowerCase());
         if (mailTemplateEntity == null) {
-            return ResponseDTO.userErrorParam("模版不存在");
+            throw new BusinessException("模版不存在");
         }
 
         if (mailTemplateEntity.getDisableFlag()) {
-            return ResponseDTO.userErrorParam("模版已禁用，无法发送");
+            throw new BusinessException("模版已禁用，无法发送");
         }
 
         String content = null;
@@ -79,7 +79,7 @@ public class MailService {
         } else if (MailTemplateTypeEnum.STRING.name().equalsIgnoreCase(mailTemplateEntity.getTemplateType().trim())) {
             content = stringResolverContent(mailTemplateEntity.getTemplateContent(), templateParamsMap);
         } else {
-            return ResponseDTO.userErrorParam("模版类型不存在");
+            throw new BusinessException("模版类型不存在");
         }
 
         try {
@@ -88,16 +88,15 @@ public class MailService {
 
         } catch (Throwable e) {
             log.error("邮件发送失败", e);
-            return ResponseDTO.userErrorParam("邮件发送失败");
+            throw new BusinessException("邮件发送失败");
         }
-        return ResponseDTO.ok();
     }
 
     /**
      * 使用模板发送邮件
      */
-    public ResponseDTO<String> sendMail(MailTemplateCodeEnum templateCode, Map<String, Object> templateParamsMap, List<String> receiverUserList) {
-        return this.sendMail(templateCode, templateParamsMap, receiverUserList, null);
+    public void sendMail(MailTemplateCodeEnum templateCode, Map<String, Object> templateParamsMap, List<String> receiverUserList) {
+        this.sendMail(templateCode, templateParamsMap, receiverUserList, null);
     }
 
 

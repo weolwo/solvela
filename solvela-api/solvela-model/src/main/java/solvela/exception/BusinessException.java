@@ -16,8 +16,6 @@ import solvela.code.UserErrorCode;
 @Data
 public class BusinessException extends RuntimeException {
 
-    private String code;
-
     // ⚠️ 这里原本还有一个 `private String message` 字段，已删除。
     // @Data 会为它生成 getMessage()，而这个方法**覆盖了 Throwable.getMessage()**
     // （Lombok 只看本类声明的方法，看不到继承来的），返回的是那个从未被赋值的字段 —— 永远 null。
@@ -49,11 +47,6 @@ public class BusinessException extends RuntimeException {
 
     public BusinessException(String message) {
         super(message);
-    }
-
-    public BusinessException(String code, String message) {
-        super(message);
-        this.code = code;
     }
 
     public BusinessException(ErrorCode errorCode, String message) {

@@ -49,7 +49,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>全程用 {@link InMemoryObjectStorage} + mock 的 DAO，不碰磁盘、不碰数据库、不碰网络。
  * 这正是当初把存储层抽象成 {@link ObjectStorage} 的目的 ——
- * 旧的 {@code IFileStorageService} 入参是 {@code MultipartFile}、返回 {@code ResponseDTO}，
+ * 旧的 {@code IFileStorageService} 入参是 {@code MultipartFile}、返回 HTTP 响应信封，
  * 这类测试根本写不出来。
  *
  * @Date 2026-08-10

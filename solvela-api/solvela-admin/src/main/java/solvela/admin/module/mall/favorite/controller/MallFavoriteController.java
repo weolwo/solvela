@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.web.ResponseDTO;
 import solvela.mall.favorite.domain.dto.MallFavoriteStatDTO;
 import solvela.mall.favorite.service.MallFavoriteService;
 
@@ -34,7 +33,7 @@ public class MallFavoriteController {
     @Operation(summary = "收藏统计与排行 @author weolwo")
     @GetMapping("/queryStat")
     @RequiresPermission("mallFavorite:query")
-    public ResponseDTO<MallFavoriteStatDTO> queryStat(@RequestParam(required = false) Integer rankTopN) {
-        return ResponseDTO.ok(mallFavoriteService.queryStat(rankTopN));
+    public MallFavoriteStatDTO queryStat(@RequestParam(required = false) Integer rankTopN) {
+        return mallFavoriteService.queryStat(rankTopN);
     }
 }

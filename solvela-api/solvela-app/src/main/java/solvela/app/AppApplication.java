@@ -45,7 +45,7 @@ import solvela.base.listener.Ip2RegionListener;
  * 这个前提由 {@code AppBoundaryTest} 守着。
  *
  * <p>特别注意<b>没有</b> {@code solvela.web}：那是管理端的 HTTP 层，
- * 它的 {@code GlobalExceptionHandler} 一律返回 200 + {@code ResponseDTO}，
+ * 它的 {@code GlobalExceptionHandler} 用的是管理端那套错误码表，
  * 与本进程的错误契约（真实状态码 + {@code ApiErrorResponse}）直接冲突。
  * 两个 {@code @RestControllerAdvice} 同时在场时，返回什么取决于哪个先匹配上 ——
  * 那是最难查的一类问题。sa-token 也随之不在本进程的 classpath 上，

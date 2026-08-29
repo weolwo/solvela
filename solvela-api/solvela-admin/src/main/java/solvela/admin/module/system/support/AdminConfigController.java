@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.config.ConfigService;
 import solvela.base.module.config.domain.ConfigAddForm;
@@ -36,24 +35,22 @@ public class AdminConfigController extends SupportBaseController {
     @Operation(summary = "分页查询系统配置 @author 卓大")
     @PostMapping("/config/query")
     @RequiresPermission("support:config:query")
-    public ResponseDTO<PageResult<ConfigVO>> queryConfigPage(@RequestBody @Valid ConfigQueryForm queryForm) {
-        return ResponseDTO.ok(configService.queryConfigPage(queryForm));
+    public PageResult<ConfigVO> queryConfigPage(@RequestBody @Valid ConfigQueryForm queryForm) {
+        return configService.queryConfigPage(queryForm);
     }
 
     @Operation(summary = "添加配置参数 @author 卓大")
     @PostMapping("/config/add")
     @RequiresPermission("support:config:addProposal")
-    public ResponseDTO<String> addConfig(@RequestBody @Valid ConfigAddForm configAddForm) {
+    public void addConfig(@RequestBody @Valid ConfigAddForm configAddForm) {
         configService.add(configAddForm);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "修改配置参数 @author 卓大")
     @PostMapping("/config/update")
     @RequiresPermission("support:config:update")
-    public ResponseDTO<String> updateConfig(@RequestBody @Valid ConfigUpdateForm updateForm) {
+    public void updateConfig(@RequestBody @Valid ConfigUpdateForm updateForm) {
         configService.updateConfig(updateForm);
-        return ResponseDTO.ok();
     }
 
 }

@@ -1,7 +1,6 @@
 package solvela.web.listener;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.code.ErrorCodeRegister;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.base.util.SolvelaIpUtil;
@@ -53,8 +52,6 @@ public class WebServerListener implements ApplicationListener<WebServerInitializ
         //拼接服务地址
         String title = String.format("-------------【%s】 服务已成功启动 （%s started successfully）-------------", projectName, projectName);
 
-        // 初始化状态码
-        int codeCount = ErrorCodeRegister.initialize();
         String localhostUrl = normalizeUrl(String.format("http://localhost:%d%s", port, contextPath));
         String externalUrl = normalizeUrl(String.format("http://%s:%d%s", ip, port, contextPath));
         // 文档地址只在 springdoc 真正装配时才打印。
@@ -70,12 +67,11 @@ public class WebServerListener implements ApplicationListener<WebServerInitializ
         }
         log.warn("\n{}\n" +
                         "\t当前启动环境:\t{} , {}" +
-                        "\n\t返回码初始化:\t完成{}个返回码初始化" +
                         "\n\t服务本机地址:\t{}" +
                         "\n\t服务外网地址:\t{}" +
                         "{}" +
                         "\n-------------------------------------------------------------------------------------\n",
-                title, profile, environmentEnum.getDesc(), codeCount, localhostUrl, externalUrl, docLines);
+                title, profile, environmentEnum.getDesc(), localhostUrl, externalUrl, docLines);
     }
 
     /**

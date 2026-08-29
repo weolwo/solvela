@@ -1,5 +1,6 @@
 package solvela.admin.module.member.operationlimit.controller;
 
+import solvela.exception.BusinessException;
 import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
 import solvela.member.operationlimit.constant.MemberOperationUnlockTypeEnum;
@@ -56,8 +56,8 @@ public class MemberOperationLimitController {
     @Operation(summary = "查询某会员的限制记录（含历史，最近50条）")
     @GetMapping("/listByMember/{memberId}")
     @RequiresPermission("member:query")
-    public ResponseDTO<List<MemberOperationLimit>> listByMember(@PathVariable Long memberId) {
-        return ResponseDTO.ok(memberOperationLimitService.listRecentByMember(memberId, RECENT_LIMIT));
+    public List<MemberOperationLimit> listByMember(@PathVariable Long memberId) {
+        return memberOperationLimitService.listRecentByMember(memberId, RECENT_LIMIT);
     }
 
     /**
@@ -67,16 +67,16 @@ public class MemberOperationLimitController {
     @Operation(summary = "人工解冻 @author 客服")
     @PostMapping("/unlock")
     @RequiresPermission("member:update")
-    public ResponseDTO<String> unlock(@RequestBody @Valid MemberOperationUnlockForm form) {
+    public String unlock(@RequestBody @Valid MemberOperationUnlockForm form) {
         MemberOperationTypeEnum type = MemberOperationTypeEnum.resolve(form.getOperationType());
         if (type == null) {
-            return ResponseDTO.userErrorParam("不支持的操作类型");
+            throw new BusinessException("不支持的操作类型");
         }
         // 操作人落到 operator 列：这一列存在的唯一理由就是事后能追到人，
         // 取当前登录员工而不是让前端传，避免被改
         String operator = CurrentEmployee.nameOrNull();
         boolean unlocked = memberOperationLimitService.unlock(
                 form.getMemberId(), type, MemberOperationUnlockTypeEnum.MANUAL, operator, form.getRemark());
-        return unlocked ? ResponseDTO.ok("已解冻") : ResponseDTO.ok("该会员当前没有生效中的限制");
+        return unlocked ? "已解冻" : "该会员当前没有生效中的限制";
     }
 }

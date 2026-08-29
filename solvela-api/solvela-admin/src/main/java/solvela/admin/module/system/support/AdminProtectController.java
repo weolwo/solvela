@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.config.ConfigKeyEnum;
@@ -46,26 +45,26 @@ public class AdminProtectController extends SupportBaseController {
 
     @Operation(summary = "分页查询 @author 1024创新实验室-主任-卓大")
     @PostMapping("/protect/loginFail/queryPage")
-    public ResponseDTO<PageResult<LoginFailVO>> queryPage(@RequestBody @Valid LoginFailQueryForm queryForm) {
-        return ResponseDTO.ok(securityLoginService.queryPage(queryForm));
+    public PageResult<LoginFailVO> queryPage(@RequestBody @Valid LoginFailQueryForm queryForm) {
+        return securityLoginService.queryPage(queryForm);
     }
 
 
     @Operation(summary = "批量删除 @author 1024创新实验室-主任-卓大")
     @PostMapping("/protect/loginFail/batchDelete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return securityLoginService.batchDelete(idList);
+    public void batchDelete(@RequestBody ValidateList<Long> idList) {
+        securityLoginService.batchDelete(idList);
     }
 
     @Operation(summary = "更新三级等保配置 @author 1024创新实验室-主任-卓大")
     @PostMapping("/protect/level3protect/updateConfig")
-    public ResponseDTO<String> updateConfig(@RequestBody @Valid Level3ProtectConfigForm configForm) {
-        return level3ProtectConfigService.updateLevel3Config(configForm);
+    public void updateConfig(@RequestBody @Valid Level3ProtectConfigForm configForm) {
+        level3ProtectConfigService.updateLevel3Config(configForm);
     }
 
     @Operation(summary = "查询 三级等保配置 @author 1024创新实验室-主任-卓大")
     @GetMapping("/protect/level3protect/getConfig")
-    public ResponseDTO<String> getConfig() {
-        return ResponseDTO.ok(configService.getConfigValue(ConfigKeyEnum.LEVEL3_PROTECT_CONFIG));
+    public String getConfig() {
+        return configService.getConfigValue(ConfigKeyEnum.LEVEL3_PROTECT_CONFIG);
     }
 }

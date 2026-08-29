@@ -58,7 +58,7 @@ import java.util.Set;
  *
  * <p><b>本类不认识对象存储 SDK</b>，只通过 {@link ObjectStorage} 打交道；
  * <b>也不认识 HTTP 响应结构</b>，失败一律抛 {@link BusinessException}，
- * 翻译成 {@code ResponseDTO} 只在 Controller 层发生一次。
+ * 翻译成 HTTP 响应只在全局异常处理器里发生一次。
  *
  * @Date 2026-08-10
  */

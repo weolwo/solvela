@@ -5,6 +5,8 @@ import solvela.admin.auth.AdminAuthorizationInterceptor;
 import solvela.base.config.FileConfig;
 import solvela.base.constant.SwaggerWhitelistConst;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.converter.HttpMessageConverters;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -26,6 +28,9 @@ public class MvcConfig implements WebMvcConfigurer {
 
     @Resource
     private AdminAuthorizationInterceptor authorizationInterceptor;
+
+    @Resource
+    private NoContentInterceptor noContentInterceptor;
 
 
 
@@ -50,6 +55,30 @@ public class MvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(authorizationInterceptor)
                 .excludePathPatterns(whitelist)
                 .addPathPatterns("/**");
+        // 没有返回值的接口回 204，见 NoContentInterceptor
+        registry.addInterceptor(noContentInterceptor).addPathPatterns("/**");
+    }
+
+    /**
+     * 去掉 {@link StringHttpMessageConverter}，让返回 {@code String} 的接口也走 JSON。
+     *
+     * <h3>为什么必须动这个</h3>
+     * 去掉 {@code ResponseDTO} 之后，「生成一个编码」「批量下线的汇总文案」这类接口的返回类型
+     * 自然变成了 {@code String}。而 Spring 默认用 {@code StringHttpMessageConverter} 处理它 ——
+     * 浏览器发来的 {@code Accept: application/json, text/plain, *&#47;*} 里有 text/plain，
+     * 于是这十九个接口会以 <b>text/plain</b> 返回裸文本，而同一套 API 的其余接口是 JSON。
+     *
+     * <p>后果不是「不好看」：前端拦截器要按 content-type 分流，一套 API 里两种格式意味着
+     * 每个调用点都得知道自己属于哪一类。去掉这个转换器之后，{@code String} 由 Jackson 序列化成
+     * 一个 JSON 字符串（带引号），整套 API 的响应格式收敛成一种。
+     *
+     * <p>不影响文件下载：那条路径是直接往 {@code HttpServletResponse} 的输出流里写字节，
+     * 根本不经过消息转换器。
+     */
+    @Override
+    public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
+        builder.configureMessageConvertersList(
+                converters -> converters.removeIf(StringHttpMessageConverter.class::isInstance));
     }
 
     @Override

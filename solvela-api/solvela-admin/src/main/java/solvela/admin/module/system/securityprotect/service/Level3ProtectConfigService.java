@@ -5,7 +5,6 @@ import jakarta.annotation.Resource;
 import solvela.admin.auth.TokenStore;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import solvela.web.ResponseDTO;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
 import solvela.admin.module.system.securityprotect.domain.Level3ProtectConfigForm;
@@ -179,12 +178,11 @@ public class Level3ProtectConfigService {
     /**
      * 更新三级等保配置
      */
-    public ResponseDTO<String> updateLevel3Config(Level3ProtectConfigForm configForm) {
+    public void updateLevel3Config(Level3ProtectConfigForm configForm) {
         // 设置属性
         setProp(configForm);
         // 保存数据库
         String configFormJsonString = JsonUtils.toJson(configForm);
         configService.updateValueByKey(ConfigKeyEnum.LEVEL3_PROTECT_CONFIG, configFormJsonString);
-        return ResponseDTO.ok();
     }
 }

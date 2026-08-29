@@ -51,10 +51,12 @@ class AppBoundaryTest {
                         C 端出现了多个 solvela 自己的 @RestControllerAdvice：%s
 
                         最可能的原因是组件扫描把 solvela.web 包了进来 —— 那里的
-                        GlobalExceptionHandler 一律返回 200 + ResponseDTO，与本进程的契约
-                        （真实 HTTP 状态码 + ApiErrorResponse）冲突。
-                        两个 advice 同时在场时，返回什么取决于哪个先匹配上，
-                        表现是「同一个异常，有时 200 有时 400」—— 最难查的一类问题。
+                        GlobalExceptionHandler 是<b>管理端</b>的错误出口。两边现在都返回
+                        真实 HTTP 状态码，但错误码表不同：管理端用 solvela.code.ErrorCode
+                        （NO_PERMISSION / LOGIN_ACTIVE_TIMEOUT…），C 端用 ApiErrors
+                        （LOGIN_REQUIRED / BAD_CREDENTIALS…）。
+                        两个 advice 同时在场时，返回哪套 code 取决于哪个先匹配上，
+                        表现是「同一个异常，客户端有时认得有时不认得」—— 最难查的一类问题。
                         """.formatted(ours));
         assertEquals("apiExceptionHandler", ours.getFirst());
     }

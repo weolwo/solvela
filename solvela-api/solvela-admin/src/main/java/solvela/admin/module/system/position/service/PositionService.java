@@ -9,7 +9,6 @@ import solvela.admin.module.system.position.domain.form.PositionQueryForm;
 import solvela.admin.module.system.position.domain.form.PositionUpdateForm;
 import solvela.admin.module.system.position.domain.vo.PositionVO;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -48,10 +47,9 @@ public class PositionService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PositionAddForm addForm) {
+    public void add(PositionAddForm addForm) {
         PositionEntity positionEntity = SolvelaBeanUtil.copy(addForm, PositionEntity.class);
         positionDao.insert(positionEntity);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -60,10 +58,9 @@ public class PositionService {
      * @param updateForm
      * @return
      */
-    public ResponseDTO<String> update(PositionUpdateForm updateForm) {
+    public void update(PositionUpdateForm updateForm) {
         PositionEntity positionEntity = SolvelaBeanUtil.copy(updateForm, PositionEntity.class);
         positionDao.updateById(positionEntity);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -72,25 +69,23 @@ public class PositionService {
      * @param idList
      * @return
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         positionDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long positionId) {
+    public void delete(Long positionId) {
         if (null == positionId){
-            return ResponseDTO.ok();
+            return;
         }
 
         positionDao.deleteById(positionId);
-        return ResponseDTO.ok();
     }
 
     /**

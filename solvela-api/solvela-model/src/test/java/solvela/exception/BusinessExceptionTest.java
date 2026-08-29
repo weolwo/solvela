@@ -27,10 +27,18 @@ public class BusinessExceptionTest {
     }
 
     @Test
-    public void 带错误码的构造消息同样要能取回来() {
-        BusinessException e = new BusinessException("A0001", "库存不足");
-        assertEquals("库存不足", e.getMessage());
-        assertEquals("A0001", e.getCode());
+    public void 带错误码的构造既保留文案也保留身份() {
+        BusinessException e = new BusinessException(UserErrorCode.DATA_NOT_EXIST, "订单不存在");
+        assertEquals("订单不存在", e.getMessage(), "自定义文案应覆盖错误码自带的那句");
+        assertSame(UserErrorCode.DATA_NOT_EXIST, e.getErrorCode(), "错误码决定 HTTP 状态与响应体里的 code");
+    }
+
+    @Test
+    public void 不指定错误码时默认是用户级参数错误() {
+        // 默认值不是随手选的：业务校验失败是「用户干了不该干的事」，不是系统故障。
+        // 默认成 SYSTEM_ERROR 会让「运营重复点了一次删除」和「数据库连不上」
+        // 落在同一条告警曲线上
+        assertSame(UserErrorCode.PARAM_ERROR, new BusinessException("库存不足").getErrorCode());
     }
 
     @Test

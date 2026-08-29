@@ -1,5 +1,6 @@
 package solvela.admin.module.system.employee.service;
 
+import solvela.exception.BusinessException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.admin.auth.TokenStore;
@@ -22,7 +23,6 @@ import solvela.base.constant.StringConst;
 import solvela.crypto.PasswordCipher;
 import solvela.base.domain.PageResult;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
 import solvela.admin.constant.UserTypeEnum;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -85,7 +85,7 @@ public class EmployeeService {
     /**
      * 查询员工列表
      */
-    public ResponseDTO<PageResult<EmployeeVO>> queryEmployee(EmployeeQueryForm employeeQueryForm) {
+    public PageResult<EmployeeVO> queryEmployee(EmployeeQueryForm employeeQueryForm) {
         employeeQueryForm.setDeletedFlag(false);
         Page pageParam = SolvelaPageUtil.convert2PageQuery(employeeQueryForm);
 
@@ -97,7 +97,7 @@ public class EmployeeService {
         List<EmployeeVO> employeeList = employeeDao.queryEmployee(pageParam, employeeQueryForm, departmentIdList);
         if (SolvelaCollectionUtil.isEmpty(employeeList)) {
             PageResult<EmployeeVO> pageResult = SolvelaPageUtil.convert2PageResult(pageParam, employeeList);
-            return ResponseDTO.ok(pageResult);
+            return pageResult;
         }
 
         // 查询员工角色
@@ -118,28 +118,28 @@ public class EmployeeService {
             e.setPositionName(positionNameMap.get(e.getPositionId()));
         });
         PageResult<EmployeeVO> pageResult = SolvelaPageUtil.convert2PageResult(pageParam, employeeList);
-        return ResponseDTO.ok(pageResult);
+        return pageResult;
     }
 
     /**
      * 新增员工
      */
-    public synchronized ResponseDTO<String> addEmployee(EmployeeAddForm employeeAddForm) {
+    public synchronized String addEmployee(EmployeeAddForm employeeAddForm) {
         // 校验登录名是否重复
         EmployeeEntity employeeEntity = employeeDao.getByLoginName(employeeAddForm.getLoginName(), null);
         if (null != employeeEntity) {
-            return ResponseDTO.userErrorParam("登录名重复");
+            throw new BusinessException("登录名重复");
         }
         // 校验电话是否存在
         employeeEntity = employeeDao.getByPhone(employeeAddForm.getPhone(), null);
         if (null != employeeEntity) {
-            return ResponseDTO.userErrorParam("手机号已存在");
+            throw new BusinessException("手机号已存在");
         }
         // 部门是否存在
         Long departmentId = employeeAddForm.getDepartmentId();
         DepartmentEntity department = departmentDao.selectById(departmentId);
         if (department == null) {
-            return ResponseDTO.userErrorParam("部门不存在");
+            throw new BusinessException("部门不存在");
         }
 
         EmployeeEntity entity = SolvelaBeanUtil.copy(employeeAddForm, EmployeeEntity.class);
@@ -156,32 +156,29 @@ public class EmployeeService {
         entity.setDeletedFlag(Boolean.FALSE);
         employeeManager.saveEmployee(entity, employeeAddForm.getRoleIdList());
 
-        return ResponseDTO.ok(randomPassword);
+        return randomPassword;
     }
 
     /**
      * 更新员工
      */
-    public synchronized ResponseDTO<String> updateEmployee(EmployeeUpdateForm employeeUpdateForm) {
+    public synchronized void updateEmployee(EmployeeUpdateForm employeeUpdateForm) {
 
         Long employeeId = employeeUpdateForm.getEmployeeId();
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (null == employeeEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
         // 部门是否存在
         Long departmentId = employeeUpdateForm.getDepartmentId();
         DepartmentEntity departmentEntity = departmentDao.selectById(departmentId);
         if (departmentEntity == null) {
-            return ResponseDTO.userErrorParam("部门不存在");
+            throw new BusinessException("部门不存在");
         }
 
-        // 检查唯一性
-        ResponseDTO<String> checkResponse = checkUniqueness(employeeId, employeeUpdateForm.getLoginName(), employeeUpdateForm.getPhone(), employeeUpdateForm.getEmail());
-        if (!checkResponse.getOk()) {
-            return checkResponse;
-        }
+        // 检查唯一性（不通过直接抛）
+        checkUniqueness(employeeId, employeeUpdateForm.getLoginName(), employeeUpdateForm.getPhone(), employeeUpdateForm.getEmail());
 
         EmployeeEntity entity = SolvelaBeanUtil.copy(employeeUpdateForm, EmployeeEntity.class);
         // 不更新密码
@@ -193,25 +190,21 @@ public class EmployeeService {
         // 清除员工缓存
         loginService.clearLoginEmployeeCache(employeeId);
 
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新员工个人中心信息
      */
-    public ResponseDTO<String> updateCenter(EmployeeUpdateCenterForm updateCenterForm) {
+    public void updateCenter(EmployeeUpdateCenterForm updateCenterForm) {
 
         Long employeeId = updateCenterForm.getEmployeeId();
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (null == employeeEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
-        // 检查唯一性 登录账号不能修改则不需要检查
-        ResponseDTO<String> checkResponse = checkUniqueness(employeeId, "", updateCenterForm.getPhone(), updateCenterForm.getEmail());
-        if (!checkResponse.getOk()) {
-            return checkResponse;
-        }
+        // 检查唯一性；登录账号不能修改，所以不参与检查
+        checkUniqueness(employeeId, "", updateCenterForm.getPhone(), updateCenterForm.getEmail());
 
         EmployeeEntity employee = SolvelaBeanUtil.copy(updateCenterForm, EmployeeEntity.class);
         // 不更新密码
@@ -223,39 +216,37 @@ public class EmployeeService {
         // 清除员工缓存
         loginService.clearLoginEmployeeCache(employeeId);
 
-        return ResponseDTO.ok();
     }
 
     /**
      * 检查唯一性
      */
-    private ResponseDTO<String> checkUniqueness(Long employeeId, String loginName, String phone, String email) {
+    private void checkUniqueness(Long employeeId, String loginName, String phone, String email) {
         EmployeeEntity existEntity = employeeDao.getByLoginName(loginName, null);
         if (null != existEntity && !Objects.equals(existEntity.getEmployeeId(), employeeId)) {
-            return ResponseDTO.userErrorParam("登录名重复");
+            throw new BusinessException("登录名重复");
         }
 
         existEntity = employeeDao.getByPhone(phone, null);
         if (null != existEntity && !Objects.equals(existEntity.getEmployeeId(), employeeId)) {
-            return ResponseDTO.userErrorParam("手机号已存在");
+            throw new BusinessException("手机号已存在");
         }
 
         existEntity = employeeDao.getByEmail(email, null);
         if (null != existEntity && !Objects.equals(existEntity.getEmployeeId(), employeeId)) {
-            return ResponseDTO.userErrorParam("邮箱账号已存在");
+            throw new BusinessException("邮箱账号已存在");
         }
 
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新登录人头像
      */
-    public ResponseDTO<String> updateAvatar(EmployeeUpdateAvatarForm employeeUpdateAvatarForm) {
+    public void updateAvatar(EmployeeUpdateAvatarForm employeeUpdateAvatarForm) {
         Long employeeId = employeeUpdateAvatarForm.getEmployeeId();
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (employeeEntity == null) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         // 更新头像
         EmployeeEntity updateEntity = new EmployeeEntity();
@@ -265,19 +256,18 @@ public class EmployeeService {
 
         // 清除员工缓存
         loginService.clearLoginEmployeeCache(employeeId);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新禁用/启用状态
      */
-    public ResponseDTO<String> updateDisableFlag(Long employeeId) {
+    public void updateDisableFlag(Long employeeId) {
         if (null == employeeId) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (null == employeeEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
         // 更新禁用状态
@@ -289,19 +279,18 @@ public class EmployeeService {
         // 用万能密码登进去的会话还能继续用。按员工 id 反查全部令牌之后，这个口子没了
         tokenStore.revokeAll(employeeId);
 
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除员工
      */
-    public ResponseDTO<String> batchUpdateDeleteFlag(List<Long> employeeIdList) {
+    public void batchUpdateDeleteFlag(List<Long> employeeIdList) {
         if (SolvelaCollectionUtil.isEmpty(employeeIdList)) {
-            return ResponseDTO.ok();
+            return;
         }
         List<EmployeeEntity> employeeEntityList = employeeManager.listByIds(employeeIdList);
         if (SolvelaCollectionUtil.isEmpty(employeeEntityList)) {
-            return ResponseDTO.ok();
+            return;
         }
         // 更新删除
         List<EmployeeEntity> deleteList = employeeIdList.stream().map(e -> {
@@ -316,18 +305,17 @@ public class EmployeeService {
             // 强制退出登录，见 updateDisableFlag 处的说明
             tokenStore.revokeAll(employeeId);
         }
-        return ResponseDTO.ok();
     }
 
 
     /**
      * 批量更新部门
      */
-    public ResponseDTO<String> batchUpdateDepartment(EmployeeBatchUpdateDepartmentForm batchUpdateDepartmentForm) {
+    public void batchUpdateDepartment(EmployeeBatchUpdateDepartmentForm batchUpdateDepartmentForm) {
         List<Long> employeeIdList = batchUpdateDepartmentForm.getEmployeeIdList();
         List<EmployeeEntity> employeeEntityList = employeeDao.selectBatchIds(employeeIdList);
         if (employeeIdList.size() != employeeEntityList.size()) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         // 更新
         List<EmployeeEntity> updateList = employeeIdList.stream().map(e -> {
@@ -338,7 +326,6 @@ public class EmployeeService {
         }).collect(Collectors.toList());
         employeeManager.updateBatchById(updateList);
 
-        return ResponseDTO.ok();
     }
 
 
@@ -346,34 +333,29 @@ public class EmployeeService {
      * 更新密码
      */
     @Transactional(rollbackFor = Throwable.class)
-    public ResponseDTO<String> updatePassword(RequestEmployee requestUser, EmployeeUpdatePasswordForm updatePasswordForm) {
+    public void updatePassword(RequestEmployee requestUser, EmployeeUpdatePasswordForm updatePasswordForm) {
         Long employeeId = updatePasswordForm.getEmployeeId();
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (employeeEntity == null) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
         // 校验原始密码
         if (!PasswordCipher.matches(this.generateSaltPassword(updatePasswordForm.getOldPassword(), employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
-            return ResponseDTO.userErrorParam("原密码有误，请重新输入");
+            throw new BusinessException("原密码有误，请重新输入");
         }
 
         // 新旧密码相同
         if (Objects.equals(updatePasswordForm.getOldPassword(), updatePasswordForm.getNewPassword())) {
-            return ResponseDTO.userErrorParam("新密码与原始密码相同，请重新输入");
+            throw new BusinessException("新密码与原始密码相同，请重新输入");
         }
 
         // 校验密码复杂度
-        ResponseDTO<String> validatePassComplexity = securityPasswordService.validatePasswordComplexity(updatePasswordForm.getNewPassword());
-        if (!validatePassComplexity.getOk()) {
-            return validatePassComplexity;
-        }
+        securityPasswordService.validatePasswordComplexity(updatePasswordForm.getNewPassword());
 
         // 根据三级等保规则，校验密码是否重复
-        ResponseDTO<String> passwordRepeatTimes = securityPasswordService.validatePasswordRepeatTimes(requestUser, this.generateSaltPassword(updatePasswordForm.getNewPassword(), employeeEntity.getEmployeeUid()));
-        if (!passwordRepeatTimes.getOk()) {
-            return ResponseDTO.error(passwordRepeatTimes);
-        }
+        securityPasswordService.validatePasswordRepeatTimes(requestUser,
+                this.generateSaltPassword(updatePasswordForm.getNewPassword(), employeeEntity.getEmployeeUid()));
 
         // 更新密码
         String newEncryptPassword = PasswordCipher.encode(this.generateSaltPassword(updatePasswordForm.getNewPassword(), employeeEntity.getEmployeeUid()));
@@ -385,17 +367,16 @@ public class EmployeeService {
         // 保存修改密码密码记录
         securityPasswordService.saveUserChangePasswordLog(requestUser, newEncryptPassword, employeeEntity.getLoginPwd());
 
-        return ResponseDTO.ok();
     }
 
     /**
      * 获取某个部门的员工信息
      */
-    public ResponseDTO<List<EmployeeVO>> getAllEmployeeByDepartmentId(Long departmentId) {
+    public List<EmployeeVO> getAllEmployeeByDepartmentId(Long departmentId) {
         List<EmployeeEntity> employeeEntityList = employeeDao.selectByDepartmentId(departmentId, Boolean.FALSE);
 
         if (SolvelaCollectionUtil.isEmpty(employeeEntityList)) {
-            return ResponseDTO.ok(Collections.emptyList());
+            return Collections.emptyList();
         }
 
         DepartmentVO department = departmentService.getDepartmentById(departmentId);
@@ -407,32 +388,32 @@ public class EmployeeService {
             }
             return employeeVO;
         }).collect(Collectors.toList());
-        return ResponseDTO.ok(voList);
+        return voList;
     }
 
 
     /**
      * 重置密码
      */
-    public ResponseDTO<String> resetPassword(Long employeeId) {
+    public String resetPassword(Long employeeId) {
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (employeeEntity == null) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
         String password = securityPasswordService.randomPassword();
         String saltPassword = this.generateSaltPassword(password, employeeEntity.getEmployeeUid());
         employeeDao.updatePassword(employeeId, PasswordCipher.encode(saltPassword));
-        return ResponseDTO.ok(password);
+        return password;
     }
 
 
     /**
      * 查询全部员工
      */
-    public ResponseDTO<List<EmployeeVO>> queryAllEmployee(Boolean disabledFlag) {
+    public List<EmployeeVO> queryAllEmployee(Boolean disabledFlag) {
         List<EmployeeVO> employeeList = employeeDao.selectEmployeeByDisabledAndDeleted(disabledFlag, Boolean.FALSE);
-        return ResponseDTO.ok(employeeList);
+        return employeeList;
     }
 
     /**

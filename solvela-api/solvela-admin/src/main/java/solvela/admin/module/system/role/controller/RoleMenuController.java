@@ -9,7 +9,6 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.role.domain.form.RoleMenuUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleMenuTreeVO;
 import solvela.admin.module.system.role.service.RoleMenuService;
-import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -31,13 +30,13 @@ public class RoleMenuController {
     @Operation(summary = "更新角色权限 @author 卓大")
     @PostMapping("/role/menu/updateRoleMenu")
     @RequiresPermission("system:role:menu:update")
-    public ResponseDTO<String> updateRoleMenu(@Valid @RequestBody RoleMenuUpdateForm updateDTO) {
-        return roleMenuService.updateRoleMenu(updateDTO);
+    public void updateRoleMenu(@Valid @RequestBody RoleMenuUpdateForm updateDTO) {
+        roleMenuService.updateRoleMenu(updateDTO);
     }
 
     @Operation(summary = "获取角色关联菜单权限 @author 卓大")
     @GetMapping("/role/menu/getRoleSelectedMenu/{roleId}")
-    public ResponseDTO<RoleMenuTreeVO> getRoleSelectedMenu(@PathVariable Long roleId) {
+    public RoleMenuTreeVO getRoleSelectedMenu(@PathVariable Long roleId) {
         return roleMenuService.getRoleSelectedMenu(roleId);
     }
 }

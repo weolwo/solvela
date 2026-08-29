@@ -1,5 +1,6 @@
 package solvela.admin.module.system.role.service;
 
+import solvela.exception.BusinessException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.department.dao.DepartmentDao;
@@ -16,7 +17,6 @@ import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.manager.RoleEmployeeManager;
 import solvela.base.constant.StringConst;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -62,7 +62,7 @@ public class RoleEmployeeService {
      * 通过角色id，分页获取成员员工列表
      *
      */
-    public ResponseDTO<PageResult<EmployeeVO>> queryEmployee(RoleEmployeeQueryForm roleEmployeeQueryForm) {
+    public PageResult<EmployeeVO> queryEmployee(RoleEmployeeQueryForm roleEmployeeQueryForm) {
         Page page = SolvelaPageUtil.convert2PageQuery(roleEmployeeQueryForm);
         List<EmployeeVO> employeeList = roleEmployeeDao.selectRoleEmployeeByName(page, roleEmployeeQueryForm)
                 .stream()
@@ -77,7 +77,7 @@ public class RoleEmployeeService {
             });
         }
         PageResult<EmployeeVO> pageResult = SolvelaPageUtil.convert2PageResult(page, employeeList, EmployeeVO.class);
-        return ResponseDTO.ok(pageResult);
+        return pageResult;
     }
 
     public List<EmployeeVO> getAllEmployeeByRoleId(Long roleId) {
@@ -88,28 +88,26 @@ public class RoleEmployeeService {
      * 移除员工角色
      *
      */
-    public ResponseDTO<String> removeRoleEmployee(Long employeeId, Long roleId) {
+    public void removeRoleEmployee(Long employeeId, Long roleId) {
         if (null == employeeId || null == roleId) {
-            return ResponseDTO.userErrorParam();
+            throw new BusinessException();
         }
         roleEmployeeDao.deleteByEmployeeIdRoleId(employeeId, roleId);
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除角色的成员员工
      *
      */
-    public ResponseDTO<String> batchRemoveRoleEmployee(RoleEmployeeUpdateForm roleEmployeeUpdateForm) {
+    public void batchRemoveRoleEmployee(RoleEmployeeUpdateForm roleEmployeeUpdateForm) {
         roleEmployeeDao.batchDeleteEmployeeRole(roleEmployeeUpdateForm.getRoleId(), roleEmployeeUpdateForm.getEmployeeIdList());
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量添加角色的成员员工
      *
      */
-    public ResponseDTO<String> batchAddRoleEmployee(RoleEmployeeUpdateForm roleEmployeeUpdateForm) {
+    public void batchAddRoleEmployee(RoleEmployeeUpdateForm roleEmployeeUpdateForm) {
         Long roleId = roleEmployeeUpdateForm.getRoleId();
 
         // 已选择的员工id列表
@@ -126,7 +124,6 @@ public class RoleEmployeeService {
                     .collect(Collectors.toList());
             roleEmployeeManager.saveBatch(roleEmployeeList);
         }
-        return ResponseDTO.ok();
     }
 
     /**

@@ -12,7 +12,6 @@ import solvela.admin.module.system.menu.domain.vo.MenuTreeVO;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.admin.module.system.menu.service.MenuService;
 import solvela.web.config.RequestUrl;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,47 +36,47 @@ public class MenuController {
     @Operation(summary = "添加菜单 @author 卓大")
     @PostMapping("/menu/add")
     @RequiresPermission("system:menu:addProposal")
-    public ResponseDTO<String> addMenu(@RequestBody @Valid MenuAddForm menuAddForm) {
+    public void addMenu(@RequestBody @Valid MenuAddForm menuAddForm) {
         menuAddForm.setCreateUserId(CurrentEmployee.idOrNull());
-        return menuService.addMenu(menuAddForm);
+        menuService.addMenu(menuAddForm);
     }
 
     @Operation(summary = "更新菜单 @author 卓大")
     @PostMapping("/menu/update")
     @RequiresPermission("system:menu:update")
-    public ResponseDTO<String> updateMenu(@RequestBody @Valid MenuUpdateForm menuUpdateForm) {
+    public void updateMenu(@RequestBody @Valid MenuUpdateForm menuUpdateForm) {
         menuUpdateForm.setUpdateUserId(CurrentEmployee.idOrNull());
-        return menuService.updateMenu(menuUpdateForm);
+        menuService.updateMenu(menuUpdateForm);
     }
 
     @Operation(summary = "批量删除菜单 @author 卓大")
     @GetMapping("/menu/batchDelete")
     @RequiresPermission("system:menu:batchDelete")
-    public ResponseDTO<String> batchDeleteMenu(@RequestParam("menuIdList") List<Long> menuIdList) {
-        return menuService.batchDeleteMenu(menuIdList, CurrentEmployee.idOrNull());
+    public void batchDeleteMenu(@RequestParam("menuIdList") List<Long> menuIdList) {
+        menuService.batchDeleteMenu(menuIdList, CurrentEmployee.idOrNull());
     }
 
     @Operation(summary = "查询菜单列表 @author 卓大")
     @GetMapping("/menu/query")
-    public ResponseDTO<List<MenuVO>> queryMenuList() {
-        return ResponseDTO.ok(menuService.queryMenuList(null));
+    public List<MenuVO> queryMenuList() {
+        return menuService.queryMenuList(null);
     }
 
     @Operation(summary = "查询菜单详情 @author 卓大")
     @GetMapping("/menu/detail/{menuId}")
-    public ResponseDTO<MenuVO> getMenuDetail(@PathVariable Long menuId) {
+    public MenuVO getMenuDetail(@PathVariable Long menuId) {
         return menuService.getMenuDetail(menuId);
     }
 
     @Operation(summary = "查询菜单树 @author 卓大")
     @GetMapping("/menu/tree")
-    public ResponseDTO<List<MenuTreeVO>> queryMenuTree(@RequestParam("onlyMenu") Boolean onlyMenu) {
+    public List<MenuTreeVO> queryMenuTree(@RequestParam("onlyMenu") Boolean onlyMenu) {
         return menuService.queryMenuTree(onlyMenu);
     }
 
     @Operation(summary = "获取所有请求路径 @author 卓大")
     @GetMapping("/menu/auth/url")
-    public ResponseDTO<List<RequestUrl>> getAuthUrl() {
+    public List<RequestUrl> getAuthUrl() {
         return menuService.getAuthUrl();
     }
 }

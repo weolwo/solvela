@@ -2,7 +2,6 @@ package solvela.admin.module.system.table;
 
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.admin.module.system.table.domain.TableColumnEntity;
 import solvela.admin.module.system.table.domain.TableColumnUpdateForm;
@@ -39,9 +38,9 @@ public class TableColumnService {
      *
      * @return
      */
-    public ResponseDTO<String> updateTableColumns(RequestEmployee requestUser, TableColumnUpdateForm updateForm) {
+    public void updateTableColumns(RequestEmployee requestUser, TableColumnUpdateForm updateForm) {
         if (SolvelaCollectionUtil.isEmpty(updateForm.getColumnList())) {
-            return ResponseDTO.ok();
+            return;
         }
         Integer tableId = updateForm.getTableId();
         TableColumnEntity tableColumnEntity = tableColumnDao.selectByUserIdAndTableId(requestUser.getUserId(), requestUser.getUserType().getValue(), tableId);
@@ -57,7 +56,6 @@ public class TableColumnService {
             tableColumnEntity.setColumns(JsonUtils.toJson(updateForm.getColumnList()));
             tableColumnDao.updateById(tableColumnEntity);
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -65,8 +63,7 @@ public class TableColumnService {
      *
      * @return
      */
-    public ResponseDTO<String> deleteTableColumn(RequestEmployee requestUser, Integer tableId) {
+    public void deleteTableColumn(RequestEmployee requestUser, Integer tableId) {
         tableColumnDao.deleteTableColumn(requestUser.getUserId(), requestUser.getUserType().getValue(), tableId);
-        return ResponseDTO.ok();
     }
 }

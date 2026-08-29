@@ -2,21 +2,24 @@ package solvela.web;
 
 import solvela.base.util.SolvelaContentDispositionUtil;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.base.json.JsonUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import solvela.web.ResponseDTO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 
-import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * 返回工具栏
+ * 下载响应头工具。
+ *
+ * <p>原先这里还有一个 {@code write(response, ResponseDTO)} —— 直接往响应里手写 JSON。
+ * 它是错误响应格式的<b>第二个来源</b>：{@code AdminInterceptor} 用它写未登录/无权限，
+ * 于是全局异常处理器改了格式，那三种最常见的错误不会跟着改。
+ * 现在所有错误都走 {@code GlobalExceptionHandler}，这个方法没有存在的理由了。
+ *
  *
  * @Author 1024创新实验室-主任:卓大
  * @Date 2023/11/25 18:51:32
@@ -27,20 +30,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Slf4j
 public class SolvelaResponseUtil {
-
-    public static void write(HttpServletResponse response, ResponseDTO<?> responseDTO) {
-        // 重置response
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(UTF_8.name());
-
-        try {
-            response.getWriter().write(JsonUtils.toJson(responseDTO));
-            response.flushBuffer();
-        } catch (IOException ex) {
-            log.error(ex.getMessage(), ex);
-            throw new RuntimeException(ex);
-        }
-    }
 
     public static void setDownloadFileHeader(HttpServletResponse response, String fileName) {
         setDownloadFileHeader(response, fileName, null);

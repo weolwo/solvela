@@ -19,7 +19,6 @@ import solvela.task.taskconfig.domain.dto.TaskConfigDTO;
 import solvela.task.taskconfig.service.TaskConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
@@ -48,71 +47,66 @@ public class TaskConfigController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("taskConfig:query")
-    public ResponseDTO<PageResult<TaskConfigVO>> queryPage(@RequestBody @Valid TaskConfigQueryForm queryForm) {
+    public PageResult<TaskConfigVO> queryPage(@RequestBody @Valid TaskConfigQueryForm queryForm) {
         PageResult<TaskConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, TaskConfigQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskConfigVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, TaskConfigVO.class);
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
     @RequiresPermission("taskConfig:add")
-    public ResponseDTO<String> add(@RequestBody @Valid TaskConfigAddForm addForm) {
+    public void add(@RequestBody @Valid TaskConfigAddForm addForm) {
         Service.add(SolvelaBeanUtil.copy(addForm, TaskConfigAddCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "任务配置向导提交（主子表：taskConfig + prizeMappingList）")
     @PostMapping("/wizard/submit")
     @RequiresPermission("taskConfig:wizard:submit")
-    public ResponseDTO<Long> wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
+    public Long wizardSubmit(@RequestBody @Valid TaskConfigWizardSubmitForm submitForm) {
         // 🔴 deepCopy：向导表单含嵌套（taskConfig 对象 + prizeMappingList 集合），
         // 浅拷贝会跳过它们，表现是"向导提交成功但任务与奖品映射都没建"
-        return ResponseDTO.ok(Service.wizardSubmit(SolvelaBeanUtil.deepCopy(submitForm, TaskConfigWizardSubmitCommand.class)));
+        return Service.wizardSubmit(SolvelaBeanUtil.deepCopy(submitForm, TaskConfigWizardSubmitCommand.class));
     }
 
     @Operation(summary = "上/下线（列表页批量下线用它，替代删除）")
     @PostMapping("/updateStatus")
     @RequiresPermission("taskConfig:update")
-    public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskConfigStatusUpdateForm form) {
+    public void updateStatus(@RequestBody @Valid TaskConfigStatusUpdateForm form) {
         Service.updateStatus(form.getIdList(), form.getStatus());
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "任务配置向导回显（主子表一次性返回，供编辑态铺回 5 个步骤）")
     @GetMapping("/wizard/detail/{id}")
     @RequiresPermission("taskConfig:query")
-    public ResponseDTO<TaskConfigWizardDetailDTO> wizardDetail(@PathVariable Long id) {
-        return ResponseDTO.ok(Service.wizardDetail(id));
+    public TaskConfigWizardDetailDTO wizardDetail(@PathVariable Long id) {
+        return Service.wizardDetail(id);
     }
 
     @Operation(summary = "任务配置向导更新（主表更新 + 奖励阶梯整体替换，同一事务）")
     @PostMapping("/wizard/update")
     @RequiresPermission("taskConfig:wizard:submit")
-    public ResponseDTO<Long> wizardUpdate(@RequestBody @Valid TaskConfigWizardUpdateForm updateForm) {
-        return ResponseDTO.ok(Service.wizardUpdate(SolvelaBeanUtil.deepCopy(updateForm, TaskConfigWizardUpdateCommand.class)));
+    public Long wizardUpdate(@RequestBody @Valid TaskConfigWizardUpdateForm updateForm) {
+        return Service.wizardUpdate(SolvelaBeanUtil.deepCopy(updateForm, TaskConfigWizardUpdateCommand.class));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @RequiresPermission("taskConfig:update")
-    public ResponseDTO<String> update(@RequestBody @Valid TaskConfigUpdateForm updateForm) {
+    public void update(@RequestBody @Valid TaskConfigUpdateForm updateForm) {
         Service.update(SolvelaBeanUtil.copy(updateForm, TaskConfigUpdateCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
     @RequiresPermission("taskConfig:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
+    public void batchDelete(@RequestBody ValidateList<Long> idList) {
         Service.batchDelete(idList);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
     @RequiresPermission("taskConfig:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
+    public void batchDelete(@PathVariable Long id) {
         Service.delete(id);
-        return ResponseDTO.ok();
     }
 }

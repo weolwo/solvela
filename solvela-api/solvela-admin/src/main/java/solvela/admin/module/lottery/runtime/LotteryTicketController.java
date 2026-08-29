@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.lottery.LotteryRecord;
 import solvela.admin.module.lottery.runtime.domain.form.TicketObtainForm;
@@ -44,25 +43,25 @@ public class LotteryTicketController {
     @Operation(summary = "领号：为用户发一个彩票号码")
     @PostMapping("/obtain")
     @RequiresPermission("lotteryTicket:query")
-    public ResponseDTO<TicketObtainDTO> obtain(@RequestBody @Valid TicketObtainForm form) {
-        return ResponseDTO.ok(ticketIssueService.obtain(SolvelaBeanUtil.copy(form, TicketObtainCommand.class)));
+    public TicketObtainDTO obtain(@RequestBody @Valid TicketObtainForm form) {
+        return ticketIssueService.obtain(SolvelaBeanUtil.copy(form, TicketObtainCommand.class));
     }
 
     @Operation(summary = "我的号码：按奖级升序，未中奖(99)沉底")
     @GetMapping("/myTickets")
     @RequiresPermission("lotteryTicket:query")
-    public ResponseDTO<List<LotteryRecord>> myTickets(@RequestParam String lotteryCode,
+    public List<LotteryRecord> myTickets(@RequestParam String lotteryCode,
                                                       @RequestParam(required = false) String issueNo,
                                                       @RequestParam Long memberId) {
-        return ResponseDTO.ok(ticketQueryService.myTickets(lotteryCode, issueNo, memberId));
+        return ticketQueryService.myTickets(lotteryCode, issueNo, memberId);
     }
 
     @Operation(summary = "号码验真：反解游标 + 校验签名，供客服核对用户出示的号码")
     @GetMapping("/verify")
     @RequiresPermission("lotteryTicket:query")
-    public ResponseDTO<String> verify(@RequestParam String lotteryCode,
+    public String verify(@RequestParam String lotteryCode,
                                       @RequestParam String issueNo,
                                       @RequestParam String ticketNumber) {
-        return ResponseDTO.ok(ticketQueryService.verify(lotteryCode, issueNo, ticketNumber));
+        return ticketQueryService.verify(lotteryCode, issueNo, ticketNumber);
     }
 }

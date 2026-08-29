@@ -10,7 +10,6 @@ import solvela.admin.module.system.role.domain.form.RoleAddForm;
 import solvela.admin.module.system.role.domain.form.RoleUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.service.RoleService;
-import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,33 +33,33 @@ public class RoleController {
     @Operation(summary = "添加角色 @author 卓大")
     @PostMapping("/role/add")
     @RequiresPermission("system:role:addProposal")
-    public ResponseDTO<String> addRole(@Valid @RequestBody RoleAddForm roleAddForm) {
-        return roleService.addRole(roleAddForm);
+    public void addRole(@Valid @RequestBody RoleAddForm roleAddForm) {
+        roleService.addRole(roleAddForm);
     }
 
     @Operation(summary = "删除角色 @author 卓大")
     @GetMapping("/role/delete/{roleId}")
     @RequiresPermission("system:role:delete")
-    public ResponseDTO<String> deleteRole(@PathVariable Long roleId) {
-        return roleService.deleteRole(roleId);
+    public void deleteRole(@PathVariable Long roleId) {
+        roleService.deleteRole(roleId);
     }
 
     @Operation(summary = "更新角色 @author 卓大")
     @PostMapping("/role/update")
     @RequiresPermission("system:role:update")
-    public ResponseDTO<String> updateRole(@Valid @RequestBody RoleUpdateForm roleUpdateDTO) {
-        return roleService.updateRole(roleUpdateDTO);
+    public void updateRole(@Valid @RequestBody RoleUpdateForm roleUpdateDTO) {
+        roleService.updateRole(roleUpdateDTO);
     }
 
     @Operation(summary = "获取角色数据 @author 卓大")
     @GetMapping("/role/get/{roleId}")
-    public ResponseDTO<RoleVO> getRole(@PathVariable("roleId") Long roleId) {
+    public RoleVO getRole(@PathVariable("roleId") Long roleId) {
         return roleService.getRoleById(roleId);
     }
 
     @Operation(summary = "获取所有角色 @author 卓大")
     @GetMapping("/role/getAll")
-    public ResponseDTO<List<RoleVO>> getAllRole() {
+    public List<RoleVO> getAllRole() {
         return roleService.getAllRole();
     }
 

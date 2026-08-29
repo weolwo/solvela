@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.web.ResponseDTO;
 import solvela.exception.EngineScriptException;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.scriptengine.controller.form.ScriptTestForm;
 import solvela.scriptengine.core.EngineFunctionRegistry;
+import solvela.scriptengine.domain.ScriptFunctionDocDTO;
 import solvela.scriptengine.domain.ExecutableScript;
 import solvela.admin.module.scriptengine.domain.vo.ScriptCheckResultVO;
 import solvela.scriptengine.domain.ScriptSceneDocDTO;
@@ -50,15 +50,15 @@ public class ScriptEngineController {
     @Operation(summary = "【用户】脚本引擎-已注册函数文档，按业务域分组")
     @RequiresPermission("script:query")
     @GetMapping("/view")
-    public ResponseDTO<?> view() {
-        return ResponseDTO.ok(engineFunctionRegistry.exportDocs());
+    public List<ScriptFunctionDocDTO> view() {
+        return engineFunctionRegistry.exportDocs();
     }
 
     @Operation(summary = "【用户】脚本引擎-场景契约查询，编辑器据此补全变量名")
     @RequiresPermission("script:query")
     @GetMapping("/scene/view")
-    public ResponseDTO<List<ScriptSceneDocDTO>> sceneView() {
-        return ResponseDTO.ok(Arrays.stream(ScriptScene.values()).map(scene -> {
+    public List<ScriptSceneDocDTO> sceneView() {
+        return Arrays.stream(ScriptScene.values()).map(scene -> {
             ScriptSceneDocDTO doc = new ScriptSceneDocDTO();
             doc.setScene(scene.name());
             doc.setTitle(scene.getTitle());
@@ -76,29 +76,29 @@ public class ScriptEngineController {
                 return item;
             }).toList());
             return doc;
-        }).toList());
+        }).toList();
     }
 
     @Operation(summary = "【用户】脚本引擎-语法校验，不执行")
     @RequiresPermission("script:query")
     @PostMapping("/check")
-    public ResponseDTO<ScriptCheckResultVO> check(@RequestBody @Valid ScriptTestForm form) {
+    public ScriptCheckResultVO check(@RequestBody @Valid ScriptTestForm form) {
         try {
             scriptEngine.check(ExecutableScript.untrusted("online-check", form.getScript()));
-            return ResponseDTO.ok(ScriptCheckResultVO.pass());
+            return ScriptCheckResultVO.pass();
         } catch (EngineScriptException e) {
             // 语法不合法是校验接口的正常结果，不是故障：正常返回，把行列号交给编辑器划红线
-            return ResponseDTO.ok(ScriptCheckResultVO.fail(e.getScriptErrorDetail()));
+            return ScriptCheckResultVO.fail(e.getScriptErrorDetail());
         }
     }
 
     @Operation(summary = "【用户】脚本引擎-在线试跑")
     @RequiresPermission("script:test")
     @PostMapping("/online/test")
-    public ResponseDTO<?> onlineTest(@RequestBody @Valid ScriptTestForm form) {
+    public Object onlineTest(@RequestBody @Valid ScriptTestForm form) {
         // untrusted：在线试跑的内容完全由请求决定，引擎据此关闭一切以脚本原文为 key 的缓存
         ExecutableScript script = ExecutableScript.untrusted("online-test", form.getScript());
         EngineContext context = EngineContext.create(form.getVariables());
-        return ResponseDTO.ok(scriptEngine.evaluate(script, context));
+        return scriptEngine.evaluate(script, context);
     }
 }

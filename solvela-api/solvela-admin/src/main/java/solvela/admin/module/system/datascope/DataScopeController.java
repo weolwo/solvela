@@ -6,7 +6,6 @@ import jakarta.annotation.Resource;
 import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.datascope.domain.DataScopeAndViewTypeVO;
 import solvela.admin.module.system.datascope.service.DataScopeService;
-import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,7 +29,7 @@ public class DataScopeController {
 
     @Operation(summary = "获取当前系统所配置的所有数据范围 @author 罗伊")
     @GetMapping("/dataScope/list")
-    public ResponseDTO<List<DataScopeAndViewTypeVO>> dataScopeList() {
+    public List<DataScopeAndViewTypeVO> dataScopeList() {
         return dataScopeService.dataScopeList();
     }
 

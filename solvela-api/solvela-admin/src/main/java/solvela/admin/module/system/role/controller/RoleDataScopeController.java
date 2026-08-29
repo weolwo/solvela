@@ -9,7 +9,6 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleDataScopeVO;
 import solvela.admin.module.system.role.service.RoleDataScopeService;
-import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,15 +31,15 @@ public class RoleDataScopeController {
 
     @Operation(summary = "获取某角色所设置的数据范围 @author 卓大")
     @GetMapping("/role/dataScope/getRoleDataScopeList/{roleId}")
-    public ResponseDTO<List<RoleDataScopeVO>> dataScopeListByRole(@PathVariable Long roleId) {
+    public List<RoleDataScopeVO> dataScopeListByRole(@PathVariable Long roleId) {
         return roleDataScopeService.getRoleDataScopeList(roleId);
     }
 
     @Operation(summary = "批量设置某角色数据范围 @author 卓大")
     @PostMapping("/role/dataScope/updateRoleDataScopeList")
     @RequiresPermission("system:role:dataScope:update")
-    public ResponseDTO<String> updateRoleDataScopeList(@RequestBody @Valid RoleDataScopeUpdateForm roleDataScopeUpdateForm) {
-        return roleDataScopeService.updateRoleDataScopeList(roleDataScopeUpdateForm);
+    public void updateRoleDataScopeList(@RequestBody @Valid RoleDataScopeUpdateForm roleDataScopeUpdateForm) {
+        roleDataScopeService.updateRoleDataScopeList(roleDataScopeUpdateForm);
     }
 
 

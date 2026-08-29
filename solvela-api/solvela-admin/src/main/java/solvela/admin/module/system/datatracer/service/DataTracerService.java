@@ -6,7 +6,6 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageResult;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.util.SolvelaIpUtil;
@@ -217,11 +216,11 @@ public class DataTracerService {
      * @param queryForm
      * @return
      */
-    public ResponseDTO<PageResult<DataTracerVO>> query(DataTracerQueryForm queryForm) {
+    public PageResult<DataTracerVO> query(DataTracerQueryForm queryForm) {
         Page page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<DataTracerVO> list = dataTracerDao.query(page, queryForm);
         PageResult<DataTracerVO> pageResult = SolvelaPageUtil.convert2PageResult(page, list);
-        return ResponseDTO.ok(pageResult);
+        return pageResult;
     }
 
 }

@@ -1,5 +1,6 @@
 package solvela.admin.module.system.menu.service;
 
+import solvela.exception.BusinessException;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.menu.constant.MenuTypeEnum;
 import solvela.admin.module.system.menu.dao.MenuDao;
@@ -11,7 +12,6 @@ import solvela.admin.module.system.menu.domain.vo.MenuTreeVO;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.code.SystemErrorCode;
 import solvela.web.config.RequestUrl;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaStringUtil;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -45,47 +45,45 @@ public class MenuService {
      * 添加菜单
      *
      */
-    public synchronized ResponseDTO<String> addMenu(MenuAddForm menuAddForm) {
+    public synchronized void addMenu(MenuAddForm menuAddForm) {
         // 校验菜单名称
         if (this.validateMenuName(menuAddForm)) {
-            return ResponseDTO.userErrorParam("菜单名称已存在");
+            throw new BusinessException("菜单名称已存在");
         }
         // 校验前端权限字符串
         if (this.validateWebPerms(menuAddForm)) {
-            return ResponseDTO.userErrorParam("前端权限字符串已存在");
+            throw new BusinessException("前端权限字符串已存在");
         }
         MenuEntity menuEntity = SolvelaBeanUtil.copy(menuAddForm, MenuEntity.class);
         menuDao.insert(menuEntity);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新菜单
      *
      */
-    public synchronized ResponseDTO<String> updateMenu(MenuUpdateForm menuUpdateForm) {
+    public synchronized void updateMenu(MenuUpdateForm menuUpdateForm) {
         //校验菜单是否存在
         MenuEntity selectMenu = menuDao.selectById(menuUpdateForm.getMenuId());
         if (selectMenu == null) {
-            return ResponseDTO.userErrorParam("菜单不存在");
+            throw new BusinessException("菜单不存在");
         }
         if (selectMenu.getDeletedFlag()) {
-            return ResponseDTO.userErrorParam("菜单已被删除");
+            throw new BusinessException("菜单已被删除");
         }
         //校验菜单名称
         if (this.validateMenuName(menuUpdateForm)) {
-            return ResponseDTO.userErrorParam("菜单名称已存在");
+            throw new BusinessException("菜单名称已存在");
         }
         // 校验前端权限字符串
         if (this.validateWebPerms(menuUpdateForm)) {
-            return ResponseDTO.userErrorParam("前端权限字符串已存在");
+            throw new BusinessException("前端权限字符串已存在");
         }
         if (menuUpdateForm.getMenuId().equals(menuUpdateForm.getParentId())) {
-            return ResponseDTO.userErrorParam("上级菜单不能为自己");
+            throw new BusinessException("上级菜单不能为自己");
         }
         MenuEntity menuEntity = SolvelaBeanUtil.copy(menuUpdateForm, MenuEntity.class);
         menuDao.updateById(menuEntity);
-        return ResponseDTO.ok();
     }
 
 
@@ -93,14 +91,13 @@ public class MenuService {
      * 批量删除菜单
      *
      */
-    public synchronized ResponseDTO<String> batchDeleteMenu(List<Long> menuIdList, Long employeeId) {
+    public synchronized void batchDeleteMenu(List<Long> menuIdList, Long employeeId) {
         if (CollectionUtils.isEmpty(menuIdList)) {
-            return ResponseDTO.userErrorParam("所选菜单不能为空");
+            throw new BusinessException("所选菜单不能为空");
         }
         menuDao.deleteByMenuIdList(menuIdList, employeeId, Boolean.TRUE);
         //孩子节点也需要删除
         this.recursiveDeleteChildren(menuIdList, employeeId);
-        return ResponseDTO.ok();
     }
 
     private void recursiveDeleteChildren(List<Long> menuIdList, Long employeeId) {
@@ -182,7 +179,7 @@ public class MenuService {
      *
      * @param onlyMenu 不查询功能点
      */
-    public ResponseDTO<List<MenuTreeVO>> queryMenuTree(Boolean onlyMenu) {
+    public List<MenuTreeVO> queryMenuTree(Boolean onlyMenu) {
         List<Integer> menuTypeList = new ArrayList<>();
         if (onlyMenu) {
             menuTypeList = List.of(MenuTypeEnum.CATALOG.getValue(), MenuTypeEnum.MENU.getValue());
@@ -191,7 +188,7 @@ public class MenuService {
         //根据ParentId进行分组
         Map<Long, List<MenuVO>> parentMap = menuVOList.stream().collect(Collectors.groupingBy(MenuVO::getParentId, Collectors.toList()));
         List<MenuTreeVO> menuTreeVOList = this.buildMenuTree(parentMap, NumberUtils.LONG_ZERO);
-        return ResponseDTO.ok(menuTreeVOList);
+        return menuTreeVOList;
     }
 
     /**
@@ -213,24 +210,24 @@ public class MenuService {
      * 查询菜单详情
      *
      */
-    public ResponseDTO<MenuVO> getMenuDetail(Long menuId) {
+    public MenuVO getMenuDetail(Long menuId) {
         //校验菜单是否存在
         MenuEntity selectMenu = menuDao.selectById(menuId);
         if (selectMenu == null) {
-            return ResponseDTO.error(SystemErrorCode.SYSTEM_ERROR, "菜单不存在");
+            throw new BusinessException(SystemErrorCode.SYSTEM_ERROR, "菜单不存在");
         }
         if (selectMenu.getDeletedFlag()) {
-            return ResponseDTO.error(SystemErrorCode.SYSTEM_ERROR, "菜单已被删除");
+            throw new BusinessException(SystemErrorCode.SYSTEM_ERROR, "菜单已被删除");
         }
         MenuVO menuVO = SolvelaBeanUtil.copy(selectMenu, MenuVO.class);
-        return ResponseDTO.ok(menuVO);
+        return menuVO;
     }
 
     /**
      * 获取系统所有请求路径
      */
-    public ResponseDTO<List<RequestUrl>> getAuthUrl() {
-        return ResponseDTO.ok(authUrl);
+    public List<RequestUrl> getAuthUrl() {
+        return authUrl;
     }
 
 }

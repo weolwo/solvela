@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityDisplay;
 import solvela.activity.service.ActivityDisplayService;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,8 +46,8 @@ public class ActivityDisplayController {
     @Operation(summary = "查询活动展示配置 @author 1024")
     @GetMapping("/get/{activityCode}")
     @RequiresPermission("activityConfig:query")
-    public ResponseDTO<ActivityDisplay> get(@PathVariable String activityCode) {
-        return ResponseDTO.ok(activityDisplayService.getByActivityCode(activityCode));
+    public ActivityDisplay get(@PathVariable String activityCode) {
+        return activityDisplayService.getByActivityCode(activityCode);
     }
 
     /**
@@ -60,8 +59,8 @@ public class ActivityDisplayController {
     @Operation(summary = "保存活动展示配置 @author 1024")
     @PostMapping("/save/{activityCode}")
     @RequiresPermission("activityConfig:update")
-    public ResponseDTO<ActivityDisplay> save(@PathVariable String activityCode,
+    public ActivityDisplay save(@PathVariable String activityCode,
                                              @RequestBody @Valid ActivityDisplay form) {
-        return ResponseDTO.ok(activityDisplayService.saveByCode(activityCode, form, CurrentEmployee.nameOrNull()));
+        return activityDisplayService.saveByCode(activityCode, form, CurrentEmployee.nameOrNull());
     }
 }

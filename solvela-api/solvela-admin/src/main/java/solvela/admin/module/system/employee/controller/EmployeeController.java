@@ -10,7 +10,6 @@ import solvela.admin.module.system.employee.domain.form.*;
 import solvela.admin.module.system.employee.domain.vo.EmployeeVO;
 import solvela.admin.module.system.employee.service.EmployeeService;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.apiencrypt.annotation.ApiDecrypt;
 import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
@@ -39,90 +38,90 @@ public class EmployeeController {
 
     @PostMapping("/employee/query")
     @Operation(summary = "员工管理查询 @author 卓大")
-    public ResponseDTO<PageResult<EmployeeVO>> query(@Valid @RequestBody EmployeeQueryForm query) {
+    public PageResult<EmployeeVO> query(@Valid @RequestBody EmployeeQueryForm query) {
         return employeeService.queryEmployee(query);
     }
 
     @Operation(summary = "添加员工(返回添加员工的密码) @author 卓大")
     @PostMapping("/employee/add")
     @RequiresPermission("system:employee:addProposal")
-    public ResponseDTO<String> addEmployee(@Valid @RequestBody EmployeeAddForm employeeAddForm) {
+    public String addEmployee(@Valid @RequestBody EmployeeAddForm employeeAddForm) {
         return employeeService.addEmployee(employeeAddForm);
     }
 
     @Operation(summary = "更新员工 @author 卓大")
     @PostMapping("/employee/update")
     @RequiresPermission("system:employee:update")
-    public ResponseDTO<String> updateEmployee(@Valid @RequestBody EmployeeUpdateForm employeeUpdateForm) {
-        return employeeService.updateEmployee(employeeUpdateForm);
+    public void updateEmployee(@Valid @RequestBody EmployeeUpdateForm employeeUpdateForm) {
+        employeeService.updateEmployee(employeeUpdateForm);
     }
 
     @Operation(summary = "更新员工个人中心信息 @author 善逸")
     @PostMapping("/employee/update/center")
-    public ResponseDTO<String> updateCenter(@Valid @RequestBody EmployeeUpdateCenterForm updateCenterForm) {
+    public void updateCenter(@Valid @RequestBody EmployeeUpdateCenterForm updateCenterForm) {
         updateCenterForm.setEmployeeId(CurrentEmployee.idOrNull());
-        return employeeService.updateCenter(updateCenterForm);
+        employeeService.updateCenter(updateCenterForm);
     }
 
     @Operation(summary = "更新登录人头像 @author 善逸")
     @PostMapping("/employee/update/avatar")
-    public ResponseDTO<String> updateAvatar(@Valid @RequestBody EmployeeUpdateAvatarForm employeeUpdateAvatarForm) {
+    public void updateAvatar(@Valid @RequestBody EmployeeUpdateAvatarForm employeeUpdateAvatarForm) {
         employeeUpdateAvatarForm.setEmployeeId(CurrentEmployee.idOrNull());
-        return employeeService.updateAvatar(employeeUpdateAvatarForm);
+        employeeService.updateAvatar(employeeUpdateAvatarForm);
     }
 
     @Operation(summary = "更新员工禁用/启用状态 @author 卓大")
     @GetMapping("/employee/update/disabled/{employeeId}")
     @RequiresPermission("system:employee:disabled")
-    public ResponseDTO<String> updateDisableFlag(@PathVariable Long employeeId) {
-        return employeeService.updateDisableFlag(employeeId);
+    public void updateDisableFlag(@PathVariable Long employeeId) {
+        employeeService.updateDisableFlag(employeeId);
     }
 
     @Operation(summary = "批量删除员工 @author 卓大")
     @PostMapping("/employee/update/batch/delete")
     @RequiresPermission("system:employee:delete")
-    public ResponseDTO<String> batchUpdateDeleteFlag(@RequestBody List<Long> employeeIdList) {
-        return employeeService.batchUpdateDeleteFlag(employeeIdList);
+    public void batchUpdateDeleteFlag(@RequestBody List<Long> employeeIdList) {
+        employeeService.batchUpdateDeleteFlag(employeeIdList);
     }
 
     @Operation(summary = "批量调整员工部门 @author 卓大")
     @PostMapping("/employee/update/batch/department")
     @RequiresPermission("system:employee:department:update")
-    public ResponseDTO<String> batchUpdateDepartment(@Valid @RequestBody EmployeeBatchUpdateDepartmentForm batchUpdateDepartmentForm) {
-        return employeeService.batchUpdateDepartment(batchUpdateDepartmentForm);
+    public void batchUpdateDepartment(@Valid @RequestBody EmployeeBatchUpdateDepartmentForm batchUpdateDepartmentForm) {
+        employeeService.batchUpdateDepartment(batchUpdateDepartmentForm);
     }
 
     @Operation(summary = "修改密码 @author 卓大")
     @PostMapping("/employee/update/password")
     @ApiDecrypt
-    public ResponseDTO<String> updatePassword(@Valid @RequestBody EmployeeUpdatePasswordForm updatePasswordForm) {
+    public void updatePassword(@Valid @RequestBody EmployeeUpdatePasswordForm updatePasswordForm) {
         updatePasswordForm.setEmployeeId(CurrentEmployee.idOrNull());
-        return employeeService.updatePassword(CurrentEmployee.orNull(), updatePasswordForm);
+        employeeService.updatePassword(CurrentEmployee.orNull(), updatePasswordForm);
     }
 
     @Operation(summary = "获取密码复杂度 @author 卓大")
     @GetMapping("/employee/getPasswordComplexityEnabled")
     @ApiDecrypt
-    public ResponseDTO<Boolean> getPasswordComplexityEnabled() {
-        return ResponseDTO.ok(level3ProtectConfigService.isPasswordComplexityEnabled());
+    public Boolean getPasswordComplexityEnabled() {
+        return level3ProtectConfigService.isPasswordComplexityEnabled();
     }
 
     @Operation(summary = "重置员工密码 @author 卓大")
     @GetMapping("/employee/update/password/reset/{employeeId}")
     @RequiresPermission("system:employee:password:reset")
-    public ResponseDTO<String> resetPassword(@PathVariable Long employeeId) {
+    public String resetPassword(@PathVariable Long employeeId) {
         return employeeService.resetPassword(employeeId);
     }
 
     @Operation(summary = "查询员工-根据部门id @author 卓大")
     @GetMapping("/employee/getAllEmployeeByDepartmentId/{departmentId}")
-    public ResponseDTO<List<EmployeeVO>> getAllEmployeeByDepartmentId(@PathVariable Long departmentId) {
+    public List<EmployeeVO> getAllEmployeeByDepartmentId(@PathVariable Long departmentId) {
         return employeeService.getAllEmployeeByDepartmentId(departmentId);
     }
 
     @Operation(summary = "查询所有员工 @author 卓大")
     @GetMapping("/employee/queryAll")
-    public ResponseDTO<List<EmployeeVO>> queryAllEmployee(@RequestParam(value = "disabledFlag", required = false) Boolean disabledFlag) {
+    public List<EmployeeVO> queryAllEmployee(@RequestParam(value = "disabledFlag", required = false) Boolean disabledFlag) {
         return employeeService.queryAllEmployee(disabledFlag);
     }
 

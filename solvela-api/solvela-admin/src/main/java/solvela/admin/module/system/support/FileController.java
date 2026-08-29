@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import solvela.web.ResponseDTO;
 import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaContentDispositionUtil;
 import solvela.admin.auth.CurrentEmployee;
@@ -34,8 +33,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * 文件服务。
  *
- * <p><b>这是整个文件模块唯一认识 {@code ResponseDTO} 和 HttpServletResponse 的地方</b>。
- * 业务层抛 {@code BusinessException}，翻译成响应结构只在这一层发生一次。
+ * <p><b>这是整个文件模块唯一认识 HttpServletResponse 的地方</b>。
+ * 业务层抛 {@code BusinessException}，翻译成 HTTP 响应只在全局异常处理器里发生一次。
  *
  * @Author 1024创新实验室: 罗伊
  * @Date 2019年10月11日 15:34:47
@@ -59,14 +58,14 @@ public class FileController extends SupportBaseController {
      */
     @Operation(summary = "文件上传（categoryCode 与 folder 二选一） @author 胡克")
     @PostMapping("/file/upload")
-    public ResponseDTO<FileUploadVO> upload(@RequestParam MultipartFile file,
+    public FileUploadVO upload(@RequestParam MultipartFile file,
                                             @RequestParam(required = false) Integer folder,
                                             @RequestParam(required = false) String categoryCode) {
         String operator = CurrentEmployee.nameOrNull();
         FileEntity entity = (categoryCode == null || categoryCode.isBlank())
                 ? fileAssetService.upload(MultipartUploadSource.of(file), Long.valueOf(requireFolder(folder)), operator)
                 : fileAssetService.upload(MultipartUploadSource.of(file), categoryCode, operator);
-        return ResponseDTO.ok(toUploadVO(entity));
+        return toUploadVO(entity);
     }
 
     private static Integer requireFolder(Integer folder) {
@@ -78,8 +77,8 @@ public class FileController extends SupportBaseController {
 
     @Operation(summary = "获取文件URL：根据storageKey，支持逗号分隔 @author 胡克")
     @GetMapping("/file/getFileUrl")
-    public ResponseDTO<String> getUrl(@RequestParam String storageKey) {
-        return ResponseDTO.ok(fileAssetService.urlByStorageKeys(storageKey));
+    public String getUrl(@RequestParam String storageKey) {
+        return fileAssetService.urlByStorageKeys(storageKey);
     }
 
     /**

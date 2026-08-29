@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.entity.FileCategoryEntity;
@@ -36,31 +35,29 @@ public class FileCategoryController extends SupportBaseController {
 
     @Operation(summary = "文件分类列表（按展示顺序，带文件数） @author 1024")
     @GetMapping("/file/category/list")
-    public ResponseDTO<List<FileCategoryVO>> list() {
-        return ResponseDTO.ok(fileCategoryService.listWithCount());
+    public List<FileCategoryVO> list() {
+        return fileCategoryService.listWithCount();
     }
 
     @Operation(summary = "新建文件分类 @author 1024")
     @PostMapping("/file/category/add")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<FileCategoryEntity> add(@RequestBody @Valid FileCategoryEntity form) {
-        return ResponseDTO.ok(fileCategoryService.add(form, CurrentEmployee.nameOrNull()));
+    public FileCategoryEntity add(@RequestBody @Valid FileCategoryEntity form) {
+        return fileCategoryService.add(form, CurrentEmployee.nameOrNull());
     }
 
     @Operation(summary = "更新文件分类 @author 1024")
     @PostMapping("/file/category/update")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<String> update(@RequestBody @Valid FileCategoryEntity form) {
+    public void update(@RequestBody @Valid FileCategoryEntity form) {
         fileCategoryService.update(form, CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "删除文件分类（内置分类与非空分类不允许删） @author 1024")
     @GetMapping("/file/category/delete/{categoryId}")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<String> delete(@PathVariable Long categoryId) {
+    public void delete(@PathVariable Long categoryId) {
         fileCategoryService.delete(categoryId);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -72,8 +69,7 @@ public class FileCategoryController extends SupportBaseController {
     @Operation(summary = "文件分类拖拽排序 @author 1024")
     @PostMapping("/file/category/reorder")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<String> reorder(@RequestBody List<Long> orderedIds) {
+    public void reorder(@RequestBody List<Long> orderedIds) {
         fileCategoryService.reorder(orderedIds, CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 }

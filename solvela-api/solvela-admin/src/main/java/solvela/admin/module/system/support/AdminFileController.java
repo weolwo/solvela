@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.form.FileMetaUpdateForm;
@@ -39,8 +38,8 @@ public class AdminFileController extends SupportBaseController {
     @Operation(summary = "分页查询 @author 1024创新实验室-主任-卓大")
     @PostMapping("/file/queryPage")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<PageResult<FileVO>> queryPage(@RequestBody @Valid FileQueryForm queryForm) {
-        return ResponseDTO.ok(fileAssetService.queryPage(queryForm));
+    public PageResult<FileVO> queryPage(@RequestBody @Valid FileQueryForm queryForm) {
+        return fileAssetService.queryPage(queryForm);
     }
 
     /**
@@ -50,8 +49,8 @@ public class AdminFileController extends SupportBaseController {
     @Operation(summary = "文件详情（含引用） @author 1024")
     @GetMapping("/file/detail/{fileId}")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<FileDetailVO> detail(@PathVariable Long fileId) {
-        return ResponseDTO.ok(fileAssetService.detail(fileId));
+    public FileDetailVO detail(@PathVariable Long fileId) {
+        return fileAssetService.detail(fileId);
     }
 
     /**
@@ -61,10 +60,9 @@ public class AdminFileController extends SupportBaseController {
     @Operation(summary = "修改文件名称与标签 @author 1024")
     @PostMapping("/file/updateMeta")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<String> updateMeta(@RequestBody @Valid FileMetaUpdateForm form) {
+    public void updateMeta(@RequestBody @Valid FileMetaUpdateForm form) {
         fileAssetService.updateMeta(form.getFileId(), form.getOriginalName(), form.getTags(),
                 CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 
     /**
@@ -77,9 +75,8 @@ public class AdminFileController extends SupportBaseController {
     @Operation(summary = "删除文件（有引用则拒绝） @author 1024")
     @GetMapping("/file/delete/{fileId}")
     @RequiresPermission("support:file:query")
-    public ResponseDTO<String> delete(@PathVariable Long fileId) {
+    public void delete(@PathVariable Long fileId) {
         fileAssetService.delete(fileId, CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 
 }

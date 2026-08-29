@@ -3,7 +3,7 @@ package solvela.base.storage;
 /**
  * 存储层失败原因。<b>类型即语义。</b>
  *
- * <p><b>存储层不认识 {@code ResponseDTO}</b> —— 那是 HTTP 响应结构，让基础设施层返回它，
+ * <p><b>存储层不认识 HTTP</b> —— 让基础设施层返回一个响应结构，
  * 就意味着这一层永远只能被 Controller 调，定时任务、MQ 消费者、单测都用不了。
  * 旧的 {@code IFileStorageService} 就是这么长的。
  *

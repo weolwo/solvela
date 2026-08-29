@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.member.domain.form.MemberQueryForm;
@@ -48,9 +47,9 @@ public class MemberController {
     @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
     @RequiresPermission("member:query")
-    public ResponseDTO<PageResult<MemberVO>> queryPage(@RequestBody @Valid MemberQueryForm queryForm) {
+    public PageResult<MemberVO> queryPage(@RequestBody @Valid MemberQueryForm queryForm) {
         PageResult<MemberDTO> page = memberService.queryPage(SolvelaBeanUtil.copy(queryForm, MemberQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, MemberVO.class);
     }
 
     /**
@@ -59,9 +58,8 @@ public class MemberController {
     @Operation(summary = "冻结/解冻 @author weolwo")
     @GetMapping("/updateStatus/{memberId}/{status}")
     @RequiresPermission("member:update")
-    public ResponseDTO<String> updateStatus(@PathVariable Long memberId, @PathVariable Integer status) {
+    public void updateStatus(@PathVariable Long memberId, @PathVariable Integer status) {
         memberService.updateStatus(memberId, status, CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 
     /**
@@ -73,9 +71,8 @@ public class MemberController {
     @Operation(summary = "保存运营备注 @author weolwo")
     @PostMapping("/updateRemark")
     @RequiresPermission("member:update")
-    public ResponseDTO<String> updateRemark(@RequestBody @Valid MemberRemarkForm remarkForm) {
+    public void updateRemark(@RequestBody @Valid MemberRemarkForm remarkForm) {
         memberService.updateRemark(remarkForm.getMemberId(), remarkForm.getRemark(),
                 CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 }

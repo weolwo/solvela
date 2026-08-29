@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.admin.constant.UserTypeEnum;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.admin.module.system.loginlog.domain.LoginLogEntity;
@@ -34,11 +33,11 @@ public class LoginLogService {
      * @author 卓大
      * @description 分页查询
      */
-    public ResponseDTO<PageResult<LoginLogVO>> queryByPage(LoginLogQueryForm queryForm) {
+    public PageResult<LoginLogVO> queryByPage(LoginLogQueryForm queryForm) {
         Page page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<LoginLogVO> logList = loginLogDao.queryByPage(page, queryForm);
         PageResult<LoginLogVO> pageResult = SolvelaPageUtil.convert2PageResult(page, logList);
-        return ResponseDTO.ok(pageResult);
+        return pageResult;
     }
 
     /**

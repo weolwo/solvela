@@ -1,10 +1,10 @@
 package solvela.admin.module.system.operatelog;
 
+import solvela.exception.BusinessException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.admin.module.system.operatelog.domain.OperateLogEntity;
@@ -33,11 +33,11 @@ public class OperateLogService {
      * @author 罗伊
      * @description 分页查询
      */
-    public ResponseDTO<PageResult<OperateLogVO>> queryByPage(OperateLogQueryForm queryForm) {
+    public PageResult<OperateLogVO> queryByPage(OperateLogQueryForm queryForm) {
         Page page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<OperateLogEntity> logEntityList = operateLogDao.queryByPage(page, queryForm);
         PageResult<OperateLogVO> pageResult = SolvelaPageUtil.convert2PageResult(page, logEntityList, OperateLogVO.class);
-        return ResponseDTO.ok(pageResult);
+        return pageResult;
     }
 
 
@@ -46,12 +46,12 @@ public class OperateLogService {
      * @param operateLogId
      * @return
      */
-    public ResponseDTO<OperateLogVO> detail(Long operateLogId) {
+    public OperateLogVO detail(Long operateLogId) {
         OperateLogEntity operateLogEntity = operateLogDao.selectById(operateLogId);
         if(operateLogEntity == null){
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         OperateLogVO operateLogVO = SolvelaBeanUtil.copy(operateLogEntity, OperateLogVO.class);
-        return ResponseDTO.ok(operateLogVO);
+        return operateLogVO;
     }
 }

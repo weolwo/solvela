@@ -4,7 +4,7 @@ package solvela.base.storage;
  * 存储层异常，携带一个 {@link StorageFailure} 说明失败类型。
  *
  * <p>刻意<b>不继承 {@code BusinessException}</b>：存储层是基础设施，不该知道业务异常体系的存在。
- * 翻译成 {@code ResponseDTO} 这件事只在 Controller 层发生一次。
+ * 翻译成 HTTP 状态码这件事只在全局异常处理器里发生一次。
  *
  * @Date 2026-08-09
  */

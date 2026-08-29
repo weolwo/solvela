@@ -14,7 +14,6 @@ import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
 import solvela.lottery.issue.service.LotteryIssueService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
@@ -43,54 +42,50 @@ public class LotteryIssueController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("lotteryIssue:query")
-    public ResponseDTO<PageResult<LotteryIssueVO>> queryPage(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
+    public PageResult<LotteryIssueVO> queryPage(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
         PageResult<LotteryIssueDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryIssueQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryIssueVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, LotteryIssueVO.class);
     }
 
     @Operation(summary = "巡检概览：逾期未开奖/售卖中/已售罄/今日计划开奖。只吃 lotteryCode 一个条件")
     @PostMapping("/overview")
     @RequiresPermission("lotteryIssue:query")
-    public ResponseDTO<LotteryIssueOverviewDTO> overview(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
-        return ResponseDTO.ok(Service.overview(SolvelaBeanUtil.copy(queryForm, LotteryIssueQuery.class)));
+    public LotteryIssueOverviewDTO overview(@RequestBody @Valid LotteryIssueQueryForm queryForm) {
+        return Service.overview(SolvelaBeanUtil.copy(queryForm, LotteryIssueQuery.class));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
     @RequiresPermission("lotteryIssue:add")
-    public ResponseDTO<String> add(@RequestBody @Valid LotteryIssueAddForm addForm) {
+    public void add(@RequestBody @Valid LotteryIssueAddForm addForm) {
         Service.add(SolvelaBeanUtil.copy(addForm, LotteryIssueAddCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @RequiresPermission("lotteryIssue:update")
-    public ResponseDTO<String> update(@RequestBody @Valid LotteryIssueUpdateForm updateForm) {
+    public void update(@RequestBody @Valid LotteryIssueUpdateForm updateForm) {
         Service.update(SolvelaBeanUtil.copy(updateForm, LotteryIssueUpdateCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "停售：把售卖结束时间提前到此刻，立刻停止发号。想恢复售卖走编辑改回未来时刻")
     @GetMapping("/stopSale/{id}")
     @RequiresPermission("lotteryIssue:update")
-    public ResponseDTO<String> stopSale(@PathVariable Long id) {
+    public void stopSale(@PathVariable Long id) {
         Service.stopSale(id);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量停售：逐期停售并回一句汇总，已停售/已开奖计入跳过")
     @PostMapping("/batchStopSale")
     @RequiresPermission("lotteryIssue:update")
-    public ResponseDTO<String> batchStopSale(@RequestBody ValidateList<Long> idList) {
-        return ResponseDTO.ok(Service.batchStopSale(idList));
+    public String batchStopSale(@RequestBody ValidateList<Long> idList) {
+        return Service.batchStopSale(idList);
     }
 
     @Operation(summary = "单个删除：只能删「零发号 + 待开奖」的空期，供工作台清理误建的期号")
     @GetMapping("/delete/{id}")
     @RequiresPermission("lotteryIssue:delete")
-    public ResponseDTO<String> batchDelete(@PathVariable Long id) {
+    public void batchDelete(@PathVariable Long id) {
         Service.delete(id);
-        return ResponseDTO.ok();
     }
 }

@@ -1,5 +1,6 @@
 package solvela.admin.module.system.securityprotect.service;
 
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.util.SolvelaDateFormatterEnum;
 import solvela.base.util.SolvelaLocalDateUtil;
@@ -7,7 +8,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.admin.constant.UserTypeEnum;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.admin.module.system.securityprotect.dao.LoginFailDao;
@@ -44,43 +44,41 @@ public class SecurityLoginService {
 
 
     /**
-     * 检查是否可以登录
+     * 检查是否可以登录；已被锁定则抛 {@link UserErrorCode#LOGIN_FAIL_LOCK}。
      *
-     * @param userId
-     * @param userType
-     * @return
+     * @return 该用户当前的登录失败记录，<b>可能为 null</b>（没配失败锁定、或从没失败过）。
+     *         调用方要把它原样传给 {@link #recordLoginFail}，那边靠它算「还剩几次」
      */
-    public ResponseDTO<LoginFailEntity> checkLogin(Long userId, UserTypeEnum userType) {
+    public LoginFailEntity checkLogin(Long userId, UserTypeEnum userType) {
 
         // 若登录最大失败次数小于1，无需校验
         if (level3ProtectConfigService.getLoginFailMaxTimes() < 1) {
-            return ResponseDTO.ok();
+            return null;
         }
-
 
         LoginFailEntity loginFailEntity = loginFailDao.selectByUserIdAndUserType(userId, userType.getValue());
         if (loginFailEntity == null) {
-            return ResponseDTO.ok();
+            return null;
         }
 
         // 校验登录失败次数
         if (loginFailEntity.getLoginFailCount() < level3ProtectConfigService.getLoginFailMaxTimes()) {
-            return ResponseDTO.ok(loginFailEntity);
+            return loginFailEntity;
         }
 
         // 校验是否锁定
         if (loginFailEntity.getLoginLockBeginTime() == null) {
-            return ResponseDTO.ok(loginFailEntity);
+            return loginFailEntity;
         }
 
         // 校验锁定时长
         if (loginFailEntity.getLoginLockBeginTime().plusSeconds(level3ProtectConfigService.getLoginFailLockSeconds()).isBefore(LocalDateTime.now())) {
             // 过了锁定时间
-            return ResponseDTO.ok(loginFailEntity);
+            return loginFailEntity;
         }
 
         LocalDateTime unlockTime = loginFailEntity.getLoginLockBeginTime().plusSeconds(level3ProtectConfigService.getLoginFailLockSeconds());
-        return ResponseDTO.error(UserErrorCode.LOGIN_FAIL_LOCK, String.format(LOGIN_LOCK_MSG, loginFailEntity.getLoginFailCount(), level3ProtectConfigService.getLoginFailLockSeconds() / 60, SolvelaLocalDateUtil.format(unlockTime, SolvelaDateFormatterEnum.YMD_HMS)));
+        throw new BusinessException(UserErrorCode.LOGIN_FAIL_LOCK, String.format(LOGIN_LOCK_MSG, loginFailEntity.getLoginFailCount(), level3ProtectConfigService.getLoginFailLockSeconds() / 60, SolvelaLocalDateUtil.format(unlockTime, SolvelaDateFormatterEnum.YMD_HMS)));
     }
 
     /**
@@ -163,13 +161,12 @@ public class SecurityLoginService {
      * @param idList
      * @return
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         loginFailDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
 }

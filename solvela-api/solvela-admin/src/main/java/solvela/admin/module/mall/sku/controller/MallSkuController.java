@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.mall.sku.domain.form.MallSkuQueryForm;
 import solvela.mall.sku.domain.query.MallSkuQuery;
@@ -45,8 +44,8 @@ public class MallSkuController {
     @Operation(summary = "库存总览分页查询（按可用库存升序） @author weolwo")
     @PostMapping("/queryPage")
     @RequiresPermission("mallSku:query")
-    public ResponseDTO<PageResult<MallSkuVO>> queryPage(@RequestBody @Valid MallSkuQueryForm queryForm) {
+    public PageResult<MallSkuVO> queryPage(@RequestBody @Valid MallSkuQueryForm queryForm) {
         PageResult<MallSkuDTO> page = mallSkuService.queryPage(SolvelaBeanUtil.copy(queryForm, MallSkuQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallSkuVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, MallSkuVO.class);
     }
 }

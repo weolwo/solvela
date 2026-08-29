@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.domain.ValidateList;
 import solvela.admin.auth.CurrentEmployee;
@@ -50,9 +49,9 @@ public class MallCategoryController {
     @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
     @RequiresPermission("mallCategory:query")
-    public ResponseDTO<PageResult<MallCategoryVO>> queryPage(@RequestBody @Valid MallCategoryQueryForm queryForm) {
+    public PageResult<MallCategoryVO> queryPage(@RequestBody @Valid MallCategoryQueryForm queryForm) {
         PageResult<MallCategoryDTO> page = mallCategoryService.queryPage(SolvelaBeanUtil.copy(queryForm, MallCategoryQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallCategoryVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, MallCategoryVO.class);
     }
 
     /**
@@ -62,17 +61,17 @@ public class MallCategoryController {
     @Operation(summary = "全部分类（不分页），列表页拼树用 @author weolwo")
     @GetMapping("/queryAll")
     @RequiresPermission("mallCategory:query")
-    public ResponseDTO<List<MallCategoryVO>> queryAll() {
-        return ResponseDTO.ok(SolvelaBeanUtil.copyList(
-                mallCategoryService.queryAll(), MallCategoryVO.class));
+    public List<MallCategoryVO> queryAll() {
+        return SolvelaBeanUtil.copyList(
+                mallCategoryService.queryAll(), MallCategoryVO.class);
     }
 
     @Operation(summary = "启用中的分类列表：商品编辑页的分类下拉用 @author weolwo")
     @GetMapping("/enabledList")
     @RequiresPermission("mallCategory:query")
-    public ResponseDTO<List<MallCategoryVO>> enabledList() {
-        return ResponseDTO.ok(SolvelaBeanUtil.copyList(
-                mallCategoryService.queryEnabledList(), MallCategoryVO.class));
+    public List<MallCategoryVO> enabledList() {
+        return SolvelaBeanUtil.copyList(
+                mallCategoryService.queryEnabledList(), MallCategoryVO.class);
     }
 
     /**
@@ -81,8 +80,8 @@ public class MallCategoryController {
     @Operation(summary = "保存分类，id为空即新建 @author weolwo")
     @PostMapping("/save")
     @RequiresPermission("mallCategory:update")
-    public ResponseDTO<Long> save(@RequestBody @Valid MallCategorySaveForm saveForm) {
-        return ResponseDTO.ok(mallCategoryService.save(SolvelaBeanUtil.copy(saveForm, MallCategorySaveCommand.class), CurrentEmployee.nameOrNull()));
+    public Long save(@RequestBody @Valid MallCategorySaveForm saveForm) {
+        return mallCategoryService.save(SolvelaBeanUtil.copy(saveForm, MallCategorySaveCommand.class), CurrentEmployee.nameOrNull());
     }
 
     /**
@@ -94,31 +93,28 @@ public class MallCategoryController {
     @Operation(summary = "批量新建分类（可带一层子分类） @author weolwo")
     @PostMapping("/batchSave")
     @RequiresPermission("mallCategory:add")
-    public ResponseDTO<Integer> batchSave(@RequestBody @Valid MallCategoryBatchSaveForm batchSaveForm) {
-        return ResponseDTO.ok(mallCategoryService.batchSave(SolvelaBeanUtil.deepCopy(batchSaveForm, MallCategoryBatchSaveCommand.class), CurrentEmployee.nameOrNull()));
+    public Integer batchSave(@RequestBody @Valid MallCategoryBatchSaveForm batchSaveForm) {
+        return mallCategoryService.batchSave(SolvelaBeanUtil.deepCopy(batchSaveForm, MallCategoryBatchSaveCommand.class), CurrentEmployee.nameOrNull());
     }
 
     @Operation(summary = "启用/停用 @author weolwo")
     @GetMapping("/updateStatus/{id}/{status}")
     @RequiresPermission("mallCategory:update")
-    public ResponseDTO<String> updateStatus(@PathVariable Long id, @PathVariable Integer status) {
+    public void updateStatus(@PathVariable Long id, @PathVariable Integer status) {
         mallCategoryService.updateStatus(id, status, CurrentEmployee.nameOrNull());
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除 @author weolwo")
     @PostMapping("/batchDelete")
     @RequiresPermission("mallCategory:delete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
+    public void batchDelete(@RequestBody ValidateList<Long> idList) {
         mallCategoryService.batchDelete(idList);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除 @author weolwo")
     @GetMapping("/delete/{id}")
     @RequiresPermission("mallCategory:delete")
-    public ResponseDTO<String> delete(@PathVariable Long id) {
+    public void delete(@PathVariable Long id) {
         mallCategoryService.delete(id);
-        return ResponseDTO.ok();
     }
 }

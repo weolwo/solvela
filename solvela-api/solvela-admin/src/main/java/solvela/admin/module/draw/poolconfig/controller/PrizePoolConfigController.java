@@ -18,7 +18,6 @@ import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
 import solvela.draw.poolconfig.service.PrizePoolConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
@@ -49,48 +48,46 @@ public class PrizePoolConfigController {
     @Operation(summary = "分页查询：奖池原始行，供下拉选项等场景使用")
     @PostMapping("/queryPage")
     @RequiresPermission("prizePoolConfig:query")
-    public ResponseDTO<PageResult<PrizePoolConfigVO>> queryPage(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
+    public PageResult<PrizePoolConfigVO> queryPage(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
         PageResult<PrizePoolConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizePoolConfigQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizePoolConfigVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, PrizePoolConfigVO.class);
     }
 
     @Operation(summary = "奖池一览：可编辑字段 + 坑位/概率/限领搭配的体检结论，列表页主视图")
     @PostMapping("/board")
     @RequiresPermission("prizePoolConfig:query")
-    public ResponseDTO<PrizePoolBoardResultDTO> board(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
-        return ResponseDTO.ok(prizePoolBoardService.board(SolvelaBeanUtil.copy(queryForm, PrizePoolConfigQuery.class)));
+    public PrizePoolBoardResultDTO board(@RequestBody @Valid PrizePoolConfigQueryForm queryForm) {
+        return prizePoolBoardService.board(SolvelaBeanUtil.copy(queryForm, PrizePoolConfigQuery.class));
     }
 
     @Operation(summary = "生成奖池编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
     @RequiresPermission("prizePoolConfig:workbench:save")
-    public ResponseDTO<String> generatePoolCode() {
-        return ResponseDTO.ok(Service.generatePoolCode());
+    public String generatePoolCode() {
+        return Service.generatePoolCode();
     }
 
     @Operation(summary = "抽奖工作台聚合回显（与聚合保存入参同构）")
     @GetMapping("/workbench/detail")
     @RequiresPermission("prizePoolConfig:query")
-    public ResponseDTO<DrawWorkbenchDTO> workbenchDetail(@RequestParam String activityCode) {
-        return ResponseDTO.ok(Service.workbenchDetail(activityCode));
+    public DrawWorkbenchDTO workbenchDetail(@RequestParam String activityCode) {
+        return Service.workbenchDetail(activityCode);
     }
 
     @Operation(summary = "抽奖工作台聚合保存（物资 + 多奖池 + 坑位映射，主子表事务）")
     @PostMapping("/workbench/save")
     @RequiresPermission("prizePoolConfig:workbench:save")
-    public ResponseDTO<String> workbenchSave(@RequestBody @Valid DrawWorkbenchSaveForm saveForm) {
+    public void workbenchSave(@RequestBody @Valid DrawWorkbenchSaveForm saveForm) {
         // 🔴 用 deepCopy 而不是 copy：本表单有两层嵌套（poolList -> mappingList），
         // 浅拷贝会因泛型不兼容<b>跳过</b>这些集合，结果是"保存成功但奖池一个没建"
         Service.workbenchSave(SolvelaBeanUtil.deepCopy(saveForm, DrawWorkbenchSaveCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
     @RequiresPermission("prizePoolConfig:update")
-    public ResponseDTO<String> update(@RequestBody @Valid PrizePoolConfigUpdateForm updateForm) {
+    public void update(@RequestBody @Valid PrizePoolConfigUpdateForm updateForm) {
         Service.update(SolvelaBeanUtil.copy(updateForm, PrizePoolConfigUpdateCommand.class));
-        return ResponseDTO.ok();
     }
 
     /*
@@ -112,23 +109,21 @@ public class PrizePoolConfigController {
     @Operation(summary = "禁用奖池：关闭开关，运行态立即拒绝新的抽奖请求；历史流水与坑位不受影响，可逆")
     @GetMapping("/offline/{id}")
     @RequiresPermission("prizePoolConfig:update")
-    public ResponseDTO<String> offline(@PathVariable Long id) {
+    public void offline(@PathVariable Long id) {
         Service.offline(id);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "启用奖池：把开关拨回开启")
     @GetMapping("/online/{id}")
     @RequiresPermission("prizePoolConfig:update")
-    public ResponseDTO<String> online(@PathVariable Long id) {
+    public void online(@PathVariable Long id) {
         Service.online(id);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量禁用：逐个禁用并回一句汇总，本就已关闭的计入跳过")
     @PostMapping("/batchOffline")
     @RequiresPermission("prizePoolConfig:update")
-    public ResponseDTO<String> batchOffline(@RequestBody ValidateList<Long> idList) {
-        return ResponseDTO.ok(Service.batchOffline(idList));
+    public String batchOffline(@RequestBody ValidateList<Long> idList) {
+        return Service.batchOffline(idList);
     }
 }

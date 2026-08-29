@@ -1,5 +1,6 @@
 package solvela.admin.module.system.login.service;
 
+import solvela.exception.BusinessException;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.employee.domain.entity.EmployeeEntity;
@@ -18,7 +19,6 @@ import solvela.admin.module.system.role.service.RoleMenuService;
 import solvela.code.UserErrorCode;
 import solvela.base.constant.StringConst;
 import solvela.crypto.PasswordCipher;
-import solvela.web.ResponseDTO;
 import solvela.admin.constant.UserTypeEnum;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaEnumUtil;
@@ -116,27 +116,27 @@ public class LoginService {
      *
      * @return 返回用户登录信息
      */
-    public ResponseDTO<LoginResultVO> login(LoginForm loginForm, String ip, String userAgent) {
+    public LoginResultVO login(LoginForm loginForm, String ip, String userAgent) {
 
         LoginDeviceEnum loginDeviceEnum = SolvelaEnumUtil.getEnumByValue(loginForm.getLoginDevice(), LoginDeviceEnum.class);
         if (loginDeviceEnum == null) {
-            return ResponseDTO.userErrorParam("登录设备暂不支持！");
+            throw new BusinessException("登录设备暂不支持！");
         }
         // 验证登录名
         EmployeeEntity employeeEntity = employeeService.getByLoginName(loginForm.getLoginName());
         if (null == employeeEntity) {
-            return ResponseDTO.userErrorParam("登录名或密码错误！");
+            throw new BusinessException("登录名或密码错误！");
         }
 
         // 验证账号状态
         if (employeeEntity.getDeletedFlag()) {
             saveLoginLog(employeeEntity, ip, userAgent, "账号已删除", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
-            return ResponseDTO.userErrorParam("您的账号已被删除,请联系工作人员！");
+            throw new BusinessException("您的账号已被删除,请联系工作人员！");
         }
 
         if (employeeEntity.getDisabledFlag()) {
             saveLoginLog(employeeEntity, ip, userAgent, "账号已禁用", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
-            return ResponseDTO.userErrorParam("您的账号已被禁用,请联系工作人员！");
+            throw new BusinessException("您的账号已被禁用,请联系工作人员！");
         }
 
         // 解密前端加密的密码
@@ -146,11 +146,8 @@ public class LoginService {
         String superPassword = configService.getConfigValue(ConfigKeyEnum.SUPER_PASSWORD);
         boolean superPasswordFlag = superPassword.equals(requestPassword);
 
-        // 校验双因子登录
-        ResponseDTO<String> validateEmailCode = validateEmailCode(loginForm, employeeEntity, superPasswordFlag);
-        if (!validateEmailCode.getOk()) {
-            return ResponseDTO.error(validateEmailCode);
-        }
+        // 校验双因子登录（不通过直接抛）
+        validateEmailCode(loginForm, employeeEntity, superPasswordFlag);
 
         AccessToken accessToken;
         if (superPasswordFlag) {
@@ -160,19 +157,22 @@ public class LoginService {
 
         } else {
 
-            // 按照等保登录要求，进行登录失败次数校验
-            ResponseDTO<LoginFailEntity> loginFailEntityResponseDTO = securityLoginService.checkLogin(employeeEntity.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE);
-            if (!loginFailEntityResponseDTO.getOk()) {
-                return ResponseDTO.error(loginFailEntityResponseDTO);
-            }
+            // 按照等保登录要求，进行登录失败次数校验；已锁定会直接抛 LOGIN_FAIL_LOCK
+            LoginFailEntity loginFailEntity = securityLoginService.checkLogin(
+                    employeeEntity.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE);
 
             // 密码错误
             if (!PasswordCipher.matches(employeeService.generateSaltPassword(requestPassword, employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
                 // 记录登录失败
                 saveLoginLog(employeeEntity, ip, userAgent, "密码错误", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
                 // 记录等级保护次数
-                String msg = securityLoginService.recordLoginFail(employeeEntity.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE, employeeEntity.getLoginName(), loginFailEntityResponseDTO.getData());
-                return msg == null ? ResponseDTO.userErrorParam("登录名或密码错误！") : ResponseDTO.error(UserErrorCode.LOGIN_FAIL_WILL_LOCK, msg);
+                String msg = securityLoginService.recordLoginFail(employeeEntity.getEmployeeId(),
+                        UserTypeEnum.ADMIN_EMPLOYEE, employeeEntity.getLoginName(), loginFailEntity);
+                // msg 非空说明等保开了失败锁定，里面写着「还剩几次 / 锁到什么时候」——
+                // 这句话必须原样给用户，否则他不知道再错一次会发生什么
+                throw msg == null
+                        ? new BusinessException("登录名或密码错误！")
+                        : new BusinessException(UserErrorCode.LOGIN_FAIL_WILL_LOCK, msg);
             }
 
             accessToken = tokenStore.issue(employeeEntity.getEmployeeId(), false, loginDeviceEnum.getDesc());
@@ -200,7 +200,7 @@ public class LoginService {
         // 更新用户权限
         loginManager.loadUserPermission(employeeEntity.getEmployeeId());
 
-        return ResponseDTO.ok(loginResultVO);
+        return loginResultVO;
     }
 
 
@@ -242,7 +242,7 @@ public class LoginService {
     /**
      * 退出登录
      */
-    public ResponseDTO<String> logout(RequestEmployee requestUser) {
+    public void logout(RequestEmployee requestUser) {
 
         // 吊销本次会话的令牌。<b>只吊销这一个</b> —— 账号禁用/改密走 revokeAll，
         // 不该由「点了退出」顺带把这个人其它设备上的会话也踢掉
@@ -264,7 +264,6 @@ public class LoginService {
                 .build();
         loginLogService.log(loginEntity);
 
-        return ResponseDTO.ok();
     }
 
     /**
@@ -292,31 +291,32 @@ public class LoginService {
     /**
      * 发送 邮箱 验证码
      */
-    public ResponseDTO<String> sendEmailCode(String loginName) {
+    public void sendEmailCode(String loginName) {
 
         // 开启双因子登录
         if (!level3ProtectConfigService.isTwoFactorLoginEnabled()) {
-            return ResponseDTO.userErrorParam("无需使用邮箱验证码");
+            throw new BusinessException("无需使用邮箱验证码");
         }
 
         // 验证登录名
         EmployeeEntity employeeEntity = employeeService.getByLoginName(loginName);
         if (null == employeeEntity) {
-            return ResponseDTO.ok();
+            // 账号不存在也当作成功：区分「有没有这个账号」等于送出一个账号枚举接口
+            return;
         }
 
         // 验证账号状态
         if (employeeEntity.getDeletedFlag()) {
-            return ResponseDTO.userErrorParam("您的账号已被删除,请联系工作人员！");
+            throw new BusinessException("您的账号已被删除,请联系工作人员！");
         }
 
         if (employeeEntity.getDisabledFlag()) {
-            return ResponseDTO.userErrorParam("您的账号已被禁用,请联系工作人员！");
+            throw new BusinessException("您的账号已被禁用,请联系工作人员！");
         }
 
         String mail = employeeEntity.getEmail();
         if (SolvelaStringUtil.isBlank(mail)) {
-            return ResponseDTO.userErrorParam("您暂未配置邮箱地址，请联系管理员配置邮箱");
+            throw new BusinessException("您暂未配置邮箱地址，请联系管理员配置邮箱");
         }
 
         // 校验验证码发送时间，60秒内不能重复发生
@@ -328,7 +328,7 @@ public class LoginService {
         }
 
         if (System.currentTimeMillis() - sendCodeTimeMills < 60 * 1000) {
-            return ResponseDTO.userErrorParam("邮箱验证码已发送，一分钟内请勿重复发送");
+            throw new BusinessException("邮箱验证码已发送，一分钟内请勿重复发送");
         }
 
         //生成验证码
@@ -339,40 +339,40 @@ public class LoginService {
         // 发送邮件验证码
         HashMap<String, Object> mailParams = new HashMap<>();
         mailParams.put("code", verificationCode);
-        return mailService.sendMail(MailTemplateCodeEnum.LOGIN_VERIFICATION_CODE, mailParams, Collections.singletonList(employeeEntity.getEmail()));
+        mailService.sendMail(MailTemplateCodeEnum.LOGIN_VERIFICATION_CODE, mailParams,
+                Collections.singletonList(employeeEntity.getEmail()));
     }
 
 
     /**
      * 校验邮箱验证码
      */
-    private ResponseDTO<String> validateEmailCode(LoginForm loginForm, EmployeeEntity employeeEntity, boolean superPasswordFlag) {
+    private void validateEmailCode(LoginForm loginForm, EmployeeEntity employeeEntity, boolean superPasswordFlag) {
         // 万能密码则不校验
         if (superPasswordFlag) {
-            return ResponseDTO.ok();
+            return;
         }
 
         // 未开启双因子登录
         if (!level3ProtectConfigService.isTwoFactorLoginEnabled()) {
-            return ResponseDTO.ok();
+            return;
         }
 
         if (SolvelaStringUtil.isEmpty(loginForm.getEmailCode())) {
-            return ResponseDTO.userErrorParam("请输入邮箱验证码");
+            throw new BusinessException("请输入邮箱验证码");
         }
 
         // 校验验证码
         String redisVerificationCodeKey = emailCodeKey(employeeEntity.getEmployeeId());
         String emailCode = redisService.get(redisVerificationCodeKey);
         if (SolvelaStringUtil.isEmpty(emailCode)) {
-            return ResponseDTO.userErrorParam("邮箱验证码已失效，请重新发送");
+            throw new BusinessException("邮箱验证码已失效，请重新发送");
         }
 
         if (!emailCode.split(StringConst.UNDERLINE)[0].equals(loginForm.getEmailCode().trim())) {
-            return ResponseDTO.userErrorParam("邮箱验证码错误，请重新填写");
+            throw new BusinessException("邮箱验证码错误，请重新填写");
         }
 
-        return ResponseDTO.ok();
     }
 
     /**

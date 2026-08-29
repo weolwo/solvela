@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.web.SolvelaResponseUtil;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;
@@ -44,15 +43,15 @@ public class CodeGeneratorController extends SupportBaseController {
     @Operation(summary = "获取表的列 @author 卓大")
     @GetMapping("/codeGenerator/table/getTableColumns/{table}")
     @ResponseBody
-    public ResponseDTO<List<TableColumnVO>> getTableColumns(@PathVariable String table) {
-        return ResponseDTO.ok(codeGeneratorService.getTableColumns(table));
+    public List<TableColumnVO> getTableColumns(@PathVariable String table) {
+        return codeGeneratorService.getTableColumns(table);
     }
 
     @Operation(summary = "查询数据库的表 @author 卓大")
     @PostMapping("/codeGenerator/table/queryTableList")
     @ResponseBody
-    public ResponseDTO<PageResult<TableVO>> queryTableList(@RequestBody @Valid TableQueryForm tableQueryForm) {
-        return ResponseDTO.ok(codeGeneratorService.queryTableList(tableQueryForm));
+    public PageResult<TableVO> queryTableList(@RequestBody @Valid TableQueryForm tableQueryForm) {
+        return codeGeneratorService.queryTableList(tableQueryForm);
     }
 
     // ------------------- 配置 -------------------
@@ -60,15 +59,15 @@ public class CodeGeneratorController extends SupportBaseController {
     @Operation(summary = "获取表的配置信息 @author 卓大")
     @GetMapping("/codeGenerator/table/getConfig/{table}")
     @ResponseBody
-    public ResponseDTO<TableConfigVO> getTableConfig(@PathVariable String table) {
-        return ResponseDTO.ok(codeGeneratorService.getTableConfig(table));
+    public TableConfigVO getTableConfig(@PathVariable String table) {
+        return codeGeneratorService.getTableConfig(table);
     }
 
     @Operation(summary = "更新配置信息 @author 卓大")
     @PostMapping("/codeGenerator/table/updateConfig")
     @ResponseBody
-    public ResponseDTO<String> updateConfig(@RequestBody @Valid CodeGeneratorConfigForm form) {
-        return codeGeneratorService.updateConfig(form);
+    public void updateConfig(@RequestBody @Valid CodeGeneratorConfigForm form) {
+        codeGeneratorService.updateConfig(form);
     }
 
     // ------------------- 生成 -------------------
@@ -76,22 +75,19 @@ public class CodeGeneratorController extends SupportBaseController {
     @Operation(summary = "代码预览 @author 卓大")
     @PostMapping("/codeGenerator/code/preview")
     @ResponseBody
-    public ResponseDTO<String> preview(@RequestBody @Valid CodeGeneratorPreviewForm form) {
+    public String preview(@RequestBody @Valid CodeGeneratorPreviewForm form) {
         return codeGeneratorService.preview(form);
     }
 
     @Operation(summary = "代码下载 @author 卓大")
     @GetMapping(value = "/codeGenerator/code/download/{tableName}", produces = "application/octet-stream")
     public void download(@PathVariable String tableName, HttpServletResponse response) throws IOException {
-
-        ResponseDTO<byte[]> download = codeGeneratorService.download(tableName);
-
-        if (download.getOk()) {
-            SolvelaResponseUtil.setDownloadFileHeader(response, tableName + "_code.zip", (long) download.getData().length);
-            response.getOutputStream().write(download.getData());
-        } else {
-            SolvelaResponseUtil.write(response, download);
-        }
+        // 生成失败时 service 直接抛 BusinessException，由全局处理器翻成 4xx/5xx。
+        // 原先是在这里判返回值、失败就往一个已经声明了 octet-stream 的响应里手写 JSON ——
+        // 浏览器会照样把它当成文件存下来，用户得到一个内容是错误信息的 .zip
+        byte[] zip = codeGeneratorService.download(tableName);
+        SolvelaResponseUtil.setDownloadFileHeader(response, tableName + "_code.zip", (long) zip.length);
+        response.getOutputStream().write(zip);
     }
 
 }

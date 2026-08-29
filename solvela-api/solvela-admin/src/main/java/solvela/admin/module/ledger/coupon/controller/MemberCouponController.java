@@ -14,7 +14,6 @@ import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
 import solvela.ledger.coupon.domain.query.MemberCouponQuery;
-import solvela.web.ResponseDTO;
 import solvela.admin.module.ledger.coupon.domain.form.MemberCouponQueryForm;
 import solvela.ledger.coupon.domain.dto.MemberCouponStatDTO;
 import solvela.admin.module.ledger.coupon.domain.vo.MemberCouponVO;
@@ -40,18 +39,18 @@ public class MemberCouponController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("memberCoupon:query")
-    public ResponseDTO<PageResult<MemberCouponVO>> queryPage(@RequestBody @Valid MemberCouponQueryForm queryForm) {
+    public PageResult<MemberCouponVO> queryPage(@RequestBody @Valid MemberCouponQueryForm queryForm) {
         MemberCouponQuery query = SolvelaBeanUtil.copy(queryForm, MemberCouponQuery.class);
         PageResult<MemberCouponDTO> page = Service.queryPage(query);
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberCouponVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, MemberCouponVO.class);
     }
 
     @Operation(summary = "优惠券统计：本期发放与本期核销（两个口径）、券库存与过期体检（时间范围默认当天）")
     @PostMapping("/stat")
     @RequiresPermission("memberCoupon:query")
-    public ResponseDTO<MemberCouponStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
-        return ResponseDTO.ok(Service.stat(
-                SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
+    public MemberCouponStatDTO stat(@RequestBody @Valid LedgerStatForm form) {
+        return Service.stat(
+                SolvelaBeanUtil.copy(form, LedgerStatQuery.class));
     }
 
     /*

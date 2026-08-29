@@ -1,11 +1,11 @@
 package solvela.admin.module.system.job.api;
 
+import solvela.exception.BusinessException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -86,22 +86,22 @@ public class SolvelaJobService {
 
     // ==================== 查询 ====================
 
-    public ResponseDTO<SolvelaJobVO> queryJobInfo(Integer jobId) {
+    public SolvelaJobVO queryJobInfo(Integer jobId) {
         SolvelaJobEntity jobEntity = jobDao.selectById(jobId);
         if (null == jobEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         SolvelaJobVO jobVO = SolvelaBeanUtil.copy(jobEntity, SolvelaJobVO.class);
         this.handleJobInfo(new ArrayList<>(List.of(jobVO)));
-        return ResponseDTO.ok(jobVO);
+        return jobVO;
     }
 
-    public ResponseDTO<PageResult<SolvelaJobVO>> queryJob(SolvelaJobQueryForm queryForm) {
+    public PageResult<SolvelaJobVO> queryJob(SolvelaJobQueryForm queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<SolvelaJobVO> jobList = jobDao.query(page, queryForm);
         PageResult<SolvelaJobVO> pageResult = SolvelaPageUtil.convert2PageResult(page, jobList);
         this.handleJobInfo(jobList);
-        return ResponseDTO.ok(pageResult);
+        return pageResult;
     }
 
     private void handleJobInfo(List<SolvelaJobVO> jobList) {
@@ -143,10 +143,10 @@ public class SolvelaJobService {
         }
     }
 
-    public ResponseDTO<PageResult<SolvelaJobLogVO>> queryJobLog(SolvelaJobLogQueryForm queryForm) {
+    public PageResult<SolvelaJobLogVO> queryJobLog(SolvelaJobLogQueryForm queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<SolvelaJobLogVO> logList = jobLogDao.query(page, queryForm);
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, logList));
+        return SolvelaPageUtil.convert2PageResult(page, logList);
     }
 
     /**
@@ -154,7 +154,7 @@ public class SolvelaJobService {
      *
      * <p>让运营从列表里<b>选</b>而不是手打 —— 手打是「配了却永远不跑」的温床
      */
-    public ResponseDTO<List<SolvelaJobHandlerVO>> queryHandlerList() {
+    public List<SolvelaJobHandlerVO> queryHandlerList() {
         List<SolvelaJobHandlerVO> voList = handlerRegistry.getAllHandler().stream()
                 .map(meta -> {
                     SolvelaJobHandlerVO vo = new SolvelaJobHandlerVO();
@@ -179,7 +179,7 @@ public class SolvelaJobService {
                     return vo;
                 })
                 .toList();
-        return ResponseDTO.ok(voList);
+        return voList;
     }
 
     /**
@@ -198,7 +198,7 @@ public class SolvelaJobService {
      * 这时只能给出未打散的基准时刻。假装算准比不给预览更糟：
      * 运营会拿着一个精确到秒的时刻去对，然后发现对不上。
      */
-    public ResponseDTO<SolvelaJobTriggerPreviewVO> previewTriggerTime(SolvelaJobTriggerPreviewForm form) {
+    public SolvelaJobTriggerPreviewVO previewTriggerTime(SolvelaJobTriggerPreviewForm form) {
         SolvelaJobTriggerPreviewVO vo = new SolvelaJobTriggerPreviewVO();
         String triggerType = form.getTriggerType();
         String triggerValue = null == form.getTriggerValue() ? "" : form.getTriggerValue().trim();
@@ -225,18 +225,18 @@ public class SolvelaJobService {
                 vo.setValid(false);
                 vo.setMessage("时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
             }
-            return ResponseDTO.ok(vo);
+            return vo;
         }
 
         if (!SolvelaJobTriggerTypeEnum.CRON.equalsValue(triggerType)) {
             vo.setValid(false);
             vo.setMessage("不支持的触发类型：" + triggerType);
-            return ResponseDTO.ok(vo);
+            return vo;
         }
         if (!SolvelaJobUtil.checkCron(triggerValue)) {
             vo.setValid(false);
             vo.setMessage("cron 表达式无法解析。本项目用六段式：秒 分 时 日 月 周，例如 0 15 2 * * *（每天 2:15）");
-            return ResponseDTO.ok(vo);
+            return vo;
         }
 
         // jobId 为空（新建）时 applyJitter 会原样返回，正好就是「未打散的基准时刻」
@@ -246,7 +246,7 @@ public class SolvelaJobService {
             // 语法合法但永远排不出下一次，例如 2 月 30 日
             vo.setValid(false);
             vo.setMessage("表达式合法，但算不出任何未来触发时刻 —— 请检查日期组合是否根本不存在");
-            return ResponseDTO.ok(vo);
+            return vo;
         }
 
         boolean exact = null != form.getJobId() || jitterSeconds <= 0;
@@ -260,7 +260,7 @@ public class SolvelaJobService {
                     : String.format("以上是未打散的基准时刻。实际触发会固定延后 0~%d 秒 —— "
                     + "具体偏移在保存后才确定（由任务 id 决定，同一任务每次相同）", jitterSeconds));
         }
-        return ResponseDTO.ok(vo);
+        return vo;
     }
 
     /**
@@ -270,11 +270,8 @@ public class SolvelaJobService {
 
     // ==================== 增改 ====================
 
-    public synchronized ResponseDTO<String> addJob(SolvelaJobAddForm addForm) {
-        ResponseDTO<String> checkRes = this.checkParam(addForm);
-        if (!checkRes.getOk()) {
-            return checkRes;
-        }
+    public synchronized void addJob(SolvelaJobAddForm addForm) {
+        this.checkParam(addForm);
         SolvelaJobEntity jobEntity = SolvelaBeanUtil.copy(addForm, SolvelaJobEntity.class);
         jobEntity.setJobCode(SolvelaCodeUtil.generateUniqueBizCode(jobDao::existsJobCode));
         jobEntity.setAppEnv(jobConfig.getEnv());
@@ -290,19 +287,15 @@ public class SolvelaJobService {
         jobDao.insert(jobEntity);
         dataTracerService.insert(Long.valueOf(jobEntity.getJobId()), DataTracerTypeEnum.SOLVELA_JOB);
         this.notifyClient(jobEntity.getJobId(), addForm.getUpdateName());
-        return ResponseDTO.ok();
     }
 
-    public synchronized ResponseDTO<String> updateJob(SolvelaJobUpdateForm updateForm) {
+    public synchronized void updateJob(SolvelaJobUpdateForm updateForm) {
         Integer jobId = updateForm.getJobId();
         SolvelaJobEntity exist = jobDao.selectById(jobId);
         if (null == exist) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
-        ResponseDTO<String> checkRes = this.checkParam(updateForm);
-        if (!checkRes.getOk()) {
-            return checkRes;
-        }
+        this.checkParam(updateForm);
         SolvelaJobEntity jobEntity = SolvelaBeanUtil.copy(updateForm, SolvelaJobEntity.class);
         this.applyPreset(jobEntity, updateForm);
         // 🔴 改了触发配置必须重算 next_trigger_time，否则要等到下一次原定触发后才生效 ——
@@ -321,7 +314,6 @@ public class SolvelaJobService {
         dataTracerService.update(Long.valueOf(jobId), DataTracerTypeEnum.SOLVELA_JOB, exist,
                 jobDao.selectById(jobId));
         this.notifyClient(jobId, updateForm.getUpdateName());
-        return ResponseDTO.ok();
     }
 
     /**
@@ -368,17 +360,17 @@ public class SolvelaJobService {
         return null == next ? base : next;
     }
 
-    private ResponseDTO<String> checkParam(SolvelaJobAddForm form) {
+    private void checkParam(SolvelaJobAddForm form) {
         String triggerType = form.getTriggerType();
         String triggerValue = form.getTriggerValue();
         if (SolvelaJobTriggerTypeEnum.CRON.equalsValue(triggerType) && !SolvelaJobUtil.checkCron(triggerValue)) {
-            return ResponseDTO.userErrorParam("cron表达式错误");
+            throw new BusinessException("cron表达式错误");
         }
         if (SolvelaJobTriggerTypeEnum.ONE_TIME.equalsValue(triggerType)) {
             try {
                 LocalDateTime.parse(triggerValue.replace(' ', 'T'));
             } catch (Exception e) {
-                return ResponseDTO.userErrorParam("一次性任务的触发时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
+                throw new BusinessException("一次性任务的触发时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
             }
         }
         // 🔴 校验执行器走的是运行期匹配用的同一份注册表。
@@ -387,7 +379,7 @@ public class SolvelaJobService {
         //    于是「保存成功 + 任务永不执行」，全程零报错
         Optional<SolvelaJobHandlerMeta> metaOpt = handlerRegistry.getHandler(form.getHandlerName());
         if (metaOpt.isEmpty()) {
-            return ResponseDTO.userErrorParam("代码中不存在该执行器：" + form.getHandlerName());
+            throw new BusinessException("代码中不存在该执行器：" + form.getHandlerName());
         }
         SolvelaJobHandlerMeta meta = metaOpt.get();
 
@@ -395,7 +387,7 @@ public class SolvelaJobService {
         //    其余档位的超时都突破了快车道 30 秒的硬上限 —— 让它进来就等于毒死快车道
         SolvelaJobPresetEnum preset = SolvelaJobPresetEnum.resolve(form.getPresetCode());
         if (!preset.matchLane(meta.lane())) {
-            return ResponseDTO.userErrorParam(String.format(
+            throw new BusinessException(String.format(
                     "执行器 %s 声明为 %s 车道，不能使用「%s」档位",
                     meta.name(), meta.lane().getDesc(), preset.getDesc()));
         }
@@ -404,21 +396,20 @@ public class SolvelaJobService {
                 ? (null == form.getRetryTimes() ? 0 : form.getRetryTimes())
                 : preset.getRetryTimes();
         if (retryTimes > 0 && !meta.idempotent()) {
-            return ResponseDTO.userErrorParam(String.format(
+            throw new BusinessException(String.format(
                     "执行器 %s 未声明幂等，不能配置失败重试（重试会让一次失败变成两次副作用）", meta.name()));
         }
-        return ResponseDTO.ok();
     }
 
-    public ResponseDTO<String> updateJobEnabled(SolvelaJobEnabledUpdateForm updateForm) {
+    public void updateJobEnabled(SolvelaJobEnabledUpdateForm updateForm) {
         Integer jobId = updateForm.getJobId();
         SolvelaJobEntity exist = jobDao.selectById(jobId);
         if (null == exist) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         Boolean enabledFlag = updateForm.getEnabledFlag();
         if (Objects.equals(enabledFlag, exist.getEnabledFlag())) {
-            return ResponseDTO.ok();
+            return;
         }
         SolvelaJobEntity jobEntity = new SolvelaJobEntity();
         jobEntity.setJobId(jobId);
@@ -433,14 +424,12 @@ public class SolvelaJobService {
         dataTracerService.addTrace(Long.valueOf(jobId), DataTracerTypeEnum.SOLVELA_JOB,
                 Boolean.TRUE.equals(enabledFlag) ? "启用任务" : "停用任务");
         this.notifyClient(jobId, updateForm.getUpdateName());
-        return ResponseDTO.ok();
     }
 
-    public synchronized ResponseDTO<String> deleteJob(Integer jobId, RequestEmployee requestUser) {
+    public synchronized void deleteJob(Integer jobId, RequestEmployee requestUser) {
         jobDao.updateDeletedFlag(jobId, Boolean.TRUE);
         dataTracerService.delete(Long.valueOf(jobId), DataTracerTypeEnum.SOLVELA_JOB);
         this.notifyClient(jobId, requestUser.getUserName());
-        return ResponseDTO.ok();
     }
 
     // ==================== 手动执行与重跑 ====================
@@ -454,23 +443,23 @@ public class SolvelaJobService {
      *
      * <p>保留「忽略任务开启状态」的既有语义：运营需要这个能力来调试未启用的任务。
      */
-    public ResponseDTO<String> execute(SolvelaJobExecuteForm executeForm) {
+    public void execute(SolvelaJobExecuteForm executeForm) {
         SolvelaJobEntity job = jobDao.selectById(executeForm.getJobId());
         if (null == job) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         if (Boolean.TRUE.equals(job.getDeletedFlag())) {
-            return ResponseDTO.userErrorParam("任务已删除");
+            throw new BusinessException("任务已删除");
         }
         Optional<SolvelaJobHandlerMeta> meta = handlerRegistry.getHandler(job.getHandlerName());
         if (meta.isEmpty()) {
-            return ResponseDTO.userErrorParam("代码中不存在该执行器：" + job.getHandlerName());
+            throw new BusinessException("代码中不存在该执行器：" + job.getHandlerName());
         }
         String param = (null == executeForm.getParam() || executeForm.getParam().isBlank())
                 ? job.getParam() : executeForm.getParam();
         LocalDate bizDate = null != executeForm.getBizDate() ? executeForm.getBizDate()
                 : LocalDate.now().plusDays(meta.get().bizDateOffset());
-        return this.submitPending(job, param, bizDate, executeForm.getUpdateName(), 0, null);
+        this.submitPending(job, param, bizDate, executeForm.getUpdateName(), 0, null);
     }
 
     /**
@@ -479,26 +468,26 @@ public class SolvelaJobService {
      * <p>🔴 关键在「当初那一次」：拿当前配置重跑是错的 —— 配置可能早已被人改过，
      * 而运营的意图是「把那次失败的补回来」，不是「用新配置跑一遍」。
      */
-    public ResponseDTO<String> rerun(Long logId, String operator) {
+    public void rerun(Long logId, String operator) {
         SolvelaJobLogEntity sourceLog = jobLogDao.selectById(logId);
         if (null == sourceLog) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         SolvelaJobEntity job = jobDao.selectById(sourceLog.getJobId());
         if (null == job || Boolean.TRUE.equals(job.getDeletedFlag())) {
-            return ResponseDTO.userErrorParam("任务已删除，无法重跑");
+            throw new BusinessException("任务已删除，无法重跑");
         }
         if (!handlerRegistry.contains(job.getHandlerName())) {
-            return ResponseDTO.userErrorParam("代码中不存在该执行器：" + job.getHandlerName());
+            throw new BusinessException("代码中不存在该执行器：" + job.getHandlerName());
         }
-        return this.submitPending(job, sourceLog.getParamSnapshot(), sourceLog.getBizDate(),
+        this.submitPending(job, sourceLog.getParamSnapshot(), sourceLog.getBizDate(),
                 operator, 0, sourceLog.getLogId());
     }
 
     /**
      * 写一条 PENDING 记录，等扫描线程捞走。
      */
-    private ResponseDTO<String> submitPending(SolvelaJobEntity job, String param, LocalDate bizDate,
+    private void submitPending(SolvelaJobEntity job, String param, LocalDate bizDate,
                                               String operator, int retrySeq, Long retryOfLogId) {
         LocalDateTime now = LocalDateTime.now();
         SolvelaJobLogEntity logEntity = new SolvelaJobLogEntity();
@@ -529,11 +518,10 @@ public class SolvelaJobService {
         } catch (DuplicateKeyException e) {
             // 同一秒内连点两次会撞 uk_job_trigger。这是防重特性，但必须转译成人话 ——
             // 直接把 SQL 异常抛给运营是铁律 8 明确反对的
-            return ResponseDTO.userErrorParam("该任务 1 秒内已被触发，请勿重复点击");
+            throw new BusinessException("该任务 1 秒内已被触发，请勿重复点击");
         }
         // pub/sub 只是加速：丢了最多晚一秒被扫到，不影响正确性
         this.notifyClient(job.getJobId(), operator);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -544,13 +532,13 @@ public class SolvelaJobService {
      * 不响应中断的执行器砍不掉，谎报成功会让运营以为处理完了，
      * 转身去做别的，而任务还在跑。
      */
-    public ResponseDTO<String> terminate(Long logId, String operator) {
+    public String terminate(Long logId, String operator) {
         SolvelaJobLogEntity logEntity = jobLogDao.selectById(logId);
         if (null == logEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         if (!Objects.equals(logEntity.getStatus(), SolvelaJobExecuteStatusEnum.RUNNING.getValue())) {
-            return ResponseDTO.userErrorParam("该执行记录不在「执行中」状态，无需终止");
+            throw new BusinessException("该执行记录不在「执行中」状态，无需终止");
         }
         SolvelaJobMsg msg = new SolvelaJobMsg();
         msg.setJobId(logEntity.getJobId());
@@ -561,7 +549,7 @@ public class SolvelaJobService {
         jobMsgPublisher.publishToClient(msg);
         dataTracerService.addTrace(Long.valueOf(logEntity.getJobId()), DataTracerTypeEnum.SOLVELA_JOB,
                 "终止执行记录 logId=" + logId);
-        return ResponseDTO.ok("已发出中断信号。能否真正停止取决于该执行器是否响应中断，请稍后刷新状态确认");
+        return "已发出中断信号。能否真正停止取决于该执行器是否响应中断，请稍后刷新状态确认";
     }
 
     /**
@@ -570,8 +558,8 @@ public class SolvelaJobService {
      * <p>取不到就是取不到（已过期、或那台节点当时没开采集）—— 如实返回空，
      * 不要伪造成「无日志输出」，那会让人以为任务真的什么都没打
      */
-    public ResponseDTO<List<String>> queryExecuteLog(Long logId) {
-        return ResponseDTO.ok(logCollector.read(logId));
+    public List<String> queryExecuteLog(Long logId) {
+        return logCollector.read(logId);
     }
 
     private void notifyClient(Integer jobId, String operator) {

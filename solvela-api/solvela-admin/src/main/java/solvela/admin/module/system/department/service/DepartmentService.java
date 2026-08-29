@@ -1,5 +1,6 @@
 package solvela.admin.module.system.department.service;
 
+import solvela.exception.BusinessException;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.department.dao.DepartmentDao;
 import solvela.admin.module.system.department.domain.entity.DepartmentEntity;
@@ -10,7 +11,6 @@ import solvela.admin.module.system.department.domain.vo.DepartmentVO;
 import solvela.admin.module.system.department.manager.DepartmentCacheManager;
 import solvela.admin.module.system.employee.dao.EmployeeDao;
 import solvela.code.UserErrorCode;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 
@@ -43,30 +43,28 @@ public class DepartmentService {
      * 新增添加部门
      */
 
-    public ResponseDTO<String> addDepartment(DepartmentAddForm departmentAddForm) {
+    public void addDepartment(DepartmentAddForm departmentAddForm) {
         DepartmentEntity departmentEntity = SolvelaBeanUtil.copy(departmentAddForm, DepartmentEntity.class);
         departmentDao.insert(departmentEntity);
         this.clearCache();
-        return ResponseDTO.ok();
     }
 
 
     /**
      * 更新部门信息
      */
-    public ResponseDTO<String> updateDepartment(DepartmentUpdateForm updateDTO) {
+    public void updateDepartment(DepartmentUpdateForm updateDTO) {
         if (updateDTO.getParentId() == null) {
-            return ResponseDTO.userErrorParam("父级部门id不能为空");
+            throw new BusinessException("父级部门id不能为空");
         }
         DepartmentEntity entity = departmentDao.selectById(updateDTO.getDepartmentId());
         if (entity == null) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         DepartmentEntity departmentEntity = SolvelaBeanUtil.copy(updateDTO, DepartmentEntity.class);
         departmentEntity.setSort(updateDTO.getSort());
         departmentDao.updateById(departmentEntity);
         this.clearCache();
-        return ResponseDTO.ok();
     }
 
     /**
@@ -74,26 +72,25 @@ public class DepartmentService {
      * 1、需要判断当前部门是否有子部门,有子部门则不允许删除
      * 2、需要判断当前部门是否有员工，有员工则不能删除
      */
-    public ResponseDTO<String> deleteDepartment(Long departmentId) {
+    public void deleteDepartment(Long departmentId) {
         DepartmentEntity departmentEntity = departmentDao.selectById(departmentId);
         if (null == departmentEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         // 是否有子级部门
         int subDepartmentNum = departmentDao.countSubDepartment(departmentId);
         if (subDepartmentNum > 0) {
-            return ResponseDTO.userErrorParam("请先删除子级部门");
+            throw new BusinessException("请先删除子级部门");
         }
 
         // 是否有未删除员工
         int employeeNum = employeeDao.countByDepartmentId(departmentId, Boolean.FALSE);
         if (employeeNum > 0) {
-            return ResponseDTO.userErrorParam("请先删除部门员工");
+            throw new BusinessException("请先删除部门员工");
         }
         departmentDao.deleteById(departmentId);
         // 清除缓存
         this.clearCache();
-        return ResponseDTO.ok();
     }
 
     /**
@@ -108,9 +105,9 @@ public class DepartmentService {
     /**
      * 获取部门树形结构
      */
-    public ResponseDTO<List<DepartmentTreeVO>> departmentTree() {
+    public List<DepartmentTreeVO> departmentTree() {
         List<DepartmentTreeVO> treeVOList = departmentCacheManager.getDepartmentTree();
-        return ResponseDTO.ok(treeVOList);
+        return treeVOList;
     }
 
 

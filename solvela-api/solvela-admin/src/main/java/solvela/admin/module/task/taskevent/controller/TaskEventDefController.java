@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.task.taskevent.domain.form.TaskEventAddForm;
 import solvela.task.taskevent.domain.command.TaskEventAddCommand;
@@ -54,9 +53,9 @@ public class TaskEventDefController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("taskEventDef:query")
-    public ResponseDTO<PageResult<TaskEventVO>> queryPage(@RequestBody @Valid TaskEventQueryForm queryForm) {
+    public PageResult<TaskEventVO> queryPage(@RequestBody @Valid TaskEventQueryForm queryForm) {
         PageResult<TaskEventDTO> page = taskEventDefService.queryPage(SolvelaBeanUtil.copy(queryForm, TaskEventQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskEventVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, TaskEventVO.class);
     }
 
     /**
@@ -68,31 +67,28 @@ public class TaskEventDefController {
     @Operation(summary = "事件下拉（向导第1步用，只返回启用中的）")
     @GetMapping("/optionList")
     @RequiresPermission("taskConfig:query")
-    public ResponseDTO<List<TaskEventOptionDTO>> optionList() {
-        return ResponseDTO.ok(taskEventDefService.optionList());
+    public List<TaskEventOptionDTO> optionList() {
+        return taskEventDefService.optionList();
     }
 
     @Operation(summary = "注册新事件")
     @PostMapping("/add")
     @RequiresPermission("taskEventDef:add")
-    public ResponseDTO<String> add(@RequestBody @Valid TaskEventAddForm addForm) {
+    public void add(@RequestBody @Valid TaskEventAddForm addForm) {
         taskEventDefService.add(SolvelaBeanUtil.copy(addForm, TaskEventAddCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新（事件编码不可改，UpdateForm 里刻意不定义该字段）")
     @PostMapping("/update")
     @RequiresPermission("taskEventDef:update")
-    public ResponseDTO<String> update(@RequestBody @Valid TaskEventUpdateForm updateForm) {
+    public void update(@RequestBody @Valid TaskEventUpdateForm updateForm) {
         taskEventDefService.update(SolvelaBeanUtil.copy(updateForm, TaskEventUpdateCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "删除（仍被任务配置引用时拒绝；建议优先用停用）")
     @GetMapping("/delete/{id}")
     @RequiresPermission("taskEventDef:delete")
-    public ResponseDTO<String> delete(@PathVariable Long id) {
+    public void delete(@PathVariable Long id) {
         taskEventDefService.delete(id);
-        return ResponseDTO.ok();
     }
 }

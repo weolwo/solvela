@@ -4,7 +4,6 @@ import solvela.base.module.config.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import solvela.web.ResponseDTO;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.config.domain.ConfigVO;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,8 +28,8 @@ public class ConfigController extends SupportBaseController {
 
     @Operation(summary = "查询配置详情 @author 卓大")
     @GetMapping("/config/queryByKey")
-    public ResponseDTO<ConfigVO> queryByKey(@RequestParam String configKey) {
-        return ResponseDTO.ok(configService.getConfig(configKey));
+    public ConfigVO queryByKey(@RequestParam String configKey) {
+        return configService.getConfig(configKey);
     }
 
 }

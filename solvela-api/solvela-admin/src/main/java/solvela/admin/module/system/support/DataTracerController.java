@@ -6,7 +6,6 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.datatracer.domain.form.DataTracerQueryForm;
 import solvela.admin.module.system.datatracer.domain.vo.DataTracerVO;
@@ -33,7 +32,7 @@ public class DataTracerController extends SupportBaseController {
 
     @Operation(summary = "分页查询业务操作日志 - @author 卓大")
     @PostMapping("/dataTracer/query")
-    public ResponseDTO<PageResult<DataTracerVO>> query(@Valid @RequestBody DataTracerQueryForm queryForm) {
+    public PageResult<DataTracerVO> query(@Valid @RequestBody DataTracerQueryForm queryForm) {
         return dataTracerService.query(queryForm);
     }
 }

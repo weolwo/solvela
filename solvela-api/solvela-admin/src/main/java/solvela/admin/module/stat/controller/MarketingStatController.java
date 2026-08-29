@@ -4,7 +4,6 @@ import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import solvela.web.ResponseDTO;
 import solvela.stat.domain.dto.EventHealthDTO;
 import solvela.stat.domain.dto.GameplayDTO;
 import solvela.stat.domain.dto.OverviewDTO;
@@ -50,50 +49,50 @@ public class MarketingStatController {
     @Operation(summary = "首页参与统计：趋势 + 各玩法类型参与人数")
     @GetMapping("/participation")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<ParticipationDTO> participation(@RequestParam(required = false) Integer days) {
-        return ResponseDTO.ok(marketingStatService.participation(days));
+    public ParticipationDTO participation(@RequestParam(required = false) Integer days) {
+        return marketingStatService.participation(days);
     }
 
     @Operation(summary = "大屏总览：活动状态分布（启用/禁用两态）+ 活动卡片 + 逾期未开奖告警")
     @GetMapping("/overview")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<OverviewDTO> overview() {
-        return ResponseDTO.ok(marketingStatService.overview());
+    public OverviewDTO overview() {
+        return marketingStatService.overview();
     }
 
     @Operation(summary = "发奖健康度：条数/价值双口径 + 待审积压 + 失败TOP + 价值趋势")
     @GetMapping("/prizeHealth")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<PrizeHealthDTO> prizeHealth(@RequestParam(required = false) String activityCode,
+    public PrizeHealthDTO prizeHealth(@RequestParam(required = false) String activityCode,
                                                   @RequestParam(required = false) Integer days) {
-        return ResponseDTO.ok(marketingStatService.prizeHealth(activityCode, days));
+        return marketingStatService.prizeHealth(activityCode, days);
     }
 
     @Operation(summary = "玩法运行态：按活动类型返回抽奖状态分布 / 彩票期号 / 任务列表")
     @GetMapping("/gameplay/{activityCode}")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<GameplayDTO> gameplay(@PathVariable String activityCode) {
-        return ResponseDTO.ok(marketingStatService.gameplay(activityCode));
+    public GameplayDTO gameplay(@PathVariable String activityCode) {
+        return marketingStatService.gameplay(activityCode);
     }
 
     @Operation(summary = "任务阶梯流失漏斗")
     @GetMapping("/taskFunnel/{taskConfigId}")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<TaskFunnelDTO> taskFunnel(@PathVariable Long taskConfigId) {
-        return ResponseDTO.ok(marketingStatService.taskFunnel(taskConfigId));
+    public TaskFunnelDTO taskFunnel(@PathVariable Long taskConfigId) {
+        return marketingStatService.taskFunnel(taskConfigId);
     }
 
     @Operation(summary = "事件健康度：推进/丢弃趋势，丢弃按 discard_code 聚类")
     @GetMapping("/eventHealth")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<EventHealthDTO> eventHealth(@RequestParam(required = false) Integer days) {
-        return ResponseDTO.ok(marketingStatService.eventHealth(days));
+    public EventHealthDTO eventHealth(@RequestParam(required = false) Integer days) {
+        return marketingStatService.eventHealth(days);
     }
 
     @Operation(summary = "Top 获奖用户（营销域口径：已发出价值）")
     @GetMapping("/topMembers")
     @RequiresPermission("marketingStat:query")
-    public ResponseDTO<List<TopMemberDTO>> topMembers(@RequestParam(required = false) Integer days) {
-        return ResponseDTO.ok(marketingStatService.topMembers(days));
+    public List<TopMemberDTO> topMembers(@RequestParam(required = false) Integer days) {
+        return marketingStatService.topMembers(days);
     }
 }

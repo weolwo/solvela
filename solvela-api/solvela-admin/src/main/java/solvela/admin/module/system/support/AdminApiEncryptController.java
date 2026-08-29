@@ -8,7 +8,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import solvela.admin.module.system.support.SupportBaseController;
-import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.apiencrypt.annotation.ApiDecrypt;
@@ -38,31 +37,31 @@ public class AdminApiEncryptController extends SupportBaseController {
     @ApiDecrypt
     @PostMapping("/apiEncrypt/testRequestEncrypt")
     @Operation(summary = "测试 请求加密")
-    public ResponseDTO<JweForm> testRequestEncrypt(@RequestBody @Valid JweForm form) {
-        return ResponseDTO.ok(form);
+    public JweForm testRequestEncrypt(@RequestBody @Valid JweForm form) {
+        return form;
     }
 
     @ApiEncrypt
     @PostMapping("/apiEncrypt/testResponseEncrypt")
     @Operation(summary = "测试 返回加密")
-    public ResponseDTO<JweForm> testResponseEncrypt(@RequestBody @Valid JweForm form) {
-        return ResponseDTO.ok(form);
+    public JweForm testResponseEncrypt(@RequestBody @Valid JweForm form) {
+        return form;
     }
 
     @ApiDecrypt
     @ApiEncrypt
     @PostMapping("/apiEncrypt/testDecryptAndEncrypt")
     @Operation(summary = "测试 请求参数加密和解密、返回数据加密和解密")
-    public ResponseDTO<JweForm> testDecryptAndEncrypt(@RequestBody @Valid JweForm form) {
-        return ResponseDTO.ok(form);
+    public JweForm testDecryptAndEncrypt(@RequestBody @Valid JweForm form) {
+        return form;
     }
 
     @ApiDecrypt
     @ApiEncrypt
     @PostMapping("/apiEncrypt/testArray")
     @Operation(summary = "测试 数组加密和解密")
-    public ResponseDTO<List<JweForm>> testArray(@RequestBody @Valid ValidateList<JweForm> list) {
-        return ResponseDTO.ok(list);
+    public List<JweForm> testArray(@RequestBody @Valid ValidateList<JweForm> list) {
+        return list;
     }
 
 

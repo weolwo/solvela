@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.risk.proposal.domain.form.ProposalRecordQueryForm;
@@ -36,32 +35,30 @@ public class ProposalRecordController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("proposalRecord:query")
-    public ResponseDTO<PageResult<ProposalRecordVO>> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
+    public PageResult<ProposalRecordVO> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
         PageResult<ProposalRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, ProposalRecordVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, ProposalRecordVO.class);
     }
 
     @Operation(summary = "提案漏斗：到账率、审批积压、下发卡单、资产/来源分布与流程体检")
     @PostMapping("/funnel")
     @RequiresPermission("proposalRecord:query")
-    public ResponseDTO<ProposalFunnelDTO> funnel(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
-        return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class)));
+    public ProposalFunnelDTO funnel(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
+        return Service.funnel(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class));
     }
 
     @Operation(summary = "提案审批通过（财务视角；一审通过后按 review_level 决定进二审还是直接放行下发）")
     @GetMapping("/approve/{id}")
     @RequiresPermission("proposalRecord:approve")
-    public ResponseDTO<String> approve(@PathVariable Long id, @RequestParam(required = false) String comment) {
+    public void approve(@PathVariable Long id, @RequestParam(required = false) String comment) {
         Service.approve(id, CurrentEmployee.nameOrNull(), comment);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "提案审批驳回")
     @GetMapping("/reject/{id}")
     @RequiresPermission("proposalRecord:approve")
-    public ResponseDTO<String> reject(@PathVariable Long id, @RequestParam(required = false) String comment) {
+    public void reject(@PathVariable Long id, @RequestParam(required = false) String comment) {
         Service.reject(id, CurrentEmployee.nameOrNull(), comment);
-        return ResponseDTO.ok();
     }
 
     /*

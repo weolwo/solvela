@@ -12,7 +12,6 @@ import solvela.admin.module.system.login.domain.LoginResultVO;
 import solvela.admin.module.system.login.service.LoginService;
 import solvela.web.AllowAnonymous;
 import solvela.base.constant.RequestHeaderConst;
-import solvela.web.ResponseDTO;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,7 +38,7 @@ public class LoginController {
     @AllowAnonymous
     @PostMapping("/login")
     @Operation(summary = "登录 @author 卓大")
-    public ResponseDTO<LoginResultVO> login(@Valid @RequestBody LoginForm loginForm, HttpServletRequest request) {
+    public LoginResultVO login(@Valid @RequestBody LoginForm loginForm, HttpServletRequest request) {
         String ip = SolvelaServletUtil.getClientIP(request);
         String userAgent = request.getHeader(RequestHeaderConst.USER_AGENT);
         return loginService.login(loginForm, ip, userAgent);
@@ -47,33 +46,33 @@ public class LoginController {
 
     @GetMapping("/login/getLoginInfo")
     @Operation(summary = "获取登录结果信息  @author 卓大")
-    public ResponseDTO<LoginResultVO> getLoginInfo() {
+    public LoginResultVO getLoginInfo() {
         LoginResultVO loginResult = loginService.getLoginResult(
                 CurrentEmployee.orNull(), CurrentEmployee.isSuperPassword());
         loginResult.setToken(CurrentEmployee.tokenOrNull());
-        return ResponseDTO.ok(loginResult);
+        return loginResult;
     }
 
     @Operation(summary = "退出登录  @author 卓大")
     @GetMapping("/login/logout")
-    public ResponseDTO<String> logout() {
-        return loginService.logout(CurrentEmployee.orNull());
+    public void logout() {
+        loginService.logout(CurrentEmployee.orNull());
     }
 
     @AllowAnonymous
     @GetMapping("/login/sendEmailCode/{loginName}")
     @Operation(summary = "获取邮箱登录验证码 @author 卓大")
-    public ResponseDTO<String> sendEmailCode(@PathVariable String loginName) {
-        return loginService.sendEmailCode(loginName);
+    public void sendEmailCode(@PathVariable String loginName) {
+        loginService.sendEmailCode(loginName);
     }
 
 
     @AllowAnonymous
     @GetMapping("/login/getTwoFactorLoginFlag")
     @Operation(summary = "获取双因子登录标识 @author 卓大")
-    public ResponseDTO<Boolean> getTwoFactorLoginFlag() {
+    public Boolean getTwoFactorLoginFlag() {
         // 双因子登录
         boolean twoFactorLoginEnabled = level3ProtectConfigService.isTwoFactorLoginEnabled();
-        return ResponseDTO.ok(twoFactorLoginEnabled);
+        return twoFactorLoginEnabled;
     }
 }

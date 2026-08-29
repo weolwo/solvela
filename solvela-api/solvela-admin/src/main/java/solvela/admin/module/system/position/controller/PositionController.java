@@ -11,7 +11,6 @@ import solvela.admin.module.system.position.domain.form.PositionUpdateForm;
 import solvela.admin.module.system.position.domain.vo.PositionVO;
 import solvela.admin.module.system.position.service.PositionService;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,38 +33,38 @@ public class PositionController {
 
     @Operation(summary = "分页查询 @author kaiyun")
     @PostMapping("/position/queryPage")
-    public ResponseDTO<PageResult<PositionVO>> queryPage(@RequestBody @Valid PositionQueryForm queryForm) {
-        return ResponseDTO.ok(positionService.queryPage(queryForm));
+    public PageResult<PositionVO> queryPage(@RequestBody @Valid PositionQueryForm queryForm) {
+        return positionService.queryPage(queryForm);
     }
 
     @Operation(summary = "添加 @author kaiyun")
     @PostMapping("/position/add")
-    public ResponseDTO<String> add(@RequestBody @Valid PositionAddForm addForm) {
-        return positionService.add(addForm);
+    public void add(@RequestBody @Valid PositionAddForm addForm) {
+        positionService.add(addForm);
     }
 
     @Operation(summary = "更新 @author kaiyun")
     @PostMapping("/position/update")
-    public ResponseDTO<String> update(@RequestBody @Valid PositionUpdateForm updateForm) {
-        return positionService.update(updateForm);
+    public void update(@RequestBody @Valid PositionUpdateForm updateForm) {
+        positionService.update(updateForm);
     }
 
     @Operation(summary = "批量删除 @author kaiyun")
     @PostMapping("/position/batchDelete")
-    public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return positionService.batchDelete(idList);
+    public void batchDelete(@RequestBody ValidateList<Long> idList) {
+        positionService.batchDelete(idList);
     }
 
     @Operation(summary = "单个删除 @author kaiyun")
     @GetMapping("/position/delete/{positionId}")
-    public ResponseDTO<String> batchDelete(@PathVariable Long positionId) {
-        return positionService.delete(positionId);
+    public void batchDelete(@PathVariable Long positionId) {
+        positionService.delete(positionId);
     }
 
 
     @Operation(summary = "不分页查询 @author kaiyun")
     @GetMapping("/position/queryList")
-    public ResponseDTO<List<PositionVO>> queryList() {
-        return ResponseDTO.ok(positionService.queryList());
+    public List<PositionVO> queryList() {
+        return positionService.queryList();
     }
 }

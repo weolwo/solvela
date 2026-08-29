@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.domain.ValidateList;
 import solvela.lottery.config.domain.dto.LotteryConfigBoardResultDTO;
@@ -58,16 +57,16 @@ public class LotteryConfigController {
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
     @RequiresPermission("lotteryConfig:query")
-    public ResponseDTO<PageResult<LotteryConfigVO>> queryPage(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
+    public PageResult<LotteryConfigVO> queryPage(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
         PageResult<LotteryConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryConfigQuery.class));
-        return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryConfigVO.class));
+        return SolvelaPageUtil.convert2PageResult(page, LotteryConfigVO.class);
     }
 
     @Operation(summary = "玩法一览：号码空间占用、期号与发号实况、参与人数与体检告警，列表页主视图")
     @PostMapping("/board")
     @RequiresPermission("lotteryConfig:query")
-    public ResponseDTO<LotteryConfigBoardResultDTO> board(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
-        return ResponseDTO.ok(lotteryConfigBoardService.board(SolvelaBeanUtil.copy(queryForm, LotteryConfigQuery.class)));
+    public LotteryConfigBoardResultDTO board(@RequestBody @Valid LotteryConfigQueryForm queryForm) {
+        return lotteryConfigBoardService.board(SolvelaBeanUtil.copy(queryForm, LotteryConfigQuery.class));
     }
 
     // ==================== 彩票工作台 ====================
@@ -75,63 +74,60 @@ public class LotteryConfigController {
     @Operation(summary = "生成彩票编码：10位大写字母+数字，服务端已判重")
     @GetMapping("/generateCode")
     @RequiresPermission("lotteryConfig:query")
-    public ResponseDTO<String> generateCode() {
-        return ResponseDTO.ok(Service.generateCode());
+    public String generateCode() {
+        return Service.generateCode();
     }
 
     @Operation(summary = "玩法下拉：按活动过滤，工作台顶部二级切换用")
     @GetMapping("/optionList")
     @RequiresPermission("lotteryConfig:query")
-    public ResponseDTO<List<LotteryConfigOptionDTO>> optionList(@RequestParam String activityCode) {
-        return ResponseDTO.ok(Service.optionList(activityCode));
+    public List<LotteryConfigOptionDTO> optionList(@RequestParam String activityCode) {
+        return Service.optionList(activityCode);
     }
 
     @Operation(summary = "工作台聚合回显：lotteryCode 为空表示在该活动下新建玩法，返回带预生成编码的空壳")
     @GetMapping("/workbench/detail")
     @RequiresPermission("lotteryConfig:query")
-    public ResponseDTO<LotteryWorkbenchDTO> workbenchDetail(@RequestParam String activityCode,
+    public LotteryWorkbenchDTO workbenchDetail(@RequestParam String activityCode,
                                                            @RequestParam(required = false) String lotteryCode) {
-        return ResponseDTO.ok(Service.workbenchDetail(activityCode, lotteryCode));
+        return Service.workbenchDetail(activityCode, lotteryCode);
     }
 
     @Operation(summary = "工作台聚合保存：彩票配置 + 奖级规则，单事务")
     @PostMapping("/workbench/save")
     @RequiresPermission("lotteryConfig:update")
-    public ResponseDTO<String> workbenchSave(@RequestBody @Valid LotteryWorkbenchSaveForm form) {
+    public void workbenchSave(@RequestBody @Valid LotteryWorkbenchSaveForm form) {
         // 🔴 deepCopy：本表单含嵌套集合（prizeRuleList），浅拷贝会因泛型不兼容
         // 跳过它，表现是"工作台保存成功，但奖励规则一条没建"
         Service.workbenchSave(SolvelaBeanUtil.deepCopy(form, LotteryWorkbenchSaveCommand.class));
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "上线：允许开始发号。上线前必须已配置奖级规则")
     @GetMapping("/online/{lotteryCode}")
     @RequiresPermission("lotteryConfig:update")
-    public ResponseDTO<String> online(@PathVariable String lotteryCode) {
+    public void online(@PathVariable String lotteryCode) {
         Service.online(lotteryCode);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "下线：停止发号。已发出的号码不受影响，期号照常可以开奖")
     @GetMapping("/offline/{lotteryCode}")
     @RequiresPermission("lotteryConfig:update")
-    public ResponseDTO<String> offline(@PathVariable String lotteryCode) {
+    public void offline(@PathVariable String lotteryCode) {
         Service.offline(lotteryCode);
-        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量下线：列表页的「批量禁用」，逐个下线并回一句汇总")
     @PostMapping("/batchOffline")
     @RequiresPermission("lotteryConfig:update")
-    public ResponseDTO<String> batchOffline(@RequestBody ValidateList<String> lotteryCodeList) {
-        return ResponseDTO.ok(Service.batchOffline(lotteryCodeList));
+    public String batchOffline(@RequestBody ValidateList<String> lotteryCodeList) {
+        return Service.batchOffline(lotteryCodeList);
     }
 
     @Operation(summary = "FPE 算号推演：用固定演示期号算样例号码，与线上发号同一段代码")
     @PostMapping("/fpe/preview")
     @RequiresPermission("lotteryConfig:query")
-    public ResponseDTO<String> fpePreview(@RequestBody @Valid FpePreviewForm form) {
-        return ResponseDTO.ok(Service.fpePreview(SolvelaBeanUtil.copy(form, FpePreviewCommand.class)));
+    public String fpePreview(@RequestBody @Valid FpePreviewForm form) {
+        return Service.fpePreview(SolvelaBeanUtil.copy(form, FpePreviewCommand.class));
     }
 
 }

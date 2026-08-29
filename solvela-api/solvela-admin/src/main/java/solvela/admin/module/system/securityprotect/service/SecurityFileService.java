@@ -1,10 +1,10 @@
 package solvela.admin.module.system.securityprotect.service;
 
+import solvela.exception.BusinessException;
 import solvela.web.file.MultipartUploadSource;
 
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.Resource;
-import solvela.web.ResponseDTO;
 import solvela.base.module.file.FileMimeTypeUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,13 +37,13 @@ public class SecurityFileService {
     /**
      * 检测文件安全类型
      */
-    public ResponseDTO<String> checkFile(MultipartFile file) {
+    public void checkFile(MultipartFile file) {
 
         // 检验文件大小
         if (level3ProtectConfigService.getMaxUploadFileSizeMb() > 0) {
             long maxSize = level3ProtectConfigService.getMaxUploadFileSizeMb() * 1024 * 1024;
             if (file.getSize() > maxSize) {
-                return ResponseDTO.userErrorParam("上传文件最大为:" + level3ProtectConfigService.getMaxUploadFileSizeMb() + " mb");
+                throw new BusinessException("上传文件最大为:" + level3ProtectConfigService.getMaxUploadFileSizeMb() + " mb");
             }
         }
 
@@ -51,11 +51,10 @@ public class SecurityFileService {
         if (level3ProtectConfigService.isFileDetectFlag()) {
             String fileType = FileMimeTypeUtil.detect(MultipartUploadSource.of(file));
             if (ALLOWED_MIME_TYPES.stream().noneMatch(allowedType -> FileMimeTypeUtil.matches(fileType, allowedType))) {
-                return ResponseDTO.userErrorParam("禁止上传此文件类型");
+                throw new BusinessException("禁止上传此文件类型");
             }
         }
 
-        return ResponseDTO.ok();
     }
 
 }

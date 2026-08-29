@@ -1,6 +1,5 @@
 package solvela.code;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -13,26 +12,19 @@ import lombok.Getter;
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a>
  */
 @Getter
-@AllArgsConstructor
 public enum SystemErrorCode implements ErrorCode {
 
     /**
      * 系统错误
      */
-    SYSTEM_ERROR(10001, "系统似乎出现了点小问题"),
+    SYSTEM_ERROR("系统似乎出现了点小问题"),
 
     ;
 
-    private final int code;
-
     private final String msg;
 
-    private final String level;
-
-    SystemErrorCode(int code, String msg) {
-        this.code = code;
+    SystemErrorCode(String msg) {
         this.msg = msg;
-        this.level = LEVEL_SYSTEM;
     }
 
 }

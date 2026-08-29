@@ -1,5 +1,6 @@
 package solvela.admin.module.system.role.service;
 
+import solvela.exception.BusinessException;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.menu.dao.MenuDao;
 import solvela.admin.module.system.menu.domain.entity.MenuEntity;
@@ -13,7 +14,6 @@ import solvela.admin.module.system.role.domain.form.RoleMenuUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleMenuTreeVO;
 import solvela.admin.module.system.role.manager.RoleMenuManager;
 import solvela.code.UserErrorCode;
-import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -49,12 +49,12 @@ public class RoleMenuService {
      * 更新角色权限
      *
      */
-    public ResponseDTO<String> updateRoleMenu(RoleMenuUpdateForm roleMenuUpdateForm) {
+    public void updateRoleMenu(RoleMenuUpdateForm roleMenuUpdateForm) {
         //查询角色是否存在
         Long roleId = roleMenuUpdateForm.getRoleId();
         RoleEntity roleEntity = roleDao.selectById(roleId);
         if (null == roleEntity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         List<RoleMenuEntity> roleMenuEntityList = new ArrayList<>();
         RoleMenuEntity roleMenuEntity;
@@ -65,7 +65,6 @@ public class RoleMenuService {
             roleMenuEntityList.add(roleMenuEntity);
         }
         roleMenuManager.updateRoleMenu(roleMenuUpdateForm.getRoleId(), roleMenuEntityList);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -91,7 +90,7 @@ public class RoleMenuService {
      * 获取角色关联菜单权限
      *
      */
-    public ResponseDTO<RoleMenuTreeVO> getRoleSelectedMenu(Long roleId) {
+    public RoleMenuTreeVO getRoleSelectedMenu(Long roleId) {
         RoleMenuTreeVO res = new RoleMenuTreeVO();
         res.setRoleId(roleId);
         //查询角色ID选择的菜单权限
@@ -102,7 +101,7 @@ public class RoleMenuService {
         Map<Long, List<MenuVO>> parentMap = menuVOList.stream().collect(Collectors.groupingBy(MenuVO::getParentId, Collectors.toList()));
         List<MenuSimpleTreeVO> menuTreeList = this.buildMenuTree(parentMap, NumberUtils.LONG_ZERO);
         res.setMenuTreeList(menuTreeList);
-        return ResponseDTO.ok(res);
+        return res;
     }
 
     /**

@@ -9,7 +9,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.constant.StringConst;
 import solvela.admin.module.system.login.domain.RequestEmployee;
-import solvela.web.ResponseDTO;
+import solvela.code.SystemErrorCode;
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaIpUtil;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.operatelog.OperateLogDao;
@@ -37,6 +38,7 @@ import java.lang.reflect.Method;
 import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -112,14 +114,14 @@ public abstract class OperateLogAspect {
     public void logPointCut() {
     }
 
-    @AfterReturning(pointcut = "logPointCut()", returning = "responseDTO")
-    public void doAfterReturning(JoinPoint joinPoint, Object responseDTO) {
-        handleLog(joinPoint, null, responseDTO);
+    @AfterReturning(pointcut = "logPointCut()")
+    public void doAfterReturning(JoinPoint joinPoint) {
+        handleLog(joinPoint, null);
     }
 
     @AfterThrowing(value = "logPointCut()", throwing = "e")
     public void doAfterThrowing(JoinPoint joinPoint, Exception e) {
-        handleLog(joinPoint, e, null);
+        handleLog(joinPoint, e);
     }
 
     /**
@@ -157,12 +159,12 @@ public abstract class OperateLogAspect {
         taskExecutor.initialize();
     }
 
-    protected void handleLog(final JoinPoint joinPoint, final Exception e, Object responseDTO) {
+    protected void handleLog(final JoinPoint joinPoint, final Exception e) {
         try {
             if (isReadOperation(joinPoint.getSignature().getName())) {
                 return;
             }
-            this.submitLog(joinPoint, e, responseDTO);
+            this.submitLog(joinPoint, e);
         } catch (Exception exp) {
             log.error("保存操作日志异常:{}", exp.getMessage());
         }
@@ -231,7 +233,7 @@ public abstract class OperateLogAspect {
      * 提交存储操作日志
      *
      */
-    private void submitLog(final JoinPoint joinPoint, final Throwable e, Object responseDTO) {
+    private void submitLog(final JoinPoint joinPoint, final Throwable e) {
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
         //设置用户信息
         RequestEmployee user = CurrentEmployee.orNull();
@@ -276,23 +278,40 @@ public abstract class OperateLogAspect {
             operateLogEntity.setModule(name);
         }
 
-        // 处理返回值 ResponseDTO
-        if(responseDTO instanceof ResponseDTO) {
-            ResponseDTO response = (ResponseDTO) responseDTO;
-            ResponseDTO logResponseDTO = new ResponseDTO(
-                    response.getCode(),
-                    response.getLevel(),
-                    response.getOk(),
-                    response.getMsg(),
-                    null
-            );
-            logResponseDTO.setDataType(response.getDataType());
-            operateLogEntity.setResponse(JsonUtils.toJson(logResponseDTO));
+        /*
+         * 结果只记「失败长什么样」，成功不记。
+         *
+         * 上一版把整个 ResponseDTO（去掉 data）序列化进 response 列。信封没了之后，
+         * 成功的返回值就是业务数据本身 —— 那是<b>不能往审计日志里塞</b>的东西：
+         * 会员列表、钱包余额、手机号都会成段落库，而 t_operate_log 谁都能查。
+         *
+         * 失败信息从异常本身推导，<b>不从响应里取</b>：本切面包的是 Controller 方法，
+         * 它抛出来的时候 GlobalExceptionHandler 还没跑过 —— 那一步发生在 DispatcherServlet 里，
+         * 比这里晚。想从 request 上取处理器写下的结果，取到的永远是 null。
+         */
+        if (e != null) {
+            operateLogEntity.setResponse(JsonUtils.toJson(describeFailure(e)));
         }
 
         taskExecutor.execute(() -> {
             this.saveLog(operateLogEntity);
         });
+    }
+
+    /**
+     * 失败结果的落库形态：{@code {"code": "...", "message": "..."}}。
+     *
+     * <p>与响应体里的 {@code ApiErrorResponse} 保持同样的两个字段，
+     * 这样运营在操作日志里看到的 code 和用户当时看到的是同一个。
+     */
+    private Map<String, String> describeFailure(Throwable e) {
+        if (e instanceof BusinessException be) {
+            return Map.of("code", be.getErrorCode().name(),
+                    "message", be.getMessage() == null ? be.getErrorCode().getMsg() : be.getMessage());
+        }
+        // 非业务异常一律记成系统错误：具体堆栈已经在 failReason 里，这里只标类别
+        return Map.of("code", SystemErrorCode.SYSTEM_ERROR.name(),
+                "message", SystemErrorCode.SYSTEM_ERROR.getMsg());
     }
 
     private String buildParamString(Object[] args) {
