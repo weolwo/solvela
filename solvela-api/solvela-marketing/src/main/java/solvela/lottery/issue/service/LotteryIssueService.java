@@ -1,5 +1,6 @@
 package solvela.lottery.issue.service;
 
+import solvela.enums.IssueStatusEnum;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -38,8 +39,7 @@ public class LotteryIssueService {
 
     /**
      * 期号状态：0-待开奖（可售卖、可编辑、可删除）
-     */
-    private static final Integer STATUS_WAIT = 0;
+     */
 
     /**
      * 分页查询
@@ -76,7 +76,7 @@ public class LotteryIssueService {
         }
         LotteryIssue lotteryIssue = SolvelaBeanUtil.copy(addForm, LotteryIssue.class);
         lotteryIssue.setSoldCount(0);
-        lotteryIssue.setStatus(STATUS_WAIT);
+        lotteryIssue.setStatus(IssueStatusEnum.WAIT);
         lotteryIssueDao.insert(lotteryIssue);
     }
 
@@ -92,7 +92,7 @@ public class LotteryIssueService {
         if (existed == null) {
             throw new BusinessException("期号不存在");
         }
-        if (!STATUS_WAIT.equals(existed.getStatus())) {
+        if (existed.getStatus() != IssueStatusEnum.WAIT) {
             throw new BusinessException("该期已开奖或正在核销，不能再修改");
         }
         String timeError = checkSaleWindow(updateForm.getSaleStartTime(), updateForm.getSaleEndTime());
@@ -147,7 +147,7 @@ public class LotteryIssueService {
         if (sold > 0) {
             return "期号「" + issue.getIssueNo() + "」已发出 " + sold + " 个号码，不能删除";
         }
-        if (!STATUS_WAIT.equals(issue.getStatus())) {
+        if (issue.getStatus() != IssueStatusEnum.WAIT) {
             return "期号「" + issue.getIssueNo() + "」已开奖或正在核销，不能删除";
         }
         return null;
@@ -174,7 +174,7 @@ public class LotteryIssueService {
         if (issue == null) {
             throw new BusinessException("期号不存在");
         }
-        if (!STATUS_WAIT.equals(issue.getStatus())) {
+        if (issue.getStatus() != IssueStatusEnum.WAIT) {
             throw new BusinessException("期号「" + issue.getIssueNo() + "」已开奖或正在核销，本就不再发号");
         }
         // 时间只由数据库产生（铁律 9/10）：售卖窗口的判定用的是 DB 时钟，写入也必须用同一个

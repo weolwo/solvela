@@ -87,7 +87,7 @@ public class SolvelaJobZombieScanHandler implements SolvelaJob {
 
             SolvelaJobLogEntity update = new SolvelaJobLogEntity();
             update.setLogId(zombie.getLogId());
-            update.setStatus(SolvelaJobExecuteStatusEnum.INTERRUPTED.getValue());
+            update.setStatus(SolvelaJobExecuteStatusEnum.INTERRUPTED);
             update.setExecuteEndTime(ctx.dbNow());
             update.setErrorDetail("疑似节点异常退出或进程被强杀，执行记录长期停留在「执行中」，由僵尸扫描回收");
 
@@ -143,7 +143,7 @@ public class SolvelaJobZombieScanHandler implements SolvelaJob {
         retry.setBizDate(zombie.getBizDate());
         retry.setRetrySeq(currentSeq + 1);
         retry.setRetryOfLogId(zombie.getLogId());
-        retry.setStatus(SolvelaJobExecuteStatusEnum.PENDING.getValue());
+        retry.setStatus(SolvelaJobExecuteStatusEnum.PENDING);
         retry.setFireTime(dbNow.plusSeconds(interval));
         retry.setCreateName("system");
         return retry;

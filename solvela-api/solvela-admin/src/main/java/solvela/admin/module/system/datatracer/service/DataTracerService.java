@@ -167,13 +167,13 @@ public class DataTracerService {
      */
     public void addTrace(DataTracerForm tracerForm, RequestEmployee requestUser) {
         DataTracerEntity tracerEntity = SolvelaBeanUtil.copy(tracerForm, DataTracerEntity.class);
-        tracerEntity.setType(tracerForm.getType().getValue());
+        tracerEntity.setType(tracerForm.getType());
         if (requestUser != null) {
             tracerEntity.setIp(requestUser.getIp());
             tracerEntity.setIpRegion(SolvelaIpUtil.getRegion(requestUser.getIp()));
             tracerEntity.setUserAgent(requestUser.getUserAgent());
             tracerEntity.setUserId(requestUser.getUserId());
-            tracerEntity.setUserType(requestUser.getUserType().getValue());
+            tracerEntity.setUserType(requestUser.getUserType());
             tracerEntity.setUserName(requestUser.getUserName());
         }
         dataTracerManger.save(tracerEntity);
@@ -197,12 +197,12 @@ public class DataTracerService {
 
         List<DataTracerEntity> tracerEntityList = tracerFormList.stream().map(e -> {
             DataTracerEntity tracerEntity = SolvelaBeanUtil.copy(e, DataTracerEntity.class);
-            tracerEntity.setType(e.getType().getValue());
+            tracerEntity.setType(e.getType());
             tracerEntity.setIp(requestUser.getIp());
             tracerEntity.setIpRegion(SolvelaIpUtil.getRegion(requestUser.getIp()));
             tracerEntity.setUserAgent(requestUser.getUserAgent());
             tracerEntity.setUserId(requestUser.getUserId());
-            tracerEntity.setUserType(requestUser.getUserType().getValue());
+            tracerEntity.setUserType(requestUser.getUserType());
             tracerEntity.setUserName(requestUser.getUserName());
             return tracerEntity;
         }).collect(Collectors.toList());

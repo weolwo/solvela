@@ -44,7 +44,7 @@ public class AdminLoginLogController extends SupportBaseController {
     public PageResult<LoginLogVO> queryByPageLogin(@RequestBody LoginLogQueryForm queryForm) {
         RequestEmployee requestUser = CurrentEmployee.orNull();
         queryForm.setUserId(requestUser.getUserId());
-        queryForm.setUserType(requestUser.getUserType().getValue());
+        queryForm.setUserType(requestUser.getUserType());
         return loginLogService.queryByPage(queryForm);
     }
 

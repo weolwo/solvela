@@ -1,5 +1,6 @@
 package solvela.lottery;
 
+import solvela.enums.TicketStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -73,7 +74,7 @@ public class LotteryRecord {
     /**
      * 中奖状态: 0-未开奖, 1-未中奖, 2-已中奖
      */
-    private Integer winStatus;
+    private TicketStatusEnum winStatus;
 
     /**
      * 奖励等级

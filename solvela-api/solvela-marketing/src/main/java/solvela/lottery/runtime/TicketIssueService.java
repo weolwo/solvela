@@ -1,5 +1,6 @@
 package solvela.lottery.runtime;
 
+import solvela.enums.IssueStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.lottery.LotteryConfig;
@@ -79,8 +80,7 @@ public class TicketIssueService {
 
     /**
      * 期号状态：0-待开奖（可售卖）。已进入核销或已开奖的期号不再发号
-     */
-    private static final Integer ISSUE_STATUS_WAIT = 0;
+     */
 
     /**
      * 防刷限流：单用户单玩法每秒 5 次。
@@ -161,7 +161,7 @@ public class TicketIssueService {
         if (issue == null) {
             throw new BusinessException("期号不存在：" + issueNo);
         }
-        if (!ISSUE_STATUS_WAIT.equals(issue.getStatus())) {
+        if (issue.getStatus() != IssueStatusEnum.WAIT) {
             throw new BusinessException("该期已开奖或正在核销，不能再领号");
         }
         // 售卖窗口用数据库时钟判定（铁律 9/10：不引第二个时钟源）

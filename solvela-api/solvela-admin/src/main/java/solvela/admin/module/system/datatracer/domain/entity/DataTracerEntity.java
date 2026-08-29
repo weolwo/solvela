@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import solvela.admin.constant.UserTypeEnum;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 
 import java.time.LocalDateTime;
@@ -31,7 +32,7 @@ public class DataTracerEntity {
      * 业务类型
      * {@link DataTracerTypeEnum}
      */
-    private Integer type;
+    private DataTracerTypeEnum type;
 
     /**
      * 内容
@@ -61,7 +62,7 @@ public class DataTracerEntity {
     /**
      * 用户类型
      */
-    private Integer userType;
+    private UserTypeEnum userType;
 
     /**
      * 用户名

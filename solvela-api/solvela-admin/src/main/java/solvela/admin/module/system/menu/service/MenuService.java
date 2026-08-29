@@ -180,9 +180,9 @@ public class MenuService {
      * @param onlyMenu 不查询功能点
      */
     public List<MenuTreeVO> queryMenuTree(Boolean onlyMenu) {
-        List<Integer> menuTypeList = new ArrayList<>();
+        List<MenuTypeEnum> menuTypeList = new ArrayList<>();
         if (onlyMenu) {
-            menuTypeList = List.of(MenuTypeEnum.CATALOG.getValue(), MenuTypeEnum.MENU.getValue());
+            menuTypeList = List.of(MenuTypeEnum.CATALOG, MenuTypeEnum.MENU);
         }
         List<MenuVO> menuVOList = menuDao.queryMenuList(Boolean.FALSE, null, menuTypeList);
         //根据ParentId进行分组

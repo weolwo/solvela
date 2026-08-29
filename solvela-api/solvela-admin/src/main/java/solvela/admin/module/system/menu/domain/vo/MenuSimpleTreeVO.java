@@ -1,5 +1,6 @@
 package solvela.admin.module.system.menu.domain.vo;
 
+import solvela.admin.module.system.menu.constant.MenuTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -30,7 +31,7 @@ public class MenuSimpleTreeVO {
     private Long parentId;
 
     @Schema(description = "菜单类型")
-    private Integer menuType;
+    private MenuTypeEnum menuType;
 
     @Schema(description = "子菜单")
     private List<MenuSimpleTreeVO> children;

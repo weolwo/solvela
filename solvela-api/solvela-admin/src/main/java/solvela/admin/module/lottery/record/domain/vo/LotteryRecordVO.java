@@ -1,5 +1,6 @@
 package solvela.admin.module.lottery.record.domain.vo;
 
+import solvela.enums.TicketStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -45,7 +46,7 @@ public class LotteryRecordVO {
     private LocalDateTime obtainTime;
 
     @Schema(description = "中奖状态: 0-未开奖, 1-未中奖, 已开奖")
-    private Integer winStatus;
+    private TicketStatusEnum winStatus;
 
     @Schema(description = "奖励等级")
     private Integer prizeLevel;

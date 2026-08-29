@@ -1,5 +1,6 @@
 package solvela.admin.module.lottery.issue.domain.vo;
 
+import solvela.enums.IssueStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -52,7 +53,7 @@ public class LotteryIssueVO {
     private String winningNumber;
 
     @Schema(description = "状态: 0-待开奖, 1-售卖中, 2-已开奖")
-    private Integer status;
+    private IssueStatusEnum status;
 
     @Schema(description = "创建人")
     private String createBy;

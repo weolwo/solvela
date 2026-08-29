@@ -27,7 +27,7 @@ public class DataTracerVO {
     private Long dataId;
 
     @SchemaEnum(value = DataTracerTypeEnum.class, desc = "业务类型")
-    private Integer type;
+    private DataTracerTypeEnum type;
 
     @Schema(description = "操作内容")
     private String content;
@@ -45,7 +45,7 @@ public class DataTracerVO {
     private Long userId;
 
     @SchemaEnum(value = UserTypeEnum.class, desc = "用户类型")
-    private Integer userType;
+    private UserTypeEnum userType;
 
     @Schema(description = "操作人名称")
     private String userName;

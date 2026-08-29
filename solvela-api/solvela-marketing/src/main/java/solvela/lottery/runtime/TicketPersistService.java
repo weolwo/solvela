@@ -1,5 +1,6 @@
 package solvela.lottery.runtime;
 
+import solvela.enums.TicketStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.constant.LotteryConst;
@@ -41,11 +42,6 @@ public class TicketPersistService {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
-     * 中奖状态：0-未开奖
-     */
-    private static final int WIN_STATUS_WAIT = 0;
-
-    /**
      * 落记录 + 累加 sold_count，同一事务。
      *
      * <p>sold_count 用条件更新兜底（WHERE sold_count &lt; total_count）：
@@ -68,7 +64,7 @@ public class TicketPersistService {
         // 账号只作展示快照 —— 同时它还是 security_sign 的签名要素，见 LotteryRecord.memberName
         record.setMemberName(memberName);
         record.setObtainTime(now);
-        record.setWinStatus(WIN_STATUS_WAIT);
+        record.setWinStatus(TicketStatusEnum.WAIT);
         // 未开奖统一落 99，让 C 端「我的号码」可以直接 ORDER BY prize_level ASC
         record.setPrizeLevel(LotteryConst.PRIZE_LEVEL_NONE);
         // security_sign 是 NOT NULL 无默认值，漏赋值会被 MySQL 严格模式直接拒绝

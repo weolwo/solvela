@@ -1,5 +1,6 @@
 package solvela.admin.module.system.job.api.domain;
 
+import solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import solvela.base.domain.PageParam;
@@ -24,7 +25,7 @@ public class SolvelaJobLogQueryForm extends PageParam {
     private Integer jobId;
 
     @Schema(description = "执行状态|可选：1-执行中 2-成功 3-失败 4-超时中断")
-    private Integer status;
+    private SolvelaJobExecuteStatusEnum status;
 
     @Schema(description = "触发来源|可选：SCHEDULE/MANUAL")
     private String triggerSource;

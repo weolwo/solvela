@@ -38,16 +38,6 @@ public final class MemberConst {
     public static final int GENDER_MALE = 1;
     public static final int GENDER_FEMALE = 2;
 
-    // ------------------------------------------------------------------ 登录日志状态
-
-    /**
-     * ⚠️ 与 {@code t_login_log.login_result} <b>取值相反</b>（DDL 注释里专门标了这一条）。
-     * 那张是员工登录日志，这张是会员登录日志，别照着另一张的语义读这一列。
-     */
-    public static final int LOGIN_STATUS_FAIL = 0;
-    public static final int LOGIN_STATUS_SUCCESS = 1;
-    public static final int LOGIN_STATUS_LOGOUT = 2;
-
     // ------------------------------------------------------------------ 实名认证状态
 
     public static final int VERIFY_STATUS_NONE = 0;

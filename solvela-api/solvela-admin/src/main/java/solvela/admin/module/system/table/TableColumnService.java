@@ -29,7 +29,7 @@ public class TableColumnService {
      * @return
      */
     public String getTableColumns(RequestEmployee requestUser, Integer tableId) {
-        TableColumnEntity tableColumnEntity = tableColumnDao.selectByUserIdAndTableId(requestUser.getUserId(), requestUser.getUserType().getValue(), tableId);
+        TableColumnEntity tableColumnEntity = tableColumnDao.selectByUserIdAndTableId(requestUser.getUserId(), requestUser.getUserType(), tableId);
         return tableColumnEntity == null ? null : tableColumnEntity.getColumns();
     }
 
@@ -43,12 +43,12 @@ public class TableColumnService {
             return;
         }
         Integer tableId = updateForm.getTableId();
-        TableColumnEntity tableColumnEntity = tableColumnDao.selectByUserIdAndTableId(requestUser.getUserId(), requestUser.getUserType().getValue(), tableId);
+        TableColumnEntity tableColumnEntity = tableColumnDao.selectByUserIdAndTableId(requestUser.getUserId(), requestUser.getUserType(), tableId);
         if (tableColumnEntity == null) {
             tableColumnEntity = new TableColumnEntity();
             tableColumnEntity.setTableId(tableId);
             tableColumnEntity.setUserId(requestUser.getUserId());
-            tableColumnEntity.setUserType(requestUser.getUserType().getValue());
+            tableColumnEntity.setUserType(requestUser.getUserType());
 
             tableColumnEntity.setColumns(JsonUtils.toJson(updateForm.getColumnList()));
             tableColumnDao.insert(tableColumnEntity);
@@ -64,6 +64,6 @@ public class TableColumnService {
      * @return
      */
     public void deleteTableColumn(RequestEmployee requestUser, Integer tableId) {
-        tableColumnDao.deleteTableColumn(requestUser.getUserId(), requestUser.getUserType().getValue(), tableId);
+        tableColumnDao.deleteTableColumn(requestUser.getUserId(), requestUser.getUserType(), tableId);
     }
 }

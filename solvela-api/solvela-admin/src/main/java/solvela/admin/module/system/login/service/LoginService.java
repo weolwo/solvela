@@ -29,7 +29,7 @@ import solvela.base.constant.LoginDeviceEnum;
 import solvela.admin.module.system.apiencrypt.service.ApiEncryptService;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
-import solvela.admin.module.system.loginlog.LoginLogResultEnum;
+import solvela.enums.LoginLogResultEnum;
 import solvela.admin.module.system.loginlog.LoginLogService;
 import solvela.admin.module.system.loginlog.domain.LoginLogEntity;
 import solvela.admin.module.system.loginlog.domain.LoginLogVO;
@@ -254,12 +254,12 @@ public class LoginService {
         //保存登出日志
         LoginLogEntity loginEntity = LoginLogEntity.builder()
                 .userId(requestUser.getUserId())
-                .userType(requestUser.getUserType().getValue())
+                .userType(requestUser.getUserType())
                 .userName(requestUser.getUserName())
                 .userAgent(requestUser.getUserAgent())
                 .loginIp(requestUser.getIp())
                 .loginIpRegion(SolvelaIpUtil.getRegion(requestUser.getIp()))
-                .loginResult(LoginLogResultEnum.LOGIN_OUT.getValue())
+                .loginResult(LoginLogResultEnum.LOGIN_OUT)
                 .createTime(LocalDateTime.now())
                 .build();
         loginLogService.log(loginEntity);
@@ -272,14 +272,14 @@ public class LoginService {
     private void saveLoginLog(EmployeeEntity employeeEntity, String ip, String userAgent, String remark, LoginLogResultEnum result, LoginDeviceEnum loginDeviceEnum) {
         LoginLogEntity loginEntity = LoginLogEntity.builder()
                 .userId(employeeEntity.getEmployeeId())
-                .userType(UserTypeEnum.ADMIN_EMPLOYEE.getValue())
+                .userType(UserTypeEnum.ADMIN_EMPLOYEE)
                 .userName(employeeEntity.getActualName())
                 .userAgent(userAgent)
                 .loginIp(ip)
                 .loginIpRegion(SolvelaIpUtil.getRegion(ip))
                 .remark(remark)
                 .loginDevice(loginDeviceEnum.getDesc())
-                .loginResult(result.getValue())
+                .loginResult(result)
                 .createTime(LocalDateTime.now())
                 .build();
         loginLogService.log(loginEntity);

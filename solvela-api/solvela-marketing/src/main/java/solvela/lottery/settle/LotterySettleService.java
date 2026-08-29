@@ -1,5 +1,6 @@
 package solvela.lottery.settle;
 
+import solvela.enums.IssueStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.lottery.LotteryConfig;
@@ -57,11 +58,7 @@ public class LotterySettleService {
     private final LotteryIssueDao lotteryIssueDao;
     private final LotteryPrizeRuleManager lotteryPrizeRuleManager;
     private final LotteryRecordDao lotteryRecordDao;
-    private final LotteryDispatchService lotteryDispatchService;
-
-    private static final int STATUS_WAIT = 0;
-    private static final int STATUS_SETTLING = 1;
-    private static final int STATUS_OPENED = 2;
+    private final LotteryDispatchService lotteryDispatchService;
 
     /**
      * 单批认领上限。十万级记录一次性 UPDATE 会撑爆 undo log 与锁等待，
@@ -111,7 +108,7 @@ public class LotterySettleService {
         if (issue == null) {
             throw new BusinessException("期号不存在");
         }
-        if (issue.getStatus() == STATUS_OPENED) {
+        if (issue.getStatus() == IssueStatusEnum.OPENED) {
             throw new BusinessException("该期已开奖，开奖号码为 " + issue.getWinningNumber());
         }
         LotteryConfig config = lotteryConfigService.getByLotteryCode(issue.getLotteryCode());
@@ -120,7 +117,7 @@ public class LotterySettleService {
         }
 
         String finalNumber;
-        if (issue.getStatus() == STATUS_SETTLING) {
+        if (issue.getStatus() == IssueStatusEnum.STAGED) {
             // 断点续跑：号码早已定案，忽略入参，避免「中途换号」这种最坏情况
             finalNumber = issue.getWinningNumber();
             log.warn("[彩票开奖] 期号 {} 处于核销中，按已定案号码 {} 续跑", issue.getIssueNo(), finalNumber);
@@ -130,7 +127,7 @@ public class LotterySettleService {
                 throw new BusinessException(error);
             }
             // 抢闸门：两个人同时点，第二个人 rows=0 直接退出，不会重复核销
-            int rows = lotteryIssueDao.startSettle(issueId, STATUS_WAIT, STATUS_SETTLING, winningNumber);
+            int rows = lotteryIssueDao.startSettle(issueId, IssueStatusEnum.WAIT, IssueStatusEnum.STAGED, winningNumber);
             if (rows == 0) {
                 throw new BusinessException("开奖失败：该期状态已被其他操作变更，请刷新后重试");
             }
@@ -164,7 +161,7 @@ public class LotterySettleService {
         }
 
         // settle_time 没有 ON UPDATE CURRENT_TIMESTAMP 兜底，必须显式写（铁律 9 的例外分支）
-        lotteryIssueDao.finishSettle(issueId, STATUS_SETTLING, STATUS_OPENED);
+        lotteryIssueDao.finishSettle(issueId, IssueStatusEnum.STAGED, IssueStatusEnum.OPENED);
 
         Map<String, Object> summary = lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo());
         log.info("[彩票开奖] 期号 {} 核销完成，开奖号码 {}，中奖 {} 张、未中奖 {} 张", issue.getIssueNo(), finalNumber, claimed, lose);
@@ -230,7 +227,7 @@ public class LotterySettleService {
         if (issue == null) {
             throw new BusinessException("期号不存在");
         }
-        if (issue.getStatus() != STATUS_OPENED) {
+        if (issue.getStatus() != IssueStatusEnum.OPENED) {
             throw new BusinessException("该期尚未开奖完成，不能派奖");
         }
         return lotteryDispatchService.dispatchIssue(issue.getLotteryCode(), issue.getIssueNo());

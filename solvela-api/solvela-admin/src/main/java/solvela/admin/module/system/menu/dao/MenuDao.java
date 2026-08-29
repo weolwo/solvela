@@ -1,5 +1,6 @@
 package solvela.admin.module.system.menu.dao;
 
+import solvela.admin.module.system.menu.constant.MenuTypeEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -54,7 +55,7 @@ public interface MenuDao extends BaseMapper<MenuEntity> {
      * @param disabledFlag 是否禁用
      * @param menuTypeList 菜单类型集合
      */
-    List<MenuVO> queryMenuList(@Param("deletedFlag") Boolean deletedFlag, @Param("disabledFlag") Boolean disabledFlag, @Param("menuTypeList") List<Integer> menuTypeList);
+    List<MenuVO> queryMenuList(@Param("deletedFlag") Boolean deletedFlag, @Param("disabledFlag") Boolean disabledFlag, @Param("menuTypeList") List<MenuTypeEnum> menuTypeList);
 
 
     /**
@@ -64,7 +65,7 @@ public interface MenuDao extends BaseMapper<MenuEntity> {
      * @param menuType    菜单类型
      * @param deletedFlag 删除标记
      */
-    List<MenuEntity> getPointListByMenuId(@Param("menuId") Long menuId, @Param("menuType") Integer menuType, @Param("deletedFlag") Boolean deletedFlag);
+    List<MenuEntity> getPointListByMenuId(@Param("menuId") Long menuId, @Param("menuType") MenuTypeEnum menuType, @Param("deletedFlag") Boolean deletedFlag);
 
     /**
      * 根据员工ID查询菜单列表
@@ -84,7 +85,7 @@ public interface MenuDao extends BaseMapper<MenuEntity> {
      * @param deletedFlag  删除
      * @param disabledFlag 禁用
      */
-    List<MenuEntity> queryMenuByType(@Param("menuType") Integer menuType,
+    List<MenuEntity> queryMenuByType(@Param("menuType") MenuTypeEnum menuType,
                                      @Param("deletedFlag") Boolean deletedFlag,
                                      @Param("disabledFlag") Boolean disabledFlag);
 

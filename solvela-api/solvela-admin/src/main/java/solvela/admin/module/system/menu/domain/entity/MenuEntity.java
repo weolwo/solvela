@@ -1,5 +1,6 @@
 package solvela.admin.module.system.menu.domain.entity;
 
+import solvela.admin.module.system.menu.constant.MenuPermsTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -37,7 +38,7 @@ public class MenuEntity {
      *
      * @see MenuTypeEnum
      */
-    private Integer menuType;
+    private MenuTypeEnum menuType;
 
     /**
      * 父菜单ID
@@ -92,7 +93,7 @@ public class MenuEntity {
     /**
      * 权限类型
      */
-    private Integer permsType;
+    private MenuPermsTypeEnum permsType;
 
     /**
      * 前端权限字符串

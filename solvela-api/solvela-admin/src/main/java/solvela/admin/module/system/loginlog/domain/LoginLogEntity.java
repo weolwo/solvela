@@ -1,5 +1,7 @@
 package solvela.admin.module.system.loginlog.domain;
 
+import solvela.enums.LoginLogResultEnum;
+import solvela.admin.constant.UserTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -37,7 +39,7 @@ public class LoginLogEntity {
     /**
      * 用户类型
      */
-    private Integer userType;
+    private UserTypeEnum userType;
 
     /**
      * 用户名
@@ -72,7 +74,7 @@ public class LoginLogEntity {
     /**
      * 登录类型
      */
-    private Integer loginResult;
+    private LoginLogResultEnum loginResult;
 
     private LocalDateTime updateTime;
 

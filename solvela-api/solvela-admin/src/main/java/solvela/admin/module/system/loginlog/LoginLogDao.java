@@ -1,5 +1,7 @@
 package solvela.admin.module.system.loginlog;
 
+import solvela.enums.LoginLogResultEnum;
+import solvela.admin.constant.UserTypeEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.admin.module.system.loginlog.domain.LoginLogEntity;
@@ -39,7 +41,7 @@ public interface LoginLogDao extends BaseMapper<LoginLogEntity> {
      * @param userType
      * @return LoginLogVO
      */
-    LoginLogVO queryLastByUserId(@Param("userId") Long userId,@Param("userType") Integer userType, @Param("loginLogResult")Integer loginLogResult);
+    LoginLogVO queryLastByUserId(@Param("userId") Long userId,@Param("userType") UserTypeEnum userType, @Param("loginLogResult") LoginLogResultEnum loginLogResult);
 
 
 }

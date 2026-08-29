@@ -6,6 +6,7 @@ package solvela.lottery.issue.dao;
         import solvela.lottery.issue.domain.query.LotteryIssueQuery;
         import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
         import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
+import solvela.enums.IssueStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -77,8 +78,8 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      *
      * @return 影响行数，0 表示没抢到（状态已被别人改过）
      */
-    int startSettle(@Param("id") Long id, @Param("from") Integer from,
-                    @Param("to") Integer to, @Param("winningNumber") String winningNumber);
+    int startSettle(@Param("id") Long id, @Param("from") IssueStatusEnum from,
+                    @Param("to") IssueStatusEnum to, @Param("winningNumber") String winningNumber);
 
     /**
      * 核销完成：1->2，并显式写 settle_time。
@@ -87,7 +88,7 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      * 必须在这里显式赋值 —— 这是铁律 9「时间只由数据库产生」的例外分支
      * （同 t_proposal_record.approve_time）。用 NOW() 而不是 Java 时间，仍然只有数据库一个时钟。
      */
-    int finishSettle(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
+    int finishSettle(@Param("id") Long id, @Param("from") IssueStatusEnum from, @Param("to") IssueStatusEnum to);
 
 
             // ----- 物理删除 -----

@@ -1,5 +1,6 @@
 package solvela.lottery.record.domain.dto;
 
+import solvela.enums.TicketStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -41,7 +42,7 @@ public class LotteryRecordDTO {
     private LocalDateTime obtainTime;
 
     /** 中奖状态: 0-未开奖, 1-未中奖, 已开奖 */
-    private Integer winStatus;
+    private TicketStatusEnum winStatus;
 
     /** 奖励等级 */
     private Integer prizeLevel;

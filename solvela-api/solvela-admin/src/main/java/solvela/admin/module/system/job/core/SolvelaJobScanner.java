@@ -313,7 +313,7 @@ public class SolvelaJobScanner {
         if (this.isBlocked(job, handler, dbNow, pending.getLogId())) {
             SolvelaJobLogEntity update = new SolvelaJobLogEntity();
             update.setLogId(pending.getLogId());
-            update.setStatus(SolvelaJobExecuteStatusEnum.BLOCKED.getValue());
+            update.setStatus(SolvelaJobExecuteStatusEnum.BLOCKED);
             update.setExecuteEndTime(dbNow);
             update.setExecuteTimeMillis(0L);
             update.setResultSummary("上一次执行尚未结束，按阻塞策略丢弃本次");
@@ -328,7 +328,7 @@ public class SolvelaJobScanner {
             return;
         }
         // ④ 投递。记录已是 RUNNING，补齐执行期字段后交给 runner
-        pending.setStatus(SolvelaJobExecuteStatusEnum.RUNNING.getValue());
+        pending.setStatus(SolvelaJobExecuteStatusEnum.RUNNING);
         pending.setExecuteStartTime(dbNow);
         pending.setScheduleDelayMs(this.calcDelayMillis(pending.getTriggerTime(), dbNow));
         this.fillNodeInfo(pending);
@@ -345,7 +345,7 @@ public class SolvelaJobScanner {
     private void abandonPending(SolvelaJobLogEntity pending, String reason) {
         SolvelaJobLogEntity update = new SolvelaJobLogEntity();
         update.setLogId(pending.getLogId());
-        update.setStatus(SolvelaJobExecuteStatusEnum.BLOCKED.getValue());
+        update.setStatus(SolvelaJobExecuteStatusEnum.BLOCKED);
         update.setFireTime(null);
         update.setResultSummary(reason);
         jobRepository.getJobLogDao().updateById(update);
@@ -410,7 +410,7 @@ public class SolvelaJobScanner {
         logEntity.setBizDate(null != bizDate ? bizDate
                 : triggerTime.toLocalDate().plusDays(handler.bizDateOffset()));
         logEntity.setParamSnapshot(param);
-        logEntity.setStatus(SolvelaJobExecuteStatusEnum.RUNNING.getValue());
+        logEntity.setStatus(SolvelaJobExecuteStatusEnum.RUNNING);
         logEntity.setExecuteStartTime(dbNow);
         logEntity.setExecuteTimeMillis(0L);
         logEntity.setScheduleDelayMs(this.calcDelayMillis(triggerTime, dbNow));
@@ -432,7 +432,7 @@ public class SolvelaJobScanner {
         if (!jobRunner.submit(job, logEntity, handler)) {
             SolvelaJobLogEntity update = new SolvelaJobLogEntity();
             update.setLogId(logEntity.getLogId());
-            update.setStatus(SolvelaJobExecuteStatusEnum.BLOCKED.getValue());
+            update.setStatus(SolvelaJobExecuteStatusEnum.BLOCKED);
             update.setExecuteEndTime(dbNow);
             update.setResultSummary("执行池已满，本次未投递");
             jobRepository.getJobLogDao().updateById(update);
@@ -456,7 +456,7 @@ public class SolvelaJobScanner {
         logEntity.setTriggerTime(triggerTime);
         logEntity.setRetrySeq(0);
         logEntity.setParamSnapshot(job.getParam());
-        logEntity.setStatus(status.getValue());
+        logEntity.setStatus(status);
         logEntity.setExecuteStartTime(dbNow);
         logEntity.setExecuteEndTime(dbNow);
         logEntity.setExecuteTimeMillis(0L);

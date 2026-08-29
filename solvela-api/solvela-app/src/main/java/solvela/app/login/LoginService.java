@@ -1,5 +1,6 @@
 package solvela.app.login;
 
+import solvela.enums.LoginLogResultEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -96,7 +97,7 @@ public class LoginService {
         }
         if (MemberConst.STATUS_FROZEN == member.getStatus()) {
             saveLoginLog(member.getMemberId(), ip, request.deviceType(),
-                    MemberConst.LOGIN_STATUS_FAIL, "账号已冻结");
+                    LoginLogResultEnum.LOGIN_FAIL, "账号已冻结");
             throw new ApiException(ApiErrors.ACCOUNT_DISABLED, "账号已被冻结，请联系客服");
         }
 
@@ -108,21 +109,21 @@ public class LoginService {
         if (activeLimit != null) {
             String message = lockedMessage(activeLimit);
             saveLoginLog(member.getMemberId(), ip, request.deviceType(),
-                    MemberConst.LOGIN_STATUS_FAIL, message);
+                    LoginLogResultEnum.LOGIN_FAIL, message);
             throw new ApiException(ApiErrors.OPERATION_LIMITED, message);
         }
 
         // ---------- 验密码 ----------
         if (SolvelaStringUtil.isEmpty(member.getPassword())) {
             saveLoginLog(member.getMemberId(), ip, request.deviceType(),
-                    MemberConst.LOGIN_STATUS_FAIL, "未设置登录密码");
+                    LoginLogResultEnum.LOGIN_FAIL, "未设置登录密码");
             throw new ApiException(ApiErrors.BAD_CREDENTIALS, "该账号未设置密码，请使用短信验证码登录");
         }
         if (!PasswordCipher.matches(request.password(), member.getPassword())) {
             MemberOperationLimit triggered = operationLimitService.recordFail(
                     member.getMemberId(), MemberOperationTypeEnum.LOGIN, "连续登录失败");
             saveLoginLog(member.getMemberId(), ip, request.deviceType(),
-                    MemberConst.LOGIN_STATUS_FAIL, BAD_CREDENTIALS_MSG);
+                    LoginLogResultEnum.LOGIN_FAIL, BAD_CREDENTIALS_MSG);
             // triggered 非空表示这一次失败刚好把人限制住了，直接告诉他要等多久，
             // 而不是让他再点一次才发现被限 —— 后者是投诉的主要来源
             if (triggered != null) {
@@ -138,7 +139,7 @@ public class LoginService {
         // 资料可能在上次缓存之后被后台改过，登录是重建缓存最自然的时机
         principalLoader.evict(member.getMemberId());
         saveLoginLog(member.getMemberId(), ip, request.deviceType(),
-                MemberConst.LOGIN_STATUS_SUCCESS, null);
+                LoginLogResultEnum.LOGIN_SUCCESS, null);
 
         MemberPrincipal principal = new MemberPrincipal(
                 member.getMemberId(), member.getMemberName(), member.getNickname(),
@@ -152,7 +153,7 @@ public class LoginService {
      */
     public void logout(String tokenValue, Long memberId, String ip) {
         tokenStore.revoke(tokenValue);
-        saveLoginLog(memberId, ip, null, MemberConst.LOGIN_STATUS_LOGOUT, null);
+        saveLoginLog(memberId, ip, null, LoginLogResultEnum.LOGIN_OUT, null);
     }
 
     /**
@@ -169,14 +170,14 @@ public class LoginService {
     /**
      * 写登录日志。
      *
-     * <p>🔴 {@code status} 的取值口径与 {@code t_login_log.login_result} <b>正好相反</b>
-     * （DDL 注释里专门标了这一条）：这里 1 是成功、0 是失败。
-     * 照抄管理端 {@code LoginService} 那套判断会正好搞反。
+     * <p>取值与管理端的 {@code t_login_log.login_result} <b>完全一致</b>，共用
+     * {@link LoginLogResultEnum}。这两张表曾经 0/1 相反（本表 1 是成功），
+     * 2026-08-29 趁本表还是零行统一了口径 —— 别再往回改。
      *
      * <p>⚠️ 日志失败绝不能影响登录本身 —— 「登不上去是因为日志表满了」这种事排查极其费劲，
      * 而登录日志的价值再高也高不过登录本身。
      */
-    private void saveLoginLog(Long memberId, String ip, String deviceType, int status, String remark) {
+    private void saveLoginLog(Long memberId, String ip, String deviceType, LoginLogResultEnum status, String remark) {
         try {
             MemberLoginLog loginLog = new MemberLoginLog();
             loginLog.setMemberId(memberId);

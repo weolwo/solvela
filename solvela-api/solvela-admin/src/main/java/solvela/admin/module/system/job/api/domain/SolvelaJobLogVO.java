@@ -49,7 +49,7 @@ public class SolvelaJobLogVO {
 
     @SchemaEnum(desc = "执行状态", value = SolvelaJobExecuteStatusEnum.class)
     @EnumSerialize(SolvelaJobExecuteStatusEnum.class)
-    private Integer status;
+    private SolvelaJobExecuteStatusEnum status;
 
     @Schema(description = "链路追踪 id，可用它去日志系统检索这次执行")
     private String traceId;

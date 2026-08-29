@@ -29,7 +29,7 @@ public class MenuBaseForm {
 
     @SchemaEnum(value = MenuTypeEnum.class, desc = "类型")
     @CheckEnum(value = MenuTypeEnum.class, message = "类型错误")
-    private Integer menuType;
+    private MenuTypeEnum menuType;
 
     @Schema(description = "父菜单ID 无上级可传0")
     @NotNull(message = "父菜单ID不能为空")
@@ -65,7 +65,7 @@ public class MenuBaseForm {
 
     @SchemaEnum(value = MenuPermsTypeEnum.class, desc = "权限类型 ")
     @CheckEnum(value = MenuPermsTypeEnum.class, message = "权限类型")
-    private Integer permsType;
+    private MenuPermsTypeEnum permsType;
 
     @Schema(description = "前端权限字符串")
     private String webPerms;

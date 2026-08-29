@@ -3,6 +3,7 @@ package solvela.admin.module.system.table.domain;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import solvela.admin.constant.UserTypeEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -31,7 +32,7 @@ public class TableColumnEntity {
     /**
      * 用户类型
      */
-    private Integer userType;
+    private UserTypeEnum userType;
 
     /**
      * 表id

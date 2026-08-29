@@ -39,7 +39,7 @@ public class LotteryRecordQueryForm extends PageParam {
 
     @SchemaEnum(value = TicketStatusEnum.class, desc = "中奖状态: 0-未开奖, 1-未中奖, 已开奖")
     @CheckEnum(value = TicketStatusEnum.class, message = "中奖状态: 0-未开奖, 1-未中奖, 已开奖 错误")
-    private Integer winStatus;
+    private TicketStatusEnum winStatus;
 
     /**
      * 会员号（精确匹配，走 member_id 索引）。

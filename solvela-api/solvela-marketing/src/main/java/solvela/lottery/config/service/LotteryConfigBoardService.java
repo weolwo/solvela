@@ -1,5 +1,6 @@
 package solvela.lottery.config.service;
 
+import solvela.enums.IssueStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
@@ -61,10 +62,6 @@ public class LotteryConfigBoardService {
     private final ActivityConfigManager activityConfigManager;
 
     private static final Integer STATUS_ONLINE = 1;
-
-    /** 期号状态：0-待开奖（可售卖），2-已开奖。与 IssueStatusEnum 对齐 */
-    private static final Integer ISSUE_WAIT = 0;
-    private static final Integer ISSUE_OPENED = 2;
 
     /** 占用率到这个比例就提示扩容余地不足，早于发号才有意义 */
     private static final BigDecimal SPACE_WARN_THRESHOLD = new BigDecimal("0.9");
@@ -168,7 +165,7 @@ public class LotteryConfigBoardService {
         int openedCount = 0;
         int sellableNow = 0;
         for (LotteryIssue issue : issues) {
-            if (ISSUE_WAIT.equals(issue.getStatus())) {
+            if (issue.getStatus() == IssueStatusEnum.WAIT) {
                 waitCount++;
                 // 与运行态一致：待开奖 + 当前时间落在售卖窗口内才算真能领号
                 boolean started = issue.getSaleStartTime() == null || !dbNow.isBefore(issue.getSaleStartTime());
@@ -176,7 +173,7 @@ public class LotteryConfigBoardService {
                 if (started && notEnded) {
                     sellableNow++;
                 }
-            } else if (ISSUE_OPENED.equals(issue.getStatus())) {
+            } else if (issue.getStatus() == IssueStatusEnum.OPENED) {
                 openedCount++;
             }
         }

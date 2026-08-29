@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import solvela.admin.constant.UserTypeEnum;
 import solvela.web.swagger.SchemaEnum;
-import solvela.admin.module.system.loginlog.LoginLogResultEnum;
+import solvela.enums.LoginLogResultEnum;
 
 import java.time.LocalDateTime;
 
@@ -26,7 +26,7 @@ public class LoginLogVO {
     private Long userId;
 
     @SchemaEnum(value = UserTypeEnum.class, desc = "用户类型")
-    private Integer userType;
+    private UserTypeEnum userType;
 
     @Schema(description = "用户名")
     private String userName;
@@ -44,7 +44,7 @@ public class LoginLogVO {
     private String remark;
 
     @SchemaEnum(LoginLogResultEnum.class)
-    private Integer loginResult;
+    private LoginLogResultEnum loginResult;
 
     private String loginDevice;
 

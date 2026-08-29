@@ -1,5 +1,6 @@
 package solvela.lottery;
 
+import solvela.enums.IssueStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -71,7 +72,7 @@ public class LotteryIssue {
     /**
      * 状态: 0-待开奖, 1-部分开奖, 2-已开奖
      */
-    private Integer status;
+    private IssueStatusEnum status;
 
     /**
      * 创建人

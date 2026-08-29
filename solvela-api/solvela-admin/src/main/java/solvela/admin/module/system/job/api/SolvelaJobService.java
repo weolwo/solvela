@@ -502,7 +502,7 @@ public class SolvelaJobService {
         logEntity.setBizDate(bizDate);
         logEntity.setParamSnapshot(param);
         logEntity.setRetryOfLogId(retryOfLogId);
-        logEntity.setStatus(SolvelaJobExecuteStatusEnum.PENDING.getValue());
+        logEntity.setStatus(SolvelaJobExecuteStatusEnum.PENDING);
         // 🔴 只有 PENDING 记录带 fire_time；立即执行即 now
         logEntity.setFireTime(now);
         logEntity.setCreateName(operator);
@@ -537,7 +537,7 @@ public class SolvelaJobService {
         if (null == logEntity) {
             throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
-        if (!Objects.equals(logEntity.getStatus(), SolvelaJobExecuteStatusEnum.RUNNING.getValue())) {
+        if (logEntity.getStatus() != SolvelaJobExecuteStatusEnum.RUNNING) {
             throw new BusinessException("该执行记录不在「执行中」状态，无需终止");
         }
         SolvelaJobMsg msg = new SolvelaJobMsg();

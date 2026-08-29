@@ -1,5 +1,6 @@
 package solvela.lottery.prizerule.service;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.manager.LotteryConfigManager;
@@ -70,8 +71,6 @@ public class LotteryPrizeAnalysisService {
     /** 玩法状态：1-已上线 */
     private static final Integer LOTTERY_STATUS_ONLINE = 1;
 
-    /** 奖品状态：1-启用 */
-    private static final Integer PRIZE_STATUS_ENABLED = 1;
 
     /**
      * 中奖率保留位数。9 位号码的 EXACT 命中率是 1e-9，再留几位余量，
@@ -305,7 +304,7 @@ public class LotteryPrizeAnalysisService {
                 issues.add(PrizeRuleIssueDTO.danger("PRIZE_MISSING",
                         "奖品「" + rule.getPrizeCode() + "」在奖品库中不存在，派奖时会报『奖品配置不存在』，用户中了奖拿不到东西"));
             } else {
-                if (!PRIZE_STATUS_ENABLED.equals(prize.getStatus())) {
+                if (prize.getStatus() != EnableStatusEnum.ENABLED) {
                     issues.add(PrizeRuleIssueDTO.danger("PRIZE_DISABLED",
                             "奖品「" + prize.getPrizeName() + "」已停用，派奖链路会拒绝发放"));
                 }

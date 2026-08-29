@@ -301,11 +301,15 @@ CREATE TABLE `t_member_login_log`
     `browser_name` varchar(32)          DEFAULT NULL COMMENT '浏览器：Chrome/Safari',
 
     -- ---------- 行为结果 ----------
-    -- 🔴 取值与既有 t_login_log.login_result <b>正好相反</b>（那边 0-成功 1-失败）。
-    --    这里跟随本项目 status 列的通行口径（1 = 正常/成功，见 t_member.status、
-    --    t_mall_commodity.status），因为<b>列名不同</b>，不会被误当成同一个字典。
-    --    但写代码时别照抄 LoginService 里那套 login_result 的判断，会正好搞反。
-    `status`       tinyint     NOT NULL DEFAULT 1 COMMENT '状态：0-失败, 1-成功, 2-登出。⚠️与t_login_log.login_result取值相反',
+    -- 取值与 t_login_log.login_result 完全一致，两端共用 LoginLogResultEnum。
+    --
+    -- 🔴 2026-08-29 之前这一列是<b>反的</b>（1 是成功），理由是「跟随 status 列的通行口径」。
+    --    代价是两张登录日志表、同一个概念、相反的取值，DDL 和代码里各留了一处 ⚠️ 提醒，
+    --    而提醒是防不住照抄的。趁本表还是零行统一了口径，别再往回改。
+    --
+    -- 刻意不留 DEFAULT：对齐 t_login_log.login_result 的写法。
+    -- 有默认值意味着漏赋值时会静默落成某个具体结果，而这一列漏赋值应该直接失败。
+    `status`       tinyint     NOT NULL COMMENT '登录结果：0-成功, 1-失败, 2-登出。与 t_login_log.login_result 同口径，共用 LoginLogResultEnum',
     `remark`       varchar(128)         DEFAULT NULL COMMENT '提示信息：成功可为空，失败写具体原因',
 
     -- ---------- 链路追踪 ----------

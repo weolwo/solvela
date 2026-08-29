@@ -1,5 +1,6 @@
 package solvela.admin.module.lottery.issue.domain.form;
 
+import solvela.enums.IssueStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -26,7 +27,7 @@ public class LotteryIssueQueryForm extends PageParam {
     private String issueNo;
 
     @Schema(description = "状态: 0-待开奖, 1-核销中, 2-已开奖")
-    private Integer status;
+    private IssueStatusEnum status;
 
     /**
      * 售卖态筛选，与 status 是两个维度：status 问「开奖走到哪一步」，它问「现在还能不能领号」。

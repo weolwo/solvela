@@ -20,7 +20,7 @@ import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 public class DataTracerQueryForm extends PageParam {
 
     @SchemaEnum(DataTracerTypeEnum.class)
-    private Integer type;
+    private DataTracerTypeEnum type;
 
     @Schema(description = "业务id")
     @NotNull(message = "业务id不能为空")

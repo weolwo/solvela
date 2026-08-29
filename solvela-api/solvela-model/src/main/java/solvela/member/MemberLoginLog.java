@@ -1,5 +1,6 @@
 package solvela.member;
 
+import solvela.enums.LoginLogResultEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -59,7 +60,7 @@ public class MemberLoginLog {
     /**
      * 状态：0-失败, 1-成功, 2-登出。⚠️与t_login_log.login_result取值相反
      */
-    private Integer status;
+    private LoginLogResultEnum status;
 
     /**
      * 提示信息：成功可为空，失败写具体原因

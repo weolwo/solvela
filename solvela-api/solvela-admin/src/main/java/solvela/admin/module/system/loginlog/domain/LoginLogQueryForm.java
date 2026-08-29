@@ -1,5 +1,6 @@
 package solvela.admin.module.system.loginlog.domain;
 
+import solvela.admin.constant.UserTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import solvela.base.domain.PageParam;
@@ -20,7 +21,7 @@ public class LoginLogQueryForm extends PageParam {
     private Long userId;
 
     @Schema(description = "用户类型")
-    private Integer userType;
+    private UserTypeEnum userType;
 
     @Schema(description = "开始日期")
     private String startDate;

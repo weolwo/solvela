@@ -168,7 +168,7 @@ public class SolvelaJobRunner {
 
         SolvelaJobLogEntity update = new SolvelaJobLogEntity();
         update.setLogId(logEntity.getLogId());
-        update.setStatus(status.getValue());
+        update.setStatus(status);
         update.setExecuteEndTime(endTime);
         update.setExecuteTimeMillis(costMillis);
         update.setResultSummary(resultSummary);
@@ -224,7 +224,7 @@ public class SolvelaJobRunner {
         retry.setBizDate(logEntity.getBizDate());
         retry.setRetrySeq(currentSeq + 1);
         retry.setRetryOfLogId(logEntity.getLogId());
-        retry.setStatus(SolvelaJobExecuteStatusEnum.PENDING.getValue());
+        retry.setStatus(SolvelaJobExecuteStatusEnum.PENDING);
         // 🔴 只有 PENDING 记录带 fire_time
         retry.setFireTime(logEntity.getExecuteStartTime().plusSeconds(interval));
         retry.setCreateName(logEntity.getCreateName());

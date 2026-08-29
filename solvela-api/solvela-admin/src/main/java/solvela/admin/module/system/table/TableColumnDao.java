@@ -1,5 +1,6 @@
 package solvela.admin.module.system.table;
 
+import solvela.admin.constant.UserTypeEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import solvela.admin.module.system.table.domain.TableColumnEntity;
 import org.apache.ibatis.annotations.Mapper;
@@ -17,7 +18,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface TableColumnDao extends BaseMapper<TableColumnEntity> {
 
-    TableColumnEntity selectByUserIdAndTableId(@Param("userId") Long userId, @Param("userType") Integer userType, @Param("tableId") Integer tableId);
+    TableColumnEntity selectByUserIdAndTableId(@Param("userId") Long userId, @Param("userType") UserTypeEnum userType, @Param("tableId") Integer tableId);
 
-    void deleteTableColumn(@Param("userId") Long userId, @Param("userType") Integer userType, @Param("tableId") Integer tableId);
+    void deleteTableColumn(@Param("userId") Long userId, @Param("userType") UserTypeEnum userType, @Param("tableId") Integer tableId);
 }

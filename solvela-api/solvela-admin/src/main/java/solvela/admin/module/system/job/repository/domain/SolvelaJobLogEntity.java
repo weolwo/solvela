@@ -1,5 +1,6 @@
 package solvela.admin.module.system.job.repository.domain;
 
+import solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -90,7 +91,7 @@ public class SolvelaJobLogEntity {
      *
      * @see solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum
      */
-    private Integer status;
+    private SolvelaJobExecuteStatusEnum status;
 
     private LocalDateTime executeStartTime;
 
