@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.admin.auth.CurrentEmployee;
-import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
-import solvela.member.operationlimit.constant.MemberOperationUnlockTypeEnum;
+import solvela.enums.MemberOperationTypeEnum;
+import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.member.MemberOperationLimit;
 import solvela.admin.module.member.operationlimit.domain.form.MemberOperationUnlockForm;
 import solvela.member.operationlimit.service.MemberOperationLimitService;
@@ -68,7 +68,8 @@ public class MemberOperationLimitController {
     @PostMapping("/unlock")
     @RequiresPermission("member:update")
     public String unlock(@RequestBody @Valid MemberOperationUnlockForm form) {
-        MemberOperationTypeEnum type = MemberOperationTypeEnum.resolve(form.getOperationType());
+        // 非法取值在 Jackson 反序列化那层就被挡住了，这里只兜住「压根没传」
+        MemberOperationTypeEnum type = form.getOperationType();
         if (type == null) {
             throw new BusinessException("不支持的操作类型");
         }

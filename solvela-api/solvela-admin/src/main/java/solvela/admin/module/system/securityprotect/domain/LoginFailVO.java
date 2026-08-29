@@ -1,5 +1,6 @@
 package solvela.admin.module.system.securityprotect.domain;
 
+import solvela.admin.constant.UserTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -23,7 +24,7 @@ public class LoginFailVO {
     private Long userId;
 
     @Schema(description = "用户类型")
-    private Integer userType;
+    private UserTypeEnum userType;
 
     @Schema(description = "登录名")
     private String loginName;

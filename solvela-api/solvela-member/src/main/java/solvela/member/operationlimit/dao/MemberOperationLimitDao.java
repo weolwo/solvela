@@ -1,5 +1,7 @@
 package solvela.member.operationlimit.dao;
 
+import solvela.enums.MemberOperationUnlockTypeEnum;
+import solvela.enums.MemberOperationTypeEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -34,7 +36,7 @@ public interface MemberOperationLimitDao extends BaseMapper<MemberOperationLimit
             ORDER BY expire_time DESC LIMIT 1
             """)
     MemberOperationLimit selectActive(@Param("memberId") Long memberId,
-                                      @Param("operationType") Integer operationType,
+                                      @Param("operationType") MemberOperationTypeEnum operationType,
                                       @Param("now") LocalDateTime now);
 
     /**
@@ -52,9 +54,9 @@ public interface MemberOperationLimitDao extends BaseMapper<MemberOperationLimit
             WHERE member_id = #{memberId} AND operation_type = #{operationType} AND status = 0
             """)
     int unlock(@Param("memberId") Long memberId,
-               @Param("operationType") Integer operationType,
+               @Param("operationType") MemberOperationTypeEnum operationType,
                @Param("unlockTime") LocalDateTime unlockTime,
-               @Param("unlockType") Integer unlockType,
+               @Param("unlockType") MemberOperationUnlockTypeEnum unlockType,
                @Param("unlockOperator") String unlockOperator,
                @Param("remark") String remark);
 

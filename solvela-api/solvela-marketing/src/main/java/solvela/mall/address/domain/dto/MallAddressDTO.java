@@ -31,7 +31,7 @@ public class MallAddressDTO {
     private String district;
 
     /** 是否默认地址：0-否, 1-是。设默认时先把该会员其余行置0 */
-    private Integer isDefault;
+    private Boolean isDefault;
 
     /** 创建人 */
     private String createBy;

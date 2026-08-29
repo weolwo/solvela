@@ -103,7 +103,7 @@ public class SecurityLoginService {
         if (loginFailEntity == null) {
             loginFailEntity = LoginFailEntity.builder()
                     .userId(userId)
-                    .userType(userType.getValue())
+                    .userType(userType)
                     .loginName(loginName)
                     .loginFailCount(loginFailCount)
                     .lockFlag(lockFlag)

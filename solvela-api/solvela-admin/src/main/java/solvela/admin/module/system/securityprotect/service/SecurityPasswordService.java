@@ -113,7 +113,7 @@ public class SecurityPasswordService {
         passwordLogEntity.setNewPassword(newPassword);
         passwordLogEntity.setOldPassword(oldPassword);
         passwordLogEntity.setUserId(requestUser.getUserId());
-        passwordLogEntity.setUserType(requestUser.getUserType().getValue());
+        passwordLogEntity.setUserType(requestUser.getUserType());
         passwordLogDao.insert(passwordLogEntity);
     }
 

@@ -1,5 +1,6 @@
 package solvela.member;
 
+import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
@@ -52,7 +53,7 @@ public class Member {
     /**
      * 性别：0-未知, 1-男, 2-女
      */
-    private Integer gender;
+    private GenderEnum gender;
 
     /**
      * 生日：生日营销用，可空

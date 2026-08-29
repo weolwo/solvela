@@ -412,7 +412,7 @@ public class MallCommodityService {
         entity.setStartTime(startTime);
         entity.setEndTime(endTime);
         entity.setStatus(status);
-        entity.setIsHome(form.getIsHome() == null ? 0 : form.getIsHome());
+        entity.setIsHome(Boolean.TRUE.equals(form.getIsHome()));
         entity.setSort(form.getSort() == null ? 0 : form.getSort());
         // create_time / update_time 一律不设：铁律 9，只认数据库时钟
         if (isCreate) {

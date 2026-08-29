@@ -1,10 +1,8 @@
-package solvela.member.operationlimit.constant;
+package solvela.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.enums.BaseEnum;
 
-import java.util.Arrays;
 
 /**
  * 会员<b>受限操作</b>类型，对齐 {@code t_member_operation_limit.operation_type}。
@@ -37,15 +35,4 @@ public enum MemberOperationTypeEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
-
-    /**
-     * 按 value 反查；无匹配返回 null。用于接口入参校验 —— 前端传了没定义的类型时，
-     * 该报「不支持的操作类型」，而不是拿一个不存在的类型去查库然后返回「没有限制」
-     */
-    public static MemberOperationTypeEnum resolve(Integer value) {
-        return Arrays.stream(values())
-                .filter(e -> e.value.equals(value))
-                .findFirst()
-                .orElse(null);
-    }
 }

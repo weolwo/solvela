@@ -1,5 +1,6 @@
 package solvela.admin.module.activity.domain.form;
 
+import solvela.enums.ApproveModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -93,7 +94,7 @@ public class ActivityWizardCreateForm {
 
         @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "审批模式 不能为空")
-        private Integer approveMode;
+        private ApproveModeEnum approveMode;
 
         @Schema(description = "奖品级别，可空")
         private Integer prizeLevel;

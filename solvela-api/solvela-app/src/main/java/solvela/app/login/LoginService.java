@@ -22,7 +22,7 @@ import solvela.member.MemberLoginLog;
 import solvela.member.MemberOperationLimit;
 import solvela.member.constant.MemberConst;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
+import solvela.enums.MemberOperationTypeEnum;
 import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.util.MemberPhoneUtil;
 

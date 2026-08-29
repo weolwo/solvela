@@ -2,7 +2,7 @@ package solvela.admin.module.system.login.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.enumeration.GenderEnum;
+import solvela.enums.GenderEnum;
 import solvela.admin.constant.UserTypeEnum;
 import solvela.web.swagger.SchemaEnum;
 
@@ -36,7 +36,7 @@ public class RequestEmployee implements Serializable {
     private String avatar;
 
     @SchemaEnum(GenderEnum.class)
-    private Integer gender;
+    private GenderEnum gender;
 
     @Schema(description = "手机号码")
     private String phone;

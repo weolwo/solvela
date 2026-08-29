@@ -1,5 +1,6 @@
 package solvela.admin.module.member.domain.vo;
 
+import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -36,7 +37,7 @@ public class MemberVO {
     private Long avatarFileId;
 
     @Schema(description = "性别：0-未知, 1-男, 2-女")
-    private Integer gender;
+    private GenderEnum gender;
 
     @Schema(description = "生日：生日营销用，可空")
     private LocalDate birthday;

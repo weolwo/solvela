@@ -256,7 +256,7 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item label="首页推荐">
-                  <a-switch :checked="form.isHome === 1" @change="(c) => (form.isHome = c ? 1 : 0)" />
+                  <a-switch v-model:checked="form.isHome" />
                 </a-form-item>
               </a-col>
 
@@ -380,7 +380,7 @@
       startTime: null,
       endTime: null,
       status: COMMODITY_STATUS_ENUM.DRAFT.value,
-      isHome: 0,
+      isHome: false,
       sort: 0,
       skuList: [],
     };

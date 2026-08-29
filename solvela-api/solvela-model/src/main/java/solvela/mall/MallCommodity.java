@@ -132,7 +132,7 @@ public class MallCommodity {
     /**
      * 是否首页推荐：0-否, 1-是
      */
-    private Integer isHome;
+    private Boolean isHome;
 
     /**
      * 排序权重：从小到大

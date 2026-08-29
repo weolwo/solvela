@@ -2,7 +2,7 @@ package solvela.admin.module.system.employee.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.enumeration.GenderEnum;
+import solvela.enums.GenderEnum;
 import solvela.web.swagger.SchemaEnum;
 
 import java.time.LocalDateTime;
@@ -27,7 +27,7 @@ public class EmployeeVO {
     private String loginName;
 
     @SchemaEnum(GenderEnum.class)
-    private Integer gender;
+    private GenderEnum gender;
 
     @Schema(description = "员工名称")
     private String actualName;

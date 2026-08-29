@@ -1,5 +1,7 @@
 package solvela.stat.domain.dto;
 
+import solvela.enums.IssueStatusEnum;
+import solvela.enums.DrawResultEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -33,8 +35,8 @@ public class GameplayDTO {
     /** 抽奖状态分布 */
     public static class DrawStatItem {
 
-        /** 状态 0-未中奖 1-已中奖 2-库存不足 3-异常 */
-        private Integer status;
+        /** 抽奖结果，对齐 t_draw_prize_log.status */
+        private DrawResultEnum status;
 
         /** 记录条数 */
         private Integer count;
@@ -62,8 +64,8 @@ public class GameplayDTO {
         /** 该玩法发行总量 */
         private Long totalCount;
 
-        /** 期号状态 0-销售中 1-开奖中 2-已开奖 */
-        private Integer status;
+        /** 期号状态，对齐 t_lottery_issue.status。⚠️ 与上面 DrawStatItem.status 不是同一套字典 */
+        private IssueStatusEnum status;
 
         /** 计划开奖时间 */
         private LocalDateTime planDrawTime;

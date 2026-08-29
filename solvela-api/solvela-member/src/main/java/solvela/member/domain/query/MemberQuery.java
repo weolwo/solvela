@@ -1,5 +1,6 @@
 package solvela.member.domain.query;
 
+import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.base.domain.PageParam;
 
@@ -32,7 +33,7 @@ public class MemberQuery extends PageParam {
     private String nickname;
 
     /** 性别：0-未知, 1-男, 2-女 */
-    private Integer gender;
+    private GenderEnum gender;
 
     /** 状态：1-正常, 2-冻结(风控/违规), 3-已注销 */
     private MemberStatusEnum status;

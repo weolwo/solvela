@@ -4,9 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import solvela.base.module.redis.RedisService;
 import solvela.member.operationlimit.MemberOperationLimitProperties;
-import solvela.member.operationlimit.constant.MemberOperationLimitStatusEnum;
-import solvela.member.operationlimit.constant.MemberOperationTypeEnum;
-import solvela.member.operationlimit.constant.MemberOperationUnlockTypeEnum;
+import solvela.enums.MemberOperationLimitStatusEnum;
+import solvela.enums.MemberOperationTypeEnum;
+import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.member.operationlimit.dao.MemberOperationLimitDao;
 import solvela.member.MemberOperationLimit;
 
@@ -62,7 +62,7 @@ public class MemberOperationLimitService {
         if (memberId == null || operationType == null) {
             return null;
         }
-        return memberOperationLimitDao.selectActive(memberId, operationType.getValue(), LocalDateTime.now());
+        return memberOperationLimitDao.selectActive(memberId, operationType, LocalDateTime.now());
     }
 
     /**
@@ -90,10 +90,10 @@ public class MemberOperationLimitService {
         LocalDateTime now = LocalDateTime.now();
         MemberOperationLimit limit = new MemberOperationLimit();
         limit.setMemberId(memberId);
-        limit.setOperationType(operationType.getValue());
+        limit.setOperationType(operationType);
         limit.setLockTime(now);
         limit.setExpireTime(now.plusSeconds(properties.getLockSeconds()));
-        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED.getValue());
+        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
         limit.setReason(reason);
         limit.setCreateTime(now);
         limit.setUpdateTime(now);
@@ -128,8 +128,8 @@ public class MemberOperationLimitService {
         if (memberId == null || operationType == null) {
             return false;
         }
-        int rows = memberOperationLimitDao.unlock(memberId, operationType.getValue(),
-                LocalDateTime.now(), unlockType.getValue(), unlockOperator, remark);
+        int rows = memberOperationLimitDao.unlock(memberId, operationType,
+                LocalDateTime.now(), unlockType, unlockOperator, remark);
         if (rows > 0) {
             // 解了锁却留着计数，等于「解冻后再错一次立刻又被限」
             this.clearFail(memberId, operationType);

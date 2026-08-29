@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.enums.MemberVerifyStatusEnum;
 import solvela.member.Member;
@@ -69,6 +70,29 @@ class MemberEnumMappingTest {
         }
         assertEquals(total.longValue(), sum,
                 "分状态计数之和与总量对不上，说明有行的 status 落在枚举之外");
+    }
+
+    @Test
+    @DisplayName("性别：3392 行全部能装配，且分性别计数之和等于总量")
+    void 会员性别() {
+        // gender 从来没进过对账报告 —— 那份报告是按「列名像不像 status」筛的，
+        // gender 不像，于是躲过了整轮改造，直到最后回查实体字段类型才翻出来。
+        List<Member> list = memberDao.selectList(null);
+        assertFalse(list.isEmpty(), "t_member 没有数据，这条用例失去意义");
+        for (Member e : list) {
+            assertNotNull(e.getGender(), "gender 装配成了 null");
+        }
+
+        Long total = memberDao.selectCount(new LambdaQueryWrapper<>());
+        assertNotNull(total);
+        long sum = 0;
+        for (GenderEnum gender : GenderEnum.values()) {
+            Long n = memberDao.selectCount(new LambdaQueryWrapper<Member>().eq(Member::getGender, gender));
+            assertNotNull(n);
+            sum += n;
+        }
+        assertEquals(total.longValue(), sum,
+                "分性别计数之和与总量对不上，说明有行的 gender 落在枚举之外");
     }
 
     @Test

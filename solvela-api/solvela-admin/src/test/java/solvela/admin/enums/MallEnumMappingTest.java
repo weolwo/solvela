@@ -17,10 +17,12 @@ import solvela.ledger.MemberCoupon;
 import solvela.ledger.MemberWallet;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.wallet.dao.MemberWalletDao;
+import solvela.mall.MallAddress;
 import solvela.mall.MallCategory;
 import solvela.mall.MallCommodity;
 import solvela.mall.MallOrder;
 import solvela.mall.MallSku;
+import solvela.mall.address.dao.MallAddressDao;
 import solvela.mall.category.dao.MallCategoryDao;
 import solvela.mall.commodity.dao.MallCommodityDao;
 import solvela.mall.order.dao.MallOrderDao;
@@ -64,6 +66,9 @@ class MallEnumMappingTest {
 
     @Autowired
     private MallCommodityDao mallCommodityDao;
+
+    @Autowired
+    private MallAddressDao mallAddressDao;
 
     @Autowired
     private MallOrderDao mallOrderDao;
@@ -179,6 +184,25 @@ class MallEnumMappingTest {
         assertEquals(list.size(), sumByStatus(WalletStatusEnum.values(),
                         s -> memberWalletDao.selectCount(new LambdaQueryWrapper<MemberWallet>().eq(MemberWallet::getStatus, s))),
                 "分状态计数之和与总量对不上，说明有行的 status 落在枚举之外");
+    }
+
+    @Test
+    @DisplayName("0/1 标记列：is_home 与 is_default 能装配成 Boolean")
+    void 标记列() {
+        // 这两列没进过对账报告 —— 那份报告是按「列名像不像 status」筛的，
+        // is_home / is_default 不像，于是躲过了整轮改造，最后回查实体字段类型才翻出来。
+        // MyBatis 读 tinyint 到 Boolean 是原生支持的，这里验的是「确实读出来了」而不是全成 null——
+        // 全 null 的话商品编辑页那个「首页推荐」开关会永远显示关闭。
+        List<MallCommodity> commodities = mallCommodityDao.selectList(null);
+        assertFalse(commodities.isEmpty(), "t_mall_commodity 没有数据，这条用例失去意义");
+        for (MallCommodity e : commodities) {
+            assertNotNull(e.getIsHome(), "isHome 装配成了 null");
+        }
+
+        List<MallAddress> addresses = mallAddressDao.selectList(null);
+        for (MallAddress e : addresses) {
+            assertNotNull(e.getIsDefault(), "isDefault 装配成了 null");
+        }
     }
 
     private <E> long sumByStatus(E[] values, java.util.function.Function<E, Long> counter) {

@@ -1,5 +1,6 @@
 package solvela.admin.module.member.operationlimit.domain.form;
 
+import solvela.enums.MemberOperationTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,7 +24,7 @@ public class MemberOperationUnlockForm {
 
     @Schema(description = "受限操作类型：1-登录, 2-修改密码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "操作类型不能为空")
-    private Integer operationType;
+    private MemberOperationTypeEnum operationType;
 
     /**
      * 刻意<b>必填</b>：人工解冻是绕过风控的动作，「为什么给他解」必须留下来。

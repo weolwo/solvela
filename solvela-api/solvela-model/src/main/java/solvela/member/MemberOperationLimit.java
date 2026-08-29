@@ -1,5 +1,8 @@
 package solvela.member;
 
+import solvela.enums.MemberOperationLimitStatusEnum;
+import solvela.enums.MemberOperationUnlockTypeEnum;
+import solvela.enums.MemberOperationTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -43,7 +46,7 @@ public class MemberOperationLimit {
     /**
      * 受限操作类型，见 MemberOperationTypeEnum
      */
-    private Integer operationType;
+    private MemberOperationTypeEnum operationType;
 
     /**
      * 冻结开始时间
@@ -63,7 +66,7 @@ public class MemberOperationLimit {
     /**
      * 解冻方式，见 MemberOperationUnlockTypeEnum；status=0 时为 null
      */
-    private Integer unlockType;
+    private MemberOperationUnlockTypeEnum unlockType;
 
     /**
      * 人工解冻的操作人。unlock_type=3 时必填，其余为 null —— 追溯用
@@ -73,7 +76,7 @@ public class MemberOperationLimit {
     /**
      * 0 冻结中，1 已解冻
      */
-    private Integer status;
+    private MemberOperationLimitStatusEnum status;
 
     /**
      * 触发原因，给客服看的人话，如「连续登录失败5次」

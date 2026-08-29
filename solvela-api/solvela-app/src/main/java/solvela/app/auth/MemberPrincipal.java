@@ -1,5 +1,6 @@
 package solvela.app.auth;
 
+import solvela.enums.GenderEnum;
 import java.io.Serializable;
 
 /**
@@ -28,12 +29,12 @@ import java.io.Serializable;
  * @param memberName   账号（用户可改，但唯一）—— 留痕用它，不用昵称
  * @param nickname     昵称，展示用
  * @param avatarFileId 头像 file_id
- * @param gender       性别：0-未知, 1-男, 2-女
+ * @param gender       性别，见 {@link GenderEnum}
  */
 public record MemberPrincipal(
         Long memberId,
         String memberName,
         String nickname,
         Long avatarFileId,
-        Integer gender) implements Serializable {
+        GenderEnum gender) implements Serializable {
 }

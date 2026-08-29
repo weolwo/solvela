@@ -1,5 +1,6 @@
 package solvela.activity.domain.command;
 
+import solvela.enums.ApproveModeEnum;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.validation.enumeration.CheckEnum;
@@ -75,7 +76,7 @@ public class ActivityWizardCreateCommand {
         private java.math.BigDecimal prizeValue;
 
         /** 审批模式：0-自动免审, 1-人工审批 */
-        private Integer approveMode;
+        private ApproveModeEnum approveMode;
 
         /** 奖品级别，可空 */
         private Integer prizeLevel;

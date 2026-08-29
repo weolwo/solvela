@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
-import solvela.base.enumeration.GenderEnum;
+import solvela.enums.GenderEnum;
 import solvela.web.swagger.SchemaEnum;
 import solvela.base.util.SolvelaVerificationUtil;
 import solvela.base.validation.enumeration.CheckEnum;
@@ -32,7 +32,7 @@ public class EmployeeUpdateCenterForm {
 
     @SchemaEnum(GenderEnum.class)
     @CheckEnum(value = GenderEnum.class, message = "性别错误")
-    private Integer gender;
+    private GenderEnum gender;
 
     @Schema(description = "手机号")
     @NotNull(message = "手机号不能为空")

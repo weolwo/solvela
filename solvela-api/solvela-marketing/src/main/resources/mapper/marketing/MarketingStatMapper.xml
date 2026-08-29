@@ -235,6 +235,8 @@
                c.total_count    AS totalCount,
                i.status         AS status,
                i.plan_draw_time AS planDrawTime,
+               <!-- i.status &lt;&gt; 2 即「还没开奖」（IssueStatusEnum.OPENED = 2）；
+                    CASE 表达式里引用不了 Java 枚举，改枚举取值要手动同步 -->
                CASE WHEN i.status &lt;&gt; 2 AND i.plan_draw_time IS NOT NULL AND i.plan_draw_time &lt; now()
                     THEN TIMESTAMPDIFF(HOUR, i.plan_draw_time, now()) ELSE 0 END AS overdueHours
         FROM t_lottery_issue i

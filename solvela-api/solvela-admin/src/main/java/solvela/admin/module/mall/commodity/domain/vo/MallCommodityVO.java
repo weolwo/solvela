@@ -78,7 +78,7 @@ public class MallCommodityVO {
     private MallCommodityStatusEnum status;
 
     @Schema(description = "是否首页推荐：0-否, 1-是")
-    private Integer isHome;
+    private Boolean isHome;
 
     @Schema(description = "排序权重：从小到大")
     private Integer sort;

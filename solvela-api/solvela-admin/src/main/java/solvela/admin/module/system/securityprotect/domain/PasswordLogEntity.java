@@ -1,5 +1,6 @@
 package solvela.admin.module.system.securityprotect.domain;
 
+import solvela.admin.constant.UserTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -22,7 +23,7 @@ public class PasswordLogEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Integer userType;
+    private UserTypeEnum userType;
 
     private Long userId;
 

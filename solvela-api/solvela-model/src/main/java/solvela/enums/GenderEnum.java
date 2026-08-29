@@ -1,6 +1,5 @@
-package solvela.base.enumeration;
+package solvela.enums;
 
-import solvela.enums.BaseEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

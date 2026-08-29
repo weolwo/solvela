@@ -1,8 +1,7 @@
-package solvela.member.operationlimit.constant;
+package solvela.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import solvela.enums.BaseEnum;
 
 /**
  * 会员操作限制的状态，对齐 {@code t_member_operation_limit.status}。

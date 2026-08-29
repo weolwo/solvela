@@ -1,5 +1,6 @@
 package solvela.admin.module.system.employee.domain.entity;
 
+import solvela.enums.GenderEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -52,7 +53,7 @@ public class EmployeeEntity {
     /**
      * 性别
      */
-    private Integer gender;
+    private GenderEnum gender;
 
     /**
      * 手机号码

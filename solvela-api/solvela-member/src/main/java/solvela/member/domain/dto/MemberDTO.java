@@ -1,6 +1,7 @@
 package solvela.member.domain.dto;
 
 
+import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -34,7 +35,7 @@ public class MemberDTO {
     private Long avatarFileId;
 
     /** 性别：0-未知, 1-男, 2-女 */
-    private Integer gender;
+    private GenderEnum gender;
 
     /** 生日：生日营销用，可空 */
     private LocalDate birthday;
