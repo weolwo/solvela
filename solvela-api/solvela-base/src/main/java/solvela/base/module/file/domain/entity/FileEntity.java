@@ -1,5 +1,6 @@
 package solvela.base.module.file.domain.entity;
 
+import solvela.base.module.file.constant.FileStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -91,7 +92,7 @@ public class FileEntity {
      * <p>没有它的话，"用户选了文件然后关掉页面没提交"产生的文件永远没人引用也永远不会被删，
      * 跑几年后存储里一半是垃圾，而且无法区分哪些是垃圾。
      */
-    private Integer status;
+    private FileStatusEnum status;
 
     /**
      * 标签，<b>前后各带一个逗号</b>：{@code ,双十一,banner,}。

@@ -1,5 +1,6 @@
 package solvela.lottery.settle;
 
+import solvela.enums.LotteryDispatchStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.event.UserPrizeEvent;
@@ -37,8 +38,6 @@ public class LotteryDispatchBatchService {
     private final PrizeConfigService prizeConfigService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    private static final int DISPATCH_FAIL = 2;
-
     /**
      * 一批的投递 + 标记，单事务。
      *
@@ -59,7 +58,7 @@ public class LotteryDispatchBatchService {
                         record.getId(), config.getActivityCode(), record.getPrizeCode());
                 LotteryRecord fail = new LotteryRecord();
                 fail.setId(record.getId());
-                fail.setDispatchStatus(DISPATCH_FAIL);
+                fail.setDispatchStatus(LotteryDispatchStatusEnum.FAILED);
                 lotteryRecordDao.updateById(fail);
                 continue;
             }

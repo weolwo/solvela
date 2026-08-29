@@ -1,5 +1,6 @@
 package solvela.scriptengine.loader;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -197,10 +198,10 @@ public class ScriptFileLoader implements SmartInitializingSingleton {
         List<String> codes = scriptFiles.stream().map(ScriptFile::scriptCode).toList();
         List<Script> orphans = existing.values().stream()
                 .filter(script -> !codes.contains(script.getScriptCode()))
-                .filter(script -> script.getStatus() != null && script.getStatus() == 1)
+                .filter(script -> script.getStatus() == EnableStatusEnum.ENABLED)
                 .toList();
         if (!orphans.isEmpty()) {
-            orphans.forEach(script -> script.setStatus(0));
+            orphans.forEach(script -> script.setStatus(EnableStatusEnum.DISABLED));
             scriptManager.updateBatchById(orphans);
             log.warn("[ScriptEngine] 以下脚本在文件里已不存在，已自动停用（未物理删除，可能仍有引用）：{}",
                     orphans.stream().map(Script::getScriptCode).toList());
@@ -271,7 +272,7 @@ public class ScriptFileLoader implements SmartInitializingSingleton {
                 .toList()));
         target.setReturnType(scene.getReturnType().getSimpleName());
         target.setDescription(file.description());
-        target.setStatus(1);
+        target.setStatus(EnableStatusEnum.ENABLED);
         return target;
     }
 

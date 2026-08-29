@@ -1,5 +1,6 @@
 package solvela.ledger;
 
+import solvela.enums.TransactionTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -53,7 +54,7 @@ public class MemberAssetTransaction {
     /**
      * 资金流向：1-收入, 2-支出
      */
-    private Integer transactionType;
+    private TransactionTypeEnum transactionType;
 
     /**
      * 变动绝对值

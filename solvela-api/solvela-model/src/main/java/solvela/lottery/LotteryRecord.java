@@ -1,5 +1,6 @@
 package solvela.lottery;
 
+import solvela.enums.LotteryDispatchStatusEnum;
 import solvela.enums.TicketStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -89,7 +90,7 @@ public class LotteryRecord {
     /**
      * 派发状态：0-待派发/无需派发, 1-已投递, 2-投递失败（v3.40 新增）
      */
-    private Integer dispatchStatus;
+    private LotteryDispatchStatusEnum dispatchStatus;
 
     /**
      * 防篡改签名

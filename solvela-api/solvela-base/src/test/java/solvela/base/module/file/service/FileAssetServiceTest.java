@@ -187,7 +187,7 @@ class FileAssetServiceTest {
         FileEntity saved = service.upload(png("a.png"), "BANNER", null);
 
         assertThat(storage.exists(new StorageKey(saved.getStorageKey()))).isTrue();
-        assertThat(saved.getStatus()).isEqualTo(FileStatusEnum.TEMP.getValue());
+        assertThat(saved.getStatus()).isEqualTo(FileStatusEnum.TEMP);
         assertThat(saved.getFileSize()).isEqualTo(PNG.length);
         assertThat(saved.getStorageKind()).isEqualTo("LOCAL");
     }

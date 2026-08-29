@@ -198,7 +198,7 @@ public class FileAssetService {
         entity.setExtension(extension);
         entity.setContentType(contentType);
         entity.setFileSize(size);
-        entity.setStatus(FileStatusEnum.TEMP.getValue());
+        entity.setStatus(FileStatusEnum.TEMP);
         entity.setDeletedFlag(0);
         entity.setCreateBy(operator);
         if (IMAGE_MIME_TYPES.contains(contentType)) {
@@ -526,10 +526,10 @@ public class FileAssetService {
                 throw new BusinessException("部分文件不存在，无法确认引用");
             }
             for (FileEntity file : files) {
-                if (!FileStatusEnum.CONFIRMED.equalsValue(file.getStatus())) {
+                if (file.getStatus() != FileStatusEnum.CONFIRMED) {
                     FileEntity update = new FileEntity();
                     update.setFileId(file.getFileId());
-                    update.setStatus(FileStatusEnum.CONFIRMED.getValue());
+                    update.setStatus(FileStatusEnum.CONFIRMED);
                     fileDao.updateById(update);
                 }
             }

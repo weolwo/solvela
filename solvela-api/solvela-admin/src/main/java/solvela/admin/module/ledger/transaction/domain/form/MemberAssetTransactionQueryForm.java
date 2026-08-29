@@ -1,5 +1,6 @@
 package solvela.admin.module.ledger.transaction.domain.form;
 
+import solvela.enums.TransactionTypeEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -35,7 +36,7 @@ public class MemberAssetTransactionQueryForm extends PageParam {
     private String assetType;
 
     @Schema(description = "资金流向：1-收入, 2-支出")
-    private Integer transactionType;
+    private TransactionTypeEnum transactionType;
 
     @Schema(description = "关联外部业务ID(如 prizeCode)")
     private String bizRefId;

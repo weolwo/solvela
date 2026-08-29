@@ -1,5 +1,6 @@
 package solvela.admin.module.lottery.record.domain.vo;
 
+import solvela.enums.LotteryDispatchStatusEnum;
 import solvela.enums.TicketStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -55,7 +56,7 @@ public class LotteryRecordVO {
     private String prizeCode;
 
     @Schema(description = "派发状态：0-待派发/无需派发, 1-已投递, 2-投递失败")
-    private Integer dispatchStatus;
+    private LotteryDispatchStatusEnum dispatchStatus;
 
     @Schema(description = "签名")
     private String securitySign;

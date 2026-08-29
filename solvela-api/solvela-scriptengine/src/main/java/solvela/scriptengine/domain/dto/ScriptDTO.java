@@ -1,5 +1,6 @@
 package solvela.scriptengine.domain.dto;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -47,7 +48,7 @@ public class ScriptDTO {
     private Integer refCount;
 
     /** 状态：0-停用(文件已删除), 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /** 更新时间 */
     private LocalDateTime updateTime;

@@ -1,5 +1,6 @@
 package solvela.ledger.wallet.service;
 
+import solvela.enums.TransactionTypeEnum;
 import solvela.enums.WalletStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -181,7 +182,7 @@ public class MemberWalletService {
         txn.setMemberId(memberId);
         txn.setMemberName(memberName);
         txn.setAssetType(assetType.name());
-        txn.setTransactionType(2); // 2-支出
+        txn.setTransactionType(TransactionTypeEnum.EXPENSE);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(wallet.getBalance().subtract(amount));
         txn.setBizType(bizType);
@@ -216,7 +217,7 @@ public class MemberWalletService {
         txn.setMemberId(memberId);
         txn.setMemberName(memberName);
         txn.setAssetType(assetType.name());
-        txn.setTransactionType(1); // 1-收入
+        txn.setTransactionType(TransactionTypeEnum.INCOME);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(balanceAfter);
         txn.setBizType(bizType);
@@ -231,7 +232,7 @@ public class MemberWalletService {
         // 展示快照取提案上的那一份，不再查一次会员表：提案落库时已经把「当时那个账号」记下来了
         txn.setMemberName(proposal.getMemberName());
         txn.setAssetType(assetType.name());
-        txn.setTransactionType(1); // 1-收入
+        txn.setTransactionType(TransactionTypeEnum.INCOME);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(balanceAfter); // 留下不可磨灭的财务对账证据
         txn.setBizType("PROPOSAL_REWARD"); // 业务来源分类

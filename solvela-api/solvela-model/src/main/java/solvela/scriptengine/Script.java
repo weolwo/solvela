@@ -1,5 +1,6 @@
 package solvela.scriptengine;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -79,7 +80,7 @@ public class Script {
     /**
      * 状态：0-停用, 1-启用
      */
-    private Integer status;
+    private EnableStatusEnum status;
 
     private LocalDateTime createTime;
 

@@ -1,5 +1,6 @@
 package solvela.scriptengine.service;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,13 +65,13 @@ public class ScriptRefService {
             ref.setRefType(point.getRefType());
             ref.setRefId(refId);
             ref.setRefSlot(point.getRefSlot());
-            ref.setStatus(1);
+            ref.setStatus(EnableStatusEnum.ENABLED);
             ref.setCreateBy(operator);
             ref.setUpdateBy(operator);
             scriptRefManager.save(ref);
         } else {
             existing.setScriptCode(scriptCode);
-            existing.setStatus(1);
+            existing.setStatus(EnableStatusEnum.ENABLED);
             existing.setUpdateBy(operator);
             scriptRefManager.updateById(existing);
         }

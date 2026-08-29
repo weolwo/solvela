@@ -1,5 +1,6 @@
 package solvela.admin.script;
 
+import solvela.enums.EnableStatusEnum;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -213,7 +214,7 @@ class ScriptRuntimeAcceptanceTest {
         dangling.setRefType(ScriptRefPoint.PRIZE_POOL_ENTRY.getRefType());
         dangling.setRefId(FAKE_POOL_CODE);
         dangling.setRefSlot(ScriptRefPoint.PRIZE_POOL_ENTRY.getRefSlot());
-        dangling.setStatus(1);
+        dangling.setStatus(EnableStatusEnum.ENABLED);
         scriptRefManager.save(dangling);
 
         try {

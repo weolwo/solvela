@@ -45,7 +45,7 @@ public class FileVO {
 
     /** 生命周期状态 */
     /** 状态，取值见 {@link FileStatusEnum} */
-    private Integer status;
+    private FileStatusEnum status;
 
     /** 标签，前后各带逗号 */
     private String tags;

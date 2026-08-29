@@ -59,9 +59,19 @@ class EnumMigrationRatchetTest {
     private static final Pattern MAGIC_STATUS_CONST = Pattern.compile(
             "(?:private|public) static final (?:int|Integer) ([A-Z][A-Z0-9_]*)\\s*=\\s*-?\\d+;");
 
-    /** 名字里带这些词才算「状态语义」 */
+    /**
+     * 名字里带这些词才算「状态语义」。
+     *
+     * <p>{@code DISPATCH} 是补进来的：{@code LotteryDispatchBatchService} 里
+     * 有过一个 {@code DISPATCH_FAIL = 2}，名字里没有 STATUS 也没有 TYPE，
+     * 棘轮当时看不见它。{@code TYPE} 一并放宽成前缀匹配，
+     * 原来只认 FLOW_TYPE / USER_TYPE 两个具体名字，同样漏。
+     *
+     * <p>没收 {@code LEVEL}：{@code PRIZE_LEVEL_NONE = 99} 和
+     * {@code MAX_EXACT_LEVELS} 都是真的算术常量，收进来只会制造噪音。
+     */
     private static final List<String> STATUS_WORDS =
-            List.of("STATUS", "MODE", "RESULT", "FLOW_TYPE", "USER_TYPE");
+            List.of("STATUS", "MODE", "RESULT", "TYPE", "STATE", "APPROVE", "PAY", "DISPATCH");
 
     /** 带这些词的一律不算：长度/精度这类算术常量，只是碰巧撞词 */
     private static final List<String> NOT_STATUS_WORDS = List.of("LENGTH", "SCALE", "SIZE");

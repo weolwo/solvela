@@ -1,5 +1,6 @@
 package solvela.admin.module.ledger.transaction.domain.vo;
 
+import solvela.enums.TransactionTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -36,7 +37,7 @@ public class MemberAssetTransactionVO {
     private String assetType;
 
     @Schema(description = "资金流向：1-收入, 2-支出")
-    private Integer transactionType;
+    private TransactionTypeEnum transactionType;
 
     @Schema(description = "变动绝对值")
     private BigDecimal changeAmount;

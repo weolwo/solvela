@@ -1,5 +1,6 @@
 package solvela.ledger.transaction.domain.dto;
 
+import solvela.enums.TransactionTypeEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -38,7 +39,7 @@ public class MemberAssetTransactionDTO {
     /**
      * 资金流向：1-收入, 2-支出
      */
-    private Integer transactionType;
+    private TransactionTypeEnum transactionType;
 
     /**
      * 变动绝对值

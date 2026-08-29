@@ -1,5 +1,6 @@
 package solvela.ledger.transaction.domain.query;
 
+import solvela.enums.TransactionTypeEnum;
 import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
@@ -37,7 +38,7 @@ public class MemberAssetTransactionQuery extends PageParam {
     /**
      * 资金流向：1-收入, 2-支出
      */
-    private Integer transactionType;
+    private TransactionTypeEnum transactionType;
 
     /**
      * 关联外部业务ID(如 prizeCode)
