@@ -1,5 +1,7 @@
 package solvela.admin.module.mall.commodity.domain.form;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -24,7 +26,7 @@ public class MallCommodityQueryForm extends PageParam {
     private Long categoryId;
 
     @Schema(description = "状态：0-下架, 1-上架, 2-草稿")
-    private Integer status;
+    private MallCommodityStatusEnum status;
 
     @Schema(description = "商品类型：PHYSICAL-实物, COUPON-优惠券, BALANCE-现金/红包")
     private String commodityType;
@@ -34,6 +36,6 @@ public class MallCommodityQueryForm extends PageParam {
     private String commodityName;
 
     @Schema(description = "支付方式：1-纯积分, 2-积分+现金")
-    private Integer payType;
+    private MallPayTypeEnum payType;
 
 }

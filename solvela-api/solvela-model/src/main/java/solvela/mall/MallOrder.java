@@ -1,5 +1,6 @@
 package solvela.mall;
 
+import solvela.enums.MallOrderStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -120,7 +121,7 @@ public class MallOrder {
     /**
      * 状态：0-待支付, 10-待履约, 20-履约中, 30-已完成, 40-已取消, 50-已退款, 60-履约失败
      */
-    private Integer status;
+    private MallOrderStatusEnum status;
 
     /**
      * 待支付超时时间：到点由 job 取消并释放锁定库存。纯积分订单为空

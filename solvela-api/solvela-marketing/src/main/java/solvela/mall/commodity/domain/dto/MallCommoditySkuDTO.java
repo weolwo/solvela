@@ -1,5 +1,6 @@
 package solvela.mall.commodity.domain.dto;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -47,7 +48,7 @@ public class MallCommoditySkuDTO {
     private Integer availableStock;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     /** 排序 */
     private Integer sort;

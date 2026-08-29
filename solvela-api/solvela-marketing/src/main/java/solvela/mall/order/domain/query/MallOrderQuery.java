@@ -1,5 +1,6 @@
 package solvela.mall.order.domain.query;
 
+import solvela.enums.MallOrderStatusEnum;
 import solvela.base.domain.PageParam;
 import lombok.Data;
 
@@ -44,7 +45,7 @@ public class MallOrderQuery extends PageParam {
     private String commodityType;
 
     /** 状态：0-待支付, 10-待履约, 20-履约中, 30-已完成, 40-已取消, 50-已退款, 60-履约失败 */
-    private Integer status;
+    private MallOrderStatusEnum status;
 
     /** 订单来源：NORMAL-日常兑换, FLASH_SALE-限时抢购场次 */
     private String sourceType;

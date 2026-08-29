@@ -1,5 +1,6 @@
 package solvela.mall.category.domain.command;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ public class MallCategoryBatchItemCommand {
     private Integer sort;
 
     /** 状态：0-禁用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 子分类。<b>这是「同时新建上下级」的落点</b> —— 子分类的 parentId 依赖父分类的自增 id，

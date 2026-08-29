@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.category.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -36,7 +37,7 @@ public class MallCategoryBatchItemForm {
     private Integer sort;
 
     @Schema(description = "状态：0-禁用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 子分类。<b>这是「同时新建上下级」的落点</b> —— 子分类的 parentId 依赖父分类的自增 id，

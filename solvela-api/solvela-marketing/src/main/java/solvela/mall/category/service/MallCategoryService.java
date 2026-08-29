@@ -1,5 +1,6 @@
 package solvela.mall.category.service;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -77,7 +78,7 @@ public class MallCategoryService {
      */
     public List<MallCategoryDTO> queryEnabledList() {
         MallCategoryQuery queryForm = new MallCategoryQuery();
-        queryForm.setStatus(MallConst.CATEGORY_STATUS_ENABLED);
+        queryForm.setStatus(EnableStatusEnum.ENABLED);
         List<MallCategoryDTO> enabled = mallCategoryDao.queryList(queryForm);
 
         Set<Long> enabledRootIds = enabled.stream()
@@ -153,7 +154,7 @@ public class MallCategoryService {
         entity.setCategoryName(categoryName);
         entity.setIconFileId(form.getIconFileId());
         entity.setSort(form.getSort() == null ? 0 : form.getSort());
-        entity.setStatus(form.getStatus() == null ? MallConst.CATEGORY_STATUS_ENABLED : form.getStatus());
+        entity.setStatus(form.getStatus() == null ? EnableStatusEnum.ENABLED : form.getStatus());
         // create_time / update_time 一律不设：铁律 9，只认数据库时钟
         if (existing == null) {
             entity.setCreateBy(operator);
@@ -275,7 +276,7 @@ public class MallCategoryService {
         entity.setIconFileId(item.getIconFileId());
         // 没填排序就按录入顺序来 —— 运营在表单里从上往下写的顺序，就是他想要的展示顺序
         entity.setSort(item.getSort() == null ? index : item.getSort());
-        entity.setStatus(item.getStatus() == null ? MallConst.CATEGORY_STATUS_ENABLED : item.getStatus());
+        entity.setStatus(item.getStatus() == null ? EnableStatusEnum.ENABLED : item.getStatus());
         entity.setCreateBy(operator);
         entity.setUpdateBy(operator);
         // create_time / update_time 一律不设：铁律 9，只认数据库时钟
@@ -289,9 +290,8 @@ public class MallCategoryService {
      * 会把它们排除）。列表页在点停用前会按树里的子节点数提示运营波及多大。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(Long id, Integer status, String operator) {
-        if (status == null
-                || (status != MallConst.CATEGORY_STATUS_ENABLED && status != MallConst.CATEGORY_STATUS_DISABLED)) {
+    public void updateStatus(Long id, EnableStatusEnum status, String operator) {
+        if (status == null) {
             throw new BusinessException("分类状态不合法");
         }
         MallCategory category = mallCategoryManager.getById(id);
@@ -299,9 +299,9 @@ public class MallCategoryService {
             throw new BusinessException("分类不存在");
         }
         // 子分类要启用，父级得先是启用的，否则它启用了也没人看得见
-        if (status == MallConst.CATEGORY_STATUS_ENABLED && !isRoot(category.getParentId())) {
+        if (status == EnableStatusEnum.ENABLED && !isRoot(category.getParentId())) {
             MallCategory parent = mallCategoryManager.getById(category.getParentId());
-            if (parent != null && MallConst.CATEGORY_STATUS_DISABLED == nullToZero(parent.getStatus())) {
+            if (parent != null && parent.getStatus() == EnableStatusEnum.DISABLED) {
                 throw new BusinessException("上级分类「" + parent.getCategoryName() + "」已停用，请先启用它");
             }
         }

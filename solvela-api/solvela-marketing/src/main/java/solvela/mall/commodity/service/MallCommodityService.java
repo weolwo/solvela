@@ -1,5 +1,8 @@
 package solvela.mall.commodity.service;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
@@ -77,9 +80,6 @@ public class MallCommodityService {
     private static final Set<String> LIMIT_PERIODS = Set.of(
             MallConst.LIMIT_PERIOD_LIFETIME, MallConst.LIMIT_PERIOD_DAILY,
             MallConst.LIMIT_PERIOD_WEEKLY, MallConst.LIMIT_PERIOD_MONTHLY);
-
-    private static final Set<Integer> COMMODITY_STATUSES = Set.of(
-            MallConst.COMMODITY_STATUS_OFF, MallConst.COMMODITY_STATUS_ON, MallConst.COMMODITY_STATUS_DRAFT);
 
     // ================================================================== 查询
 
@@ -256,18 +256,14 @@ public class MallCommodityService {
         if (PrizeTypeEnum.COUPON.name().equals(form.getCommodityType()) && StringUtils.isBlank(form.getAssetRef())) {
             throw new BusinessException("优惠券商品必须填写券模编码");
         }
-        if (form.getPayType() == null
-                || (form.getPayType() != MallConst.PAY_TYPE_POINTS && form.getPayType() != MallConst.PAY_TYPE_POINTS_CASH)) {
+        if (form.getPayType() == null) {
             throw new BusinessException("支付方式不合法");
         }
         String limitPeriod = StringUtils.defaultIfBlank(form.getLimitPeriod(), MallConst.LIMIT_PERIOD_LIFETIME);
         if (!LIMIT_PERIODS.contains(limitPeriod)) {
             throw new BusinessException("限兑周期不合法：" + limitPeriod);
         }
-        int status = form.getStatus() == null ? MallConst.COMMODITY_STATUS_DRAFT : form.getStatus();
-        if (!COMMODITY_STATUSES.contains(status)) {
-            throw new BusinessException("商品状态不合法");
-        }
+        MallCommodityStatusEnum status = form.getStatus() == null ? MallCommodityStatusEnum.DRAFT : form.getStatus();
         String detailError = checkDetailContent(form.getDetailContent());
         if (detailError != null) {
             throw new BusinessException(detailError);
@@ -378,13 +374,13 @@ public class MallCommodityService {
         }
 
         // ---------- 3. 上架校验：只在真的要上架时收紧 ----------
-        if (status == MallConst.COMMODITY_STATUS_ON) {
+        if (status == MallCommodityStatusEnum.ON) {
             boolean hasEnabledSku = skuFormList.stream()
-                    .anyMatch(sku -> sku.getSkuStatus() == null || sku.getSkuStatus() == MallConst.SKU_STATUS_ENABLED);
+                    .anyMatch(sku -> sku.getSkuStatus() == null || sku.getSkuStatus() == EnableStatusEnum.ENABLED);
             if (!hasEnabledSku) {
                 throw new BusinessException("上架的商品至少要有一个启用的规格");
             }
-            if (category.getStatus() != null && category.getStatus() == MallConst.CATEGORY_STATUS_DISABLED) {
+            if (category.getStatus() == EnableStatusEnum.DISABLED) {
                 throw new BusinessException("分类「" + category.getCategoryName() + "」已停用，不能在该分类下上架商品");
             }
         }
@@ -409,7 +405,7 @@ public class MallCommodityService {
         entity.setPointsPrice(form.getPointsPrice());
         // pay_type=1 时现金价恒为 0（DDL）。信任前端传值的话，运营从「积分+现金」改回
         // 「纯积分」时那个现金价会留在库里，下单扣款读到它就是白扣用户的钱
-        entity.setCashPrice(form.getPayType() == MallConst.PAY_TYPE_POINTS
+        entity.setCashPrice(form.getPayType() == MallPayTypeEnum.POINTS
                 ? BigDecimal.ZERO : nullToZero(form.getCashPrice()));
         entity.setLimitPeriod(limitPeriod);
         entity.setLimitCount(form.getLimitCount() == null ? 0 : form.getLimitCount());
@@ -431,7 +427,7 @@ public class MallCommodityService {
         Long commodityId = entity.getId();
 
         // ---------- 5. 落库：SKU 整表 diff ----------
-        boolean pointsOnly = form.getPayType() == MallConst.PAY_TYPE_POINTS;
+        boolean pointsOnly = form.getPayType() == MallPayTypeEnum.POINTS;
         for (int i = 0; i < skuFormList.size(); i++) {
             MallCommoditySkuCommand skuForm = skuFormList.get(i);
             MallSku sku = new MallSku();
@@ -443,7 +439,7 @@ public class MallCommodityService {
             // 纯积分商品不存在现金覆盖价，理由同主表
             sku.setSkuCashPrice(pointsOnly ? null : skuForm.getSkuCashPrice());
             sku.setTotalStock(skuForm.getTotalStock());
-            sku.setSkuStatus(skuForm.getSkuStatus() == null ? MallConst.SKU_STATUS_ENABLED : skuForm.getSkuStatus());
+            sku.setSkuStatus(skuForm.getSkuStatus() == null ? EnableStatusEnum.ENABLED : skuForm.getSkuStatus());
             // 顺序取表单里的行序 —— 运营拖动排序后期望 C 端就是那个顺序
             sku.setSort(skuForm.getSort() == null ? i : skuForm.getSort());
             if (skuForm.getId() == null) {
@@ -519,22 +515,22 @@ public class MallCommodityService {
      * 运营就有了一条「先存草稿、再从列表点上架」的路，把没有规格的商品放到 C 端。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(Long id, Integer status, String operator) {
-        if (status == null || !COMMODITY_STATUSES.contains(status)) {
+    public void updateStatus(Long id, MallCommodityStatusEnum status, String operator) {
+        if (status == null) {
             throw new BusinessException("商品状态不合法");
         }
         MallCommodity commodity = mallCommodityManager.getById(id);
         if (commodity == null) {
             throw new BusinessException("商品不存在");
         }
-        if (status == MallConst.COMMODITY_STATUS_ON) {
+        if (status == MallCommodityStatusEnum.ON) {
             boolean hasEnabledSku = listDbSku(id).stream()
-                    .anyMatch(sku -> MallConst.SKU_STATUS_ENABLED == nullToZero(sku.getSkuStatus()));
+                    .anyMatch(sku -> sku.getSkuStatus() == EnableStatusEnum.ENABLED);
             if (!hasEnabledSku) {
                 throw new BusinessException("该商品没有启用的规格，不能上架");
             }
             MallCategory category = mallCategoryManager.getById(commodity.getCategoryId());
-            if (category == null || (category.getStatus() != null && category.getStatus() == MallConst.CATEGORY_STATUS_DISABLED)) {
+            if (category == null || category.getStatus() == EnableStatusEnum.DISABLED) {
                 throw new BusinessException("商品分类不存在或已停用，不能上架");
             }
         }
@@ -604,7 +600,7 @@ public class MallCommodityService {
                 SolvelaCodeUtil.BizCodePrefix.MALL_SKU, this::existsBySkuCode));
         skuForm.setSkuAttrs(new LinkedHashMap<>());
         skuForm.setTotalStock(0);
-        skuForm.setSkuStatus(MallConst.SKU_STATUS_ENABLED);
+        skuForm.setSkuStatus(EnableStatusEnum.ENABLED);
         skuForm.setSort(0);
         return skuForm;
     }

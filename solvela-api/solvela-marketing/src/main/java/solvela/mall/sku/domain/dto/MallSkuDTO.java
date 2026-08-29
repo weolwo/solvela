@@ -1,5 +1,7 @@
 package solvela.mall.sku.domain.dto;
 
+import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -32,7 +34,7 @@ public class MallSkuDTO {
     private Long coverFileId;
 
     /** 商品状态：0-下架, 1-上架, 2-草稿 */
-    private Integer commodityStatus;
+    private MallCommodityStatusEnum commodityStatus;
 
     /** 商品基准积分（SKU 未覆盖时的实际售价） */
     private Integer basePointsPrice;
@@ -71,7 +73,7 @@ public class MallSkuDTO {
     private Integer availableStock;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     /** 排序 */
     private Integer sort;

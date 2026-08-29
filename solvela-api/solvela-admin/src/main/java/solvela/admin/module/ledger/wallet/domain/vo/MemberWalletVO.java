@@ -1,5 +1,6 @@
 package solvela.admin.module.ledger.wallet.domain.vo;
 
+import solvela.enums.WalletStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -39,7 +40,7 @@ public class MemberWalletVO {
     private BigDecimal balance;
 
     @Schema(description = "状态：0-冻结, 1-正常")
-    private Integer status;
+    private WalletStatusEnum status;
 
     @Schema(description = "乐观锁版本号")
     private Integer version;

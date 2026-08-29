@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.category.domain.vo;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -32,7 +33,7 @@ public class MallCategoryVO {
     private Integer sort;
 
     @Schema(description = "状态：0-禁用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 该分类下的商品数。列表里直接显示出来，运营点删除之前就知道会不会被拦 ——

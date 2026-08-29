@@ -1,5 +1,6 @@
 package solvela.admin.module.ledger.wallet.domain.form;
 
+import solvela.enums.WalletStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -34,7 +35,7 @@ public class MemberWalletQueryForm extends PageParam {
     private String assetType;
 
     @Schema(description = "状态：0-冻结, 1-正常")
-    private Integer status;
+    private WalletStatusEnum status;
 
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;

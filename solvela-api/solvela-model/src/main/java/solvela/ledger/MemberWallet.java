@@ -1,5 +1,6 @@
 package solvela.ledger;
 
+import solvela.enums.WalletStatusEnum;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import solvela.code.UserErrorCode;
@@ -53,7 +54,7 @@ public class MemberWallet {
     /**
      * 状态：0-冻结, 1-正常
      */
-    private Integer status;
+    private WalletStatusEnum status;
 
     /**
      * 乐观锁版本号
@@ -85,7 +86,7 @@ public class MemberWallet {
      * 实体自带业务校验逻辑
      */
     public void checkAvailable() {
-        if (this.status != 1) { // 最好用枚举 StatusEnum.NORMAL.getCode()
+        if (this.status != WalletStatusEnum.NORMAL) {
             throw new BusinessException(UserErrorCode.ACCOUNT_FROZEN);
         }
     }

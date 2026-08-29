@@ -1,5 +1,6 @@
 package solvela.mall.category.domain.query;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -19,7 +20,7 @@ public class MallCategoryQuery extends PageParam {
     private String categoryName;
 
     /** 状态：0-禁用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /** 创建人 */
     private String createBy;

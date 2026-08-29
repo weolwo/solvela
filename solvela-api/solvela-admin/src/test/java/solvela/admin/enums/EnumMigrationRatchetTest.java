@@ -67,30 +67,16 @@ class EnumMigrationRatchetTest {
     private static final List<String> NOT_STATUS_WORDS = List.of("LENGTH", "SCALE", "SIZE");
 
     /**
-     * 尚未枚举化的列留下的常量。<b>只许删，不许加。</b>
+     * 尚未枚举化的列留下的常量，<b>只许删，不许加</b> —— 现在是空的。
+     *
+     * <p>A/B/C 三桶全部枚举化之后，仓库里已经没有「状态/类型语义的裸 int 常量」了。
+     * 名单空着不是形式：任何新加的这类常量都会被下面那条用例挡下来，
+     * 得先解释清楚为什么不该是枚举，才能往这里加行。
+     *
+     * <p>最后一批被清掉的是 {@code MallConst} 的 14 个（商品/SKU/分类/订单状态），
+     * 它们现在分别是 MallCommodityStatusEnum、EnableStatusEnum、MallOrderStatusEnum。
      */
-    private static final Set<String> ALLOWED = Set.of(
-            // ---- t_mall_sku.sku_status ----
-            "solvela-marketing/mall/constant/MallConst.java#SKU_STATUS_DISABLED",
-            "solvela-marketing/mall/constant/MallConst.java#SKU_STATUS_ENABLED",
-
-            // ---- t_mall_category.status ----
-            "solvela-marketing/mall/constant/MallConst.java#CATEGORY_STATUS_DISABLED",
-            "solvela-marketing/mall/constant/MallConst.java#CATEGORY_STATUS_ENABLED",
-
-            // ---- t_mall_commodity.status ----
-            "solvela-marketing/mall/constant/MallConst.java#COMMODITY_STATUS_DRAFT",
-            "solvela-marketing/mall/constant/MallConst.java#COMMODITY_STATUS_OFF",
-            "solvela-marketing/mall/constant/MallConst.java#COMMODITY_STATUS_ON",
-
-            // ---- t_mall_order.status（对账时零行，风险未覆盖）----
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_CANCELLED",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FAILED",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FINISHED",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FULFILLING",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_PENDING",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_REFUNDED",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_UNPAID");
+    private static final Set<String> ALLOWED = Set.of();
 
     @Test
     @DisplayName("状态魔法常量只许变少：新增即视为改造在往回走")

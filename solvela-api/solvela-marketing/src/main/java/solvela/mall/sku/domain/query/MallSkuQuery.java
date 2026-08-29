@@ -1,5 +1,7 @@
 package solvela.mall.sku.domain.query;
 
+import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
@@ -27,10 +29,10 @@ public class MallSkuQuery extends PageParam {
     private Long categoryId;
 
     /** SKU状态：0-停用, 1-启用 */
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     /** 商品状态：0-下架, 1-上架, 2-草稿 */
-    private Integer commodityStatus;
+    private MallCommodityStatusEnum commodityStatus;
 
     /**
      * 只看告警：可用库存 ≤ 阈值。

@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.order.domain.vo;
 
+import solvela.enums.MallOrderStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -75,7 +76,7 @@ public class MallOrderVO {
     private Long addressId;
 
     @Schema(description = "状态：0-待支付, 10-待履约, 20-履约中, 30-已完成, 40-已取消, 50-已退款, 60-履约失败")
-    private Integer status;
+    private MallOrderStatusEnum status;
 
     @Schema(description = "待支付超时时间：到点由 job 取消并释放锁定库存。纯积分订单为空")
     private LocalDateTime expireTime;

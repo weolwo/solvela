@@ -1,5 +1,7 @@
 package solvela.admin.module.mall.sku.domain.vo;
 
+import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,7 +37,7 @@ public class MallSkuVO {
     private Long coverFileId;
 
     @Schema(description = "商品状态：0-下架, 1-上架, 2-草稿")
-    private Integer commodityStatus;
+    private MallCommodityStatusEnum commodityStatus;
 
     @Schema(description = "商品基准积分（SKU 未覆盖时的实际售价）")
     private Integer basePointsPrice;
@@ -74,7 +76,7 @@ public class MallSkuVO {
     private Integer availableStock;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     @Schema(description = "排序")
     private Integer sort;

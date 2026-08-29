@@ -1,5 +1,6 @@
 package solvela.mall.favorite.domain.dto;
 
+import solvela.enums.MallCommodityStatusEnum;
 import lombok.Data;
 
 /**
@@ -27,7 +28,7 @@ public class MallFavoriteRankDTO {
     private Long coverFileId;
 
     /** 商品状态：0-下架, 1-上架, 2-草稿 */
-    private Integer commodityStatus;
+    private MallCommodityStatusEnum commodityStatus;
 
     /** 基准兑换积分 */
     private Integer pointsPrice;

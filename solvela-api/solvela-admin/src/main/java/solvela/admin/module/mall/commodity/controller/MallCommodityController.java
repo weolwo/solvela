@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.commodity.controller;
 
+import solvela.enums.MallCommodityStatusEnum;
 import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -98,7 +99,7 @@ public class MallCommodityController {
     @Operation(summary = "上架/下架 @author weolwo")
     @GetMapping("/updateStatus/{id}/{status}")
     @RequiresPermission("mallCommodity:update")
-    public void updateStatus(@PathVariable Long id, @PathVariable Integer status) {
+    public void updateStatus(@PathVariable Long id, @PathVariable MallCommodityStatusEnum status) {
         mallCommodityService.updateStatus(id, status, CurrentEmployee.nameOrNull());
     }
 

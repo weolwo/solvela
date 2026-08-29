@@ -1,5 +1,6 @@
 package solvela.ledger.handler;
 
+import solvela.enums.CouponStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
@@ -75,7 +76,7 @@ public class CouponAssetHandler implements IAssetHandler {
 
         coupon.setSourceType(SOURCE_TYPE_PROPOSAL); // 来源是提案
         coupon.setSourceBizId(proposal.getId().toString()); // 溯源提案ID
-        coupon.setStatus(0); // 0-未使用
+        coupon.setStatus(CouponStatusEnum.UNUSED);
 
         try {
             memberCouponDao.insert(coupon);

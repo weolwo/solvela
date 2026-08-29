@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.commodity.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -65,7 +66,7 @@ public class MallCommoditySkuForm {
     private Integer totalStock;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     @Schema(description = "排序：从小到大")
     private Integer sort;

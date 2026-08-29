@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.category.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -21,7 +22,7 @@ public class MallCategoryQueryForm extends PageParam {
     private String categoryName;
 
     @Schema(description = "状态：0-禁用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     @Schema(description = "创建人")
     private String createBy;

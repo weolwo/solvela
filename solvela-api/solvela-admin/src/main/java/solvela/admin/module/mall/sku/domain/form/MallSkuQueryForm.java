@@ -1,5 +1,7 @@
 package solvela.admin.module.mall.sku.domain.form;
 
+import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -36,10 +38,10 @@ public class MallSkuQueryForm extends PageParam {
     private Long categoryId;
 
     @Schema(description = "SKU状态：0-停用, 1-启用")
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     @Schema(description = "商品状态：0-下架, 1-上架, 2-草稿")
-    private Integer commodityStatus;
+    private MallCommodityStatusEnum commodityStatus;
 
     /**
      * 只看告警：可用库存 ≤ 阈值。

@@ -1,5 +1,6 @@
 package solvela.mall.category.domain.dto;
 
+import solvela.enums.EnableStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -29,7 +30,7 @@ public class MallCategoryDTO {
     private Integer sort;
 
     /** 状态：0-禁用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 该分类下的商品数。列表里直接显示出来，运营点删除之前就知道会不会被拦 ——

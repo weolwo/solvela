@@ -1,5 +1,7 @@
 package solvela.admin.module.mall.commodity.domain.vo;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,7 +51,7 @@ public class MallCommodityVO {
     private String exchangeNotice;
 
     @Schema(description = "支付方式：1-纯积分, 2-积分+现金")
-    private Integer payType;
+    private MallPayTypeEnum payType;
 
     @Schema(description = "划线原价：仅前端展示「价值￥199」，纯积分商品可留 0")
     private BigDecimal originalPrice;
@@ -73,7 +75,7 @@ public class MallCommodityVO {
     private LocalDateTime endTime;
 
     @Schema(description = "状态：0-下架, 1-上架, 2-草稿。新建默认落草稿")
-    private Integer status;
+    private MallCommodityStatusEnum status;
 
     @Schema(description = "是否首页推荐：0-否, 1-是")
     private Integer isHome;

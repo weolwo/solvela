@@ -1,5 +1,7 @@
 package solvela.mall.commodity.domain.dto;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -56,7 +58,7 @@ public class MallCommodityDetailDTO {
     private String exchangeNotice;
 
     /** 支付方式：1-纯积分, 2-积分+现金 */
-    private Integer payType;
+    private MallPayTypeEnum payType;
 
     /** 划线原价 */
     private BigDecimal originalPrice;
@@ -84,7 +86,7 @@ public class MallCommodityDetailDTO {
     private LocalDateTime endTime;
 
     /** 状态：0-下架, 1-上架, 2-草稿 */
-    private Integer status;
+    private MallCommodityStatusEnum status;
 
     /** 是否首页推荐：0-否, 1-是 */
     private Integer isHome;

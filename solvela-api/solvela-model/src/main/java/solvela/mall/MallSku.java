@@ -1,5 +1,6 @@
 package solvela.mall;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -96,7 +97,7 @@ public class MallSku {
     /**
      * 状态：0-停用, 1-启用
      */
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     /**
      * 排序

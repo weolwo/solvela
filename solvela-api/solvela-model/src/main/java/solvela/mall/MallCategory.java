@@ -1,5 +1,6 @@
 package solvela.mall;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -49,7 +50,7 @@ public class MallCategory {
     /**
      * 状态：0-禁用, 1-启用
      */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 创建人

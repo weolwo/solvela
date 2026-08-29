@@ -1,5 +1,6 @@
 package solvela.mall.category.domain.command;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 
 /**
@@ -32,5 +33,5 @@ public class MallCategorySaveCommand {
     private Integer sort;
 
     /** 状态：0-禁用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 }

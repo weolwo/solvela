@@ -1,5 +1,6 @@
 package solvela.ledger;
 
+import solvela.enums.CouponStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -62,7 +63,7 @@ public class MemberCoupon {
     /**
      * 状态：0-未使用, 1-已使用, 2-已过期, 3-已作废
      */
-    private Integer status;
+    private CouponStatusEnum status;
 
     /**
      * 来源：DRAW, TASK, MANUAL_SEND

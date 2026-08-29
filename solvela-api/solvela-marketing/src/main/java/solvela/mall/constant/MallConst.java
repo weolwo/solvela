@@ -18,24 +18,12 @@ public final class MallConst {
     private MallConst() {
     }
 
-    // ------------------------------------------------------------------ 商品状态
-
-    /** 下架 */
-    public static final int COMMODITY_STATUS_OFF = 0;
-    /** 上架 */
-    public static final int COMMODITY_STATUS_ON = 1;
-    /** 草稿：新建默认落这里，对齐 DDL 的 DEFAULT 2 */
-    public static final int COMMODITY_STATUS_DRAFT = 2;
-
-    // ------------------------------------------------------------------ SKU 状态
-
-    public static final int SKU_STATUS_DISABLED = 0;
-    public static final int SKU_STATUS_ENABLED = 1;
-
-    // ------------------------------------------------------------------ 分类状态
-
-    public static final int CATEGORY_STATUS_DISABLED = 0;
-    public static final int CATEGORY_STATUS_ENABLED = 1;
+    // ------------------------------------------------------------------ 状态类取值
+    //
+    // 商品状态 / SKU 状态 / 分类状态 / 支付方式 / 订单状态原先都在这里，现在是枚举：
+    //   MallCommodityStatusEnum、EnableStatusEnum（SKU 与分类共用）、
+    //   MallPayTypeEnum、MallOrderStatusEnum
+    // 字段类型也一并换成了枚举，MyBatis 与 Jackson 两端都按 value 收发。
 
     /**
      * 分类批量新建的单次上限（父 + 子一起算）。
@@ -44,28 +32,6 @@ public final class MallConst {
      * 比分两次提交更容易出错。超了就分批，反正批量本来就是为了省点击次数。
      */
     public static final int MAX_CATEGORY_BATCH = 10;
-
-    // ------------------------------------------------------------------ 支付方式
-
-    /** 纯积分：cash_price 恒为 0 */
-    public static final int PAY_TYPE_POINTS = 1;
-    /** 积分 + 现金 */
-    public static final int PAY_TYPE_POINTS_CASH = 2;
-
-    // ------------------------------------------------------------------ 订单状态
-
-    /**
-     * 取值是<b>跳跃的（0/10/20/...）</b>，不是连续序号 —— DDL 里就是这么定的，
-     * 留出空档是为了将来插入中间态（比如「待发货」）时不用重排既有值。
-     * 所以任何地方都别写 {@code status < 30} 这种范围判断，只能逐个比。
-     */
-    public static final int ORDER_STATUS_UNPAID = 0;
-    public static final int ORDER_STATUS_PENDING = 10;
-    public static final int ORDER_STATUS_FULFILLING = 20;
-    public static final int ORDER_STATUS_FINISHED = 30;
-    public static final int ORDER_STATUS_CANCELLED = 40;
-    public static final int ORDER_STATUS_REFUNDED = 50;
-    public static final int ORDER_STATUS_FAILED = 60;
 
     // ------------------------------------------------------------------ 订单来源
 

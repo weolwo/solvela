@@ -33,6 +33,7 @@
             c.points_price              AS pointsPrice,
             c.sold_count                AS soldCount,
             COUNT(1)                    AS favoriteCount,
+            <!-- sku_status = 1 即 EnableStatusEnum.ENABLED；标量子查询里引用不了 Java 枚举，改值要手动同步 -->
             (SELECT IFNULL(SUM(s.available_stock), 0) FROM t_mall_sku s
               WHERE s.commodity_id = f.commodity_id AND s.sku_status = 1) AS availableStock
         FROM t_mall_favorite f
@@ -59,6 +60,8 @@
             c.points_price              AS pointsPrice,
             c.sold_count                AS soldCount,
             COUNT(1)                    AS favoriteCount,
+            <!-- sku_status = 1 即 EnableStatusEnum.ENABLED，commodityStatus != 1 即「不是 MallCommodityStatusEnum.ON」；
+                 聚合/HAVING 里引用不了 Java 枚举，改值要手动同步 -->
             (SELECT IFNULL(SUM(s.available_stock), 0) FROM t_mall_sku s
               WHERE s.commodity_id = f.commodity_id AND s.sku_status = 1) AS availableStock
         FROM t_mall_favorite f

@@ -1,5 +1,6 @@
 package solvela.admin.module.mall.category.controller;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -100,7 +101,7 @@ public class MallCategoryController {
     @Operation(summary = "启用/停用 @author weolwo")
     @GetMapping("/updateStatus/{id}/{status}")
     @RequiresPermission("mallCategory:update")
-    public void updateStatus(@PathVariable Long id, @PathVariable Integer status) {
+    public void updateStatus(@PathVariable Long id, @PathVariable EnableStatusEnum status) {
         mallCategoryService.updateStatus(id, status, CurrentEmployee.nameOrNull());
     }
 

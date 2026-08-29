@@ -1,5 +1,7 @@
 package solvela.admin.module.mall.commodity.domain.form;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -92,7 +94,7 @@ public class MallCommoditySaveForm {
 
     @Schema(description = "支付方式：1-纯积分, 2-积分+现金", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "请选择支付方式")
-    private Integer payType;
+    private MallPayTypeEnum payType;
 
     @Schema(description = "划线原价：仅前端展示「价值￥199」，纯积分商品可留 0")
     @DecimalMin(value = "0", message = "划线原价不能为负")
@@ -129,7 +131,7 @@ public class MallCommoditySaveForm {
      * 上架会触发一组额外校验（至少一个启用 SKU 等），草稿不校验 —— 运营常常要先存一半。
      */
     @Schema(description = "状态：0-下架, 1-上架, 2-草稿")
-    private Integer status;
+    private MallCommodityStatusEnum status;
 
     @Schema(description = "是否首页推荐：0-否, 1-是")
     private Integer isHome;

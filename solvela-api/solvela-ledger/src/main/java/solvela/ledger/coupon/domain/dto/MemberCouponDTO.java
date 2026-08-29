@@ -1,5 +1,6 @@
 package solvela.ledger.coupon.domain.dto;
 
+import solvela.enums.CouponStatusEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -47,7 +48,7 @@ public class MemberCouponDTO {
     /**
      * 状态：0-未使用, 1-已使用, 2-已过期, 3-已作废
      */
-    private Integer status;
+    private CouponStatusEnum status;
 
     /**
      * 来源：DRAW, TASK, MANUAL_SEND

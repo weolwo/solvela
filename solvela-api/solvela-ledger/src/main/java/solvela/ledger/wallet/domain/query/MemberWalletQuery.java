@@ -1,5 +1,6 @@
 package solvela.ledger.wallet.domain.query;
 
+import solvela.enums.WalletStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
@@ -39,7 +40,7 @@ public class MemberWalletQuery extends PageParam {
     /**
      * 状态：0-冻结, 1-正常
      */
-    private Integer status;
+    private WalletStatusEnum status;
 
     private LocalDate createTimeBegin;
 

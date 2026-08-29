@@ -1,5 +1,6 @@
 package solvela.mall.commodity.domain.command;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
 
@@ -52,7 +53,7 @@ public class MallCommoditySkuCommand {
     private Integer totalStock;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer skuStatus;
+    private EnableStatusEnum skuStatus;
 
     /** 排序：从小到大 */
     private Integer sort;

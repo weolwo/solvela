@@ -1,5 +1,7 @@
 package solvela.mall.commodity.domain.command;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
 
@@ -72,7 +74,7 @@ public class MallCommoditySaveCommand {
     private String exchangeNotice;
 
     /** 支付方式：1-纯积分, 2-积分+现金 */
-    private Integer payType;
+    private MallPayTypeEnum payType;
 
     /** 划线原价：仅前端展示「价值￥199」，纯积分商品可留 0 */
     private BigDecimal originalPrice;
@@ -102,7 +104,7 @@ public class MallCommoditySaveCommand {
      * 编辑页顶部两个按钮的差别只在这个值上：「存草稿」传 2，「保存并上架」传 1。
      * 上架会触发一组额外校验（至少一个启用 SKU 等），草稿不校验 —— 运营常常要先存一半。
      */
-    private Integer status;
+    private MallCommodityStatusEnum status;
 
     /** 是否首页推荐：0-否, 1-是 */
     private Integer isHome;

@@ -1,5 +1,7 @@
 package solvela.mall.commodity.domain.query;
 
+import solvela.enums.MallPayTypeEnum;
+import solvela.enums.MallCommodityStatusEnum;
 import solvela.base.domain.PageParam;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -22,7 +24,7 @@ public class MallCommodityQuery extends PageParam {
     private Long categoryId;
 
     /** 状态：0-下架, 1-上架, 2-草稿 */
-    private Integer status;
+    private MallCommodityStatusEnum status;
 
     /** 商品类型：PHYSICAL-实物, COUPON-优惠券, BALANCE-现金/红包 */
     private String commodityType;
@@ -31,6 +33,6 @@ public class MallCommodityQuery extends PageParam {
     private String commodityName;
 
     /** 支付方式：1-纯积分, 2-积分+现金 */
-    private Integer payType;
+    private MallPayTypeEnum payType;
 
 }
