@@ -1,5 +1,6 @@
 package solvela.lottery.config.domain.dto;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import java.util.List;
 
 /**
@@ -31,7 +32,7 @@ public record LotteryWorkbenchDTO(String activityCode,
                                  String lotteryName,
                                  Integer numberLength,
                                  Integer totalCount,
-                                 Integer status,
+                                 LotteryConfigStatusEnum status,
                                  boolean configured,
                                  boolean structureLocked,
                                  String lockReason,

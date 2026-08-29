@@ -1,5 +1,6 @@
 package solvela.lottery.config.service;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import solvela.enums.IssueStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
@@ -60,9 +61,6 @@ public class LotteryConfigBoardService {
     private final LotteryPrizeRuleManager lotteryPrizeRuleManager;
     private final LotteryRecordDao lotteryRecordDao;
     private final ActivityConfigManager activityConfigManager;
-
-    private static final Integer STATUS_ONLINE = 1;
-
     /** 占用率到这个比例就提示扩容余地不足，早于发号才有意义 */
     private static final BigDecimal SPACE_WARN_THRESHOLD = new BigDecimal("0.9");
 
@@ -106,13 +104,13 @@ public class LotteryConfigBoardService {
         // 排序即优先级：已上线且有危险告警的排最前 —— 那是正在流血的
         all.sort(Comparator
                 .comparing((LotteryConfigBoardDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(v -> STATUS_ONLINE.equals(v.getStatus()) ? 0 : 1)
+                .thenComparing(v -> v.getStatus() == LotteryConfigStatusEnum.ONLINE ? 0 : 1)
                 .thenComparing(LotteryConfigBoardDTO::getSoldTotal, Comparator.reverseOrder()));
 
         LotteryConfigBoardResultDTO result = new LotteryConfigBoardResultDTO();
         result.setLotteryCount(all.size());
         result.setSellableCount((int) all.stream()
-                .filter(v -> STATUS_ONLINE.equals(v.getStatus()) && v.getDangerCount() == 0
+                .filter(v -> v.getStatus() == LotteryConfigStatusEnum.ONLINE && v.getDangerCount() == 0
                         && v.getWaitIssueCount() > 0).count());
         result.setDangerCount(all.stream().mapToInt(LotteryConfigBoardDTO::getDangerCount).sum());
         result.setWarnCount(all.stream().mapToInt(LotteryConfigBoardDTO::getWarnCount).sum());
@@ -193,7 +191,7 @@ public class LotteryConfigBoardService {
         }
 
         // ---- 体检 ----
-        boolean online = STATUS_ONLINE.equals(config.getStatus());
+        boolean online = config.getStatus() == LotteryConfigStatusEnum.ONLINE;
 
         /*
          * 上线的唯一前置条件就是「配了奖级规则」（LotteryConfigService.checkOnlineReady）——

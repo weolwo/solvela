@@ -1,5 +1,7 @@
 package solvela.admin.module.risk.promotionconfig.domain.form;
 
+import solvela.enums.ReviewLevelEnum;
+import solvela.enums.EnableStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -54,7 +56,7 @@ public class PromotionConfigUpdateForm {
 
     @Schema(description = "审核层级控制：0-无需审核, 1-单层审批, 2-双层审批", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审核层级控制：0-无需审核, 1-单层审批, 2-双层审批 不能为空")
-    private Integer reviewLevel;
+    private ReviewLevelEnum reviewLevel;
 
     @Schema(description = "一审触发阈值：动账金额 >= 此值必须一审(值为0代表笔笔一审)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "一审触发阈值：动账金额 >= 此值必须一审(值为0代表笔笔一审) 不能为空")
@@ -95,6 +97,6 @@ public class PromotionConfigUpdateForm {
     private String mutexRule;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
 }

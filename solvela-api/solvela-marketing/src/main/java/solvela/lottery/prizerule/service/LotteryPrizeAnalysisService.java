@@ -1,5 +1,6 @@
 package solvela.lottery.prizerule.service;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import solvela.enums.EnableStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.lottery.LotteryConfig;
@@ -68,10 +69,6 @@ public class LotteryPrizeAnalysisService {
     private final LotteryConfigManager lotteryConfigManager;
     private final PrizeConfigManager prizeConfigManager;
 
-    /** 玩法状态：1-已上线 */
-    private static final Integer LOTTERY_STATUS_ONLINE = 1;
-
-
     /**
      * 中奖率保留位数。9 位号码的 EXACT 命中率是 1e-9，再留几位余量，
      * 保证最小的那个概率不会被四舍五入成 0（显示成 0 会让人以为规则是死的）
@@ -117,7 +114,7 @@ public class LotteryPrizeAnalysisService {
         // 排序即优先级：已上线 + 有 DANGER 的玩法是真在流血，必须第一眼看见
         all.sort(Comparator
                 .comparing((LotteryPrizeAnalysisDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(v -> LOTTERY_STATUS_ONLINE.equals(v.getLotteryStatus()) ? 0 : 1)
+                .thenComparing(v -> v.getLotteryStatus() == LotteryConfigStatusEnum.ONLINE ? 0 : 1)
                 .thenComparing(LotteryPrizeAnalysisDTO::getTotalExpectedCost, Comparator.reverseOrder()));
 
         if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {

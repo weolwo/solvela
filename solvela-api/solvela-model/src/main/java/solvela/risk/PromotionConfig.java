@@ -1,5 +1,7 @@
 package solvela.risk;
 
+import solvela.enums.ReviewLevelEnum;
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -61,7 +63,7 @@ public class PromotionConfig {
     /**
      * 审核层级控制：0-无需审核, 1-单层审批, 2-双层审批
      */
-    private Integer reviewLevel;
+    private ReviewLevelEnum reviewLevel;
 
     /**
      * 一审触发阈值：动账金额 >= 此值必须一审(值为0代表笔笔一审)
@@ -121,7 +123,7 @@ public class PromotionConfig {
     /**
      * 状态：0-停用, 1-启用
      */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 创建人

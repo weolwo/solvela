@@ -5,6 +5,7 @@ package solvela.lottery.config.dao;
         import solvela.lottery.LotteryConfig;
         import solvela.lottery.config.domain.query.LotteryConfigQuery;
         import solvela.lottery.config.domain.dto.LotteryConfigDTO;
+import solvela.enums.LotteryConfigStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -45,7 +46,7 @@ public interface LotteryConfigDao extends BaseMapper<LotteryConfig> {
      *
      * @return 影响行数，0 表示状态已被别人改过
      */
-    int updateStatus(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
+    int updateStatus(@Param("id") Long id, @Param("from") LotteryConfigStatusEnum from, @Param("to") LotteryConfigStatusEnum to);
 
     // 物理删除已移除：t_lottery_record 里存着 lottery_code，删配置会让用户手里已发出的号码断链。
     // 停售走 updateStatus 下线 —— 见 LotteryConfigController 的类注释

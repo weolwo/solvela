@@ -1,5 +1,6 @@
 package solvela.admin.module.lottery.config.domain.form;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -28,7 +29,7 @@ public class LotteryConfigQueryForm extends PageParam {
     private String lotteryName;
 
     @Schema(description = "状态：0-下线, 1-上线")
-    private Integer status;
+    private LotteryConfigStatusEnum status;
 
     /**
      * 只看有体检告警的玩法。「已上线却没配奖级」「上线了但没有可领号的期号」

@@ -1,5 +1,6 @@
 package solvela.lottery.config.service;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,14 +67,6 @@ public class LotteryConfigService {
     private final ActivityConfigService activityConfigService;
     private final PrizeConfigService prizeConfigService;
     private final FpeCipherFactory fpeCipherFactory;
-
-    /**
-     * 彩票配置状态：1-上线
-     */
-    private static final Integer STATUS_ONLINE = 1;
-
-    private static final Integer STATUS_OFFLINE = 0;
-
     /**
      * 活动类型：彩票工作台只接受这一类活动。
      * 取值统一走 ActivityTypeEnum，不再在本类里裸写 "LOTTERY" 字符串（铁律 3：消除魔法值）。
@@ -220,7 +213,7 @@ public class LotteryConfigService {
                     + "号码是由游标加密得来的，改参数会让已发号码无法验证、且新号码可能与历史重复。"
                     + "如需不同的发行规格，请新建一个彩票玩法。";
         }
-        if (STATUS_ONLINE.equals(config.getStatus())) {
+        if (config.getStatus() == LotteryConfigStatusEnum.ONLINE) {
             return "玩法已上线，发号引擎参数不可修改。如需调整请先下线。";
         }
         return null;
@@ -293,7 +286,7 @@ public class LotteryConfigService {
             // 字符集固定十进制，不接受前端值
             entity.setNumberCharset(LotteryConst.NUMBER_CHARSET);
             // 新建默认下线，上线是独立的动作，不能靠保存配置顺带把玩法推上线
-            entity.setStatus(STATUS_OFFLINE);
+            entity.setStatus(LotteryConfigStatusEnum.OFFLINE);
             lotteryConfigDao.insert(entity);
         } else {
             LotteryConfig update = new LotteryConfig();
@@ -373,14 +366,14 @@ public class LotteryConfigService {
         if (config == null) {
             throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
-        if (STATUS_ONLINE.equals(config.getStatus())) {
+        if (config.getStatus() == LotteryConfigStatusEnum.ONLINE) {
             throw new BusinessException("该玩法已经是上线状态");
         }
         String notReady = checkOnlineReady(lotteryCode);
         if (notReady != null) {
             throw new BusinessException(notReady);
         }
-        int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_OFFLINE, STATUS_ONLINE);
+        int rows = lotteryConfigDao.updateStatus(config.getId(), LotteryConfigStatusEnum.OFFLINE, LotteryConfigStatusEnum.ONLINE);
         if (rows == 0) {
             throw new BusinessException("上线失败：状态已被其他人变更，请刷新后重试");
         }
@@ -417,10 +410,10 @@ public class LotteryConfigService {
         if (config == null) {
             throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
-        if (STATUS_OFFLINE.equals(config.getStatus())) {
+        if (config.getStatus() == LotteryConfigStatusEnum.OFFLINE) {
             throw new BusinessException("该玩法已经是下线状态");
         }
-        int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_ONLINE, STATUS_OFFLINE);
+        int rows = lotteryConfigDao.updateStatus(config.getId(), LotteryConfigStatusEnum.ONLINE, LotteryConfigStatusEnum.OFFLINE);
         if (rows == 0) {
             throw new BusinessException("下线失败：状态已被其他人变更，请刷新后重试");
         }
@@ -469,7 +462,7 @@ public class LotteryConfigService {
                 failed.add(lotteryCode + "（玩法不存在）");
                 continue;
             }
-            if (STATUS_OFFLINE.equals(config.getStatus())) {
+            if (config.getStatus() == LotteryConfigStatusEnum.OFFLINE) {
                 skipped++;
                 continue;
             }

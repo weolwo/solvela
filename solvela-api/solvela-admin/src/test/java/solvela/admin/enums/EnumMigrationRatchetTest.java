@@ -50,9 +50,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class EnumMigrationRatchetTest {
 
-    /** 抓所有 {@code private static final int/Integer NAME = 数字;}，再按名字过滤 */
+    /**
+     * 抓所有 {@code private/public static final int/Integer NAME = 数字;}，再按名字过滤。
+     *
+     * <p>⚠️ 必须带上 public：早期版本只盯 private，于是漏掉了 {@code TaskConst} /
+     * {@code MallConst} 这类<b>公共常量类</b> —— 而它们恰恰是同一份魔法值被最多地方引用的形态。
+     */
     private static final Pattern MAGIC_STATUS_CONST = Pattern.compile(
-            "private static final (?:int|Integer) ([A-Z][A-Z0-9_]*)\\s*=\\s*-?\\d+;");
+            "(?:private|public) static final (?:int|Integer) ([A-Z][A-Z0-9_]*)\\s*=\\s*-?\\d+;");
 
     /** 名字里带这些词才算「状态语义」 */
     private static final List<String> STATUS_WORDS =
@@ -65,18 +70,38 @@ class EnumMigrationRatchetTest {
      * 尚未枚举化的列留下的常量。<b>只许删，不许加。</b>
      */
     private static final Set<String> ALLOWED = Set.of(
+            // ---- t_mall_sku.sku_status ----
+            "solvela-marketing/mall/constant/MallConst.java#SKU_STATUS_DISABLED",
+            "solvela-marketing/mall/constant/MallConst.java#SKU_STATUS_ENABLED",
 
+            // ---- t_mall_category.status ----
+            "solvela-marketing/mall/constant/MallConst.java#CATEGORY_STATUS_DISABLED",
+            "solvela-marketing/mall/constant/MallConst.java#CATEGORY_STATUS_ENABLED",
 
+            // ---- t_mall_commodity.status ----
+            "solvela-marketing/mall/constant/MallConst.java#COMMODITY_STATUS_DRAFT",
+            "solvela-marketing/mall/constant/MallConst.java#COMMODITY_STATUS_OFF",
+            "solvela-marketing/mall/constant/MallConst.java#COMMODITY_STATUS_ON",
 
-            // ---- t_lottery_config.status ----
-            "solvela-marketing/lottery/config/service/LotteryConfigBoardService.java#STATUS_ONLINE",
-            "solvela-marketing/lottery/config/service/LotteryConfigService.java#STATUS_OFFLINE",
-            "solvela-marketing/lottery/config/service/LotteryConfigService.java#STATUS_ONLINE",
-            "solvela-marketing/lottery/prizerule/service/LotteryPrizeAnalysisService.java#LOTTERY_STATUS_ONLINE",
-            "solvela-marketing/lottery/runtime/TicketIssueService.java#CONFIG_STATUS_ONLINE",
+            // ---- t_mall_order.status（对账时零行，风险未覆盖）----
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_CANCELLED",
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FAILED",
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FINISHED",
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FULFILLING",
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_PENDING",
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_REFUNDED",
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_UNPAID",
 
-            // ---- t_promotion_config.status ----
-            "solvela-risk/risk/promotionconfig/service/PromotionConfigService.java#STATUS_ENABLED");
+            // ---- t_member.status ----
+            "solvela-member/member/constant/MemberConst.java#STATUS_CANCELLED",
+            "solvela-member/member/constant/MemberConst.java#STATUS_FROZEN",
+            "solvela-member/member/constant/MemberConst.java#STATUS_NORMAL",
+
+            // ---- t_member_verify.verify_status（对账时零行，风险未覆盖）----
+            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_FAILED",
+            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_NONE",
+            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_PENDING",
+            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_VERIFIED");
 
     @Test
     @DisplayName("状态魔法常量只许变少：新增即视为改造在往回走")

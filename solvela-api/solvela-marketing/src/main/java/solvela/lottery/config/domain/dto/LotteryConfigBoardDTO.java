@@ -1,5 +1,6 @@
 package solvela.lottery.config.domain.dto;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -43,7 +44,7 @@ public class LotteryConfigBoardDTO {
     private Integer totalCount;
 
     /** 状态: 0-未上线, 1-已上线 */
-    private Integer status;
+    private LotteryConfigStatusEnum status;
 
     // ---------------- 派生 ----------------
 

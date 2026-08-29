@@ -1,5 +1,7 @@
 package solvela.risk.proposal.service;
 
+import solvela.enums.EnableStatusEnum;
+import solvela.enums.ReviewLevelEnum;
 import solvela.enums.ProposalStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -104,7 +106,7 @@ public class ProposalRecordService {
 
         // 1. 获取底层资产（优惠）配置
         PromotionConfig config = promotionConfigService.getById(req.getPromotionConfigId());
-        if (config == null || config.getStatus() == 0) {
+        if (config == null || config.getStatus() == EnableStatusEnum.DISABLED) {
             log.error("【提案阻断】优惠配置不存在或已停用, ID: {}", req.getPromotionConfigId());
             throw new BusinessException("资产配置异常");
         }
@@ -162,12 +164,6 @@ public class ProposalRecordService {
      */
     private static final String FIELD_FIRST_REVIEWER = "first_reviewer";
     private static final String FIELD_SECOND_REVIEWER = "second_reviewer";
-
-    /**
-     * 需要双层审批
-     */
-    private static final int REVIEW_LEVEL_DOUBLE = 2;
-
     /**
      * 审批通过：一审通过后按 review_level 决定进二审还是直接放行下发
      * <p>
@@ -190,7 +186,7 @@ public class ProposalRecordService {
         ProposalStatusEnum targetStatus;
         if (current == ProposalStatusEnum.FIRST_REVIEW) {
             // 一审通过：双层审批则转二审，否则直接待执行
-            targetStatus = config.getReviewLevel() == REVIEW_LEVEL_DOUBLE
+            targetStatus = config.getReviewLevel() == ReviewLevelEnum.DOUBLE
                     ? ProposalStatusEnum.SECOND_REVIEW
                     : ProposalStatusEnum.PENDING_EXECUTE;
             rows = proposalRecordDao.updateReview(id, ProposalStatusEnum.FIRST_REVIEW, targetStatus,
@@ -269,7 +265,7 @@ public class ProposalRecordService {
      */
     private ProposalStatusEnum calculateInitStatus(BigDecimal amount, PromotionConfig config) {
         // 配置了不需要审批，直接待执行
-        if (config.getReviewLevel() == 0) {
+        if (config.getReviewLevel() == ReviewLevelEnum.NONE) {
             return ProposalStatusEnum.PENDING_EXECUTE;
         }
 

@@ -1,5 +1,6 @@
 package solvela.lottery.config.domain.query;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import solvela.base.domain.PageParam;
 import java.time.LocalDate;
 import lombok.Data;
@@ -26,7 +27,7 @@ public class LotteryConfigQuery extends PageParam {
     private String lotteryName;
 
     /** 状态：0-下线, 1-上线 */
-    private Integer status;
+    private LotteryConfigStatusEnum status;
 
     /**
      * 只看有体检告警的玩法。「已上线却没配奖级」「上线了但没有可领号的期号」

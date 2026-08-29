@@ -1,5 +1,7 @@
 package solvela.lottery.config.domain.dto;
 
+import solvela.enums.LotteryConfigStatusEnum;
+
 /**
  * 彩票玩法下拉项：工作台顶部「当前玩法」切换用，按活动过滤。
  *
@@ -21,5 +23,5 @@ public record LotteryConfigOptionDTO(String lotteryCode,
                                     String activityCode,
                                     Integer numberLength,
                                     Integer totalCount,
-                                    Integer status) {
+                                    LotteryConfigStatusEnum status) {
 }

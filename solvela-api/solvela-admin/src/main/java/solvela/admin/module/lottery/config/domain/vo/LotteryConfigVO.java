@@ -1,5 +1,6 @@
 package solvela.admin.module.lottery.config.domain.vo;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -38,7 +39,7 @@ public class LotteryConfigVO {
     private Integer totalCount;
 
     @Schema(description = "状态：0-下线, 1-上线")
-    private Integer status;
+    private LotteryConfigStatusEnum status;
 
     @Schema(description = "创建人")
     private String createBy;

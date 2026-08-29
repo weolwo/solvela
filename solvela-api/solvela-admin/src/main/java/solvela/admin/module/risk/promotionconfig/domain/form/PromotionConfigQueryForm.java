@@ -1,5 +1,6 @@
 package solvela.admin.module.risk.promotionconfig.domain.form;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -42,6 +43,6 @@ public class PromotionConfigQueryForm extends PageParam {
     private Integer ipLimit;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
 }

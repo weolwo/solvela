@@ -1,5 +1,6 @@
 package solvela.lottery.config.domain.dto;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -35,7 +36,7 @@ public class LotteryConfigDTO {
     private Integer totalCount;
 
     /** 状态：0-下线, 1-上线 */
-    private Integer status;
+    private LotteryConfigStatusEnum status;
 
     /** 创建人 */
     private String createBy;

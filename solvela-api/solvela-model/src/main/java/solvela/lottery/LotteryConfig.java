@@ -1,5 +1,6 @@
 package solvela.lottery;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -60,7 +61,7 @@ public class LotteryConfig {
     /**
      * 状态：0-下线, 1-上线
      */
-    private Integer status;
+    private LotteryConfigStatusEnum status;
 
     /**
      * 创建人

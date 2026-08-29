@@ -1,5 +1,6 @@
 package solvela.risk.promotionconfig.domain.dto;
 
+import solvela.enums.ReviewLevelEnum;
 import java.math.BigDecimal;
 
 /**
@@ -26,5 +27,5 @@ public record PromotionConfigOptionDTO(Long id,
                                       BigDecimal usedAmount,
                                       Integer totalQuota,
                                       Integer usedQuota,
-                                      Integer reviewLevel) {
+                                      ReviewLevelEnum reviewLevel) {
 }

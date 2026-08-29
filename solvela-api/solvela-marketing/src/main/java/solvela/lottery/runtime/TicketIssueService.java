@@ -1,5 +1,6 @@
 package solvela.lottery.runtime;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import solvela.enums.IssueStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,12 +76,9 @@ public class TicketIssueService {
      * 顺带把「会员号根本不存在」挡在发号之前 —— 号一旦发出去就收不回来了。
      */
     private final MemberService memberService;
-
-    private static final Integer CONFIG_STATUS_ONLINE = 1;
-
     /**
      * 期号状态：0-待开奖（可售卖）。已进入核销或已开奖的期号不再发号
-     */
+     */
 
     /**
      * 防刷限流：单用户单玩法每秒 5 次。
@@ -152,7 +150,7 @@ public class TicketIssueService {
         if (config == null) {
             throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
-        if (!CONFIG_STATUS_ONLINE.equals(config.getStatus())) {
+        if (config.getStatus() != LotteryConfigStatusEnum.ONLINE) {
             throw new BusinessException("彩票玩法未上线，暂不能领号");
         }
         LotteryIssue issue = lotteryIssueManager.lambdaQuery()

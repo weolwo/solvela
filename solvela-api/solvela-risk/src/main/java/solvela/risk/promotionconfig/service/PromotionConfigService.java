@@ -1,5 +1,6 @@
 package solvela.risk.promotionconfig.service;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -44,12 +45,6 @@ public class PromotionConfigService {
     public PromotionConfig getById(Long id) {
         return promotionConfigDao.selectById(id);
     }
-
-    /**
-     * 优惠配置状态：1-启用
-     */
-    private static final Integer STATUS_ENABLED = 1;
-
     /**
      * 下拉选项：返回启用中的全部优惠配置，按资产类型排序
      * <p>
@@ -59,7 +54,7 @@ public class PromotionConfigService {
     public List<PromotionConfigOptionDTO> queryOptionList() {
         List<PromotionConfig> list = promotionConfigDao.selectList(
                 Wrappers.<PromotionConfig>lambdaQuery()
-                        .eq(PromotionConfig::getStatus, STATUS_ENABLED)
+                        .eq(PromotionConfig::getStatus, EnableStatusEnum.ENABLED)
                         .orderByAsc(PromotionConfig::getPrizeType)
                         .orderByAsc(PromotionConfig::getId));
         List<PromotionConfigOptionDTO> optionList = list.stream()

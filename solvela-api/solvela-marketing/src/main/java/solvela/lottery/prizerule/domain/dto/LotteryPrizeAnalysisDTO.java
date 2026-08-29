@@ -1,5 +1,6 @@
 package solvela.lottery.prizerule.domain.dto;
 
+import solvela.enums.LotteryConfigStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -32,7 +33,7 @@ public class LotteryPrizeAnalysisDTO {
     private Integer totalCount;
 
     /** 玩法状态: 0-未上线, 1-已上线。已上线且有告警的最该先处理 */
-    private Integer lotteryStatus;
+    private LotteryConfigStatusEnum lotteryStatus;
 
     /**
      * 各奖级净中奖率之和 —— 一张号码中任意一个奖的概率。

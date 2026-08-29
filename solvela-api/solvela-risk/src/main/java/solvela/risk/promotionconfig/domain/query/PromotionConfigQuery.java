@@ -1,5 +1,6 @@
 package solvela.risk.promotionconfig.domain.query;
 
+import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
@@ -41,6 +42,6 @@ public class PromotionConfigQuery extends PageParam {
     private Integer ipLimit;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
 }
