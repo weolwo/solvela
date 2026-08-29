@@ -1,6 +1,7 @@
 package solvela.prize.prizeconfig.domain.command;
 
 
+import solvela.enums.ApproveModeEnum;
 import java.math.BigDecimal;
 
 import lombok.Data;
@@ -47,7 +48,7 @@ public class PrizeConfigAddCommand {
     private BigDecimal prizeValue;
 
     /** 审批模式：0-自动免审, 1-人工审批 */
-    private Integer approveMode;
+    private ApproveModeEnum approveMode;
 
     /** 排序权重 */
     private Integer sortWeight;

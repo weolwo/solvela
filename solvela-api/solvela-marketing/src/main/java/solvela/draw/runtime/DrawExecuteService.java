@@ -1,5 +1,7 @@
 package solvela.draw.runtime;
 
+import solvela.enums.DrawResultEnum;
+import solvela.enums.PrizePoolStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.json.JsonUtils;
@@ -94,8 +96,6 @@ public class DrawExecuteService {
      * 白名单判定、流水快照、派发事件三处都要用，各查一次就是三次往返。
      */
     private final MemberService memberService;
-
-    private static final Integer POOL_STATUS_OPEN = 1;
     private static final int UNLIMITED = -1;
 
     /**
@@ -104,11 +104,6 @@ public class DrawExecuteService {
     private static final long RATE_LIMIT_PER_INTERVAL = 2;
     private static final long RATE_LIMIT_INTERVAL_SECONDS = 1;
     private static final Duration RATE_LIMITER_TTL = Duration.ofHours(1);
-    /**
-     * 抽奖流水状态（对齐 t_draw_prize_log.status 注释）
-     */
-    private static final int LOG_STATUS_HIT = 1;
-    private static final int LOG_STATUS_NO_STOCK = 2;
     /**
      * 幂等标记有效期：覆盖常见网络重试窗口
      */
@@ -150,7 +145,7 @@ public class DrawExecuteService {
         if (pool == null || !form.getActivityCode().equals(pool.getActivityCode())) {
             throw new BusinessException("奖池不存在或不属于该活动");
         }
-        if (!POOL_STATUS_OPEN.equals(pool.getStatus())) {
+        if (pool.getStatus() != PrizePoolStatusEnum.OPEN) {
             throw new BusinessException("奖池未开启");
         }
 
@@ -203,7 +198,7 @@ public class DrawExecuteService {
                     settle(form, memberName, traceId, snapshot, itemMap, prize, source, period);
             case DrawResult.NoStock(String candidateCode) -> {
                 // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
-                saveLog(form, memberName, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
+                saveLog(form, memberName, traceId, null, candidateCode, DrawResultEnum.NO_STOCK, "快照判定无库存");
                 yield DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完");
             }
         };
@@ -241,7 +236,7 @@ public class DrawExecuteService {
                                               DrawPrizeSnapshot candidate, DrawResult.HitSource source,
                                               DrawPeriodResolver.Period period) {
         if (tryDeduct(form, itemMap, candidate, period)) {
-            saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
+            saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), DrawResultEnum.HIT, source.name());
             publishPrizeEvent(form, memberName, traceId, candidate.prizeCode());
             return DrawExecuteDTO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name());
         }
@@ -250,7 +245,7 @@ public class DrawExecuteService {
         DrawPrizeSnapshot fallback = snapshot.fallbackPrize();
         if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId()
                 && tryDeduct(form, itemMap, fallback, period)) {
-            saveLog(form, memberName, traceId, fallback.prizeItemId(), fallback.prizeCode(), LOG_STATUS_HIT,
+            saveLog(form, memberName, traceId, fallback.prizeItemId(), fallback.prizeCode(), DrawResultEnum.HIT,
                     DrawResult.HitSource.FALLBACK_DEGRADE.name());
             publishPrizeEvent(form, memberName, traceId, fallback.prizeCode());
             return DrawExecuteDTO.ofHit(fallback.prizeItemId(), fallback.prizeCode(),
@@ -258,7 +253,7 @@ public class DrawExecuteService {
         }
 
         // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
-        saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_NO_STOCK, "预扣失败且兜底不可用");
+        saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), DrawResultEnum.NO_STOCK, "预扣失败且兜底不可用");
         return DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完");
     }
 
@@ -321,7 +316,7 @@ public class DrawExecuteService {
     }
 
     private void saveLog(DrawExecuteCommand form, String memberName, String traceId, Long prizeItemId, String prizeCode,
-                         int status, String remark) {
+                         DrawResultEnum status, String remark) {
         DrawPrizeLog logEntity = new DrawPrizeLog();
         logEntity.setTraceId(traceId);
         logEntity.setActivityCode(form.getActivityCode());

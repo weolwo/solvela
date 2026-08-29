@@ -1,5 +1,6 @@
 package solvela.prize.prizeconfig.service;
 
+import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
@@ -38,16 +39,6 @@ public class PrizeConfigService {
     private final PromotionConfigService promotionConfigService;
 
     /**
-     * 奖品状态：1-启用
-     */
-    private static final Integer STATUS_ENABLED = 1;
-
-    /**
-     * 状态：0-禁用
-     */
-    private static final Integer STATUS_DISABLED = 0;
-
-    /**
      * 查询活动下的全部奖品（含停用）：抽奖工作台回显时按 prizeCode 补名称/价值等展示信息
      */
     public List<PrizeConfig> queryListByActivityCode(String activityCode) {
@@ -60,7 +51,7 @@ public class PrizeConfigService {
     public List<PrizeConfigDTO> queryEnabledList(String activityCode) {
         List<PrizeConfig> list = prizeConfigManager.lambdaQuery()
                 .eq(PrizeConfig::getActivityCode, activityCode)
-                .eq(PrizeConfig::getStatus, STATUS_ENABLED)
+                .eq(PrizeConfig::getStatus, EnableStatusEnum.ENABLED)
                 .orderByAsc(PrizeConfig::getSortWeight)
                 .list();
         return SolvelaBeanUtil.copyList(list, PrizeConfigDTO.class);
@@ -140,10 +131,9 @@ public class PrizeConfigService {
      * <p>禁用不做任何校验 —— 出问题时能立刻停掉一个奖品是运营最需要的能力；
      * 已被奖池/奖级引用的奖品禁用后不再发放，但历史流水不受影响。
      */
-    public void updateStatus(List<Long> idList, Integer status) {
-        if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
-            throw new BusinessException("目标状态只能是 1-启用 或 0-禁用");
-        }
+    public void updateStatus(List<Long> idList, EnableStatusEnum status) {
+        // 原先这里有一段「目标状态只能是 1 或 0」的运行期校验。入参换成枚举之后它没有意义了：
+        // 非法值在 Jackson 反序列化阶段就被拒了（400 / INVALID_ARGUMENT），走不到这一行。
         for (Long id : idList) {
             PrizeConfig update = new PrizeConfig();
             update.setId(id);

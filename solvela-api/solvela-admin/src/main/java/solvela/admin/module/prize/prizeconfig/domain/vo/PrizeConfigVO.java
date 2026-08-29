@@ -1,5 +1,7 @@
 package solvela.admin.module.prize.prizeconfig.domain.vo;
 
+import solvela.enums.EnableStatusEnum;
+import solvela.enums.ApproveModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -44,7 +46,7 @@ public class PrizeConfigVO {
     private BigDecimal prizeValue;
 
     @Schema(description = "审批模式：0-自动免审, 1-人工审批")
-    private Integer approveMode;
+    private ApproveModeEnum approveMode;
 
     @Schema(description = "排序权重")
     private Integer sortWeight;
@@ -53,7 +55,7 @@ public class PrizeConfigVO {
     private String ext;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
     @Schema(description = "创建人")
     private String createBy;

@@ -1,5 +1,7 @@
 package solvela.admin.module.system.role.domain.form;
 
+import solvela.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
+import solvela.admin.module.system.datascope.constant.DataScopeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -33,11 +35,11 @@ public class RoleDataScopeUpdateForm {
 
         @Schema(description = "数据范围类型")
         @NotNull(message = "数据范围类型不能为空")
-        private Integer dataScopeType;
+        private DataScopeTypeEnum dataScopeType;
 
         @Schema(description = "可见范围")
         @NotNull(message = "可见范围不能为空")
-        private Integer viewType;
+        private DataScopeViewTypeEnum viewType;
     }
 
 }

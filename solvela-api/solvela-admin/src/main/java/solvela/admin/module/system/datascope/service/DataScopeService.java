@@ -45,7 +45,7 @@ public class DataScopeService {
         DataScopeViewTypeEnum[] enums = DataScopeViewTypeEnum.class.getEnumConstants();
         DataScopeViewTypeVO dataScopeViewTypeDTO;
         for (DataScopeViewTypeEnum viewTypeEnum : enums) {
-            dataScopeViewTypeDTO = DataScopeViewTypeVO.builder().viewType(viewTypeEnum.getValue()).viewTypeLevel(viewTypeEnum.getLevel()).viewTypeName(viewTypeEnum.getDesc()).build();
+            dataScopeViewTypeDTO = DataScopeViewTypeVO.builder().viewType(viewTypeEnum).viewTypeLevel(viewTypeEnum.getLevel()).viewTypeName(viewTypeEnum.getDesc()).build();
             viewTypeList.add(dataScopeViewTypeDTO);
         }
         Comparator<DataScopeViewTypeVO> comparator = (h1, h2) -> h1.getViewTypeLevel().compareTo(h2.getViewTypeLevel());
@@ -59,7 +59,7 @@ public class DataScopeService {
         DataScopeDTO dataScopeDTO;
         for (DataScopeTypeEnum typeEnum : enums) {
             dataScopeDTO =
-                    DataScopeDTO.builder().dataScopeType(typeEnum.getValue()).dataScopeTypeDesc(typeEnum.getDesc()).dataScopeTypeName(typeEnum.getName()).dataScopeTypeSort(typeEnum.getSort()).build();
+                    DataScopeDTO.builder().dataScopeType(typeEnum).dataScopeTypeDesc(typeEnum.getDesc()).dataScopeTypeName(typeEnum.getName()).dataScopeTypeSort(typeEnum.getSort()).build();
             dataScopeTypeList.add(dataScopeDTO);
         }
         Comparator<DataScopeDTO> comparator = (h1, h2) -> h1.getDataScopeTypeSort().compareTo(h2.getDataScopeTypeSort());

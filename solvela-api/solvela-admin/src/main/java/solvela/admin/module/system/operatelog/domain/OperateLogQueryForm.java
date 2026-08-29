@@ -1,5 +1,6 @@
 package solvela.admin.module.system.operatelog.domain;
 
+import solvela.admin.constant.UserTypeEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -20,7 +21,7 @@ public class OperateLogQueryForm extends PageParam {
     private Long operateUserId;
 
     @Schema(description = "用户类型")
-    private Integer operateUserType;
+    private UserTypeEnum operateUserType;
 
     @Schema(description = "关键字：模块、操作内容")
     private String keywords;

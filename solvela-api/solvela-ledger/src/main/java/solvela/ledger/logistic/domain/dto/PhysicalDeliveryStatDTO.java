@@ -82,7 +82,7 @@ public class PhysicalDeliveryStatDTO {
      * 只有前端字典认得它。不单独给它一个桶的话，四个状态桶之和会小于总数，
      * 看的人只会以为统计算错了。
      */
-    private Long discardedCount;
+    private Long cancelledCount;
 
     /**
      * 有效履约单数 = 总数 - 已作废。发货率的分母用它 ——
@@ -117,7 +117,7 @@ public class PhysicalDeliveryStatDTO {
         private Long pendingCount;
 
         /** 其中已作废的单数：status=-1 */
-        private Long discardedCount;
+        private Long cancelledCount;
 
         /** 发货率 = (已发货 + 已签收) / (履约单数 - 已作废) */
         private BigDecimal deliveredRate;

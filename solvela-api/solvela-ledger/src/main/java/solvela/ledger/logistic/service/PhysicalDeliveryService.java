@@ -100,7 +100,7 @@ public class PhysicalDeliveryService {
         long delivered = toLong(row.get("deliveredCount"));
         long signed = toLong(row.get("signedCount"));
         long returned = toLong(row.get("returnedCount"));
-        long discarded = toLong(row.get("discardedCount"));
+        long cancelled = toLong(row.get("cancelledCount"));
         long oldestMinutes = toLong(row.get("pendingOldestMinutes"));
 
         vo.setTotalCount(total);
@@ -113,13 +113,13 @@ public class PhysicalDeliveryService {
         vo.setDeliveredCount(delivered);
         vo.setSignedCount(signed);
         vo.setReturnedCount(returned);
-        vo.setDiscardedCount(discarded);
+        vo.setCancelledCount(cancelled);
         /*
          * 发货率的分母剔掉已作废：那些单子是被主动撤回的（页面「删除」= UPDATE status=-1），
          * 算成「没发出去」会平白拉低发货率，而运营根本没法把它们发出去。
          */
-        vo.setValidCount(total - discarded);
-        vo.setDeliveredRate(rate(delivered + signed, total - discarded));
+        vo.setValidCount(total - cancelled);
+        vo.setDeliveredRate(rate(delivered + signed, total - cancelled));
 
         // ---- 来源分布 ----
         List<PhysicalDeliveryStatDTO.SourceStatDTO> sourceList = new ArrayList<>();
@@ -128,10 +128,10 @@ public class PhysicalDeliveryService {
             long count = toLong(stat.get("deliveryCount"));
             item.setSourceType(toStr(stat, "sourceType"));
             item.setDeliveryCount(count);
-            long sourceDiscarded = toLong(stat.get("discardedCount"));
+            long sourceCancelled = toLong(stat.get("cancelledCount"));
             item.setPendingCount(toLong(stat.get("pendingCount")));
-            item.setDiscardedCount(sourceDiscarded);
-            item.setDeliveredRate(rate(toLong(stat.get("shippedCount")), count - sourceDiscarded));
+            item.setCancelledCount(sourceCancelled);
+            item.setDeliveredRate(rate(toLong(stat.get("shippedCount")), count - sourceCancelled));
             sourceList.add(item);
         }
         vo.setSourceList(sourceList);

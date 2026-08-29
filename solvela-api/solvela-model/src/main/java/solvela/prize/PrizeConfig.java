@@ -1,5 +1,7 @@
 package solvela.prize;
 
+import solvela.enums.EnableStatusEnum;
+import solvela.enums.ApproveModeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -66,7 +68,7 @@ public class PrizeConfig {
     /**
      * 审批模式：0-自动免审, 1-人工审批
      */
-    private Integer approveMode;
+    private ApproveModeEnum approveMode;
 
     /**
      * 排序权重
@@ -81,7 +83,7 @@ public class PrizeConfig {
     /**
      * 状态：0-停用, 1-启用
      */
-    private Integer status;
+    private EnableStatusEnum status;
 
     /**
      * 创建人

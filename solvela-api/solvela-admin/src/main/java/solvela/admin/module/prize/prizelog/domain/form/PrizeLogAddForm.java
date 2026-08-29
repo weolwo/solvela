@@ -1,5 +1,7 @@
 package solvela.admin.module.prize.prizelog.domain.form;
 
+import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.enums.PrizeApproveStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -55,7 +57,7 @@ public class PrizeLogAddForm {
 
     @Schema(description = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 不能为空")
-    private Integer approveStatus;
+    private PrizeApproveStatusEnum approveStatus;
 
     @Schema(description = "审批人")
     private String approveBy;
@@ -67,7 +69,7 @@ public class PrizeLogAddForm {
     private LocalDateTime validUntil;
 
     @Schema(description = "执行状态：0-等待, 1-成功, 2-失败")
-    private Integer status;
+    private PrizeDispatchStatusEnum status;
 
     @Schema(description = "外部单号")
     private String externalBizNo;

@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.service;
 
+import solvela.enums.PrizePoolStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,14 +79,6 @@ public class PrizePoolConfigService {
      * 活动状态：1-上线（上线后启用结构锁：库存只增不减、禁止删奖项/删池/池内增删坑位）
      */
     private static final Integer ACTIVITY_STATUS_ONLINE = 1;
-
-    /**
-     * 奖池开关（对齐 t_prize_pool_config.status）。
-     * 运行态 DrawExecuteService 判 status 是否为 OPEN 来决定放不放行。
-     */
-    private static final Integer POOL_STATUS_OPEN = 1;
-    private static final Integer POOL_STATUS_CLOSED = 0;
-
     /**
      * 库存/限领「不限量」哨兵值
      */
@@ -454,7 +447,7 @@ public class PrizePoolConfigService {
      *       那是发奖凭证与对账依据 —— 用户说「我明明在这个池抽中过」，
      *       而那个池已经不存在了，客诉自证当场断掉。</li>
      * </ul>
-     * 禁用则完全没有这些问题：运行态判 {@code POOL_STATUS_OPEN} 直接拒绝新的抽奖请求，
+     * 禁用则完全没有这些问题：运行态判 {@code PrizePoolStatusEnum.OPEN} 直接拒绝新的抽奖请求，
      * 已有的流水与坑位一个字都不动，而且<b>可逆</b> —— 出问题时这才是运营要的止血按钮。
      * 与彩票玩法「删除换成下线」是同一个决定（见 v3.63.0.sql）。
      *
@@ -466,10 +459,10 @@ public class PrizePoolConfigService {
         if (pool == null) {
             throw new BusinessException("奖池不存在");
         }
-        if (!POOL_STATUS_OPEN.equals(pool.getStatus())) {
+        if (pool.getStatus() != PrizePoolStatusEnum.OPEN) {
             throw new BusinessException("奖池「" + pool.getPoolName() + "」本来就是关闭状态");
         }
-        int rows = prizePoolConfigDao.updateStatus(id, POOL_STATUS_OPEN, POOL_STATUS_CLOSED);
+        int rows = prizePoolConfigDao.updateStatus(id, PrizePoolStatusEnum.OPEN, PrizePoolStatusEnum.CLOSED);
         if (rows == 0) {
             throw new BusinessException("禁用失败：状态已被其他人变更，请刷新后重试");
         }
@@ -487,10 +480,10 @@ public class PrizePoolConfigService {
         if (pool == null) {
             throw new BusinessException("奖池不存在");
         }
-        if (POOL_STATUS_OPEN.equals(pool.getStatus())) {
+        if (pool.getStatus() == PrizePoolStatusEnum.OPEN) {
             throw new BusinessException("奖池「" + pool.getPoolName() + "」已经是开启状态");
         }
-        int rows = prizePoolConfigDao.updateStatus(id, POOL_STATUS_CLOSED, POOL_STATUS_OPEN);
+        int rows = prizePoolConfigDao.updateStatus(id, PrizePoolStatusEnum.CLOSED, PrizePoolStatusEnum.OPEN);
         if (rows == 0) {
             throw new BusinessException("启用失败：状态已被其他人变更，请刷新后重试");
         }

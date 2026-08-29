@@ -1,5 +1,6 @@
 package solvela.admin.module.draw.drawlog.domain.form;
 
+import solvela.enums.DrawResultEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -45,6 +46,6 @@ public class DrawPrizeLogQueryForm extends PageParam {
     private String poolCode;
 
     @Schema(description = "状态: 0-未中奖, 1-已中奖, 2-库存不足, 3-异常")
-    private Integer status;
+    private DrawResultEnum status;
 
 }

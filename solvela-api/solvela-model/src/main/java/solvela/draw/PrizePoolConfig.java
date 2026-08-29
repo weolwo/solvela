@@ -1,5 +1,7 @@
 package solvela.draw;
 
+import solvela.enums.PrizePoolStatusEnum;
+import solvela.enums.DrawModeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -51,12 +53,12 @@ public class PrizePoolConfig {
     /**
      * 抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)
      */
-    private Integer drawMode;
+    private DrawModeEnum drawMode;
 
     /**
      * 0关闭，1开启
      */
-    private Integer status;
+    private PrizePoolStatusEnum status;
 
     /**
      * 创建人

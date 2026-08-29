@@ -1,5 +1,6 @@
 package solvela.ledger.engine;
 
+import solvela.enums.PrizeDispatchStatusEnum;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.dispatch.DispatchOutcome;
@@ -109,7 +110,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
             // 5. 闭环：根据结果落终态。失败原因写进 remark，运营/研发能直接从提案列表看出卡在哪
             if (outcome.ok()) {
                 proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_SUCCESS, "资产下发成功");
-                syncPrizeLog(proposal, PRIZE_LOG_SUCCESS, null);
+                syncPrizeLog(proposal, PrizeDispatchStatusEnum.SUCCESS, null);
             } else {
                 // 没发出去就得把预算还回去，否则预算只减不加，跑一段时间水位就虚高到发不出奖
                 releaseBudgetQuietly(config, amount, quantity);
@@ -137,7 +138,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
         } catch (Exception e) {
             log.error("【引擎状态回写失败】提案ID: {} 将停留在 40(执行中)，请人工核对", proposal.getId(), e);
         }
-        syncPrizeLog(proposal, PRIZE_LOG_FAILED, remark);
+        syncPrizeLog(proposal, PrizeDispatchStatusEnum.FAIL, remark);
     }
 
     /**
@@ -147,7 +148,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
      * 结果已经无法沿调用栈回到 PrizeDispatchHandler，而运营看的恰恰是发奖记录 ——
      * 不回写就会出现「记录显示成功、用户没收到」。两者靠 external_biz_no == source_biz_id 这条既定契约关联。
      */
-    private void syncPrizeLog(ProposalRecord proposal, int status, String failReason) {
+    private void syncPrizeLog(ProposalRecord proposal, PrizeDispatchStatusEnum status, String failReason) {
         try {
             prizeLogDao.updateStatusByExternalBizNo(proposal.getSourceBizId(), status,
                     SolvelaStringUtil.truncate(failReason, FAIL_REASON_MAX_LENGTH));

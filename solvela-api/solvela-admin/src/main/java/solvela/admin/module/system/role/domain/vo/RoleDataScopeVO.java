@@ -1,5 +1,7 @@
 package solvela.admin.module.system.role.domain.vo;
 
+import solvela.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
+import solvela.admin.module.system.datascope.constant.DataScopeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -16,8 +18,8 @@ import lombok.Data;
 public class RoleDataScopeVO {
 
     @Schema(description = "数据范围id")
-    private Integer dataScopeType;
+    private DataScopeTypeEnum dataScopeType;
 
     @Schema(description = "可见范围")
-    private Integer viewType;
+    private DataScopeViewTypeEnum viewType;
 }

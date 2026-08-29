@@ -1,5 +1,6 @@
 package solvela.admin.module.prize.prizeconfig.domain.form;
 
+import solvela.enums.ApproveModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -50,7 +51,7 @@ public class PrizeConfigAddForm {
 
     @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "审批模式：0-自动免审, 1-人工审批 不能为空")
-    private Integer approveMode;
+    private ApproveModeEnum approveMode;
 
     @Schema(description = "排序权重")
     private Integer sortWeight;

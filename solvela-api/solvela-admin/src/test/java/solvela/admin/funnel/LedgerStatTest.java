@@ -122,11 +122,11 @@ class LedgerStatTest {
                 deliveryDao.selectNewStat(form).keySet(), "发货本期新增：key 对不上");
         assertEquals(Set.of("totalCount", "pendingCount", "pendingNoAddressCount", "deliveredCount",
                         "signedCount", "returnedCount", "pendingOldestMinutes",
-                        "discardedCount", "shippedNoLogisticsNo", "returnedNoLogisticsNo"),
+                        "cancelledCount", "shippedNoLogisticsNo", "returnedNoLogisticsNo"),
                 deliveryDao.selectStatusStat().keySet(), "发货履约状态：key 对不上");
         List<Map<String, Object>> deliverySource = deliveryDao.selectSourceStat();
         if (!deliverySource.isEmpty()) {
-            assertEquals(Set.of("sourceType", "deliveryCount", "pendingCount", "shippedCount", "discardedCount"),
+            assertEquals(Set.of("sourceType", "deliveryCount", "pendingCount", "shippedCount", "cancelledCount"),
                     deliverySource.get(0).keySet());
         }
 
@@ -252,9 +252,9 @@ class LedgerStatTest {
          */
         assertEquals(vo.getTotalCount(),
                 vo.getPendingCount() + vo.getDeliveredCount() + vo.getSignedCount()
-                        + vo.getReturnedCount() + vo.getDiscardedCount(),
+                        + vo.getReturnedCount() + vo.getCancelledCount(),
                 "状态桶之和不等于总数：库里出现了 -1/0/1/2/3 之外的 status");
-        assertEquals(vo.getTotalCount() - vo.getDiscardedCount(), vo.getValidCount(),
+        assertEquals(vo.getTotalCount() - vo.getCancelledCount(), vo.getValidCount(),
                 "有效单数应当等于总数减去已作废");
         assertEquals(vo.getPendingCount(), vo.getPendingNoAddressCount() + vo.getPendingReadyCount(),
                 "待发货没有被完整拆成「缺收件信息」和「可直接发」两类");

@@ -27,7 +27,7 @@ public class OperateLogVO {
     private Long operateUserId;
 
     @SchemaEnum(value = UserTypeEnum.class, desc = "用户类型")
-    private Integer operateUserType;
+    private UserTypeEnum operateUserType;
 
     @Schema(description = "用户名称")
     private String operateUserName;

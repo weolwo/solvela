@@ -1,5 +1,6 @@
 package solvela.draw.poolitem.service;
 
+import solvela.enums.EnableStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.activity.ActivityConfig;
@@ -62,12 +63,11 @@ public class PrizeItemStockService {
     private final ActivityConfigManager activityConfigManager;
     private final DrawStockService drawStockService;
 
-    private static final int UNLIMITED = -1;
-
-    private static final Integer PRIZE_STATUS_ENABLED = 1;
 
     /** 剩余低于总量这个比例时提醒补货，早于抽空发出才有意义 */
     private static final BigDecimal LOW_STOCK_THRESHOLD = new BigDecimal("0.1");
+
+    private static final int UNLIMITED = -1;
 
     private static final int SCALE = 4;
 
@@ -188,7 +188,7 @@ public class PrizeItemStockService {
             vo.setPrizeName(prize.getPrizeName());
             vo.setPrizeType(prize.getPrizeType());
             vo.setPrizeValue(prize.getPrizeValue());
-            if (!PRIZE_STATUS_ENABLED.equals(prize.getStatus())) {
+            if (prize.getStatus() != EnableStatusEnum.ENABLED) {
                 vo.getIssueList().add(PrizeItemIssueDTO.danger("PRIZE_DISABLED",
                         "奖品「" + prize.getPrizeName() + "」已停用，派奖链路会拒绝发放"));
             }

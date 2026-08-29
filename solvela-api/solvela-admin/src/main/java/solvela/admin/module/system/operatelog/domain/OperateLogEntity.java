@@ -1,5 +1,6 @@
 package solvela.admin.module.system.operatelog.domain;
 
+import solvela.admin.constant.UserTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -40,7 +41,7 @@ public class OperateLogEntity {
     /**
      * 用户类型
      */
-    private Integer operateUserType;
+    private UserTypeEnum operateUserType;
 
     /**
      * 操作人名称

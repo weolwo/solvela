@@ -1,5 +1,6 @@
 package solvela.draw;
 
+import solvela.enums.DrawResultEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -72,7 +73,7 @@ public class DrawPrizeLog {
     /**
      * 状态: 0-未中奖, 1-已中奖, 2-库存不足, 3-异常
      */
-    private Integer status;
+    private DrawResultEnum status;
 
     /**
      * 备注

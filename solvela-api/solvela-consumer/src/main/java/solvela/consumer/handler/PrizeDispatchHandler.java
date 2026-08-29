@@ -1,5 +1,8 @@
 package solvela.consumer.handler;
 
+import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.enums.PrizeApproveStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.EventRoute;
@@ -48,7 +51,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
 
         // 1. 获取最新鲜的配置 (带本地缓存最佳)
         PrizeConfig config = prizeConfigService.getByPrizeCode(event.getPrizeCode());
-        if (config == null || config.getStatus() == 0) {
+        if (config == null || config.getStatus() == EnableStatusEnum.DISABLED) {
             log.error("【重大异常】奖品配置不存在或已停用！prizeCode: {}", event.getPrizeCode());
             return;
         }
@@ -65,7 +68,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         }
 
         // 4. 风控与审批拦截阀门
-        if (Objects.equals(config.getApproveMode(), ApproveModeEnum.MANUAL.getCode())) {
+        if (config.getApproveMode() == ApproveModeEnum.MANUAL) {
             log.info("【风控拦截】命中人工审批，提案已挂起。LogId: {}", prizeLog.getId());
             return; // 流程到此结束！后台状态停留在：待审批(1) + 等待执行(0)
         }
@@ -73,13 +76,6 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         // 5. 自动免审通道，全速放行！
         doDispatch(prizeLog);
     }
-
-    /**
-     * 发奖审批状态（对齐 t_prize_log.approve_status）
-     */
-    private static final int APPROVE_PENDING = 1;
-    private static final int APPROVE_PASSED = 2;
-    private static final int APPROVE_REJECTED = 3;
 
     /**
      * 运营审批通过发奖：这是 approve_mode=1 的奖品唯一的出口
@@ -97,13 +93,13 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         if (prizeLog == null) {
             throw new BusinessException("发奖记录不存在");
         }
-        int rows = prizeLogDao.updateApproveStatus(prizeLogId, APPROVE_PENDING, APPROVE_PASSED, approveBy);
+        int rows = prizeLogDao.updateApproveStatus(prizeLogId, PrizeApproveStatusEnum.PENDING, PrizeApproveStatusEnum.PASSED, approveBy);
         if (rows == 0) {
             throw new BusinessException("该发奖记录已被处理，请刷新后重试");
         }
         log.info("【发奖审批通过】LogId: {}, 审批人: {}", prizeLogId, approveBy);
         // 状态已在内存里同步，避免 doDispatch 里回写时把审批结果覆盖掉
-        prizeLog.setApproveStatus(APPROVE_PASSED);
+        prizeLog.setApproveStatus(PrizeApproveStatusEnum.PASSED);
         prizeLog.setApproveBy(approveBy);
         doDispatch(prizeLog);
     }
@@ -113,7 +109,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
      */
     @Transactional(rollbackFor = Exception.class)
     public void rejectDispatch(Long prizeLogId, String approveBy, String reason) {
-        int rows = prizeLogDao.updateApproveStatus(prizeLogId, APPROVE_PENDING, APPROVE_REJECTED, approveBy);
+        int rows = prizeLogDao.updateApproveStatus(prizeLogId, PrizeApproveStatusEnum.PENDING, PrizeApproveStatusEnum.REJECTED, approveBy);
         if (rows == 0) {
             throw new BusinessException("该发奖记录已被处理，请刷新后重试");
         }
@@ -142,14 +138,14 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             //    成功路径的终态由 AssetDispatchEngine.updateStatusByExternalBizNo 回写；
             //    若提案进了人工审批池，则合理地停在 0-等待执行。
             if (!outcome.ok()) {
-                prizeLog.setStatus(2); // 2-失败
+                prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
                 prizeLog.setFailReason(SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH));
                 log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
                 updateQuietly(prizeLog);
             } else if (isNoDeliveryNeeded(prizeLog)) {
                 // 0 值奖品（谢谢参与这类占位奖）压根不会生成提案，引擎不会跑，
                 // 状态没人回写就会永远悬在 0-等待执行。它本就是当场的终态，这里直接落成功
-                prizeLog.setStatus(1);
+                prizeLog.setStatus(PrizeDispatchStatusEnum.SUCCESS);
                 updateQuietly(prizeLog);
                 log.info("【无需发放】LogId: {}, 奖品价值为0，直接判成功", prizeLog.getId());
             } else {
@@ -158,7 +154,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         } catch (Exception e) {
             // 捕获不可预知的异常（如网络超时、空指针），防止影响整个应用的稳定性
             log.error("【发奖异常】执行策略时发生严重错误，LogId: {}", prizeLog.getId(), e);
-            prizeLog.setStatus(2); // 2-失败
+            prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
             // 必须截断：异常 message 动辄几百字，直接塞 varchar(128) 会抛 Data too long，
             // 一抛异常连状态都刷不进去，最终表现为「状态永远停在 0」——已踩过
             prizeLog.setFailReason(SolvelaStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH));
@@ -211,8 +207,10 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         log.setPrizeType(config.getPrizeType());
 
         // --- 3. 初始状态与时效 ---
-        log.setApproveStatus(config.getApproveMode() == 1 ? 1 : 0); // 1-待审, 0-无需
-        log.setStatus(0); // 0-等待执行
+        log.setApproveStatus(config.getApproveMode() == ApproveModeEnum.MANUAL
+                ? PrizeApproveStatusEnum.PENDING
+                : PrizeApproveStatusEnum.NOT_REQUIRED);
+        log.setStatus(PrizeDispatchStatusEnum.WAITING);
 
         // 如果有配置过期时间，在这里相加
         // log.setExpireTime(LocalDateTime.now().plusHours(config.getExpireHours()));

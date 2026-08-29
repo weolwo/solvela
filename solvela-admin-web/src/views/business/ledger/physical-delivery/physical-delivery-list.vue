@@ -98,7 +98,7 @@
           </div>
           <div class="solvela-stat-card-value">{{ percent(stat.deliveredRate) }}</div>
           <div class="solvela-stat-card-foot">
-            已签收 {{ num(stat.signedCount) }} · 退回 {{ num(stat.returnedCount) }} · 作废 {{ num(stat.discardedCount) }}
+            已签收 {{ num(stat.signedCount) }} · 退回 {{ num(stat.returnedCount) }} · 已取消 {{ num(stat.cancelledCount) }}
           </div>
         </div>
       </a-col>

@@ -1,5 +1,6 @@
 package solvela.draw.prizemapping.domain.dto;
 
+import solvela.enums.PrizePoolStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -30,7 +31,7 @@ public class DrawPoolAnalysisDTO {
     private Integer activityStatus;
 
     /** 奖池开关: 0-关闭, 1-开启 */
-    private Integer poolStatus;
+    private PrizePoolStatusEnum poolStatus;
 
     /** 坑位数量 */
     private Integer slotCount;

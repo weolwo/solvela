@@ -1,5 +1,7 @@
 package solvela.admin.module.prize.prizeconfig.domain.form;
 
+import solvela.enums.EnableStatusEnum;
+import solvela.enums.ApproveModeEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -30,9 +32,9 @@ public class PrizeConfigQueryForm extends PageParam {
     private String prizeName;
 
     @Schema(description = "审批模式：0-自动免审, 1-人工审批")
-    private Integer approveMode;
+    private ApproveModeEnum approveMode;
 
     @Schema(description = "状态：0-停用, 1-启用")
-    private Integer status;
+    private EnableStatusEnum status;
 
 }

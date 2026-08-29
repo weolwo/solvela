@@ -1,5 +1,7 @@
 package solvela.draw.poolconfig.domain.dto;
 
+import solvela.enums.PrizePoolStatusEnum;
+import solvela.enums.DrawModeEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -30,10 +32,10 @@ public class PrizePoolConfigDTO {
     private String resetPeriod;
 
     /** 抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio) */
-    private Integer drawMode;
+    private DrawModeEnum drawMode;
 
     /** 0关闭，1开启 */
-    private Integer status;
+    private PrizePoolStatusEnum status;
 
     /** 创建人 */
     private String createBy;

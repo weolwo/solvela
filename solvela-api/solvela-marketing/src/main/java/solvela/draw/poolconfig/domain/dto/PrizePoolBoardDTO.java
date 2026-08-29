@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.domain.dto;
 
+import solvela.enums.PrizePoolStatusEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,7 +39,7 @@ public class PrizePoolBoardDTO {
     private String resetPeriod;
 
     /** 奖池开关: 0-关闭, 1-开启 */
-    private Integer status;
+    private PrizePoolStatusEnum status;
 
     /** 创建时间 */
     private LocalDateTime createTime;

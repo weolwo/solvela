@@ -25,6 +25,21 @@ import java.util.Arrays;
 public enum DeliveryStatusEnum implements BaseEnum {
 
     /**
+     * 已取消：发货被取消，<b>终态</b>。
+     *
+     * <p>🔴 它一直存在于数据里，却长期不在本枚举、也不在 DDL 列注释里 ——
+     * {@code PhysicalDeliveryStatDTO} 早就有对应的统计字段，
+     * {@code LedgerStatTest#deliveryNumbersAddUp} 的注释里也写着「四个桶加起来比总数少 1」。
+     * 统计层一直认它，只有类型层不认。2026-08-29 补齐。
+     *
+     * <p>统计层原先叫它「作废(discarded)」，与本枚举的「取消」不是一套说法，
+     * 同日一并改成 {@code cancelledCount}（含前端展示文案），全链路只剩一种叫法。
+     *
+     * <p>用负数是刻意的：取消不是履约流程上的一环，不该排进 0..3 的推进序列。
+     */
+    CANCELLED(-1, "已取消"),
+
+    /**
      * 待发货：履约单已建立，东西还没寄出
      */
     PENDING(0, "待发货"),

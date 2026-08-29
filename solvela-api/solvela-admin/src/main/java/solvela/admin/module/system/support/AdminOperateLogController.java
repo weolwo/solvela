@@ -49,7 +49,7 @@ public class AdminOperateLogController extends SupportBaseController {
     public PageResult<OperateLogVO> queryByPageLogin(@RequestBody OperateLogQueryForm queryForm) {
         RequestEmployee requestUser = CurrentEmployee.orNull();
         queryForm.setOperateUserId(requestUser.getUserId());
-        queryForm.setOperateUserType(requestUser.getUserType().getValue());
+        queryForm.setOperateUserType(requestUser.getUserType());
         return operateLogService.queryByPage(queryForm);
     }
 

@@ -1,5 +1,6 @@
 package solvela.draw.drawlog.domain.query;
 
+import solvela.enums.DrawResultEnum;
 import solvela.base.domain.PageParam;
 import java.time.LocalDate;
 import lombok.Data;
@@ -42,6 +43,6 @@ public class DrawPrizeLogQuery extends PageParam {
     private String poolCode;
 
     /** 状态: 0-未中奖, 1-已中奖, 2-库存不足, 3-异常 */
-    private Integer status;
+    private DrawResultEnum status;
 
 }

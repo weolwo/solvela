@@ -1,5 +1,7 @@
 package solvela.admin.task;
 
+import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.base.util.SolvelaEnumUtil;
 import solvela.exception.BusinessException;
 import solvela.prize.PrizeLog;
 import solvela.task.constant.TaskConst;
@@ -178,7 +180,8 @@ class TaskRuntimeP0AcceptanceTest {
                     log.setPrizeCode(rs.getString("prize_code"));
                     log.setPrizeName(rs.getString("prize_name"));
                     log.setExternalBizNo(rs.getString("external_biz_no"));
-                    log.setStatus(rs.getInt("status"));
+                    // 手工装配：JdbcTemplate 不经过 MyBatis 的 TypeHandler，得自己把 int 映回枚举
+                    log.setStatus(SolvelaEnumUtil.getEnumByValue(rs.getInt("status"), PrizeDispatchStatusEnum.class));
                     log.setFailReason(rs.getString("fail_reason"));
                     return log;
                 }, memberId);

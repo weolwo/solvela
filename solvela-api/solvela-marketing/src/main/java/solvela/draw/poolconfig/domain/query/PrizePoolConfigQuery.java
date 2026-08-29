@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.domain.query;
 
+import solvela.enums.PrizePoolStatusEnum;
 import solvela.base.domain.PageParam;
 import java.time.LocalDate;
 import lombok.Data;
@@ -26,7 +27,7 @@ public class PrizePoolConfigQuery extends PageParam {
     private String poolName;
 
     /** 0关闭，1开启 */
-    private Integer status;
+    private PrizePoolStatusEnum status;
 
     /**
      * 只看有体检告警的奖池。「配了却抽不了」是这页最该先处理的一类问题 ——

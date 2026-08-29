@@ -5,6 +5,7 @@ package solvela.draw.poolconfig.dao;
         import solvela.draw.PrizePoolConfig;
         import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
         import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
+import solvela.enums.PrizePoolStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -45,7 +46,7 @@ public interface PrizePoolConfigDao extends BaseMapper<PrizePoolConfig> {
      * 第二个人拿到 rows=0 就知道状态已被别人改过，而不是两个人都以为自己成功了。
      * 与 {@code LotteryConfigDao.updateStatus} 同构 —— 这类开关全项目一个形状。
      */
-    int updateStatus(@Param("id") Long id, @Param("from") Integer from, @Param("to") Integer to);
+    int updateStatus(@Param("id") Long id, @Param("from") PrizePoolStatusEnum from, @Param("to") PrizePoolStatusEnum to);
 
             // ----- 物理删除 -----
                 /**

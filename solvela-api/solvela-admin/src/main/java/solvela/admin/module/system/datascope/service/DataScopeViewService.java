@@ -112,13 +112,16 @@ public class DataScopeViewService {
         if (SolvelaCollectionUtil.isEmpty(dataScopeRoleList)) {
             return DataScopeViewTypeEnum.ME;
         }
-        Map<Integer, List<RoleDataScopeEntity>> listMap = dataScopeRoleList.stream().collect(Collectors.groupingBy(RoleDataScopeEntity::getDataScopeType));
+        Map<DataScopeTypeEnum, List<RoleDataScopeEntity>> listMap = dataScopeRoleList.stream().collect(Collectors.groupingBy(RoleDataScopeEntity::getDataScopeType));
         List<RoleDataScopeEntity> viewLevelList = listMap.getOrDefault(dataScopeTypeEnum.getValue(), new ArrayList<>());
         if (SolvelaCollectionUtil.isEmpty(viewLevelList)) {
             return DataScopeViewTypeEnum.ME;
         }
-        RoleDataScopeEntity maxLevel = viewLevelList.stream().max(Comparator.comparing(e -> SolvelaEnumUtil.getEnumByValue(e.getViewType(), DataScopeViewTypeEnum.class).getLevel())).get();
-        return SolvelaEnumUtil.getEnumByValue(maxLevel.getViewType(), DataScopeViewTypeEnum.class);
+        // 字段本身已经是枚举，不需要再 getEnumByValue 转一次
+        return viewLevelList.stream()
+                .map(RoleDataScopeEntity::getViewType)
+                .max(Comparator.comparing(DataScopeViewTypeEnum::getLevel))
+                .orElseThrow();
     }
 
     /**

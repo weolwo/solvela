@@ -256,7 +256,7 @@ public abstract class OperateLogAspect {
         OperateLogEntity operateLogEntity =
                 OperateLogEntity.builder()
                         .operateUserId(user.getUserId())
-                        .operateUserType(user.getUserType().getValue())
+                        .operateUserType(user.getUserType())
                         .operateUserName(user.getUserName())
                         .url(request.getRequestURI())
                         .method(operateMethod)

@@ -162,7 +162,7 @@
                COALESCE(SUM(status = 1), 0)                                                      AS deliveredCount,
                COALESCE(SUM(status = 2), 0)                                                      AS signedCount,
                COALESCE(SUM(status = 3), 0)                                                      AS returnedCount,
-               COALESCE(SUM(status = -1), 0)                                                     AS discardedCount,
+               COALESCE(SUM(status = -1), 0)                                                     AS cancelledCount,
                COALESCE(TIMESTAMPDIFF(MINUTE,
                                       MIN(CASE WHEN status = 0 THEN create_time END), now()),
                         0)                                                                       AS pendingOldestMinutes,
@@ -181,7 +181,7 @@
                COUNT(*)                           AS deliveryCount,
                COALESCE(SUM(status = 0), 0)       AS pendingCount,
                COALESCE(SUM(status IN (1, 2)), 0) AS shippedCount,
-               COALESCE(SUM(status = -1), 0)      AS discardedCount
+               COALESCE(SUM(status = -1), 0)      AS cancelledCount
         FROM t_physical_delivery
         GROUP BY source_type
         ORDER BY deliveryCount DESC

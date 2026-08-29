@@ -1,5 +1,7 @@
 package solvela.prize.prizeconfig.domain.query;
 
+import solvela.enums.EnableStatusEnum;
+import solvela.enums.ApproveModeEnum;
 import solvela.base.domain.PageParam;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -29,9 +31,9 @@ public class PrizeConfigQuery extends PageParam {
     private String prizeName;
 
     /** 审批模式：0-自动免审, 1-人工审批 */
-    private Integer approveMode;
+    private ApproveModeEnum approveMode;
 
     /** 状态：0-停用, 1-启用 */
-    private Integer status;
+    private EnableStatusEnum status;
 
 }

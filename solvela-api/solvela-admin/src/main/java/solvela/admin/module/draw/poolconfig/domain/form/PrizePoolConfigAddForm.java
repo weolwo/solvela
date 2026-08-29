@@ -1,5 +1,7 @@
 package solvela.admin.module.draw.poolconfig.domain.form;
 
+import solvela.enums.PrizePoolStatusEnum;
+import solvela.enums.DrawModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -38,9 +40,9 @@ public class PrizePoolConfigAddForm {
     private String resetPeriod;
 
     @Schema(description = "抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)")
-    private Integer drawMode;
+    private DrawModeEnum drawMode;
 
     @Schema(description = "0关闭，1开启")
-    private Integer status;
+    private PrizePoolStatusEnum status;
 
 }

@@ -1,5 +1,7 @@
 package solvela.prize.prizelog.dao;
 
+import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.enums.PrizeApproveStatusEnum;
 import java.util.List;
 
 import solvela.prize.PrizeLog;
@@ -41,7 +43,7 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      * @return 更新行数
      */
     int updateStatusByExternalBizNo(@Param("externalBizNo") String externalBizNo,
-                                    @Param("status") Integer status,
+                                    @Param("status") PrizeDispatchStatusEnum status,
                                     @Param("failReason") String failReason);
 
     /**
@@ -52,8 +54,8 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      * @return 更新行数，0 表示已被别人处理
      */
     int updateApproveStatus(@Param("id") Long id,
-                            @Param("fromApproveStatus") Integer fromApproveStatus,
-                            @Param("toApproveStatus") Integer toApproveStatus,
+                            @Param("fromApproveStatus") PrizeApproveStatusEnum fromApproveStatus,
+                            @Param("toApproveStatus") PrizeApproveStatusEnum toApproveStatus,
                             @Param("approveBy") String approveBy);
 
     /**

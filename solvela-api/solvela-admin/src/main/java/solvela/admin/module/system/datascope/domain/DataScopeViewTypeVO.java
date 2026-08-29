@@ -1,5 +1,6 @@
 package solvela.admin.module.system.datascope.domain;
 
+import solvela.admin.module.system.datascope.constant.DataScopeViewTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
@@ -18,7 +19,7 @@ import lombok.Data;
 public class DataScopeViewTypeVO {
 
     @Schema(description = "可见范围")
-    private Integer viewType;
+    private DataScopeViewTypeEnum viewType;
 
     @Schema(description = "可见范围名称")
     private String viewTypeName;

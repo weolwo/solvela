@@ -30,12 +30,12 @@ public class RoleDataScopeEntity {
      * 数据范围id
      * {@link DataScopeTypeEnum}
      */
-    private Integer dataScopeType;
+    private DataScopeTypeEnum dataScopeType;
     /**
      * 数据范围类型
      * {@link DataScopeViewTypeEnum}
      */
-    private Integer viewType;
+    private DataScopeViewTypeEnum viewType;
     /**
      * 角色id
      */
