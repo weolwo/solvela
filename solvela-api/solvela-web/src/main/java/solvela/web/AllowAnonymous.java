@@ -1,4 +1,4 @@
-package solvela.base.annotation;
+package solvela.web;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -10,12 +10,16 @@ import java.lang.annotation.Target;
  *
  * <p>两处在读它，改动前都要想到：
  * <ul>
- *   <li>拦截器（{@code AdminInterceptor} / {@code MemberInterceptor}）—— 决定这次请求放不放行；</li>
+ *   <li>{@code AuthorizationInterceptor} —— 决定这次请求放不放行；</li>
  *   <li>{@code UrlConfig} —— 启动时扫全部方法，汇总成白名单 URL 清单。</li>
  * </ul>
  *
- * <p>⚠️ 管理端与会员端<b>共用这一个注解</b>，各自的拦截器只管自己那条链路。
- * 加在方法上就是对所有拦截它的链路都免校验 —— 别指望「它只对某一端生效」。
+ * <p>它<b>不是</b>「不要权限点」的意思 —— 那个意思是「不写 {@link RequiresPermission}」。
+ * 这里说的是「连登录都不要」，整个后台只有登录、发验证码、查双因子开关三个接口配得上。
+ * 加一个之前先问一句：这个接口暴露在公网上、任何人都能打，可以吗？
+ *
+ * <p>住在 solvela-web 而不是 solvela-base：它是 HTTP 授权模型的一部分，
+ * 只有认识 handler 的那一层读得懂它。C 端有自己的 {@code @Anonymous}，两端互不迁就。
  *
  * @Author 1024创新实验室: 罗伊
  * @Date 2022-05-30 21:22:12

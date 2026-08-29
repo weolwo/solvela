@@ -35,7 +35,7 @@
             <!-- ⚠️ Lettuce 排掉了（2.49MB）：Redis 连接工厂由 redisson-spring-data-41 提供的
                  RedissonConnectionFactory 承担，全量检索下来 Lettuce 一处没用，
                  LettuceConnectionConfiguration 是 @ConditionalOnClass(RedisClient) 的，类不在即不装配。
-                 sa-token-redis-template 走的也是 RedisTemplate → 同一个 RedissonConnectionFactory。
+                 管理端的令牌存储（RedisTokenStore）走的也是 StringRedisTemplate → 同一个 RedissonConnectionFactory。
                  ⚠️ 不要顺手排 reactor-core：spring-data-redis 的响应式部分自己要用。 -->
             <exclusions>
                 <exclusion>
@@ -54,7 +54,6 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
-        <!-- sa-token end -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-logging</artifactId>

@@ -32,7 +32,7 @@
         </dependency>
         <!--
         直接依赖 web 栈，<b>不经过 solvela-web</b>。
-        solvela-web 是管理端的 HTTP 层：它带着 sa-token、knife4j 的管理端定制，
+        solvela-web 是管理端的 HTTP 层：它带着 knife4j 与管理端的鉴权注解，
         以及一个一律返回 200 + ResponseDTO 的全局异常处理器 —— 那套契约与本进程冲突。
         本模块自己写 TraceFilter / ApiExceptionHandler / ClientIp，共十来个类，
         换来的是「C 端的 HTTP 行为只有一个地方定义」。

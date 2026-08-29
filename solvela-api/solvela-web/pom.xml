@@ -13,7 +13,7 @@
     <packaging>jar</packaging>
 
     <!--
-    HTTP 那一层，只有它认识 servlet / spring-web / sa-token / springdoc。
+    HTTP 那一层，只有它认识 servlet / spring-web / springdoc。
 
     存在的理由是<b>让约定变成编译错误</b>：共享层「不认识 HTTP」这条规矩，
     光靠代码评审守不住 —— 只要 solvela-base 里有 spring-boot-starter-web，
@@ -41,11 +41,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot4-starter</artifactId>
         </dependency>
 
         <dependency>
