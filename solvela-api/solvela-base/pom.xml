@@ -130,11 +130,6 @@
             <artifactId>p6spy</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.httpcomponents.client5</groupId>
-            <artifactId>httpclient5</artifactId>
-        </dependency>
-
         <!-- 🔻 optional：默认不进包，省 31 个 jar / 8.37MB。
              理由是 dev / test / pre / prod 四套配置的 file.storage.mode 全是 local，
              那两个 S3 Bean 挂着 @ConditionalOnProperty(havingValue="cloud")，从来没被实例化过。
@@ -143,8 +138,8 @@
 
              ⚠️ 别把这 8.37MB 想成「排几个传递依赖」能解决：s3 一个 jar 就 4.38MB（全量 API 模型类），
              加上 sdk-core / regions / third-party-jackson-core，4 个 jar 占了 82%，其余 27 个全是几 KB 的 SPI 包。
-             另外 apache5-client(81KB) 不值得换成 url-connection-client —— httpclient5 那 2.27MB 是
-             RestClientConfig 自己在用，AWS 只是搭顺风车，排掉反而要多引一个 jar。
+             另外 apache5-client(81KB) 不值得换成 url-connection-client —— 它依赖的
+             httpclient5 + httpcore5 已经随 s3 一起进/出包，排掉反而要多引一个 jar。
 
              ✅ netty-nio-client 这条 exclusion 要留着：只用同步 S3Client，S3AsyncClient 一处没用。
              注意 netty 本体不会消失，Redisson 与 Lettuce 还在用。 -->

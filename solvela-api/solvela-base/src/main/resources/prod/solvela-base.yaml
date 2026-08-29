@@ -101,6 +101,22 @@ server:
       max-days: 30
       pattern: "%t %{X-Forwarded-For}i %a %r %s (%D ms) %I (%B byte)"
 
+  # 响应压缩。收益集中在管理端：/login、/login/getLoginInfo、/menu/query 这三个
+  # 平均 43~48KB（菜单与权限树），实测 gzip 后剩 ~18%，一次登录 ~138KB 降到 ~25KB。
+  # C 端响应绝大多数在 512B 以下，够不到阈值，基本不受影响。
+  #
+  # ⚠️ 刻意不写 mime-types：Boot 默认列表已含 application/json，且【不】含
+  #    application/octet-stream、图片和 xlsx —— 代码生成器下载、文件下载、
+  #    Excel 导出（xlsx 本身就是 zip）因此天然被排除，压了也白压。
+  #    要加类型用 additional-mime-types 追加，别覆盖 mime-types 把这个安全默认冲掉。
+  #
+  # ⚠️ 开启后上面 accesslog 的 %B 记的是【压缩后】字节数，与历史日志不能直接比。
+  compression:
+    enabled: true
+    # 与 Boot 默认值一致。1~2KB 这一档只占总响应字节的约 2%，
+    # 而压缩会让响应丢掉 Content-Length 转成 chunked，为这 2% 不值当。
+    min-response-size: 2KB
+
 
 # 文件上传 配置
 file:
@@ -143,15 +159,6 @@ knife4j:
     enable: false
     username: api # Basic认证用户名
     password: 1024 # Basic认证密码
-
-# RestTemplate 请求配置 毫秒
-http:
-  pool:
-    max-total: 100
-    connect-timeout: 50000
-    read-timeout: 50000
-    write-timeout: 50000
-    keep-alive: 300000
 
 
 

@@ -1,13 +1,25 @@
 package solvela.base.util;
 
-import java.time.*;
-import java.time.format.TextStyle;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.Locale;
-
 
 /**
+ * java.time 日期时间工具类。
+ * <p>
+ * ⚠️ 格式化 / 解析一律走 {@link SolvelaDateFormatterEnum}，不要新增收 pattern 字符串的重载：
+ * 枚举里的 DateTimeFormatter 是线程安全的常量，而 {@code DateTimeFormatter.ofPattern(pattern)}
+ * 每次调用都会重新解析一遍 pattern，JsonConfig 在反序列化热路径上用着这里。
+ * <p>
+ * ⚠️ 所有时区换算统一用 {@link ZoneId#systemDefault()}，与数据源 URL 上的
+ * {@code serverTimezone=Asia/Shanghai} 保持一致。不要再写死 {@code ZoneOffset.ofHours(8)}——
+ * 那样容器时区一改就跟数据库对不上，且没有任何报错。
+ *
  * @Author 1024创新实验室:胡克
  * @Date 2023/12/5 22:25:43
  * @Wechat zhuoda1024
@@ -16,6 +28,13 @@ import java.util.Locale;
  */
 public class SolvelaLocalDateUtil {
 
+    private SolvelaLocalDateUtil() {
+        // 私有构造，防止实例化
+    }
+
+    // ==========================================
+    // 格式化与解析
+    // ==========================================
 
     /**
      * 格式化 LocalDateTime 返回对应格式字符串
@@ -25,7 +44,7 @@ public class SolvelaLocalDateUtil {
      * @return
      */
     public static String format(LocalDateTime time, SolvelaDateFormatterEnum formatterEnum) {
-        return time.format(formatterEnum.getFormatter());
+        return time == null ? null : time.format(formatterEnum.getFormatter());
     }
 
     /**
@@ -36,7 +55,7 @@ public class SolvelaLocalDateUtil {
      * @return
      */
     public static String format(LocalDate date, SolvelaDateFormatterEnum formatterEnum) {
-        return date.format(formatterEnum.getFormatter());
+        return date == null ? null : date.format(formatterEnum.getFormatter());
     }
 
     /**
@@ -61,15 +80,9 @@ public class SolvelaLocalDateUtil {
         return LocalDate.parse(time, formatterEnum.getFormatter());
     }
 
-    /**
-     * 获取指定日期时间戳
-     *
-     * @param time
-     * @return
-     */
-    public static Long getTimestamp(LocalDateTime time) {
-        return time.toInstant(ZoneOffset.ofHours(8)).toEpochMilli();
-    }
+    // ==========================================
+    // 时间戳
+    // ==========================================
 
     /**
      * 获取当前时间戳(秒)
@@ -81,44 +94,100 @@ public class SolvelaLocalDateUtil {
     }
 
     /**
-     * 将时间格式化为 星期几，例：星期一 ... 星期日
-     *
-     * @param localDate
-     * @return
+     * LocalDateTime 转 秒时间戳
      */
-    public static String formatToChineseWeek(LocalDate localDate) {
-        return localDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINESE);
+    public static long toEpochSecond(LocalDateTime time) {
+        return time.atZone(ZoneId.systemDefault()).toInstant().getEpochSecond();
     }
 
     /**
-     * 将时间格式化为 周几，例：周一 ... 周日
-     *
-     * @param localDate
-     * @return
+     * LocalDateTime 转 毫秒时间戳
      */
-    public static String formatToChineseWeekZhou(LocalDate localDate) {
-        return formatToChineseWeek(localDate).replace("星期", "周");
+    public static long toEpochMilli(LocalDateTime time) {
+        return time.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
     }
 
+    /**
+     * 秒时间戳 转 LocalDateTime
+     */
+    public static LocalDateTime ofEpochSecond(long timestamp) {
+        return Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    /**
+     * 毫秒时间戳 转 LocalDateTime
+     */
+    public static LocalDateTime ofEpochMilli(long timestamp) {
+        return Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    // ==========================================
+    // 与 java.util.Date 互转（兼容老 API 与 JDBC 取出的字段）
+    // ==========================================
+
+    /**
+     * Date 转 LocalDateTime
+     * <p>
+     * java.sql.Date 单独处理：它只有日期部分，走 toLocalDate().atStartOfDay() 语义更明确。
+     */
     public static LocalDateTime toLocalDateTime(Date date) {
+        if (date == null) {
+            return null;
+        }
+        if (date instanceof java.sql.Date sqlDate) {
+            return sqlDate.toLocalDate().atStartOfDay();
+        }
         return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 
     /**
-     * 获取当天剩余时间 单位
-     *
-     * @param unit 时间单位
-     * @return
+     * LocalDateTime 转 Date
      */
-    public static Long getDayBalanceTime(ChronoUnit unit) {
-        LocalDateTime now = LocalDateTime.now();
-        return Duration.between(now, now.plusDays(1L).with(LocalTime.MIN)).get(unit);
+    public static Date toDate(LocalDateTime time) {
+        return time == null ? null : Date.from(time.atZone(ZoneId.systemDefault()).toInstant());
     }
 
-    public static void main(String[] args) {
-        System.out.println(SolvelaLocalDateUtil.format(LocalDateTime.now(), SolvelaDateFormatterEnum.YMD_HMS));
-        System.out.println(SolvelaLocalDateUtil.format(LocalDateTime.now(), SolvelaDateFormatterEnum.YMD_HM));
-        System.out.println(SolvelaLocalDateUtil.parse("2021-10-15 10:10:00", SolvelaDateFormatterEnum.YMD_HMS));
+    // ==========================================
+    // 区间计算
+    // ==========================================
+
+    /**
+     * 两个时间相差的秒数（常用于算 Redis TTL）
+     */
+    public static long betweenSeconds(LocalDateTime startTime, LocalDateTime endTime) {
+        return Duration.between(startTime, endTime).getSeconds();
+    }
+
+    /**
+     * 两个时间相差的天数
+     */
+    public static long betweenDays(LocalDateTime startTime, LocalDateTime endTime) {
+        return ChronoUnit.DAYS.between(startTime, endTime);
+    }
+
+    /**
+     * 当前时间是否落在 [startTime, endTime] 区间内（常用于判断期号 / 活动是否在售）
+     */
+    public static boolean isBetween(LocalDateTime startTime, LocalDateTime endTime) {
+        if (startTime == null || endTime == null) {
+            return false;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        return now.isAfter(startTime) && now.isBefore(endTime);
+    }
+
+    /**
+     * 指定日期的开始时刻，例：2023-10-01 00:00:00
+     */
+    public static LocalDateTime getStartOfDay(LocalDate date) {
+        return LocalDateTime.of(date, LocalTime.MIN);
+    }
+
+    /**
+     * 指定日期的结束时刻，例：2023-10-01 23:59:59.999999999
+     */
+    public static LocalDateTime getEndOfDay(LocalDate date) {
+        return LocalDateTime.of(date, LocalTime.MAX);
     }
 
 }

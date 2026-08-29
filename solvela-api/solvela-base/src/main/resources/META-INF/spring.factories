@@ -1,2 +1,4 @@
-org.springframework.boot.env.EnvironmentPostProcessor=\
+# Boot 4.0 起 org.springframework.boot.env.EnvironmentPostProcessor 已废弃，4.2 移除，
+# key 必须用新包名 org.springframework.boot.EnvironmentPostProcessor。
+org.springframework.boot.EnvironmentPostProcessor=\
   solvela.base.config.YamlProcessor
