@@ -1,5 +1,6 @@
 package solvela.draw.prizemapping.service;
 
+import solvela.enums.ActivityStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
@@ -71,7 +72,6 @@ public class DrawPoolAnalysisService {
 
     private static final int UNLIMITED = -1;
 
-    private static final Integer FALLBACK_YES = 1;
 
     private static final int AMOUNT_SCALE = 4;
 
@@ -143,7 +143,7 @@ public class DrawPoolAnalysisService {
         all.sort(Comparator
                 .comparing((DrawPoolAnalysisDTO v) -> Boolean.TRUE.equals(v.getProbabilityClosed()) ? 1 : 0)
                 .thenComparing(v -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(v -> Integer.valueOf(1).equals(v.getActivityStatus()) ? 0 : 1)
+                .thenComparing(v -> v.getActivityStatus() == ActivityStatusEnum.ONLINE ? 0 : 1)
                 .thenComparing(DrawPoolAnalysisDTO::getPoolCode));
 
         if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
@@ -213,7 +213,7 @@ public class DrawPoolAnalysisService {
             slot.setSortWeight(mapping.getSortWeight());
             slot.setPrizeItemId(mapping.getPrizeItemId());
             slot.setProbability(mapping.getProbability());
-            slot.setFallback(FALLBACK_YES.equals(mapping.getIsFallback()));
+            slot.setFallback(Boolean.TRUE.equals(mapping.getIsFallback()));
             slot.setIssueList(new ArrayList<>());
             if (Boolean.TRUE.equals(slot.getFallback())) {
                 fallbackCount++;

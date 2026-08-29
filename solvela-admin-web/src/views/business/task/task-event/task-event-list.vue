@@ -68,9 +68,9 @@
         </template>
 
         <template v-if="column.dataIndex === 'bizIdRequired'">
-          <!-- 这一列是给对接方看的：为 1 时上游必须传业务单号，否则服务端只能按事件日兜底，
+          <!-- 这一列是给对接方看的：为真时上游必须传业务单号，否则服务端只能按事件日兜底，
                对订单类事件那意味着「一天只算一笔」 -->
-          <a-tag v-if="text === 1" color="orange">必须带单号</a-tag>
+          <a-tag v-if="text" color="orange">必须带单号</a-tag>
           <a-tag v-else color="default">按天兜底</a-tag>
         </template>
 
@@ -80,7 +80,7 @@
         </template>
 
         <template v-if="column.dataIndex === 'isHighFrequency'">
-          <a-tag v-if="text === 1" color="purple">高频</a-tag>
+          <a-tag v-if="text" color="purple">高频</a-tag>
           <span v-else class="text-gray-400!">—</span>
         </template>
 
@@ -89,7 +89,7 @@
             <template #title>
               开启时，未推进进度的事件会连同原因一起写入流水，是客诉自证的依据； 高频事件建议关闭，否则不匹配的事件会把流水表写爆。
             </template>
-            <a-tag :color="text === 1 ? 'green' : 'default'">{{ text === 1 ? '记录' : '不记录' }}</a-tag>
+            <a-tag :color="text ? 'green' : 'default'">{{ text ? '记录' : '不记录' }}</a-tag>
           </a-tooltip>
         </template>
 
@@ -147,18 +147,18 @@
         <a-input v-model:value="form.eventName" placeholder="如 订单支付成功" />
       </a-form-item>
       <a-form-item label="必须带业务单号" name="bizIdRequired">
-        <a-switch v-model:checked="form.bizIdRequired" :checkedValue="1" :unCheckedValue="0" />
+        <a-switch v-model:checked="form.bizIdRequired" />
         <div class="text-xs text-gray-400! mt-1">有天然单号的事件（订单号）请开启。关闭时服务端按事件自然日兜底幂等，即<b>一天只算一次</b></div>
       </a-form-item>
       <a-form-item label="计量来源" name="metricSource">
         <a-input v-model:value="form.metricSource" placeholder="NONE 表示计次；计额型填 payload 里的字段名，如 payAmount" />
       </a-form-item>
       <a-form-item label="高频事件" name="isHighFrequency">
-        <a-switch v-model:checked="form.isHighFrequency" :checkedValue="1" :unCheckedValue="0" />
+        <a-switch v-model:checked="form.isHighFrequency" />
         <div class="text-xs text-gray-400! mt-1">目前仅作标记，路由优化尚未实现</div>
       </a-form-item>
       <a-form-item label="记录丢弃流水" name="discardLogFlag">
-        <a-switch v-model:checked="form.discardLogFlag" :checkedValue="1" :unCheckedValue="0" />
+        <a-switch v-model:checked="form.discardLogFlag" />
         <div class="text-xs text-gray-400! mt-1">高频事件建议关闭，否则不匹配的事件会把流水表写爆</div>
       </a-form-item>
       <a-form-item label="字段说明 payload_schema" name="payloadSchema">
@@ -296,9 +296,9 @@
     eventName: '',
     metricSource: 'NONE',
     payloadSchema: '',
-    bizIdRequired: 0,
-    isHighFrequency: 0,
-    discardLogFlag: 1,
+    bizIdRequired: false,
+    isHighFrequency: false,
+    discardLogFlag: true,
     remark: '',
     status: 1,
   };

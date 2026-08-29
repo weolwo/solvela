@@ -31,13 +31,13 @@ public class TaskEventVO {
     private String payloadSchema;
 
     @Schema(description = "上游是否必须带幂等单号：1-必须, 0-可按事件日兜底")
-    private Integer bizIdRequired;
+    private Boolean bizIdRequired;
 
     @Schema(description = "是否高频事件（预留，本期未实现路由优化）")
-    private Integer isHighFrequency;
+    private Boolean isHighFrequency;
 
     @Schema(description = "是否记录被丢弃事件的流水")
-    private Integer discardLogFlag;
+    private Boolean discardLogFlag;
 
     @Schema(description = "备注")
     private String remark;

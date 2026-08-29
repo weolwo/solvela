@@ -27,7 +27,7 @@ public class PoolPrizeMappingDTO {
     private BigDecimal probability;
 
     /** 是否兜底奖项：1-兜底，每池最多一个 */
-    private Integer isFallback;
+    private Boolean isFallback;
 
     /** 序号 */
     private Integer sortWeight;

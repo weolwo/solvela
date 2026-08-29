@@ -64,7 +64,6 @@ public class PrizePoolBoardService {
 
     /** 与 DrawPoolSnapshot 的闭环容差保持一致，两边必须同时改 */
     private static final BigDecimal PROBABILITY_EPSILON = new BigDecimal("0.0001");
-    private static final Integer FALLBACK_YES = 1;
     private static final int UNLIMITED = -1;
 
     /**
@@ -155,7 +154,7 @@ public class PrizePoolBoardService {
         Set<Long> itemIds = new java.util.HashSet<>();
         for (PoolPrizeMapping mapping : mappings) {
             sum = sum.add(mapping.getProbability() == null ? BigDecimal.ZERO : mapping.getProbability());
-            if (FALLBACK_YES.equals(mapping.getIsFallback())) {
+            if (Boolean.TRUE.equals(mapping.getIsFallback())) {
                 fallbackCount++;
             }
             if (mapping.getPrizeItemId() != null) {

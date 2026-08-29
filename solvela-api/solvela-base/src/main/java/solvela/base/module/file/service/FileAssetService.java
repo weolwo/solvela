@@ -199,7 +199,7 @@ public class FileAssetService {
         entity.setContentType(contentType);
         entity.setFileSize(size);
         entity.setStatus(FileStatusEnum.TEMP);
-        entity.setDeletedFlag(0);
+        entity.setDeletedFlag(false);
         entity.setCreateBy(operator);
         if (IMAGE_MIME_TYPES.contains(contentType)) {
             readImageSize(file, entity);
@@ -353,7 +353,7 @@ public class FileAssetService {
     public FileEntity requireByStorageKey(String storageKey) {
         FileEntity entity = fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
                 .eq(FileEntity::getStorageKey, storageKey)
-                .eq(FileEntity::getDeletedFlag, 0));
+                .eq(FileEntity::getDeletedFlag, false));
         if (entity == null) {
             throw new BusinessException("文件不存在");
         }
@@ -372,7 +372,7 @@ public class FileAssetService {
     public FileEntity findByStorageKey(String storageKey) {
         return fileDao.selectOne(new LambdaQueryWrapper<FileEntity>()
                 .eq(FileEntity::getStorageKey, storageKey)
-                .eq(FileEntity::getDeletedFlag, 0));
+                .eq(FileEntity::getDeletedFlag, false));
     }
 
     public PageResult<FileVO> queryPage(FileQueryForm queryForm) {
@@ -479,7 +479,7 @@ public class FileAssetService {
         }
         FileEntity update = new FileEntity();
         update.setFileId(fileId);
-        update.setDeletedFlag(1);
+        update.setDeletedFlag(true);
         update.setUpdateBy(operator);
         fileDao.updateById(update);
         // 放在最后：DB 事务回滚得了，删掉的字节回滚不了
@@ -583,7 +583,7 @@ public class FileAssetService {
      */
     public FileEntity requireFile(Long fileId) {
         FileEntity entity = fileId == null ? null : fileDao.selectById(fileId);
-        if (entity == null || (entity.getDeletedFlag() != null && entity.getDeletedFlag() == 1)) {
+        if (entity == null || Boolean.TRUE.equals(entity.getDeletedFlag())) {
             throw new BusinessException("文件不存在");
         }
         return entity;

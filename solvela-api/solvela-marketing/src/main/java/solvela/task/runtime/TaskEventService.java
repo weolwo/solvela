@@ -123,7 +123,7 @@ public class TaskEventService {
         //    ⚠️ 这一步必须在 normalize 之前 —— normalize 会按事件日兜底填上 eventBizId，
         //    之后就再也分不清「上游传了」还是「服务端兜底的」。
         //    对订单类事件放过兜底 = 一天只算一笔，是资损级的错，不能只靠文档约定。
-        if (Integer.valueOf(1).equals(eventDef.getBizIdRequired()) && StringUtils.isBlank(form.getEventBizId())) {
+        if (Boolean.TRUE.equals(eventDef.getBizIdRequired()) && StringUtils.isBlank(form.getEventBizId())) {
             log.warn("[任务事件] 缺少必需的幂等单号被拒。eventCode={}, memberId={}",
                     form.getEventCode(), form.getMemberId());
             throw new BusinessException("事件 " + form.getEventCode() + " 必须携带 eventBizId（上游业务单号），否则无法防重");

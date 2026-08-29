@@ -82,7 +82,7 @@ public class TaskRecordAdvanceService {
     @Transactional(rollbackFor = Exception.class)
     public TaskAdvanceResult advance(TaskConfig config, TaskEventContext ctx, TaskEvent eventDef) {
         // 丢弃流水是客诉自证的关键，但高频事件每条不匹配都写一行会把流水表写爆，故由注册表开关控制
-        boolean logDiscard = eventDef == null || !Integer.valueOf(0).equals(eventDef.getDiscardLogFlag());
+        boolean logDiscard = eventDef == null || !Boolean.FALSE.equals(eventDef.getDiscardLogFlag());
         TaskRuleConfig rule = TaskRuleConfig.parse(config.getRuleConfig());
         TaskTypeEnum taskType = rule.taskType();
         if (taskType == null) {

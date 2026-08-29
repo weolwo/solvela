@@ -46,7 +46,7 @@ public class PoolPrizeMapping {
     /**
      * 是否兜底奖项：1-兜底(库存不足时降级命中)，每池最多一个
      */
-    private Integer isFallback;
+    private Boolean isFallback;
 
     /**
      * 序号

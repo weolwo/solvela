@@ -46,10 +46,6 @@ public class TaskEventDefService {
      */
     public static final String METRIC_SOURCE_NONE = "NONE";
 
-    /** 0/1 布尔标记列的取值（bizIdRequired / isHighFrequency / discardLogFlag），与 status 无关 */
-    private static final int FLAG_NO = 0;
-    private static final int FLAG_YES = 1;
-
     public PageResult<TaskEventDTO> queryPage(TaskEventQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<TaskEventDTO> list = taskEventDao.queryPage(page, queryForm);
@@ -70,7 +66,7 @@ public class TaskEventDefService {
                         e.getEventCode(),
                         e.getEventName(),
                         e.getMetricSource(),
-                        Integer.valueOf(1).equals(e.getBizIdRequired()),
+                        Boolean.TRUE.equals(e.getBizIdRequired()),
                         parseSchemaQuietly(e)))
                 .toList();
     }
@@ -154,17 +150,20 @@ public class TaskEventDefService {
         if (StringUtils.isBlank(entity.getMetricSource())) {
             entity.setMetricSource(METRIC_SOURCE_NONE);
         }
-        // ⚠️ 下面三个是 0/1 的布尔标记列，与 status 不是一个概念。
-        //    原先它们借用 STATUS_ENABLED/STATUS_DISABLED 赋值 —— 值恰好一样，语义完全不同，
-        //    status 一旦改成枚举，这种借用就会把两件事绑死。故拆出独立常量。
+        // 下面三个是布尔标记列，与 status 不是一个概念 —— 它们曾借用
+        // STATUS_ENABLED/STATUS_DISABLED 赋值（值恰好一样，语义完全不同），
+        // 后来拆成独立的 int 常量，现在直接是 Boolean，借用不了了。
+        //
+        // discardLogFlag 默认 true 而不是 false：新事件先留痕，等确认它是高频再关。
+        // 反过来（默认不留痕）出问题时没有任何自证材料。
         if (entity.getBizIdRequired() == null) {
-            entity.setBizIdRequired(FLAG_NO);
+            entity.setBizIdRequired(false);
         }
         if (entity.getIsHighFrequency() == null) {
-            entity.setIsHighFrequency(FLAG_NO);
+            entity.setIsHighFrequency(false);
         }
         if (entity.getDiscardLogFlag() == null) {
-            entity.setDiscardLogFlag(FLAG_YES);
+            entity.setDiscardLogFlag(true);
         }
         if (entity.getStatus() == null) {
             entity.setStatus(EnableStatusEnum.ENABLED);

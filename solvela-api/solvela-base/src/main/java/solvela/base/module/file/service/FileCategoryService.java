@@ -133,7 +133,7 @@ public class FileCategoryService {
         }
         Long count = fileDao.selectCount(new LambdaQueryWrapper<FileEntity>()
                 .eq(FileEntity::getCategoryId, categoryId)
-                .eq(FileEntity::getDeletedFlag, 0));
+                .eq(FileEntity::getDeletedFlag, false));
         if (count != null && count > 0) {
             throw new BusinessException("该分类下还有 " + count + " 个文件，不能删除");
         }

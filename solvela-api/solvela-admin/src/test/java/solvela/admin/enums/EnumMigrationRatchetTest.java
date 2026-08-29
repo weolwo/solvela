@@ -8,6 +8,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -105,31 +108,92 @@ class EnumMigrationRatchetTest {
                 "这些常量已经不存在了，请从 ALLOWED 里删掉对应的行 —— 名单不缩短，棘轮就失去意义");
     }
 
+    /**
+     * 抓 {@code Integer.valueOf(x).equals(表达式.getFoo())} 这种<b>装箱比较</b>。
+     *
+     * <p>它和上面那份常量名单是同一个坑的两种形态：常量那种有名字，能列名单盯住；
+     * 这种是<b>字面量写在表达式里</b>，没有名字，名单看不见它。
+     */
+    private static final Pattern BOXED_EQUALS = Pattern.compile(
+            "Integer\\.valueOf\\([^)]*\\)\\.equals\\([^)]*?\\bget([A-Z]\\w*)\\(\\)\\)");
+
+    /** {@code private <类型> <字段名>;} —— 用来建「字段名 → 声明过的类型」索引 */
+    private static final Pattern FIELD_DECL = Pattern.compile(
+            "private\\s+([A-Za-z][\\w.]*(?:<[^>]*>)?)\\s+(\\w+)\\s*;");
+
+    private static final Set<String> INTEGERISH = Set.of("int", "Integer", "long", "Long", "short", "Short");
+
+    @Test
+    @DisplayName("装箱比较：Integer.valueOf(x).equals(枚举/布尔) 恒为 false，编译器不管")
+    void 没有拿Integer去比非Integer字段() throws IOException {
+        List<Path> sources = mainSources();
+
+        // 1. 建索引：字段名 -> 这个名字在全仓被声明过的所有类型
+        Map<String, Set<String>> fieldTypes = new TreeMap<>();
+        Map<Path, String> texts = new LinkedHashMap<>();
+        for (Path p : sources) {
+            String text = Files.readString(p, StandardCharsets.UTF_8);
+            texts.put(p, text);
+            Matcher m = FIELD_DECL.matcher(text);
+            while (m.find()) {
+                fieldTypes.computeIfAbsent(m.group(2), k -> new TreeSet<>()).add(m.group(1));
+            }
+        }
+
+        // 2. 找出所有装箱比较，看被比的那个字段是不是真的 Integer
+        Set<String> suspects = new TreeSet<>();
+        for (Map.Entry<Path, String> e : texts.entrySet()) {
+            Matcher m = BOXED_EQUALS.matcher(e.getValue());
+            while (m.find()) {
+                String getter = m.group(1);
+                String field = Character.toLowerCase(getter.charAt(0)) + getter.substring(1);
+                Set<String> types = fieldTypes.get(field);
+                if (types == null) {
+                    // 索引里没有这个字段（record 组件、继承来的 getter 等），无法判定，放过
+                    continue;
+                }
+                if (types.stream().anyMatch(t -> !INTEGERISH.contains(t))) {
+                    suspects.add(shorten(root(), e.getKey()) + "#" + field + " 被声明过的类型=" + types);
+                }
+            }
+        }
+
+        assertEquals(Set.of(), suspects,
+                "这些地方拿 Integer.valueOf(...).equals(...) 去比一个并非处处都是 Integer 的字段。"
+                        + "Integer.equals(Object) 接受任何类型，编译通过但恒为 false —— "
+                        + "改成 == 枚举常量，或 Boolean.TRUE.equals(...)");
+    }
+
     private Set<String> scan() throws IOException {
-        // surefire 的工作目录是模块目录（solvela-api/solvela-admin），上一级才是所有模块的根
-        Path root = Paths.get("..").toAbsolutePath().normalize();
-        try (Stream<Path> paths = Files.walk(root)) {
-            List<Path> sources = paths
+        Set<String> found = new TreeSet<>();
+        for (Path p : mainSources()) {
+            Matcher m = MAGIC_STATUS_CONST.matcher(Files.readString(p, StandardCharsets.UTF_8));
+            while (m.find()) {
+                String name = m.group(1);
+                boolean statusLike = STATUS_WORDS.stream().anyMatch(name::contains)
+                        && NOT_STATUS_WORDS.stream().noneMatch(name::contains);
+                if (statusLike) {
+                    found.add(shorten(root(), p) + "#" + name);
+                }
+            }
+        }
+        return found;
+    }
+
+    /** surefire 的工作目录是模块目录（solvela-api/solvela-admin），上一级才是所有模块的根 */
+    private Path root() {
+        return Paths.get("..").toAbsolutePath().normalize();
+    }
+
+    private List<Path> mainSources() throws IOException {
+        try (Stream<Path> paths = Files.walk(root())) {
+            return paths
                     .filter(p -> p.toString().endsWith(".java"))
                     .filter(p -> {
                         String s = p.toString().replace('\\', '/');
                         return s.contains("/src/main/java/") && !s.contains("/target/");
                     })
                     .collect(Collectors.toList());
-
-            Set<String> found = new TreeSet<>();
-            for (Path p : sources) {
-                Matcher m = MAGIC_STATUS_CONST.matcher(Files.readString(p, StandardCharsets.UTF_8));
-                while (m.find()) {
-                    String name = m.group(1);
-                    boolean statusLike = STATUS_WORDS.stream().anyMatch(name::contains)
-                            && NOT_STATUS_WORDS.stream().noneMatch(name::contains);
-                    if (statusLike) {
-                        found.add(shorten(root, p) + "#" + name);
-                    }
-                }
-            }
-            return found;
         }
     }
 

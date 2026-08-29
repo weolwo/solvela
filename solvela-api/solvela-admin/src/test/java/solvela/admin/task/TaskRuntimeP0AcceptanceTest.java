@@ -456,7 +456,7 @@ class TaskRuntimeP0AcceptanceTest {
         // 前提确认：ORDER_PAID 在注册表里确实要求带单号，否则本用例是空过
         TaskEvent def = taskEventDefService.getEnabledByCode("ORDER_PAID");
         assertNotNull(def, "前提不成立：ORDER_PAID 未注册，请先执行 v3.47.0.sql");
-        assertEquals(1, def.getBizIdRequired().intValue(), "前提不成立：ORDER_PAID 应要求带单号");
+        assertTrue(def.getBizIdRequired(), "前提不成立：ORDER_PAID 应要求带单号");
 
         TaskEventReportCommand without = new TaskEventReportCommand();
         without.setEventCode("ORDER_PAID");
@@ -504,7 +504,7 @@ class TaskRuntimeP0AcceptanceTest {
         TaskConfig config = configOf(TASK_HIGH_FREQ);
         TaskEvent def = taskEventDefService.getEnabledByCode("PAGE_VIEW");
         assertNotNull(def, "前提不成立：PAGE_VIEW 未注册");
-        assertEquals(0, def.getDiscardLogFlag().intValue(), "前提不成立：PAGE_VIEW 应已关闭丢弃留痕");
+        assertFalse(def.getDiscardLogFlag(), "前提不成立：PAGE_VIEW 应已关闭丢弃留痕");
 
         // PAGE_VIEW 不带金额，而这条任务是 AMOUNT 规则 —— 必被丢弃
         List<TaskAdvanceResult> results = taskEventService.handle(

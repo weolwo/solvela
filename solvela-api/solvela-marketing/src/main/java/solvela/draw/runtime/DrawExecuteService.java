@@ -174,7 +174,7 @@ public class DrawExecuteService {
             prizes.add(new DrawPrizeSnapshot(
                     item.getId(),
                     item.getPrizeCode(),
-                    Integer.valueOf(1).equals(mapping.getIsFallback()),
+                    Boolean.TRUE.equals(mapping.getIsFallback()),
                     resolveRemainStock(form.getActivityCode(), item),
                     parseWhiteList(item.getWhiteList())));
             probabilities.add(mapping.getProbability());

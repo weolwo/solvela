@@ -58,7 +58,7 @@ public class TaskEvent {
      * ORDER_PAID 这类有天然单号的必须置 1 —— 不带单号时服务端只能按事件日兜底，
      * 那对订单事件意味着「一天只算一笔」，是错的。
      */
-    private Integer bizIdRequired;
+    private Boolean bizIdRequired;
 
     /**
      * 是否高频事件：1-是。
@@ -66,7 +66,7 @@ public class TaskEvent {
      * <p>⚠️ <b>本期只建字段、不实现路由优化</b>。理由见 v3.47.0.sql 的列注释：
      * 没有真实流量剖面时，缓存判定的一致性方案是凭空设计。
      */
-    private Integer isHighFrequency;
+    private Boolean isHighFrequency;
 
     /**
      * 是否记录被丢弃事件的流水：1-记录, 0-不记录。
@@ -74,7 +74,7 @@ public class TaskEvent {
      * <p>丢弃流水是客诉自证的关键，但高频事件每条不匹配都写一行会把
      * {@code t_task_record_flow} 写爆，故做成开关。关掉时仍打 DEBUG 日志。
      */
-    private Integer discardLogFlag;
+    private Boolean discardLogFlag;
 
     private String remark;
 

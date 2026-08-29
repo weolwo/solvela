@@ -30,7 +30,7 @@ public class PoolPrizeMappingVO {
     private BigDecimal probability;
 
     @Schema(description = "是否兜底奖项：1-兜底，每池最多一个")
-    private Integer isFallback;
+    private Boolean isFallback;
 
     @Schema(description = "序号")
     private Integer sortWeight;

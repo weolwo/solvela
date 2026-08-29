@@ -29,13 +29,13 @@ public class TaskEventDTO {
     private String payloadSchema;
 
     /** 上游是否必须带幂等单号：1-必须, 0-可按事件日兜底 */
-    private Integer bizIdRequired;
+    private Boolean bizIdRequired;
 
     /** 是否高频事件（预留，本期未实现路由优化） */
-    private Integer isHighFrequency;
+    private Boolean isHighFrequency;
 
     /** 是否记录被丢弃事件的流水 */
-    private Integer discardLogFlag;
+    private Boolean discardLogFlag;
 
     /** 备注 */
     private String remark;

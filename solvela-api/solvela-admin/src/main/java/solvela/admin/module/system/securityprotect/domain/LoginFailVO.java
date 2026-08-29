@@ -32,7 +32,7 @@ public class LoginFailVO {
     private Integer loginFailCount;
 
     @Schema(description = "锁定状态:1锁定，0未锁定")
-    private Integer lockFlag;
+    private Boolean lockFlag;
 
     @Schema(description = "连续登录失败锁定开始时间")
     private LocalDateTime loginLockBeginTime;

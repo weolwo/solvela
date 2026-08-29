@@ -89,13 +89,6 @@ public class PrizePoolConfigService {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     /**
-     * 坑位兜底标记：1-兜底（库存不足时降级命中），每池最多一个
-     */
-    private static final Integer FALLBACK_YES = 1;
-
-    private static final Integer FALLBACK_NO = 0;
-
-    /**
      * 生成一个未被占用的奖池编码（10 位大写字母+数字），供工作台「新建奖池」调用
      */
     public String generatePoolCode() {
@@ -161,7 +154,7 @@ public class PrizePoolConfigService {
                     .map(mapping -> new DrawWorkbenchMappingDTO(
                             itemIdToCodeMap.get(mapping.getPrizeItemId()),
                             mapping.getProbability(),
-                            FALLBACK_YES.equals(mapping.getIsFallback())))
+                            Boolean.TRUE.equals(mapping.getIsFallback())))
                     .collect(Collectors.toList());
             return new DrawWorkbenchPoolDTO(pool.getPoolCode(), pool.getPoolName(), mappingVOList);
         }).collect(Collectors.toList());
@@ -334,7 +327,7 @@ public class PrizePoolConfigService {
                 entity.setPoolCode(pool.getPoolCode());
                 entity.setPrizeItemId(dbItemMap.get(mapping.getPrizeCode()).getId());
                 entity.setProbability(mapping.getProbability());
-                entity.setIsFallback(Boolean.TRUE.equals(mapping.getIsFallback()) ? FALLBACK_YES : FALLBACK_NO);
+                entity.setIsFallback(Boolean.TRUE.equals(mapping.getIsFallback()));
                 entity.setSortWeight(i);
                 mappingList.add(entity);
             }

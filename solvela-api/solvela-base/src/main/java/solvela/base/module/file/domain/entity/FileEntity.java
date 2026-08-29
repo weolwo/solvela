@@ -100,7 +100,7 @@ public class FileEntity {
      */
     private String tags;
 
-    private Integer deletedFlag;
+    private Boolean deletedFlag;
 
     /**
      * 创建人（用户名，即 {@code t_employee.actual_name}）。
