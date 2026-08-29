@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+.eslintcache
+*.tsbuildinfo
+
+# vite 重启会生成带时间戳的临时配置
+vite.config.ts.timestamp-*.mjs

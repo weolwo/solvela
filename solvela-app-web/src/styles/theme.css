@@ -1,0 +1,32 @@
+/*
+ * 主题变量。组件里只准用 var(--sv-*)，不准写死颜色值 ——
+ * 活动换皮肤时要能只改这一层。
+ */
+:root {
+  --sv-color-primary: #ff4d3a;
+  --sv-color-primary-dark: #e03a29;
+  --sv-color-success: #16a34a;
+  --sv-color-danger: #dc2626;
+  --sv-color-warning: #f59e0b;
+
+  --sv-text-primary: #1f2229;
+  --sv-text-secondary: #6b7280;
+  --sv-text-placeholder: #9ca3af;
+
+  --sv-bg-page: #f6f7f9;
+  --sv-bg-surface: #ffffff;
+  --sv-border-color: #ebedf0;
+
+  --sv-radius-sm: 4px;
+  --sv-radius-md: 8px;
+  --sv-radius-lg: 16px;
+
+  --sv-space-xs: 4px;
+  --sv-space-sm: 8px;
+  --sv-space-md: 16px;
+  --sv-space-lg: 24px;
+
+  /* 刘海屏安全区，底部固定按钮必须加上，否则会被 Home Indicator 盖住 */
+  --sv-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sv-safe-top: env(safe-area-inset-top, 0px);
+}

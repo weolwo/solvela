@@ -1,0 +1,35 @@
+name: app-web CI
+
+# 只在 C 端前端有改动时触发：后端提交不该被前端流水线拖慢
+on:
+  push:
+    paths:
+      - 'solvela-app-web/**'
+      - '.github/workflows/app-web-ci.yml'
+  pull_request:
+    paths:
+      - 'solvela-app-web/**'
+      - '.github/workflows/app-web-ci.yml'
+
+defaults:
+  run:
+    working-directory: solvela-app-web
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 版本以 solvela-app-web/.nvmrc 为准，别在这里另写一个
+          node-version-file: solvela-app-web/.nvmrc
+          cache: npm
+          cache-dependency-path: solvela-app-web/package-lock.json
+
+      # 用 ci 而不是 install：锁文件说了算，不允许流水线里悄悄改依赖版本
+      - run: npm ci
+
+      # 与本地 `npm run ci` 完全一致：format:check + lint + typecheck + test + build
+      - run: npm run ci

@@ -1,0 +1,12 @@
+/*
+ * 样式入口。
+ *
+ * 不引入 Tailwind：本项目的页面是高度定制的活动视觉（转盘、九宫格、皮肤），
+ * utility class 在这类页面上收益最低、噪音最大。规整间距由 Varlet 组件承担，
+ * 其余用 SFC 的 scoped CSS 写，主题走下面这组 CSS 变量。
+ *
+ * CSS reset 的归属：**由本文件负责**，不要再引第三方 normalize。
+ * Varlet 自带的基础样式只作用于它自己的组件类名，两者不冲突。
+ */
+@import './theme.css';
+@import './base.css';
