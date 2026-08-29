@@ -1,6 +1,7 @@
 package solvela.risk.proposal.domain.dto;
 
 
+import solvela.enums.ProposalStatusEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -56,7 +57,7 @@ public class ProposalRecordDTO {
     private Long promotionConfigId;
 
     /** 状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截 */
-    private Integer status;
+    private ProposalStatusEnum status;
 
     /** 执行失败/风控拦截原因 */
     private String remark;

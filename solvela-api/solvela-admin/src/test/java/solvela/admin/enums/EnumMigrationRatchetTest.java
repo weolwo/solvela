@@ -66,15 +66,6 @@ class EnumMigrationRatchetTest {
      */
     private static final Set<String> ALLOWED = Set.of(
 
-            // ---- t_proposal_record.status ----
-            "solvela-ledger/ledger/engine/AssetDispatchEngine.java#STATUS_EXECUTING",
-            "solvela-ledger/ledger/engine/AssetDispatchEngine.java#STATUS_FAILED",
-            "solvela-ledger/ledger/engine/AssetDispatchEngine.java#STATUS_PENDING_EXECUTE",
-            "solvela-ledger/ledger/engine/AssetDispatchEngine.java#STATUS_SUCCESS",
-            "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_FIRST_REVIEW",
-            "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_PENDING_EXECUTE",
-            "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_REJECTED",
-            "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_SECOND_REVIEW",
 
 
             // ---- t_lottery_config.status ----

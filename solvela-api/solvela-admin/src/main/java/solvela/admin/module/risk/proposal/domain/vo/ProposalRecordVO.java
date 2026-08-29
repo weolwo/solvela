@@ -1,5 +1,6 @@
 package solvela.admin.module.risk.proposal.domain.vo;
 
+import solvela.enums.ProposalStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -60,7 +61,7 @@ public class ProposalRecordVO {
     private Long promotionConfigId;
 
     @Schema(description = "状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截")
-    private Integer status;
+    private ProposalStatusEnum status;
 
     @Schema(description = "执行失败/风控拦截原因")
     private String remark;

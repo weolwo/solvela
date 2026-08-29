@@ -1,5 +1,6 @@
 package solvela.risk.proposal.domain.query;
 
+import solvela.enums.ProposalStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
@@ -44,7 +45,7 @@ public class ProposalRecordQuery extends PageParam {
     private Long promotionConfigId;
 
     /** 状态：0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截 */
-    private Integer status;
+    private ProposalStatusEnum status;
 
     /** 来源：TASK(任务), DRAW(抽奖), MANUAL(人工) */
     private String sourceType;

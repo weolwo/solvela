@@ -1,5 +1,6 @@
 package solvela.risk.proposal.dao;
 
+import solvela.enums.ProposalStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.risk.ProposalRecord;
@@ -37,12 +38,12 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      *
      * @return 更新行数，0 表示状态已被别人推进或提案已完结
      */
-    int updateStatus(@Param("id") Long id, @Param("fromStatus") Integer fromStatus, @Param("toStatus") Integer toStatus);
+    int updateStatus(@Param("id") Long id, @Param("fromStatus") ProposalStatusEnum fromStatus, @Param("toStatus") ProposalStatusEnum toStatus);
 
     /**
      * 无条件写入终态与备注（成功/失败的收尾，不参与并发竞争）
      */
-    int updateStatusAndRemark(@Param("id") Long id, @Param("status") Integer status, @Param("remark") String remark);
+    int updateStatusAndRemark(@Param("id") Long id, @Param("status") ProposalStatusEnum status, @Param("remark") String remark);
 
     /**
      * 审批流转：只有当前状态等于 fromStatus 才更新，同时记录审批人与意见
@@ -54,8 +55,8 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * @return 更新行数，0 表示状态已被别人推进
      */
     int updateReview(@Param("id") Long id,
-                     @Param("fromStatus") Integer fromStatus,
-                     @Param("toStatus") Integer toStatus,
+                     @Param("fromStatus") ProposalStatusEnum fromStatus,
+                     @Param("toStatus") ProposalStatusEnum toStatus,
                      @Param("reviewerField") String reviewerField,
                      @Param("reviewer") String reviewer,
                      @Param("comment") String comment);

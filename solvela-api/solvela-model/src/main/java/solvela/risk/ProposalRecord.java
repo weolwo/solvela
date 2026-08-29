@@ -1,5 +1,6 @@
 package solvela.risk;
 
+import solvela.enums.ProposalStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -98,7 +99,7 @@ public class ProposalRecord {
     /**
      * 0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截
      */
-    private Integer status;
+    private ProposalStatusEnum status;
 
     /**
      * 执行失败/风控拦截原因，或调用方传入的场景说明

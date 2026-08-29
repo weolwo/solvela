@@ -1,5 +1,6 @@
 package solvela.ledger.engine;
 
+import solvela.enums.ProposalStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,14 +47,6 @@ public class AssetDispatchEngine implements AssetDispatcher {
     private static final int DEFAULT_QUANTITY = 1;
 
     /**
-     * 提案状态：对齐 t_proposal_record.status 注释，避免散落魔法值
-     */
-    private static final int STATUS_PENDING_EXECUTE = 30;
-    private static final int STATUS_EXECUTING = 40;
-    private static final int STATUS_SUCCESS = 50;
-    private static final int STATUS_FAILED = 70;
-
-    /**
      * 对齐 t_proposal_record.remark 的列长度：异常 message 直接入库会抛 Data too long，
      * 而这句正是失败兜底，一抛就把状态永远留在 40(执行中)
      */
@@ -82,7 +75,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
 
         try {
             // 1. 推进状态：30(待执行) -> 40(执行中)。条件更新即并发闸门，抢不到说明别人已在执行或已完结
-            int rows = proposalRecordDao.updateStatus(proposal.getId(), STATUS_PENDING_EXECUTE, STATUS_EXECUTING);
+            int rows = proposalRecordDao.updateStatus(proposal.getId(), ProposalStatusEnum.PENDING_EXECUTE, ProposalStatusEnum.EXECUTING);
             if (rows == 0) {
                 log.warn("【引擎拦截】提案正在执行中或已完结，忽略本次调用。提案ID: {}", proposal.getId());
                 return;
@@ -109,7 +102,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
 
             // 5. 闭环：根据结果落终态。失败原因写进 remark，运营/研发能直接从提案列表看出卡在哪
             if (outcome.ok()) {
-                proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_SUCCESS, "资产下发成功");
+                proposalRecordDao.updateStatusAndRemark(proposal.getId(), ProposalStatusEnum.SUCCESS, "资产下发成功");
                 syncPrizeLog(proposal, PrizeDispatchStatusEnum.SUCCESS, null);
             } else {
                 // 没发出去就得把预算还回去，否则预算只减不加，跑一段时间水位就虚高到发不出奖
@@ -134,7 +127,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
     private void markFailed(ProposalRecord proposal, String reason) {
         String remark = SolvelaStringUtil.truncate(reason, REMARK_MAX_LENGTH);
         try {
-            proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_FAILED, remark);
+            proposalRecordDao.updateStatusAndRemark(proposal.getId(), ProposalStatusEnum.FAILED, remark);
         } catch (Exception e) {
             log.error("【引擎状态回写失败】提案ID: {} 将停留在 40(执行中)，请人工核对", proposal.getId(), e);
         }
