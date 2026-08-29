@@ -5,7 +5,7 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.base.json.JsonUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;

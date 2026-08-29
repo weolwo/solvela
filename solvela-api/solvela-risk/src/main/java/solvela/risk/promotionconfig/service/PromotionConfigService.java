@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -57,7 +56,7 @@ public class PromotionConfigService {
      * 刻意不做服务端按类型过滤：配置总量本来就不大，前端一次拉全量、按 prizeType 分组缓存，
      * 运营切换奖品类型时本地过滤即可，省掉来回打接口。
      */
-    public ResponseDTO<List<PromotionConfigOptionDTO>> queryOptionList() {
+    public List<PromotionConfigOptionDTO> queryOptionList() {
         List<PromotionConfig> list = promotionConfigDao.selectList(
                 Wrappers.<PromotionConfig>lambdaQuery()
                         .eq(PromotionConfig::getStatus, STATUS_ENABLED)
@@ -74,49 +73,45 @@ public class PromotionConfigService {
                         item.getUsedQuota(),
                         item.getReviewLevel()))
                 .collect(Collectors.toList());
-        return ResponseDTO.ok(optionList);
+        return optionList;
     }
 
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PromotionConfigAddCommand addForm) {
+    public void add(PromotionConfigAddCommand addForm) {
         PromotionConfig promotionConfig = SolvelaBeanUtil.copy(addForm, PromotionConfig.class);
         promotionConfigDao.insert(promotionConfig);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新
      *
      */
-    public ResponseDTO<String> update(PromotionConfigUpdateCommand updateForm) {
+    public void update(PromotionConfigUpdateCommand updateForm) {
         PromotionConfig promotionConfig = SolvelaBeanUtil.copy(updateForm, PromotionConfig.class);
         promotionConfigDao.updateById(promotionConfig);
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         promotionConfigDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (null == id) {
-            return ResponseDTO.ok();
+            return;
         }
 
         promotionConfigDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 }

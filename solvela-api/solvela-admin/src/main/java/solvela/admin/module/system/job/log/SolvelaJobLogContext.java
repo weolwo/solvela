@@ -4,8 +4,7 @@ package solvela.admin.module.system.job.log;
  * 当前线程正在执行哪个 logId —— 供日志 Appender 判断「这条日志属于哪次执行」。
  *
  * <p>⚠️ <b>ThreadLocal 的固有局限必须写在这里，而不是等人踩</b>：
- * 执行器内部若自己起了线程或线程池，那些线程上的日志<b>不会</b>被收集
- * （除非用 {@code ThreadPoolUtil} 提交，它会透传 MDC，但本类是独立的 ThreadLocal）。
+ * 执行器内部若自己起了线程或线程池，那些线程上的日志<b>不会</b>被收集。
  * 表现是「这次执行的日志缺了一大块」，而且完全不报错 ——
  * 不提前说清楚，它会变成一类新的排查负担。
  *

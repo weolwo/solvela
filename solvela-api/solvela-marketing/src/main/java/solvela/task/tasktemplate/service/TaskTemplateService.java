@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
@@ -20,6 +19,7 @@ import solvela.task.tasktemplate.domain.command.TaskTemplateUpdateCommand;
 import solvela.task.tasktemplate.domain.dto.TaskTemplateOptionDTO;
 import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
 import solvela.task.tasktemplate.manager.TaskTemplateManager;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -74,15 +74,15 @@ public class TaskTemplateService {
     /**
      * 生成一个未被占用的模板编码（10 位大写字母+数字），供模板设计器「生成」按钮调用
      */
-    public ResponseDTO<String> generateTemplateCode() {
-        return ResponseDTO.ok(SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.TASK_TEMPLATE, this::existsByTemplateCode));
+    public String generateTemplateCode() {
+        return SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.TASK_TEMPLATE, this::existsByTemplateCode);
     }
 
     /**
      * 任务配置向导用的模板列表：ui_schema 以 JSON 对象下发，前端直接喂给 SchemaFormRenderer
      * 单个模板的 ui_schema 脏了不该让整个向导开不了，解析失败的模板跳过并告警
      */
-    public ResponseDTO<List<TaskTemplateOptionDTO>> queryOptionList() {
+    public List<TaskTemplateOptionDTO> queryOptionList() {
         // 只给启用中的模板：禁用的意义就是「不再让人拿它建新任务」，
         // 已经用它建好的任务不受影响（运行态按 template_code 取脚本，与这里的候选列表无关）
         List<TaskTemplate> list = taskTemplateManager.lambdaQuery()
@@ -104,7 +104,7 @@ public class TaskTemplateService {
                     stringValue(uiSchema.get(SCHEMA_KEY_DESC), ""),
                     uiSchema));
         }
-        return ResponseDTO.ok(optionList);
+        return optionList;
     }
 
     @SuppressWarnings("unchecked")
@@ -126,14 +126,14 @@ public class TaskTemplateService {
      *
      * @return true-新建模板，false-覆盖更新了已存在的模板（前端据此区分提示，防止误覆盖线上模板）
      */
-    public ResponseDTO<Boolean> save(TaskTemplateSaveCommand saveForm) {
+    public Boolean save(TaskTemplateSaveCommand saveForm) {
         String schemaError = checkUiSchema(saveForm.getUiSchema());
         if (schemaError != null) {
-            return ResponseDTO.userErrorParam(schemaError);
+            throw new BusinessException(schemaError);
         }
         String contractError = checkTargetParamDeclared(saveForm.getTaskType(), saveForm.getUiSchema());
         if (contractError != null) {
-            return ResponseDTO.userErrorParam(contractError);
+            throw new BusinessException(contractError);
         }
 
         TaskTemplate taskTemplate = SolvelaBeanUtil.copy(saveForm, TaskTemplate.class);
@@ -147,7 +147,7 @@ public class TaskTemplateService {
             taskTemplate.setId(existed.getId());
             taskTemplateDao.updateById(taskTemplate);
         }
-        return ResponseDTO.ok(createFlag);
+        return createFlag;
     }
 
     /**
@@ -235,33 +235,31 @@ public class TaskTemplateService {
      * 添加
      * 模板编码允许手工输入，故服务端必须重校验唯一性（格式由 AddForm 的 @Pattern 拦）
      */
-    public ResponseDTO<String> add(TaskTemplateAddCommand addForm) {
+    public void add(TaskTemplateAddCommand addForm) {
         if (existsByTemplateCode(addForm.getTemplateCode())) {
-            return ResponseDTO.userErrorParam("模板编码已存在：" + addForm.getTemplateCode());
+            throw new BusinessException("模板编码已存在：" + addForm.getTemplateCode());
         }
         // 这两条 CRUD 接口收的是 ui_schema 字符串，是绕过设计器的另一条入口 ——
         // 校验必须两边都做，否则「防不住绕过页面直接 POST」（铁律 2）
         String error = checkRawUiSchema(addForm.getTaskType(), addForm.getUiSchema());
         if (error != null) {
-            return ResponseDTO.userErrorParam(error);
+            throw new BusinessException(error);
         }
         TaskTemplate taskTemplate = SolvelaBeanUtil.copy(addForm, TaskTemplate.class);
         taskTemplateDao.insert(taskTemplate);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新
      *
      */
-    public ResponseDTO<String> update(TaskTemplateUpdateCommand updateForm) {
+    public void update(TaskTemplateUpdateCommand updateForm) {
         String error = checkRawUiSchema(updateForm.getTaskType(), updateForm.getUiSchema());
         if (error != null) {
-            return ResponseDTO.userErrorParam(error);
+            throw new BusinessException(error);
         }
         TaskTemplate taskTemplate = SolvelaBeanUtil.copy(updateForm, TaskTemplate.class);
         taskTemplateDao.updateById(taskTemplate);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -292,9 +290,9 @@ public class TaskTemplateService {
      * ui_schema / rule_script。删掉不会立刻报错，而是让引用它的任务安静地不再推进 ——
      * 禁用则只是不再出现在向导的候选里，存量任务照常跑。
      */
-    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+    public void updateStatus(List<Long> idList, Integer status) {
         if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
-            return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 0-禁用");
+            throw new BusinessException("目标状态只能是 1-启用 或 0-禁用");
         }
         for (Long id : idList) {
             TaskTemplate update = new TaskTemplate();
@@ -302,41 +300,38 @@ public class TaskTemplateService {
             update.setStatus(status);
             taskTemplateDao.updateById(update);
         }
-        return ResponseDTO.ok();
     }
 
     /**
      * 模板详情：供模板设计器的编辑态回显 ui_schema / rule_script。
      */
-    public ResponseDTO<TaskTemplateDTO> detail(Long id) {
+    public TaskTemplateDTO detail(Long id) {
         TaskTemplate template = taskTemplateDao.selectById(id);
         if (template == null) {
-            return ResponseDTO.userErrorParam("任务模板不存在");
+            throw new BusinessException("任务模板不存在");
         }
-        return ResponseDTO.ok(SolvelaBeanUtil.copy(template, TaskTemplateDTO.class));
+        return SolvelaBeanUtil.copy(template, TaskTemplateDTO.class);
     }
 
     /**
      * 批量删除
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         taskTemplateDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (null == id){
-            return ResponseDTO.ok();
+            return;
         }
 
         taskTemplateDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 }

@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import solvela.activity.ActivityConfig;
 import solvela.activity.service.ActivityConfigService;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
@@ -36,6 +35,7 @@ import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
 import solvela.draw.runtime.DrawStockService;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,8 +108,8 @@ public class PrizePoolConfigService {
     /**
      * 生成一个未被占用的奖池编码（10 位大写字母+数字），供工作台「新建奖池」调用
      */
-    public ResponseDTO<String> generatePoolCode() {
-        return ResponseDTO.ok(SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.POOL, this::existsByPoolCode));
+    public String generatePoolCode() {
+        return SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.POOL, this::existsByPoolCode);
     }
 
     /**
@@ -123,10 +123,10 @@ public class PrizePoolConfigService {
      * 抽奖工作台聚合回显：与 workbenchSave 的入参同构，前端拿到即可直接填回两个 Tab
      * 空配置（活动刚建、还没配过奖池）返回空列表而非报错，前端据此进入「从零配置」态
      */
-    public ResponseDTO<DrawWorkbenchDTO> workbenchDetail(String activityCode) {
+    public DrawWorkbenchDTO workbenchDetail(String activityCode) {
         ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
         if (activity == null) {
-            return ResponseDTO.userErrorParam("活动不存在：" + activityCode);
+            throw new BusinessException("活动不存在：" + activityCode);
         }
         boolean online = ACTIVITY_STATUS_ONLINE.equals(activity.getStatus());
 
@@ -176,8 +176,8 @@ public class PrizePoolConfigService {
             return new DrawWorkbenchPoolDTO(pool.getPoolCode(), pool.getPoolName(), mappingVOList);
         }).collect(Collectors.toList());
 
-        return ResponseDTO.ok(new DrawWorkbenchDTO(activity.getActivityCode(), activity.getActivityName(),
-                activity.getStatus(), online, itemVOList, poolVOList));
+        return new DrawWorkbenchDTO(activity.getActivityCode(), activity.getActivityName(),
+                activity.getStatus(), online, itemVOList, poolVOList);
     }
 
     /**
@@ -202,11 +202,11 @@ public class PrizePoolConfigService {
      * 同一事务落库。前端的概率闭环/上线锁只是 UI 防呆，此处全部服务端重算
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> workbenchSave(DrawWorkbenchSaveCommand form) {
+    public void workbenchSave(DrawWorkbenchSaveCommand form) {
         // 1. 活动必须存在，并据其状态判定是否启用结构锁
         ActivityConfig activity = activityConfigService.getByActivityCode(form.getActivityCode());
         if (activity == null) {
-            return ResponseDTO.userErrorParam("活动不存在：" + form.getActivityCode());
+            throw new BusinessException("活动不存在：" + form.getActivityCode());
         }
         boolean online = ACTIVITY_STATUS_ONLINE.equals(activity.getStatus());
 
@@ -214,10 +214,10 @@ public class PrizePoolConfigService {
         Set<String> itemCodes = new HashSet<>();
         for (DrawWorkbenchPoolItemCommand item : form.getPrizeItemList()) {
             if (!itemCodes.add(item.getPrizeCode())) {
-                return ResponseDTO.userErrorParam("奖品编码重复：" + item.getPrizeCode());
+                throw new BusinessException("奖品编码重复：" + item.getPrizeCode());
             }
             if (prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), item.getPrizeCode()) == null) {
-                return ResponseDTO.userErrorParam("奖品不存在于本活动的资产大库：" + item.getPrizeCode());
+                throw new BusinessException("奖品不存在于本活动的资产大库：" + item.getPrizeCode());
             }
         }
 
@@ -226,20 +226,20 @@ public class PrizePoolConfigService {
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
             // 奖池编码由前端生成/手输，服务端重校验格式（对齐活动编码、奖品编码的统一约定）
             if (!SolvelaCodeUtil.isValidBizCode(pool.getPoolCode())) {
-                return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+                throw new BusinessException("奖池「" + pool.getPoolName() + "」" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
             }
             if (!poolCodes.add(pool.getPoolCode())) {
-                return ResponseDTO.userErrorParam("奖池编码重复：" + pool.getPoolCode());
+                throw new BusinessException("奖池编码重复：" + pool.getPoolCode());
             }
             Set<String> mappingCodes = new HashSet<>();
             BigDecimal total = BigDecimal.ZERO;
             int fallbackCount = 0;
             for (DrawWorkbenchMappingCommand mapping : pool.getPrizeMappingList()) {
                 if (!mappingCodes.add(mapping.getPrizeCode())) {
-                    return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」坑位奖品重复：" + mapping.getPrizeCode());
+                    throw new BusinessException("奖池「" + pool.getPoolName() + "」坑位奖品重复：" + mapping.getPrizeCode());
                 }
                 if (!itemCodes.contains(mapping.getPrizeCode())) {
-                    return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」引用了物资列表外的奖品：" + mapping.getPrizeCode());
+                    throw new BusinessException("奖池「" + pool.getPoolName() + "」引用了物资列表外的奖品：" + mapping.getPrizeCode());
                 }
                 if (Boolean.TRUE.equals(mapping.getIsFallback())) {
                     fallbackCount++;
@@ -247,10 +247,10 @@ public class PrizePoolConfigService {
                 total = total.add(mapping.getProbability());
             }
             if (fallbackCount > 1) {
-                return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」兜底奖项最多只能有一个");
+                throw new BusinessException("奖池「" + pool.getPoolName() + "」兜底奖项最多只能有一个");
             }
             if (total.subtract(HUNDRED).abs().compareTo(PROBABILITY_EPSILON) > 0) {
-                return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」概率总和为 " + total.toPlainString() + "%，必须等于100%");
+                throw new BusinessException("奖池「" + pool.getPoolName() + "」概率总和为 " + total.toPlainString() + "%，必须等于100%");
             }
         }
 
@@ -268,7 +268,7 @@ public class PrizePoolConfigService {
         if (online) {
             String lockError = checkOnlineStructureLock(form, itemCodes, poolCodes, dbItemMap, dbPools);
             if (lockError != null) {
-                return ResponseDTO.userErrorParam(lockError);
+                throw new BusinessException(lockError);
             }
         }
 
@@ -310,7 +310,7 @@ public class PrizePoolConfigService {
             if (existed == null) {
                 // uk_pool_code 是全局唯一：手输的编码可能撞上别的活动的奖池，提前给出人话提示而不是抛 SQL 异常
                 if (existsByPoolCode(pool.getPoolCode())) {
-                    return ResponseDTO.userErrorParam("奖池编码已被其他活动占用：" + pool.getPoolCode());
+                    throw new BusinessException("奖池编码已被其他活动占用：" + pool.getPoolCode());
                 }
                 PrizePoolConfig entity = new PrizePoolConfig();
                 entity.setActivityCode(form.getActivityCode());
@@ -354,7 +354,6 @@ public class PrizePoolConfigService {
         // 9. 预热库存缓存：抽奖运行态的 Lua 预扣依赖这些 key（dbItemMap 此时已含新插入项的 id）
         drawStockService.warmStock(form.getActivityCode(), new ArrayList<>(dbItemMap.values()));
 
-        return ResponseDTO.ok();
     }
 
     /**
@@ -437,10 +436,9 @@ public class PrizePoolConfigService {
      * 更新
      *
      */
-    public ResponseDTO<String> update(PrizePoolConfigUpdateCommand updateForm) {
+    public void update(PrizePoolConfigUpdateCommand updateForm) {
         PrizePoolConfig prizePoolConfig = SolvelaBeanUtil.copy(updateForm, PrizePoolConfig.class);
         prizePoolConfigDao.updateById(prizePoolConfig);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -463,19 +461,18 @@ public class PrizePoolConfigService {
      * <p>用条件更新做并发闸门：两个运营同时点，第二次 rows=0，
      * 不会出现「都以为自己禁用成功了」的假象。
      */
-    public ResponseDTO<String> offline(Long id) {
+    public void offline(Long id) {
         PrizePoolConfig pool = prizePoolConfigDao.selectById(id);
         if (pool == null) {
-            return ResponseDTO.userErrorParam("奖池不存在");
+            throw new BusinessException("奖池不存在");
         }
         if (!POOL_STATUS_OPEN.equals(pool.getStatus())) {
-            return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」本来就是关闭状态");
+            throw new BusinessException("奖池「" + pool.getPoolName() + "」本来就是关闭状态");
         }
         int rows = prizePoolConfigDao.updateStatus(id, POOL_STATUS_OPEN, POOL_STATUS_CLOSED);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("禁用失败：状态已被其他人变更，请刷新后重试");
+            throw new BusinessException("禁用失败：状态已被其他人变更，请刷新后重试");
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -485,19 +482,18 @@ public class PrizePoolConfigService {
      * 启用只是把开关拨回去，配置是否可用由奖池一览的体检去回答（那里看得更全）。
      * 若在此拦截，运营会遇到「禁用得掉、启用不回来」的单向门，比让他自己看告警更糟。
      */
-    public ResponseDTO<String> online(Long id) {
+    public void online(Long id) {
         PrizePoolConfig pool = prizePoolConfigDao.selectById(id);
         if (pool == null) {
-            return ResponseDTO.userErrorParam("奖池不存在");
+            throw new BusinessException("奖池不存在");
         }
         if (POOL_STATUS_OPEN.equals(pool.getStatus())) {
-            return ResponseDTO.userErrorParam("奖池「" + pool.getPoolName() + "」已经是开启状态");
+            throw new BusinessException("奖池「" + pool.getPoolName() + "」已经是开启状态");
         }
         int rows = prizePoolConfigDao.updateStatus(id, POOL_STATUS_CLOSED, POOL_STATUS_OPEN);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("启用失败：状态已被其他人变更，请刷新后重试");
+            throw new BusinessException("启用失败：状态已被其他人变更，请刷新后重试");
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -507,20 +503,23 @@ public class PrizePoolConfigService {
      * 止血动作里混着几个「本来就已关闭」是常态，不该把其余的一起回滚掉。
      * 已关闭的计入跳过，最后回一句人话汇总。
      */
-    public ResponseDTO<String> batchOffline(List<Long> idList) {
+    public String batchOffline(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return "没有需要禁用的奖池";
         }
         int success = 0;
         int skipped = 0;
         for (Long id : idList) {
-            if (offline(id).getOk()) {
+            try {
+                offline(id);
                 success++;
-            } else {
+            } catch (BusinessException e) {
+                // 「本就已关闭 / 不存在」由 offline 抛出，这里按跳过计数：
+                // 逐个独立提交是刻意的，见上面的方法注释
                 skipped++;
             }
         }
-        return ResponseDTO.ok("已禁用 " + success + " 个奖池"
-                + (skipped > 0 ? "，跳过 " + skipped + " 个（本就已关闭或不存在）" : ""));
+        return "已禁用 " + success + " 个奖池"
+                + (skipped > 0 ? "，跳过 " + skipped + " 个（本就已关闭或不存在）" : "");
     }
 }

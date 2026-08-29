@@ -2,7 +2,6 @@ package solvela.lottery.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.engine.FpeCipher;
@@ -13,6 +12,7 @@ import solvela.lottery.issue.manager.LotteryIssueManager;
 import solvela.lottery.runtime.domain.TicketObtainCommand;
 import solvela.lottery.runtime.domain.TicketObtainDTO;
 import solvela.member.service.MemberService;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
@@ -105,7 +105,7 @@ public class TicketIssueService {
      * 上游若已经持有一个完整的领号上下文，整个传进来比拆成几个参数顺手。
      * <b>核心实现只有下面那一份，这里只做拆包</b> —— 两个入口的行为不可能漂移。
      */
-    public ResponseDTO<TicketObtainDTO> obtain(TicketObtainCommand form) {
+    public TicketObtainDTO obtain(TicketObtainCommand form) {
         return obtain(form.getLotteryCode(), form.getIssueNo(), form.getMemberId(), form.getRequestId());
     }
 
@@ -123,13 +123,13 @@ public class TicketIssueService {
      * @param memberId    会员号（关联键）。账号快照由本方法查会员表取，调用方不用传
      * @param requestId   幂等键，可为空；传了则同一个 requestId 只会发出一个号码
      */
-    public ResponseDTO<TicketObtainDTO> obtain(String lotteryCode, String issueNo, Long memberId, String requestId) {
+    public TicketObtainDTO obtain(String lotteryCode, String issueNo, Long memberId, String requestId) {
         // 1. 幂等防重
         if (StringUtils.isNotBlank(requestId)) {
             boolean first = redissonClient.getBucket(LotteryCacheKey.request(requestId), StringCodec.INSTANCE)
                     .setIfAbsent("1", REQUEST_DEDUP_TTL);
             if (!first) {
-                return ResponseDTO.userErrorParam("请求处理中或已处理，请勿重复提交");
+                throw new BusinessException("请求处理中或已处理，请勿重复提交");
             }
         }
 
@@ -144,33 +144,33 @@ public class TicketIssueService {
             limiter.expire(RATE_LIMITER_TTL);
         }
         if (!limiter.tryAcquire()) {
-            return ResponseDTO.userErrorParam("操作太频繁，请稍后再试");
+            throw new BusinessException("操作太频繁，请稍后再试");
         }
 
         // 3. 玩法与期号校验
         LotteryConfig config = lotteryConfigService.getByLotteryCode(lotteryCode);
         if (config == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + lotteryCode);
+            throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
         if (!CONFIG_STATUS_ONLINE.equals(config.getStatus())) {
-            return ResponseDTO.userErrorParam("彩票玩法未上线，暂不能领号");
+            throw new BusinessException("彩票玩法未上线，暂不能领号");
         }
         LotteryIssue issue = lotteryIssueManager.lambdaQuery()
                 .eq(LotteryIssue::getLotteryCode, lotteryCode)
                 .eq(LotteryIssue::getIssueNo, issueNo).one();
         if (issue == null) {
-            return ResponseDTO.userErrorParam("期号不存在：" + issueNo);
+            throw new BusinessException("期号不存在：" + issueNo);
         }
         if (!ISSUE_STATUS_WAIT.equals(issue.getStatus())) {
-            return ResponseDTO.userErrorParam("该期已开奖或正在核销，不能再领号");
+            throw new BusinessException("该期已开奖或正在核销，不能再领号");
         }
         // 售卖窗口用数据库时钟判定（铁律 9/10：不引第二个时钟源）
         LocalDateTime now = lotteryIssueDao.selectDbNow();
         if (issue.getSaleStartTime() != null && now.isBefore(issue.getSaleStartTime())) {
-            return ResponseDTO.userErrorParam("该期尚未开始发售");
+            throw new BusinessException("该期尚未开始发售");
         }
         if (issue.getSaleEndTime() != null && now.isAfter(issue.getSaleEndTime())) {
-            return ResponseDTO.userErrorParam("该期已停止发售");
+            throw new BusinessException("该期已停止发售");
         }
 
         FpeCipher cipher = fpeCipherFactory.create(lotteryCode, issueNo, config.getNumberLength());
@@ -180,15 +180,15 @@ public class TicketIssueService {
             long cursor = lotterySequenceService.nextCursor(lotteryCode, issueNo);
             if (cursor > config.getTotalCount()) {
                 // 售罄。游标已经涨上去了也不退回 —— 见类注释
-                return ResponseDTO.userErrorParam("本期号码已发完");
+                throw new BusinessException("本期号码已发完");
             }
             long sequenceNo = lotterySequenceService.toSequenceNo(cursor, config.getTotalCount(), cipher.domain());
             String ticketNumber = cipher.encrypt(sequenceNo);
 
             String securitySign = ticketSignService.sign(lotteryCode, issueNo, sequenceNo, ticketNumber, memberName);
             try {
-                return ResponseDTO.ok(ticketPersistService.persist(
-                        config, issue, memberId, memberName, sequenceNo, ticketNumber, securitySign));
+                return ticketPersistService.persist(
+                        config, issue, memberId, memberName, sequenceNo, ticketNumber, securitySign);
             } catch (DuplicateKeyException e) {
                 // 双射保证了这不该发生。真发生说明 Redis 游标与 DB 不一致（如误清了 Redis），
                 // 不静默吞：告警 + 换游标重试，重试耗尽则如实报错
@@ -197,7 +197,7 @@ public class TicketIssueService {
                         lotteryCode, issueNo, cursor, sequenceNo, ticketNumber, attempt + 1);
             }
         }
-        return ResponseDTO.userErrorParam("系统繁忙，请稍后重试");
+        throw new BusinessException("系统繁忙，请稍后重试");
     }
 
 }

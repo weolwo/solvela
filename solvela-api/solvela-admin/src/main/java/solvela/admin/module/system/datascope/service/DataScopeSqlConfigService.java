@@ -11,7 +11,7 @@ import solvela.admin.module.system.datascope.constant.DataScopeWhereInTypeEnum;
 import solvela.admin.module.system.datascope.domain.DataScopeSqlConfig;
 import solvela.admin.module.system.datascope.strategy.AbstractDataScopeStrategy;
 import solvela.base.util.SolvelaCollectionUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import org.apache.commons.lang3.StringUtils;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -98,7 +98,7 @@ public class DataScopeSqlConfigService {
      * 组装需要拼接的sql
      */
     public String getJoinSql(Map<String, Object> paramMap, DataScopeSqlConfig sqlConfigDTO) {
-        Long employeeId = CurrentUser.idOrNull();
+        Long employeeId = CurrentEmployee.idOrNull();
         if (employeeId == null) {
             return "";
         }

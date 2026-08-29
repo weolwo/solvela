@@ -1,6 +1,6 @@
 package solvela.consumer.handler;
 
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.prize.PrizeLog;
 
 public interface IPrizeHandler {
@@ -10,5 +10,5 @@ public interface IPrizeHandler {
      * @param prizeLog 已经落库的奖品日志记录
      * @return 派发结果 (包含成功/失败状态和外部流水号等)
      */
-    ResponseDTO dispatch(PrizeLog prizeLog);
+    DispatchOutcome dispatch(PrizeLog prizeLog);
 }

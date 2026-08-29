@@ -2,7 +2,6 @@ package solvela.mall.favorite.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import solvela.base.domain.ResponseDTO;
 import solvela.mall.constant.MallConst;
 import solvela.mall.favorite.dao.MallFavoriteDao;
 import solvela.mall.favorite.domain.dto.MallFavoriteStatDTO;
@@ -28,7 +27,7 @@ public class MallFavoriteService {
 
     private final MallFavoriteDao mallFavoriteDao;
 
-    public ResponseDTO<MallFavoriteStatDTO> queryStat(Integer rankTopN) {
+    public MallFavoriteStatDTO queryStat(Integer rankTopN) {
         int topN = rankTopN == null ? MallConst.RANK_TOP_N : rankTopN;
         topN = Math.min(Math.max(topN, 1), MallConst.MAX_RANK_TOP_N);
 
@@ -42,7 +41,7 @@ public class MallFavoriteService {
         }
         stat.setRank(nullToEmpty(mallFavoriteDao.queryRank(topN)));
         stat.setUnavailableRank(nullToEmpty(mallFavoriteDao.queryUnavailableRank(topN)));
-        return ResponseDTO.ok(stat);
+        return stat;
     }
 
     private static <T> List<T> nullToEmpty(List<T> list) {

@@ -3,9 +3,8 @@ package solvela.admin.module.system.repeatsubmit;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import solvela.base.json.JsonUtils;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.base.constant.RedisKeyConst;
 import org.aspectj.lang.JoinPoint;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,15 +16,19 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 public class DefaultMd5KeyGenerator implements RepeatSubmitKeyGenerator {
+
+    /** 防重提交 key 的前缀。只有本类会生成这种 key，所以它就住在这里 */
+    private static final String KEY_PREFIX = "repeat:submit";
+
     @Override
     public String createKey(JoinPoint point, HttpServletRequest request) {
 
         String url = request.getRequestURL().toString();
-        Long userId = CurrentUser.idOrNull();
+        Long userId = CurrentEmployee.idOrNull();
         String reqParams = argsArrayToString(point.getArgs());
         String md5 = md5Hex(SolvelaStringUtil.join(":", userId, url, reqParams));
         // 唯一标识
-        return String.join(":", RedisKeyConst.REPEAT_SUBMIT, md5);
+        return String.join(":", KEY_PREFIX, md5);
     }
 
 

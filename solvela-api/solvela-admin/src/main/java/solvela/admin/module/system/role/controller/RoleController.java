@@ -1,6 +1,6 @@
 package solvela.admin.module.system.role.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -10,7 +10,7 @@ import solvela.admin.module.system.role.domain.form.RoleAddForm;
 import solvela.admin.module.system.role.domain.form.RoleUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.service.RoleService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,21 +33,21 @@ public class RoleController {
 
     @Operation(summary = "添加角色 @author 卓大")
     @PostMapping("/role/add")
-    @SaCheckPermission("system:role:addProposal")
+    @RequiresPermission("system:role:addProposal")
     public ResponseDTO<String> addRole(@Valid @RequestBody RoleAddForm roleAddForm) {
         return roleService.addRole(roleAddForm);
     }
 
     @Operation(summary = "删除角色 @author 卓大")
     @GetMapping("/role/delete/{roleId}")
-    @SaCheckPermission("system:role:delete")
+    @RequiresPermission("system:role:delete")
     public ResponseDTO<String> deleteRole(@PathVariable Long roleId) {
         return roleService.deleteRole(roleId);
     }
 
     @Operation(summary = "更新角色 @author 卓大")
     @PostMapping("/role/update")
-    @SaCheckPermission("system:role:update")
+    @RequiresPermission("system:role:update")
     public ResponseDTO<String> updateRole(@Valid @RequestBody RoleUpdateForm roleUpdateDTO) {
         return roleService.updateRole(roleUpdateDTO);
     }

@@ -3,7 +3,6 @@ package solvela.task.record.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -20,6 +19,7 @@ import solvela.task.taskconfig.manager.TaskConfigManager;
 import org.springframework.stereotype.Service;
 
 import solvela.member.service.MemberService;
+import solvela.exception.BusinessException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -202,23 +202,21 @@ public class TaskRecordService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(TaskRecordAddCommand addForm) {
+    public void add(TaskRecordAddCommand addForm) {
         TaskRecord taskRecord = SolvelaBeanUtil.copy(addForm, TaskRecord.class);
         // 任务记录是状态表，不留账号快照；但会员号必须真实存在 ——
         // 关联键指向一个查不到的会员，列表里会是一行没有名字的孤儿记录，且当场不报错
         memberService.requireExists(addForm.getMemberId());
         taskRecordDao.insert(taskRecord);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新
      *
      */
-    public ResponseDTO<String> update(TaskRecordUpdateCommand updateForm) {
+    public void update(TaskRecordUpdateCommand updateForm) {
         TaskRecord taskRecord = SolvelaBeanUtil.copy(updateForm, TaskRecord.class);
         taskRecordDao.updateById(taskRecord);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -229,9 +227,9 @@ public class TaskRecordService {
      * 故这里只放行 3，不接受其它值 —— 允许管理端随手把记录改回「进行中」或「已发奖」，
      * 等于给了一条绕过运行态直接改结果的路。
      */
-    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+    public void updateStatus(List<Long> idList, Integer status) {
         if (!STATUS_EXPIRED.equals(status)) {
-            return ResponseDTO.userErrorParam("任务记录只支持置为 3-已过期（即管理端的「禁用」）");
+            throw new BusinessException("任务记录只支持置为 3-已过期（即管理端的「禁用」）");
         }
         for (Long id : idList) {
             TaskRecord update = new TaskRecord();
@@ -239,31 +237,28 @@ public class TaskRecordService {
             update.setStatus(status);
             taskRecordDao.updateById(update);
         }
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         taskRecordDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (null == id){
-            return ResponseDTO.ok();
+            return;
         }
 
         taskRecordDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 
     private BigDecimal rate(long part, long total) {

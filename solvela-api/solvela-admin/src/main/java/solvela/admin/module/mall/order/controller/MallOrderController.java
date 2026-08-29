@@ -1,6 +1,6 @@
 package solvela.admin.module.mall.order.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.mall.order.domain.form.MallOrderQueryForm;
 import solvela.mall.order.domain.query.MallOrderQuery;
@@ -42,7 +42,7 @@ public class MallOrderController {
 
     @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission("mallOrder:query")
+    @RequiresPermission("mallOrder:query")
     public ResponseDTO<PageResult<MallOrderVO>> queryPage(@RequestBody @Valid MallOrderQueryForm queryForm) {
         PageResult<MallOrderDTO> page = mallOrderService.queryPage(SolvelaBeanUtil.copy(queryForm, MallOrderQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallOrderVO.class));
@@ -53,8 +53,8 @@ public class MallOrderController {
      */
     @Operation(summary = "订单统计与兑换商品排行 @author weolwo")
     @PostMapping("/queryStat")
-    @SaCheckPermission("mallOrder:query")
+    @RequiresPermission("mallOrder:query")
     public ResponseDTO<MallOrderStatDTO> queryStat(@RequestBody @Valid MallOrderQueryForm queryForm) {
-        return mallOrderService.queryStat(SolvelaBeanUtil.copy(queryForm, MallOrderQuery.class));
+        return ResponseDTO.ok(mallOrderService.queryStat(SolvelaBeanUtil.copy(queryForm, MallOrderQuery.class)));
     }
 }

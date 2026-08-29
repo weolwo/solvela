@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.web.SolvelaResponseUtil;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.codegenerator.domain.form.CodeGeneratorConfigForm;

@@ -1,6 +1,6 @@
 package solvela.admin.module.system.menu.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -11,9 +11,9 @@ import solvela.admin.module.system.menu.domain.form.MenuUpdateForm;
 import solvela.admin.module.system.menu.domain.vo.MenuTreeVO;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.admin.module.system.menu.service.MenuService;
-import solvela.base.domain.RequestUrlVO;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.web.CurrentUser;
+import solvela.web.config.RequestUrl;
+import solvela.web.ResponseDTO;
+import solvela.admin.auth.CurrentEmployee;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,25 +36,25 @@ public class MenuController {
 
     @Operation(summary = "添加菜单 @author 卓大")
     @PostMapping("/menu/add")
-    @SaCheckPermission("system:menu:addProposal")
+    @RequiresPermission("system:menu:addProposal")
     public ResponseDTO<String> addMenu(@RequestBody @Valid MenuAddForm menuAddForm) {
-        menuAddForm.setCreateUserId(CurrentUser.idOrNull());
+        menuAddForm.setCreateUserId(CurrentEmployee.idOrNull());
         return menuService.addMenu(menuAddForm);
     }
 
     @Operation(summary = "更新菜单 @author 卓大")
     @PostMapping("/menu/update")
-    @SaCheckPermission("system:menu:update")
+    @RequiresPermission("system:menu:update")
     public ResponseDTO<String> updateMenu(@RequestBody @Valid MenuUpdateForm menuUpdateForm) {
-        menuUpdateForm.setUpdateUserId(CurrentUser.idOrNull());
+        menuUpdateForm.setUpdateUserId(CurrentEmployee.idOrNull());
         return menuService.updateMenu(menuUpdateForm);
     }
 
     @Operation(summary = "批量删除菜单 @author 卓大")
     @GetMapping("/menu/batchDelete")
-    @SaCheckPermission("system:menu:batchDelete")
+    @RequiresPermission("system:menu:batchDelete")
     public ResponseDTO<String> batchDeleteMenu(@RequestParam("menuIdList") List<Long> menuIdList) {
-        return menuService.batchDeleteMenu(menuIdList, CurrentUser.idOrNull());
+        return menuService.batchDeleteMenu(menuIdList, CurrentEmployee.idOrNull());
     }
 
     @Operation(summary = "查询菜单列表 @author 卓大")
@@ -77,7 +77,7 @@ public class MenuController {
 
     @Operation(summary = "获取所有请求路径 @author 卓大")
     @GetMapping("/menu/auth/url")
-    public ResponseDTO<List<RequestUrlVO>> getAuthUrl() {
+    public ResponseDTO<List<RequestUrl>> getAuthUrl() {
         return menuService.getAuthUrl();
     }
 }

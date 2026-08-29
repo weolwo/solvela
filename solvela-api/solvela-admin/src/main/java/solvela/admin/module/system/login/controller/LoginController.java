@@ -1,6 +1,5 @@
 package solvela.admin.module.system.login.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
 import solvela.web.SolvelaServletUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,11 +10,10 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.login.domain.LoginForm;
 import solvela.admin.module.system.login.domain.LoginResultVO;
 import solvela.admin.module.system.login.service.LoginService;
-import solvela.admin.util.AdminRequestUtil;
-import solvela.base.annotation.AllowAnonymous;
+import solvela.web.AllowAnonymous;
 import solvela.base.constant.RequestHeaderConst;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.web.CurrentUser;
+import solvela.web.ResponseDTO;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.securityprotect.service.Level3ProtectConfigService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -50,16 +48,16 @@ public class LoginController {
     @GetMapping("/login/getLoginInfo")
     @Operation(summary = "获取登录结果信息  @author 卓大")
     public ResponseDTO<LoginResultVO> getLoginInfo() {
-        String tokenValue = StpUtil.getTokenValue();
-        LoginResultVO loginResult = loginService.getLoginResult(AdminRequestUtil.getRequestUser(), tokenValue);
-        loginResult.setToken(tokenValue);
+        LoginResultVO loginResult = loginService.getLoginResult(
+                CurrentEmployee.orNull(), CurrentEmployee.isSuperPassword());
+        loginResult.setToken(CurrentEmployee.tokenOrNull());
         return ResponseDTO.ok(loginResult);
     }
 
     @Operation(summary = "退出登录  @author 卓大")
     @GetMapping("/login/logout")
     public ResponseDTO<String> logout() {
-        return loginService.logout(CurrentUser.orNull());
+        return loginService.logout(CurrentEmployee.orNull());
     }
 
     @AllowAnonymous

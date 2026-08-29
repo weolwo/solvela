@@ -6,8 +6,6 @@ import org.springframework.stereotype.Service;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
 import solvela.exception.BusinessException;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.member.constant.MemberConst;
@@ -69,24 +67,23 @@ public class MemberService {
      * 前端把已注销那行的开关禁掉了，这里是真正的约束。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> updateStatus(Long memberId, Integer status, RequestUser user) {
+    public void updateStatus(Long memberId, Integer status, String operator) {
         if (status == null
                 || (status != MemberConst.STATUS_NORMAL && status != MemberConst.STATUS_FROZEN)) {
-            return ResponseDTO.userErrorParam("只能在「正常」与「冻结」之间切换");
+            throw new BusinessException("只能在「正常」与「冻结」之间切换");
         }
         Member member = memberManager.getById(memberId);
         if (member == null) {
-            return ResponseDTO.userErrorParam("会员不存在");
+            throw new BusinessException("会员不存在");
         }
         if (MemberConst.STATUS_CANCELLED == nullToZero(member.getStatus())) {
-            return ResponseDTO.userErrorParam("该会员已注销，注销是终态，不能改回其它状态");
+            throw new BusinessException("该会员已注销，注销是终态，不能改回其它状态");
         }
         Member update = new Member();
         update.setMemberId(memberId);
         update.setStatus(status);
-        update.setUpdateBy(user == null ? null : user.getUserName());
+        update.setUpdateBy(operator);
         memberDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -96,22 +93,21 @@ public class MemberService {
      * 开一个能改整行的口子，等于把昵称、状态、注册来源也一并暴露给了这个入口。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> updateRemark(Long memberId, String remark, RequestUser user) {
+    public void updateRemark(Long memberId, String remark, String operator) {
         Member member = memberManager.getById(memberId);
         if (member == null) {
-            return ResponseDTO.userErrorParam("会员不存在");
+            throw new BusinessException("会员不存在");
         }
         String trimmed = StringUtils.trimToNull(remark);
         if (trimmed != null && trimmed.length() > MemberConst.MAX_REMARK_LENGTH) {
-            return ResponseDTO.userErrorParam("备注最长 " + MemberConst.MAX_REMARK_LENGTH + " 字");
+            throw new BusinessException("备注最长 " + MemberConst.MAX_REMARK_LENGTH + " 字");
         }
         Member update = new Member();
         update.setMemberId(memberId);
         // 清空备注要真的写回 null，所以这一列在实体上挂了 updateStrategy = ALWAYS
         update.setRemark(trimmed);
-        update.setUpdateBy(user == null ? null : user.getUserName());
+        update.setUpdateBy(operator);
         memberDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     private static int nullToZero(Integer value) {

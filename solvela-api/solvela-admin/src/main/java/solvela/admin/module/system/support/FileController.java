@@ -7,11 +7,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaContentDispositionUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.base.config.FileConfig;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.entity.FileEntity;
@@ -63,10 +62,10 @@ public class FileController extends SupportBaseController {
     public ResponseDTO<FileUploadVO> upload(@RequestParam MultipartFile file,
                                             @RequestParam(required = false) Integer folder,
                                             @RequestParam(required = false) String categoryCode) {
-        RequestUser requestUser = CurrentUser.orNull();
+        String operator = CurrentEmployee.nameOrNull();
         FileEntity entity = (categoryCode == null || categoryCode.isBlank())
-                ? fileAssetService.upload(MultipartUploadSource.of(file), Long.valueOf(requireFolder(folder)), requestUser)
-                : fileAssetService.upload(MultipartUploadSource.of(file), categoryCode, requestUser);
+                ? fileAssetService.upload(MultipartUploadSource.of(file), Long.valueOf(requireFolder(folder)), operator)
+                : fileAssetService.upload(MultipartUploadSource.of(file), categoryCode, operator);
         return ResponseDTO.ok(toUploadVO(entity));
     }
 

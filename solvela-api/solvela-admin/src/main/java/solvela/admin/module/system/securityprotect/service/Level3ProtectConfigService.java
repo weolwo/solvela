@@ -1,11 +1,11 @@
 package solvela.admin.module.system.securityprotect.service;
 
-import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
+import solvela.admin.auth.TokenStore;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
 import solvela.admin.module.system.securityprotect.domain.Level3ProtectConfigForm;
@@ -108,6 +108,9 @@ public class Level3ProtectConfigService {
     @Resource
     private ConfigService configService;
 
+    @Resource
+    private TokenStore tokenStore;
+
     /**
      * 最低活跃时间（单位：秒），超过此时间没有操作系统就会被冻结，默认-1 代表不限制，永不冻结; 默认 30分钟
      */
@@ -167,12 +170,10 @@ public class Level3ProtectConfigService {
             this.regularChangePasswordNotAllowRepeatTimes = configForm.getRegularChangePasswordNotAllowRepeatTimes();
         }
 
-        // 设置 最低活跃时间（单位：秒）
-        if (this.loginActiveTimeoutSeconds > 0) {
-            StpUtil.getStpLogic().getConfigOrGlobal().setActiveTimeout(getLoginActiveTimeoutSeconds());
-        } else {
-            StpUtil.getStpLogic().getConfigOrGlobal().setActiveTimeout(-1);
-        }
+        // 把「最低活跃频率」推给令牌存储。这是数据库配置，改完必须<b>立刻</b>生效 ——
+        // 原先是往 sa-token 的全局配置对象里塞值，等于隔着一个框架单例改状态；
+        // 现在是一次显式的方法调用，能被测试直接验证
+        tokenStore.setActiveTimeoutSeconds(getLoginActiveTimeoutSeconds());
     }
 
     /**
@@ -183,6 +184,7 @@ public class Level3ProtectConfigService {
         setProp(configForm);
         // 保存数据库
         String configFormJsonString = JsonUtils.toJson(configForm);
-        return configService.updateValueByKey(ConfigKeyEnum.LEVEL3_PROTECT_CONFIG, configFormJsonString);
+        configService.updateValueByKey(ConfigKeyEnum.LEVEL3_PROTECT_CONFIG, configFormJsonString);
+        return ResponseDTO.ok();
     }
 }

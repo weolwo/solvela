@@ -16,7 +16,7 @@ import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.manager.RoleEmployeeManager;
 import solvela.base.constant.StringConst;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;

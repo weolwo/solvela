@@ -4,7 +4,7 @@ import solvela.base.module.config.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.config.domain.ConfigVO;
 import org.springframework.web.bind.annotation.GetMapping;

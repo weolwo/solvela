@@ -1,7 +1,5 @@
 package solvela.admin.constant;
 
-import solvela.base.constant.CacheKeyConst;
-
 /**
  * 缓存 key
  *
@@ -11,7 +9,7 @@ import solvela.base.constant.CacheKeyConst;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
-public class AdminCacheConst extends CacheKeyConst {
+public class AdminCacheConst {
 
     public static class Department {
 
@@ -62,7 +60,30 @@ public class AdminCacheConst extends CacheKeyConst {
         /**
          * 请求用户信息权限
          */
-        public static final String USER_PERMISSION = "login_user_permission";
+        /**
+         * 缓存名带 v2：{@code UserPermission} 从 solvela-base 搬到了 admin，而缓存里的 JSON
+         * 带着旧的全限定类名。沿用旧缓存名的话，发布后第一次读会拿旧 payload 反序列化，
+         * 直接 ClassNotFound —— 换个名字等于让存量条目自然过期，谁也不用去线上手工清 key。
+         */
+        public static final String USER_PERMISSION = "login_user_permission_v2";
+    }
+
+    /**
+     * 字典缓存。原先在 solvela-base 的 {@code CacheKeyConst}，但只有管理端的字典模块用它，
+     * 而字典的增删改也只发生在管理端 —— 放在共享层等于让每个端都以为自己该管它。
+     */
+    public static class Dict {
+
+        public static final String DICT_DATA = "dict_data_cache";
+
+        /**
+         * 字典标签 → 字典项的反查缓存。
+         *
+         * <p>刻意和 {@link #DICT_DATA} 分成两个缓存而不是共用一个加前缀：
+         * 共用时 key 形如 {@code CODE_L_xxx}，而 dataValue 本身完全可能就等于 {@code L_xxx}，
+         * 两种 key 会撞在一起。
+         */
+        public static final String DICT_DATA_LABEL = "dict_data_label_cache";
     }
 
 }

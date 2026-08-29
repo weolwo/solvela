@@ -2,7 +2,6 @@ package solvela.draw.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.json.JsonUtils;
 import tools.jackson.core.type.TypeReference;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
@@ -24,6 +23,7 @@ import solvela.event.UserPrizeEvent;
 import solvela.member.service.MemberService;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
+import solvela.exception.BusinessException;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
 import org.redisson.api.RateType;
@@ -119,13 +119,13 @@ public class DrawExecuteService {
      * UserPrizeEvent 经 @TransactionalEventListener(AFTER_COMMIT) 在提交后才真正派发，天然防「事务回滚但奖已发」
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<DrawExecuteDTO> execute(DrawExecuteCommand form) {
+    public DrawExecuteDTO execute(DrawExecuteCommand form) {
         // 1. 幂等防重（调用方传 requestId 即启用）
         if (form.getRequestId() != null && !form.getRequestId().isBlank()) {
             boolean first = redissonClient.getBucket(DrawCacheKey.request(form.getRequestId()), StringCodec.INSTANCE)
                     .setIfAbsent("1", REQUEST_DEDUP_TTL);
             if (!first) {
-                return ResponseDTO.userErrorParam("请求处理中或已处理，请勿重复提交");
+                throw new BusinessException("请求处理中或已处理，请勿重复提交");
             }
         }
 
@@ -141,17 +141,17 @@ public class DrawExecuteService {
             limiter.expire(RATE_LIMITER_TTL);
         }
         if (!limiter.tryAcquire()) {
-            return ResponseDTO.userErrorParam("操作太频繁，请稍后再试");
+            throw new BusinessException("操作太频繁，请稍后再试");
         }
 
         // 3. 奖池校验
         PrizePoolConfig pool = prizePoolConfigManager.lambdaQuery()
                 .eq(PrizePoolConfig::getPoolCode, form.getPoolCode()).one();
         if (pool == null || !form.getActivityCode().equals(pool.getActivityCode())) {
-            return ResponseDTO.userErrorParam("奖池不存在或不属于该活动");
+            throw new BusinessException("奖池不存在或不属于该活动");
         }
         if (!POOL_STATUS_OPEN.equals(pool.getStatus())) {
-            return ResponseDTO.userErrorParam("奖池未开启");
+            throw new BusinessException("奖池未开启");
         }
 
         String traceId = form.getRequestId() != null && !form.getRequestId().isBlank()
@@ -162,7 +162,7 @@ public class DrawExecuteService {
                 .eq(PoolPrizeMapping::getPoolCode, form.getPoolCode())
                 .orderByAsc(PoolPrizeMapping::getSortWeight).list();
         if (mappings.isEmpty()) {
-            return ResponseDTO.userErrorParam("奖池未配置奖项");
+            throw new BusinessException("奖池未配置奖项");
         }
         List<Long> itemIds = mappings.stream().map(PoolPrizeMapping::getPrizeItemId).toList();
         Map<Long, PrizePoolItem> itemMap = prizePoolItemManager.listByIds(itemIds).stream()
@@ -174,7 +174,7 @@ public class DrawExecuteService {
                 .sorted(Comparator.comparing(PoolPrizeMapping::getSortWeight)).toList()) {
             PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
             if (item == null) {
-                return ResponseDTO.userErrorParam("奖池配置异常：奖项已被删除，itemId=" + mapping.getPrizeItemId());
+                throw new BusinessException("奖池配置异常：奖项已被删除，itemId=" + mapping.getPrizeItemId());
             }
             prizes.add(new DrawPrizeSnapshot(
                     item.getId(),
@@ -204,7 +204,7 @@ public class DrawExecuteService {
             case DrawResult.NoStock(String candidateCode) -> {
                 // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
                 saveLog(form, memberName, traceId, null, candidateCode, LOG_STATUS_NO_STOCK, "快照判定无库存");
-                yield ResponseDTO.ok(DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完"));
+                yield DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完");
             }
         };
     }
@@ -235,7 +235,7 @@ public class DrawExecuteService {
     /**
      * 结算：Lua 预扣 -> DB 条件更新兜底 -> 失败降级兜底奖项 -> 落流水
      */
-    private ResponseDTO<DrawExecuteDTO> settle(DrawExecuteCommand form, String memberName, String traceId,
+    private DrawExecuteDTO settle(DrawExecuteCommand form, String memberName, String traceId,
                                               DrawPoolSnapshot snapshot,
                                               Map<Long, PrizePoolItem> itemMap,
                                               DrawPrizeSnapshot candidate, DrawResult.HitSource source,
@@ -243,7 +243,7 @@ public class DrawExecuteService {
         if (tryDeduct(form, itemMap, candidate, period)) {
             saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_HIT, source.name());
             publishPrizeEvent(form, memberName, traceId, candidate.prizeCode());
-            return ResponseDTO.ok(DrawExecuteDTO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name()));
+            return DrawExecuteDTO.ofHit(candidate.prizeItemId(), candidate.prizeCode(), source.name());
         }
 
         // 候选奖项扣减失败（并发抢空/超单人限领）-> 降级兜底
@@ -253,13 +253,13 @@ public class DrawExecuteService {
             saveLog(form, memberName, traceId, fallback.prizeItemId(), fallback.prizeCode(), LOG_STATUS_HIT,
                     DrawResult.HitSource.FALLBACK_DEGRADE.name());
             publishPrizeEvent(form, memberName, traceId, fallback.prizeCode());
-            return ResponseDTO.ok(DrawExecuteDTO.ofHit(fallback.prizeItemId(), fallback.prizeCode(),
-                    DrawResult.HitSource.FALLBACK_DEGRADE.name()));
+            return DrawExecuteDTO.ofHit(fallback.prizeItemId(), fallback.prizeCode(),
+                    DrawResult.HitSource.FALLBACK_DEGRADE.name());
         }
 
         // 引擎不扣费也就不退费：上游若已扣过资产，按这个返回值自行退还
         saveLog(form, memberName, traceId, candidate.prizeItemId(), candidate.prizeCode(), LOG_STATUS_NO_STOCK, "预扣失败且兜底不可用");
-        return ResponseDTO.ok(DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完"));
+        return DrawExecuteDTO.ofMiss("手慢了，奖品已被抽完");
     }
 
     /**

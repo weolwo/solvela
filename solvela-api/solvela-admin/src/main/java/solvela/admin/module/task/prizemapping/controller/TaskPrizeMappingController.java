@@ -5,14 +5,14 @@ import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
 import solvela.admin.module.task.prizemapping.domain.vo.TaskPrizeMappingVO;
 import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
 import solvela.task.prizemapping.service.TaskPrizeMappingService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -43,7 +43,7 @@ public class TaskPrizeMappingController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("taskPrizeMapping:query")
+    @RequiresPermission("taskPrizeMapping:query")
     public ResponseDTO<PageResult<TaskPrizeMappingVO>> queryPage(@RequestBody @Valid TaskPrizeMappingQueryForm queryForm) {
         PageResult<TaskPrizeMappingDTO> page = taskPrizeMappingService.queryPage(SolvelaBeanUtil.copy(queryForm, TaskPrizeMappingQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskPrizeMappingVO.class));

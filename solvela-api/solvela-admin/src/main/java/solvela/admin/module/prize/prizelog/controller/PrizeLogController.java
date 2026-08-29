@@ -1,6 +1,6 @@
 package solvela.admin.module.prize.prizelog.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.consumer.handler.PrizeDispatchHandler;
 import solvela.admin.module.prize.prizelog.domain.form.PrizeLogAddForm;
 import solvela.prize.prizelog.domain.command.PrizeLogAddCommand;
@@ -40,21 +40,23 @@ public class PrizeLogController {
 
     @Operation(summary = "发奖审批通过（approve_mode=1 的奖品唯一出口，通过后立即派发）")
     @GetMapping("/approve/{id}")
-    @SaCheckPermission("prizeLog:approve")
+    @RequiresPermission("prizeLog:approve")
     public ResponseDTO<String> approveDispatch(@PathVariable Long id) {
-        return prizeDispatchHandler.approveDispatch(id, CurrentUser.orNull().getUserName());
+        prizeDispatchHandler.approveDispatch(id, CurrentEmployee.nameOrNull());
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "发奖审批驳回")
     @GetMapping("/reject/{id}")
-    @SaCheckPermission("prizeLog:approve")
+    @RequiresPermission("prizeLog:approve")
     public ResponseDTO<String> rejectDispatch(@PathVariable Long id, @RequestParam(required = false) String reason) {
-        return prizeDispatchHandler.rejectDispatch(id, CurrentUser.orNull().getUserName(), reason);
+        prizeDispatchHandler.rejectDispatch(id, CurrentEmployee.nameOrNull(), reason);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("prizeLog:query")
+    @RequiresPermission("prizeLog:query")
     public ResponseDTO<PageResult<PrizeLogVO>> queryPage(@RequestBody @Valid PrizeLogQueryForm queryForm) {
         PageResult<PrizeLogDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizeLogQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizeLogVO.class));
@@ -62,16 +64,17 @@ public class PrizeLogController {
 
     @Operation(summary = "奖励漏斗：已发出条数与价值（双口径）、审批积压、卡单、失败原因与一致性体检")
     @PostMapping("/funnel")
-    @SaCheckPermission("prizeLog:query")
+    @RequiresPermission("prizeLog:query")
     public ResponseDTO<PrizeLogFunnelDTO> funnel(@RequestBody @Valid PrizeLogQueryForm queryForm) {
         return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, PrizeLogQuery.class)));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission("prizeLog:add")
+    @RequiresPermission("prizeLog:add")
     public ResponseDTO<String> add(@RequestBody @Valid PrizeLogAddForm addForm) {
-        return Service.add(SolvelaBeanUtil.copy(addForm, PrizeLogAddCommand.class));
+        Service.add(SolvelaBeanUtil.copy(addForm, PrizeLogAddCommand.class));
+        return ResponseDTO.ok();
     }
 
     /*

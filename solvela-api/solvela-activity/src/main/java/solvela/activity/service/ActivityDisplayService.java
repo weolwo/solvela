@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import solvela.activity.dao.ActivityDisplayDao;
 import solvela.activity.ActivityConfig;
 import solvela.activity.ActivityDisplay;
-import solvela.base.domain.RequestUser;
 import solvela.exception.BusinessException;
 import solvela.base.module.file.service.FileAssetService;
 import solvela.base.module.file.service.RichTextImageExtractor;
@@ -70,10 +69,10 @@ public class ActivityDisplayService {
      * 按活动编码保存。活动 ID 从活动上带过来，前端不用传也篡改不了。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ActivityDisplay saveByCode(String activityCode, ActivityDisplay form, RequestUser user) {
+    public ActivityDisplay saveByCode(String activityCode, ActivityDisplay form, String operator) {
         ActivityConfig activity = requireActivity(activityCode);
         form.setActivityId(activity.getId());
-        return save(form, user);
+        return save(form, operator);
     }
 
     private ActivityConfig requireActivity(String activityCode) {
@@ -92,13 +91,12 @@ public class ActivityDisplayService {
      * 因为是定时任务按规则删的，日志里只有一句"清理了 N 个过期临时文件"。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ActivityDisplay save(ActivityDisplay form, RequestUser user) {
+    public ActivityDisplay save(ActivityDisplay form, String operator) {
         if (form.getActivityId() == null) {
             throw new BusinessException("活动ID不能为空");
         }
         checkRuleContent(form.getRuleContent());
 
-        String operator = user == null ? null : user.getUserName();
         ActivityDisplay existing = activityDisplayDao.getByActivityId(form.getActivityId());
         if (existing == null) {
             form.setId(null);

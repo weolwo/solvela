@@ -17,14 +17,14 @@ import solvela.activity.service.ActivityConfigService;
 import solvela.base.domain.ValidateList;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -53,7 +53,7 @@ public class ActivityConfigController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("activityConfig:query")
+    @RequiresPermission("activityConfig:query")
     public ResponseDTO<PageResult<ActivityConfigVO>> queryPage(@RequestBody @Valid ActivityConfigQueryForm queryForm) {
         PageResult<ActivityConfigDTO> page = activityConfigService.queryPage(SolvelaBeanUtil.copy(queryForm, ActivityConfigQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, ActivityConfigVO.class));
@@ -61,7 +61,7 @@ public class ActivityConfigController {
 
     @Operation(summary = "活动下拉列表（按类型过滤；includeInactive=true 时连已下线/已过期一并返回）")
     @GetMapping("/optionList")
-    @SaCheckPermission("activityConfig:query")
+    @RequiresPermission("activityConfig:query")
     public ResponseDTO<List<ActivityConfigVO>> queryOptionList(
             @RequestParam(required = false) String activityType,
             @RequestParam(required = false, defaultValue = "false") Boolean includeInactive) {
@@ -71,35 +71,36 @@ public class ActivityConfigController {
 
     @Operation(summary = "批量查询「是否已配置玩法」，供活动列表页一次算完")
     @PostMapping("/configuredStatus")
-    @SaCheckPermission("activityConfig:query")
+    @RequiresPermission("activityConfig:query")
     public ResponseDTO<Map<String, Boolean>> queryConfiguredStatus(@RequestBody ValidateList<String> activityCodeList) {
         return ResponseDTO.ok(activityConfigService.queryConfiguredStatus(activityCodeList));
     }
 
     @Operation(summary = "删除前检查：是否可删 + 下游引用明细")
     @GetMapping("/checkDeletable/{id}")
-    @SaCheckPermission("activityConfig:query")
+    @RequiresPermission("activityConfig:query")
     public ResponseDTO<ActivityDeleteCheckDTO> checkDeletable(@PathVariable Long id) {
         return ResponseDTO.ok(activityConfigService.checkDeletable(id));
     }
 
     @Operation(summary = "生成活动编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
-    @SaCheckPermission("activityConfig:add")
+    @RequiresPermission("activityConfig:add")
     public ResponseDTO<String> generateActivityCode() {
-        return activityConfigService.generateActivityCode();
+        return ResponseDTO.ok(activityConfigService.generateActivityCode());
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission("activityConfig:add")
+    @RequiresPermission("activityConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid ActivityConfigAddForm addForm) {
-        return activityConfigService.add(SolvelaBeanUtil.copy(addForm, ActivityConfigAddCommand.class));
+        activityConfigService.add(SolvelaBeanUtil.copy(addForm, ActivityConfigAddCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "创建向导第一步：建活动 + 随手建的若干奖品，一次事务落库")
     @PostMapping("/wizard/create")
-    @SaCheckPermission("activityConfig:add")
+    @RequiresPermission("activityConfig:add")
     public ResponseDTO<String> wizardCreate(@RequestBody @Valid ActivityWizardCreateForm form) {
         ActivityWizardCreateCommand command = SolvelaBeanUtil.copy(form, ActivityWizardCreateCommand.class);
         // 🔴 嵌套集合必须显式转换。BeanUtils.copyProperties 会解析泛型，发现
@@ -107,41 +108,47 @@ public class ActivityConfigController {
         // 既不报错也不转换，prizeList 会留在 null，表现是"向导提交了但奖品一个没建"
         command.setPrizeList(SolvelaBeanUtil.copyList(
                 form.getPrizeList(), ActivityWizardCreateCommand.WizardPrizeCommand.class));
-        return activityConfigService.wizardCreate(command);
+        activityConfigService.wizardCreate(command);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新（不含活动类型，类型创建后不可改）")
     @PostMapping("/update")
-    @SaCheckPermission("activityConfig:update")
+    @RequiresPermission("activityConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid ActivityConfigUpdateForm updateForm) {
-        return activityConfigService.update(SolvelaBeanUtil.copy(updateForm, ActivityConfigUpdateCommand.class));
+        activityConfigService.update(SolvelaBeanUtil.copy(updateForm, ActivityConfigUpdateCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "活动上下线（单个开关与批量操作共用）；上线前校验玩法完备度")
     @PostMapping("/updateStatus")
-    @SaCheckPermission("activityConfig:update")
+    @RequiresPermission("activityConfig:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid ActivityStatusUpdateForm form) {
-        return activityConfigService.updateStatus(form.getIdList(), form.getStatus());
+        activityConfigService.updateStatus(form.getIdList(), form.getStatus());
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "升级活动类型：仅 BASIC → DRAW/TASK/LOTTERY，且下游玩法表必须为空")
     @PostMapping("/upgradeType")
-    @SaCheckPermission("activityConfig:update")
+    @RequiresPermission("activityConfig:update")
     public ResponseDTO<String> upgradeType(@RequestBody @Valid ActivityTypeUpgradeForm upgradeForm) {
-        return activityConfigService.upgradeType(upgradeForm.getId(), upgradeForm.getTargetType());
+        activityConfigService.upgradeType(upgradeForm.getId(), upgradeForm.getTargetType());
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission("activityConfig:delete")
+    @RequiresPermission("activityConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return activityConfigService.batchDelete(idList);
+        activityConfigService.batchDelete(idList);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission("activityConfig:delete")
+    @RequiresPermission("activityConfig:delete")
     public ResponseDTO<String> delete(@PathVariable Long id) {
-        return activityConfigService.delete(id);
+        activityConfigService.delete(id);
+        return ResponseDTO.ok();
     }
 }

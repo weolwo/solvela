@@ -10,7 +10,7 @@ import jakarta.annotation.Resource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.util.SolvelaTemplateUtil;
 import solvela.admin.module.system.mail.constant.MailTemplateCodeEnum;

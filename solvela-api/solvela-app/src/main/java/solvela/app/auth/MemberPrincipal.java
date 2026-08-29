@@ -5,9 +5,9 @@ import java.io.Serializable;
 /**
  * 当前请求的会员身份。
  *
- * <p><b>刻意不实现 {@code RequestUser}</b>。那个接口要求 {@code getUserId / getUserName /
- * getUserType}，是按后台员工的形状定的 —— 员工有工号、有角色、有数据范围，
- * 于是「用户」这个抽象里就带着这些概念。会员一个都没有：
+ * <p><b>刻意不复用管理端的 {@code RequestEmployee}</b>。那个类是按后台员工的形状定的 ——
+ * 员工有工号、有角色、有数据范围、有 userType，于是「用户」这个抽象里就带着这些概念。
+ * 会员一个都没有：
  * 会员的授权边界是「只能动自己的数据」，由每个 service 用 memberId 过滤，
  * 不存在角色，也不存在「用户类型」这个维度（本进程里只可能是会员）。
  *

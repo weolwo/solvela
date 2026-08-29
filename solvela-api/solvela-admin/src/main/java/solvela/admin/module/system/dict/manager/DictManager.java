@@ -2,7 +2,7 @@ package solvela.admin.module.system.dict.manager;
 
 import jakarta.annotation.Resource;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.base.constant.CacheKeyConst;
+import solvela.admin.constant.AdminCacheConst;
 import solvela.admin.module.system.dict.dao.DictDao;
 import solvela.admin.module.system.dict.dao.DictDataDao;
 import solvela.admin.module.system.dict.domain.entity.DictDataEntity;
@@ -35,7 +35,7 @@ public class DictManager {
     /**
      * 获取字典
      */
-    @Cacheable(value = CacheKeyConst.Dict.DICT_DATA, key = "#dictCode + '_' + #dataValue")
+    @Cacheable(value = AdminCacheConst.Dict.DICT_DATA, key = "#dictCode + '_' + #dataValue")
     public DictDataVO getDictData(String dictCode, String dataValue) {
         DictEntity dictEntity = dictDao.selectByCode(dictCode);
         if (dictEntity == null) {
@@ -58,7 +58,7 @@ public class DictManager {
      *       返回空 List 既能正常缓存、又不会把这条路变成异常路径。</li>
      * </ul>
      */
-    @Cacheable(value = CacheKeyConst.Dict.DICT_DATA_LABEL, key = "#dictCode + '_' + #dataLabel")
+    @Cacheable(value = AdminCacheConst.Dict.DICT_DATA_LABEL, key = "#dictCode + '_' + #dataLabel")
     public List<DictDataVO> listDictDataByLabel(String dictCode, String dataLabel) {
         DictEntity dictEntity = dictDao.selectByCode(dictCode);
         if (dictEntity == null) {

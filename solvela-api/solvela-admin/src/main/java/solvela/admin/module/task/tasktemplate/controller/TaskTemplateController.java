@@ -17,14 +17,14 @@ import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
 import solvela.task.tasktemplate.service.TaskTemplateService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -47,7 +47,7 @@ public class TaskTemplateController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("taskTemplate:query")
+    @RequiresPermission("taskTemplate:query")
     public ResponseDTO<PageResult<TaskTemplateVO>> queryPage(@RequestBody @Valid TaskTemplateQueryForm queryForm) {
         PageResult<TaskTemplateDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, TaskTemplateQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskTemplateVO.class));
@@ -55,64 +55,69 @@ public class TaskTemplateController {
 
     @Operation(summary = "生成模板编码（10位大写字母+数字，已判重）")
     @GetMapping("/generateCode")
-    @SaCheckPermission("taskTemplate:save")
+    @RequiresPermission("taskTemplate:save")
     public ResponseDTO<String> generateTemplateCode() {
-        return Service.generateTemplateCode();
+        return ResponseDTO.ok(Service.generateTemplateCode());
     }
 
     @Operation(summary = "任务向导用模板列表（ui_schema 以 JSON 对象下发）")
     @GetMapping("/optionList")
-    @SaCheckPermission("taskTemplate:query")
+    @RequiresPermission("taskTemplate:query")
     public ResponseDTO<List<TaskTemplateOptionDTO>> queryOptionList() {
-        return Service.queryOptionList();
+        return ResponseDTO.ok(Service.queryOptionList());
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission("taskTemplate:add")
+    @RequiresPermission("taskTemplate:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskTemplateAddForm addForm) {
-        return Service.add(SolvelaBeanUtil.copy(addForm, TaskTemplateAddCommand.class));
+        Service.add(SolvelaBeanUtil.copy(addForm, TaskTemplateAddCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "模板设计器保存（按 templateCode upsert）")
     @PostMapping("/save")
-    @SaCheckPermission("taskTemplate:save")
+    @RequiresPermission("taskTemplate:save")
     public ResponseDTO<Boolean> save(@RequestBody @Valid TaskTemplateSaveForm saveForm) {
-        return Service.save(SolvelaBeanUtil.copy(saveForm, TaskTemplateSaveCommand.class));
+        return ResponseDTO.ok(Service.save(SolvelaBeanUtil.copy(saveForm, TaskTemplateSaveCommand.class)));
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission("taskTemplate:update")
+    @RequiresPermission("taskTemplate:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskTemplateUpdateForm updateForm) {
-        return Service.update(SolvelaBeanUtil.copy(updateForm, TaskTemplateUpdateCommand.class));
+        Service.update(SolvelaBeanUtil.copy(updateForm, TaskTemplateUpdateCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "启用/禁用（单个开关与批量禁用共用）")
     @PostMapping("/updateStatus")
-    @SaCheckPermission("taskTemplate:update")
+    @RequiresPermission("taskTemplate:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskTemplateStatusUpdateForm form) {
-        return Service.updateStatus(form.getIdList(), form.getStatus());
+        Service.updateStatus(form.getIdList(), form.getStatus());
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "模板详情（供模板设计器编辑态回显）")
     @GetMapping("/detail/{id}")
-    @SaCheckPermission("taskTemplate:query")
+    @RequiresPermission("taskTemplate:query")
     public ResponseDTO<TaskTemplateVO> detail(@PathVariable Long id) {
-        return ResponseDTO.ok(SolvelaBeanUtil.copy(Service.detail(id).getData(), TaskTemplateVO.class));
+        return ResponseDTO.ok(SolvelaBeanUtil.copy(Service.detail(id), TaskTemplateVO.class));
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission("taskTemplate:delete")
+    @RequiresPermission("taskTemplate:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+        Service.batchDelete(idList);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission("taskTemplate:delete")
+    @RequiresPermission("taskTemplate:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
+        Service.delete(id);
+        return ResponseDTO.ok();
     }
 }

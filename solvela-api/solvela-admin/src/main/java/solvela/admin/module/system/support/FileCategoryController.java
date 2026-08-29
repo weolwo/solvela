@@ -1,12 +1,12 @@
 package solvela.admin.module.system.support;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.web.CurrentUser;
+import solvela.web.ResponseDTO;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.base.module.file.domain.entity.FileCategoryEntity;
 import solvela.base.module.file.domain.vo.FileCategoryVO;
@@ -42,22 +42,22 @@ public class FileCategoryController extends SupportBaseController {
 
     @Operation(summary = "新建文件分类 @author 1024")
     @PostMapping("/file/category/add")
-    @SaCheckPermission("support:file:query")
+    @RequiresPermission("support:file:query")
     public ResponseDTO<FileCategoryEntity> add(@RequestBody @Valid FileCategoryEntity form) {
-        return ResponseDTO.ok(fileCategoryService.add(form, CurrentUser.orNull()));
+        return ResponseDTO.ok(fileCategoryService.add(form, CurrentEmployee.nameOrNull()));
     }
 
     @Operation(summary = "更新文件分类 @author 1024")
     @PostMapping("/file/category/update")
-    @SaCheckPermission("support:file:query")
+    @RequiresPermission("support:file:query")
     public ResponseDTO<String> update(@RequestBody @Valid FileCategoryEntity form) {
-        fileCategoryService.update(form, CurrentUser.orNull());
+        fileCategoryService.update(form, CurrentEmployee.nameOrNull());
         return ResponseDTO.ok();
     }
 
     @Operation(summary = "删除文件分类（内置分类与非空分类不允许删） @author 1024")
     @GetMapping("/file/category/delete/{categoryId}")
-    @SaCheckPermission("support:file:query")
+    @RequiresPermission("support:file:query")
     public ResponseDTO<String> delete(@PathVariable Long categoryId) {
         fileCategoryService.delete(categoryId);
         return ResponseDTO.ok();
@@ -71,9 +71,9 @@ public class FileCategoryController extends SupportBaseController {
      */
     @Operation(summary = "文件分类拖拽排序 @author 1024")
     @PostMapping("/file/category/reorder")
-    @SaCheckPermission("support:file:query")
+    @RequiresPermission("support:file:query")
     public ResponseDTO<String> reorder(@RequestBody List<Long> orderedIds) {
-        fileCategoryService.reorder(orderedIds, CurrentUser.orNull());
+        fileCategoryService.reorder(orderedIds, CurrentEmployee.nameOrNull());
         return ResponseDTO.ok();
     }
 }

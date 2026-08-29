@@ -6,7 +6,7 @@ import solvela.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleDataScopeVO;
 import solvela.admin.module.system.role.manager.RoleDataScopeManager;
 import solvela.code.UserErrorCode;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

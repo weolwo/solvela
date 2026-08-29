@@ -6,8 +6,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.member.constant.MemberConst;
 import solvela.member.verify.MemberVerifyMask;
@@ -17,6 +15,7 @@ import solvela.member.verify.domain.query.MemberVerifyQuery;
 import solvela.member.verify.domain.dto.MemberVerifyDetailDTO;
 import solvela.member.verify.domain.dto.MemberVerifyDTO;
 import solvela.member.verify.manager.MemberVerifyManager;
+import solvela.exception.BusinessException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -61,10 +60,10 @@ public class MemberVerifyService {
      *
      * <p>它和列表分开，是为了让「下发完整证件号」成为一个可以单独授权、单独审计的动作。
      */
-    public ResponseDTO<MemberVerifyDetailDTO> detail(Long id) {
+    public MemberVerifyDetailDTO detail(Long id) {
         MemberVerifyDTO row = memberVerifyDao.getDetail(id);
         if (row == null) {
-            return ResponseDTO.userErrorParam("实名记录不存在");
+            throw new BusinessException("实名记录不存在");
         }
         MemberVerifyDetailDTO vo = new MemberVerifyDetailDTO();
         vo.setId(row.getId());
@@ -77,7 +76,7 @@ public class MemberVerifyService {
         vo.setVerifyTime(row.getVerifyTime());
         vo.setFailReason(row.getFailReason());
         vo.setCreateTime(row.getCreateTime());
-        return ResponseDTO.ok(vo);
+        return vo;
     }
 
     /**
@@ -87,10 +86,10 @@ public class MemberVerifyService {
      * 那个时间是有业务含义的（合规审计要回答「什么时候通过的」）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> approve(Long id, RequestUser user) {
+    public void approve(Long id) {
         MemberVerify verify = requireAuditable(id);
         if (verify == null) {
-            return ResponseDTO.userErrorParam("只有「认证中」的记录可以审核");
+            throw new BusinessException("只有「认证中」的记录可以审核");
         }
         MemberVerify update = new MemberVerify();
         update.setId(id);
@@ -99,7 +98,6 @@ public class MemberVerifyService {
         // 通过时清掉上一次的驳回原因，否则界面上会出现「已认证」旁边挂着一条失败理由
         update.setFailReason(null);
         memberVerifyDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -107,16 +105,16 @@ public class MemberVerifyService {
      * 不填的话他只知道失败了，不知道该改什么，只能反复重交。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> reject(Long id, String failReason, RequestUser user) {
+    public void reject(Long id, String failReason) {
         if (StringUtils.isBlank(failReason)) {
-            return ResponseDTO.userErrorParam("请填写驳回原因，用户会看到这句话");
+            throw new BusinessException("请填写驳回原因，用户会看到这句话");
         }
         if (failReason.length() > MemberConst.MAX_FAIL_REASON_LENGTH) {
-            return ResponseDTO.userErrorParam("驳回原因最长 " + MemberConst.MAX_FAIL_REASON_LENGTH + " 字");
+            throw new BusinessException("驳回原因最长 " + MemberConst.MAX_FAIL_REASON_LENGTH + " 字");
         }
         MemberVerify verify = requireAuditable(id);
         if (verify == null) {
-            return ResponseDTO.userErrorParam("只有「认证中」的记录可以审核");
+            throw new BusinessException("只有「认证中」的记录可以审核");
         }
         MemberVerify update = new MemberVerify();
         update.setId(id);
@@ -124,7 +122,6 @@ public class MemberVerifyService {
         update.setFailReason(failReason.trim());
         // 驳回不写 verify_time：那一列的语义是「认证通过时间」，驳回没有通过
         memberVerifyDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     /**

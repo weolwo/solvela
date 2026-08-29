@@ -1,6 +1,6 @@
 package solvela.admin.module.scriptengine.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.exception.EngineScriptException;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.scriptengine.controller.form.ScriptTestForm;
@@ -48,14 +48,14 @@ public class ScriptEngineController {
     private final ScriptEngine scriptEngine;
 
     @Operation(summary = "【用户】脚本引擎-已注册函数文档，按业务域分组")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/view")
     public ResponseDTO<?> view() {
         return ResponseDTO.ok(engineFunctionRegistry.exportDocs());
     }
 
     @Operation(summary = "【用户】脚本引擎-场景契约查询，编辑器据此补全变量名")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/scene/view")
     public ResponseDTO<List<ScriptSceneDocDTO>> sceneView() {
         return ResponseDTO.ok(Arrays.stream(ScriptScene.values()).map(scene -> {
@@ -80,7 +80,7 @@ public class ScriptEngineController {
     }
 
     @Operation(summary = "【用户】脚本引擎-语法校验，不执行")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @PostMapping("/check")
     public ResponseDTO<ScriptCheckResultVO> check(@RequestBody @Valid ScriptTestForm form) {
         try {
@@ -93,7 +93,7 @@ public class ScriptEngineController {
     }
 
     @Operation(summary = "【用户】脚本引擎-在线试跑")
-    @SaCheckPermission("script:test")
+    @RequiresPermission("script:test")
     @PostMapping("/online/test")
     public ResponseDTO<?> onlineTest(@RequestBody @Valid ScriptTestForm form) {
         // untrusted：在线试跑的内容完全由请求决定，引擎据此关闭一切以脚本原文为 key 的缓存

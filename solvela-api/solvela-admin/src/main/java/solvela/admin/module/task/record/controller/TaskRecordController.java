@@ -15,14 +15,14 @@ import solvela.task.record.domain.dto.TaskRecordDTO;
 import solvela.task.record.service.TaskRecordService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -43,7 +43,7 @@ public class TaskRecordController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("taskRecord:query")
+    @RequiresPermission("taskRecord:query")
     public ResponseDTO<PageResult<TaskRecordVO>> queryPage(@RequestBody @Valid TaskRecordQueryForm queryForm) {
         PageResult<TaskRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, TaskRecordQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, TaskRecordVO.class));
@@ -51,43 +51,48 @@ public class TaskRecordController {
 
     @Operation(summary = "任务漏斗：达标率、任务分布、事件丢弃原因与数据一致性体检")
     @PostMapping("/funnel")
-    @SaCheckPermission("taskRecord:query")
+    @RequiresPermission("taskRecord:query")
     public ResponseDTO<TaskRecordFunnelDTO> funnel(@RequestBody @Valid TaskRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, TaskRecordQuery.class)));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission("taskRecord:add")
+    @RequiresPermission("taskRecord:add")
     public ResponseDTO<String> add(@RequestBody @Valid TaskRecordAddForm addForm) {
-        return Service.add(SolvelaBeanUtil.copy(addForm, TaskRecordAddCommand.class));
+        Service.add(SolvelaBeanUtil.copy(addForm, TaskRecordAddCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission("taskRecord:update")
+    @RequiresPermission("taskRecord:update")
     public ResponseDTO<String> update(@RequestBody @Valid TaskRecordUpdateForm updateForm) {
-        return Service.update(SolvelaBeanUtil.copy(updateForm, TaskRecordUpdateCommand.class));
+        Service.update(SolvelaBeanUtil.copy(updateForm, TaskRecordUpdateCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量禁用（置为 3-已过期，替代删除）")
     @PostMapping("/updateStatus")
-    @SaCheckPermission("taskRecord:update")
+    @RequiresPermission("taskRecord:update")
     public ResponseDTO<String> updateStatus(@RequestBody @Valid TaskRecordStatusUpdateForm form) {
-        return Service.updateStatus(form.getIdList(), form.getStatus());
+        Service.updateStatus(form.getIdList(), form.getStatus());
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission("taskRecord:delete")
+    @RequiresPermission("taskRecord:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+        Service.batchDelete(idList);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission("taskRecord:delete")
+    @RequiresPermission("taskRecord:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
+        Service.delete(id);
+        return ResponseDTO.ok();
     }
 }

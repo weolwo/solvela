@@ -7,7 +7,6 @@ import solvela.base.constant.StringConst;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.RequestUser;
 import solvela.exception.BusinessException;
 import solvela.base.module.file.constant.FileStatusEnum;
 import solvela.base.module.file.config.FileImageProperties;
@@ -154,7 +153,7 @@ public class FileAssetService {
      * <p><b>刻意不加 {@code @Transactional}</b>：这个方法既写库又写对象存储，而对象存储不参与
      * 数据库事务。加了事务只会制造一种错觉 —— 真正的一致性靠下面的写入顺序和 TEMP 状态保证。
      */
-    public FileEntity upload(UploadSource file, String categoryCode, RequestUser user) {
+    public FileEntity upload(UploadSource file, String categoryCode, String operator) {
         FileCategoryEntity category = requireCategory(categoryCode);
         FileImageProperties.Rule rule = imageProperties.ruleOf(category.getCategoryCode());
 
@@ -201,7 +200,7 @@ public class FileAssetService {
         entity.setFileSize(size);
         entity.setStatus(FileStatusEnum.TEMP.getValue());
         entity.setDeletedFlag(0);
-        entity.setCreateBy(user == null ? null : user.getUserName());
+        entity.setCreateBy(operator);
         if (IMAGE_MIME_TYPES.contains(contentType)) {
             readImageSize(file, entity);
             // 尺寸不合规必须在上传时就拦下来。等运营把 banner 发布出去、页面变形了才发现，
@@ -227,12 +226,12 @@ public class FileAssetService {
      * 按分类 ID 上传。给旧的 {@code /file/upload?folder=N} 接口用 ——
      * 迁移脚本把内置分类的 ID 对齐成了原 {@code folderType} 的值，所以前端不用改。
      */
-    public FileEntity upload(UploadSource file, Long categoryId, RequestUser user) {
+    public FileEntity upload(UploadSource file, Long categoryId, String operator) {
         FileCategoryEntity category = fileCategoryDao.selectById(categoryId);
         if (category == null) {
             throw new BusinessException("文件分类不存在：" + categoryId);
         }
-        return upload(file, category.getCategoryCode(), user);
+        return upload(file, category.getCategoryCode(), operator);
     }
 
     // ------------------------------------------------------------------ 按 storageKey 查询
@@ -428,7 +427,7 @@ public class FileAssetService {
      * key 不可变是 CDN 能设 immutable、以及"换图不用刷缓存"的前提（设计文档 §7.6）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateMeta(Long fileId, String originalName, List<String> tags, RequestUser user) {
+    public void updateMeta(Long fileId, String originalName, List<String> tags, String operator) {
         FileEntity existing = requireFile(fileId);
         FileEntity update = new FileEntity();
         update.setFileId(existing.getFileId());
@@ -441,7 +440,7 @@ public class FileAssetService {
         if (tags != null) {
             update.setTags(normalizeTags(tags));
         }
-        update.setUpdateBy(user == null ? null : user.getUserName());
+        update.setUpdateBy(operator);
         fileDao.updateById(update);
     }
 
@@ -472,7 +471,7 @@ public class FileAssetService {
      * 而且没有任何机制会回来收它。<b>代价是删除不可恢复</b>，所以上面那道引用检查必须严。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long fileId, RequestUser user) {
+    public void delete(Long fileId, String operator) {
         FileEntity existing = requireFile(fileId);
         List<FileRelationEntity> references = fileRelationDao.listByFileIds(List.of(fileId));
         if (!references.isEmpty()) {
@@ -481,7 +480,7 @@ public class FileAssetService {
         FileEntity update = new FileEntity();
         update.setFileId(fileId);
         update.setDeletedFlag(1);
-        update.setUpdateBy(user == null ? null : user.getUserName());
+        update.setUpdateBy(operator);
         fileDao.updateById(update);
         // 放在最后：DB 事务回滚得了，删掉的字节回滚不了
         objectStorage.delete(new StorageKey(existing.getStorageKey()));

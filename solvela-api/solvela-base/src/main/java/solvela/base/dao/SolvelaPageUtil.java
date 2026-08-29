@@ -12,7 +12,6 @@ import solvela.exception.BusinessException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.LinkedList;
 
 import solvela.base.util.SolvelaCollectionUtil;
 
@@ -72,50 +71,28 @@ public class SolvelaPageUtil {
      * 转换为 PageResult 对象
      */
     public static <E> PageResult<E> convert2PageResult(Page<?> page, List<E> sourceList) {
-        PageResult<E> pageResult = new PageResult<>();
-        pageResult.setPageNum(page.getCurrent());
-        pageResult.setPageSize(page.getSize());
-        pageResult.setTotal(page.getTotal());
-        pageResult.setPages(page.getPages());
-        pageResult.setList(sourceList);
-        pageResult.setEmptyFlag(SolvelaCollectionUtil.isEmpty(sourceList));
-        return pageResult;
+        return new PageResult<>(page.getCurrent(), page.getSize(), page.getTotal(), page.getPages(), sourceList);
     }
 
     /**
-     * 转换分页结果对象
+     * 转换分页结果对象：只换元素类型，分页元信息原样带过去
      */
     public static <E, T> PageResult<T> convert2PageResult(PageResult<E> pageResult, Class<T> targetClazz) {
-        PageResult<T> newPageResult = new PageResult<>();
-        newPageResult.setPageNum(pageResult.getPageNum());
-        newPageResult.setPageSize(pageResult.getPageSize());
-        newPageResult.setTotal(pageResult.getTotal());
-        newPageResult.setPages(pageResult.getPages());
-        newPageResult.setEmptyFlag(pageResult.getEmptyFlag());
-        newPageResult.setList(SolvelaBeanUtil.copyList(pageResult.getList(), targetClazz));
-        return newPageResult;
+        return new PageResult<>(pageResult.pageNum(), pageResult.pageSize(), pageResult.total(), pageResult.pages(),
+                SolvelaBeanUtil.copyList(pageResult.list(), targetClazz));
     }
 
+    /**
+     * 内存分页：整份数据已经在手上，只取其中一页
+     */
     public static <T> PageResult<T> subListPage(Integer pageNum, Integer pageSize, List<T> list) {
-        PageResult<T> pageRet = new PageResult<T>();
-        //总条数
         int count = list.size();
         int pages = count % pageSize == 0 ? count / pageSize : (count / pageSize + 1);
+        if (pageNum > pages) {
+            return new PageResult<>(pageNum, pageSize, count, pages, List.of());
+        }
         int fromIndex = (pageNum - 1) * pageSize;
         int toIndex = Math.min(pageNum * pageSize, count);
-
-        if (pageNum > pages) {
-            pageRet.setList(new LinkedList<>());
-            pageRet.setPageNum(pageNum.longValue());
-            pageRet.setPages((long) pages);
-            pageRet.setTotal((long) count);
-            return pageRet;
-        }
-        List<T> pageList = list.subList(fromIndex, toIndex);
-        pageRet.setList(pageList);
-        pageRet.setPageNum(pageNum.longValue());
-        pageRet.setPages((long) pages);
-        pageRet.setTotal((long) count);
-        return pageRet;
+        return new PageResult<>(pageNum, pageSize, count, pages, List.copyOf(list.subList(fromIndex, toIndex)));
     }
 }

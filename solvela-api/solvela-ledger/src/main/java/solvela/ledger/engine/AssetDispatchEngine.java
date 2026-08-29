@@ -2,7 +2,7 @@ package solvela.ledger.engine;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.ledger.handler.IAssetHandler;
 import solvela.ledger.strategy.AssetStrategyFactory;
@@ -104,16 +104,16 @@ public class AssetDispatchEngine implements AssetDispatcher {
             IAssetHandler handler = strategyFactory.getHandler(proposal.getAssetType());
 
             // 4. 极简下发：只管抛给下层，拿到成功/失败的结果
-            ResponseDTO responseDTO = handler.dispatch(proposal);
+            DispatchOutcome outcome = handler.dispatch(proposal);
 
             // 5. 闭环：根据结果落终态。失败原因写进 remark，运营/研发能直接从提案列表看出卡在哪
-            if (responseDTO.getOk()) {
+            if (outcome.ok()) {
                 proposalRecordDao.updateStatusAndRemark(proposal.getId(), STATUS_SUCCESS, "资产下发成功");
                 syncPrizeLog(proposal, PRIZE_LOG_SUCCESS, null);
             } else {
                 // 没发出去就得把预算还回去，否则预算只减不加，跑一段时间水位就虚高到发不出奖
                 releaseBudgetQuietly(config, amount, quantity);
-                markFailed(proposal, "资产下发失败：" + responseDTO.getMsg());
+                markFailed(proposal, "资产下发失败：" + outcome.failReason());
             }
 
         } catch (Exception e) {

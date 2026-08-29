@@ -13,7 +13,7 @@ import solvela.admin.module.system.role.domain.form.RoleMenuUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleMenuTreeVO;
 import solvela.admin.module.system.role.manager.RoleMenuManager;
 import solvela.code.UserErrorCode;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import org.apache.commons.lang3.math.NumberUtils;

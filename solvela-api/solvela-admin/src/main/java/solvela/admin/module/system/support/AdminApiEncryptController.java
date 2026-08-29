@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import solvela.admin.module.system.support.SupportBaseController;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.apiencrypt.annotation.ApiDecrypt;

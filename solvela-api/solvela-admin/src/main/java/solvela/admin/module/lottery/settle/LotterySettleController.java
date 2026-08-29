@@ -1,11 +1,11 @@
 package solvela.admin.module.lottery.settle;
 
 import solvela.lottery.settle.LotterySettleService;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.lottery.settle.domain.SettleResultDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,30 +31,30 @@ public class LotterySettleController {
 
     @Operation(summary = "服务端摇号：SecureRandom 生成，前端不可信")
     @GetMapping("/randomNumber")
-    @SaCheckPermission("lotteryIssue:query")
+    @RequiresPermission("lotteryIssue:query")
     public ResponseDTO<String> randomNumber(@RequestParam Long issueId) {
-        return lotterySettleService.randomNumber(issueId);
+        return ResponseDTO.ok(lotterySettleService.randomNumber(issueId));
     }
 
     @Operation(summary = "执行开奖核销：状态闸门 + 按奖级升序逐级认领。核销中重复调用会接着跑，不会重复认领")
     @PostMapping("/settle")
-    @SaCheckPermission("lotteryIssue:update")
+    @RequiresPermission("lotteryIssue:update")
     public ResponseDTO<SettleResultDTO> settle(@RequestParam Long issueId,
                                               @RequestParam(required = false) String winningNumber) {
-        return lotterySettleService.settle(issueId, winningNumber);
+        return ResponseDTO.ok(lotterySettleService.settle(issueId, winningNumber));
     }
 
     @Operation(summary = "核销进度：中奖/未中奖/待派奖各多少")
     @GetMapping("/settleSummary")
-    @SaCheckPermission("lotteryIssue:query")
+    @RequiresPermission("lotteryIssue:query")
     public ResponseDTO<Map<String, Object>> settleSummary(@RequestParam Long issueId) {
-        return lotterySettleService.summary(issueId);
+        return ResponseDTO.ok(lotterySettleService.summary(issueId));
     }
 
     @Operation(summary = "触发派奖：把中奖记录分批投递进公共派发链路")
     @PostMapping("/dispatch")
-    @SaCheckPermission("lotteryIssue:update")
+    @RequiresPermission("lotteryIssue:update")
     public ResponseDTO<Integer> dispatch(@RequestParam Long issueId) {
-        return lotterySettleService.dispatch(issueId);
+        return ResponseDTO.ok(lotterySettleService.dispatch(issueId));
     }
 }

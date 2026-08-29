@@ -1,6 +1,6 @@
 package solvela.admin.module.system.role.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -12,7 +12,7 @@ import solvela.admin.module.system.role.domain.form.RoleEmployeeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleSelectedVO;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,21 +47,21 @@ public class RoleEmployeeController {
 
     @Operation(summary = "从角色成员列表中移除员工 @author 卓大")
     @GetMapping("/role/employee/removeEmployee")
-    @SaCheckPermission("system:role:employee:delete")
+    @RequiresPermission("system:role:employee:delete")
     public ResponseDTO<String> removeEmployee(Long employeeId, Long roleId) {
         return roleEmployeeService.removeRoleEmployee(employeeId, roleId);
     }
 
     @Operation(summary = "从角色成员列表中批量移除员工 @author 卓大")
     @PostMapping("/role/employee/batchRemoveRoleEmployee")
-    @SaCheckPermission("system:role:employee:batch:delete")
+    @RequiresPermission("system:role:employee:batch:delete")
     public ResponseDTO<String> batchRemoveEmployee(@Valid @RequestBody RoleEmployeeUpdateForm updateForm) {
         return roleEmployeeService.batchRemoveRoleEmployee(updateForm);
     }
 
     @Operation(summary = "角色成员列表中批量添加员工 @author 卓大")
     @PostMapping("/role/employee/batchAddRoleEmployee")
-    @SaCheckPermission("system:role:employee:addProposal")
+    @RequiresPermission("system:role:employee:addProposal")
     public ResponseDTO<String> addEmployeeList(@Valid @RequestBody RoleEmployeeUpdateForm addForm) {
         return roleEmployeeService.batchAddRoleEmployee(addForm);
     }

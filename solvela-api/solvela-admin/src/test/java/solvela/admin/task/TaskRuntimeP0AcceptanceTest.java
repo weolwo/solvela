@@ -1,6 +1,6 @@
 package solvela.admin.task;
 
-import solvela.base.domain.ResponseDTO;
+import solvela.exception.BusinessException;
 import solvela.prize.PrizeLog;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
@@ -40,11 +40,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -433,10 +435,9 @@ class TaskRuntimeP0AcceptanceTest {
         form.setEventCode("NOT_REGISTERED_XYZ");
         form.setMemberId(memberId);
 
-        ResponseDTO<String> result = taskEventService.report(form);
-        assertFalse(result.getOk(), "未注册的事件必须被拒 —— 上游拼错一个字母时，"
-                + "立刻收到失败远比「返回成功但任务永远不动」好排查");
-        assertTrue(result.getMsg().contains("NOT_REGISTERED_XYZ"), "错误信息要点出是哪个编码：" + result.getMsg());
+        BusinessException result = assertThrows(BusinessException.class, () -> taskEventService.report(form),
+                "未注册的事件必须被拒 —— 上游拼错一个字母时，立刻收到失败远比「返回成功但任务永远不动」好排查");
+        assertTrue(result.getMessage().contains("NOT_REGISTERED_XYZ"), "错误信息要点出是哪个编码：" + result.getMessage());
 
         // 同步入口也要自守，不能靠 report 把关
         assertTrue(taskEventService.handle(
@@ -454,17 +455,16 @@ class TaskRuntimeP0AcceptanceTest {
         TaskEventReportCommand without = new TaskEventReportCommand();
         without.setEventCode("ORDER_PAID");
         without.setMemberId(memberId);
-        ResponseDTO<String> rejected = taskEventService.report(without);
-        assertFalse(rejected.getOk(), "订单类事件不带单号时服务端只能按事件日兜底，"
-                + "那意味着一天只算一笔 —— 必须拒绝而不是默默兜底");
-        assertTrue(rejected.getMsg().contains("eventBizId"), "错误信息要说清缺什么：" + rejected.getMsg());
+        BusinessException rejected = assertThrows(BusinessException.class, () -> taskEventService.report(without),
+                "订单类事件不带单号时服务端只能按事件日兜底，那意味着一天只算一笔 —— 必须拒绝而不是默默兜底");
+        assertTrue(rejected.getMessage().contains("eventBizId"), "错误信息要说清缺什么：" + rejected.getMessage());
 
         // 带上单号就该放行 —— 证明拒绝的是「缺单号」，不是这个事件本身不可用
         TaskEventReportCommand with = new TaskEventReportCommand();
         with.setEventCode("ORDER_PAID");
         with.setMemberId(memberId);
         with.setEventBizId("order-p1-001");
-        assertTrue(taskEventService.report(with).getOk());
+        assertDoesNotThrow(() -> taskEventService.report(with));
     }
 
     @Test
@@ -480,7 +480,7 @@ class TaskRuntimeP0AcceptanceTest {
         form.setEventBizId("order-metric-001");
         // 刻意不设 amount，只给 payload
         form.setPayload(Map.of("orderId", "order-metric-001", "payAmount", 200));
-        assertTrue(taskEventService.report(form).getOk());
+        assertDoesNotThrow(() -> taskEventService.report(form));
 
         // report 是异步的，轮询等落库
         for (int i = 0; i < 40 && recordOf(config.getId()) == null; i++) {
@@ -719,38 +719,37 @@ class TaskRuntimeP0AcceptanceTest {
     @Test
     @DisplayName("🔴 契约校验：COUNT 模板没声明 targetCount 必须存不进去（否则任务会永远不完成且零报错）")
     void templateWithoutTargetParamIsRejected() {
-        ResponseDTO<Boolean> result = taskTemplateService.save(
-                templateForm("TCONTRACT1", "COUNT", List.of(numberParam("targetX"))));
-
-        assertFalse(result.getOk(), "起错参数名的模板必须在保存时就被拦下 —— "
-                + "放过去的话，运营能配任务、事件能进来、进度也涨，就是永远不完成，而且一条报错都没有");
-        assertTrue(result.getMsg().contains("targetCount"),
-                "报错要给出可直接照抄的键名：" + result.getMsg());
-        assertTrue(result.getMsg().contains("targetX"),
-                "报错要说清当前声明了什么，便于对照：" + result.getMsg());
+        BusinessException result = assertThrows(BusinessException.class,
+                () -> taskTemplateService.save(templateForm("TCONTRACT1", "COUNT", List.of(numberParam("targetX")))),
+                "起错参数名的模板必须在保存时就被拦下 —— 放过去的话，运营能配任务、事件能进来、"
+                        + "进度也涨，就是永远不完成，而且一条报错都没有");
+        assertTrue(result.getMessage().contains("targetCount"),
+                "报错要给出可直接照抄的键名：" + result.getMessage());
+        assertTrue(result.getMessage().contains("targetX"),
+                "报错要说清当前声明了什么，便于对照：" + result.getMessage());
     }
 
     @Test
     @DisplayName("契约校验：AMOUNT 要的是 targetAmount，给 targetCount 不算数")
     void amountTemplateRequiresTargetAmount() {
-        ResponseDTO<Boolean> wrong = taskTemplateService.save(
-                templateForm("TCONTRACT2", "AMOUNT", List.of(numberParam("targetCount"))));
-        assertFalse(wrong.getOk(), "AMOUNT 判达标读的是 targetAmount，声明 targetCount 一样读不到");
-        assertTrue(wrong.getMsg().contains("targetAmount"), wrong.getMsg());
+        BusinessException wrong = assertThrows(BusinessException.class,
+                () -> taskTemplateService.save(templateForm("TCONTRACT2", "AMOUNT", List.of(numberParam("targetCount")))),
+                "AMOUNT 判达标读的是 targetAmount，声明 targetCount 一样读不到");
+        assertTrue(wrong.getMessage().contains("targetAmount"), wrong.getMessage());
     }
 
     @Test
     @DisplayName("契约校验：兼容存量的 targetDays；SIMPLE 不强制声明目标参数")
     void legacyKeyAndSimpleTypeAreAccepted() {
         // 存量模板 FRWAYF2X6N 用的就是 targetDays，不兼容的话它一编辑就存不回去
-        ResponseDTO<Boolean> legacy = taskTemplateService.save(
-                templateForm("TCONTRACT3", "COUNT", List.of(numberParam("targetDays"))));
-        assertTrue(legacy.getOk(), "兼容形态 targetDays 应放行：" + legacy.getMsg());
+        assertDoesNotThrow(() -> taskTemplateService.save(
+                templateForm("TCONTRACT3", "COUNT", List.of(numberParam("targetDays")))),
+                "兼容形态 targetDays 应放行");
 
         // SIMPLE 目标恒为 1，强制声明反而是逼运营填一个永远是 1 的参数
-        ResponseDTO<Boolean> simple = taskTemplateService.save(
-                templateForm("TCONTRACT4", "SIMPLE", List.of(numberParam("someFlag"))));
-        assertTrue(simple.getOk(), "SIMPLE 不该强制声明目标参数：" + simple.getMsg());
+        assertDoesNotThrow(() -> taskTemplateService.save(
+                templateForm("TCONTRACT4", "SIMPLE", List.of(numberParam("someFlag")))),
+                "SIMPLE 不该强制声明目标参数");
 
         jdbcTemplate.update("DELETE FROM t_task_template WHERE template_code IN ('TCONTRACT3','TCONTRACT4')");
     }
@@ -758,10 +757,9 @@ class TaskRuntimeP0AcceptanceTest {
     @Test
     @DisplayName("契约校验：非法 task_type 直接拒绝，并列出可选值")
     void illegalTaskTypeIsRejected() {
-        ResponseDTO<Boolean> result = taskTemplateService.save(
-                templateForm("TCONTRACT5", "NOT_A_TYPE", List.of(numberParam("targetCount"))));
-        assertFalse(result.getOk());
-        assertTrue(result.getMsg().contains("STREAK"), "报错要列出可选值：" + result.getMsg());
+        BusinessException result = assertThrows(BusinessException.class,
+                () -> taskTemplateService.save(templateForm("TCONTRACT5", "NOT_A_TYPE", List.of(numberParam("targetCount")))));
+        assertTrue(result.getMessage().contains("STREAK"), "报错要列出可选值：" + result.getMessage());
     }
 
     @Test

@@ -1,14 +1,14 @@
 package solvela.admin.module.system.support;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.web.CurrentUser;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.loginlog.LoginLogService;
 import solvela.admin.module.system.loginlog.domain.LoginLogQueryForm;
@@ -35,7 +35,7 @@ public class AdminLoginLogController extends SupportBaseController {
 
     @Operation(summary = "分页查询 @author 卓大")
     @PostMapping("/loginLog/page/query")
-    @SaCheckPermission("support:loginLog:query")
+    @RequiresPermission("support:loginLog:query")
     public ResponseDTO<PageResult<LoginLogVO>> queryByPage(@RequestBody LoginLogQueryForm queryForm) {
         return loginLogService.queryByPage(queryForm);
     }
@@ -43,7 +43,7 @@ public class AdminLoginLogController extends SupportBaseController {
     @Operation(summary = "分页查询当前登录人信息 @author 善逸")
     @PostMapping("/loginLog/page/query/login")
     public ResponseDTO<PageResult<LoginLogVO>> queryByPageLogin(@RequestBody LoginLogQueryForm queryForm) {
-        RequestUser requestUser = CurrentUser.orNull();
+        RequestEmployee requestUser = CurrentEmployee.orNull();
         queryForm.setUserId(requestUser.getUserId());
         queryForm.setUserType(requestUser.getUserType().getValue());
         return loginLogService.queryByPage(queryForm);

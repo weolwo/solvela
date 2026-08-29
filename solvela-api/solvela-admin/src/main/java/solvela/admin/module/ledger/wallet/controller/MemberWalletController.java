@@ -1,6 +1,6 @@
 package solvela.admin.module.ledger.wallet.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -13,7 +13,7 @@ import solvela.admin.module.ledger.wallet.domain.form.MemberWalletQueryForm;
 import solvela.admin.module.ledger.wallet.domain.vo.MemberWalletVO;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.ledger.stat.domain.form.LedgerStatForm;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
@@ -47,7 +47,7 @@ public class MemberWalletController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("memberWallet:query")
+    @RequiresPermission("memberWallet:query")
     public ResponseDTO<PageResult<MemberWalletVO>> queryPage(@RequestBody @Valid MemberWalletQueryForm queryForm) {
         MemberWalletQuery query = SolvelaBeanUtil.copy(queryForm, MemberWalletQuery.class);
         PageResult<MemberWalletDTO> page = Service.queryPage(query);
@@ -64,7 +64,7 @@ public class MemberWalletController {
      */
     @Operation(summary = "钱包统计：资产存量（全量）+ 本期变动（默认当天，取自交易明细）")
     @PostMapping("/stat")
-    @SaCheckPermission("memberWallet:query")
+    @RequiresPermission("memberWallet:query")
     public ResponseDTO<MemberWalletStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
         return ResponseDTO.ok(Service.stat(
                 SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));

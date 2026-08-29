@@ -14,14 +14,14 @@ import solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -43,7 +43,7 @@ public class PromotionConfigController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("promotionConfig:query")
+    @RequiresPermission("promotionConfig:query")
     public ResponseDTO<PageResult<PromotionConfigVO>> queryPage(@RequestBody @Valid PromotionConfigQueryForm queryForm) {
         PageResult<PromotionConfigDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PromotionConfigQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PromotionConfigVO.class));
@@ -51,36 +51,40 @@ public class PromotionConfigController {
 
     @Operation(summary = "优惠配置下拉列表（全量启用中，前端按 prizeType 分组做级联）")
     @GetMapping("/optionList")
-    @SaCheckPermission("promotionConfig:query")
+    @RequiresPermission("promotionConfig:query")
     public ResponseDTO<List<PromotionConfigOptionDTO>> queryOptionList() {
-        return Service.queryOptionList();
+        return ResponseDTO.ok(Service.queryOptionList());
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission("promotionConfig:add")
+    @RequiresPermission("promotionConfig:add")
     public ResponseDTO<String> add(@RequestBody @Valid PromotionConfigAddForm addForm) {
-        return Service.add(SolvelaBeanUtil.copy(addForm, PromotionConfigAddCommand.class));
+        Service.add(SolvelaBeanUtil.copy(addForm, PromotionConfigAddCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission("promotionConfig:update")
+    @RequiresPermission("promotionConfig:update")
     public ResponseDTO<String> update(@RequestBody @Valid PromotionConfigUpdateForm updateForm) {
-        return Service.update(SolvelaBeanUtil.copy(updateForm, PromotionConfigUpdateCommand.class));
+        Service.update(SolvelaBeanUtil.copy(updateForm, PromotionConfigUpdateCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDelete")
-    @SaCheckPermission("promotionConfig:delete")
+    @RequiresPermission("promotionConfig:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDelete(idList);
+        Service.batchDelete(idList);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission("promotionConfig:delete")
+    @RequiresPermission("promotionConfig:delete")
     public ResponseDTO<String> batchDelete(@PathVariable Long id) {
-        return Service.delete(id);
+        Service.delete(id);
+        return ResponseDTO.ok();
     }
 }

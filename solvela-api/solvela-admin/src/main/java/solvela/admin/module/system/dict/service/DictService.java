@@ -3,13 +3,13 @@ package solvela.admin.module.system.dict.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.base.constant.CacheKeyConst;
+import solvela.admin.constant.AdminCacheConst;
 import solvela.admin.module.system.dict.dao.DictDao;
 import solvela.admin.module.system.dict.dao.DictDataDao;
 import solvela.admin.module.system.dict.domain.entity.DictDataEntity;
@@ -107,8 +107,8 @@ public class DictService {
      * 更新
      */
     @Caching(evict = {
-            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, allEntries = true),
-            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
+            @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA, allEntries = true),
+            @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
     public synchronized ResponseDTO<String> update(DictUpdateForm updateForm) {
         DictEntity existDictCode = dictDao.selectByCode(updateForm.getDictCode());
@@ -125,8 +125,8 @@ public class DictService {
      * 批量删除
      */
     @Caching(evict = {
-            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, allEntries = true),
-            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
+            @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA, allEntries = true),
+            @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
     public synchronized ResponseDTO<String> batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
@@ -141,8 +141,8 @@ public class DictService {
      * 单个删除
      */
     @Caching(evict = {
-            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA, allEntries = true),
-            @CacheEvict(value = CacheKeyConst.Dict.DICT_DATA_LABEL, allEntries = true)
+            @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA, allEntries = true),
+            @CacheEvict(value = AdminCacheConst.Dict.DICT_DATA_LABEL, allEntries = true)
     })
     public synchronized ResponseDTO<String> delete(Long dictId) {
         if (null == dictId) {
@@ -280,8 +280,8 @@ public class DictService {
      */
     private void clearDictDataCache(List<Long> idList) {
         List<DictDataVO> dictDataList = dictDataDao.selectByDictDataIds(idList);
-        Cache valueCache = cacheManager.getCache(CacheKeyConst.Dict.DICT_DATA);
-        Cache labelCache = cacheManager.getCache(CacheKeyConst.Dict.DICT_DATA_LABEL);
+        Cache valueCache = cacheManager.getCache(AdminCacheConst.Dict.DICT_DATA);
+        Cache labelCache = cacheManager.getCache(AdminCacheConst.Dict.DICT_DATA_LABEL);
 
         for (DictDataVO dictDataVO : dictDataList) {
             if (valueCache != null) {

@@ -1,6 +1,6 @@
 package solvela.admin.module.system.role.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -9,7 +9,7 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.role.domain.form.RoleDataScopeUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleDataScopeVO;
 import solvela.admin.module.system.role.service.RoleDataScopeService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,7 +38,7 @@ public class RoleDataScopeController {
 
     @Operation(summary = "批量设置某角色数据范围 @author 卓大")
     @PostMapping("/role/dataScope/updateRoleDataScopeList")
-    @SaCheckPermission("system:role:dataScope:update")
+    @RequiresPermission("system:role:dataScope:update")
     public ResponseDTO<String> updateRoleDataScopeList(@RequestBody @Valid RoleDataScopeUpdateForm roleDataScopeUpdateForm) {
         return roleDataScopeService.updateRoleDataScopeList(roleDataScopeUpdateForm);
     }

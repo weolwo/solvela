@@ -6,7 +6,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -82,11 +82,10 @@ public class ConfigService {
      * 分页查询系统配置
      *
      */
-    public ResponseDTO<PageResult<ConfigVO>> queryConfigPage(ConfigQueryForm queryForm) {
+    public PageResult<ConfigVO> queryConfigPage(ConfigQueryForm queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<ConfigEntity> entityList = configDao.queryByPage(page, queryForm);
-        PageResult<ConfigVO> pageResult = SolvelaPageUtil.convert2PageResult(page, entityList, ConfigVO.class);
-        return ResponseDTO.ok(pageResult);
+        return SolvelaPageUtil.convert2PageResult(page, entityList, ConfigVO.class);
     }
 
     /**
@@ -131,32 +130,31 @@ public class ConfigService {
      * 添加系统配置
      *
      */
-    public ResponseDTO<String> add(ConfigAddForm configAddForm) {
+    public void add(ConfigAddForm configAddForm) {
         ConfigEntity entity = configDao.selectByKey(configAddForm.getConfigKey());
         if (null != entity) {
-            return ResponseDTO.error(UserErrorCode.ALREADY_EXIST);
+            throw new BusinessException(UserErrorCode.ALREADY_EXIST);
         }
         entity = SolvelaBeanUtil.copy(configAddForm, ConfigEntity.class);
         configDao.insert(entity);
 
         // 刷新缓存
         this.refreshConfigCache(entity.getConfigId());
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新系统配置
      *
      */
-    public ResponseDTO<String> updateConfig(ConfigUpdateForm updateDTO) {
+    public void updateConfig(ConfigUpdateForm updateDTO) {
         Long configId = updateDTO.getConfigId();
         ConfigEntity entity = configDao.selectById(configId);
         if (null == entity) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
         ConfigEntity alreadyEntity = configDao.selectByKey(updateDTO.getConfigKey());
         if (null != alreadyEntity && !Objects.equals(configId, alreadyEntity.getConfigId())) {
-            return ResponseDTO.error(UserErrorCode.ALREADY_EXIST, "config key 已存在");
+            throw new BusinessException(UserErrorCode.ALREADY_EXIST, "config key 已存在");
         }
 
         // 更新数据
@@ -165,17 +163,16 @@ public class ConfigService {
 
         // 刷新缓存
         this.refreshConfigCache(configId);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新系统配置
      *
      */
-    public ResponseDTO<String> updateValueByKey(ConfigKeyEnum key, String value) {
+    public void updateValueByKey(ConfigKeyEnum key, String value) {
         ConfigVO config = this.getConfig(key);
         if (null == config) {
-            return ResponseDTO.error(UserErrorCode.DATA_NOT_EXIST);
+            throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
         // 更新数据
@@ -187,6 +184,5 @@ public class ConfigService {
 
         // 刷新缓存
         this.refreshConfigCache(configId);
-        return ResponseDTO.ok();
     }
 }

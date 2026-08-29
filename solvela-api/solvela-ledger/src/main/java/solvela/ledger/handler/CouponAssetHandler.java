@@ -3,7 +3,7 @@ package solvela.ledger.handler;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.MemberCoupon;
@@ -38,14 +38,14 @@ public class CouponAssetHandler implements IAssetHandler {
     private static final String SOURCE_TYPE_PROPOSAL = "PROPOSAL";
 
     @Override
-    public ResponseDTO dispatch(ProposalRecord proposal) {
+    public DispatchOutcome dispatch(ProposalRecord proposal) {
         // 券模直接取提案自带的 assetRef —— 由营销侧在生成提案时传入。
         // 此前是本方法反查 t_prize_log 拿 prize_code，那是「账务域依赖营销域」的错误依赖方向，
         // 拆微服务时会直接卡住；现在依赖方向翻转为「营销 -> 账务」，本域只认自己的资产引用。
         String assetRef = proposal.getAssetRef();
         if (StringUtils.isBlank(assetRef)) {
             log.error("【发券阻断】提案未指定券模 assetRef, 提案ID: {}", proposal.getId());
-            return ResponseDTO.userErrorParam("提案未指定券模，无法发券");
+            return DispatchOutcome.failed("提案未指定券模，无法发券");
         }
 
         MemberCoupon coupon = new MemberCoupon();
@@ -80,10 +80,10 @@ public class CouponAssetHandler implements IAssetHandler {
         try {
             memberCouponDao.insert(coupon);
             log.info(">>>> [发券成功] 提案ID: {}, 券模: {}", proposal.getId(), coupon.getCouponCode());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         } catch (DuplicateKeyException e) {
             log.warn("【防重拦截】该提案已发过券: {}", proposal.getId());
-            return ResponseDTO.ok(); // 幂等，视为成功
+            return DispatchOutcome.success(); // 幂等，视为成功
         }
     }
 }

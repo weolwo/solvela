@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.enums.ProposalSourceTypeEnum;
@@ -27,6 +26,7 @@ import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
 import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
+import solvela.exception.BusinessException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -86,15 +86,26 @@ public class ProposalRecordService {
      */
     private static final long MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 
-    @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO addProposal(ProposalRecordAddCommand req) {
+    /**
+     * ⚠️ {@code noRollbackFor = BusinessException.class} 不是可有可无的调优。
+     *
+     * <p>风控拦截那条分支<b>先落一条 status=80 的提案记录再抛</b>，那条记录是合规审计和客诉排查的唯一证据。
+     * 默认的 {@code rollbackFor = Exception.class} 会把它连同异常一起回滚掉 ——
+     * 表现是「风控明明拦了，提案表里一条记录都没有」，只能靠翻日志复原。
+     *
+     * <p>本方法抛出的 BusinessException 全部来自显式校验，抛之前要么没写过库，
+     * 要么写的正是那条必须留下的审计记录，所以对它一律不回滚是安全的；
+     * DAO / 事务层的真实异常仍然照常回滚。
+     */
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
+    public void addProposal(ProposalRecordAddCommand req) {
         log.info(">>>> [风控提案域] 收到提案申请，来源: {}, 单号: {}", req.getSourceType(), req.getSourceBizId());
 
         // 1. 获取底层资产（优惠）配置
         PromotionConfig config = promotionConfigService.getById(req.getPromotionConfigId());
         if (config == null || config.getStatus() == 0) {
             log.error("【提案阻断】优惠配置不存在或已停用, ID: {}", req.getPromotionConfigId());
-            return ResponseDTO.userErrorParam("资产配置异常");
+            throw new BusinessException("资产配置异常");
         }
 
         // ==========================================
@@ -111,7 +122,7 @@ public class ProposalRecordService {
              * （此前它只进了日志，于是漏斗只能按 remark 自由文本聚类）。
              */
             saveProposal(req, config, 80, "风控拦截: " + riskResult.getReason(), riskResult.getRuleCode());
-            return ResponseDTO.userErrorParam(riskResult.getReason());
+            throw new BusinessException(riskResult.getReason());
         }
 
         // ==========================================
@@ -128,7 +139,7 @@ public class ProposalRecordService {
             proposal = saveProposal(req, config, targetStatus, "提案生成成功", null);
         } catch (DuplicateKeyException e) {
             log.warn("【提案防重】该业务单号已存在提案记录，直接忽略: {}", req.getSourceBizId());
-            return ResponseDTO.ok(); // 幂等返回成功
+            return; // 幂等返回成功
         }
 
         // ==========================================
@@ -142,7 +153,6 @@ public class ProposalRecordService {
             // 流程驻留在此，等待财务人员在后台调用 approve() 接口
         }
 
-        return ResponseDTO.ok();
     }
 
     /**
@@ -171,14 +181,14 @@ public class ProposalRecordService {
      * 避免重复审批引发重复发放。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> approve(Long id, String reviewer, String comment) {
+    public void approve(Long id, String reviewer, String comment) {
         ProposalRecord proposal = proposalRecordDao.selectById(id);
         if (proposal == null) {
-            return ResponseDTO.userErrorParam("提案不存在");
+            throw new BusinessException("提案不存在");
         }
         PromotionConfig config = promotionConfigService.getById(proposal.getPromotionConfigId());
         if (config == null) {
-            return ResponseDTO.userErrorParam("优惠配置不存在，无法审批");
+            throw new BusinessException("优惠配置不存在，无法审批");
         }
 
         Integer current = proposal.getStatus();
@@ -194,11 +204,11 @@ public class ProposalRecordService {
             rows = proposalRecordDao.updateReview(id, STATUS_SECOND_REVIEW, targetStatus,
                     FIELD_SECOND_REVIEWER, reviewer, comment);
         } else {
-            return ResponseDTO.userErrorParam("当前状态不可审批：" + current);
+            throw new BusinessException("当前状态不可审批：" + current);
         }
 
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("该提案已被处理，请刷新后重试");
+            throw new BusinessException("该提案已被处理，请刷新后重试");
         }
 
         // 审批到「待执行」才触发下发，且同样放在事务提交后 —— 理由与 addProposal 一致：
@@ -207,17 +217,16 @@ public class ProposalRecordService {
             proposal.setStatus(STATUS_PENDING_EXECUTE);
             dispatchAfterCommit(proposal, config);
         }
-        return ResponseDTO.ok();
     }
 
     /**
      * 审批驳回：一审/二审均可驳回，驳回后不再下发
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> reject(Long id, String reviewer, String comment) {
+    public void reject(Long id, String reviewer, String comment) {
         ProposalRecord proposal = proposalRecordDao.selectById(id);
         if (proposal == null) {
-            return ResponseDTO.userErrorParam("提案不存在");
+            throw new BusinessException("提案不存在");
         }
         Integer current = proposal.getStatus();
         String reviewerField;
@@ -226,13 +235,12 @@ public class ProposalRecordService {
         } else if (STATUS_SECOND_REVIEW == current) {
             reviewerField = FIELD_SECOND_REVIEWER;
         } else {
-            return ResponseDTO.userErrorParam("当前状态不可驳回：" + current);
+            throw new BusinessException("当前状态不可驳回：" + current);
         }
         int rows = proposalRecordDao.updateReview(id, current, STATUS_REJECTED, reviewerField, reviewer, comment);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("该提案已被处理，请刷新后重试");
+            throw new BusinessException("该提案已被处理，请刷新后重试");
         }
-        return ResponseDTO.ok();
     }
 
     /**

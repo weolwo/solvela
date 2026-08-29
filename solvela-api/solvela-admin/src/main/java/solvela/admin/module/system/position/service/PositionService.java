@@ -9,7 +9,7 @@ import solvela.admin.module.system.position.domain.form.PositionQueryForm;
 import solvela.admin.module.system.position.domain.form.PositionUpdateForm;
 import solvela.admin.module.system.position.domain.vo.PositionVO;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;

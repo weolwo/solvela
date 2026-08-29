@@ -1,6 +1,6 @@
 package solvela.admin.module.member.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.member.domain.form.MemberQueryForm;
 import solvela.member.domain.query.MemberQuery;
 import solvela.admin.module.member.domain.form.MemberRemarkForm;
@@ -47,7 +47,7 @@ public class MemberController {
 
     @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission("member:query")
+    @RequiresPermission("member:query")
     public ResponseDTO<PageResult<MemberVO>> queryPage(@RequestBody @Valid MemberQueryForm queryForm) {
         PageResult<MemberDTO> page = memberService.queryPage(SolvelaBeanUtil.copy(queryForm, MemberQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberVO.class));
@@ -58,9 +58,10 @@ public class MemberController {
      */
     @Operation(summary = "冻结/解冻 @author weolwo")
     @GetMapping("/updateStatus/{memberId}/{status}")
-    @SaCheckPermission("member:update")
+    @RequiresPermission("member:update")
     public ResponseDTO<String> updateStatus(@PathVariable Long memberId, @PathVariable Integer status) {
-        return memberService.updateStatus(memberId, status, CurrentUser.orNull());
+        memberService.updateStatus(memberId, status, CurrentEmployee.nameOrNull());
+        return ResponseDTO.ok();
     }
 
     /**
@@ -71,9 +72,10 @@ public class MemberController {
      */
     @Operation(summary = "保存运营备注 @author weolwo")
     @PostMapping("/updateRemark")
-    @SaCheckPermission("member:update")
+    @RequiresPermission("member:update")
     public ResponseDTO<String> updateRemark(@RequestBody @Valid MemberRemarkForm remarkForm) {
-        return memberService.updateRemark(remarkForm.getMemberId(), remarkForm.getRemark(),
-                CurrentUser.orNull());
+        memberService.updateRemark(remarkForm.getMemberId(), remarkForm.getRemark(),
+                CurrentEmployee.nameOrNull());
+        return ResponseDTO.ok();
     }
 }

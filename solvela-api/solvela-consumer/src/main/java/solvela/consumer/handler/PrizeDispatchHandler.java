@@ -3,7 +3,8 @@ package solvela.consumer.handler;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.EventRoute;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
+import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.consumer.strategy.PrizeStrategyFactory;
 import solvela.event.UserPrizeEvent;
@@ -91,34 +92,32 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
      * 条件更新做并发闸门：两个运营同时点通过，只有一个能推进状态，另一个会被告知已处理。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> approveDispatch(Long prizeLogId, String approveBy) {
+    public void approveDispatch(Long prizeLogId, String approveBy) {
         PrizeLog prizeLog = prizeLogDao.selectById(prizeLogId);
         if (prizeLog == null) {
-            return ResponseDTO.userErrorParam("发奖记录不存在");
+            throw new BusinessException("发奖记录不存在");
         }
         int rows = prizeLogDao.updateApproveStatus(prizeLogId, APPROVE_PENDING, APPROVE_PASSED, approveBy);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("该发奖记录已被处理，请刷新后重试");
+            throw new BusinessException("该发奖记录已被处理，请刷新后重试");
         }
         log.info("【发奖审批通过】LogId: {}, 审批人: {}", prizeLogId, approveBy);
         // 状态已在内存里同步，避免 doDispatch 里回写时把审批结果覆盖掉
         prizeLog.setApproveStatus(APPROVE_PASSED);
         prizeLog.setApproveBy(approveBy);
         doDispatch(prizeLog);
-        return ResponseDTO.ok();
     }
 
     /**
      * 运营审批驳回：不再派发，记录留痕
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> rejectDispatch(Long prizeLogId, String approveBy, String reason) {
+    public void rejectDispatch(Long prizeLogId, String approveBy, String reason) {
         int rows = prizeLogDao.updateApproveStatus(prizeLogId, APPROVE_PENDING, APPROVE_REJECTED, approveBy);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("该发奖记录已被处理，请刷新后重试");
+            throw new BusinessException("该发奖记录已被处理，请刷新后重试");
         }
         log.info("【发奖审批驳回】LogId: {}, 审批人: {}, 理由: {}", prizeLogId, approveBy, reason);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -133,9 +132,8 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             // A. 通过工厂获取具体的发货策略（完全消灭 switch/if-else）
             IPrizeHandler handler = strategyFactory.getHandler(prizeLog.getPrizeType());
 
-            // B. 执行发货，返回标准结果 (建议自己封装一个 DispatchResult 类)
-            // Result result = handler.dispatch(prizeLog);
-            ResponseDTO result = handler.dispatch(prizeLog); // 假设返回 boolean 演示
+            // B. 执行发货，拿到标准结果
+            DispatchOutcome outcome = handler.dispatch(prizeLog);
 
             // C. 只有「当场就失败」才由这里落终态。
             //    成功路径刻意不写 status=1：资产下发已被挪到提案事务提交之后（方案A），
@@ -143,10 +141,10 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             //    表现为「发奖记录显示成功、用户其实没收到」（预算耗尽那批就是这么被写成成功的）。
             //    成功路径的终态由 AssetDispatchEngine.updateStatusByExternalBizNo 回写；
             //    若提案进了人工审批池，则合理地停在 0-等待执行。
-            if (!result.getOk()) {
+            if (!outcome.ok()) {
                 prizeLog.setStatus(2); // 2-失败
-                prizeLog.setFailReason(SolvelaStringUtil.truncate(result.getMsg(), FAIL_REASON_MAX_LENGTH));
-                log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), result.getMsg());
+                prizeLog.setFailReason(SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH));
+                log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
                 updateQuietly(prizeLog);
             } else if (isNoDeliveryNeeded(prizeLog)) {
                 // 0 值奖品（谢谢参与这类占位奖）压根不会生成提案，引擎不会跑，

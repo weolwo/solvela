@@ -102,7 +102,7 @@ public class FileEntity {
     private Integer deletedFlag;
 
     /**
-     * 创建人（用户名，即 {@code RequestUser#getUserName()} / {@code t_employee.actual_name}）。
+     * 创建人（用户名，即 {@code t_employee.actual_name}）。
      */
     private String createBy;
 

@@ -101,8 +101,8 @@ class PhysicalDeliveryPiiTest {
             queryForm.setPageNum(1L);
             queryForm.setPageSize(10L);
             PageResult<PhysicalDeliveryDTO> page = physicalDeliveryService.queryPage(queryForm);
-            assertEquals(1, page.getList().size(), "按来源单号没查到刚插的那条");
-            PhysicalDeliveryDTO vo = page.getList().get(0);
+            assertEquals(1, page.list().size(), "按来源单号没查到刚插的那条");
+            PhysicalDeliveryDTO vo = page.list().get(0);
             assertEquals(NAME, vo.getReceiverName());
             assertEquals(PHONE, vo.getReceiverPhone());
             assertEquals(ADDRESS, vo.getReceiverAddress());

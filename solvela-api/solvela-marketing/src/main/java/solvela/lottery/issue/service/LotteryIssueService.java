@@ -15,8 +15,8 @@ import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
 import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.domain.PageResult;
+import solvela.exception.BusinessException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
@@ -63,22 +63,21 @@ public class LotteryIssueService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(LotteryIssueAddCommand addForm) {
+    public void add(LotteryIssueAddCommand addForm) {
         if (lotteryConfigService.getByLotteryCode(addForm.getLotteryCode()) == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + addForm.getLotteryCode());
+            throw new BusinessException("彩票玩法不存在：" + addForm.getLotteryCode());
         }
         if (existsIssueNo(addForm.getLotteryCode(), addForm.getIssueNo())) {
-            return ResponseDTO.userErrorParam("期号已存在：" + addForm.getIssueNo());
+            throw new BusinessException("期号已存在：" + addForm.getIssueNo());
         }
         String timeError = checkSaleWindow(addForm.getSaleStartTime(), addForm.getSaleEndTime());
         if (timeError != null) {
-            return ResponseDTO.userErrorParam(timeError);
+            throw new BusinessException(timeError);
         }
         LotteryIssue lotteryIssue = SolvelaBeanUtil.copy(addForm, LotteryIssue.class);
         lotteryIssue.setSoldCount(0);
         lotteryIssue.setStatus(STATUS_WAIT);
         lotteryIssueDao.insert(lotteryIssue);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -88,23 +87,23 @@ public class LotteryIssueService {
      * 改动它们等于换了一套加密映射：已发号码再也反解不回游标、签名全部失效、
      * 新号码还可能与历史号码重复。所以这两个字段一律忽略前端传值，只允许改时间。
      */
-    public ResponseDTO<String> update(LotteryIssueUpdateCommand updateForm) {
+    public void update(LotteryIssueUpdateCommand updateForm) {
         LotteryIssue existed = lotteryIssueDao.selectById(updateForm.getId());
         if (existed == null) {
-            return ResponseDTO.userErrorParam("期号不存在");
+            throw new BusinessException("期号不存在");
         }
         if (!STATUS_WAIT.equals(existed.getStatus())) {
-            return ResponseDTO.userErrorParam("该期已开奖或正在核销，不能再修改");
+            throw new BusinessException("该期已开奖或正在核销，不能再修改");
         }
         String timeError = checkSaleWindow(updateForm.getSaleStartTime(), updateForm.getSaleEndTime());
         if (timeError != null) {
-            return ResponseDTO.userErrorParam(timeError);
+            throw new BusinessException(timeError);
         }
         // 已经发过号之后，连售卖开始时间都不该往后挪 —— 那会让「已发出的号」落在窗口之外，自相矛盾
         int sold = existed.getSoldCount() == null ? 0 : existed.getSoldCount();
         if (sold > 0 && updateForm.getSaleStartTime() != null
                 && updateForm.getSaleStartTime().isAfter(existed.getSaleStartTime())) {
-            return ResponseDTO.userErrorParam("本期已发出 " + sold + " 个号码，售卖开始时间不能再往后调整");
+            throw new BusinessException("本期已发出 " + sold + " 个号码，售卖开始时间不能再往后调整");
         }
 
         LotteryIssue update = new LotteryIssue();
@@ -114,7 +113,6 @@ public class LotteryIssueService {
         update.setPlanDrawTime(updateForm.getPlanDrawTime());
         // lottery_code / issue_no / sold_count / status / winning_number 一律不接受前端值
         lotteryIssueDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     public boolean existsIssueNo(String lotteryCode, String issueNo) {
@@ -171,18 +169,18 @@ public class LotteryIssueService {
      * 取严格大于。若把结束时间设成整点的「此刻」，同一秒内进来的请求 isAfter 为 false，
      * 会漏出一个可领号的窗口。止血动作不该留这种缝。
      */
-    public ResponseDTO<String> stopSale(Long id) {
+    public void stopSale(Long id) {
         LotteryIssue issue = lotteryIssueDao.selectById(id);
         if (issue == null) {
-            return ResponseDTO.userErrorParam("期号不存在");
+            throw new BusinessException("期号不存在");
         }
         if (!STATUS_WAIT.equals(issue.getStatus())) {
-            return ResponseDTO.userErrorParam("期号「" + issue.getIssueNo() + "」已开奖或正在核销，本就不再发号");
+            throw new BusinessException("期号「" + issue.getIssueNo() + "」已开奖或正在核销，本就不再发号");
         }
         // 时间只由数据库产生（铁律 9/10）：售卖窗口的判定用的是 DB 时钟，写入也必须用同一个
         LocalDateTime stopAt = lotteryIssueDao.selectDbNow().minusSeconds(1);
         if (issue.getSaleEndTime() != null && !issue.getSaleEndTime().isAfter(stopAt)) {
-            return ResponseDTO.userErrorParam("期号「" + issue.getIssueNo() + "」已经停止发售");
+            throw new BusinessException("期号「" + issue.getIssueNo() + "」已经停止发售");
         }
 
         LotteryIssue update = new LotteryIssue();
@@ -194,7 +192,6 @@ public class LotteryIssueService {
             update.setSaleStartTime(stopAt);
         }
         lotteryIssueDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -204,35 +201,36 @@ public class LotteryIssueService {
      * 止血动作里混着几个「本来就停售了」是常态，不该把其余的一起回滚掉。
      * 已停售 / 已开奖计入跳过，最后回一句人话汇总。
      */
-    public ResponseDTO<String> batchStopSale(List<Long> idList) {
+    public String batchStopSale(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return "没有需要停售的期次";
         }
         int success = 0;
         int skipped = 0;
         for (Long id : idList) {
-            if (stopSale(id).getOk()) {
+            try {
+                stopSale(id);
                 success++;
-            } else {
+            } catch (BusinessException e) {
+                // 「已停售 / 已开奖」由 stopSale 抛出，按跳过计数
                 skipped++;
             }
         }
-        return ResponseDTO.ok("已停售 " + success + " 期"
-                + (skipped > 0 ? "，跳过 " + skipped + " 期（已停售或已开奖）" : ""));
+        return "已停售 " + success + " 期"
+                + (skipped > 0 ? "，跳过 " + skipped + " 期（已停售或已开奖）" : "");
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (null == id){
-            return ResponseDTO.ok();
+            return;
         }
         String error = checkDeletable(id);
         if (error != null) {
-            return ResponseDTO.userErrorParam(error);
+            throw new BusinessException(error);
         }
         lotteryIssueDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 }

@@ -6,7 +6,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import solvela.admin.module.system.support.SupportBaseController;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.system.datatracer.domain.form.DataTracerQueryForm;
 import solvela.admin.module.system.datatracer.domain.vo.DataTracerVO;

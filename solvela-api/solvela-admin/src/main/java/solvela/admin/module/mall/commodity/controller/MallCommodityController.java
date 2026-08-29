@@ -1,6 +1,6 @@
 package solvela.admin.module.mall.commodity.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.domain.ValidateList;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.mall.commodity.domain.form.MallCommodityQueryForm;
 import solvela.mall.commodity.domain.query.MallCommodityQuery;
 import solvela.admin.module.mall.commodity.domain.form.MallCommoditySaveForm;
@@ -49,7 +49,7 @@ public class MallCommodityController {
 
     @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission("mallCommodity:query")
+    @RequiresPermission("mallCommodity:query")
     public ResponseDTO<PageResult<MallCommodityVO>> queryPage(@RequestBody @Valid MallCommodityQueryForm queryForm) {
         PageResult<MallCommodityDTO> page = mallCommodityService.queryPage(SolvelaBeanUtil.copy(queryForm, MallCommodityQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallCommodityVO.class));
@@ -57,9 +57,9 @@ public class MallCommodityController {
 
     @Operation(summary = "商品详情：主表+SKU+轮播图，编辑页回显用 @author weolwo")
     @GetMapping("/detail/{id}")
-    @SaCheckPermission("mallCommodity:query")
+    @RequiresPermission("mallCommodity:query")
     public ResponseDTO<MallCommodityDetailDTO> detail(@PathVariable Long id) {
-        return mallCommodityService.detail(id);
+        return ResponseDTO.ok(mallCommodityService.detail(id));
     }
 
     /**
@@ -68,9 +68,9 @@ public class MallCommodityController {
      */
     @Operation(summary = "生成商品编码（候选值，保存时判重） @author weolwo")
     @GetMapping("/generateCode")
-    @SaCheckPermission("mallCommodity:add")
+    @RequiresPermission("mallCommodity:add")
     public ResponseDTO<String> generateCode() {
-        return mallCommodityService.generateCommodityCode();
+        return ResponseDTO.ok(mallCommodityService.generateCommodityCode());
     }
 
     /**
@@ -78,9 +78,9 @@ public class MallCommodityController {
      */
     @Operation(summary = "批量生成SKU编码（仅展示，保存时判重） @author weolwo")
     @GetMapping("/generateSkuCodes/{count}")
-    @SaCheckPermission("mallCommodity:update")
+    @RequiresPermission("mallCommodity:update")
     public ResponseDTO<List<String>> generateSkuCodes(@PathVariable Integer count) {
-        return mallCommodityService.generateSkuCodes(count == null ? 0 : count);
+        return ResponseDTO.ok(mallCommodityService.generateSkuCodes(count == null ? 0 : count));
     }
 
     /**
@@ -91,29 +91,32 @@ public class MallCommodityController {
      */
     @Operation(summary = "保存商品（含SKU、轮播图），id为空即新建 @author weolwo")
     @PostMapping("/save")
-    @SaCheckPermission("mallCommodity:update")
+    @RequiresPermission("mallCommodity:update")
     public ResponseDTO<Long> save(@RequestBody @Valid MallCommoditySaveForm saveForm) {
-        return mallCommodityService.save(SolvelaBeanUtil.deepCopy(saveForm, MallCommoditySaveCommand.class), CurrentUser.orNull());
+        return ResponseDTO.ok(mallCommodityService.save(SolvelaBeanUtil.deepCopy(saveForm, MallCommoditySaveCommand.class), CurrentEmployee.nameOrNull()));
     }
 
     @Operation(summary = "上架/下架 @author weolwo")
     @GetMapping("/updateStatus/{id}/{status}")
-    @SaCheckPermission("mallCommodity:update")
+    @RequiresPermission("mallCommodity:update")
     public ResponseDTO<String> updateStatus(@PathVariable Long id, @PathVariable Integer status) {
-        return mallCommodityService.updateStatus(id, status, CurrentUser.orNull());
+        mallCommodityService.updateStatus(id, status, CurrentEmployee.nameOrNull());
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除 @author weolwo")
     @PostMapping("/batchDelete")
-    @SaCheckPermission("mallCommodity:delete")
+    @RequiresPermission("mallCommodity:delete")
     public ResponseDTO<String> batchDelete(@RequestBody ValidateList<Long> idList) {
-        return mallCommodityService.batchDelete(idList);
+        mallCommodityService.batchDelete(idList);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除 @author weolwo")
     @GetMapping("/delete/{id}")
-    @SaCheckPermission("mallCommodity:delete")
+    @RequiresPermission("mallCommodity:delete")
     public ResponseDTO<String> delete(@PathVariable Long id) {
-        return mallCommodityService.delete(id);
+        mallCommodityService.delete(id);
+        return ResponseDTO.ok();
     }
 }

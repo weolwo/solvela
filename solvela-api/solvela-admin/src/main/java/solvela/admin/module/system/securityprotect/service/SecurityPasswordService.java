@@ -2,8 +2,8 @@ package solvela.admin.module.system.securityprotect.service;
 
 import jakarta.annotation.Resource;
 import solvela.crypto.PasswordCipher;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.admin.module.system.securityprotect.dao.PasswordLogDao;
 import solvela.admin.module.system.securityprotect.domain.PasswordLogEntity;
@@ -72,7 +72,7 @@ public class SecurityPasswordService {
     /**
      * 校验密码重复次数
      */
-    public ResponseDTO<String> validatePasswordRepeatTimes(RequestUser requestUser, String newPassword) {
+    public ResponseDTO<String> validatePasswordRepeatTimes(RequestEmployee requestUser, String newPassword) {
 
         // 密码重复次数小于1  无需校验
         if (level3ProtectConfigService.getRegularChangePasswordNotAllowRepeatTimes() < 1) {
@@ -109,7 +109,7 @@ public class SecurityPasswordService {
     /**
      * 保存修改密码
      */
-    public void saveUserChangePasswordLog(RequestUser requestUser, String newPassword, String oldPassword) {
+    public void saveUserChangePasswordLog(RequestEmployee requestUser, String newPassword, String oldPassword) {
 
         PasswordLogEntity passwordLogEntity = new PasswordLogEntity();
         passwordLogEntity.setNewPassword(newPassword);

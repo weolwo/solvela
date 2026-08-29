@@ -1,11 +1,10 @@
 package solvela.web.handler;
 
-import cn.dev33.satoken.exception.NotPermissionException;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.code.SystemErrorCode;
 import solvela.code.UserErrorCode;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.exception.BusinessException;
@@ -74,32 +73,23 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * sa-token 权限异常处理
+     * 业务异常。
      *
-     * @param e 权限异常
-     * @return 错误结果
-     */
-    @ResponseBody
-    @ExceptionHandler(NotPermissionException.class)
-    public ResponseDTO<String> permissionException(NotPermissionException e) {
-        // 开发环境 方便调试
-        if (SystemEnvironmentEnum.PROD != systemEnvironment.getCurrentEnvironment()) {
-            return ResponseDTO.error(UserErrorCode.NO_PERMISSION, e.getMessage());
-        }
-        return ResponseDTO.error(UserErrorCode.NO_PERMISSION);
-    }
-
-
-    /**
-     * 业务异常
+     * <p>按异常自带的错误码返回（默认 {@link solvela.code.UserErrorCode#PARAM_ERROR}），
+     * <b>不再一律映射成 SYSTEM_ERROR(10001)</b>。旧映射有两个后果：
+     * 前端拿到的 level 是 system，用户看到的是「系统似乎出现了点小问题」而不是自己填错了什么；
+     * 监控按「系统错误」计数，于是「运营重复点了一次批量删除」和「数据库连不上」
+     * 落在同一条告警曲线上，告警从此没人看。
+     *
+     * <p>日志也降为 warn：业务校验失败是预期内的分支，不是需要有人半夜起来看的事故。
      */
     @ResponseBody
     @ExceptionHandler(BusinessException.class)
     public ResponseDTO<?> businessExceptionHandler(BusinessException e) {
         if (!systemEnvironment.isProd()) {
-            log.error("全局业务异常,URL:{}", getCurrentRequestUrl(), e);
+            log.warn("全局业务异常,URL:{}, msg:{}", getCurrentRequestUrl(), e.getMessage());
         }
-        return ResponseDTO.error(SystemErrorCode.SYSTEM_ERROR, e.getMessage());
+        return ResponseDTO.error(e.getErrorCode(), e.getMessage());
     }
 
     /**

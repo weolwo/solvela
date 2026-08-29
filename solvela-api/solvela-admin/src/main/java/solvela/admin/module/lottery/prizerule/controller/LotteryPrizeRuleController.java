@@ -7,14 +7,14 @@ import solvela.admin.module.lottery.prizerule.domain.vo.LotteryPrizeRuleVO;
 import solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleDTO;
 import solvela.lottery.prizerule.service.LotteryPrizeAnalysisService;
 import solvela.lottery.prizerule.service.LotteryPrizeRuleService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -52,7 +52,7 @@ public class LotteryPrizeRuleController {
 
     @Operation(summary = "分页查询：奖级规则原始行，保留给排查与导出用")
     @PostMapping("/queryPage")
-    @SaCheckPermission("lotteryPrizeRule:query")
+    @RequiresPermission("lotteryPrizeRule:query")
     public ResponseDTO<PageResult<LotteryPrizeRuleVO>> queryPage(@RequestBody @Valid LotteryPrizeRuleQueryForm queryForm) {
         PageResult<LotteryPrizeRuleDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryPrizeRuleQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryPrizeRuleVO.class));
@@ -60,7 +60,7 @@ public class LotteryPrizeRuleController {
 
     @Operation(summary = "奖励结构分析：按玩法给出净中奖率、预计中奖注数、预计赔付成本与配置体检告警")
     @PostMapping("/analysis")
-    @SaCheckPermission("lotteryPrizeRule:query")
+    @RequiresPermission("lotteryPrizeRule:query")
     public ResponseDTO<LotteryPrizeAnalysisResultDTO> analysis(@RequestBody @Valid LotteryPrizeRuleQueryForm queryForm) {
         return ResponseDTO.ok(lotteryPrizeAnalysisService.analysis(SolvelaBeanUtil.copy(queryForm, LotteryPrizeRuleQuery.class)));
     }

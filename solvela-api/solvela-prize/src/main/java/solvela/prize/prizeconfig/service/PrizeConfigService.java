@@ -3,7 +3,6 @@ package solvela.prize.prizeconfig.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -17,6 +16,7 @@ import solvela.prize.prizeconfig.domain.dto.PrizeConfigDTO;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -78,8 +78,8 @@ public class PrizeConfigService {
     /**
      * 生成一个未被占用的奖品编码（10 位大写字母+数字），供前端「生成」按钮调用
      */
-    public ResponseDTO<String> generatePrizeCode() {
-        return ResponseDTO.ok(SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.PRIZE, this::existsByPrizeCode));
+    public String generatePrizeCode() {
+        return SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.PRIZE, this::existsByPrizeCode);
     }
 
     /**
@@ -119,20 +119,19 @@ public class PrizeConfigService {
      * 添加
      * 奖品编码允许手工输入，故服务端必须重校验格式与唯一性
      */
-    public ResponseDTO<String> add(PrizeConfigAddCommand addForm) {
+    public void add(PrizeConfigAddCommand addForm) {
         if (!SolvelaCodeUtil.isValidBizCode(addForm.getPrizeCode())) {
-            return ResponseDTO.userErrorParam("奖品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+            throw new BusinessException("奖品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
         if (existsByPrizeCode(addForm.getPrizeCode())) {
-            return ResponseDTO.userErrorParam("奖品编码已存在：" + addForm.getPrizeCode());
+            throw new BusinessException("奖品编码已存在：" + addForm.getPrizeCode());
         }
         String matchError = checkPromotionConfigMatch(addForm.getPromotionConfigId(), addForm.getPrizeType());
         if (matchError != null) {
-            return ResponseDTO.userErrorParam(matchError);
+            throw new BusinessException(matchError);
         }
         PrizeConfig prizeConfig = SolvelaBeanUtil.copy(addForm, PrizeConfig.class);
         prizeConfigDao.insert(prizeConfig);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -141,9 +140,9 @@ public class PrizeConfigService {
      * <p>禁用不做任何校验 —— 出问题时能立刻停掉一个奖品是运营最需要的能力；
      * 已被奖池/奖级引用的奖品禁用后不再发放，但历史流水不受影响。
      */
-    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+    public void updateStatus(List<Long> idList, Integer status) {
         if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
-            return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 0-禁用");
+            throw new BusinessException("目标状态只能是 1-启用 或 0-禁用");
         }
         for (Long id : idList) {
             PrizeConfig update = new PrizeConfig();
@@ -151,24 +150,22 @@ public class PrizeConfigService {
             update.setStatus(status);
             prizeConfigDao.updateById(update);
         }
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新
      *
      */
-    public ResponseDTO<String> update(PrizeConfigUpdateCommand updateForm) {
+    public void update(PrizeConfigUpdateCommand updateForm) {
         // 编辑同样要校验：改类型不改配置（或反过来）都会造成错配
         if (updateForm.getPromotionConfigId() != null && StringUtils.isNotBlank(updateForm.getPrizeType())) {
             String matchError = checkPromotionConfigMatch(updateForm.getPromotionConfigId(), updateForm.getPrizeType());
             if (matchError != null) {
-                return ResponseDTO.userErrorParam(matchError);
+                throw new BusinessException(matchError);
             }
         }
         PrizeConfig prizeConfig = SolvelaBeanUtil.copy(updateForm, PrizeConfig.class);
         prizeConfigDao.updateById(prizeConfig);
-        return ResponseDTO.ok();
     }
 
     public PrizeConfig getByPrizeCode(String prizeCode) {
@@ -190,24 +187,22 @@ public class PrizeConfigService {
     /**
      * 批量删除
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         prizeConfigDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (null == id) {
-            return ResponseDTO.ok();
+            return;
         }
 
         prizeConfigDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 }

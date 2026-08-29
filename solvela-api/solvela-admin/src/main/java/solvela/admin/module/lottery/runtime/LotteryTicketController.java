@@ -2,12 +2,12 @@ package solvela.admin.module.lottery.runtime;
 
 import solvela.lottery.runtime.TicketQueryService;
 import solvela.lottery.runtime.TicketIssueService;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.lottery.LotteryRecord;
 import solvela.admin.module.lottery.runtime.domain.form.TicketObtainForm;
@@ -43,26 +43,26 @@ public class LotteryTicketController {
 
     @Operation(summary = "领号：为用户发一个彩票号码")
     @PostMapping("/obtain")
-    @SaCheckPermission("lotteryTicket:query")
+    @RequiresPermission("lotteryTicket:query")
     public ResponseDTO<TicketObtainDTO> obtain(@RequestBody @Valid TicketObtainForm form) {
-        return ticketIssueService.obtain(SolvelaBeanUtil.copy(form, TicketObtainCommand.class));
+        return ResponseDTO.ok(ticketIssueService.obtain(SolvelaBeanUtil.copy(form, TicketObtainCommand.class)));
     }
 
     @Operation(summary = "我的号码：按奖级升序，未中奖(99)沉底")
     @GetMapping("/myTickets")
-    @SaCheckPermission("lotteryTicket:query")
+    @RequiresPermission("lotteryTicket:query")
     public ResponseDTO<List<LotteryRecord>> myTickets(@RequestParam String lotteryCode,
                                                       @RequestParam(required = false) String issueNo,
                                                       @RequestParam Long memberId) {
-        return ticketQueryService.myTickets(lotteryCode, issueNo, memberId);
+        return ResponseDTO.ok(ticketQueryService.myTickets(lotteryCode, issueNo, memberId));
     }
 
     @Operation(summary = "号码验真：反解游标 + 校验签名，供客服核对用户出示的号码")
     @GetMapping("/verify")
-    @SaCheckPermission("lotteryTicket:query")
+    @RequiresPermission("lotteryTicket:query")
     public ResponseDTO<String> verify(@RequestParam String lotteryCode,
                                       @RequestParam String issueNo,
                                       @RequestParam String ticketNumber) {
-        return ticketQueryService.verify(lotteryCode, issueNo, ticketNumber);
+        return ResponseDTO.ok(ticketQueryService.verify(lotteryCode, issueNo, ticketNumber));
     }
 }

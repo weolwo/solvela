@@ -1,6 +1,6 @@
 package solvela.admin.module.risk.proposal.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.risk.proposal.domain.form.ProposalRecordQueryForm;
 import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
@@ -35,7 +35,7 @@ public class ProposalRecordController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("proposalRecord:query")
+    @RequiresPermission("proposalRecord:query")
     public ResponseDTO<PageResult<ProposalRecordVO>> queryPage(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
         PageResult<ProposalRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, ProposalRecordVO.class));
@@ -43,23 +43,25 @@ public class ProposalRecordController {
 
     @Operation(summary = "提案漏斗：到账率、审批积压、下发卡单、资产/来源分布与流程体检")
     @PostMapping("/funnel")
-    @SaCheckPermission("proposalRecord:query")
+    @RequiresPermission("proposalRecord:query")
     public ResponseDTO<ProposalFunnelDTO> funnel(@RequestBody @Valid ProposalRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, ProposalRecordQuery.class)));
     }
 
     @Operation(summary = "提案审批通过（财务视角；一审通过后按 review_level 决定进二审还是直接放行下发）")
     @GetMapping("/approve/{id}")
-    @SaCheckPermission("proposalRecord:approve")
+    @RequiresPermission("proposalRecord:approve")
     public ResponseDTO<String> approve(@PathVariable Long id, @RequestParam(required = false) String comment) {
-        return Service.approve(id, CurrentUser.orNull().getUserName(), comment);
+        Service.approve(id, CurrentEmployee.nameOrNull(), comment);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "提案审批驳回")
     @GetMapping("/reject/{id}")
-    @SaCheckPermission("proposalRecord:approve")
+    @RequiresPermission("proposalRecord:approve")
     public ResponseDTO<String> reject(@PathVariable Long id, @RequestParam(required = false) String comment) {
-        return Service.reject(id, CurrentUser.orNull().getUserName(), comment);
+        Service.reject(id, CurrentEmployee.nameOrNull(), comment);
+        return ResponseDTO.ok();
     }
 
     /*

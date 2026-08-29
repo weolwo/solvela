@@ -5,12 +5,12 @@ import java.util.Optional;
 /**
  * 当前请求的会员身份，绑定在 {@link ScopedValue} 的作用域上。
  *
- * <p>与 solvela-base 的 {@code CurrentUser} 是<b>两套独立机制</b>，不是复用也不是继承：
- * 那边持有的是 {@code RequestUser}（员工形状），本进程只有会员。
+ * <p>与管理端的 {@code CurrentEmployee} 是<b>两套独立机制</b>，不是复用也不是继承：
+ * 那边持有的是 {@code RequestEmployee}（员工形状），本进程只有会员。
  * 共用一个上下文的唯一好处是少写一个类，坏处是两个端的身份模型从此绑在一起。
  *
- * <h3>为什么比 CurrentUser 简单</h3>
- * {@code CurrentUser} 需要一个可变的 Slot：管理端的拦截器要先开作用域、
+ * <h3>为什么比 CurrentEmployee 简单</h3>
+ * {@code CurrentEmployee} 需要一个可变的 Slot：管理端的拦截器要先开作用域、
  * 再在拿到员工信息后 bind 进去。本进程的 {@link AuthenticationFilter}
  * <b>在开作用域之前就已经解析完 token</b>，所以可以直接
  * {@code ScopedValue.where(MEMBER, principal)} —— 值一旦绑定就不可变，

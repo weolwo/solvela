@@ -6,7 +6,7 @@ import jakarta.annotation.Resource;
 import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.datascope.domain.DataScopeAndViewTypeVO;
 import solvela.admin.module.system.datascope.service.DataScopeService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 

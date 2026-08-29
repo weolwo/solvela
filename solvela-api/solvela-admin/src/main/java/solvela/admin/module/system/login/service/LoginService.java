@@ -1,14 +1,14 @@
 package solvela.admin.module.system.login.service;
 
-import cn.dev33.satoken.stp.StpInterface;
-import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.employee.domain.entity.EmployeeEntity;
 import solvela.admin.module.system.employee.service.EmployeeService;
 import solvela.admin.module.system.login.domain.LoginForm;
 import solvela.admin.module.system.login.domain.LoginResultVO;
+import solvela.admin.auth.AccessToken;
+import solvela.admin.auth.CurrentEmployee;
+import solvela.admin.auth.TokenStore;
 import solvela.admin.module.system.login.domain.RequestEmployee;
 import solvela.admin.module.system.login.manager.LoginManager;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
@@ -16,21 +16,16 @@ import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
 import solvela.admin.module.system.role.service.RoleMenuService;
 import solvela.code.UserErrorCode;
-import solvela.base.constant.RequestHeaderConst;
 import solvela.base.constant.StringConst;
 import solvela.crypto.PasswordCipher;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.domain.UserPermission;
-import solvela.base.enumeration.UserTypeEnum;
+import solvela.web.ResponseDTO;
+import solvela.admin.constant.UserTypeEnum;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaEnumUtil;
 import solvela.base.util.SolvelaIpUtil;
 import solvela.base.util.SolvelaRandomUtil;
-import solvela.web.SolvelaServletUtil;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.base.constant.LoginDeviceEnum;
-import solvela.base.constant.RedisKeyConst;
 import solvela.admin.module.system.apiencrypt.service.ApiEncryptService;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
@@ -47,6 +42,7 @@ import solvela.admin.module.system.securityprotect.service.SecurityLoginService;
 import solvela.admin.module.system.securityprotect.service.SecurityPasswordService;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
@@ -64,12 +60,19 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-public class LoginService implements StpInterface {
+public class LoginService {
 
     /**
-     * 万能密码的 sa token loginId 前缀
+     * 万能密码登录的有效期：<b>30 分钟</b>。
+     *
+     * <p>原先这里写的是 {@code StpUtil.login(loginId, 180000000)} —— 注释说「只能登录30分钟」，
+     * 而那个数字是 <b>180000000 秒 ≈ 5.7 年</b>。一个能以任意员工身份登录的后门，
+     * 有效期比系统本身的生命周期还长，且没有任何人会注意到，因为注释写着 30 分钟。
      */
-    private static final String SUPER_PASSWORD_LOGIN_ID_PREFIX = "S";
+    private static final Duration SUPER_PASSWORD_TOKEN_TTL = Duration.ofMinutes(30);
+
+    /** 邮箱验证码 redis key 的业务前缀 */
+    private static final String EMAIL_CODE_KEY_PREFIX = "login:verification-code:";
     // 注入你刚写的配置，默认设为 true 防翻车
     @Resource
     private EmployeeService employeeService;
@@ -105,6 +108,9 @@ public class LoginService implements StpInterface {
 
     @Resource
     private LoginManager loginManager;
+
+    @Resource
+    private TokenStore tokenStore;
     /**
      * 员工登录
      *
@@ -146,13 +152,11 @@ public class LoginService implements StpInterface {
             return ResponseDTO.error(validateEmailCode);
         }
 
-        // 万能密码特殊操作
+        AccessToken accessToken;
         if (superPasswordFlag) {
 
-            // 对于万能密码：受限制sa token 要求loginId唯一，万能密码只能插入一段uuid
-            String saTokenLoginId = SUPER_PASSWORD_LOGIN_ID_PREFIX + StringConst.COLON + SolvelaRandomUtil.simpleUuid() + StringConst.COLON + employeeEntity.getEmployeeId();
-            // 万能密码登录只能登录30分钟
-            StpUtil.login(saTokenLoginId, 180000000);
+            accessToken = tokenStore.issue(employeeEntity.getEmployeeId(), true,
+                    loginDeviceEnum.getDesc(), SUPER_PASSWORD_TOKEN_TTL);
 
         } else {
 
@@ -171,10 +175,7 @@ public class LoginService implements StpInterface {
                 return msg == null ? ResponseDTO.userErrorParam("登录名或密码错误！") : ResponseDTO.error(UserErrorCode.LOGIN_FAIL_WILL_LOCK, msg);
             }
 
-            String saTokenLoginId = UserTypeEnum.ADMIN_EMPLOYEE.getValue() + StringConst.COLON + employeeEntity.getEmployeeId();
-
-            // 登录
-            StpUtil.login(saTokenLoginId, String.valueOf(loginDeviceEnum.getDesc()));
+            accessToken = tokenStore.issue(employeeEntity.getEmployeeId(), false, loginDeviceEnum.getDesc());
 
             // 移除邮箱验证码
             deleteEmailCode(employeeEntity.getEmployeeId());
@@ -187,8 +188,8 @@ public class LoginService implements StpInterface {
         securityLoginService.removeLoginFail(employeeEntity.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE);
 
         // 获取登录结果信息
-        String token = StpUtil.getTokenValue();
-        LoginResultVO loginResultVO = getLoginResult(requestEmployee, token);
+        String token = accessToken.value();
+        LoginResultVO loginResultVO = getLoginResult(requestEmployee, superPasswordFlag);
 
         //保存登录记录
         saveLoginLog(employeeEntity, ip, userAgent, superPasswordFlag ? "万能密码登录" : StringConst.EMPTY, LoginLogResultEnum.LOGIN_SUCCESS, loginDeviceEnum);
@@ -206,7 +207,7 @@ public class LoginService implements StpInterface {
     /**
      * 获取登录结果信息
      */
-    public LoginResultVO getLoginResult(RequestEmployee requestEmployee, String token) {
+    public LoginResultVO getLoginResult(RequestEmployee requestEmployee, boolean superPasswordFlag) {
 
         // 基础信息
         LoginResultVO loginResultVO = SolvelaBeanUtil.copy(requestEmployee, LoginResultVO.class);
@@ -230,8 +231,7 @@ public class LoginService implements StpInterface {
         loginResultVO.setNeedUpdatePwdFlag(needChangePasswordFlag);
 
         // 万能密码登录，则不需要设置强制修改密码
-        String loginIdByToken = (String) StpUtil.getLoginIdByToken(token);
-        if (loginIdByToken != null && loginIdByToken.startsWith(SUPER_PASSWORD_LOGIN_ID_PREFIX)) {
+        if (superPasswordFlag) {
             loginResultVO.setNeedUpdatePwdFlag(false);
         }
 
@@ -240,60 +240,13 @@ public class LoginService implements StpInterface {
 
 
     /**
-     * 根据登录token 获取员请求工信息
-     */
-    public RequestEmployee getLoginEmployee(String loginId, HttpServletRequest request) {
-        if (loginId == null) {
-            return null;
-        }
-
-        Long requestEmployeeId = getEmployeeIdByLoginId(loginId);
-        if (requestEmployeeId == null) {
-            return null;
-        }
-
-        RequestEmployee requestEmployee = loginManager.getRequestEmployee(requestEmployeeId);
-
-        // 更新请求ip和user agent
-        requestEmployee.setUserAgent(request.getHeader(RequestHeaderConst.USER_AGENT));
-        requestEmployee.setIp(SolvelaServletUtil.getClientIP(request));
-
-        return requestEmployee;
-    }
-
-    /**
-     * 根据 loginId 获取 员工id
-     */
-    Long getEmployeeIdByLoginId(String loginId) {
-
-        if (loginId == null) {
-            return null;
-        }
-
-        try {
-            // 如果是 万能密码 登录的用户
-            String employeeIdStr = null;
-            if (loginId.startsWith(SUPER_PASSWORD_LOGIN_ID_PREFIX)) {
-                employeeIdStr = loginId.split(StringConst.COLON)[2];
-            } else {
-                employeeIdStr = loginId.substring(2);
-            }
-
-            return Long.parseLong(employeeIdStr);
-        } catch (Exception e) {
-            log.error("loginId parse error , loginId : {}", loginId, e);
-            return null;
-        }
-    }
-
-
-    /**
      * 退出登录
      */
-    public ResponseDTO<String> logout(RequestUser requestUser) {
+    public ResponseDTO<String> logout(RequestEmployee requestUser) {
 
-        // sa token 登出
-        StpUtil.logout();
+        // 吊销本次会话的令牌。<b>只吊销这一个</b> —— 账号禁用/改密走 revokeAll，
+        // 不该由「点了退出」顺带把这个人其它设备上的会话也踢掉
+        tokenStore.revoke(CurrentEmployee.tokenOrNull());
 
         // 清除用户登录信息缓存和权限信息
         this.clearLoginEmployeeCache(requestUser.getUserId());
@@ -334,27 +287,6 @@ public class LoginService implements StpInterface {
     }
 
 
-    @Override
-    public List<String> getPermissionList(Object loginId, String loginType) {
-        Long employeeId = this.getEmployeeIdByLoginId((String) loginId);
-        if (employeeId == null) {
-            return Collections.emptyList();
-        }
-
-        UserPermission userPermission = loginManager.getUserPermission(employeeId);
-        return userPermission.getPermissionList();
-    }
-
-    @Override
-    public List<String> getRoleList(Object loginId, String loginType) {
-        Long employeeId = this.getEmployeeIdByLoginId((String) loginId);
-        if (employeeId == null) {
-            return Collections.emptyList();
-        }
-
-        UserPermission userPermission = loginManager.getUserPermission(employeeId);
-        return userPermission.getRoleList();
-    }
 
 
     /**
@@ -388,7 +320,7 @@ public class LoginService implements StpInterface {
         }
 
         // 校验验证码发送时间，60秒内不能重复发生
-        String redisVerificationCodeKey = redisService.generateRedisKey(RedisKeyConst.Support.LOGIN_VERIFICATION_CODE, UserTypeEnum.ADMIN_EMPLOYEE.getValue() + RedisKeyConst.SEPARATOR + employeeEntity.getEmployeeId());
+        String redisVerificationCodeKey = emailCodeKey(employeeEntity.getEmployeeId());
         String emailCode = redisService.get(redisVerificationCodeKey);
         long sendCodeTimeMills = -1;
         if (!SolvelaStringUtil.isEmpty(emailCode)) {
@@ -430,7 +362,7 @@ public class LoginService implements StpInterface {
         }
 
         // 校验验证码
-        String redisVerificationCodeKey = redisService.generateRedisKey(RedisKeyConst.Support.LOGIN_VERIFICATION_CODE, UserTypeEnum.ADMIN_EMPLOYEE.getValue() + RedisKeyConst.SEPARATOR + employeeEntity.getEmployeeId());
+        String redisVerificationCodeKey = emailCodeKey(employeeEntity.getEmployeeId());
         String emailCode = redisService.get(redisVerificationCodeKey);
         if (SolvelaStringUtil.isEmpty(emailCode)) {
             return ResponseDTO.userErrorParam("邮箱验证码已失效，请重新发送");
@@ -444,10 +376,21 @@ public class LoginService implements StpInterface {
     }
 
     /**
+     * 邮箱验证码的 redis key。
+     *
+     * <p>发送、校验、删除三处必须算出<b>同一个字符串</b>，以前是三份复制粘贴的拼接表达式 ——
+     * 改前缀时漏改一处，表现是「验证码发出去了但怎么填都说失效」。收敛到这里之后改不漏。
+     */
+    private String emailCodeKey(Long employeeId) {
+        return redisService.generateRedisKey(EMAIL_CODE_KEY_PREFIX,
+                UserTypeEnum.ADMIN_EMPLOYEE.getValue() + StringConst.COLON + employeeId);
+    }
+
+    /**
      * 移除邮箱验证码
      */
     private void deleteEmailCode(Long employeeId) {
-        String redisVerificationCodeKey = redisService.generateRedisKey(RedisKeyConst.Support.LOGIN_VERIFICATION_CODE, UserTypeEnum.ADMIN_EMPLOYEE.getValue() + RedisKeyConst.SEPARATOR + employeeId);
+        String redisVerificationCodeKey = emailCodeKey(employeeId);
         redisService.delete(redisVerificationCodeKey);
     }
 

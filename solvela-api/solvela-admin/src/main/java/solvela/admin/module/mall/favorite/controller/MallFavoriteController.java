@@ -1,6 +1,6 @@
 package solvela.admin.module.mall.favorite.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.mall.favorite.domain.dto.MallFavoriteStatDTO;
 import solvela.mall.favorite.service.MallFavoriteService;
 
@@ -33,8 +33,8 @@ public class MallFavoriteController {
 
     @Operation(summary = "收藏统计与排行 @author weolwo")
     @GetMapping("/queryStat")
-    @SaCheckPermission("mallFavorite:query")
+    @RequiresPermission("mallFavorite:query")
     public ResponseDTO<MallFavoriteStatDTO> queryStat(@RequestParam(required = false) Integer rankTopN) {
-        return mallFavoriteService.queryStat(rankTopN);
+        return ResponseDTO.ok(mallFavoriteService.queryStat(rankTopN));
     }
 }

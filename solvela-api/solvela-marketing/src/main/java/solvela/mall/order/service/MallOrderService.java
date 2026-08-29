@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.mall.constant.MallConst;
 import solvela.mall.order.dao.MallOrderDao;
@@ -55,9 +54,9 @@ public class MallOrderService {
      * 统计 + 兑换商品排行。<b>与列表共用同一套查询条件</b> ——
      * 顶部筛选改了统计跟着变，两套条件的话运营会看到「统计说 100 单、列表只有 3 条」。
      */
-    public ResponseDTO<MallOrderStatDTO> queryStat(MallOrderQuery queryForm) {
+    public MallOrderStatDTO queryStat(MallOrderQuery queryForm) {
         if (!resolveMemberId(queryForm)) {
-            return ResponseDTO.ok(emptyStat());
+            return emptyStat();
         }
         MallOrderStatDTO stat = mallOrderDao.queryStat(queryForm);
         stat = stat == null ? emptyStat() : normalize(stat);
@@ -65,7 +64,7 @@ public class MallOrderService {
         int topN = queryForm.getRankTopN() == null ? MallConst.RANK_TOP_N : queryForm.getRankTopN();
         topN = Math.min(Math.max(topN, 1), MallConst.MAX_RANK_TOP_N);
         stat.setCommodityRank(mallOrderDao.queryCommodityRank(queryForm, topN));
-        return ResponseDTO.ok(stat);
+        return stat;
     }
 
     /**
@@ -89,16 +88,9 @@ public class MallOrderService {
         return true;
     }
 
-    /** PageResult 没有静态工厂，手工拼一个空页 */
     private PageResult<MallOrderDTO> emptyPage(MallOrderQuery queryForm) {
-        PageResult<MallOrderDTO> result = new PageResult<>();
-        result.setPageNum(queryForm.getPageNum() == null ? 1L : queryForm.getPageNum());
-        result.setPageSize(queryForm.getPageSize() == null ? 10L : queryForm.getPageSize());
-        result.setTotal(0L);
-        result.setPages(0L);
-        result.setList(List.of());
-        result.setEmptyFlag(true);
-        return result;
+        return PageResult.empty(queryForm.getPageNum() == null ? 1L : queryForm.getPageNum(),
+                queryForm.getPageSize() == null ? 10L : queryForm.getPageSize());
     }
 
     private MallOrderStatDTO emptyStat() {

@@ -5,13 +5,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.util.SolvelaIpUtil;
 import solvela.base.dao.SolvelaPageUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.datatracer.constant.DataTracerConst;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 import solvela.admin.module.system.datatracer.dao.DataTracerDao;
@@ -158,7 +158,7 @@ public class DataTracerService {
      * 保存数据变动记录
      */
     public void addTrace(DataTracerForm tracerForm) {
-        RequestUser requestUser = CurrentUser.orNull();
+        RequestEmployee requestUser = CurrentEmployee.orNull();
         this.addTrace(tracerForm, requestUser);
     }
 
@@ -166,7 +166,7 @@ public class DataTracerService {
     /**
      * 保存数据变动记录
      */
-    public void addTrace(DataTracerForm tracerForm, RequestUser requestUser) {
+    public void addTrace(DataTracerForm tracerForm, RequestEmployee requestUser) {
         DataTracerEntity tracerEntity = SolvelaBeanUtil.copy(tracerForm, DataTracerEntity.class);
         tracerEntity.setType(tracerForm.getType().getValue());
         if (requestUser != null) {
@@ -184,14 +184,14 @@ public class DataTracerService {
      * 批量保存数据变动记录
      */
     public void addTraceList(List<DataTracerForm> tracerFormList) {
-        RequestUser requestUser = CurrentUser.orNull();
+        RequestEmployee requestUser = CurrentEmployee.orNull();
         this.addTraceList(tracerFormList, requestUser);
     }
 
     /**
      * 批量保存数据变动记录
      */
-    public void addTraceList(List<DataTracerForm> tracerFormList, RequestUser requestUser) {
+    public void addTraceList(List<DataTracerForm> tracerFormList, RequestEmployee requestUser) {
         if (SolvelaCollectionUtil.isEmpty(tracerFormList)) {
             return;
         }

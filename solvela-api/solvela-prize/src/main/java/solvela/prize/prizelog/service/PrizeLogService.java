@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
@@ -15,6 +14,7 @@ import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
 import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
 
 import solvela.member.service.MemberService;
+import solvela.exception.BusinessException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -202,21 +202,20 @@ public class PrizeLogService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PrizeLogAddCommand addForm) {
+    public void add(PrizeLogAddCommand addForm) {
         PrizeLog prizeLog = SolvelaBeanUtil.copy(addForm, PrizeLog.class);
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
         // ⚠️ member_name 仍是 NOT NULL 且无默认值，漏了这一句整条 INSERT 会被拒。
         prizeLog.setMemberName(memberService.requireMemberName(addForm.getMemberId()));
         prizeLogDao.insert(prizeLog);
-        return ResponseDTO.ok();
     }
 
-    public ResponseDTO<String> updateById(PrizeLog prizeLog) {
+    public void updateById(PrizeLog prizeLog) {
         int updated = prizeLogDao.updateById(prizeLog);
         if (updated > 0) {
-            return ResponseDTO.ok();
+            return;
         }
-        return ResponseDTO.userErrorParam();
+        throw new BusinessException();
     }
 
     public int save(PrizeLog prizeLog) {

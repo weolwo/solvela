@@ -4,7 +4,7 @@ import jakarta.annotation.Resource;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.base.constant.RedisKeyConst;
+import solvela.base.constant.StringConst;
 import solvela.base.json.JsonUtils;
 import org.slf4j.Logger;
 import org.springframework.data.redis.core.*;
@@ -65,7 +65,7 @@ public class RedisService {
      */
     public String generateRedisKey(String prefix, String key) {
         SystemEnvironmentEnum currentEnvironment = systemEnvironment.getCurrentEnvironment();
-        return systemEnvironment.getProjectName() + RedisKeyConst.SEPARATOR + currentEnvironment.getValue() +  RedisKeyConst.SEPARATOR + prefix + key;
+        return systemEnvironment.getProjectName() + StringConst.COLON + currentEnvironment.getValue() +  StringConst.COLON + prefix + key;
     }
 
     /**
@@ -77,7 +77,7 @@ public class RedisService {
         if (SolvelaStringUtil.isBlank(redisKey)) {
             return "";
         }
-        int index = redisKey.lastIndexOf(RedisKeyConst.SEPARATOR);
+        int index = redisKey.lastIndexOf(StringConst.COLON);
         if(index < 1){
             return redisKey;
         }

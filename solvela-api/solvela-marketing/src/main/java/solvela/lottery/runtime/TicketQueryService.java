@@ -2,13 +2,13 @@ package solvela.lottery.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.engine.FpeCipher;
 import solvela.lottery.engine.FpeCipherFactory;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.LotteryRecord;
+import solvela.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -38,8 +38,8 @@ public class TicketQueryService {
      * 我的号码。issueNo 为空则返回该玩法下的全部期。
      * 排序由 SQL 保证：奖级升序（一等奖在前、未中奖的 99 沉底），同奖级按最新在前
      */
-    public ResponseDTO<List<LotteryRecord>> myTickets(String lotteryCode, String issueNo, Long memberId) {
-        return ResponseDTO.ok(lotteryRecordDao.selectMyTickets(lotteryCode, issueNo, memberId));
+    public List<LotteryRecord> myTickets(String lotteryCode, String issueNo, Long memberId) {
+        return lotteryRecordDao.selectMyTickets(lotteryCode, issueNo, memberId);
     }
 
     /**
@@ -50,10 +50,10 @@ public class TicketQueryService {
      *   <li>落库：记录在不在、签名对不对 —— 反解合法但查无记录，说明记录被删或尚未发到这个游标。</li>
      * </ol>
      */
-    public ResponseDTO<String> verify(String lotteryCode, String issueNo, String ticketNumber) {
+    public String verify(String lotteryCode, String issueNo, String ticketNumber) {
         LotteryConfig config = lotteryConfigService.getByLotteryCode(lotteryCode);
         if (config == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + lotteryCode);
+            throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
 
         long sequenceNo;
@@ -61,12 +61,12 @@ public class TicketQueryService {
             FpeCipher cipher = fpeCipherFactory.create(lotteryCode, issueNo, config.getNumberLength());
             sequenceNo = cipher.decrypt(ticketNumber);
         } catch (RuntimeException e) {
-            return ResponseDTO.ok("❌ 号码格式非法：" + e.getMessage());
+            return "❌ 号码格式非法：" + e.getMessage();
         }
 
         if (sequenceNo >= config.getTotalCount()) {
-            return ResponseDTO.ok("❌ 号码不可能由本期发出（反解游标 " + sequenceNo
-                    + " 超出本期发行量 " + config.getTotalCount() + "），疑似伪造");
+            return "❌ 号码不可能由本期发出（反解游标 " + sequenceNo
+                    + " 超出本期发行量 " + config.getTotalCount() + "），疑似伪造";
         }
 
         List<LotteryRecord> list = lotteryRecordDao.selectList(
@@ -75,18 +75,18 @@ public class TicketQueryService {
                         .eq(LotteryRecord::getIssueNo, issueNo)
                         .eq(LotteryRecord::getTicketNumber, ticketNumber));
         if (list.isEmpty()) {
-            return ResponseDTO.ok("⚠️ 号码格式合法（对应游标 " + sequenceNo + "），但库中无发放记录 —— "
-                    + "可能该游标尚未发出，或记录已被删除");
+            return "⚠️ 号码格式合法（对应游标 " + sequenceNo + "），但库中无发放记录 —— "
+                    + "可能该游标尚未发出，或记录已被删除";
         }
         LotteryRecord record = list.get(0);
         if (!ticketSignService.verify(record)) {
             log.error("[彩票验真] 签名不匹配，记录可能被直接改库 recordId={}, ticketNumber={}",
                     record.getId(), ticketNumber);
-            return ResponseDTO.ok("🔴 记录存在但签名校验失败，数据可能被篡改，请人工核查（记录ID " + record.getId() + "）");
+            return "🔴 记录存在但签名校验失败，数据可能被篡改，请人工核查（记录ID " + record.getId() + "）";
         }
         // 归属显示的是<b>领号当时的账号快照</b>；会员号才是这张票真正的归属键
-        return ResponseDTO.ok("✅ 号码真实有效：归属 " + record.getMemberName()
+        return "✅ 号码真实有效：归属 " + record.getMemberName()
                 + "(" + record.getMemberId() + ")"
-                + "，游标 " + record.getSequenceNo() + "，领取于 " + record.getObtainTime());
+                + "，游标 " + record.getSequenceNo() + "，领取于 " + record.getObtainTime();
     }
 }

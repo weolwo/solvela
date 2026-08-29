@@ -1,14 +1,14 @@
 package solvela.admin.module.activity.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityDisplay;
 import solvela.activity.service.ActivityDisplayService;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.web.CurrentUser;
+import solvela.web.ResponseDTO;
+import solvela.admin.auth.CurrentEmployee;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,7 +46,7 @@ public class ActivityDisplayController {
      */
     @Operation(summary = "查询活动展示配置 @author 1024")
     @GetMapping("/get/{activityCode}")
-    @SaCheckPermission("activityConfig:query")
+    @RequiresPermission("activityConfig:query")
     public ResponseDTO<ActivityDisplay> get(@PathVariable String activityCode) {
         return ResponseDTO.ok(activityDisplayService.getByActivityCode(activityCode));
     }
@@ -59,9 +59,9 @@ public class ActivityDisplayController {
      */
     @Operation(summary = "保存活动展示配置 @author 1024")
     @PostMapping("/save/{activityCode}")
-    @SaCheckPermission("activityConfig:update")
+    @RequiresPermission("activityConfig:update")
     public ResponseDTO<ActivityDisplay> save(@PathVariable String activityCode,
                                              @RequestBody @Valid ActivityDisplay form) {
-        return ResponseDTO.ok(activityDisplayService.saveByCode(activityCode, form, CurrentUser.orNull()));
+        return ResponseDTO.ok(activityDisplayService.saveByCode(activityCode, form, CurrentEmployee.nameOrNull()));
     }
 }

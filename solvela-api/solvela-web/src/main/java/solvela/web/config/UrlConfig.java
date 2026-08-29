@@ -1,11 +1,10 @@
 package solvela.web.config;
 
-import cn.dev33.satoken.annotation.SaIgnore;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.annotation.AllowAnonymous;
-import solvela.base.domain.RequestUrlVO;
+import solvela.web.AllowAnonymous;
+import solvela.web.RequiresPermission;
 import solvela.base.util.SolvelaCollectionUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,34 +62,32 @@ public class UrlConfig {
     }
 
     /**
-     * 需要进行url权限校验的方法
+     * 需要进行 url 权限校验的方法：菜单配置页拿它当「接口地址」下拉。
+     *
+     * <p>判据从「没标 @SaIgnore 且没标 @AllowAnonymous」改成「标了 @RequiresPermission」——
+     * 这是一次收窄，而且是对的：原先只要没显式忽略就会被列进来，于是下拉里混着
+     * 一堆本来就不做权限校验的接口（比如各种下拉数据源），运营给菜单挂上去也不会生效。
      *
      * @param methodUrlMap
      * @return
      */
     @Bean
-    public List<RequestUrlVO> authUrl(Map<Method, Set<String>> methodUrlMap) {
-        List<RequestUrlVO> authUrlList = new ArrayList<>();
+    public List<RequestUrl> authUrl(Map<Method, Set<String>> methodUrlMap) {
+        List<RequestUrl> authUrlList = new ArrayList<>();
         for (Map.Entry<Method, Set<String>> entry : methodUrlMap.entrySet()) {
             Method method = entry.getKey();
-            // 忽略权限
-            SaIgnore ignore = method.getAnnotation(SaIgnore.class);
-            if (null != ignore) {
-                continue;
-            }
-            AllowAnonymous allowAnonymous = method.getAnnotation(AllowAnonymous.class);
-            if (null != allowAnonymous) {
+            if (method.getAnnotation(RequiresPermission.class) == null) {
                 continue;
             }
             Set<String> urlSet = entry.getValue();
-            List<RequestUrlVO> requestUrlList = this.buildRequestUrl(method, urlSet);
+            List<RequestUrl> requestUrlList = this.buildRequestUrl(method, urlSet);
             authUrlList.addAll(requestUrlList);
         }
         return authUrlList;
     }
 
-    private List<RequestUrlVO> buildRequestUrl(Method method, Set<String> urlSet) {
-        List<RequestUrlVO> requestUrlList = new ArrayList<>();
+    private List<RequestUrl> buildRequestUrl(Method method, Set<String> urlSet) {
+        List<RequestUrl> requestUrlList = new ArrayList<>();
         if (SolvelaCollectionUtil.isEmpty(urlSet)) {
             return requestUrlList;
         }
@@ -106,11 +103,7 @@ public class UrlConfig {
             methodComment = apiOperation.summary();
         }
         for (String url : urlSet) {
-            RequestUrlVO requestUrlVO = new RequestUrlVO();
-            requestUrlVO.setUrl(url);
-            requestUrlVO.setName(name);
-            requestUrlVO.setComment(methodComment);
-            requestUrlList.add(requestUrlVO);
+            requestUrlList.add(new RequestUrl(methodComment, name, url));
         }
         return requestUrlList;
     }

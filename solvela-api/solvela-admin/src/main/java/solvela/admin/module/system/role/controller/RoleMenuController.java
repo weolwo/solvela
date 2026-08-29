@@ -1,6 +1,6 @@
 package solvela.admin.module.system.role.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -9,7 +9,7 @@ import solvela.admin.constant.AdminSwaggerTagConst;
 import solvela.admin.module.system.role.domain.form.RoleMenuUpdateForm;
 import solvela.admin.module.system.role.domain.vo.RoleMenuTreeVO;
 import solvela.admin.module.system.role.service.RoleMenuService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -30,7 +30,7 @@ public class RoleMenuController {
 
     @Operation(summary = "更新角色权限 @author 卓大")
     @PostMapping("/role/menu/updateRoleMenu")
-    @SaCheckPermission("system:role:menu:update")
+    @RequiresPermission("system:role:menu:update")
     public ResponseDTO<String> updateRoleMenu(@Valid @RequestBody RoleMenuUpdateForm updateDTO) {
         return roleMenuService.updateRoleMenu(updateDTO);
     }

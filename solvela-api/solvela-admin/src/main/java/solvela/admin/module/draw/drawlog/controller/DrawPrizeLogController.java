@@ -10,14 +10,14 @@ import solvela.draw.runtime.DrawExecuteService;
 import solvela.admin.module.draw.runtime.domain.form.DrawExecuteForm;
 import solvela.draw.runtime.domain.DrawExecuteCommand;
 import solvela.draw.runtime.domain.DrawExecuteDTO;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -52,14 +52,14 @@ public class DrawPrizeLogController {
 
     @Operation(summary = "执行抽奖（引擎判定 + Lua预扣 + DB兜底 + 落流水）")
     @PostMapping("/execute")
-    @SaCheckPermission("drawPrizeLog:execute")
+    @RequiresPermission("drawPrizeLog:execute")
     public ResponseDTO<DrawExecuteDTO> execute(@RequestBody @Valid DrawExecuteForm executeForm) {
-        return drawExecuteService.execute(SolvelaBeanUtil.copy(executeForm, DrawExecuteCommand.class));
+        return ResponseDTO.ok(drawExecuteService.execute(SolvelaBeanUtil.copy(executeForm, DrawExecuteCommand.class)));
     }
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("drawPrizeLog:query")
+    @RequiresPermission("drawPrizeLog:query")
     public ResponseDTO<PageResult<DrawPrizeLogVO>> queryPage(@RequestBody @Valid DrawPrizeLogQueryForm queryForm) {
         PageResult<DrawPrizeLogDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, DrawPrizeLogQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, DrawPrizeLogVO.class));
@@ -67,7 +67,7 @@ public class DrawPrizeLogController {
 
     @Operation(summary = "抽奖转化漏斗：中奖率、库存不足率、参与人数、奖品发放分布")
     @PostMapping("/funnel")
-    @SaCheckPermission("drawPrizeLog:query")
+    @RequiresPermission("drawPrizeLog:query")
     public ResponseDTO<DrawFunnelDTO> funnel(@RequestBody @Valid DrawPrizeLogQueryForm queryForm) {
         return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, DrawPrizeLogQuery.class)));
     }

@@ -1,6 +1,6 @@
 package solvela.admin.module.scriptengine.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
 import solvela.exception.BusinessException;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.admin.module.scriptengine.domain.form.ScriptBindForm;
 import solvela.admin.module.scriptengine.domain.vo.ScriptRefPointVO;
@@ -50,35 +50,35 @@ public class ScriptAdminController {
     private final ScriptRefService scriptRefService;
 
     @Operation(summary = "【用户】脚本-列表（只读，权威在项目文件里）")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/list")
     public ResponseDTO<List<ScriptDTO>> list() {
         return ResponseDTO.ok(scriptQueryService.listAll());
     }
 
     @Operation(summary = "【用户】脚本-详情，含内容与引用它的业务对象")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/detail")
     public ResponseDTO<ScriptDTO> detail(@RequestParam String scriptCode) {
         return ResponseDTO.ok(scriptQueryService.detail(scriptCode));
     }
 
     @Operation(summary = "【用户】脚本-改这个脚本会影响哪些业务对象")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/refs")
     public ResponseDTO<List<ScriptRefDTO>> refs(@RequestParam String scriptCode) {
         return ResponseDTO.ok(scriptRefService.findRefsOfScript(scriptCode));
     }
 
     @Operation(summary = "【用户】脚本-某个业务对象身上挂了哪些脚本")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/refs/owner")
     public ResponseDTO<List<ScriptRefDTO>> refsOfOwner(@RequestParam String refType, @RequestParam String refId) {
         return ResponseDTO.ok(scriptRefService.findRefsOfOwner(refType, refId));
     }
 
     @Operation(summary = "【用户】脚本-可挂载点清单，前端下拉用")
-    @SaCheckPermission("script:query")
+    @RequiresPermission("script:query")
     @GetMapping("/ref/point/list")
     public ResponseDTO<List<ScriptRefPointVO>> refPoints() {
         return ResponseDTO.ok(Arrays.stream(ScriptRefPoint.values()).map(point -> {
@@ -94,17 +94,17 @@ public class ScriptAdminController {
     }
 
     @Operation(summary = "【用户】脚本-挂载到业务对象")
-    @SaCheckPermission("script:bind")
+    @RequiresPermission("script:bind")
     @PostMapping("/ref/bind")
     public ResponseDTO<String> bind(@RequestBody @Valid ScriptBindForm form) {
-        RequestUser user = CurrentUser.orNull();
+        RequestEmployee user = CurrentEmployee.orNull();
         scriptRefService.bind(toPoint(form.getRefPoint()), form.getRefId(), form.getScriptCode(),
                 user == null ? null : user.getUserName());
         return ResponseDTO.ok();
     }
 
     @Operation(summary = "【用户】脚本-摘除挂载")
-    @SaCheckPermission("script:bind")
+    @RequiresPermission("script:bind")
     @PostMapping("/ref/unbind/{refPoint}/{refId}")
     public ResponseDTO<String> unbind(@PathVariable String refPoint, @PathVariable String refId) {
         scriptRefService.unbind(toPoint(refPoint), refId);

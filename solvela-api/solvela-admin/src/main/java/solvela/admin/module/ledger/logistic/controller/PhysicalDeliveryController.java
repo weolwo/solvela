@@ -1,6 +1,6 @@
 package solvela.admin.module.ledger.logistic.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,7 +11,7 @@ import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import solvela.web.excel.SolvelaExcelWebUtil;
 import solvela.admin.module.ledger.logistic.domain.form.PhysicalDeliveryAddForm;
@@ -53,7 +53,7 @@ public class PhysicalDeliveryController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("physicalDelivery:query")
+    @RequiresPermission("physicalDelivery:query")
     public ResponseDTO<PageResult<PhysicalDeliveryVO>> queryPage(@RequestBody @Valid PhysicalDeliveryQueryForm queryForm) {
         PhysicalDeliveryQuery query = SolvelaBeanUtil.copy(queryForm, PhysicalDeliveryQuery.class);
         PageResult<PhysicalDeliveryDTO> page = Service.queryPage(query);
@@ -64,44 +64,48 @@ public class PhysicalDeliveryController {
 
     @Operation(summary = "发货统计：本期新增（默认当天）+ 待发货积压与收件信息体检（积压是全量）")
     @PostMapping("/stat")
-    @SaCheckPermission("physicalDelivery:query")
+    @RequiresPermission("physicalDelivery:query")
     public ResponseDTO<PhysicalDeliveryStatDTO> stat(@RequestBody @Valid LedgerStatForm form) {
         return ResponseDTO.ok(Service.stat(SolvelaBeanUtil.copy(form, LedgerStatQuery.class)));
     }
 
     @Operation(summary = "添加")
     @PostMapping("/add")
-    @SaCheckPermission("physicalDelivery:add")
+    @RequiresPermission("physicalDelivery:add")
     public ResponseDTO<String> add(@RequestBody @Valid PhysicalDeliveryAddForm addForm) {
-        return Service.add(SolvelaBeanUtil.copy(addForm, PhysicalDeliveryAddCommand.class));
+        Service.add(SolvelaBeanUtil.copy(addForm, PhysicalDeliveryAddCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "更新")
     @PostMapping("/update")
-    @SaCheckPermission("physicalDelivery:update")
+    @RequiresPermission("physicalDelivery:update")
     public ResponseDTO<String> update(@RequestBody @Valid PhysicalDeliveryUpdateForm updateForm) {
-        return Service.update(SolvelaBeanUtil.copy(updateForm, PhysicalDeliveryUpdateCommand.class));
+        Service.update(SolvelaBeanUtil.copy(updateForm, PhysicalDeliveryUpdateCommand.class));
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "批量删除")
     @PostMapping("/batchDiscard")
-    @SaCheckPermission("physicalDelivery:discard")
+    @RequiresPermission("physicalDelivery:discard")
     public ResponseDTO<String> batchDiscard(@RequestBody ValidateList<Long> idList) {
-        return Service.batchDiscard(idList);
+        Service.batchDiscard(idList);
+        return ResponseDTO.ok();
     }
 
     @Operation(summary = "单个删除")
     @GetMapping("/discard/{id}")
-    @SaCheckPermission("physicalDelivery:discard")
+    @RequiresPermission("physicalDelivery:discard")
     public ResponseDTO<String> discard(@PathVariable Long id) {
-        return Service.discard(id);
+        Service.discard(id);
+        return ResponseDTO.ok();
     }
 
     // ------------------------------------------------------------------ Excel 导入
 
     @Operation(summary = "导入模板下载：新增履约单")
     @GetMapping("/importAddTemplate")
-    @SaCheckPermission("physicalDelivery:import")
+    @RequiresPermission("physicalDelivery:import")
     public void importAddTemplate(HttpServletResponse response) throws IOException {
         // 空数据 = 只有表头（带下拉）的模板；表头由 Form 上的 @SonicTitle 单一来源生成，
         // 不会出现"字段改了模板没改"的漂移
@@ -111,7 +115,7 @@ public class PhysicalDeliveryController {
 
     @Operation(summary = "导入模板下载：回填物流")
     @GetMapping("/importShipTemplate")
-    @SaCheckPermission("physicalDelivery:import")
+    @RequiresPermission("physicalDelivery:import")
     public void importShipTemplate(HttpServletResponse response) throws IOException {
         SolvelaExcelWebUtil.exportExcel(response, "发货物流-回填模板.xlsx", "回填物流",
                 PhysicalDeliveryShipImportRow.class, Collections.emptyList());
@@ -119,12 +123,12 @@ public class PhysicalDeliveryController {
 
     @Operation(summary = "导入：新增履约单")
     @PostMapping("/importAdd")
-    @SaCheckPermission("physicalDelivery:import")
+    @RequiresPermission("physicalDelivery:import")
     public ResponseDTO<String> importAdd(@RequestParam MultipartFile file) {
         // 共享层的 service 只认 InputStream —— MultipartFile 是 spring-web 的类型，
         // 让它出现在 solvela-ledger 的签名上，那个模块就只能被 HTTP 调用了。
         try (InputStream in = file.getInputStream()) {
-            return Service.importAdd(in);
+            return ResponseDTO.okMsg(Service.importAdd(in));
         } catch (IOException e) {
             throw new UncheckedIOException("读取上传文件失败", e);
         }
@@ -132,12 +136,12 @@ public class PhysicalDeliveryController {
 
     @Operation(summary = "导入：回填物流")
     @PostMapping("/importShip")
-    @SaCheckPermission("physicalDelivery:import")
+    @RequiresPermission("physicalDelivery:import")
     public ResponseDTO<String> importShip(@RequestParam MultipartFile file) {
         // 共享层的 service 只认 InputStream —— MultipartFile 是 spring-web 的类型，
         // 让它出现在 solvela-ledger 的签名上，那个模块就只能被 HTTP 调用了。
         try (InputStream in = file.getInputStream()) {
-            return Service.importShip(in);
+            return ResponseDTO.okMsg(Service.importShip(in));
         } catch (IOException e) {
             throw new UncheckedIOException("读取上传文件失败", e);
         }

@@ -2,7 +2,6 @@ package solvela.base.module.file.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
-import solvela.base.domain.RequestUser;
 import solvela.exception.BusinessException;
 import solvela.base.module.file.dao.FileCategoryDao;
 import solvela.base.module.file.dao.FileDao;
@@ -83,7 +82,7 @@ public class FileCategoryService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public FileCategoryEntity add(FileCategoryEntity form, RequestUser user) {
+    public FileCategoryEntity add(FileCategoryEntity form, String operator) {
         String code = requireCode(form.getCategoryCode());
         form.setCategoryName(requireName(form.getCategoryName()));
         if (fileCategoryDao.getByCode(code) != null) {
@@ -92,7 +91,7 @@ public class FileCategoryService {
         form.setCategoryCode(code);
         form.setCategoryId(null);
         form.setSort(form.getSort() == null ? nextSort() : form.getSort());
-        form.setCreateBy(user == null ? null : user.getUserName());
+        form.setCreateBy(operator);
         form.setUpdateBy(form.getCreateBy());
         fileCategoryDao.insert(form);
         return form;
@@ -103,7 +102,7 @@ public class FileCategoryService {
      * 而这个后果要等到下一次上传公告附件时才会暴露。名称和标签随便改，那不影响任何引用。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void update(FileCategoryEntity form, RequestUser user) {
+    public void update(FileCategoryEntity form, String operator) {
         FileCategoryEntity existing = require(form.getCategoryId());
         String newCode = requireCode(form.getCategoryCode());
         form.setCategoryName(requireName(form.getCategoryName()));
@@ -116,7 +115,7 @@ public class FileCategoryService {
             }
         }
         form.setCategoryCode(newCode);
-        form.setUpdateBy(user == null ? null : user.getUserName());
+        form.setUpdateBy(operator);
         fileCategoryDao.updateById(form);
     }
 
@@ -151,11 +150,10 @@ public class FileCategoryService {
      * 而排序值没有唯一约束（拖拽中间态必然有重复），这种半成品状态肉眼看不出来。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void reorder(List<Long> orderedIds, RequestUser user) {
+    public void reorder(List<Long> orderedIds, String operator) {
         if (orderedIds == null || orderedIds.isEmpty()) {
             return;
         }
-        String operator = user == null ? null : user.getUserName();
         for (int i = 0; i < orderedIds.size(); i++) {
             FileCategoryEntity update = new FileCategoryEntity();
             update.setCategoryId(orderedIds.get(i));

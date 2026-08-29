@@ -1,18 +1,23 @@
 package solvela.web.swagger;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
 import io.swagger.v3.oas.models.Operation;
-import solvela.base.util.SolvelaStringUtil;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.web.method.HandlerMethod;
-
-import java.util.ArrayList;
-import java.util.List;
+import solvela.web.AllowAnonymous;
+import solvela.web.RequiresPermission;
 
 /**
- * 权限、接口加解密等
+ * 在接口文档上标出这个接口的鉴权要求。
+ *
+ * <p>只有三种可能，所以只写三行：免登录、需要登录、需要某个权限点。
+ *
+ * <p>原先这里读的是 sa-token 的 {@code @SaCheckPermission} / {@code @SaCheckRole}，
+ * 还带一段把 {@code SaMode.AND/OR} 渲染成「且 / 或」的逻辑。两处问题一并去掉了：
+ * <ul>
+ *   <li>「角色校验」那一段读的其实是 {@code SaCheckPermission}（复制粘贴时漏改），
+ *       于是同一个权限点会以「角色」的名义再打印一遍 —— 文档上一直是错的；</li>
+ *   <li>{@code @SaCheckRole} 全项目零使用，那套「且 / 或」的渲染没有任何输入。</li>
+ * </ul>
  *
  * @Author 1024创新实验室-主任:卓大
  * @Date 2023/12/26 13:47:39
@@ -20,86 +25,24 @@ import java.util.List;
  * @Email lab1024@163.com
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a>
  */
-
 public class SolvelaOperationCustomizer implements OperationCustomizer {
+
+    private static final String RED = "<font style=\"color:red\" class=\"light-red\">";
 
     @Override
     public Operation customize(Operation operation, HandlerMethod handlerMethod) {
-
-        List<String> noteList = new ArrayList<>();
-
-        /*
-         * 这里原先还会读 @ApiDecrypt / @ApiEncrypt，在文档上标一行红字
-         * 「接口安全：【请求参数加密】」。2026-08-25 apiencrypt 模块移交 solvela-admin 之后删除 ——
-         * solvela-base 不能反过来依赖 solvela-admin，而这两个注解已经在那边了。
-         *
-         * 只丢了一个<b>装饰性的文档标记</b>，加解密本身照常工作（那是 advice 干的事）。
-         * 真想找回这行标记，让 solvela-admin 自己再注册一个 OperationCustomizer 即可 ——
-         * 不值得为它把整个 apiencrypt 拽回 solvela-base。
-         */
-
-        // 权限
-        noteList.addAll(getPermission(handlerMethod));
-
-        // 更新
-        operation.setDescription(SolvelaStringUtil.join("<br/>", noteList));
-
+        operation.setDescription(describeAuth(handlerMethod));
         return operation;
     }
 
-
-    private List<String> getPermission(HandlerMethod handlerMethod) {
-        List<String> values = new ArrayList<>();
-
-        StringBuilder permissionStringBuilder = new StringBuilder();
-        SaCheckPermission classPermissions = handlerMethod.getBeanType().getAnnotation(SaCheckPermission.class);
-        if (classPermissions != null) {
-            permissionStringBuilder.append("<font style=\"color:red\" class=\"light-red\">");
-            permissionStringBuilder.append("类：").append(getAnnotationNote(classPermissions.value(), classPermissions.mode()));
-            permissionStringBuilder.append("</font></br>");
+    private String describeAuth(HandlerMethod handlerMethod) {
+        if (handlerMethod.hasMethodAnnotation(AllowAnonymous.class)) {
+            return RED + "鉴权：免登录，公网可直接访问</font>";
         }
-
-        SaCheckPermission methodPermission = handlerMethod.getMethodAnnotation(SaCheckPermission.class);
-        if (methodPermission != null) {
-            permissionStringBuilder.append("<font style=\"color:red\" class=\"light-red\">");
-            permissionStringBuilder.append("方法：").append(getAnnotationNote(methodPermission.value(), methodPermission.mode()));
-            permissionStringBuilder.append("</font></br>");
+        RequiresPermission required = handlerMethod.getMethodAnnotation(RequiresPermission.class);
+        if (required == null) {
+            return RED + "鉴权：需要登录</font>";
         }
-
-        if (permissionStringBuilder.length() > 0) {
-            permissionStringBuilder.insert(0, "<font style=\"color:red\" class=\"light-red\">权限校验：</font></br>");
-            values.add(permissionStringBuilder.toString());
-        }
-
-
-        StringBuilder roleStringBuilder = new StringBuilder();
-        SaCheckRole classCheckRole = handlerMethod.getBeanType().getAnnotation(SaCheckRole.class);
-        if (classCheckRole != null) {
-            roleStringBuilder.append("<font style=\"color:red\" class=\"light-red\">");
-            roleStringBuilder.append("类：").append(getAnnotationNote(classCheckRole.value(), classCheckRole.mode()));
-            roleStringBuilder.append("</font></br>");
-        }
-
-        SaCheckPermission methodCheckRole = handlerMethod.getMethodAnnotation(SaCheckPermission.class);
-        if (methodCheckRole != null) {
-            roleStringBuilder.append("<font style=\"color:red\" class=\"light-red\">");
-            roleStringBuilder.append("方法：").append(getAnnotationNote(methodCheckRole.value(), methodCheckRole.mode()));
-            roleStringBuilder.append("</font></br>");
-        }
-
-        if (roleStringBuilder.length() > 0) {
-            roleStringBuilder.insert(0, "<font style=\"color:red\" class=\"light-red\">角色校验：</font></br>");
-            values.add(roleStringBuilder.toString());
-        }
-
-        return values;
-    }
-
-    private String getAnnotationNote(String[] values, SaMode mode) {
-        if (mode.equals(SaMode.AND)) {
-            return String.join(" 且 ", values);
-        } else {
-            return String.join(" 或 ", values);
-        }
+        return RED + "鉴权：需要权限点 " + required.value() + "</font>";
     }
 }

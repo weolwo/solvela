@@ -7,14 +7,14 @@ import solvela.admin.module.draw.prizemapping.domain.vo.PoolPrizeMappingVO;
 import solvela.draw.prizemapping.domain.dto.PoolPrizeMappingDTO;
 import solvela.draw.prizemapping.service.DrawPoolAnalysisService;
 import solvela.draw.prizemapping.service.PoolPrizeMappingService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -55,7 +55,7 @@ public class PoolPrizeMappingController {
 
     @Operation(summary = "分页查询：坑位映射原始行，保留给排查与导出用")
     @PostMapping("/queryPage")
-    @SaCheckPermission("poolPrizeMapping:query")
+    @RequiresPermission("poolPrizeMapping:query")
     public ResponseDTO<PageResult<PoolPrizeMappingVO>> queryPage(@RequestBody @Valid PoolPrizeMappingQueryForm queryForm) {
         PageResult<PoolPrizeMappingDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PoolPrizeMappingQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PoolPrizeMappingVO.class));
@@ -63,7 +63,7 @@ public class PoolPrizeMappingController {
 
     @Operation(summary = "奖池概率分析：按池给出命中区间、期望赔付、库存口径对比与配置体检告警")
     @PostMapping("/analysis")
-    @SaCheckPermission("poolPrizeMapping:query")
+    @RequiresPermission("poolPrizeMapping:query")
     public ResponseDTO<DrawPoolAnalysisResultDTO> analysis(@RequestBody @Valid PoolPrizeMappingQueryForm queryForm) {
         return ResponseDTO.ok(drawPoolAnalysisService.analysis(SolvelaBeanUtil.copy(queryForm, PoolPrizeMappingQuery.class)));
     }

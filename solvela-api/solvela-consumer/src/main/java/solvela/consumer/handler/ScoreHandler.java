@@ -3,7 +3,8 @@ package solvela.consumer.handler;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.PrizeStrategy;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
+import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
@@ -39,7 +40,7 @@ public class ScoreHandler implements IPrizeHandler {
     private static final int QUANTITY_PER_PRIZE = 1;
 
     @Override
-    public ResponseDTO dispatch(PrizeLog prizeLog) {
+    public DispatchOutcome dispatch(PrizeLog prizeLog) {
         log.info(">>>> [积分派发策略] 开始派发积分，提案LogId: {}", prizeLog.getId());
 
         BigDecimal amount;
@@ -47,24 +48,24 @@ public class ScoreHandler implements IPrizeHandler {
             amount = new BigDecimal(prizeLog.getPrizeValue());
         } catch (NumberFormatException e) {
             log.error("【发奖异常】积分数值格式错误: {}", prizeLog.getPrizeValue());
-            return ResponseDTO.userErrorParam("积分数值格式错误");
+            return DispatchOutcome.failed("积分数值格式错误");
         }
 
         // 负数一律拦死，防改包
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
             log.error("【重大风控拦截】派发积分为负！LogId: {}, 数值: {}", prizeLog.getId(), amount);
-            return ResponseDTO.userErrorParam("派发积分不能为负数");
+            return DispatchOutcome.failed("派发积分不能为负数");
         }
         // 0 分是「谢谢参与」这类占位奖品的正常取值：无需入账，直接判成功。
         // 若按 BalanceHandler 那样把 0 也当异常，抽奖的兜底奖项会刷出满屏失败流水，淹没真正的故障
         if (amount.compareTo(BigDecimal.ZERO) == 0) {
             log.info("【无需入账】奖品价值为0（如谢谢参与），跳过提案。LogId: {}", prizeLog.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         }
 
         PrizeConfig prizeConfig = prizeConfigService.getByPrizeCode(prizeLog.getPrizeCode());
         if (prizeConfig == null) {
-            return ResponseDTO.userErrorParam("奖品配置不存在");
+            return DispatchOutcome.failed("奖品配置不存在");
         }
 
         ProposalRecordAddCommand req = new ProposalRecordAddCommand();
@@ -78,12 +79,14 @@ public class ScoreHandler implements IPrizeHandler {
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放积分");
 
-        // 提案被风控拦截 / 资产配置异常时会返回非 ok，必须把失败如实传上去，
-        // 否则 PrizeDispatchHandler 会把一条根本没入账的记录标成「发货成功」
-        ResponseDTO result = proposalRecordService.addProposal(req);
-        if (!result.getOk()) {
-            log.warn("【积分提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), result.getMsg());
+        // 风控拦截 / 资产配置异常由 addProposal 抛 BusinessException，必须如实上报：
+        // 吞掉失败会让 PrizeDispatchHandler 把一条根本没入账的记录标成「发货成功」
+        try {
+            proposalRecordService.addProposal(req);
+            return DispatchOutcome.success();
+        } catch (BusinessException e) {
+            log.warn("【积分提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), e.getMessage());
+            return DispatchOutcome.failed(e.getMessage());
         }
-        return result;
     }
 }

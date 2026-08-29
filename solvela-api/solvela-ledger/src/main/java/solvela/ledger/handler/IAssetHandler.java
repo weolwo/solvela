@@ -1,8 +1,8 @@
 package solvela.ledger.handler;
 
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.risk.ProposalRecord;
 
 public interface IAssetHandler {
-    ResponseDTO dispatch(ProposalRecord proposal);
+    DispatchOutcome dispatch(ProposalRecord proposal);
 }

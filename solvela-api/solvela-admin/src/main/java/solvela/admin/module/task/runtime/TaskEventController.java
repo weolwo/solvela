@@ -1,12 +1,12 @@
 package solvela.admin.module.task.runtime;
 
 import solvela.task.runtime.TaskEventService;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;
 import solvela.task.TaskRecordFlow;
@@ -50,9 +50,10 @@ public class TaskEventController {
      */
     @Operation(summary = "上报任务事件（异步推进进度，达标自动发奖）")
     @PostMapping("/report")
-    @SaCheckPermission("taskEvent:report")
+    @RequiresPermission("taskEvent:report")
     public ResponseDTO<String> report(@RequestBody @Valid TaskEventReportForm form) {
-        return taskEventService.report(SolvelaBeanUtil.copy(form, TaskEventReportCommand.class));
+        taskEventService.report(SolvelaBeanUtil.copy(form, TaskEventReportCommand.class));
+        return ResponseDTO.ok();
     }
 
     /**
@@ -63,7 +64,7 @@ public class TaskEventController {
      */
     @Operation(summary = "查询任务记录的事件流水（含被丢弃的事件与原因）")
     @GetMapping("/flow/{recordId}")
-    @SaCheckPermission("taskRecord:query")
+    @RequiresPermission("taskRecord:query")
     public ResponseDTO<List<TaskRecordFlow>> queryFlow(@PathVariable Long recordId) {
         return ResponseDTO.ok(taskRecordFlowDao.selectByRecordId(recordId));
     }

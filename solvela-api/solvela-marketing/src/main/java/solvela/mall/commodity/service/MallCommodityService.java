@@ -8,8 +8,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
 import solvela.exception.BusinessException;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaCodeUtil;
@@ -100,10 +98,10 @@ public class MallCommodityService {
      * <p>拆成三个接口的话，编辑页打开要发三个请求，而且「主表回来了、SKU 还没回来」
      * 这一帧里表单是可编辑的 —— 手快的人能在空 SKU 状态下点保存。
      */
-    public ResponseDTO<MallCommodityDetailDTO> detail(Long id) {
+    public MallCommodityDetailDTO detail(Long id) {
         MallCommodity commodity = mallCommodityManager.getById(id);
         if (commodity == null) {
-            return ResponseDTO.userErrorParam("商品不存在");
+            throw new BusinessException("商品不存在");
         }
 
         MallCommodityDetailDTO vo = new MallCommodityDetailDTO();
@@ -140,7 +138,7 @@ public class MallCommodityService {
         // 轮播图存在 t_file_relation 里（顺序即 sort），不是商品表的列
         vo.setBannerFileIds(new ArrayList<>(fileAssetService.listBizFileIds(MallConst.BIZ_TYPE_BANNER, id)));
         vo.setSkuList(listSkuVO(id));
-        return ResponseDTO.ok(vo);
+        return vo;
     }
 
     /**
@@ -150,9 +148,9 @@ public class MallCommodityService {
      * 真正的判重在 {@link #save} 里做 —— 中间隔着填表单的几分钟，
      * 这里判过不代表保存时还没被占走。
      */
-    public ResponseDTO<String> generateCommodityCode() {
-        return ResponseDTO.ok(SolvelaCodeUtil.generateUniqueBizCode(
-                SolvelaCodeUtil.BizCodePrefix.MALL_COMMODITY, this::existsByCommodityCode));
+    public String generateCommodityCode() {
+        return SolvelaCodeUtil.generateUniqueBizCode(
+                SolvelaCodeUtil.BizCodePrefix.MALL_COMMODITY, this::existsByCommodityCode);
     }
 
     /**
@@ -164,9 +162,9 @@ public class MallCommodityService {
      *
      * <p>同样只是<b>给运营看的候选值</b>：真正的判重在保存时做，中间隔着填表单的几分钟。
      */
-    public ResponseDTO<List<String>> generateSkuCodes(int count) {
+    public List<String> generateSkuCodes(int count) {
         if (count <= 0 || count > MallConst.MAX_SKU_COUNT) {
-            return ResponseDTO.userErrorParam("一次最多生成 " + MallConst.MAX_SKU_COUNT + " 个编码");
+            throw new BusinessException("一次最多生成 " + MallConst.MAX_SKU_COUNT + " 个编码");
         }
         Set<String> codes = new LinkedHashSet<>();
         // 本批内部也要互不重复：SolvelaCodeUtil 只保证「库里没有」，不知道这一批已经发过什么
@@ -174,7 +172,7 @@ public class MallCommodityService {
             codes.add(SolvelaCodeUtil.generateUniqueBizCode(
                     SolvelaCodeUtil.BizCodePrefix.MALL_SKU, this::existsBySkuCode));
         }
-        return ResponseDTO.ok(new ArrayList<>(codes));
+        return new ArrayList<>(codes);
     }
 
     public boolean existsByCommodityCode(String commodityCode) {
@@ -244,47 +242,47 @@ public class MallCommodityService {
      * 否则运营保存后又点一次保存，会建出第二个商品。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<Long> save(MallCommoditySaveCommand form, RequestUser user) {
+    public Long save(MallCommoditySaveCommand form, String operator) {
         // ---------- 1. 主表字段校验 ----------
         MallCategory category = mallCategoryManager.getById(form.getCategoryId());
         if (category == null) {
-            return ResponseDTO.userErrorParam("商品分类不存在");
+            throw new BusinessException("商品分类不存在");
         }
         if (!COMMODITY_TYPES.contains(form.getCommodityType())) {
-            return ResponseDTO.userErrorParam("商品类型不合法：" + form.getCommodityType());
+            throw new BusinessException("商品类型不合法：" + form.getCommodityType());
         }
         // COUPON 必须说清楚发哪张券。不卡这一条的话，兑换会在履约阶段失败 ——
         // 而那时用户的积分已经扣掉了
         if (PrizeTypeEnum.COUPON.name().equals(form.getCommodityType()) && StringUtils.isBlank(form.getAssetRef())) {
-            return ResponseDTO.userErrorParam("优惠券商品必须填写券模编码");
+            throw new BusinessException("优惠券商品必须填写券模编码");
         }
         if (form.getPayType() == null
                 || (form.getPayType() != MallConst.PAY_TYPE_POINTS && form.getPayType() != MallConst.PAY_TYPE_POINTS_CASH)) {
-            return ResponseDTO.userErrorParam("支付方式不合法");
+            throw new BusinessException("支付方式不合法");
         }
         String limitPeriod = StringUtils.defaultIfBlank(form.getLimitPeriod(), MallConst.LIMIT_PERIOD_LIFETIME);
         if (!LIMIT_PERIODS.contains(limitPeriod)) {
-            return ResponseDTO.userErrorParam("限兑周期不合法：" + limitPeriod);
+            throw new BusinessException("限兑周期不合法：" + limitPeriod);
         }
         int status = form.getStatus() == null ? MallConst.COMMODITY_STATUS_DRAFT : form.getStatus();
         if (!COMMODITY_STATUSES.contains(status)) {
-            return ResponseDTO.userErrorParam("商品状态不合法");
+            throw new BusinessException("商品状态不合法");
         }
         String detailError = checkDetailContent(form.getDetailContent());
         if (detailError != null) {
-            return ResponseDTO.userErrorParam(detailError);
+            throw new BusinessException(detailError);
         }
         // 留空 = 不限，落哨兵值。列是 NOT NULL 的，理由见 MallConst.SHELF_START_SENTINEL
         LocalDateTime startTime = form.getStartTime() == null ? MallConst.SHELF_START_SENTINEL : form.getStartTime();
         LocalDateTime endTime = form.getEndTime() == null ? MallConst.SHELF_END_SENTINEL : form.getEndTime();
         if (!endTime.isAfter(startTime)) {
-            return ResponseDTO.userErrorParam("上架结束时间必须晚于开始时间");
+            throw new BusinessException("上架结束时间必须晚于开始时间");
         }
 
         // ---------- 2. SKU 列表校验 ----------
         MallCommodity existing = form.getId() == null ? null : mallCommodityManager.getById(form.getId());
         if (form.getId() != null && existing == null) {
-            return ResponseDTO.userErrorParam("商品不存在，可能已被删除");
+            throw new BusinessException("商品不存在，可能已被删除");
         }
         boolean isCreate = existing == null;
 
@@ -294,10 +292,10 @@ public class MallCommodityService {
         if (isCreate) {
             commodityCode = StringUtils.upperCase(StringUtils.trimToEmpty(form.getCommodityCode()));
             if (!SolvelaCodeUtil.isValidBizCode(commodityCode)) {
-                return ResponseDTO.userErrorParam("商品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+                throw new BusinessException("商品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
             }
             if (existsByCommodityCode(commodityCode)) {
-                return ResponseDTO.userErrorParam("商品编码「" + commodityCode + "」已被占用，请换一个或点「生成」");
+                throw new BusinessException("商品编码「" + commodityCode + "」已被占用，请换一个或点「生成」");
             }
         } else {
             // 创建后不可改（DDL）：它一旦被 C 端楼层配置或履约单引用就锁死了，
@@ -312,13 +310,13 @@ public class MallCommodityService {
             if (!dbSkuList.isEmpty()) {
                 // 空列表在「整表提交」语义下等于删光。这几乎总是前端出了问题，
                 // 而代价是把库存、已售、SKU 编码一起抹掉，所以宁可拒绝也不执行
-                return ResponseDTO.userErrorParam("商品至少要保留一个规格；不再售卖请把规格停用，或把商品下架");
+                throw new BusinessException("商品至少要保留一个规格；不再售卖请把规格停用，或把商品下架");
             }
             // 无规格商品：由服务端补一条 {} 的默认规格，而不是让运营手工建「没有规格的规格」
             skuFormList.add(defaultSkuForm());
         }
         if (skuFormList.size() > MallConst.MAX_SKU_COUNT) {
-            return ResponseDTO.userErrorParam("单个商品最多 " + MallConst.MAX_SKU_COUNT + " 个规格");
+            throw new BusinessException("单个商品最多 " + MallConst.MAX_SKU_COUNT + " 个规格");
         }
 
         Map<Long, MallSku> dbSkuMap = dbSkuList.stream()
@@ -333,16 +331,16 @@ public class MallCommodityService {
                     ? dbSkuForCode.getSkuCode()
                     : StringUtils.upperCase(StringUtils.trimToEmpty(skuForm.getSkuCode()));
             if (!SolvelaCodeUtil.isValidBizCode(skuCode)) {
-                return ResponseDTO.userErrorParam("规格「" + displayAttrs(skuForm.getSkuAttrs()) + "」的 SKU"
+                throw new BusinessException("规格「" + displayAttrs(skuForm.getSkuAttrs()) + "」的 SKU"
                         + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
             }
             // 同一次提交内部先查一遍：两行填了同一个编码，只靠唯一索引会在插到第二行时才炸，
             // 那时第一行已经写进去了（虽然事务会回滚，但报错信息是 SQL 层的）
             if (!skuCodes.add(skuCode)) {
-                return ResponseDTO.userErrorParam("SKU 编码重复：" + skuCode);
+                throw new BusinessException("SKU 编码重复：" + skuCode);
             }
             if (dbSkuForCode == null && existsBySkuCode(skuCode)) {
-                return ResponseDTO.userErrorParam("SKU 编码「" + skuCode + "」已被占用，请换一个或点「生成」");
+                throw new BusinessException("SKU 编码「" + skuCode + "」已被占用，请换一个或点「生成」");
             }
             skuForm.setSkuCode(skuCode);
 
@@ -350,21 +348,21 @@ public class MallCommodityService {
             // 不做的话，表单重复提交会生成一堆规格完全相同的 SKU，C 端下拉里出现两个「星空灰 XL」
             String attrsKey = normalizedAttrsKey(skuForm.getSkuAttrs());
             if (!attrsKeys.add(attrsKey)) {
-                return ResponseDTO.userErrorParam("规格组合重复：" + displayAttrs(skuForm.getSkuAttrs()));
+                throw new BusinessException("规格组合重复：" + displayAttrs(skuForm.getSkuAttrs()));
             }
             if (skuForm.getId() == null) {
                 continue;
             }
             MallSku dbSku = dbSkuMap.get(skuForm.getId());
             if (dbSku == null) {
-                return ResponseDTO.userErrorParam("规格不存在或不属于本商品");
+                throw new BusinessException("规格不存在或不属于本商品");
             }
             keepSkuIds.add(dbSku.getId());
             // 总库存是「运营投放量」，卖掉和锁定的那部分已经发生了，改不回去。
             // 允许改小到低于 locked+sold，虚拟列 available_stock 会变成负数
             int occupied = nullToZero(dbSku.getLockedStock()) + nullToZero(dbSku.getSoldCount());
             if (skuForm.getTotalStock() < occupied) {
-                return ResponseDTO.userErrorParam("规格「" + displayAttrs(skuForm.getSkuAttrs())
+                throw new BusinessException("规格「" + displayAttrs(skuForm.getSkuAttrs())
                         + "」的总库存不能小于已锁定+已售的 " + occupied + " 件");
             }
         }
@@ -374,7 +372,7 @@ public class MallCommodityService {
                 .filter(sku -> !keepSkuIds.contains(sku.getId())).toList();
         for (MallSku sku : toDeleteList) {
             if (nullToZero(sku.getLockedStock()) > 0 || nullToZero(sku.getSoldCount()) > 0) {
-                return ResponseDTO.userErrorParam("规格「" + displayAttrs(parseSkuAttrs(sku.getSkuAttrs()))
+                throw new BusinessException("规格「" + displayAttrs(parseSkuAttrs(sku.getSkuAttrs()))
                         + "」已产生兑换记录，不能删除；请改为停用");
             }
         }
@@ -384,10 +382,10 @@ public class MallCommodityService {
             boolean hasEnabledSku = skuFormList.stream()
                     .anyMatch(sku -> sku.getSkuStatus() == null || sku.getSkuStatus() == MallConst.SKU_STATUS_ENABLED);
             if (!hasEnabledSku) {
-                return ResponseDTO.userErrorParam("上架的商品至少要有一个启用的规格");
+                throw new BusinessException("上架的商品至少要有一个启用的规格");
             }
             if (category.getStatus() != null && category.getStatus() == MallConst.CATEGORY_STATUS_DISABLED) {
-                return ResponseDTO.userErrorParam("分类「" + category.getCategoryName() + "」已停用，不能在该分类下上架商品");
+                throw new BusinessException("分类「" + category.getCategoryName() + "」已停用，不能在该分类下上架商品");
             }
         }
 
@@ -420,7 +418,6 @@ public class MallCommodityService {
         entity.setStatus(status);
         entity.setIsHome(form.getIsHome() == null ? 0 : form.getIsHome());
         entity.setSort(form.getSort() == null ? 0 : form.getSort());
-        String operator = user == null ? null : user.getUserName();
         // create_time / update_time 一律不设：铁律 9，只认数据库时钟
         if (isCreate) {
             entity.setSoldCount(0);
@@ -469,7 +466,7 @@ public class MallCommodityService {
 
         // ---------- 6. 图片引用登记 ----------
         confirmFileRelations(commodityId, form, skuFormList);
-        return ResponseDTO.ok(commodityId);
+        return commodityId;
     }
 
     /**
@@ -522,31 +519,30 @@ public class MallCommodityService {
      * 运营就有了一条「先存草稿、再从列表点上架」的路，把没有规格的商品放到 C 端。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> updateStatus(Long id, Integer status, RequestUser user) {
+    public void updateStatus(Long id, Integer status, String operator) {
         if (status == null || !COMMODITY_STATUSES.contains(status)) {
-            return ResponseDTO.userErrorParam("商品状态不合法");
+            throw new BusinessException("商品状态不合法");
         }
         MallCommodity commodity = mallCommodityManager.getById(id);
         if (commodity == null) {
-            return ResponseDTO.userErrorParam("商品不存在");
+            throw new BusinessException("商品不存在");
         }
         if (status == MallConst.COMMODITY_STATUS_ON) {
             boolean hasEnabledSku = listDbSku(id).stream()
                     .anyMatch(sku -> MallConst.SKU_STATUS_ENABLED == nullToZero(sku.getSkuStatus()));
             if (!hasEnabledSku) {
-                return ResponseDTO.userErrorParam("该商品没有启用的规格，不能上架");
+                throw new BusinessException("该商品没有启用的规格，不能上架");
             }
             MallCategory category = mallCategoryManager.getById(commodity.getCategoryId());
             if (category == null || (category.getStatus() != null && category.getStatus() == MallConst.CATEGORY_STATUS_DISABLED)) {
-                return ResponseDTO.userErrorParam("商品分类不存在或已停用，不能上架");
+                throw new BusinessException("商品分类不存在或已停用，不能上架");
             }
         }
         MallCommodity update = new MallCommodity();
         update.setId(id);
         update.setStatus(status);
-        update.setUpdateBy(user == null ? null : user.getUserName());
+        update.setUpdateBy(operator);
         mallCommodityDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     // ================================================================== 删除
@@ -556,20 +552,13 @@ public class MallCommodityService {
      * 「删了 3 个、第 4 个失败」这种半截结果，运营根本不知道该怎么收拾。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (idList == null || idList.isEmpty()) {
-            return ResponseDTO.ok();
+            return;
         }
-        for (Long id : idList) {
-            ResponseDTO<String> result = delete(id);
-            if (!Boolean.TRUE.equals(result.getOk())) {
-                // 事务回滚靠抛异常，而这里是返回值 —— 所以整批放在同一个事务里，
-                // 由外层的 @Transactional 在返回后照常提交已删的那几条是不行的。
-                // 用异常把已删的滚回去，保证「要么全删，要么一个没删」
-                throw new BusinessException(result.getMsg());
-            }
-        }
-        return ResponseDTO.ok();
+        // delete 自己抛 BusinessException，异常穿透本方法即触发回滚，
+        // 「要么全删、要么一个没删」由事务保证，这里不需要再判返回值
+        idList.forEach(this::delete);
     }
 
     /**
@@ -580,17 +569,17 @@ public class MallCommodityService {
      * 「不卖了」的正确动作是把状态改成下架，不是删除。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (id == null) {
-            return ResponseDTO.ok();
+            return;
         }
         MallCommodity commodity = mallCommodityManager.getById(id);
         if (commodity == null) {
-            return ResponseDTO.ok();
+            return;
         }
         boolean hasOrder = mallOrderManager.lambdaQuery().eq(MallOrder::getCommodityId, id).exists();
         if (hasOrder) {
-            return ResponseDTO.userErrorParam("商品「" + commodity.getCommodityName() + "」已产生兑换订单，不能删除；请改为下架");
+            throw new BusinessException("商品「" + commodity.getCommodityName() + "」已产生兑换订单，不能删除；请改为下架");
         }
 
         List<MallSku> dbSkuList = listDbSku(id);
@@ -601,7 +590,6 @@ public class MallCommodityService {
         fileAssetService.releaseRelation(MallConst.BIZ_TYPE, id);
         fileAssetService.releaseRelation(MallConst.BIZ_TYPE_BANNER, id);
         mallCommodityDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 
     // ================================================================== 内部工具

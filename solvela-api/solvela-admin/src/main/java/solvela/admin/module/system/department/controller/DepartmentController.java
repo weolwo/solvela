@@ -1,6 +1,6 @@
 package solvela.admin.module.system.department.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -11,7 +11,7 @@ import solvela.admin.module.system.department.domain.form.DepartmentUpdateForm;
 import solvela.admin.module.system.department.domain.vo.DepartmentTreeVO;
 import solvela.admin.module.system.department.domain.vo.DepartmentVO;
 import solvela.admin.module.system.department.service.DepartmentService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,21 +40,21 @@ public class DepartmentController {
 
     @Operation(summary = "添加部门 @author 卓大")
     @PostMapping("/department/add")
-    @SaCheckPermission("system:department:addProposal")
+    @RequiresPermission("system:department:addProposal")
     public ResponseDTO<String> addDepartment(@Valid @RequestBody DepartmentAddForm createDTO) {
         return departmentService.addDepartment(createDTO);
     }
 
     @Operation(summary = "更新部门 @author 卓大")
     @PostMapping("/department/update")
-    @SaCheckPermission("system:department:update")
+    @RequiresPermission("system:department:update")
     public ResponseDTO<String> updateDepartment(@Valid @RequestBody DepartmentUpdateForm updateDTO) {
         return departmentService.updateDepartment(updateDTO);
     }
 
     @Operation(summary = "删除部门 @author 卓大")
     @GetMapping("/department/delete/{departmentId}")
-    @SaCheckPermission("system:department:delete")
+    @RequiresPermission("system:department:delete")
     public ResponseDTO<String> deleteDepartment(@PathVariable Long departmentId) {
         return departmentService.deleteDepartment(departmentId);
     }

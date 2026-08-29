@@ -5,7 +5,6 @@ import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -18,6 +17,7 @@ import solvela.task.taskevent.domain.query.TaskEventQuery;
 import solvela.task.taskevent.domain.command.TaskEventUpdateCommand;
 import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
 import solvela.task.taskevent.domain.dto.TaskEventDTO;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -86,22 +86,21 @@ public class TaskEventDefService {
         }
     }
 
-    public ResponseDTO<String> add(TaskEventAddCommand addForm) {
+    public void add(TaskEventAddCommand addForm) {
         TaskEvent exists = taskEventDao.selectByEventCode(addForm.getEventCode());
         if (exists != null) {
             // 唯一索引只是兜底：直接抛 SQL 异常对运营不友好
-            return ResponseDTO.userErrorParam("事件编码已存在：" + addForm.getEventCode());
+            throw new BusinessException("事件编码已存在：" + addForm.getEventCode());
         }
         TaskEvent entity = SolvelaBeanUtil.copy(addForm, TaskEvent.class);
         applyDefaults(entity);
         taskEventDao.insert(entity);
-        return ResponseDTO.ok();
     }
 
-    public ResponseDTO<String> update(TaskEventUpdateCommand updateForm) {
+    public void update(TaskEventUpdateCommand updateForm) {
         TaskEvent exists = taskEventDao.selectById(updateForm.getId());
         if (exists == null) {
-            return ResponseDTO.userErrorParam("事件不存在");
+            throw new BusinessException("事件不存在");
         }
         TaskEvent entity = SolvelaBeanUtil.copy(updateForm, TaskEvent.class);
         // eventCode 不在 UpdateForm 里（刻意的，见该类注释），这里显式带上原值，
@@ -109,7 +108,6 @@ public class TaskEventDefService {
         entity.setEventCode(exists.getEventCode());
         applyDefaults(entity);
         taskEventDao.updateById(entity);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -120,20 +118,19 @@ public class TaskEventDefService {
      * <b>建议优先用「停用」而不是删除</b>：停用同样阻断触发，但保留了这条记录，
      * 排查时能看出「这个事件是被人关掉的」，而删除只留下一片空白。
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         TaskEvent exists = taskEventDao.selectById(id);
         if (exists == null) {
-            return ResponseDTO.ok();
+            return;
         }
         Long refCount = taskConfigDao.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskConfig>()
                         .eq(TaskConfig::getTriggerEvent, exists.getEventCode()));
         if (refCount != null && refCount > 0) {
-            return ResponseDTO.userErrorParam("该事件已被 " + refCount
+            throw new BusinessException("该事件已被 " + refCount
                     + " 个任务配置引用，不能删除。若要停止触发请改为「停用」");
         }
         taskEventDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 
     /**

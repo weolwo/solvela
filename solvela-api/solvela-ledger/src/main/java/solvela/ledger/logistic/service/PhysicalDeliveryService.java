@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.sonicexcel.SolvelaExcelUtil;
@@ -32,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.InputStream;
 
 import solvela.member.service.MemberService;
+import solvela.exception.BusinessException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -168,10 +168,10 @@ public class PhysicalDeliveryService {
     /**
      * 添加
      */
-    public ResponseDTO<String> add(PhysicalDeliveryAddCommand addForm) {
+    public void add(PhysicalDeliveryAddCommand addForm) {
         String tooLong = checkPii(addForm.getReceiverName(), addForm.getReceiverPhone(), addForm.getReceiverAddress());
         if (tooLong != null) {
-            return ResponseDTO.userErrorParam(tooLong);
+            throw new BusinessException(tooLong);
         }
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(addForm, PhysicalDelivery.class);
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
@@ -179,45 +179,41 @@ public class PhysicalDeliveryService {
         //    漏了会以「Field 'member_name' doesn't have a default value」整条被拒。
         physicalDelivery.setMemberName(memberService.requireMemberName(addForm.getMemberId()));
         physicalDeliveryDao.insert(physicalDelivery);
-        return ResponseDTO.ok();
     }
 
     /**
      * 更新
      *
      */
-    public ResponseDTO<String> update(PhysicalDeliveryUpdateCommand updateForm) {
+    public void update(PhysicalDeliveryUpdateCommand updateForm) {
         String tooLong = checkPii(updateForm.getReceiverName(), updateForm.getReceiverPhone(), updateForm.getReceiverAddress());
         if (tooLong != null) {
-            return ResponseDTO.userErrorParam(tooLong);
+            throw new BusinessException(tooLong);
         }
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(updateForm, PhysicalDelivery.class);
         physicalDeliveryDao.updateById(physicalDelivery);
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除
      */
-    public ResponseDTO<String> batchDiscard(List<Long> idList) {
+    public void batchDiscard(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
 
         physicalDeliveryDao.discardBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> discard(Long id) {
+    public void discard(Long id) {
         if (null == id) {
-            return ResponseDTO.ok();
+            return;
         }
 
         physicalDeliveryDao.discardById(id);
-        return ResponseDTO.ok();
     }
 
     // ------------------------------------------------------------------ Excel 导入
@@ -229,13 +225,13 @@ public class PhysicalDeliveryService {
      * "成功 470 条失败 30 条"这种半截状态没法让人判断该补哪些行，只能整批退回重来。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> importAdd(InputStream file) {
+    public String importAdd(InputStream file) {
         SonicReadResult<PhysicalDeliveryImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryImportRow.class);
         if (result.hasError()) {
-            return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
+            throw new BusinessException("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
         }
         if (result.isEmpty()) {
-            return ResponseDTO.userErrorParam("数据为空");
+            throw new BusinessException("数据为空");
         }
 
         List<PhysicalDeliveryImportRow> dataList = result.data();
@@ -296,7 +292,7 @@ public class PhysicalDeliveryService {
         }
 
         if (!errorList.isEmpty()) {
-            return ResponseDTO.userErrorParam(describe(errorList));
+            throw new BusinessException(describe(errorList));
         }
 
         for (PhysicalDeliveryImportRow row : dataList) {
@@ -316,7 +312,7 @@ public class PhysicalDeliveryService {
             entity.setStatus(DeliveryStatusEnum.PENDING.getValue());
             physicalDeliveryDao.insert(entity);
         }
-        return ResponseDTO.okMsg("成功导入 " + dataList.size() + " 条");
+        return "成功导入 " + dataList.size() + " 条";
     }
 
     /**
@@ -326,13 +322,13 @@ public class PhysicalDeliveryService {
      * 凭一张 Excel 凭空造单等于绕过提案与预算，是资损口子。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> importShip(InputStream file) {
+    public String importShip(InputStream file) {
         SonicReadResult<PhysicalDeliveryShipImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryShipImportRow.class);
         if (result.hasError()) {
-            return ResponseDTO.userErrorParam("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
+            throw new BusinessException("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
         }
         if (result.isEmpty()) {
-            return ResponseDTO.userErrorParam("数据为空");
+            throw new BusinessException("数据为空");
         }
 
         List<PhysicalDeliveryShipImportRow> dataList = result.data();
@@ -374,7 +370,7 @@ public class PhysicalDeliveryService {
         }
 
         if (!errorList.isEmpty()) {
-            return ResponseDTO.userErrorParam(describe(errorList));
+            throw new BusinessException(describe(errorList));
         }
 
         for (PhysicalDeliveryShipImportRow row : dataList) {
@@ -392,7 +388,7 @@ public class PhysicalDeliveryService {
             update.setStatus(row.status());
             physicalDeliveryDao.updateById(update);
         }
-        return ResponseDTO.okMsg("成功回填 " + dataList.size() + " 条");
+        return "成功回填 " + dataList.size() + " 条";
     }
 
     /**

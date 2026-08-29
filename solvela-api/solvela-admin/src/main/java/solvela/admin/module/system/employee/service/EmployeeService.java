@@ -1,8 +1,8 @@
 package solvela.admin.module.system.employee.service;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import solvela.admin.auth.TokenStore;
 import solvela.admin.module.system.department.dao.DepartmentDao;
 import solvela.admin.module.system.department.domain.entity.DepartmentEntity;
 import solvela.admin.module.system.department.domain.vo.DepartmentVO;
@@ -21,9 +21,9 @@ import solvela.code.UserErrorCode;
 import solvela.base.constant.StringConst;
 import solvela.crypto.PasswordCipher;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
-import solvela.base.enumeration.UserTypeEnum;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
+import solvela.admin.constant.UserTypeEnum;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -51,6 +51,9 @@ public class EmployeeService {
 
     @Resource
     private EmployeeDao employeeDao;
+
+    @Resource
+    private TokenStore tokenStore;
 
     @Resource
     private DepartmentDao departmentDao;
@@ -280,8 +283,11 @@ public class EmployeeService {
         // 更新禁用状态
         employeeDao.updateDisableFlag(employeeId, !employeeEntity.getDisabledFlag());
 
-        // 强制退出登录
-        StpUtil.logout(UserTypeEnum.ADMIN_EMPLOYEE.getValue() + StringConst.COLON + employeeId);
+        // 强制退出登录。
+        // 🔴 原先是 StpUtil.logout(拼出来的 loginId)，<b>踢不掉万能密码登录的那条会话</b> ——
+        // 它的 loginId 是另一种格式。也就是说：禁用一个员工之后，
+        // 用万能密码登进去的会话还能继续用。按员工 id 反查全部令牌之后，这个口子没了
+        tokenStore.revokeAll(employeeId);
 
         return ResponseDTO.ok();
     }
@@ -307,8 +313,8 @@ public class EmployeeService {
         employeeManager.updateBatchById(deleteList);
 
         for (Long employeeId : employeeIdList) {
-            // 强制退出登录
-            StpUtil.logout(UserTypeEnum.ADMIN_EMPLOYEE.getValue() + StringConst.COLON + employeeId);
+            // 强制退出登录，见 updateDisableFlag 处的说明
+            tokenStore.revokeAll(employeeId);
         }
         return ResponseDTO.ok();
     }
@@ -340,7 +346,7 @@ public class EmployeeService {
      * 更新密码
      */
     @Transactional(rollbackFor = Throwable.class)
-    public ResponseDTO<String> updatePassword(RequestUser requestUser, EmployeeUpdatePasswordForm updatePasswordForm) {
+    public ResponseDTO<String> updatePassword(RequestEmployee requestUser, EmployeeUpdatePasswordForm updatePasswordForm) {
         Long employeeId = updatePasswordForm.getEmployeeId();
         EmployeeEntity employeeEntity = employeeDao.selectById(employeeId);
         if (employeeEntity == null) {

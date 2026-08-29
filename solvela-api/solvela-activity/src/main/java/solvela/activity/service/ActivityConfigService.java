@@ -14,7 +14,6 @@ import solvela.activity.domain.dto.ActivityRefItem;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.activity.spi.ActivityRefProvider;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -233,24 +232,23 @@ public class ActivityConfigService {
     /**
      * 生成一个未被占用的活动编码（10 位大写字母+数字），供前端「生成」按钮调用
      */
-    public ResponseDTO<String> generateActivityCode() {
-        return ResponseDTO.ok(SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.ACTIVITY, code -> getByActivityCode(code) != null));
+    public String generateActivityCode() {
+        return SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.ACTIVITY, code -> getByActivityCode(code) != null);
     }
 
     /**
      * 添加
      * 活动编码允许手工输入，故服务端必须重校验格式与唯一性（表上虽有唯一索引，但直接抛 SQL 异常对运营不友好）
      */
-    public ResponseDTO<String> add(ActivityConfigAddCommand addForm) {
+    public void add(ActivityConfigAddCommand addForm) {
         if (!SolvelaCodeUtil.isValidBizCode(addForm.getActivityCode())) {
-            return ResponseDTO.userErrorParam("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+            throw new BusinessException("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
         if (getByActivityCode(addForm.getActivityCode()) != null) {
-            return ResponseDTO.userErrorParam("活动编码已存在：" + addForm.getActivityCode());
+            throw new BusinessException("活动编码已存在：" + addForm.getActivityCode());
         }
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(addForm, ActivityConfig.class);
         activityConfigDao.insert(activityConfig);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -268,13 +266,13 @@ public class ActivityConfigService {
      * 先验完再插，插入阶段就只剩真正的 DB 异常，那种异常抛出去正好由 @Transactional 回滚。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> wizardCreate(ActivityWizardCreateCommand form) {
+    public void wizardCreate(ActivityWizardCreateCommand form) {
         // ---------- 1. 活动校验 ----------
         if (!SolvelaCodeUtil.isValidBizCode(form.getActivityCode())) {
-            return ResponseDTO.userErrorParam("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+            throw new BusinessException("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
         if (getByActivityCode(form.getActivityCode()) != null) {
-            return ResponseDTO.userErrorParam("活动编码已存在：" + form.getActivityCode());
+            throw new BusinessException("活动编码已存在：" + form.getActivityCode());
         }
 
         // ---------- 2. 奖品全量预校验（插入前一次验完） ----------
@@ -283,18 +281,18 @@ public class ActivityConfigService {
         Set<String> batchCodes = new HashSet<>();
         for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
             if (!SolvelaCodeUtil.isValidBizCode(prize.getPrizeCode())) {
-                return ResponseDTO.userErrorParam("奖品「" + prize.getPrizeName() + "」的" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+                throw new BusinessException("奖品「" + prize.getPrizeName() + "」的" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
             }
             // 本次提交内重复：唯一索引只能挡住与库里已有的冲突，挡不住同一批次里的两条
             if (!batchCodes.add(prize.getPrizeCode())) {
-                return ResponseDTO.userErrorParam("本次提交的奖品编码重复：" + prize.getPrizeCode());
+                throw new BusinessException("本次提交的奖品编码重复：" + prize.getPrizeCode());
             }
             if (prizeConfigService.existsByPrizeCode(prize.getPrizeCode())) {
-                return ResponseDTO.userErrorParam("奖品编码已存在：" + prize.getPrizeCode());
+                throw new BusinessException("奖品编码已存在：" + prize.getPrizeCode());
             }
             String matchError = prizeConfigService.checkPromotionConfigMatch(prize.getPromotionConfigId(), prize.getPrizeType());
             if (matchError != null) {
-                return ResponseDTO.userErrorParam("奖品「" + prize.getPrizeName() + "」" + matchError);
+                throw new BusinessException("奖品「" + prize.getPrizeName() + "」" + matchError);
             }
         }
 
@@ -306,15 +304,15 @@ public class ActivityConfigService {
         for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
             PrizeConfigAddCommand addForm = SolvelaBeanUtil.copy(prize, PrizeConfigAddCommand.class);
             addForm.setActivityCode(form.getActivityCode());
-            ResponseDTO<String> res = prizeConfigService.add(addForm);
-            if (!res.getOk()) {
+            try {
+                prizeConfigService.add(addForm);
+            } catch (BusinessException e) {
                 // 预校验已覆盖全部可预期的失败，走到这里说明是并发抢占编码之类的意外。
-                // 抛异常而不是 return：只有异常才能让 @Transactional 干净回滚，
-                // 否则活动会连同半截奖品一起提交。
-                throw new BusinessException("奖品「" + prize.getPrizeName() + "」创建失败：" + res.getMsg());
+                // 重新抛出并补上是哪个奖品：@Transactional 靠异常回滚，
+                // 吞掉它活动会连同半截奖品一起提交。
+                throw new BusinessException("奖品「" + prize.getPrizeName() + "」创建失败：" + e.getMessage(), e);
             }
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -328,12 +326,11 @@ public class ActivityConfigService {
      * 保护会<b>静默失效</b>。本项目已经吃过「只改 handler 不够、注解也得摘」那种亏（铁律 9），
      * 教训就是别把正确性寄托在 ORM 的默认行为上。
      */
-    public ResponseDTO<String> update(ActivityConfigUpdateCommand updateForm) {
+    public void update(ActivityConfigUpdateCommand updateForm) {
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(updateForm, ActivityConfig.class);
         activityConfig.setActivityType(null);
         activityConfig.setActivityCode(null);
         activityConfigDao.updateById(activityConfig);
-        return ResponseDTO.ok();
     }
 
     /**
@@ -350,13 +347,13 @@ public class ActivityConfigService {
      * （对齐 `LotteryConfigService.offline()` 的既定取舍）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> updateStatus(List<Long> idList, Integer status) {
+    public void updateStatus(List<Long> idList, Integer status) {
         if (!STATUS_ONLINE.equals(status) && !STATUS_OFFLINE.equals(status)) {
-            return ResponseDTO.userErrorParam("目标状态只能是 1-启用 或 2-禁用");
+            throw new BusinessException("目标状态只能是 1-启用 或 2-禁用");
         }
         List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(idList);
         if (SolvelaCollectionUtil.isEmpty(activityList)) {
-            return ResponseDTO.userErrorParam("活动不存在");
+            throw new BusinessException("活动不存在");
         }
 
         // 启用：逐个校验完备度。任一不通过则整批拒绝并点名是哪个活动 ——
@@ -365,8 +362,7 @@ public class ActivityConfigService {
             for (ActivityConfig activity : activityList) {
                 String notReady = checkConfigured(activity);
                 if (notReady != null) {
-                    return ResponseDTO.userErrorParam(
-                            "「" + activity.getActivityName() + "」" + notReady + "，请先配置完成再启用");
+                    throw new BusinessException("「" + activity.getActivityName() + "」" + notReady + "，请先配置完成再启用");
                 }
             }
         }
@@ -377,7 +373,6 @@ public class ActivityConfigService {
             update.setStatus(status);
             activityConfigDao.updateById(update);
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -389,18 +384,17 @@ public class ActivityConfigService {
      * 升级成 DRAW 后正好成为抽奖的资产大库，不但不冲突，反而顺理成章。
      * 而玩法类之间互转、或降级回 BASIC，都会遗弃已配好的玩法配置，一律拒绝。
      */
-    public ResponseDTO<String> upgradeType(Long id, String targetType) {
+    public void upgradeType(Long id, String targetType) {
         ActivityConfig activity = activityConfigDao.selectById(id);
         if (activity == null) {
-            return ResponseDTO.userErrorParam("活动不存在");
+            throw new BusinessException("活动不存在");
         }
         if (ActivityTypeEnum.hasGameplay(activity.getActivityType())) {
-            return ResponseDTO.userErrorParam(
-                    "只有基础活动可以升级玩法；玩法类活动之间不可互转，也不可降级回基础活动 —— 那会遗弃已配好的玩法配置。");
+            throw new BusinessException("只有基础活动可以升级玩法；玩法类活动之间不可互转，也不可降级回基础活动 —— 那会遗弃已配好的玩法配置。");
         }
         ActivityTypeEnum target = ActivityTypeEnum.resolve(targetType);
         if (target == null || !target.isGameplay()) {
-            return ResponseDTO.userErrorParam("升级目标必须是 DRAW / TASK / LOTTERY 之一");
+            throw new BusinessException("升级目标必须是 DRAW / TASK / LOTTERY 之一");
         }
 
         // 二次校验：BASIC 理论上没有玩法下游，但编码可能被历史数据复用过，落库前再确认一次
@@ -411,7 +405,7 @@ public class ActivityConfigService {
                 String detail = refs.stream()
                         .map(r -> r.bizName() + " " + r.count() + " 个")
                         .collect(Collectors.joining(" / "));
-                return ResponseDTO.userErrorParam("该活动编码下已存在 " + target.getDesc() + " 配置（" + detail + "），无法升级");
+                throw new BusinessException("该活动编码下已存在 " + target.getDesc() + " 配置（" + detail + "），无法升级");
             }
         }
 
@@ -419,45 +413,42 @@ public class ActivityConfigService {
         update.setId(activity.getId());
         update.setActivityType(target.getValue());
         activityConfigDao.updateById(update);
-        return ResponseDTO.ok();
     }
 
     /**
      * 批量删除：逐个走与单个删除相同的守卫，任一不通过则整批拒绝并说明是哪个活动。
      * 不做「跳过不能删的、删掉能删的」—— 部分成功对运营是更难排查的结果。
      */
-    public ResponseDTO<String> batchDelete(List<Long> idList) {
+    public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
-            return ResponseDTO.ok();
+            return;
         }
         List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(idList);
         for (ActivityConfig activity : activityList) {
             ActivityDeleteCheckDTO check = checkDeletable(activity);
             if (!check.deletable()) {
-                return ResponseDTO.userErrorParam("「" + activity.getActivityName() + "」" + check.reason());
+                throw new BusinessException("「" + activity.getActivityName() + "」" + check.reason());
             }
         }
         activityConfigDao.deleteBatchIds(idList);
-        return ResponseDTO.ok();
     }
 
     /**
      * 单个删除
      */
-    public ResponseDTO<String> delete(Long id) {
+    public void delete(Long id) {
         if (null == id) {
-            return ResponseDTO.ok();
+            return;
         }
         ActivityConfig activity = activityConfigDao.selectById(id);
         if (activity == null) {
-            return ResponseDTO.ok();
+            return;
         }
         // 前端已经调过 checkDeletable，这里再拦一次 —— 前端校验只是防呆（铁律 2）
         ActivityDeleteCheckDTO check = checkDeletable(activity);
         if (!check.deletable()) {
-            return ResponseDTO.userErrorParam(check.reason());
+            throw new BusinessException(check.reason());
         }
         activityConfigDao.deleteById(id);
-        return ResponseDTO.ok();
     }
 }

@@ -7,7 +7,6 @@ import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.member.loginlog.domain.query.MemberLoginLogQuery;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.base.domain.ResponseDTO;
 import solvela.member.loginlog.domain.dto.MemberLoginLogStatDTO;
 import solvela.member.loginlog.domain.dto.MemberLoginLogDTO;
 
@@ -40,10 +39,10 @@ public class MemberLoginLogService {
      * 统计。<b>与列表共用同一套查询条件</b> —— 顶部筛选改了统计跟着变，
      * 两套条件的话运营会看到「统计说 100 次、列表只有 3 条」然后不知道信哪个。
      */
-    public ResponseDTO<MemberLoginLogStatDTO> queryStat(MemberLoginLogQuery queryForm) {
+    public MemberLoginLogStatDTO queryStat(MemberLoginLogQuery queryForm) {
         MemberLoginLogStatDTO stat = memberLoginLogDao.queryStat(queryForm);
         // 一条记录都没有时 SUM() 返回 null，直接下发会让前端把「0 次」渲染成空白
-        return ResponseDTO.ok(stat == null ? emptyStat() : normalize(stat));
+        return stat == null ? emptyStat() : normalize(stat);
     }
 
     private MemberLoginLogStatDTO emptyStat() {

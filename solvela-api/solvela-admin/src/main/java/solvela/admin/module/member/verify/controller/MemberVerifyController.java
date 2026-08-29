@@ -1,6 +1,6 @@
 package solvela.admin.module.member.verify.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -13,9 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.base.web.CurrentUser;
 import solvela.admin.module.member.verify.domain.form.MemberVerifyQueryForm;
 import solvela.member.verify.domain.query.MemberVerifyQuery;
 import solvela.admin.module.member.verify.domain.form.MemberVerifyRejectForm;
@@ -49,7 +48,7 @@ public class MemberVerifyController {
 
     @Operation(summary = "分页查询（姓名与身份证已脱敏） @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission("memberVerify:query")
+    @RequiresPermission("memberVerify:query")
     public ResponseDTO<PageResult<MemberVerifyVO>> queryPage(@RequestBody @Valid MemberVerifyQueryForm queryForm) {
         PageResult<MemberVerifyDTO> page = memberVerifyService.queryPage(SolvelaBeanUtil.copy(queryForm, MemberVerifyQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberVerifyVO.class));
@@ -61,16 +60,17 @@ public class MemberVerifyController {
      */
     @Operation(summary = "实名详情（明文，审核弹窗用） @author weolwo")
     @GetMapping("/detail/{id}")
-    @SaCheckPermission("memberVerify:detail")
+    @RequiresPermission("memberVerify:detail")
     public ResponseDTO<MemberVerifyDetailDTO> detail(@PathVariable Long id) {
-        return memberVerifyService.detail(id);
+        return ResponseDTO.ok(memberVerifyService.detail(id));
     }
 
     @Operation(summary = "审核通过 @author weolwo")
     @GetMapping("/approve/{id}")
-    @SaCheckPermission("memberVerify:audit")
+    @RequiresPermission("memberVerify:audit")
     public ResponseDTO<String> approve(@PathVariable Long id) {
-        return memberVerifyService.approve(id, CurrentUser.orNull());
+        memberVerifyService.approve(id);
+        return ResponseDTO.ok();
     }
 
     /**
@@ -79,9 +79,9 @@ public class MemberVerifyController {
      */
     @Operation(summary = "审核驳回（必须填原因） @author weolwo")
     @PostMapping("/reject")
-    @SaCheckPermission("memberVerify:audit")
+    @RequiresPermission("memberVerify:audit")
     public ResponseDTO<String> reject(@RequestBody @Valid MemberVerifyRejectForm rejectForm) {
-        return memberVerifyService.reject(rejectForm.getId(), rejectForm.getFailReason(),
-                CurrentUser.orNull());
+        memberVerifyService.reject(rejectForm.getId(), rejectForm.getFailReason());
+        return ResponseDTO.ok();
     }
 }

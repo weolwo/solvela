@@ -2,9 +2,8 @@ package solvela.admin.module.system.login.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.domain.RequestUser;
 import solvela.base.enumeration.GenderEnum;
-import solvela.base.enumeration.UserTypeEnum;
+import solvela.admin.constant.UserTypeEnum;
 import solvela.web.swagger.SchemaEnum;
 
 import java.io.Serializable;
@@ -19,7 +18,7 @@ import java.io.Serializable;
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
 @Data
-public class RequestEmployee implements RequestUser, Serializable {
+public class RequestEmployee implements Serializable {
 
     @Schema(description = "员工id")
     private Long employeeId;
@@ -69,12 +68,17 @@ public class RequestEmployee implements RequestUser, Serializable {
     @Schema(description = "请求user-agent")
     private String userAgent;
 
-    @Override
+    /**
+     * 别名：{@code employeeId}。审计字段与日志里统一叫 userId，保留一个稳定的读法，
+     * 免得每个调用点都要记住「这里的 user 就是 employee」。
+     */
     public Long getUserId() {
         return employeeId;
     }
 
-    @Override
+    /**
+     * 别名：{@code actualName} —— 落进 {@code create_by} / {@code update_by} 的就是它
+     */
     public String getUserName() {
         return actualName;
     }

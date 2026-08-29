@@ -11,7 +11,7 @@ import solvela.admin.module.system.position.domain.form.PositionUpdateForm;
 import solvela.admin.module.system.position.domain.vo.PositionVO;
 import solvela.admin.module.system.position.service.PositionService;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.domain.ValidateList;
 import org.springframework.web.bind.annotation.*;
 

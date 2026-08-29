@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import solvela.code.UserErrorCode;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
@@ -436,7 +436,7 @@ public class SolvelaJobService {
         return ResponseDTO.ok();
     }
 
-    public synchronized ResponseDTO<String> deleteJob(Integer jobId, RequestUser requestUser) {
+    public synchronized ResponseDTO<String> deleteJob(Integer jobId, RequestEmployee requestUser) {
         jobDao.updateDeletedFlag(jobId, Boolean.TRUE);
         dataTracerService.delete(Long.valueOf(jobId), DataTracerTypeEnum.SOLVELA_JOB);
         this.notifyClient(jobId, requestUser.getUserName());

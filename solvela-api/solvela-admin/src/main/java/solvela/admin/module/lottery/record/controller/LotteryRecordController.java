@@ -6,14 +6,14 @@ import solvela.lottery.record.domain.dto.LotteryRecordFunnelDTO;
 import solvela.admin.module.lottery.record.domain.vo.LotteryRecordVO;
 import solvela.lottery.record.domain.dto.LotteryRecordDTO;
 import solvela.lottery.record.service.LotteryRecordService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -47,7 +47,7 @@ public class LotteryRecordController {
 
     @Operation(summary = "分页查询")
     @PostMapping("/queryPage")
-    @SaCheckPermission("lotteryRecord:query")
+    @RequiresPermission("lotteryRecord:query")
     public ResponseDTO<PageResult<LotteryRecordVO>> queryPage(@RequestBody @Valid LotteryRecordQueryForm queryForm) {
         PageResult<LotteryRecordDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, LotteryRecordQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, LotteryRecordVO.class));
@@ -55,7 +55,7 @@ public class LotteryRecordController {
 
     @Operation(summary = "购彩漏斗：中奖率、奖级分布、派发状态与数据一致性体检")
     @PostMapping("/funnel")
-    @SaCheckPermission("lotteryRecord:query")
+    @RequiresPermission("lotteryRecord:query")
     public ResponseDTO<LotteryRecordFunnelDTO> funnel(@RequestBody @Valid LotteryRecordQueryForm queryForm) {
         return ResponseDTO.ok(Service.funnel(SolvelaBeanUtil.copy(queryForm, LotteryRecordQuery.class)));
     }

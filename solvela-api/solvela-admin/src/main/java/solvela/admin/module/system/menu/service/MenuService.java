@@ -10,8 +10,8 @@ import solvela.admin.module.system.menu.domain.form.MenuUpdateForm;
 import solvela.admin.module.system.menu.domain.vo.MenuTreeVO;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.code.SystemErrorCode;
-import solvela.base.domain.RequestUrlVO;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.config.RequestUrl;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaStringUtil;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -39,7 +39,7 @@ public class MenuService {
     private MenuDao menuDao;
 
     @Resource
-    private List<RequestUrlVO> authUrl;
+    private List<RequestUrl> authUrl;
 
     /**
      * 添加菜单
@@ -229,7 +229,7 @@ public class MenuService {
     /**
      * 获取系统所有请求路径
      */
-    public ResponseDTO<List<RequestUrlVO>> getAuthUrl() {
+    public ResponseDTO<List<RequestUrl>> getAuthUrl() {
         return ResponseDTO.ok(authUrl);
     }
 

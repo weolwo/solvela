@@ -4,7 +4,7 @@ import solvela.web.file.MultipartUploadSource;
 
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.Resource;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.module.file.FileMimeTypeUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;

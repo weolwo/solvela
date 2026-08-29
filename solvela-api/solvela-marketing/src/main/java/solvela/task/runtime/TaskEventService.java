@@ -2,7 +2,6 @@ package solvela.task.runtime;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.json.JsonUtils;
 import solvela.member.service.MemberService;
 import solvela.task.constant.TaskConst;
@@ -17,6 +16,7 @@ import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.TaskConfig;
 import solvela.task.TaskEvent;
 import solvela.task.taskevent.service.TaskEventDefService;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -106,7 +106,7 @@ public class TaskEventService {
      * <p>返回失败只有一种情况：<b>队列打满被拒</b>。这是留给上游的重试信号 ——
      * 选了 AbortPolicy 就必须如实告诉上游「这条我没接住」，否则丢事件会变成静默的。
      */
-    public ResponseDTO<String> report(TaskEventReportCommand form) {
+    public void report(TaskEventReportCommand form) {
         // ① 事件必须已注册且启用 —— 注册表是「哪些事件合法」的唯一真源。
         //    不认识的事件当场拒绝，而不是丢进线程池里慢慢发现：上游拼错一个字母时，
         //    立刻收到 400 远比「返回 200 但任务永远不动」好排查。
@@ -114,7 +114,7 @@ public class TaskEventService {
         if (eventDef == null) {
             log.warn("[任务事件] 未注册或已停用的事件被拒。eventCode={}, memberId={}",
                     form.getEventCode(), form.getMemberId());
-            return ResponseDTO.userErrorParam("未注册或已停用的事件编码：" + form.getEventCode());
+            throw new BusinessException("未注册或已停用的事件编码：" + form.getEventCode());
         }
 
         // ② 幂等键契约：t_task_event.biz_id_required 把「上游必须带单号」从口头约定变成强制校验。
@@ -124,8 +124,7 @@ public class TaskEventService {
         if (Integer.valueOf(1).equals(eventDef.getBizIdRequired()) && StringUtils.isBlank(form.getEventBizId())) {
             log.warn("[任务事件] 缺少必需的幂等单号被拒。eventCode={}, memberId={}",
                     form.getEventCode(), form.getMemberId());
-            return ResponseDTO.userErrorParam(
-                    "事件 " + form.getEventCode() + " 必须携带 eventBizId（上游业务单号），否则无法防重");
+            throw new BusinessException("事件 " + form.getEventCode() + " 必须携带 eventBizId（上游业务单号），否则无法防重");
         }
 
         TaskEventContext ctx = normalize(form, eventDef);
@@ -135,9 +134,8 @@ public class TaskEventService {
             log.error("[任务事件] 线程池队列已满，事件被拒。eventCode={}, memberId={}, eventBizId={}",
                     ctx.eventCode(), ctx.memberId(), ctx.eventBizId());
             saveRejectedFlow(ctx);
-            return ResponseDTO.userErrorParam("任务事件处理繁忙，请稍后重试");
+            throw new BusinessException("任务事件处理繁忙，请稍后重试");
         }
-        return ResponseDTO.ok();
     }
 
     /**

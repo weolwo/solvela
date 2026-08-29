@@ -1,7 +1,7 @@
 package solvela.admin.config;
 
 import jakarta.annotation.Resource;
-import solvela.admin.interceptor.AdminInterceptor;
+import solvela.admin.auth.AdminAuthorizationInterceptor;
 import solvela.base.config.FileConfig;
 import solvela.base.constant.SwaggerWhitelistConst;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 public class MvcConfig implements WebMvcConfigurer {
 
     @Resource
-    private AdminInterceptor adminInterceptor;
+    private AdminAuthorizationInterceptor authorizationInterceptor;
 
 
 
@@ -47,7 +47,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         Arrays.stream(SwaggerWhitelistConst.SWAGGER_WHITELIST),
                         Arrays.stream(PUBLIC_FILE_WHITELIST))
                 .toArray(String[]::new);
-        registry.addInterceptor(adminInterceptor)
+        registry.addInterceptor(authorizationInterceptor)
                 .excludePathPatterns(whitelist)
                 .addPathPatterns("/**");
     }

@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import solvela.activity.ActivityConfig;
 import solvela.activity.service.ActivityConfigService;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
@@ -32,6 +31,7 @@ import solvela.lottery.LotteryPrizeRule;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
+import solvela.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,8 +85,8 @@ public class LotteryConfigService {
     /**
      * 生成一个未被占用的彩票编码（铁律 8：10 位大写字母+数字，全局唯一）
      */
-    public ResponseDTO<String> generateCode() {
-        return ResponseDTO.ok(SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode));
+    public String generateCode() {
+        return SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode);
     }
 
     public boolean existsByLotteryCode(String lotteryCode) {
@@ -120,8 +120,8 @@ public class LotteryConfigService {
      * 活动是容器，一个活动下可以并存多个玩法（不同的号码长度/发行量就是不同的玩法），
      * 所以顶部是「活动 + 玩法」两级下拉，玩法列表随活动切换而变。
      */
-    public ResponseDTO<List<LotteryConfigOptionDTO>> optionList(String activityCode) {
-        return ResponseDTO.ok(queryByActivityCode(activityCode).stream()
+    public List<LotteryConfigOptionDTO> optionList(String activityCode) {
+        return queryByActivityCode(activityCode).stream()
                 .map(config -> new LotteryConfigOptionDTO(
                         config.getLotteryCode(),
                         config.getLotteryName(),
@@ -129,7 +129,7 @@ public class LotteryConfigService {
                         config.getNumberLength(),
                         config.getTotalCount(),
                         config.getStatus()))
-                .toList());
+                .toList();
     }
 
     // ==================== 工作台：聚合回显 ====================
@@ -141,27 +141,27 @@ public class LotteryConfigService {
      * lotteryCode 决定具体加载哪一个玩法。lotteryCode 为空表示「在该活动下新建玩法」，
      * 返回一个带预生成编码的空壳而非报错，前端据此进入「从零配置」态。
      */
-    public ResponseDTO<LotteryWorkbenchDTO> workbenchDetail(String activityCode, String lotteryCode) {
+    public LotteryWorkbenchDTO workbenchDetail(String activityCode, String lotteryCode) {
         ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
         if (activity == null) {
-            return ResponseDTO.userErrorParam("活动不存在：" + activityCode);
+            throw new BusinessException("活动不存在：" + activityCode);
         }
         if (!ACTIVITY_TYPE_LOTTERY.equals(activity.getActivityType())) {
-            return ResponseDTO.userErrorParam("活动「" + activity.getActivityName() + "」不是彩票类活动");
+            throw new BusinessException("活动「" + activity.getActivityName() + "」不是彩票类活动");
         }
 
         LotteryConfig config = getByLotteryCode(lotteryCode);
         if (config == null) {
             // 新建玩法态：活动信息已知，预填一个可用编码，运营可直接用也可重新生成
-            return ResponseDTO.ok(new LotteryWorkbenchDTO(
+            return new LotteryWorkbenchDTO(
                     activity.getActivityCode(), activity.getActivityName(),
                     SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode),
                     null, null, null, null,
-                    false, false, null, 0L, 0L, List.of()));
+                    false, false, null, 0L, 0L, List.of());
         }
         // 前端传来的两个参数必须自洽，否则会出现「顶部显示活动A、内容却是活动B的玩法」这种错位
         if (!activityCode.equals(config.getActivityCode())) {
-            return ResponseDTO.userErrorParam("玩法 " + lotteryCode + " 不属于活动 " + activityCode);
+            throw new BusinessException("玩法 " + lotteryCode + " 不属于活动 " + activityCode);
         }
 
         // 结构锁：一旦发过号，发号引擎参数就永久冻结
@@ -192,7 +192,7 @@ public class LotteryConfigService {
                     ;
         }).toList();
 
-        return ResponseDTO.ok(new LotteryWorkbenchDTO(
+        return new LotteryWorkbenchDTO(
                 config.getActivityCode(),
                 activity.getActivityName(),
                 config.getLotteryCode(),
@@ -205,7 +205,7 @@ public class LotteryConfigService {
                 lockReason,
                 issueList.size(),
                 soldTotal,
-                ruleVOList));
+                ruleVOList);
     }
 
     /**
@@ -233,14 +233,14 @@ public class LotteryConfigService {
      * 前端的所有校验都只是 UI 防呆，这里全部服务端重算（铁律 2）
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResponseDTO<String> workbenchSave(LotteryWorkbenchSaveCommand form) {
+    public void workbenchSave(LotteryWorkbenchSaveCommand form) {
         // 1. 活动必须存在且是彩票类
         ActivityConfig activity = activityConfigService.getByActivityCode(form.getActivityCode());
         if (activity == null) {
-            return ResponseDTO.userErrorParam("活动不存在：" + form.getActivityCode());
+            throw new BusinessException("活动不存在：" + form.getActivityCode());
         }
         if (!ACTIVITY_TYPE_LOTTERY.equals(activity.getActivityType())) {
-            return ResponseDTO.userErrorParam("活动「" + activity.getActivityName() + "」不是彩票类活动");
+            throw new BusinessException("活动「" + activity.getActivityName() + "」不是彩票类活动");
         }
 
         // 2. 编码格式由 @Pattern 拦，这里补唯一性判重（铁律 8 落点清单第 ② 项）
@@ -249,14 +249,14 @@ public class LotteryConfigService {
         // 一个活动可以有多个玩法，但编码是全局唯一的（uk_lottery_code）：
         // 手输的编码可能撞上别的活动的玩法，提前给人话提示而不是抛 SQL 异常
         if (existed != null && !Objects.equals(existed.getActivityCode(), form.getActivityCode())) {
-            return ResponseDTO.userErrorParam("彩票编码 " + form.getLotteryCode()
+            throw new BusinessException("彩票编码 " + form.getLotteryCode()
                     + " 已被活动 " + existed.getActivityCode() + " 占用，请重新生成");
         }
 
         // 3. 号码空间必须装得下发售量。10^length 与 totalCount 都是 int 存储，用 long 比较防溢出
         long domain = (long) Math.pow(10, form.getNumberLength());
         if (form.getTotalCount() > domain) {
-            return ResponseDTO.userErrorParam("单期发售上限 " + form.getTotalCount()
+            throw new BusinessException("单期发售上限 " + form.getTotalCount()
                     + " 超过了 " + form.getNumberLength() + " 位号码的空间上限 " + domain + "，请增加号码长度或降低发售量");
         }
 
@@ -270,7 +270,7 @@ public class LotteryConfigService {
                 boolean lengthChanged = !Objects.equals(existed.getNumberLength(), form.getNumberLength());
                 boolean totalChanged = !Objects.equals(existed.getTotalCount(), form.getTotalCount());
                 if (lengthChanged || totalChanged) {
-                    return ResponseDTO.userErrorParam(lockReason);
+                    throw new BusinessException(lockReason);
                 }
             }
         }
@@ -279,7 +279,7 @@ public class LotteryConfigService {
         List<LotteryWorkbenchRuleCommand> ruleList = form.getPrizeRuleList() == null ? List.of() : form.getPrizeRuleList();
         String ruleError = validateRules(ruleList, form);
         if (ruleError != null) {
-            return ResponseDTO.userErrorParam(ruleError);
+            throw new BusinessException(ruleError);
         }
 
         // 6. 落库：彩票配置 upsert
@@ -321,7 +321,6 @@ public class LotteryConfigService {
             lotteryPrizeRuleDao.insert(entity);
         }
 
-        return ResponseDTO.ok();
     }
 
     /**
@@ -369,23 +368,22 @@ public class LotteryConfigService {
      * 用条件更新做并发闸门（WHERE status = 0）：两个运营同时点，第二次 rows=0，
      * 不会出现「都以为自己上线成功」的假象。
      */
-    public ResponseDTO<String> online(String lotteryCode) {
+    public void online(String lotteryCode) {
         LotteryConfig config = getByLotteryCode(lotteryCode);
         if (config == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + lotteryCode);
+            throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
         if (STATUS_ONLINE.equals(config.getStatus())) {
-            return ResponseDTO.userErrorParam("该玩法已经是上线状态");
+            throw new BusinessException("该玩法已经是上线状态");
         }
         String notReady = checkOnlineReady(lotteryCode);
         if (notReady != null) {
-            return ResponseDTO.userErrorParam(notReady);
+            throw new BusinessException(notReady);
         }
         int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_OFFLINE, STATUS_ONLINE);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("上线失败：状态已被其他人变更，请刷新后重试");
+            throw new BusinessException("上线失败：状态已被其他人变更，请刷新后重试");
         }
-        return ResponseDTO.ok();
     }
 
     /**
@@ -414,19 +412,18 @@ public class LotteryConfigService {
      * 下线不做「已发过号就不许下线」的限制 —— 恰恰相反，出问题时能立刻止血地停止发号，
      * 是运营最需要的能力。下线只影响后续领号，不动任何已有数据。
      */
-    public ResponseDTO<String> offline(String lotteryCode) {
+    public void offline(String lotteryCode) {
         LotteryConfig config = getByLotteryCode(lotteryCode);
         if (config == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + lotteryCode);
+            throw new BusinessException("彩票玩法不存在：" + lotteryCode);
         }
         if (STATUS_OFFLINE.equals(config.getStatus())) {
-            return ResponseDTO.userErrorParam("该玩法已经是下线状态");
+            throw new BusinessException("该玩法已经是下线状态");
         }
         int rows = lotteryConfigDao.updateStatus(config.getId(), STATUS_ONLINE, STATUS_OFFLINE);
         if (rows == 0) {
-            return ResponseDTO.userErrorParam("下线失败：状态已被其他人变更，请刷新后重试");
+            throw new BusinessException("下线失败：状态已被其他人变更，请刷新后重试");
         }
-        return ResponseDTO.ok();
     }
 
     // ==================== FPE 推演台 ====================
@@ -437,17 +434,17 @@ public class LotteryConfigService {
      * 与线上发号<b>共用同一个 FpeCipher 与同一套密钥派生</b>，所见即所得；
      * 但 tweak 用的是演示期号，所以结果只代表「号码长什么样」，不等于某一期的真实号码。
      */
-    public ResponseDTO<String> fpePreview(FpePreviewCommand form) {
+    public String fpePreview(FpePreviewCommand form) {
         long domain = (long) Math.pow(10, form.getNumberLength());
         if (form.getSequenceNo() > domain) {
-            return ResponseDTO.userErrorParam("游标 " + form.getSequenceNo()
+            throw new BusinessException("游标 " + form.getSequenceNo()
                     + " 超过 " + form.getNumberLength() + " 位号码的空间上限 " + domain);
         }
         // 入参是 1-indexed（运营心智：第 1 个领号的人），FPE 定义域是 [0, N)，此处减 1
         long sequenceNo = form.getSequenceNo() - 1;
-        return ResponseDTO.ok(fpeCipherFactory
+        return fpeCipherFactory
                 .createForPreview(form.getLotteryCode(), form.getNumberLength())
-                .encrypt(sequenceNo));
+                .encrypt(sequenceNo);
     }
 
     /**
@@ -459,9 +456,9 @@ public class LotteryConfigService {
      *
      * <p>「已是下线」不算失败，计入跳过 —— 运营框选一批时本来就分不清哪些已经下线了。
      */
-    public ResponseDTO<String> batchOffline(List<String> lotteryCodeList) {
+    public String batchOffline(List<String> lotteryCodeList) {
         if (SolvelaCollectionUtil.isEmpty(lotteryCodeList)) {
-            return ResponseDTO.ok();
+            return "没有需要禁用的玩法";
         }
         int success = 0;
         int skipped = 0;
@@ -476,18 +473,18 @@ public class LotteryConfigService {
                 skipped++;
                 continue;
             }
-            ResponseDTO<String> result = offline(lotteryCode);
-            if (result.getOk()) {
+            try {
+                offline(lotteryCode);
                 success++;
-            } else {
-                failed.add(lotteryCode + "（" + result.getMsg() + "）");
+            } catch (BusinessException e) {
+                failed.add(lotteryCode + "（" + e.getMessage() + "）");
             }
         }
         String summary = "已禁用 " + success + " 个玩法"
                 + (skipped > 0 ? "，跳过 " + skipped + " 个（本就是下线态）" : "")
                 + (failed.isEmpty() ? "" : "，失败 " + failed.size() + " 个：" + String.join("、", failed));
-        // 有失败也返回 ok：成功的那部分已经落库了，报错会让运营以为一个都没生效
-        return ResponseDTO.ok(summary);
+        // 有失败也正常返回、不抛：成功的那部分已经落库了，抛异常会让运营以为一个都没生效
+        return summary;
     }
 
     // ==================== 生成器产出的 CRUD ====================

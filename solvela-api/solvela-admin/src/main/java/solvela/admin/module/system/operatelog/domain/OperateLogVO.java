@@ -3,7 +3,7 @@ package solvela.admin.module.system.operatelog.domain;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import solvela.base.enumeration.UserTypeEnum;
+import solvela.admin.constant.UserTypeEnum;
 import solvela.web.swagger.SchemaEnum;
 
 import java.time.LocalDateTime;

@@ -7,14 +7,14 @@ import solvela.admin.module.draw.poolitem.domain.vo.PrizePoolItemVO;
 import solvela.draw.poolitem.domain.dto.PrizePoolItemDTO;
 import solvela.draw.poolitem.service.PrizeItemStockService;
 import solvela.draw.poolitem.service.PrizePoolItemService;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -53,7 +53,7 @@ public class PrizePoolItemController {
 
     @Operation(summary = "分页查询：奖项原始行，保留给排查与导出用")
     @PostMapping("/queryPage")
-    @SaCheckPermission("prizePoolItem:query")
+    @RequiresPermission("prizePoolItem:query")
     public ResponseDTO<PageResult<PrizePoolItemVO>> queryPage(@RequestBody @Valid PrizePoolItemQueryForm queryForm) {
         PageResult<PrizePoolItemDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, PrizePoolItemQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, PrizePoolItemVO.class));
@@ -61,7 +61,7 @@ public class PrizePoolItemController {
 
     @Operation(summary = "库存看板：Redis/DB 双口径剩余、消耗率、售罄预警、跨奖池引用与体检告警")
     @PostMapping("/stockBoard")
-    @SaCheckPermission("prizePoolItem:query")
+    @RequiresPermission("prizePoolItem:query")
     public ResponseDTO<PrizeItemStockResultDTO> stockBoard(@RequestBody @Valid PrizePoolItemQueryForm queryForm) {
         return ResponseDTO.ok(prizeItemStockService.stockBoard(SolvelaBeanUtil.copy(queryForm, PrizePoolItemQuery.class)));
     }

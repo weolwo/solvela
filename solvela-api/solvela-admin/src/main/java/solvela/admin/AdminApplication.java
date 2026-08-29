@@ -6,6 +6,7 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -23,6 +24,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
 @ComponentScan(AdminApplication.COMPONENT_SCAN)
+@ConfigurationPropertiesScan("solvela.admin.auth")
 @MapperScan(value = AdminApplication.COMPONENT_SCAN, annotationClass = Mapper.class)
 // Spring Boot 4 把 UserDetailsServiceAutoConfiguration 挪进了独立的 spring-boot-security 模块，
 // 本项目只依赖 spring-security-crypto（没有 security starter），该自动配置根本不在 classpath 上，

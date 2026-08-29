@@ -3,7 +3,7 @@ package solvela.ledger.handler;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.wallet.service.MemberWalletService;
@@ -12,7 +12,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 /**
- * 积分入账策略（门面：负责把 Service 抛的领域异常翻译成 ResponseDTO）
+ * 积分入账策略（门面：负责把 Service 抛的领域异常翻译成 DispatchOutcome）
  * <p>
  * 钱包是「一行一种资产」，{@link MemberWalletService#executeWalletCharge} 本身就是按 assetType 泛化的，
  * 所以积分与现金的差别只有传入的枚举和锁粒度，逻辑完全复用。
@@ -38,18 +38,18 @@ public class ScoreAssetHandler extends AbstractAssetHandler {
     }
 
     @Override
-    protected ResponseDTO executeWithLock(ProposalRecord proposal) {
+    protected DispatchOutcome executeWithLock(ProposalRecord proposal) {
         try {
             memberWalletService.executeWalletCharge(proposal, PrizeTypeEnum.SCORE);
             log.info(">>>> [积分入账成功] 提案ID: {}", proposal.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         } catch (BusinessException e) {
             log.error("【账务风控拦截】提案ID: {}, 错误: {}", proposal.getId(), e.getMessage());
-            return ResponseDTO.userErrorParam(e.getMessage());
+            return DispatchOutcome.failed(e.getMessage());
         } catch (DuplicateKeyException e) {
             // 资金流水的唯一索引兜底：同一提案重复入账视为幂等成功
             log.warn("【动账防重拦截】该提案已存在积分流水, 提案ID: {}", proposal.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         }
     }
 }

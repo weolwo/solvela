@@ -8,10 +8,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.constant.StringConst;
-import solvela.base.domain.RequestUser;
-import solvela.base.domain.ResponseDTO;
+import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaIpUtil;
-import solvela.base.web.CurrentUser;
+import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.operatelog.OperateLogDao;
 import solvela.admin.module.system.operatelog.domain.OperateLogEntity;
 import solvela.base.json.JsonUtils;
@@ -234,7 +234,7 @@ public abstract class OperateLogAspect {
     private void submitLog(final JoinPoint joinPoint, final Throwable e, Object responseDTO) {
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
         //设置用户信息
-        RequestUser user = CurrentUser.orNull();
+        RequestEmployee user = CurrentEmployee.orNull();
         if (user == null) {
             return;
         }

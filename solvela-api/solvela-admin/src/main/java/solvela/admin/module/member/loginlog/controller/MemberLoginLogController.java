@@ -1,6 +1,6 @@
 package solvela.admin.module.member.loginlog.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.member.loginlog.domain.form.MemberLoginLogQueryForm;
 import solvela.member.loginlog.domain.query.MemberLoginLogQuery;
@@ -37,7 +37,7 @@ public class MemberLoginLogController {
 
     @Operation(summary = "分页查询 @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission("memberLoginLog:query")
+    @RequiresPermission("memberLoginLog:query")
     public ResponseDTO<PageResult<MemberLoginLogVO>> queryPage(@RequestBody @Valid MemberLoginLogQueryForm queryForm) {
         PageResult<MemberLoginLogDTO> page = Service.queryPage(SolvelaBeanUtil.copy(queryForm, MemberLoginLogQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MemberLoginLogVO.class));
@@ -51,8 +51,8 @@ public class MemberLoginLogController {
      */
     @Operation(summary = "登录统计：与列表同一套筛选条件 @author weolwo")
     @PostMapping("/queryStat")
-    @SaCheckPermission("memberLoginLog:query")
+    @RequiresPermission("memberLoginLog:query")
     public ResponseDTO<MemberLoginLogStatDTO> queryStat(@RequestBody @Valid MemberLoginLogQueryForm queryForm) {
-        return Service.queryStat(SolvelaBeanUtil.copy(queryForm, MemberLoginLogQuery.class));
+        return ResponseDTO.ok(Service.queryStat(SolvelaBeanUtil.copy(queryForm, MemberLoginLogQuery.class)));
     }
 }

@@ -3,7 +3,7 @@ package solvela.ledger.handler;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.PhysicalDelivery;
@@ -39,7 +39,7 @@ public class PhysicalAssetHandler implements IAssetHandler {
     private PhysicalDeliveryDao deliveryDao;
 
     @Override
-    public ResponseDTO dispatch(ProposalRecord proposal) {
+    public DispatchOutcome dispatch(ProposalRecord proposal) {
         PhysicalDelivery delivery = new PhysicalDelivery();
         delivery.setMemberId(proposal.getMemberId());
         // 展示快照沿用提案上的那一份（履约单是单据，记的是「中奖当时那个账号」）
@@ -57,10 +57,10 @@ public class PhysicalAssetHandler implements IAssetHandler {
         try {
             deliveryDao.insert(delivery);
             log.info(">>>> [实物履约单已建立] 提案ID: {}, 待用户补充收货信息", proposal.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         } catch (DuplicateKeyException e) {
             log.warn("【防重拦截】该提案已生成物流单: {}", proposal.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         }
     }
 }

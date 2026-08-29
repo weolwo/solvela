@@ -1,6 +1,6 @@
 package solvela.admin.module.mall.sku.controller;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
+import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.admin.module.mall.sku.domain.form.MallSkuQueryForm;
 import solvela.mall.sku.domain.query.MallSkuQuery;
@@ -44,7 +44,7 @@ public class MallSkuController {
 
     @Operation(summary = "库存总览分页查询（按可用库存升序） @author weolwo")
     @PostMapping("/queryPage")
-    @SaCheckPermission("mallSku:query")
+    @RequiresPermission("mallSku:query")
     public ResponseDTO<PageResult<MallSkuVO>> queryPage(@RequestBody @Valid MallSkuQueryForm queryForm) {
         PageResult<MallSkuDTO> page = mallSkuService.queryPage(SolvelaBeanUtil.copy(queryForm, MallSkuQuery.class));
         return ResponseDTO.ok(SolvelaPageUtil.convert2PageResult(page, MallSkuVO.class));

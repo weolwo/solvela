@@ -8,13 +8,13 @@ import solvela.admin.module.system.department.service.DepartmentService;
 import solvela.admin.module.system.employee.domain.entity.EmployeeEntity;
 import solvela.admin.module.system.employee.service.EmployeeService;
 import solvela.admin.module.system.login.domain.RequestEmployee;
+import solvela.admin.module.system.login.domain.UserPermission;
 import solvela.admin.module.system.menu.domain.vo.MenuVO;
 import solvela.admin.module.system.role.domain.vo.RoleVO;
 import solvela.admin.module.system.role.service.RoleEmployeeService;
 import solvela.admin.module.system.role.service.RoleMenuService;
 import solvela.base.constant.StringConst;
-import solvela.base.domain.UserPermission;
-import solvela.base.enumeration.UserTypeEnum;
+import solvela.admin.constant.UserTypeEnum;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.module.file.service.FileAssetService;
 import org.apache.commons.lang3.StringUtils;
@@ -23,10 +23,10 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -119,37 +119,25 @@ public class LoginManager {
      */
     @CachePut(AdminCacheConst.Login.USER_PERMISSION)
     public UserPermission loadUserPermission(Long employeeId) {
-        UserPermission userPermission = new UserPermission();
-        userPermission.setPermissionList(new ArrayList<>());
-        userPermission.setRoleList(new ArrayList<>());
-
         // 角色列表
         List<RoleVO> roleList = roleEmployeeService.getRoleIdList(employeeId);
-        userPermission.getRoleList().addAll(roleList.stream().map(RoleVO::getRoleCode).collect(Collectors.toSet()));
+        Set<String> roleCodeSet = roleList.stream().map(RoleVO::getRoleCode).collect(Collectors.toSet());
 
         // 前端菜单和功能点清单
         EmployeeEntity employeeEntity = employeeService.getById(employeeId);
+        List<MenuVO> menuAndPointsList = roleMenuService.getMenuList(
+                roleList.stream().map(RoleVO::getRoleId).toList(), employeeEntity.getAdministratorFlag());
 
-        List<MenuVO> menuAndPointsList = roleMenuService.getMenuList(roleList.stream().map(RoleVO::getRoleId).collect(Collectors.toList()), employeeEntity.getAdministratorFlag());
-
-        // 权限列表
-        HashSet<String> permissionSet = new HashSet<>();
+        // 权限列表：一个菜单的 apiPerms 是逗号分隔的多个权限点
+        Set<String> permissionSet = new HashSet<>();
         for (MenuVO menu : menuAndPointsList) {
-            if (menu.getPermsType() == null) {
+            if (menu.getPermsType() == null || StringUtils.isEmpty(menu.getApiPerms())) {
                 continue;
             }
-
-            String perms = menu.getApiPerms();
-            if (StringUtils.isEmpty(perms)) {
-                continue;
-            }
-            //接口权限
-            String[] split = perms.split(",");
-            permissionSet.addAll(Arrays.asList(split));
+            permissionSet.addAll(Arrays.asList(menu.getApiPerms().split(",")));
         }
-        userPermission.getPermissionList().addAll(permissionSet);
 
-        return userPermission;
+        return new UserPermission(List.copyOf(permissionSet), List.copyOf(roleCodeSet));
     }
 
 

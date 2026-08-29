@@ -2,7 +2,6 @@ package solvela.lottery.settle;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.base.domain.ResponseDTO;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.engine.MatchRuleEnum;
@@ -13,6 +12,7 @@ import solvela.lottery.LotteryPrizeRule;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.settle.domain.SettleResultDTO;
+import solvela.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -84,20 +84,20 @@ public class LotterySettleService {
      * 开奖号码是资损敏感数据，前端生成意味着运营（或抓包的人）可以自选号码。
      * 这里用 {@link SecureRandom} 在服务端产生，前端只负责展示与二次确认。
      */
-    public ResponseDTO<String> randomNumber(Long issueId) {
+    public String randomNumber(Long issueId) {
         LotteryIssue issue = lotteryIssueDao.selectById(issueId);
         if (issue == null) {
-            return ResponseDTO.userErrorParam("期号不存在");
+            throw new BusinessException("期号不存在");
         }
         LotteryConfig config = lotteryConfigService.getByLotteryCode(issue.getLotteryCode());
         if (config == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + issue.getLotteryCode());
+            throw new BusinessException("彩票玩法不存在：" + issue.getLotteryCode());
         }
         StringBuilder builder = new StringBuilder(config.getNumberLength());
         for (int i = 0; i < config.getNumberLength(); i++) {
             builder.append(RANDOM.nextInt(10));
         }
-        return ResponseDTO.ok(builder.toString());
+        return builder.toString();
     }
 
     /**
@@ -106,17 +106,17 @@ public class LotterySettleService {
      * @param issueId       期号ID
      * @param winningNumber 开奖号码；期号已处于「核销中」时本参数被忽略（号码早已定案）
      */
-    public ResponseDTO<SettleResultDTO> settle(Long issueId, String winningNumber) {
+    public SettleResultDTO settle(Long issueId, String winningNumber) {
         LotteryIssue issue = lotteryIssueDao.selectById(issueId);
         if (issue == null) {
-            return ResponseDTO.userErrorParam("期号不存在");
+            throw new BusinessException("期号不存在");
         }
         if (issue.getStatus() == STATUS_OPENED) {
-            return ResponseDTO.userErrorParam("该期已开奖，开奖号码为 " + issue.getWinningNumber());
+            throw new BusinessException("该期已开奖，开奖号码为 " + issue.getWinningNumber());
         }
         LotteryConfig config = lotteryConfigService.getByLotteryCode(issue.getLotteryCode());
         if (config == null) {
-            return ResponseDTO.userErrorParam("彩票玩法不存在：" + issue.getLotteryCode());
+            throw new BusinessException("彩票玩法不存在：" + issue.getLotteryCode());
         }
 
         String finalNumber;
@@ -127,12 +127,12 @@ public class LotterySettleService {
         } else {
             String error = checkNumber(winningNumber, config.getNumberLength());
             if (error != null) {
-                return ResponseDTO.userErrorParam(error);
+                throw new BusinessException(error);
             }
             // 抢闸门：两个人同时点，第二个人 rows=0 直接退出，不会重复核销
             int rows = lotteryIssueDao.startSettle(issueId, STATUS_WAIT, STATUS_SETTLING, winningNumber);
             if (rows == 0) {
-                return ResponseDTO.userErrorParam("开奖失败：该期状态已被其他操作变更，请刷新后重试");
+                throw new BusinessException("开奖失败：该期状态已被其他操作变更，请刷新后重试");
             }
             finalNumber = winningNumber;
         }
@@ -169,8 +169,8 @@ public class LotterySettleService {
         Map<String, Object> summary = lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo());
         log.info("[彩票开奖] 期号 {} 核销完成，开奖号码 {}，中奖 {} 张、未中奖 {} 张", issue.getIssueNo(), finalNumber, claimed, lose);
 
-        return ResponseDTO.ok(new SettleResultDTO(issue.getIssueNo(), finalNumber, claimed, lose,
-                toLong(summary.get("total")), toLong(summary.get("waitDispatch"))));
+        return new SettleResultDTO(issue.getIssueNo(), finalNumber, claimed, lose,
+                toLong(summary.get("total")), toLong(summary.get("waitDispatch")));
     }
 
     /**
@@ -214,26 +214,26 @@ public class LotterySettleService {
     /**
      * 核销进度，供前端轮询与验收核对
      */
-    public ResponseDTO<Map<String, Object>> summary(Long issueId) {
+    public Map<String, Object> summary(Long issueId) {
         LotteryIssue issue = lotteryIssueDao.selectById(issueId);
         if (issue == null) {
-            return ResponseDTO.userErrorParam("期号不存在");
+            throw new BusinessException("期号不存在");
         }
-        return ResponseDTO.ok(lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo()));
+        return lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo());
     }
 
     /**
      * 触发派奖（独立于核销，见 {@link LotteryDispatchService} 的说明）
      */
-    public ResponseDTO<Integer> dispatch(Long issueId) {
+    public Integer dispatch(Long issueId) {
         LotteryIssue issue = lotteryIssueDao.selectById(issueId);
         if (issue == null) {
-            return ResponseDTO.userErrorParam("期号不存在");
+            throw new BusinessException("期号不存在");
         }
         if (issue.getStatus() != STATUS_OPENED) {
-            return ResponseDTO.userErrorParam("该期尚未开奖完成，不能派奖");
+            throw new BusinessException("该期尚未开奖完成，不能派奖");
         }
-        return ResponseDTO.ok(lotteryDispatchService.dispatchIssue(issue.getLotteryCode(), issue.getIssueNo()));
+        return lotteryDispatchService.dispatchIssue(issue.getLotteryCode(), issue.getIssueNo());
     }
 
     private long toLong(Object value) {

@@ -10,7 +10,7 @@ import solvela.admin.module.system.department.domain.vo.DepartmentVO;
 import solvela.admin.module.system.department.manager.DepartmentCacheManager;
 import solvela.admin.module.system.employee.dao.EmployeeDao;
 import solvela.code.UserErrorCode;
-import solvela.base.domain.ResponseDTO;
+import solvela.web.ResponseDTO;
 import solvela.base.util.SolvelaBeanUtil;
 import org.springframework.stereotype.Service;
 

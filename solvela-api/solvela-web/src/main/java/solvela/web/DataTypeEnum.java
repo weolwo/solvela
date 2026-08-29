@@ -1,4 +1,4 @@
-package solvela.base.enumeration;
+package solvela.web;
 
 import solvela.enums.BaseEnum;
 import lombok.AllArgsConstructor;

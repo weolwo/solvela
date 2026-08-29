@@ -3,7 +3,7 @@ package solvela.ledger.handler;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
-import solvela.base.domain.ResponseDTO;
+import solvela.dispatch.DispatchOutcome;
 import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.wallet.service.MemberWalletService;
@@ -28,23 +28,23 @@ public class WalletAssetHandler extends AbstractAssetHandler {
     }
 
     @Override
-    protected ResponseDTO executeWithLock(ProposalRecord proposal) {
+    protected DispatchOutcome executeWithLock(ProposalRecord proposal) {
         try {
             // 纯净的 Service 调用：本 Handler 负责的资产类型为 BALANCE（现金）
             memberWalletService.executeWalletCharge(proposal, PrizeTypeEnum.BALANCE);
 
             log.info(">>>> [动账成功] 提案ID: {}", proposal.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
 
         } catch (BusinessException e) {
-            // 【分层精髓】：在这里拦截领域层的 BizException，并包装成 Web 层的 ResponseDTO
+            // 【分层精髓】：在这里拦截领域层的 BizException，翻译成引擎认识的下发结果
             log.error("【账务风控拦截】提案ID: {}, 错误: {}", proposal.getId(), e.getMessage());
-            return ResponseDTO.userErrorParam(e.getMessage());
+            return DispatchOutcome.failed(e.getMessage());
 
         } catch (DuplicateKeyException e) {
             // 依然在这里做幂等兜底
             log.warn("【动账防重拦截】该提案已存在资金流水, 提案ID: {}", proposal.getId());
-            return ResponseDTO.ok();
+            return DispatchOutcome.success();
         }
     }
 }
