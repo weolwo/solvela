@@ -1,5 +1,6 @@
 package solvela.member.loginlog.domain.query;
 
+import solvela.enums.LoginLogResultEnum;
 import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
@@ -38,7 +39,7 @@ public class MemberLoginLogQuery extends PageParam {
     private LocalDate createTimeEnd;
 
     /** 状态：0-失败, 1-成功, 2-登出。⚠️与tLoginLog.loginResult取值相反 */
-    private Integer status;
+    private LoginLogResultEnum status;
 
     /** 设备端：APP/H5/WECHAT/PC */
     private String deviceType;

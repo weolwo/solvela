@@ -1,5 +1,6 @@
 package solvela.admin.module.member.verify.domain.vo;
 
+import solvela.enums.MemberVerifyStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -44,7 +45,7 @@ public class MemberVerifyVO {
     private String idCard;
 
     @Schema(description = "认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败")
-    private Integer verifyStatus;
+    private MemberVerifyStatusEnum verifyStatus;
 
     @Schema(description = "认证通过时间")
     private LocalDateTime verifyTime;

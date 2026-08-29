@@ -1,5 +1,6 @@
 package solvela.member.verify.domain.query;
 
+import solvela.enums.MemberVerifyStatusEnum;
 import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
@@ -31,7 +32,7 @@ public class MemberVerifyQuery extends PageParam {
     private String memberName;
 
     /** 认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败 */
-    private Integer verifyStatus;
+    private MemberVerifyStatusEnum verifyStatus;
 
     /** 创建时间 */
     private LocalDate createTimeBegin;

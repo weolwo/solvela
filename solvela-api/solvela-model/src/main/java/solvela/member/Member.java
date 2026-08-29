@@ -1,5 +1,6 @@
 package solvela.member;
 
+import solvela.enums.MemberStatusEnum;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -86,7 +87,7 @@ public class Member {
     /**
      * 状态：1-正常, 2-冻结(风控/违规), 3-已注销
      */
-    private Integer status;
+    private MemberStatusEnum status;
 
     /**
      * 注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT...

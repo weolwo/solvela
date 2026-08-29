@@ -1,5 +1,6 @@
 package solvela.admin.module.member.controller;
 
+import solvela.enums.MemberStatusEnum;
 import solvela.web.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -58,7 +59,7 @@ public class MemberController {
     @Operation(summary = "冻结/解冻 @author weolwo")
     @GetMapping("/updateStatus/{memberId}/{status}")
     @RequiresPermission("member:update")
-    public void updateStatus(@PathVariable Long memberId, @PathVariable Integer status) {
+    public void updateStatus(@PathVariable Long memberId, @PathVariable MemberStatusEnum status) {
         memberService.updateStatus(memberId, status, CurrentEmployee.nameOrNull());
     }
 

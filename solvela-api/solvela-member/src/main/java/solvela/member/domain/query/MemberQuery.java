@@ -1,5 +1,6 @@
 package solvela.member.domain.query;
 
+import solvela.enums.MemberStatusEnum;
 import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
@@ -34,7 +35,7 @@ public class MemberQuery extends PageParam {
     private Integer gender;
 
     /** 状态：1-正常, 2-冻结(风控/违规), 3-已注销 */
-    private Integer status;
+    private MemberStatusEnum status;
 
     /** 注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT... */
     private String registerSource;

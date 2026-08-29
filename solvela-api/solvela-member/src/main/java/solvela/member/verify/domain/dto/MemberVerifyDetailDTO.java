@@ -1,5 +1,6 @@
 package solvela.member.verify.domain.dto;
 
+import solvela.enums.MemberVerifyStatusEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -39,7 +40,7 @@ public class MemberVerifyDetailDTO {
     private String idCard;
 
     /** 认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败 */
-    private Integer verifyStatus;
+    private MemberVerifyStatusEnum verifyStatus;
 
     /** 认证通过时间 */
     private LocalDateTime verifyTime;

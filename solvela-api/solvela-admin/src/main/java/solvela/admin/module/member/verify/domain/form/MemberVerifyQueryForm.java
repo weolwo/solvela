@@ -1,5 +1,6 @@
 package solvela.admin.module.member.verify.domain.form;
 
+import solvela.enums.MemberVerifyStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -33,7 +34,7 @@ public class MemberVerifyQueryForm extends PageParam {
     private String memberName;
 
     @Schema(description = "认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败")
-    private Integer verifyStatus;
+    private MemberVerifyStatusEnum verifyStatus;
 
     @Schema(description = "创建时间")
     private LocalDate createTimeBegin;

@@ -1,5 +1,6 @@
 package solvela.admin.module.member.domain.form;
 
+import solvela.enums.MemberStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -36,7 +37,7 @@ public class MemberQueryForm extends PageParam {
     private Integer gender;
 
     @Schema(description = "状态：1-正常, 2-冻结(风控/违规), 3-已注销")
-    private Integer status;
+    private MemberStatusEnum status;
 
     @Schema(description = "注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT...")
     private String registerSource;

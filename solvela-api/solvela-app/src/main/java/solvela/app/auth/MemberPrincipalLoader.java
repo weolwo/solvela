@@ -1,5 +1,6 @@
 package solvela.app.auth;
 
+import solvela.enums.MemberStatusEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -45,7 +46,7 @@ public class MemberPrincipalLoader {
         }
         Member member = memberAuthDao.selectForAuth(memberId);
         if (member == null || member.getStatus() == null
-                || MemberConst.STATUS_NORMAL != member.getStatus()) {
+                || member.getStatus() != MemberStatusEnum.NORMAL) {
             return null;
         }
         return new MemberPrincipal(

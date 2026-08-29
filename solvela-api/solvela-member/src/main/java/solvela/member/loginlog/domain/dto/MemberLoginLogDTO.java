@@ -1,6 +1,7 @@
 package solvela.member.loginlog.domain.dto;
 
 
+import solvela.enums.LoginLogResultEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -46,7 +47,7 @@ public class MemberLoginLogDTO {
     private String browserName;
 
     /** 状态：0-失败, 1-成功, 2-登出。⚠️与t_login_log.login_result取值相反 */
-    private Integer status;
+    private LoginLogResultEnum status;
 
     /** 提示信息：成功可为空，失败写具体原因 */
     private String remark;

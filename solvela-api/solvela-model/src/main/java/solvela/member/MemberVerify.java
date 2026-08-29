@@ -1,5 +1,6 @@
 package solvela.member;
 
+import solvela.enums.MemberVerifyStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
@@ -64,7 +65,7 @@ public class MemberVerify {
     /**
      * 认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败
      */
-    private Integer verifyStatus;
+    private MemberVerifyStatusEnum verifyStatus;
 
     /**
      * 认证通过时间

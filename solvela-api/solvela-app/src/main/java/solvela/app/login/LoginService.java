@@ -1,5 +1,6 @@
 package solvela.app.login;
 
+import solvela.enums.MemberStatusEnum;
 import solvela.enums.LoginLogResultEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,12 +91,12 @@ public class LoginService {
         }
 
         // ---------- 账号状态 ----------
-        if (MemberConst.STATUS_CANCELLED == member.getStatus()) {
+        if (member.getStatus() == MemberStatusEnum.CANCELLED) {
             // 正常走不到：注销会把 phone_hash 置 NULL，上一步就查不到人。
             // 留着是因为「查不到」依赖的是另一处代码写对，而这一行只值三行代价。
             throw new ApiException(ApiErrors.BAD_CREDENTIALS, BAD_CREDENTIALS_MSG);
         }
-        if (MemberConst.STATUS_FROZEN == member.getStatus()) {
+        if (member.getStatus() == MemberStatusEnum.FROZEN) {
             saveLoginLog(member.getMemberId(), ip, request.deviceType(),
                     LoginLogResultEnum.LOGIN_FAIL, "账号已冻结");
             throw new ApiException(ApiErrors.ACCOUNT_DISABLED, "账号已被冻结，请联系客服");

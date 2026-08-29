@@ -90,18 +90,7 @@ class EnumMigrationRatchetTest {
             "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_FULFILLING",
             "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_PENDING",
             "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_REFUNDED",
-            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_UNPAID",
-
-            // ---- t_member.status ----
-            "solvela-member/member/constant/MemberConst.java#STATUS_CANCELLED",
-            "solvela-member/member/constant/MemberConst.java#STATUS_FROZEN",
-            "solvela-member/member/constant/MemberConst.java#STATUS_NORMAL",
-
-            // ---- t_member_verify.verify_status（对账时零行，风险未覆盖）----
-            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_FAILED",
-            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_NONE",
-            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_PENDING",
-            "solvela-member/member/constant/MemberConst.java#VERIFY_STATUS_VERIFIED");
+            "solvela-marketing/mall/constant/MallConst.java#ORDER_STATUS_UNPAID");
 
     @Test
     @DisplayName("状态魔法常量只许变少：新增即视为改造在往回走")

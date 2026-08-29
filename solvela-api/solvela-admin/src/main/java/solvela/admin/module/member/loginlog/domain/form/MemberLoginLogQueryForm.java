@@ -1,5 +1,6 @@
 package solvela.admin.module.member.loginlog.domain.form;
 
+import solvela.enums.LoginLogResultEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -40,7 +41,7 @@ public class MemberLoginLogQueryForm extends PageParam {
     private LocalDate createTimeEnd;
 
     @Schema(description = "状态：0-失败, 1-成功, 2-登出。⚠️与tLoginLog.loginResult取值相反")
-    private Integer status;
+    private LoginLogResultEnum status;
 
     @Schema(description = "设备端：APP/H5/WECHAT/PC")
     private String deviceType;

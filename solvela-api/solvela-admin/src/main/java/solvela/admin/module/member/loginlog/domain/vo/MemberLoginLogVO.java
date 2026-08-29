@@ -1,5 +1,6 @@
 package solvela.admin.module.member.loginlog.domain.vo;
 
+import solvela.enums.LoginLogResultEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -50,7 +51,7 @@ public class MemberLoginLogVO {
     private String browserName;
 
     @Schema(description = "状态：0-失败, 1-成功, 2-登出。⚠️与t_login_log.login_result取值相反")
-    private Integer status;
+    private LoginLogResultEnum status;
 
     @Schema(description = "提示信息：成功可为空，失败写具体原因")
     private String remark;

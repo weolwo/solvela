@@ -1,5 +1,6 @@
 package solvela.member.verify.service;
 
+import solvela.enums.MemberVerifyStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -93,7 +94,7 @@ public class MemberVerifyService {
         }
         MemberVerify update = new MemberVerify();
         update.setId(id);
-        update.setVerifyStatus(MemberConst.VERIFY_STATUS_VERIFIED);
+        update.setVerifyStatus(MemberVerifyStatusEnum.VERIFIED);
         update.setVerifyTime(LocalDateTime.now());
         // 通过时清掉上一次的驳回原因，否则界面上会出现「已认证」旁边挂着一条失败理由
         update.setFailReason(null);
@@ -118,7 +119,7 @@ public class MemberVerifyService {
         }
         MemberVerify update = new MemberVerify();
         update.setId(id);
-        update.setVerifyStatus(MemberConst.VERIFY_STATUS_FAILED);
+        update.setVerifyStatus(MemberVerifyStatusEnum.FAILED);
         update.setFailReason(failReason.trim());
         // 驳回不写 verify_time：那一列的语义是「认证通过时间」，驳回没有通过
         memberVerifyDao.updateById(update);
@@ -132,7 +133,7 @@ public class MemberVerifyService {
         if (verify == null) {
             return null;
         }
-        return MemberConst.VERIFY_STATUS_PENDING == nullToZero(verify.getVerifyStatus()) ? verify : null;
+        return verify.getVerifyStatus() == MemberVerifyStatusEnum.PENDING ? verify : null;
     }
 
     private static void mask(MemberVerifyDTO vo) {

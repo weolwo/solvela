@@ -16,21 +16,7 @@ public final class MemberConst {
     private MemberConst() {
     }
 
-    // ------------------------------------------------------------------ 会员状态
-
-    /**
-     * 正常
-     */
-    public static final int STATUS_NORMAL = 1;
-    /**
-     * 冻结（风控/违规）
-     */
-    public static final int STATUS_FROZEN = 2;
-    /**
-     * 已注销。<b>终态</b> —— 注销会把 phone_hash 置 NULL 以释放号码，
-     * 那个动作不可逆，所以后台不提供「从注销改回正常」的入口。
-     */
-    public static final int STATUS_CANCELLED = 3;
+    // 会员状态已迁到 solvela-model 的 MemberStatusEnum
 
     // ------------------------------------------------------------------ 性别
 
@@ -38,15 +24,7 @@ public final class MemberConst {
     public static final int GENDER_MALE = 1;
     public static final int GENDER_FEMALE = 2;
 
-    // ------------------------------------------------------------------ 实名认证状态
-
-    public static final int VERIFY_STATUS_NONE = 0;
-    /**
-     * 认证中 —— <b>只有这个状态能被审核</b>
-     */
-    public static final int VERIFY_STATUS_PENDING = 1;
-    public static final int VERIFY_STATUS_VERIFIED = 2;
-    public static final int VERIFY_STATUS_FAILED = 3;
+    // 实名认证状态已迁到 solvela-model 的 MemberVerifyStatusEnum
 
     /**
      * 驳回原因长度上限，对齐 t_member_verify.fail_reason 的 varchar(255)

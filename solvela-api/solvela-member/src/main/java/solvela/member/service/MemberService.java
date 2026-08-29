@@ -1,5 +1,6 @@
 package solvela.member.service;
 
+import solvela.enums.MemberStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -67,16 +68,16 @@ public class MemberService {
      * 前端把已注销那行的开关禁掉了，这里是真正的约束。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(Long memberId, Integer status, String operator) {
+    public void updateStatus(Long memberId, MemberStatusEnum status, String operator) {
         if (status == null
-                || (status != MemberConst.STATUS_NORMAL && status != MemberConst.STATUS_FROZEN)) {
+                || (status != MemberStatusEnum.NORMAL && status != MemberStatusEnum.FROZEN)) {
             throw new BusinessException("只能在「正常」与「冻结」之间切换");
         }
         Member member = memberManager.getById(memberId);
         if (member == null) {
             throw new BusinessException("会员不存在");
         }
-        if (MemberConst.STATUS_CANCELLED == nullToZero(member.getStatus())) {
+        if (member.getStatus() == MemberStatusEnum.CANCELLED) {
             throw new BusinessException("该会员已注销，注销是终态，不能改回其它状态");
         }
         Member update = new Member();
