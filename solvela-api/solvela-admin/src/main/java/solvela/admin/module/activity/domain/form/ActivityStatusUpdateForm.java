@@ -1,5 +1,6 @@
 package solvela.admin.module.activity.domain.form;
 
+import solvela.enums.ActivityStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -36,5 +37,5 @@ public class ActivityStatusUpdateForm {
      */
     @Schema(description = "目标状态：1-启用, 2-禁用", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "目标状态 不能为空")
-    private Integer status;
+    private ActivityStatusEnum status;
 }

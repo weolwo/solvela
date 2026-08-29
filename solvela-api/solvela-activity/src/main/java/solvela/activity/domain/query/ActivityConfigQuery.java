@@ -1,5 +1,6 @@
 package solvela.activity.domain.query;
 
+import solvela.enums.ActivityStatusEnum;
 import solvela.base.domain.PageParam;
 
 import java.time.LocalDate;
@@ -35,6 +36,6 @@ public class ActivityConfigQuery extends PageParam {
     private String activityType;
 
     /** 状态：0-未开始, 1-上线, 2-下线 */
-    private Integer status;
+    private ActivityStatusEnum status;
 
 }

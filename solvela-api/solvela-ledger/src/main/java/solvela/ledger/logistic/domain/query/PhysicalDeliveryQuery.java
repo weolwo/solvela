@@ -1,5 +1,6 @@
 package solvela.ledger.logistic.domain.query;
 
+import solvela.enums.DeliveryStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
@@ -46,7 +47,7 @@ public class PhysicalDeliveryQuery extends PageParam {
     /**
      * 状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回
      */
-    private Integer status;
+    private DeliveryStatusEnum status;
 
     /**
      * 创建时间

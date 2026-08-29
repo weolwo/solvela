@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.domain.dto;
 
+import solvela.enums.ActivityStatusEnum;
 import java.util.List;
 
 /**
@@ -17,7 +18,7 @@ import java.util.List;
  */
 public record DrawWorkbenchDTO(String activityCode,
                               String activityName,
-                              Integer activityStatus,
+                              ActivityStatusEnum activityStatus,
                               boolean online,
                               List<DrawWorkbenchItemDTO> prizeItemList,
                               List<DrawWorkbenchPoolDTO> poolList) {

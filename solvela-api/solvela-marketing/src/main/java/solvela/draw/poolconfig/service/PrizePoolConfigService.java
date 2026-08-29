@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.service;
 
+import solvela.enums.ActivityStatusEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -76,10 +77,6 @@ public class PrizePoolConfigService {
     private final DrawPrizeLogManager drawPrizeLogManager;
 
     /**
-     * 活动状态：1-上线（上线后启用结构锁：库存只增不减、禁止删奖项/删池/池内增删坑位）
-     */
-    private static final Integer ACTIVITY_STATUS_ONLINE = 1;
-    /**
      * 库存/限领「不限量」哨兵值
      */
     private static final Integer UNLIMITED = -1;
@@ -121,7 +118,7 @@ public class PrizePoolConfigService {
         if (activity == null) {
             throw new BusinessException("活动不存在：" + activityCode);
         }
-        boolean online = ACTIVITY_STATUS_ONLINE.equals(activity.getStatus());
+        boolean online = activity.getStatus() == ActivityStatusEnum.ONLINE;
 
         // Tab1 物资：SKU 化后名称/价值等展示信息需回查资产大库补齐
         List<PrizePoolItem> dbItems = prizePoolItemManager.lambdaQuery()
@@ -201,7 +198,7 @@ public class PrizePoolConfigService {
         if (activity == null) {
             throw new BusinessException("活动不存在：" + form.getActivityCode());
         }
-        boolean online = ACTIVITY_STATUS_ONLINE.equals(activity.getStatus());
+        boolean online = activity.getStatus() == ActivityStatusEnum.ONLINE;
 
         // 2. 物资编码不允许重复，且必须真实存在于资产大库 t_prize_config
         Set<String> itemCodes = new HashSet<>();

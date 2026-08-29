@@ -1,5 +1,6 @@
 package solvela.ledger.handler;
 
+import solvela.enums.DeliveryStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
@@ -27,12 +28,6 @@ import org.springframework.stereotype.Service;
 @AssetStrategy(PrizeTypeEnum.PHYSICAL)
 public class PhysicalAssetHandler implements IAssetHandler {
 
-    /**
-     * 履约单初始状态：0-待发货。此时收件三要素为空，运营列表用
-     * status=0 AND receiver_address IS NULL 筛出「待用户补地址」的单子
-     */
-    private static final int STATUS_PENDING_DELIVERY = 0;
-
     private static final String SOURCE_TYPE_PROPOSAL = "PROPOSAL";
 
     @Resource
@@ -48,7 +43,9 @@ public class PhysicalAssetHandler implements IAssetHandler {
         // 泛化成字符串单号之后，商城兑换实物才能以 source_type='MALL' + 订单号 走同一张表。
         delivery.setSourceBizId(String.valueOf(proposal.getId()));
         delivery.setSourceType(SOURCE_TYPE_PROPOSAL);
-        delivery.setStatus(STATUS_PENDING_DELIVERY);
+        // 此时收件三要素为空，运营列表用 status=0 AND receiver_address IS NULL
+        // 筛出「待用户补地址」的单子
+        delivery.setStatus(DeliveryStatusEnum.PENDING);
         // receiver_name / receiver_phone / receiver_address 刻意不设：
         // 中奖时用户尚未填写地址，v3.37 已把这三列改为可空，由第 ② 步补齐。
         // （此前它们是 NOT NULL 无默认值，实物审批通过必抛

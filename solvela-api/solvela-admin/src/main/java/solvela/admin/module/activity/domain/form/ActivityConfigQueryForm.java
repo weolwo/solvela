@@ -1,5 +1,6 @@
 package solvela.admin.module.activity.domain.form;
 
+import solvela.enums.ActivityStatusEnum;
 import solvela.base.domain.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -36,6 +37,6 @@ public class ActivityConfigQueryForm extends PageParam {
     private String activityType;
 
     @Schema(description = "状态：0-未开始, 1-上线, 2-下线")
-    private Integer status;
+    private ActivityStatusEnum status;
 
 }

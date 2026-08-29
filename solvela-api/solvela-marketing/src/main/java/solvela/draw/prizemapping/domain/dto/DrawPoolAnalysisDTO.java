@@ -1,5 +1,6 @@
 package solvela.draw.prizemapping.domain.dto;
 
+import solvela.enums.ActivityStatusEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,7 +29,7 @@ public class DrawPoolAnalysisDTO {
     private String activityCode;
 
     /** 活动状态: 0-未上线, 1-已上线。已上线且有告警的最该先处理 */
-    private Integer activityStatus;
+    private ActivityStatusEnum activityStatus;
 
     /** 奖池开关: 0-关闭, 1-开启 */
     private PrizePoolStatusEnum poolStatus;

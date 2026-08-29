@@ -1,5 +1,6 @@
 package solvela.admin.module.activity.domain.form;
 
+import solvela.enums.ActivityStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -38,7 +39,7 @@ public class ActivityConfigAddForm {
     private String activityType;
 
     @Schema(description = "状态：0-未开始, 1-上线, 2-下线")
-    private Integer status;
+    private ActivityStatusEnum status;
 
     @Schema(description = "活动开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "活动开始时间 不能为空")

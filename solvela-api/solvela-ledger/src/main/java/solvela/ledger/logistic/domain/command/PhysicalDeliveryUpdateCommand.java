@@ -1,5 +1,6 @@
 package solvela.ledger.logistic.domain.command;
 
+import solvela.enums.DeliveryStatusEnum;
 import lombok.Data;
 
 /**
@@ -44,6 +45,6 @@ public class PhysicalDeliveryUpdateCommand {
     private String logisticsNo;
 
     /** 状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回 */
-    private Integer status;
+    private DeliveryStatusEnum status;
 
 }

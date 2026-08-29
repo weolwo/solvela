@@ -32,6 +32,11 @@ public final class SonicEnumConverter implements SonicConverter<Object, String> 
         if (value == null) {
             return null;
         }
+        // 字段类型已经是枚举本身时直接取 desc —— getEnumDescByValue 是拿 value 比
+        // getValue()，传枚举实例进去恒不相等，会误报「没有对应项」。
+        if (value instanceof BaseEnum baseEnum) {
+            return baseEnum.getDesc();
+        }
         String desc = SolvelaEnumUtil.getEnumDescByValue(value, enumType(ctx));
         if (desc == null) {
             throw new SonicExcelException("枚举值 " + value + " 在 "

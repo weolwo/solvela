@@ -1,5 +1,6 @@
 package solvela.ledger;
 
+import solvela.enums.DeliveryStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -102,7 +103,7 @@ public class PhysicalDelivery {
     /**
      * 状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回
      */
-    private Integer status;
+    private DeliveryStatusEnum status;
 
     /**
      * 创建人

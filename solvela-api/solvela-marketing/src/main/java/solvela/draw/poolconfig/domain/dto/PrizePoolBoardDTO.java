@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.domain.dto;
 
+import solvela.enums.ActivityStatusEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -50,7 +51,7 @@ public class PrizePoolBoardDTO {
     private String activityName;
 
     /** 活动状态: 0-未上线, 1-已上线 */
-    private Integer activityStatus;
+    private ActivityStatusEnum activityStatus;
 
     /** 坑位数量 */
     private Integer slotCount;

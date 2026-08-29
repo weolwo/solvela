@@ -65,13 +65,6 @@ class EnumMigrationRatchetTest {
      * 尚未枚举化的列留下的常量。<b>只许删，不许加。</b>
      */
     private static final Set<String> ALLOWED = Set.of(
-            // ---- t_activity_config.status ----
-            "solvela-activity/activity/service/ActivityConfigService.java#STATUS_NOT_START",
-            "solvela-activity/activity/service/ActivityConfigService.java#STATUS_OFFLINE",
-            "solvela-activity/activity/service/ActivityConfigService.java#STATUS_ONLINE",
-            "solvela-marketing/draw/poolconfig/service/PrizePoolBoardService.java#ACTIVITY_STATUS_ONLINE",
-            "solvela-marketing/draw/poolconfig/service/PrizePoolConfigService.java#ACTIVITY_STATUS_ONLINE",
-            "solvela-marketing/stat/service/MarketingStatService.java#ACTIVITY_STATUS_DISABLED",
 
             // ---- t_proposal_record.status ----
             "solvela-ledger/ledger/engine/AssetDispatchEngine.java#STATUS_EXECUTING",
@@ -82,9 +75,6 @@ class EnumMigrationRatchetTest {
             "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_PENDING_EXECUTE",
             "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_REJECTED",
             "solvela-risk/risk/proposal/service/ProposalRecordService.java#STATUS_SECOND_REVIEW",
-
-            // ---- t_physical_delivery.status ----
-            "solvela-ledger/ledger/handler/PhysicalAssetHandler.java#STATUS_PENDING_DELIVERY",
 
 
             // ---- t_lottery_config.status ----

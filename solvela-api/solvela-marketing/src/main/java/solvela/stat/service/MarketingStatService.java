@@ -1,5 +1,6 @@
 package solvela.stat.service;
 
+import solvela.enums.ActivityStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.service.ActivityConfigService;
 import solvela.activity.spi.ActivityRefProvider;
@@ -39,9 +40,6 @@ public class MarketingStatService {
 
     /** 有参与行为的玩法类型。BASIC 没有参与行为，不出现在图上 */
     private static final List<String> GAMEPLAY_TYPES = List.of("DRAW", "TASK", "LOTTERY");
-
-    /** 活动禁用态。其余取值（含历史值 0）一律按启用处理 —— 只有开关两态，不看起止时间 */
-    private static final int ACTIVITY_STATUS_DISABLED = 2;
 
     private static final int FLOW_TYPE_ADVANCE = 1;
     private static final int FLOW_TYPE_DISCARD = 2;
@@ -97,7 +95,8 @@ public class MarketingStatService {
 
         int enabled = 0;
         for (OverviewDTO.ActivityCard card : cards) {
-            boolean isEnabled = card.getStatus() == null || card.getStatus() != ACTIVITY_STATUS_DISABLED;
+            // 只有「下线」算禁用，其余取值（含未开始）一律按启用处理 —— 只看开关两态，不看起止时间
+            boolean isEnabled = card.getStatus() == null || card.getStatus() != ActivityStatusEnum.OFFLINE;
             card.setEnabled(isEnabled);
             if (isEnabled) {
                 enabled++;

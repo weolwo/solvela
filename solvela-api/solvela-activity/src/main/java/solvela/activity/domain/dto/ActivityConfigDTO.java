@@ -1,6 +1,7 @@
 package solvela.activity.domain.dto;
 
 
+import solvela.enums.ActivityStatusEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -28,7 +29,7 @@ public class ActivityConfigDTO {
     private String activityType;
 
     /** 状态：0-未开始, 1-上线, 2-下线 */
-    private Integer status;
+    private ActivityStatusEnum status;
 
     /** 活动开始时间 */
     private LocalDateTime startTime;

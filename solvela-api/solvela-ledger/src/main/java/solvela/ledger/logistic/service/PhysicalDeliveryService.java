@@ -309,7 +309,7 @@ public class PhysicalDeliveryService {
             entity.setReceiverAddress(row.receiverAddress());
             entity.setLogisticsCompany(row.logisticsCompany());
             entity.setLogisticsNo(row.logisticsNo());
-            entity.setStatus(DeliveryStatusEnum.PENDING.getValue());
+            entity.setStatus(DeliveryStatusEnum.PENDING);
             physicalDeliveryDao.insert(entity);
         }
         return "成功导入 " + dataList.size() + " 条";
@@ -385,7 +385,9 @@ public class PhysicalDeliveryService {
             if (SolvelaStringUtil.isNotBlank(row.logisticsNo())) {
                 update.setLogisticsNo(row.logisticsNo());
             }
-            update.setStatus(row.status());
+            // Excel 行模型刻意保持 Integer（那是文件格式的边界，单元格里是人手填的文本），
+            // 到这里做一次显式转换。合法性已经在上面的校验里保证过，null 表示不改状态。
+            update.setStatus(DeliveryStatusEnum.resolve(row.status()));
             physicalDeliveryDao.updateById(update);
         }
         return "成功回填 " + dataList.size() + " 条";

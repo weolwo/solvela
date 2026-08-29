@@ -1,5 +1,6 @@
 package solvela.activity.service;
 
+import solvela.enums.ActivityStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.dao.ActivityConfigDao;
@@ -49,18 +50,6 @@ import java.util.stream.Collectors;
 @Service
 public class ActivityConfigService {
 
-    /**
-     * 活动状态：0-未开始
-     */
-    private static final Integer STATUS_NOT_START = 0;
-    /**
-     * 活动状态：1-上线
-     */
-    private static final Integer STATUS_ONLINE = 1;
-    /**
-     * 活动状态：2-下线
-     */
-    private static final Integer STATUS_OFFLINE = 2;
 
     private final ActivityConfigDao activityConfigDao;
     private final ActivityConfigManager activityConfigManager;
@@ -102,7 +91,7 @@ public class ActivityConfigService {
         boolean keepAll = Boolean.TRUE.equals(includeInactive);
         List<ActivityConfig> list = activityConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(activityType), ActivityConfig::getActivityType, activityType)
-                .ne(!keepAll, ActivityConfig::getStatus, STATUS_OFFLINE)
+                .ne(!keepAll, ActivityConfig::getStatus, ActivityStatusEnum.OFFLINE)
                 .ge(!keepAll, ActivityConfig::getEndTime, LocalDateTime.now())
                 .orderByDesc(ActivityConfig::getId)
                 .list();
@@ -177,8 +166,8 @@ public class ActivityConfigService {
      * 不做级联删除 —— 下游挂着发奖流水与资产账务。
      */
     private ActivityDeleteCheckDTO checkDeletable(ActivityConfig activity) {
-        if (!STATUS_NOT_START.equals(activity.getStatus())) {
-            String statusDesc = STATUS_ONLINE.equals(activity.getStatus()) ? "上线中" : "已下线";
+        if (activity.getStatus() != ActivityStatusEnum.NOT_START) {
+            String statusDesc = activity.getStatus() == ActivityStatusEnum.ONLINE ? "上线中" : "已下线";
             return ActivityDeleteCheckDTO.reject(
                     "该活动" + statusDesc + "，已产生或可能已产生发奖记录，不允许删除；如需停止请将其下线。",
                     List.of());
@@ -298,7 +287,7 @@ public class ActivityConfigService {
 
         // ---------- 3. 落库 ----------
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(form, ActivityConfig.class);
-        activityConfig.setStatus(STATUS_NOT_START);
+        activityConfig.setStatus(ActivityStatusEnum.NOT_START);
         activityConfigDao.insert(activityConfig);
 
         for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
@@ -347,9 +336,11 @@ public class ActivityConfigService {
      * （对齐 `LotteryConfigService.offline()` 的既定取舍）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(List<Long> idList, Integer status) {
-        if (!STATUS_ONLINE.equals(status) && !STATUS_OFFLINE.equals(status)) {
-            throw new BusinessException("目标状态只能是 1-启用 或 2-禁用");
+    public void updateStatus(List<Long> idList, ActivityStatusEnum status) {
+        // 入参换成枚举之后，「取值合不合法」由反序列化保证（非法值直接 400）。
+        // 这里只剩一条业务规则：活动上过线就回不到「未开始」。
+        if (status != ActivityStatusEnum.ONLINE && status != ActivityStatusEnum.OFFLINE) {
+            throw new BusinessException("目标状态只能是 上线 或 下线");
         }
         List<ActivityConfig> activityList = activityConfigDao.selectBatchIds(idList);
         if (SolvelaCollectionUtil.isEmpty(activityList)) {
@@ -358,7 +349,7 @@ public class ActivityConfigService {
 
         // 启用：逐个校验完备度。任一不通过则整批拒绝并点名是哪个活动 ——
         // 部分成功会让运营以为「都启用了」，而实际有几个没启，这种结果比整批失败更难排查
-        if (STATUS_ONLINE.equals(status)) {
+        if (status == ActivityStatusEnum.ONLINE) {
             for (ActivityConfig activity : activityList) {
                 String notReady = checkConfigured(activity);
                 if (notReady != null) {

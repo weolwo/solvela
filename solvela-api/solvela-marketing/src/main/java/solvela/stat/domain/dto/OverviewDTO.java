@@ -1,5 +1,6 @@
 package solvela.stat.domain.dto;
 
+import solvela.enums.ActivityStatusEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -44,7 +45,7 @@ public class OverviewDTO {
         private String activityType;
 
         /** 原始状态值，1-启用 2-禁用 0-历史值（按启用处理） */
-        private Integer status;
+        private ActivityStatusEnum status;
 
         /** 是否启用，= status != 2。前端直接用它，不要自己再判一遍 */
         private Boolean enabled;

@@ -1,5 +1,6 @@
 package solvela.draw.poolitem.domain.dto;
 
+import solvela.enums.ActivityStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
@@ -25,7 +26,7 @@ public class PrizeItemStockDTO {
     private String activityCode;
 
     /** 活动状态: 0-未上线, 1-已上线 */
-    private Integer activityStatus;
+    private ActivityStatusEnum activityStatus;
 
     /** 奖品编码 */
     private String prizeCode;

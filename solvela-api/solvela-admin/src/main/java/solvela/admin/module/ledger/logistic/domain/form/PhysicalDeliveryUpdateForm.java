@@ -1,5 +1,6 @@
 package solvela.admin.module.ledger.logistic.domain.form;
 
+import solvela.enums.DeliveryStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -53,6 +54,6 @@ public class PhysicalDeliveryUpdateForm {
     private String logisticsNo;
 
     @Schema(description = "状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回")
-    private Integer status;
+    private DeliveryStatusEnum status;
 
 }

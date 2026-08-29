@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.service;
 
+import solvela.enums.ActivityStatusEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
@@ -63,7 +64,6 @@ public class PrizePoolBoardService {
 
     /** 与 DrawPoolSnapshot 的闭环容差保持一致，两边必须同时改 */
     private static final BigDecimal PROBABILITY_EPSILON = new BigDecimal("0.0001");
-    private static final Integer ACTIVITY_STATUS_ONLINE = 1;
     private static final Integer FALLBACK_YES = 1;
     private static final int UNLIMITED = -1;
 
@@ -146,7 +146,7 @@ public class PrizePoolBoardService {
             vo.setActivityName(activity.getActivityName());
             vo.setActivityStatus(activity.getStatus());
         }
-        boolean activityOnline = activity != null && ACTIVITY_STATUS_ONLINE.equals(activity.getStatus());
+        boolean activityOnline = activity != null && activity.getStatus() == ActivityStatusEnum.ONLINE;
         boolean poolOpen = pool.getStatus() == PrizePoolStatusEnum.OPEN;
 
         // ---- 坑位与概率 ----
