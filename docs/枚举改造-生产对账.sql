@@ -237,5 +237,33 @@ SELECT 't_task_record_flow.flow_type' AS col, CAST(`flow_type` AS CHAR) AS value
 UNION ALL
 -- t_task_template.status  状态：0-禁用, 1-启用
 SELECT 't_task_template.status' AS col, CAST(`status` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_task_template` GROUP BY `status`
+
+-- ===================================================================
+-- 2026-08-29 补：下面 7 列原先没进这份脚本。
+-- 原因是生成脚本按「列名像不像 status/type/flag」筛，gender / is_home /
+-- is_default / biz_id_required 这些都不像，于是整轮对账都没覆盖到它们。
+-- 它们现在全是枚举或 Boolean，上线前同样要对。
+-- ===================================================================
+UNION ALL
+-- t_member.gender  性别：0-未知, 1-男, 2-女（GenderEnum）
+SELECT 't_member.gender' AS col, CAST(`gender` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_member` GROUP BY `gender`
+UNION ALL
+-- t_employee.gender  性别：0-未知, 1-男, 2-女（GenderEnum）
+SELECT 't_employee.gender' AS col, CAST(`gender` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_employee` GROUP BY `gender`
+UNION ALL
+-- t_mall_commodity.is_home  是否首页推荐：0-否, 1-是（Boolean）
+SELECT 't_mall_commodity.is_home' AS col, CAST(`is_home` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_mall_commodity` GROUP BY `is_home`
+UNION ALL
+-- t_mall_address.is_default  是否默认地址：0-否, 1-是（Boolean）
+SELECT 't_mall_address.is_default' AS col, CAST(`is_default` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_mall_address` GROUP BY `is_default`
+UNION ALL
+-- t_task_event.biz_id_required  是否必须带业务单号：0-否, 1-是（Boolean）
+SELECT 't_task_event.biz_id_required' AS col, CAST(`biz_id_required` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_task_event` GROUP BY `biz_id_required`
+UNION ALL
+-- t_task_event.is_high_frequency  是否高频事件：0-否, 1-是（Boolean）
+SELECT 't_task_event.is_high_frequency' AS col, CAST(`is_high_frequency` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_task_event` GROUP BY `is_high_frequency`
+UNION ALL
+-- t_pool_prize_mapping.is_fallback  是否兜底奖项：0-否, 1-是（Boolean）
+SELECT 't_pool_prize_mapping.is_fallback' AS col, CAST(`is_fallback` AS CHAR) AS value, COUNT(*) AS rows_count FROM `t_pool_prize_mapping` GROUP BY `is_fallback`
 -- 全局排序，保证结果清晰可读
 ORDER BY col, value;

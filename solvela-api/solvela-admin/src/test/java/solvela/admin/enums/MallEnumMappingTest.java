@@ -199,6 +199,9 @@ class MallEnumMappingTest {
             assertNotNull(e.getIsHome(), "isHome 装配成了 null");
         }
 
+        // ⚠️ t_mall_address 是零行（实跑对账 SQL 确认过），下面这个循环当前一次也不转。
+        // 它现在只能证明查询链路不炸，等 C 端收货地址功能上线有数据了才开始有意义——
+        // 写成这样而不是断言非空，是因为现在断言非空就是一条恒红的用例。
         List<MallAddress> addresses = mallAddressDao.selectList(null);
         for (MallAddress e : addresses) {
             assertNotNull(e.getIsDefault(), "isDefault 装配成了 null");
