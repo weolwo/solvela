@@ -1,6 +1,8 @@
 package solvela.base.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.autoconfigure.ConfigurationCustomizer;
+import com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler;
 import com.baomidou.mybatisplus.core.injector.AbstractMethod;
 import com.baomidou.mybatisplus.core.injector.DefaultSqlInjector;
 import com.baomidou.mybatisplus.core.metadata.TableInfo;
@@ -25,6 +27,31 @@ import java.util.List;
 @EnableTransactionManagement
 @Configuration
 public class MybatisPlusConfig {
+
+    /**
+     * 让 MyBatis 用<b>枚举的 value</b> 而不是<b>枚举名</b>来读写数据库列。
+     *
+     * <h3>这一条是承重墙，删掉会静默炸</h3>
+     * {@code BaseEnum} 继承了 {@code IEnum}，但<b>光有 IEnum 是不够的</b> ——
+     * MyBatis 默认的 {@code EnumTypeHandler} 按 {@link Enum#name()} 映射，
+     * 于是从库里读出 int 值 10 时它会去找一个名叫 "10" 的常量，抛
+     * {@code IllegalArgumentException: No enum constant XxxEnum.10}。
+     *
+     * <p>把默认处理器换成 MP 的 {@link MybatisEnumTypeHandler}，它才认 {@code IEnum.getValue()}。
+     *
+     * <p>三条读写路径都依赖它：BaseMapper 的增删改查、手写 XML 的 {@code resultType}
+     * 自动映射、以及把枚举当查询参数（{@code #{query.type}}）。
+     * 其中 <b>resultType 那条最隐蔽</b>：它不看实体上的任何注解，只按属性类型找 TypeHandler。
+     *
+     * <p>放在这里而不是四份 yaml 的 {@code mybatis-plus.configuration.default-enum-type-handler}：
+     * 这是全局语义，不该有「某个环境配漏了」的可能。
+     *
+     * <p>回归用例见 {@code DataTracerEnumMappingTest}。
+     */
+    @Bean
+    public ConfigurationCustomizer enumTypeHandlerCustomizer() {
+        return configuration -> configuration.setDefaultEnumTypeHandler(MybatisEnumTypeHandler.class);
+    }
 
     /**
      * MyBatis-Plus 拦截器链。

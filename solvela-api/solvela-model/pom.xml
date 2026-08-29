@@ -45,6 +45,14 @@
             <artifactId>mybatis-plus-core</artifactId>
         </dependency>
 
+        <!-- BaseEnum.getValue() 上的 @JsonValue。**只引 annotations，不引 databind** ——
+             annotations 是个零传递依赖的纯注解包，model 层不会因此知道任何序列化实现。
+             版本由 spring-boot-dependencies 管理（Jackson 3 的 databind 也依赖它） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
         <!-- PiiCipher / PiiHasher 是 @Component + @Value。spring-context 不含 web -->
         <dependency>
             <groupId>org.springframework</groupId>

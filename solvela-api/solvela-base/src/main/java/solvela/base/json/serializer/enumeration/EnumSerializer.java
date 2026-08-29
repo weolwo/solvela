@@ -32,6 +32,12 @@ public class EnumSerializer extends ValueSerializer<Object> {
             desc = SolvelaStringUtil.splitConvertToIntList(String.valueOf(value), StringConst.SEPARATOR)
                     .stream().map(e -> SolvelaEnumUtil.getEnumDescByValue(e, enumClazz)).collect(Collectors.toList());
 
+        } else if (value instanceof BaseEnum baseEnum) {
+            // 字段类型已经是枚举本身（枚举化改造之后的形态）。
+            // 这一支不能省：getEnumByValue 是拿 value 去比 getValue()，
+            // 传进来的若是枚举实例，Objects.equals(Integer, 枚举) 恒为 false，
+            // desc 会静默变成 null —— 页面上就是一列空白，接口照样 200。
+            desc = baseEnum.getDesc();
         } else {
             BaseEnum anEnum = SolvelaEnumUtil.getEnumByValue(value, enumClazz);
             desc = null != anEnum ? anEnum.getDesc() : null;

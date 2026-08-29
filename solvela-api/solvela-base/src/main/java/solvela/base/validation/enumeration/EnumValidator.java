@@ -45,6 +45,18 @@ public class EnumValidator implements ConstraintValidator<CheckEnum, Object> {
             return !required;
         }
 
+        if (value instanceof BaseEnum) {
+            // 字段类型已经是枚举本身（枚举化改造之后的形态）。
+            // 这一支不能省：enumValList 装的是各常量的 value（Integer / String），
+            // contains(枚举实例) 恒为 false，整个接口会变成恒返回 400 ——
+            // TicketStatusEnum 当年就是这个症状（见其 javadoc）。
+            //
+            // 能走到这里说明 Jackson 已经成功把入参反序列化成了枚举常量，
+            // 也就是说取值天然合法；非法值在反序列化阶段就被拒了（400 / INVALID_ARGUMENT）。
+            // 本注解此时只剩 required 的语义，而它在上面的 null 判断里已经处理过了。
+            return true;
+        }
+
         if (value instanceof List) {
             // 如果为 List 集合数据
             return this.checkList((List<Object>) value);
@@ -67,6 +79,10 @@ public class EnumValidator implements ConstraintValidator<CheckEnum, Object> {
         long count = list.stream().distinct().count();
         if (count != list.size()) {
             return false;
+        }
+        // 元素已经是枚举常量时同上：能反序列化出来就说明合法
+        if (list.stream().allMatch(e -> e instanceof BaseEnum)) {
+            return true;
         }
         return enumValList.containsAll(list);
     }
