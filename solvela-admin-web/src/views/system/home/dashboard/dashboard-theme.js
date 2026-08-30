@@ -63,12 +63,16 @@ export const ACTIVITY_TYPE_COLOR = {
  * 资产类型 → 槽位（固定映射）。
  * ⚠️ 堆叠时必须按这里的顺序码放，相邻配对才与校验结果一致。
  */
-export const ASSET_ORDER = ['SCORE', 'COUPON', 'BALANCE', 'PHYSICAL'];
+export const ASSET_ORDER = ['SCORE', 'COUPON', 'BALANCE', 'PHYSICAL', 'MARKER'];
 export const ASSET_COLOR = {
   SCORE: SERIES[0],
   COUPON: SERIES[1],
   BALANCE: SERIES[2],
   PHYSICAL: SERIES[3],
+  // 标记（谢谢参与）排在最后且给中性色：它是所有奖项里被抽中最频繁的一档，
+  // 占一个高饱和槽位会在图上盖过真正要看的资产口径。
+  // 它也没有金额可堆叠 —— prize_value 恒为 0，只在「条数」口径下有意义。
+  MARKER: STATUS.neutral,
   // 这两类目前没有派发策略，正常不会出现在图上；真出现了给个中性色，别顶掉正经槽位
   LOTTERY: STATUS.neutral,
   CUSTOM: STATUS.neutral,

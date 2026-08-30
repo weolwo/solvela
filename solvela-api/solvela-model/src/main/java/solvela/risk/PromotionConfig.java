@@ -31,12 +31,27 @@ public class PromotionConfig {
     private Long id;
 
     /**
+     * 所属优惠配置分组ID，关联 {@code t_promotion_group}。
+     *
+     * <p><b>可空</b>：分组是 2026-08-30 加的配置入口，此前建的独立配置继续按原样工作，
+     * 不做存量迁移。为空即「不属于任何分组」。
+     *
+     * <p>唯一索引 {@code uk_group_prize_type (group_id, prize_type)} 保证组内一种资产类型
+     * 只有一条配置 —— 这是工作台「按奖励类型定位到具体配置」能成立的前提。
+     * MySQL 的唯一索引不约束 NULL，所以存量的未分组配置不受影响。
+     *
+     * <p>⚠️ 发奖链路<b>不认识</b>这一列：{@code t_prize_config} 关联的仍是具体的
+     * {@code promotion_config_id}，分组只在管理端用。
+     */
+    private Long groupId;
+
+    /**
      * 优惠配置名称
      */
     private String promoName;
 
     /**
-     * 资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)
+     * 资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物), MARKER(标记)
      */
     private String prizeType;
 
@@ -89,6 +104,21 @@ public class PromotionConfig {
      * 限制周期：LIFETIME(终身), DAILY(每日), WEEKLY(每周), MONTHLY(每月), CUSTOM
      */
     private String limitPeriod;
+
+    /**
+     * 限制周期为 CUSTOM 时的窗口开始时间；其余周期留空。
+     *
+     * <p>刻意<b>不与活动周期联动</b>：优惠配置是可跨活动复用的预算池，
+     * 表上没有、也不该有活动关联列。要「和活动周期一样」就把活动的起止时间抄进来。
+     */
+    private LocalDateTime limitStartTime;
+
+    /**
+     * 限制周期为 CUSTOM 时的窗口结束时间；其余周期留空。
+     *
+     * <p>它决定 {@code FrequencyRiskFilter} 里那个计数键的 TTL —— 窗口一过计数自然清零。
+     */
+    private LocalDateTime limitEndTime;
 
     /**
      * 同周期内，单会员ID最多领取次数 (-1为不限)

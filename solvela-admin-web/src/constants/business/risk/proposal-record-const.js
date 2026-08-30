@@ -55,19 +55,30 @@ export const PROPOSAL_SOURCE_TYPE_OPTIONS = Object.values(PROPOSAL_SOURCE_TYPE_E
 }));
 
 /**
- * 资产类型：对齐 t_proposal_record.asset_type，与后端 PrizeTypeEnum 同一字典
+ * 资产类型：对齐 t_proposal_record.asset_type，与后端 PrizeTypeEnum 同一字典。
+ *
+ * ⚠️ 这份字典被 [[prize-log-const]] 直接 re-export 成 PRIZE_TYPE_ENUM 用于奖励流水，
+ * 所以它得覆盖 t_prize_log 里会出现的<b>全部</b>取值，而不只是提案里会出现的那些。
+ * MARKER 就是这种情况：标记类奖品不生成提案，只落 t_prize_log。
  */
 export const ASSET_TYPE_ENUM = {
   SCORE: { value: 'SCORE', desc: '积分', color: 'blue' },
   BALANCE: { value: 'BALANCE', desc: '现金', color: 'green' },
   COUPON: { value: 'COUPON', desc: '优惠券', color: 'orange' },
   PHYSICAL: { value: 'PHYSICAL', desc: '实物', color: 'purple' },
+  MARKER: { value: 'MARKER', desc: '标记', color: 'default' },
 };
 
-export const ASSET_TYPE_OPTIONS = Object.values(ASSET_TYPE_ENUM).map((i) => ({
-  value: i.value,
-  label: i.desc,
-}));
+/**
+ * 提案筛选项：MARKER 排除在外 —— 标记类奖品永远不会生成提案，
+ * 放进筛选框只会得到一个必然为空的结果集。
+ */
+export const ASSET_TYPE_OPTIONS = Object.values(ASSET_TYPE_ENUM)
+  .filter((i) => i.value !== 'MARKER')
+  .map((i) => ({
+    value: i.value,
+    label: i.desc,
+  }));
 
 /**
  * 资产计量单位：金额只在同一 assetType 内可加，展示时必须带上单位，
@@ -78,6 +89,8 @@ export const ASSET_UNIT = {
   BALANCE: '元',
   COUPON: '张',
   PHYSICAL: '件',
+  // MARKER 没有计量单位：它压根不是资产，数量只有「中了几次」这一个口径
+  MARKER: '',
 };
 
 export function assetUnitOf(value) {

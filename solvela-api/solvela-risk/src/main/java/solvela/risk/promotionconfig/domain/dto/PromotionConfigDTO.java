@@ -22,6 +22,9 @@ public class PromotionConfigDTO {
     /** 配置ID */
     private Long id;
 
+    /** 所属优惠配置分组ID，可空（未分组的独立配置） */
+    private Long groupId;
+
     /** 优惠配置名称 */
     private String promoName;
 
@@ -57,6 +60,12 @@ public class PromotionConfigDTO {
 
     /** 限制周期：LIFETIME(终身), DAILY(每日), WEEKLY(每周), MONTHLY(每月), CUSTOM */
     private String limitPeriod;
+
+    /** 限制周期为 CUSTOM 时的窗口开始时间；其余周期留空 */
+    private LocalDateTime limitStartTime;
+
+    /** 限制周期为 CUSTOM 时的窗口结束时间；其余周期留空 */
+    private LocalDateTime limitEndTime;
 
     /** 同周期内，单会员ID最多领取次数 (-1为不限) */
     private Integer identifyLimit;

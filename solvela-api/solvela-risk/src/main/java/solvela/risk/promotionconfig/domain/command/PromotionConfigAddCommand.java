@@ -2,6 +2,7 @@ package solvela.risk.promotionconfig.domain.command;
 
 
 import solvela.enums.ReviewLevelEnum;
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 
 import lombok.Data;
@@ -59,6 +60,12 @@ public class PromotionConfigAddCommand {
 
     /** 限制周期：LIFETIME(终身), DAILY(每日), WEEKLY(每周), MONTHLY(每月), CUSTOM */
     private String limitPeriod;
+
+    /** 限制周期为 CUSTOM 时的窗口开始时间；其余周期留空。校验见 PromotionConfigService.validateLimitWindow */
+    private LocalDateTime limitStartTime;
+
+    /** 限制周期为 CUSTOM 时的窗口结束时间；其余周期留空 */
+    private LocalDateTime limitEndTime;
 
     /** 同周期内，单会员ID最多领取次数 (-1为不限) */
     private Integer identifyLimit;

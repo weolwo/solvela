@@ -36,12 +36,17 @@ public class PrizeConfig {
     private String activityCode;
 
     /**
-     * 优惠配置ID
+     * 优惠配置ID，关联 {@code t_promotion_config}，承载预算 / 库存 / 风控频次 / 审批阈值。
+     *
+     * <p><b>可空，且只对 {@code prizeType = MARKER} 可空</b>：标记类奖品不动账也不进提案，
+     * 这四样东西对它一个都不适用，{@code MarkerHandler} 从头到尾不会读这一列。
+     * 其余类型必填 —— 这条规则由 {@code PrizeConfigService.checkPromotionConfigMatch}
+     * 按类型判，不是靠 Form 上的 {@code @NotNull}（那里看不到 prizeType）。
      */
     private Long promotionConfigId;
 
     /**
-     * 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM
+     * 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM
      */
     private String prizeType;
 

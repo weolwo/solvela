@@ -130,6 +130,11 @@
             -->
             <a-button type="link" @click="resumeDisplay(record)">展示配置</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
+            <!--
+              复制：配下一期活动时，奖品、奖池概率、任务、彩票奖级这些几乎原样再来一遍，
+              重新配一次的成本远高于复制出来改几个数。
+            -->
+            <a-button @click="onCopy(record)" type="link">复制</a-button>
             <!-- 不提供删除：活动的生命周期用「启用/禁用」表达。
                  发奖流水按 activity_code 追溯（t_prize_log 上有 (member_name, activity_code) 索引），
                  删掉活动等于把资损追溯链路断在源头。
@@ -139,6 +144,30 @@
       </template>
     </a-table>
     <!---------- 表格 end ----------->
+
+    <!--
+      复制确认。新活动名让人当场改一次 —— 默认「原名 副本」，
+      而活动名几乎一定要改成新一期的名字，建完再去编辑等于多绕一圈。
+    -->
+    <a-modal v-model:open="copyModalVisible" title="复制活动" :confirmLoading="copying" @ok="confirmCopy">
+      <a-form :label-col="{ span: 5 }">
+        <a-form-item label="源活动">
+          <span class="text-slate-500">{{ copySource?.activityName }}（{{ copySource?.activityCode }}）</span>
+        </a-form-item>
+        <a-form-item label="新活动名称" required>
+          <a-input v-model:value="copyName" placeholder="新活动名称" :maxlength="64" />
+        </a-form-item>
+      </a-form>
+      <a-alert type="info" show-icon>
+        <template #message>
+          奖品配置与该玩法下的全部配置会一起复制，<b>新活动落「未开始」</b>。
+        </template>
+        <template #description>
+          中奖流水、任务记录、彩票期号这些运行态数据不会复制；库存与预算水位归零。
+          源活动的奖池若绑了规则脚本，新活动需要到「脚本管理」重新绑一次。
+        </template>
+      </a-alert>
+    </a-modal>
 
     <div class="solvela-query-table-page">
       <a-pagination
@@ -373,6 +402,43 @@
 
   function showForm(data) {
     formRef.value.show(data);
+  }
+
+  // ---------------------------- 复制 ----------------------------
+
+  const copyModalVisible = ref(false);
+  const copying = ref(false);
+  const copyName = ref('');
+  const copySource = ref(null);
+
+  function onCopy(record) {
+    copySource.value = record;
+    copyName.value = `${record.activityName || ''} 副本`;
+    copyModalVisible.value = true;
+  }
+
+  async function confirmCopy() {
+    if (!copyName.value?.trim()) {
+      message.warning('请填写新活动名称');
+      return;
+    }
+    copying.value = true;
+    try {
+      await activityConfigApi.copy({
+        activityCode: copySource.value.activityCode,
+        activityName: copyName.value.trim(),
+      });
+      message.success('已复制，新活动为「未开始」状态');
+      copyModalVisible.value = false;
+      // 停在列表而不是跳进新活动的向导：复制出来要改的东西散在奖品价值、
+      // 奖池概率、活动时间好几处，跳到向导第一步反而不是最该先看的地方。
+      // 列表刷新后新活动就在最上面，「配置完备度」也一并显示出来了。
+      await queryData();
+    } catch (err) {
+      solvelaSentry.captureError(err);
+    } finally {
+      copying.value = false;
+    }
   }
 
   // ---------------------------- 向导入口 ----------------------------

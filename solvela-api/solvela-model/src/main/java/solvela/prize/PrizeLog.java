@@ -63,7 +63,7 @@ public class PrizeLog {
     private String prizeName;
 
     /**
-     * 奖励类型：SCORE, BALANCE, COUPON, PHYSICAL
+     * 奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER
      */
     private String prizeType;
 

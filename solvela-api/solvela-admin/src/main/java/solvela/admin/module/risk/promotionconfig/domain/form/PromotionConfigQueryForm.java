@@ -24,7 +24,7 @@ public class PromotionConfigQueryForm extends PageParam {
     @Schema(description = "优惠配置名称")
     private String promoName;
 
-    @Schema(description = "资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)")
+    @Schema(description = "资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物), MARKER(标记)")
     private String prizeType;
 
     @Schema(description = "创建时间")

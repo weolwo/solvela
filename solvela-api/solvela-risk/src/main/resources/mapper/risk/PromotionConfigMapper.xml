@@ -4,6 +4,7 @@
 
     <resultMap id="PromotionConfigDTO" type="solvela.risk.promotionconfig.domain.dto.PromotionConfigDTO">
         <result column="id" property="id"/>
+        <result column="group_id" property="groupId"/>
         <result column="promo_name" property="promoName"/>
         <result column="prize_type" property="prizeType"/>
         <result column="total_quota" property="totalQuota"/>
@@ -16,6 +17,8 @@
         <result column="single_max_quota" property="singleMaxQuota"/>
         <result column="single_max_amount" property="singleMaxAmount"/>
         <result column="limit_period" property="limitPeriod"/>
+        <result column="limit_start_time" property="limitStartTime"/>
+        <result column="limit_end_time" property="limitEndTime"/>
         <result column="identify_limit" property="identifyLimit"/>
         <result column="phone_limit" property="phoneLimit"/>
         <result column="ip_limit" property="ipLimit"/>
@@ -31,6 +34,7 @@
 
     <sql id="base_columns">
         id,
+                group_id, 
                 promo_name, 
                 prize_type, 
                 total_quota, 
@@ -43,6 +47,8 @@
                 single_max_quota, 
                 single_max_amount, 
                 limit_period, 
+                limit_start_time, 
+                limit_end_time, 
                 identify_limit, 
                 phone_limit, 
                 ip_limit, 

@@ -44,8 +44,8 @@ public class PrizeLogAddForm {
     @NotBlank(message = "奖品名称 不能为空")
     private String prizeName;
 
-    @Schema(description = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL 不能为空")
+    @Schema(description = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER 不能为空")
     private String prizeType;
 
     @Schema(description = "奖励体值(积分数/券ID)", requiredMode = Schema.RequiredMode.REQUIRED)

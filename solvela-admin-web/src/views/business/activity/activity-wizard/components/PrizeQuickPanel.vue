@@ -52,10 +52,13 @@
         </div>
 
         <!--
-          优惠配置承载预算与风控，是 NOT NULL；且服务端会重算「它的资产类型必须与奖品一致」——
+          优惠配置承载预算与风控；服务端会重算「它的资产类型必须与奖品一致」——
           积分奖品挂了优惠券的配置，用户实际会收到一张券，所以这里只能按类型级联，不能自由选。
+
+          标记(MARKER)类整项隐藏：它不动账、不进提案，没有预算与审批可控，
+          服务端也是按类型判必填的（PrizeConfigService.checkPromotionConfigMatch）。
         -->
-        <a-form-item label="优惠配置（承载预算与风控）" name="promotionConfigId" class="mb-2">
+        <a-form-item v-if="!isMarker" label="优惠配置（承载预算与风控）" name="promotionConfigId" class="mb-2">
           <a-select
             v-model:value="draft.promotionConfigId"
             :options="filteredPromotionOptions"
@@ -67,6 +70,7 @@
             该资产类型下暂无可用的优惠配置，请先到「风控管理 › 优惠配置」创建一个，否则奖品发不出去。
           </div>
         </a-form-item>
+        <div v-else class="text-xs text-slate-500 mb-2">标记类奖品不动账、不进提案，无需优惠配置。</div>
 
         <a-form-item label="审批模式" name="approveMode" class="mb-2">
           <a-radio-group v-model:value="draft.approveMode" size="small">
@@ -119,7 +123,7 @@
   import { Empty, message } from 'ant-design-vue';
   import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
   import { promotionConfigApi } from '/src/api/business/risk/promotion-config-api';
-  import { PRIZE_TYPE_OPTIONS } from '/src/constants/business/prize/prize-config-const';
+  import { PRIZE_TYPE_ENUM, PRIZE_TYPE_OPTIONS } from '/src/constants/business/prize/prize-config-const';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
 
   const props = defineProps({
@@ -135,7 +139,7 @@
 
   const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE;
 
-  const PRIZE_TYPE_ICON = { SCORE: '⭐', BALANCE: '💰', COUPON: '🎟️', PHYSICAL: '📦', LOTTERY: '🎰', CUSTOM: '🎨' };
+  const PRIZE_TYPE_ICON = { SCORE: '⭐', BALANCE: '💰', COUPON: '🎟️', PHYSICAL: '📦', MARKER: '🙏', LOTTERY: '🎰', CUSTOM: '🎨' };
   const typeIcon = (t) => PRIZE_TYPE_ICON[t] || '🎁';
 
   const prizeList = ref([]);
@@ -156,13 +160,17 @@
     approveMode: 0,
   });
 
-  const rules = {
+  // 标记类不挂优惠配置，与奖品配置页、与服务端 checkPromotionConfigMatch 三处口径一致
+  const isMarker = computed(() => draft.prizeType === PRIZE_TYPE_ENUM.MARKER.value);
+
+  const rules = computed(() => ({
     prizeName: [{ required: true, message: '请输入奖品名称' }],
     prizeType: [{ required: true, message: '请选择资产类型' }],
     prizeValue: [{ required: true, message: '请输入奖励价值', type: 'number' }],
-    promotionConfigId: [{ required: true, message: '请选择优惠配置', type: 'number' }],
+    // 字段本身已 v-if 隐藏，规则要整条摘掉 —— 留个 required:false 会让校验去找一个不存在的表单项
+    ...(isMarker.value ? {} : { promotionConfigId: [{ required: true, message: '请选择优惠配置', type: 'number' }] }),
     approveMode: [{ required: true, message: '请选择审批模式', type: 'number' }],
-  };
+  }));
 
   // ---------------------------- 优惠配置：一次拉全量，本地按类型分组 ----------------------------
 
@@ -187,7 +195,8 @@
       .filter((p) => p.prizeType === draft.prizeType)
       .map((p) => ({
         value: p.id,
-        label: `${p.promoName}｜预算 ${p.usedAmount}/${p.totalAmount === '-1.0000' ? '不限' : p.totalAmount}`,
+        // 组名放最前，与奖品配置页同一口径：不带组名分不出同名配置属于哪个活动
+        label: `${p.groupName ? `[${p.groupName}] ` : ''}${p.promoName}｜预算 ${p.usedAmount}/${p.totalAmount === '-1.0000' ? '不限' : p.totalAmount}`,
       }))
   );
 

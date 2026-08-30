@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.risk.promotiongroup.dao.PromotionGroupDao">
+
+    <resultMap id="PromotionGroupDTO" type="solvela.risk.promotiongroup.domain.dto.PromotionGroupDTO">
+        <result column="id" property="id"/>
+        <result column="group_code" property="groupCode"/>
+        <result column="group_name" property="groupName"/>
+        <result column="remark" property="remark"/>
+        <result column="status" property="status"/>
+        <result column="type_count" property="typeCount"/>
+        <result column="enabled_type_count" property="enabledTypeCount"/>
+        <result column="create_by" property="createBy"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_by" property="updateBy"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!--
+      列表要回答的核心问题是「这个组配齐了没有 / 有没有类型被关掉」，
+      光有组名回答不了。所以这里带一个子表聚合：
+        type_count         组内配置总数（含停用）
+        enabled_type_count 其中启用中的数量
+
+      用相关子查询而不是 LEFT JOIN + GROUP BY：分组数量很小（一个活动一个组），
+      而 JOIN 完再 GROUP BY 会让分页的 COUNT 语句也跟着变复杂，
+      MyBatis-Plus 的分页插件自动生成的 COUNT 在有 GROUP BY 时会退化成子查询包一层，
+      得不偿失。
+    -->
+    <select id="queryPage" resultMap="PromotionGroupDTO">
+        SELECT g.id,
+               g.group_code,
+               g.group_name,
+               g.remark,
+               g.status,
+               g.create_by,
+               g.create_time,
+               g.update_by,
+               g.update_time,
+               (SELECT COUNT(*) FROM t_promotion_config c WHERE c.group_id = g.id) AS type_count,
+               (SELECT COUNT(*) FROM t_promotion_config c WHERE c.group_id = g.id AND c.status = 1) AS enabled_type_count
+        FROM t_promotion_group g
+        <where>
+            <if test="queryForm.groupName != null and queryForm.groupName != ''">
+                AND g.group_name LIKE CONCAT('%', #{queryForm.groupName}, '%')
+            </if>
+            <if test="queryForm.groupCode != null and queryForm.groupCode != ''">
+                AND g.group_code = #{queryForm.groupCode}
+            </if>
+            <if test="queryForm.status != null">
+                AND g.status = #{queryForm.status}
+            </if>
+        </where>
+        ORDER BY g.create_time DESC
+    </select>
+
+</mapper>

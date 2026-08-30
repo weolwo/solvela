@@ -82,6 +82,8 @@ public class SolvelaCodeUtil {
         public static final char MALL_COMMODITY = 'M';
         /** 商城 SKU */
         public static final char MALL_SKU = 'S';
+        /** 优惠配置分组 Group */
+        public static final char PROMOTION_GROUP = 'G';
     }
 
     /**

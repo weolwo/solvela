@@ -24,10 +24,13 @@ public class PromotionConfigVO {
     @Schema(description = "配置ID")
     private Long id;
 
+    @Schema(description = "所属优惠配置分组ID，可空")
+    private Long groupId;
+
     @Schema(description = "优惠配置名称")
     private String promoName;
 
-    @Schema(description = "资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物)")
+    @Schema(description = "资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物), MARKER(标记)")
     private String prizeType;
 
     @Schema(description = "总库存(个数)：-1为不限制(适用于券/实物)")
@@ -59,6 +62,12 @@ public class PromotionConfigVO {
 
     @Schema(description = "限制周期：LIFETIME(终身), DAILY(每日), WEEKLY(每周), MONTHLY(每月), CUSTOM")
     private String limitPeriod;
+
+    @Schema(description = "限制周期为 CUSTOM 时的窗口开始时间；其余周期留空")
+    private LocalDateTime limitStartTime;
+
+    @Schema(description = "限制周期为 CUSTOM 时的窗口结束时间；其余周期留空")
+    private LocalDateTime limitEndTime;
 
     @Schema(description = "同周期内，单会员ID最多领取次数 (-1为不限)")
     private Integer identifyLimit;

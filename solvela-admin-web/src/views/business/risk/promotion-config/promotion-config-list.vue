@@ -138,6 +138,7 @@
           <div class="solvela-table-operate">
             <a-button @click="showDetail(record)" type="link">详情</a-button>
             <a-button @click="showForm(record)" type="link">编辑</a-button>
+            <a-button @click="onCopy(record)" type="link">复制</a-button>
             <a-button @click="onDelete(record)" danger type="link">删除</a-button>
           </div>
         </template>
@@ -206,12 +207,21 @@
 
       <a-descriptions title="风控与防刷" bordered size="small" :column="2">
         <a-descriptions-item label="限制周期" :span="2">{{ limitPeriodOf(detail.limitPeriod).desc }}</a-descriptions-item>
+        <a-descriptions-item v-if="detail.limitStartTime || detail.limitEndTime" label="限制窗口" :span="2">
+          {{ detail.limitStartTime || '—' }} ~ {{ detail.limitEndTime || '—' }}
+        </a-descriptions-item>
         <a-descriptions-item label="单会员ID限制">{{ limitText(detail.identifyLimit) }}</a-descriptions-item>
         <a-descriptions-item label="单手机号限制">{{ limitText(detail.phoneLimit) }}</a-descriptions-item>
         <a-descriptions-item label="单IP限制">{{ limitText(detail.ipLimit) }}</a-descriptions-item>
         <a-descriptions-item label="单设备号限制">{{ limitText(detail.deviceLimit) }}</a-descriptions-item>
         <a-descriptions-item label="单端指纹限制">{{ limitText(detail.fingerprintLimit) }}</a-descriptions-item>
-        <a-descriptions-item label="互斥规则">{{ detail.mutexRule || '无' }}</a-descriptions-item>
+        <!-- 显示配置名而不是裸 ID：「[12, 15]」对看的人没有任何信息量 -->
+        <a-descriptions-item label="互斥规则">
+          <template v-if="mutexNames(detail.mutexRule).length">
+            <a-tag v-for="name in mutexNames(detail.mutexRule)" :key="name" class="mb-1">{{ name }}</a-tag>
+          </template>
+          <span v-else class="text-slate-400">无</span>
+        </a-descriptions-item>
       </a-descriptions>
     </a-drawer>
   </a-card>
@@ -463,7 +473,11 @@
     queryForm.createTimeEnd = dateStrings[1];
   }
 
-  onMounted(queryData);
+  onMounted(() => {
+    queryData();
+    // 互斥规则详情要把配置 ID 翻成配置名，选项一次拉全量本地映射
+    loadPromotionNames();
+  });
 
   // ---------------------------- 详情 ----------------------------
 
@@ -475,11 +489,63 @@
     detailVisible.value = true;
   }
 
+  // 互斥规则存的是配置 ID 数组，详情里要显示成人看得懂的配置名
+  const promotionNameMap = ref({});
+
+  async function loadPromotionNames() {
+    try {
+      const res = await promotionConfigApi.optionList();
+      promotionNameMap.value = Object.fromEntries((res || []).map((i) => [i.id, i.promoName]));
+    } catch (err) {
+      solvelaSentry.captureError(err);
+    }
+  }
+
+  /**
+   * 解析失败一律按空处理：这一列历史上是自由输入的 textarea，库里可能留着任何东西，
+   * 为一条不生效的字段把详情抽屉整个白屏不值得。查不到名字的 ID 原样显示，
+   * 说明那条配置已经被删了 —— 那本身就是要让人看见的信息。
+   */
+  function mutexNames(raw) {
+    if (!raw) {
+      return [];
+    }
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.map((id) => promotionNameMap.value[id] || `已删除的配置(${id})`);
+    } catch (e) {
+      return [];
+    }
+  }
+
   // ---------------------------- 添加/修改 ----------------------------
   const formRef = ref();
 
   function showForm(data) {
     formRef.value.show(data);
+  }
+
+  /**
+   * 复制一条配置。
+   *
+   * <p>一个活动里每种奖励类型都要一条优惠配置，而这几条之间通常只有资产类型和预算不同，
+   * 风控那一大堆参数是一模一样的 —— 复制省掉的就是那部分重复劳动。
+   *
+   * <p>三个字段必须清掉：
+   * id（留着就变成编辑原记录，会把原配置直接覆盖）、
+   * usedQuota / usedAmount（运行态计数器，复制过来等于开局就把新池子的预算闸门拨到半途）。
+   */
+  function onCopy(record) {
+    formRef.value.show({
+      ...record,
+      id: undefined,
+      usedQuota: 0,
+      usedAmount: 0,
+      promoName: `${record.promoName || ''} 副本`,
+    });
   }
 
   // ---------------------------- 单个删除 ----------------------------

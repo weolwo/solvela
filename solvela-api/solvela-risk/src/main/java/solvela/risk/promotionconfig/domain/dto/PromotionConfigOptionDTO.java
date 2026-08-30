@@ -17,6 +17,8 @@ import java.math.BigDecimal;
  * @param totalQuota  总数量，-1 为不限
  * @param usedQuota   已用数量
  * @param reviewLevel 审核层级：0-无需审核, 1-单层, 2-双层
+ * @param groupId     所属分组ID，可为空（未分组的独立配置）
+ * @param groupName   所属分组名称，可为空。奖品配置表单靠这两个字段做「先选组、再按类型自动定位」
  * @Author alaric
  * @Date 2026-07-26
  */
@@ -27,5 +29,7 @@ public record PromotionConfigOptionDTO(Long id,
                                       BigDecimal usedAmount,
                                       Integer totalQuota,
                                       Integer usedQuota,
-                                      ReviewLevelEnum reviewLevel) {
+                                      ReviewLevelEnum reviewLevel,
+                                      Long groupId,
+                                      String groupName) {
 }

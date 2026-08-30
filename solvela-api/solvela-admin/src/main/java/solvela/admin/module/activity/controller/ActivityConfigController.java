@@ -8,6 +8,7 @@ import solvela.admin.module.activity.domain.form.ActivityConfigUpdateForm;
 import solvela.activity.domain.command.ActivityConfigUpdateCommand;
 import solvela.admin.module.activity.domain.form.ActivityStatusUpdateForm;
 import solvela.admin.module.activity.domain.form.ActivityTypeUpgradeForm;
+import solvela.admin.module.activity.domain.form.ActivityConfigCopyForm;
 import solvela.admin.module.activity.domain.form.ActivityWizardCreateForm;
 import solvela.activity.domain.command.ActivityWizardCreateCommand;
 import solvela.admin.module.activity.domain.vo.ActivityConfigVO;
@@ -94,6 +95,13 @@ public class ActivityConfigController {
     @RequiresPermission("activityConfig:add")
     public void add(@RequestBody @Valid ActivityConfigAddForm addForm) {
         activityConfigService.add(SolvelaBeanUtil.copy(addForm, ActivityConfigAddCommand.class));
+    }
+
+    @Operation(summary = "复制活动：奖品配置与该玩法下的全部配置一起复制，新活动落「未开始」")
+    @PostMapping("/copy")
+    @RequiresPermission("activityConfig:add")
+    public String copy(@RequestBody @Valid ActivityConfigCopyForm form) {
+        return activityConfigService.copy(form.getActivityCode(), form.getActivityName());
     }
 
     @Operation(summary = "创建向导第一步：建活动 + 随手建的若干奖品，一次事务落库")

@@ -67,6 +67,8 @@ export const PRIZE_VALUE_UNIT = {
   BALANCE: '元',
   COUPON: '元',
   PHYSICAL: '元',
+  // 标记类奖品（谢谢参与）不动账，prize_value 恒为 0 且没有语义，不要给它安单位
+  MARKER: '',
 };
 
 export function prizeValueUnitOf(value) {

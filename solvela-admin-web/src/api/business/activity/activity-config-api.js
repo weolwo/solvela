@@ -69,6 +69,15 @@ export const activityConfigApi = {
    * 不要拆成「先 add 活动再循环 add 奖品」—— 奖品的 activityCode 必填，
    * 活动必须先存在；串行发起时中途失败会留下「活动建好了、奖品只建了一半」的残局。
    */
+  /**
+   * 复制活动：奖品配置与该玩法下的全部配置（奖池/任务/彩票）一起复制。
+   * 新活动落「未开始」，玩法主体落不可运行状态，运行态数据一条不带。
+   * 返回新活动编码。
+   */
+  copy: (param) => {
+    return postRequest('/activityConfig/copy', param);
+  },
+
   wizardCreate: (param) => {
     return postRequest('/activityConfig/wizard/create', param);
   },

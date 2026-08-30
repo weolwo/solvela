@@ -44,7 +44,7 @@ public class PrizeLogAddCommand {
     /** 奖品名称 */
     private String prizeName;
 
-    /** 奖励类型：SCORE, BALANCE, COUPON, PHYSICAL */
+    /** 奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER */
     private String prizeType;
 
     /** 奖励体值(积分数/券ID) */

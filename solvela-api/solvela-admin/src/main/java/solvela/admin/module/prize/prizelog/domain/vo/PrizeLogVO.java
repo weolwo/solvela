@@ -45,7 +45,7 @@ public class PrizeLogVO {
     @Schema(description = "奖品名称")
     private String prizeName;
 
-    @Schema(description = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL")
+    @Schema(description = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER")
     private String prizeType;
 
     @Schema(description = "奖励体值(积分数/券ID)")

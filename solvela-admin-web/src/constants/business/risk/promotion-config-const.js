@@ -34,6 +34,13 @@ export const PRIZE_TYPE_ENUM = {
   BALANCE: { value: 'BALANCE', desc: '现金', color: 'green' },
   COUPON: { value: 'COUPON', desc: '优惠券', color: 'orange' },
   PHYSICAL: { value: 'PHYSICAL', desc: '实物', color: 'purple' },
+
+  // ⚠️ 这里【没有】MARKER，是刻意的：标记类奖品不动账、不进提案，
+  // 预算 / 库存 / 风控频次 / 审批阈值这四样它一个都用不上，挂优惠配置纯属多余。
+  // t_prize_config.promotion_config_id 已改为可空，服务端
+  // PrizeConfigService.checkPromotionConfigMatch 对 MARKER 直接放行。
+  // 别为了「字典要对齐 PrizeTypeEnum」把它加回来 —— 加回来只会让运营建出
+  // 一堆永远不会被消耗的空池子。
 };
 
 export const PRIZE_TYPE_OPTIONS = Object.values(PRIZE_TYPE_ENUM).map((i) => ({

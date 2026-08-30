@@ -30,7 +30,7 @@ public class PrizeConfigVO {
     @Schema(description = "优惠配置ID")
     private Long promotionConfigId;
 
-    @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM")
+    @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM")
     private String prizeType;
 
     @Schema(description = "奖品名称")

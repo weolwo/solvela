@@ -83,9 +83,13 @@ public class ActivityWizardCreateForm {
         @NotBlank(message = "资产类型 不能为空")
         private String prizeType;
 
-        @Schema(description = "优惠配置ID，承载预算与风控；服务端会校验其资产类型与奖品一致",
-                requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "优惠配置 不能为空")
+        /**
+         * 优惠配置ID，承载预算与风控；服务端会校验其资产类型与奖品一致。
+         *
+         * <p>与 {@code PrizeConfigAddForm} 同理，必填与否取决于 prizeType，
+         * 所以这里不挂 {@code @NotNull}，交给 checkPromotionConfigMatch 按类型判。
+         */
+        @Schema(description = "优惠配置ID，承载预算与风控；标记(MARKER)类奖品不需要，留空即可")
         private Long promotionConfigId;
 
         @Schema(description = "奖励价值", requiredMode = Schema.RequiredMode.REQUIRED)

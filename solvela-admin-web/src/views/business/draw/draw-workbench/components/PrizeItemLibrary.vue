@@ -229,6 +229,7 @@
     BALANCE: { label: '现金', color: 'green' },
     COUPON: { label: '优惠券', color: 'blue' },
     PHYSICAL: { label: '实物', color: 'purple' },
+    MARKER: { label: '标记', color: 'default' },
   };
   const prizeTypeLabel = (type) => PRIZE_TYPE_MAP[type]?.label || type;
 

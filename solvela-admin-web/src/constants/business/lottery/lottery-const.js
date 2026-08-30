@@ -153,6 +153,7 @@ export const PRIZE_TYPE_ICON = {
   BALANCE: '💰',
   COUPON: '🎟️',
   SCORE: '⭐',
+  MARKER: '🙏',
   LOTTERY: '🎫',
   CUSTOM: '🎁',
 };

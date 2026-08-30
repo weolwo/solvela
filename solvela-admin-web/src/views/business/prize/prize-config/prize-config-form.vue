@@ -31,8 +31,12 @@
           @change="onPrizeTypeChange"
         />
       </a-form-item>
-      <!-- 优惠配置：预算与风控的载体。全量拉回后按 prizeType 本地过滤，避免切一次类型打一次接口 -->
-      <a-form-item label="优惠配置" name="promotionConfigId">
+      <!--
+        优惠配置：预算与风控的载体。全量拉回后按 prizeType 本地过滤，避免切一次类型打一次接口。
+        标记类整项隐藏而不是置灰：置灰仍然占着版面，会让人以为「以后要填」——
+        而它是永远不需要填的，MarkerHandler 根本不读这一列。
+      -->
+      <a-form-item v-if="!isMarker" label="优惠配置" name="promotionConfigId">
         <a-select
           style="width: 100%"
           v-model:value="form.promotionConfigId"
@@ -46,6 +50,12 @@
         <div v-if="form.prizeType && promotionOptions.length === 0 && !promotionLoading" class="mt-1 text-xs text-orange-500">
           该资产类型下还没有启用中的优惠配置，请先到「优惠配置」页创建，否则发奖时会被判「资产配置异常」
         </div>
+      </a-form-item>
+      <a-form-item v-else label="优惠配置">
+        <span class="text-slate-500">不需要</span>
+        <a-tooltip title="标记类奖品不动账、不进提案，没有预算与审批可控，因此不挂优惠配置">
+          <QuestionCircleOutlined class="ml-1 text-slate-400" />
+        </a-tooltip>
       </a-form-item>
       <a-form-item label="奖品名称" name="prizeName">
         <a-input style="width: 100%" v-model:value="form.prizeName" placeholder="奖品名称" />
@@ -190,7 +200,7 @@
   import { computed, reactive, ref, nextTick } from 'vue';
   import _ from 'lodash';
   import { message } from 'ant-design-vue';
-  import { DeleteOutlined, PictureOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons-vue';
+  import { DeleteOutlined, PictureOutlined, PlusOutlined, QuestionCircleOutlined, ThunderboltOutlined } from '@ant-design/icons-vue';
   import { SolvelaLoading } from '/@/components/framework/solvela-loading';
   import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
   import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
@@ -198,7 +208,7 @@
   import { solvelaSentry } from '/@/lib/solvela-sentry';
   import { regular } from '/@/constants/regular-const';
   import ImageField from '/@/components/support/image-field/index.vue';
-  import { PRIZE_STATUS_ENUM, PRIZE_TYPE_OPTIONS } from '/src/constants/business/prize/prize-config-const';
+  import { PRIZE_STATUS_ENUM, PRIZE_TYPE_ENUM, PRIZE_TYPE_OPTIONS } from '/src/constants/business/prize/prize-config-const';
 
   // 审批模式：对齐 t_prize_config.approve_mode，与列表页的开关同一套取值
   const APPROVE_MODE_AUTO = 0;
@@ -250,7 +260,7 @@
     id: undefined, //配置ID
     activityCode: undefined, //活动编码
     promotionConfigId: undefined, //优惠配置ID
-    prizeType: undefined, //资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM
+    prizeType: undefined, //资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM
     prizeName: undefined, //奖品名称
     prizeCode: undefined, //奖品编码
     prizeLevel: undefined, //奖品级别
@@ -263,17 +273,26 @@
 
   let form = reactive({ ...formDefault });
 
-  const rules = {
+  /**
+   * 标记（MARKER）是唯一不挂优惠配置的资产类型：它不动账、不进提案，
+   * 预算/风控/审批阈值这四样东西对它全都不适用。服务端
+   * PrizeConfigService.checkPromotionConfigMatch 也是按类型判必填的，两边口径一致。
+   */
+  const isMarker = computed(() => form.prizeType === PRIZE_TYPE_ENUM.MARKER.value);
+
+  const rules = computed(() => ({
     activityCode: [{ required: true, message: '归属活动 必选' }],
     prizeType: [{ required: true, message: '资产类型 必选' }],
-    // 不选优惠配置的话，发奖时 addProposal 第一步就会判「资产配置异常」，必须卡死
-    promotionConfigId: [{ required: true, message: '优惠配置 必选' }],
+    // 非标记类不选优惠配置的话，发奖时 addProposal 第一步就会判「资产配置异常」，必须卡死。
+    // 标记类要把规则整条摘掉而不是留个 required:false —— 字段本身已经 v-if 隐藏，
+    // 留着规则会让校验去找一个不存在的表单项
+    ...(isMarker.value ? {} : { promotionConfigId: [{ required: true, message: '优惠配置 必选' }] }),
     prizeCode: [
       { required: true, message: '奖品编码 必填' },
       { pattern: regular.bizCode, message: regular.bizCodeDesc },
     ],
     approveMode: [{ required: true, message: '审批模式 必填' }],
-  };
+  }));
 
   // ------------------------ 优惠配置级联下拉 ------------------------
 
@@ -289,12 +308,16 @@
       .filter((item) => item.prizeType === form.prizeType)
       .map((item) => ({
         value: item.id,
-        // 标题里直接带预算水位与审批档位，运营选的时候就能看出这个池子还发不发得出来
-        label: `${item.promoName}｜预算 ${budgetText(item)}｜数量 ${quotaText(item)}｜${reviewText(item.reviewLevel)}`,
+        // 标题里直接带预算水位与审批档位，运营选的时候就能看出这个池子还发不发得出来。
+        // 分组名放最前：一个活动的几条配置现在都归在同一个组里，
+        // 不带组名的话「积分池」「积分池2」这种同名配置根本分不出是哪个活动的
+        label: `${groupPrefix(item)}${item.promoName}｜预算 ${budgetText(item)}｜数量 ${quotaText(item)}｜${reviewText(item.reviewLevel)}`,
       }));
   });
 
   const UNLIMITED = -1;
+  // 未分组的独立配置不加前缀 —— 空的方括号比没有更碍眼
+  const groupPrefix = (item) => (item.groupName ? `[${item.groupName}] ` : '');
   const budgetText = (item) => (Number(item.totalAmount) === UNLIMITED ? '不限' : `${Number(item.usedAmount)}/${Number(item.totalAmount)}`);
   const quotaText = (item) => (item.totalQuota === UNLIMITED ? '不限' : `${item.usedQuota}/${item.totalQuota}`);
   const reviewText = (level) => (level === 0 ? '免审' : level === 1 ? '单层审批' : '双层审批');
@@ -313,6 +336,12 @@
 
   // 换了资产类型，原来选中的优惠配置多半已经不属于新类型了，直接清掉避免带着脏值提交
   function onPrizeTypeChange() {
+    // 改成标记类：这一列对它没有语义，留着上一个类型的 ID 会被服务端在落库前抹掉，
+    // 但表单里还显示着旧值会让人以为它生效了，所以这里先清干净
+    if (isMarker.value) {
+      form.promotionConfigId = undefined;
+      return;
+    }
     const stillValid = promotionAllList.value.some((item) => item.id === form.promotionConfigId && item.prizeType === form.prizeType);
     if (!stillValid) {
       form.promotionConfigId = undefined;

@@ -29,10 +29,10 @@ public class PrizeConfigAddCommand {
     /** 归属活动编码 */
     private String activityCode;
 
-    /** 优惠配置ID，关联 t_promotion_config，承载预算与风控 */
+    /** 优惠配置ID，关联 t_promotion_config，承载预算与风控；标记(MARKER)类奖品可空 */
     private Long promotionConfigId;
 
-    /** 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM */
+    /** 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM */
     private String prizeType;
 
     /** 奖品名称 */

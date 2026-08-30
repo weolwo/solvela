@@ -37,6 +37,17 @@ public enum RiskBlockCode implements BaseEnum {
     SINGLE_MAX_AMOUNT_LIMIT("SINGLE_MAX_AMOUNT_LIMIT", "单次金额超限（系统兜底）"),
 
     /**
+     * 🔴 单次发奖数量超过 {@code t_promotion_config.single_max_quota} 兜底上限。
+     * 与金额那档同性质：出现即说明配置或上游数量计算有问题。
+     *
+     * <p>⚠️ 这一列的 DDL 默认值是 <b>1</b>（不是 0），语义上等于「每个存量配置都限死单次 1 份」。
+     * 眼下四个 PrizeHandler 都硬编码发 1 份，所以这道闸门补进链路不会拦住任何现有流量；
+     * 但将来一旦支持「一次发 N 份」，存量配置会集体开始拦 —— 那时要么改配置，
+     * 要么把默认值语义改成与金额一致的「0 表示不限」。
+     */
+    SINGLE_MAX_QUOTA_LIMIT("SINGLE_MAX_QUOTA_LIMIT", "单次数量超限（系统兜底）"),
+
+    /**
      * 会员参与频次超过 {@code identify_limit}。属正常防刷，量再大也不用管 ——
      * 拦掉的本来就是薅羊毛的请求。
      */
@@ -60,7 +71,7 @@ public enum RiskBlockCode implements BaseEnum {
      * 而这两类哪怕只有几条都该有人看。判据收在这一处，别在前端散写（铁律 3）。
      */
     public boolean needsAttention() {
-        return this == SINGLE_MAX_AMOUNT_LIMIT || this == GLOBAL_BUDGET_LIMIT;
+        return this == SINGLE_MAX_AMOUNT_LIMIT || this == SINGLE_MAX_QUOTA_LIMIT || this == GLOBAL_BUDGET_LIMIT;
     }
 
     public static RiskBlockCode resolve(String value) {

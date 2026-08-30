@@ -21,6 +21,8 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.enums.ActivityTypeEnum;
 import solvela.exception.BusinessException;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import solvela.prize.prizeconfig.domain.command.PrizeConfigAddCommand;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
  * @Date 2026-04-18 19:31:49
  * @Copyright weolwo
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class ActivityConfigService {
@@ -302,6 +305,70 @@ public class ActivityConfigService {
                 throw new BusinessException("奖品「" + prize.getPrizeName() + "」创建失败：" + e.getMessage(), e);
             }
         }
+    }
+
+    /**
+     * 复制一个活动：连同奖品配置与该玩法下的全部配置一起复制成新的一份。
+     *
+     * <h3>复制什么、不复制什么</h3>
+     * <pre>
+     * 复制： t_activity_config + t_prize_config + 玩法配置（奖池 / 任务 / 彩票，走 SPI）
+     * 不复制：t_prize_log、t_draw_prize_log、t_task_record、彩票期号与已售号码
+     *         —— 那些是运行态数据，跟着复制就是伪造历史
+     * </pre>
+     *
+     * <h3>🔴 新活动一律落「未开始」</h3>
+     * 不管源活动是不是上线中。复制一个正在跑的活动时，新活动如果跟着变成上线，
+     * 那一刻它的奖池概率还是抄来的、预算也还没调，却已经对外可见了。
+     * 同理各玩法主体也由 SPI 实现落成不可运行状态 —— 尤其是彩票：
+     * {@code TicketIssueService} 只校验彩票玩法自己的状态，<b>根本不看活动状态</b>，
+     * 玩法留在上线就是真的能领号。
+     *
+     * <h3>奖品编码的重映射</h3>
+     * 奖品先复制并拿到「旧编码 -&gt; 新编码」的映射，再把映射交给玩法侧 ——
+     * 奖池物资、任务奖励、彩票奖级三处都按 {@code prize_code} 引用奖品，
+     * 不重映射的话新活动的奖池会指向老活动的奖品，而这是能跑通的，
+     * 只是抽中之后发出去的是另一个活动的奖。
+     *
+     * <p>⚠️ <b>规则脚本绑定（t_script_ref）不在复制范围内</b>：那张表归 solvela-scriptengine，
+     * 而本模块与 solvela-marketing 都不依赖它。源活动的奖池若绑了规则脚本，
+     * 新活动要到「脚本管理」里重新绑一次。
+     *
+     * @param activityName 新活动名称，留空则在原名后加「副本」
+     * @return 新活动编码
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String copy(String sourceActivityCode, String activityName) {
+        ActivityConfig source = getByActivityCode(sourceActivityCode);
+        if (source == null) {
+            throw new BusinessException("活动不存在：" + sourceActivityCode);
+        }
+
+        ActivityConfig target = new ActivityConfig();
+        target.setActivityCode(SolvelaCodeUtil.generateUniqueBizCode(
+                SolvelaCodeUtil.BizCodePrefix.ACTIVITY, code -> getByActivityCode(code) != null));
+        target.setActivityName(StringUtils.isBlank(activityName)
+                ? source.getActivityName() + " 副本" : activityName);
+        // 类型必须照抄：它决定了下面走哪个玩法 Provider，也是活动创建后就不可改的
+        target.setActivityType(source.getActivityType());
+        target.setStartTime(source.getStartTime());
+        target.setEndTime(source.getEndTime());
+        target.setStatus(ActivityStatusEnum.NOT_START);
+        activityConfigDao.insert(target);
+
+        // 奖品先复制，玩法侧要靠这份映射重指向
+        Map<String, String> prizeCodeMap =
+                prizeConfigService.copyForActivity(sourceActivityCode, target.getActivityCode());
+
+        // BASIC 没有 Provider（它本来就是「仅外壳，不挂玩法」），找不到实现直接跳过
+        ActivityRefProvider provider = findProvider(source.getActivityType());
+        if (provider != null) {
+            provider.copyTo(sourceActivityCode, target.getActivityCode(), prizeCodeMap);
+        }
+
+        log.info("【活动复制】{} -> {}（{}），复制奖品 {} 个",
+                sourceActivityCode, target.getActivityCode(), target.getActivityName(), prizeCodeMap.size());
+        return target.getActivityCode();
     }
 
     /**

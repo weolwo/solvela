@@ -11,15 +11,21 @@
  * 奖品配置表单靠它做「奖品类型 -> 优惠配置」的级联过滤，两边取值必须完全一致
  */
 export const PRIZE_TYPE_ENUM = {
-  // dispatchable：派发链路两层策略都齐了（consumer 的 @PrizeStrategy + ledger 的 @AssetStrategy），
-  // 这样的奖品建出来才发得出去
+  // dispatchable：这个类型「发得出去」——链路上该有的策略都注册齐了。
+  // 对动账的类型是两层（consumer 的 @PrizeStrategy + ledger 的 @AssetStrategy），
+  // 对不动账的 MARKER 只有一层就够（见下），所以判据是「链路完整」而不是「凑够两个注解」
   SCORE: { value: 'SCORE', desc: '积分', dispatchable: true },
   BALANCE: { value: 'BALANCE', desc: '现金', dispatchable: true },
   COUPON: { value: 'COUPON', desc: '优惠券', dispatchable: true },
   PHYSICAL: { value: 'PHYSICAL', desc: '实物', dispatchable: true },
 
+  // 标记只有 @PrizeStrategy 一层，且这是【刻意的】：它不产生任何资产变动，
+  // 所以 MarkerHandler 不生成提案，链路到 consumer 就结束了，根本走不到 ledger。
+  // 缺 @AssetStrategy 在这里不是「没实现」，别照着别的类型给它补一个空壳。
+  MARKER: { value: 'MARKER', desc: '标记', dispatchable: true },
+
   // ⚠️ 以下两类目前【两层策略都没有】—— 全工程 @PrizeStrategy 与 @AssetStrategy
-  // 各只注册了 SCORE/BALANCE/COUPON/PHYSICAL 四个。
+  // 各只注册了 SCORE/BALANCE/COUPON/PHYSICAL/MARKER。
   // 建出这两类奖品，中奖后派发必定失败并写下 fail_reason「不支持的奖品类型」，
   // 而那是 AFTER_COMMIT 里的静默失败：抽奖照样返回 200 中奖，只有下游表才看得出没发出去。
   // 枚举保留（后端 PrizeTypeEnum 里有，且将来会实现），但不进可选项，见 PRIZE_TYPE_OPTIONS。

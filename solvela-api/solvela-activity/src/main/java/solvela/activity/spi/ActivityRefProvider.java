@@ -62,4 +62,32 @@ public interface ActivityRefProvider {
      * SettleSemanticsTest 就是专门防它们漂移的）。
      */
     String checkConfigured(String activityCode);
+
+    /**
+     * 把该活动在本玩法下的配置<b>复制</b>到新活动。
+     *
+     * <h3>为什么复制也走这个 SPI</h3>
+     * 与 {@link #countRefs} 同一个理由：三张玩法表的 Dao 都在 solvela-marketing，
+     * 而活动模块是它的上游。硬写成「活动模块里 if 三种类型各查一张表」既造成循环依赖，
+     * 又让每加一种玩法都得回头改活动模块。
+     *
+     * <h3>实现必须遵守的三条</h3>
+     * <ol>
+     *   <li><b>所有唯一编码重新发</b>（pool_code / lottery_code 等）。抄过来直接撞唯一索引；</li>
+     *   <li><b>运行态计数器归零</b>：{@code used_stock}、{@code version}、{@code sold_count} 这类。
+     *       抄过来等于新活动开局库存就少一半，而这件事在页面上完全看不出来；</li>
+     *   <li><b>玩法主体一律落成「不可运行」状态</b>（彩票下线 / 任务待生效 / 奖池按需）。
+     *       复制出来的活动本身是「未开始」，玩法却是上线的话，会出现活动没开始但已经能领号的情况 ——
+     *       {@code TicketIssueService} 只校验彩票玩法的状态，<b>不看活动状态</b>。</li>
+     * </ol>
+     *
+     * <p>运行态数据（中奖流水、任务记录、期号与已售号码）一条都不能带。
+     *
+     * @param sourceActivityCode 源活动编码
+     * @param targetActivityCode 新活动编码，调用方已建好活动主记录
+     * @param prizeCodeMap       旧奖品编码 -&gt; 新奖品编码。奖品配置由活动模块先复制完再调本方法，
+     *                           玩法侧凡是引用 prize_code 的地方都要按它重映射，
+     *                           否则新活动的奖池会指向老活动的奖品
+     */
+    void copyTo(String sourceActivityCode, String targetActivityCode, java.util.Map<String, String> prizeCodeMap);
 }

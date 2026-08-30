@@ -27,11 +27,19 @@ public class PrizeConfigAddForm {
     @Pattern(regexp = SolvelaCodeUtil.BIZ_CODE_REGEX, message = "活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE)
     private String activityCode;
 
-    @Schema(description = "优惠配置ID，关联 t_promotion_config，承载预算与风控", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "优惠配置 不能为空")
+    /**
+     * 优惠配置ID，关联 t_promotion_config，承载预算与风控。
+     *
+     * <p>⚠️ <b>刻意没有 {@code @NotNull}</b>：必填与否取决于 {@code prizeType} ——
+     * MARKER（标记）不动账也不进提案，没有预算可控，本来就不该挂。
+     * bean validation 看不到字段之间的关系，所以这条必填规则放在
+     * {@code PrizeConfigService.checkPromotionConfigMatch} 里按类型判，
+     * 非标记类传 null 一样会被打回，只是错误信息更像人话。
+     */
+    @Schema(description = "优惠配置ID，关联 t_promotion_config，承载预算与风控；标记(MARKER)类奖品不需要，留空即可")
     private Long promotionConfigId;
 
-    @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "资产类型 不能为空")
     private String prizeType;
 
