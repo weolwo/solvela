@@ -101,7 +101,7 @@ public class ProposalRecordService {
      * DAO / 事务层的真实异常仍然照常回滚。
      */
     @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
-    public void addProposal(ProposalRecordAddCommand req) {
+    public Long addProposal(ProposalRecordAddCommand req) {
         log.info(">>>> [风控提案域] 收到提案申请，来源: {}, 单号: {}", req.getSourceType(), req.getSourceBizId());
 
         // 1. 获取底层资产（优惠）配置
@@ -143,7 +143,10 @@ public class ProposalRecordService {
             proposal = saveProposal(req, config, targetStatus, "提案生成成功", null);
         } catch (DuplicateKeyException e) {
             log.warn("【提案防重】该业务单号已存在提案记录，直接忽略: {}", req.getSourceBizId());
-            return; // 幂等返回成功
+            // 幂等返回成功。id 给 null 而不是回查一次：调用方拿它只为人工排查，
+            // 而「重复请求」这条路上真正要保证的是【不报错、不重复发】，这两点已经成立。
+            // 真要那个 id 时按 sourceBizId 查提案表即可，不值得在热路径上多一次查询
+            return null;
         }
 
         // ==========================================
@@ -157,6 +160,7 @@ public class ProposalRecordService {
             // 流程驻留在此，等待财务人员在后台调用 approve() 接口
         }
 
+        return proposal.getId();
     }
 
     /**

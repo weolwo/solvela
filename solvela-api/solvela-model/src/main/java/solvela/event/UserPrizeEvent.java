@@ -26,6 +26,14 @@ public class UserPrizeEvent extends BaseBizEvent implements Serializable {
     private String sourceBizId;   // 来源单号（LotteryRecord的ID）
     private String activityCode;  // 追踪用：活动/彩票编码
 
+    /**
+     * 玩法类型 BASIC/DRAW/TASK/LOTTERY。
+     *
+     * <p><b>发送方必须填</b>：派发方据它归类提案来源，而拆成独立服务后它<b>没法回头查活动表</b>
+     * —— 活动配置在营销服务，派发在会员服务。为空时派发方降级为 MANUAL，不中断发奖。
+     */
+    private String activityType;
+
     // ================== 3. 用户信息 ==================
     /**
      * 会员号 —— <b>关联键</b>。下游（发奖流水/提案/钱包/券/履约单）全部按它落库。

@@ -10,7 +10,9 @@ import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeLog;
 import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
-import solvela.risk.proposal.service.ProposalRecordService;
+import solvela.member.api.CreateProposalCmd;
+import solvela.member.api.MemberProposalApi;
+import solvela.member.api.ProposalResult;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -30,7 +32,7 @@ import java.math.BigDecimal;
 @Service
 public class ScoreHandler implements IPrizeHandler {
 
-    private final ProposalRecordService proposalRecordService;
+    private final MemberProposalApi memberProposalApi;
     private final PrizeConfigService prizeConfigService;
     private final ProposalSourceResolver proposalSourceResolver;
 
@@ -75,15 +77,19 @@ public class ScoreHandler implements IPrizeHandler {
         req.setAssetType(PrizeTypeEnum.SCORE.name());
         req.setAmount(amount);
         req.setQuantity(QUANTITY_PER_PRIZE);
-        req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityCode()));
+        req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityType()));
         req.setSourceBizId(prizeLog.getExternalBizNo());
         req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放积分");
 
         // 风控拦截 / 资产配置异常由 addProposal 抛 BusinessException，必须如实上报：
         // 吞掉失败会让 PrizeDispatchHandler 把一条根本没入账的记录标成「发货成功」
         try {
-            proposalRecordService.addProposal(req);
-            return DispatchOutcome.success();
+            ProposalResult result = memberProposalApi.createProposal(toCmd(req));
+            if (!result.accepted()) {
+                log.warn("【发奖提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), result.failReason());
+                return DispatchOutcome.failed(result.failReason());
+            }
+            return DispatchOutcome.success(result.proposalId());
         } catch (BusinessException e) {
             log.warn("【积分提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), e.getMessage());
             return DispatchOutcome.failed(e.getMessage());

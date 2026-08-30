@@ -1,0 +1,99 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-base-file</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-base-file</name>
+    <description>基础设施-文件：对象存储、文件模块、SonicExcel 读写、邮件、模板渲染。</description>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 文件模块有自己的表（t_file / t_file_category），要 Dao 基类与 MyBatis -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 🔻 optional：默认不进包，省 31 个 jar / 8.37MB。
+             理由是 dev / test / pre / prod 四套配置的 file.storage.mode 全是 local，
+             那两个 S3 Bean 挂着 @ConditionalOnProperty(havingValue="cloud")，从来没被实例化过。
+             要用云存储：在业务模块 pom 里显式引一次（版本走 dependencyManagement）；
+             忘了引而又配了 mode=cloud 时，FileCloudStorageMissingGuard 会在启动期把话说明白。
+
+             ✅ netty-nio-client 这条 exclusion 要留着：只用同步 S3Client，S3AsyncClient 一处没用。 -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <optional>true</optional>
+            <exclusions>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- SonicExcel 写引擎 -->
+        <dependency>
+            <groupId>org.dhatim</groupId>
+            <artifactId>fastexcel</artifactId>
+        </dependency>
+        <!-- SonicExcel 读引擎。它会带进 aalto-xml，而 aalto 的 META-INF/services 会抢占
+             JVM 全局 StAX 实现（影响 spring-core / spring-web / hibernate-validator /
+             mysql-connector-j / tika-core）—— 由 SonicStaxIsolation 拨回 JDK 实现，
+             SonicStaxIsolationTest 是它的哨兵。另外它还会带进 commons-compress。 -->
+        <dependency>
+            <groupId>org.dhatim</groupId>
+            <artifactId>fastexcel-reader</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.freemarker</groupId>
+            <artifactId>freemarker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

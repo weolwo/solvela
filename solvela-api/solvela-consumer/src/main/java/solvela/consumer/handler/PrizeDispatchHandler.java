@@ -198,6 +198,9 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         log.setMemberName(event.getMemberName());
         log.setExternalBizNo(event.getSourceBizId());
         log.setActivityCode(event.getActivityCode());
+        // 玩法类型由【发放方】填在事件里，这里原样落库。
+        // 不在这里查活动表反推 —— 派发与活动配置将来不在同一个进程里，见 ProposalSourceResolver 的注释
+        log.setActivityType(event.getActivityType());
         log.setPrizeValue(event.getPrizeValue()); // 通常价值以 Event(彩票引擎算出的)为准
         log.setPrizeLevel(event.getPrizeLevel());
 

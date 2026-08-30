@@ -40,6 +40,9 @@ public class ActivityConfigVO {
     @Schema(description = "活动结束时间")
     private LocalDateTime endTime;
 
+    @Schema(description = "数据截止时间：此刻起不再受理参与，但奖品仍可领到活动结束时间。为空表示与活动结束时间相同")
+    private LocalDateTime dataEndTime;
+
     @Schema(description = "创建人")
     private String createBy;
 

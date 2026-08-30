@@ -80,6 +80,38 @@ public enum ScriptScene {
                     ScriptParam.required("memberId", Long.class, "会员号（关联键）"),
                     ScriptParam.required("activityCode", String.class, "活动编码")
             )),
+
+    /**
+     * 活动玩法编排。<b>本枚举里第一个有副作用的场景</b>，读之前先读完下面两段。
+     *
+     * <p>C 端一次「参与」请求进来，活动域做完活动与会员校验后进到这里。脚本按次数、身份、
+     * 时段动态决定抽哪个奖池（或走哪条玩法分支），最后调用有副作用的函数完成参与，
+     * 把结果原样返回。挂在 {@code t_activity_config} 上。
+     *
+     * <h3>🔴 与另外三个场景的根本区别：这里会真的发奖</h3>
+     * {@code TASK_RULE} / {@code POOL_ENTRY} / {@code ACTIVITY_RULE} 都是<b>纯谓词</b>，
+     * 返回 Boolean，重跑无害。本场景的脚本会扣库存、发奖、写流水。于是：
+     * <ul>
+     *   <li>脚本调完发奖函数再抛异常 → DB 事务回滚，但 Redis 的库存预扣与幂等键<b>不回滚</b>；</li>
+     *   <li>脚本里两个分支各写一次发奖 → 抽两次，而这在脚本里看起来完全正常。</li>
+     * </ul>
+     * 所以有副作用的函数由引擎限制成<b>一次执行只准调一次</b>
+     * （见 {@code @ScriptFunction#sideEffect}），并且应当是脚本的最后一步。
+     *
+     * <h3>返回类型为什么是 Object</h3>
+     * 脚本的返回值是<b>玩法侧</b>的结果对象（抽奖是 {@code DrawResultView}）。
+     * 引擎不该认识任何一个玩法的类型 —— 它是所有域的下游。
+     * 代价是这里只能校验「非 null」，具体类型由调用方（活动域门面）自己断言并给出人话报错。
+     */
+    ACTIVITY_PLAY(ScriptDomain.ACTIVITY, "活动玩法编排", Object.class,
+            "按次数/身份/时段动态决定走哪条玩法分支，并调用玩法函数完成参与，返回玩法的结果对象。"
+                    + "⚠️ 有副作用的函数一次执行只准调一次，且应当是脚本的最后一步。",
+            List.of(
+                    ScriptParam.required("memberId", Long.class, "会员号（关联键）"),
+                    ScriptParam.required("activityCode", String.class, "活动编码"),
+                    ScriptParam.required("activityType", String.class, "玩法类型 BASIC/DRAW/TASK/LOTTERY"),
+                    ScriptParam.required("params", Map.class, "前端传入的自定义参数，各玩法自定义；没有时是空 Map 而不是 null")
+            )),
     ;
 
     private final ScriptDomain domain;

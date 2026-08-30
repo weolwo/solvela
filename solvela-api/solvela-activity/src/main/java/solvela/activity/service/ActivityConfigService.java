@@ -229,10 +229,31 @@ public class ActivityConfigService {
     }
 
     /**
+     * 数据截止时间必须落在活动周期内。
+     *
+     * <p><b>为空不校验</b> —— 为空的语义是「与结束时间相同」，永远合法。
+     *
+     * <p>只拦这一条，不顺手加「开始必须早于结束」：那是另一件事，
+     * 现在全仓没有这条校验，在这里补一半会让人以为时间校验已经齐了。要补就单独补全。
+     */
+    private static void validateDataEndTime(LocalDateTime startTime, LocalDateTime endTime, LocalDateTime dataEndTime) {
+        if (dataEndTime == null) {
+            return;
+        }
+        if (endTime != null && dataEndTime.isAfter(endTime)) {
+            throw new BusinessException("数据截止时间不能晚于活动结束时间");
+        }
+        if (startTime != null && dataEndTime.isBefore(startTime)) {
+            throw new BusinessException("数据截止时间不能早于活动开始时间");
+        }
+    }
+
+    /**
      * 添加
      * 活动编码允许手工输入，故服务端必须重校验格式与唯一性（表上虽有唯一索引，但直接抛 SQL 异常对运营不友好）
      */
     public void add(ActivityConfigAddCommand addForm) {
+        validateDataEndTime(addForm.getStartTime(), addForm.getEndTime(), addForm.getDataEndTime());
         if (!SolvelaCodeUtil.isValidBizCode(addForm.getActivityCode())) {
             throw new BusinessException("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
@@ -260,6 +281,7 @@ public class ActivityConfigService {
     @Transactional(rollbackFor = Exception.class)
     public void wizardCreate(ActivityWizardCreateCommand form) {
         // ---------- 1. 活动校验 ----------
+        validateDataEndTime(form.getStartTime(), form.getEndTime(), form.getDataEndTime());
         if (!SolvelaCodeUtil.isValidBizCode(form.getActivityCode())) {
             throw new BusinessException("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
@@ -383,6 +405,7 @@ public class ActivityConfigService {
      * 教训就是别把正确性寄托在 ORM 的默认行为上。
      */
     public void update(ActivityConfigUpdateCommand updateForm) {
+        validateDataEndTime(updateForm.getStartTime(), updateForm.getEndTime(), updateForm.getDataEndTime());
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(updateForm, ActivityConfig.class);
         activityConfig.setActivityType(null);
         activityConfig.setActivityCode(null);

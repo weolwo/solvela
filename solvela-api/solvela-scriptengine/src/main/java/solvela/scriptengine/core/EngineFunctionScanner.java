@@ -102,6 +102,7 @@ public class EngineFunctionScanner implements SmartInitializingSingleton {
                 .targetBean(bean)
                 .method(method)
                 .injectContext(injectContext)
+                .sideEffect(annotation.sideEffect())
                 .description(annotation.description())
                 .returnType(method.getReturnType().getSimpleName())
                 .params(scriptParams)

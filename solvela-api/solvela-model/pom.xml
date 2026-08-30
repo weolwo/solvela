@@ -37,6 +37,15 @@
     -->
 
     <dependencies>
+
+        <!-- 枚举与错误码。entity 的字段类型（MemberStatusEnum 等）与 BusinessException
+             持有的 ErrorCode 都在那边。2026-08-30 从本模块搬出去的，包名没变 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-contract</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- entity 的 @TableName/@TableId，以及 PiiTypeHandler 继承的 BaseTypeHandler。
              刻意只引 core，不引 mybatis-plus 的 spring-boot-starter ——
              starter 会把整套自动配置和 spring-boot 拉进来，那不是 model 该知道的东西 -->
@@ -69,12 +78,6 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <!-- ErrorCodeRangeContainer 用了 ImmutablePair -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
         </dependency>
 
         <!-- 测试依赖必须锁在 test 作用域，理由同其它模块 -->

@@ -9,6 +9,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import solvela.member.session.MemberTokenStore;
 
 import java.io.IOException;
 
@@ -33,7 +34,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class AuthenticationFilter extends OncePerRequestFilter {
 
-    private final TokenStore tokenStore;
+    private final MemberTokenStore tokenStore;
     private final MemberPrincipalLoader principalLoader;
     private final AuthProperties properties;
 

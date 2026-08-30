@@ -26,6 +26,13 @@
     -->
 
     <dependencies>
+
+        <!-- 本模块实现的对外契约。api 在前、实现在后，方向不可反 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 本模块直接用到 model 的实体 15 处。
              原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
         <dependency>
@@ -34,9 +41,24 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 只依赖真正用到的三块，不写 solvela-base 那个门面 ——
+             本模块用的是 base.util / base.domain / base.trace（core）、base.module.redis（redis）、
+             base.dao（data）。写门面会顺带把 S3、Excel 引擎、tika、邮件、freemarker 一并背上，
+             而会员域一个都不用。这条也是 C 端网关能摘掉那些依赖的前提：
+             网关经 solvela-member 传递到什么，就得背什么 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-base</artifactId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-redis</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
             <version>3.0.0</version>
         </dependency>
 

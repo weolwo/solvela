@@ -751,6 +751,7 @@ CREATE TABLE `t_activity_config` (
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0-未开始, 1-上线, 2-下线',
   `start_time` datetime NOT NULL COMMENT '活动开始时间',
   `end_time` datetime NOT NULL COMMENT '活动结束时间',
+  `data_end_time` datetime DEFAULT NULL COMMENT '数据截止时间：此刻起不再受理参与（抽奖/任务累计），但活动仍可见、奖品仍可领到 end_time。为空表示与 end_time 相同',
   `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',
@@ -802,6 +803,43 @@ CREATE TABLE `t_prize_config` (
   UNIQUE KEY `uk_prize_code` (`prize_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='奖品配置表';
 
+DROP TABLE IF EXISTS `t_prize_dispatch_outbox`;
+CREATE TABLE `t_prize_dispatch_outbox` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `source_biz_id` varchar(64) NOT NULL COMMENT '来源单号：与 t_prize_log.external_biz_no 同值，消费方据它幂等',
+  `routing_key` varchar(64) NOT NULL COMMENT '路由键，见 MqTopology',
+  `payload` mediumtext NOT NULL COMMENT '事件 JSON 原文。存原文而不是存字段：重投时不需要再拼一次，也就不可能拼得跟当初不一样',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '0-待投递, 1-已投递',
+  `retry_count` int NOT NULL DEFAULT '0' COMMENT '重投次数。持续增长说明下游有问题，是最直接的告警指标',
+  `last_error` varchar(255) DEFAULT NULL COMMENT '最后一次失败原因，截断到列宽',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '写入时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  -- 同一个来源单号只写一行：重复发奖在这里就被挡住，不用等到消费端
+  UNIQUE KEY `uk_outbox_biz` (`source_biz_id`),
+  -- 重投任务的扫描索引：只扫待投递的，按写入时间先进先出
+  KEY `idx_outbox_pending` (`status`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='发奖投递 outbox：MQ 负责投递，本表负责不丢';
+
+DROP TABLE IF EXISTS `t_mq_message_log`;
+CREATE TABLE `t_mq_message_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `message_id` varchar(64) NOT NULL COMMENT '消息唯一标识（发送方生成）。唯一索引即消费幂等',
+  `exchange` varchar(64) NOT NULL COMMENT '交换机',
+  `routing_key` varchar(64) NOT NULL COMMENT '路由键。将来活动挂事件监听就是按它路由的',
+  `queue` varchar(64) NOT NULL COMMENT '队列名：同一条消息可能被多个队列消费，队列名参与定位',
+  `payload` mediumtext NOT NULL COMMENT '消息 JSON 原文',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '0-已接收, 1-处理成功, 2-处理失败',
+  `fail_reason` varchar(255) DEFAULT NULL COMMENT '处理失败原因',
+  `retry_count` int NOT NULL DEFAULT '0' COMMENT '重试次数',
+  `receive_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '接收时间',
+  `handle_time` datetime DEFAULT NULL COMMENT '处理完成时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mq_msg` (`message_id`,`queue`),
+  KEY `idx_mq_status` (`status`,`receive_time`),
+  KEY `idx_mq_receive_time` (`receive_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='消息接收记录：唯一索引即消费幂等，只保留 7 天';
+
 DROP TABLE IF EXISTS `t_prize_log`;
 CREATE TABLE `t_prize_log` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
@@ -809,6 +847,7 @@ CREATE TABLE `t_prize_log` (
   `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
   `prize_code` varchar(64) NOT NULL COMMENT '奖品编码',
   `activity_code` varchar(32) NOT NULL COMMENT '活动编码',
+  `activity_type` varchar(32) DEFAULT NULL COMMENT '玩法类型 BASIC/DRAW/TASK/LOTTERY：发奖时由发放方写入。派发链路据它归类提案来源，不再回头查活动表 —— 拆服务后活动域与资产域不在同一个进程',
   `prize_level` int DEFAULT '0' COMMENT '奖品级别',
   `prize_name` varchar(128) NOT NULL COMMENT '奖品名称',
   `prize_type` varchar(32) NOT NULL COMMENT '奖励类型：SCORE, BALANCE, COUPON, PHYSICAL',
@@ -819,6 +858,8 @@ CREATE TABLE `t_prize_log` (
   `approve_time` datetime DEFAULT NULL COMMENT '审批时间',
   `valid_until` datetime DEFAULT NULL COMMENT '过期时间',
   `status` tinyint DEFAULT '0' COMMENT '执行状态：0-等待, 1-成功, 2-失败',
+  `proposal_status` tinyint NOT NULL DEFAULT '0' COMMENT '提案侧结果：0-待提交, 1-已受理, 2-被拒绝。与 status 是两件事：本列说「会员服务收没收下」，status 说「用户最终有没有拿到」',
+  `proposal_id` bigint DEFAULT NULL COMMENT '会员服务返回的提案 id，对账与人工排查用',
   `external_biz_no` varchar(128) DEFAULT NULL COMMENT '外部单号',
   `remark` varchar(255) DEFAULT NULL COMMENT '异常原因',
   `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',

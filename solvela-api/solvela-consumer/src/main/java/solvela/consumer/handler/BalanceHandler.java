@@ -10,7 +10,9 @@ import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeLog;
 import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
-import solvela.risk.proposal.service.ProposalRecordService;
+import solvela.member.api.CreateProposalCmd;
+import solvela.member.api.MemberProposalApi;
+import solvela.member.api.ProposalResult;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,7 +26,7 @@ import java.math.BigDecimal;
 @Service
 public class BalanceHandler implements IPrizeHandler {
 
-    private final ProposalRecordService proposalRecordService;
+    private final MemberProposalApi memberProposalApi;
     private final PrizeConfigService prizeConfigService;
     private final ProposalSourceResolver proposalSourceResolver;
 
@@ -58,7 +60,7 @@ public class BalanceHandler implements IPrizeHandler {
             req.setAssetType(PrizeTypeEnum.BALANCE.name());
             req.setAmount(amount);
             req.setQuantity(QUANTITY_PER_PRIZE);
-            req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityCode()));
+            req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityType()));
             req.setSourceBizId(prizeLog.getExternalBizNo()); // 极度关键：原彩票记录ID
             req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放");
 
@@ -66,10 +68,16 @@ public class BalanceHandler implements IPrizeHandler {
             // 风控拦截 / 资产配置异常由 addProposal 抛 BusinessException，必须如实上报：
             // 曾经这里丢弃了失败直接 return ok，会把根本没入账的记录标成「发货成功」
             try {
-                proposalRecordService.addProposal(req);
-                return DispatchOutcome.success();
+                ProposalResult result = memberProposalApi.createProposal(toCmd(req));
+                if (!result.accepted()) {
+                    log.warn("【发奖提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), result.failReason());
+                    return DispatchOutcome.failed(result.failReason());
+                }
+                return DispatchOutcome.success(result.proposalId());
             } catch (BusinessException e) {
-                log.warn("【发奖提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), e.getMessage());
+                // 走到这里的不再是「被风控拒了」——那已经变成 accepted=false 的返回值。
+                // 剩下的是真正的意外（跨进程后就是 5xx / 连不上），如实上报为失败
+                log.warn("【发奖提案异常】LogId: {}, 原因: {}", prizeLog.getId(), e.getMessage());
                 return DispatchOutcome.failed(e.getMessage());
             }
         } catch (NumberFormatException e) {

@@ -59,6 +59,21 @@ public class ActivityConfig {
     private LocalDateTime endTime;
 
     /**
+     * 数据截止时间：此刻起<b>不再受理参与</b>（抽奖、任务累计），但活动仍可见、已中的奖仍可领到 {@link #endTime}。
+     *
+     * <p>三个时间窗：
+     * <pre>
+     *   startTime ──── dataEndTime ──── endTime
+     *   [ 可参与、可领奖 ][ 只可领奖、可查看 ][ 已结束 ]
+     * </pre>
+     *
+     * <p><b>允许为空，为空即等同于 {@link #endTime}</b>。绝大多数活动不区分这两件事。
+     * 刻意不给具体默认值 —— 有默认值的话，「没配」和「配成与结束时间相同」看起来一模一样，
+     * 将来想区分就区分不了了。
+     */
+    private LocalDateTime dataEndTime;
+
+    /**
      * 创建人
      */
     private String createBy;

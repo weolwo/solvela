@@ -1,0 +1,102 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-base-core</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-base-core</name>
+    <description>基础设施-核心：工具、JSON、校验、常量、链路 id、配置装载。不碰数据库、不碰 Redis、不碰对象存储。</description>
+
+    <!--
+    ⚠️ 这一层是【谁都会依赖】的底座，所以加依赖前先想清楚：
+    它多一个依赖，全仓每个模块就多一个。
+
+    🔴 尤其不许出现 JDBC / MyBatis / Redis / S3 —— 把它们分出去正是拆分的目的：
+    C 端网关的目标是「classpath 上连 mysql 驱动都没有」，而它必然依赖本模块。
+    -->
+    <dependencies>
+
+        <!-- 领域词汇（错误码 / 领域异常 / PII 加解密 / BaseEnum / entity）。
+             方向是 base → model：技术底座可以用领域词汇，反过来不行 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-model</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- JsonUtils 与各种序列化器直接用 Jackson。
+             原来是 starter-web 顺带带进来的，摘掉 starter-web 之后必须显式声明 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+        </dependency>
+
+        <!-- SolvelaIpUtil 的 IP 归属地；xdb 数据文件也在本模块的 resources 里 -->
+        <dependency>
+            <groupId>org.lionsoul</groupId>
+            <artifactId>ip2region</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
+
+        <!-- 运行时读 javadoc：与 annotationProcessorPaths 里的 scribe 配对，
+             缺了它 springdoc 的 SpringDocJavadocConfiguration 不会激活（@ConditionalOnClass） -->
+        <dependency>
+            <groupId>com.github.therapi</groupId>
+            <artifactId>therapi-runtime-javadoc</artifactId>
+            <version>${therapi.version}</version>
+        </dependency>
+
+        <!-- provided：lombok 是纯编译期的注解处理器。provided 不传递，每个用 @Data 的模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 测试依赖必须锁在 test 作用域，否则 JUnit/Mockito/AssertJ 会被打进生产 jar -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

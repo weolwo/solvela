@@ -49,4 +49,7 @@ public class ActivityConfigAddForm {
     @NotNull(message = "活动结束时间 不能为空")
     private LocalDateTime endTime;
 
+    @Schema(description = "数据截止时间：此刻起不再受理参与（抽奖/任务累计），但活动仍可见、已中的奖仍可领到活动结束时间。不填表示与活动结束时间相同")
+    private LocalDateTime dataEndTime;
+
 }

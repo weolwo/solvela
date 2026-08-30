@@ -1,6 +1,8 @@
 package solvela.app.auth;
 
 import solvela.enums.GenderEnum;
+import solvela.member.api.MemberIdentity;
+
 import java.io.Serializable;
 
 /**
@@ -37,4 +39,22 @@ public record MemberPrincipal(
         String nickname,
         Long avatarFileId,
         GenderEnum gender) implements Serializable {
+
+    /**
+     * 从会员域的身份对象转过来。
+     *
+     * <p>两个记录字段一样，为什么不直接用 {@code MemberIdentity}：
+     * 那是<b>会员域的契约</b>，本进程要把它缓存进 Redis、绑进 {@link CurrentMember} 的作用域、
+     * 序列化给客户端。共用一个类型意味着会员域每加一个字段，网关的缓存格式就跟着变 ——
+     * 而缓存里的旧数据反序列化失败是在<b>下一次发布之后</b>才暴露的。
+     * 一个五行的转换换来两边各自演进。
+     */
+    public static MemberPrincipal of(MemberIdentity identity) {
+        return new MemberPrincipal(
+                identity.memberId(),
+                identity.memberName(),
+                identity.nickname(),
+                identity.avatarFileId(),
+                identity.gender());
+    }
 }

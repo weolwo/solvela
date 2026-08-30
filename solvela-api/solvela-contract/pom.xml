@@ -1,0 +1,66 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-contract</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-contract</name>
+    <description>全仓共享的枚举与错误码。反应堆里的第一个模块，谁都可以依赖它，它谁也不依赖。</description>
+
+    <!--
+    ⚠️ 这个模块存在的理由只有一个：**让 *-api 模块能用枚举，而不必依赖 solvela-model**。
+
+    枚举原先住在 solvela-model 里。model 同时还装着 MyBatis entity、PiiTypeHandler、
+    PiiCipher —— 也就是整个持久层。C 端网关将来只依赖 *-api，如果 api 的 DTO 里出现一个
+    MemberStatusEnum 就得把 model 拖进来，那么「网关不碰持久层」这条约束在第一个接口上就破了。
+
+    包名<b>刻意不变</b>（仍是 solvela.enums / solvela.code）：全仓两百多处 import 一行不用改，
+    这次搬迁对调用方是完全透明的。代价是「类在哪个模块」得看 pom 而不是看包名 ——
+    换来的是零风险的搬迁，值。
+
+    🔴 加依赖前先想清楚：本模块被所有人依赖，它多一个依赖，全仓每个模块就多一个。
+    -->
+    <dependencies>
+
+        <!--
+        BaseEnum 继承 IEnum，让枚举与数据库 value 的转换由 MyBatis-Plus 自动完成。
+
+        引的是 annotation 而<b>不是 core</b>：前者是个只有接口和注解的包（约 60KB，
+        零传递依赖），不含任何 ORM 运行时。所以「*-api 不得依赖持久层」这条约束没有被打破 ——
+        要防的是把 SqlSession、TypeHandler、entity 这些东西带给调用方，不是字面上不许出现
+        mybatis 几个字母。
+
+        版本由 mybatis-plus-bom 管理，与 model 用的 core 同版本。
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-annotation</artifactId>
+        </dependency>
+
+        <!-- BaseEnum.getValue() 上的 @JsonValue。**只引 annotations，不引 databind** ——
+             annotations 是个零传递依赖的纯注解包，本模块不会因此知道任何序列化实现 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

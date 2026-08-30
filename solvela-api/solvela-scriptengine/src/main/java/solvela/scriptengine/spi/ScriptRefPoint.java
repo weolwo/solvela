@@ -36,6 +36,16 @@ public enum ScriptRefPoint {
      */
     ACTIVITY_ENTRY("ACTIVITY", "ENTRY", ScriptScene.ACTIVITY_RULE,
             "活动", "准入判定"),
+
+    /**
+     * 活动的玩法编排。挂在 {@code t_activity_config.activity_code} 上。
+     *
+     * <p>与 {@link #ACTIVITY_ENTRY} 的区别是「判定」与「执行」：那个回答「能不能参与」，
+     * 这个真的去参与（抽奖、发奖）。两个挂载点<b>各挂各的脚本</b>，
+     * 因为它们的失败含义完全不同 —— 准入不通过是正常拒绝，编排出错是事故。
+     */
+    ACTIVITY_PLAY("ACTIVITY", "PLAY", ScriptScene.ACTIVITY_PLAY,
+            "活动", "玩法编排"),
     ;
 
     private final String refType;

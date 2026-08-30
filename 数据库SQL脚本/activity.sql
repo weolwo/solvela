@@ -26,6 +26,7 @@ CREATE TABLE `t_activity_config` (
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0-未开始, 1-上线, 2-下线',
   `start_time` datetime NOT NULL COMMENT '活动开始时间',
   `end_time` datetime NOT NULL COMMENT '活动结束时间',
+  `data_end_time` datetime DEFAULT NULL COMMENT '数据截止时间：此刻起不再受理参与（抽奖/任务累计），但活动仍可见、奖品仍可领到 end_time。为空表示与 end_time 相同',
   `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` varchar(32) DEFAULT NULL COMMENT '更新人',

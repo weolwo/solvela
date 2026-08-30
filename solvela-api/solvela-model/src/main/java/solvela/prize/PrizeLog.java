@@ -1,6 +1,7 @@
 package solvela.prize;
 
 import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.enums.PrizeProposalStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -53,6 +54,18 @@ public class PrizeLog {
     private String activityCode;
 
     /**
+     * 玩法类型 BASIC/DRAW/TASK/LOTTERY，<b>发奖时由发放方写入</b>。
+     *
+     * <p>派发链路据它归类提案来源。此前是拿 activityCode 回头查 t_activity_config 反推的，
+     * 而四个服务拆开之后那条路走不通：派发在会员服务、活动配置在营销服务，不在一个进程里。
+     * <b>让消费方反向去查发送方的域，两个服务就又绑在一起了</b> ——
+     * 事件驱动里的正解是消息自带上下文，这一列就是那个上下文落库的形态。
+     *
+     * <p>允许为空：存量行没有这个值，派发链路对空值降级为 MANUAL。
+     */
+    private String activityType;
+
+    /**
      * 奖品级别
      */
     private Integer prizeLevel;
@@ -101,6 +114,19 @@ public class PrizeLog {
      * 执行状态：0-等待, 1-成功, 2-失败
      */
     private PrizeDispatchStatusEnum status;
+
+    /**
+     * 提案侧结果：会员服务<b>收没收下</b>这笔奖。同步调用当场就知道。
+     *
+     * <p>与 {@link #status} 是两件事：本列说「提交过去了没有」，status 说「用户最终有没有拿到」。
+     * 拆成两列之前这两件事压在一个字段上，「已受理但还在审批」与「已入账」长得一模一样。
+     *
+     * <p>停在 {@code PENDING} 的行是<b>可重试的</b> —— 重投任务扫的就是它们。
+     */
+    private PrizeProposalStatusEnum proposalStatus;
+
+    /** 会员服务返回的提案 id。回调靠 externalBizNo 关联即可，这个 id 是给人工排查用的 */
+    private Long proposalId;
 
     /**
      * 外部单号

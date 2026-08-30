@@ -65,6 +65,19 @@
           placeholder="活动结束时间"
         />
       </a-form-item>
+      <a-form-item label="数据截止时间" name="dataEndTime">
+        <a-date-picker
+          :show-time="DAY_END_SHOW_TIME"
+          valueFormat="YYYY-MM-DD HH:mm:ss"
+          v-model:value="form.dataEndTime"
+          style="width: 100%"
+          placeholder="不填 = 与活动结束时间相同"
+        />
+        <div class="text-xs text-slate-400 mt-1">
+          此刻起<b>不再受理参与</b>（抽奖、任务累计），但活动仍可见、已中的奖仍可领到活动结束时间。
+          常见是比结束时间早 1 天到 1 周，留出发奖与对账的时间。
+        </div>
+      </a-form-item>
     </a-form>
 
     <template #footer>
@@ -130,6 +143,7 @@
     status: undefined, //状态：1-启用, 2-禁用（不传则落库取默认值，列表上显示为「禁用」）
     startTime: undefined, //活动开始时间
     endTime: undefined, //活动结束时间
+    dataEndTime: undefined, //数据截止时间：不填表示与活动结束时间相同
   };
 
   let form = reactive({ ...formDefault });
@@ -142,7 +156,29 @@
     activityName: [{ required: true, message: '活动名称 必填' }],
     startTime: [{ required: true, message: '活动开始时间 必填' }],
     endTime: [{ required: true, message: '活动结束时间 必填' }],
+    // 非必填。这里只做即时反馈，真正的约束在服务端（ActivityConfigService.validateDataEndTime）——
+    // 前端校验绕得过去，不能当守卫用
+    dataEndTime: [{ validator: validateDataEndTime, trigger: 'change' }],
   };
+
+  /**
+   * 数据截止时间必须落在活动周期内。
+   *
+   * 直接比字符串：valueFormat 是 'YYYY-MM-DD HH:mm:ss'，这个格式下字典序等于时间序，
+   * 不用把两边都转成 dayjs 再比。换格式的话这里要跟着改。
+   */
+  function validateDataEndTime(_rule, value) {
+    if (!value) {
+      return Promise.resolve();
+    }
+    if (form.endTime && value > form.endTime) {
+      return Promise.reject('数据截止时间不能晚于活动结束时间');
+    }
+    if (form.startTime && value < form.startTime) {
+      return Promise.reject('数据截止时间不能早于活动开始时间');
+    }
+    return Promise.resolve();
+  }
 
   // ------------------------ 活动编码 ------------------------
 

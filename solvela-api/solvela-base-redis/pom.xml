@@ -1,0 +1,119 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-base-redis</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-base-redis</name>
+    <description>基础设施-Redis：缓存管理器、RedisService、Redisson、分布式锁、发号器。</description>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- RedisLockAspect 用 AOP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <!-- ⚠️ Lettuce 排掉了（2.49MB）：Redis 连接工厂由 redisson-spring-data-41 提供的
+                 RedissonConnectionFactory 承担，全量检索下来 Lettuce 一处没用，
+                 LettuceConnectionConfiguration 是 @ConditionalOnClass(RedisClient) 的，类不在即不装配。
+                 ⚠️ 不要顺手排 reactor-core：spring-data-redis 的响应式部分自己要用。 -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.lettuce</groupId>
+                    <artifactId>lettuce-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+            <!-- 项目只用 Redisson 的同步 API（RLock / RScript / RTopic），RxJava 客户端一处没用。
+                 ⚠️ 不要顺手把 reactor-core 也排掉：它的真实来源是 starter-data-redis。 -->
+            <exclusions>
+                <exclusion>
+                    <groupId>io.reactivex.rxjava3</groupId>
+                    <artifactId>rxjava</artifactId>
+                </exclusion>
+                <!-- byte-buddy 4.44MB：只在 RLiveObject / RemoteService 的动态代理里用，本项目一处没碰 -->
+                <exclusion>
+                    <groupId>net.bytebuddy</groupId>
+                    <artifactId>byte-buddy</artifactId>
+                </exclusion>
+                <!-- kryo 及其 reflectasm / minlog / jodd-util 共 0.75MB：只服务 Kryo5Codec，
+                     而 RedissonPasswordConfigurationCustomizer 已把 codec 换成 SmileJackson3Codec -->
+                <exclusion>
+                    <groupId>com.esotericsoftware</groupId>
+                    <artifactId>kryo</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jodd</groupId>
+                    <artifactId>jodd-util</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Smile 二进制格式，配合 Redisson 的 SmileJackson3Codec。
+             ⚠️ groupId 是 Jackson 3 的 tools.jackson.dataformat，不是 Jackson 2 的
+             com.fasterxml.jackson.dataformat —— 后者会把整套 Jackson 2 运行时拖进来并存 -->
+        <dependency>
+            <groupId>tools.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-smile</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <exclusions>
+                <exclusion>
+                    <artifactId>error_prone_annotations</artifactId>
+                    <groupId>com.google.errorprone</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

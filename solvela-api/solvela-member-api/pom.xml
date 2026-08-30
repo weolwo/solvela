@@ -1,0 +1,53 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-member-api</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-member-api</name>
+    <description>app-member 服务的对外契约：会员、资产、提案、优惠配置。只有接口与 record，没有实现。</description>
+
+    <!--
+    这个模块是**将来那个 app-member 服务的门面**，粒度对齐服务、不对齐今天的 maven 模块：
+    会员在 solvela-member、资产在 solvela-ledger、提案与优惠配置在 solvela-risk，
+    三个实现模块共用本模块这一份契约。所以不会再有 solvela-ledger-api。
+
+    🔴 依赖只允许这两个，加第三个之前先想清楚它会不会跟着流到网关：
+      - solvela-contract：枚举与错误码；
+      - spring-web：@HttpExchange / @RequestBody 等注解，以及将来生成 HTTP 客户端代理。
+
+    ⚠️ 不许依赖 solvela-model —— 那里面是 MyBatis entity、TypeHandler、PiiCipher，
+    也就是整个持久层。契约一旦引它，「网关不碰持久层」这条约束在第一个接口上就破了。
+    要传的数据自己定 record，不要图省事复用 entity。
+    -->
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-contract</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!--
+        只要 spring-web，不要 spring-boot-starter-web：
+        契约模块不该知道有没有 servlet 容器 —— 它可能被一个纯客户端（没有 web 服务器的进程）依赖。
+        @HttpExchange 及其客户端代理都在 spring-web 里。
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

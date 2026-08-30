@@ -2,6 +2,7 @@ package solvela.task.runtime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import solvela.enums.ActivityTypeEnum;
 import solvela.event.UserPrizeEvent;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
@@ -12,7 +13,7 @@ import solvela.task.record.dao.TaskRecordDao;
 import solvela.task.TaskRecord;
 import solvela.task.runtime.domain.TaskProgressData;
 import solvela.task.runtime.domain.TaskRuleConfig;
-import org.springframework.context.ApplicationEventPublisher;
+import solvela.dispatch.outbox.PrizeEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -41,7 +42,7 @@ public class TaskPrizeDispatcher {
     private final TaskPrizeMappingManager taskPrizeMappingManager;
     private final PrizeConfigService prizeConfigService;
     private final TaskRecordDao taskRecordDao;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final PrizeEventPublisher prizeEventPublisher;
 
     /**
      * 派发本次事件跨过的所有档位。
@@ -116,6 +117,7 @@ public class TaskPrizeDispatcher {
 
         UserPrizeEvent event = UserPrizeEvent.builder()
                 .sourceBizId(TaskConst.buildSourceBizId(record.getId(), mapping.getStageLevel()))
+                .activityType(ActivityTypeEnum.TASK.getValue())
                 .activityCode(activityCode)
                 // 关联键取记录上的 member_id；展示名由上下文传进来 —— 任务记录是状态表，没有账号快照
                 .memberId(record.getMemberId())
@@ -126,7 +128,7 @@ public class TaskPrizeDispatcher {
                 .prizeName(prizeConfig.getPrizeName())
                 .prizeLevel(mapping.getStageLevel())
                 .build();
-        applicationEventPublisher.publishEvent(event);
+        prizeEventPublisher.publish(event);
 
         log.info("[任务发奖] 已投递派发事件。recordId={}, stage={}, prizeCode={}, sourceBizId={}",
                 record.getId(), mapping.getStageLevel(), mapping.getPrizeCode(), event.getSourceBizId());

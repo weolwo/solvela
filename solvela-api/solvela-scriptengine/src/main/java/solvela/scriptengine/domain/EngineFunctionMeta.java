@@ -45,6 +45,12 @@ public class EngineFunctionMeta {
     private final Method method;
 
     /**
+     * 本函数是否有副作用（扣库存、发奖、动账）。为 true 时引擎限制它一次执行内只能被调用一次，
+     * 理由见 {@code @ScriptFunction#sideEffect}。
+     */
+    private final boolean sideEffect;
+
+    /**
      * 首参是否为 EngineContext。为 true 时引擎会自动注入执行上下文，
      * 脚本侧的实参从方法的第 2 个形参开始对应。
      */

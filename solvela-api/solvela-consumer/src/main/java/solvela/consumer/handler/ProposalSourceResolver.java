@@ -1,9 +1,6 @@
 package solvela.consumer.handler;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import solvela.activity.ActivityConfig;
-import solvela.activity.service.ActivityConfigService;
 import solvela.enums.ActivityTypeEnum;
 import solvela.enums.ProposalSourceTypeEnum;
 import org.springframework.stereotype.Component;
@@ -25,30 +22,27 @@ import org.springframework.stereotype.Component;
  * @Date 2026-08-01
  */
 @Slf4j
-@RequiredArgsConstructor
 @Component
 public class ProposalSourceResolver {
 
-    private final ActivityConfigService activityConfigService;
-
     /**
-     * @param activityCode 发奖流水上的活动编码
-     * @return 提案来源类型；活动查不到或类型非法时降级为 {@link ProposalSourceTypeEnum#MANUAL}
+     * <b>纯函数，不查库。</b>
+     *
+     * <p>2026-08-30 之前它注入 {@code ActivityConfigService}，拿 activityCode 回头查活动表反推类型。
+     * 四个服务拆开之后那条路走不通：<b>派发在会员服务，活动配置在营销服务</b>，不在一个进程里。
+     * 让消费方反向依赖发送方的域，两个服务就又绑在一起了。
+     *
+     * <p>现在类型由发放方写进 {@code t_prize_log.activity_type}（发奖那一刻它本来就知道），
+     * 这里只做翻译。事件驱动里的通则：<b>消息自带上下文，消费方不回头查发送方</b>。
+     *
+     * @param activityType 发奖流水上的玩法类型
+     * @return 提案来源类型；为空或类型非法时降级为 {@link ProposalSourceTypeEnum#MANUAL}
      */
-    public String resolve(String activityCode) {
-        if (activityCode == null || activityCode.isBlank()) {
-            return ProposalSourceTypeEnum.MANUAL.getValue();
-        }
-        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
-        if (activity == null) {
-            // 不抛异常：来源类型只是归类维度，为它中断一次真实发奖不划算
-            log.warn("【提案来源】活动不存在，来源降级为 MANUAL。activityCode={}", activityCode);
-            return ProposalSourceTypeEnum.MANUAL.getValue();
-        }
-        ActivityTypeEnum type = ActivityTypeEnum.resolve(activity.getActivityType());
+    public String resolve(String activityType) {
+        ActivityTypeEnum type = ActivityTypeEnum.resolve(activityType);
         if (type == null) {
-            log.warn("【提案来源】活动类型非法，来源降级为 MANUAL。activityCode={}, activityType={}",
-                    activityCode, activity.getActivityType());
+            // 不抛异常：来源类型只是归类维度，为它中断一次真实发奖不划算
+            log.warn("【提案来源】玩法类型为空或非法，来源降级为 MANUAL。activityType={}", activityType);
             return ProposalSourceTypeEnum.MANUAL.getValue();
         }
         return switch (type) {

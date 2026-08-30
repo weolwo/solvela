@@ -1,5 +1,7 @@
 package solvela.draw.runtime;
 
+import solvela.enums.ActivityTypeEnum;
+import solvela.marketing.api.DrawRejectReason;
 import solvela.enums.DrawResultEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import lombok.RequiredArgsConstructor;
@@ -25,13 +27,12 @@ import solvela.event.UserPrizeEvent;
 import solvela.member.service.MemberService;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
-import solvela.exception.BusinessException;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
 import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
-import org.springframework.context.ApplicationEventPublisher;
+import solvela.dispatch.outbox.PrizeEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,7 +91,7 @@ public class DrawExecuteService {
     private final DrawStockService drawStockService;
     private final RedissonClient redissonClient;
     private final PrizeConfigService prizeConfigService;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final PrizeEventPublisher prizeEventPublisher;
     /**
      * 会员号 -> 账号。一次抽奖只查一次，结果沿调用链传下去：
      * 白名单判定、流水快照、派发事件三处都要用，各查一次就是三次往返。
@@ -120,7 +121,9 @@ public class DrawExecuteService {
             boolean first = redissonClient.getBucket(DrawCacheKey.request(form.getRequestId()), StringCodec.INSTANCE)
                     .setIfAbsent("1", REQUEST_DEDUP_TTL);
             if (!first) {
-                throw new BusinessException("请求处理中或已处理，请勿重复提交");
+                // 幂等拦截不是错误：网络重试本来就该撞上它。返回而不是抛 ——
+                // 走到这里还没有任何 DB 写入，事务提交与回滚等价（下同，五个 reject 分支都是）
+                return DrawExecuteDTO.ofReject(DrawRejectReason.DUPLICATE_REQUEST);
             }
         }
 
@@ -136,17 +139,17 @@ public class DrawExecuteService {
             limiter.expire(RATE_LIMITER_TTL);
         }
         if (!limiter.tryAcquire()) {
-            throw new BusinessException("操作太频繁，请稍后再试");
+            return DrawExecuteDTO.ofReject(DrawRejectReason.TOO_FREQUENT);
         }
 
         // 3. 奖池校验
         PrizePoolConfig pool = prizePoolConfigManager.lambdaQuery()
                 .eq(PrizePoolConfig::getPoolCode, form.getPoolCode()).one();
         if (pool == null || !form.getActivityCode().equals(pool.getActivityCode())) {
-            throw new BusinessException("奖池不存在或不属于该活动");
+            return DrawExecuteDTO.ofReject(DrawRejectReason.POOL_NOT_FOUND);
         }
         if (pool.getStatus() != PrizePoolStatusEnum.OPEN) {
-            throw new BusinessException("奖池未开启");
+            return DrawExecuteDTO.ofReject(DrawRejectReason.POOL_CLOSED);
         }
 
         String traceId = form.getRequestId() != null && !form.getRequestId().isBlank()
@@ -157,7 +160,7 @@ public class DrawExecuteService {
                 .eq(PoolPrizeMapping::getPoolCode, form.getPoolCode())
                 .orderByAsc(PoolPrizeMapping::getSortWeight).list();
         if (mappings.isEmpty()) {
-            throw new BusinessException("奖池未配置奖项");
+            return DrawExecuteDTO.ofReject(DrawRejectReason.POOL_NO_PRIZE);
         }
         List<Long> itemIds = mappings.stream().map(PoolPrizeMapping::getPrizeItemId).toList();
         Map<Long, PrizePoolItem> itemMap = prizePoolItemManager.listByIds(itemIds).stream()
@@ -169,7 +172,11 @@ public class DrawExecuteService {
                 .sorted(Comparator.comparing(PoolPrizeMapping::getSortWeight)).toList()) {
             PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
             if (item == null) {
-                throw new BusinessException("奖池配置异常：奖项已被删除，itemId=" + mapping.getPrizeItemId());
+                // 配置坏了要告警。itemId 只进日志不进返回值 —— 它是奖池内部主键，
+                // 而这个返回值最终会走到 C 端；运维要的那个数在日志里查得到
+                log.error("[抽奖] 奖池配置异常：奖项已被删除, poolCode: {}, itemId: {}",
+                        form.getPoolCode(), mapping.getPrizeItemId());
+                return DrawExecuteDTO.ofReject(DrawRejectReason.POOL_BROKEN);
             }
             prizes.add(new DrawPrizeSnapshot(
                     item.getId(),
@@ -217,6 +224,9 @@ public class DrawExecuteService {
         UserPrizeEvent event = UserPrizeEvent.builder()
                 .sourceBizId(traceId)
                 .activityCode(form.getActivityCode())
+                // 抽奖发出来的奖，类型必然是 DRAW。派发方据它归类提案来源，
+                // 不填的话那边只能降级成 MANUAL —— 对账时这批奖就归错类了
+                .activityType(ActivityTypeEnum.DRAW.getValue())
                 .memberId(form.getMemberId())
                 .memberName(memberName)
                 .prizeCode(prizeCode)
@@ -224,7 +234,7 @@ public class DrawExecuteService {
                 .prizeValue(prizeConfig.getPrizeValue() == null ? null : prizeConfig.getPrizeValue().toPlainString())
                 .prizeName(prizeConfig.getPrizeName())
                 .build();
-        applicationEventPublisher.publishEvent(event);
+        prizeEventPublisher.publish(event);
     }
 
     /**

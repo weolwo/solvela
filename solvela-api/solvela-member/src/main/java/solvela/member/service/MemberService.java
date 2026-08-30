@@ -3,6 +3,7 @@ package solvela.member.service;
 import solvela.enums.MemberStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import solvela.member.constant.MemberConst;
 import solvela.member.dao.MemberDao;
 import solvela.member.Member;
 import solvela.member.manager.MemberManager;
+import solvela.member.session.MemberTokenStore;
 import solvela.member.domain.query.MemberQuery;
 import solvela.member.domain.dto.MemberDTO;
 
@@ -43,12 +45,14 @@ import java.util.*;
  *
  * @Date 2026-08-22
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MemberService {
 
     private final MemberDao memberDao;
     private final MemberManager memberManager;
+    private final MemberTokenStore tokenStore;
 
 
     /**
@@ -66,6 +70,23 @@ public class MemberService {
      * <p><b>只在「正常」与「冻结」之间切</b>：已注销是终态，注销会把 phone_hash 置 NULL
      * 以释放号码，那个动作不可逆 —— 从注销改回正常只会得到一个登录不了、也没法找回的账号。
      * 前端把已注销那行的开关禁掉了，这里是真正的约束。
+     *
+     * <h3>🔴 冻结必须连会话一起吊销</h3>
+     * 只改一行 status 是<b>不够的</b>：C 端的身份缓存有 30 分钟 TTL，被冻结的人在那之内
+     * 照常能抽奖、能领奖。风控封一个刷子账号，他还有半小时继续刷。
+     *
+     * <p>这正是 2026-08-30 之前的真实状态 —— 那时 {@code MemberTokenStore.revokeAll} 全仓只有测试在调，
+     * 而网关那边的注释却写着「冻结时会 revokeAll 掉全部令牌」。
+     * 注释描述了一个不存在的机制，且没有任何测试盯着它。
+     *
+     * <p>为此把会话存储从网关下沉到了会员域（{@code solvela.member.session}）：
+     * 冻结发生在这里，会话存储就得在这里够得着。
+     *
+     * <h3>吊销放在事务【内】</h3>
+     * 吊销失败时整个操作回滚，运营看到报错可以重来。反过来（先提交再吊销）一旦吊销失败，
+     * 就回到了「已冻结但还能用」——正是这次要消灭的状态。
+     * 代价是极端情况下可能「令牌被吊销了但状态没改成功」，那只是让用户重登一次，
+     * 与「封不住」不在一个量级上。
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long memberId, MemberStatusEnum status, String operator) {
@@ -85,6 +106,14 @@ public class MemberService {
         update.setStatus(status);
         update.setUpdateBy(operator);
         memberDao.updateById(update);
+
+        if (status == MemberStatusEnum.FROZEN) {
+            int revoked = tokenStore.revokeAll(memberId);
+            log.info("[会员冻结] memberId: {}, 操作人: {}, 吊销会话: {} 个", memberId, operator, revoked);
+        }
+        // 解冻不需要做什么：令牌已经在冻结时清光了，用户重新登录即可。
+        // 「解冻后恢复原来的会话」既做不到（摘要不可逆），也不该做 —— 被封期间的那些会话
+        // 很可能正是导致被封的那批
     }
 
     /**

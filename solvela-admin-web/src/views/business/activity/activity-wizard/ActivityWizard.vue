@@ -64,6 +64,21 @@
                 />
               </a-form-item>
 
+              <a-form-item label="数据截止时间" name="dataEndTime">
+                <a-date-picker
+                  v-model:value="form.dataEndTime"
+                  :show-time="DAY_END_SHOW_TIME"
+                  placeholder="不填 = 与活动结束时间相同"
+                  value-format="YYYY-MM-DD HH:mm:ss"
+                  class="w-full"
+                  size="large"
+                />
+                <div class="text-xs text-slate-400 mt-1">
+                  选填。此刻起<b>不再受理参与</b>，但活动仍可见、已中的奖仍可领到结束时间 ——
+                  常见是比结束时间早 1 天到 1 周，留出发奖与对账的时间。建完之后在活动列表里也能改。
+                </div>
+              </a-form-item>
+
               <a-form-item label="活动编码" name="activityCode">
                 <div class="flex gap-2">
                   <a-input v-model:value="form.activityCode" size="large" placeholder="10 位大写字母 + 数字" class="font-mono" />
@@ -176,7 +191,7 @@
 </template>
 
 <script setup>
-  import { RANGE_SHOW_TIME } from '/@/constants/date-time-const';
+  import { DAY_END_SHOW_TIME, RANGE_SHOW_TIME } from '/@/constants/date-time-const';
   import { computed, onMounted, reactive, ref, watch } from 'vue';
   import { message } from 'ant-design-vue';
   import { useRoute, useRouter } from 'vue-router';
@@ -221,6 +236,8 @@
   const form = reactive({
     activityName: '',
     timeRange: [],
+    // 选填：数据截止时间。不填表示与活动结束时间相同
+    dataEndTime: null,
     activityCode: '',
     activityType: 'BASIC',
   });
@@ -266,6 +283,24 @@
   const rules = {
     activityName: [{ required: true, message: '请输入活动名称' }],
     timeRange: [{ required: true, message: '请选择起止时间', type: 'array' }],
+    // 非必填；真正的约束在服务端。字典序等于时间序，因为 value-format 是 'YYYY-MM-DD HH:mm:ss'
+    dataEndTime: [
+      {
+        validator: (_rule, value) => {
+          if (!value || form.timeRange.length !== 2) {
+            return Promise.resolve();
+          }
+          if (value > form.timeRange[1]) {
+            return Promise.reject('数据截止时间不能晚于活动结束时间');
+          }
+          if (value < form.timeRange[0]) {
+            return Promise.reject('数据截止时间不能早于活动开始时间');
+          }
+          return Promise.resolve();
+        },
+        trigger: 'change',
+      },
+    ],
     activityCode: [
       { required: true, message: '请输入或生成活动编码' },
       { pattern: regular.bizCode, message: regular.bizCodeDesc },
@@ -305,6 +340,8 @@
         activityType: form.activityType,
         startTime: form.timeRange[0],
         endTime: form.timeRange[1],
+        // 不填时传 undefined 而不是空串：后端那一列可空，空串会被当成非法时间
+        dataEndTime: form.dataEndTime || undefined,
         prizeList: draftPrizeList.value,
       });
       message.success(draftPrizeList.value.length ? `活动已创建，同时建了 ${draftPrizeList.value.length} 个奖品` : '活动已创建');
@@ -378,7 +415,7 @@
     // 新建：把上一次的残留状态清干净再开始。
     // 草稿奖品也必须清 —— 否则「再建一个」会把上个活动的奖品原样带进新活动，
     // 而奖品编码全局唯一，第二次提交必然撞码，报错信息还会指向一个运营没印象的编码。
-    Object.assign(form, { activityName: '', timeRange: [], activityCode: '', activityType: 'BASIC' });
+    Object.assign(form, { activityName: '', timeRange: [], dataEndTime: null, activityCode: '', activityType: 'BASIC' });
     Object.assign(created, { activityCode: '', activityName: '', activityType: '' });
     draftPrizeList.value = [];
     step.value = STEP.BASE;

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import solvela.member.session.MemberAccessToken;
+import solvela.member.session.MemberTokenStore;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,7 +28,7 @@ class TokenStoreTest {
     private static final Long MEMBER_ID = 999_000_001L;
 
     @Autowired
-    private TokenStore tokenStore;
+    private MemberTokenStore tokenStore;
 
     @Autowired
     private StringRedisTemplate redis;
@@ -34,7 +36,7 @@ class TokenStoreTest {
     @Test
     @DisplayName("签发的令牌能换回会员号，且带过期时间")
     void 签发与解析() {
-        AccessToken token = tokenStore.issue(MEMBER_ID);
+        MemberAccessToken token = tokenStore.issue(MEMBER_ID);
         try {
             assertTrue(token.value().startsWith("mb_"), "令牌应带系统前缀，实际：" + token.value());
             assertEquals(MEMBER_ID, tokenStore.resolve(token.value()));
@@ -50,7 +52,7 @@ class TokenStoreTest {
     @Test
     @DisplayName("🔴 Redis 里存的是摘要，不是令牌原文")
     void 令牌原文不落库() {
-        AccessToken token = tokenStore.issue(MEMBER_ID);
+        MemberAccessToken token = tokenStore.issue(MEMBER_ID);
         try {
             // 原文当 key 查不到 —— 说明存的不是它
             assertNull(redis.opsForValue().get("app:auth:t:" + token.value()));
@@ -71,7 +73,7 @@ class TokenStoreTest {
     @Test
     @DisplayName("吊销之后立刻失效 —— 这是选不透明令牌而不是 JWT 的全部理由")
     void 吊销即时生效() {
-        AccessToken token = tokenStore.issue(MEMBER_ID);
+        MemberAccessToken token = tokenStore.issue(MEMBER_ID);
         assertEquals(MEMBER_ID, tokenStore.resolve(token.value()));
 
         tokenStore.revoke(token.value());

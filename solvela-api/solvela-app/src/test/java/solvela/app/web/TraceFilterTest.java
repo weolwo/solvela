@@ -1,5 +1,7 @@
 package solvela.app.web;
 
+import solvela.base.trace.Trace;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

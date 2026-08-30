@@ -1,0 +1,56 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-base-mq</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-base-mq</name>
+    <description>基础设施-消息：RabbitMQ 的连接、交换机/队列声明与 JSON 编解码。</description>
+
+    <!--
+    <h3>为什么单独一块，而不是塞进 base-core</h3>
+    与 data / file 同一个道理：<b>依赖它就等于这个进程要连 RabbitMQ</b>。
+    admin 与网关都不需要消息，把 amqp 放进 core 会让它们平白多一个启动期依赖 ——
+    而 MQ 连不上时 Spring 默认是<b>启动失败</b>，不是降级。
+
+    <h3>谁会依赖它</h3>
+    发奖的两端：marketing（发消息）与 member（收消息）。第三方不要引。
+    -->
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

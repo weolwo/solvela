@@ -26,6 +26,13 @@
     -->
 
     <dependencies>
+
+        <!-- 本模块实现 MemberProposalApi：营销侧把一笔奖交过来，这里做风控与提案 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 本模块直接用到 model 的实体 15 处。
              原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
         <dependency>

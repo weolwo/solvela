@@ -1,5 +1,6 @@
 package solvela.lottery.settle;
 
+import solvela.enums.ActivityTypeEnum;
 import solvela.enums.LotteryDispatchStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +10,7 @@ import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.LotteryRecord;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
-import org.springframework.context.ApplicationEventPublisher;
+import solvela.dispatch.outbox.PrizeEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +37,7 @@ public class LotteryDispatchBatchService {
 
     private final LotteryRecordDao lotteryRecordDao;
     private final PrizeConfigService prizeConfigService;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final PrizeEventPublisher prizeEventPublisher;
 
     /**
      * 一批的投递 + 标记，单事务。
@@ -62,9 +63,10 @@ public class LotteryDispatchBatchService {
                 lotteryRecordDao.updateById(fail);
                 continue;
             }
-            applicationEventPublisher.publishEvent(UserPrizeEvent.builder()
+            prizeEventPublisher.publish(UserPrizeEvent.builder()
                     // 跨域幂等键：配合 t_prize_log.uk_external_biz，事件重投也不会重复发奖
                     .sourceBizId(String.valueOf(record.getId()))
+                    .activityType(ActivityTypeEnum.LOTTERY.getValue())
                     .activityCode(config.getActivityCode())
                     .memberId(record.getMemberId())
                     .memberName(record.getMemberName())

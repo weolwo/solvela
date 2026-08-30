@@ -12,7 +12,24 @@
 
 	<modules>
         <!-- 顺序即依赖方向：上面的不认识下面的。maven 会强制它 —— 写反了直接报循环依赖 -->
+
+        <!-- 全仓共享的枚举与错误码。排在最前是因为它谁也不依赖 ——
+             拆出来是为了让将来的 *-api 模块能用枚举，而不必把整个 model（entity + 持久层）拖过去 -->
+        <module>solvela-contract</module>
         <module>solvela-model</module>
+
+        <!-- 对外契约：接口 + record，没有实现。粒度对齐【将来的服务】而不是今天的域模块 ——
+             会员/资产/提案/优惠配置将来同属 app-member，所以共用一个 api 模块。
+             只依赖 contract 与 spring-web，排在 base 之前正是因为它们连基础设施都不需要 -->
+        <module>solvela-member-api</module>
+        <module>solvela-marketing-api</module>
+        <!-- 技术底座，2026-08-30 拆成四块：谁都能依赖 core，而 data 意味着 classpath 上有 JDBC 驱动。
+             solvela-base 现在只是把四块聚在一起的门面，本身没有代码 —— 新模块请直接依赖具体那一个 -->
+        <module>solvela-base-core</module>
+        <module>solvela-base-redis</module>
+        <module>solvela-base-data</module>
+        <module>solvela-base-file</module>
+        <module>solvela-base-mq</module>
         <module>solvela-base</module>
 
         <!-- 业务域。按域拆而不是按"将来谁用"拆：prize 横跨活动侧与资产侧，
@@ -31,6 +48,10 @@
         <!-- HTTP 层。刻意排在业务域之后：域模块不认识它，只有端认识 -->
         <module>solvela-web</module>
         <module>solvela-admin</module>
+        <!-- 四个进程：admin 1024 / app 1025(网关) / marketing 1026 / member 1027。
+             端模块只有启动类、HTTP 薄壳与错误出口，业务逻辑一行都不在里面 -->
+        <module>solvela-app-marketing</module>
+        <module>solvela-app-member</module>
         <module>solvela-app</module>
     </modules>
 

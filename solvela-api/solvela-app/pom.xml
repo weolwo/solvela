@@ -61,9 +61,31 @@
         </dependency>
 
 
+        <!-- 网关只直接依赖这两块：工具/JSON/校验/链路 id（core）与会话存储要的 Redis。
+             🔴 刻意【不写】 solvela-base 那个门面，也不写 solvela-base-data ——
+             目标是 classpath 上连 mysql 驱动都没有。
+
+             ⚠️ 今天还没达成：JDBC 仍经 solvela-member 传递进来（会员域有 MyBatis Dao，
+             而它的 bean 目前与网关同进程）。等第 6 步把下面那条 solvela-member 依赖删掉，
+             这个目标才真正成立，那时才能给 AppBoundaryTest 加上
+             「Class.forName("com.mysql.cj.jdbc.Driver") 应当抛异常」这条断言。 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-base</artifactId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-redis</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 会员域的【契约】。网关的代码只认识它 —— 接口 + record，没有实现。
+             第 6 步会把下面那条对 solvela-member 的依赖删掉，那时 Maven 就成了硬边界：
+             后台 service 连 classpath 都上不来。现在还留着，是因为域的 bean 仍与网关同进程。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
             <version>3.0.0</version>
         </dependency>
 

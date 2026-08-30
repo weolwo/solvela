@@ -17,6 +17,22 @@
          抽奖引擎用到的 switch 模式匹配需要 21+，实际正是靠 25 才编得过。 -->
 
     <dependencies>
+
+        <!-- 把抽奖暴露成脚本函数（DrawScriptFunctions）。只用到 @ScriptFunction 与 SPI，
+             不自己执行脚本 —— 执行入口在活动域 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-scriptengine</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 本模块实现 DrawApi。虽然经 solvela-activity 也能传递拿到，
+             但用什么就声明什么 —— 别指望别人替你带 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-marketing-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 活动系统的依赖边界：只有这三个域。刻意<b>没有</b>
              risk / consumer / scriptengine / ledger —— pom 里没写就引不进来，
              这比「约定不要引」可靠。

@@ -9,6 +9,7 @@ import solvela.scriptengine.annotation.ScriptFunction;
 import solvela.scriptengine.core.DefaultScriptEngine;
 import solvela.scriptengine.core.EngineFunctionRegistry;
 import solvela.scriptengine.core.QLExpressEvaluator;
+import solvela.scriptengine.core.QLExpressFunctionAdapter;
 import solvela.scriptengine.core.ScriptEngineProperties;
 import solvela.scriptengine.domain.EngineFunctionMeta;
 import solvela.scriptengine.domain.ExecutableScript;
@@ -460,6 +461,77 @@ public class ScriptEngineTest {
     // =====================================================================
     // 测试用桩
     // =====================================================================
+    // 10. 副作用约束：有副作用的函数一次执行只准调一次
+    // =====================================================================
+
+    @Test
+    @DisplayName("有副作用的函数调一次，正常返回")
+    void side_effect_function_can_be_called_once() {
+        SideEffectTestHandler handler = new SideEffectTestHandler();
+        bind(handler);
+
+        Object result = scriptEngine.evaluate(
+                ExecutableScript.trusted("test/grant-once", "return draw_grant('POOL_A');"),
+                EngineContext.create());
+
+        assertEquals("granted:POOL_A", result);
+        assertEquals(1, handler.calls, "函数该被真正执行一次");
+    }
+
+    @Test
+    @DisplayName("🔴 有副作用的函数调第二次直接抛出，且第二次【没有被执行】")
+    void side_effect_function_cannot_be_called_twice() {
+        SideEffectTestHandler handler = new SideEffectTestHandler();
+        bind(handler);
+
+        // 运营最容易写出的形态：两个 if 各写一次，而两个条件同时成立。
+        // 语法完全正确，评审时也很难一眼看出，后果是多发一份奖
+        String script = """
+                if (true) { r = draw_grant('POOL_A'); }
+                if (true) { r = draw_grant('POOL_NEW'); }
+                return r;
+                """;
+
+        BusinessException e = assertThrows(BusinessException.class, () -> scriptEngine.evaluate(
+                ExecutableScript.trusted("test/grant-twice", script), EngineContext.create()));
+
+        assertTrue(e.getMessage().contains("draw_grant"), "报错要点名是哪个函数。实际: " + e.getMessage());
+        assertEquals(1, handler.calls,
+                "🔴 第二次调用必须在【执行之前】被拦下。若这里是 2，说明实现变成了「先执行再记账」——"
+                        + "那时奖已经发出去了，抛异常也收不回来");
+    }
+
+    @Test
+    @DisplayName("纯查询函数不受限制，调多少次都行")
+    void plain_function_is_not_limited() {
+        bind(new SideEffectTestHandler());
+
+        Object result = scriptEngine.evaluate(
+                ExecutableScript.trusted("test/query-many",
+                        "return draw_stockOf('A') + draw_stockOf('B') + draw_stockOf('C');"),
+                EngineContext.create());
+
+        // QLExpress 的算术结果是 BigDecimal，比数值不比类型
+        assertEquals(3, ((Number) result).intValue(),
+                "把纯查询也限制成一次，会让脚本连基本的判断都写不出来");
+    }
+
+    @Test
+    @DisplayName("副作用哨兵放在内部通道，脚本看不见也改不掉")
+    void side_effect_guard_is_invisible_to_script() {
+        bind(new SideEffectTestHandler());
+        EngineContext context = EngineContext.create();
+
+        scriptEngine.evaluate(
+                ExecutableScript.trusted("test/grant-guard", "return draw_grant('POOL_A');"), context);
+
+        assertFalse(context.getScriptVariables().containsKey(QLExpressFunctionAdapter.SIDE_EFFECT_GUARD_KEY),
+                "哨兵一旦出现在脚本变量里，脚本就能把它清掉，这道约束等于把开关交给了被约束的人");
+        assertEquals("draw_grant",
+                context.getInternal(QLExpressFunctionAdapter.SIDE_EFFECT_GUARD_KEY, String.class));
+    }
+
+    // =====================================================================
 
     /**
      * 把 handler 上所有 @ScriptFunction 方法绑进 evaluator，等价于启动期 EngineFunctionScanner 做的事
@@ -485,6 +557,7 @@ public class ScriptEngineTest {
                     .targetBean(handler)
                     .method(method)
                     .injectContext(injectContext)
+                    .sideEffect(annotation.sideEffect())
                     .description(annotation.description())
                     .returnType(method.getReturnType().getSimpleName())
                     .params(Arrays.stream(method.getParameters())
@@ -522,6 +595,27 @@ public class ScriptEngineTest {
         @ScriptFunction(name = "boom", description = "测试用：抛业务异常")
         public String boom() {
             throw new BusinessException("会员不存在");
+        }
+    }
+
+    static class SideEffectTestHandler implements ScriptFunctionHandler {
+
+        int calls;
+
+        @Override
+        public ScriptDomain domain() {
+            return ScriptDomain.DRAW;
+        }
+
+        @ScriptFunction(name = "grant", sideEffect = true, description = "测试用：模拟一次有副作用的发奖")
+        public String grant(String poolCode) {
+            calls++;
+            return "granted:" + poolCode;
+        }
+
+        @ScriptFunction(name = "stockOf", description = "测试用：纯查询，不该被副作用约束限制")
+        public Integer stockOf(String poolCode) {
+            return 1;
         }
     }
 }

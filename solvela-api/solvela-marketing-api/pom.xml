@@ -1,0 +1,49 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-marketing-api</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-marketing-api</name>
+    <description>app-activity 服务的对外契约：活动、抽奖、任务、彩票、奖品、商城。只有接口与 record。</description>
+
+    <!--
+    这个模块是**将来那个 app-activity 服务的门面**，粒度对齐服务、不对齐今天的 maven 模块：
+    活动在 solvela-activity、抽奖/任务/彩票/商城在 solvela-marketing、奖品在 solvela-prize，
+    它们将来在同一个进程里，所以共用一份契约。不会再有 solvela-marketing-api。
+
+    🔴 里面按【实现归属】分成多个接口，不是一个大接口：
+      - ActivityQueryApi → solvela-activity 实现
+      - DrawApi          → solvela-marketing 实现
+    合成一个的话没法装配 —— 一个 Spring bean 实现不了半个接口，而这两半在不同的 maven 模块里。
+
+    ⚠️ 不许依赖 solvela-model：那是 MyBatis entity 与持久层。要传什么自己定 record。
+    -->
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-contract</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 只要 spring-web（@HttpExchange 与客户端代理），不要 starter-web：
+             契约模块不该知道有没有 servlet 容器 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

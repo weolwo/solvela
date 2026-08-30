@@ -37,6 +37,9 @@ public class ActivityConfigDTO {
     /** 活动结束时间 */
     private LocalDateTime endTime;
 
+    /** 数据截止时间：此刻起不再受理参与，但奖品仍可领到 endTime。为空表示与 endTime 相同 */
+    private LocalDateTime dataEndTime;
+
     /** 创建人 */
     private String createBy;
 

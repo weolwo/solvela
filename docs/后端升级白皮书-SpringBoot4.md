@@ -453,7 +453,7 @@ starter 类、`mysql-connector-j`、`p6spy`、`caffeine`、`commons-pool2` 全�
 
 4. **不改用第三方 IP 查询 API（如 ipdata）**。本地 ip2region 方案完全可用，且 API 方案在本项目是退步：
     - **调用量对不上**：`SolvelaIpUtil.getRegion()` 挂在登录、 **每条操作日志**、数据追踪三个切面上
-     （`OperateLogAspect` / `DataTracerService` / `LoginService`），每个后台写操作都会打一次，
+     （`OperateLogAspect` / `DataTracerService` / `MemberLoginService`），每个后台写操作都会打一次，
      免费额度 1500 次/天几个活跃运营就用光。
    - **把外部网络调用塞进登录链路**，多一个延迟来源与故障点；本地查表是微秒级、零失败。
    - **把用户 IP 送到第三方**，与本项目「满足《网络安全》《数据安全》、三级等保」的定位冲突，会是审计问题。

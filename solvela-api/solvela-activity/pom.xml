@@ -26,6 +26,22 @@
     -->
 
     <dependencies>
+
+        <!-- 玩法编排脚本：ActivityFacade 通过 ScriptRuntime 执行挂在活动上的 ACTIVITY_PLAY 脚本。
+             引擎只依赖 model + base，是本模块的上游，不构成环 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-scriptengine</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 本模块实现的对外契约（ActivityQueryApi）。同一个 api 模块里的 DrawApi
+             由 solvela-marketing 实现 —— 一个契约模块，多个实现模块，是正常的 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-marketing-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 本模块直接用到 model 的实体 13 处。
              原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
         <dependency>
