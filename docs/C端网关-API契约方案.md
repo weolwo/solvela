@@ -477,6 +477,59 @@ publisher-confirm 也救不了 —— 确认回调的前提是消息真的发出
 
 ---
 
+### 7.5 发奖跨服务：同步提案 + 异步回写（2026-08-30，同步段已完成）
+
+```
+marketing ──同步 HTTP──▶ member    受理 / 拒绝 + 原因（当场返回）
+     ↓ 落 t_prize_log.proposal_status + proposal_id + fail_reason
+member ────异步消息────▶ marketing  资产真正入账完成 / 失败
+     ↓ 落 t_prize_log.status（终态）
+```
+
+**为什么不是全异步**：「被风控拒了」这个当场就知道的结论，全异步要等一个来回才回来，
+而这期间发奖流水停在「待提交」——分不清是没提交过去还是被拒了。
+失败原因要能直接展示给 C 端用户、要让开发不必翻两个服务的日志对时间戳。
+
+**为什么不是全同步**：审批与入账是慢的（可能人工审批几小时），同步等不了。
+
+**状态拆两列**（`proposal_status` / `status`）的理由见 `PrizeProposalStatusEnum` 类注释：
+压在一个字段上时，「已受理但还在审批」与「已入账」长得一模一样。
+
+#### 已完成
+
+- 契约 `MemberProposalApi` + `CreateProposalCmd` + `ProposalResult`；
+- 会员侧 `ProposalApiService`：把 `BusinessException` 翻成 `failReason`。
+  **翻译放在这一层而不是改 `addProposal` 本身** —— 后台审批、人工补发也在调它，
+  那些路径上抛异常是对的（调用方是人）。同一段逻辑，对内抛异常、对外给返回值；
+- 四个发奖 handler 改调 api；`DispatchOutcome` 带上 `proposalId`；
+- `PrizeDispatchHandler` 落 `proposal_status`：被拒 → REJECTED + 原因；受理 → ACCEPTED + 提案 id。
+  **受理时刻意不写 `status=1`** —— 那会造成「记录显示成功、用户其实没收到」。
+
+#### 未完成
+
+| # | 事项 |
+|---|---|
+| 1 | consumer 从 member 挪到 marketing（它写 prize_log），member 去掉 prize |
+| 2 | ledger 停写 `t_prize_log`（跨服务写别人的表），改成发消息 |
+| 3 | marketing 订阅回写消息落终态 |
+| 4 | `t_mq_message_log` 落表 + 消费幂等 + 7 天清理 |
+| 5 | 重投任务：扫 `proposal_status = PENDING` 的行 |
+
+#### 已定但未实施的下一摊（活动事件订阅）
+
+- `t_mq_message_log` 的隔离列叫 **`consumer_key`** 而不是 `activity_code`：
+  这张表也要装非活动的消息（发奖回写），后者填 handler 名。唯一键 `(message_id, consumer_key)`，
+  后台重试按 `consumer_key` 过滤 —— 重跑 A 活动不会碰到 B；
+- **每种事件一个队列 + 订阅关系在库里**，不是每活动一个队列：活动是运营随时建的，
+  队列与绑定会爆炸且下线后残留。订阅关系复用现成的 `t_script_ref` + `ScriptRefPoint`；
+- 取订阅者时必须 **join 活动表过滤**（`t_script_ref` 不知道活动上没上线、数据结没结束）。
+  **活动没启用或数据已结束的，消息不记录**；
+- ⚠️ 这会让时间窗判据出现第三处（展示、准入、事件过滤）。**到第三处必须收口**成一个
+  `joinable(activity, now)`，SQL 只做粗筛。缓存只能存活动对象，不能存布尔值 ——
+  数据截止是时间到了自然失效，存布尔值会让活动结束后仍触发到 TTL 过期。
+
+---
+
 ## 8. 拆分那天要做的事（提前记下，验证今天的设计是否够）
 
 | 步骤 | 改动量 |

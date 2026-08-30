@@ -33,3 +33,20 @@ server:
 spring:
   profiles:
     active: '@profiles.active@'
+
+# ---------------------------------------------------------------------------
+# RabbitMQ：发奖的异步回写走它（会员服务发、营销服务收）
+# ---------------------------------------------------------------------------
+spring.rabbitmq:
+  host: 127.0.0.1
+  port: 5672
+  username: admin
+  password: 123456
+  listener:
+    simple:
+      # 消费失败不重新入队，直接进死信 —— 重入队会让一条必然失败的消息把队列打爆，
+      # 而死信队列至少留下了证据、能被人工重投
+      default-requeue-rejected: false
+      retry:
+        enabled: true
+        max-attempts: 3

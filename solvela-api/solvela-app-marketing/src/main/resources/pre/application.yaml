@@ -33,3 +33,18 @@ server:
 spring:
   profiles:
     active: '@profiles.active@'
+
+# ---------------------------------------------------------------------------
+# RabbitMQ：账号密码走环境变量 —— 生产配置里不写明文口令
+# ---------------------------------------------------------------------------
+spring.rabbitmq:
+  host: ${RABBITMQ_HOST:127.0.0.1}
+  port: ${RABBITMQ_PORT:5672}
+  username: ${RABBITMQ_USERNAME}
+  password: ${RABBITMQ_PASSWORD}
+  listener:
+    simple:
+      default-requeue-rejected: false
+      retry:
+        enabled: true
+        max-attempts: 3

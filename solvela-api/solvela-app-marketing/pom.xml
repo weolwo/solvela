@@ -67,6 +67,13 @@
         「这两个域将来若真拆成独立服务，它们之间只能是单向调用或事件」。
         -->
 
+        <!-- 消息：本服务与另一侧靠它连接。拓扑常量与消费幂等都在这个模块里 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-mq</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- ================= HTTP 层 ================= -->
 
         <!--

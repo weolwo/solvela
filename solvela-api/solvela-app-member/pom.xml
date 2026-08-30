@@ -66,6 +66,13 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 消息：本服务与另一侧靠它连接。拓扑常量与消费幂等都在这个模块里 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-mq</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- ================= HTTP 层 ================= -->
 
         <!-- 直接依赖 web 栈，不经过 solvela-web（那是管理端的 HTTP 层，

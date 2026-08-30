@@ -827,6 +827,7 @@ CREATE TABLE `t_mq_message_log` (
   `message_id` varchar(64) NOT NULL COMMENT '消息唯一标识（发送方生成）。唯一索引即消费幂等',
   `exchange` varchar(64) NOT NULL COMMENT '交换机',
   `routing_key` varchar(64) NOT NULL COMMENT '路由键。将来活动挂事件监听就是按它路由的',
+  `consumer_key` varchar(64) NOT NULL DEFAULT '' COMMENT '消费者标识：活动事件填活动编码，固定消费者填 handler 名。后台重试按它隔离',
   `queue` varchar(64) NOT NULL COMMENT '队列名：同一条消息可能被多个队列消费，队列名参与定位',
   `payload` mediumtext NOT NULL COMMENT '消息 JSON 原文',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '0-已接收, 1-处理成功, 2-处理失败',
@@ -835,7 +836,8 @@ CREATE TABLE `t_mq_message_log` (
   `receive_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '接收时间',
   `handle_time` datetime DEFAULT NULL COMMENT '处理完成时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_mq_msg` (`message_id`,`queue`),
+  UNIQUE KEY `uk_mq_msg` (`message_id`,`consumer_key`),
+  KEY `idx_mq_retry` (`consumer_key`,`status`,`receive_time`),
   KEY `idx_mq_status` (`status`,`receive_time`),
   KEY `idx_mq_receive_time` (`receive_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='消息接收记录：唯一索引即消费幂等，只保留 7 天';

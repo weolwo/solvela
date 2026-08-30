@@ -26,6 +26,14 @@
     -->
 
     <dependencies>
+
+        <!-- 发奖要把奖交给会员服务：同步调 MemberProposalApi 拿「受理 / 拒绝 + 原因」。
+             拆服务后这是营销与会员之间唯一的同步调用 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 本模块直接用到 model 的实体 27 处。
              原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
         <dependency>

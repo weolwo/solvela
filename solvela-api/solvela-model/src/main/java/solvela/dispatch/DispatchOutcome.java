@@ -20,17 +20,23 @@ package solvela.dispatch;
  *
  * @param ok         是否下发成功
  * @param failReason 失败原因，成功时为 null；会落库给运营看，别写堆栈
+ * @param proposalId 会员服务返回的提案 id，落进 {@code t_prize_log.proposal_id} 供人工排查。
+ *                   走不到提案那一步（如 0 值奖品）或幂等重复请求时为 null
  */
-public record DispatchOutcome(boolean ok, String failReason) {
+public record DispatchOutcome(boolean ok, String failReason, Long proposalId) {
 
-    private static final DispatchOutcome SUCCESS = new DispatchOutcome(true, null);
+    private static final DispatchOutcome SUCCESS = new DispatchOutcome(true, null, null);
 
     /** 工厂名是 success 而不是 ok：{@code ok} 已经是这个 record 的访问器名，重名过不了编译 */
     public static DispatchOutcome success() {
         return SUCCESS;
     }
 
+    public static DispatchOutcome success(Long proposalId) {
+        return new DispatchOutcome(true, null, proposalId);
+    }
+
     public static DispatchOutcome failed(String failReason) {
-        return new DispatchOutcome(false, failReason);
+        return new DispatchOutcome(false, failReason, null);
     }
 }

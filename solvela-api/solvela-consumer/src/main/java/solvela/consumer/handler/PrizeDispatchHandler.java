@@ -12,6 +12,7 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.consumer.strategy.PrizeStrategyFactory;
 import solvela.event.UserPrizeEvent;
 import solvela.enums.ApproveModeEnum;
+import solvela.enums.PrizeProposalStatusEnum;
 import solvela.enums.EventCategoryEnum;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
@@ -139,6 +140,9 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             //    若提案进了人工审批池，则合理地停在 0-等待执行。
             if (!outcome.ok()) {
                 prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
+                // 提案侧被拒 —— 原因来自会员服务，会落库并可能展示给用户，
+                // 这正是「同步调用」而不是发消息的理由：拒绝的原因当场就要拿到
+                prizeLog.setProposalStatus(PrizeProposalStatusEnum.REJECTED);
                 prizeLog.setFailReason(SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH));
                 log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
                 updateQuietly(prizeLog);
@@ -149,7 +153,14 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
                 updateQuietly(prizeLog);
                 log.info("【无需发放】LogId: {}, 奖品价值为0，直接判成功", prizeLog.getId());
             } else {
-                log.info("【发货已受理】LogId: {}, 最终状态由资产分发引擎回写", prizeLog.getId());
+                // 已受理 ≠ 用户拿到了：提案可能进人工审批池，资产入账也在提案事务提交之后。
+                // 所以这里只落【提案侧】的状态，status 留给终态回写 ——
+                // 抢先写 status=1 会造成「记录显示成功、用户其实没收到」，这个坑踩过一次
+                prizeLog.setProposalStatus(PrizeProposalStatusEnum.ACCEPTED);
+                prizeLog.setProposalId(outcome.proposalId());
+                updateQuietly(prizeLog);
+                log.info("【发货已受理】LogId: {}, 提案ID: {}, 最终状态由资产分发引擎回写",
+                        prizeLog.getId(), outcome.proposalId());
             }
         } catch (Exception e) {
             // 捕获不可预知的异常（如网络超时、空指针），防止影响整个应用的稳定性

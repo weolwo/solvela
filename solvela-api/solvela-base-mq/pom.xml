@@ -34,6 +34,15 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 消息记录表：唯一索引即消费幂等，所以本模块需要 ORM。
+             代价是「依赖 mq 就有 JDBC」—— 而收发消息的两个服务本来就连着库，
+             没有哪个进程是只要消息不要数据库的 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>

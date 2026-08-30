@@ -8,6 +8,7 @@ import solvela.dispatch.DispatchOutcome;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.ledger.handler.IAssetHandler;
 import solvela.ledger.strategy.AssetStrategyFactory;
+import solvela.member.api.PrizeDispatchResultMessage;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
 import solvela.risk.PromotionConfig;
@@ -38,6 +39,9 @@ public class AssetDispatchEngine implements AssetDispatcher {
     private final PromotionConfigDao promotionConfigDao;
 
     private final PrizeLogDao prizeLogDao;
+
+    /** 派发结果的出口：单体直接改库，会员服务发消息。见 PrizeDispatchResultPublisher */
+    private final PrizeDispatchResultPublisher dispatchResultPublisher;
 
     private final AssetStrategyFactory strategyFactory; // 资产策略工厂
 
@@ -135,20 +139,26 @@ public class AssetDispatchEngine implements AssetDispatcher {
     }
 
     /**
-     * 把派发结果同步回 t_prize_log
-     * <p>
-     * 分层上略有妥协：ledger 的引擎去改 prize 域的流水。但方案A 把下发挪到事务提交之后以后，
-     * 结果已经无法沿调用栈回到 PrizeDispatchHandler，而运营看的恰恰是发奖记录 ——
-     * 不回写就会出现「记录显示成功、用户没收到」。两者靠 external_biz_no == source_biz_id 这条既定契约关联。
+     * 把派发结果交回给发奖侧。
+     *
+     * <p>2026-08-30 之前这里是<b>直接 update t_prize_log</b>，注释里写着「分层上略有妥协：
+     * ledger 的引擎去改 prize 域的流水」。拆成两个服务之后那条路不通了 ——
+     * 发奖流水在营销服务，一个服务不能写另一个服务的表。
+     *
+     * <p>现在交给 {@link PrizeDispatchResultPublisher}：单体形态下它仍然直接更新（行为不变），
+     * 会员服务里换成发消息。<b>本方法不再关心结果落到哪</b>。
+     *
+     * <p>关联键仍是 {@code external_biz_no == source_biz_id} 这条既定契约。
      */
     private void syncPrizeLog(ProposalRecord proposal, PrizeDispatchStatusEnum status, String failReason) {
-        try {
-            prizeLogDao.updateStatusByExternalBizNo(proposal.getSourceBizId(), status,
-                    SolvelaStringUtil.truncate(failReason, FAIL_REASON_MAX_LENGTH));
-        } catch (Exception e) {
-            log.error("【发奖记录回写失败】业务单号: {}, 发奖记录状态可能与提案不一致，请人工核对",
-                    proposal.getSourceBizId(), e);
-        }
+        dispatchResultPublisher.publish(new PrizeDispatchResultMessage(
+                // 消息 id 用来源单号加状态后缀：同一笔奖的成功与失败是两条不同的消息，
+                // 而重复投递同一条时消费方能靠它判重
+                proposal.getSourceBizId() + ":" + status.name(),
+                proposal.getSourceBizId(),
+                proposal.getId(),
+                status == PrizeDispatchStatusEnum.SUCCESS,
+                SolvelaStringUtil.truncate(failReason, FAIL_REASON_MAX_LENGTH)));
     }
 
     /**

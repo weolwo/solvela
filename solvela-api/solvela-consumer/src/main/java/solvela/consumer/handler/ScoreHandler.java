@@ -84,7 +84,7 @@ public class ScoreHandler implements IPrizeHandler {
         // 风控拦截 / 资产配置异常由 addProposal 抛 BusinessException，必须如实上报：
         // 吞掉失败会让 PrizeDispatchHandler 把一条根本没入账的记录标成「发货成功」
         try {
-            ProposalResult result = memberProposalApi.createProposal(toCmd(req));
+            ProposalResult result = memberProposalApi.createProposal(ProposalCmdMapper.toCmd(req));
             if (!result.accepted()) {
                 log.warn("【发奖提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), result.failReason());
                 return DispatchOutcome.failed(result.failReason());

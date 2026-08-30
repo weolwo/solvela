@@ -39,3 +39,21 @@ solvela:
     session:
       token-ttl: 30d
       max-sessions: 10
+
+# ---------------------------------------------------------------------------
+# RabbitMQ：账号密码走环境变量 —— 生产配置里不写明文口令
+# ---------------------------------------------------------------------------
+spring.rabbitmq:
+  host: ${RABBITMQ_HOST:127.0.0.1}
+  port: ${RABBITMQ_PORT:5672}
+  username: ${RABBITMQ_USERNAME}
+  password: ${RABBITMQ_PASSWORD}
+  listener:
+    simple:
+      default-requeue-rejected: false
+      retry:
+        enabled: true
+        max-attempts: 3
+
+# 本进程的发奖链路是跨服务的：入账结果发消息给营销服务，而不是直接改它的表
+solvela.prize.dispatch.mode: mq
