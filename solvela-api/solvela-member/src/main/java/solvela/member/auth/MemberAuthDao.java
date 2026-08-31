@@ -21,11 +21,21 @@ public interface MemberAuthDao {
      *
      * <p>用 {@code phone_hash} 而不是 {@code phone}：手机号是加密落库的，
      * 密文每次加密都不同（AES-GCM 带随机 IV），没法用来查。摘要是确定的，且有唯一索引。
+     *
+     * <h3>🔴 UNHEX 不能省</h3>
+     * 列类型是 {@code binary(32)}（原始 32 字节），而 {@code PiiHasher.hash()} 返回的是
+     * <b>64 位 hex 字符串</b>。直接 {@code WHERE phone_hash = #{phoneHashHex}} 是拿 64 字节
+     * 去比 32 字节，<b>永远不相等</b> —— 表现是「注册成功，但登录一直说手机号或密码错误」。
+     *
+     * <p>2026-08-31 修正。此前一直没暴露，因为在那之前<b>全仓没有任何写 phone_hash 的路径</b>，
+     * {@code t_member} 是空表，这个查询从来没真正匹配过任何一行。
+     * 写入侧的对称转换见 {@code MemberRegisterDao} 的 UNHEX —— 两边只要有一处漏了，
+     * 症状就是登录静默失败，而两边代码单看都很正常。
      */
     @Select("""
             SELECT member_id, member_name, nickname, avatar_file_id, gender, status, password
             FROM t_member
-            WHERE phone_hash = #{phoneHashHex}
+            WHERE phone_hash = UNHEX(#{phoneHashHex})
             """)
     Member selectForLogin(@Param("phoneHashHex") String phoneHashHex);
 

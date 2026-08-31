@@ -18,6 +18,14 @@ const routes: RouteRecordRaw[] = [
     meta: { anonymous: true, title: '登录' },
   },
   {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    // 注册当然要匿名可访问。注意默认是【需要登录】的，公开页必须显式开口子 ——
+    // 反过来写的话，新加页面忘了标记就是默默裸奔，而那个方向的错误在 C 端是数据泄露
+    meta: { anonymous: true, title: '注册' },
+  },
+  {
     path: '/',
     name: 'home',
     component: () => import('@/views/HomeView.vue'),

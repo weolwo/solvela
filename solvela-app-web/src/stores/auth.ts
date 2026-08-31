@@ -5,8 +5,10 @@ import {
   fetchMe,
   login as loginApi,
   logout as logoutApi,
+  register as registerApi,
   type LoginPayload,
   type MemberProfile,
+  type RegisterPayload,
 } from '@/api/auth'
 import { ApiError } from '@/api/errors'
 import { configureHttp } from '@/api/http'
@@ -34,6 +36,17 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(payload: LoginPayload): Promise<void> {
     // 这里不吞异常：BAD_CREDENTIALS 必须原样抛给登录页去展示 message
     const result = await loginApi(payload)
+    setSession(result.accessToken, result.expiresIn, result.member)
+  }
+
+  /**
+   * 注册成功即登录：后端直接把令牌一起返回了，所以这里与 login 走同一条 setSession。
+   *
+   * 同样不吞异常 —— CONFLICT（手机号已注册）必须原样抛给注册页，
+   * 它要据此引导用户去登录，而不是只显示一行红字。
+   */
+  async function register(payload: RegisterPayload): Promise<void> {
+    const result = await registerApi(payload)
     setSession(result.accessToken, result.expiresIn, result.member)
   }
 
@@ -72,5 +85,5 @@ export const useAuthStore = defineStore('auth', () => {
     onLoginRequired: clearSession,
   })
 
-  return { token, member, isLoggedIn, restoring, login, logout, restore, clearSession }
+  return { token, member, isLoggedIn, restoring, login, register, logout, restore, clearSession }
 })

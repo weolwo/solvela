@@ -20,6 +20,9 @@ import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberIdentity;
 import solvela.member.api.MemberLogoutCmd;
+import solvela.member.api.MemberRegisterCmd;
+import solvela.member.api.MemberRegisterResult;
+import solvela.member.register.MemberRegisterService;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
 import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.util.MemberPhoneUtil;
@@ -59,9 +62,23 @@ public class MemberAuthService implements MemberAuthApi {
     private static final int REMARK_MAX_LENGTH = 128;
 
     private final MemberAuthDao memberAuthDao;
+    /**
+     * 注册委托给它。本类是<b>读</b>（验身份），注册是<b>写</b>（建号 + 事务），
+     * 塞进同一个类只会让「会员认证：验明身份，仅此而已」这句话变成假话。
+     * 契约共用 {@link MemberAuthApi} 的理由见那个接口上 register 方法的注释。
+     */
+    private final MemberRegisterService memberRegisterService;
     private final MemberLoginLogDao memberLoginLogDao;
     private final MemberOperationLimitService operationLimitService;
     private final PiiHasher piiHasher;
+
+    /**
+     * 手机号 + 密码注册。逻辑全在 {@link MemberRegisterService}，本方法只是契约的落点。
+     */
+    @Override
+    public MemberRegisterResult register(MemberRegisterCmd cmd) {
+        return memberRegisterService.register(cmd);
+    }
 
     /**
      * 手机号 + 密码认证。

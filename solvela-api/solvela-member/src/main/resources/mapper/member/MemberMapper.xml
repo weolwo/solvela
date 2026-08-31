@@ -14,7 +14,6 @@
         <result column="phone_hash" property="phoneHash"/>
         <result column="email" property="email"/>
         <result column="email_hash" property="emailHash"/>
-        <result column="password" property="password"/>
         <result column="status" property="status"/>
         <result column="register_source" property="registerSource"/>
         <result column="register_ip" property="registerIp"/>
@@ -35,10 +34,16 @@
                 gender, 
                 birthday, 
                 phone, 
-                phone_hash, 
+                <!-- 🔴 binary(32) 列必须 HEX 出来：DTO 字段是 String，直接 select 拿到的是
+                     32 个原始字节，映射成 String 就是一串乱码。DDL「附六」原话：「排查时
+                     SELECT HEX(phone_hash) 就能看到熟悉的十六进制」。
+                     写入侧的对称转换见 MemberRegisterDao 的 UNHEX。 -->
+                HEX(phone_hash) AS phone_hash, 
                 email, 
-                email_hash, 
-                password, 
+                HEX(email_hash) AS email_hash, 
+                <!-- 🔴 刻意不 select password：它是 Argon2id 哈希，会经 MemberDTO → MemberVO
+                     一路返回给管理端前端。前端一处都没用到，而哈希外泄等于把离线爆破的
+                     材料送出去。查不到，就不可能漏。 -->
                 status, 
                 register_source, 
                 register_ip, 

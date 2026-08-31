@@ -13,6 +13,7 @@ import solvela.app.auth.Anonymous;
 import solvela.app.auth.CurrentMember;
 import solvela.app.auth.MemberPrincipal;
 import solvela.app.domain.MemberLoginRequest;
+import solvela.app.domain.MemberRegisterRequest;
 import solvela.app.domain.MemberResult;
 import solvela.app.service.MemberLoginService;
 import solvela.app.web.ClientIp;
@@ -32,6 +33,24 @@ import solvela.app.web.ClientIp;
 public class MemberLoginController {
 
     private final MemberLoginService memberLoginService;
+
+    /**
+     * 手机号 + 密码注册，成功后<b>直接返回令牌</b>，形状与登录完全一致。
+     *
+     * <p>客户端因此不用为注册单独写一套「存令牌 + 存会员信息」的代码 ——
+     * 拿到 {@code MemberResult} 就走登录成功那条路。
+     *
+     * <h3>⚠️ 目前没有短信验证码</h3>
+     * 全仓没有短信基础设施，所以这条路由现在<b>任何人都能拿别人的手机号建号</b>，
+     * 唯一的缓解是会员域里的 IP 限频（见 {@code MemberRegisterService} 的类注释）。
+     * 上线前必须补验证码 —— 加一个字段、域里加一步校验，本方法不用动。
+     */
+    @Anonymous
+    @PostMapping("/register")
+    public MemberResult register(@RequestBody @Valid MemberRegisterRequest request,
+                                 HttpServletRequest servletRequest) {
+        return memberLoginService.register(request, ClientIp.of(servletRequest));
+    }
 
     /**
      * 手机号 + 密码登录。

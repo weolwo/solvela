@@ -28,6 +28,12 @@ export interface MemberProfile {
   gender: number | null
 }
 
+export interface RegisterPayload {
+  phone: string
+  password: string
+  deviceType?: DeviceType
+}
+
 export interface LoginResult {
   accessToken: string
   /** 有效期秒数。用来提前续期，而不是等 401 才反应 */
@@ -58,6 +64,30 @@ function normalizeMember(raw: RawMemberProfile): MemberProfile {
     nickname: raw.nickname,
     avatarFileId: raw.avatarFileId === null ? null : toId(raw.avatarFileId),
     gender: raw.gender,
+  }
+}
+
+/**
+ * 注册。**返回形状与登录完全一致**，所以调用方走同一条「存令牌 + 存会员信息」的路。
+ *
+ * 后端注册成功直接签令牌（见 MemberLoginController.register 的注释）——
+ * 没有「注册完再登一次」这一步，那一步不产生任何信息，只多一次可能失败的调用。
+ *
+ * 失败时抛 ApiError，几个码各有含义，注册页据此分支：
+ *   CONFLICT(409)         手机号已注册 → 引导去登录，不要只显示一行红字
+ *   INVALID_ARGUMENT(400) 手机号格式错 / 密码太弱 → message 就是规则原文，直接展示
+ *   OPERATION_LIMITED(429) 同一 IP 注册过于频繁 → message 里已带「还要等多久」
+ */
+export async function register(payload: RegisterPayload): Promise<LoginResult> {
+  const raw = await request<RawLoginResult>({
+    url: '/auth/register',
+    method: 'POST',
+    data: { deviceType: 'H5', ...payload },
+  })
+  return {
+    accessToken: raw.accessToken,
+    expiresIn: raw.expiresIn,
+    member: normalizeMember(raw.member),
   }
 }
 

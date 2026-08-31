@@ -52,8 +52,9 @@ public class MemberDTO {
     /** 邮箱HMAC-SHA256原始字节(32B)，可空 */
     private String emailHash;
 
-    /** 登录密码：Argon2id PHC串(盐已内嵌，不要再开salt列)。验证码登录可为空 */
-    private String password;
+    // 🔴 刻意没有 password：它是 Argon2id 哈希，2026-08-31 从本 DTO、MemberVO 与
+    // MemberMapper.xml 的 base_columns 里一并删除 —— 查不到，就不可能漏。
+    // 验密码走 MemberAuthDao.selectForLogin，那条查询单独取 password，只给认证链路用。
 
     /** 状态：1-正常, 2-冻结(风控/违规), 3-已注销 */
     private MemberStatusEnum status;

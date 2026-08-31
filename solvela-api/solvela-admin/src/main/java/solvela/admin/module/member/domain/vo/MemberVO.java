@@ -54,8 +54,11 @@ public class MemberVO {
     @Schema(description = "邮箱HMAC-SHA256原始字节(32B)，可空")
     private String emailHash;
 
-    @Schema(description = "登录密码：Argon2id PHC串(盐已内嵌，不要再开salt列)。验证码登录可为空")
-    private String password;
+    // 🔴 刻意没有 password：它是 Argon2id 哈希，2026-08-31 从本 VO 与
+    // MemberMapper.xml 的 base_columns 里一并删除。管理端前端一处都没用过它，
+    // 而把口令哈希送到浏览器等于把离线爆破的材料交出去。
+    // 同理 phoneHash / emailHash 现在经 SQL 的 HEX() 出来（列是 binary(32)），
+    // 只用于排查比对，不做展示。
 
     @Schema(description = "状态：1-正常, 2-冻结(风控/违规), 3-已注销")
     private MemberStatusEnum status;

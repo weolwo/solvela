@@ -8,6 +8,7 @@ import solvela.app.auth.MemberPrincipalLoader;
 import solvela.member.session.MemberAccessToken;
 import solvela.member.session.MemberTokenStore;
 import solvela.app.domain.MemberLoginRequest;
+import solvela.app.domain.MemberRegisterRequest;
 import solvela.app.domain.MemberResult;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
@@ -15,6 +16,9 @@ import solvela.member.api.MemberAuthApi;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberLogoutCmd;
+import solvela.member.api.MemberRegisterCmd;
+import solvela.member.api.MemberRegisterResult;
+import solvela.member.api.MemberPasswordPolicy;
 
 /**
  * 会员登录与退出的<b>接入层</b>：会话 + 措辞，没有别的。
@@ -50,9 +54,40 @@ public class MemberLoginService {
 
     private static final String LOCKED_MSG = "连续登录失败次数过多，请 %d 分钟后重试；需要提前恢复请联系客服";
 
+    private static final String REGISTER_LIMITED_MSG = "注册过于频繁，请 %d 分钟后重试";
+
+    /** 不传 deviceType 时的兜底，与 MemberAuthCmd 的约定一致 */
+    private static final String DEFAULT_DEVICE_TYPE = "H5";
+
     private final MemberAuthApi memberAuthApi;
     private final MemberPrincipalLoader principalLoader;
     private final MemberTokenStore tokenStore;
+
+    /**
+     * 注册并<b>直接登录</b>。
+     *
+     * <p>不让用户注册完再登一次：那一步不产生任何信息，只多一次可能失败的调用。
+     * 域返回 {@code MemberIdentity} 正是为了让这一层能直接签令牌。
+     *
+     * <h3>register_source 由这一层推导，不收客户端的</h3>
+     * 它是运营分析渠道、风控识别批量注册的依据，可被任意伪造就没有价值。
+     * 按 deviceType 推导：客户端仍能撒谎说自己是 APP，但至少只能在这几个已知取值里撒。
+     */
+    public MemberResult register(MemberRegisterRequest request, String ip) {
+        String deviceType = request.deviceType() == null || request.deviceType().isBlank()
+                ? DEFAULT_DEVICE_TYPE
+                : request.deviceType();
+
+        MemberRegisterResult result = memberAuthApi.register(new MemberRegisterCmd(
+                request.phone(), request.password(), deviceType, ip, deviceType));
+        if (!result.success()) {
+            throw translateRegister(result);
+        }
+
+        MemberPrincipal principal = MemberPrincipal.of(result.identity());
+        MemberAccessToken token = tokenStore.issue(principal.memberId());
+        return new MemberResult(token.value(), token.expiresIn().toSeconds(), principal);
+    }
 
     public MemberResult login(MemberLoginRequest request, String ip) {
         MemberAuthResult result = memberAuthApi.authenticate(new MemberAuthCmd(
@@ -92,6 +127,32 @@ public class MemberLoginService {
             case NO_PASSWORD -> new ApiException(ApiErrors.BAD_CREDENTIALS, "该账号未设置密码，请使用短信验证码登录");
             case OPERATION_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED, lockedMessage(result.lockedSeconds()));
         };
+    }
+
+    /**
+     * 注册失败原因 → HTTP 契约。同样用 switch 表达式，新增原因时编译不过。
+     *
+     * <h3>这里的措辞取舍与登录【正好相反】</h3>
+     * 登录要含糊（不能让人拿登录接口枚举手机号），注册必须明说 ——
+     * 用户得知道该去登录还是该换个号，含糊其辞只会让他一直点注册。
+     * 这确实是一个手机号枚举口子，但它是注册这件事自带的、藏不掉，
+     * 只能靠限频压速率。详见 {@code RegisterFailReason} 的类注释。
+     */
+    private ApiException translateRegister(MemberRegisterResult result) {
+        return switch (result.reason()) {
+            case BAD_PHONE_FORMAT -> new ApiException(ApiErrors.INVALID_ARGUMENT, "手机号格式不正确");
+            // 409 而不是 400：这不是「你填错了」，是「服务端已有一个冲突的东西」。
+            // 前端据此可以直接引导去登录页，而 400 是一堆参数问题的大杂烩
+            case PHONE_TAKEN -> new ApiException(ApiErrors.CONFLICT, "该手机号已注册，请直接登录");
+            // 提示文案从域里取，不在这里再写一遍规则 —— 两份措辞迟早对不上
+            case WEAK_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, MemberPasswordPolicy.HINT);
+            case TOO_MANY_ATTEMPTS ->
+                    new ApiException(ApiErrors.OPERATION_LIMITED, registerLimitedMessage(result.retryAfterSeconds()));
+        };
+    }
+
+    private static String registerLimitedMessage(long retryAfterSeconds) {
+        return String.format(REGISTER_LIMITED_MSG, Math.max(1, (long) Math.ceil(retryAfterSeconds / 60.0)));
     }
 
     /**

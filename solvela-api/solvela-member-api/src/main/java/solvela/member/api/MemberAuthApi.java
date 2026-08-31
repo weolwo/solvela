@@ -31,6 +31,21 @@ import org.springframework.web.service.annotation.PostExchange;
 public interface MemberAuthApi {
 
     /**
+     * 手机号 + 密码注册。<b>只建会员，不发令牌</b> —— 与 {@link #authenticate} 同一个理由。
+     *
+     * <p>成功返回 {@link MemberIdentity}，网关据此直接签令牌让用户进去，不必再走一次登录。
+     *
+     * <p>放在<b>认证契约</b>里而不是另建一个 {@code MemberRegisterApi}：多一个接口就多一个
+     * 「服务端薄壳建了没有」的失误面 —— 那个坑踩过一次（{@code MemberProposalApi} 的壳漏了，
+     * 所有进程内测试都发现不了，一直到第一次真实发奖才炸）。挂在已有壳上，编译器替你记着。
+     *
+     * <p>实现委托给 {@code MemberRegisterService}：认证是读、注册是写，事务语义不同，
+     * 不该塞进同一个类。
+     */
+    @PostExchange("/register")
+    MemberRegisterResult register(@RequestBody MemberRegisterCmd cmd);
+
+    /**
      * 手机号 + 密码认证。<b>只验身份，不发令牌。</b>
      *
      * <p>成功返回带 {@link MemberIdentity} 的结果；失败带 {@link AuthFailReason}，

@@ -9,6 +9,11 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
+/** 带着 redirect 一起跳，注册完能回到用户本来要去的页面 */
+async function goRegister(): Promise<void> {
+  await router.replace({ name: 'register', query: route.query })
+}
+
 const phone = ref('')
 const password = ref('')
 const submitting = ref(false)
@@ -81,6 +86,8 @@ async function submit(): Promise<void> {
     >
       登录
     </var-button>
+
+    <var-button class="login__alt" text block @click="goRegister">还没有账号？去注册</var-button>
   </div>
 </template>
 
@@ -111,6 +118,10 @@ async function submit(): Promise<void> {
 }
 
 .login__submit {
+  margin-top: var(--sv-space-sm);
+}
+
+.login__alt {
   margin-top: var(--sv-space-sm);
 }
 </style>

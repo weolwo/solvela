@@ -16,6 +16,11 @@ import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberIdentity;
 import solvela.member.api.MemberLogoutCmd;
+import solvela.member.api.MemberPasswordPolicy;
+import solvela.member.api.MemberRegisterCmd;
+import solvela.member.api.MemberRegisterResult;
+import solvela.member.api.RegisterFailReason;
+import solvela.enums.GenderEnum;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -71,6 +76,29 @@ class ApiContractTest {
                     return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
                 }
 
+                /**
+                 * 桩：按手机号的最后一位分派到各个 reason，让网关那张注册翻译表
+                 * 每条分支都能被真实 HTTP 请求走一遍。
+                 * 域自己的规则（格式、强度、限频）由会员域的测试负责，这里不重复。
+                 */
+                @Override
+                public MemberRegisterResult register(MemberRegisterCmd cmd) {
+                    if (cmd.phone() == null || !cmd.phone().matches("[0-9]{11}")) {
+                        return MemberRegisterResult.fail(RegisterFailReason.BAD_PHONE_FORMAT);
+                    }
+                    if (cmd.phone().endsWith("1")) {
+                        return MemberRegisterResult.fail(RegisterFailReason.PHONE_TAKEN);
+                    }
+                    if (cmd.phone().endsWith("2")) {
+                        return MemberRegisterResult.fail(RegisterFailReason.WEAK_PASSWORD);
+                    }
+                    if (cmd.phone().endsWith("3")) {
+                        return MemberRegisterResult.tooManyAttempts(90L);
+                    }
+                    return MemberRegisterResult.ok(new MemberIdentity(
+                            1000000001L, "sv1000000001", "会员1000000001", null, GenderEnum.UNKNOWN));
+                }
+
                 @Override
                 public MemberIdentity getAuthIdentity(Long memberId) {
                     return null;
@@ -101,6 +129,84 @@ class ApiContractTest {
         assertEquals("LOGIN_REQUIRED", body.path("code").asText(),
                 "错误码要稳定且自解释，客户端按它分支");
         assertFalse(body.path("message").asText().isBlank(), "要有一句能直接展示给用户的话");
+    }
+
+    @Test
+    @DisplayName("注册成功 → 200，直接带回令牌（不用再登一次）")
+    void 注册成功直接返回令牌() {
+        HttpResponse<String> response =
+                post("/auth/register", "{\"phone\":\"13800000000\",\"password\":\"abcd1234\"}", null);
+
+        assertEquals(200, response.statusCode(), "实际响应：" + response.body());
+
+        JsonNode body = parse(response);
+        assertFalse(body.path("accessToken").asText().isBlank(),
+                "注册完必须直接给令牌 —— 让用户注册完再登一次是纯多余的一步，"
+                        + "而多一次调用就多一次失败的机会");
+        assertTrue(body.path("expiresIn").asLong() > 0, "要给有效期，客户端据此提前续期");
+        assertEquals("sv1000000001", body.path("member").path("memberName").asText(),
+                "账号由会员域自动生成，不需要用户在注册时起");
+    }
+
+    @Test
+    @DisplayName("🔴 注册接口不能泄露密码或手机号")
+    void 注册响应里没有敏感信息() {
+        HttpResponse<String> response =
+                post("/auth/register", "{\"phone\":\"13800000000\",\"password\":\"abcd1234\"}", null);
+
+        String raw = response.body();
+        assertFalse(raw.contains("13800000000"),
+                "响应里出现了手机号。MemberIdentity 刻意不带它 —— 这个对象会进 Redis、进日志，"
+                        + "放明文手机号等于让整套 PII 加密失效。实际响应：" + raw);
+        assertFalse(raw.contains("abcd1234"), "响应里出现了明文密码。实际响应：" + raw);
+        assertFalse(raw.contains("$argon2"), "响应里出现了密码哈希。实际响应：" + raw);
+    }
+
+    @Test
+    @DisplayName("手机号已注册 → 409，且明说，不含糊")
+    void 手机号已注册返回409() {
+        HttpResponse<String> response =
+                post("/auth/register", "{\"phone\":\"13800000001\",\"password\":\"abcd1234\"}", null);
+
+        assertEquals(409, response.statusCode(),
+                "用 409 而不是 400：这不是「你填错了」，是「服务端已有一个冲突的东西」，"
+                        + "前端据此可以直接引导去登录页。实际响应：" + response.body());
+
+        JsonNode body = parse(response);
+        assertEquals("CONFLICT", body.path("code").asText());
+        assertTrue(body.path("message").asText().contains("已注册"),
+                "注册的措辞与登录【正好相反】：登录要含糊（防手机号枚举），"
+                        + "注册必须明说，否则用户不知道该去登录还是换号。实际：" + body.path("message").asText());
+    }
+
+    @Test
+    @DisplayName("密码太弱 → 400，且把规则原文给出来")
+    void 密码太弱返回400() {
+        HttpResponse<String> response =
+                post("/auth/register", "{\"phone\":\"13800000002\",\"password\":\"abcd1234\"}", null);
+
+        assertEquals(400, response.statusCode(), "实际响应：" + response.body());
+
+        JsonNode body = parse(response);
+        assertEquals("INVALID_ARGUMENT", body.path("code").asText());
+        assertEquals(MemberPasswordPolicy.HINT, body.path("message").asText(),
+                "提示文案必须来自 MemberPasswordPolicy.HINT —— 在网关再写一遍，"
+                        + "改规则时两处措辞就会对不上");
+    }
+
+    @Test
+    @DisplayName("注册过于频繁 → 429，并告诉还要等多久")
+    void 注册限频返回429() {
+        HttpResponse<String> response =
+                post("/auth/register", "{\"phone\":\"13800000003\",\"password\":\"abcd1234\"}", null);
+
+        assertEquals(429, response.statusCode(), "实际响应：" + response.body());
+
+        JsonNode body = parse(response);
+        assertEquals("OPERATION_LIMITED", body.path("code").asText());
+        // 域给的是 90 秒，向上取整到 2 分钟 —— 剩 90 秒时说「请 1 分钟后重试」用户会白点一次
+        assertTrue(body.path("message").asText().contains("2 分钟"),
+                "秒数要向上取整成人话。实际：" + body.path("message").asText());
     }
 
     @Test
