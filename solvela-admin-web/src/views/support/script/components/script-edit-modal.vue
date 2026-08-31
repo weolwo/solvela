@@ -41,6 +41,19 @@
         <a-input v-model:value="form.description" placeholder="这个脚本是干什么的" />
       </a-form-item>
 
+      <!--
+        🔴 选了一个没有已接入挂载点的场景，这里必须说清楚：
+        脚本能写、能存、能激活，但挂载那一步会发现无处可挂 —— 而场景改不了。
+      -->
+      <a-alert v-if="sceneUnmountable" type="error" show-icon class="mb-3">
+        <template #message>这个场景目前没有已接入的挂载点</template>
+        <template #description>
+          脚本可以写、可以保存，但<b>挂不上任何业务对象</b>：引擎里还没有代码会执行这个场景的槽位。
+          而<b>场景创建后不能改</b>，选错就只能换一个脚本编码重建。<br />
+          如果你要写的是「一次抽奖走哪条玩法分支、进哪个奖池」，请选<b>活动玩法编排</b>。
+        </template>
+      </a-alert>
+
       <!-- 场景变量放在编辑器上方：写脚本时最需要的就是「我能拿到什么」 -->
       <a-alert v-if="currentScene" type="info" class="mb-3">
         <template #message>
@@ -113,7 +126,21 @@
     changeLog: '',
   });
 
-  const sceneOptions = computed(() => props.scenes.map((scene) => ({ value: scene.scene, label: `${scene.title}（${scene.scene}）` })));
+  /*
+   * 🔴 挂不上的场景标出来但<b>不禁选</b>。
+   *
+   * 禁掉会挡住「调用点还没写完，先把脚本准备好」这种正当用法；
+   * 而完全不提示的代价更大 —— 场景创建后不可改，选错了整个脚本作废、只能换编码重建。
+   * 所以：可选、但把后果摆在眼前。
+   */
+  const sceneOptions = computed(() =>
+    props.scenes.map((scene) => ({
+      value: scene.scene,
+      label: scene.mountable === false ? `${scene.title}（挂载点未接入）` : `${scene.title}（${scene.scene}）`,
+    }))
+  );
+
+  const sceneUnmountable = computed(() => currentScene.value?.mountable === false);
 
   const currentScene = computed(() => props.scenes.find((scene) => scene.scene === form.scene));
 

@@ -48,6 +48,15 @@ public class ScriptSceneDocDTO {
      */
     private List<Param> params;
 
+    /**
+     * 这个场景<b>现在挂得上去吗</b>：是否存在「接受本场景 + 引擎已接入」的挂载点。
+     *
+     * <p>false 表示脚本写出来也没地方挂、挂了也不会执行。
+     * 🔴 而场景<b>创建后不可改</b>，所以这件事必须在<b>写脚本之前</b>就告诉人，
+     * 不能等他写完保存完、到挂载那一步看见一个灰掉的下拉才发现 —— 那时只能换个编码重建。
+     */
+    private Boolean mountable;
+
     @Data
     public static class Param {
 

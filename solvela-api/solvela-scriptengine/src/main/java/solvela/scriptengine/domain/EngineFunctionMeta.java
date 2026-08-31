@@ -56,6 +56,14 @@ public class EngineFunctionMeta {
      */
     private final boolean injectContext;
 
+    /**
+     * 首参要注入的<b>场景专用上下文</b>的投影；为 null 表示注入 {@link solvela.scriptengine.spi.EngineContext} 本身
+     * （或 {@code injectContext=false} 时不注入任何东西）。
+     *
+     * <p>见 {@link solvela.scriptengine.spi.ScriptContextProjection}。
+     */
+    private final solvela.scriptengine.spi.ScriptContextProjection<?> contextProjection;
+
     // --- 前端展示与文档所需资源 ---
 
     /**

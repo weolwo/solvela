@@ -145,21 +145,24 @@ public class ActivityFacade implements ActivityApi {
      *   <li>内部通道那份是给 <b>Java 函数用</b>的权威值，脚本看不见也改不掉。</li>
      * </ul>
      * 只绑脚本变量的话，一段 {@code memberId = 10086; return draw_draw('POOL_A');}
-     * 就能替别人抽奖。详见 {@link ActivityPlayKeys}。
+     * 就能替别人抽奖。内部通道的读写统一走 {@link ActivityPlayContext}，
+     * 键的定义见 {@link ActivityPlayKeys}。
      */
     private static EngineContext playContext(ActivityConfig activity, ActivityDrawCmd cmd) {
-        return EngineContext.create()
+        EngineContext context = EngineContext.create()
                 // --- 脚本可见：给运营写判断用 ---
                 .bind("memberId", cmd.memberId())
                 .bind("activityCode", activity.getActivityCode())
                 .bind("activityType", activity.getActivityType())
                 // 空 Map 而不是 null：场景契约要求 params 必填，而「前端没传自定义参数」是常态。
                 // 让脚本去判 null 是把一个本可以消灭的分支塞给运营
-                .bind("params", cmd.params() == null ? Map.of() : cmd.params())
-                // --- 脚本不可见：函数用的权威值 ---
-                .bindInternal(ActivityPlayKeys.MEMBER_ID, cmd.memberId())
-                .bindInternal(ActivityPlayKeys.ACTIVITY_CODE, activity.getActivityCode())
-                .bindInternal(ActivityPlayKeys.REQUEST_ID, cmd.requestId());
+                .bind("params", cmd.params() == null ? Map.of() : cmd.params());
+
+        // --- 脚本不可见：函数用的权威值 ---
+        // 🔴 内部通道的读写统一走 ActivityPlayContext，别处不要直接碰 ActivityPlayKeys ——
+        //    通道里有哪些键、少了算不算错，只有那一个类知道
+        return new ActivityPlayContext(cmd.memberId(), activity.getActivityCode(), cmd.requestId())
+                .bindInto(context);
     }
 
     /**

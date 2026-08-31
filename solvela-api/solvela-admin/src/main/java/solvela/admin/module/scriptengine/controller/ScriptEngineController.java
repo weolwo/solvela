@@ -20,6 +20,7 @@ import solvela.admin.module.scriptengine.domain.vo.ScriptCheckResultVO;
 import solvela.scriptengine.domain.ScriptSceneDocDTO;
 import solvela.scriptengine.spi.EngineContext;
 import solvela.scriptengine.spi.ScriptEngine;
+import solvela.scriptengine.spi.ScriptRefPoint;
 import solvela.scriptengine.spi.ScriptScene;
 
 import java.util.Arrays;
@@ -66,6 +67,9 @@ public class ScriptEngineController {
             doc.setDomainTitle(scene.getDomain().getTitle());
             doc.setDescription(scene.getDescription());
             doc.setReturnType(scene.getReturnType().getSimpleName());
+            // 有没有「接受本场景且引擎已接入」的挂载点。没有就等于写了也用不上
+            doc.setMountable(Arrays.stream(ScriptRefPoint.values())
+                    .anyMatch(point -> point.getExpectedScene() == scene && point.isWired()));
             doc.setParams(scene.getParams().stream().map(param -> {
                 ScriptSceneDocDTO.Param item = new ScriptSceneDocDTO.Param();
                 item.setName(param.name());

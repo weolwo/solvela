@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 import solvela.scriptengine.annotation.ScriptFunction;
 import solvela.scriptengine.domain.EngineFunctionMeta;
+import solvela.scriptengine.spi.ScriptContextProjection;
 import solvela.scriptengine.spi.EngineContext;
 import solvela.scriptengine.spi.ScriptDomain;
 import solvela.scriptengine.spi.ScriptEvaluator;
@@ -18,6 +19,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -40,8 +42,35 @@ public class EngineFunctionScanner implements SmartInitializingSingleton {
 
     private final ScriptEvaluator scriptEvaluator;
 
+    /** 类型化上下文投影：contextType -> 投影实现。启动时从容器收集 */
+    private final Map<Class<?>, ScriptContextProjection<?>> projections = new HashMap<>();
+
+    /**
+     * 收集类型化上下文投影。
+     *
+     * <p>🔴 一个类型注册了两个投影就直接抛：那意味着「同一个上下文类型有两种解释」，
+     * 让引擎去猜用哪个，出问题时没有任何线索能回溯到这一步。
+     */
+    private void collectProjections() {
+        for (String name : applicationContext.getBeanNamesForType(ScriptContextProjection.class)) {
+            ScriptContextProjection<?> projection = applicationContext.getBean(name, ScriptContextProjection.class);
+            ScriptContextProjection<?> exists = projections.putIfAbsent(projection.contextType(), projection);
+            if (exists != null) {
+                throw new IllegalStateException(String.format(
+                        "脚本上下文投影冲突：类型 [%s] 同时被 %s 与 %s 注册",
+                        projection.contextType().getName(),
+                        exists.getClass().getName(), projection.getClass().getName()));
+            }
+        }
+        if (!projections.isEmpty()) {
+            log.info("[ScriptEngine] 类型化上下文投影 {} 个：{}", projections.size(),
+                    projections.keySet().stream().map(Class::getSimpleName).toList());
+        }
+    }
+
     @Override
     public void afterSingletonsInstantiated() {
+        collectProjections();
         String[] beanNames = applicationContext.getBeanNamesForType(ScriptFunctionHandler.class);
         for (String beanName : beanNames) {
             scanHandler(applicationContext.getBean(beanName, ScriptFunctionHandler.class));
@@ -86,9 +115,17 @@ public class EngineFunctionScanner implements SmartInitializingSingleton {
         }
 
         Parameter[] parameters = method.getParameters();
-        // 约定：首参声明为 EngineContext 即视为「请求注入执行上下文」，脚本侧不传这个参数
-        boolean injectContext = parameters.length > 0
-                && EngineContext.class.isAssignableFrom(parameters[0].getType());
+        /*
+         * 约定：首参声明为 EngineContext、或声明为任何已注册投影的类型，
+         * 即视为「请求注入执行上下文」，脚本侧不传这个参数。
+         *
+         * 两种写法的区别只在拿到手的是什么：前者是无边界的袋子，后者是场景专用的类型化对象。
+         * 新函数应当优先用后者 —— 签名即契约。
+         */
+        Class<?> firstType = parameters.length > 0 ? parameters[0].getType() : null;
+        ScriptContextProjection<?> projection = firstType == null ? null : projections.get(firstType);
+        boolean injectContext = projection != null
+                || (firstType != null && EngineContext.class.isAssignableFrom(firstType));
 
         List<String> scriptParams = Arrays.stream(parameters)
                 .skip(injectContext ? 1 : 0)
@@ -96,6 +133,7 @@ public class EngineFunctionScanner implements SmartInitializingSingleton {
                 .collect(Collectors.toList());
 
         return EngineFunctionMeta.builder()
+                .contextProjection(projection)
                 .domain(domain)
                 .functionName(qualifiedName)
                 .simpleName(simpleName)

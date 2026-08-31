@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import solvela.activity.runtime.ActivityPlayContext;
 import solvela.draw.DrawConfig;
 import solvela.draw.DrawPrizeLog;
 import solvela.draw.drawconfig.service.DrawConfigService;
@@ -32,7 +33,8 @@ import java.time.LocalDateTime;
  * </pre>
  *
  * <h3>🔴 会员号、活动编码、幂等键都不从脚本参数取</h3>
- * 它们从 {@link EngineContext} 的<b>内部通道</b>取（{@link ActivityPlayKeys}）。
+ * 它们从 {@link EngineContext} 的<b>内部通道</b>取，读取统一走 {@link ActivityPlayContext}
+ * （通道的键定义见 {@link ActivityPlayKeys}，但别在这里直接用它）。
  * 脚本变量里虽然也有一份 memberId 供脚本判断，但那是<b>脚本能改的</b>：
  * <pre>
  *   memberId = 10086;
@@ -93,17 +95,8 @@ public class DrawScriptFunctions implements ScriptFunctionHandler {
             description = "本周期内该会员已经抽了几次。周期由抽奖配置的 reset_period 决定"
                     + "（按天/周/月从周期起点数起，ACTIVITY 则整个活动累计）。"
                     + "未中奖与异常记录都算一次。只读，可多次调用")
-    public int countDrawn(EngineContext context) {
-        Long memberId = context.getInternal(ActivityPlayKeys.MEMBER_ID, Long.class);
-        String activityCode = context.getInternal(ActivityPlayKeys.ACTIVITY_CODE, String.class);
-        if (memberId == null || activityCode == null) {
-            // 与抽奖函数同一套判据：拿不到身份是编程错误，不是业务失败。
-            // 绝不能兜底成 0 —— 那等于「查不到就当没抽过」，直接把次数限制废掉
-            throw new BusinessException("次数查询函数缺少执行上下文（memberId / activityCode）。"
-                    + "本函数只能在 ACTIVITY_PLAY 场景里调用。");
-        }
-
-        DrawConfig drawConfig = drawConfigService.getByActivityCode(activityCode);
+    public int countDrawn(ActivityPlayContext play) {
+        DrawConfig drawConfig = drawConfigService.getByActivityCode(play.activityCode());
         String resetPeriod = drawConfig == null ? null : drawConfig.getResetPeriod();
 
         LocalDateTime since = null;
@@ -116,8 +109,8 @@ public class DrawScriptFunctions implements ScriptFunctionHandler {
         LocalDateTime finalSince = since;
         // 走 idx_mem_act (member_id, activity_code)
         long count = drawPrizeLogDao.selectCount(Wrappers.<DrawPrizeLog>lambdaQuery()
-                .eq(DrawPrizeLog::getMemberId, memberId)
-                .eq(DrawPrizeLog::getActivityCode, activityCode)
+                .eq(DrawPrizeLog::getMemberId, play.memberId())
+                .eq(DrawPrizeLog::getActivityCode, play.activityCode())
                 .ge(finalSince != null, DrawPrizeLog::getCreateTime, finalSince));
         return Math.toIntExact(count);
     }
@@ -132,22 +125,14 @@ public class DrawScriptFunctions implements ScriptFunctionHandler {
     @ScriptFunction(name = "executeDrawByScript", sideEffect = true,
             description = "在指定奖池抽一次，返回抽奖结果。会员号与幂等键由引擎从上下文取，脚本只传奖池编码。"
                     + "⚠️ 有副作用：一次执行只准调一次，且应当是脚本的最后一步")
-    public DrawResultView executeDrawByScript(EngineContext context, String poolCode) {
-        Long memberId = context.getInternal(ActivityPlayKeys.MEMBER_ID, Long.class);
-        String activityCode = context.getInternal(ActivityPlayKeys.ACTIVITY_CODE, String.class);
-        String requestId = context.getInternal(ActivityPlayKeys.REQUEST_ID, String.class);
-
-        // 走到这里还拿不到身份，说明调用方没按 ACTIVITY_PLAY 的约定绑上下文 —— 这是编程错误，
-        // 不是业务失败，抛出去让它变成 5xx 是对的。绝不能兜底成「按匿名抽一次」
-        if (memberId == null || activityCode == null) {
-            throw new BusinessException("抽奖函数缺少执行上下文（memberId / activityCode）。"
-                    + "本函数只能在 ACTIVITY_PLAY 场景里调用，其它场景没有绑定这些内部数据。");
-        }
+    public DrawResultView executeDrawByScript(ActivityPlayContext play, String poolCode) {
         if (poolCode == null || poolCode.isBlank()) {
             throw new BusinessException("脚本调用抽奖函数时没有给出奖池编码");
         }
 
-        log.info("[抽奖-脚本] activityCode: {}, poolCode: {}, memberId: {}", activityCode, poolCode, memberId);
-        return activityDrawFacade.draw(new DrawCmd(activityCode, poolCode, memberId, requestId));
+        log.info("[抽奖-脚本] activityCode: {}, poolCode: {}, memberId: {}",
+                play.activityCode(), poolCode, play.memberId());
+        return activityDrawFacade.draw(
+                new DrawCmd(play.activityCode(), poolCode, play.memberId(), play.requestId()));
     }
 }

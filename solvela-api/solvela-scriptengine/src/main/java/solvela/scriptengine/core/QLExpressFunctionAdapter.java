@@ -7,6 +7,7 @@ import com.alibaba.qlexpress4.runtime.function.CustomFunction;
 import solvela.exception.BusinessException;
 import solvela.scriptengine.domain.EngineFunctionMeta;
 import solvela.scriptengine.spi.EngineContext;
+import solvela.scriptengine.spi.ScriptContextProjection;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -74,7 +75,9 @@ public class QLExpressFunctionAdapter implements CustomFunction {
         Object[] finalArgs;
         if (meta.isInjectContext()) {
             finalArgs = new Object[converted.length + 1];
-            finalArgs[0] = qContext.attachment().get(QLExpressEvaluator.ATTACH_ENGINE_CONTEXT);
+            Object engineContext = qContext.attachment().get(QLExpressEvaluator.ATTACH_ENGINE_CONTEXT);
+            // 声明了场景专用上下文的，注入投影结果；否则注入 EngineContext 本身
+            finalArgs[0] = projectIfNeeded(engineContext);
             System.arraycopy(converted, 0, finalArgs, 1, converted.length);
         } else {
             finalArgs = converted;
@@ -115,5 +118,20 @@ public class QLExpressFunctionAdapter implements CustomFunction {
                     firstCalled, meta.getFunctionName()));
         }
         context.bindInternal(SIDE_EFFECT_GUARD_KEY, meta.getFunctionName());
+    }
+
+    /**
+     * 需要的话把 {@link EngineContext} 投影成场景专用类型。
+     *
+     * <p>拿不到上下文时直接把 null 传下去 —— 与 {@code guardSideEffect} 的处理一致：
+     * 那说明这次执行没有上下文（引擎自检、语法预校验），不该在这里炸。
+     * 真正在业务场景里少了上下文，投影自己会抛，而且报得比这里清楚。
+     */
+    private Object projectIfNeeded(Object engineContext) {
+        ScriptContextProjection<?> projection = meta.getContextProjection();
+        if (projection == null || !(engineContext instanceof EngineContext context)) {
+            return engineContext;
+        }
+        return projection.project(context, meta.getFunctionName());
     }
 }

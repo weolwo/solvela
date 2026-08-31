@@ -168,6 +168,17 @@
         <div v-if="compatiblePointOptions.length === 0" class="no-point-hint">
           没有挂载点接受「{{ detail.sceneTitle || detail.scene }}」这个场景的脚本
         </div>
+        <!--
+          有挂载点、但全是未接入 —— 这是最容易让人困惑的一种：下拉里明明有东西，却全是灰的。
+          不解释的话，看到的就只是「挂不上，也不知道为什么」。
+        -->
+        <div v-else-if="allPointsUnwired" class="no-point-hint">
+          「{{ detail.sceneTitle || detail.scene }}」只能挂到
+          {{ compatiblePointOptions.map((p) => p.label).join('、') }}，
+          而这些槽位<b>引擎还没有接入</b> —— 挂上去也不会执行，所以暂时不开放挂载。
+          <br />
+          场景创建后不可改；要让这个脚本能用，需要换一个场景合适的新脚本编码。
+        </div>
 
         <!---------- 版本 ----------->
         <a-divider orientation="left">
@@ -476,6 +487,11 @@
 
   /** 表单标签跟着挂载点走：说「抽奖配置」比说「业务对象编码」清楚得多 */
   const ownerLabel = computed(() => (selectedPoint.value ? selectedPoint.value.ownerTitle || '业务对象' : '业务对象'));
+
+  /** 有候选挂载点、但一个都没接入。与「一个候选都没有」是两种不同的困惑，文案要分开 */
+  const allPointsUnwired = computed(
+    () => compatiblePointOptions.value.length > 0 && compatiblePointOptions.value.every((option) => option.disabled)
+  );
 
   function isUnwired(refPoint) {
     const hit = refPoints.value.find((point) => point.refPoint === refPoint);
