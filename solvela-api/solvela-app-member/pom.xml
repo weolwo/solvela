@@ -20,12 +20,15 @@
     <!--
     与 solvela-app-marketing 同构：本模块只有启动类、HTTP 薄壳、错误出口，业务逻辑一行都不在这里。
 
-    <h3>为什么发奖派发（consumer）在本服务</h3>
-    派发的终点是<b>动资产</b>：consumer → risk.proposal → AssetDispatcher → ledger。
-    ledger 与 risk 都在这一侧，把 consumer 放这里，整条派发链保持进程内、单事务。
-    放在营销那侧的话，等于把 risk 与 ledger 一并拖进营销进程 —— 那就不是拆分了。
+    <h3>🔴 这里没有 prize，也没有 consumer</h3>
+    发奖流水（t_prize_log）是<b>营销侧的账</b>，读写它的 consumer 也就归营销。
+    本服务只负责「收下一笔奖」这一段：风控过滤 → 生成提案 → 资产入账。
 
-    <p>代价是「抽奖」与「派发」跨了进程，两者之间靠消息连接（见 outbox 与 RabbitMQ）。
+    <p>于是发奖被切成两段，方向相反：
+    <ul>
+      <li>营销 →(同步 HTTP)→ 本服务：MemberProposalApi，当场返回受理/拒绝+原因；</li>
+      <li>本服务 →(异步消息)→ 营销：资产真正入账的结果，落发奖流水的终态。</li>
+    </ul>
     这正是 AssetDispatcher 那个 SPI 的类注释预言的形态：
     「这两个域将来若真拆成独立服务，它们之间只能是单向调用或事件」。
     -->
@@ -59,13 +62,6 @@
             <artifactId>solvela-risk</artifactId>
             <version>3.0.0</version>
         </dependency>
-        <!-- 发奖派发。理由见上面那段 -->
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-consumer</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-
         <!-- 消息：本服务与另一侧靠它连接。拓扑常量与消费幂等都在这个模块里 -->
         <dependency>
             <groupId>solvela</groupId>
@@ -74,6 +70,13 @@
         </dependency>
 
         <!-- ================= HTTP 层 ================= -->
+
+        <!-- 链路 id 过滤器 + 服务间调用的错误出口（两者在两个包根下，见该模块 pom 的说明） -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-web</artifactId>
+            <version>3.0.0</version>
+        </dependency>
 
         <!-- 直接依赖 web 栈，不经过 solvela-web（那是管理端的 HTTP 层，
              它的 GlobalExceptionHandler 一律返回 200 + ResponseDTO，与本服务的契约冲突） -->

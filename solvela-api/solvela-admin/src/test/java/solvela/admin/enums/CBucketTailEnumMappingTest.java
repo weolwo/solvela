@@ -12,6 +12,7 @@ import solvela.base.module.file.dao.FileDao;
 import solvela.base.module.file.domain.entity.FileEntity;
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.LotteryDispatchStatusEnum;
+import solvela.enums.ScriptSourceEnum;
 import solvela.enums.TransactionTypeEnum;
 import solvela.ledger.MemberAssetTransaction;
 import solvela.ledger.transaction.dao.MemberAssetTransactionDao;
@@ -23,9 +24,12 @@ import solvela.scriptengine.dao.ScriptDao;
 import solvela.scriptengine.dao.ScriptRefDao;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -122,19 +126,27 @@ class CBucketTailEnumMappingTest {
     }
 
     @Test
-    @DisplayName("脚本与脚本引用状态：都能装配，计数之和等于总量")
+    @DisplayName("脚本来源与激活标记、脚本引用状态：都能装配，且激活版本至多一个")
     void 脚本状态() {
         List<Script> scripts = scriptDao.selectList(null);
         assertFalse(scripts.isEmpty(), "t_script 没有数据，这条用例失去意义");
         for (Script e : scripts) {
-            assertNotNull(e.getStatus(), "status 装配成了 null");
+            assertNotNull(e.getSource(), "source 装配成了 null");
+            // 🔴 未激活的行必须是 null，不能是 false：唯一键 (script_code, active_flag)
+            //    靠「NULL 不参与判重」保证至多一个激活版本，写 false 会让历史版本只能存一行
+            assertNotEquals(Boolean.FALSE, e.getActiveFlag(),
+                    "active_flag 出现了 false，唯一键会把第二个历史版本挡在门外");
         }
-        // 装反了 ScriptFileLoader 会把在用的脚本全当孤儿停掉
-        assertTrue(scripts.stream().anyMatch(e -> e.getStatus() == EnableStatusEnum.ENABLED),
-                "一个启用的脚本都没有，多半是 0/1 方向反了");
-        assertEquals(scripts.size(), sum(EnableStatusEnum.values(),
-                        s -> scriptDao.selectCount(new LambdaQueryWrapper<Script>().eq(Script::getStatus, s))),
-                "分状态计数之和与总量对不上，说明有行的 status 落在枚举之外");
+        assertEquals(scripts.size(), sum(ScriptSourceEnum.values(),
+                        s -> scriptDao.selectCount(new LambdaQueryWrapper<Script>().eq(Script::getSource, s))),
+                "分来源计数之和与总量对不上，说明有行的 source 落在枚举之外");
+
+        Map<String, Long> activePerCode = scripts.stream()
+                .filter(e -> Boolean.TRUE.equals(e.getActiveFlag()))
+                .collect(Collectors.groupingBy(Script::getScriptCode, Collectors.counting()));
+        assertFalse(activePerCode.isEmpty(), "一个激活的脚本都没有，线上等于没有任何脚本在跑");
+        activePerCode.forEach((code, count) ->
+                assertEquals(1L, count, "脚本 " + code + " 有多个激活版本，唯一键没起作用"));
 
         List<ScriptRef> refs = scriptRefDao.selectList(null);
         for (ScriptRef e : refs) {

@@ -34,14 +34,14 @@
             <version>3.0.0</version>
         </dependency>
 
-        <!-- 消息记录表：唯一索引即消费幂等，所以本模块需要 ORM。
-             代价是「依赖 mq 就有 JDBC」—— 而收发消息的两个服务本来就连着库，
-             没有哪个进程是只要消息不要数据库的 -->
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-base-data</artifactId>
-            <version>3.0.0</version>
-        </dependency>
+        <!--
+        ⚠️ 本模块【只有】拓扑与编解码，没有那张消息记录表。
+        记录表（MqMessageLog / MqMessageLogService）在 solvela-base-data 里，因为：
+          · 它是一张表加一个 dao，本质是数据层的东西，与 AMQP 无关；
+          · 放这里的话，任何想清理这张表的进程（比如跑定时任务的 admin）
+            都得跟着背上 amqp —— 而 amqp 一进 classpath，那个进程就想要一个 broker。
+        分开之后 admin 只要 base-data 就能清理，不需要连 RabbitMQ。
+        -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

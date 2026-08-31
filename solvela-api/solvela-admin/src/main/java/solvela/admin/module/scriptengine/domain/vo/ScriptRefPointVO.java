@@ -21,6 +21,12 @@ public class ScriptRefPointVO {
     @Schema(description = "挂载槽位")
     private String refSlot;
 
+    @Schema(description = "是不是按 key 分组的多值槽位。true 时挂载必须传 refKey")
+    private Boolean keyed;
+
+    @Schema(description = "分组键的中文名，如「事件编码」。单值槽位为 null")
+    private String keyTitle;
+
     @Schema(description = "本挂载点只接受这个场景的脚本")
     private String expectedScene;
 

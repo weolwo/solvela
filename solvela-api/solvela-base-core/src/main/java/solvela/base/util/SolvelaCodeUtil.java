@@ -74,6 +74,8 @@ public class SolvelaCodeUtil {
         public static final char PRIZE = 'P';
         /** 奖池 Draw pool */
         public static final char POOL = 'D';
+        /** 抽奖配置 draW config。W 是因为 D 已经被奖池占了 */
+        public static final char DRAW_CONFIG = 'W';
         /** 任务模板 Task template */
         public static final char TASK_TEMPLATE = 'T';
         /** 彩票玩法 Lottery */
@@ -84,6 +86,8 @@ public class SolvelaCodeUtil {
         public static final char MALL_SKU = 'S';
         /** 优惠配置分组 Group */
         public static final char PROMOTION_GROUP = 'G';
+        /** 脚本 QL script。用 Q 是因为 S 已经被 SKU 占了 */
+        public static final char SCRIPT = 'Q';
     }
 
     /**

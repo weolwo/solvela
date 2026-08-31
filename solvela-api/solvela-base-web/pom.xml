@@ -1,0 +1,60 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-base-web</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-base-web</name>
+    <description>各端共用的 HTTP 基础件：链路 id 过滤器、服务间调用的错误出口。</description>
+
+    <!--
+    ⚠️ 本模块里的两样东西【故意放在两个包根下】，因为各端的组件扫描粒度不同：
+
+      · solvela.base.web    —— 链路 id 过滤器。三个端都扫 solvela.base，所以自动生效；
+      · solvela.server.internal —— 服务间调用的错误出口。它【只该出现在 marketing / member】，
+        网关有自己的 C 端错误契约（ApiErrors + 真实状态码 + ApiErrorResponse），
+        两个 @RestControllerAdvice 同时在场时返回什么取决于哪个先匹配上。
+        放在 solvela.base 之下的话网关会连带扫到 —— AppBoundaryTest 的
+        「本进程只有一个错误出口」断言会当场失败，而那条断言正是为了防这件事。
+
+    所以两个内部服务要显式多扫一个 solvela.server.internal，网关不扫。
+    包根的差别不是风格，是<b>可见性的开关</b>。
+    -->
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

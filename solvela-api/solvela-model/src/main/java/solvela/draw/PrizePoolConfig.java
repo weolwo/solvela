@@ -41,6 +41,14 @@ public class PrizePoolConfig {
     private String poolCode;
 
     /**
+     * 所属抽奖配置编码，关联 {@code t_draw_config.draw_code}。
+     *
+     * <p>存量行可能为空（这一列是后加的）。为空时按 activity_code 回退查抽奖配置 ——
+     * 一个活动一套抽奖，两条路等价。见 {@code DrawConfigService#getByPool}。
+     */
+    private String drawCode;
+
+    /**
      * 奖池名称
      */
     private String poolName;

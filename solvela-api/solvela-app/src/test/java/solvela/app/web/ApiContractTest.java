@@ -5,7 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import solvela.member.api.AuthFailReason;
+import solvela.member.api.MemberAuthApi;
+import solvela.member.api.MemberAuthCmd;
+import solvela.member.api.MemberAuthResult;
+import solvela.member.api.MemberIdentity;
+import solvela.member.api.MemberLogoutCmd;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -25,9 +35,53 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>状态码这种东西，单元测试测不出来：controller 返回什么对象、
  * 异常处理器怎么映射、Spring 最后实际写出什么状态，中间隔着好几层。
  * 所以这里真起服务、真发 HTTP 请求、真读状态行。
+ *
+ * <h3>🔴 下游被桩掉了，这是刻意的</h3>
+ * 拆成四个进程之后，登录要经 HTTP 调会员服务。如果这里用真下游：
+ * <ul>
+ *   <li>会员服务没起时，整套契约测试全红 —— 而它们要验的<b>根本不是会员服务</b>；</li>
+ *   <li>断言会变成「会员服务的行为对不对」，而网关自己的翻译规则
+ *       （{@code AuthFailReason} → HTTP 状态码）反倒没人守。</li>
+ * </ul>
+ * 桩掉之后，本类专注一件事：<b>给定域返回的 reason，网关吐出什么状态码和 code</b>。
+ * 域本身的行为由会员服务自己的测试负责。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(ApiContractTest.StubDownstream.class)
 class ApiContractTest {
+
+    /**
+     * 桩掉会员服务。只按<b>输入形状</b>给结果，不做任何真实逻辑 ——
+     * 它存在的意义是让网关那张翻译表跑起来，不是模拟一个会员域。
+     */
+    @TestConfiguration
+    static class StubDownstream {
+
+        @Bean
+        @Primary
+        MemberAuthApi stubMemberAuthApi() {
+            return new MemberAuthApi() {
+                @Override
+                public MemberAuthResult authenticate(MemberAuthCmd cmd) {
+                    // 只区分「像不像手机号」这一件事：契约测试要的是
+                    // BAD_PHONE_FORMAT → 400、BAD_CREDENTIALS → 401 这两条映射成立
+                    if (cmd.phone() == null || !cmd.phone().matches("[0-9]{11}")) {
+                        return MemberAuthResult.fail(AuthFailReason.BAD_PHONE_FORMAT);
+                    }
+                    return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
+                }
+
+                @Override
+                public MemberIdentity getAuthIdentity(Long memberId) {
+                    return null;
+                }
+
+                @Override
+                public void recordLogout(MemberLogoutCmd cmd) {
+                }
+            };
+        }
+    }
 
     @LocalServerPort
     private int port;

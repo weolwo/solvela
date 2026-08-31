@@ -37,6 +37,7 @@ public class PrizePoolBoardDTO {
     private String poolName;
 
     /** 限领重置周期: DAY/WEEK/MONTH/ACTIVITY */
+    /** 生效的重置周期。<b>值来自本池所属的抽奖配置</b>，不是奖池自己的字段 */
     private String resetPeriod;
 
     /** 奖池开关: 0-关闭, 1-开启 */

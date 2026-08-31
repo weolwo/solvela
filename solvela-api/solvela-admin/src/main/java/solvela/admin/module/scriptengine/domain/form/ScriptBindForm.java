@@ -18,6 +18,9 @@ public class ScriptBindForm {
     @NotBlank(message = "业务对象编码不能为空")
     private String refId;
 
+    @Schema(description = "槽位内的分组键。多值槽位必填（如事件编码），单值槽位不要传")
+    private String refKey;
+
     @Schema(description = "脚本编码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "脚本编码不能为空")
     private String scriptCode;

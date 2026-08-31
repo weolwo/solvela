@@ -1,0 +1,58 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-member-session</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-member-session</name>
+    <description>会员会话：令牌的签发、解析、吊销。只用 Redis，不碰数据库。</description>
+
+    <!--
+    <h3>为什么单独一个模块</h3>
+    会话有两个使用者，而它们的依赖诉求相反：
+    <ul>
+      <li><b>网关</b>：每个请求都要解析令牌，登录时要签发。但它的目标是
+          「classpath 上连 mysql 驱动都没有」；</li>
+      <li><b>会员服务</b>：后台冻结会员时要吊销该会员的全部会话。</li>
+    </ul>
+    2026-08-30 先把会话从网关下沉到了 solvela-member（为了让冻结能吊销令牌），
+    但那个模块带着 MyBatis Dao —— 网关依赖它就等于把 JDBC 拖回来了。
+    所以再拆一层：<b>会话只用 Redis，本模块就只依赖 base-redis</b>。
+
+    <p>🔴 不许往这里加任何 Dao。加了就等于把 JDBC 还给网关，
+    而 AppBoundaryTest 里那条「mysql 驱动不在 classpath 上」的断言会当场失败 ——
+    那条断言存在的意义正是拦住这件事。
+    -->
+    <dependencies>
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-redis</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

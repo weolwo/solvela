@@ -9,7 +9,6 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.ledger.handler.IAssetHandler;
 import solvela.ledger.strategy.AssetStrategyFactory;
 import solvela.member.api.PrizeDispatchResultMessage;
-import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
 import solvela.risk.PromotionConfig;
 import solvela.risk.proposal.dao.ProposalRecordDao;
@@ -38,7 +37,6 @@ public class AssetDispatchEngine implements AssetDispatcher {
 
     private final PromotionConfigDao promotionConfigDao;
 
-    private final PrizeLogDao prizeLogDao;
 
     /** 派发结果的出口：单体直接改库，会员服务发消息。见 PrizeDispatchResultPublisher */
     private final PrizeDispatchResultPublisher dispatchResultPublisher;

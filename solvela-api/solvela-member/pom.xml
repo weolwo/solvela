@@ -41,6 +41,14 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 会话存储：冻结会员时要吊销他的全部令牌。会话被拆到独立模块，
+             因为网关也要用它而网关不能有 JDBC -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-session</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- 只依赖真正用到的三块，不写 solvela-base 那个门面 ——
              本模块用的是 base.util / base.domain / base.trace（core）、base.module.redis（redis）、
              base.dao（data）。写门面会顺带把 S3、Excel 引擎、tika、邮件、freemarker 一并背上，

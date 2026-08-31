@@ -6,7 +6,7 @@
  *        改脚本不用发版，这正是把这段决策放进脚本的原因。
  *
  *        ⚠️ 两条必须守的规矩：
- *        1) draw_draw 有副作用，一次执行只准调一次，且必须是最后一步；
+ *        1) draw_executeDrawByScript 有副作用，一次执行只准调一次，且必须是最后一步；
  *           两个 if 分支各写一次而条件同时成立时，引擎会直接拦下并抛出。
  *        2) 不要读 params 里的 poolCode —— 那等于让客户端自己挑池子抽，
  *           而挑池子正是这段脚本存在的理由。
@@ -23,4 +23,4 @@ if (activityType != 'DRAW') {
 tier = params['tier'];
 pool = tier == 'NEW' ? 'DRAW_POOL_NEWCOMER' : 'DRAW_POOL_NORMAL';
 
-return draw_draw(pool);
+return draw_executeDrawByScript(pool);

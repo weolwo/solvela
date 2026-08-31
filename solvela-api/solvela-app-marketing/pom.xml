@@ -67,6 +67,16 @@
         「这两个域将来若真拆成独立服务，它们之间只能是单向调用或事件」。
         -->
 
+        <!-- 发奖派发：读发奖流水、拼提案请求、拿会员服务的结果回写流水。
+             它写的是 t_prize_log —— 那是【营销侧的账】，所以归本服务。
+             2026-08-30 从会员服务挪过来：当初按「派发终点是资产」放在那边，
+             但真正的分界不在终点，在账本归属 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-consumer</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- 消息：本服务与另一侧靠它连接。拓扑常量与消费幂等都在这个模块里 -->
         <dependency>
             <groupId>solvela</groupId>
@@ -75,6 +85,13 @@
         </dependency>
 
         <!-- ================= HTTP 层 ================= -->
+
+        <!-- 链路 id 过滤器 + 服务间调用的错误出口（两者在两个包根下，见该模块 pom 的说明） -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-web</artifactId>
+            <version>3.0.0</version>
+        </dependency>
 
         <!--
         直接依赖 web 栈，不经过 solvela-web —— 那是管理端的 HTTP 层，

@@ -1,14 +1,11 @@
 package solvela.app;
 
-import org.apache.ibatis.annotations.Mapper;
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import solvela.base.listener.Ip2RegionListener;
 
 /**
  * solvela C 端应用服务 启动类。
@@ -31,9 +28,16 @@ import solvela.base.listener.Ip2RegionListener;
  * <ul>
  *   <li>{@code solvela.app} —— 本模块；</li>
  *   <li>{@code solvela.base} —— 基础设施（数据源、Redis、缓存、加解密、Excel）；</li>
- *   <li>{@code solvela.member} —— 会员域（登录日志、操作限制、发号）；</li>
- *   <li>{@code solvela.crypto} —— PII 的加解密与摘要（{@code PiiCipher} / {@code PiiHasher}）。</li>
+ *   <li>{@code solvela.member.session} —— 会话存储（令牌的签发/解析/吊销）。
+ *       <b>只用 Redis，不带 JDBC</b> —— 它被单独拆成一个模块正是为了这一点。</li>
  * </ul>
+ *
+ * <p>🔴 <b>会员域与营销域的实现一个都不在本进程</b>。它们在 member(1027) 与 marketing(1026)
+ * 两个服务里，网关只认识两个 api 接口，实现由 {@code DownstreamClientConfig} 生成成 HTTP 代理。
+ * 而且这已经不靠自觉了：那两个域的 jar 根本不在本模块的 pom 里，<b>Maven 就是那道边界</b>。
+ *
+ * <p>随之而来的是本进程<b>没有数据源、没有 Mapper、classpath 上连 mysql 驱动都没有</b> ——
+ * 由 {@code AppBoundaryTest} 的断言守着。从「约定网关不查库」变成「物理上不具备」。
  *
  * <p>要把 {@code solvela.crypto} 单列出来，是显式扫描的代价：上一版扫 {@code solvela} 全包，
  * 这类散落在 model 里的 {@code @Component} 自动就有了。代价换来的是
@@ -58,17 +62,14 @@ import solvela.base.listener.Ip2RegionListener;
  */
 @EnableCaching
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
-@ComponentScan({"solvela.app", "solvela.base", "solvela.member", "solvela.crypto"})
+@ComponentScan({"solvela.app", "solvela.base", "solvela.member.session"})
 @ConfigurationPropertiesScan("solvela.app")
-// Mapper 与 controller 不同，共享模块里的要全量扫：会员、钱包、券的 Mapper 都在那边
-@MapperScan(value = {"solvela.app", "solvela.base", "solvela.member"}, annotationClass = Mapper.class)
 @SpringBootApplication
 public class AppApplication {
 
     public static void main(String[] args) {
-        SpringApplication application = new SpringApplication(AppApplication.class);
-        // ip2region 的 xdb 要在容器启动前落到本地文件，登录日志的「IP 归属地」依赖它
-        application.addListeners(new Ip2RegionListener());
-        application.run(args);
+        // 不再注册 Ip2RegionListener：IP 归属地是写登录日志时算的，而登录日志在会员服务那边。
+        // 本进程连 ip2region 的 xdb 都不需要落盘
+        SpringApplication.run(AppApplication.class, args);
     }
 }

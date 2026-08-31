@@ -45,13 +45,16 @@ import solvela.base.listener.Ip2RegionListener;
         "solvela.member.server",
         // 基础设施
         "solvela.base",
-        // 域：会员与会话、资产、风控与提案、发奖派发、奖品
-        "solvela.member", "solvela.ledger", "solvela.risk", "solvela.consumer", "solvela.prize",
+        // 服务间调用的错误出口。刻意不在 solvela.base 之下 —— 网关不能扫到它，
+        // 否则那边会出现第二个 @RestControllerAdvice（见该类注释）
+        "solvela.server.internal",
+        // 域：会员与会话、资产、风控与提案
+        "solvela.member", "solvela.ledger", "solvela.risk",
         // PII 加解密（散落在 model 里的 @Component）
         "solvela.crypto"
 })
 @MapperScan(value = {
-        "solvela.base", "solvela.member", "solvela.ledger", "solvela.risk", "solvela.prize"
+        "solvela.base", "solvela.member", "solvela.ledger", "solvela.risk"
 }, annotationClass = Mapper.class)
 @SpringBootApplication
 public class MemberApplication {

@@ -7,8 +7,6 @@
             <result column="activity_code" property="activityCode" />
             <result column="pool_code" property="poolCode" />
             <result column="pool_name" property="poolName" />
-            <result column="reset_period" property="resetPeriod" />
-            <result column="draw_mode" property="drawMode" />
             <result column="status" property="status" />
             <result column="create_by" property="createBy" />
             <result column="create_time" property="createTime" />
@@ -21,8 +19,6 @@
                 activity_code, 
                 pool_code, 
                 pool_name,
-                reset_period,
-                draw_mode, 
                 status, 
                 create_by, 
                 create_time, 

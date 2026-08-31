@@ -1,6 +1,7 @@
 package solvela.activity.runtime;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import solvela.activity.ActivityConfig;
@@ -13,6 +14,7 @@ import solvela.marketing.api.DrawResultView;
 import solvela.activity.service.ActivityConfigService;
 import solvela.enums.ActivityStatusEnum;
 import solvela.exception.BusinessException;
+import solvela.activity.spi.ActivityPlayMountProvider;
 import solvela.scriptengine.runtime.ScriptRuntime;
 import solvela.scriptengine.spi.EngineContext;
 import solvela.scriptengine.spi.ScriptRefPoint;
@@ -64,6 +66,11 @@ public class ActivityFacade implements ActivityApi {
 
     private final ScriptRuntime scriptRuntime;
 
+    /**
+     * 各玩法回答「脚本挂在哪」。由 solvela-marketing 注册（依赖倒置，见 {@link ActivityPlayMountProvider}）。
+     */
+    private final ObjectProvider<ActivityPlayMountProvider> playMountProviders;
+
     @Override
     public ActivityRuleView getActivityRule(String activityCode) {
         return activityRuntimeService.getActivityRule(activityCode);
@@ -79,12 +86,21 @@ public class ActivityFacade implements ActivityApi {
             return DrawResultView.ofReject(DrawRejectReason.ACTIVITY_NOT_OPEN);
         }
 
+        // 脚本挂在哪由玩法自己说：抽奖挂在抽奖配置上，没有玩法配置的活动仍挂在活动上
+        ActivityPlayMountProvider.PlayMount mount = resolveMount(activity);
+        if (mount == null) {
+            log.warn("[活动-参与] 活动是 {} 类型但没有可用的玩法配置, activityCode: {}",
+                    activity.getActivityType(), activity.getActivityCode());
+            return DrawResultView.ofReject(DrawRejectReason.NO_PLAY_CONFIG);
+        }
+
         Optional<Object> result = scriptRuntime.evaluate(
-                ScriptRefPoint.ACTIVITY_PLAY, activity.getActivityCode(), playContext(activity, cmd), Object.class);
+                mount.point(), mount.refId(), playContext(activity, cmd), Object.class);
 
         if (result.isEmpty()) {
-            // 活动上线了却没挂编排脚本 —— 运营配置没做完，不是用户的问题，所以是 reject 不是异常
-            log.warn("[活动-参与] 活动未挂玩法编排脚本, activityCode: {}", activity.getActivityCode());
+            // 玩法配置有了却没挂编排脚本 —— 运营配置没做完，不是用户的问题，所以是 reject 不是异常
+            log.warn("[活动-参与] 未挂玩法编排脚本, 挂载点: {}, 业务对象: {}",
+                    mount.point().getTitle(), mount.refId());
             return DrawResultView.ofReject(DrawRejectReason.NO_PLAY_SCRIPT);
         }
         if (result.get() instanceof DrawResultView view) {
@@ -95,6 +111,29 @@ public class ActivityFacade implements ActivityApi {
                 "活动 [%s] 的玩法编排脚本返回了 %s，而调用方要的是抽奖结果。"
                         + "多半是把别的场景的脚本挂到了 ACTIVITY_PLAY 上，或者脚本最后一步没有返回抽奖函数的结果。",
                 activity.getActivityCode(), result.get().getClass().getSimpleName()));
+    }
+
+    /**
+     * 这个活动的玩法编排脚本挂在哪。
+     *
+     * <p>找不到对应玩法的实现时<b>退回 {@code ACTIVITY_PLAY} / 活动编码</b> ——
+     * 这正是本 SPI 出现之前的行为，BASIC 这类没有玩法配置的活动一直走这条路。
+     *
+     * <p>⚠️ 「没有实现」与「有实现但返回 null」是两件事：前者说明这个玩法还没有配置层，
+     * 退回老路是对的；后者说明这个玩法有配置层、但这个活动的配置没建或被关了，
+     * 那必须报出来，不能悄悄退回去挂到活动上 —— 否则运营关掉抽奖配置之后活动照样能抽。
+     */
+    private ActivityPlayMountProvider.PlayMount resolveMount(ActivityConfig activity) {
+        ActivityPlayMountProvider provider = playMountProviders.stream()
+                .filter(item -> item.supportType() != null
+                        && item.supportType().getValue().equals(activity.getActivityType()))
+                .findFirst()
+                .orElse(null);
+        if (provider == null) {
+            return new ActivityPlayMountProvider.PlayMount(
+                    ScriptRefPoint.ACTIVITY_PLAY, activity.getActivityCode());
+        }
+        return provider.resolve(activity.getActivityCode());
     }
 
     /**

@@ -52,7 +52,17 @@ public enum DrawRejectReason {
     ACTIVITY_NOT_OPEN,
 
     /**
-     * 活动没挂玩法编排脚本。运营配置没做完 —— 挂载点见 {@code ScriptRefPoint.ACTIVITY_PLAY}。
+     * 活动的玩法配置还没建（抽奖类活动没有对应的 {@code t_draw_config}）。
+     *
+     * <p>与 {@link #NO_PLAY_SCRIPT} 的区别是<b>缺的东西不一样</b>：
+     * 这个是连玩法配置都没有，脚本写好了也没地方挂；那个是配置有了、脚本没挂上去。
+     * 排查方向完全不同，所以不合并成一个。
+     */
+    NO_PLAY_CONFIG,
+
+    /**
+     * 活动没挂玩法编排脚本。运营配置没做完 —— 挂载点见
+     * {@code ScriptRefPoint.DRAW_PLAY}（抽奖）或 {@code ACTIVITY_PLAY}（其它玩法）。
      */
     NO_PLAY_SCRIPT,
 

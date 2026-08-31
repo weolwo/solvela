@@ -20,6 +20,9 @@ public class ScriptRefDTO {
     /** 脚本名称 */
     private String scriptName;
 
+    /** 该脚本当前激活的版本号；没有激活版本时为 null（说明这条挂载已经跑不起来了） */
+    private Integer scriptVersion;
+
     /** 挂载点枚举名，如 PRIZE_POOL_ENTRY */
     private String refPoint;
 
@@ -34,6 +37,9 @@ public class ScriptRefDTO {
 
     /** 挂载槽位 */
     private String refSlot;
+
+    /** 槽位内的分组键。单值槽位是空串 */
+    private String refKey;
 
     /** 状态：0-停用, 1-启用 */
     private EnableStatusEnum status;

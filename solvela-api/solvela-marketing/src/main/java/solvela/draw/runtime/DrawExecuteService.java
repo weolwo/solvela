@@ -14,6 +14,7 @@ import solvela.draw.engine.DrawEngine;
 import solvela.draw.engine.DrawPoolSnapshot;
 import solvela.draw.engine.DrawPrizeSnapshot;
 import solvela.draw.engine.DrawResult;
+import solvela.draw.DrawConfig;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
 import solvela.draw.poolitem.dao.PrizePoolItemDao;
@@ -21,6 +22,7 @@ import solvela.draw.PrizePoolItem;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
 import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
+import solvela.draw.drawconfig.service.DrawConfigService;
 import solvela.draw.runtime.domain.DrawExecuteCommand;
 import solvela.draw.runtime.domain.DrawExecuteDTO;
 import solvela.event.UserPrizeEvent;
@@ -84,6 +86,7 @@ import java.util.stream.Collectors;
 public class DrawExecuteService {
 
     private final PrizePoolConfigManager prizePoolConfigManager;
+    private final DrawConfigService drawConfigService;
     private final PoolPrizeMappingManager poolPrizeMappingManager;
     private final PrizePoolItemManager prizePoolItemManager;
     private final PrizePoolItemDao prizePoolItemDao;
@@ -283,7 +286,12 @@ public class DrawExecuteService {
      * 同一个用户在两个桶里各拿一次额度 —— 正好是限领要防的那件事。
      */
     private DrawPeriodResolver.Period resolvePeriod(PrizePoolConfig pool, Map<Long, PrizePoolItem> itemMap) {
-        if (!DrawPeriodResolver.needsClock(pool.getResetPeriod())) {
+        // 重置周期是玩法级配置，住在 t_draw_config 上 —— 它管的是「这套抽奖的限领多久清一次」，
+        // 不是某个奖池自己的事。取不到配置时 resetPeriod 为 null，下面按「不重置」处理
+        DrawConfig drawConfig = drawConfigService.getByPool(pool);
+        String resetPeriod = drawConfig == null ? null : drawConfig.getResetPeriod();
+
+        if (!DrawPeriodResolver.needsClock(resetPeriod)) {
             return new DrawPeriodResolver.Period(DrawPeriodResolver.BUCKET_ALL, DrawPeriodResolver.TTL_NONE);
         }
         boolean anyLimited = itemMap.values().stream()
@@ -291,7 +299,7 @@ public class DrawExecuteService {
         if (!anyLimited) {
             return new DrawPeriodResolver.Period(DrawPeriodResolver.BUCKET_ALL, DrawPeriodResolver.TTL_NONE);
         }
-        return DrawPeriodResolver.resolve(pool.getResetPeriod(), prizePoolItemDao.selectDbNow());
+        return DrawPeriodResolver.resolve(resetPeriod, prizePoolItemDao.selectDbNow());
     }
 
     /**

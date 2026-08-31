@@ -149,4 +149,9 @@
                         where id = #{id}
                 </delete>
 
+
+    <select id="selectDbNow" resultType="java.time.LocalDateTime">
+        SELECT NOW()
+    </select>
+
 </mapper>

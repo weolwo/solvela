@@ -39,9 +39,13 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
  * 正解是把这个模块拆开。在拆开之前，这两行必须精确到子包，
  * 谁把它改回 {@code "solvela.risk"} 都会让营销进程重新背上整个账务域。
  *
- * <h3>发奖派发不在这里</h3>
- * consumer / risk.proposal / ledger 都归 member 服务，理由见 pom 里那段注释：
- * 中奖后本服务只发一条消息，派发在 member 那侧完成。
+ * <h3>发奖派发在这里，但资产不在</h3>
+ * {@code consumer} 写的是 {@code t_prize_log} —— <b>营销侧的账</b>，所以归本服务。
+ * 它同步调 {@code MemberProposalApi} 把奖交给会员服务，当场拿到「受理 / 拒绝 + 原因」；
+ * 资产是否真的入账则由会员服务<b>异步回消息</b>（{@code PrizeDispatchResultListener} 收）。
+ *
+ * <p>{@code risk.proposal} 与 {@code ledger} 不在这里 —— 那两个是会员侧的。
+ * 分界不在「派发链路的终点」，在<b>账本归属</b>：谁的表谁写。
  *
  * <h3>刻意没有 @EnableScheduling</h3>
  * 四个进程连同一个库，{@code @Scheduled} 每多开一个进程就多跑一遍 ——
@@ -59,13 +63,18 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
         "solvela.marketing.server",
         // 基础设施
         "solvela.base",
+        // 服务间调用的错误出口。刻意不在 solvela.base 之下 —— 网关不能扫到它，
+        // 否则那边会出现第二个 @RestControllerAdvice（见该类注释）
+        "solvela.server.internal",
         // 脚本引擎（solvela.config 是它的自动配置，solvela.aspect 是执行监控切面）
         "solvela.scriptengine", "solvela.config", "solvela.aspect",
         // 域：活动、抽奖、任务、彩票、商城、统计、奖品、发奖派发
         "solvela.activity", "solvela.draw", "solvela.task", "solvela.lottery",
         "solvela.mall", "solvela.stat", "solvela.prize",
-        // 发奖投递：PrizeEventPublisher 与 outbox。中奖之后「把奖交出去」的唯一出口
+        // 发奖投递：中奖之后「把奖交出去」的唯一出口
         "solvela.dispatch",
+        // 发奖派发：写的是 t_prize_log，营销侧的账
+        "solvela.consumer",
         // PII 加解密（散落在 model 里的 @Component）
         "solvela.crypto",
         // ⚠️ 两处妥协，见类注释

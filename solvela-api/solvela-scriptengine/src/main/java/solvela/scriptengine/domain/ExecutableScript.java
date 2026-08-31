@@ -21,7 +21,7 @@ public record ExecutableScript(String name, String content, ScriptSource source)
     }
 
     /**
-     * 受控脚本：内容来自项目内 git 管理的脚本文件
+     * 受控脚本：内容来自 {@code t_script} 里已激活的版本（集合有界，可安全缓存编译产物）
      */
     public static ExecutableScript trusted(String name, String content) {
         return new ExecutableScript(name, content, ScriptSource.TRUSTED);

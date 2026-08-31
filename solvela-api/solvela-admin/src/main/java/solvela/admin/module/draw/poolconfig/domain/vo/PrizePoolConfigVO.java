@@ -31,12 +31,6 @@ public class PrizePoolConfigVO {
     @Schema(description = "奖池名称")
     private String poolName;
 
-    @Schema(description = "重置周期，天，周，月，活动期间")
-    private String resetPeriod;
-
-    @Schema(description = "抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)")
-    private DrawModeEnum drawMode;
-
     @Schema(description = "0关闭，1开启")
     private PrizePoolStatusEnum status;
 

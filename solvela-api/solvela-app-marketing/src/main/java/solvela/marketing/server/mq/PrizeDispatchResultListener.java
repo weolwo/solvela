@@ -6,7 +6,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import solvela.base.mq.MqTopology;
-import solvela.base.mq.log.MqMessageLogService;
+import solvela.base.mqlog.MqMessageLogService;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.member.api.PrizeDispatchResultMessage;

@@ -63,4 +63,13 @@ public interface DrawPrizeLogDao extends BaseMapper<DrawPrizeLog> {
                  * 批量物理删除
                  */
                 void batchDelete(@Param("idList") List<Long> idList);
+
+    /**
+     * 数据库当前时间。
+     *
+     * <p>算「本周期从哪一刻起」要据此定 {@code create_time} 的下界，不能用 JVM 时钟 ——
+     * 铁律 9/10：全系统只认数据库一个时钟。多实例部署时跨零点那一刻，
+     * A 节点认为还是昨天、B 节点认为已是今天，同一个用户能在两个周期里各抽一轮。
+     */
+    java.time.LocalDateTime selectDbNow();
 }

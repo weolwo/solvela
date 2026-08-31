@@ -37,6 +37,5 @@ public class PrizePoolConfigUpdateCommand {
     private String poolName;
 
     /** 限领重置周期: DAY/WEEK/MONTH/ACTIVITY */
-    private String resetPeriod;
 
 }

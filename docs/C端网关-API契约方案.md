@@ -187,7 +187,7 @@ Result<MemberIdentity>(false, "OPERATION_LIMITED", "请 3 分钟后重试", null
 | 方法 | 用途 | 状态 |
 |---|---|---|
 | `getActivityRule(code)` | 活动信息 + 时间窗 + 状态 + 展示配置 + 规则正文 | ✅ 已实现 |
-| `draw(cmd)` | 抽奖（走脚本编排） | ✅ 已实现（2026-08-30） |
+| `draw(cmd)` | 抽奖（走脚本编排） | ✅ 已实现，**网关的 C 端接口已接通**（2026-08-30） |
 | `claimPrize(cmd)` | 领取奖励 | ⏳ |
 | `getPrizeRecord(qry)` | 我的奖励：**可领的** + 历史记录（app 拿它判断要不要弹窗） | ⏳ |
 | `getTaskCenter(code, memberId)` | 我的任务中心 | ⏳ |
@@ -527,6 +527,71 @@ member ────异步消息────▶ marketing  资产真正入账完�
 - ⚠️ 这会让时间窗判据出现第三处（展示、准入、事件过滤）。**到第三处必须收口**成一个
   `joinable(activity, now)`，SQL 只做粗筛。缓存只能存活动对象，不能存布尔值 ——
   数据截止是时间到了自然失效，存布尔值会让活动结束后仍触发到 TTL 过期。
+
+---
+
+### 7.6 端到端联调（2026-08-30，两条缝已验证）
+
+真起两个进程、发真 HTTP、发真消息，验的是<b>拆分新增的两条缝</b>
+（抽奖引擎本身由营销服务自己的测试覆盖，不重复验）。
+
+| 缝 | 验证方式 | 结果 |
+|---|---|---|
+| marketing →(同步 HTTP)→ member | POST `/internal/member/proposal`，用不存在的优惠配置 | `200` + `{"accepted":false,"failReason":"资产配置异常"}` ✅ |
+| member →(异步消息)→ marketing | 向 `solvela.prize` 发 `prize.dispatch.result` | `routed:true`，监听器消费并落 `t_mq_message_log`（status=成功）✅ |
+| 重复投递 | 同一条消息再发一次 | 行数仍为 1、`retry_count=0`、日志「已成功处理过」✅ |
+
+#### 🔴 抓到一个真缺陷：`MemberProposalApi` 的 HTTP 薄壳漏了
+
+`ProposalApiService` 实现了接口，但它是 `@Service` ——
+**Spring MVC 只给 `@Controller`/`@RestController` 建映射**。没有薄壳时端点根本不存在。
+
+而这件事**所有进程内测试都发现不了**：会员服务的上下文照常启动，
+营销服务的上下文也照常启动（它那边只是个 HTTP 代理，不校验对端存在），
+一直要到第一次真实发奖才炸。
+
+> 教训：**每加一个 api 接口，就要问一句「服务端的壳建了没有」**。
+> 契约实现类和 HTTP 薄壳是两件事，而它们分别在两个模块里。
+
+#### 顺带发现：新服务没有 TraceFilter
+
+会员服务的错误响应里 `traceId` 是 `null`。网关侧的客户端拦截器<b>已经在发</b>
+`traceId` 请求头（见 `DownstreamClientConfig`），但 marketing / member 两侧
+**没有 Filter 把它读进 MDC** —— 所以跨服务的链路 id 目前是断的，
+两边日志还是只能靠时间戳对。补一个十来行的 Filter 即可，已记进债表。
+
+---
+
+### 7.7 C 端活动接口接通（2026-08-30）
+
+```
+GET  /activity/{code}        匿名可访问 —— 活动页是分享入口，要求先登录等于把分享链路掐断
+POST /activity/{code}/draw   需登录；会员号取自登录态，客户端传的一律不认
+```
+
+真起网关 + 营销两个进程验过：
+
+| 用例 | 结果 |
+|---|---|
+| 匿名看不存在的活动 | `404` `{"code":"NOT_FOUND","message":"活动不存在或已结束"}` |
+| 未登录抽奖 | `401` `LOGIN_REQUIRED`（鉴权在任何下游调用之前） |
+| 伪造令牌抽奖 | `401`，**没有产生下游调用** —— 令牌在网关的 Redis 里就解析失败了 |
+
+#### 网关在这条链路上只做三件事
+
+1. **身份**：`CurrentMember.require()` 取会员号，客户端传的不认；
+2. **翻译**：`DrawRejectReason` → 状态码 + <b>给用户看的话</b>。用 switch 表达式，
+   营销侧新增一个 reason 时网关<b>编译不过</b> —— 两边分开发版，编译期能拦的不该留到运行期；
+3. **组装**：`prizeItemId`（奖池内部主键）与 `source`（概率/白名单/兜底）<b>不下发</b>。
+   后者尤其：让用户知道自己是「白名单命中」的，等于告诉他这个活动内定了。
+
+#### 奖池那四种拒绝对用户说同一句话
+
+`POOL_NOT_FOUND` / `POOL_CLOSED` / `POOL_NO_PRIZE` / `POOL_BROKEN` 对用户是同一件事：
+**现在抽不了**。把区别告诉他既没用，又暴露了配置结构 —— 真正的原因在营销服务的日志里。
+
+而 `NO_PLAY_SCRIPT`（活动没挂编排脚本）在网关<b>打 error 日志</b>：
+对用户含糊其辞是对的，但没有这行日志，这个活动会安静地一个奖都发不出去。
 
 ---
 

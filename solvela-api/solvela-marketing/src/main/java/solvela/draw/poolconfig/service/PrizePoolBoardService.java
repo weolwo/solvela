@@ -5,6 +5,7 @@ import solvela.enums.PrizePoolStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
+import solvela.draw.DrawConfig;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
 import solvela.draw.poolconfig.domain.dto.PoolConfigIssueDTO;
@@ -15,6 +16,7 @@ import solvela.draw.PrizePoolItem;
 import solvela.draw.poolitem.manager.PrizePoolItemManager;
 import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
+import solvela.draw.drawconfig.service.DrawConfigService;
 import solvela.draw.runtime.DrawPeriodResolver;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -56,6 +58,7 @@ import java.util.stream.Collectors;
 public class PrizePoolBoardService {
 
     private final PrizePoolConfigManager prizePoolConfigManager;
+    private final DrawConfigService drawConfigService;
     private final PoolPrizeMappingManager poolPrizeMappingManager;
     private final PrizePoolItemManager prizePoolItemManager;
     private final ActivityConfigManager activityConfigManager;
@@ -132,7 +135,8 @@ public class PrizePoolBoardService {
         vo.setActivityCode(pool.getActivityCode());
         vo.setPoolCode(pool.getPoolCode());
         vo.setPoolName(pool.getPoolName());
-        vo.setResetPeriod(pool.getResetPeriod());
+        vo.setResetPeriod(java.util.Optional.ofNullable(drawConfigService.getByPool(pool))
+                .map(DrawConfig::getResetPeriod).orElse(null));
         vo.setStatus(pool.getStatus());
         vo.setCreateTime(pool.getCreateTime());
         vo.setIssueList(new ArrayList<>());
@@ -206,10 +210,18 @@ public class PrizePoolBoardService {
          * ⚠️ 本页独有的两条：reset_period 与单人限领的搭配。
          * 这两条要同时看奖池表与奖项表，而它们分属两个页面，谁都看不全。
          */
-        boolean periodic = DrawPeriodResolver.needsClock(pool.getResetPeriod());
+        // 重置周期住在抽奖配置上（玩法级），但这条体检要同时看奖项的限领设置，所以在奖池页出现
+        DrawConfig drawConfig = drawConfigService.getByPool(pool);
+        String resetPeriod = drawConfig == null ? null : drawConfig.getResetPeriod();
+        boolean periodic = DrawPeriodResolver.needsClock(resetPeriod);
+        if (drawConfig == null) {
+            vo.getIssueList().add(PoolConfigIssueDTO.warn("NO_DRAW_CONFIG",
+                    "这个奖池不属于任何抽奖配置：抽奖走不到它，单人限领也永远不会重置。"
+                            + "请先给活动建抽奖配置，再把奖池归到它下面"));
+        }
         if (periodic && limitedItemCount == 0 && !mappings.isEmpty()) {
             vo.getIssueList().add(PoolConfigIssueDTO.warn("RESET_PERIOD_USELESS",
-                    "配置了「" + resetPeriodText(pool.getResetPeriod()) + "」重置，但池内没有任何奖项设置单人限领次数："
+                    "抽奖配置了「" + resetPeriodText(resetPeriod) + "」重置，但池内没有任何奖项设置单人限领次数："
                             + "重置周期重置的是限领计数，没有限领就没有计数要重置，这个配置当前不产生任何效果"));
         }
         if (!periodic && limitedItemCount > 0) {

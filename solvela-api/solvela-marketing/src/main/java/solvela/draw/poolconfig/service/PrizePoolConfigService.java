@@ -16,6 +16,7 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.drawlog.manager.DrawPrizeLogManager;
 import solvela.draw.poolconfig.dao.PrizePoolConfigDao;
 import solvela.draw.PrizePoolConfig;
+import solvela.draw.drawconfig.service.DrawConfigService;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchMappingCommand;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchPoolCommand;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchPoolItemCommand;
@@ -65,6 +66,9 @@ import java.util.stream.Collectors;
 public class PrizePoolConfigService {
 
     private final PrizePoolConfigDao prizePoolConfigDao;
+
+
+    private final DrawConfigService drawConfigService;
     private final PrizePoolConfigManager prizePoolConfigManager;
     private final PrizePoolItemDao prizePoolItemDao;
     private final PrizePoolItemManager prizePoolItemManager;
@@ -287,7 +291,15 @@ public class PrizePoolConfigService {
             prizePoolItemDao.deleteBatchIds(removeItemIdList);
         }
 
-        // 7. 落库：奖池 upsert（工作台只管理 poolName，resetPeriod 等奖池自身配置由奖池 CRUD 页维护，不覆盖）
+        /*
+         * 7. 落库：奖池 upsert（工作台只管理 poolName，奖池自身的其它配置由奖池 CRUD 页维护，不覆盖）
+         *
+         * 🔴 新奖池必须归到抽奖配置下：重置周期从那里读，脚本也挂在那里。
+         *    没有的话就地建一条 —— 工作台就是「把一个抽奖活动配起来」的地方，
+         *    让运营先去另一个页面建配置再回来，只会造出一堆没有配置的孤儿奖池。
+         */
+        String drawCode = drawConfigService.ensureForActivity(form.getActivityCode());
+
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
             PrizePoolConfig existed = dbPoolMap.get(pool.getPoolCode());
             if (existed == null) {
@@ -297,9 +309,17 @@ public class PrizePoolConfigService {
                 }
                 PrizePoolConfig entity = new PrizePoolConfig();
                 entity.setActivityCode(form.getActivityCode());
+                entity.setDrawCode(drawCode);
                 entity.setPoolCode(pool.getPoolCode());
                 entity.setPoolName(pool.getPoolName());
                 prizePoolConfigDao.insert(entity);
+            } else if (existed.getDrawCode() == null) {
+                // 存量奖池：迁移之前建的，顺手补上归属（同时也可能要改名）
+                PrizePoolConfig update = new PrizePoolConfig();
+                update.setId(existed.getId());
+                update.setDrawCode(drawCode);
+                update.setPoolName(pool.getPoolName());
+                prizePoolConfigDao.updateById(update);
             } else if (!Objects.equals(existed.getPoolName(), pool.getPoolName())) {
                 PrizePoolConfig update = new PrizePoolConfig();
                 update.setId(existed.getId());

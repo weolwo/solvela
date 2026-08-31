@@ -53,8 +53,8 @@ public class ScriptFileParserTest {
         assertEquals("task/streak_sign_7d",
                 ScriptFileParser.toScriptCode("scripts/task/streak_sign_7d.ql"));
         // classpath URL 形态、Windows 反斜杠都要能处理
-        assertEquals("draw/vip_pool_entry",
-                ScriptFileParser.toScriptCode("file:/D:/app/BOOT-INF/classes/scripts/draw/vip_pool_entry.ql"));
+        assertEquals("draw/2026中秋活动抽奖_A8P0Y3ANGI",
+                ScriptFileParser.toScriptCode("file:/D:/app/BOOT-INF/classes/scripts/draw/2026中秋活动抽奖_A8P0Y3ANGI.ql"));
         assertEquals("activity/basic_entry",
                 ScriptFileParser.toScriptCode("scripts\\activity\\basic_entry.ql"));
     }

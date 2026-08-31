@@ -99,6 +99,39 @@ public final class DrawPeriodResolver {
     }
 
     /**
+     * 本周期<b>从什么时候开始</b>——查抽奖记录算「已经抽了几次」时的时间下界。
+     *
+     * <h3>与 {@link #resolve} 的分工</h3>
+     * 那个给的是 Redis 计数 key 里的<b>桶名</b>，管的是单人限领；
+     * 这个给的是 SQL 的 {@code create_time >= ?}，管的是「这一轮抽了几次」。
+     * 同一个 {@code reset_period} 配置，两种用法：一个决定计数记在哪，一个决定从哪开始数。
+     *
+     * <p>两者必须<b>由同一个开关驱动</b>，否则会出现「限领已经重置了、但次数还没重置」
+     * 这种谁也说不清的状态。所以放在同一个类里，改一个必然会看见另一个。
+     *
+     * @param resetPeriod 抽奖配置的 reset_period，可为 null
+     * @param now         当前时间，<b>必须来自数据库时钟</b>（铁律 9/10）
+     * @return 周期起点；{@code ACTIVITY} / 空值 / 脏值返回 {@code null}，
+     * 表示<b>不设下界</b>——整个活动期间累计。方向与 {@link #resolve} 一致：
+     * 脏数据面前宁可严格，不设下界只会让用户比配置少抽，不会超发
+     */
+    public static LocalDateTime periodStart(String resetPeriod, LocalDateTime now) {
+        if (resetPeriod == null || now == null) {
+            return null;
+        }
+        return switch (resetPeriod.trim().toUpperCase()) {
+            case PERIOD_DAY -> now.toLocalDate().atStartOfDay();
+            // 与 resolve 的周桶同一套 ISO 语义：周一 00:00 起算
+            case PERIOD_WEEK -> now.toLocalDate()
+                    .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                    .atStartOfDay();
+            case PERIOD_MONTH -> now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+            case PERIOD_ACTIVITY -> null;
+            default -> null;
+        };
+    }
+
+    /**
      * 这个周期配置是否需要知道「现在几点」。
      *
      * <p>抽奖是热路径，而取数据库时钟是一次额外往返。ACTIVITY / 空值 / 脏值

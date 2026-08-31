@@ -42,8 +42,4 @@ public class PrizePoolConfigUpdateForm {
     @NotBlank(message = "奖池名称 不能为空")
     private String poolName;
 
-    @Schema(description = "限领重置周期: DAY/WEEK/MONTH/ACTIVITY", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "限领重置周期 不能为空")
-    private String resetPeriod;
-
 }

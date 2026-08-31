@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -184,5 +185,81 @@ class DrawPeriodResolverTest {
         assertNotEquals(d, m);
         assertNotEquals(w, m);
         assertNotEquals(DrawPeriodResolver.BUCKET_ALL, d);
+    }
+
+    // ==================== 周期起点：查抽奖记录的时间下界 ====================
+
+    /**
+     * 起点必须与桶名<b>同进同出</b>。两者一个管「计数记在哪」、一个管「从哪开始数」，
+     * 由同一个 reset_period 驱动 —— 不一致就会出现「限领重置了但次数没重置」，
+     * 而那种状态没有任何日志能解释。
+     */
+    @Test
+    @DisplayName("按天：起点是当天零点，一天之内任何时刻算出来都一样")
+    void 按天起点是当天零点() {
+        LocalDateTime expected = LocalDateTime.of(2026, 8, 31, 0, 0);
+
+        assertEquals(expected, DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_DAY, LocalDateTime.of(2026, 8, 31, 0, 0, 0)));
+        assertEquals(expected, DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_DAY, LocalDateTime.of(2026, 8, 31, 23, 59, 59)));
+    }
+
+    @Test
+    @DisplayName("🔴 按天：跨过零点起点就换一天 —— 昨天的记录不该算进今天")
+    void 按天跨零点换起点() {
+        LocalDateTime before = DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_DAY, LocalDateTime.of(2026, 8, 31, 23, 59, 59));
+        LocalDateTime after = DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_DAY, LocalDateTime.of(2026, 9, 1, 0, 0, 0));
+
+        assertNotEquals(before, after, "跨零点起点没变，用户昨天抽的次数会一直压着他");
+        assertEquals(LocalDateTime.of(2026, 9, 1, 0, 0), after);
+    }
+
+    @Test
+    @DisplayName("按周：起点是本周一零点，与桶名同一套 ISO 语义")
+    void 按周起点是周一零点() {
+        // 2026-08-31 是周一
+        assertEquals(LocalDateTime.of(2026, 8, 31, 0, 0), DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_WEEK, LocalDateTime.of(2026, 8, 31, 10, 0)));
+        // 同一周的周日仍然回到那个周一
+        assertEquals(LocalDateTime.of(2026, 8, 31, 0, 0), DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_WEEK, LocalDateTime.of(2026, 9, 6, 23, 59)));
+        // 前一天是上周日，起点该落在上一个周一
+        assertEquals(LocalDateTime.of(2026, 8, 24, 0, 0), DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_WEEK, LocalDateTime.of(2026, 8, 30, 23, 59)));
+    }
+
+    @Test
+    @DisplayName("按月：起点是当月 1 号零点")
+    void 按月起点是一号零点() {
+        assertEquals(LocalDateTime.of(2026, 8, 1, 0, 0), DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_MONTH, LocalDateTime.of(2026, 8, 31, 23, 59)));
+        assertEquals(LocalDateTime.of(2026, 9, 1, 0, 0), DrawPeriodResolver.periodStart(
+                DrawPeriodResolver.PERIOD_MONTH, LocalDateTime.of(2026, 9, 1, 0, 0)));
+    }
+
+    /**
+     * 🔴 方向与 {@code resolve} 一致：脏数据面前宁可严格。
+     * 返回 null = 不设下界 = 整个活动累计，用户只会比配置少抽，不会超发。
+     */
+    @Test
+    @DisplayName("ACTIVITY / 空值 / 脏值都不设下界，而不是退回按天")
+    void 脏值不设下界() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 31, 12, 0);
+
+        assertNull(DrawPeriodResolver.periodStart(DrawPeriodResolver.PERIOD_ACTIVITY, now));
+        assertNull(DrawPeriodResolver.periodStart(null, now));
+        assertNull(DrawPeriodResolver.periodStart("每天", now), "脏值退回按天的话，用户会比配置多抽");
+        assertNull(DrawPeriodResolver.periodStart(DrawPeriodResolver.PERIOD_DAY, null));
+    }
+
+    @Test
+    @DisplayName("大小写与空格与 resolve 一样宽容")
+    void 大小写与空格() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 31, 12, 0);
+        assertEquals(LocalDateTime.of(2026, 8, 31, 0, 0),
+                DrawPeriodResolver.periodStart("  day  ", now));
     }
 }

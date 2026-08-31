@@ -22,6 +22,8 @@
              会员/资产/提案/优惠配置将来同属 app-member，所以共用一个 api 模块。
              只依赖 contract 与 spring-web，排在 base 之前正是因为它们连基础设施都不需要 -->
         <module>solvela-member-api</module>
+        <!-- 会话只用 Redis，单独一块：网关要它（每个请求解析令牌），但网关不能有 JDBC -->
+        <module>solvela-member-session</module>
         <module>solvela-marketing-api</module>
         <!-- 技术底座，2026-08-30 拆成四块：谁都能依赖 core，而 data 意味着 classpath 上有 JDBC 驱动。
              solvela-base 现在只是把四块聚在一起的门面，本身没有代码 —— 新模块请直接依赖具体那一个 -->
@@ -30,6 +32,7 @@
         <module>solvela-base-data</module>
         <module>solvela-base-file</module>
         <module>solvela-base-mq</module>
+        <module>solvela-base-web</module>
         <module>solvela-base</module>
 
         <!-- 业务域。按域拆而不是按"将来谁用"拆：prize 横跨活动侧与资产侧，

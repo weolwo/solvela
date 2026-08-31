@@ -12,7 +12,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 守住 C 端进程的三条边界。
+ * 守住 C 端进程的四条边界。
  *
  * <p>这三条都属于「坏掉的时候不会有任何报错」的那一类 —— 应用照常启动，
  * 接口照常响应，只是行为悄悄变了。所以必须有会失败的测试盯着。
@@ -22,6 +22,25 @@ class AppBoundaryTest {
 
     @Autowired
     private ApplicationContext context;
+
+    @Test
+    @DisplayName("🔴 mysql 驱动不在网关的 classpath 上")
+    void 没有数据库驱动() {
+        assertThrows(ClassNotFoundException.class,
+                () -> Class.forName("com.mysql.cj.jdbc.Driver"),
+                """
+                        网关的 classpath 上又出现了 mysql 驱动。
+                        多半是有人给 solvela-app 加了一个带 Dao 的模块 —— 常见的是某个域实现模块，
+                        或者往 solvela-member-session 里加了 Dao。
+
+                        网关只做转发与组装，域数据一律经 HTTP 向 member(1027) / marketing(1026) 要。
+                        它一旦能直连数据库，「绕过下游服务直接查一下」就会变成随手可做的事，
+                        而那正是把刚拆开的两个服务重新粘回去的方式 —— 且不会有任何报错。
+
+                        这条断言是「物理上不具备」而不是「约定不要那么做」：
+                        前者坏掉时构建就红了，后者要等到 code review 有人注意到。
+                        """);
+    }
 
     @Test
     @DisplayName("sa-token 不在 C 端的 classpath 上")

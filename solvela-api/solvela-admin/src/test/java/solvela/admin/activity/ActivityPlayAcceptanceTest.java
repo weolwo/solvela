@@ -15,8 +15,15 @@ import solvela.marketing.api.ActivityRuleView;
 import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.DrawResultView;
 import solvela.exception.BusinessException;
+import org.redisson.api.RedissonClient;
+import solvela.draw.runtime.DrawCacheKey;
+import solvela.scriptengine.Script;
+import solvela.scriptengine.domain.ScriptSaveCommand;
+import solvela.scriptengine.manager.ScriptManager;
+import solvela.scriptengine.service.ScriptEditService;
 import solvela.scriptengine.service.ScriptRefService;
 import solvela.scriptengine.spi.ScriptRefPoint;
+import solvela.scriptengine.spi.ScriptScene;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -48,8 +55,14 @@ class ActivityPlayAcceptanceTest {
     /** 刻意用真实业务不会出现的编码，避免误挂到线上活动 */
     private static final String ACTIVITY_CODE = "__PLAY_ACCEPTANCE_TEST__";
 
+    /** 抽奖配置编码 —— 抽奖的编排脚本挂在它身上，不是挂在活动上 */
+    private static final String DRAW_CODE = "WPLAYACPT1";
+
     /** 样例编排脚本，见 scripts/activity/draw_play.ql */
     private static final String PLAY_SCRIPT = "activity/draw_play";
+
+    /** 次数判定脚本：抽满 3 次就返回 null，用来验证 draw_countDrawn 的周期口径 */
+    private static final String COUNT_SCRIPT = "__acceptance__/count_guard";
 
     /** 准入判定脚本 —— 场景是 ACTIVITY_RULE，用来验证挂载点的场景守卫 */
     private static final String ENTRY_SCRIPT = "activity/basic_entry";
@@ -66,6 +79,15 @@ class ActivityPlayAcceptanceTest {
     private ScriptRefService scriptRefService;
 
     @Autowired
+    private ScriptEditService scriptEditService;
+
+    @Autowired
+    private ScriptManager scriptManager;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -80,6 +102,18 @@ class ActivityPlayAcceptanceTest {
         // 🔴 前提条件必须真实成立：样例脚本算出来的奖池在库里【不能】存在，
         // 否则这一轮抽奖会真的走进引擎门内，测试断言的东西就变了。
         // 本项目已经空过三次「前提不成立时通过和空过分不出来」，所以这里显式确认。
+        // 次数判定脚本：库里没有就建一版（首版自动激活）。放在 setUp 而不是 @BeforeAll，
+        // 是因为 cleanUp 会把它删掉 —— 让每条用例都从同一个已知状态开始
+        scriptEditService.save(new ScriptSaveCommand(
+                COUNT_SCRIPT, "次数守卫（验收用）", ScriptScene.ACTIVITY_PLAY.name(), "验收用",
+                """
+                if (draw_countDrawn() >= 3) {
+                    return null;
+                }
+                return draw_executeDrawByScript('DRAW_POOL_NORMAL');
+                """,
+                "验收用", "acceptance-test"));
+
         Integer poolCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(1) FROM t_prize_pool_config WHERE pool_code = ?", Integer.class, EXPECTED_POOL);
         assertEquals(0, poolCount, () -> String.format(
@@ -90,6 +124,22 @@ class ActivityPlayAcceptanceTest {
     @AfterEach
     void cleanUp() {
         scriptRefService.unbind(ScriptRefPoint.ACTIVITY_PLAY, ACTIVITY_CODE);
+        scriptRefService.unbind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE);
+        /*
+         * 🔴 Redis 的限流 key 也要清。
+         *
+         * 抽奖对「单会员单活动」限流 2 次/秒，key 的 TTL 是 1 小时 —— 也就是说
+         * 它会跨用例存活。用例跑得比生产快得多，前一条用例的抽奖会把额度吃掉，
+         * 后一条就拿到 TOO_FREQUENT，而失败信息指向的是完全无关的断言。
+         *
+         * 这个洞一直都在，只是之前每条用例最多抽一次，恰好没撞上。
+         */
+        redissonClient.getRateLimiter(DrawCacheKey.rateLimit(ACTIVITY_CODE, MEMBER_ID)).delete();
+
+        scriptManager.remove(com.baomidou.mybatisplus.core.toolkit.Wrappers.<Script>lambdaQuery()
+                .eq(Script::getScriptCode, COUNT_SCRIPT));
+        jdbcTemplate.update("DELETE FROM t_draw_prize_log WHERE activity_code = ?", ACTIVITY_CODE);
+        jdbcTemplate.update("DELETE FROM t_draw_config WHERE activity_code = ?", ACTIVITY_CODE);
         jdbcTemplate.update("DELETE FROM t_activity_config WHERE activity_code = ?", ACTIVITY_CODE);
         jdbcTemplate.update("DELETE FROM t_member WHERE member_id = ?", MEMBER_ID);
     }
@@ -151,6 +201,28 @@ class ActivityPlayAcceptanceTest {
     }
 
     @Test
+    @DisplayName("🔴 抽奖活动没有抽奖配置 → NO_PLAY_CONFIG，与「没挂脚本」分开")
+    void 没有抽奖配置() {
+        // 刻意不调 insertOnlineActivity（它会顺带建抽奖配置）
+        insertActivity(1, LocalDateTime.now().minusDays(1), null, LocalDateTime.now().plusDays(7));
+
+        assertEquals(DrawRejectReason.NO_PLAY_CONFIG, activityApi.draw(cmd()).reject(),
+                "「连玩法配置都没建」和「配置有了但没挂脚本」缺的东西不一样，排查方向也不一样，"
+                        + "混成一个 reject 会让运维先去找脚本，而脚本根本没地方挂");
+    }
+
+    @Test
+    @DisplayName("抽奖配置被关闭 → 同样是 NO_PLAY_CONFIG，不会照样跑脚本")
+    void 抽奖配置被关闭() {
+        insertOnlineActivity();
+        scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, PLAY_SCRIPT, "acceptance-test");
+        jdbcTemplate.update("UPDATE t_draw_config SET status = 0 WHERE draw_code = ?", DRAW_CODE);
+
+        assertEquals(DrawRejectReason.NO_PLAY_CONFIG, activityApi.draw(cmd()).reject(),
+                "运营关掉了抽奖配置，活动却照样能抽，才是真正的意外");
+    }
+
+    @Test
     @DisplayName("活动在窗内但没挂编排脚本 → NO_PLAY_SCRIPT，不是异常")
     void 没挂脚本() {
         insertOnlineActivity();
@@ -167,7 +239,7 @@ class ActivityPlayAcceptanceTest {
     @DisplayName("🔴 脚本算出的奖池真的被用上了 —— 请求走到了抽奖引擎门口")
     void 脚本决定的奖池被传到了引擎() {
         insertOnlineActivity();
-        scriptRefService.bind(ScriptRefPoint.ACTIVITY_PLAY, ACTIVITY_CODE, PLAY_SCRIPT, "acceptance-test");
+        scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, PLAY_SCRIPT, "acceptance-test");
 
         DrawResultView result = activityApi.draw(cmd());
 
@@ -183,7 +255,7 @@ class ActivityPlayAcceptanceTest {
     @DisplayName("params 缺 tier 时脚本照常跑 —— 空 Map 由域内补，不是让脚本判 null")
     void 缺省参数不会让脚本炸() {
         insertOnlineActivity();
-        scriptRefService.bind(ScriptRefPoint.ACTIVITY_PLAY, ACTIVITY_CODE, PLAY_SCRIPT, "acceptance-test");
+        scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, PLAY_SCRIPT, "acceptance-test");
 
         DrawResultView result = activityApi.draw(
                 new ActivityDrawCmd(ACTIVITY_CODE, MEMBER_ID, "req-" + System.nanoTime(), null));
@@ -220,6 +292,24 @@ class ActivityPlayAcceptanceTest {
     }
 
     @Test
+    @DisplayName("🔴 已抽次数按周期起点数：昨天的记录不算进今天")
+    void 已抽次数只数本周期() {
+        insertOnlineActivity();  // 重置周期 DAY
+        scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, COUNT_SCRIPT, "acceptance-test");
+
+        // 昨天抽过 5 次 —— 按天重置的话一次都不该算进来
+        insertDrawLog(5, LocalDateTime.now().minusDays(1));
+        assertEquals(DrawRejectReason.POOL_NOT_FOUND, activityApi.draw(cmd()).reject(),
+                "昨天的记录被算进了今天，用户会平白少抽 5 次");
+
+        // 今天已经抽了 3 次，脚本的阈值就是 3
+        insertDrawLog(3, LocalDateTime.now());
+        BusinessException e = assertThrows(BusinessException.class, () -> activityApi.draw(cmd()));
+        assertTrue(e.getMessage().contains("没有返回值"),
+                "次数用完时样例脚本返回 null，应被场景契约拦下。实际: " + e.getMessage());
+    }
+
+    @Test
     @DisplayName("活动不存在时 getActivityRule 返回 null，不抛异常")
     void 查不到的活动返回null() {
         assertNull(activityApi.getActivityRule(ACTIVITY_CODE));
@@ -234,6 +324,30 @@ class ActivityPlayAcceptanceTest {
 
     private void insertOnlineActivity() {
         insertActivity(1, LocalDateTime.now().minusDays(1), null, LocalDateTime.now().plusDays(7));
+        insertDrawConfig();
+    }
+
+    /**
+     * 抽奖活动的编排脚本挂在抽奖配置上，所以 DRAW 类型的用例都得先有这一条。
+     * 单独成一个方法，是为了让「没有抽奖配置」那条用例能<b>不</b>调用它。
+     */
+    /** 造 n 条抽奖记录，时间由调用方给 —— 周期口径这件事只能靠时间来验 */
+    private void insertDrawLog(int n, LocalDateTime when) {
+        for (int i = 0; i < n; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO t_draw_prize_log
+                        (member_id, trace_id, activity_code, pool_code, prize_item_id, prize_code, status, create_time)
+                    VALUES (?, ?, ?, 'ACPT_POOL', 0, 'ACPT_PRIZE', 0, ?)
+                    """, MEMBER_ID, "acpt-" + System.nanoTime(), ACTIVITY_CODE, when);
+        }
+    }
+
+    private void insertDrawConfig() {
+        jdbcTemplate.update("""
+                INSERT INTO t_draw_config
+                    (activity_code, draw_code, draw_name, draw_mode, reset_period, status)
+                VALUES (?, ?, ?, 1, 'DAY', 1)
+                """, ACTIVITY_CODE, DRAW_CODE, "参与链路验收抽奖");
     }
 
     private void insertActivity(int status, LocalDateTime start, LocalDateTime dataEnd, LocalDateTime end) {

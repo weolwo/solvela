@@ -23,11 +23,16 @@
 
     <dependencies>
 
-        <!-- 本模块直接用到 model 的实体 10 处。
-             原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
+        <!-- 枚举与错误码。本模块直接用到的只有 solvela.code.ErrorCode 与 solvela.enums.*，
+             都在 contract 里 —— 2026-08-30 把 solvela-model 摘掉了：网关不再碰任何实体。
+
+             ⚠️ 说实话：mybatis-plus-core 仍会经 base-core → solvela-model 传递进来。
+             真正有意义的那条线是「没有驱动、没有数据源、没有 Mapper」，
+             由 AppBoundaryTest 的 Class.forName 断言守着 ——
+             没有驱动的 ORM 核心是一堆用不上的类，不是一条能连库的路。 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-model</artifactId>
+            <artifactId>solvela-contract</artifactId>
             <version>3.0.0</version>
         </dependency>
         <!--
@@ -37,6 +42,14 @@
         本模块自己写 TraceFilter / ApiExceptionHandler / ClientIp，共十来个类，
         换来的是「C 端的 HTTP 行为只有一个地方定义」。
         -->
+        <!-- 链路 id 过滤器（solvela.base.web.TraceFilter）。它与
+             DownstreamClientConfig 的请求头拦截器是一件事的两半 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-web</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -80,27 +93,28 @@
             <version>3.0.0</version>
         </dependency>
 
-        <!-- 会员域的【契约】。网关的代码只认识它 —— 接口 + record，没有实现。
-             第 6 步会把下面那条对 solvela-member 的依赖删掉，那时 Maven 就成了硬边界：
-             后台 service 连 classpath 都上不来。现在还留着，是因为域的 bean 仍与网关同进程。 -->
+        <!-- 两个下游服务的【契约】：只有接口 + record，没有实现。
+             实现由 HttpServiceProxyFactory 在运行期生成成 HTTP 代理（见 DownstreamClientConfig）。
+             🔴 这里没有任何域实现模块 —— Maven 就是那道边界，后台 service 连 classpath 都上不来 -->
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-member-api</artifactId>
             <version>3.0.0</version>
         </dependency>
-
-        <!-- 会员、钱包、券、活动、奖品等领域层。
-             ⚠️ 只用它的 service / manager / dao，【它的 controller 全部不装配】——
-             那些是管理端视角的接口（/member/queryPage、/updateStatus…），
-             挂到 C 端端口上就是把后台功能暴露给了用户。过滤规则见 AppApplication。 -->
-        <!-- C 端目前只做登录，所以只依赖会员域。
-             将来接"我的钱包/我的券"时再加 solvela-ledger —— 那时加的每一行都是一次明确决策，
-             而不是像以前依赖 common-api 那样，一次性把所有域都拿到手 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-member</artifactId>
+            <artifactId>solvela-marketing-api</artifactId>
             <version>3.0.0</version>
         </dependency>
+
+        <!-- 会话：签发/解析/吊销令牌。只用 Redis，不带 JDBC —— 这正是它被拆出来的原因 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-session</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        
 
         <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
         <dependency>

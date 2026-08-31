@@ -29,10 +29,8 @@ public class PrizePoolConfigDTO {
     private String poolName;
 
     /** 重置周期，天，周，月，活动期间 */
-    private String resetPeriod;
 
     /** 抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio) */
-    private DrawModeEnum drawMode;
 
     /** 0关闭，1开启 */
     private PrizePoolStatusEnum status;
