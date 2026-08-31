@@ -1,5 +1,6 @@
 package solvela.draw.poolconfig.service;
 
+import solvela.enums.DrawModeEnum;
 import solvela.enums.ActivityStatusEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -15,6 +16,8 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.draw.drawlog.manager.DrawPrizeLogManager;
 import solvela.draw.poolconfig.dao.PrizePoolConfigDao;
+import solvela.draw.DrawConfig;
+import solvela.draw.runtime.DrawPeriodResolver;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.drawconfig.service.DrawConfigService;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchMappingCommand;
@@ -117,6 +120,16 @@ public class PrizePoolConfigService {
         }
         boolean online = activity.getStatus() == ActivityStatusEnum.ONLINE;
 
+        /*
+         * 抽奖配置：玩法这一层的参数（重置周期、算法、开关）与脚本挂载用的 drawCode。
+         *
+         * 没配过时不报错，而是返回一个「空壳」+ 一个预生成的可用编码 ——
+         * 与彩票工作台一致，让运营进来就能填，不用先跑一趟别的页面。
+         */
+        DrawConfig drawConfig = drawConfigService.getByActivityCode(activityCode);
+        boolean drawConfigured = drawConfig != null;
+        String drawCode = drawConfigured ? drawConfig.getDrawCode() : drawConfigService.generateDrawCode();
+
         // Tab1 物资：SKU 化后名称/价值等展示信息需回查资产大库补齐
         List<PrizePoolItem> dbItems = prizePoolItemManager.lambdaQuery()
                 .eq(PrizePoolItem::getActivityCode, activityCode)
@@ -164,7 +177,16 @@ public class PrizePoolConfigService {
         }).collect(Collectors.toList());
 
         return new DrawWorkbenchDTO(activity.getActivityCode(), activity.getActivityName(),
-                activity.getStatus(), online, itemVOList, poolVOList);
+                activity.getStatus(), online,
+                drawCode,
+                drawConfigured ? drawConfig.getDrawName() : activity.getActivityName() + "-抽奖",
+                drawConfigured ? drawConfig.getResetPeriod() : DrawPeriodResolver.PERIOD_DAY,
+                drawConfigured ? drawConfig.getDrawMode() : DrawModeEnum.PROBABILITY,
+                drawConfigured ? drawConfig.getStatus() : null,
+                drawConfigured,
+                // 已有配置即冻结编码：脚本挂载引用的就是它
+                drawConfigured,
+                itemVOList, poolVOList);
     }
 
     /**
@@ -298,7 +320,9 @@ public class PrizePoolConfigService {
          *    没有的话就地建一条 —— 工作台就是「把一个抽奖活动配起来」的地方，
          *    让运营先去另一个页面建配置再回来，只会造出一堆没有配置的孤儿奖池。
          */
-        String drawCode = drawConfigService.ensureForActivity(form.getActivityCode());
+        String drawCode = drawConfigService.saveFromWorkbench(
+                form.getActivityCode(), form.getDrawCode(), form.getDrawName(),
+                form.getResetPeriod(), form.getDrawMode(), form.getDrawStatus(), null);
 
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
             PrizePoolConfig existed = dbPoolMap.get(pool.getPoolCode());

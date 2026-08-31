@@ -28,7 +28,14 @@ export const POOL_STATUS_OPTIONS = Object.values(POOL_STATUS_ENUM).map((i) => ({
  */
 
 /**
- * 重置周期：对齐 t_prize_pool_config.reset_period
+ * 重置周期：对齐 <b>t_draw_config.reset_period</b>。
+ *
+ * ⚠️ 它曾经在 t_prize_pool_config 上，那是挂错了层 —— 重置周期是玩法级的，
+ * 不是某个奖池自己的事。现在住在抽奖配置上，奖池页只展示不编辑。
+ *
+ * 它决定两件事，由同一个开关驱动：
+ *   ① 奖项「单人限领次数」的计数记在哪个周期桶（Redis key）
+ *   ② 统计「本轮已经抽了几次」时从哪天起算（SQL 的 create_time 下界）
  */
 export const RESET_PERIOD_ENUM = {
   DAY: { value: 'DAY', desc: '每天' },
@@ -40,15 +47,17 @@ export const RESET_PERIOD_ENUM = {
 export const RESET_PERIOD_OPTIONS = Object.values(RESET_PERIOD_ENUM).map((i) => ({ value: i.value, label: i.desc }));
 
 /**
- * 抽奖算法：对齐 t_prize_pool_config.draw_mode
+ * 抽奖算法：对齐 <b>t_draw_config.draw_mode</b>（从奖池上移过来）。
  *
  * 按概率 = 用 t_pool_prize_mapping.probability 直接抽；
  * 按库存比例 = 按各奖项剩余库存的占比抽，库存多的更容易中。
  *
- * ⚠️ <b>后端从未读取过 draw_mode，这个枚举当前不接在任何界面上</b>（同 script_id）。
- * 全仓库 grep 确认：DrawEngine 只实现了「按概率」，选「按库存比例」照样按概率抽。
- * 表单与列表里的对应项已于 v3.64 摘除，免得运营配一个假开关。
- * 枚举与数据库列都先留着，等真做出来了再放回界面。
+ * 🔴 <b>STOCK_RATIO 至今没有实现</b>：DrawEngine 只做了「按概率」，选它照样按概率抽。
+ * 所以它在下拉里是 <b>disabled</b> 的（见 DRAW_MODE_SELECTABLE_OPTIONS）——
+ * 字段可见但选不中，而不是藏起来假装没有。
+ *
+ * 曾经因为「免得运营配一个假开关」把整个字段从界面摘掉过；搬到抽奖配置之后
+ * 字段重新露面，那条理由依然成立，所以用禁用而不是重新放开。
  */
 export const DRAW_MODE_ENUM = {
   PROBABILITY: { value: 1, desc: '按概率' },
@@ -56,6 +65,18 @@ export const DRAW_MODE_ENUM = {
 };
 
 export const DRAW_MODE_OPTIONS = Object.values(DRAW_MODE_ENUM).map((i) => ({ value: i.value, label: i.desc }));
+
+/**
+ * 给下拉用：未实现的算法禁选。
+ *
+ * 与 DRAW_MODE_OPTIONS 分开，是因为列表页展示存量值时不该受禁用影响 ——
+ * 库里真有一行是 STOCK_RATIO 的话，它得能显示出来。
+ */
+export const DRAW_MODE_SELECTABLE_OPTIONS = Object.values(DRAW_MODE_ENUM).map((i) => ({
+  value: i.value,
+  label: i.value === DRAW_MODE_ENUM.STOCK_RATIO.value ? `${i.desc}（尚未实现）` : i.desc,
+  disabled: i.value === DRAW_MODE_ENUM.STOCK_RATIO.value,
+}));
 
 export function poolStatusOf(value) {
   return Object.values(POOL_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
@@ -76,6 +97,7 @@ export default {
   RESET_PERIOD_OPTIONS,
   DRAW_MODE_ENUM,
   DRAW_MODE_OPTIONS,
+  DRAW_MODE_SELECTABLE_OPTIONS,
   poolStatusOf,
   resetPeriodOf,
   drawModeOf,

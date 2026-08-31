@@ -167,6 +167,47 @@ public class DrawConfigService {
     }
 
     /**
+     * 工作台聚合保存用：有则更新、无则新建，返回 draw_code。
+     *
+     * <p>🔴 <b>已有配置时 {@code drawCode} 一律沿用库里的</b>，前端传什么都不认。
+     * 那是脚本挂载的引用键，改了等于把已有挂载指向一个不存在的对象，
+     * 而挂载表不会跟着动 —— 表现是活动照常上线、一抽就报「脚本没挂」。
+     *
+     * <p>字段留空时用默认值，让「只想配奖池、不关心玩法参数」的运营不必先填一遍表单。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String saveFromWorkbench(String activityCode, String drawCode, String drawName,
+                                    String resetPeriod, DrawModeEnum drawMode,
+                                    EnableStatusEnum status, String operator) {
+        DrawConfig existing = getByActivityCode(activityCode);
+
+        DrawConfig target = existing == null ? new DrawConfig() : existing;
+        target.setActivityCode(activityCode);
+        target.setDrawName(blankTo(drawName, activityCode + "-抽奖"));
+        target.setResetPeriod(blankTo(resetPeriod, DrawPeriodResolver.PERIOD_DAY));
+        target.setDrawMode(drawMode == null ? DrawModeEnum.PROBABILITY : drawMode);
+        target.setStatus(status == null ? EnableStatusEnum.ENABLED : status);
+        target.setUpdateBy(operator);
+
+        if (existing == null) {
+            // 新建才认前端给的编码；格式非法或没给就自己生成
+            target.setDrawCode(SolvelaCodeUtil.isValidBizCode(drawCode) && getByDrawCode(drawCode) == null
+                    ? drawCode : generateDrawCode());
+            target.setCreateBy(operator);
+            drawConfigManager.save(target);
+            log.info("【抽奖配置】工作台新建 {}（活动 {}，操作人 {}）",
+                    target.getDrawCode(), activityCode, operator);
+        } else {
+            drawConfigManager.updateById(target);
+        }
+        return target.getDrawCode();
+    }
+
+    private static String blankTo(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    /**
      * 新增。
      *
      * <p>「一个活动一套抽奖」由唯一键兜底，这里先查一次只是为了给出人话报错 ——

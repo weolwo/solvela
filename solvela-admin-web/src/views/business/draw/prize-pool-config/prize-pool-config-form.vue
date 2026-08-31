@@ -28,17 +28,20 @@
         <a-input style="width: 100%" v-model:value="form.poolName" placeholder="奖池名称" />
       </a-form-item>
       <!--
-        重置周期是这个表单上唯一真正生效的业务开关：它决定奖项的「单人限领次数」
-        按什么粒度归零（每天/每周/每月/整个活动期间）。
-        v3.64 之前它是个装饰字段，运行态压根不读；现已由 DrawPeriodResolver 落到
-        限领计数的 Redis key 上，换周期即换 key，计数天然归零。
+        🔴 「限领重置周期」已于 2026-08-31 从这里摘除：它搬到了 t_draw_config。
+
+        重置周期是<b>玩法级</b>的（一套抽奖一个节奏），不是某个奖池自己的事；
+        而且它现在同时决定两件事 —— 单人限领计数记在哪个周期桶，以及
+        统计「本轮已抽几次」时从哪天起算。两件事必须由同一个开关驱动。
+
+        后端 PrizePoolConfigUpdateForm 已经不再接收这个字段，留在这里就是个不生效的控件。
       -->
-      <a-form-item label="限领重置周期" name="resetPeriod">
-        <a-select style="width: 100%" v-model:value="form.resetPeriod" :options="RESET_PERIOD_OPTIONS" placeholder="请选择重置周期" />
-        <div class="form-hint">
-          决定奖项的「单人限领次数」多久归零一次。选「活动期间」表示整个活动内累计不重置。 限领次数本身在奖项上配（工作台 → 奖项库）。
-        </div>
-      </a-form-item>
+      <a-alert type="info" show-icon class="mt-1">
+        <template #message><span class="text-xs">限领重置周期请到「抽奖配置」页设置</span></template>
+        <template #description>
+          <span class="text-xs">它是整套抽奖共用的节奏，不再逐个奖池配置。</span>
+        </template>
+      </a-alert>
 
       <!--
         ⚠️ 抽奖算法(draw_mode) 与 前置脚本(script_id) 已从表单摘除。
@@ -79,7 +82,6 @@
   import { SolvelaLoading } from '/@/components/framework/solvela-loading';
   import { prizePoolConfigApi } from '/src/api/business/draw/prize-pool-config-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
-  import { RESET_PERIOD_OPTIONS } from '/src/constants/business/draw/prize-pool-config-const';
 
   const router = useRouter();
 
@@ -134,7 +136,6 @@
     poolCode: undefined, //奖池编码，只读（被坑位映射与抽奖流水引用）
     poolName: undefined, //奖池名称
     // 重置周期：奖项「单人限领次数」的归零粒度，运行态由 DrawPeriodResolver 消费
-    resetPeriod: undefined,
     // drawMode 刻意不提交：后端从未读取过，是个假开关。
     // scriptId 已于 2026-08-23 随列一起删除，奖池准入脚本改挂 t_script_ref
     activityName: undefined, //只读展示用，不提交
@@ -144,7 +145,6 @@
 
   const rules = {
     poolName: [{ required: true, message: '奖池名称 必填' }],
-    resetPeriod: [{ required: true, message: '重置周期 必填' }],
   };
 
   // ------------------------ 跳转工作台 ------------------------
@@ -179,7 +179,6 @@
       await prizePoolConfigApi.update({
         id: form.id,
         poolName: form.poolName,
-        resetPeriod: form.resetPeriod,
       });
       message.success('操作成功');
       emits('reloadList');

@@ -179,10 +179,17 @@
           </div>
         </template>
 
-        <!-- 重置周期与限领奖项数必须放在一起看：没有限领奖项时，重置周期配了也不起作用 -->
+        <!--
+          重置周期与限领奖项数必须放在一起看：没有限领奖项时，重置周期配了也不起作用。
+
+          ⚠️ 这一列是<b>只读</b>的：值来自本池所属的「抽奖配置」，不是奖池自己的字段。
+          要改去抽奖配置页 —— 一套抽奖一个节奏，不再逐个奖池配。
+        -->
         <template v-if="column.dataIndex === 'resetPeriod'">
           <div class="cell-stack">
-            <span>{{ resetPeriodOf(text) }}</span>
+            <a-tooltip title="来自所属抽奖配置，要改请到「抽奖配置」页">
+              <span>{{ resetPeriodOf(text) }}</span>
+            </a-tooltip>
             <span class="cell-sub" :class="periodHintClass(record)">{{ periodHint(record) }}</span>
           </div>
         </template>
@@ -301,7 +308,7 @@
       width: 150,
     },
     {
-      title: '限领重置周期',
+      title: '限领重置周期（来自抽奖配置）',
       dataIndex: 'resetPeriod',
       width: 190,
     },

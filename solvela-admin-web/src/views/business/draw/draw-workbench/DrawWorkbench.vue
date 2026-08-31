@@ -60,6 +60,13 @@
     <a-card :bordered="false" class="shadow-sm">
       <a-spin :spinning="detailLoading">
         <a-tabs v-model:activeKey="activeTab">
+          <a-tab-pane key="drawConfig" force-render>
+            <template #tab>
+              <a-badge :dot="tab0Dirty" :offset="[6, 0]"><span>⚙️ 玩法配置</span></a-badge>
+            </template>
+            <DrawConfigPanel ref="tab0Ref" @change="onTab0Change" />
+          </a-tab-pane>
+
           <a-tab-pane key="prizeItem" force-render>
             <template #tab>
               <a-badge :dot="tab1Dirty" :offset="[6, 0]"><span>📦 奖项物资库</span></a-badge>
@@ -87,6 +94,7 @@
   import { drawWorkbenchApi } from '/@/api/business/draw/draw-workbench-api';
   import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
+  import DrawConfigPanel from './components/DrawConfigPanel.vue';
   import PrizeItemLibrary from './components/PrizeItemLibrary.vue';
   import PoolProbabilityEngine from './components/PoolProbabilityEngine.vue';
 
@@ -157,12 +165,14 @@
 
   // ---------------------------- 子组件 ref 与脏标记 ----------------------------
 
+  const tab0Ref = ref();
   const tab1Ref = ref();
   const tab2Ref = ref();
+  const tab0Dirty = ref(false);
   const tab1Dirty = ref(false);
   const tab2Dirty = ref(false);
 
-  const isDirty = computed(() => tab1Dirty.value || tab2Dirty.value);
+  const isDirty = computed(() => tab0Dirty.value || tab1Dirty.value || tab2Dirty.value);
 
   // Tab2 只读消费的物资库快照（来自 Tab1）
   const prizeItems = ref([]);
@@ -172,6 +182,11 @@
     if (tab1Ref.value) {
       prizeItems.value = tab1Ref.value.getData();
     }
+  }
+
+  // 玩法配置面板只发「有改动」，不带 payload —— 它没有需要喂给别的 Tab 的数据
+  function onTab0Change() {
+    tab0Dirty.value = true;
   }
 
   function onTab1Change(payload) {
@@ -199,6 +214,8 @@
       isOnline.value = Boolean(detail.online);
       // force-render 下两个 Tab 均已挂载，可直接 setData
       await nextTick();
+      tab0Ref.value?.setData(detail);
+      tab0Dirty.value = false;
       tab1Ref.value?.setData(detail.prizeItemList);
       tab2Ref.value?.setData(detail.poolList);
       // 回显后基线归零，脏标记随之复位
@@ -261,6 +278,9 @@
       // 多池契约：Tab2 V2 的 getData() 返回完整 poolList 数组
       const submitData = {
         activityCode: currentActivity.value,
+        // 玩法配置与奖池一起提交：配一个抽奖活动本来就是一件事，
+        // 分两次保存意味着中间存在「奖池配好了但玩法配置还没建」的半截状态
+        ...(tab0Ref.value ? tab0Ref.value.getData() : {}),
         prizeItemList: tab1Ref.value ? tab1Ref.value.getData() : [],
         poolList: tab2Ref.value ? tab2Ref.value.getData() : [],
       };
