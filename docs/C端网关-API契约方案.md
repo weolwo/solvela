@@ -1,36 +1,33 @@
 # C 端网关 API 契约方案（solvela-app → 域服务）
 
-> 目标：`solvela-app` 作为**编排网关**，今天同 JVM 调用、将来拆成 `app-activity` / `app-member` 等独立服务时**调用方代码一行不改**。
-> 范围：本轮优先 activity / member / ledger(资产) 三个域 + 抽奖执行，服务于「活动全链路验证」。
-> 日期：2026-08-30
+> 目标：`solvela-app` 作为**编排网关**，今天同 JVM 调用、将来把域拆成独立服务时**调用方代码一行不改**。
+> 范围：activity / member / ledger(资产) 三个域 + 抽奖执行。
+> 日期：2026-08-30 初版，2026-08-31 按进程拓扑变更修订。
 
 ---
 
-> ## ⚠️ 2026-08-31：进程拓扑已变，本文中的服务划分部分已过时
->
-> **本文的核心结论仍然成立且已兑现** —— `*-api` + `@HttpExchange`、本地实现与 HTTP 实现共用同一接口、
-> 调用方注入的类型不变。正是这一条让下面这次进程合并只花了一次改名的功夫。
->
-> **过时的是服务划分**。现在是**三个进程**，不是四个：
->
-> | 进程 | 端口 | 装什么 |
-> |---|---|---|
-> | `solvela-admin` | 1024 | 全域后台单体，独占 `@EnableScheduling` |
-> | `solvela-app` | 1025 | 网关，不查库 |
-> | `solvela-app-biz` | 1026 | C 端唯一业务进程：会员 + 营销 + 资产 |
->
-> `app-member`(1027) 已撤销并入 `app-biz`（原 `app-marketing`，改名是因为它装的已不只是营销）。
-> 四个进程连的是同一个库，那一刀买不到数据隔离，换来的是发奖热路径上一次同步 HTTP
-> 和一条只为回写而存在的 MQ 链路。
->
-> **将来真要拆，拆的是资产域（ledger），不是会员** —— 目标是资产独立成服务，
-> 会员 + 资产用一个独立的后台控制台。所以本文 §1.0 服务映射表里
-> 「app-activity / app-member」那套划分不要照着做。
->
-> 那条缝现在由 `solvela-marketing` 的 `LedgerBoundaryTest` 守：
-> 营销侧要动资产只能经 `MemberProposalApi`。当前形态与理由见 `BizApplication` 的类注释。
->
-> 下面正文原样保留 —— 它记录了契约设计的推理过程，那部分没有过时。
+## 修订说明（2026-08-31）
+
+**本文的核心结论已经被兑现，而且正是它让这次进程收缩只花了一次改名的功夫** ——
+`*-api` + `@HttpExchange`、本地实现与 HTTP 实现共用同一接口、调用方注入的类型不变。
+撤掉一个进程时，`MemberAuthApi` / `MemberProposalApi` 从 HTTP 代理换回本地 bean，
+业务代码一行没动。
+
+**变的是服务划分**。初版按「app-activity / app-member 两个业务服务」设计，
+2026-08-30 照此拆出了四个进程，2026-08-31 又把 member 收了回来 ——
+原因不是设计错了，是**那一刀切在了不产生隔离的地方**（见 §7.4）。
+
+现在是三个进程：
+
+| 进程 | 端口 | 装什么 |
+|---|---|---|
+| `solvela-admin` | 1024 | 全域后台单体，独占 `@EnableScheduling` |
+| `solvela-app` | 1025 | 网关。**classpath 上没有 mysql 驱动**，由 `AppBoundaryTest` 断言守着 |
+| `solvela-app-biz` | 1026 | C 端唯一业务进程：会员 + 营销 + 资产 |
+
+**将来真要拆，拆的是资产域（ledger），不是会员** —— 目标是资产独立成服务，
+会员 + 资产用一个独立的后台控制台。所以本文凡是提到「app-activity / app-member」的划分，
+都按这条重读；那条缝的守法见 §7.4 与 §8。
 
 ---
 
@@ -46,37 +43,54 @@
 
 ### 1.0 api 模块的粒度 = 将来的服务粒度，不是今天的 maven 模块粒度
 
-目标服务只有两个（外加网关）：
+**这条原则不变，变的是「将来的服务」是哪几个。**
 
-| 将来的服务 | 装哪些实现模块 | 对应的 api 模块 |
+今天的进程与实现模块：
+
+| 进程 | 装哪些实现模块 | 对应的 api 模块 |
 |---|---|---|
-| **app-marketing** (1026) | `solvela-activity`、`solvela-marketing`(draw/lottery/mall/task/stat)、`solvela-prize`、`solvela-scriptengine` | `solvela-marketing-api` |
-| **app-member** (1027) | `solvela-member`、`solvela-ledger`(资产)、`solvela-risk`、**`solvela-consumer`(发奖派发)**、`solvela-prize`(读配置/写流水) | `solvela-member-api` |
-| **solvela-app** (1025) | 网关，无域实现 | 依赖上面两个 |
-| **solvela-admin** (1024) | 后台，仍是单体，装全部 | — |
+| **solvela-app-biz** (1026) | `solvela-marketing`（含并入的 activity/consumer）、`solvela-prize`、`solvela-scriptengine`、`solvela-member`、`solvela-ledger`、`solvela-risk` | 两个都实现 |
+| **solvela-app** (1025) | 网关，无域实现 | 依赖两个 api |
+| **solvela-admin** (1024) | 后台，单体，装全部 | — |
 
-**所以只建两个 api 模块，不按今天的 maven 模块一一对应。** 特别地：
+将来拆出去的那一个：
 
-- **活动与商城同属一个服务**，所以只有一个 `solvela-marketing-api`，不按今天的 maven 模块再切细 —— 它们将来在同一个进程里，拆成两个 api 只会让网关同时持有两个指向同一台机器的 client；
-- **不建 `solvela-ledger-api`。** 资产属于 app-member 服务，契约进 `solvela-member-api`；
-- **一个 api 模块里按实现归属切多个接口**：`solvela-marketing-api` 里有 `ActivityQueryApi`（solvela-activity 实现）和 `DrawApi`（solvela-marketing 实现）。
-  不能合成一个大接口 —— 一个 Spring bean 没法只实现半个接口，而这两半在不同的 maven 模块里；
-- **实现模块保持今天的域切分不动。** `solvela-marketing` 里的 `DrawExecuteService` 去 implements `solvela-marketing-api` 里的 `DrawApi` —— 跨 maven 模块实现同一个 api 模块的接口是正常的。拆分那天是「把若干实现模块打进一个服务」，api 一行不用改。
+| 将来的服务 | 装哪些 | 契约 |
+|---|---|---|
+| **资产服务** | `solvela-ledger`、`solvela-risk` 的 `proposal` + `engine` 半边、`solvela-prize` 的 `prizelog` 半边 | `solvela-member-api` 里的 `MemberProposalApi` |
+
+**仍然只建两个 api 模块**，理由与初版一致：
+
+- **一个 api 模块里按实现归属切多个接口**：`solvela-marketing-api` 里有 `ActivityApi`（活动域实现）
+  和 `DrawApi`（抽奖实现）。不能合成一个大接口 —— 一个 Spring bean 没法只实现半个接口；
+- **不建 `solvela-ledger-api`。** 资产的对外契约就是 `MemberProposalApi`，它已经在
+  `solvela-member-api` 里，拆资产那天不用新建模块；
+- **实现模块的域切分与 api 无关。** 2026-08-31 把 `solvela-activity` 与 `solvela-consumer`
+  并进了 `solvela-marketing`（三者进程足迹完全相同），`solvela-marketing-api` 一行没改 ——
+  这正说明 api 粒度对齐的是服务，不是 maven 模块。
 
 ```
-solvela-contract         ← 新增。纯枚举 + 错误码，零第三方依赖
-solvela-marketing-api     ← 活动 / 抽奖 / 任务 / 奖品 / 商城 的对外契约
-solvela-member-api       ← 会员 / 资产 / 提案 / 优惠配置 的对外契约
+solvela-contract         ← 纯枚举 + 错误码，零第三方运行时依赖
+solvela-marketing-api    ← 活动 / 抽奖 / 任务 / 奖品 / 商城 的对外契约
+solvela-member-api       ← 会员 / 资产 / 提案 的对外契约
    ↑ implements（可由多个实现模块分别实现）
-solvela-activity + solvela-marketing + solvela-prize
+solvela-marketing + solvela-prize + solvela-scriptengine
 solvela-member + solvela-ledger + solvela-risk
    ↑ 只依赖这两个 api
 solvela-app
 ```
 
-### 1.0.1 尚未定的一处
+### 1.0.1 曾经未定的一处：consumer 归哪个服务（已定）
 
-`solvela-consumer`（事件派发 + 各类发奖 handler）依赖 activity / prize / risk / scriptengine，而它的产物是「奖品变成资产」。按数据所有权应归 **app-member**（写的是资产与账本），但它读的是活动侧的配置。本轮不动它，等两个服务的库拆分方案定了再决定 —— 也可能它就该是第三个服务（异步消费者），那是另一个话题。
+初版写着「`solvela-consumer` 按数据所有权应归 app-member（写的是资产与账本），
+但它读的是活动侧的配置，本轮不动它」。
+
+**已定：跟营销走。** 判据不是「谁在链路终点」，是**账本归属 —— 谁的表谁写**：
+consumer 写的是 `t_prize_log`，那是营销侧的账。资产入账由它经
+`MemberProposalApi` 交给资产侧，自己一个字都不写别人的表。
+
+2026-08-31 它整个并进了 `solvela-marketing`（进程足迹完全相同，合并不改变任何 classpath）。
+代价是编译器不再拦着玩法侧直接调它的发奖处理器，改由 `PrizeDispatchBypassTest` 守。
 
 ### 1.1 三条硬约束
 
@@ -84,7 +98,7 @@ solvela-app
 |---|---|---|
 | 1 | `*-api` **不得依赖 `solvela-model`** | model 里有 `PiiTypeHandler`、`PiiCipher`、MyBatis entity。api 依赖它 = 把持久层塞给每一个调用方，拆进程时还得跟着带 mybatis-plus |
 | 2 | 先拆 `solvela-contract`（把 `solvela/enums` + `solvela/code` 从 model 挪出来）✅ 2026-08-30 完成 | 否则 api 的 DTO 想用 `MemberStatusEnum` 就会把整个 model 拉进来。**包名刻意不变**，全仓 import 零改动 |
-| 3 | `solvela-app` 的 pom **只有 `*-api`**，没有任何域实现模块 | Maven 成为硬边界。`AppApplication` 的白名单 `@ComponentScan` 与 `AppBoundaryTest` 第三条断言可以退休 —— 后台 service 在 classpath 上根本不存在，比"扫进来再排除"强一个数量级 |
+| 3 | `solvela-app` 的 pom **只有 `*-api`**，没有任何域实现模块 ✅ 2026-08-31 达成 | Maven 成为硬边界。`dependency:tree` 复核：网关 114 个依赖里 0 个 mysql、0 个 `base-data`、0 个 `base-file`、0 个域实现模块。`AppBoundaryTest` 的四条断言全绿，其中「mysql 驱动必须 `ClassNotFound`」是这条约束的物理证明 |
 
 ### 1.1.1 `solvela-contract` 的两个依赖，以及为什么它们不算破例
 
@@ -105,7 +119,8 @@ contract 里的 `BaseEnum` 继承 MyBatis-Plus 的 `IEnum`（枚举 ↔ 数据�
 
 `solvela-scriptengine` 是**域内实现细节**，网关永远不该直接调它。它已经有正确的形态（`ScriptEngine` 门面 + `EngineContext` 双通道）。
 
-拆微服务时，脚本引擎**跟着用它的域走**：任务与抽奖都在 app-marketing，它就打进 app-marketing 服务，不独立成服务 —— 它是个库，不是个服务。
+拆微服务时，脚本引擎**跟着用它的域走**：任务与抽奖都在 `solvela-app-biz`，它就打进那个服务，不独立成服务 —— 它是个库，不是个服务。
+（2026-08-31 复核：`solvela-scriptengine` 的依赖方只有 marketing 与 admin，资产侧一处都不用它。所以拆资产域时它不跟着走。）
 
 C 端请求里也绝不能出现脚本变量：`activityCode` / `memberId` 由域服务自己绑进 `EngineContext`，走**内部通道**（`bindInternal`），运营的脚本视野里看不到。这正是 `EngineContext` 拆两条通道的用途。
 
@@ -285,15 +300,18 @@ app  POST /activity/{code}/draw
 🔴 **绝对不能这样写：**
 
 ```
-app: MemberApi.deductScore(memberId, 100)   // 扣积分（app-member 服务）
-app: ActivityApi.draw(...)                  // 抽奖（app-marketing 服务）
+app: MemberApi.deductScore(memberId, 100)   // 扣积分（将来的资产服务）
+app: ActivityApi.draw(...)                  // 抽奖（业务服务）
 ```
 
 拆成微服务后，这两次网络调用中间断电 = 用户扣了分没抽奖，没有任何补偿路径。
 
-`DrawExecuteService` 明说自己**不做资产扣减**，"由上游业务算完再调进来"。
-那个"上游业务"是 **app-marketing 内部**的编排（`ActivityDrawFacade` / `ACTIVITY_PLAY` 脚本），
-在一个本地事务里完成。**这条从今天单体阶段就要守**。
+`DrawExecuteService` 明说自己**不做资产扣减**，「由上游业务算完再调进来」。
+那个「上游业务」是**业务服务内部**的编排（`ActivityDrawFacade` / `ACTIVITY_PLAY` 脚本），
+在一个本地事务里完成。
+
+🔴 **这条从今天就要守，而且今天更容易破** —— 资产域现在与营销域同进程，
+网关连着两次写调用是「能跑通」的。守法见 §8.2 的 `LedgerBoundaryTest`。
 
 ### 4.4 判据
 
@@ -349,52 +367,46 @@ start_time ──── data_end_time ──── end_time
 
 ---
 
-## 7. 落地顺序（本轮活动链路）
+## 7. 落地顺序（本轮活动链路，七步已全部完成）
 
 | # | 步骤 | 完成判据 |
 |---|---|---|
-| **1** ✅ | **登录逻辑下沉到 `solvela.member.auth`**（2026-08-30 完成） | app 里**一个 DAO 都没有**（见 §9）。21 个测试全绿 |
-| **2** ✅ | 拆 `solvela-contract`：`solvela/enums` + `solvela/code` 从 model 挪过去，model 反过来依赖它（2026-08-30 完成） | 包名不动，全仓 import 零改动；contract 只依赖两个纯注解包（见 §1.1.1） |
-| **3** ✅ | 建 `solvela-marketing-api` / `solvela-member-api`（只两个，理由见 §1.0）（2026-08-30 完成） | api 模块的 pom 里只有 contract + spring-web；没有 solvela-model、没有 mybatis 运行时 |
-| **4** 部分 | **只放本轮链路要用的方法** | 已放：认证 3 个、活动详情/规则 2 个、抽奖 1 个。剩余次数与钱包余额**没放** —— 域里今天还没有对应的读方法（`MemberWalletService` 只有 stat/queryPage/扣加退），等真要用时连实现一起加 |
-| 5 | 域模块 implements；`MemberPrincipalLoader` 回源改调 api | 认证热路径仍是「Redis 命中 → 直接返回」，miss 才回源 |
-| 6 | app 换依赖：删掉 `solvela-member`，`@ComponentScan` 收缩 | app 的 pom 里只有两个 `*-api` |
-| 7 | 拆 `solvela-base`，app 摘掉 JDBC（见 §9.4） | `Class.forName("com.mysql.cj.jdbc.Driver")` 在 app 进程里抛 `ClassNotFoundException` |
+| **1** ✅ | 登录逻辑下沉到 `solvela.member.auth`（2026-08-30） | app 里**一个 DAO 都没有**（见 §9） |
+| **2** ✅ | 拆 `solvela-contract`：`solvela/enums` + `solvela/code` 从 model 挪过去（2026-08-30） | 包名不动，全仓 import 零改动；contract 只依赖两个纯注解包（见 §1.1.1） |
+| **3** ✅ | 建 `solvela-marketing-api` / `solvela-member-api`（2026-08-30） | api 的 pom 里只有 contract + spring-web；没有 model、没有 mybatis 运行时 |
+| **4** 部分 | 只放本轮链路要用的方法 | 已放：认证 3 个、活动详情/规则 2 个、抽奖 1 个、建提案 1 个。剩余次数与钱包余额**没放** —— 域里今天还没有对应的读方法，等真要用时连实现一起加 |
+| **5** ✅ | 域模块 implements；`MemberPrincipalLoader` 回源改调 api（2026-08-30） | 认证热路径仍是「Redis 命中 → 直接返回」，miss 才回源 |
+| **6** ✅ | app 换依赖：删掉 `solvela-member`，`@ComponentScan` 收缩（2026-08-30） | app 的 pom 里只有两个 `*-api` + 三块 base + session |
+| **7** ✅ | 拆 `solvela-base`，app 摘掉 JDBC（2026-08-30 拆，2026-08-31 删门面） | `AppBoundaryTest.没有数据库驱动()` 断言 `Class.forName("com.mysql.cj.jdbc.Driver")` 抛 `ClassNotFoundException`，已通过 |
 
-🔴 **第 1 步和第 5 步之间不要往 app 里加任何新的 DAO。** 现在 app 是干净的，保持住比事后清理便宜得多。
+🔴 **不要往 app 里加任何 DAO。** 现在它连驱动都没有，这是「物理上不具备」而不是「约定不要那么做」——
+前者坏掉时构建就红了，后者要等到 code review 有人注意到。
 
-### 7.0 已决：app 暂不接活动实现（2026-08-30）
+### 7.0 「app 暂不接活动实现」这个决定，以及它是怎么被兑现的
 
-`ActivityApi.draw` 的实现（活动校验 → `ACTIVITY_PLAY` 脚本 → 抽奖）已经在活动域跑通，
-但**网关侧刻意先不接**。
+2026-08-30 曾决定网关先不接 `ActivityApi.draw`：接上它当时需要 app 依赖
+`solvela-activity` + `solvela-marketing` 的**实现**，把一堆包加进 `@ComponentScan` ——
+那两个模块里混着后台写路径（`wizardCreate`、`DrawWorkbench*`），
+进了容器就离公网 controller 只差一个 `@Autowired`。
 
-接上它需要 app 依赖 `solvela-activity` + `solvela-marketing` 的**实现**，
-并把 `solvela.activity` / `solvela.draw` / `solvela.scriptengine` / `solvela.prize` / `solvela.risk`
-加进 `@ComponentScan` —— 那两个模块里混着后台写路径（`wizardCreate`、`DrawWorkbench*`），
-进了容器就离公网 controller 只差一个 `@Autowired`（§1.1 的装配面问题）。
+**决定是「等 HTTP 客户端形态到位后再接」，而不是「凑合先接上」。** 结果见 §7.7：
+接通的时候走的是 `DownstreamClientConfig` 生成的 HTTP 代理，网关的 classpath 上
+一个域实现模块都没有。**如果当时凑合接了，第 6、7 步就得反过来做一遍。**
 
-**决定：等 HTTP 客户端形态（`@ImportHttpServices`）到位后再接**，不为了早跑一天把装配面撑大，
-反正拆分时还要收回来。
-
-代价本来是「没有任何调用方会走到 `ACTIVITY_PLAY` 这条路」（后台的 `/drawPrizeLog/execute`
-是直调引擎、绕过脚本的）。**已用验收测试补上**：`ActivityPlayAcceptanceTest`（solvela-admin，10 条，
-自建自删造数，不依赖任何造数脚本）覆盖活动校验的四种拒绝、脚本算出的奖池确实被传到了引擎、
-挂载点的场景守卫；引擎侧的副作用约束由 `ScriptEngineTest` 的 4 条钉住。
-
-⚠️ 仍未覆盖：**真正中奖的那一段**。中奖要奖池/奖项/映射/库存四套配置，那是
-`抽奖模块-联调造数.sql` 的活，引擎门内的行为由 marketing 自己的测试负责。
-
----
+> 这是本方案里最值钱的一次「先不做」。
 
 ### 7.1 已知的债，按该还的顺序
 
-| # | 债 | 什么时候必须还 |
+| # | 债 | 状态 |
 |---|---|---|
-| 1 ✅ | ~~`DrawExecuteService` 用 `BusinessException` 表达预期内结果~~ | **2026-08-30 已还**，见 §7.2 |
-| 2 | 剩余次数 / 钱包余额还没有 C 端读方法 | 活动详情页要显示它们时 |
-| 5 ✅ | ~~`ACTIVITY_PLAY` 这条链路没有自动化验证~~ | **2026-08-30 已还**：`ActivityPlayAcceptanceTest`（admin，10 条）+ `ScriptEngineTest` 副作用约束 4 条 |
-| 3 ✅ 潜伏 | ~~冻结不生效（安全）~~ **2026-08-30 已还**，见 §7.3。剩下的「改昵称后最多 30 分钟看到旧资料」**目前够不着** —— 全仓没有任何修改会员昵称/头像的写路径（`t_member` 只有 status 与运营备注两个写入口），没有东西会变旧 | 等真有改资料的功能时，跟那个功能一起做 |
-| 4 半 ✅ | `solvela-base` **已拆成四块**（2026-08-30，见 §9.5）；app 摘掉 JDBC 仍**被决策 B 挡着** —— 同进程托管 member 实现，走 MyBatis DAO | 摘 JDBC：等第 6 步 |
+| 1 | `DrawExecuteService` 用 `BusinessException` 表达预期内结果 | ✅ 2026-08-30 已还，见 §7.2 |
+| 2 | 剩余次数 / 钱包余额还没有 C 端读方法 | ⏳ 活动详情页要显示它们时再做 |
+| 3 | 冻结不生效（安全） | ✅ 2026-08-30 已还，见 §7.3。剩下的「改昵称后最多 30 分钟看到旧资料」**目前够不着** —— 全仓没有任何修改会员昵称/头像的写路径，没有东西会变旧 |
+| 4 | `solvela-base` 把库和文件捆在一起，app 摘不掉 JDBC | ✅ 2026-08-31 全部还清：base 拆四块（2026-08-30）、空门面删除、网关 classpath 上没有驱动、断言已加 |
+| 5 | `ACTIVITY_PLAY` 链路没有自动化验证 | ✅ 2026-08-30 已还：`ActivityPlayAcceptanceTest`（admin，10 条）+ `ScriptEngineTest` 副作用约束 4 条 |
+| 6 | 跨服务链路 id 断掉（新服务没有 TraceFilter） | ✅ 已还：`TraceFilter` 在 `solvela-base-web`，三个进程都依赖它并扫 `solvela.base` |
+| 7 | **发奖投递没有不丢保证** | ❌ **未还，且比初版记的更严重** —— 见 §7.4「outbox 的真实状态」 |
+| 8 | `ProposalCmdMapper` 是过渡形态 | ⏳ 它的前提（consumer 搬到营销服务）2026-08-31 已成立，见 §7.5 |
 
 ### 7.2 抽奖的失败表达（债 1，已还）
 
@@ -460,52 +472,87 @@ start_time ──── data_end_time ──── end_time
 
 ---
 
-## 7.4 四进程拆分实录（2026-08-30，进行中）
+## 7.4 四进程拆分与回收实录（2026-08-30 拆，2026-08-31 收）
 
-### 已完成
+拆了一次又收回来一半，两次都留了记录 —— **收回来不是推翻设计，是发现那一刀切错了地方**。
 
-| | 产物 | 验证 |
+### 拆的时候做出来的东西（大部分留下了）
+
+| | 产物 | 现在 |
 |---|---|---|
-| marketing 服务 | 端模块 + 启动类 + 四套 yaml + 错误出口 + 两个 HTTP 薄壳 | `InternalEndpointMappingTest` 起真端口发真 HTTP，2/2 |
-| member 服务 | 同构，薄壳接 `MemberAuthApi` | 同上，2/2 |
-| 消息底座 | `solvela-base-mq`：拓扑常量、交换机/队列/死信声明、JSON 编解码 | 编译通过（还没接线） |
-| outbox | `t_prize_dispatch_outbox` + 实体 + dao | DDL 已写，**待执行** |
-| 发布方抽象 | `PrizeEventPublisher` + `LocalPrizeEventPublisher`，三个发布点全部改走它 | 全反应堆绿，admin 行为不变 |
+| 端模块形态 | 启动类 + 四套 yaml + 错误出口 + HTTP 薄壳，两个服务同构 | ✅ 留下，`solvela-app-biz` 用的就是这套 |
+| 真起进程的验证 | `InternalEndpointMappingTest` 起真端口发真 HTTP | ✅ 留下，拆成两个（活动/抽奖、会员认证） |
+| 契约与两侧实现 | `MemberProposalApi` / `MemberAuthApi` + 本地实现 + HTTP 薄壳 | ✅ 留下，这是最值钱的部分 |
+| 消息底座 | `solvela-base-mq` | ⚠️ 留下，但只剩编解码 —— 发奖专用拓扑已删 |
+| outbox | `t_prize_dispatch_outbox` + 实体 + dao | ❌ **从来没接线**，2026-08-31 连表带类一并删除 |
+| 发布方抽象 | `PrizeEventPublisher` + `LocalPrizeEventPublisher` | ✅ 留下 |
 
 ### 装配过程逼出来的四件事（都不报错、只在运行期炸）
 
 1. **`@MapperScan` 漏了 `solvela.stat`** —— 手写清单的必然产物；
 2. **两个契约撞同一个 URL**：`ActivityApi` 的 `/internal/activity` + `/draw` 与 `DrawApi` 的
-   `/internal/activity/draw`。启动期 Ambiguous mapping —— 这个报错顺带<b>证明了
-   Spring MVC 确实认接口上的 `@HttpExchange`</b>，整套「契约只定义一次」的做法才站得住；
+   `/internal/activity/draw`。启动期 Ambiguous mapping —— 这个报错顺带**证明了
+   Spring MVC 确实认接口上的 `@HttpExchange`**，整套「契约只定义一次」的做法才站得住；
 3. **派发链路反向依赖活动域**：`ProposalSourceResolver` 拿 activityCode 回头查活动表。
-   拆开后活动配置在营销、派发在会员，不在一个进程里。改成
-   **消息自带上下文**：`t_prize_log.activity_type` + `UserPrizeEvent.activityType`，
-   解析器变成纯函数；
+   改成**消息自带上下文**：`t_prize_log.activity_type` + `UserPrizeEvent.activityType`，
+   解析器变成纯函数。**这个改动即使收回进程也是对的**，留着；
 4. **`solvela.dispatch` 忘了进扫描清单** —— 同 1。
 
-### 🔴 两个模块横跨两个服务（真要拆库前必须先拆它们）
+### 🔴 为什么把 member 收了回来（2026-08-31）
 
-| 模块 | 一半归营销 | 一半归会员 |
+摊开算了一次账，那一刀**买到的是零，付出的是三样**：
+
+| 付出 | 事实 |
+|---|---|
+| 热路径上一次同步 HTTP | 抽奖 → 建提案跨进程，读超时 3s；超时会让发奖流水停在「待提交」等重投 |
+| 一条只为回写存在的 MQ 链路 | RabbitMQ 全仓**只用在这一件事上**：一个 publisher、一个 listener |
+| 两处不得不开的扫描妥协 | 整个 `solvela.member` 和半个 `solvela.risk` 本来就已经在营销进程里了 |
+| **买到的隔离** | **零** —— 四个进程连的是同一个库，yaml 里自己写着「第一步只拆进程，不拆数据」 |
+
+而 `solvela-app-member` 本身只有 6 个 java 文件，不装任何独有的域。
+
+**收回来不用扔掉任何契约**：`MemberProposalApi` 在合并后的进程里解析成 `ProposalApiService`
+（本地 bean）而不是 HTTP 代理，`MemberAuthApi` 同理，调用方代码一行没动。
+**这正是 §0 那个结论的反向验证** —— 它不只保证「拆的时候不用改」，也保证「合的时候不用改」。
+
+### 🔴 两个模块横跨两个域（拆资产域前必须先拆它们）
+
+| 模块 | 归营销的一半 | 归资产的一半 |
 |---|---|---|
-| `solvela-risk` | `promotionconfig` / `promotiongroup`（奖品关联它） | `proposal`（跟资产走） |
-| `solvela-prize` | `prizeconfig`（配活动要读） | `prizelog`（发奖流水） |
+| `solvela-risk` | `promotionconfig`(8) / `promotiongroup`(7)，奖品关联它 | `proposal`(9) + `engine`(8)，跟资产走 |
+| `solvela-prize` | `prizeconfig`，配活动要读 | `prizelog`，发奖流水 |
 
-现在靠「精确到子包扫描」和「两个服务都装 prize」绕过去，共库阶段无害。
-**共库阶段唯一的硬规则：写路径只能有一个服务拥有**（`prize_log` 只由 member 写）。
+`solvela-risk` 已查实**这一刀切得很干净**：`engine` 只被 `proposal` 引用，
+`promotionconfig` / `promotiongroup` 一处都不引用 `proposal`，两侧零交叉。
 
-### 为什么 MQ 之外还要 outbox
+四进程时代靠「精确到子包扫描」绕过去；现在同进程，那个止血撤掉了，
+**改由 `LedgerBoundaryTest` 守**（见 §8）。
 
-MQ 覆盖不了这个窗口：**事务提交成功 → 进程在发消息之前挂了**。
-奖已判定、流水已落库，消息却没发出去，而且没有任何地方记得这件事。
-publisher-confirm 也救不了 —— 确认回调的前提是消息真的发出去了。
+⚠️ `solvela-prize` 的分界在**派发那一刻**：奖品配置属于营销，发出去之后的资产属于资产侧。
+共库阶段唯一的硬规则：**写路径只能有一个服务拥有**。
 
-**MQ 负责投递，outbox 负责不丢**，各管一段。代价是消费方必须幂等
-（发奖侧靠 `t_prize_log` 的 `uk_external_biz` 兜底，与 `source_biz_id` 同值）。
+### outbox 的真实状态：**没有，而且比初版记的更严重**
 
----
+初版这里论证了「MQ 之外还要 outbox」，论证本身是对的：
 
-### 7.5 发奖跨服务：同步提案 + 异步回写（2026-08-30，同步段已完成）
+> MQ 覆盖不了这个窗口：**事务提交成功 → 进程在发消息之前挂了**。
+> 奖已判定、流水已落库，消息却没发出去，而且没有任何地方记得这件事。
+> publisher-confirm 也救不了 —— 确认回调的前提是消息真的发出去了。
+
+**但它从来没有落地。** 2026-08-31 核查发现 `PrizeDispatchOutbox` 实体与
+`PrizeDispatchOutboxDao` 除互相引用外**零使用**，`t_prize_dispatch_outbox` 是一张
+没人写也没人读的表；而 `PrizeEventPublisher` 的注释却把它描述成已有能力，
+`LocalPrizeEventPublisher` 的注释甚至在教人给营销服务配 `dispatch.mode=mq`
+（真配了会因为没有第二个实现而启动失败）。三者已一并清理。
+
+> 教训：**写下了一个没有测试盯着的可靠性承诺**，与 §7.3 的「冻结不生效」同一个形状。
+> 差别是那次有类注释可以打脸，这次连打脸的地方都没有 —— 因为死代码看起来就像已经做完了。
+
+**那个窗口今天是敞着的**（进程内 `AFTER_COMMIT` 同样覆盖不了「提交后、派发前进程挂掉」）。
+风险比跨进程时小（少一个网络跃点），但没有消失。真要覆盖就补一个 `PrizeEventPublisher`
+的 outbox 实现 —— 业务代码一行不用改，这正是留着那个接口的意义。
+
+### 7.5 发奖：同步提案 + 结果回写（2026-08-30 跨服务设计，2026-08-31 收进同一进程）
 
 ```
 marketing ──同步 HTTP──▶ member    受理 / 拒绝 + 原因（当场返回）
@@ -523,38 +570,65 @@ member ────异步消息────▶ marketing  资产真正入账完�
 **状态拆两列**（`proposal_status` / `status`）的理由见 `PrizeProposalStatusEnum` 类注释：
 压在一个字段上时，「已受理但还在审批」与「已入账」长得一模一样。
 
-#### 已完成
+#### 已完成，并且合并进程后原样有效
 
 - 契约 `MemberProposalApi` + `CreateProposalCmd` + `ProposalResult`；
-- 会员侧 `ProposalApiService`：把 `BusinessException` 翻成 `failReason`。
+- 资产侧 `ProposalApiService`：把 `BusinessException` 翻成 `failReason`。
   **翻译放在这一层而不是改 `addProposal` 本身** —— 后台审批、人工补发也在调它，
   那些路径上抛异常是对的（调用方是人）。同一段逻辑，对内抛异常、对外给返回值；
 - 四个发奖 handler 改调 api；`DispatchOutcome` 带上 `proposalId`；
 - `PrizeDispatchHandler` 落 `proposal_status`：被拒 → REJECTED + 原因；受理 → ACCEPTED + 提案 id。
   **受理时刻意不写 `status=1`** —— 那会造成「记录显示成功、用户其实没收到」。
 
-#### 未完成
+#### 2026-08-31 的变化：异步回写那一段没有了
 
-| # | 事项 |
+两侧进了同一个进程，所以：
+
+| 初版的未完成项 | 现在 |
 |---|---|
-| 1 | consumer 从 member 挪到 marketing（它写 prize_log），member 去掉 prize |
-| 2 | ledger 停写 `t_prize_log`（跨服务写别人的表），改成发消息 |
-| 3 | marketing 订阅回写消息落终态 |
-| 4 | `t_mq_message_log` 落表 + 消费幂等 + 7 天清理 |
-| 5 | 重投任务：扫 `proposal_status = PENDING` 的行 |
+| consumer 从 member 挪到 marketing | ✅ 已挪，并进一步并入 `solvela-marketing` |
+| ledger 停写 `t_prize_log`，改成发消息 | ✅ 不写别人的表这条守住了 —— 它调 `PrizeDispatchResultPublisher`，今天的实现是进程内更新 |
+| marketing 订阅回写消息落终态 | ❎ **不需要了**，同进程直接落 |
+| `t_mq_message_log` + 消费幂等 + 7 天清理 | ⚠️ 代码与表都在，但**目前没有任何使用者** —— 唯一的消费者随发奖 listener 一起删了。留着是给下一摊（活动事件订阅）用的 |
+| 重投任务：扫 `proposal_status = PENDING` | ⏳ 仍然要做。`PrizeDispatchReconcileJob` 已在，覆盖面待核 |
+
+**上表那三个 ❎/✅ 在拆资产域那天会重新变成待办** —— 所以 `PrizeDispatchResultPublisher`
+这个接口刻意留着（今天只有一个实现），到时候加一个 MQ 实现、在端模块换装配即可。
+
+#### 一个可以收尾的过渡形态
+
+`ProposalCmdMapper` 的类注释写着：
+
+> ⚠️ 这是过渡形态。`ProposalRecordAddCommand` 属于会员侧的风控域，发奖侧本不该认识它。
+> **等 consumer 整体搬到营销服务之后**，四个 handler 应当直接拼 `CreateProposalCmd`，本类随之删除。
+
+**那个前提 2026-08-31 已经成立。** 改完之后可以把 `LedgerBoundaryTest` 里
+`ALLOWED_PROPOSAL_SUBPACKAGE = "domain"` 那条放行去掉，禁掉整个 `risk.proposal` ——
+缝守得更严。⚠️ 这是改四个 handler 拼装奖品命令的业务代码，字段映射错了就是发错奖，
+该单独一次改动、单独过一遍。
 
 #### 已定但未实施的下一摊（活动事件订阅）
 
+**MQ 底座就是为这个留着的** —— 发奖那条链路没了，但 `solvela-base-mq` 的 JSON 编解码
+（⚠️ 必须是 Jackson 3 的 `JacksonJsonMessageConverter`，名字带 2 的那个绑的是 Jackson 2）
+与 `MqMessageLog` 的消费幂等表都在，补拓扑与发布点即可。
+
 - `t_mq_message_log` 的隔离列叫 **`consumer_key`** 而不是 `activity_code`：
-  这张表也要装非活动的消息（发奖回写），后者填 handler 名。唯一键 `(message_id, consumer_key)`，
-  后台重试按 `consumer_key` 过滤 —— 重跑 A 活动不会碰到 B；
+  这张表要装多种消息，唯一键 `(message_id, consumer_key)`，后台重试按 `consumer_key` 过滤 ——
+  重跑 A 活动不会碰到 B。**这一列本来就是为多消费者设计的**，正好接住登录事件这类 fan-out；
 - **每种事件一个队列 + 订阅关系在库里**，不是每活动一个队列：活动是运营随时建的，
   队列与绑定会爆炸且下线后残留。订阅关系复用现成的 `t_script_ref` + `ScriptRefPoint`；
 - 取订阅者时必须 **join 活动表过滤**（`t_script_ref` 不知道活动上没上线、数据结没结束）。
   **活动没启用或数据已结束的，消息不记录**；
+- 🔴 **每个队列都必须绑死信交换机**。没有死信配置时 RabbitMQ 对被拒消息的默认行为是
+  **直接丢弃**；消费端同时要配 `default-requeue-rejected: false`，
+  否则一条必然失败的消息会被反复重入队把队列打爆。写法见 `MqConfig` 的类注释；
 - ⚠️ 这会让时间窗判据出现第三处（展示、准入、事件过滤）。**到第三处必须收口**成一个
   `joinable(activity, now)`，SQL 只做粗筛。缓存只能存活动对象，不能存布尔值 ——
   数据截止是时间到了自然失效，存布尔值会让活动结束后仍触发到 TTL 过期。
+
+⚠️ `docker-compose.yml` 里**没有 RabbitMQ 服务**，yaml 指向 127.0.0.1:5672 的外部实例。
+这一摊开工前要先补上。
 
 ---
 
@@ -581,12 +655,15 @@ member ────异步消息────▶ marketing  资产真正入账完�
 > 教训：**每加一个 api 接口，就要问一句「服务端的壳建了没有」**。
 > 契约实现类和 HTTP 薄壳是两件事，而它们分别在两个模块里。
 
-#### 顺带发现：新服务没有 TraceFilter
+#### 顺带发现：新服务没有 TraceFilter（已还）
 
-会员服务的错误响应里 `traceId` 是 `null`。网关侧的客户端拦截器<b>已经在发</b>
-`traceId` 请求头（见 `DownstreamClientConfig`），但 marketing / member 两侧
-**没有 Filter 把它读进 MDC** —— 所以跨服务的链路 id 目前是断的，
-两边日志还是只能靠时间戳对。补一个十来行的 Filter 即可，已记进债表。
+当时会员服务的错误响应里 `traceId` 是 `null`：网关侧的客户端拦截器**已经在发**
+`traceId` 请求头（见 `DownstreamClientConfig`），但两个新服务**没有 Filter 把它读进 MDC**，
+跨服务的链路 id 是断的。
+
+**已还**：`TraceFilter` 收进 `solvela-base-web`，三个进程都依赖它并扫 `solvela.base`。
+它与 `DownstreamClientConfig` 的请求头拦截器是**一件事的两半**，少任何一半链路都断 ——
+抄三份的话三处的 sanitize 规则迟早不一致，断得还更隐蔽（两边都有 id，只是不一样）。
 
 ---
 
@@ -623,20 +700,51 @@ POST /activity/{code}/draw   需登录；会员号取自登录态，客户端传
 
 ---
 
-## 8. 拆分那天要做的事（提前记下，验证今天的设计是否够）
+## 8. 拆资产域那天要做的事（以及今天怎么把那条缝守住）
+
+目标形态：**资产独立成服务，会员 + 资产用一个独立的后台控制台**。
+所以 `marketing ↔ ledger` 就是那条缝。
+
+### 8.1 那天的改动量
 
 | 步骤 | 改动量 |
 |---|---|
-| 域模块外面套 `@RestController implements XxxApi` 的薄壳 | 每个 api 一个类，方法体全是 `return delegate.xxx()` |
-| app 侧把本地 bean 换成 `@ImportHttpServices` 生成的 HTTP 代理 | 配置改动，**调用方代码 0 行** |
-| traceId / clientIp 从 MDC 改成 HTTP header 透传 | 一个 `RestClient` 拦截器 + 一个服务端 Filter |
-| **数据库跟着拆** | ⚠️ 见下 |
+| 拆 `solvela-risk`：`proposal` + `engine` 归资产，`promotionconfig` + `promotiongroup` 留营销 | 两侧零交叉，已查实 |
+| 拆 `solvela-prize`：`prizelog` 归资产，`prizeconfig` 留营销 | 分界在派发那一刻 |
+| 资产侧套 `@RestController implements MemberProposalApi` 的薄壳 | `MemberProposalInternalController` 就是它，删掉的那个照抄回来即可 |
+| 营销侧把本地 bean 换成 HTTP 代理 | `MemberServiceClientConfig` 同上。**调用方代码 0 行** |
+| 入账结果回写改回发消息 | 加一个 `PrizeDispatchResultPublisher` 的 MQ 实现，端模块换装配 |
+| **数据库跟着拆** | ⚠️ 见 §8.3 |
 
-### 8.1 真正的大头不是 RPC，是数据所有权
+前两行是真活，后三行是把 2026-08-31 删掉的东西照抄回来 —— **git 里都有**。
 
-拆成多服务后，"两个进程共库共 Redis"必须变成每个服务管自己的库，否则拆出来的是**共享数据库的分布式单体** —— RPC 的复杂度全付了，故障隔离和独立伸缩一个没拿到。
+### 8.2 🔴 今天靠什么守住这条缝
 
-`solvela-prize` 的归属**已定**：跟 activity 走（见 §1.0 的服务映射表）。parent pom 注释里那句「prize 横跨活动侧与资产侧」在服务边界上的解法是：**奖品配置**属于 app-activity，**发出去之后的资产**属于 app-member，分界线在派发那一刻。
+四进程时代靠 `@ComponentScan` 精确到子包；合并之后那个止血撤掉了。现在靠两条断言，
+都在 `solvela-marketing` 里，都用注入探针验证过**确实会失败**：
+
+| 断言 | 守什么 |
+|---|---|
+| `LedgerBoundaryTest` | pom 里不许有 `solvela-ledger`；class 不许引用 `solvela/ledger/` 与 `solvela/risk/proposal/` 的非 `domain` 子包。**要动资产只能经 `MemberProposalApi`** |
+| `PrizeDispatchBypassTest` | 玩法侧不许直接引用 `solvela.consumer.handler`。绕过 `PrizeEventPublisher` 会让派发跑进事务里，业务回滚撤不掉已发的奖 |
+
+两条都**扫 class 文件常量池，不是扫 import** —— 全限定名直接写在代码里是没有 import 行的。
+
+> 这两条断言就是「将来还能不能便宜地拆出去」的全部保障。它们红了别去改它们，去改代码。
+
+### 8.3 真正的大头不是 RPC，是数据所有权
+
+拆成多服务后，「三个进程共库共 Redis」必须变成每个服务管自己的库，
+否则拆出来的是**共享数据库的分布式单体** —— RPC 的复杂度全付了，
+故障隔离和独立伸缩一个没拿到。
+
+**2026-08-31 那次把 member 收回来，根因就在这里**：进程拆了、库没拆，
+所以那一刀买到的隔离是零。**下次动手前先问：库拆不拆？** 不拆就不值得拆进程。
+
+⚠️ 后台控制台的成本容易被低估：`solvela-admin` 里 `module/ledger`(15) + `module/member`(13)
+只有 28 个文件，而 `module/system`(280 —— 菜单/角色/员工/字典/权限/代码生成器)
+是两个控制台都要的。**那 280 个怎么办**（复制 / 抽成模块 / 共用一套账号走 SSO）
+才是那一刀的实际工作量，别按 28 个文件的量级排期。
 
 ---
 
@@ -644,9 +752,9 @@ POST /activity/{code}/draw   需登录；会员号取自登录态，客户端传
 
 ### 9.1 边界：Redis 算 app 的，DB 不算
 
-`RedisTokenStore` 存的是会话凭证，是网关自己的状态，不是域数据。**app 可以有自己的 Redis，不可以有 DB。** 拆服务那天，app 的 Redis 也是它自己的，不与 app-member 共享。
+`RedisTokenStore` 存的是会话凭证，是网关自己的状态，不是域数据。**app 可以有自己的 Redis，不可以有 DB。** 拆服务那天，app 的 Redis 也是它自己的，不与业务服务共享。
 
-### 9.2 现在 app 里全部的库触点，正好都在登录链路上
+### 9.2 当初 app 里全部的库触点，正好都在登录链路上（已全部下沉）
 
 | 触点 | 去向 |
 |---|---|
@@ -654,11 +762,11 @@ POST /activity/{code}/draw   需登录；会员号取自登录态，客户端传
 | `MemberLoginLogDao` | → 随登录日志进 member |
 | `MemberOperationLimitService` | → 本来就在 member，app 不再直接调 |
 | `PiiHasher` / `PasswordCipher` / `MemberPhoneUtil` | → 手机号摘要与验密在 member 算 |
-| `SolvelaIpUtil.getRegion()` | → IP 归属地跟着登录日志走。⚠️ `AppApplication` 的 `Ip2RegionListener` **现在还不能删** —— member 的 bean 仍与网关同进程，xdb 得有人加载；到第 6 步 app 不再装配 member 时才删 |
+| `SolvelaIpUtil.getRegion()` | → IP 归属地跟着登录日志走。`AppApplication` 的 `Ip2RegionListener` ✅ 已删（`AppApplication:71` 留了一行注释说明为什么不再注册），`Ip2RegionListener` 现在挂在 `BizApplication` 上 |
 
-下沉后 app 自己的代码里**不再有任何 DAO**，对外部包的引用只剩 `solvela.enums` 与 `solvela.member.auth`（域契约，第 3 步会换成 api 模块里的同名类型）。
-
-⚠️ `@ComponentScan` 这时还不能收缩：member 的 bean 仍与网关同进程，`solvela.member` 和 `solvela.crypto`（`PiiHasher` 给会员域算手机号摘要用）都还得扫。收缩发生在第 6 步。
+**已全部完成**：app 自己的代码里没有任何 DAO，`@ComponentScan` 已收缩，
+pom 里只有两个 `*-api` + `base-core`/`base-redis`/`base-web` + `member-session`。
+`solvela.member.auth` 那条引用换成了 `solvela-member-api` 里的同名契约类型。
 
 ### 9.3 认证热路径：缓存结构不变，只换回源
 
@@ -678,13 +786,13 @@ public MemberPrincipal load(Long memberId) {
 
 ⚠️ **不要为了省这次回源退回 JWT。** `RedisTokenStore` 注释里那段取舍（即时吊销 vs 无状态）在拆服务后**更成立**，别因为「少一次 RPC」重开这个决定。
 
-### 9.4 两笔要还的债
+### 9.4 两笔要还的债（债二已还）
 
 **债一：缓存失效跨进程。** 改昵称/换头像发生在 member 侧，缓存在 app 的 Redis 里。现在共享 Redis，member 直接 `evict` 就行；拆开后需要事件广播。
 
 现在就该做的：把「会员资料变更 → 失效身份缓存」收口成**一个出口**（member 侧发 `MemberProfileChangedEvent`，app 侧一个监听器调 `evict`）。今天是本地 `ApplicationEvent`，将来换 MQ 只改订阅端一处。散在各个改资料的地方直接调 `evict`，拆分那天就是满仓库找调用点。
 
-**债二：`solvela-base` 把库和文件捆在一起。** app 依赖 base 就自动带上 `mybatis-plus-spring-boot4-starter` + `mysql-connector-j` + p6spy。不拆 base，「app 没有库」就只能靠 `exclude = DataSourceAutoConfiguration.class` 打补丁 —— 那正是 `AppApplication` 注释里批判的「扫全世界再减掉」。
+**债二：`solvela-base` 把库和文件捆在一起。** ✅ **已还**，见 §9.5。
 
 ### 9.5 base 已拆（2026-08-30）
 
@@ -720,14 +828,45 @@ S3 SDK、Excel 引擎一并背上。
    老模块的残留 class 与 mapper 会和新模块的同时在 classpath 上，
    表现是 MyBatis 报「重复的 mapper 片段」——看起来完全像是配置写错了。
 
-**app 摘掉 JDBC 仍未达成**：会员域有 MyBatis Dao，而它的 bean 目前与网关同进程。
-等第 6 步删掉 `solvela-member` 依赖，才能给 `AppBoundaryTest` 加上那条
-`Class.forName("com.mysql.cj.jdbc.Driver")` 断言。
+### 9.6 门面已删，app 摘掉 JDBC 已达成（2026-08-31）
 
-拆完后 `AppBoundaryTest` 加第四条断言，与「sa-token 不在 classpath 上」同形：
+`solvela-base` 那个 0 行代码的门面**已经删除**。留它是为了不动十几个 pom，
+但它同时是「一行 pom 就把 JDBC 驱动 + S3 SDK + Excel 引擎一起拖进来」的最短路径 ——
+而那正是本节两条边界最容易被破的方式。
+
+现在 9 个模块各自列出真用到的 base 子模块（按 148 个 base 类逐个归属统计）：
+
+| 模块 | 依赖 | 甩掉了 |
+|---|---|---|
+| `solvela-scriptengine` | core + data | file、redis |
+| `solvela-prize` | core + data | file、redis |
+| `solvela-risk` | core + redis + data | file |
+| `solvela-marketing` / `solvela-ledger` | core + data + file | redis |
+| `solvela-admin` | 四块都真用到 | — |
+
+拆门面顺带暴露了一条白嫖：`solvela-scriptengine` 的 `EngineExecutionMonitorAspect` 用
+`@Aspect/@Around`，而 aspectj 是经 `solvela-base → base-redis` 白嫖来的
+（base-redis 需要它是为了 `RedisLockAspect`，跟脚本引擎没有半点关系）。
+**这正是门面在掩盖的那类东西**，现在显式声明了。
+
+🔴 **别再造一个「什么都有」的聚合模块。** 判据：一个 Maven 模块只有在
+**能把某个 jar 挡在某个 classpath 之外**时才值这个价；挡不住任何东西的，
+用包 + 一条会失败的断言表达更便宜。全仓 20 个模块里，base-core/redis/data/file/mq/web、
+contract、两个 `*-api`、member-session 都在挡东西，一个都不能合。
+
+**`AppBoundaryTest` 的四条断言（全部通过）**：
 
 ```java
+// 1
 assertThrows(ClassNotFoundException.class, () -> Class.forName("com.mysql.cj.jdbc.Driver"));
+// 2
+assertThrows(ClassNotFoundException.class, () -> Class.forName("cn.dev33.satoken.stp.StpUtil"));
+// 3  本进程只有一个 solvela 自己的 @RestControllerAdvice
+// 4  共享模块的 controller 一个都没被装配
 ```
 
-从「约定 app 不查库」变成「app 连驱动都没有」—— 与 job 模块那次收敛是同一个形状：**从"靠配置约束"变成"物理上不具备"**。
+`dependency:tree` 复核：网关 114 个依赖里 0 个 mysql、0 个 `base-data`、0 个 `base-file`、
+0 个域实现模块。
+
+从「约定 app 不查库」变成「app 连驱动都没有」—— 与 job 模块那次收敛是同一个形状：
+**从「靠配置约束」变成「物理上不具备」**。
