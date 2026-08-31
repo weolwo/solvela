@@ -198,6 +198,11 @@ public class DrawConfigService {
             log.info("【抽奖配置】工作台新建 {}（活动 {}，操作人 {}）",
                     target.getDrawCode(), activityCode, operator);
         } else {
+            // 🔴 必须把 updateTime 置空再更新：target 是从库里读出来的实体，
+            //    带着旧的 update_time；updateById 会把它原样写回去，盖掉列上的
+            //    ON UPDATE CURRENT_TIMESTAMP —— 表现是「改了配置但更新时间没变」，
+            //    审计列从此说谎，而且没有任何报错
+            target.setUpdateTime(null);
             drawConfigManager.updateById(target);
         }
         return target.getDrawCode();

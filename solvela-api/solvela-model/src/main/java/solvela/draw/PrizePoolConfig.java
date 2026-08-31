@@ -1,16 +1,12 @@
 package solvela.draw;
 
-import solvela.enums.PrizePoolStatusEnum;
-import solvela.enums.DrawModeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
 import lombok.Data;
+import solvela.enums.PrizePoolStatusEnum;
+
+import java.time.LocalDateTime;
 
 /**
  * 奖池配置 实体类
@@ -53,15 +49,16 @@ public class PrizePoolConfig {
      */
     private String poolName;
 
-    /**
-     * 重置周期，天，周，月，活动期间
+    /*
+     * 🔴 reset_period 与 draw_mode 已于 2026-08-31 搬到 t_draw_config，列也已删除。
+     *
+     * 它们是<b>玩法级</b>参数（一套抽奖一个节奏），不是某个奖池自己的事。
+     * 重置周期现在同时决定两件事：单人限领的计数桶，以及统计「本轮已抽几次」时的时间下界。
+     *
+     * ⚠️ 别在这里加回来：MyBatis-Plus 按实体字段拼 SELECT 列清单，
+     * 加一个库里没有的字段 = 这张表的每一次查询都报 Unknown column，
+     * 而报错点在 DAO 里，离病因很远。
      */
-    private String resetPeriod;
-
-    /**
-     * 抽奖算法: 1-按概率(probability), 2-按库存比例(stock_ratio)
-     */
-    private DrawModeEnum drawMode;
 
     /**
      * 0关闭，1开启

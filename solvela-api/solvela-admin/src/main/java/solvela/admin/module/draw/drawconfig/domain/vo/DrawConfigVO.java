@@ -40,6 +40,9 @@ public class DrawConfigVO {
     @Schema(description = "状态：0-关闭, 1-开启")
     private EnableStatusEnum status;
 
+    @Schema(description = "创建人。工作台自动创建的记为 workbench，迁移来的记为 migration")
+    private String createBy;
+
     @Schema(description = "更新时间")
     private LocalDateTime updateTime;
 }

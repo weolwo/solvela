@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.draw.DrawPrizeLog;
+import solvela.draw.DrawConfig;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 import solvela.draw.poolconfig.dao.PrizePoolConfigDao;
@@ -37,15 +38,17 @@ class DrawEnumMappingTest {
     private PrizePoolConfigDao prizePoolConfigDao;
 
     @Autowired
+    private solvela.draw.drawconfig.manager.DrawConfigManager drawConfigManager;
+
+    @Autowired
     private DrawPrizeLogDao drawPrizeLogDao;
 
     @Test
-    @DisplayName("奖池配置：draw_mode 与 status 都能从 int 列装配")
+    @DisplayName("奖池配置：status 能从 int 列装配")
     void 奖池配置装配() {
         List<PrizePoolConfig> list = prizePoolConfigDao.selectList(null);
         assertFalse(list.isEmpty(), "t_prize_pool_config 没有数据，这条用例失去意义");
         for (PrizePoolConfig e : list) {
-            assertNotNull(e.getDrawMode(), "drawMode 装配成了 null");
             assertNotNull(e.getStatus(), "status 装配成了 null");
         }
     }
@@ -89,12 +92,17 @@ class DrawEnumMappingTest {
                 "分状态查询的总数(" + sum + ")与总量(" + all.size() + ")对不上");
     }
 
+    /**
+     * ⚠️ draw_mode 于 2026-08-31 从 t_prize_pool_config 搬到 t_draw_config —— 它是玩法级参数，
+     * 不是某个奖池自己的事。这条用例跟着搬，不是删掉：装配错了照样不报错，只是算法选错。
+     */
     @Test
-    @DisplayName("draw_mode 的两种算法都能被正确识别")
+    @DisplayName("draw_mode 的两种算法都能被正确识别（现居 t_draw_config）")
     void 抽奖算法装配() {
-        List<PrizePoolConfig> list = prizePoolConfigDao.selectList(null);
-        assertFalse(list.isEmpty());
-        for (PrizePoolConfig e : list) {
+        List<DrawConfig> list = drawConfigManager.list();
+        assertFalse(list.isEmpty(), "t_draw_config 没有数据，这条用例失去意义");
+        for (DrawConfig e : list) {
+            assertNotNull(e.getDrawMode(), "drawMode 装配成了 null");
             assertTrue(e.getDrawMode() == DrawModeEnum.PROBABILITY || e.getDrawMode() == DrawModeEnum.STOCK_RATIO,
                     "drawMode 落在枚举之外：" + e.getDrawMode());
         }
