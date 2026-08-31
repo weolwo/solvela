@@ -56,7 +56,7 @@
       <template #bodyCell="{ record, column }">
         <template v-if="column.dataIndex === 'scriptName'">
           <a @click="openDetail(record)">{{ record.scriptName }}</a>
-          <div class="cell-sub">{{ record.scriptCode }}</div>
+          <div class="cell-sub">{{ record.scriptCode }}<SolvelaCopyIcon :value="record.scriptCode" /></div>
         </template>
         <template v-else-if="column.dataIndex === 'sceneTitle'">
           <a-tag color="blue">{{ record.sceneTitle || record.scene }}</a-tag>
@@ -87,7 +87,9 @@
     <a-drawer v-model:open="detailOpen" :title="detail.scriptName || '脚本详情'" width="1000" :destroy-on-close="true">
       <a-spin :spinning="detailLoading">
         <a-descriptions :column="2" size="small" bordered class="mb-4">
-          <a-descriptions-item label="脚本编码">{{ detail.scriptCode }}</a-descriptions-item>
+          <a-descriptions-item label="脚本编码">
+            {{ detail.scriptCode }}<SolvelaCopyIcon :value="detail.scriptCode" />
+          </a-descriptions-item>
           <a-descriptions-item label="生效版本">
             <a-tag v-if="activeVersion" color="green">v{{ activeVersion.version }}</a-tag>
             <a-tag v-else color="red">未激活</a-tag>
@@ -114,7 +116,7 @@
           <template #bodyCell="{ record, column }">
             <template v-if="column.dataIndex === 'refPointTitle'">
               {{ record.refPointTitle || `${record.refType} / ${record.refSlot}` }}
-              <div v-if="record.refKey" class="cell-sub">键：{{ record.refKey }}</div>
+              <div v-if="record.refKey" class="cell-sub">键：{{ record.refKey }}<SolvelaCopyIcon :value="record.refKey" /></div>
             </template>
             <template v-else-if="column.dataIndex === 'operate'">
               <a-popconfirm title="摘除后该业务对象将不再执行此脚本，确认？" @confirm="unbind(record)">
@@ -218,6 +220,7 @@
   import { scriptApi } from '/@/api/support/script-api.js';
   import SolvelaCodeEditor from '/@/components/business/code-editor/SolvelaCodeEditor.vue';
   import ScriptEditModal from './components/script-edit-modal.vue';
+  import SolvelaCopyIcon from '/@/components/framework/solvela-copy-icon/index.vue';
 
   // ---------------------------- 列表 ----------------------------
 

@@ -24,6 +24,7 @@
       <a-form-item label="抽奖编码">
         <span class="readonly-field">
           <span class="font-mono">{{ form.drawCode }}</span>
+          <SolvelaCopyIcon :value="form.drawCode" />
           <a-tag v-if="codeLocked" color="default" class="ml-2">创建后不可修改</a-tag>
           <a-tag v-else color="blue" class="ml-2">保存时创建</a-tag>
         </span>
@@ -62,6 +63,7 @@
 
 <script setup>
   import { reactive, ref } from 'vue';
+  import SolvelaCopyIcon from '/@/components/framework/solvela-copy-icon/index.vue';
   import { RESET_PERIOD_OPTIONS, DRAW_MODE_SELECTABLE_OPTIONS, DRAW_MODE_ENUM } from '/@/constants/business/draw/prize-pool-config-const';
 
   const emit = defineEmits(['change']);

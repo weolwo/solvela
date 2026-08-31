@@ -38,11 +38,15 @@
       <template #bodyCell="{ record, column }">
         <template v-if="column.dataIndex === 'drawName'">
           <div>{{ record.drawName }}</div>
-          <div class="cell-sub font-mono">{{ record.drawCode }}</div>
+          <div class="cell-sub font-mono">
+            {{ record.drawCode }}<SolvelaCopyIcon :value="record.drawCode" />
+          </div>
         </template>
         <template v-else-if="column.dataIndex === 'activityName'">
           <div>{{ record.activityName || '—' }}</div>
-          <div class="cell-sub font-mono">{{ record.activityCode }}</div>
+          <div class="cell-sub font-mono">
+            {{ record.activityCode }}<SolvelaCopyIcon :value="record.activityCode" />
+          </div>
         </template>
         <template v-else-if="column.dataIndex === 'resetPeriod'">
           {{ resetPeriodOf(record.resetPeriod) }}
@@ -98,6 +102,7 @@
           <a-input v-if="isAdd" v-model:value="form.activityCode" placeholder="活动编码" />
           <span v-else class="readonly-field">
             <span class="font-mono">{{ form.activityCode }}</span>
+            <SolvelaCopyIcon :value="form.activityCode" />
             <a-tag color="default" class="ml-2">创建后不可修改</a-tag>
           </span>
         </a-form-item>
@@ -109,6 +114,7 @@
           </a-input-group>
           <span v-else class="readonly-field">
             <span class="font-mono">{{ form.drawCode }}</span>
+            <SolvelaCopyIcon :value="form.drawCode" />
             <a-tag color="default" class="ml-2">创建后不可修改</a-tag>
           </span>
           <div v-if="isAdd" class="form-hint">脚本挂载点「抽奖配置 - 玩法编排」填的就是它</div>
@@ -155,6 +161,7 @@
   import { PlusOutlined } from '@ant-design/icons-vue';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
   import { drawConfigApi } from '/@/api/business/draw/draw-config-api';
+  import SolvelaCopyIcon from '/@/components/framework/solvela-copy-icon/index.vue';
   import {
     RESET_PERIOD_OPTIONS,
     DRAW_MODE_SELECTABLE_OPTIONS,
