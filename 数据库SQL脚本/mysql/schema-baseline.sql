@@ -25,8 +25,20 @@ SET NAMES utf8mb4;
 --   然后重新跑一次 DumpSchema 覆盖本文件，用 git diff 核对是否与预期一致。
 --   🔴 只改迁移不改基线 = 新环境和老环境结构不一样，而且没人会发现。
 --
--- 生成时间：2026-08-23
--- 表数量：84 张
+-- 生成时间：2026-08-23（DumpSchema 导出）
+-- 最后核对：2026-08-31（手工，见下）
+-- 表数量：64 张
+--
+-- ⚠️ 2026-08-31 核对结果：本文件自 2026-08-23 导出之后【被手工改过】，
+--    但头部与分组的计数没跟着改 —— 曾写着 84 张，实际只有 64 张。
+--    差的 23 张（另有 2 张是后加的）已逐个查过：t_notice / t_help_doc / t_feedback /
+--    t_message / t_oa_* / t_goods / t_category 等 16 张办公内容表，
+--    加上 t_change_log / t_heart_beat_record / t_serial_number* / t_reload_* 6 张、
+--    t_prize_group 1 张 —— 全仓【零代码引用】，是随功能一起下掉的，不是掉了。
+--    本次只修计数，一张表都没动。
+--
+--    🔴 教训写在这儿：这个文件的价值全在「它就是库里真实的样子」。
+--    手工改它而不重新导出，它就退化成一份人工维护的近似版本 —— 正是它当初要取代的东西。
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -35,7 +47,7 @@ SET NAMES utf8mb4;
 
 
 -- =====================================================================================
--- 系统底座（上游 Solvela）（27 张）
+-- 系统底座（上游 Solvela）（21 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_employee`;
@@ -412,10 +424,6 @@ CREATE TABLE `t_mail_template` (
 
 
 -- =====================================================================================
--- 办公 / 内容（16 张）
--- =====================================================================================
-
--- =====================================================================================
 -- 文件 / 素材库（3 张）
 -- =====================================================================================
 
@@ -476,7 +484,7 @@ CREATE TABLE `t_file_relation` (
 
 
 -- =====================================================================================
--- 会员域（4 张）
+-- 会员域（5 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_member`;
@@ -739,7 +747,7 @@ CREATE TABLE `t_promotion_config` (
 
 
 -- =====================================================================================
--- 营销 - 活动与奖品（8 张）
+-- 营销 - 活动与奖品（9 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_activity_config`;
@@ -802,24 +810,6 @@ CREATE TABLE `t_prize_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_prize_code` (`prize_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='奖品配置表';
-
-DROP TABLE IF EXISTS `t_prize_dispatch_outbox`;
-CREATE TABLE `t_prize_dispatch_outbox` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `source_biz_id` varchar(64) NOT NULL COMMENT '来源单号：与 t_prize_log.external_biz_no 同值，消费方据它幂等',
-  `routing_key` varchar(64) NOT NULL COMMENT '路由键，见 MqTopology',
-  `payload` mediumtext NOT NULL COMMENT '事件 JSON 原文。存原文而不是存字段：重投时不需要再拼一次，也就不可能拼得跟当初不一样',
-  `status` tinyint NOT NULL DEFAULT '0' COMMENT '0-待投递, 1-已投递',
-  `retry_count` int NOT NULL DEFAULT '0' COMMENT '重投次数。持续增长说明下游有问题，是最直接的告警指标',
-  `last_error` varchar(255) DEFAULT NULL COMMENT '最后一次失败原因，截断到列宽',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '写入时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  -- 同一个来源单号只写一行：重复发奖在这里就被挡住，不用等到消费端
-  UNIQUE KEY `uk_outbox_biz` (`source_biz_id`),
-  -- 重投任务的扫描索引：只扫待投递的，按写入时间先进先出
-  KEY `idx_outbox_pending` (`status`,`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='发奖投递 outbox：MQ 负责投递，本表负责不丢';
 
 DROP TABLE IF EXISTS `t_mq_message_log`;
 CREATE TABLE `t_mq_message_log` (

@@ -26,25 +26,34 @@ public class DumpSchema {
         GROUPS.put("系统底座（上游 Solvela）", List.of(
             "t_employee","t_department","t_position","t_role","t_role_employee","t_role_menu",
             "t_role_data_scope","t_menu","t_login_log","t_login_fail","t_password_log",
-            "t_operate_log","t_data_tracer","t_change_log","t_heart_beat_record",
-            "t_config","t_dict","t_dict_data","t_serial_number","t_serial_number_record",
-            "t_solvela_job","t_solvela_job_log","t_reload_item","t_reload_result",
+            "t_operate_log","t_data_tracer",
+            "t_config","t_dict","t_dict_data",
+            "t_solvela_job","t_solvela_job_log",
             "t_table_column","t_code_generator_config","t_mail_template"));
-        GROUPS.put("办公 / 内容", List.of(
-            "t_notice","t_notice_type","t_notice_view_record","t_notice_visible_range",
-            "t_help_doc","t_help_doc_catalog","t_help_doc_relation","t_help_doc_view_record",
-            "t_feedback","t_message","t_oa_bank","t_oa_enterprise","t_oa_enterprise_employee",
-            "t_oa_invoice","t_goods","t_category"));
+        // 2026-08-31 从本组移除（库里已无、全仓零代码引用，随功能一起下掉的）：
+        //   t_change_log / t_heart_beat_record / t_serial_number / t_serial_number_record
+        //   / t_reload_item / t_reload_result
+        //
+        // 整组「办公 / 内容」同期移除：t_notice* 4 张、t_help_doc* 4 张、
+        //   t_feedback / t_message / t_oa_bank / t_oa_enterprise / t_oa_enterprise_employee
+        //   / t_oa_invoice / t_goods / t_category —— 共 16 张，同样零引用。
+        //   留着不会出错（本类按 all::contains 过滤），但会让人以为库里还有它们。
         GROUPS.put("文件 / 素材库", List.of("t_file","t_file_category","t_file_relation"));
         GROUPS.put("会员域", List.of(
-            "t_member","t_member_verify","t_member_id_seq","t_member_login_log"));
+            "t_member","t_member_verify","t_member_id_seq","t_member_login_log",
+            // 2026-08-31 补：此前不在任何组里，导出时会掉进「未分类」
+            "t_member_operation_limit"));
         GROUPS.put("账务 / 履约", List.of(
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config"));
         GROUPS.put("营销 - 活动与奖品", List.of(
             "t_activity_config","t_activity_display","t_prize_config","t_prize_log",
-            "t_prize_group","t_prize_pool_config","t_prize_pool_item","t_pool_prize_mapping",
-            "t_draw_prize_log"));
+            "t_prize_pool_config","t_prize_pool_item","t_pool_prize_mapping",
+            "t_draw_prize_log",
+            // 2026-08-31 补：此前不在任何组里，导出时会掉进「未分类」
+            "t_mq_message_log"));
+            // 同期移除 t_prize_group（库里已无、零引用）。
+            // t_prize_dispatch_outbox 也在本次删除 —— 它的实体与 Dao 从来没有代码读写。
         GROUPS.put("营销 - 任务", List.of(
             "t_task_template","t_task_config","t_task_record","t_task_record_flow",
             "t_task_event","t_task_prize_mapping"));
@@ -154,7 +163,7 @@ SET NAMES utf8mb4;
                 System.exit(1);
             }
 
-            Path p = Path.of("D:/workspace/solvela-admin/数据库SQL脚本/mysql/schema-baseline.sql");
+            Path p = Path.of("D:/workspace/solvela/数据库SQL脚本/mysql/schema-baseline.sql");
             Files.write(p, out.toString().getBytes(StandardCharsets.UTF_8));
             System.out.println("已生成 " + p);
             System.out.println("  表数量 " + written + " 张，排除 " + excluded.size() + " 张备份表: " + excluded);

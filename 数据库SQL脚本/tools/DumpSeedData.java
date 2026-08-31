@@ -129,7 +129,7 @@ SET FOREIGN_KEY_CHECKS = 0;
                 for (String t : empty) out.append("--   ").append(t).append('\n');
             }
 
-            Path p = Path.of("D:/workspace/solvela-admin/数据库SQL脚本/mysql/data-baseline.sql");
+            Path p = Path.of("D:/workspace/solvela/数据库SQL脚本/mysql/data-baseline.sql");
             Files.write(p, out.toString().getBytes(StandardCharsets.UTF_8));
             System.out.println("generated " + p);
             System.out.println("  seed tables=" + (SEED.size() - empty.size()) + "  rows=" + totalRows
