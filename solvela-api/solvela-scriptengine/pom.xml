@@ -34,10 +34,28 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 基础设施。2026-08-31 起不再写 solvela-base 那个空门面（0 行代码），
+             改成列出真正用到的那几块 —— 写门面等于把 JDBC 驱动、S3 SDK、Excel 引擎一并背上。
+             归因：core 只有 2 处，但 data 是必需的 —— ScriptManager / ScriptRefManager 继承
+             mybatis-plus 的 ServiceImpl，那在 mybatis-plus 的 spring 扩展包里，由 base-data 提供。
+             不要 file、不要 redis：一处都没用到 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-base</artifactId>
+            <artifactId>solvela-base-core</artifactId>
             <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- EngineExecutionMonitorAspect 用 @Aspect / @Around 统计脚本执行耗时。
+             此前是经 solvela-base → base-redis 白嫖来的 —— base-redis 需要它是为了
+             RedisLockAspect，跟脚本引擎没有半点关系。用什么就声明什么。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
         <!-- QLExpress4 规则引擎。全工程只有本模块用它 ——

@@ -25,15 +25,17 @@
         <!-- 会话只用 Redis，单独一块：网关要它（每个请求解析令牌），但网关不能有 JDBC -->
         <module>solvela-member-session</module>
         <module>solvela-marketing-api</module>
-        <!-- 技术底座，2026-08-30 拆成四块：谁都能依赖 core，而 data 意味着 classpath 上有 JDBC 驱动。
-             solvela-base 现在只是把四块聚在一起的门面，本身没有代码 —— 新模块请直接依赖具体那一个 -->
+        <!-- 技术底座，2026-08-30 拆成四块（+ mq / web 两块给端用）：
+             谁都能依赖 core，而 data 意味着 classpath 上有 JDBC 驱动。
+             2026-08-31：聚合门面 solvela-base 已删除 —— 每个模块现在列出真正用到的那几块。
+             🔴 别再造一个「什么都有」的聚合模块：它是把 JDBC 驱动带上网关、
+             把 S3 SDK 和 Excel 引擎带进 C 端两个进程的最短路径，而且写的时候完全无感。 -->
         <module>solvela-base-core</module>
         <module>solvela-base-redis</module>
         <module>solvela-base-data</module>
         <module>solvela-base-file</module>
         <module>solvela-base-mq</module>
         <module>solvela-base-web</module>
-        <module>solvela-base</module>
 
         <!-- 业务域。按域拆而不是按"将来谁用"拆：prize 横跨活动侧与资产侧，
              硬塞进任何一端都会造出新的环 -->
@@ -42,19 +44,29 @@
         <module>solvela-risk</module>
         <module>solvela-prize</module>
         <module>solvela-ledger</module>
-        <module>solvela-activity</module>
-        <module>solvela-consumer</module>
 
-        <!-- 玩法与端 -->
+        <!-- 玩法与端。2026-08-31：solvela-activity 与 solvela-consumer 已并入 solvela-marketing ——
+             三者的【进程足迹完全相同】（只进 admin 与 C 端业务进程），合并不改变任何进程的 classpath。
+             代价是编译器不再拦着 draw/task/lottery 直接调 consumer 的发奖处理器，
+             改由 PrizeDispatchBypassTest 断言守着（绕过 PrizeEventPublisher 会让派发跑进事务里）。 -->
         <module>solvela-marketing</module>
 
-        <!-- HTTP 层。刻意排在业务域之后：域模块不认识它，只有端认识 -->
-        <module>solvela-web</module>
+        <!-- HTTP 层。刻意排在业务域之后：域模块不认识它，只有端认识。
+             2026-08-31：solvela-web 已并入 solvela-admin —— 它只有管理端一个使用方
+             （模块外 84 处引用全在 admin），而独立成 artifact 反而是条隐患：
+             AppBoundaryTest 的失败提示里写着「多半是有人给 solvela-app 加回了 solvela-web 依赖」，
+             不再是独立 artifact 之后，那条路物理上不存在了。
+             C 端的 HTTP 薄壳走 solvela-base-web，两套不共用是刻意的（错误码表不同） -->
         <module>solvela-admin</module>
-        <!-- 四个进程：admin 1024 / app 1025(网关) / marketing 1026 / member 1027。
-             端模块只有启动类、HTTP 薄壳与错误出口，业务逻辑一行都不在里面 -->
-        <module>solvela-app-marketing</module>
-        <module>solvela-app-member</module>
+        <!-- 三个进程：admin 1024 / app 1025(网关) / biz 1026。
+             端模块只有启动类、HTTP 薄壳与错误出口，业务逻辑一行都不在里面。
+
+             2026-08-31：app-member(1027) 撤销，并入 app-biz（原 app-marketing，因为它装的
+             已经不只是营销）。四个进程连的是同一个库，那一刀买不到数据隔离，
+             换来的是发奖热路径上一次同步 HTTP 和一条只为回写而存在的 MQ 链路。
+             拆服务最贵的是契约，而契约（member-api / marketing-api）原样留着 ——
+             将来把资产域拆出去是加回一个进程壳 + 换一个 bean。详见 BizApplication 类注释。 -->
+        <module>solvela-app-biz</module>
         <module>solvela-app</module>
     </modules>
 

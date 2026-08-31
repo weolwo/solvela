@@ -36,11 +36,14 @@
             <version>3.0.0</version>
         </dependency>
         <!--
-        直接依赖 web 栈，<b>不经过 solvela-web</b>。
-        solvela-web 是管理端的 HTTP 层：它带着 knife4j 与管理端的鉴权注解，
+        直接依赖 web 栈，<b>不碰管理端那套 HTTP 层</b>（solvela.web 包，2026-08-31 起住在
+        solvela-admin 里，此前是独立的 solvela-web 模块）。它带着 knife4j 与管理端的鉴权注解，
         以及一个一律返回 200 + ResponseDTO 的全局异常处理器 —— 那套契约与本进程冲突。
         本模块自己写 TraceFilter / ApiExceptionHandler / ClientIp，共十来个类，
         换来的是「C 端的 HTTP 行为只有一个地方定义」。
+
+        它不再是独立 artifact 之后，这条边界从「约定」变成了「没有东西可加」——
+        AppBoundaryTest.没有satoken() 那条断言的失败提示也是照这个写的。
         -->
         <!-- 链路 id 过滤器（solvela.base.web.TraceFilter）。它与
              DownstreamClientConfig 的请求头拦截器是一件事的两半 -->
@@ -75,13 +78,16 @@
 
 
         <!-- 网关只直接依赖这两块：工具/JSON/校验/链路 id（core）与会话存储要的 Redis。
-             🔴 刻意【不写】 solvela-base 那个门面，也不写 solvela-base-data ——
+             🔴 刻意【不写】 solvela-base-data、也不写任何域实现模块 ——
              目标是 classpath 上连 mysql 驱动都没有。
 
-             ⚠️ 今天还没达成：JDBC 仍经 solvela-member 传递进来（会员域有 MyBatis Dao，
-             而它的 bean 目前与网关同进程）。等第 6 步把下面那条 solvela-member 依赖删掉，
-             这个目标才真正成立，那时才能给 AppBoundaryTest 加上
-             「Class.forName("com.mysql.cj.jdbc.Driver") 应当抛异常」这条断言。 -->
+             ✅ 已达成，并且有断言守着：solvela-member 依赖已经摘掉，
+             AppBoundaryTest.没有数据库驱动() 断言 Class.forName("com.mysql.cj.jdbc.Driver")
+             必须抛 ClassNotFoundException。2026-08-31 全反应堆 dependency:tree 复核：
+             本模块 114 个依赖里没有 mysql、没有 base-data、没有 base-file。
+
+             （原先那个「什么都有」的 solvela-base 聚合门面已于 2026-08-31 删除 ——
+             它正是一行 pom 就能把 JDBC 拖上来的路径。） -->
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-base-core</artifactId>

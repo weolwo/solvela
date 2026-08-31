@@ -33,17 +33,17 @@
             <artifactId>solvela-marketing-api</artifactId>
             <version>3.0.0</version>
         </dependency>
-        <!-- 活动系统的依赖边界：只有这三个域。刻意<b>没有</b>
-             risk / consumer / scriptengine / ledger —— pom 里没写就引不进来，
-             这比「约定不要引」可靠。
+        <!-- 🔴 依赖边界：这里【没有】 solvela-ledger，将来也不要加回来。
 
-             曾经这里还有一条 solvela-ledger，因为 DrawExecuteService 里挂着一行
-             {@code import MemberWalletService}。查下去发现<b>那行根本没被用到</b> ——
-             活动系统事实上一直是无状态的，只是一个未使用的 import 让整个模块
-             白背了一个域的依赖。删掉它，边界就与设计一致了。
+             曾经有过一条，因为 DrawExecuteService 里挂着一行未被使用的
+             {@code import MemberWalletService} —— 一个死 import 让整个模块白背了一个域。
 
-             ⚠️ 将来活动要发资产，走事件或 SPI（参考 risk.spi.AssetDispatcher），
-             不要把这条依赖加回来。 -->
+             这条边界现在比以前重要：资产域（ledger）是将来要独立出去的那个服务，
+             marketing ↔ ledger 就是那条缝。要发资产只能经 {@code MemberProposalApi}，
+             由 MarketingLedgerBoundaryTest 断言守着（它同时守着 risk.proposal）。
+
+             2026-08-31 合并进来的 solvela-risk 是给 consumer 用的，而且只该用到
+             promotionconfig / promotiongroup 那半边；proposal 那半边属于资产侧。 -->
         <!-- 本模块直接用到 model 的实体 135 处。
              原来靠 base 传递过来 —— 用什么就声明什么，别指望别人替你带。 -->
         <dependency>
@@ -52,19 +52,26 @@
             <version>3.0.0</version>
         </dependency>
 
-        <!-- 本模块直接用到 base 的 111 处（ResponseDTO、PageResult、各种 Util）。
-             原来靠传递依赖拿到 —— 一旦上游模块调整，这里会在毫不相关的地方成片编译失败。 -->
+        <!-- 基础设施。2026-08-31 起不再写 solvela-base 那个空门面（0 行代码），
+             改成列出真正用到的那几块 —— 写门面等于把 JDBC 驱动、S3 SDK、Excel 引擎一并背上。
+             归因：core 13 处、file 2 处、data 1 处；本模块有 22 个 Mapper.xml，是全仓最重的域模块。
+             不要 redis：一处都没用到 —— 分布式锁走的是各自进程里已有的 RedisLockAspect -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-base</artifactId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-file</artifactId>
             <version>3.0.0</version>
         </dependency>
 
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-activity</artifactId>
-            <version>3.0.0</version>
-        </dependency>
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-member</artifactId>
@@ -73,6 +80,20 @@
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-prize</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!-- 以下两条随 solvela-consumer 于 2026-08-31 并入本模块：
+             发奖要把奖交给资产侧 —— 同步调 MemberProposalApi 拿「受理 / 拒绝 + 原因」。
+             🔴 这是本模块碰资产的【唯一】合法途径 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!-- consumer 的 ProposalSourceResolver / PrizeStrategyFactory 用到 risk 的枚举与 spi -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-risk</artifactId>
             <version>3.0.0</version>
         </dependency>
         <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->

@@ -2,7 +2,6 @@ package solvela.ledger.engine;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.enums.PrizeDispatchStatusEnum;
@@ -10,18 +9,24 @@ import solvela.member.api.PrizeDispatchResultMessage;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 
 /**
- * 单体形态下的回写：直接更新 {@code t_prize_log}。
+ * 进程内回写：直接更新 {@code t_prize_log}。
  *
- * <p><b>admin 用它</b> —— 发奖流水就在同一个进程、同一个库，绕一圈 MQ 只是凭空
- * 多一个必须在线的中间件，还让 admin 的验收测试需要一个真 broker。
+ * <p>{@link PrizeDispatchResultPublisher} <b>今天唯一的实现</b>，admin 与 biz 装的都是它 ——
+ * 入账与发奖流水在同一个进程、同一个库，绕一圈 MQ 只是凭空多一个必须在线的中间件，
+ * 还让验收测试需要一个真 broker。
  *
- * <p>装哪个实现由 {@code solvela.prize.dispatch.mode} 决定，不填即 {@code local}。
- * 会员服务那边配成 {@code mq}，本实现就自动让位。
+ * <h3>为什么不再有 @ConditionalOnProperty</h3>
+ * 本类此前挂着 {@code @ConditionalOnProperty(name = "solvela.prize.dispatch.mode",
+ * havingValue = "local", matchIfMissing = true)}，用来给 member 服务的 MQ 实现让位。
+ * 那个实现已随 app-member 撤销一并删除，于是这个条件只可能<b>减掉本 bean</b>、
+ * 不可能选中别的：谁再配上 {@code dispatch.mode=mq}，得到的是
+ * {@code AssetDispatcher} 注入失败、进程起不来。整个配置键也一并删了。
+ *
+ * <p>资产域将来真独立出去时，再加回 MQ 实现和相应的装配条件 —— 到那时它才有意义。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "solvela.prize.dispatch.mode", havingValue = "local", matchIfMissing = true)
 public class LocalPrizeDispatchResultPublisher implements PrizeDispatchResultPublisher {
 
     /** 对齐 t_prize_log.fail_reason 的列宽 */

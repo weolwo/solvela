@@ -23,7 +23,8 @@
       编译直接失败 —— 而不是等 code review 有没有人注意到。
 
       【依赖方向】
-      本模块<b>不依赖 solvela-base</b>，反过来 base 依赖它 —— 领域词汇在下，技术底座在上。
+      本模块<b>不依赖任何 base 模块</b>，反过来 solvela-base-core 依赖它 ——
+      领域词汇在下，技术底座在上。
       为此把这些从 base 下沉了进来：错误码（code/）、领域异常（exception/）、
       PII 加解密与密码哈希（crypto/）、BaseEnum。它们本来就是领域概念，
       放在「技术底座」里只是历史原因。

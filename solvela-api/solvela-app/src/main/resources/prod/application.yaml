@@ -54,8 +54,14 @@ solvela:
       max-sessions: 10
 
 # ---------------------------------------------------------------------------
-# 下游服务地址。走环境变量：容器编排里服务名与端口不该写死在包里
+# 下游服务地址。
+#
+# ⚠️ 2026-08-31 起 member 与 marketing 是【同一个进程】（solvela-app-biz:1026）——
+# app-member(1027) 已撤销。两个键刻意都留着、都指向 1026：
+# 网关的业务代码认的是 MemberAuthApi / ActivityApi 两个契约，
+# 将来资产域真拆出去时只改这里的一个 URL，代码一行不动。
+# 合成一个键反而是把「它们是两个逻辑服务」这件事抹掉了。
 # ---------------------------------------------------------------------------
 solvela.client:
-  member.base-url: ${MEMBER_SERVICE_URL:http://127.0.0.1:1027}
+  member.base-url: ${MEMBER_SERVICE_URL:http://127.0.0.1:1026}
   marketing.base-url: ${MARKETING_SERVICE_URL:http://127.0.0.1:1026}

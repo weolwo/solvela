@@ -25,15 +25,48 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 管理端的 HTTP 层（solvela.web 包）。2026-08-31 从 solvela-web 模块并进来 ——
+             它模块外只有本模块一个使用方，84 处引用全在这里，独立成 artifact 只是多一个
+             「能被别人误加」的入口。原模块的两个依赖随之搬到这里。
+
+             ⚠️ 「共享层不认识 HTTP」这条规矩不是靠 solvela-web 独立守住的，而是靠
+             base-core/data/file 里没有 spring-boot-starter-web —— 域模块依旧一行
+             HttpServletRequest 都编不过，合并前后完全一样。 -->
         <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-web</artifactId>
-            <version>3.0.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baizhukui</groupId>
+            <artifactId>knife4j-openapi3-boot4-spring-boot-starter</artifactId>
         </dependency>
 
+        <!-- 基础设施。2026-08-31 起不再写 solvela-base 那个空门面，四块各自列出 ——
+             管理端是唯一四块都真用到的模块（core 33 处 / file 25 处 / data 7 处 / redis 1 处）。
+             🔴 刻意【不依赖】 solvela-base-web：本模块是 @ComponentScan("solvela")，
+             它里面的 solvela.server.internal.InternalExceptionHandler 会被扫进来，
+             变成本进程的第二个 @RestControllerAdvice —— 那正是 AppBoundaryTest
+             「只有一个错误出口」那条断言在防的事，只不过方向反过来。
+             所以 solvela.web.filter.LogTraceFilter 与 base-web 的 TraceFilter 重复着，
+             要合并得先把 InternalExceptionHandler 从被扫描的包里挪走。 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-base</artifactId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-redis</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-file</artifactId>
             <version>3.0.0</version>
         </dependency>
         <dependency>
@@ -46,16 +79,6 @@
              本模块<b>直接</b>依赖了它的 service/form/vo —— 直接用到就直接声明，
              否则哪天 solvela-marketing 不再依赖 common-api，这边会毫无征兆地编译不过。 -->
         <!-- 管理端是全域控制台，七个域都要。这里"全都依赖"是事实而非偷懒 -->
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-activity</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-consumer</artifactId>
-            <version>3.0.0</version>
-        </dependency>
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-ledger</artifactId>
@@ -81,8 +104,7 @@
             <artifactId>solvela-scriptengine</artifactId>
             <version>3.0.0</version>
         </dependency>
-        <!-- 本模块大量用 @Data / @Slf4j；此前是靠 solvela-base 的 compile 作用域传递白嫖来的，
-             solvela-base 改成 provided 后不再传递，必须自己声明 -->
+        <!-- 本模块大量用 @Data / @Slf4j。lombok 是 provided，不传递，每个模块各自声明 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

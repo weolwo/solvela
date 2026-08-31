@@ -41,9 +41,22 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 基础设施。2026-08-31 起不再写 solvela-base 那个空门面（0 行代码），
+             改成列出真正用到的那几块 —— 写门面等于把 JDBC 驱动、S3 SDK、Excel 引擎一并背上。
+             归因：core 10 处、redis 1 处、data 1 处（3 个 Mapper.xml）。不要 file：一处都没用到 -->
         <dependency>
             <groupId>solvela</groupId>
-            <artifactId>solvela-base</artifactId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-redis</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
             <version>3.0.0</version>
         </dependency>
         <dependency>

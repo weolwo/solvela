@@ -1,0 +1,163 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <groupId>solvela</groupId>
+    <artifactId>solvela-app-biz</artifactId>
+    <version>3.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>solvela-app-biz</name>
+    <description>C 端业务服务：会员、营销、资产。只对内提供 /internal 接口，由网关转发。</description>
+
+    <!--
+    <h3>这是【端】，不是域</h3>
+    本模块只有三样东西：启动类、HTTP 薄壳（@RestController implements XxxApi）、错误出口。
+    业务逻辑一行都不在这里 —— 它们在下面列出的域模块里，本模块只是把它们装进一个进程并挂上 HTTP。
+
+    <h3>2026-08-31：从 solvela-app-marketing 改名而来，并吸收了 solvela-app-member</h3>
+    改名是因为它装的已经不只是营销：会员、营销、资产三块都在这一个进程。
+    为什么撤掉 member 服务，见 BizApplication 的类注释。
+
+    <h3>为什么单独一个模块而不是把启动类塞进 solvela-marketing</h3>
+    parent pom 的模块顺序注释写着「HTTP 层刻意排在业务域之后：域模块不认识它，只有端认识」。
+    把启动类放进域模块，域就认识 web 栈了，而域模块是要被别的服务复用的。
+    -->
+    <dependencies>
+
+        <!-- 本服务实现的对外契约。两个都实现：网关经 MemberAuthApi 拿身份，
+             经 ActivityApi / DrawApi 走活动与抽奖 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-marketing-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- ================= 装进本进程的域实现 ================= -->
+
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-marketing</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-prize</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!-- 会员域。含 solvela.member.session —— 会话签发在网关，
+             吊销在这里（后台冻结会员时要当场断掉他的全部令牌） -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 🔴 资产域 + 风控/提案。2026-08-31 随 app-member 撤销并入本进程。
+
+             这两块是【将来要独立出去的那一半】（目标：资产独立成服务，
+             会员 + 资产用一个独立控制台）。所以 marketing ↔ ledger 是本仓最该守的缝，
+             而它现在没有 Maven 边界拦着 —— 由 solvela-marketing 的 LedgerBoundaryTest 守：
+             玩法侧要动资产只能经 MemberProposalApi。
+
+             ⚠️ 别在 solvela-marketing 的 pom 里加 solvela-ledger。那条断言会红。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-ledger</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-risk</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 消息。2026-08-31 起本进程【没有任何 publisher / listener】——
+             它此前唯一的用途是「入账结果从 member 进程回写给 marketing 进程」，
+             两侧合并后那条链路是进程内方法调用了。
+
+             留着依赖是刻意的：将来要用 MQ 承载业务事件（如会员登录事件，供多方消费），
+             那时 JSON 编解码（⚠️ 必须是 Jackson 3 的 JacksonJsonMessageConverter）
+             与 MqMessageLog 的消费幂等表直接就位，只需补拓扑与发布点。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-mq</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- ================= HTTP 层 ================= -->
+
+        <!-- 链路 id 过滤器 + 服务间调用的错误出口（两者在两个包根下，见该模块 pom 的说明） -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-web</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!--
+        直接依赖 web 栈，不碰管理端那套 HTTP 层（solvela.web 包，2026-08-31 起住在
+        solvela-admin 里）—— 它的 GlobalExceptionHandler 一律返回 200 + ResponseDTO，
+        与本服务的契约冲突。本模块自己写错误出口，理由与 solvela-app 相同。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>solvela.biz.server.BizApplication</mainClass>
+                    <!-- repackage 默认把 provided 也打进 BOOT-INF/lib，光把 lombok 改成 provided 不够 -->
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
