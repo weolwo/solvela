@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.scriptengine.domain.form.ScriptBindForm;
 import solvela.admin.module.scriptengine.domain.form.ScriptSaveForm;
+import solvela.admin.module.scriptengine.domain.vo.ScriptRefCandidateVO;
 import solvela.admin.module.scriptengine.domain.vo.ScriptRefPointVO;
+import solvela.admin.module.scriptengine.service.ScriptRefCandidateService;
 import solvela.admin.module.system.login.domain.RequestEmployee;
 import solvela.base.constant.SwaggerTagConst;
 import solvela.exception.BusinessException;
@@ -67,6 +69,8 @@ public class ScriptAdminController {
 
     private final ScriptRefService scriptRefService;
 
+    private final ScriptRefCandidateService scriptRefCandidateService;
+
     // ------------------------------------------------------------------
     // 查
     // ------------------------------------------------------------------
@@ -116,12 +120,21 @@ public class ScriptAdminController {
             vo.setTitle(point.getTitle());
             vo.setRefType(point.getRefType());
             vo.setRefSlot(point.getRefSlot());
+            vo.setOwnerTitle(point.getOwnerTitle());
             vo.setKeyed(point.isKeyed());
+            vo.setWired(point.isWired());
             vo.setKeyTitle(point.getKeyTitle());
             vo.setExpectedScene(point.getExpectedScene().name());
             vo.setExpectedSceneTitle(point.getExpectedScene().getTitle());
             return vo;
         }).toList();
+    }
+
+    @Operation(summary = "【用户】脚本-某挂载点可选的业务对象，挂载表单的下拉用")
+    @RequiresPermission("script:query")
+    @GetMapping("/ref/candidate/list")
+    public List<ScriptRefCandidateVO> refCandidates(@RequestParam String refPoint) {
+        return scriptRefCandidateService.list(toPoint(refPoint));
     }
 
     // ------------------------------------------------------------------

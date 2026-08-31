@@ -116,6 +116,9 @@
           <template #bodyCell="{ record, column }">
             <template v-if="column.dataIndex === 'refPointTitle'">
               {{ record.refPointTitle || `${record.refType} / ${record.refSlot}` }}
+              <a-tooltip v-if="isUnwired(record.refPoint)" title="引擎里没有代码会执行这个槽位，挂着也不会生效">
+                <a-tag color="orange">未接入</a-tag>
+              </a-tooltip>
               <div v-if="record.refKey" class="cell-sub">键：{{ record.refKey }}<SolvelaCopyIcon :value="record.refKey" /></div>
             </template>
             <template v-else-if="column.dataIndex === 'operate'">
@@ -129,10 +132,30 @@
         <!-- 挂载表单：挂载点只列出与本脚本场景兼容的，避免选了才被后端拒绝 -->
         <a-form layout="inline" class="bind-form">
           <a-form-item label="挂载点">
-            <a-select v-model:value="bindForm.refPoint" style="width: 200px" placeholder="选择挂载点" :options="compatiblePointOptions" />
+            <a-select
+              v-model:value="bindForm.refPoint"
+              style="width: 220px"
+              placeholder="选择挂载点"
+              :options="compatiblePointOptions"
+              @change="onPointChange"
+            />
           </a-form-item>
-          <a-form-item label="业务对象编码">
-            <a-input v-model:value="bindForm.refId" style="width: 200px" :placeholder="refIdPlaceholder" />
+          <a-form-item :label="ownerLabel">
+            <!--
+              下拉而不是手输：编码是 10 位随机串，靠人记或去别的页面复制都是白白的出错机会。
+              仍然 show-search + 可清空，编码多了要能搜。
+            -->
+            <a-select
+              v-model:value="bindForm.refId"
+              style="width: 260px"
+              show-search
+              allow-clear
+              :loading="candidateLoading"
+              :disabled="!bindForm.refPoint"
+              :options="candidateOptions"
+              :filter-option="filterCandidate"
+              :placeholder="bindForm.refPoint ? '搜索名称或编码' : '先选挂载点'"
+            />
           </a-form-item>
           <!-- 多值槽位才出现：单值槽位传了键后端会直接拒 -->
           <a-form-item v-if="selectedPoint?.keyed" :label="selectedPoint.keyTitle">
@@ -420,7 +443,7 @@
 
   const refPoints = ref([]);
   const bindLoading = ref(false);
-  const bindForm = reactive({ refPoint: undefined, refId: '', refKey: '' });
+  const bindForm = reactive({ refPoint: undefined, refId: undefined, refKey: '' });
 
   async function loadRefPoints() {
     try {
@@ -431,31 +454,79 @@
     }
   }
 
-  // 后端挂载时会强校验场景一致，这里先过滤只是为了不让人选了才被拒
+  /*
+   * 挂载点下拉。两层过滤，含义不同：
+   *   ① 场景不兼容的直接不列出来 —— 后端会强校验，列出来只会让人选了才被拒；
+   *   ② 🔴 未接入的（wired=false）列出来但禁选 —— 引擎里没有代码会执行那个槽位，
+   *      挂上去不报错、也永远不生效。藏起来会让人以为「怎么少了一个」，
+   *      标着「未接入」并禁选，才说得清「它存在，但还不能用」。
+   *      与抽奖算法里那个未实现的选项是同一个处理方式。
+   */
   const compatiblePointOptions = computed(() =>
-    refPoints.value.filter((point) => point.expectedScene === detail.value.scene).map((point) => ({ value: point.refPoint, label: point.title }))
+    refPoints.value
+      .filter((point) => point.expectedScene === detail.value.scene)
+      .map((point) => ({
+        value: point.refPoint,
+        label: point.wired === false ? `${point.title}（未接入）` : point.title,
+        disabled: point.wired === false,
+      }))
   );
 
   const selectedPoint = computed(() => refPoints.value.find((point) => point.refPoint === bindForm.refPoint));
 
-  const refIdPlaceholder = computed(() => {
-    if (!selectedPoint.value) return '先选挂载点';
-    return (
-      { DRAW: '抽奖配置编码', PRIZE_POOL: '奖池编码', TASK_TEMPLATE: '模板编码', ACTIVITY: '活动编码' }[selectedPoint.value.refType] ||
-      '业务对象编码'
-    );
-  });
+  /** 表单标签跟着挂载点走：说「抽奖配置」比说「业务对象编码」清楚得多 */
+  const ownerLabel = computed(() => (selectedPoint.value ? selectedPoint.value.ownerTitle || '业务对象' : '业务对象'));
+
+  function isUnwired(refPoint) {
+    const hit = refPoints.value.find((point) => point.refPoint === refPoint);
+    return hit ? hit.wired === false : false;
+  }
+
+  // ---------------------------- 候选业务对象 ----------------------------
+
+  const candidates = ref([]);
+  const candidateLoading = ref(false);
+
+  const candidateOptions = computed(() =>
+    candidates.value.map((item) => ({
+      value: item.code,
+      label: `${item.name}（${item.code}）${item.remark ? ' · ' + item.remark : ''}`,
+    }))
+  );
+
+  /** 名称和编码都能搜：运营记名字，开发记编码 */
+  function filterCandidate(input, option) {
+    return (option.label || '').toLowerCase().includes(String(input).toLowerCase());
+  }
+
+  async function onPointChange() {
+    // 换挂载点等于换了对象类型，上一个选中的编码在新类型里没有意义
+    bindForm.refId = undefined;
+    candidates.value = [];
+    if (!bindForm.refPoint) {
+      return;
+    }
+    try {
+      candidateLoading.value = true;
+      candidates.value = (await scriptApi.refCandidateList(bindForm.refPoint)) || [];
+    } catch (e) {
+      solvelaSentry.captureError(e);
+    } finally {
+      candidateLoading.value = false;
+    }
+  }
 
   function resetBindForm() {
     bindForm.refPoint = undefined;
-    bindForm.refId = '';
+    bindForm.refId = undefined;
     bindForm.refKey = '';
+    candidates.value = [];
     refs.value = [];
   }
 
   async function bind() {
-    if (!bindForm.refPoint || !bindForm.refId.trim()) {
-      message.warning('请选择挂载点并填写业务对象编码');
+    if (!bindForm.refPoint || !bindForm.refId) {
+      message.warning('请选择挂载点与业务对象');
       return;
     }
     if (selectedPoint.value?.keyed && !bindForm.refKey.trim()) {
@@ -466,12 +537,12 @@
       bindLoading.value = true;
       await scriptApi.bind({
         refPoint: bindForm.refPoint,
-        refId: bindForm.refId.trim(),
+        refId: bindForm.refId,
         refKey: selectedPoint.value?.keyed ? bindForm.refKey.trim() : undefined,
         scriptCode: detail.value.scriptCode,
       });
       message.success('挂载成功');
-      bindForm.refId = '';
+      bindForm.refId = undefined;
       bindForm.refKey = '';
       await loadRefs();
       await queryList();

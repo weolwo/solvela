@@ -23,19 +23,19 @@ public enum ScriptRefPoint {
      * 任务模板的完成判定规则。挂在 {@code t_task_template.template_code} 上。
      */
     TASK_TEMPLATE_RULE("TASK_TEMPLATE", "RULE", ScriptScene.TASK_RULE,
-            "任务模板", "完成判定规则"),
+            "任务模板", "完成判定规则", false),
 
     /**
      * 奖池的准入判定。挂在 {@code t_prize_pool_config.pool_code} 上。
      */
     PRIZE_POOL_ENTRY("PRIZE_POOL", "ENTRY", ScriptScene.POOL_ENTRY,
-            "奖池", "准入判定"),
+            "奖池", "准入判定", false),
 
     /**
      * 活动的准入判定。挂在 {@code t_activity_config.activity_code} 上。
      */
     ACTIVITY_ENTRY("ACTIVITY", "ENTRY", ScriptScene.ACTIVITY_RULE,
-            "活动", "准入判定"),
+            "活动", "准入判定", false),
 
     /**
      * 活动的玩法编排。挂在 {@code t_activity_config.activity_code} 上。
@@ -45,7 +45,7 @@ public enum ScriptRefPoint {
      * 因为它们的失败含义完全不同 —— 准入不通过是正常拒绝，编排出错是事故。
      */
     ACTIVITY_PLAY("ACTIVITY", "PLAY", ScriptScene.ACTIVITY_PLAY,
-            "活动", "玩法编排"),
+            "活动", "玩法编排", true),
 
     /**
      * 抽奖的玩法编排。挂在 {@code t_draw_config.draw_code} 上。
@@ -56,7 +56,7 @@ public enum ScriptRefPoint {
      * 这个说法只有挂在抽奖配置上才立得住，将来放开成一活动多套抽奖时不用再搬一次。
      */
     DRAW_PLAY("DRAW", "PLAY", ScriptScene.ACTIVITY_PLAY,
-            "抽奖配置", "玩法编排"),
+            "抽奖配置", "玩法编排", true),
     ;
 
     /**
@@ -79,12 +79,14 @@ public enum ScriptRefPoint {
 
     private final String keyTitle;
 
+    private final boolean wired;
+
     /**
      * 单值槽位：一个业务对象在这个槽位上只能挂一个脚本。
      */
     ScriptRefPoint(String refType, String refSlot, ScriptScene expectedScene,
-                   String ownerTitle, String slotTitle) {
-        this(refType, refSlot, expectedScene, ownerTitle, slotTitle, null);
+                   String ownerTitle, String slotTitle, boolean wired) {
+        this(refType, refSlot, expectedScene, ownerTitle, slotTitle, null, wired);
     }
 
     /**
@@ -94,13 +96,14 @@ public enum ScriptRefPoint {
      * 「这个 key 是什么」，那它多半只是想绕开单值约束，而不是真的有分组语义。
      */
     ScriptRefPoint(String refType, String refSlot, ScriptScene expectedScene,
-                   String ownerTitle, String slotTitle, String keyTitle) {
+                   String ownerTitle, String slotTitle, String keyTitle, boolean wired) {
         this.refType = refType;
         this.refSlot = refSlot;
         this.expectedScene = expectedScene;
         this.ownerTitle = ownerTitle;
         this.slotTitle = slotTitle;
         this.keyTitle = keyTitle;
+        this.wired = wired;
     }
 
     /**
@@ -136,6 +139,24 @@ public enum ScriptRefPoint {
      */
     public String getSlotTitle() {
         return slotTitle;
+    }
+
+    /**
+     * 引擎里<b>真的有代码会执行这个槽位</b>吗。
+     *
+     * <h3>为什么需要这个标记</h3>
+     * 挂载点是枚举，加一个常量是零成本的；而让它真正生效需要在业务代码里写一处
+     * {@code scriptRuntime.evaluate(...)}。两件事分开做的结果是：
+     * 后台能挂、能存、能在列表里看到，<b>但脚本永远不会被执行</b>，且没有任何报错。
+     *
+     * <p>本仓库真出现过：五个挂载点里三个从来没有调用点。运营挂上去，
+     * 以为配好了，一直到有人问「为什么规则不生效」才发现。
+     *
+     * <p>🔴 <b>加调用点时记得把这里改成 true</b>，否则后台会一直把它显示成「未接入」而挂不上。
+     * 这个标记是手工维护的 —— 没有任何办法从代码里自动推断「某处会不会调到它」。
+     */
+    public boolean isWired() {
+        return wired;
     }
 
     /**

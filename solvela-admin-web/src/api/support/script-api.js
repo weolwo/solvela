@@ -52,6 +52,11 @@ export const scriptApi = {
     return getRequest('/script/ref/point/list');
   },
 
+  // 某挂载点可选的业务对象。服务端按挂载点分发，前端不用认识各业务模块的 optionList
+  refCandidateList: (refPoint) => {
+    return getRequest(`/script/ref/candidate/list?refPoint=${encodeURIComponent(refPoint)}`);
+  },
+
   // 挂载到业务对象
   bind: (form) => {
     return postRequest('/script/ref/bind', form);
