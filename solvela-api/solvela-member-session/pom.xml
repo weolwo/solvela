@@ -35,10 +35,14 @@
     -->
     <dependencies>
 
+        <!-- 🔴 只要 Spring Data Redis 本身，不要 solvela-base-redis。
+             2026-09-01 核对：本模块四个文件的 import 里，来自 base 的<b>一个都没有</b> ——
+             只用到 StringRedisTemplate，那是 Spring Boot 自动配置给的。
+             此前声明 base-redis 是纯白嫖，代价是把 Redisson + 9 个 netty 传递给每个
+             依赖会话存储的进程，其中包括刻意保持轻量的网关。 -->
         <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-base-redis</artifactId>
-            <version>3.0.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <dependency>

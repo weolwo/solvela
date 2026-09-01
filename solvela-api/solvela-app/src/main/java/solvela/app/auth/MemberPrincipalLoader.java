@@ -44,7 +44,7 @@ import solvela.member.api.MemberIdentity;
 @RequiredArgsConstructor
 public class MemberPrincipalLoader {
 
-    /** {@code #30m} 是 CustomRedisCacheManager 的 TTL 语法。 */
+    /** {@code #30m} 是 {@code AppCacheConfig} 的 TTL 语法（网关自己那份缓存管理器）。 */
     public static final String CACHE = "app_member_principal#30m";
 
     private final MemberAuthApi memberAuthApi;
@@ -52,7 +52,7 @@ public class MemberPrincipalLoader {
     /**
      * 取可用的会员身份；会员不存在或状态不正常返回 null。
      *
-     * <p>⚠️ 返回 null 时<b>不写缓存</b>（RedisConfig 开了 disableCachingNullValues）。
+     * <p>⚠️ 返回 null 时<b>不写缓存</b>（AppCacheConfig 开了 disableCachingNullValues）。
      * 也就是说不存在的 memberId 每次都回源 —— 这是刻意的：正常令牌指向的会员一定存在，
      * 会走到这里只可能是会员被物理删了（业务不允许，注销是改 status），或者有人在试探。
      * 后者恰恰不该给它缓存。

@@ -5,7 +5,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 /**
  * solvela C 端应用服务 启动类。
@@ -60,9 +59,22 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
  * {@code @Scheduled} 任务每天跑两遍 —— 发奖、结算重复执行，多发的那一份没人会主动来报。
  * 定时任务归管理端进程所有，本服务只处理请求。
  */
-@EnableCaching
-@EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
-@ComponentScan({"solvela.app", "solvela.base", "solvela.member.session"})
+/*
+ * proxyTargetClass = true：MemberPrincipalLoader 是【类】不是接口，
+ * 走 JDK 动态代理会代理不上，@Cacheable 静默失效 —— 表现是「缓存明明配了却每次都回源」。
+ *
+ * 🔴 刻意【没有】 @EnableAspectJAutoProxy：本进程一个 @Aspect 都没有，也没人调
+ * AopContext.currentProxy()。它此前能编过是因为 aspectj 经 base-redis 白嫖进来了；
+ * 2026-09-01 网关摘掉所有 base 模块后，那个注解会让启动直接报
+ * NoClassDefFoundError: org/aspectj/lang/annotation/Pointcut。
+ * 要用切面时先在 pom 里显式声明 spring-boot-starter-aspectj。
+ */
+@EnableCaching(proxyTargetClass = true)
+// 🔴 这里【没有】 solvela.base：网关的 pom 里一个 base 模块都没有。
+// 从前写 "solvela.base" 是「扫全世界再靠 Maven 减掉」—— 而 solvela.base.config
+// 这个包同时属于 base-core / base-redis / base-data / base-file 四个模块，
+// 精确到子包也挡不住 base-data 的 MybatisPlusConfig。现在这行清单就是全部真相。
+@ComponentScan({"solvela.app", "solvela.member.session"})
 @ConfigurationPropertiesScan("solvela.app")
 @SpringBootApplication
 public class AppApplication {

@@ -1,6 +1,7 @@
 package solvela.base.trace;
 
 import org.slf4j.MDC;
+import solvela.trace.TraceContract;
 
 /**
  * 本次请求的链路 id。
@@ -51,8 +52,12 @@ public final class Trace {
      *
      * <p>公开是因为端模块要用它写响应头。业务代码取值一律走 {@link #id()}，
      * 不要自己 {@code MDC.get(Trace.KEY)}。
+     *
+     * <p>🔴 值本身来自 {@link TraceContract#KEY}（在 solvela-contract 里）——
+     * 它是<b>两个进程之间的头名约定</b>，而网关刻意不依赖任何 base 模块，
+     * 定义留在这里的话网关就只能抄一份，两份对不上时链路会静默断掉。
      */
-    public static final String KEY = "traceId";
+    public static final String KEY = TraceContract.KEY;
 
     private Trace() {
     }

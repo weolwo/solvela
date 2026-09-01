@@ -6,13 +6,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.MDC;
 import solvela.base.trace.Trace;
+import solvela.trace.TraceContract;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 给每个请求一个链路 id，放进 MDC，同时回写响应头。
@@ -62,35 +62,18 @@ import java.util.concurrent.ThreadLocalRandom;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class TraceFilter extends OncePerRequestFilter {
 
-    private static final int MAX_LENGTH = 32;
-
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        String traceId = sanitize(request.getHeader(Trace.KEY));
+        // 🔴 sanitize 与生成规则来自 solvela-contract，不在本类实现：
+        //    网关那边有一份自己的 TraceFilter（它不依赖任何 base 模块），
+        //    两份各写各的 sanitize 时，网关认的 id 会被这边判非法、这边于是重新生成一个 ——
+        //    两边日志都有 traceId、都看着正常，只是对不上。没有任何报错。
+        String traceId = TraceContract.sanitize(request.getHeader(Trace.KEY));
         response.setHeader(Trace.KEY, traceId);
 
         try (MDC.MDCCloseable ignored = Trace.open(traceId)) {
             chain.doFilter(request, response);
         }
-    }
-
-    private static String sanitize(String candidate) {
-        if (candidate == null || candidate.isBlank() || candidate.length() > MAX_LENGTH) {
-            return generate();
-        }
-        for (int i = 0; i < candidate.length(); i++) {
-            char c = candidate.charAt(i);
-            boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9') || c == '-';
-            if (!allowed) {
-                return generate();
-            }
-        }
-        return candidate;
-    }
-
-    private static String generate() {
-        return Long.toHexString(ThreadLocalRandom.current().nextLong());
     }
 }

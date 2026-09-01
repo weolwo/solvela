@@ -45,14 +45,6 @@
         它不再是独立 artifact 之后，这条边界从「约定」变成了「没有东西可加」——
         AppBoundaryTest.没有satoken() 那条断言的失败提示也是照这个写的。
         -->
-        <!-- 链路 id 过滤器（solvela.base.web.TraceFilter）。它与
-             DownstreamClientConfig 的请求头拦截器是一件事的两半 -->
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-base-web</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -77,26 +69,28 @@
         </dependency>
 
 
-        <!-- 网关只直接依赖这两块：工具/JSON/校验/链路 id（core）与会话存储要的 Redis。
-             🔴 刻意【不写】 solvela-base-data、也不写任何域实现模块 ——
-             目标是 classpath 上连 mysql 驱动都没有。
+        <!-- 🔴 网关的 pom 里【没有任何 base 模块】，这是刻意的，别加回来。
 
-             ✅ 已达成，并且有断言守着：solvela-member 依赖已经摘掉，
-             AppBoundaryTest.没有数据库驱动() 断言 Class.forName("com.mysql.cj.jdbc.Driver")
-             必须抛 ClassNotFoundException。2026-08-31 全反应堆 dependency:tree 复核：
-             本模块 114 个依赖里没有 mysql、没有 base-data、没有 base-file。
+             2026-09-01 拆掉 base-core / base-redis / base-web，去掉了 114 个依赖里的 37 个（32%）：
+               · base-redis 带 27 个 —— Redisson + 9 个 netty、caffeine、aspectjweaver，本进程一个没用；
+               · base-core  带 10 个 —— solvela-model、mybatis-plus-core、spring-security-crypto、
+                 bcprov、ip2region(含 11MB 的 xdb 数据文件)。网关取 IP 走自己的 ClientIp
+                 （45 行、只 import HttpServletRequest），【归属地解析归 biz】，所以 ip2region 用不上；
+               · base-web   带 0 个 —— 就一个 TraceFilter。
 
-             （原先那个「什么都有」的 solvela-base 聚合门面已于 2026-08-31 删除 ——
-             它正是一行 pom 就能把 JDBC 拖上来的路径。） -->
+             代价是网关自己写了这几个类，都在 solvela.app 下、都有注释说明为什么冗余：
+               web/Trace + web/TraceFilter        链路 id
+               config/AppJsonConfig + AppLongSerializer  C 端 JSON 形状
+               config/AppCacheConfig              身份缓存（cacheName#ttl 语法）
+
+             ⚠️ 冗余的是【实现】，不是【约定】：头名与 sanitize 规则在 solvela-contract 的
+             TraceContract 里，两侧共用 —— 那是跨进程协议，抄两份对不上时链路会静默断掉。
+
+             Redis 只要 Spring Data Redis 本身：会话存储用 StringRedisTemplate（自动配置就给），
+             身份缓存用 AppCacheConfig 里的 RedisCacheManager。 -->
         <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-base-core</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>solvela</groupId>
-            <artifactId>solvela-base-redis</artifactId>
-            <version>3.0.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <!-- 两个下游服务的【契约】：只有接口 + record，没有实现。

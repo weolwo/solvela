@@ -43,6 +43,33 @@ class AppBoundaryTest {
     }
 
     @Test
+    @DisplayName("🔴 网关的 classpath 上没有任何 solvela-base 模块")
+    void 没有base模块() {
+        assertThrows(ClassNotFoundException.class,
+                () -> Class.forName("solvela.base.trace.Trace"),
+                """
+                        某个 solvela-base-* 模块又回到了网关的 classpath 上。
+
+                        2026-09-01 网关摘掉了 base-core / base-redis / base-web，
+                        依赖从 114 个降到 77 个 —— 少掉的 37 个里有 Redisson + 9 个 netty、
+                        mybatis-plus-core、solvela-model、bcprov，以及 ip2region 那个 11MB 的
+                        数据文件。一个转发 HTTP、解析令牌的进程，一个都用不上。
+
+                        网关需要的那几样自己写了（都在 solvela.app 下，注释说明了为什么冗余）：
+                          web/Trace + web/TraceFilter               链路 id
+                          config/AppJsonConfig + AppLongSerializer  C 端 JSON 形状
+                          config/AppCacheConfig                     身份缓存
+
+                        ⚠️ 冗余的是【实现】不是【约定】：头名与 sanitize 规则在
+                        solvela-contract 的 TraceContract 里两侧共用 —— 抄两份对不上时，
+                        跨服务链路会静默断掉（两边日志都有 traceId，只是不一样）。
+
+                        真要用 base 里的某个东西：先问它值不值那一串传递依赖，
+                        多半答案是把那几十行抄过来。
+                        """);
+    }
+
+    @Test
     @DisplayName("sa-token 不在 C 端的 classpath 上")
     void 没有satoken() {
         assertThrows(ClassNotFoundException.class,

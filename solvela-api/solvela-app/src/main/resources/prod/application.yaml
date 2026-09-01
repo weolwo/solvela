@@ -30,6 +30,32 @@ spring:
   profiles:
     active: '@profiles.active@'
 
+  # ---------------------------------------------------------------------------
+  # Redis。2026-09-01 从 solvela-base-core 的 solvela-base.yaml 搬过来 ——
+  # 网关不再依赖任何 base 模块，那份共享配置也就不再自动生效。
+  #
+  # 顺带说明搬过来的只有这一段：那份共享配置还给网关配了一个【它连驱动都没有的
+  # MySQL 数据源】和一套【它从不发信的 SMTP】。网关真正用到的只有下面这几行。
+  #
+  # 两个用途：会话存储（MemberRedisTokenStore，StringRedisTemplate）
+  #          与身份缓存（AppCacheConfig 的 RedisCacheManager）。
+  #
+  # ⚠️ 没有密码就【不要】留空的 password 键 —— 空串会被当成"有密码"而发 AUTH，
+  #    对无密码的 Redis 直接报 ERR Client sent AUTH, but no password is set。
+  # ---------------------------------------------------------------------------
+  data:
+    redis:
+      database: 1
+      host: 127.0.0.1
+      port: 6379
+      timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 100
+          min-idle: 10
+          max-idle: 50
+          max-wait: 30000ms
+
 # ---------------------------------------------------------------------------
 # C 端认证
 # ---------------------------------------------------------------------------
@@ -65,3 +91,20 @@ solvela:
 solvela.client:
   member.base-url: ${MEMBER_SERVICE_URL:http://127.0.0.1:1026}
   marketing.base-url: ${MARKETING_SERVICE_URL:http://127.0.0.1:1026}
+
+# ---------------------------------------------------------------------------
+# 接口文档。同上，从 solvela-base.yaml 搬来 —— prod 环境关。
+# 生产包还会在 pom 的 prod profile 里把整套文档依赖排出 BOOT-INF/lib，这里是第二道。
+# ---------------------------------------------------------------------------
+springdoc:
+  swagger-ui:
+    enabled: false
+    doc-expansion: none
+    tags-sorter: alpha
+  api-docs:
+    enabled: false
+
+knife4j:
+  enable: false
+  basic:
+    enable: false

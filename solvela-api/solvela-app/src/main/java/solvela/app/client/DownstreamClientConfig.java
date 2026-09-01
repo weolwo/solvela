@@ -7,7 +7,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
-import solvela.base.trace.Trace;
+import solvela.app.web.Trace;
 import solvela.marketing.api.ActivityApi;
 import solvela.member.api.MemberAuthApi;
 
