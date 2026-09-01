@@ -9,7 +9,7 @@ import solvela.draw.drawlog.service.DrawPrizeLogService;
 import solvela.draw.runtime.DrawExecuteService;
 import solvela.admin.module.draw.runtime.domain.form.DrawExecuteForm;
 import solvela.draw.runtime.domain.DrawExecuteCommand;
-import solvela.draw.runtime.domain.DrawExecuteDTO;
+import solvela.draw.runtime.domain.DrawExecuteResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
@@ -52,8 +52,13 @@ public class DrawPrizeLogController {
     @Operation(summary = "执行抽奖（引擎判定 + Lua预扣 + DB兜底 + 落流水）")
     @PostMapping("/execute")
     @RequiresPermission("drawPrizeLog:execute")
-    public DrawExecuteDTO execute(@RequestBody @Valid DrawExecuteForm executeForm) {
-        return drawExecuteService.execute(SolvelaBeanUtil.copy(executeForm, DrawExecuteCommand.class));
+    public DrawExecuteResult execute(@RequestBody @Valid DrawExecuteForm executeForm) {
+        // 联调接口原样下发引擎的结果（sealed，Jackson 按实际子类型序列化）——
+        // 造数与压测脚本据此判定：Rejected 表示这一批压根没抽，Executed 里逐条看 hit
+        return drawExecuteService.execute(new DrawExecuteCommand(
+                executeForm.getActivityCode(), executeForm.getPoolCode(),
+                executeForm.getMemberId(), executeForm.getRequestId(),
+                executeForm.getTimes() == null ? 1 : executeForm.getTimes()));
     }
 
     @Operation(summary = "分页查询")

@@ -51,6 +51,41 @@ public record DrawPoolSnapshot(String poolCode, List<ProbabilityRange> ranges) {
     /**
      * 本池的兜底奖项（无则返回 null）
      */
+    /**
+     * 返回一份「某个奖项被消耗掉一份库存」的新快照。<b>连抽专用。</b>
+     *
+     * <h3>为什么连抽必须逐次更新快照</h3>
+     * 快照里的 {@code remainStock} 是<b>抽之前</b>的值。10 连抽若全部拿同一份快照判定：
+     * 某个奖只剩 1 个时，10 次判定都会认为它「有货」，而实际只有第一次扣得动，
+     * 后 9 次全部走 fallback 降级 —— 用户看到的是「9 连保底」。
+     *
+     * <h3>为什么是「消耗后重建」而不是让引擎自己批量抽</h3>
+     * 引擎的判定是<b>预测</b>，真实扣减（Redis 预扣 + DB 兜底）可能失败。
+     * 让引擎一次判完 N 次，它的库存视图会与真实结果漂移。
+     * 所以循环留在 service 里：<b>抽一次 → 真扣一次 → 按真实结果更新快照 → 再抽</b>，
+     * 引擎则保持「一次判定、纯函数」不变。
+     *
+     * <p>不限量的奖项（{@code UNLIMITED}）原样返回，不会被减成 -2。
+     * 找不到该奖项时原样返回自己 —— 那说明调用方拿了个不属于本池的 id，
+     * 静默忽略比抛异常好：这个方法在热路径上，而库存的最终裁决权本来就在 Redis。
+     *
+     * <p>概率区间不变，所以构造器的闭环校验照样通过。
+     */
+    public DrawPoolSnapshot withStockConsumed(long prizeItemId) {
+        List<ProbabilityRange> updated = new ArrayList<>(ranges.size());
+        for (ProbabilityRange range : ranges) {
+            DrawPrizeSnapshot prize = range.prize();
+            if (prize.prizeItemId() == prizeItemId
+                    && prize.remainStock() != DrawPrizeSnapshot.UNLIMITED
+                    && prize.remainStock() > 0) {
+                prize = new DrawPrizeSnapshot(prize.prizeItemId(), prize.prizeCode(), prize.fallback(),
+                        prize.remainStock() - 1, prize.whiteList());
+            }
+            updated.add(new ProbabilityRange(prize, range.min(), range.max()));
+        }
+        return new DrawPoolSnapshot(poolCode, updated);
+    }
+
     public DrawPrizeSnapshot fallbackPrize() {
         return ranges.stream().map(ProbabilityRange::prize).filter(DrawPrizeSnapshot::fallback).findFirst().orElse(null);
     }

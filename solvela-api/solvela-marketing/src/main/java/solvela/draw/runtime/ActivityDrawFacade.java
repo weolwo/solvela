@@ -6,7 +6,8 @@ import solvela.marketing.api.DrawApi;
 import solvela.marketing.api.DrawCmd;
 import solvela.marketing.api.DrawResultView;
 import solvela.draw.runtime.domain.DrawExecuteCommand;
-import solvela.draw.runtime.domain.DrawExecuteDTO;
+import solvela.draw.runtime.domain.DrawExecuteResult;
+import solvela.draw.runtime.domain.DrawRecord;
 
 /**
  * 抽奖的<b>业务编排</b>入口。{@link DrawApi} 的实现。
@@ -41,16 +42,29 @@ public class ActivityDrawFacade implements DrawApi {
      */
     @Override
     public DrawResultView draw(DrawCmd cmd) {
-        DrawExecuteCommand command = new DrawExecuteCommand();
-        command.setActivityCode(cmd.activityCode());
-        command.setPoolCode(cmd.poolCode());
-        command.setMemberId(cmd.memberId());
-        command.setRequestId(cmd.requestId());
+        DrawExecuteResult result = drawExecuteService.execute(
+                DrawExecuteCommand.once(cmd.activityCode(), cmd.poolCode(), cmd.memberId(), cmd.requestId()));
 
-        DrawExecuteDTO result = drawExecuteService.execute(command);
         // 引擎与契约共用 DrawRejectReason，所以这里没有映射表 —— 映射表是会漂的：
         // 加一个原因忘了加映射，表现是返回一个 null 原因，而编译不报错
-        return new DrawResultView(result.reject(), result.hit(),
-                result.prizeCode(), result.prizeItemId(), result.source(), result.message());
+        return switch (result) {
+            case DrawExecuteResult.Rejected(var reason) -> DrawResultView.ofReject(reason);
+            case DrawExecuteResult.Executed(var records) -> toView(records.getFirst());
+        };
+    }
+
+    /**
+     * 单次结果 -> 对外契约。
+     *
+     * <p>⚠️ 这里补的两句文案（「恭喜中奖」「手慢了，奖品已被抽完」）是<b>过渡</b>：
+     * 域已经不再返回 message（措辞该由调用方定，见 {@code DrawRecord} 的类注释），
+     * 但契约 {@code DrawResultView} 目前还带着这个字段，网关也还在原样透传。
+     * 等契约改成列表形态时，这两句应当搬到网关，本方法随之简化。
+     */
+    private static DrawResultView toView(DrawRecord record) {
+        return record.hit()
+                ? DrawResultView.ofHit(record.prizeItemId(), record.prizeCode(),
+                        record.source() == null ? null : record.source().name(), "恭喜中奖")
+                : DrawResultView.ofMiss("手慢了，奖品已被抽完");
     }
 }

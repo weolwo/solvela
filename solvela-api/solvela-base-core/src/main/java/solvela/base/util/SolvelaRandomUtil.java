@@ -78,6 +78,13 @@ public class SolvelaRandomUtil {
     }
 
     /**
+     * 16位
+     */
+    public static String randomString() {
+        return Long.toHexString(ThreadLocalRandom.current().nextLong());
+    }
+
+    /**
      * 在给定字符集里随机取 length 个字符（可重复）
      */
     public static String randomString(String charset, int length) {

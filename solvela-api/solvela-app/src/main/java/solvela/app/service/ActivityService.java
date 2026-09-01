@@ -104,6 +104,13 @@ public class ActivityService {
                 log.error("【活动配置缺失】活动 {} 没挂玩法编排脚本，用户点了但抽不了", activityCode);
                 yield new ApiException(ApiErrors.CONFLICT, "活动暂未开放，请稍后再试");
             }
+            case INVALID_TIMES -> {
+                // 走到这里说明【我们自己】把次数算错了（times <= 0）——
+                // 用户没有任何办法让它发生，所以对用户是「服务出问题了」，不是「你填错了」。
+                // 这一行日志必须有：它指向的是一个代码或脚本的 bug，不是运营配置问题
+                log.error("【抽奖次数非法】活动 {} 请求了 <= 0 次抽奖，调用方把次数算错了", activityCode);
+                yield new ApiException(ApiErrors.INTERNAL, "活动暂时无法参与，请稍后再试");
+            }
             case POOL_NOT_FOUND, POOL_CLOSED, POOL_NO_PRIZE, POOL_BROKEN -> {
                 log.warn("【奖池不可用】活动 {} 抽奖被拒，原因: {}", activityCode, reason);
                 yield new ApiException(ApiErrors.CONFLICT, "活动暂时无法参与，请稍后再试");
