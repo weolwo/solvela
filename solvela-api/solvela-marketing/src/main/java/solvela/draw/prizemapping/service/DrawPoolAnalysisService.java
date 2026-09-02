@@ -18,6 +18,7 @@ import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
 import solvela.draw.runtime.DrawStockService;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
+import solvela.draw.engine.Ppm;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -67,8 +68,6 @@ public class DrawPoolAnalysisService {
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
-    /** 与 DrawPoolSnapshot 的闭环容差保持一致，两边必须同时改 */
-    private static final BigDecimal PROBABILITY_EPSILON = new BigDecimal("0.0001");
 
     private static final int UNLIMITED = -1;
 
@@ -318,7 +317,7 @@ public class DrawPoolAnalysisService {
         vo.setExpectedCostPerDraw(expectedCost.setScale(AMOUNT_SCALE, RoundingMode.HALF_UP));
 
         // ---- 整池校验 ----
-        boolean closed = !slots.isEmpty() && acc.subtract(HUNDRED).abs().compareTo(PROBABILITY_EPSILON) <= 0;
+        boolean closed = !slots.isEmpty() && Ppm.isClosedPercent(acc);
         vo.setProbabilityClosed(closed);
         if (slots.isEmpty()) {
             vo.getIssueList().add(DrawPoolIssueDTO.danger("POOL_EMPTY",

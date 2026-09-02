@@ -39,7 +39,14 @@ public class PoolPrizeMapping {
     private Long prizeItemId;
 
     /**
-     * 中奖概率(万分位)
+     * 中奖概率，单位<b>百分比</b>：{@code 10.9500} 表示 10.95%。同一奖池所有坑位之和须为 100。
+     *
+     * <p>⚠️ 这里原本写的是「万分位」，<b>是错的</b> —— 闭环校验对着 100 做、
+     * 后台报错文案写「必须等于100%」、前端也按 {@code %} 渲染。建表注释同样写错，已一并订正。
+     *
+     * <p>运行态不用这个类型：{@code DrawSlot.ofPercent} 会在组装奖池快照时换算成
+     * {@code Ppm}（百万分之一整数），引擎内部不存在小数。列是 {@code decimal(8,4)}，
+     * 最小步长 0.0001% 正好是百万分之一，换算无损。
      */
     private BigDecimal probability;
 

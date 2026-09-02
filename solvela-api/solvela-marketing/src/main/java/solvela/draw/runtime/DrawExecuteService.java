@@ -15,6 +15,7 @@ import solvela.draw.engine.DrawEngine;
 import solvela.draw.engine.DrawPoolSnapshot;
 import solvela.draw.engine.DrawPrizeSnapshot;
 import solvela.draw.engine.DrawResult;
+import solvela.draw.engine.DrawSlot;
 import solvela.draw.DrawConfig;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
@@ -42,7 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -104,7 +104,13 @@ public class DrawExecuteService {
      * 白名单判定、流水快照、派发事件三处都要用，各查一次就是三次往返。
      */
     private final MemberService memberService;
-    private static final int UNLIMITED = -1;
+    /**
+     * {@code t_prize_pool_item.user_max_count} 的「不限领」哨兵值。
+     *
+     * <p>⚠️ 与 {@link DrawPrizeSnapshot#UNLIMITED}（库存不限量）同值但<b>不是一个概念</b>：
+     * 那个说的是「这个奖发不完」，这个说的是「一个人能拿几份不设上限」。
+     */
+    private static final int USER_LIMIT_UNLIMITED = -1;
 
     /**
      * 防刷限流：单用户单活动每秒最多 2 次；限流器 key 一小时无活动自动过期
@@ -190,8 +196,7 @@ public class DrawExecuteService {
         Map<Long, PrizePoolItem> itemMap = prizePoolItemManager.listByIds(itemIds).stream()
                 .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity()));
 
-        List<DrawPrizeSnapshot> prizes = new ArrayList<>(mappings.size());
-        List<BigDecimal> probabilities = new ArrayList<>(mappings.size());
+        List<DrawSlot> slots = new ArrayList<>(mappings.size());
         // 顺序已由上面的 orderByAsc(sortWeight) 保证，这里不再排第二遍
         for (PoolPrizeMapping mapping : mappings) {
             PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
@@ -202,15 +207,16 @@ public class DrawExecuteService {
                         form.poolCode(), mapping.getPrizeItemId());
                 return reject(resultKey, DrawRejectReason.POOL_BROKEN);
             }
-            prizes.add(new DrawPrizeSnapshot(
+            DrawPrizeSnapshot prize = new DrawPrizeSnapshot(
                     item.getId(),
                     item.getPrizeCode(),
                     Boolean.TRUE.equals(mapping.getIsFallback()),
                     resolveRemainStock(form.activityCode(), item),
-                    parseWhiteList(item.getWhiteList())));
-            probabilities.add(mapping.getProbability());
+                    parseWhiteList(item.getWhiteList()));
+            // 百分比 -> ppm 的【唯一】转换点：过了这一行，运行态就不再有小数
+            slots.add(DrawSlot.ofPercent(prize, mapping.getProbability()));
         }
-        DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(form.poolCode(), prizes, probabilities);
+        DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(form.poolCode(), slots);
 
         /*
          * 5. 解析本次抽奖归属的限领周期桶。
@@ -350,9 +356,6 @@ public class DrawExecuteService {
     }
 
     /**
-     * 结算：Lua 预扣 -> DB 条件更新兜底 -> 失败降级兜底奖项 -> 落流水
-     */
-    /**
      * 结算一次命中：Lua 预扣 -> DB 条件更新兜底 -> 失败降级兜底奖项 -> 落流水。
      *
      * <p>返回的 {@link DrawRecord} 就是这一次的最终结论：真扣下来了才算 hit，
@@ -412,7 +415,7 @@ public class DrawExecuteService {
             return new DrawPeriodResolver.Period(DrawPeriodResolver.BUCKET_ALL, DrawPeriodResolver.TTL_NONE);
         }
         boolean anyLimited = itemMap.values().stream()
-                .anyMatch(item -> item.getUserMaxCount() != null && item.getUserMaxCount() != UNLIMITED);
+                .anyMatch(item -> item.getUserMaxCount() != null && item.getUserMaxCount() != USER_LIMIT_UNLIMITED);
         if (!anyLimited) {
             return new DrawPeriodResolver.Period(DrawPeriodResolver.BUCKET_ALL, DrawPeriodResolver.TTL_NONE);
         }
@@ -425,7 +428,7 @@ public class DrawExecuteService {
     private boolean tryDeduct(DrawExecuteCommand form, Map<Long, PrizePoolItem> itemMap, DrawPrizeSnapshot prize,
                               DrawPeriodResolver.Period period) {
         PrizePoolItem item = itemMap.get(prize.prizeItemId());
-        int userMax = item == null || item.getUserMaxCount() == null ? UNLIMITED : item.getUserMaxCount();
+        int userMax = item == null || item.getUserMaxCount() == null ? USER_LIMIT_UNLIMITED : item.getUserMaxCount();
 
         StockDeductResult redisResult = drawStockService.deduct(
                 form.activityCode(), prize.prizeItemId(), form.memberId(), userMax, period);

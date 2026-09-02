@@ -42,6 +42,7 @@ import solvela.draw.runtime.DrawStockService;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.exception.BusinessException;
+import solvela.draw.engine.Ppm;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,13 +88,6 @@ public class PrizePoolConfigService {
      * 库存/限领「不限量」哨兵值
      */
     private static final Integer UNLIMITED = -1;
-
-    /**
-     * 概率累加容差：防御浮点边界，前后端同语义
-     */
-    private static final BigDecimal PROBABILITY_EPSILON = new BigDecimal("0.0001");
-
-    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     /**
      * 生成一个未被占用的奖池编码（10 位大写字母+数字），供工作台「新建奖池」调用
@@ -258,7 +252,7 @@ public class PrizePoolConfigService {
             if (fallbackCount > 1) {
                 throw new BusinessException("奖池「" + pool.getPoolName() + "」兜底奖项最多只能有一个");
             }
-            if (total.subtract(HUNDRED).abs().compareTo(PROBABILITY_EPSILON) > 0) {
+            if (!Ppm.isClosedPercent(total)) {
                 throw new BusinessException("奖池「" + pool.getPoolName() + "」概率总和为 " + total.toPlainString() + "%，必须等于100%");
             }
         }

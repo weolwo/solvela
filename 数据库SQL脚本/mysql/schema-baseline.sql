@@ -903,7 +903,7 @@ CREATE TABLE `t_pool_prize_mapping` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `pool_code` varchar(32) NOT NULL COMMENT '奖池编码',
   `prize_item_id` bigint NOT NULL COMMENT '奖项id',
-  `probability` decimal(8,4) NOT NULL DEFAULT '0.0000' COMMENT '中奖概率(万分位)',
+  `probability` decimal(8,4) NOT NULL DEFAULT '0.0000' COMMENT '中奖概率，百分比：10.9500 表示 10.95%，同池之和须为 100',
   `is_fallback` tinyint NOT NULL DEFAULT '0' COMMENT '是否兜底奖项：1-兜底(自动吃掉剩余概率/库存不足时降级命中)，每池最多一个',
   `sort_weight` int NOT NULL DEFAULT '0' COMMENT '序号',
   `create_by` varchar(32) DEFAULT NULL COMMENT '创建人',

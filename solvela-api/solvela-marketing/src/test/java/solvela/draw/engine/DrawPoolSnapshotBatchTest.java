@@ -3,7 +3,6 @@ package solvela.draw.engine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -30,9 +29,8 @@ class DrawPoolSnapshotBatchTest {
 
     /** 一个奖项概率 100%，方便让判定必然落在它身上 */
     private static DrawPoolSnapshot singlePrizePool(int stock) {
-        return DrawPoolSnapshot.of(POOL,
-                List.of(new DrawPrizeSnapshot(1L, "PRIZE_ONLY", false, stock, Set.of())),
-                List.of(new BigDecimal("100")));
+        return DrawPoolSnapshot.of(POOL, List.of(new DrawSlot(
+                new DrawPrizeSnapshot(1L, "PRIZE_ONLY", false, stock, Set.of()), Ppm.FULL)));
     }
 
     @Test
@@ -68,10 +66,9 @@ class DrawPoolSnapshotBatchTest {
     @Test
     @DisplayName("不限量的奖项不会被减成负数")
     void 不限量奖项不受影响() {
-        DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(POOL,
-                List.of(new DrawPrizeSnapshot(9L, "PRIZE_UNLIMITED", true,
-                        DrawPrizeSnapshot.UNLIMITED, Set.of())),
-                List.of(new BigDecimal("100")));
+        DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(POOL, List.of(new DrawSlot(
+                new DrawPrizeSnapshot(9L, "PRIZE_UNLIMITED", true, DrawPrizeSnapshot.UNLIMITED, Set.of()),
+                Ppm.FULL)));
 
         DrawPoolSnapshot after = snapshot.withStockConsumed(9L).withStockConsumed(9L);
 
@@ -99,16 +96,15 @@ class DrawPoolSnapshotBatchTest {
     @Test
     @DisplayName("概率区间不受影响 —— 否则构造器的闭环校验会炸")
     void 消耗库存不动概率区间() {
-        DrawPoolSnapshot before = DrawPoolSnapshot.of(POOL,
-                List.of(new DrawPrizeSnapshot(1L, "A", false, 2, Set.of()),
-                        new DrawPrizeSnapshot(2L, "B", true, DrawPrizeSnapshot.UNLIMITED, Set.of())),
-                List.of(new BigDecimal("30"), new BigDecimal("70")));
+        DrawPoolSnapshot before = DrawPoolSnapshot.of(POOL, List.of(
+                new DrawSlot(new DrawPrizeSnapshot(1L, "A", false, 2, Set.of()), 300_000),
+                new DrawSlot(new DrawPrizeSnapshot(2L, "B", true, DrawPrizeSnapshot.UNLIMITED, Set.of()), 700_000)));
 
         DrawPoolSnapshot after = before.withStockConsumed(1L);
 
-        List<BigDecimal> beforeMax = new ArrayList<>();
+        List<Integer> beforeMax = new ArrayList<>();
         before.ranges().forEach(r -> beforeMax.add(r.max()));
-        List<BigDecimal> afterMax = new ArrayList<>();
+        List<Integer> afterMax = new ArrayList<>();
         after.ranges().forEach(r -> afterMax.add(r.max()));
 
         assertEquals(beforeMax, afterMax, "区间变了的话，概率就跟着库存漂移了");
