@@ -13,7 +13,8 @@ declare module 'vue' {
   export interface GlobalComponents {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    VarButton: typeof import('@varlet/ui')['_ButtonComponent']
-    VarInput: typeof import('@varlet/ui')['_InputComponent']
+    SvButton: typeof import('./ui/SvButton.vue')['default']
+    SvCard: typeof import('./ui/SvCard.vue')['default']
+    SvField: typeof import('./ui/SvField.vue')['default']
   }
 }

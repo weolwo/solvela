@@ -19,33 +19,35 @@ async function handleLogout(): Promise<void> {
 
 <template>
   <div class="home">
-    <div class="home__card">
+    <SvCard :divided="false" class="home__card">
       <p class="home__label">当前会员</p>
       <p class="home__value">{{ auth.member?.nickname ?? '—' }}</p>
       <!-- memberId 是 Id（字符串），直接渲染即可，不要 parseInt 也不要参与计算 -->
       <p class="home__muted">ID {{ auth.member?.memberId ?? '—' }}</p>
-    </div>
+    </SvCard>
 
-    <div class="home__card">
+    <SvCard :divided="false" class="home__card">
       <p class="home__label">余额（示例）</p>
       <p class="home__amount">¥{{ demoBalance }}</p>
-    </div>
+    </SvCard>
 
-    <var-button type="default" block @click="handleLogout">退出登录</var-button>
+    <SvButton variant="text" @click="handleLogout">退出登录</SvButton>
   </div>
 </template>
 
 <style scoped>
 .home {
-  padding: var(--sv-space-md);
-  padding-top: calc(var(--sv-safe-top) + var(--sv-space-md));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-md);
+  padding: var(--sv-space-page);
+  padding-top: calc(var(--sv-safe-top) + var(--sv-space-lg));
+  padding-bottom: calc(var(--sv-safe-bottom) + var(--sv-space-lg));
 }
 
+/* 圆角和底色由 SvCard 给，这里只补内边距 */
 .home__card {
-  margin-bottom: var(--sv-space-md);
   padding: var(--sv-space-md);
-  border-radius: var(--sv-radius-lg);
-  background: var(--sv-bg-surface);
 }
 
 .home__label {

@@ -41,6 +41,17 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       'vue/multi-word-component-names': 'off',
+
+      /*
+       * 与 tsconfig 的 exactOptionalPropertyTypes 直接冲突，必须关。
+       *
+       * 这条规则要求每个可选 prop 都给默认值，而在 <script setup> + TS 下
+       * 可选 prop 的默认值只能写成 `undefined` —— 那正是
+       * exactOptionalPropertyTypes 判为类型错误的写法（在那个开关下，
+       * 「没传这个 prop」和「传了 undefined」是两件事）。
+       * 两者只能留一个，留类型检查：它拦得住的东西更多。
+       */
+      'vue/require-default-prop': 'off',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },

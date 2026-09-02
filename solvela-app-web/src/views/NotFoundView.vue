@@ -5,24 +5,40 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="not-found">
-    <p class="not-found__text">页面不存在</p>
-    <var-button type="primary" @click="router.replace('/')">回到首页</var-button>
+  <div class="page">
+    <p class="page__code">404</p>
+    <p class="page__text">页面不存在</p>
+    <SvButton class="page__action" :block="false" @click="router.replace('/')">回到首页</SvButton>
   </div>
 </template>
 
 <style scoped>
-.not-found {
+.page {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: var(--sv-space-md);
+  padding: var(--sv-space-page);
+  gap: var(--sv-space-sm);
 }
 
-.not-found__text {
+.page__code {
+  margin: 0;
+  color: var(--sv-text-placeholder);
+  font-size: 56px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.page__text {
   margin: 0;
   color: var(--sv-text-secondary);
+  font-size: var(--sv-font-caption);
+}
+
+.page__action {
+  margin-top: var(--sv-space-md);
 }
 </style>

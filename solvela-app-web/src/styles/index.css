@@ -2,11 +2,20 @@
  * 样式入口。
  *
  * 不引入 Tailwind：本项目的页面是高度定制的活动视觉（转盘、九宫格、皮肤），
- * utility class 在这类页面上收益最低、噪音最大。规整间距由 Varlet 组件承担，
- * 其余用 SFC 的 scoped CSS 写，主题走下面这组 CSS 变量。
+ * utility class 在这类页面上收益最低、噪音最大。
+ * 规整间距由 src/ui 下的基础组件承担，其余用 SFC 的 scoped CSS 写，
+ * 主题走 theme.css 那组 CSS 变量。
  *
  * CSS reset 的归属：**由本文件负责**，不要再引第三方 normalize。
- * Varlet 自带的基础样式只作用于它自己的组件类名，两者不冲突。
+ *
+ * 🔴 没有 UI 组件库，是刻意的。曾经用 @varlet/ui，但全项目只用到了它的
+ *    Button 和 Input 两个组件，而它是 Material Design 实现（描边输入框、涟漪、
+ *    4px 圆角阶梯）—— 与我们要的 HarmonyOS 观感处处相反，只能一层层 ::v-deep
+ *    覆盖，最后维护的是「一套被改写过的 Material」。
+ *
+ *    判断标准：**纯 CSS + 一个 v-model 就能写完的，自己写在 src/ui；
+ *    要碰 teleport / 滚动锁定 / 焦点陷阱 / 手势惯性 的，到时候按需装库**
+ *    （Picker、Popup、ImagePreview、PullRefresh 属于后者，自己实现不划算）。
  */
 @import './theme.css';
 @import './base.css';
