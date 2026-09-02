@@ -16,6 +16,7 @@ import solvela.draw.engine.DrawPoolSnapshot;
 import solvela.draw.engine.DrawPrizeSnapshot;
 import solvela.draw.engine.DrawResult;
 import solvela.draw.engine.DrawSlot;
+import solvela.draw.engine.LocalInventory;
 import solvela.draw.DrawConfig;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
@@ -174,8 +175,13 @@ public class DrawExecuteService {
      */
     private sealed interface Preflight {
 
-        /** 可以开抽 */
-        record Ready(DrawBatch batch, DrawPoolSnapshot snapshot) implements Preflight {
+        /**
+         * 可以开抽。
+         *
+         * @param snapshot  奖池配置，整批只读
+         * @param inventory 批内库存视图，整批唯一会变的东西
+         */
+        record Ready(DrawBatch batch, DrawPoolSnapshot snapshot, LocalInventory inventory) implements Preflight {
         }
 
         /** 整批不受理 */
@@ -208,8 +214,8 @@ public class DrawExecuteService {
 
         return switch (preflight(command)) {
             case Preflight.Reject(DrawRejectReason reason) -> reject(resultKey, reason);
-            case Preflight.Ready(DrawBatch batch, DrawPoolSnapshot snapshot) -> {
-                DrawExecuteResult result = new DrawExecuteResult.Executed(drawTimes(batch, snapshot));
+            case Preflight.Ready(DrawBatch batch, DrawPoolSnapshot snapshot, LocalInventory inventory) -> {
+                DrawExecuteResult result = new DrawExecuteResult.Executed(drawTimes(batch, snapshot, inventory));
                 remember(resultKey, result);
                 yield result;
             }
@@ -279,9 +285,12 @@ public class DrawExecuteService {
                 .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity()));
 
         // 配置读 DB，库存读 Redis；缓存未预热则回源并预热。
-        // 坑位顺序已由上面的 orderByAsc(sortWeight) 保证，这里不再排第二遍
+        // 坑位顺序已由上面的 orderByAsc(sortWeight) 保证，这里不再排第二遍。
+        // 配置进 slots，库存进 remainStocks —— 两者从这里就是分开的
         List<DrawSlot> slots = new ArrayList<>(mappings.size());
-        for (PoolPrizeMapping mapping : mappings) {
+        int[] remainStocks = new int[mappings.size()];
+        for (int i = 0; i < mappings.size(); i++) {
+            PoolPrizeMapping mapping = mappings.get(i);
             PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
             if (item == null) {
                 // 配置坏了要告警。itemId 只进日志不进返回值 —— 它是奖池内部主键，
@@ -294,35 +303,40 @@ public class DrawExecuteService {
                     item.getId(),
                     item.getPrizeCode(),
                     Boolean.TRUE.equals(mapping.getIsFallback()),
-                    resolveRemainStock(command.activityCode(), item),
                     parseWhiteList(item.getWhiteList()));
             // 百分比 -> ppm 的【唯一】转换点：过了这一行，运行态就不再有小数
             slots.add(DrawSlot.ofPercent(prize, mapping.getProbability()));
+            remainStocks[i] = resolveRemainStock(command.activityCode(), item);
         }
 
         DrawBatch batch = new DrawBatch(command, memberName, itemMap, resolvePeriod(pool, itemMap));
-        return new Preflight.Ready(batch, DrawPoolSnapshot.of(command.poolCode(), slots));
+        return new Preflight.Ready(batch,
+                DrawPoolSnapshot.of(command.poolCode(), slots),
+                LocalInventory.of(slots, remainStocks));
     }
 
     /**
      * 逐次抽奖。
      *
-     * <p>🔴 快照必须在批内递减：{@code remainStock} 是抽之前的值。N 次全拿同一份判定的话，
+     * <p>🔴 库存必须在批内递减：{@code inventory} 里是开抽那一刻的读数。N 次全拿同一份判定的话，
      * 只剩 1 个的奖会被判定 N 次「有货」，而实际只有第一次扣得动，
      * 后面全部走 fallback —— 用户看到的是「N-1 连保底」。
      *
-     * <p>判定用引擎（纯函数），真扣用 {@link #settle}，然后按<b>真实结果</b>更新快照再进下一次 ——
+     * <p>判定用引擎，真扣用 {@link #settle}，然后按<b>真实结果</b>更新库存视图再进下一次 ——
      * 而不是让引擎一次判完 N 次，那样它的库存视图会与真实扣减结果漂移。
+     *
+     * <p>{@code snapshot} 整批只读，{@code inventory} 是唯一变的东西，
+     * 且变的方式是 {@code remain[i]--}：不重建任何对象。
      *
      * <p>⚠️ 白名单是「必中且每次判定都优先命中」，所以连抽会让白名单用户
      * 连拿 N 份同一个奖（直到该奖库存耗尽）。这是连抽才暴露出来的语义 ——
      * 现状如此，要改成「一批只必中一次」得先定产品口径。
      */
-    private List<DrawRecord> drawTimes(DrawBatch batch, DrawPoolSnapshot snapshot) {
+    private List<DrawRecord> drawTimes(DrawBatch batch, DrawPoolSnapshot snapshot, LocalInventory inventory) {
         List<DrawRecord> records = new ArrayList<>(batch.times());
         for (int i = 0; i < batch.times(); i++) {
             String sourceBizId = sourceBizId(batch.command(), i);
-            DrawRecord record = switch (DrawEngine.draw(snapshot, batch.memberName())) {
+            DrawRecord record = switch (DrawEngine.draw(snapshot, batch.memberName(), inventory)) {
                 case DrawResult.Hit(DrawPrizeSnapshot prize, DrawResult.HitSource source) ->
                         settle(batch, sourceBizId, snapshot, prize, source);
                 case DrawResult.NoStock(String candidateCode) -> {
@@ -333,7 +347,7 @@ public class DrawExecuteService {
             };
             records.add(record);
             if (record.hit()) {
-                snapshot = snapshot.withStockConsumed(record.prizeItemId());
+                inventory.consume(record.prizeItemId());
             }
         }
         return records;

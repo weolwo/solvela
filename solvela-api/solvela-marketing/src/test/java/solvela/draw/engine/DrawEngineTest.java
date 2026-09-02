@@ -31,18 +31,27 @@ class DrawEngineTest {
     }
 
     /**
-     * 标准三奖项池：iPhone 0.05% / 积分 10.95% / 谢谢参与(兜底) 89%
+     * 标准三奖项池：iPhone 0.05% / 积分 10.95% / 谢谢参与(兜底) 89%。
+     * 纯配置，不含库存 —— 库存由 {@link #stock} 单独给。
      */
-    private DrawPoolSnapshot standardPool(int iphoneStock, int scoreStock) {
-        return DrawPoolSnapshot.of(POOL, List.of(
-                new DrawSlot(new DrawPrizeSnapshot(1L, "PRIZE_IPHONE", false, iphoneStock, Set.of("vip_10086")), pct("0.05")),
-                new DrawSlot(new DrawPrizeSnapshot(2L, "PRIZE_SCORE", false, scoreStock, Set.of()), pct("10.95")),
-                new DrawSlot(new DrawPrizeSnapshot(3L, "PRIZE_THANKS", true, DrawPrizeSnapshot.UNLIMITED, Set.of()), pct("89"))
-        ));
+    private static List<DrawSlot> standardSlots() {
+        return List.of(
+                new DrawSlot(new DrawPrizeSnapshot(1L, "PRIZE_IPHONE", false, Set.of("vip_10086")), pct("0.05")),
+                new DrawSlot(new DrawPrizeSnapshot(2L, "PRIZE_SCORE", false, Set.of()), pct("10.95")),
+                new DrawSlot(new DrawPrizeSnapshot(3L, "PRIZE_THANKS", true, Set.of()), pct("89")));
     }
 
-    private static DrawSlot slot(long id, String code, boolean fallback, int stock, String percent) {
-        return new DrawSlot(new DrawPrizeSnapshot(id, code, fallback, stock, Set.of()), pct(percent));
+    private static DrawPoolSnapshot standardPool() {
+        return DrawPoolSnapshot.of(POOL, standardSlots());
+    }
+
+    /** 标准池的库存：兜底恒为不限量 */
+    private static LocalInventory stock(int iphone, int score) {
+        return LocalInventory.of(standardSlots(), new int[]{iphone, score, LocalInventory.UNLIMITED});
+    }
+
+    private static DrawSlot slot(long id, String code, boolean fallback, String percent) {
+        return new DrawSlot(new DrawPrizeSnapshot(id, code, fallback, Set.of()), pct(percent));
     }
 
     // ==================== 概率单位 ====================
@@ -70,7 +79,7 @@ class DrawEngineTest {
     @DisplayName("概率未闭环的快照直接拒绝构造")
     void poolMustBeClosed() {
         assertThrows(IllegalArgumentException.class,
-                () -> DrawPoolSnapshot.of(POOL, List.of(slot(1L, "A", false, 1, "99"))));
+                () -> DrawPoolSnapshot.of(POOL, List.of(slot(1L, "A", false, "99"))));
     }
 
     @Test
@@ -78,8 +87,8 @@ class DrawEngineTest {
     void closureIsExactNotFuzzy() {
         assertThrows(IllegalArgumentException.class,
                 () -> DrawPoolSnapshot.of(POOL, List.of(
-                        slot(1L, "A", false, 10, "10"),
-                        slot(2L, "FB", true, 10, "89.9999"))),
+                        slot(1L, "A", false, "10"),
+                        slot(2L, "FB", true, "89.9999"))),
                 "改造前闭环是 |total - 100| <= 0.0001 的容差判定，99.9999% 会被判为「闭环」，"
                         + "于是随机数真的可能落在所有区间之外，靠 locate 静默回落到最后一个区间兜住 —— "
                         + "配置错了，但表现只是概率悄悄偏斜，没有任何报错。"
@@ -89,20 +98,22 @@ class DrawEngineTest {
     @Test
     @DisplayName("区间边界：0 命中第一项，999999 命中兜底")
     void boundary() {
-        DrawPoolSnapshot pool = standardPool(5, 100);
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(5, 100);
 
-        DrawResult atZero = DrawEngine.draw(pool, "nobody", 0);
+        DrawResult atZero = DrawEngine.draw(pool, "nobody", inventory, 0);
         assertEquals("PRIZE_IPHONE", ((DrawResult.Hit) atZero).prize().prizeCode());
 
-        DrawResult nearTop = DrawEngine.draw(pool, "nobody", Ppm.FULL - 1);
+        DrawResult nearTop = DrawEngine.draw(pool, "nobody", inventory, Ppm.FULL - 1);
         assertEquals("PRIZE_THANKS", ((DrawResult.Hit) nearTop).prize().prizeCode());
     }
 
     @Test
     @DisplayName("随机数等于 FULL 时抛异常，而不是静默回落到最后一个区间")
     void randomOutOfRangeFailsLoud() {
-        DrawPoolSnapshot pool = standardPool(5, 100);
-        assertThrows(IllegalStateException.class, () -> DrawEngine.draw(pool, "nobody", Ppm.FULL),
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(5, 100);
+        assertThrows(IllegalStateException.class, () -> DrawEngine.draw(pool, "nobody", inventory, Ppm.FULL),
                 "区间铺满 [0, FULL) 且 nextInt(FULL) 取不到 FULL，所以这条路生产上不可达。"
                         + "真走到了只可能是有人绕过 DrawPoolSnapshot.of 构造了非法快照 —— 该炸。");
     }
@@ -110,12 +121,13 @@ class DrawEngineTest {
     @Test
     @DisplayName("10万次固定种子模拟：实际分布贴合理论概率（±0.5个百分点）")
     void distribution() {
-        DrawPoolSnapshot pool = standardPool(DrawPrizeSnapshot.UNLIMITED, DrawPrizeSnapshot.UNLIMITED);
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(LocalInventory.UNLIMITED, LocalInventory.UNLIMITED);
         Random random = new Random(20260726L);
         int times = 100_000;
         Map<String, Integer> counter = new HashMap<>();
         for (int i = 0; i < times; i++) {
-            DrawResult result = DrawEngine.draw(pool, "nobody", random.nextInt(Ppm.FULL));
+            DrawResult result = DrawEngine.draw(pool, "nobody", inventory, random.nextInt(Ppm.FULL));
             String code = ((DrawResult.Hit) result).prize().prizeCode();
             counter.merge(code, 1, Integer::sum);
         }
@@ -132,9 +144,10 @@ class DrawEngineTest {
     @Test
     @DisplayName("白名单必中：即使随机数落在兜底区间，名单内用户仍命中白名单奖项")
     void whiteListWins() {
-        DrawPoolSnapshot pool = standardPool(5, 100);
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(5, 100);
         // 随机数 50% 落在兜底区间，但 vip_10086 在 iPhone 白名单内
-        DrawResult result = DrawEngine.draw(pool, "vip_10086", pct("50"));
+        DrawResult result = DrawEngine.draw(pool, "vip_10086", inventory, pct("50"));
         DrawResult.Hit hit = assertInstanceOf(DrawResult.Hit.class, result);
         assertEquals("PRIZE_IPHONE", hit.prize().prizeCode());
         assertEquals(DrawResult.HitSource.WHITE_LIST, hit.source());
@@ -143,8 +156,9 @@ class DrawEngineTest {
     @Test
     @DisplayName("白名单仍受库存约束：目标奖项无库存时回落到概率命中")
     void whiteListRespectsStock() {
-        DrawPoolSnapshot pool = standardPool(0, 100);
-        DrawResult result = DrawEngine.draw(pool, "vip_10086", pct("50"));
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(0, 100);
+        DrawResult result = DrawEngine.draw(pool, "vip_10086", inventory, pct("50"));
         DrawResult.Hit hit = assertInstanceOf(DrawResult.Hit.class, result);
         assertEquals("PRIZE_THANKS", hit.prize().prizeCode());
         assertEquals(DrawResult.HitSource.PROBABILITY, hit.source());
@@ -155,9 +169,10 @@ class DrawEngineTest {
     @Test
     @DisplayName("命中奖项无库存降级到兜底，来源标记为 FALLBACK_DEGRADE")
     void degradeToFallback() {
-        DrawPoolSnapshot pool = standardPool(5, 0);
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(5, 0);
         // 随机数 5% 落在积分区间 [0.05%, 11%)，但积分库存为 0
-        DrawResult result = DrawEngine.draw(pool, "nobody", pct("5"));
+        DrawResult result = DrawEngine.draw(pool, "nobody", inventory, pct("5"));
         DrawResult.Hit hit = assertInstanceOf(DrawResult.Hit.class, result);
         assertEquals("PRIZE_THANKS", hit.prize().prizeCode());
         assertEquals(DrawResult.HitSource.FALLBACK_DEGRADE, hit.source());
@@ -166,10 +181,10 @@ class DrawEngineTest {
     @Test
     @DisplayName("命中奖项与兜底同时无库存 -> NoStock，携带候选奖品编码")
     void noStockWhenFallbackDry() {
-        DrawPoolSnapshot pool = DrawPoolSnapshot.of(POOL, List.of(
-                slot(1L, "PRIZE_A", false, 0, "40"),
-                slot(2L, "PRIZE_FB", true, 0, "60")));
-        DrawResult result = DrawEngine.draw(pool, "nobody", pct("10"));
+        List<DrawSlot> slots = List.of(slot(1L, "PRIZE_A", false, "40"), slot(2L, "PRIZE_FB", true, "60"));
+        DrawPoolSnapshot pool = DrawPoolSnapshot.of(POOL, slots);
+        LocalInventory inventory = LocalInventory.of(slots, new int[]{0, 0});
+        DrawResult result = DrawEngine.draw(pool, "nobody", inventory, pct("10"));
         DrawResult.NoStock noStock = assertInstanceOf(DrawResult.NoStock.class, result);
         assertEquals("PRIZE_A", noStock.candidatePrizeCode());
     }
@@ -177,11 +192,11 @@ class DrawEngineTest {
     @Test
     @DisplayName("兜底自己被抽中且无库存时不自我降级，直接 NoStock")
     void fallbackHitButDryNoSelfDegrade() {
-        DrawPoolSnapshot pool = DrawPoolSnapshot.of(POOL, List.of(
-                slot(1L, "PRIZE_A", false, 10, "40"),
-                slot(2L, "PRIZE_FB", true, 0, "60")));
+        List<DrawSlot> slots = List.of(slot(1L, "PRIZE_A", false, "40"), slot(2L, "PRIZE_FB", true, "60"));
+        DrawPoolSnapshot pool = DrawPoolSnapshot.of(POOL, slots);
+        LocalInventory inventory = LocalInventory.of(slots, new int[]{10, 0});
         // 随机数落在兜底区间，兜底无库存，且不能降级到自己
-        DrawResult result = DrawEngine.draw(pool, "nobody", pct("70"));
+        DrawResult result = DrawEngine.draw(pool, "nobody", inventory, pct("70"));
         assertInstanceOf(DrawResult.NoStock.class, result);
     }
 
@@ -190,8 +205,9 @@ class DrawEngineTest {
     @Test
     @DisplayName("switch 模式匹配解构消费 DrawResult（穷尽性由编译器保证）")
     void patternMatchingConsumption() {
-        DrawPoolSnapshot pool = standardPool(5, 100);
-        DrawResult result = DrawEngine.draw(pool, "vip_10086", pct("50"));
+        DrawPoolSnapshot pool = standardPool();
+        LocalInventory inventory = stock(5, 100);
+        DrawResult result = DrawEngine.draw(pool, "vip_10086", inventory, pct("50"));
 
         String display = switch (result) {
             case DrawResult.Hit(DrawPrizeSnapshot prize, DrawResult.HitSource source) ->

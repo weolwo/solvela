@@ -16,6 +16,9 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>概率单位见 {@link Ppm}：引擎内部全整数，不存在小数与容差。
  *
+ * <p>配置（{@link DrawPoolSnapshot}）与库存（{@link LocalInventory}）分开传：
+ * 前者整批只读，后者是批内唯一会变的东西。
+ *
  * @Author alaric
  * @Date 2026-07-26
  */
@@ -25,33 +28,37 @@ public final class DrawEngine {
     }
 
     /** 执行一次抽奖判定（随机数由内部生成） */
-    public static DrawResult draw(DrawPoolSnapshot pool, String memberName) {
-        return draw(pool, memberName, ThreadLocalRandom.current().nextInt(Ppm.FULL));
+    public static DrawResult draw(DrawPoolSnapshot pool, String memberName, LocalInventory inventory) {
+        return draw(pool, memberName, inventory, ThreadLocalRandom.current().nextInt(Ppm.FULL));
     }
 
     /**
      * 执行一次抽奖判定（随机数外部注入，供测试与审计回放使用）。
      *
-     * @param randPpm {@code [0, }{@link Ppm#FULL}{@code )} 区间的随机数
+     * @param inventory 批内库存视图。引擎<b>只读不写</b> —— 判定是预测，
+     *                  真扣可能失败，按预测扣会让视图与真实结果漂移。
+     *                  扣减由 {@code DrawExecuteService} 在真扣成功之后做
+     * @param randPpm   {@code [0, }{@link Ppm#FULL}{@code )} 区间的随机数
      */
-    public static DrawResult draw(DrawPoolSnapshot pool, String memberName, int randPpm) {
+    public static DrawResult draw(DrawPoolSnapshot pool, String memberName, LocalInventory inventory, int randPpm) {
         // 1. 白名单必中（按坑位顺序取第一个命中的白名单奖项；无库存的白名单奖项跳过）
         for (ProbabilityRange range : pool.ranges()) {
             DrawPrizeSnapshot prize = range.prize();
-            if (prize.inWhiteList(memberName) && prize.hasStock()) {
+            if (prize.inWhiteList(memberName) && inventory.hasStock(prize.prizeItemId())) {
                 return new DrawResult.Hit(prize, DrawResult.HitSource.WHITE_LIST);
             }
         }
 
         // 2. 概率区间命中
         DrawPrizeSnapshot candidate = locate(pool, randPpm);
-        if (candidate.hasStock()) {
+        if (inventory.hasStock(candidate.prizeItemId())) {
             return new DrawResult.Hit(candidate, DrawResult.HitSource.PROBABILITY);
         }
 
         // 3. 命中奖项无库存 -> 降级兜底
         DrawPrizeSnapshot fallback = pool.fallbackPrize();
-        if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId() && fallback.hasStock()) {
+        if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId()
+                && inventory.hasStock(fallback.prizeItemId())) {
             return new DrawResult.Hit(fallback, DrawResult.HitSource.FALLBACK_DEGRADE);
         }
         return new DrawResult.NoStock(candidate.prizeCode());
