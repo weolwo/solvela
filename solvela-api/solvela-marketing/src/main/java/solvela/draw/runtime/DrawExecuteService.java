@@ -45,11 +45,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -58,6 +56,11 @@ import java.util.stream.Collectors;
  *
  * 流程：幂等防重 -> 防刷限流 -> 组装奖池快照 -> DrawEngine 纯函数判定 -> Redis Lua 原子预扣(防超发第一道)
  *      -> DB 条件更新库存(防超发第二道，失败补偿回滚 Redis) -> 落抽奖流水 -> 中奖异步派发
+ *
+ * <h3>三段式：受理 -> 预检 -> 开抽</h3>
+ * {@link #execute} 只负责「这一批要不要受理」，{@link #preflight} 负责「能不能抽、拿什么抽」，
+ * {@link #drawTimes} 负责「真的抽 N 次」。上一版这三段挤在一个 150 行的方法里，
+ * 靠 {@code // 1.} ~ {@code // 6.} 的编号注释分段 —— 编号注释本身就是「这几步该是方法」的信号。
  *
  * <h3>没有资产扣减，是刻意的</h3>
  * 本模块是纯粹的<b>命中判定与库存派发引擎</b>：抽一次消耗多少积分、要不要门票、
@@ -78,8 +81,7 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>⚠️ <b>契约变更</b>：本接口不再扣费，因此<b>也不再退费</b>。
- * 返回 {@code ofMiss（手慢了，奖品已被抽完）} 时上游若已扣过资产，需要自行退还 ——
- * 判断依据就是返回值，不需要额外接口。
+ * 返回 miss 的那几次上游若已扣过资产，需要自行退还 —— 判断依据就是返回值，不需要额外接口。
  *
  * @Author alaric
  * @Date 2026-07-26
@@ -100,7 +102,7 @@ public class DrawExecuteService {
     private final PrizeConfigService prizeConfigService;
     private final PrizeEventPublisher prizeEventPublisher;
     /**
-     * 会员号 -> 账号。一次抽奖只查一次，结果沿调用链传下去：
+     * 会员号 -> 账号。一次抽奖只查一次，查到的结果放进 {@link DrawBatch} 传下去：
      * 白名单判定、流水快照、派发事件三处都要用，各查一次就是三次往返。
      */
     private final MemberService memberService;
@@ -127,127 +129,204 @@ public class DrawExecuteService {
     private static final String IN_FLIGHT = "IN_FLIGHT";
 
     /**
+     * 一批抽奖的运行态上下文：预检阶段解析一次，之后整批共用。
+     *
+     * <h3>它替掉了什么</h3>
+     * 改造前 {@code settle} 有 8 个参数、{@code saveLog} 有 7 个，其中
+     * {@code (form, memberName, itemMap, period)} 这一组在五个私有方法之间原样传来传去 ——
+     * 每加一个批次级的东西，五个签名一起改。现在它们是一个值，
+     * 逐次抽奖时真正变化的只有 {@code sourceBizId}。
+     *
+     * @param command    调用方原样的入参
+     * @param memberName 会员账号，{@code memberService} 查一次的结果
+     * @param itemMap    本池奖项配置，奖项 id -> 配置
+     * @param period     本次抽奖归属的单人限领周期桶
+     */
+    private record DrawBatch(DrawExecuteCommand command,
+                             String memberName,
+                             Map<Long, PrizePoolItem> itemMap,
+                             DrawPeriodResolver.Period period) {
+
+        String activityCode() {
+            return command.activityCode();
+        }
+
+        String poolCode() {
+            return command.poolCode();
+        }
+
+        Long memberId() {
+            return command.memberId();
+        }
+
+        int times() {
+            return command.times();
+        }
+    }
+
+    /**
+     * 预检结果：<b>要么拿到了可以开抽的东西，要么整批被拒</b>。
+     *
+     * <p>用 sealed 而不是「返回 null 表示被拒 + 一个字段带原因」：
+     * 预检有 5 个拒绝点散在一段线性流程里，被拒时没有快照、通过时没有原因，
+     * 两种状态的字段完全不重叠。与本链路里 {@code DrawResult}、{@code DrawExecuteResult}
+     * 的做法一致，新增拒绝点时 {@code execute} 的 switch 由编译器保证不漏。
+     */
+    private sealed interface Preflight {
+
+        /** 可以开抽 */
+        record Ready(DrawBatch batch, DrawPoolSnapshot snapshot) implements Preflight {
+        }
+
+        /** 整批不受理 */
+        record Reject(DrawRejectReason reason) implements Preflight {
+        }
+    }
+
+    /**
      * 事务边界说明：DB 写入（资格扣减/流水/库存兜底）同一事务；
      * UserPrizeEvent 经 @TransactionalEventListener(AFTER_COMMIT) 在提交后才真正派发，天然防「事务回滚但奖已发」
+     *
+     * <p>⚠️ 下面三步的<b>先后顺序是有约束的</b>，别调换：
+     * 幂等抢占必须在限流之前（否则一次网络重试会白白消耗一个令牌），
+     * 而限流必须在预检之前（预检第一件事就是查会员表，那是一次数据库往返，
+     * 放在限流之前等于防刷没保护住它）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DrawExecuteResult execute(DrawExecuteCommand form) {
-        if (form.times() <= 0) {
+    public DrawExecuteResult execute(DrawExecuteCommand command) {
+        if (command.times() <= 0) {
             // 不是业务规则，是退化输入。静默返回「抽了 0 次」会让上游以为成功了，
             // 而它多半是上游把次数算错了
             return new DrawExecuteResult.Rejected(DrawRejectReason.INVALID_TIMES);
         }
 
-        // 1. 幂等：命中就【回放第一次的结果】，而不是告诉调用方「你重复了」。
-        //    reject 的契约是「压根没抽、请退还」，而重试时第一次真的抽了 ——
-        //    用 reject 表达重试，会让上游把已中奖那一次的资产退回去。连抽后这是 N 份奖的事
-        boolean idempotent = form.requestId() != null && !form.requestId().isBlank();
-        String resultKey = idempotent ? DrawCacheKey.request(form.requestId()) : null;
-        if (idempotent) {
-            boolean first = redissonClient.getBucket(resultKey, StringCodec.INSTANCE)
-                    .setIfAbsent(IN_FLIGHT, REQUEST_DEDUP_TTL);
-            if (!first) {
-                DrawExecuteResult replayed = replay(resultKey);
-                if (replayed != null) {
-                    return replayed;
-                }
-                // 拿到了锁标记但还没有结果 —— 上一次【正在处理中】，这是真正的并发重复提交。
-                // 这时说「重复请求」是准确的：那一次还没落定，没有结果可回放
-                return new DrawExecuteResult.Rejected(DrawRejectReason.DUPLICATE_REQUEST);
-            }
+        String resultKey = command.hasRequestId() ? DrawCacheKey.request(command.requestId()) : null;
+        DrawExecuteResult handled = claimOrReplay(resultKey);
+        if (handled != null) {
+            return handled;
         }
 
-        // 2. 防刷限流（单用户单活动）。连抽只消耗一个令牌 ——
-        //    它限的是【请求频率】，防的是脚本刷接口；能抽多少由资产与单人限领决定
-        // 🔴 限流 key 用会员号：账号可改，改完就是一个全新的 key，限流当场归零
-        RRateLimiter limiter = redissonClient.getRateLimiter(
-                DrawCacheKey.rateLimit(form.activityCode(), form.memberId()));
-        if (limiter.trySetRate(RateType.OVERALL, RATE_LIMIT_PER_INTERVAL, RATE_LIMIT_INTERVAL_SECONDS, RateIntervalUnit.SECONDS)) {
-            limiter.expire(RATE_LIMITER_TTL);
+        return switch (preflight(command)) {
+            case Preflight.Reject(DrawRejectReason reason) -> reject(resultKey, reason);
+            case Preflight.Ready(DrawBatch batch, DrawPoolSnapshot snapshot) -> {
+                DrawExecuteResult result = new DrawExecuteResult.Executed(drawTimes(batch, snapshot));
+                remember(resultKey, result);
+                yield result;
+            }
+        };
+    }
+
+    /**
+     * 幂等抢占。
+     *
+     * <p>命中时<b>回放第一次的结果</b>，而不是告诉调用方「你重复了」：
+     * reject 的契约是「压根没抽、请退还」，而重试时第一次真的抽了 ——
+     * 用 reject 表达重试，会让上游把已中奖那一次的资产退回去。连抽后这是 N 份奖的事。
+     *
+     * @return <b>非 null 表示这一批不该再往下走</b>，调用方直接返回它：
+     *         要么是第一次的完整结果（回放），要么是「上一次还在处理中」。
+     *         返回 null 表示本次抢到了执行权（或调用方没带 requestId，不做幂等）
+     */
+    private DrawExecuteResult claimOrReplay(String resultKey) {
+        if (resultKey == null) {
+            return null;
         }
-        if (!limiter.tryAcquire()) {
-            return reject(resultKey, DrawRejectReason.TOO_FREQUENT);
+        boolean first = redissonClient.getBucket(resultKey, StringCodec.INSTANCE)
+                .setIfAbsent(IN_FLIGHT, REQUEST_DEDUP_TTL);
+        if (first) {
+            return null;
+        }
+        DrawExecuteResult replayed = replay(resultKey);
+        if (replayed != null) {
+            return replayed;
+        }
+        // 拿到了锁标记但还没有结果 —— 上一次【正在处理中】，这是真正的并发重复提交。
+        // 这时说「重复请求」是准确的：那一次还没落定，没有结果可回放
+        return new DrawExecuteResult.Rejected(DrawRejectReason.DUPLICATE_REQUEST);
+    }
+
+    /**
+     * 预检：限流 -> 会员 -> 奖池 -> 快照 -> 周期桶。全部通过才拿得到开抽所需的东西。
+     *
+     * <p>整批只做一次。连抽 N 次不该打 N 轮配置查询。
+     */
+    private Preflight preflight(DrawExecuteCommand command) {
+        if (!acquireRateLimit(command)) {
+            return new Preflight.Reject(DrawRejectReason.TOO_FREQUENT);
         }
 
         // 会员号必须真实存在；顺带把账号取回来，后面白名单判定、流水快照、派发事件都要用。
-        // 一次请求只查这一次，不在每个用到名字的地方各查一次。
         // ⚠️ 刻意放在限流【之后】：这是一次数据库往返，放在限流之前等于防刷没保护住它
-        String memberName = memberService.requireMemberName(form.memberId());
+        String memberName = memberService.requireMemberName(command.memberId());
 
-        // 3. 奖池校验
         PrizePoolConfig pool = prizePoolConfigManager.lambdaQuery()
-                .eq(PrizePoolConfig::getPoolCode, form.poolCode()).one();
-        if (pool == null || !form.activityCode().equals(pool.getActivityCode())) {
-            return reject(resultKey, DrawRejectReason.POOL_NOT_FOUND);
+                .eq(PrizePoolConfig::getPoolCode, command.poolCode()).one();
+        if (pool == null || !command.activityCode().equals(pool.getActivityCode())) {
+            return new Preflight.Reject(DrawRejectReason.POOL_NOT_FOUND);
         }
         if (pool.getStatus() != PrizePoolStatusEnum.OPEN) {
-            return reject(resultKey, DrawRejectReason.POOL_CLOSED);
+            return new Preflight.Reject(DrawRejectReason.POOL_CLOSED);
         }
 
-        // 4. 组装快照（配置读 DB，库存读 Redis；缓存未预热则回源并预热）。
-        //    整批只组装一次：连抽 N 次不该打 N 轮配置查询
         List<PoolPrizeMapping> mappings = poolPrizeMappingManager.lambdaQuery()
-                .eq(PoolPrizeMapping::getPoolCode, form.poolCode())
+                .eq(PoolPrizeMapping::getPoolCode, command.poolCode())
                 .orderByAsc(PoolPrizeMapping::getSortWeight).list();
         if (mappings.isEmpty()) {
-            return reject(resultKey, DrawRejectReason.POOL_NO_PRIZE);
+            return new Preflight.Reject(DrawRejectReason.POOL_NO_PRIZE);
         }
         List<Long> itemIds = mappings.stream().map(PoolPrizeMapping::getPrizeItemId).toList();
         Map<Long, PrizePoolItem> itemMap = prizePoolItemManager.listByIds(itemIds).stream()
                 .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity()));
 
+        // 配置读 DB，库存读 Redis；缓存未预热则回源并预热。
+        // 坑位顺序已由上面的 orderByAsc(sortWeight) 保证，这里不再排第二遍
         List<DrawSlot> slots = new ArrayList<>(mappings.size());
-        // 顺序已由上面的 orderByAsc(sortWeight) 保证，这里不再排第二遍
         for (PoolPrizeMapping mapping : mappings) {
             PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
             if (item == null) {
                 // 配置坏了要告警。itemId 只进日志不进返回值 —— 它是奖池内部主键，
                 // 而这个返回值最终会走到 C 端；运维要的那个数在日志里查得到
                 log.error("[抽奖] 奖池配置异常：奖项已被删除, poolCode: {}, itemId: {}",
-                        form.poolCode(), mapping.getPrizeItemId());
-                return reject(resultKey, DrawRejectReason.POOL_BROKEN);
+                        command.poolCode(), mapping.getPrizeItemId());
+                return new Preflight.Reject(DrawRejectReason.POOL_BROKEN);
             }
             DrawPrizeSnapshot prize = new DrawPrizeSnapshot(
                     item.getId(),
                     item.getPrizeCode(),
                     Boolean.TRUE.equals(mapping.getIsFallback()),
-                    resolveRemainStock(form.activityCode(), item),
+                    resolveRemainStock(command.activityCode(), item),
                     parseWhiteList(item.getWhiteList()));
             // 百分比 -> ppm 的【唯一】转换点：过了这一行，运行态就不再有小数
             slots.add(DrawSlot.ofPercent(prize, mapping.getProbability()));
         }
-        DrawPoolSnapshot snapshot = DrawPoolSnapshot.of(form.poolCode(), slots);
 
-        /*
-         * 5. 解析本次抽奖归属的限领周期桶。
-         *
-         * 只有「奖池配了按天/周/月重置」且「确实存在限领的奖项」时才去取数据库时钟 ——
-         * 抽奖是热路径，一次额外往返能省则省。两个条件任一不成立，桶都恒为 ALL。
-         */
-        DrawPeriodResolver.Period period = resolvePeriod(pool, itemMap);
+        DrawBatch batch = new DrawBatch(command, memberName, itemMap, resolvePeriod(pool, itemMap));
+        return new Preflight.Ready(batch, DrawPoolSnapshot.of(command.poolCode(), slots));
+    }
 
-        /*
-         * 6. 逐次抽奖。
-         *
-         * 🔴 快照必须在批内递减：remainStock 是抽之前的值。N 次全拿同一份判定的话，
-         *    只剩 1 个的奖会被判定 N 次「有货」，而实际只有第一次扣得动，
-         *    后面全部走 fallback —— 用户看到的是「N-1 连保底」。
-         *
-         * 判定用引擎（纯函数），真扣用 settle，然后按【真实结果】更新快照再进下一次 ——
-         * 而不是让引擎一次判完 N 次，那样它的库存视图会与真实扣减结果漂移。
-         *
-         * ⚠️ 白名单是「必中且每次判定都优先命中」，所以连抽会让白名单用户
-         *    连拿 N 份同一个奖（直到该奖库存耗尽）。这是连抽才暴露出来的语义 ——
-         *    现状如此，要改成「一批只必中一次」得先定产品口径。
-         */
-        List<DrawRecord> records = new ArrayList<>(form.times());
-        for (int i = 0; i < form.times(); i++) {
-            String sourceBizId = sourceBizId(form, i);
-            DrawRecord record = switch (DrawEngine.draw(snapshot, memberName)) {
+    /**
+     * 逐次抽奖。
+     *
+     * <p>🔴 快照必须在批内递减：{@code remainStock} 是抽之前的值。N 次全拿同一份判定的话，
+     * 只剩 1 个的奖会被判定 N 次「有货」，而实际只有第一次扣得动，
+     * 后面全部走 fallback —— 用户看到的是「N-1 连保底」。
+     *
+     * <p>判定用引擎（纯函数），真扣用 {@link #settle}，然后按<b>真实结果</b>更新快照再进下一次 ——
+     * 而不是让引擎一次判完 N 次，那样它的库存视图会与真实扣减结果漂移。
+     *
+     * <p>⚠️ 白名单是「必中且每次判定都优先命中」，所以连抽会让白名单用户
+     * 连拿 N 份同一个奖（直到该奖库存耗尽）。这是连抽才暴露出来的语义 ——
+     * 现状如此，要改成「一批只必中一次」得先定产品口径。
+     */
+    private List<DrawRecord> drawTimes(DrawBatch batch, DrawPoolSnapshot snapshot) {
+        List<DrawRecord> records = new ArrayList<>(batch.times());
+        for (int i = 0; i < batch.times(); i++) {
+            String sourceBizId = sourceBizId(batch.command(), i);
+            DrawRecord record = switch (DrawEngine.draw(snapshot, batch.memberName())) {
                 case DrawResult.Hit(DrawPrizeSnapshot prize, DrawResult.HitSource source) ->
-                        settle(form, memberName, sourceBizId, snapshot, itemMap, prize, source, period);
+                        settle(batch, sourceBizId, snapshot, prize, source);
                 case DrawResult.NoStock(String candidateCode) -> {
-                    saveLog(form, memberName, sourceBizId, null, candidateCode,
+                    saveLog(batch, sourceBizId, null, candidateCode,
                             DrawResultEnum.NO_STOCK, "快照判定无库存");
                     yield DrawRecord.miss(sourceBizId);
                 }
@@ -257,10 +336,62 @@ public class DrawExecuteService {
                 snapshot = snapshot.withStockConsumed(record.prizeItemId());
             }
         }
+        return records;
+    }
 
-        DrawExecuteResult result = new DrawExecuteResult.Executed(records);
-        remember(resultKey, result);
-        return result;
+    /**
+     * 结算一次命中：预扣候选奖项 -> 扣不动就降级兜底 -> 兜底也扣不动就记 miss。
+     *
+     * <p>返回的 {@link DrawRecord} 就是这一次的最终结论：真扣下来了才算 hit。
+     * <b>不回滚前面几次</b>（各抽各的）。
+     */
+    private DrawRecord settle(DrawBatch batch, String sourceBizId, DrawPoolSnapshot snapshot,
+                              DrawPrizeSnapshot candidate, DrawResult.HitSource source) {
+        if (tryDeduct(batch, candidate)) {
+            return award(batch, sourceBizId, candidate, source);
+        }
+
+        // 候选奖项扣减失败（并发抢空/超单人限领）-> 降级兜底
+        DrawPrizeSnapshot fallback = snapshot.fallbackPrize();
+        if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId() && tryDeduct(batch, fallback)) {
+            return award(batch, sourceBizId, fallback, DrawResult.HitSource.FALLBACK_DEGRADE);
+        }
+
+        // 引擎不扣费也就不退费：上游若已扣过资产，按这条记录自行退还
+        saveLog(batch, sourceBizId, candidate.prizeItemId(), candidate.prizeCode(),
+                DrawResultEnum.NO_STOCK, "预扣失败且兜底不可用");
+        return DrawRecord.miss(sourceBizId);
+    }
+
+    /**
+     * 中奖的收尾：落流水 + 发派发事件 + 生成记录。
+     *
+     * <p>三件事<b>永远一起发生</b>，所以放在一处。上一版候选命中与兜底降级各写了一遍
+     * 这三行，只有奖项和来源不同 —— 那种重复迟早变成「某一条路忘了发事件」：
+     * 表现是流水里有中奖记录、用户却没收到奖，而且不报错。
+     */
+    private DrawRecord award(DrawBatch batch, String sourceBizId, DrawPrizeSnapshot prize,
+                             DrawResult.HitSource source) {
+        saveLog(batch, sourceBizId, prize.prizeItemId(), prize.prizeCode(),
+                DrawResultEnum.HIT, source.name());
+        publishPrizeEvent(batch, sourceBizId, prize.prizeCode());
+        return DrawRecord.hit(sourceBizId, prize.prizeItemId(), prize.prizeCode(), source);
+    }
+
+    /**
+     * 防刷限流（单用户单活动）。连抽只消耗一个令牌 ——
+     * 它限的是<b>请求频率</b>，防的是脚本刷接口；能抽多少由资产与单人限领决定。
+     *
+     * <p>🔴 限流 key 用会员号：账号可改，改完就是一个全新的 key，限流当场归零。
+     */
+    private boolean acquireRateLimit(DrawExecuteCommand command) {
+        RRateLimiter limiter = redissonClient.getRateLimiter(
+                DrawCacheKey.rateLimit(command.activityCode(), command.memberId()));
+        if (limiter.trySetRate(RateType.OVERALL, RATE_LIMIT_PER_INTERVAL, RATE_LIMIT_INTERVAL_SECONDS,
+                RateIntervalUnit.SECONDS)) {
+            limiter.expire(RATE_LIMITER_TTL);
+        }
+        return limiter.tryAcquire();
     }
 
     /**
@@ -274,12 +405,11 @@ public class DrawExecuteService {
      *
      * <p>带 requestId 前缀是为了让重投仍然幂等：同一批重投产生同样的 N 个单号。
      * 没有 requestId 时退化成随机串（后台联调、定时任务那类调用方）。
-     * 单抽时不加后缀 —— 保持与改动之前完全一致的单号形态。
+     * 单抽时不加后缀 —— 保持与连抽改造之前完全一致的单号形态。
      */
-    private static String sourceBizId(DrawExecuteCommand form, int index) {
-        String batch = form.requestId() != null && !form.requestId().isBlank()
-                ? form.requestId() : SolvelaRandomUtil.randomString();
-        return form.times() == 1 ? batch : batch + "#" + index;
+    private static String sourceBizId(DrawExecuteCommand command, int index) {
+        String batch = command.hasRequestId() ? command.requestId() : SolvelaRandomUtil.randomString();
+        return command.times() == 1 ? batch : batch + "#" + index;
     }
 
     /** 拒绝时把幂等锁标记删掉：这一批没抽，调用方改正之后应当能重试同一个 requestId */
@@ -329,65 +459,30 @@ public class DrawExecuteService {
     }
 
     /**
-     * 中奖后发布派发事件：AFTER_COMMIT 投递到 consumer -> risk -> ledger 公共链路
+     * 中奖后发布派发事件：AFTER_COMMIT 投递到 consumer -> risk -> ledger 公共链路。
      * 每次抽奖各自的 sourceBizId，配合 t_prize_log.uk_external_biz 做跨系统防重 ——
-     * 连抽共用一个单号的话，发奖侧只会落第一条，后面的全被唯一约束吃掉
+     * 连抽共用一个单号的话，发奖侧只会落第一条，后面的全被唯一约束吃掉。
      */
-    private void publishPrizeEvent(DrawExecuteCommand form, String memberName, String sourceBizId, String prizeCode) {
-        PrizeConfig prizeConfig = prizeConfigService.getByActivityCodeAndPrizeCode(form.activityCode(), prizeCode);
+    private void publishPrizeEvent(DrawBatch batch, String sourceBizId, String prizeCode) {
+        PrizeConfig prizeConfig = prizeConfigService.getByActivityCodeAndPrizeCode(batch.activityCode(), prizeCode);
         if (prizeConfig == null) {
             log.error("[抽奖派发] 奖品配置不存在，跳过派发: {}", prizeCode);
             return;
         }
         UserPrizeEvent event = UserPrizeEvent.builder()
                 .sourceBizId(sourceBizId)
-                .activityCode(form.activityCode())
+                .activityCode(batch.activityCode())
                 // 抽奖发出来的奖，类型必然是 DRAW。派发方据它归类提案来源，
                 // 不填的话那边只能降级成 MANUAL —— 对账时这批奖就归错类了
                 .activityType(ActivityTypeEnum.DRAW.getValue())
-                .memberId(form.memberId())
-                .memberName(memberName)
+                .memberId(batch.memberId())
+                .memberName(batch.memberName())
                 .prizeCode(prizeCode)
                 .prizeType(prizeConfig.getPrizeType())
                 .prizeValue(prizeConfig.getPrizeValue() == null ? null : prizeConfig.getPrizeValue().toPlainString())
                 .prizeName(prizeConfig.getPrizeName())
                 .build();
         prizeEventPublisher.publish(event);
-    }
-
-    /**
-     * 结算一次命中：Lua 预扣 -> DB 条件更新兜底 -> 失败降级兜底奖项 -> 落流水。
-     *
-     * <p>返回的 {@link DrawRecord} 就是这一次的最终结论：真扣下来了才算 hit，
-     * 兜底也扣不动就是 miss。<b>不回滚前面几次</b>（各抽各的）。
-     */
-    private DrawRecord settle(DrawExecuteCommand form, String memberName, String sourceBizId,
-                              DrawPoolSnapshot snapshot,
-                              Map<Long, PrizePoolItem> itemMap,
-                              DrawPrizeSnapshot candidate, DrawResult.HitSource source,
-                              DrawPeriodResolver.Period period) {
-        if (tryDeduct(form, itemMap, candidate, period)) {
-            saveLog(form, memberName, sourceBizId, candidate.prizeItemId(), candidate.prizeCode(),
-                    DrawResultEnum.HIT, source.name());
-            publishPrizeEvent(form, memberName, sourceBizId, candidate.prizeCode());
-            return DrawRecord.hit(sourceBizId, candidate.prizeItemId(), candidate.prizeCode(), source);
-        }
-
-        // 候选奖项扣减失败（并发抢空/超单人限领）-> 降级兜底
-        DrawPrizeSnapshot fallback = snapshot.fallbackPrize();
-        if (fallback != null && fallback.prizeItemId() != candidate.prizeItemId()
-                && tryDeduct(form, itemMap, fallback, period)) {
-            saveLog(form, memberName, sourceBizId, fallback.prizeItemId(), fallback.prizeCode(),
-                    DrawResultEnum.HIT, DrawResult.HitSource.FALLBACK_DEGRADE.name());
-            publishPrizeEvent(form, memberName, sourceBizId, fallback.prizeCode());
-            return DrawRecord.hit(sourceBizId, fallback.prizeItemId(), fallback.prizeCode(),
-                    DrawResult.HitSource.FALLBACK_DEGRADE);
-        }
-
-        // 引擎不扣费也就不退费：上游若已扣过资产，按这条记录自行退还
-        saveLog(form, memberName, sourceBizId, candidate.prizeItemId(), candidate.prizeCode(),
-                DrawResultEnum.NO_STOCK, "预扣失败且兜底不可用");
-        return DrawRecord.miss(sourceBizId);
     }
 
     /**
@@ -425,32 +520,32 @@ public class DrawExecuteService {
     /**
      * 双层扣减：Redis Lua 原子预扣扛并发；DB 条件更新做最终一致性兜底，DB 拒绝则补偿回滚 Redis
      */
-    private boolean tryDeduct(DrawExecuteCommand form, Map<Long, PrizePoolItem> itemMap, DrawPrizeSnapshot prize,
-                              DrawPeriodResolver.Period period) {
-        PrizePoolItem item = itemMap.get(prize.prizeItemId());
-        int userMax = item == null || item.getUserMaxCount() == null ? USER_LIMIT_UNLIMITED : item.getUserMaxCount();
+    private boolean tryDeduct(DrawBatch batch, DrawPrizeSnapshot prize) {
+        PrizePoolItem item = batch.itemMap().get(prize.prizeItemId());
+        int userMax = item == null || item.getUserMaxCount() == null
+                ? USER_LIMIT_UNLIMITED : item.getUserMaxCount();
 
         StockDeductResult redisResult = drawStockService.deduct(
-                form.activityCode(), prize.prizeItemId(), form.memberId(), userMax, period);
+                batch.activityCode(), prize.prizeItemId(), batch.memberId(), userMax, batch.period());
         if (!redisResult.success()) {
             log.info("[抽奖预扣拒绝] memberId={}, prizeItemId={}, reason={}",
-                    form.memberId(), prize.prizeItemId(), redisResult.message());
+                    batch.memberId(), prize.prizeItemId(), redisResult.message());
             return false;
         }
         // 🔴 预扣已经落到 Redis 了，从这一刻起它必须跟着事务走
-        registerRedisRollbackOnFailure(form, prize.prizeItemId(), period);
+        registerRedisRollbackOnFailure(batch, prize.prizeItemId());
 
         try {
             int rows = prizePoolItemDao.increaseUsedStock(prize.prizeItemId());
             if (rows == 0) {
                 // Redis 与 DB 不一致（如缓存被误预热），以 DB 为准并补偿
-                drawStockService.rollback(form.activityCode(), prize.prizeItemId(), form.memberId(), period);
+                drawStockService.rollback(batch.activityCode(), prize.prizeItemId(), batch.memberId(), batch.period());
                 log.warn("[抽奖DB兜底拒绝] prizeItemId={}, Redis已回滚", prize.prizeItemId());
                 return false;
             }
             return true;
         } catch (RuntimeException e) {
-            drawStockService.rollback(form.activityCode(), prize.prizeItemId(), form.memberId(), period);
+            drawStockService.rollback(batch.activityCode(), prize.prizeItemId(), batch.memberId(), batch.period());
             throw e;
         }
     }
@@ -475,8 +570,7 @@ public class DrawExecuteService {
      * 两种收尾下都会被调到，我们据 status 判断，漏不掉「既没提交也没回滚」那类异常收尾。
      * 补偿本身失败只记日志 —— 那时事务已经结束，抛出去没有任何人能处理。
      */
-    private void registerRedisRollbackOnFailure(DrawExecuteCommand form, long prizeItemId,
-                                                DrawPeriodResolver.Period period) {
+    private void registerRedisRollbackOnFailure(DrawBatch batch, long prizeItemId) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             // 没有事务上下文（不该发生，本方法在 @Transactional 之内）。
             // 静默跳过等于把缺口留着，所以至少要留下痕迹
@@ -490,7 +584,7 @@ public class DrawExecuteService {
                     return;
                 }
                 try {
-                    drawStockService.rollback(form.activityCode(), prizeItemId, form.memberId(), period);
+                    drawStockService.rollback(batch.activityCode(), prizeItemId, batch.memberId(), batch.period());
                     log.warn("[抽奖预扣补偿] 事务未提交，已回滚 Redis 预扣, prizeItemId={}, status={}",
                             prizeItemId, status);
                 } catch (RuntimeException e) {
@@ -501,17 +595,17 @@ public class DrawExecuteService {
         });
     }
 
-    private void saveLog(DrawExecuteCommand form, String memberName, String sourceBizId, Long prizeItemId, String prizeCode,
+    private void saveLog(DrawBatch batch, String sourceBizId, Long prizeItemId, String prizeCode,
                          DrawResultEnum status, String remark) {
         DrawPrizeLog logEntity = new DrawPrizeLog();
         // 列名叫 trace_id，存的是本次抽奖的业务单号（每次各不相同）——
         // 与 solvela.app.web.Trace 那个跨服务链路 id【不是一回事】，历史命名
         logEntity.setTraceId(sourceBizId);
-        logEntity.setActivityCode(form.activityCode());
-        logEntity.setPoolCode(form.poolCode());
-        logEntity.setMemberId(form.memberId());
+        logEntity.setActivityCode(batch.activityCode());
+        logEntity.setPoolCode(batch.poolCode());
+        logEntity.setMemberId(batch.memberId());
         // 抽奖流水是单据：账号只作展示快照落库
-        logEntity.setMemberName(memberName);
+        logEntity.setMemberName(batch.memberName());
         logEntity.setPrizeItemId(prizeItemId == null ? 0L : prizeItemId);
         logEntity.setPrizeCode(prizeCode);
         logEntity.setStatus(status);

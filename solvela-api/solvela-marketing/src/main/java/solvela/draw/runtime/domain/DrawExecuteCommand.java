@@ -34,6 +34,16 @@ public record DrawExecuteCommand(
         String requestId,
         int times) {
 
+    /**
+     * 是否启用了幂等。判空逻辑放在这里而不是散在调用方 ——
+     * 它在「算幂等键」和「拼每次抽奖的 sourceBizId」两处都要用，
+     * 两处对「什么算有效 requestId」的判断必须一致，否则会出现
+     * 「做了幂等但单号用随机串」这种半吊子状态。
+     */
+    public boolean hasRequestId() {
+        return requestId != null && !requestId.isBlank();
+    }
+
     /** 单抽。绝大多数调用方用这个 */
     public static DrawExecuteCommand once(String activityCode, String poolCode, Long memberId, String requestId) {
         return new DrawExecuteCommand(activityCode, poolCode, memberId, requestId, 1);
