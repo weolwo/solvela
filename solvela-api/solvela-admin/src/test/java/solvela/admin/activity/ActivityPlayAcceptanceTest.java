@@ -12,6 +12,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityDrawCmd;
 import solvela.marketing.api.ActivityRuleView;
+import solvela.marketing.api.DrawLimits;
 import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.DrawResultView;
 import solvela.exception.BusinessException;
@@ -63,6 +64,17 @@ class ActivityPlayAcceptanceTest {
 
     /** 次数判定脚本：抽满 3 次就返回 null，用来验证 draw_countDrawn 的周期口径 */
     private static final String COUNT_SCRIPT = "__acceptance__/count_guard";
+
+    /**
+     * 🔴 连抽用例必须用<b>自己的脚本编码</b>，不能复用 COUNT_SCRIPT。
+     *
+     * <p>{@code scriptEditService.save} 只有<b>首版自动激活</b>，而 COUNT_SCRIPT 在 setUp
+     * 里已经存过一版了 —— 在用例里再存一次只是新建一个未激活的版本，跑的还是 setUp 那份。
+     * 这么写出来的用例会「通过」，但它验证的是旧脚本，与本用例要证明的事毫无关系。
+     */
+    private static final String MULTI_SCRIPT = "__acceptance__/multi_draw";
+
+    private static final String OVER_LIMIT_SCRIPT = "__acceptance__/multi_draw_over_limit";
 
     /** 准入判定脚本 —— 场景是 ACTIVITY_RULE，用来验证挂载点的场景守卫 */
     private static final String ENTRY_SCRIPT = "activity/basic_entry";
@@ -137,7 +149,7 @@ class ActivityPlayAcceptanceTest {
         redissonClient.getRateLimiter(DrawCacheKey.rateLimit(ACTIVITY_CODE, MEMBER_ID)).delete();
 
         scriptManager.remove(com.baomidou.mybatisplus.core.toolkit.Wrappers.<Script>lambdaQuery()
-                .eq(Script::getScriptCode, COUNT_SCRIPT));
+                .in(Script::getScriptCode, COUNT_SCRIPT, MULTI_SCRIPT, OVER_LIMIT_SCRIPT));
         jdbcTemplate.update("DELETE FROM t_draw_prize_log WHERE activity_code = ?", ACTIVITY_CODE);
         jdbcTemplate.update("DELETE FROM t_draw_config WHERE activity_code = ?", ACTIVITY_CODE);
         jdbcTemplate.update("DELETE FROM t_activity_config WHERE activity_code = ?", ACTIVITY_CODE);
@@ -157,7 +169,7 @@ class ActivityPlayAcceptanceTest {
                 "拿一个不存在的活动编码来访问是完全正常的事（链接过期、地址栏被改），"
                         + "用异常表达它，跨进程后会变成 5xx，监控上多一堆假的服务端错误");
         assertFalse(result.accepted());
-        assertFalse(result.hit());
+        assertEquals(0, result.times(), "没被受理就一条记录都不该有");
     }
 
     @Test
@@ -252,13 +264,52 @@ class ActivityPlayAcceptanceTest {
     }
 
     @Test
+    @DisplayName("🔴 连抽：脚本拿到客户端传的 times 并原样交给引擎")
+    void 连抽函数打通到引擎() {
+        insertOnlineActivity();
+        scriptEditService.save(new ScriptSaveCommand(
+                MULTI_SCRIPT, "连抽（验收用）", ScriptScene.ACTIVITY_PLAY.name(), "验收用",
+                "return draw_executeMultiDrawByScript('DRAW_POOL_NORMAL', times);",
+                "验收用", "acceptance-test"));
+        scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, MULTI_SCRIPT, "acceptance-test");
+
+        DrawResultView result = activityApi.draw(cmd(5));
+
+        // 同样以 POOL_NOT_FOUND 为「走到了引擎门口」的证据（前提见 setUp）。
+        // 这条用例证明的是新函数确实注册上了、脚本变量 times 绑上了、两个参数都传得进去 ——
+        // 链路断在任何一处，拿到的会是异常（函数不存在 / times 未定义）而不是这个 reject
+        assertEquals(DrawRejectReason.POOL_NOT_FOUND, result.reject(),
+                "期望连抽走到抽奖引擎并因奖池不存在被拒；拿到别的值说明 times 没串起来");
+    }
+
+    @Test
+    @DisplayName("🔴 脚本把次数写超上限 → 当场抛，不截断")
+    void 脚本次数超上限直接抛() {
+        insertOnlineActivity();
+        scriptEditService.save(new ScriptSaveCommand(
+                OVER_LIMIT_SCRIPT, "超限连抽（验收用）", ScriptScene.ACTIVITY_PLAY.name(), "验收用",
+                "return draw_executeMultiDrawByScript('DRAW_POOL_NORMAL', 1000);",
+                "验收用", "acceptance-test"));
+        scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, OVER_LIMIT_SCRIPT, "acceptance-test");
+
+        BusinessException e = assertThrows(BusinessException.class, () -> activityApi.draw(cmd()));
+
+        assertTrue(e.getMessage().contains(String.valueOf(DrawLimits.MAX_TIMES)),
+                () -> """
+                        引擎刻意不校验次数上限（由上游保证），而脚本函数就是那个上游 ——
+                        运营手写的一个笔误能把奖池当场抽空，且那是一次「成功」的调用。
+                        这里必须抛而不是截断到上限：截断之后没有人会知道脚本要的是 1000 次。
+                        实际报错：""" + e.getMessage());
+    }
+
+    @Test
     @DisplayName("params 缺 tier 时脚本照常跑 —— 空 Map 由域内补，不是让脚本判 null")
     void 缺省参数不会让脚本炸() {
         insertOnlineActivity();
         scriptRefService.bind(ScriptRefPoint.DRAW_PLAY, DRAW_CODE, PLAY_SCRIPT, "acceptance-test");
 
         DrawResultView result = activityApi.draw(
-                new ActivityDrawCmd(ACTIVITY_CODE, MEMBER_ID, "req-" + System.nanoTime(), null));
+                new ActivityDrawCmd(ACTIVITY_CODE, MEMBER_ID, "req-" + System.nanoTime(), 1, null));
 
         assertEquals(DrawRejectReason.POOL_NOT_FOUND, result.reject(),
                 "params 传 null 时域内会换成空 Map，脚本不该因此拿不到必填变量而失败");
@@ -318,8 +369,12 @@ class ActivityPlayAcceptanceTest {
     // =====================================================================
 
     private ActivityDrawCmd cmd() {
+        return cmd(1);
+    }
+
+    private ActivityDrawCmd cmd(int times) {
         return new ActivityDrawCmd(ACTIVITY_CODE, MEMBER_ID,
-                "req-" + System.nanoTime(), Map.of("tier", "NORMAL"));
+                "req-" + System.nanoTime(), times, Map.of("tier", "NORMAL"));
     }
 
     private void insertOnlineActivity() {

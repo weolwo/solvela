@@ -4,10 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.marketing.api.DrawApi;
 import solvela.marketing.api.DrawCmd;
+import solvela.marketing.api.DrawRecordView;
 import solvela.marketing.api.DrawResultView;
 import solvela.draw.runtime.domain.DrawExecuteCommand;
 import solvela.draw.runtime.domain.DrawExecuteResult;
 import solvela.draw.runtime.domain.DrawRecord;
+
+import java.util.List;
 
 /**
  * 抽奖的<b>业务编排</b>入口。{@link DrawApi} 的实现。
@@ -22,8 +25,8 @@ import solvela.draw.runtime.domain.DrawRecord;
  * 拆成微服务后，网关拼两次写就是「用户扣了分没抽奖」，没有补偿路径。
  * 今天先把这个位置占住，比等到要加消耗时再找地方放便宜。
  *
- * <h3>顺带把引擎的 DTO 挡在契约之外</h3>
- * {@code DrawExecuteDTO} 是引擎自己的返回值，它可以随引擎演进；
+ * <h3>顺带把引擎的类型挡在契约之外</h3>
+ * {@code DrawExecuteResult} / {@code DrawRecord} 是引擎自己的返回值，可以随引擎演进；
  * {@code DrawResultView} 是对外承诺。中间这一层转换让两者各自变化，
  * 而不是引擎一改字段，所有调用方跟着重编译。
  *
@@ -42,29 +45,31 @@ public class ActivityDrawFacade implements DrawApi {
      */
     @Override
     public DrawResultView draw(DrawCmd cmd) {
-        DrawExecuteResult result = drawExecuteService.execute(
-                DrawExecuteCommand.once(cmd.activityCode(), cmd.poolCode(), cmd.memberId(), cmd.requestId()));
+        DrawExecuteResult result = drawExecuteService.execute(new DrawExecuteCommand(
+                cmd.activityCode(), cmd.poolCode(), cmd.memberId(), cmd.requestId(), cmd.times()));
 
         // 引擎与契约共用 DrawRejectReason，所以这里没有映射表 —— 映射表是会漂的：
         // 加一个原因忘了加映射，表现是返回一个 null 原因，而编译不报错
         return switch (result) {
             case DrawExecuteResult.Rejected(var reason) -> DrawResultView.ofReject(reason);
-            case DrawExecuteResult.Executed(var records) -> toView(records.getFirst());
+            case DrawExecuteResult.Executed(List<DrawRecord> records) ->
+                    DrawResultView.ofExecuted(records.stream().map(ActivityDrawFacade::toView).toList());
         };
     }
 
     /**
-     * 单次结果 -> 对外契约。
+     * 引擎的单次记录 -> 对外契约。
      *
-     * <p>⚠️ 这里补的两句文案（「恭喜中奖」「手慢了，奖品已被抽完」）是<b>过渡</b>：
-     * 域已经不再返回 message（措辞该由调用方定，见 {@code DrawRecord} 的类注释），
-     * 但契约 {@code DrawResultView} 目前还带着这个字段，网关也还在原样透传。
-     * 等契约改成列表形态时，这两句应当搬到网关，本方法随之简化。
+     * <p>两边字段几乎一样，这一层仍然要在：{@link DrawRecord} 可以随引擎演进
+     * （它刚刚就丢过 message 字段、把 source 从 String 换回枚举），
+     * 而 {@link DrawRecordView} 是对外承诺。没有这一层的话，引擎改一个字段，
+     * 所有调用方跟着重编译 —— 拆成微服务之后是跟着重发版。
      */
-    private static DrawResultView toView(DrawRecord record) {
-        return record.hit()
-                ? DrawResultView.ofHit(record.prizeItemId(), record.prizeCode(),
-                        record.source() == null ? null : record.source().name(), "恭喜中奖")
-                : DrawResultView.ofMiss("手慢了，奖品已被抽完");
+    private static DrawRecordView toView(DrawRecord record) {
+        return new DrawRecordView(
+                record.hit(),
+                record.prizeCode(),
+                record.prizeItemId(),
+                record.source() == null ? null : record.source().name());
     }
 }

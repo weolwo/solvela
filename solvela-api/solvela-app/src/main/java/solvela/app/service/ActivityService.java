@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import solvela.app.domain.ActivityView;
 import solvela.app.domain.DrawRequest;
 import solvela.app.domain.DrawView;
+import solvela.app.domain.DrawView.DrawItemView;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.marketing.api.ActivityApi;
@@ -13,6 +14,8 @@ import solvela.marketing.api.ActivityDrawCmd;
 import solvela.marketing.api.ActivityRuleView;
 import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.DrawResultView;
+
+import java.util.List;
 
 import java.time.LocalDateTime;
 
@@ -58,20 +61,44 @@ public class ActivityService {
     }
 
     /**
-     * 抽一次。
+     * 抽一次或连抽。
      *
      * <p>「没被受理」一律翻成 4xx —— 它们全是<b>预期内</b>的情况，
      * 不该让用户看到「服务开小差了」，也不该让监控上多出一堆假的服务端错误。
+     *
+     * <p>⚠️ {@code times} 只是客户端的<b>意愿</b>，真正抽了几次看 {@code result.times()} ——
+     * 编排脚本可能按剩余次数给了别的数。所以下发的是<b>实际记录</b>，
+     * 不是把请求里那个数回显给前端。
      */
     public DrawView draw(String activityCode, Long memberId, DrawRequest request) {
         DrawResultView result = activityApi.draw(new ActivityDrawCmd(
-                activityCode, memberId, request.requestId(), request.params()));
+                activityCode, memberId, request.requestId(), request.timesOrOne(), request.params()));
 
         if (!result.accepted()) {
             throw translate(activityCode, result.reject());
         }
         // prizeItemId 与 source 刻意不下发，见 DrawView 的类注释
-        return new DrawView(result.hit(), result.prizeCode(), result.message());
+        List<DrawItemView> records = result.records().stream()
+                .map(record -> new DrawItemView(record.hit(), record.prizeCode()))
+                .toList();
+        return new DrawView(records, result.hitCount(), summary(result));
+    }
+
+    /**
+     * 给用户看的那句话。
+     *
+     * <h3>文案在这一层，是这条链路上唯一合适的位置</h3>
+     * 域侧的 {@code DrawResultView} 已经不带 message 了 —— 同一个「没中奖」，
+     * C 端要说「手慢了」，内部联调工具要看到的是事实本身。
+     * 域只陈述发生了什么，说什么由这里决定。
+     */
+    private static String summary(DrawResultView result) {
+        long hits = result.hitCount();
+        if (hits == 0) {
+            return "手慢了，奖品已被抽完";
+        }
+        // 单抽不说「中了 1 个」—— 那句话只有在连抽时才是信息
+        return result.times() == 1 ? "恭喜中奖" : "恭喜，中了 " + hits + " 个奖";
     }
 
     /**

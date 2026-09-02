@@ -56,6 +56,9 @@ class ActivityDrawEndpointMappingTest {
     @Test
     @DisplayName("接口上的 @PostExchange 被映射，且请求真的走到了域里")
     void 抽奖端点已映射且转发到位() throws Exception {
+        // 🔴 body 里刻意【不带 times】：滚动发布时老网关就是这么发的。
+        // ActivityDrawCmd.times 用原生 int 的话，Jackson 会报「Cannot map null into type int」
+        // 直接 400，整条抽奖链路在发布窗口里全挂 —— 这条用例踩到过一次
         String body = """
                 {"activityCode":"%s","memberId":9999999999,"requestId":"mapping-test","params":{}}
                 """.formatted(NOT_EXIST);
@@ -72,7 +75,9 @@ class ActivityDrawEndpointMappingTest {
         // 中间断在任何一处，body 里都不会是 ACTIVITY_NOT_FOUND
         assertTrue(response.body().contains("ACTIVITY_NOT_FOUND"),
                 "期望域里的活动校验生效并返回 reject；实际 body: " + response.body());
-        assertTrue(response.body().contains("\"hit\":false"), "实际 body: " + response.body());
+        // 未受理时一条记录都不该有 —— 这是 DrawResultView 规范构造器强制的不变式，
+        // 也是「reject 是整批级、hit 是单次级」这个划分在 wire 上的样子
+        assertTrue(response.body().contains("\"records\":[]"), "实际 body: " + response.body());
     }
 
     private String base() {

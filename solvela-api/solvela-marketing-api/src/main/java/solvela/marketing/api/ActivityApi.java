@@ -59,6 +59,9 @@ public interface ActivityApi {
      * <p>三种结果都由返回值表达，见 {@link DrawRejectReason}：中奖 / 没中奖 / 没被受理。
      * 活动不存在、活动不在参与窗内、没挂编排脚本，都算<b>没被受理</b>，不抛异常 ——
      * 它们全是预期内的情况，抛出去跨进程后一律变成 5xx。
+     *
+     * <p>连抽：{@code cmd.times()} 是客户端的<b>意愿</b>，真正抽几次由编排脚本裁决 ——
+     * 脚本调 {@code draw_executeMultiDrawByScript(pool, n)} 时给的那个 n 才算数。
      */
     @PostExchange("/draw")
     DrawResultView draw(@RequestBody ActivityDrawCmd cmd);

@@ -154,6 +154,10 @@ public class ActivityFacade implements ActivityApi {
                 .bind("memberId", cmd.memberId())
                 .bind("activityCode", activity.getActivityCode())
                 .bind("activityType", activity.getActivityType())
+                // 客户端点的是「单抽」还是「十连抽」。⚠️ 只是【意愿】——
+                // 脚本拿它跟剩余次数一比，算出真正的次数再传给抽奖函数。
+                // 脚本可以改这个变量，改了也只影响它自己传进去的那个数，这正是我们要的
+                .bind("times", cmd.times())
                 // 空 Map 而不是 null：场景契约要求 params 必填，而「前端没传自定义参数」是常态。
                 // 让脚本去判 null 是把一个本可以消灭的分支塞给运营
                 .bind("params", cmd.params() == null ? Map.of() : cmd.params());

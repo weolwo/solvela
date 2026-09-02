@@ -41,10 +41,14 @@ import org.springframework.web.service.annotation.PostExchange;
 public interface DrawApi {
 
     /**
-     * 抽一次。
+     * 抽 {@code cmd.times()} 次。
      *
-     * <p>三种结果都由返回值表达，见 {@link DrawRejectReason}：中奖 / 没中奖 / 没被受理。
+     * <p>三种结果都由返回值表达，见 {@link DrawRejectReason}：中奖 / 没中奖 / 没被受理 ——
+     * 前两者是<b>每一次各自</b>的事，后者是<b>整批</b>的事，见 {@link DrawResultView}。
      * 只有<b>意外</b>（库挂了、代码 bug）才会抛异常 —— 那些本来就该是 5xx。
+     *
+     * <p>⚠️ 中途某一次扣不动库存<b>不会回滚前面几次</b>（各抽各的）：
+     * 那一次先降级到兜底奖项，兜底也没有才记 miss。
      */
     @PostExchange
     DrawResultView draw(@RequestBody DrawCmd cmd);
