@@ -71,9 +71,28 @@ public class RedisConfig {
                 .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
                 //如果 Java 对象里某个字段是 null，存进 Redis 的时候就干脆别写这个字段了。这在海量数据的 Redis 里能省下巨量的内存空间。
                 .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
+                /*
+                 * 🔴 必须是 NON_FINAL_AND_RECORDS，不能是 NON_FINAL。
+                 *
+                 * Java record 隐式 final，而 NON_FINAL 这个策略名字的字面意思就是「只给非
+                 * final 的运行时类型写 @class」——所以缓存/存进 Redis 的每一个 record，
+                 * 从写入那一刻起就永远不带类型信息。写不报错，读的时候才炸：目标类型是
+                 * Object.class（见下面 new JacksonJsonRedisSerializer<>(om, Object.class)），
+                 * 没有 @class 就无法确定该转成哪个类，直接抛
+                 * InvalidTypeIdException: missing type id property '@class'。
+                 *
+                 * 这不是理论风险——2026-09-03 在网关的 MemberPrincipal（record）缓存上
+                 * 真实复现过：登录成功写一次缓存，此后 TTL 窗口内该会员的每一个认证请求
+                 * 都要读这份缓存，于是每次都 500，包括退出登录。这里与网关是同一份配置，
+                 * 同样的坑对本模块缓存的<b>任何</b> record 都成立——而这个代码库大量使用
+                 * record 做值对象，命中面不止一处。
+                 *
+                 * NON_FINAL_AND_RECORDS 是 Jackson 3.1 专门为这种情况新增的枚举值：
+                 * 语义与 NON_FINAL 完全一致，只是额外覆盖 record。
+                 */
                 .activateDefaultTyping(
                         BasicPolymorphicTypeValidator.builder().allowIfSubType(Object.class).build(),
-                        DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY)
+                        DefaultTyping.NON_FINAL_AND_RECORDS, JsonTypeInfo.As.PROPERTY)
                 //忽略无效字段
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .build();
