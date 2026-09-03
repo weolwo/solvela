@@ -15,6 +15,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SvButton: typeof import('./ui/SvButton.vue')['default']
     SvCard: typeof import('./ui/SvCard.vue')['default']
+    SvCarousel: typeof import('./ui/SvCarousel.vue')['default']
     SvCell: typeof import('./ui/SvCell.vue')['default']
     SvCheckbox: typeof import('./ui/SvCheckbox.vue')['default']
     SvField: typeof import('./ui/SvField.vue')['default']

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { fetchAssets, fetchRecords } from '@/api/home'
+import { fetchAssets, fetchBanners, fetchRecords } from '@/api/home'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { formatWithSeparator, money } from '@/utils/money'
@@ -10,6 +10,7 @@ const auth = useAuthStore()
 
 const assets = useAsync(fetchAssets)
 const records = useAsync(fetchRecords)
+const banners = useAsync(fetchBanners)
 
 /**
  * 主资产（列表第一项）单独放大展示。哪一项是主资产由**后端的顺序**决定，
@@ -34,6 +35,14 @@ function display(amount: string, currency: boolean): string {
       <p class="page__greeting">你好</p>
       <h1 class="page__name">{{ auth.member?.nickname ?? '—' }}</h1>
     </header>
+
+    <!--
+      运营焦点位。装饰性内容，出错不值得打断页面或给个"重试"按钮打扰用户——
+      静默隐藏就好，用户看到的只是少了一块推荐，不是功能坏了。
+      加载中用一根骨架条占位，避免它加载完成的一瞬间把下面内容顶下去一截。
+    -->
+    <div v-if="banners.loading.value" class="banner-skeleton" aria-hidden="true"></div>
+    <SvCarousel v-else-if="!banners.error.value" :items="banners.data.value ?? []" />
 
     <!-- 资产卡：整页最重的一块，用主色实底把它和下面的白卡分开 -->
     <div class="wallet">
@@ -107,6 +116,27 @@ function display(amount: string, currency: boolean): string {
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.2;
+}
+
+/* 高度对齐 SvCarousel 一张卡的 min-height，加载完成切换时不跳动 */
+.banner-skeleton {
+  height: 132px;
+  border-radius: var(--sv-radius-lg);
+  background: var(--sv-bg-surface);
+  opacity: 0.7;
+  animation: sv-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sv-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner-skeleton {
+    animation: none;
+  }
 }
 
 .wallet {

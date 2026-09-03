@@ -1,4 +1,5 @@
 import { type Id, toId } from '@/types/contract'
+import type { CarouselItem } from '@/ui/SvCarousel.vue'
 
 /**
  * 首页与优惠页的数据接口。
@@ -10,7 +11,11 @@ import { type Id, toId } from '@/types/contract'
  *   <li><b>资产</b>没有接口 —— 余额在 ledger 域，还没接到网关；</li>
  *   <li><b>订单/奖品记录</b>没有接口 —— prize 域的 t_prize_log 没开 C 端查询；</li>
  *   <li><b>活动列表</b>没有接口 —— ActivityApi 只能<b>按 code 查单个</b>，
- *       没有「列出当前开启的活动」。</li>
+ *       没有「列出当前开启的活动」；</li>
+ *   <li><b>首页轮播</b>没有接口，也没有「轮播图配置」这张表 —— 运营还没有地方去配
+ *       一张 banner 图。现在直接复用 {@link fetchPromos} 的前几条渲染成焦点位
+ *       （标题、副标题、主题色），不是另开一份数据。等真的有轮播配置接口时，
+ *       这两个函数才会分开：一个是精选排序，一个是完整列表。</li>
  * </ul>
  *
  * <p>所以下面每个函数都返回写死的样例数据，<b>但形状就是接口该有的形状</b>：
@@ -57,6 +62,23 @@ export interface PromoItem {
 /** 桩：假装网络往返一下，让加载态在开发时真的会出现 */
 function stub<T>(data: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(data), 300))
+}
+
+/**
+ * 首页顶部的运营焦点位，取当前活动的前几条。
+ *
+ * TODO 后端补「轮播图配置」接口后改成独立请求；在那之前它是
+ * {@link fetchPromos} 的一个视图，不是重复的桩数据源 —— 只有一份假数据，
+ * 不会出现两处桩各改各的、渐渐对不上的问题。
+ */
+export async function fetchBanners(): Promise<CarouselItem[]> {
+  const promos = await fetchPromos()
+  return promos.slice(0, 3).map((p) => ({
+    id: p.activityCode,
+    title: p.activityName,
+    subtitle: p.subTitle,
+    themeColor: p.themeColor,
+  }))
 }
 
 /** TODO 后端补 GET /assets 后改成 request({ url: '/assets' }) */
