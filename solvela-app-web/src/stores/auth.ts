@@ -21,8 +21,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => token.value !== null)
 
-  function setSession(accessToken: string, expiresIn: number, profile: MemberProfile): void {
-    writeToken(accessToken, expiresIn)
+  function setSession(
+    accessToken: string,
+    expiresIn: number,
+    profile: MemberProfile,
+    remember: boolean,
+  ): void {
+    writeToken(accessToken, expiresIn, remember)
     token.value = accessToken
     member.value = profile
   }
@@ -33,10 +38,14 @@ export const useAuthStore = defineStore('auth', () => {
     member.value = null
   }
 
-  async function login(payload: LoginPayload): Promise<void> {
+  /**
+   * @param remember 「记住我」。true 存 localStorage（关掉浏览器还在），
+   *                 false 存 sessionStorage（标签页一关就没）。见 token-storage
+   */
+  async function login(payload: LoginPayload, remember: boolean): Promise<void> {
     // 这里不吞异常：BAD_CREDENTIALS 必须原样抛给登录页去展示 message
     const result = await loginApi(payload)
-    setSession(result.accessToken, result.expiresIn, result.member)
+    setSession(result.accessToken, result.expiresIn, result.member, remember)
   }
 
   /**
@@ -47,7 +56,9 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function register(payload: RegisterPayload): Promise<void> {
     const result = await registerApi(payload)
-    setSession(result.accessToken, result.expiresIn, result.member)
+    // 注册没有「记住我」勾选框：刚创建账号的人当然要留在登录态，
+    // 再问一遍是多余的一步。所以固定持久化
+    setSession(result.accessToken, result.expiresIn, result.member, true)
   }
 
   async function logout(): Promise<void> {

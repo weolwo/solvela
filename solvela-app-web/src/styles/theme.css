@@ -36,7 +36,11 @@
   --sv-bg-surface: #ffffff;
   /* 按下态：卡片/行的按压反馈，比投影和缩放都轻 */
   --sv-bg-pressed: rgb(24 36 49 / 5%);
+  /* 输入框这类「填充式控件」的底。比页面底色略深一点点，浮在白卡上才看得出来 */
+  --sv-bg-fill: #f2f4f6;
   --sv-border-color: rgb(24 36 49 / 8%);
+  /* 需要看得见的描边（复选框未选中态）。--sv-border-color 那个 8% 太淡，画不出方框 */
+  --sv-border-strong: rgb(24 36 49 / 22%);
 
   /* ---- 圆角 ---- */
   --sv-radius-sm: 8px;
@@ -57,6 +61,10 @@
   /* ---- 控件尺寸 ---- */
   --sv-control-height: 40px;
   --sv-row-height: 52px;
+  /* 输入框比按钮高一档：它要装下 20px 图标 + 16px 文字，40px 会挤 */
+  --sv-field-height: 52px;
+  /* 底部导航高度。页面靠它留出底部空间，别在各页面写魔法数 */
+  --sv-tabbar-height: 54px;
 
   /* ---- 字号 ---- */
   --sv-font-title: 30px;

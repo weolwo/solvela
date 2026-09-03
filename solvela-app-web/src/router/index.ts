@@ -7,6 +7,8 @@ declare module 'vue-router' {
     /** 是否允许未登录访问。**默认需要登录**，公开页要显式声明 */
     anonymous?: boolean
     title?: string
+    /** 是否是底部导航的一级页。为 true 时 App.vue 渲染 TabBar 并留出底部空间 */
+    tab?: boolean
   }
 }
 
@@ -25,11 +27,31 @@ const routes: RouteRecordRaw[] = [
     // 反过来写的话，新加页面忘了标记就是默默裸奔，而那个方向的错误在 C 端是数据泄露
     meta: { anonymous: true, title: '注册' },
   },
+  // ---- 底部导航的三个一级页 ----
   {
     path: '/',
     name: 'home',
     component: () => import('@/views/HomeView.vue'),
-    meta: { title: 'Solvela' },
+    meta: { title: 'Solvela', tab: true },
+  },
+  {
+    path: '/promo',
+    name: 'promo',
+    component: () => import('@/views/PromoView.vue'),
+    meta: { title: '优惠', tab: true },
+  },
+  {
+    path: '/me',
+    name: 'mine',
+    component: () => import('@/views/MineView.vue'),
+    meta: { title: '我的', tab: true },
+  },
+  // ---- 二级页：从「我的」点进去，不在底部 Tab 里，需要登录（默认） ----
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { title: '设置' },
   },
   {
     path: '/:pathMatch(.*)*',

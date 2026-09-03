@@ -15,6 +15,13 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SvButton: typeof import('./ui/SvButton.vue')['default']
     SvCard: typeof import('./ui/SvCard.vue')['default']
+    SvCell: typeof import('./ui/SvCell.vue')['default']
+    SvCheckbox: typeof import('./ui/SvCheckbox.vue')['default']
     SvField: typeof import('./ui/SvField.vue')['default']
+    SvIcon: typeof import('./ui/SvIcon.vue')['default']
+    SvNavBar: typeof import('./ui/SvNavBar.vue')['default']
+    SvResult: typeof import('./ui/SvResult.vue')['default']
+    SvSection: typeof import('./ui/SvSection.vue')['default']
+    SvTabBar: typeof import('./ui/SvTabBar.vue')['default']
   }
 }

@@ -105,31 +105,32 @@ async function goLogin(): Promise<void> {
     </header>
 
     <form class="page__form" novalidate @submit.prevent="submit">
-      <SvCard>
-        <SvField
-          v-model="phone"
-          type="tel"
-          placeholder="手机号"
-          autocomplete="username"
-          :maxlength="11"
-          :error="phoneError"
-        />
-        <SvField
-          v-model="password"
-          type="password"
-          placeholder="设置密码"
-          autocomplete="new-password"
-          :hint="PASSWORD_HINT"
-          :error="passwordError"
-        />
-        <SvField
-          v-model="confirmPassword"
-          type="password"
-          placeholder="再次输入密码"
-          autocomplete="new-password"
-          :error="confirmError"
-        />
-      </SvCard>
+      <SvField
+        v-model="phone"
+        icon="phone"
+        type="tel"
+        placeholder="手机号"
+        autocomplete="username"
+        :maxlength="11"
+        :error="phoneError"
+      />
+      <SvField
+        v-model="password"
+        icon="lock"
+        type="password"
+        placeholder="设置密码"
+        autocomplete="new-password"
+        :hint="PASSWORD_HINT"
+        :error="passwordError"
+      />
+      <SvField
+        v-model="confirmPassword"
+        icon="lock"
+        type="password"
+        placeholder="再次输入密码"
+        autocomplete="new-password"
+        :error="confirmError"
+      />
 
       <p v-if="errorMessage !== ''" class="page__error" role="alert">
         {{ errorMessage }}
@@ -145,7 +146,7 @@ async function goLogin(): Promise<void> {
 
     <p class="page__alt">
       已有账号？<RouterLink class="page__link" :to="{ name: 'login', query: route.query }">
-        登录
+        去登录
       </RouterLink>
     </p>
   </div>
@@ -161,7 +162,7 @@ async function goLogin(): Promise<void> {
 }
 
 .page__head {
-  margin-bottom: var(--sv-space-lg);
+  margin-bottom: var(--sv-space-xl);
 }
 
 .page__title {
@@ -186,7 +187,7 @@ async function goLogin(): Promise<void> {
 
 .page__error {
   margin: 0;
-  padding: 0 var(--sv-space-sm);
+  padding: 0 var(--sv-space-md);
   color: var(--sv-color-danger);
   font-size: var(--sv-font-footnote);
   line-height: 1.5;
@@ -202,6 +203,7 @@ async function goLogin(): Promise<void> {
 
 .page__alt {
   margin: var(--sv-space-xl) 0 0;
+  padding-top: var(--sv-space-lg);
   text-align: center;
   color: var(--sv-text-secondary);
   font-size: var(--sv-font-caption);
@@ -209,6 +211,7 @@ async function goLogin(): Promise<void> {
 
 .page__link {
   color: var(--sv-color-primary);
+  font-weight: 500;
   text-decoration: none;
 }
 

@@ -11,12 +11,23 @@ const auth = useAuthStore()
 
 const phone = ref('')
 const password = ref('')
+/**
+ * 默认勾上。令牌有效期 30 天就是为了让人别每次都登，
+ * 默认不勾等于把那个配置作废了。共用设备的人会自己取消。
+ */
+const remember = ref(true)
 const submitting = ref(false)
-/** 整体性错误（账号密码不对、账号被禁、限流）。字段级的问题走 fieldError */
+/** 成功后先显示一下再跳，用户需要一个「确实成了」的确认 */
+const succeeded = ref(false)
+
+/** 整体性错误（账号密码不对、账号被禁、限流）。字段级的问题走 xxxError */
 const errorMessage = ref('')
 const errorTraceId = ref<string | null>(null)
 const phoneError = ref<string | undefined>(undefined)
 const passwordError = ref<string | undefined>(undefined)
+
+/** 成功提示停留多久再跳。够看清，又不至于让人等 */
+const SUCCESS_DWELL_MS = 700
 
 /**
  * 刻意不在前端写手机号正则。
@@ -26,8 +37,7 @@ const passwordError = ref<string | undefined>(undefined)
  * 这里只做「非空」这种纯交互层面的拦截。
  *
  * 🔴 而且是在【点击之后】拦，不是把按钮置灰。
- * 上一版用 :disabled="!canSubmit"，没填完时按钮是灰的 —— 用户看不出差哪一项，
- * 只知道点不动。始终可点、点了再指出缺什么，是移动端更常见也更好用的做法。
+ * 按钮置灰时用户看不出差哪一项，只知道点不动。
  */
 function validate(): boolean {
   phoneError.value = phone.value.trim() === '' ? '请输入手机号' : undefined
@@ -47,7 +57,12 @@ async function submit(): Promise<void> {
 
   submitting.value = true
   try {
-    await auth.login({ phone: phone.value.trim(), password: password.value, deviceType: 'H5' })
+    await auth.login(
+      { phone: phone.value.trim(), password: password.value, deviceType: 'H5' },
+      remember.value,
+    )
+    succeeded.value = true
+    await new Promise((resolve) => setTimeout(resolve, SUCCESS_DWELL_MS))
     const redirect = route.query.redirect
     await router.replace(typeof redirect === 'string' ? redirect : '/')
   } catch (error) {
@@ -60,7 +75,10 @@ async function submit(): Promise<void> {
       errorMessage.value = '登录失败，请稍后再试'
     }
   } finally {
-    submitting.value = false
+    // 成功时不复位：跳转前按钮应当一直是 loading，否则会闪一下「可点」
+    if (!succeeded.value) {
+      submitting.value = false
+    }
   }
 }
 </script>
@@ -69,7 +87,7 @@ async function submit(): Promise<void> {
   <div class="page">
     <header class="page__head">
       <h1 class="page__title">欢迎回来</h1>
-      <p class="page__subtitle">登录后继续参与本期抽奖</p>
+      <p class="page__subtitle">输入手机号和密码，继续参与抽奖</p>
     </header>
 
     <!--
@@ -78,23 +96,23 @@ async function submit(): Promise<void> {
       自己监听 keyup.enter 做不到后者。
     -->
     <form class="page__form" novalidate @submit.prevent="submit">
-      <SvCard>
-        <SvField
-          v-model="phone"
-          type="tel"
-          placeholder="手机号"
-          autocomplete="username"
-          :maxlength="11"
-          :error="phoneError"
-        />
-        <SvField
-          v-model="password"
-          type="password"
-          placeholder="密码"
-          autocomplete="current-password"
-          :error="passwordError"
-        />
-      </SvCard>
+      <SvField
+        v-model="phone"
+        icon="phone"
+        type="tel"
+        placeholder="手机号"
+        autocomplete="username"
+        :maxlength="11"
+        :error="phoneError"
+      />
+      <SvField
+        v-model="password"
+        icon="lock"
+        type="password"
+        placeholder="密码"
+        autocomplete="current-password"
+        :error="passwordError"
+      />
 
       <p v-if="errorMessage !== ''" class="page__error" role="alert">
         {{ errorMessage }}
@@ -103,13 +121,24 @@ async function submit(): Promise<void> {
       </p>
 
       <SvButton type="submit" :loading="submitting" class="page__submit">登录</SvButton>
+
+      <div class="page__options">
+        <SvCheckbox v-model="remember" label="记住我" />
+        <!--
+          忘记密码还没有页面。做成灰色不可点，而不是给一个点了没反应的蓝色链接——
+          后者是在骗用户，他会一直点。等找回流程做完再放开
+        -->
+        <span class="page__forgot" aria-disabled="true">忘记密码？</span>
+      </div>
     </form>
 
     <p class="page__alt">
       还没有账号？<RouterLink class="page__link" :to="{ name: 'register', query: route.query }">
-        注册
+        立即注册
       </RouterLink>
     </p>
+
+    <SvResult :open="succeeded" text="登录成功" />
   </div>
 </template>
 
@@ -123,7 +152,7 @@ async function submit(): Promise<void> {
 }
 
 .page__head {
-  margin-bottom: var(--sv-space-lg);
+  margin-bottom: var(--sv-space-xl);
 }
 
 .page__title {
@@ -148,7 +177,7 @@ async function submit(): Promise<void> {
 
 .page__error {
   margin: 0;
-  padding: 0 var(--sv-space-sm);
+  padding: 0 var(--sv-space-md);
   color: var(--sv-color-danger);
   font-size: var(--sv-font-footnote);
   line-height: 1.5;
@@ -163,13 +192,25 @@ async function submit(): Promise<void> {
   margin-top: var(--sv-space-sm);
 }
 
+.page__options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sv-space-xs);
+}
+
+.page__forgot {
+  color: var(--sv-text-placeholder);
+  font-size: var(--sv-font-caption);
+}
+
 /*
- * 次要出口就是一行小字。
- * 上一版是 <var-button text block>，占满整行跟主按钮抢视觉重量。
- * margin-top: auto 把它推到页面底部，中间的空白留给内容。
+ * 次要出口就是一行小字，钉在页面底部。
+ * margin-top: auto 把中间的空白全部留给表单，短屏时它自然上移，不会盖住内容。
  */
 .page__alt {
   margin: var(--sv-space-xl) 0 0;
+  padding-top: var(--sv-space-lg);
   text-align: center;
   color: var(--sv-text-secondary);
   font-size: var(--sv-font-caption);
@@ -177,6 +218,7 @@ async function submit(): Promise<void> {
 
 .page__link {
   color: var(--sv-color-primary);
+  font-weight: 500;
   text-decoration: none;
 }
 
