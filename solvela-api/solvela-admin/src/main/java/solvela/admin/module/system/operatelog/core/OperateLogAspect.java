@@ -230,72 +230,74 @@ public abstract class OperateLogAspect {
     }
 
     /**
-     * 提交存储操作日志
+     * 提交存储操作日志。
      *
+     * <p>拿不到当前登录人就直接不记：操作日志是<b>「谁做了什么」</b>的账，
+     * 没有「谁」的那一半，剩下的半条记录在审计时一点用都没有。
      */
     private void submitLog(final JoinPoint joinPoint, final Throwable e) {
-        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
-        //设置用户信息
         RequestEmployee user = CurrentEmployee.orNull();
         if (user == null) {
             return;
         }
 
-        Object[] args = joinPoint.getArgs();
-        String params = buildParamString(args);
-        String className = joinPoint.getTarget().getClass().getName();
-        String methodName = joinPoint.getSignature().getName();
-        String operateMethod = className + "." + methodName;
-        String failReason = null;
-        boolean successFlag = true;
+        OperateLogEntity operateLogEntity = buildLog(joinPoint, user, e);
+        describeOperation(joinPoint, operateLogEntity);
+        taskExecutor.execute(() -> this.saveLog(operateLogEntity));
+    }
+
+    /**
+     * 一条操作日志的本体：操作人、入口、参数、结果。
+     *
+     * <p>⚠️ <b>结果只记「失败长什么样」，成功不记。</b>
+     * 上一版把整个 ResponseDTO（去掉 data）序列化进 response 列。信封没了之后，
+     * 成功的返回值就是业务数据本身 —— 那是<b>不能往审计日志里塞</b>的东西：
+     * 会员列表、钱包余额、手机号都会成段落库，而 {@code t_operate_log} 谁都能查。
+     *
+     * <p>失败信息从异常本身推导，<b>不从响应里取</b>：本切面包的是 Controller 方法，
+     * 它抛出来的时候 GlobalExceptionHandler 还没跑过 —— 那一步发生在 DispatcherServlet 里，
+     * 比这里晚。想从 request 上取处理器写下的结果，取到的永远是 null。
+     */
+    private OperateLogEntity buildLog(JoinPoint joinPoint, RequestEmployee user, Throwable e) {
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        String operateMethod = joinPoint.getTarget().getClass().getName() + "." + joinPoint.getSignature().getName();
+
+        OperateLogEntity entity = OperateLogEntity.builder()
+                .operateUserId(user.getUserId())
+                .operateUserType(user.getUserType())
+                .operateUserName(user.getUserName())
+                .url(request.getRequestURI())
+                .method(operateMethod)
+                .param(buildParamString(joinPoint.getArgs()))
+                .ip(user.getIp())
+                .ipRegion(SolvelaIpUtil.getRegion(user.getIp()))
+                .userAgent(user.getUserAgent())
+                .failReason(e == null ? null : getExceptionString(e))
+                .successFlag(e == null)
+                .build();
         if (e != null) {
-            successFlag = false;
-            failReason = getExceptionString(e);
+            entity.setResponse(JsonUtils.toJson(describeFailure(e)));
         }
+        return entity;
+    }
 
-        OperateLogEntity operateLogEntity =
-                OperateLogEntity.builder()
-                        .operateUserId(user.getUserId())
-                        .operateUserType(user.getUserType())
-                        .operateUserName(user.getUserName())
-                        .url(request.getRequestURI())
-                        .method(operateMethod)
-                        .param(params)
-                        .ip(user.getIp())
-                        .ipRegion(SolvelaIpUtil.getRegion(user.getIp()))
-                        .userAgent(user.getUserAgent())
-                        .failReason(failReason)
-                        .successFlag(successFlag).build();
-
+    /**
+     * 「这次操作是干什么的」取自 swagger 注解：{@code @Operation.summary} 当内容，
+     * {@code @Tag.name} 当模块。
+     *
+     * <p>复用接口文档的注解而不是再加一套自己的：那两句话本来就要写，
+     * 而两处各写一份的下场是文档改了、日志里还是旧说法。取不到时留空 ——
+     * 一条没有描述的操作日志仍然记得住「谁、什么时候、调了哪个接口」。
+     */
+    private void describeOperation(JoinPoint joinPoint, OperateLogEntity entity) {
         Operation apiOperation = this.getApiOperation(joinPoint);
         if (apiOperation != null) {
-            operateLogEntity.setContent(apiOperation.summary());
+            entity.setContent(apiOperation.summary());
         }
-
         Tag api = this.getApi(joinPoint);
         if (api != null) {
-            String name = api.name();
-            operateLogEntity.setModule(name);
+            entity.setModule(api.name());
         }
-
-        /*
-         * 结果只记「失败长什么样」，成功不记。
-         *
-         * 上一版把整个 ResponseDTO（去掉 data）序列化进 response 列。信封没了之后，
-         * 成功的返回值就是业务数据本身 —— 那是<b>不能往审计日志里塞</b>的东西：
-         * 会员列表、钱包余额、手机号都会成段落库，而 t_operate_log 谁都能查。
-         *
-         * 失败信息从异常本身推导，<b>不从响应里取</b>：本切面包的是 Controller 方法，
-         * 它抛出来的时候 GlobalExceptionHandler 还没跑过 —— 那一步发生在 DispatcherServlet 里，
-         * 比这里晚。想从 request 上取处理器写下的结果，取到的永远是 null。
-         */
-        if (e != null) {
-            operateLogEntity.setResponse(JsonUtils.toJson(describeFailure(e)));
-        }
-
-        taskExecutor.execute(() -> {
-            this.saveLog(operateLogEntity);
-        });
     }
 
     /**

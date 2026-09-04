@@ -52,18 +52,39 @@ public class SolvelaJobBootstrapInitializer implements SmartInitializingSingleto
         }
     }
 
+    /**
+     * 内置任务不存在就建一条。
+     *
+     * <p>「不存在就建」这件事在多节点下靠的<b>不是</b>下面那句 selectByHandlerName ——
+     * 它是典型的 check-then-act，两个节点同时启动会双双查到「不存在」。
+     * 真正的幂等键是确定性编码撞上 uk_job_code，见 {@link #newSystemJob}。
+     * 这句查询只是省掉绝大多数情况下的一次无谓插入。
+     */
     private void ensure(String handlerName, String jobName, String cron,
                         SolvelaJobPresetEnum preset, String remark) {
         List<SolvelaJobEntity> exist = jobDao.selectByHandlerName(handlerName);
         if (!exist.isEmpty()) {
             return;
         }
+        try {
+            jobDao.insert(newSystemJob(handlerName, jobName, cron, preset, remark));
+            log.info("==== SolvelaJob ==== 已自动创建内置任务：{}（{}）", jobName, cron);
+        } catch (DuplicateKeyException e) {
+            // 别的节点抢先插入了 —— 这不是错误，是幂等生效
+            log.info("==== SolvelaJob ==== 内置任务已由其它节点创建，跳过：{}", jobName);
+        }
+    }
+
+    /**
+     * 一条内置任务的完整配置：调度参数全部取自档位，运行态标志位全部给初值。
+     */
+    private SolvelaJobEntity newSystemJob(String handlerName, String jobName, String cron,
+                                          SolvelaJobPresetEnum preset, String remark) {
         SolvelaJobEntity entity = new SolvelaJobEntity();
-        // 🔴 系统任务用**确定性编码**，而不是随机生成。
-        //    上面那句 selectByHandlerName 是典型的 check-then-act：两个 WORKER 节点同时启动，
-        //    都查到「不存在」、都往下走插入 —— 而 handler_name 上<b>没有</b>唯一约束
-        //    （那是刻意的：同一个执行器允许挂 N 个任务）。结果是三个系统任务各被插两份，
-        //    然后同一份工作被两条配置各跑一遍。单节点下这个竞态永远不会显形。
+        // 🔴 系统任务用【确定性编码】，而不是随机生成。
+        //    handler_name 上没有唯一约束（那是刻意的：同一个执行器允许挂 N 个任务），
+        //    所以两个节点同时启动时，三个系统任务会各被插两份，
+        //    然后同一份工作被两条配置各跑一遍 —— 单节点下这个竞态永远不会显形。
         //    编码确定之后，uk_job_code 就成了天然的幂等键：谁先插谁赢，输的那个吃 DuplicateKey。
         entity.setJobCode(systemJobCode(handlerName));
         entity.setJobName(jobName);
@@ -96,14 +117,7 @@ public class SolvelaJobBootstrapInitializer implements SmartInitializingSingleto
         entity.setSort(0);
         entity.setRemark(remark);
         entity.setUpdateName("system");
-
-        try {
-            jobDao.insert(entity);
-            log.info("==== SolvelaJob ==== 已自动创建内置任务：{}（{}）", jobName, cron);
-        } catch (DuplicateKeyException e) {
-            // 别的节点抢先插入了 —— 这不是错误，是幂等生效
-            log.info("==== SolvelaJob ==== 内置任务已由其它节点创建，跳过：{}", jobName);
-        }
+        return entity;
     }
 
     /**

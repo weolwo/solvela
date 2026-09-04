@@ -284,33 +284,57 @@ public class DataTracerChangeContentService {
     }
 
     /**
-     * 获取字段值
+     * 取一个字段的值，并把它渲染成变更日志里给人看的那句话。
+     *
+     * @return null 表示这个字段不进变更日志（读不出来，或者值本来就是 null）
      */
     private DataTracerContentBO getFieldValue(Field field, Object object) {
-        Object fieldValue = "";
-        Class clazz = object.getClass();
+        Object fieldValue = readValue(field, object);
+        if (fieldValue == null) {
+            return null;
+        }
+        DataTracerContentBO dataTracerContentBO = new DataTracerContentBO();
+        dataTracerContentBO.setField(field);
+        dataTracerContentBO.setFieldValue(fieldValue);
+        dataTracerContentBO.setFieldContent(renderContent(field, fieldValue));
+        return dataTracerContentBO;
+    }
+
+    /**
+     * 走 getter 而不是 {@code field.setAccessible(true)} 直读：Lombok 生成的 getter
+     * 可能带逻辑，而变更日志要记的是「对外表现出来的值」。
+     *
+     * <p>读失败只记日志不抛：一个字段读不出来不该让整条变更日志写不成。
+     */
+    private Object readValue(Field field, Object object) {
         try {
-            PropertyDescriptor pd = new PropertyDescriptor(field.getName(), clazz);
+            PropertyDescriptor pd = new PropertyDescriptor(field.getName(), object.getClass());
             Method get = pd.getReadMethod();
-            fieldValue = get.invoke(object);
+            return get.invoke(object);
         } catch (Exception e) {
             log.error("bean operate log: reflect field value error " + field.getName());
             return null;
         }
-        if (fieldValue == null) {
-            return null;
-        }
+    }
 
-        String fieldContent = "";
+    /**
+     * 值 -> 人话。分支顺序即优先级：<b>注解声明的翻译方式压过类型默认渲染</b> ——
+     * 一个 Integer 字段标了 {@code @DataTracerFieldEnum}，运营要看的是「已启用」而不是 1。
+     *
+     * <p>⚠️ BigDecimal 那一支只有标了 {@code @DataTracerFieldBigDecimal} 才有输出，
+     * 没标的会渲染成空串（历史行为，此处保持不变）—— 金额字段记得加注解，
+     * 否则它在变更日志里是一片空白。
+     */
+    private String renderContent(Field field, Object fieldValue) {
         DataTracerFieldEnum dataTracerFieldEnum = field.getAnnotation(DataTracerFieldEnum.class);
         DataTracerFieldSql dataTracerFieldSql = field.getAnnotation(DataTracerFieldSql.class);
         DataTracerFieldDict dataTracerFieldDict = field.getAnnotation(DataTracerFieldDict.class);
+
+        String fieldContent = "";
         if (dataTracerFieldEnum != null) {
-            if (fieldValue instanceof Collection) {
-                fieldContent = SolvelaEnumUtil.getEnumDescByValueList((Collection) fieldValue, dataTracerFieldEnum.enumClass());
-            } else {
-                fieldContent = SolvelaEnumUtil.getEnumDescByValue(fieldValue, dataTracerFieldEnum.enumClass());
-            }
+            fieldContent = fieldValue instanceof Collection
+                    ? SolvelaEnumUtil.getEnumDescByValueList((Collection) fieldValue, dataTracerFieldEnum.enumClass())
+                    : SolvelaEnumUtil.getEnumDescByValue(fieldValue, dataTracerFieldEnum.enumClass());
         } else if (dataTracerFieldDict != null) {
             DictDataVO dictData = dictService.getDictData(dataTracerFieldDict.dictCode(), fieldValue.toString());
             fieldContent = dictData == null ? fieldValue.toString() : dictData.getDataLabel();
@@ -325,17 +349,13 @@ public class DataTracerChangeContentService {
         } else if (fieldValue instanceof BigDecimal) {
             DataTracerFieldBigDecimal dataTracerFieldBigDecimal = field.getAnnotation(DataTracerFieldBigDecimal.class);
             if (dataTracerFieldBigDecimal != null) {
-                BigDecimal value = SolvelaBigDecimalUtil.setScale((BigDecimal) fieldValue, dataTracerFieldBigDecimal.scale());
-                fieldContent = value.toString();
+                fieldContent = SolvelaBigDecimalUtil.setScale((BigDecimal) fieldValue,
+                        dataTracerFieldBigDecimal.scale()).toString();
             }
         } else {
             fieldContent = JsonUtils.toJson(fieldValue);
         }
-        DataTracerContentBO dataTracerContentBO = new DataTracerContentBO();
-        dataTracerContentBO.setField(field);
-        dataTracerContentBO.setFieldValue(fieldValue);
-        dataTracerContentBO.setFieldContent(fieldContent);
-        return dataTracerContentBO;
+        return fieldContent;
     }
 
     /**

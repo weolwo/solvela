@@ -189,8 +189,7 @@ public class SolvelaJobScanner {
             return;
         }
 
-        this.dispatch(job, handler, triggerTime, dbNow, SolvelaJobTriggerSourceEnum.SCHEDULE, 0,
-                job.getParam(), null, null, null);
+        this.dispatch(job, handler, triggerTime, dbNow);
     }
 
     /**
@@ -411,13 +410,19 @@ public class SolvelaJobScanner {
     }
 
     /**
-     * 插 RUNNING 日志并投递。
+     * 插 RUNNING 日志并投递。<b>只服务于定时触发这一条路</b>。
+     *
+     * <p>另外两条路不走这里：手工「立即执行一次」与失败重试都是先落一条 PENDING 记录，
+     * 由 {@link #handlePendingLog} 接手 —— 那条路要抢日志行，这条路要抢触发点，
+     * 防重的对象不一样。
+     *
+     * <p>⚠️ 本方法原有 10 个参数，其中 {@code retrySeq / param / bizDate / retryOfLogId /
+     * operator} 五个在唯一的调用点上恒为常量（0 / job.getParam() / null / null / null）——
+     * 那是给已经改走 PENDING 路径的重试与手工触发留的口子，留着只会让人以为
+     * 「这里还要处理重试」。已按实际调用收窄。
      */
     private void dispatch(SolvelaJobEntity job, SolvelaJobHandlerMeta handler,
-                          LocalDateTime triggerTime, LocalDateTime dbNow,
-                          SolvelaJobTriggerSourceEnum source, int retrySeq,
-                          String param, java.time.LocalDate bizDate,
-                          Long retryOfLogId, String operator) {
+                          LocalDateTime triggerTime, LocalDateTime dbNow) {
         // ③ 集群级判据：阻塞则记录并终止。
         //    这条路径尚未插入自己的日志记录，所以没有要排除的 logId
         if (this.isBlocked(job, handler, dbNow, null)) {
@@ -426,25 +431,7 @@ public class SolvelaJobScanner {
             return;
         }
 
-        SolvelaJobLogEntity logEntity = new SolvelaJobLogEntity();
-        logEntity.setJobId(job.getJobId());
-        logEntity.setJobName(job.getJobName());
-        logEntity.setAppEnv(job.getAppEnv());
-        logEntity.setTraceId(newTraceId());
-        logEntity.setTriggerSource(source.getValue());
-        logEntity.setTriggerTime(triggerTime);
-        logEntity.setRetrySeq(retrySeq);
-        logEntity.setBizDate(null != bizDate ? bizDate
-                : triggerTime.toLocalDate().plusDays(handler.bizDateOffset()));
-        logEntity.setParamSnapshot(param);
-        logEntity.setStatus(SolvelaJobExecuteStatusEnum.RUNNING);
-        logEntity.setExecuteStartTime(dbNow);
-        logEntity.setExecuteTimeMillis(0L);
-        logEntity.setScheduleDelayMs(this.calcDelayMillis(triggerTime, dbNow));
-        logEntity.setRetryOfLogId(retryOfLogId);
-        logEntity.setCreateName(null != operator ? operator : "system");
-        this.fillNodeInfo(logEntity);
-
+        SolvelaJobLogEntity logEntity = newRunningLog(job, handler, triggerTime, dbNow);
         try {
             jobRepository.saveLog(logEntity);
         } catch (DuplicateKeyException e) {
@@ -464,6 +451,34 @@ public class SolvelaJobScanner {
             update.setResultSummary("执行池已满，本次未投递");
             jobRepository.getJobLogDao().updateById(update);
         }
+    }
+
+    /**
+     * 定时触发的执行记录，落库即 RUNNING。
+     *
+     * <p>{@code biz_date} 由触发日期加执行器声明的偏移得来 —— T+1 的报表任务在 1 号凌晨跑，
+     * 算的是 12 月 31 日那天的数，两个日期差一天是常态，不能拿触发日当业务日。
+     */
+    private SolvelaJobLogEntity newRunningLog(SolvelaJobEntity job, SolvelaJobHandlerMeta handler,
+                                              LocalDateTime triggerTime, LocalDateTime dbNow) {
+        SolvelaJobLogEntity logEntity = new SolvelaJobLogEntity();
+        logEntity.setJobId(job.getJobId());
+        logEntity.setJobName(job.getJobName());
+        logEntity.setAppEnv(job.getAppEnv());
+        logEntity.setTraceId(newTraceId());
+        logEntity.setTriggerSource(SolvelaJobTriggerSourceEnum.SCHEDULE.getValue());
+        logEntity.setTriggerTime(triggerTime);
+        logEntity.setRetrySeq(0);
+        logEntity.setBizDate(triggerTime.toLocalDate().plusDays(handler.bizDateOffset()));
+        logEntity.setParamSnapshot(job.getParam());
+        logEntity.setStatus(SolvelaJobExecuteStatusEnum.RUNNING);
+        logEntity.setExecuteStartTime(dbNow);
+        logEntity.setExecuteTimeMillis(0L);
+        logEntity.setScheduleDelayMs(this.calcDelayMillis(triggerTime, dbNow));
+        // 定时触发没有操作人
+        logEntity.setCreateName("system");
+        this.fillNodeInfo(logEntity);
+        return logEntity;
     }
 
     /**

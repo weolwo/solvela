@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -61,60 +62,76 @@ public class SolvelaJobHealthCheckHandler implements SolvelaJob {
         this.alarmSender = alarmSender;
     }
 
+    /**
+     * 三类体检，每类命中就发一条告警，最后汇总成一句话回给执行记录。
+     *
+     * <p>三类回答的是不同的问题：<b>调度器还活着吗</b>（超期未触发）、
+     * <b>任务在跑但一直失败吗</b>（连续失败）、<b>有任务永远跑不起来吗</b>（执行器失联）。
+     * 前者是系统级故障，后两者是单个任务的问题 —— 收件人不同，所以不合并成一条。
+     */
     @Override
     public String execute(SolvelaJobContext ctx) {
+        // 一次查库，两类体检共用。原来这里查了两遍全表
+        List<SolvelaJobEntity> liveJobs = jobRepository.getJobDao().selectList(null).stream()
+                .filter(e -> !Boolean.TRUE.equals(e.getDeletedFlag()))
+                .toList();
+
+        String summary = checkOverdue(ctx) + checkContinuousFail(liveJobs) + checkHandlerMissing(liveJobs);
+        return summary.isEmpty() ? "调度健康，无异常" : summary;
+    }
+
+    /** ① 超期未触发 —— 说明调度器没在正常工作 */
+    private String checkOverdue(SolvelaJobContext ctx) {
         LocalDateTime overdueTime = ctx.dbNow().minusSeconds(jobConfig.getAlarmOverdueSeconds());
         List<SolvelaJobEntity> overdueList = jobRepository.getJobDao()
                 .selectOverdueJobList(jobConfig.getEnv(), overdueTime);
+        return raise(SolvelaJobAlarmSender.Type.SCHEDULER_DOWN, overdueList,
+                String.format("调度可能已停摆：%d 个任务超过 %d 秒未被触发",
+                        overdueList.size(), jobConfig.getAlarmOverdueSeconds()),
+                e -> e.getJobName() + "(应触发于 " + e.getNextTriggerTime() + ")",
+                "超期未触发");
+    }
 
-        StringBuilder summary = new StringBuilder();
-
-        // ① 超期未触发 —— 说明调度器没在正常工作
-        if (!overdueList.isEmpty()) {
-            String detail = overdueList.stream()
-                    .map(e -> e.getJobName() + "(应触发于 " + e.getNextTriggerTime() + ")")
-                    .collect(Collectors.joining("; "));
-            alarmSender.send(SolvelaJobAlarmSender.Type.SCHEDULER_DOWN,
-                    String.format("调度可能已停摆：%d 个任务超过 %d 秒未被触发",
-                            overdueList.size(), jobConfig.getAlarmOverdueSeconds()),
-                    detail, this.pickReceiver(overdueList));
-            summary.append("超期未触发 ").append(overdueList.size()).append(" 个；");
-        }
-
-        // ② 连续失败 —— 任务在跑但一直失败
-        List<SolvelaJobEntity> failingList = jobRepository.getJobDao().selectList(null).stream()
-                .filter(e -> !Boolean.TRUE.equals(e.getDeletedFlag()))
+    /** ② 连续失败 —— 任务在跑但一直失败 */
+    private String checkContinuousFail(List<SolvelaJobEntity> liveJobs) {
+        List<SolvelaJobEntity> failingList = liveJobs.stream()
                 .filter(e -> Boolean.TRUE.equals(e.getEnabledFlag()))
                 .filter(e -> null != e.getContinuousFailCount()
                         && e.getContinuousFailCount() >= jobConfig.getAlarmContinuousFailTimes())
                 .toList();
-        if (!failingList.isEmpty()) {
-            String detail = failingList.stream()
-                    .map(e -> e.getJobName() + "(连续失败 " + e.getContinuousFailCount() + " 次)")
-                    .collect(Collectors.joining("; "));
-            alarmSender.send(SolvelaJobAlarmSender.Type.JOB_CONTINUOUS_FAIL,
-                    String.format("%d 个任务连续失败达到 %d 次", failingList.size(),
-                            jobConfig.getAlarmContinuousFailTimes()),
-                    detail, this.pickReceiver(failingList));
-            summary.append("连续失败 ").append(failingList.size()).append(" 个；");
-        }
+        return raise(SolvelaJobAlarmSender.Type.JOB_CONTINUOUS_FAIL, failingList,
+                String.format("%d 个任务连续失败达到 %d 次", failingList.size(),
+                        jobConfig.getAlarmContinuousFailTimes()),
+                e -> e.getJobName() + "(连续失败 " + e.getContinuousFailCount() + " 次)",
+                "连续失败");
+    }
 
-        // ③ handler 失联 —— 配了但代码里没有，这些任务永远不会执行
-        List<SolvelaJobEntity> missingList = jobRepository.getJobDao().selectList(null).stream()
-                .filter(e -> !Boolean.TRUE.equals(e.getDeletedFlag()))
+    /** ③ handler 失联 —— 配了但代码里没有，这些任务永远不会执行 */
+    private String checkHandlerMissing(List<SolvelaJobEntity> liveJobs) {
+        List<SolvelaJobEntity> missingList = liveJobs.stream()
                 .filter(e -> Boolean.TRUE.equals(e.getHandlerMissingFlag()))
                 .toList();
-        if (!missingList.isEmpty()) {
-            String detail = missingList.stream()
-                    .map(e -> e.getJobName() + "(handler=" + e.getHandlerName() + ")")
-                    .collect(Collectors.joining("; "));
-            alarmSender.send(SolvelaJobAlarmSender.Type.HANDLER_MISSING,
-                    String.format("%d 个任务的执行器在代码中不存在，它们永远不会被执行", missingList.size()),
-                    detail, this.pickReceiver(missingList));
-            summary.append("执行器失联 ").append(missingList.size()).append(" 个；");
-        }
+        return raise(SolvelaJobAlarmSender.Type.HANDLER_MISSING, missingList,
+                String.format("%d 个任务的执行器在代码中不存在，它们永远不会被执行", missingList.size()),
+                e -> e.getJobName() + "(handler=" + e.getHandlerName() + ")",
+                "执行器失联");
+    }
 
-        return summary.isEmpty() ? "调度健康，无异常" : summary.toString();
+    /**
+     * 命中就发一条告警，并返回汇总里的那一小段；没命中返回空串。
+     *
+     * @param describe 每个任务在告警明细里怎么写。三类告警要说的重点不同 ——
+     *                 超期要说「应该什么时候触发」，连续失败要说「失败了几次」
+     * @return 形如「连续失败 3 个；」，直接拼进执行记录的 result_summary
+     */
+    private String raise(SolvelaJobAlarmSender.Type type, List<SolvelaJobEntity> jobs, String title,
+                         Function<SolvelaJobEntity, String> describe, String summaryLabel) {
+        if (jobs.isEmpty()) {
+            return "";
+        }
+        String detail = jobs.stream().map(describe).collect(Collectors.joining("; "));
+        alarmSender.send(type, title, detail, this.pickReceiver(jobs));
+        return summaryLabel + " " + jobs.size() + " 个；";
     }
 
     /**

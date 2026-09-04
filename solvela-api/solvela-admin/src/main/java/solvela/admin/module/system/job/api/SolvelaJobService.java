@@ -199,57 +199,62 @@ public class SolvelaJobService {
      * 运营会拿着一个精确到秒的时刻去对，然后发现对不上。
      */
     public SolvelaJobTriggerPreviewVO previewTriggerTime(SolvelaJobTriggerPreviewForm form) {
-        SolvelaJobTriggerPreviewVO vo = new SolvelaJobTriggerPreviewVO();
         String triggerType = form.getTriggerType();
         String triggerValue = null == form.getTriggerValue() ? "" : form.getTriggerValue().trim();
 
-        // 打散秒数：非 CUSTOM 档位一律取档位值，与 applyPreset 的口径保持一致 ——
-        // 两处若各算各的，预览就会和实际对不上，那比没有预览更误导人
-        SolvelaJobPresetEnum preset = SolvelaJobPresetEnum.resolve(form.getPresetCode());
-        int jitterSeconds = preset.isCustom()
-                ? (null == form.getJitterSeconds() ? 0 : form.getJitterSeconds())
-                : preset.getJitterSeconds();
-
         if (SolvelaJobTriggerTypeEnum.ONE_TIME.equalsValue(triggerType)) {
-            // 一次性任务强制不打散：那是业务时间点，不是调度时间点
-            vo.setJitterSeconds(0);
-            vo.setExact(true);
-            try {
-                LocalDateTime fireTime = LocalDateTime.parse(triggerValue.replace(' ', 'T'));
-                vo.setValid(true);
-                vo.setNextTimeList(List.of(fireTime));
-                vo.setMessage(fireTime.isBefore(LocalDateTime.now())
-                        ? "⚠️ 该时刻已过去：任务保存后会被判定为「错过调度」，按 misfire 策略处理"
-                        : "一次性任务，执行后自动终结");
-            } catch (Exception e) {
-                vo.setValid(false);
-                vo.setMessage("时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
-            }
-            return vo;
+            return previewOneTime(triggerValue);
+        }
+        if (SolvelaJobTriggerTypeEnum.CRON.equalsValue(triggerType)) {
+            return previewCron(form, triggerValue);
+        }
+        return invalid("不支持的触发类型：" + triggerType);
+    }
+
+    /**
+     * 一次性任务：<b>强制不打散</b>。那是业务时间点（比如「双十一 0 点开卖」），
+     * 不是调度时间点 —— 打散一个业务时刻等于把业务改了。
+     */
+    private SolvelaJobTriggerPreviewVO previewOneTime(String triggerValue) {
+        LocalDateTime fireTime;
+        try {
+            fireTime = LocalDateTime.parse(triggerValue.replace(' ', 'T'));
+        } catch (Exception e) {
+            return invalid("时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
         }
 
-        if (!SolvelaJobTriggerTypeEnum.CRON.equalsValue(triggerType)) {
-            vo.setValid(false);
-            vo.setMessage("不支持的触发类型：" + triggerType);
-            return vo;
-        }
+        SolvelaJobTriggerPreviewVO vo = new SolvelaJobTriggerPreviewVO();
+        vo.setJitterSeconds(0);
+        vo.setExact(true);
+        vo.setValid(true);
+        vo.setNextTimeList(List.of(fireTime));
+        vo.setMessage(fireTime.isBefore(LocalDateTime.now())
+                ? "⚠️ 该时刻已过去：任务保存后会被判定为「错过调度」，按 misfire 策略处理"
+                : "一次性任务，执行后自动终结");
+        return vo;
+    }
+
+    /**
+     * cron 任务：算出未来几次触发时刻，并说明这几个时刻<b>准不准</b>。
+     */
+    private SolvelaJobTriggerPreviewVO previewCron(SolvelaJobTriggerPreviewForm form, String triggerValue) {
         if (!SolvelaJobUtil.checkCron(triggerValue)) {
-            vo.setValid(false);
-            vo.setMessage("cron 表达式无法解析。本项目用六段式：秒 分 时 日 月 周，例如 0 15 2 * * *（每天 2:15）");
-            return vo;
+            return invalid("cron 表达式无法解析。本项目用六段式：秒 分 时 日 月 周，例如 0 15 2 * * *（每天 2:15）");
         }
+        int jitterSeconds = resolveJitterSeconds(form);
 
         // jobId 为空（新建）时 applyJitter 会原样返回，正好就是「未打散的基准时刻」
         List<LocalDateTime> nextList = SolvelaJobUtil.queryNextTimeList(
-                triggerType, triggerValue, LocalDateTime.now(), form.getJobId(), jitterSeconds, PREVIEW_COUNT);
+                form.getTriggerType(), triggerValue, LocalDateTime.now(),
+                form.getJobId(), jitterSeconds, PREVIEW_COUNT);
         if (nextList.isEmpty()) {
             // 语法合法但永远排不出下一次，例如 2 月 30 日
-            vo.setValid(false);
-            vo.setMessage("表达式合法，但算不出任何未来触发时刻 —— 请检查日期组合是否根本不存在");
-            return vo;
+            return invalid("表达式合法，但算不出任何未来触发时刻 —— 请检查日期组合是否根本不存在");
         }
 
+        // 已有 jobId 才算得出打散偏移；不打散时也谈不上准不准
         boolean exact = null != form.getJobId() || jitterSeconds <= 0;
+        SolvelaJobTriggerPreviewVO vo = new SolvelaJobTriggerPreviewVO();
         vo.setValid(true);
         vo.setJitterSeconds(jitterSeconds);
         vo.setExact(exact);
@@ -260,6 +265,26 @@ public class SolvelaJobService {
                     : String.format("以上是未打散的基准时刻。实际触发会固定延后 0~%d 秒 —— "
                     + "具体偏移在保存后才确定（由任务 id 决定，同一任务每次相同）", jitterSeconds));
         }
+        return vo;
+    }
+
+    /**
+     * 打散秒数：非 CUSTOM 档位一律取档位值，<b>与 {@code applyPreset} 的口径保持一致</b> ——
+     * 两处若各算各的，预览就会和实际对不上，那比没有预览更误导人。
+     */
+    private int resolveJitterSeconds(SolvelaJobTriggerPreviewForm form) {
+        SolvelaJobPresetEnum preset = SolvelaJobPresetEnum.resolve(form.getPresetCode());
+        if (!preset.isCustom()) {
+            return preset.getJitterSeconds();
+        }
+        return null == form.getJitterSeconds() ? 0 : form.getJitterSeconds();
+    }
+
+    /** 预览失败：只有一句人话，其余字段留空 —— 前端据 valid 决定还渲不渲染时刻列表 */
+    private SolvelaJobTriggerPreviewVO invalid(String message) {
+        SolvelaJobTriggerPreviewVO vo = new SolvelaJobTriggerPreviewVO();
+        vo.setValid(false);
+        vo.setMessage(message);
         return vo;
     }
 

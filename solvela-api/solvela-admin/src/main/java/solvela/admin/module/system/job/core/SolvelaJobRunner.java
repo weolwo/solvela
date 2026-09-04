@@ -190,26 +190,10 @@ public class SolvelaJobRunner {
      */
     private SolvelaJobLogEntity buildRetryEntity(SolvelaJobEntity job, SolvelaJobLogEntity logEntity,
                                                  SolvelaJobHandlerMeta handler, SolvelaJobExecuteStatusEnum status) {
-        if (status == SolvelaJobExecuteStatusEnum.SUCCESS) {
-            return null;
-        }
-        int retryTimes = null == job.getRetryTimes() ? 0 : job.getRetryTimes();
-        if (retryTimes <= 0) {
-            return null;
-        }
-        // 🔴 不幂等的执行器不许重试：自动重试等于把一次失败变成两次副作用。
-        //    保存时已校验过，这里再挡一道 —— 配置可能是从别的环境同步过来的
-        if (!handler.idempotent()) {
-            log.warn("==== SolvelaJob ==== 执行器未声明幂等，跳过重试：job={} handler={}",
-                    job.getJobName(), job.getHandlerName());
+        if (!shouldRetry(job, logEntity, handler, status)) {
             return null;
         }
         int currentSeq = null == logEntity.getRetrySeq() ? 0 : logEntity.getRetrySeq();
-        if (currentSeq >= retryTimes) {
-            log.error("==== SolvelaJob ==== 重试次数已耗尽（{}/{}）：{}", currentSeq, retryTimes, job.getJobName());
-            return null;
-        }
-
         int interval = null == job.getRetryInterval() ? 30 : job.getRetryInterval();
         SolvelaJobLogEntity retry = new SolvelaJobLogEntity();
         retry.setJobId(logEntity.getJobId());
@@ -235,6 +219,34 @@ public class SolvelaJobRunner {
         //     而这个插入与「置 FAIL」在同一事务里 —— 一起回滚，
         //     记录就永久卡在 RUNNING 了。2026-08-12 实测踩到。）
         return retry;
+    }
+
+    /**
+     * 这次失败要不要自动重试。四个否决点，各自的理由不一样：
+     * 成功不必重试；没配重试次数是运营的决定；<b>执行器不幂等是安全底线</b>；次数耗尽是终点。
+     */
+    private boolean shouldRetry(SolvelaJobEntity job, SolvelaJobLogEntity logEntity,
+                                SolvelaJobHandlerMeta handler, SolvelaJobExecuteStatusEnum status) {
+        if (status == SolvelaJobExecuteStatusEnum.SUCCESS) {
+            return false;
+        }
+        int retryTimes = null == job.getRetryTimes() ? 0 : job.getRetryTimes();
+        if (retryTimes <= 0) {
+            return false;
+        }
+        // 🔴 不幂等的执行器不许重试：自动重试等于把一次失败变成两次副作用。
+        //    保存时已校验过，这里再挡一道 —— 配置可能是从别的环境同步过来的
+        if (!handler.idempotent()) {
+            log.warn("==== SolvelaJob ==== 执行器未声明幂等，跳过重试：job={} handler={}",
+                    job.getJobName(), job.getHandlerName());
+            return false;
+        }
+        int currentSeq = null == logEntity.getRetrySeq() ? 0 : logEntity.getRetrySeq();
+        if (currentSeq >= retryTimes) {
+            log.error("==== SolvelaJob ==== 重试次数已耗尽（{}/{}）：{}", currentSeq, retryTimes, job.getJobName());
+            return false;
+        }
+        return true;
     }
 
     private static String truncate(String text, int maxLength) {
