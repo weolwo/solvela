@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -96,12 +97,27 @@ public class LotteryConfigBoardService {
                 .eq(queryForm.getStatus() != null, LotteryConfig::getStatus, queryForm.getStatus())
                 .list();
 
-        Map<String, ActivityConfig> activityMap = activityConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(ActivityConfig::getActivityCode, a -> a, (a, b) -> a));
-        Map<String, List<LotteryIssue>> issueMap = lotteryIssueManager.lambdaQuery().list().stream()
-                .collect(Collectors.groupingBy(LotteryIssue::getLotteryCode));
-        Map<String, Long> ruleCountMap = lotteryPrizeRuleManager.lambdaQuery().list().stream()
-                .collect(Collectors.groupingBy(LotteryPrizeRule::getLotteryCode, Collectors.counting()));
+        /*
+         * 期号与奖级规则只按 lotteryCode 查找，活动只按 activityCode 查找，
+         * 所以只捞这一页引用到的行 —— 结果一致，且不会随着期号累积而越来越慢
+         * （期号是会一直长的表：一个日开玩法一年 365 行）。
+         */
+        List<String> lotteryCodes = configs.stream().map(LotteryConfig::getLotteryCode).toList();
+        Map<String, List<LotteryIssue>> issueMap = lotteryCodes.isEmpty() ? Map.of()
+                : lotteryIssueManager.lambdaQuery()
+                        .in(LotteryIssue::getLotteryCode, lotteryCodes).list().stream()
+                        .collect(Collectors.groupingBy(LotteryIssue::getLotteryCode));
+        Map<String, Long> ruleCountMap = lotteryCodes.isEmpty() ? Map.of()
+                : lotteryPrizeRuleManager.lambdaQuery()
+                        .in(LotteryPrizeRule::getLotteryCode, lotteryCodes).list().stream()
+                        .collect(Collectors.groupingBy(LotteryPrizeRule::getLotteryCode, Collectors.counting()));
+
+        List<String> activityCodes = configs.stream()
+                .map(LotteryConfig::getActivityCode).filter(Objects::nonNull).distinct().toList();
+        Map<String, ActivityConfig> activityMap = activityCodes.isEmpty() ? Map.of()
+                : activityConfigManager.lambdaQuery()
+                        .in(ActivityConfig::getActivityCode, activityCodes).list().stream()
+                        .collect(Collectors.toMap(ActivityConfig::getActivityCode, a -> a, (a, b) -> a));
         Map<String, Map<String, Object>> recordStatMap = lotteryRecordDao.selectStatByLottery().stream()
                 .collect(Collectors.toMap(m -> String.valueOf(m.get("lotteryCode")), m -> m, (a, b) -> a));
 

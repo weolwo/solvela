@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -86,14 +87,30 @@ public class PrizeItemStockService {
                         PrizePoolItem::getActivityCode, queryForm.getActivityCode())
                 .list();
 
-        Map<String, PrizeConfig> prizeMap = prizeConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
-        Map<String, ActivityConfig> activityMap = activityConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a));
+        /*
+         * 下面三张表都只当查找表用（map.get），所以只捞这一页引用到的行 ——
+         * 与捞全表结果完全一致，但不会随着配置变多而线性变慢。
+         */
+        List<String> prizeCodes = items.stream()
+                .map(PrizePoolItem::getPrizeCode).filter(Objects::nonNull).distinct().toList();
+        Map<String, PrizeConfig> prizeMap = prizeCodes.isEmpty() ? Map.of()
+                : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, prizeCodes).list().stream()
+                        .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
+
+        List<String> activityCodes = items.stream()
+                .map(PrizePoolItem::getActivityCode).filter(Objects::nonNull).distinct().toList();
+        Map<String, ActivityConfig> activityMap = activityCodes.isEmpty() ? Map.of()
+                : activityConfigManager.lambdaQuery()
+                        .in(ActivityConfig::getActivityCode, activityCodes).list().stream()
+                        .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a));
+
         // 一个奖项被哪些奖池引用 —— 库存跨池共享，这是「另一个池的奖怎么也没了」的答案
-        Map<Long, List<String>> poolsByItem = poolPrizeMappingManager.lambdaQuery().list().stream()
-                .collect(Collectors.groupingBy(PoolPrizeMapping::getPrizeItemId,
-                        Collectors.mapping(PoolPrizeMapping::getPoolCode, Collectors.toList())));
+        List<Long> itemIds = items.stream().map(PrizePoolItem::getId).toList();
+        Map<Long, List<String>> poolsByItem = itemIds.isEmpty() ? Map.of()
+                : poolPrizeMappingManager.lambdaQuery()
+                        .in(PoolPrizeMapping::getPrizeItemId, itemIds).list().stream()
+                        .collect(Collectors.groupingBy(PoolPrizeMapping::getPrizeItemId,
+                                Collectors.mapping(PoolPrizeMapping::getPoolCode, Collectors.toList())));
 
         // Redis 剩余量一把取回。逐行取的话一页 200 行就是 200 次串行往返
         Map<String, Map<Long, Integer>> cachedStocks = loadCachedStocks(items);

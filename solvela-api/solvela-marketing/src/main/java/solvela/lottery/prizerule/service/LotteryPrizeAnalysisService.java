@@ -112,8 +112,13 @@ public class LotteryPrizeAnalysisService {
                 .eq(StringUtils.isNotBlank(queryForm.getLotteryCode()),
                         LotteryPrizeRule::getLotteryCode, queryForm.getLotteryCode())
                 .list();
-        Map<String, LotteryConfig> configMap = lotteryConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(LotteryConfig::getLotteryCode, Function.identity(), (a, b) -> a));
+        // 玩法配置只按 lotteryCode 查找，只捞规则里出现过的那几个
+        List<String> lotteryCodes = ruleList.stream()
+                .map(LotteryPrizeRule::getLotteryCode).filter(StringUtils::isNotBlank).distinct().toList();
+        Map<String, LotteryConfig> configMap = lotteryCodes.isEmpty() ? Map.of()
+                : lotteryConfigManager.lambdaQuery()
+                        .in(LotteryConfig::getLotteryCode, lotteryCodes).list().stream()
+                        .collect(Collectors.toMap(LotteryConfig::getLotteryCode, Function.identity(), (a, b) -> a));
 
         Set<String> prizeCodes = ruleList.stream()
                 .map(LotteryPrizeRule::getPrizeCode).filter(StringUtils::isNotBlank).collect(Collectors.toSet());

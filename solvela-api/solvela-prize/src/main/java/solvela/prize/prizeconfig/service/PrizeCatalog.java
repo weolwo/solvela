@@ -41,6 +41,9 @@ public class PrizeCatalog {
      *
      * <p>同一个编码在不同活动下可能各有一份配置，撞了取先查到的那份：
      * 这里只用来取名字与类型，两份配置的这几列本就该一样。
+     *
+     * <p>刻意<b>不提供「整表翻译」的重载</b>：看板页曾经那样用，但它们真正需要的
+     * 只是自己这一页引用到的那几十个奖品，捞全表是白花的开销。
      */
     public Map<String, PrizeConfig> mapByCodes(Collection<String> codes) {
         // 分组键可能为空（流水里存在没写奖品编码的行），null 混进 in 会变成一个永远不匹配的条件
@@ -53,17 +56,6 @@ public class PrizeCatalog {
                 .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (first, ignored) -> first));
     }
 
-    /**
-     * 整表翻译。
-     *
-     * <p>⚠️ 只给「本来就要遍历全部奖品」的配置体检页用（奖池分析、库存看板）——
-     * 那些页面要回答的是「配了却没挂上的奖有哪些」，缺的那部分恰恰不在流水里，
-     * 按编码查反而查不全。流水类页面一律用 {@link #mapByCodes}。
-     */
-    public Map<String, PrizeConfig> mapAll() {
-        return prizeConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (first, ignored) -> first));
-    }
 
     /**
      * 已发出价值 = 单价 × 件数，两位小数。

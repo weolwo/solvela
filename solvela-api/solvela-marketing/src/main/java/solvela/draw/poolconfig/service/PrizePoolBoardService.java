@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -85,12 +86,38 @@ public class PrizePoolBoardService {
                 .eq(queryForm.getStatus() != null, PrizePoolConfig::getStatus, queryForm.getStatus())
                 .list();
 
-        Map<String, ActivityConfig> activityMap = activityConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a));
-        Map<Long, PrizePoolItem> itemMap = prizePoolItemManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity(), (a, b) -> a));
-        Map<String, List<PoolPrizeMapping>> mappingByPool = poolPrizeMappingManager.lambdaQuery().list().stream()
-                .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode));
+        /*
+         * 下面三张表都只当查找表用（map.get），没有一处遍历全量 ——
+         * 所以只捞这一页引用到的行，与捞全表结果完全一致。
+         *
+         * 改造前是三次无条件 list()：配置表现在小，但那是线性劣化，
+         * 活动配到几百个时这个页面会跟着一起慢下来。
+         */
+        List<String> poolCodes = pools.stream().map(PrizePoolConfig::getPoolCode).toList();
+        Map<String, List<PoolPrizeMapping>> mappingByPool = poolCodes.isEmpty() ? Map.of()
+                : poolPrizeMappingManager.lambdaQuery()
+                        .in(PoolPrizeMapping::getPoolCode, poolCodes).list().stream()
+                        .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode));
+
+        List<Long> itemIds = mappingByPool.values().stream()
+                .flatMap(List::stream)
+                .map(PoolPrizeMapping::getPrizeItemId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, PrizePoolItem> itemMap = itemIds.isEmpty() ? Map.of()
+                : prizePoolItemManager.lambdaQuery().in(PrizePoolItem::getId, itemIds).list().stream()
+                        .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity(), (a, b) -> a));
+
+        List<String> activityCodes = pools.stream()
+                .map(PrizePoolConfig::getActivityCode)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<String, ActivityConfig> activityMap = activityCodes.isEmpty() ? Map.of()
+                : activityConfigManager.lambdaQuery()
+                        .in(ActivityConfig::getActivityCode, activityCodes).list().stream()
+                        .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a));
 
         List<PrizePoolBoardDTO> all = new ArrayList<>();
         for (PrizePoolConfig pool : pools) {
