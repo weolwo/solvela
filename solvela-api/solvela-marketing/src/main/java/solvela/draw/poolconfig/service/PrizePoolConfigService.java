@@ -104,15 +104,12 @@ public class PrizePoolConfigService {
     }
 
     /**
-     * 抽奖工作台聚合回显：与 workbenchSave 的入参同构，前端拿到即可直接填回两个 Tab
-     * 空配置（活动刚建、还没配过奖池）返回空列表而非报错，前端据此进入「从零配置」态
+     * 抽奖工作台聚合回显：与 {@link #workbenchSave} 的入参同构，前端拿到即可直接填回两个 Tab。
+     *
+     * <p>空配置（活动刚建、还没配过奖池）返回空列表而非报错，前端据此进入「从零配置」态。
      */
     public DrawWorkbenchDTO workbenchDetail(String activityCode) {
-        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
-        if (activity == null) {
-            throw new BusinessException("活动不存在：" + activityCode);
-        }
-        boolean online = activity.getStatus() == ActivityStatusEnum.ONLINE;
+        ActivityConfig activity = requireActivity(activityCode);
 
         /*
          * 抽奖配置：玩法这一层的参数（重置周期、算法、开关）与脚本挂载用的 drawCode。
@@ -121,16 +118,37 @@ public class PrizePoolConfigService {
          * 与彩票工作台一致，让运营进来就能填，不用先跑一趟别的页面。
          */
         DrawConfig drawConfig = drawConfigService.getByActivityCode(activityCode);
-        boolean drawConfigured = drawConfig != null;
-        String drawCode = drawConfigured ? drawConfig.getDrawCode() : drawConfigService.generateDrawCode();
+        boolean configured = drawConfig != null;
 
-        // Tab1 物资：SKU 化后名称/价值等展示信息需回查资产大库补齐
         List<PrizePoolItem> dbItems = prizePoolItemManager.lambdaQuery()
                 .eq(PrizePoolItem::getActivityCode, activityCode)
                 .orderByAsc(PrizePoolItem::getId).list();
+
+        return new DrawWorkbenchDTO(
+                activity.getActivityCode(),
+                activity.getActivityName(),
+                activity.getStatus(),
+                activity.getStatus() == ActivityStatusEnum.ONLINE,
+                configured ? drawConfig.getDrawCode() : drawConfigService.generateDrawCode(),
+                configured ? drawConfig.getDrawName() : activity.getActivityName() + "-抽奖",
+                configured ? drawConfig.getResetPeriod() : DrawPeriodResolver.PERIOD_DAY,
+                configured ? drawConfig.getDrawMode() : DrawModeEnum.PROBABILITY,
+                configured ? drawConfig.getStatus() : null,
+                configured,
+                // 已有配置即冻结编码：脚本挂载引用的就是它
+                configured,
+                itemTab(activityCode, dbItems),
+                poolTab(activityCode, dbItems));
+    }
+
+    /**
+     * Tab1 物资。SKU 化之后这张表只存编码与库存，名称/类型/价值要回查资产大库补齐 ——
+     * 奖品可能已被删除，那时如实回显编码本身，不要凭空造一个名字。
+     */
+    private List<DrawWorkbenchItemDTO> itemTab(String activityCode, List<PrizePoolItem> dbItems) {
         Map<String, PrizeConfig> prizeConfigMap = prizeConfigService.queryListByActivityCode(activityCode).stream()
-                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
-        List<DrawWorkbenchItemDTO> itemVOList = dbItems.stream().map(item -> {
+                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (first, ignored) -> first));
+        return dbItems.stream().map(item -> {
             PrizeConfig prize = prizeConfigMap.get(item.getPrizeCode());
             return new DrawWorkbenchItemDTO(
                     item.getPrizeCode(),
@@ -141,15 +159,20 @@ public class PrizePoolConfigService {
                     item.getUserMaxCount(),
                     item.getUsedStock(),
                     parseWhiteList(item.getWhiteList()));
-        }).collect(Collectors.toList());
+        }).toList();
+    }
 
-        // Tab2 奖池：存储层用 prize_item_id 关联，对外统一翻译回 prizeCode
+    /**
+     * Tab2 奖池。存储层用 {@code prize_item_id} 关联，对外统一翻译回 prizeCode ——
+     * 前端两个 Tab 之间是靠编码对应的，暴露自增 id 会让「物资删了、奖池里那一行是什么」无从表达。
+     */
+    private List<DrawWorkbenchPoolDTO> poolTab(String activityCode, List<PrizePoolItem> dbItems) {
         List<PrizePoolConfig> dbPools = prizePoolConfigManager.lambdaQuery()
                 .eq(PrizePoolConfig::getActivityCode, activityCode)
                 .orderByAsc(PrizePoolConfig::getId).list();
         Map<Long, String> itemIdToCodeMap = dbItems.stream()
                 .collect(Collectors.toMap(PrizePoolItem::getId, PrizePoolItem::getPrizeCode));
-        List<String> poolCodeList = dbPools.stream().map(PrizePoolConfig::getPoolCode).collect(Collectors.toList());
+        List<String> poolCodeList = dbPools.stream().map(PrizePoolConfig::getPoolCode).toList();
         Map<String, List<PoolPrizeMapping>> mappingGroup = poolCodeList.isEmpty()
                 ? Map.of()
                 : poolPrizeMappingManager.lambdaQuery()
@@ -157,7 +180,7 @@ public class PrizePoolConfigService {
                         .orderByAsc(PoolPrizeMapping::getSortWeight).list().stream()
                         .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode));
 
-        List<DrawWorkbenchPoolDTO> poolVOList = dbPools.stream().map(pool -> {
+        return dbPools.stream().map(pool -> {
             List<DrawWorkbenchMappingDTO> mappingVOList = mappingGroup.getOrDefault(pool.getPoolCode(), List.of())
                     .stream()
                     // 物资被删导致的悬空坑位直接过滤，避免前端渲染出无法编辑的幽灵行
@@ -166,21 +189,9 @@ public class PrizePoolConfigService {
                             itemIdToCodeMap.get(mapping.getPrizeItemId()),
                             mapping.getProbability(),
                             Boolean.TRUE.equals(mapping.getIsFallback())))
-                    .collect(Collectors.toList());
+                    .toList();
             return new DrawWorkbenchPoolDTO(pool.getPoolCode(), pool.getPoolName(), mappingVOList);
-        }).collect(Collectors.toList());
-
-        return new DrawWorkbenchDTO(activity.getActivityCode(), activity.getActivityName(),
-                activity.getStatus(), online,
-                drawCode,
-                drawConfigured ? drawConfig.getDrawName() : activity.getActivityName() + "-抽奖",
-                drawConfigured ? drawConfig.getResetPeriod() : DrawPeriodResolver.PERIOD_DAY,
-                drawConfigured ? drawConfig.getDrawMode() : DrawModeEnum.PROBABILITY,
-                drawConfigured ? drawConfig.getStatus() : null,
-                drawConfigured,
-                // 已有配置即冻结编码：脚本挂载引用的就是它
-                drawConfigured,
-                itemVOList, poolVOList);
+        }).toList();
     }
 
     /**
@@ -201,19 +212,56 @@ public class PrizePoolConfigService {
     }
 
     /**
-     * 抽奖工作台聚合保存：物资(t_prize_pool_item) + 奖池(t_prize_pool_config) + 坑位映射(t_pool_prize_mapping)
-     * 同一事务落库。前端的概率闭环/上线锁只是 UI 防呆，此处全部服务端重算
+     * 抽奖工作台聚合保存：物资（{@code t_prize_pool_item}）+ 奖池（{@code t_prize_pool_config}）
+     * + 坑位映射（{@code t_pool_prize_mapping}）<b>同一事务落库</b>。
+     *
+     * <p>三张表必须一起成功：只落了池没落坑位，抽奖时快照构造直接抛「奖池快照不能为空」；
+     * 只落了坑位没落池，那些坑位是永远找不到主人的孤儿。
+     *
+     * <p>前端的概率闭环校验与上线锁只是 UI 防呆 —— 下面每一条服务端都重算一遍，
+     * 绕过页面直接调接口同样拦得住。
      */
     @Transactional(rollbackFor = Exception.class)
     public void workbenchSave(DrawWorkbenchSaveCommand form) {
-        // 1. 活动必须存在，并据其状态判定是否启用结构锁
-        ActivityConfig activity = activityConfigService.getByActivityCode(form.getActivityCode());
-        if (activity == null) {
-            throw new BusinessException("活动不存在：" + form.getActivityCode());
-        }
-        boolean online = activity.getStatus() == ActivityStatusEnum.ONLINE;
+        ActivityConfig activity = requireActivity(form.getActivityCode());
+        Set<String> itemCodes = checkItems(form);
+        Set<String> poolCodes = checkPools(form, itemCodes);
 
-        // 2. 物资编码不允许重复，且必须真实存在于资产大库 t_prize_config
+        Current current = loadCurrent(form.getActivityCode());
+        if (activity.getStatus() == ActivityStatusEnum.ONLINE) {
+            checkOnlineStructureLock(form, itemCodes, poolCodes, current);
+        }
+
+        saveItems(form, itemCodes, current);
+        /*
+         * 🔴 新奖池必须归到抽奖配置下：重置周期从那里读，脚本也挂在那里。
+         *    没有的话就地建一条 —— 工作台就是「把一个抽奖活动配起来」的地方，
+         *    让运营先去另一个页面建配置再回来，只会造出一堆没有配置的孤儿奖池。
+         */
+        String drawCode = drawConfigService.saveFromWorkbench(
+                form.getActivityCode(), form.getDrawCode(), form.getDrawName(),
+                form.getResetPeriod(), form.getDrawMode(), form.getDrawStatus(), null);
+        savePools(form, poolCodes, current, drawCode);
+        rebuildMappings(form, current);
+
+        // 抽奖运行态的 Lua 预扣依赖这些 key。itemMap 此时已含新插入项的 id
+        drawStockService.warmStock(form.getActivityCode(), new ArrayList<>(current.itemMap().values()));
+    }
+
+    private ActivityConfig requireActivity(String activityCode) {
+        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
+        if (activity == null) {
+            throw new BusinessException("活动不存在：" + activityCode);
+        }
+        return activity;
+    }
+
+    /**
+     * 物资校验：编码不许重复，且必须真实存在于本活动的资产大库。
+     *
+     * @return 提交上来的物资编码集合 —— 后面奖池校验、删除存量、结构锁都要拿它做判断
+     */
+    private Set<String> checkItems(DrawWorkbenchSaveCommand form) {
         Set<String> itemCodes = new HashSet<>();
         for (DrawWorkbenchPoolItemCommand item : form.getPrizeItemList()) {
             if (!itemCodes.add(item.getPrizeCode())) {
@@ -223,8 +271,18 @@ public class PrizePoolConfigService {
                 throw new BusinessException("奖品不存在于本活动的资产大库：" + item.getPrizeCode());
             }
         }
+        return itemCodes;
+    }
 
-        // 3. 逐池校验：概率闭环（BigDecimal + 容差）、池编码唯一、坑位引用的奖品必须在物资列表内
+    /**
+     * 逐池校验：编码格式与唯一性、坑位引用范围、兜底至多一个、<b>概率必须闭环到 100%</b>。
+     *
+     * <p>最后一条是这里唯一「不拦就会当场坏掉」的：未闭环的奖池在抽奖时构造快照会抛异常，
+     * 而执行链路没有捕获它 —— 后果不是某个奖抽不到，是这个池的每一次抽奖请求都直接报错。
+     *
+     * @return 提交上来的奖池编码集合
+     */
+    private Set<String> checkPools(DrawWorkbenchSaveCommand form, Set<String> itemCodes) {
         Set<String> poolCodes = new HashSet<>();
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
             // 奖池编码由前端生成/手输，服务端重校验格式（对齐活动编码、奖品编码的统一约定）
@@ -234,94 +292,112 @@ public class PrizePoolConfigService {
             if (!poolCodes.add(pool.getPoolCode())) {
                 throw new BusinessException("奖池编码重复：" + pool.getPoolCode());
             }
-            Set<String> mappingCodes = new HashSet<>();
-            BigDecimal total = BigDecimal.ZERO;
-            int fallbackCount = 0;
-            for (DrawWorkbenchMappingCommand mapping : pool.getPrizeMappingList()) {
-                if (!mappingCodes.add(mapping.getPrizeCode())) {
-                    throw new BusinessException("奖池「" + pool.getPoolName() + "」坑位奖品重复：" + mapping.getPrizeCode());
-                }
-                if (!itemCodes.contains(mapping.getPrizeCode())) {
-                    throw new BusinessException("奖池「" + pool.getPoolName() + "」引用了物资列表外的奖品：" + mapping.getPrizeCode());
-                }
-                if (Boolean.TRUE.equals(mapping.getIsFallback())) {
-                    fallbackCount++;
-                }
-                total = total.add(mapping.getProbability());
-            }
-            if (fallbackCount > 1) {
-                throw new BusinessException("奖池「" + pool.getPoolName() + "」兜底奖项最多只能有一个");
-            }
-            if (!Ppm.isClosedPercent(total)) {
-                throw new BusinessException("奖池「" + pool.getPoolName() + "」概率总和为 " + total.toPlainString() + "%，必须等于100%");
-            }
+            checkSlots(pool, itemCodes);
         }
+        return poolCodes;
+    }
 
-        // 4. 加载 DB 现状
-        List<PrizePoolItem> dbItems = prizePoolItemManager.lambdaQuery()
-                .eq(PrizePoolItem::getActivityCode, form.getActivityCode()).list();
-        Map<String, PrizePoolItem> dbItemMap = dbItems.stream()
-                .collect(Collectors.toMap(PrizePoolItem::getPrizeCode, Function.identity()));
-        List<PrizePoolConfig> dbPools = prizePoolConfigManager.lambdaQuery()
-                .eq(PrizePoolConfig::getActivityCode, form.getActivityCode()).list();
-        Map<String, PrizePoolConfig> dbPoolMap = dbPools.stream()
-                .collect(Collectors.toMap(PrizePoolConfig::getPoolCode, Function.identity()));
-
-        // 5. 上线结构锁：绕过前端直接调接口同样拦截
-        if (online) {
-            String lockError = checkOnlineStructureLock(form, itemCodes, poolCodes, dbItemMap, dbPools);
-            if (lockError != null) {
-                throw new BusinessException(lockError);
+    private void checkSlots(DrawWorkbenchPoolCommand pool, Set<String> itemCodes) {
+        Set<String> mappingCodes = new HashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+        int fallbackCount = 0;
+        for (DrawWorkbenchMappingCommand mapping : pool.getPrizeMappingList()) {
+            if (!mappingCodes.add(mapping.getPrizeCode())) {
+                throw new BusinessException("奖池「" + pool.getPoolName() + "」坑位奖品重复：" + mapping.getPrizeCode());
             }
+            if (!itemCodes.contains(mapping.getPrizeCode())) {
+                throw new BusinessException("奖池「" + pool.getPoolName() + "」引用了物资列表外的奖品：" + mapping.getPrizeCode());
+            }
+            if (Boolean.TRUE.equals(mapping.getIsFallback())) {
+                fallbackCount++;
+            }
+            total = total.add(mapping.getProbability());
         }
+        if (fallbackCount > 1) {
+            throw new BusinessException("奖池「" + pool.getPoolName() + "」兜底奖项最多只能有一个");
+        }
+        if (!Ppm.isClosedPercent(total)) {
+            throw new BusinessException("奖池「" + pool.getPoolName() + "」概率总和为 " + total.toPlainString() + "%，必须等于100%");
+        }
+    }
 
-        // 6. 落库：物资 upsert（used_stock/version 永不接受前端值）
+    /**
+     * 库里现在长什么样。四份数据在校验、结构锁、落库三个阶段反复要用，一次查完传下去。
+     *
+     * <p>⚠️ {@code itemMap} 是<b>可变的</b>：新插入的物资会被放回去，
+     * 因为后面重建坑位映射时要靠它把 prizeCode 翻成刚拿到的自增 id。
+     */
+    private record Current(List<PrizePoolItem> items, Map<String, PrizePoolItem> itemMap,
+                           List<PrizePoolConfig> pools, Map<String, PrizePoolConfig> poolMap) {
+    }
+
+    private Current loadCurrent(String activityCode) {
+        List<PrizePoolItem> items = prizePoolItemManager.lambdaQuery()
+                .eq(PrizePoolItem::getActivityCode, activityCode).list();
+        List<PrizePoolConfig> pools = prizePoolConfigManager.lambdaQuery()
+                .eq(PrizePoolConfig::getActivityCode, activityCode).list();
+        return new Current(items,
+                items.stream().collect(Collectors.toMap(PrizePoolItem::getPrizeCode, Function.identity())),
+                pools,
+                pools.stream().collect(Collectors.toMap(PrizePoolConfig::getPoolCode, Function.identity())));
+    }
+
+    /**
+     * 物资 upsert。
+     *
+     * <p>🔴 {@code used_stock} 与 {@code version} <b>永不接受前端值</b>：
+     * 前者是运行态一笔笔扣出来的，后者是乐观锁的凭据 —— 让页面能填它们，
+     * 等于把库存账目和并发保护一起交给浏览器。
+     */
+    private void saveItems(DrawWorkbenchSaveCommand form, Set<String> itemCodes, Current current) {
         for (DrawWorkbenchPoolItemCommand item : form.getPrizeItemList()) {
-            PrizePoolItem existed = dbItemMap.get(item.getPrizeCode());
+            PrizePoolItem existed = current.itemMap().get(item.getPrizeCode());
             if (existed == null) {
                 PrizePoolItem entity = new PrizePoolItem();
                 entity.setActivityCode(form.getActivityCode());
                 entity.setPrizeCode(item.getPrizeCode());
                 entity.setTotalStock(item.getTotalStock());
                 entity.setUserMaxCount(item.getUserMaxCount());
-                entity.setWhiteList(item.getWhiteList() == null ? null : JsonUtils.toJson(item.getWhiteList()));
+                entity.setWhiteList(toWhiteListJson(item));
                 entity.setUsedStock(0);
                 entity.setVersion(0);
                 prizePoolItemDao.insert(entity);
-                dbItemMap.put(item.getPrizeCode(), entity);
+                current.itemMap().put(item.getPrizeCode(), entity);
             } else {
                 PrizePoolItem update = new PrizePoolItem();
                 update.setId(existed.getId());
                 update.setTotalStock(item.getTotalStock());
                 update.setUserMaxCount(item.getUserMaxCount());
-                update.setWhiteList(item.getWhiteList() == null ? null : JsonUtils.toJson(item.getWhiteList()));
+                update.setWhiteList(toWhiteListJson(item));
                 prizePoolItemDao.updateById(update);
             }
         }
-        // 未提交的存量物资：未上线时删除（上线时已被结构锁拦截）
-        List<Long> removeItemIdList = dbItems.stream()
+        // 未提交的存量物资：未上线时删除（上线时已被结构锁拦下，走不到这里）
+        List<Long> removeItemIdList = current.items().stream()
                 .filter(db -> !itemCodes.contains(db.getPrizeCode()))
                 .map(PrizePoolItem::getId)
-                .collect(Collectors.toList());
+                .toList();
         if (!removeItemIdList.isEmpty()) {
             prizePoolItemDao.deleteBatchIds(removeItemIdList);
         }
+    }
 
-        /*
-         * 7. 落库：奖池 upsert（工作台只管理 poolName，奖池自身的其它配置由奖池 CRUD 页维护，不覆盖）
-         *
-         * 🔴 新奖池必须归到抽奖配置下：重置周期从那里读，脚本也挂在那里。
-         *    没有的话就地建一条 —— 工作台就是「把一个抽奖活动配起来」的地方，
-         *    让运营先去另一个页面建配置再回来，只会造出一堆没有配置的孤儿奖池。
-         */
-        String drawCode = drawConfigService.saveFromWorkbench(
-                form.getActivityCode(), form.getDrawCode(), form.getDrawName(),
-                form.getResetPeriod(), form.getDrawMode(), form.getDrawStatus(), null);
+    private String toWhiteListJson(DrawWorkbenchPoolItemCommand item) {
+        return item.getWhiteList() == null ? null : JsonUtils.toJson(item.getWhiteList());
+    }
 
+    /**
+     * 奖池 upsert。
+     *
+     * <p>工作台<b>只管理 poolName</b>，奖池自身的其它配置（开关等）由奖池一览页维护，这里不覆盖 ——
+     * 否则运营在工作台点一次保存，就会把别处刚做的禁用悄悄改回去。
+     */
+    private void savePools(DrawWorkbenchSaveCommand form, Set<String> poolCodes, Current current, String drawCode) {
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
-            PrizePoolConfig existed = dbPoolMap.get(pool.getPoolCode());
+            PrizePoolConfig existed = current.poolMap().get(pool.getPoolCode());
             if (existed == null) {
-                // uk_pool_code 是全局唯一：手输的编码可能撞上别的活动的奖池，提前给出人话提示而不是抛 SQL 异常
+                // uk_pool_code 是全局唯一：手输的编码可能撞上别的活动的奖池，
+                // 提前给出人话提示而不是抛 SQL 异常
                 if (existsByPoolCode(pool.getPoolCode())) {
                     throw new BusinessException("奖池编码已被其他活动占用：" + pool.getPoolCode());
                 }
@@ -345,25 +421,35 @@ public class PrizePoolConfigService {
                 prizePoolConfigDao.updateById(update);
             }
         }
-        // 未提交的存量奖池：连同其坑位映射一并删除
-        for (PrizePoolConfig dbPool : dbPools) {
+        // 未提交的存量奖池：连同其坑位映射一并删除，不留孤儿
+        for (PrizePoolConfig dbPool : current.pools()) {
             if (!poolCodes.contains(dbPool.getPoolCode())) {
                 prizePoolConfigDao.deleteById(dbPool.getId());
                 poolPrizeMappingManager.lambdaUpdate()
                         .eq(PoolPrizeMapping::getPoolCode, dbPool.getPoolCode()).remove();
             }
         }
+    }
 
-        // 8. 落库：坑位映射整池重建（prizeCode -> prize_item_id 由服务端解析）
+    /**
+     * 坑位映射<b>整池重建</b>（先删后插），而不是逐条 diff。
+     *
+     * <p>坑位的意义来自它在整池里的位置：{@code sort_weight} 决定概率区间的累加顺序，
+     * 而顺序一变，所有坑位的区间跟着变。逐条 diff 要处理「插在中间」「换位置」，
+     * 每一种都要把后面所有行重排一遍 —— 而整池也就十几行，全删重插既简单又不会漏。
+     */
+    private void rebuildMappings(DrawWorkbenchSaveCommand form, Current current) {
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
             poolPrizeMappingManager.lambdaUpdate()
                     .eq(PoolPrizeMapping::getPoolCode, pool.getPoolCode()).remove();
+
             List<PoolPrizeMapping> mappingList = new ArrayList<>();
             for (int i = 0; i < pool.getPrizeMappingList().size(); i++) {
                 DrawWorkbenchMappingCommand mapping = pool.getPrizeMappingList().get(i);
                 PoolPrizeMapping entity = new PoolPrizeMapping();
                 entity.setPoolCode(pool.getPoolCode());
-                entity.setPrizeItemId(dbItemMap.get(mapping.getPrizeCode()).getId());
+                // prizeCode -> prize_item_id 由服务端解析：前端只认编码
+                entity.setPrizeItemId(current.itemMap().get(mapping.getPrizeCode()).getId());
                 entity.setProbability(mapping.getProbability());
                 entity.setIsFallback(Boolean.TRUE.equals(mapping.getIsFallback()));
                 entity.setSortWeight(i);
@@ -371,56 +457,83 @@ public class PrizePoolConfigService {
             }
             poolPrizeMappingDao.insertBatch(mappingList);
         }
-
-        // 9. 预热库存缓存：抽奖运行态的 Lua 预扣依赖这些 key（dbItemMap 此时已含新插入项的 id）
-        drawStockService.warmStock(form.getActivityCode(), new ArrayList<>(dbItemMap.values()));
-
     }
 
     /**
-     * 上线结构锁校验：库存只增不减、禁止删物资/删池/新建池、池内坑位集合不可增删（概率可调）
-     * 返回 null 表示通过
+     * 上线结构锁：活动一旦上线，<b>能改的只剩概率与追加库存</b>。
+     *
+     * <p>为什么这么严：号已经发出去、奖已经在抽了。此时删掉一个奖项，用户上一秒还看得见的奖
+     * 下一秒消失；缩减库存，已经按旧库存中出去的奖就成了超发；增删坑位，概率区间整体重排 ——
+     * 而这些都不会报错，只会让线上悄悄跑成另一套规则。
+     *
+     * <p>三段分别锁物资、锁奖池、锁池内坑位集合。任何一条不满足就直接抛，不再往下走。
      */
-    private String checkOnlineStructureLock(DrawWorkbenchSaveCommand form, Set<String> itemCodes, Set<String> poolCodes,
-                                            Map<String, PrizePoolItem> dbItemMap, List<PrizePoolConfig> dbPools) {
-        // 物资：存量不可删除，库存不可缩减（-1 不限量视为最大，不可改回限量）
+    private void checkOnlineStructureLock(DrawWorkbenchSaveCommand form, Set<String> itemCodes,
+                                          Set<String> poolCodes, Current current) {
+        checkItemLock(form, itemCodes, current.itemMap());
+        Set<String> dbPoolCodes = checkPoolLock(poolCodes, current.pools());
+        checkSlotLock(form, dbPoolCodes, current.itemMap());
+    }
+
+    /** 物资：存量不可删除，库存只增不减（-1 不限量视为最大，不可改回限量） */
+    private void checkItemLock(DrawWorkbenchSaveCommand form, Set<String> itemCodes,
+                               Map<String, PrizePoolItem> dbItemMap) {
         for (PrizePoolItem db : dbItemMap.values()) {
             if (!itemCodes.contains(db.getPrizeCode())) {
-                return "活动已上线，禁止移除奖项：" + db.getPrizeCode();
+                throw new BusinessException("活动已上线，禁止移除奖项：" + db.getPrizeCode());
             }
         }
         for (DrawWorkbenchPoolItemCommand item : form.getPrizeItemList()) {
             PrizePoolItem db = dbItemMap.get(item.getPrizeCode());
             if (db == null) {
-                return "活动已上线，禁止引入新奖项：" + item.getPrizeCode();
+                throw new BusinessException("活动已上线，禁止引入新奖项：" + item.getPrizeCode());
             }
-            boolean dbUnlimited = UNLIMITED.equals(db.getTotalStock());
-            boolean submitUnlimited = UNLIMITED.equals(item.getTotalStock());
-            boolean shrink = (dbUnlimited && !submitUnlimited)
-                    || (!dbUnlimited && !submitUnlimited && item.getTotalStock() < db.getTotalStock());
-            if (shrink) {
-                return "活动已上线，奖项「" + item.getPrizeCode() + "」库存只允许追加，不允许缩减";
+            if (isStockShrink(db.getTotalStock(), item.getTotalStock())) {
+                throw new BusinessException("活动已上线，奖项「" + item.getPrizeCode() + "」库存只允许追加，不允许缩减");
             }
         }
-        // 奖池：不可删、不可新建
+    }
+
+    /** 「不限量 -> 限量」也算缩减：那是把一个发不完的奖改成了会抽空的奖 */
+    private boolean isStockShrink(Integer dbStock, Integer submitStock) {
+        boolean dbUnlimited = UNLIMITED.equals(dbStock);
+        boolean submitUnlimited = UNLIMITED.equals(submitStock);
+        if (submitUnlimited) {
+            return false;
+        }
+        return dbUnlimited || submitStock < dbStock;
+    }
+
+    /**
+     * 奖池：不可删、不可新建。
+     *
+     * @return 库里现有的奖池编码集合，坑位锁接着要用
+     */
+    private Set<String> checkPoolLock(Set<String> poolCodes, List<PrizePoolConfig> dbPools) {
         Set<String> dbPoolCodes = dbPools.stream().map(PrizePoolConfig::getPoolCode).collect(Collectors.toSet());
         for (String dbPoolCode : dbPoolCodes) {
             if (!poolCodes.contains(dbPoolCode)) {
-                return "活动已上线，禁止删除奖池：" + dbPoolCode;
+                throw new BusinessException("活动已上线，禁止删除奖池：" + dbPoolCode);
             }
         }
         for (String poolCode : poolCodes) {
             if (!dbPoolCodes.contains(poolCode)) {
-                return "活动已上线，禁止新建奖池：" + poolCode;
+                throw new BusinessException("活动已上线，禁止新建奖池：" + poolCode);
             }
         }
-        // 池内坑位集合不可增删（对比 prize_item_id 集合；概率调整不受限）
+        return dbPoolCodes;
+    }
+
+    /** 池内坑位集合不可增删（比对 prize_item_id 集合；概率随便调） */
+    private void checkSlotLock(DrawWorkbenchSaveCommand form, Set<String> dbPoolCodes,
+                               Map<String, PrizePoolItem> dbItemMap) {
         List<PoolPrizeMapping> dbMappings = dbPoolCodes.isEmpty()
                 ? List.of()
                 : poolPrizeMappingManager.lambdaQuery().in(PoolPrizeMapping::getPoolCode, dbPoolCodes).list();
         Map<String, Set<Long>> dbPoolItemIds = dbMappings.stream().collect(
                 Collectors.groupingBy(PoolPrizeMapping::getPoolCode,
                         Collectors.mapping(PoolPrizeMapping::getPrizeItemId, Collectors.toSet())));
+
         for (DrawWorkbenchPoolCommand pool : form.getPoolList()) {
             Set<Long> submitIds = pool.getPrizeMappingList().stream()
                     .map(m -> dbItemMap.get(m.getPrizeCode()))
@@ -429,10 +542,9 @@ public class PrizePoolConfigService {
                     .collect(Collectors.toSet());
             Set<Long> dbIds = dbPoolItemIds.getOrDefault(pool.getPoolCode(), Set.of());
             if (!submitIds.equals(dbIds)) {
-                return "活动已上线，奖池「" + pool.getPoolName() + "」禁止增删奖项（概率可调整）";
+                throw new BusinessException("活动已上线，奖池「" + pool.getPoolName() + "」禁止增删奖项（概率可调整）");
             }
         }
-        return null;
     }
 
     /**

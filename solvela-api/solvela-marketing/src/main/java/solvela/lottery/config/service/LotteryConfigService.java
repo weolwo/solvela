@@ -128,62 +128,29 @@ public class LotteryConfigService {
     // ==================== 工作台：聚合回显 ====================
 
     /**
-     * 彩票工作台聚合回显：与 workbenchSave 的入参同构，前端拿到即可直接填回表单。
+     * 彩票工作台聚合回显：与 {@link #workbenchSave} 的入参同构，前端拿到即可直接填回表单。
      *
-     * 顶部是「活动 + 玩法」两级：activityCode 决定资产大库与玩法下拉的范围，
+     * <p>顶部是「活动 + 玩法」两级：activityCode 决定资产大库与玩法下拉的范围，
      * lotteryCode 决定具体加载哪一个玩法。lotteryCode 为空表示「在该活动下新建玩法」，
      * 返回一个带预生成编码的空壳而非报错，前端据此进入「从零配置」态。
      */
     public LotteryWorkbenchDTO workbenchDetail(String activityCode, String lotteryCode) {
-        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
-        if (activity == null) {
-            throw new BusinessException("活动不存在：" + activityCode);
-        }
-        if (!ACTIVITY_TYPE_LOTTERY.equals(activity.getActivityType())) {
-            throw new BusinessException("活动「" + activity.getActivityName() + "」不是彩票类活动");
-        }
+        ActivityConfig activity = requireLotteryActivity(activityCode);
 
         LotteryConfig config = getByLotteryCode(lotteryCode);
         if (config == null) {
-            // 新建玩法态：活动信息已知，预填一个可用编码，运营可直接用也可重新生成
-            return new LotteryWorkbenchDTO(
-                    activity.getActivityCode(), activity.getActivityName(),
-                    SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode),
-                    null, null, null, null,
-                    false, false, null, 0L, 0L, List.of());
+            return blankWorkbench(activity);
         }
         // 前端传来的两个参数必须自洽，否则会出现「顶部显示活动A、内容却是活动B的玩法」这种错位
         if (!activityCode.equals(config.getActivityCode())) {
             throw new BusinessException("玩法 " + lotteryCode + " 不属于活动 " + activityCode);
         }
 
-        // 结构锁：一旦发过号，发号引擎参数就永久冻结
         List<LotteryIssue> issueList = lotteryIssueManager.lambdaQuery()
                 .eq(LotteryIssue::getLotteryCode, config.getLotteryCode()).list();
-        long soldTotal = issueList.stream()
-                .mapToLong(issue -> issue.getSoldCount() == null ? 0 : issue.getSoldCount()).sum();
+        long soldTotal = soldTotalOf(issueList);
+        // 结构锁：一旦发过号，发号引擎参数就永久冻结
         String lockReason = resolveLockReason(config, soldTotal);
-
-        // 奖级规则：只存 prize_code，展示信息回查资产大库补齐（SKU 化，与抽奖工作台一致）
-        List<LotteryPrizeRule> ruleList = lotteryPrizeRuleManager.lambdaQuery()
-                .eq(LotteryPrizeRule::getLotteryCode, config.getLotteryCode())
-                .orderByAsc(LotteryPrizeRule::getPrizeLevel).list();
-        Map<String, PrizeConfig> prizeMap = prizeConfigService.queryListByActivityCode(config.getActivityCode())
-                .stream().collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
-
-        List<LotteryWorkbenchRuleDTO> ruleVOList = ruleList.stream().map(rule -> {
-            PrizeConfig prize = prizeMap.get(rule.getPrizeCode());
-            return new LotteryWorkbenchRuleDTO(
-                    rule.getPrizeLevel(),
-                    rule.getMatchRule(),
-                    rule.getMatchLength(),
-                    rule.getPrizeCode(),
-                    // 奖品被删时回退成编码，让运营看得见「这一奖级绑的奖没了」，而不是渲染出空白行
-                    prize == null ? rule.getPrizeCode() : prize.getPrizeName(),
-                    prize == null ? null : prize.getPrizeType(),
-                    prize == null ? null : prize.getPrizeValue())
-                    ;
-        }).toList();
 
         return new LotteryWorkbenchDTO(
                 config.getActivityCode(),
@@ -198,14 +165,51 @@ public class LotteryConfigService {
                 lockReason,
                 issueList.size(),
                 soldTotal,
-                ruleVOList);
+                ruleTab(config));
+    }
+
+    /** 新建玩法态：活动信息已知，预填一个可用编码，运营可直接用也可重新生成 */
+    private LotteryWorkbenchDTO blankWorkbench(ActivityConfig activity) {
+        return new LotteryWorkbenchDTO(
+                activity.getActivityCode(), activity.getActivityName(),
+                SolvelaCodeUtil.generateUniqueBizCode(SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode),
+                null, null, null, null,
+                false, false, null, 0L, 0L, List.of());
+    }
+
+    /**
+     * 奖级规则。规则表只存 prize_code，名称/类型/价值回查资产大库补齐（SKU 化，与抽奖工作台一致）。
+     */
+    private List<LotteryWorkbenchRuleDTO> ruleTab(LotteryConfig config) {
+        List<LotteryPrizeRule> ruleList = lotteryPrizeRuleManager.lambdaQuery()
+                .eq(LotteryPrizeRule::getLotteryCode, config.getLotteryCode())
+                .orderByAsc(LotteryPrizeRule::getPrizeLevel).list();
+        Map<String, PrizeConfig> prizeMap = prizeConfigService.queryListByActivityCode(config.getActivityCode())
+                .stream().collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (first, ignored) -> first));
+
+        return ruleList.stream().map(rule -> {
+            PrizeConfig prize = prizeMap.get(rule.getPrizeCode());
+            return new LotteryWorkbenchRuleDTO(
+                    rule.getPrizeLevel(),
+                    rule.getMatchRule(),
+                    rule.getMatchLength(),
+                    rule.getPrizeCode(),
+                    // 奖品被删时回退成编码，让运营看得见「这一奖级绑的奖没了」，而不是渲染出空白行
+                    prize == null ? rule.getPrizeCode() : prize.getPrizeName(),
+                    prize == null ? null : prize.getPrizeType(),
+                    prize == null ? null : prize.getPrizeValue());
+        }).toList();
+    }
+
+    private long soldTotalOf(List<LotteryIssue> issueList) {
+        return issueList.stream().mapToLong(issue -> issue.getSoldCount() == null ? 0 : issue.getSoldCount()).sum();
     }
 
     /**
      * 结构冻结的判定与人话文案，返回 null 表示未冻结。
      *
-     * 两个触发条件的严重程度不同，文案要分开写，否则运营看到「禁止修改」只会来问为什么：
-     * 已发过号是密码学层面的不可逆（改了历史号码就没法验证了），上线只是流程管控。
+     * <p>两个触发条件的严重程度不同，文案要分开写，否则运营看到「禁止修改」只会来问为什么：
+     * 已发过号是<b>密码学层面的不可逆</b>（改了历史号码就没法验证了），上线只是流程管控。
      */
     private String resolveLockReason(LotteryConfig config, long soldTotal) {
         if (soldTotal > 0) {
@@ -222,60 +226,94 @@ public class LotteryConfigService {
     // ==================== 工作台：聚合保存 ====================
 
     /**
-     * 彩票工作台聚合保存：t_lottery_config + t_lottery_prize_rule 同一事务。
-     * 前端的所有校验都只是 UI 防呆，这里全部服务端重算（铁律 2）
+     * 彩票工作台聚合保存：{@code t_lottery_config} + {@code t_lottery_prize_rule} 同一事务。
+     *
+     * <p>前端的所有校验都只是 UI 防呆，下面每一条服务端重算一遍（铁律 2）。
      */
     @Transactional(rollbackFor = Exception.class)
     public void workbenchSave(LotteryWorkbenchSaveCommand form) {
-        // 1. 活动必须存在且是彩票类
-        ActivityConfig activity = activityConfigService.getByActivityCode(form.getActivityCode());
+        requireLotteryActivity(form.getActivityCode());
+
+        LotteryConfig existed = getByLotteryCode(form.getLotteryCode());
+        checkCodeOwnership(form, existed);
+        checkNumberSpace(form);
+        checkStructureLock(form, existed);
+
+        List<LotteryWorkbenchRuleCommand> ruleList =
+                form.getPrizeRuleList() == null ? List.of() : form.getPrizeRuleList();
+        checkRules(ruleList, form);
+
+        saveConfig(form, existed);
+        rebuildRules(form, ruleList);
+    }
+
+    private ActivityConfig requireLotteryActivity(String activityCode) {
+        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
         if (activity == null) {
-            throw new BusinessException("活动不存在：" + form.getActivityCode());
+            throw new BusinessException("活动不存在：" + activityCode);
         }
         if (!ACTIVITY_TYPE_LOTTERY.equals(activity.getActivityType())) {
             throw new BusinessException("活动「" + activity.getActivityName() + "」不是彩票类活动");
         }
+        return activity;
+    }
 
-        // 2. 编码格式由 @Pattern 拦，这里补唯一性判重（铁律 8 落点清单第 ② 项）
-        LotteryConfig existed = getByLotteryCode(form.getLotteryCode());
-
-        // 一个活动可以有多个玩法，但编码是全局唯一的（uk_lottery_code）：
-        // 手输的编码可能撞上别的活动的玩法，提前给人话提示而不是抛 SQL 异常
+    /**
+     * 编码格式由 {@code @Pattern} 拦，这里补唯一性判重（铁律 8 落点清单第 ② 项）。
+     *
+     * <p>一个活动可以有多个玩法，但编码是全局唯一的（{@code uk_lottery_code}）：
+     * 手输的编码可能撞上别的活动的玩法，提前给人话提示而不是抛 SQL 异常。
+     */
+    private void checkCodeOwnership(LotteryWorkbenchSaveCommand form, LotteryConfig existed) {
         if (existed != null && !Objects.equals(existed.getActivityCode(), form.getActivityCode())) {
             throw new BusinessException("彩票编码 " + form.getLotteryCode()
                     + " 已被活动 " + existed.getActivityCode() + " 占用，请重新生成");
         }
+    }
 
-        // 3. 号码空间必须装得下发售量。10^length 与 totalCount 都是 int 存储，用 long 比较防溢出
+    /**
+     * 号码空间必须装得下发售量。
+     *
+     * <p>{@code 10^length} 与 totalCount 都是 int 存储，用 long 比较防溢出 ——
+     * 9 位号码的空间是 10 亿，int 还装得下，10 位就不行了。
+     */
+    private void checkNumberSpace(LotteryWorkbenchSaveCommand form) {
         long domain = (long) Math.pow(10, form.getNumberLength());
         if (form.getTotalCount() > domain) {
             throw new BusinessException("单期发售上限 " + form.getTotalCount()
                     + " 超过了 " + form.getNumberLength() + " 位号码的空间上限 " + domain + "，请增加号码长度或降低发售量");
         }
+    }
 
-        // 4. 结构锁：绕过前端直接调接口同样拦截
-        if (existed != null) {
-            long soldTotal = lotteryIssueManager.lambdaQuery()
-                    .eq(LotteryIssue::getLotteryCode, form.getLotteryCode()).list().stream()
-                    .mapToLong(issue -> issue.getSoldCount() == null ? 0 : issue.getSoldCount()).sum();
-            String lockReason = resolveLockReason(existed, soldTotal);
-            if (lockReason != null) {
-                boolean lengthChanged = !Objects.equals(existed.getNumberLength(), form.getNumberLength());
-                boolean totalChanged = !Objects.equals(existed.getTotalCount(), form.getTotalCount());
-                if (lengthChanged || totalChanged) {
-                    throw new BusinessException(lockReason);
-                }
-            }
+    /**
+     * 结构锁：冻结之后<b>只有发号引擎参数不能动</b>，玩法名与奖级规则照旧可以改。
+     *
+     * <p>所以这里不是「冻结了就整个保存拒绝」，而是先看这次提交有没有真的动那两个字段 ——
+     * 否则运营连改个错别字都得先下线。
+     */
+    private void checkStructureLock(LotteryWorkbenchSaveCommand form, LotteryConfig existed) {
+        if (existed == null) {
+            return;
         }
-
-        // 5. 奖级规则逐条校验
-        List<LotteryWorkbenchRuleCommand> ruleList = form.getPrizeRuleList() == null ? List.of() : form.getPrizeRuleList();
-        String ruleError = validateRules(ruleList, form);
-        if (ruleError != null) {
-            throw new BusinessException(ruleError);
+        String lockReason = resolveLockReason(existed, soldTotalOf(lotteryIssueManager.lambdaQuery()
+                .eq(LotteryIssue::getLotteryCode, form.getLotteryCode()).list()));
+        if (lockReason == null) {
+            return;
         }
+        boolean lengthChanged = !Objects.equals(existed.getNumberLength(), form.getNumberLength());
+        boolean totalChanged = !Objects.equals(existed.getTotalCount(), form.getTotalCount());
+        if (lengthChanged || totalChanged) {
+            throw new BusinessException(lockReason);
+        }
+    }
 
-        // 6. 落库：彩票配置 upsert
+    /**
+     * 彩票配置 upsert。
+     *
+     * <p>两个字段刻意<b>不接受前端值</b>：字符集固定十进制；status 走独立的上下线接口 ——
+     * 让保存配置顺带把玩法推上线（或改回下线）是最容易出事的那种「顺手」。
+     */
+    private void saveConfig(LotteryWorkbenchSaveCommand form, LotteryConfig existed) {
         if (existed == null) {
             LotteryConfig entity = new LotteryConfig();
             entity.setActivityCode(form.getActivityCode());
@@ -283,71 +321,74 @@ public class LotteryConfigService {
             entity.setLotteryName(form.getLotteryName());
             entity.setNumberLength(form.getNumberLength());
             entity.setTotalCount(form.getTotalCount());
-            // 字符集固定十进制，不接受前端值
             entity.setNumberCharset(LotteryConst.NUMBER_CHARSET);
-            // 新建默认下线，上线是独立的动作，不能靠保存配置顺带把玩法推上线
+            // 新建默认下线，上线是独立的动作
             entity.setStatus(LotteryConfigStatusEnum.OFFLINE);
             lotteryConfigDao.insert(entity);
-        } else {
-            LotteryConfig update = new LotteryConfig();
-            update.setId(existed.getId());
-            update.setLotteryName(form.getLotteryName());
-            update.setNumberLength(form.getNumberLength());
-            update.setTotalCount(form.getTotalCount());
-            update.setNumberCharset(LotteryConst.NUMBER_CHARSET);
-            // status 不在此处覆盖：上线/下线走独立接口，避免保存配置时把状态改回去
-            lotteryConfigDao.updateById(update);
+            return;
         }
+        LotteryConfig update = new LotteryConfig();
+        update.setId(existed.getId());
+        update.setLotteryName(form.getLotteryName());
+        update.setNumberLength(form.getNumberLength());
+        update.setTotalCount(form.getTotalCount());
+        update.setNumberCharset(LotteryConst.NUMBER_CHARSET);
+        lotteryConfigDao.updateById(update);
+    }
 
-        // 7. 落库：奖级规则整表重建（子表整体替换语义，与抽奖工作台的坑位映射一致）
+    /**
+     * 奖级规则<b>整表重建</b>（子表整体替换语义，与抽奖工作台的坑位映射一致）。
+     */
+    private void rebuildRules(LotteryWorkbenchSaveCommand form, List<LotteryWorkbenchRuleCommand> ruleList) {
         lotteryPrizeRuleManager.lambdaUpdate()
                 .eq(LotteryPrizeRule::getLotteryCode, form.getLotteryCode()).remove();
         for (LotteryWorkbenchRuleCommand rule : ruleList) {
+            MatchRuleEnum matchRule = MatchRuleEnum.resolve(rule.getMatchRule());
+
             LotteryPrizeRule entity = new LotteryPrizeRule();
             entity.setLotteryCode(form.getLotteryCode());
             entity.setPrizeLevel(rule.getPrizeLevel());
-            MatchRuleEnum matchRule = MatchRuleEnum.resolve(rule.getMatchRule());
             entity.setMatchRule(matchRule.getValue());
-            // EXACT 的匹配长度恒等于号码长度：前端传什么都不算数，服务端归一，避免存进去一个自相矛盾的值
+            // EXACT 的匹配长度恒等于号码长度：前端传什么都不算数，服务端归一，
+            // 避免存进去一个自相矛盾的值
             entity.setMatchLength(matchRule == MatchRuleEnum.EXACT ? form.getNumberLength() : rule.getMatchLength());
             entity.setPrizeCode(rule.getPrizeCode());
             lotteryPrizeRuleDao.insert(entity);
         }
-
     }
 
     /**
-     * 奖级规则校验，返回 null 表示通过
+     * 奖级规则逐条校验。五条里每一条都对应一种「配得下去、开奖时才出事」的形态。
      */
-    private String validateRules(List<LotteryWorkbenchRuleCommand> ruleList, LotteryWorkbenchSaveCommand form) {
+    private void checkRules(List<LotteryWorkbenchRuleCommand> ruleList, LotteryWorkbenchSaveCommand form) {
         Set<Integer> levels = new HashSet<>();
         Set<String> prizeCodes = new HashSet<>();
         for (LotteryWorkbenchRuleCommand rule : ruleList) {
             if (!levels.add(rule.getPrizeLevel())) {
-                return "奖级重复：" + rule.getPrizeLevel() + " 级配置了多条规则";
+                throw new BusinessException("奖级重复：" + rule.getPrizeLevel() + " 级配置了多条规则");
             }
             if (rule.getPrizeLevel() == LotteryConst.PRIZE_LEVEL_NONE) {
-                return "奖级不能设为 " + LotteryConst.PRIZE_LEVEL_NONE
-                        + "：该值被「未中奖」占用，否则用户端无法区分未中奖与 " + LotteryConst.PRIZE_LEVEL_NONE + " 等奖";
+                throw new BusinessException("奖级不能设为 " + LotteryConst.PRIZE_LEVEL_NONE
+                        + "：该值被「未中奖」占用，否则用户端无法区分未中奖与 " + LotteryConst.PRIZE_LEVEL_NONE + " 等奖");
             }
             // 从 DB/前端拿到的字符串一律显式转枚举，不做 map 直查（本项目已复发三次的缺陷模式）
             MatchRuleEnum matchRule = MatchRuleEnum.resolve(rule.getMatchRule());
             if (matchRule == null) {
-                return "奖级 " + rule.getPrizeLevel() + " 的匹配规则非法：" + rule.getMatchRule();
+                throw new BusinessException("奖级 " + rule.getPrizeLevel() + " 的匹配规则非法：" + rule.getMatchRule());
             }
             if (matchRule != MatchRuleEnum.EXACT && rule.getMatchLength() > form.getNumberLength()) {
-                return "奖级 " + rule.getPrizeLevel() + " 的匹配长度 " + rule.getMatchLength()
-                        + " 超过号码长度 " + form.getNumberLength() + "，这条规则永远不可能命中";
+                throw new BusinessException("奖级 " + rule.getPrizeLevel() + " 的匹配长度 " + rule.getMatchLength()
+                        + " 超过号码长度 " + form.getNumberLength() + "，这条规则永远不可能命中");
             }
             // 同一个奖品被两个奖级引用，中奖后无法判断该按哪一级的口径统计，直接拦掉
             if (!prizeCodes.add(rule.getPrizeCode())) {
-                return "奖品 " + rule.getPrizeCode() + " 被多个奖级重复绑定";
+                throw new BusinessException("奖品 " + rule.getPrizeCode() + " 被多个奖级重复绑定");
             }
             if (prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), rule.getPrizeCode()) == null) {
-                return "奖级 " + rule.getPrizeLevel() + " 绑定的奖品不存在于本活动的资产大库：" + rule.getPrizeCode();
+                throw new BusinessException("奖级 " + rule.getPrizeLevel()
+                        + " 绑定的奖品不存在于本活动的资产大库：" + rule.getPrizeCode());
             }
         }
-        return null;
     }
 
     // ==================== 上下线 ====================

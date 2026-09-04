@@ -236,18 +236,55 @@ public class MallCommodityService {
     /**
      * 商品聚合保存：主表 + SKU（整表 diff）+ 图片引用，同一事务。
      *
-     * <p>校验全部在写库之前做完，所以那些 {@code userErrorParam} 的提前返回不依赖回滚。
+     * <p><b>校验全部在写库之前做完</b>，所以那些提前抛出不依赖回滚 ——
+     * 这条顺序不要打乱：一旦「写一半再校验」，报错信息里的商品 id 就成了一个
+     * 事务结束后并不存在的号码，排查时对不上任何东西。
      *
      * @return 商品 id。<b>新建时前端要靠它把地址栏换成编辑态</b>，
      * 否则运营保存后又点一次保存，会建出第二个商品。
      */
     @Transactional(rollbackFor = Exception.class)
     public Long save(MallCommoditySaveCommand form, String operator) {
-        // ---------- 1. 主表字段校验 ----------
-        MallCategory category = mallCategoryManager.getById(form.getCategoryId());
+        MallCategory category = requireCategory(form.getCategoryId());
+        checkCommodityFields(form);
+        Shelf shelf = resolveShelf(form);
+
+        MallCommodity existing = loadExisting(form.getId());
+        String commodityCode = resolveCommodityCode(form, existing);
+        SkuPlan skuPlan = planSkus(form);
+        if (shelf.status() == MallCommodityStatusEnum.ON) {
+            checkReadyForShelf(category, skuPlan.forms());
+        }
+
+        Long commodityId = saveCommodity(form, existing, commodityCode, shelf, operator);
+        saveSkus(commodityId, form, skuPlan, operator);
+        confirmFileRelations(commodityId, form, skuPlan.forms());
+        return commodityId;
+    }
+
+    private MallCategory requireCategory(Long categoryId) {
+        MallCategory category = mallCategoryManager.getById(categoryId);
         if (category == null) {
             throw new BusinessException("商品分类不存在");
         }
+        return category;
+    }
+
+    private MallCommodity loadExisting(Long id) {
+        if (id == null) {
+            return null;
+        }
+        MallCommodity existing = mallCommodityManager.getById(id);
+        if (existing == null) {
+            throw new BusinessException("商品不存在，可能已被删除");
+        }
+        return existing;
+    }
+
+    /**
+     * 主表字段校验。
+     */
+    private void checkCommodityFields(MallCommoditySaveCommand form) {
         if (!COMMODITY_TYPES.contains(form.getCommodityType())) {
             throw new BusinessException("商品类型不合法：" + form.getCommodityType());
         }
@@ -259,47 +296,83 @@ public class MallCommodityService {
         if (form.getPayType() == null) {
             throw new BusinessException("支付方式不合法");
         }
+        checkDetailContent(form.getDetailContent());
+    }
+
+    /**
+     * 上架窗口与限兑周期：这四个字段都<b>有服务端默认值</b>，不是简单地把表单值搬过去。
+     *
+     * @param startTime 留空 = 不限，落哨兵值。列是 NOT NULL 的，理由见 {@code MallConst.SHELF_START_SENTINEL}
+     */
+    private record Shelf(MallCommodityStatusEnum status, String limitPeriod,
+                         LocalDateTime startTime, LocalDateTime endTime) {
+    }
+
+    private Shelf resolveShelf(MallCommoditySaveCommand form) {
         String limitPeriod = StringUtils.defaultIfBlank(form.getLimitPeriod(), MallConst.LIMIT_PERIOD_LIFETIME);
         if (!LIMIT_PERIODS.contains(limitPeriod)) {
             throw new BusinessException("限兑周期不合法：" + limitPeriod);
         }
-        MallCommodityStatusEnum status = form.getStatus() == null ? MallCommodityStatusEnum.DRAFT : form.getStatus();
-        String detailError = checkDetailContent(form.getDetailContent());
-        if (detailError != null) {
-            throw new BusinessException(detailError);
-        }
-        // 留空 = 不限，落哨兵值。列是 NOT NULL 的，理由见 MallConst.SHELF_START_SENTINEL
         LocalDateTime startTime = form.getStartTime() == null ? MallConst.SHELF_START_SENTINEL : form.getStartTime();
         LocalDateTime endTime = form.getEndTime() == null ? MallConst.SHELF_END_SENTINEL : form.getEndTime();
         if (!endTime.isAfter(startTime)) {
             throw new BusinessException("上架结束时间必须晚于开始时间");
         }
+        return new Shelf(form.getStatus() == null ? MallCommodityStatusEnum.DRAFT : form.getStatus(),
+                limitPeriod, startTime, endTime);
+    }
 
-        // ---------- 2. SKU 列表校验 ----------
-        MallCommodity existing = form.getId() == null ? null : mallCommodityManager.getById(form.getId());
-        if (form.getId() != null && existing == null) {
-            throw new BusinessException("商品不存在，可能已被删除");
+    /**
+     * 商品编码：新建时校验并判重，编辑时<b>一律沿用库里的</b>。
+     *
+     * <p>创建后不可改（DDL）：它一旦被 C 端楼层配置或履约单引用就锁死了，改一次等于把那些引用
+     * 全指向空。前端禁用输入框只是防呆，这里才是约束。
+     *
+     * <p>新建这一路运营手输或点「生成」都会走到，两条路径服务端都要校验并判重（铁律 8）——
+     * 唯一索引只是兜底，让它抛 SQL 异常的话，运营看到的是一串英文堆栈。
+     */
+    private String resolveCommodityCode(MallCommoditySaveCommand form, MallCommodity existing) {
+        if (existing != null) {
+            return existing.getCommodityCode();
         }
-        boolean isCreate = existing == null;
-
-        // 编码：运营手输或点「生成」都会走到这里，两条路径服务端都要校验并判重（铁律 8）。
-        // 唯一索引只是兜底 —— 让它抛 SQL 异常，运营看到的是一串英文堆栈
-        String commodityCode;
-        if (isCreate) {
-            commodityCode = StringUtils.upperCase(StringUtils.trimToEmpty(form.getCommodityCode()));
-            if (!SolvelaCodeUtil.isValidBizCode(commodityCode)) {
-                throw new BusinessException("商品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
-            }
-            if (existsByCommodityCode(commodityCode)) {
-                throw new BusinessException("商品编码「" + commodityCode + "」已被占用，请换一个或点「生成」");
-            }
-        } else {
-            // 创建后不可改（DDL）：它一旦被 C 端楼层配置或履约单引用就锁死了，
-            // 改一次等于把那些引用全指向空。前端禁用输入框只是防呆，这里才是约束
-            commodityCode = existing.getCommodityCode();
+        String commodityCode = StringUtils.upperCase(StringUtils.trimToEmpty(form.getCommodityCode()));
+        if (!SolvelaCodeUtil.isValidBizCode(commodityCode)) {
+            throw new BusinessException("商品" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
         }
+        if (existsByCommodityCode(commodityCode)) {
+            throw new BusinessException("商品编码「" + commodityCode + "」已被占用，请换一个或点「生成」");
+        }
+        return commodityCode;
+    }
 
+    /**
+     * SKU 整表 diff 的计划：这次<b>要落的</b>规格行，与<b>要删的</b>库内行。
+     *
+     * <p>先算完再落库，是因为「哪些要删」必须在插入之前就定下来 ——
+     * 边插边判的话，这一次新建的行会被当成「库里有、表单没有」而删掉。
+     *
+     * @param forms 表单提交的规格；无规格商品在这里已被补上一条默认规格
+     */
+    private record SkuPlan(List<MallCommoditySkuCommand> forms, List<MallSku> toDelete) {
+    }
+
+    private SkuPlan planSkus(MallCommoditySaveCommand form) {
         List<MallSku> dbSkuList = listDbSku(form.getId());
+        List<MallCommoditySkuCommand> skuFormList = resolveSkuForms(form, dbSkuList);
+        Map<Long, MallSku> dbSkuMap = dbSkuList.stream()
+                .collect(Collectors.toMap(MallSku::getId, Function.identity()));
+
+        Set<Long> keepSkuIds = checkSkuForms(skuFormList, dbSkuMap);
+        List<MallSku> toDelete = dbSkuList.stream()
+                .filter(sku -> !keepSkuIds.contains(sku.getId())).toList();
+        checkDeletable(toDelete);
+        return new SkuPlan(skuFormList, toDelete);
+    }
+
+    /**
+     * 表单提交的规格行，补上两种服务端才知道的情况。
+     */
+    private List<MallCommoditySkuCommand> resolveSkuForms(MallCommoditySaveCommand form, List<MallSku> dbSkuList) {
         List<MallCommoditySkuCommand> skuFormList = form.getSkuList() == null
                 ? new ArrayList<>() : new ArrayList<>(form.getSkuList());
         if (skuFormList.isEmpty()) {
@@ -314,78 +387,111 @@ public class MallCommodityService {
         if (skuFormList.size() > MallConst.MAX_SKU_COUNT) {
             throw new BusinessException("单个商品最多 " + MallConst.MAX_SKU_COUNT + " 个规格");
         }
+        return skuFormList;
+    }
 
-        Map<Long, MallSku> dbSkuMap = dbSkuList.stream()
-                .collect(Collectors.toMap(MallSku::getId, Function.identity()));
+    /**
+     * 逐行校验规格，顺便把 skuCode 归一化回表单对象。
+     *
+     * @return 这次要保留的库内 SKU id —— 没出现在里面的就是要删的
+     */
+    private Set<Long> checkSkuForms(List<MallCommoditySkuCommand> skuFormList, Map<Long, MallSku> dbSkuMap) {
         Set<String> attrsKeys = new HashSet<>();
         Set<String> skuCodes = new HashSet<>();
         Set<Long> keepSkuIds = new HashSet<>();
         for (MallCommoditySkuCommand skuForm : skuFormList) {
-            // 新增行的编码由运营填/前端生成，老行沿用库里的（同样不可改）
-            MallSku dbSkuForCode = skuForm.getId() == null ? null : dbSkuMap.get(skuForm.getId());
-            String skuCode = dbSkuForCode != null
-                    ? dbSkuForCode.getSkuCode()
-                    : StringUtils.upperCase(StringUtils.trimToEmpty(skuForm.getSkuCode()));
-            if (!SolvelaCodeUtil.isValidBizCode(skuCode)) {
-                throw new BusinessException("规格「" + displayAttrs(skuForm.getSkuAttrs()) + "」的 SKU"
-                        + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
-            }
-            // 同一次提交内部先查一遍：两行填了同一个编码，只靠唯一索引会在插到第二行时才炸，
-            // 那时第一行已经写进去了（虽然事务会回滚，但报错信息是 SQL 层的）
-            if (!skuCodes.add(skuCode)) {
-                throw new BusinessException("SKU 编码重复：" + skuCode);
-            }
-            if (dbSkuForCode == null && existsBySkuCode(skuCode)) {
-                throw new BusinessException("SKU 编码「" + skuCode + "」已被占用，请换一个或点「生成」");
-            }
-            skuForm.setSkuCode(skuCode);
+            MallSku dbSku = skuForm.getId() == null ? null : dbSkuMap.get(skuForm.getId());
+            skuForm.setSkuCode(resolveSkuCode(skuForm, dbSku, skuCodes));
 
             // JSON 列做不了唯一索引，规格组合的去重只能在这里做（DDL 里写明了）。
-            // 不做的话，表单重复提交会生成一堆规格完全相同的 SKU，C 端下拉里出现两个「星空灰 XL」
-            String attrsKey = normalizedAttrsKey(skuForm.getSkuAttrs());
-            if (!attrsKeys.add(attrsKey)) {
+            // 不做的话，表单重复提交会生成一堆规格完全相同的 SKU，
+            // C 端下拉里出现两个「星空灰 XL」
+            if (!attrsKeys.add(normalizedAttrsKey(skuForm.getSkuAttrs()))) {
                 throw new BusinessException("规格组合重复：" + displayAttrs(skuForm.getSkuAttrs()));
             }
+
             if (skuForm.getId() == null) {
                 continue;
             }
-            MallSku dbSku = dbSkuMap.get(skuForm.getId());
             if (dbSku == null) {
                 throw new BusinessException("规格不存在或不属于本商品");
             }
             keepSkuIds.add(dbSku.getId());
-            // 总库存是「运营投放量」，卖掉和锁定的那部分已经发生了，改不回去。
-            // 允许改小到低于 locked+sold，虚拟列 available_stock 会变成负数
-            int occupied = nullToZero(dbSku.getLockedStock()) + nullToZero(dbSku.getSoldCount());
-            if (skuForm.getTotalStock() < occupied) {
-                throw new BusinessException("规格「" + displayAttrs(skuForm.getSkuAttrs())
-                        + "」的总库存不能小于已锁定+已售的 " + occupied + " 件");
-            }
+            checkStockNotBelowOccupied(skuForm, dbSku);
         }
+        return keepSkuIds;
+    }
 
-        // 库里有、这次没传 = 要删。有流水的不许删，只能停用
-        List<MallSku> toDeleteList = dbSkuList.stream()
-                .filter(sku -> !keepSkuIds.contains(sku.getId())).toList();
+    /**
+     * 新增行的编码由运营填 / 前端生成，老行沿用库里的（同样创建后不可改）。
+     *
+     * @param skuCodes 本次提交已经用掉的编码。同一次提交内部先查一遍，是因为两行填了同一个编码时，
+     *                 只靠唯一索引会在插到第二行才炸，而那时报出来的是一句 SQL 层的英文
+     */
+    private String resolveSkuCode(MallCommoditySkuCommand skuForm, MallSku dbSku, Set<String> skuCodes) {
+        String skuCode = dbSku != null
+                ? dbSku.getSkuCode()
+                : StringUtils.upperCase(StringUtils.trimToEmpty(skuForm.getSkuCode()));
+        if (!SolvelaCodeUtil.isValidBizCode(skuCode)) {
+            throw new BusinessException("规格「" + displayAttrs(skuForm.getSkuAttrs()) + "」的 SKU"
+                    + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
+        }
+        if (!skuCodes.add(skuCode)) {
+            throw new BusinessException("SKU 编码重复：" + skuCode);
+        }
+        if (dbSku == null && existsBySkuCode(skuCode)) {
+            throw new BusinessException("SKU 编码「" + skuCode + "」已被占用，请换一个或点「生成」");
+        }
+        return skuCode;
+    }
+
+    /**
+     * 总库存是「运营投放量」，而卖掉和锁定的那部分<b>已经发生了，改不回去</b>。
+     *
+     * <p>允许改小，但不能小到低于 locked + sold —— 那会让虚拟列 available_stock 变成负数。
+     */
+    private void checkStockNotBelowOccupied(MallCommoditySkuCommand skuForm, MallSku dbSku) {
+        int occupied = nullToZero(dbSku.getLockedStock()) + nullToZero(dbSku.getSoldCount());
+        if (skuForm.getTotalStock() < occupied) {
+            throw new BusinessException("规格「" + displayAttrs(skuForm.getSkuAttrs())
+                    + "」的总库存不能小于已锁定+已售的 " + occupied + " 件");
+        }
+    }
+
+    /** 库里有、这次没传 = 要删。有流水的不许删，只能停用 */
+    private void checkDeletable(List<MallSku> toDeleteList) {
         for (MallSku sku : toDeleteList) {
             if (nullToZero(sku.getLockedStock()) > 0 || nullToZero(sku.getSoldCount()) > 0) {
                 throw new BusinessException("规格「" + displayAttrs(parseSkuAttrs(sku.getSkuAttrs()))
                         + "」已产生兑换记录，不能删除；请改为停用");
             }
         }
+    }
 
-        // ---------- 3. 上架校验：只在真的要上架时收紧 ----------
-        if (status == MallCommodityStatusEnum.ON) {
-            boolean hasEnabledSku = skuFormList.stream()
-                    .anyMatch(sku -> sku.getSkuStatus() == null || sku.getSkuStatus() == EnableStatusEnum.ENABLED);
-            if (!hasEnabledSku) {
-                throw new BusinessException("上架的商品至少要有一个启用的规格");
-            }
-            if (category.getStatus() == EnableStatusEnum.DISABLED) {
-                throw new BusinessException("分类「" + category.getCategoryName() + "」已停用，不能在该分类下上架商品");
-            }
+    /**
+     * 上架校验：<b>只在真的要上架时收紧</b>。
+     *
+     * <p>存草稿时不拦，是因为运营配商品是分几次做的（先把名字图片存下来，规格晚点补）；
+     * 而一旦要放到 C 端，「没有可买的规格」「分类是停用的」都会让用户点进去看到一个死页面。
+     */
+    private void checkReadyForShelf(MallCategory category, List<MallCommoditySkuCommand> skuFormList) {
+        boolean hasEnabledSku = skuFormList.stream()
+                .anyMatch(sku -> sku.getSkuStatus() == null || sku.getSkuStatus() == EnableStatusEnum.ENABLED);
+        if (!hasEnabledSku) {
+            throw new BusinessException("上架的商品至少要有一个启用的规格");
         }
+        if (category.getStatus() == EnableStatusEnum.DISABLED) {
+            throw new BusinessException("分类「" + category.getCategoryName() + "」已停用，不能在该分类下上架商品");
+        }
+    }
 
-        // ---------- 4. 落库：主表 ----------
+    /**
+     * 落库：主表。
+     *
+     * @return 商品 id。新建时是刚拿到的自增值，SKU 与图片引用都要挂到它下面
+     */
+    private Long saveCommodity(MallCommoditySaveCommand form, MallCommodity existing,
+                               String commodityCode, Shelf shelf, String operator) {
         MallCommodity entity = new MallCommodity();
         entity.setId(form.getId());
         entity.setCommodityCode(commodityCode);
@@ -407,27 +513,36 @@ public class MallCommodityService {
         // 「纯积分」时那个现金价会留在库里，下单扣款读到它就是白扣用户的钱
         entity.setCashPrice(form.getPayType() == MallPayTypeEnum.POINTS
                 ? BigDecimal.ZERO : nullToZero(form.getCashPrice()));
-        entity.setLimitPeriod(limitPeriod);
+        entity.setLimitPeriod(shelf.limitPeriod());
         entity.setLimitCount(form.getLimitCount() == null ? 0 : form.getLimitCount());
-        entity.setStartTime(startTime);
-        entity.setEndTime(endTime);
-        entity.setStatus(status);
+        entity.setStartTime(shelf.startTime());
+        entity.setEndTime(shelf.endTime());
+        entity.setStatus(shelf.status());
         entity.setIsHome(Boolean.TRUE.equals(form.getIsHome()));
         entity.setSort(form.getSort() == null ? 0 : form.getSort());
         // create_time / update_time 一律不设：铁律 9，只认数据库时钟
-        if (isCreate) {
+        entity.setUpdateBy(operator);
+        if (existing == null) {
             entity.setSoldCount(0);
             entity.setCreateBy(operator);
-            entity.setUpdateBy(operator);
             mallCommodityDao.insert(entity);
         } else {
-            entity.setUpdateBy(operator);
             mallCommodityDao.updateById(entity);
         }
-        Long commodityId = entity.getId();
+        return entity.getId();
+    }
 
-        // ---------- 5. 落库：SKU 整表 diff ----------
+    /**
+     * 落库：SKU 整表 diff。
+     *
+     * <p>🔴 {@code locked_stock} / {@code sold_count} 只由下单与履约链路改，这里新建归零、
+     * 更新时压根不带 —— 让编辑页能写它们，等于让运营的一次保存把在途订单的锁库存抹掉。
+     * {@code available_stock} 是虚拟列，任何时候都不写。
+     */
+    private void saveSkus(Long commodityId, MallCommoditySaveCommand form, SkuPlan skuPlan, String operator) {
+        // 纯积分商品不存在现金覆盖价，理由同主表
         boolean pointsOnly = form.getPayType() == MallPayTypeEnum.POINTS;
+        List<MallCommoditySkuCommand> skuFormList = skuPlan.forms();
         for (int i = 0; i < skuFormList.size(); i++) {
             MallCommoditySkuCommand skuForm = skuFormList.get(i);
             MallSku sku = new MallSku();
@@ -436,33 +551,26 @@ public class MallCommodityService {
                     ? new LinkedHashMap<String, String>() : skuForm.getSkuAttrs()));
             sku.setSkuCoverFileId(skuForm.getSkuCoverFileId());
             sku.setSkuPointsPrice(skuForm.getSkuPointsPrice());
-            // 纯积分商品不存在现金覆盖价，理由同主表
             sku.setSkuCashPrice(pointsOnly ? null : skuForm.getSkuCashPrice());
             sku.setTotalStock(skuForm.getTotalStock());
             sku.setSkuStatus(skuForm.getSkuStatus() == null ? EnableStatusEnum.ENABLED : skuForm.getSkuStatus());
             // 顺序取表单里的行序 —— 运营拖动排序后期望 C 端就是那个顺序
             sku.setSort(skuForm.getSort() == null ? i : skuForm.getSort());
+            sku.setUpdateBy(operator);
             if (skuForm.getId() == null) {
                 sku.setSkuCode(skuForm.getSkuCode());
-                // locked / sold 只由下单与履约链路改，新建归零；available_stock 是虚拟列，不写
                 sku.setLockedStock(0);
                 sku.setSoldCount(0);
                 sku.setCreateBy(operator);
-                sku.setUpdateBy(operator);
                 mallSkuManager.save(sku);
             } else {
                 sku.setId(skuForm.getId());
-                sku.setUpdateBy(operator);
                 mallSkuManager.updateById(sku);
             }
         }
-        if (!toDeleteList.isEmpty()) {
-            mallSkuManager.removeByIds(toDeleteList.stream().map(MallSku::getId).toList());
+        if (!skuPlan.toDelete().isEmpty()) {
+            mallSkuManager.removeByIds(skuPlan.toDelete().stream().map(MallSku::getId).toList());
         }
-
-        // ---------- 6. 图片引用登记 ----------
-        confirmFileRelations(commodityId, form, skuFormList);
-        return commodityId;
     }
 
     /**
@@ -605,19 +713,23 @@ public class MallCommodityService {
         return skuForm;
     }
 
-    private String checkDetailContent(String detailContent) {
+    /**
+     * 图文详情的两条硬约束。
+     *
+     * <p>编辑器那边也关掉了 base64，但前端配置是会被人改回来的，<b>后端这道才是真的</b>：
+     * 一张图几百 KB 的 base64 塞进 mediumtext，几十个商品就把表撑爆。
+     */
+    private void checkDetailContent(String detailContent) {
         if (StringUtils.isBlank(detailContent)) {
-            return null;
+            return;
         }
-        // 编辑器那边也关掉了 base64，但前端配置是会被人改回来的，后端这道才是真的。
-        // 一张图几百 KB 的 base64 塞进 mediumtext，几十个商品就把表撑爆
         if (RichTextImageExtractor.containsBase64Image(detailContent)) {
-            return "图文详情不允许内嵌 base64 图片，请用编辑器的上传按钮插入";
+            throw new BusinessException("图文详情不允许内嵌 base64 图片，请用编辑器的上传按钮插入");
         }
         if (detailContent.length() > MallConst.MAX_DETAIL_CONTENT_LENGTH) {
-            return "图文详情过长（" + detailContent.length() + " 字符），上限 " + MallConst.MAX_DETAIL_CONTENT_LENGTH;
+            throw new BusinessException("图文详情过长（" + detailContent.length()
+                    + " 字符），上限 " + MallConst.MAX_DETAIL_CONTENT_LENGTH);
         }
-        return null;
     }
 
     /**
