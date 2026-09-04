@@ -72,6 +72,32 @@ public class TaskRecordAdvanceService {
     private static final LocalDateTime FOREVER = LocalDateTime.of(2099, 12, 31, 23, 59, 59);
 
     /**
+     * 一次推进的运行态上下文：从「决定要推进这个任务」那一刻起就固定，之后整条链路共用。
+     *
+     * <p>它替掉的是一组在四五个私有方法之间原样传来传去的参数
+     * （{@code config / ctx / rule / strategy / flow / logDiscard}）——
+     * 每加一个推进级的东西，那几个签名要一起改，而漏改哪一个编译器不会提醒。
+     * 与抽奖链路里的 {@code DrawBatch} 是同一个做法。
+     *
+     * @param flow       已经落库的事件流水。<b>它是可变的</b>：终态（推进量 / 丢弃原因）
+     *                   在链路末端才补齐，见 {@link #finishAsDiscard} 与 {@link #finishFlow}
+     * @param logDiscard 这个事件要不要留丢弃流水。丢弃流水是客诉自证的关键，
+     *                   但高频事件每条不匹配都写一行会把流水表写爆，故由事件注册表开关控制
+     */
+    private record Advancing(TaskConfig config, TaskEventContext ctx, TaskRuleConfig rule,
+                             TaskProgressStrategy strategy, TaskRecordFlow flow, boolean logDiscard) {
+    }
+
+    /**
+     * 进度真的动了：这一笔之前是多少、之后是多少、动了多少。
+     *
+     * <p>三个数<b>必须一起产生</b>：阶梯发奖靠 {@code (before, after]} 这个左开右闭区间
+     * 判断本次跨过了哪几档，流水靠 delta 与 after 对账。谁单独变了都对不上。
+     */
+    private record MetricChange(BigDecimal before, BigDecimal after, BigDecimal delta) {
+    }
+
+    /**
      * 推进一个任务配置的进度。
      *
      * <p>步骤顺序<b>不能调</b>：先插流水（占住幂等键）→ 再推进进度，两者同一事务。
@@ -81,12 +107,12 @@ public class TaskRecordAdvanceService {
      */
     @Transactional(rollbackFor = Exception.class)
     public TaskAdvanceResult advance(TaskConfig config, TaskEventContext ctx, TaskEvent eventDef) {
-        // 丢弃流水是客诉自证的关键，但高频事件每条不匹配都写一行会把流水表写爆，故由注册表开关控制
         boolean logDiscard = eventDef == null || !Boolean.FALSE.equals(eventDef.getDiscardLogFlag());
         TaskRuleConfig rule = TaskRuleConfig.parse(config.getRuleConfig());
+
+        // 配置异常直接落丢弃流水，不抛异常 —— 一个坏配置不该让整批事件处理中断
         TaskTypeEnum taskType = rule.taskType();
         if (taskType == null) {
-            // 配置异常直接落丢弃流水，不抛异常 —— 一个坏配置不该让整批事件处理中断
             return discardWithoutRecord(config, ctx, TaskDiscardCode.CONFIG_INVALID,
                     "任务类型未配置或非法：rule_config.taskType="
                             + rule.string(TaskConst.RULE_KEY_TASK_TYPE), logDiscard);
@@ -97,9 +123,7 @@ public class TaskRecordAdvanceService {
                     "没有支持 " + taskType.getValue() + " 的进度策略实现", logDiscard);
         }
 
-        String basePeriodKey = TaskPeriodResolver.resolvePeriodKey(taskType, config.getLimitType(), ctx.eventTime());
-
-        // ========== ① 先插流水：幂等键先占住 ==========
+        // 先插流水：幂等键先占住
         TaskRecordFlow flow = buildFlow(config, ctx);
         try {
             taskRecordFlowDao.insert(flow);
@@ -110,51 +134,84 @@ public class TaskRecordAdvanceService {
             return new TaskAdvanceResult.Duplicated(ctx.eventBizId());
         }
 
-        // ========== ①.5 人群过滤 ==========
+        Advancing advancing = new Advancing(config, ctx, rule, strategy, flow, logDiscard);
         AudienceCheck audience = checkAudience(config, ctx);
         if (audience != null) {
-            return finishAsDiscard(flow, audience.code(), audience.reason(), logDiscard);
+            return finishAsDiscard(advancing, audience.code(), audience.reason());
         }
 
-        // ========== ② 取或建任务记录（含 limit_count 轮次判定） ==========
-        RoundResolution round = resolveRound(config, ctx, basePeriodKey);
-        if (round.rejectReason() != null) {
-            return finishAsDiscard(flow, TaskDiscardCode.ROUND_LIMIT_EXCEEDED, round.rejectReason(), logDiscard);
+        return switch (resolveRecord(advancing, taskType)) {
+            case RecordLookup.Rejected rejected -> rejected.result();
+            case RecordLookup.Found found -> applyProgress(advancing, found.record());
+        };
+    }
+
+    /**
+     * 找记录的两种结局：找到了可以推的，或者这一笔就到此为止。
+     *
+     * <p>用 sealed 而不是「返回 null 表示被拒」：被拒时的丢弃文案要原样返回给调用方，
+     * 而它<b>未必写在流水上</b>（高频事件关掉留痕时那一行会被删掉），
+     * 从 null 反推不出来。
+     */
+    private sealed interface RecordLookup {
+
+        record Found(TaskRecord record) implements RecordLookup {
         }
+
+        record Rejected(TaskAdvanceResult result) implements RecordLookup {
+        }
+    }
+
+    /**
+     * 取到本次要推进的那条任务记录（含 limit_count 轮次判定，必要时新建）。
+     */
+    private RecordLookup resolveRecord(Advancing adv, TaskTypeEnum taskType) {
+        String basePeriodKey = TaskPeriodResolver.resolvePeriodKey(
+                taskType, adv.config().getLimitType(), adv.ctx().eventTime());
+        RoundResolution round = resolveRound(adv.config(), adv.ctx(), basePeriodKey);
+        if (round.rejectReason() != null) {
+            return new RecordLookup.Rejected(
+                    finishAsDiscard(adv, TaskDiscardCode.ROUND_LIMIT_EXCEEDED, round.rejectReason()));
+        }
+
         TaskRecord record = round.record() != null
                 ? round.record()
-                : getOrCreateRecord(config, ctx, round.periodKey());
-        flow.setRecordId(record.getId());
+                : getOrCreateRecord(adv.config(), adv.ctx(), round.periodKey());
+        adv.flow().setRecordId(record.getId());
 
         if (record.getStatus() != TaskRecordStatusEnum.RUNNING) {
-            return finishAsDiscard(flow, TaskDiscardCode.RECORD_NOT_RUNNING,
-                    "任务记录已不在进行中（status=" + record.getStatus() + "）", logDiscard);
+            return new RecordLookup.Rejected(finishAsDiscard(adv, TaskDiscardCode.RECORD_NOT_RUNNING,
+                    "任务记录已不在进行中（status=" + record.getStatus() + "）"));
         }
+        return new RecordLookup.Found(record);
+    }
 
-        // ========== ③ 策略算出推进方案（纯函数，不碰库） ==========
-        MetricPlan plan = strategy.plan(record, ctx, rule);
+    /**
+     * 算方案 -> 写进度 -> 阶梯发奖 -> 达标闸门 -> 流水补齐终态。
+     *
+     * <p>{@code strategy.plan} 是<b>纯函数，不碰库</b>：算出「该怎么推」与「真的去推」分开，
+     * 四种任务类型的差异全部收在 plan 里，写库这一段所有类型共用。
+     */
+    private TaskAdvanceResult applyProgress(Advancing adv, TaskRecord record) {
+        MetricPlan plan = adv.strategy().plan(record, adv.ctx(), adv.rule());
 
-        BigDecimal before;
-        BigDecimal after;
-        BigDecimal delta;
-
+        MetricChange change;
         switch (plan) {
             case MetricPlan.Skip(TaskDiscardCode code, String reason) -> {
-                return finishAsDiscard(flow, code, reason, logDiscard);
+                return finishAsDiscard(adv, code, reason);
             }
             case MetricPlan.Accumulate(BigDecimal amount) -> {
                 int rows = taskRecordDao.advanceMetric(record.getId(), amount);
                 if (rows == 0) {
                     // rows=0 的语义是「记录已不可推进」（状态已流转），不是并发冲突，不需要重试
-                    return finishAsDiscard(flow, TaskDiscardCode.RECORD_NOT_RUNNING,
-                            "任务记录已不可推进（并发达标或已过期）", logDiscard);
+                    return finishAsDiscard(adv, TaskDiscardCode.RECORD_NOT_RUNNING,
+                            "任务记录已不可推进（并发达标或已过期）");
                 }
-                delta = amount;
-                // 重读权威值：条件更新拿不到结果值，且必须以 DB 为准
-                after = currentMetricOf(record.getId());
+                // 重读权威值：条件更新拿不到结果值，且必须以 DB 为准。
                 // 我的 UPDATE 持有行锁，after 里已包含所有先于我提交的增量，
                 // 故 after - delta 恰好是「我这一笔之前」的值，并发下同样成立
-                before = after.subtract(delta);
+                BigDecimal after = currentMetricOf(record.getId());
+                change = new MetricChange(after.subtract(amount), after, amount);
             }
             case MetricPlan.Overwrite(BigDecimal metric, String progressJson, Integer expectedVersion) -> {
                 int rows = taskRecordDao.overwriteMetric(record.getId(), metric, progressJson, expectedVersion);
@@ -162,39 +219,50 @@ public class TaskRecordAdvanceService {
                     throw new TaskConcurrentModifyException("STREAK 乐观锁冲突，recordId=" + record.getId()
                             + ", version=" + expectedVersion);
                 }
-                before = record.getCurrentMetric() == null ? BigDecimal.ZERO : record.getCurrentMetric();
-                after = metric;
-                delta = after.subtract(before);
+                BigDecimal before = record.getCurrentMetric() == null ? BigDecimal.ZERO : record.getCurrentMetric();
+                change = new MetricChange(before, metric, metric.subtract(before));
                 record.setProgressData(progressJson);
             }
         }
 
-        // ========== ④ 阶梯发奖：本次跨过的档位 ==========
-        record.setCurrentMetric(after);
+        record.setCurrentMetric(change.after());
         // 账号快照由上下文传给派发器：任务记录上没有这一列，而派发事件要带上展示名
         Integer highestReached = taskPrizeDispatcher.dispatchReachedStages(
-                record, ctx.memberName(), config.getActivityCode(), before, after);
+                record, adv.ctx().memberName(), adv.config().getActivityCode(), change.before(), change.after());
 
-        // ========== ⑤ 达标闸门 ==========
-        boolean completed = strategy.isCompleted(after, rule) && isHighestStageReached(config, highestReached);
-        if (completed) {
-            // 条件更新做并发闸门：只有一个线程能把 0 推到 1，避免重复触发完成后的动作
-            int rows = taskRecordDao.markCompleted(record.getId());
-            if (rows > 0) {
-                // 最高档的奖已在上一步投递（防重由 uk_external_biz 保证），可以直接流转到「已发奖」
-                taskRecordDao.markDispatched(record.getId());
-                log.info("[任务达标] recordId={}, memberId={}, taskConfigId={}, metric={}",
-                        record.getId(), ctx.memberId(), config.getId(), after.toPlainString());
-            }
+        boolean completed = markCompletedIfReached(adv, record, change.after(), highestReached);
+        finishFlow(adv.flow(), change);
+        return new TaskAdvanceResult.Advanced(record.getId(), change.before(), change.after(), completed);
+    }
+
+    /**
+     * 达标闸门。
+     *
+     * <p>用条件更新做并发闸门：只有一个线程能把 0 推到 1，避免重复触发完成后的动作。
+     * 抢到的那个线程顺手流转到「已发奖」—— 最高档的奖已在上一步投递，
+     * 防重由 {@code uk_external_biz} 保证。
+     */
+    private boolean markCompletedIfReached(Advancing adv, TaskRecord record,
+                                           BigDecimal after, Integer highestReached) {
+        boolean completed = adv.strategy().isCompleted(after, adv.rule())
+                && isHighestStageReached(adv.config(), highestReached);
+        if (!completed) {
+            return false;
         }
+        if (taskRecordDao.markCompleted(record.getId()) > 0) {
+            taskRecordDao.markDispatched(record.getId());
+            log.info("[任务达标] recordId={}, memberId={}, taskConfigId={}, metric={}",
+                    record.getId(), adv.ctx().memberId(), adv.config().getId(), after.toPlainString());
+        }
+        return true;
+    }
 
-        // ========== ⑥ 流水补齐终态 ==========
+    /** 流水补齐终态：推进量与推进后的值 */
+    private void finishFlow(TaskRecordFlow flow, MetricChange change) {
         flow.setFlowType(TaskFlowTypeEnum.ADVANCE);
-        flow.setDeltaMetric(delta);
-        flow.setAfterMetric(after);
+        flow.setDeltaMetric(change.delta());
+        flow.setAfterMetric(change.after());
         taskRecordFlowDao.updateById(flow);
-
-        return new TaskAdvanceResult.Advanced(record.getId(), before, after, completed);
     }
 
     /**
@@ -412,9 +480,9 @@ public class TaskRecordAdvanceService {
      *
      * <p>丢弃原因就是「用户下了 99 元的单为什么没进度」这类客诉的答案，必须是人话。
      */
-    private TaskAdvanceResult finishAsDiscard(TaskRecordFlow flow, TaskDiscardCode code,
-                                              String reason, boolean logDiscard) {
-        if (!logDiscard) {
+    private TaskAdvanceResult finishAsDiscard(Advancing adv, TaskDiscardCode code, String reason) {
+        TaskRecordFlow flow = adv.flow();
+        if (!adv.logDiscard()) {
             // 高频事件关掉了丢弃留痕：把先前为占幂等键插入的那一行删掉。
             //
             // 删掉<b>不影响正确性</b>：被丢弃的事件没有产生任何副作用，重投时重新判定一次、

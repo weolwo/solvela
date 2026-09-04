@@ -1,98 +1,37 @@
 package solvela.consumer.handler;
 
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import solvela.anno.PrizeStrategy;
 import solvela.dispatch.DispatchOutcome;
-import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
-import solvela.prize.PrizeConfig;
-import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.prize.PrizeLog;
-import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
-import solvela.member.api.CreateProposalCmd;
-import solvela.member.api.MemberProposalApi;
-import solvela.member.api.ProposalResult;
-import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
 
 /**
- * 积分派发策略
- * <p>
- * 与 {@link BalanceHandler} 同构：不自己动账，统一走风控提案链路，
- * 由提案域做防刷/预算/审批阈值判定，externalBizNo 作为跨域幂等键。
+ * 积分派发策略。
+ *
+ * <p>积分是<b>值类资产</b>：金额即全部信息，账务侧照着数字加就行，不需要 assetRef。
+ *
+ * <p>唯一与其它三种奖不同的是<b>价值为 0 时判成功而不是失败</b>：
+ * 「谢谢参与」这类占位奖品曾经只能配成 0 积分（{@code MARKER} 类型是后来才有的），
+ * 把 0 当异常会让抽奖的兜底奖项刷出满屏失败流水，淹没真正的故障。
  *
  * @Author alaric
  * @Date 2026-07-26
  */
-@Slf4j
-@AllArgsConstructor
+@RequiredArgsConstructor
 @PrizeStrategy(value = PrizeTypeEnum.SCORE)
 @Service
 public class ScoreHandler implements IPrizeHandler {
 
-    private final MemberProposalApi memberProposalApi;
-    private final PrizeConfigService prizeConfigService;
-    private final ProposalSourceResolver proposalSourceResolver;
+    private final ProposalPrizeDispatcher dispatcher;
 
-    /**
-     * 一次中奖发放一份。奖品配置目前没有数量维度，将来支持「一次发N份」时改从配置读
-     */
-    private static final int QUANTITY_PER_PRIZE = 1;
+    private static final PrizeSpec SPEC = PrizeSpec.value(
+            PrizeTypeEnum.SCORE, "积分数值", PrizeSpec.ZeroPolicy.SKIP,
+            prizeLog -> "参与活动[" + prizeLog.getActivityCode() + "]中奖发放积分");
 
     @Override
     public DispatchOutcome dispatch(PrizeLog prizeLog) {
-        log.info(">>>> [积分派发策略] 开始派发积分，提案LogId: {}", prizeLog.getId());
-
-        BigDecimal amount;
-        try {
-            amount = new BigDecimal(prizeLog.getPrizeValue());
-        } catch (NumberFormatException e) {
-            log.error("【发奖异常】积分数值格式错误: {}", prizeLog.getPrizeValue());
-            return DispatchOutcome.failed("积分数值格式错误");
-        }
-
-        // 负数一律拦死，防改包
-        if (amount.compareTo(BigDecimal.ZERO) < 0) {
-            log.error("【重大风控拦截】派发积分为负！LogId: {}, 数值: {}", prizeLog.getId(), amount);
-            return DispatchOutcome.failed("派发积分不能为负数");
-        }
-        // 0 分是「谢谢参与」这类占位奖品的正常取值：无需入账，直接判成功。
-        // 若按 BalanceHandler 那样把 0 也当异常，抽奖的兜底奖项会刷出满屏失败流水，淹没真正的故障
-        if (amount.compareTo(BigDecimal.ZERO) == 0) {
-            log.info("【无需入账】奖品价值为0（如谢谢参与），跳过提案。LogId: {}", prizeLog.getId());
-            return DispatchOutcome.success();
-        }
-
-        PrizeConfig prizeConfig = prizeConfigService.getByPrizeCode(prizeLog.getPrizeCode());
-        if (prizeConfig == null) {
-            return DispatchOutcome.failed("奖品配置不存在");
-        }
-
-        ProposalRecordAddCommand req = new ProposalRecordAddCommand();
-        req.setMemberId(prizeLog.getMemberId());
-        req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
-        // 积分是值类资产：金额即全部信息，assetRef 留空
-        req.setAssetType(PrizeTypeEnum.SCORE.name());
-        req.setAmount(amount);
-        req.setQuantity(QUANTITY_PER_PRIZE);
-        req.setSourceType(proposalSourceResolver.resolve(prizeLog.getActivityType()));
-        req.setSourceBizId(prizeLog.getExternalBizNo());
-        req.setRemark("参与活动[" + prizeLog.getActivityCode() + "]中奖发放积分");
-
-        // 风控拦截 / 资产配置异常由 addProposal 抛 BusinessException，必须如实上报：
-        // 吞掉失败会让 PrizeDispatchHandler 把一条根本没入账的记录标成「发货成功」
-        try {
-            ProposalResult result = memberProposalApi.createProposal(ProposalCmdMapper.toCmd(req));
-            if (!result.accepted()) {
-                log.warn("【发奖提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), result.failReason());
-                return DispatchOutcome.failed(result.failReason());
-            }
-            return DispatchOutcome.success(result.proposalId());
-        } catch (BusinessException e) {
-            log.warn("【积分提案未通过】LogId: {}, 原因: {}", prizeLog.getId(), e.getMessage());
-            return DispatchOutcome.failed(e.getMessage());
-        }
+        return dispatcher.dispatch(prizeLog, SPEC);
     }
 }
