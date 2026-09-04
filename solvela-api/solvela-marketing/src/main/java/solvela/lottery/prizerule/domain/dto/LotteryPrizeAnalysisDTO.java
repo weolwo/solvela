@@ -4,6 +4,7 @@ import solvela.enums.LotteryConfigStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 一个玩法的完整奖励结构：奖级明细 + 整体赔付模型 + 体检结论。
@@ -57,7 +58,7 @@ public class LotteryPrizeAnalysisDTO {
     private Integer warnCount;
 
     /** 玩法维度的体检告警（如未配任何奖级） */
-    private List<PrizeRuleIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 
     /** 奖级明细，按奖级升序 —— 顺序即开奖认领顺序 */
     private List<LotteryPrizeRuleAnalysisDTO> ruleList;

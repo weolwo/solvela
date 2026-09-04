@@ -2,6 +2,8 @@ package solvela.draw.prizemapping.service;
 
 import solvela.enums.ActivityStatusEnum;
 import lombok.RequiredArgsConstructor;
+import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.stat.HealthIssue;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.draw.PrizePoolConfig;
@@ -12,7 +14,6 @@ import solvela.draw.PoolPrizeMapping;
 import solvela.draw.prizemapping.domain.query.PoolPrizeMappingQuery;
 import solvela.draw.prizemapping.domain.dto.DrawPoolAnalysisResultDTO;
 import solvela.draw.prizemapping.domain.dto.DrawPoolAnalysisDTO;
-import solvela.draw.prizemapping.domain.dto.DrawPoolIssueDTO;
 import solvela.draw.prizemapping.domain.dto.DrawPoolSlotDTO;
 import solvela.draw.prizemapping.manager.PoolPrizeMappingManager;
 import solvela.draw.runtime.DrawStockService;
@@ -30,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -72,7 +74,15 @@ public class DrawPoolAnalysisService {
     private static final int UNLIMITED = -1;
 
 
+    /** 期望赔付展示到 4 位：单次抽奖成本常在几分钱量级，位数少了整列都是 0.00 */
     private static final int AMOUNT_SCALE = 4;
+
+    /**
+     * 逐坑算期望赔付时的中间精度。取得比展示精度高，是因为「先各自取整再相加」
+     * 与「相加之后再取整」在十几个坑位上会差出肉眼可见的一截，
+     * 而整池期望赔付是拿来估活动预算的。
+     */
+    private static final int COST_INTERNAL_SCALE = 8;
 
     /**
      * 奖池概率分析。概览与明细一次算完，两者不可能对不上。
@@ -159,18 +169,19 @@ public class DrawPoolAnalysisService {
         result.setTotalExpectedCostPerDraw(all.stream().map(DrawPoolAnalysisDTO::getExpectedCostPerDraw)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         result.setTotal((long) all.size());
-        result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
+        result.setList(SolvelaPageUtil.subList(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<DrawPoolAnalysisDTO> page(List<DrawPoolAnalysisDTO> all, Long pageNum, Long pageSize) {
-        long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
-        long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
-        int from = (int) Math.min((num - 1) * size, all.size());
-        int to = (int) Math.min(from + size, all.size());
-        return all.subList(from, to);
-    }
-
+    /**
+     * 单个奖池的体检：先认身份，再逐坑扫一遍，最后做只有站在整池角度才看得出来的校验。
+     *
+     * <p>三段分开不是为了短，是因为它们各自回答不同的问题：坑位级的问题（概率为负、
+     * 奖项被删）看一行就能判定；整池级的问题（概率没闭环、配了两个兜底、
+     * 有多少概率其实已经抽空）单看任何一行都看不出来。
+     *
+     * @param pool 为 null 表示<b>孤儿映射</b>：坑位还在，它挂靠的奖池已经没了
+     */
     private DrawPoolAnalysisDTO analyseOne(String poolCode, PrizePoolConfig pool, List<PoolPrizeMapping> mappings,
                                           Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap,
                                           Map<String, ActivityConfig> activityMap) {
@@ -178,200 +189,304 @@ public class DrawPoolAnalysisService {
         vo.setPoolCode(poolCode);
         vo.setIssueList(new ArrayList<>());
 
-        String activityCode = null;
-        if (pool == null) {
-            vo.getIssueList().add(DrawPoolIssueDTO.danger("POOL_MISSING",
-                    "奖池配置不存在（编码 " + poolCode + "），这些坑位映射是孤儿数据：抽奖找不到奖池，配置也无处修改"));
-        } else {
-            vo.setPoolName(pool.getPoolName());
-            vo.setPoolStatus(pool.getStatus());
-            activityCode = pool.getActivityCode();
-            vo.setActivityCode(activityCode);
-            ActivityConfig activity = activityMap.get(activityCode);
-            if (activity != null) {
-                vo.setActivityStatus(activity.getStatus());
-            }
-        }
+        String activityCode = fillIdentity(poolCode, pool, activityMap, vo);
+        PoolScan scan = scanSlots(mappings, activityCode, itemMap, prizeMap);
+        scan.fill(vo);
+        checkPool(vo, scan);
 
+        vo.setDangerCount(countIssues(vo, HealthIssue::isDanger));
+        vo.setWarnCount(countIssues(vo, HealthIssue::isWarn));
+        return vo;
+    }
+
+    /**
+     * 奖池身份：名字、状态、所属活动。
+     *
+     * @return 活动编码，孤儿奖池为 null（查 Redis 库存要用它，没有就查不了）
+     */
+    private String fillIdentity(String poolCode, PrizePoolConfig pool,
+                                Map<String, ActivityConfig> activityMap, DrawPoolAnalysisDTO vo) {
+        if (pool == null) {
+            vo.getIssueList().add(HealthIssue.danger("POOL_MISSING",
+                    "奖池配置不存在（编码 " + poolCode + "），这些坑位映射是孤儿数据：抽奖找不到奖池，配置也无处修改"));
+            return null;
+        }
+        vo.setPoolName(pool.getPoolName());
+        vo.setPoolStatus(pool.getStatus());
+        vo.setActivityCode(pool.getActivityCode());
+        ActivityConfig activity = activityMap.get(pool.getActivityCode());
+        if (activity != null) {
+            vo.setActivityStatus(activity.getStatus());
+        }
+        return pool.getActivityCode();
+    }
+
+    /**
+     * 逐坑扫描的结果：坑位列表，以及四个只能边扫边累加出来的整池指标。
+     *
+     * @param probabilitySum       概率总和，用来判闭环
+     * @param expectedCost         期望赔付，<b>未取整</b>的累加值 ——
+     *                             逐坑取整再相加与相加后再取整不是同一个数
+     * @param availableProbability 仍有库存的坑位概率之和，即「现在抽一次真能拿到东西的概率」
+     * @param fallbackHasStock     第一个兜底坑位还有没有货；没有兜底时为 null
+     */
+    private record PoolScan(List<DrawPoolSlotDTO> slots,
+                            BigDecimal probabilitySum,
+                            BigDecimal expectedCost,
+                            BigDecimal availableProbability,
+                            Boolean fallbackHasStock,
+                            int fallbackCount) {
+
+        void fill(DrawPoolAnalysisDTO vo) {
+            vo.setSlotList(slots);
+            vo.setSlotCount(slots.size());
+            vo.setProbabilitySum(probabilitySum);
+            vo.setAvailableProbability(availableProbability);
+            vo.setFallbackHasStock(fallbackHasStock);
+            vo.setFallbackCount(fallbackCount);
+            vo.setExpectedCostPerDraw(expectedCost.setScale(AMOUNT_SCALE, RoundingMode.HALF_UP));
+        }
+    }
+
+    private PoolScan scanSlots(List<PoolPrizeMapping> mappings, String activityCode,
+                               Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap) {
         // 坑位顺序 = 概率区间的累加顺序，与引擎 DrawExecuteService 取快照时的排序一致
         List<PoolPrizeMapping> sorted = mappings.stream()
                 .sorted(Comparator.comparing(m -> m.getSortWeight() == null ? Integer.MAX_VALUE : m.getSortWeight()))
-                .collect(Collectors.toList());
+                .toList();
 
         List<DrawPoolSlotDTO> slots = new ArrayList<>();
         BigDecimal acc = BigDecimal.ZERO;
         BigDecimal expectedCost = BigDecimal.ZERO;
-        // 仍有库存的坑位概率之和 —— 「现在抽一次真能拿到东西的概率」
         BigDecimal availableProb = BigDecimal.ZERO;
         Boolean fallbackHasStock = null;
         int fallbackCount = 0;
 
         for (PoolPrizeMapping mapping : sorted) {
-            DrawPoolSlotDTO slot = new DrawPoolSlotDTO();
-            slot.setId(mapping.getId());
-            slot.setSortWeight(mapping.getSortWeight());
-            slot.setPrizeItemId(mapping.getPrizeItemId());
-            slot.setProbability(mapping.getProbability());
-            slot.setFallback(Boolean.TRUE.equals(mapping.getIsFallback()));
-            slot.setIssueList(new ArrayList<>());
-            if (Boolean.TRUE.equals(slot.getFallback())) {
-                fallbackCount++;
-            }
+            SlotScan scanned = scanSlot(mapping, acc, activityCode, itemMap, prizeMap);
+            DrawPoolSlotDTO slot = scanned.slot();
+            BigDecimal prob = probabilityOf(mapping);
 
-            BigDecimal prob = mapping.getProbability() == null ? BigDecimal.ZERO : mapping.getProbability();
-            slot.setRangeMin(acc);
-            acc = acc.add(prob);
-            slot.setRangeMax(acc);
-
-            if (prob.signum() < 0) {
-                slot.getIssueList().add(DrawPoolIssueDTO.danger("PROBABILITY_NEGATIVE",
-                        "概率为负数 " + prob.toPlainString() + "，会把后续坑位的命中区间整体推乱"));
-            } else if (prob.signum() == 0 && !Boolean.TRUE.equals(slot.getFallback())) {
-                slot.getIssueList().add(DrawPoolIssueDTO.warn("PROBABILITY_ZERO",
-                        "概率为 0 且不是兜底奖项：这个坑位永远不会被抽中"));
-            }
-
-            PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
-            boolean slotHasStock = false;
-            if (item == null) {
-                slot.getIssueList().add(DrawPoolIssueDTO.danger("ITEM_MISSING",
-                        "奖项 id " + mapping.getPrizeItemId() + " 不存在：抽奖时会直接返回「奖池配置异常：奖项已被删除」"));
-            } else {
-                slot.setPrizeCode(item.getPrizeCode());
-                slot.setTotalStock(item.getTotalStock());
-                slot.setUsedStock(item.getUsedStock());
-
-                Integer remainDb = null;
-                // 不限量的坑位永远算「有货」
-                slotHasStock = item.getTotalStock() == null || Integer.valueOf(UNLIMITED).equals(item.getTotalStock());
-                if (item.getTotalStock() != null && !Integer.valueOf(UNLIMITED).equals(item.getTotalStock())) {
-                    int used = item.getUsedStock() == null ? 0 : item.getUsedStock();
-                    remainDb = item.getTotalStock() - used;
-                    slot.setRemainStockDb(remainDb);
-                    slotHasStock = remainDb > 0;
-                    if (remainDb <= 0) {
-                        /*
-                         * 兜底奖项抽空要单独按 DANGER 报，不能和普通坑位一样只是个警告。
-                         *
-                         * 兜底是库存降级的最后一道防线：概率命中的奖项没库存时，引擎会退到兜底
-                         * （DrawEngine 第 3 步）。兜底自己也没库存，这一退就退空了 ——
-                         * 结果是整池只要命中任何一个缺货奖项，用户直接收到「手慢了，奖品已被抽完」。
-                         * 而兜底通常占着最大那块概率，它一空，受影响的是绝大多数请求。
-                         */
-                        if (Boolean.TRUE.equals(slot.getFallback())) {
-                            slot.getIssueList().add(DrawPoolIssueDTO.danger("FALLBACK_SOLD_OUT",
-                                    "兜底奖项自己已经抽空：兜底是库存不足时的最后一道降级，它没库存意味着降级也失败。"
-                                            + "本坑位概率 " + prob.toPlainString() + "%，加上其他缺货奖项降级过来的请求，"
-                                            + "这部分用户全部会收到「手慢了，奖品已被抽完」"));
-                        } else {
-                            slot.getIssueList().add(DrawPoolIssueDTO.warn("SOLD_OUT",
-                                    "库存已耗尽：命中本坑位的请求会降级到兜底奖项，没有兜底则返回「手慢了，奖品已被抽完」"));
-                        }
-                    }
-                }
-
-                // 运行态真正用来预扣的是 Redis 里的数，与 DB 口径漂移就是事故
-                if (activityCode != null) {
-                    Integer cached = drawStockService.getRemainStock(activityCode, item.getId());
-                    slot.setRemainStockCache(cached);
-                    if (cached != null && remainDb != null && cached.intValue() != remainDb.intValue()) {
-                        slot.getIssueList().add(DrawPoolIssueDTO.danger("STOCK_DRIFT",
-                                "库存口径漂移：Redis 剩余 " + cached + "，DB 剩余 " + remainDb
-                                        + "。运行态按 Redis 预扣，两者不一致意味着缓存被误预热或回滚失败，可能超发或少发"));
-                    }
-                }
-
-                PrizeConfig prize = prizeMap.get(item.getPrizeCode());
-                if (prize == null) {
-                    slot.getIssueList().add(DrawPoolIssueDTO.danger("PRIZE_MISSING",
-                            "奖品「" + item.getPrizeCode() + "」不在资产大库：派奖时会报『奖品配置不存在』，用户中了奖拿不到东西"));
-                } else {
-                    slot.setPrizeName(prize.getPrizeName());
-                    slot.setPrizeType(prize.getPrizeType());
-                    slot.setPrizeValue(prize.getPrizeValue());
-                    if (prize.getPrizeValue() != null) {
-                        BigDecimal cost = prob.divide(HUNDRED, 8, RoundingMode.HALF_UP)
-                                .multiply(prize.getPrizeValue());
-                        slot.setExpectedCostPerDraw(cost.setScale(AMOUNT_SCALE, RoundingMode.HALF_UP));
-                        expectedCost = expectedCost.add(cost);
-                    }
-                }
-            }
-
-            if (slotHasStock && prob.signum() > 0) {
+            acc = slot.getRangeMax();
+            expectedCost = expectedCost.add(scanned.expectedCost());
+            if (scanned.hasStock() && prob.signum() > 0) {
                 availableProb = availableProb.add(prob);
             }
-            if (Boolean.TRUE.equals(slot.getFallback()) && fallbackHasStock == null) {
-                // 多兜底时以引擎的口径为准：只认坑位顺序里的第一个
-                fallbackHasStock = slotHasStock;
+            if (Boolean.TRUE.equals(slot.getFallback())) {
+                fallbackCount++;
+                if (fallbackHasStock == null) {
+                    // 多兜底时以引擎的口径为准：只认坑位顺序里的第一个
+                    fallbackHasStock = scanned.hasStock();
+                }
             }
             slots.add(slot);
         }
+        return new PoolScan(slots, acc, expectedCost, availableProb, fallbackHasStock, fallbackCount);
+    }
 
-        vo.setAvailableProbability(availableProb);
-        vo.setFallbackHasStock(fallbackHasStock);
-        vo.setSlotList(slots);
-        vo.setSlotCount(slots.size());
-        vo.setProbabilitySum(acc);
-        vo.setFallbackCount(fallbackCount);
-        vo.setExpectedCostPerDraw(expectedCost.setScale(AMOUNT_SCALE, RoundingMode.HALF_UP));
+    /**
+     * 一个坑位扫完之后，除了它自己的 DTO，还有两件事只有这里知道、而整池要用。
+     *
+     * @param hasStock     还有没有货。不能从 DTO 反推：奖项被删时它既不是「不限量」
+     *                     也不是「剩余为 0」，但那个坑位确实发不出东西
+     * @param expectedCost 本坑位的期望赔付，未取整，理由见 {@link PoolScan#expectedCost}
+     */
+    private record SlotScan(DrawPoolSlotDTO slot, boolean hasStock, BigDecimal expectedCost) {
+    }
 
-        // ---- 整池校验 ----
-        boolean closed = !slots.isEmpty() && Ppm.isClosedPercent(acc);
-        vo.setProbabilityClosed(closed);
-        if (slots.isEmpty()) {
-            vo.getIssueList().add(DrawPoolIssueDTO.danger("POOL_EMPTY",
-                    "奖池一个坑位都没有：抽奖时快照构造直接抛「奖池快照不能为空」，本池不可用"));
-        } else if (!closed) {
-            vo.getIssueList().add(DrawPoolIssueDTO.danger("PROBABILITY_NOT_CLOSED",
-                    "概率总和为 " + acc.toPlainString() + "%，未闭环到 100%："
-                            + "抽奖时快照构造会抛异常且执行链路未捕获，本奖池的每一次抽奖请求都会直接报错"));
+    private SlotScan scanSlot(PoolPrizeMapping mapping, BigDecimal rangeMin, String activityCode,
+                              Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap) {
+        BigDecimal prob = probabilityOf(mapping);
+
+        DrawPoolSlotDTO slot = new DrawPoolSlotDTO();
+        slot.setId(mapping.getId());
+        slot.setSortWeight(mapping.getSortWeight());
+        slot.setPrizeItemId(mapping.getPrizeItemId());
+        slot.setProbability(mapping.getProbability());
+        slot.setFallback(Boolean.TRUE.equals(mapping.getIsFallback()));
+        slot.setIssueList(new ArrayList<>());
+        // 本坑位在引擎里对应的命中区间 [rangeMin, rangeMax)
+        slot.setRangeMin(rangeMin);
+        slot.setRangeMax(rangeMin.add(prob));
+
+        checkProbability(slot, prob);
+
+        PrizePoolItem item = itemMap.get(mapping.getPrizeItemId());
+        if (item == null) {
+            slot.getIssueList().add(HealthIssue.danger("ITEM_MISSING",
+                    "奖项 id " + mapping.getPrizeItemId() + " 不存在：抽奖时会直接返回「奖池配置异常：奖项已被删除」"));
+            return new SlotScan(slot, false, BigDecimal.ZERO);
         }
-        if (fallbackCount > 1) {
-            vo.getIssueList().add(DrawPoolIssueDTO.danger("MULTI_FALLBACK",
-                    "配置了 " + fallbackCount + " 个兜底奖项：引擎只认坑位顺序里的第一个，其余的静默失效"));
-        } else if (fallbackCount == 0 && !slots.isEmpty()) {
-            vo.getIssueList().add(DrawPoolIssueDTO.warn("NO_FALLBACK",
-                    "没有兜底奖项：命中的奖项一旦无库存就直接返回「手慢了，奖品已被抽完」，没有降级余地"));
-        }
 
-        /*
-         * 有货概率覆盖率：奖池真实健康度。
-         *
-         * 配置里的概率是静态的，但库存会被抽空 —— 抽空的坑位仍占着概率区间，
-         * 命中后只会走降级或直接失败。所以「还有多少概率真能拿到东西」才是用户的实际体验，
-         * 而这个数在原页面上完全不存在。
-         *
-         * 分级说明：兜底还有货时，缺口部分由兜底接住，用户至少拿到安慰奖；
-         * 兜底也空了，缺口就是纯失败率 —— 严重程度差一个量级，所以分开报。
-         */
-        if (!slots.isEmpty() && closed) {
-            BigDecimal gap = HUNDRED.subtract(availableProb);
-            if (gap.signum() > 0) {
-                boolean fallbackAlive = Boolean.TRUE.equals(fallbackHasStock);
-                String gapText = gap.stripTrailingZeros().toPlainString();
-                if (!fallbackAlive) {
-                    vo.getIssueList().add(DrawPoolIssueDTO.danger("NO_STOCK_EXPOSURE",
-                            "约 " + gapText + "% 的抽奖请求会直接失败："
-                                    + "这部分概率对应的奖项已抽空，而"
-                                    + (fallbackCount == 0 ? "本池没有兜底奖项" : "兜底奖项自己也没有库存了")
-                                    + "，用户会收到「手慢了，奖品已被抽完」"));
-                } else {
-                    vo.getIssueList().add(DrawPoolIssueDTO.warn("STOCK_DEGRADED",
-                            "约 " + gapText + "% 的抽奖请求要靠兜底接住：这部分概率对应的奖项已抽空，"
-                                    + "命中后会降级发兜底奖品。兜底一旦也抽空，这部分就变成纯失败"));
-                }
+        boolean hasStock = fillStock(slot, item, prob, activityCode);
+        BigDecimal expectedCost = fillPrize(slot, item, prizeMap, prob);
+        return new SlotScan(slot, hasStock, expectedCost);
+    }
+
+    private void checkProbability(DrawPoolSlotDTO slot, BigDecimal prob) {
+        if (prob.signum() < 0) {
+            slot.getIssueList().add(HealthIssue.danger("PROBABILITY_NEGATIVE",
+                    "概率为负数 " + prob.toPlainString() + "，会把后续坑位的命中区间整体推乱"));
+        } else if (prob.signum() == 0 && !Boolean.TRUE.equals(slot.getFallback())) {
+            slot.getIssueList().add(HealthIssue.warn("PROBABILITY_ZERO",
+                    "概率为 0 且不是兜底奖项：这个坑位永远不会被抽中"));
+        }
+    }
+
+    /**
+     * 库存两个口径：DB 的 total - used，以及运行态真正用来预扣的 Redis 剩余量。
+     *
+     * <p>两个口径并排放出来是这个页面的核心价值：现有页面只显示 DB 口径，
+     * 而漂移（缓存被误预热、回滚失败）是真实事故，光看 DB 是个安慰性的数字。
+     *
+     * @return 这个坑位现在还能不能发出东西
+     */
+    private boolean fillStock(DrawPoolSlotDTO slot, PrizePoolItem item, BigDecimal prob, String activityCode) {
+        slot.setPrizeCode(item.getPrizeCode());
+        slot.setTotalStock(item.getTotalStock());
+        slot.setUsedStock(item.getUsedStock());
+
+        // 不限量的坑位永远算「有货」
+        boolean unlimited = item.getTotalStock() == null || Integer.valueOf(UNLIMITED).equals(item.getTotalStock());
+        Integer remainDb = null;
+        boolean hasStock = true;
+        if (!unlimited) {
+            int used = item.getUsedStock() == null ? 0 : item.getUsedStock();
+            remainDb = item.getTotalStock() - used;
+            slot.setRemainStockDb(remainDb);
+            hasStock = remainDb > 0;
+            if (!hasStock) {
+                slot.getIssueList().add(soldOutIssue(slot, prob));
             }
         }
 
-        int danger = (int) vo.getIssueList().stream().filter(i -> "DANGER".equals(i.getLevel())).count()
-                + slots.stream().mapToInt(s -> (int) s.getIssueList().stream()
-                        .filter(i -> "DANGER".equals(i.getLevel())).count()).sum();
-        int warn = (int) vo.getIssueList().stream().filter(i -> "WARN".equals(i.getLevel())).count()
-                + slots.stream().mapToInt(s -> (int) s.getIssueList().stream()
-                        .filter(i -> "WARN".equals(i.getLevel())).count()).sum();
-        vo.setDangerCount(danger);
-        vo.setWarnCount(warn);
-        return vo;
+        if (activityCode != null) {
+            Integer cached = drawStockService.getRemainStock(activityCode, item.getId());
+            slot.setRemainStockCache(cached);
+            if (cached != null && remainDb != null && cached.intValue() != remainDb.intValue()) {
+                slot.getIssueList().add(HealthIssue.danger("STOCK_DRIFT",
+                        "库存口径漂移：Redis 剩余 " + cached + "，DB 剩余 " + remainDb
+                                + "。运行态按 Redis 预扣，两者不一致意味着缓存被误预热或回滚失败，可能超发或少发"));
+            }
+        }
+        return hasStock;
+    }
+
+    /**
+     * 抽空的坑位分两种，严重程度差一个量级。
+     *
+     * <p>兜底是库存降级的最后一道防线：概率命中的奖项没库存时，引擎会退到兜底
+     * （{@code DrawEngine} 第 3 步）。兜底自己也没库存，这一退就退空了 ——
+     * 结果是整池只要命中任何一个缺货奖项，用户直接收到「手慢了，奖品已被抽完」。
+     * 而兜底通常占着最大那块概率，它一空，受影响的是绝大多数请求。
+     */
+    private HealthIssue soldOutIssue(DrawPoolSlotDTO slot, BigDecimal prob) {
+        if (Boolean.TRUE.equals(slot.getFallback())) {
+            return HealthIssue.danger("FALLBACK_SOLD_OUT",
+                    "兜底奖项自己已经抽空：兜底是库存不足时的最后一道降级，它没库存意味着降级也失败。"
+                            + "本坑位概率 " + prob.toPlainString() + "%，加上其他缺货奖项降级过来的请求，"
+                            + "这部分用户全部会收到「手慢了，奖品已被抽完」");
+        }
+        return HealthIssue.warn("SOLD_OUT",
+                "库存已耗尽：命中本坑位的请求会降级到兜底奖项，没有兜底则返回「手慢了，奖品已被抽完」");
+    }
+
+    /**
+     * 奖品身份与期望赔付 = 命中概率 × 奖品单价。
+     *
+     * @return 本坑位的期望赔付，未取整；奖品没配单价时为 0
+     */
+    private BigDecimal fillPrize(DrawPoolSlotDTO slot, PrizePoolItem item,
+                                 Map<String, PrizeConfig> prizeMap, BigDecimal prob) {
+        PrizeConfig prize = prizeMap.get(item.getPrizeCode());
+        if (prize == null) {
+            slot.getIssueList().add(HealthIssue.danger("PRIZE_MISSING",
+                    "奖品「" + item.getPrizeCode() + "」不在资产大库：派奖时会报『奖品配置不存在』，用户中了奖拿不到东西"));
+            return BigDecimal.ZERO;
+        }
+        slot.setPrizeName(prize.getPrizeName());
+        slot.setPrizeType(prize.getPrizeType());
+        slot.setPrizeValue(prize.getPrizeValue());
+        if (prize.getPrizeValue() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal cost = prob.divide(HUNDRED, COST_INTERNAL_SCALE, RoundingMode.HALF_UP)
+                .multiply(prize.getPrizeValue());
+        slot.setExpectedCostPerDraw(cost.setScale(AMOUNT_SCALE, RoundingMode.HALF_UP));
+        return cost;
+    }
+
+    /**
+     * 整池校验：这些问题单看任何一个坑位都发现不了。
+     */
+    private void checkPool(DrawPoolAnalysisDTO vo, PoolScan scan) {
+        boolean empty = scan.slots().isEmpty();
+        boolean closed = !empty && Ppm.isClosedPercent(scan.probabilitySum());
+        vo.setProbabilityClosed(closed);
+
+        if (empty) {
+            vo.getIssueList().add(HealthIssue.danger("POOL_EMPTY",
+                    "奖池一个坑位都没有：抽奖时快照构造直接抛「奖池快照不能为空」，本池不可用"));
+        } else if (!closed) {
+            vo.getIssueList().add(HealthIssue.danger("PROBABILITY_NOT_CLOSED",
+                    "概率总和为 " + scan.probabilitySum().toPlainString() + "%，未闭环到 100%："
+                            + "抽奖时快照构造会抛异常且执行链路未捕获，本奖池的每一次抽奖请求都会直接报错"));
+        }
+
+        if (scan.fallbackCount() > 1) {
+            vo.getIssueList().add(HealthIssue.danger("MULTI_FALLBACK",
+                    "配置了 " + scan.fallbackCount() + " 个兜底奖项：引擎只认坑位顺序里的第一个，其余的静默失效"));
+        } else if (scan.fallbackCount() == 0 && !empty) {
+            vo.getIssueList().add(HealthIssue.warn("NO_FALLBACK",
+                    "没有兜底奖项：命中的奖项一旦无库存就直接返回「手慢了，奖品已被抽完」，没有降级余地"));
+        }
+
+        if (!empty && closed) {
+            checkStockExposure(vo, scan);
+        }
+    }
+
+    /**
+     * 有货概率覆盖率：奖池的真实健康度。
+     *
+     * <p>配置里的概率是静态的，但库存会被抽空 —— 抽空的坑位仍占着概率区间，
+     * 命中后只会走降级或直接失败。所以「还有多少概率真能拿到东西」才是用户的实际体验，
+     * 而这个数在原页面上完全不存在。
+     *
+     * <p>分级说明：兜底还有货时，缺口部分由兜底接住，用户至少拿到安慰奖；
+     * 兜底也空了，缺口就是纯失败率 —— 严重程度差一个量级，所以分开报。
+     */
+    private void checkStockExposure(DrawPoolAnalysisDTO vo, PoolScan scan) {
+        BigDecimal gap = HUNDRED.subtract(scan.availableProbability());
+        if (gap.signum() <= 0) {
+            return;
+        }
+        String gapText = gap.stripTrailingZeros().toPlainString();
+        if (Boolean.TRUE.equals(scan.fallbackHasStock())) {
+            vo.getIssueList().add(HealthIssue.warn("STOCK_DEGRADED",
+                    "约 " + gapText + "% 的抽奖请求要靠兜底接住：这部分概率对应的奖项已抽空，"
+                            + "命中后会降级发兜底奖品。兜底一旦也抽空，这部分就变成纯失败"));
+            return;
+        }
+        vo.getIssueList().add(HealthIssue.danger("NO_STOCK_EXPOSURE",
+                "约 " + gapText + "% 的抽奖请求会直接失败：这部分概率对应的奖项已抽空，而"
+                        + (scan.fallbackCount() == 0 ? "本池没有兜底奖项" : "兜底奖项自己也没有库存了")
+                        + "，用户会收到「手慢了，奖品已被抽完」"));
+    }
+
+    /**
+     * 整池告警数 = 池级 + 所有坑位级。两级合起来数，是因为页面按这个数排序与置顶，
+     * 而「某个坑位的奖品被删了」对运营的紧急程度与池级问题没有区别。
+     */
+    private int countIssues(DrawPoolAnalysisDTO vo, Predicate<HealthIssue> level) {
+        int count = (int) vo.getIssueList().stream().filter(level).count();
+        for (DrawPoolSlotDTO slot : vo.getSlotList()) {
+            count += (int) slot.getIssueList().stream().filter(level).count();
+        }
+        return count;
+    }
+
+    private BigDecimal probabilityOf(PoolPrizeMapping mapping) {
+        return mapping.getProbability() == null ? BigDecimal.ZERO : mapping.getProbability();
     }
 }

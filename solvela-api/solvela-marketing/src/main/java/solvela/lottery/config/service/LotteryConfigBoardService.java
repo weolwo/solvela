@@ -3,13 +3,16 @@ package solvela.lottery.config.service;
 import solvela.enums.LotteryConfigStatusEnum;
 import solvela.enums.IssueStatusEnum;
 import lombok.RequiredArgsConstructor;
+import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.stat.HealthIssue;
+import solvela.base.stat.Rate;
+import solvela.base.stat.StatRow;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.domain.query.LotteryConfigQuery;
 import solvela.lottery.config.domain.dto.LotteryConfigBoardResultDTO;
 import solvela.lottery.config.domain.dto.LotteryConfigBoardDTO;
-import solvela.lottery.config.domain.dto.LotteryConfigIssueDTO;
 import solvela.lottery.config.manager.LotteryConfigManager;
 import solvela.lottery.issue.dao.LotteryIssueDao;
 import solvela.lottery.LotteryIssue;
@@ -64,8 +67,6 @@ public class LotteryConfigBoardService {
     /** 占用率到这个比例就提示扩容余地不足，早于发号才有意义 */
     private static final BigDecimal SPACE_WARN_THRESHOLD = new BigDecimal("0.9");
 
-    private static final int RATE_SCALE = 4;
-
     public LotteryConfigBoardResultDTO board(LotteryConfigQuery queryForm) {
         List<LotteryConfig> configs = lotteryConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
@@ -94,7 +95,7 @@ public class LotteryConfigBoardService {
             all.add(analyseOne(config, activityMap,
                     issueMap.getOrDefault(config.getLotteryCode(), List.of()),
                     ruleCountMap.getOrDefault(config.getLotteryCode(), 0L),
-                    recordStatMap.get(config.getLotteryCode()), dbNow));
+                    StatRow.of(recordStatMap.get(config.getLotteryCode())), dbNow));
         }
 
         if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
@@ -116,21 +117,16 @@ public class LotteryConfigBoardService {
         result.setWarnCount(all.stream().mapToInt(LotteryConfigBoardDTO::getWarnCount).sum());
         result.setTotalSold(all.stream().mapToLong(LotteryConfigBoardDTO::getSoldTotal).sum());
         result.setTotal((long) all.size());
-        result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
+        result.setList(SolvelaPageUtil.subList(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<LotteryConfigBoardDTO> page(List<LotteryConfigBoardDTO> all, Long pageNum, Long pageSize) {
-        long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
-        long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
-        int from = (int) Math.min((num - 1) * size, all.size());
-        int to = (int) Math.min(from + size, all.size());
-        return all.subList(from, to);
-    }
-
+    /**
+     * 单个彩票玩法的体检：身份 -> 号码空间 -> 期号与发号 -> 三类校验。
+     */
     private LotteryConfigBoardDTO analyseOne(LotteryConfig config, Map<String, ActivityConfig> activityMap,
                                             List<LotteryIssue> issues, long ruleCount,
-                                            Map<String, Object> recordStat, LocalDateTime dbNow) {
+                                            StatRow recordStat, LocalDateTime dbNow) {
         LotteryConfigBoardDTO vo = new LotteryConfigBoardDTO();
         vo.setId(config.getId());
         vo.setActivityCode(config.getActivityCode());
@@ -146,104 +142,141 @@ public class LotteryConfigBoardService {
             vo.setActivityName(activity.getActivityName());
         }
 
-        // ---- 号码空间 ----
-        long space = 0L;
-        if (config.getNumberLength() != null && config.getNumberLength() > 0) {
-            space = (long) Math.pow(10, config.getNumberLength());
-            vo.setNumberSpace(space);
-            if (config.getTotalCount() != null && space > 0) {
-                vo.setSpaceUsage(BigDecimal.valueOf(config.getTotalCount())
-                        .divide(BigDecimal.valueOf(space), RATE_SCALE, RoundingMode.HALF_UP));
-            }
-        }
+        long space = fillNumberSpace(config, vo);
+        IssueTally tally = tally(issues, dbNow);
+        tally.fill(vo);
+        vo.setRuleCount((int) ruleCount);
+        vo.setMemberCount(recordStat.count("memberCount"));
+        vo.setWinCount(recordStat.count("winCount"));
 
-        // ---- 期号与发号 ----
-        long sold = issues.stream().mapToLong(i -> i.getSoldCount() == null ? 0 : i.getSoldCount()).sum();
+        boolean online = config.getStatus() == LotteryConfigStatusEnum.ONLINE;
+        checkPrizeRule(vo, ruleCount, online);
+        checkSellable(vo, issues, tally, online);
+        checkNumberSpace(vo, config, space);
+
+        vo.setDangerCount(HealthIssue.countDanger(vo.getIssueList()));
+        vo.setWarnCount(HealthIssue.countWarn(vo.getIssueList()));
+        return vo;
+    }
+
+    /**
+     * 号码空间 = 10^号码长度，以及发行上限对它的占用率。
+     *
+     * @return 号码空间；号码长度没配时为 0
+     */
+    private long fillNumberSpace(LotteryConfig config, LotteryConfigBoardDTO vo) {
+        if (config.getNumberLength() == null || config.getNumberLength() <= 0) {
+            return 0L;
+        }
+        long space = (long) Math.pow(10, config.getNumberLength());
+        vo.setNumberSpace(space);
+        if (config.getTotalCount() != null) {
+            vo.setSpaceUsage(Rate.share(config.getTotalCount(), space));
+        }
+        return space;
+    }
+
+    /**
+     * 期号盘点。
+     *
+     * @param sellableNow 现在真能领到号的期数：待开奖 <b>且</b> 当前时间落在售卖窗口内。
+     *                    与运行态领号的判定口径一致，否则这个页面会说「能领」而用户领不到
+     */
+    private record IssueTally(int issueCount, int waitCount, int openedCount, int sellableNow, long sold) {
+
+        void fill(LotteryConfigBoardDTO vo) {
+            vo.setIssueCount(issueCount);
+            vo.setWaitIssueCount(waitCount);
+            vo.setOpenedIssueCount(openedCount);
+            vo.setSoldTotal(sold);
+            // 发出过号码之后，号码长度与发行上限永久冻结，见 checkNumberSpace
+            vo.setParamsFrozen(sold > 0);
+        }
+    }
+
+    private IssueTally tally(List<LotteryIssue> issues, LocalDateTime dbNow) {
         int waitCount = 0;
         int openedCount = 0;
         int sellableNow = 0;
+        long sold = 0L;
         for (LotteryIssue issue : issues) {
+            sold += issue.getSoldCount() == null ? 0 : issue.getSoldCount();
             if (issue.getStatus() == IssueStatusEnum.WAIT) {
                 waitCount++;
-                // 与运行态一致：待开奖 + 当前时间落在售卖窗口内才算真能领号
-                boolean started = issue.getSaleStartTime() == null || !dbNow.isBefore(issue.getSaleStartTime());
-                boolean notEnded = issue.getSaleEndTime() == null || !dbNow.isAfter(issue.getSaleEndTime());
-                if (started && notEnded) {
+                if (onSale(issue, dbNow)) {
                     sellableNow++;
                 }
             } else if (issue.getStatus() == IssueStatusEnum.OPENED) {
                 openedCount++;
             }
         }
-        vo.setIssueCount(issues.size());
-        vo.setWaitIssueCount(waitCount);
-        vo.setOpenedIssueCount(openedCount);
-        vo.setSoldTotal(sold);
-        vo.setRuleCount((int) ruleCount);
-        vo.setParamsFrozen(sold > 0);
+        return new IssueTally(issues.size(), waitCount, openedCount, sellableNow, sold);
+    }
 
-        if (recordStat != null) {
-            vo.setMemberCount(toLong(recordStat.get("memberCount")));
-            vo.setWinCount(toLong(recordStat.get("winCount")));
-        } else {
-            vo.setMemberCount(0L);
-            vo.setWinCount(0L);
+    /** 售卖窗口两端都可以不配，不配就是那一端不设限 */
+    private boolean onSale(LotteryIssue issue, LocalDateTime dbNow) {
+        boolean started = issue.getSaleStartTime() == null || !dbNow.isBefore(issue.getSaleStartTime());
+        boolean notEnded = issue.getSaleEndTime() == null || !dbNow.isAfter(issue.getSaleEndTime());
+        return started && notEnded;
+    }
+
+    /**
+     * 上线的唯一前置条件就是「配了奖级规则」（见 {@code LotteryConfigService.checkOnlineReady}）——
+     * 否则号码发出去了、开奖时却无奖可发，而那时号码已经在用户手里。
+     */
+    private void checkPrizeRule(LotteryConfigBoardDTO vo, long ruleCount, boolean online) {
+        if (ruleCount > 0) {
+            return;
         }
+        vo.getIssueList().add(HealthIssue.danger("NO_PRIZE_RULE",
+                online ? "已上线却没有配置任何奖级规则：号码发出去了，开奖时无奖可发"
+                        : "尚未配置奖级规则，无法上线：号码发出去了却无奖可发，补救代价远高于此刻配好"));
+    }
 
-        // ---- 体检 ----
-        boolean online = config.getStatus() == LotteryConfigStatusEnum.ONLINE;
-
-        /*
-         * 上线的唯一前置条件就是「配了奖级规则」（LotteryConfigService.checkOnlineReady）——
-         * 否则号码发出去了、开奖时却无奖可发，而那时号码已经在用户手里。
-         */
-        if (ruleCount == 0) {
-            vo.getIssueList().add(LotteryConfigIssueDTO.danger("NO_PRIZE_RULE",
-                    online ? "已上线却没有配置任何奖级规则：号码发出去了，开奖时无奖可发"
-                            : "尚未配置奖级规则，无法上线：号码发出去了却无奖可发，补救代价远高于此刻配好"));
+    /**
+     * 上线了但用户领不到号的两种形态。分开报是因为处理动作不同：
+     * 一个要去建期号，一个要去调售卖时间或开新期。
+     */
+    private void checkSellable(LotteryConfigBoardDTO vo, List<LotteryIssue> issues, IssueTally tally, boolean online) {
+        if (!online) {
+            return;
         }
-
-        if (online && issues.isEmpty()) {
-            vo.getIssueList().add(LotteryConfigIssueDTO.danger("NO_ISSUE",
+        if (issues.isEmpty()) {
+            vo.getIssueList().add(HealthIssue.danger("NO_ISSUE",
                     "已上线但一个期号都没有：用户点领号会被拒（期号不存在），玩法等于开着门却没有货"));
-        } else if (online && sellableNow == 0) {
-            vo.getIssueList().add(LotteryConfigIssueDTO.warn("NO_SELLABLE_ISSUE",
+        } else if (tally.sellableNow() == 0) {
+            vo.getIssueList().add(HealthIssue.warn("NO_SELLABLE_ISSUE",
                     "已上线但当前没有任何期号处于可领号状态：所有期号要么还没开售、要么已停售、要么已开奖。"
                             + "用户现在领不到号"));
         }
-
-        /*
-         * 号码空间占用率。这是本页独有、也是最该提前看见的一条。
-         *
-         * 发过号之后号码长度与发行上限永久冻结（号码由游标加密得来，改了会让已发号码
-         * 无法验证、新号码还可能与历史重复）。所以占用率顶满 + 已冻结 = 这个玩法的
-         * 发行量再也加不上去，想扩容只能新建玩法 —— 事后才发现就来不及了。
-         */
-        if (vo.getSpaceUsage() != null && space > 0) {
-            if (config.getTotalCount() != null && config.getTotalCount() > space) {
-                vo.getIssueList().add(LotteryConfigIssueDTO.danger("SPACE_OVERFLOW",
-                        "单期发行上限 " + config.getTotalCount() + " 超过 " + config.getNumberLength()
-                                + " 位号码的空间 " + space + "：超出部分永远发不出来"));
-            } else if (vo.getSpaceUsage().compareTo(SPACE_WARN_THRESHOLD) >= 0) {
-                String pct = vo.getSpaceUsage().multiply(BigDecimal.valueOf(100))
-                        .setScale(1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
-                vo.getIssueList().add(LotteryConfigIssueDTO.warn("SPACE_ALMOST_FULL",
-                        "号码空间已占用 " + pct + "%（发行上限 " + config.getTotalCount()
-                                + " / 空间 " + space + "）。"
-                                + (Boolean.TRUE.equals(vo.getParamsFrozen())
-                                ? "本玩法已发出号码，号码长度与发行上限已永久冻结 —— 发行量无法再提高，扩容只能新建玩法"
-                                : "若还要提高发行量，请在发出第一个号码之前增加号码长度；一旦发号，这两个参数永久冻结")));
-            }
-        }
-
-        int danger = (int) vo.getIssueList().stream().filter(i -> "DANGER".equals(i.getLevel())).count();
-        int warn = (int) vo.getIssueList().stream().filter(i -> "WARN".equals(i.getLevel())).count();
-        vo.setDangerCount(danger);
-        vo.setWarnCount(warn);
-        return vo;
     }
 
-    private long toLong(Object value) {
-        return value == null ? 0L : ((Number) value).longValue();
+    /**
+     * 号码空间占用率 —— 本页独有、也是最该提前看见的一条。
+     *
+     * <p>发过号之后号码长度与发行上限<b>永久冻结</b>（号码由游标加密得来，改了会让已发号码
+     * 无法验证、新号码还可能与历史重复）。所以占用率顶满 + 已冻结 = 这个玩法的发行量
+     * 再也加不上去，想扩容只能新建玩法 —— 事后才发现就来不及了。
+     */
+    private void checkNumberSpace(LotteryConfigBoardDTO vo, LotteryConfig config, long space) {
+        if (vo.getSpaceUsage() == null || space <= 0) {
+            return;
+        }
+        if (config.getTotalCount() != null && config.getTotalCount() > space) {
+            vo.getIssueList().add(HealthIssue.danger("SPACE_OVERFLOW",
+                    "单期发行上限 " + config.getTotalCount() + " 超过 " + config.getNumberLength()
+                            + " 位号码的空间 " + space + "：超出部分永远发不出来"));
+            return;
+        }
+        if (vo.getSpaceUsage().compareTo(SPACE_WARN_THRESHOLD) < 0) {
+            return;
+        }
+        String pct = vo.getSpaceUsage().multiply(BigDecimal.valueOf(100))
+                .setScale(1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+        vo.getIssueList().add(HealthIssue.warn("SPACE_ALMOST_FULL",
+                "号码空间已占用 " + pct + "%（发行上限 " + config.getTotalCount() + " / 空间 " + space + "）。"
+                        + (Boolean.TRUE.equals(vo.getParamsFrozen())
+                        ? "本玩法已发出号码，号码长度与发行上限已永久冻结 —— 发行量无法再提高，扩容只能新建玩法"
+                        : "若还要提高发行量，请在发出第一个号码之前增加号码长度；一旦发号，这两个参数永久冻结")));
     }
 }

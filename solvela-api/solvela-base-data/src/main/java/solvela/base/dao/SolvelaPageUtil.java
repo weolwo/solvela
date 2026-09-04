@@ -28,6 +28,11 @@ import solvela.base.util.SolvelaCollectionUtil;
 public class SolvelaPageUtil {
 
     /**
+     * 默认页大小：调用方没给（或给了个 0）时用它，与前端分页组件的默认值一致
+     */
+    private static final long DEFAULT_PAGE_SIZE = 10;
+
+    /**
      * 转换为查询参数
      */
     public static Page<?> convert2PageQuery(PageParam pageParam) {
@@ -94,5 +99,23 @@ public class SolvelaPageUtil {
         int fromIndex = (pageNum - 1) * pageSize;
         int toIndex = Math.min(pageNum * pageSize, count);
         return new PageResult<>(pageNum, pageSize, count, pages, List.copyOf(list.subList(fromIndex, toIndex)));
+    }
+
+    /**
+     * 内存分页，只取这一页的元素。
+     *
+     * <p>与 {@link #subListPage} 的区别是<b>不组装 PageResult</b>：几个体检/看板接口
+     * 返回的是自带概览字段的结果对象（总数、严重告警数、期望赔付……），
+     * 分页元信息挂在它自己身上，这里只需要切出这一页的列表。
+     *
+     * <p>越界一律给空列表，不抛异常：翻到第 99 页是前端的正常行为，
+     * 而一个 500 会让整张看板白屏。
+     */
+    public static <T> List<T> subList(List<T> list, Long pageNum, Long pageSize) {
+        long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        long size = pageSize == null || pageSize < 1 ? DEFAULT_PAGE_SIZE : pageSize;
+        int from = (int) Math.min((num - 1) * size, list.size());
+        int to = (int) Math.min(from + size, list.size());
+        return list.subList(from, to);
     }
 }

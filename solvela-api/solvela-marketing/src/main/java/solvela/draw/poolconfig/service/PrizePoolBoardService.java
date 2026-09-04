@@ -3,12 +3,13 @@ package solvela.draw.poolconfig.service;
 import solvela.enums.ActivityStatusEnum;
 import solvela.enums.PrizePoolStatusEnum;
 import lombok.RequiredArgsConstructor;
+import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.stat.HealthIssue;
 import solvela.activity.ActivityConfig;
 import solvela.activity.manager.ActivityConfigManager;
 import solvela.draw.DrawConfig;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
-import solvela.draw.poolconfig.domain.dto.PoolConfigIssueDTO;
 import solvela.draw.poolconfig.domain.dto.PrizePoolBoardResultDTO;
 import solvela.draw.poolconfig.domain.dto.PrizePoolBoardDTO;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -113,46 +115,77 @@ public class PrizePoolBoardService {
         result.setDangerCount(all.stream().mapToInt(PrizePoolBoardDTO::getDangerCount).sum());
         result.setWarnCount(all.stream().mapToInt(PrizePoolBoardDTO::getWarnCount).sum());
         result.setTotal((long) all.size());
-        result.setList(page(all, queryForm.getPageNum(), queryForm.getPageSize()));
+        result.setList(SolvelaPageUtil.subList(all, queryForm.getPageNum(), queryForm.getPageSize()));
         return result;
     }
 
-    private List<PrizePoolBoardDTO> page(List<PrizePoolBoardDTO> all, Long pageNum, Long pageSize) {
-        long num = pageNum == null || pageNum < 1 ? 1 : pageNum;
-        long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
-        int from = (int) Math.min((num - 1) * size, all.size());
-        int to = (int) Math.min(from + size, all.size());
-        return all.subList(from, to);
-    }
-
+    /**
+     * 单个奖池的体检：身份 -> 整池形状 -> 三类校验（结构 / 开关 / 重置周期）。
+     */
     private PrizePoolBoardDTO analyseOne(PrizePoolConfig pool, Map<String, ActivityConfig> activityMap,
                                         Map<Long, PrizePoolItem> itemMap, List<PoolPrizeMapping> mappings) {
+        // 玩法级配置，本方法里三处要用（重置周期展示、归属校验、限领搭配校验）。
+        // 查一次传下去 —— 改造前顶上和体检里各查了一次，一屏奖池就是一屏重复查询
+        DrawConfig drawConfig = drawConfigService.getByPool(pool);
+        PoolShape shape = shapeOf(mappings, itemMap);
+
         PrizePoolBoardDTO vo = new PrizePoolBoardDTO();
         vo.setId(pool.getId());
         vo.setActivityCode(pool.getActivityCode());
         vo.setPoolCode(pool.getPoolCode());
         vo.setPoolName(pool.getPoolName());
-        vo.setResetPeriod(java.util.Optional.ofNullable(drawConfigService.getByPool(pool))
-                .map(DrawConfig::getResetPeriod).orElse(null));
+        vo.setResetPeriod(drawConfig == null ? null : drawConfig.getResetPeriod());
         vo.setStatus(pool.getStatus());
         vo.setCreateTime(pool.getCreateTime());
         vo.setIssueList(new ArrayList<>());
+        shape.fill(vo);
 
         ActivityConfig activity = activityMap.get(pool.getActivityCode());
         if (activity == null) {
-            vo.getIssueList().add(PoolConfigIssueDTO.danger("ACTIVITY_MISSING",
+            vo.getIssueList().add(HealthIssue.danger("ACTIVITY_MISSING",
                     "所属活动 " + pool.getActivityCode() + " 不存在：这个奖池挂在一个已被删除的活动上，永远不会被抽到"));
         } else {
             vo.setActivityName(activity.getActivityName());
             vo.setActivityStatus(activity.getStatus());
         }
+
         boolean activityOnline = activity != null && activity.getStatus() == ActivityStatusEnum.ONLINE;
         boolean poolOpen = pool.getStatus() == PrizePoolStatusEnum.OPEN;
+        // 「现在点一次抽奖能不能抽到这个池」的完整条件，四个缺一不可
+        vo.setDrawable(activityOnline && poolOpen && shape.slotCount() > 0 && shape.closed());
 
-        // ---- 坑位与概率 ----
+        checkStructure(vo, shape);
+        checkSwitches(vo, activity, activityOnline, poolOpen);
+        checkResetPeriod(vo, drawConfig, shape);
+
+        vo.setDangerCount(HealthIssue.countDanger(vo.getIssueList()));
+        vo.setWarnCount(HealthIssue.countWarn(vo.getIssueList()));
+        return vo;
+    }
+
+    /**
+     * 整池形状：这几个数都要把坑位扫一遍才知道，看单行看不出来。
+     *
+     * @param closed           概率是否闭环到 100%。没闭环 = 这个池每一次抽奖都直接报错
+     * @param limitedItemCount 池内配了单人限领的奖项数 ——
+     *                         判断 {@code reset_period} 有没有意义的唯一依据
+     */
+    private record PoolShape(int slotCount, BigDecimal probabilitySum, boolean closed,
+                             int fallbackCount, int limitedItemCount) {
+
+        void fill(PrizePoolBoardDTO vo) {
+            vo.setSlotCount(slotCount);
+            vo.setProbabilitySum(probabilitySum);
+            vo.setProbabilityClosed(closed);
+            vo.setFallbackCount(fallbackCount);
+            vo.setLimitedItemCount(limitedItemCount);
+        }
+    }
+
+    private PoolShape shapeOf(List<PoolPrizeMapping> mappings, Map<Long, PrizePoolItem> itemMap) {
         BigDecimal sum = BigDecimal.ZERO;
         int fallbackCount = 0;
-        Set<Long> itemIds = new java.util.HashSet<>();
+        Set<Long> itemIds = new HashSet<>();
         for (PoolPrizeMapping mapping : mappings) {
             sum = sum.add(mapping.getProbability() == null ? BigDecimal.ZERO : mapping.getProbability());
             if (Boolean.TRUE.equals(mapping.getIsFallback())) {
@@ -162,13 +195,7 @@ public class PrizePoolBoardService {
                 itemIds.add(mapping.getPrizeItemId());
             }
         }
-        boolean closed = !mappings.isEmpty() && Ppm.isClosedPercent(sum);
-        vo.setSlotCount(mappings.size());
-        vo.setProbabilitySum(sum);
-        vo.setProbabilityClosed(closed);
-        vo.setFallbackCount(fallbackCount);
 
-        // 池内有多少奖项配了单人限领 —— 这是判断 reset_period 有没有意义的唯一依据
         int limitedItemCount = 0;
         for (Long itemId : itemIds) {
             PrizePoolItem item = itemMap.get(itemId);
@@ -176,62 +203,65 @@ public class PrizePoolBoardService {
                 limitedItemCount++;
             }
         }
-        vo.setLimitedItemCount(limitedItemCount);
+        return new PoolShape(mappings.size(), sum, !mappings.isEmpty() && Ppm.isClosedPercent(sum),
+                fallbackCount, limitedItemCount);
+    }
 
-        vo.setDrawable(activityOnline && poolOpen && !mappings.isEmpty() && closed);
-
-        // ---- 体检 ----
-        if (mappings.isEmpty()) {
-            vo.getIssueList().add(PoolConfigIssueDTO.danger("POOL_EMPTY",
+    /**
+     * 结构校验：两种「这个池压根跑不起来」的形态。
+     */
+    private void checkStructure(PrizePoolBoardDTO vo, PoolShape shape) {
+        if (shape.slotCount() == 0) {
+            vo.getIssueList().add(HealthIssue.danger("POOL_EMPTY",
                     "奖池一个坑位都没有：抽奖时快照构造直接抛「奖池快照不能为空」，本池不可用。请到抽奖工作台配置奖项"));
-        } else if (!closed) {
-            vo.getIssueList().add(PoolConfigIssueDTO.danger("PROBABILITY_NOT_CLOSED",
-                    "概率总和为 " + sum.toPlainString() + "%，未闭环到 100%："
+        } else if (!shape.closed()) {
+            vo.getIssueList().add(HealthIssue.danger("PROBABILITY_NOT_CLOSED",
+                    "概率总和为 " + shape.probabilitySum().toPlainString() + "%，未闭环到 100%："
                             + "抽奖时快照构造会抛异常且执行链路未捕获，本奖池的每一次抽奖请求都会直接报错"));
         }
+    }
 
-        /*
-         * 开关与活动状态的搭配。两种「进不来」的形态要分开说 ——
-         * 运营看到「奖池已关闭」和「活动没上线」要做的事完全不同。
-         */
+    /**
+     * 开关与活动状态的搭配。
+     *
+     * <p>两种「用户进不来」的形态要分开说 —— 运营看到「奖池已关闭」和「活动没上线」
+     * 要做的事完全不同，合成一条就等于让人自己去猜该点哪个按钮。
+     */
+    private void checkSwitches(PrizePoolBoardDTO vo, ActivityConfig activity, boolean activityOnline, boolean poolOpen) {
         if (activityOnline && !poolOpen) {
-            vo.getIssueList().add(PoolConfigIssueDTO.warn("POOL_CLOSED_WHILE_ONLINE",
+            vo.getIssueList().add(HealthIssue.warn("POOL_CLOSED_WHILE_ONLINE",
                     "活动已上线但本奖池处于关闭状态：用户抽奖会被拒绝（奖池未开启）。若是有意停用可忽略"));
         }
         if (!activityOnline && poolOpen && activity != null) {
-            vo.getIssueList().add(PoolConfigIssueDTO.warn("ONLINE_BUT_ACTIVITY_OFFLINE",
+            vo.getIssueList().add(HealthIssue.warn("ONLINE_BUT_ACTIVITY_OFFLINE",
                     "奖池已开启但活动未上线：用户仍然进不来。要真正开放需要先上线活动"));
         }
+    }
 
-        /*
-         * ⚠️ 本页独有的两条：reset_period 与单人限领的搭配。
-         * 这两条要同时看奖池表与奖项表，而它们分属两个页面，谁都看不全。
-         */
-        // 重置周期住在抽奖配置上（玩法级），但这条体检要同时看奖项的限领设置，所以在奖池页出现
-        DrawConfig drawConfig = drawConfigService.getByPool(pool);
-        String resetPeriod = drawConfig == null ? null : drawConfig.getResetPeriod();
-        boolean periodic = DrawPeriodResolver.needsClock(resetPeriod);
+    /**
+     * ⚠️ 本页独有的三条：重置周期与单人限领的搭配。
+     *
+     * <p>重置周期住在抽奖配置上（玩法级），单人限领住在奖项上，两者分属两个页面，
+     * 谁都看不全 —— 而它们必须成对配置才有意义：重置周期重置的就是限领计数。
+     */
+    private void checkResetPeriod(PrizePoolBoardDTO vo, DrawConfig drawConfig, PoolShape shape) {
         if (drawConfig == null) {
-            vo.getIssueList().add(PoolConfigIssueDTO.warn("NO_DRAW_CONFIG",
+            vo.getIssueList().add(HealthIssue.warn("NO_DRAW_CONFIG",
                     "这个奖池不属于任何抽奖配置：抽奖走不到它，单人限领也永远不会重置。"
                             + "请先给活动建抽奖配置，再把奖池归到它下面"));
         }
-        if (periodic && limitedItemCount == 0 && !mappings.isEmpty()) {
-            vo.getIssueList().add(PoolConfigIssueDTO.warn("RESET_PERIOD_USELESS",
+        String resetPeriod = drawConfig == null ? null : drawConfig.getResetPeriod();
+        boolean periodic = DrawPeriodResolver.needsClock(resetPeriod);
+        if (periodic && shape.limitedItemCount() == 0 && shape.slotCount() > 0) {
+            vo.getIssueList().add(HealthIssue.warn("RESET_PERIOD_USELESS",
                     "抽奖配置了「" + resetPeriodText(resetPeriod) + "」重置，但池内没有任何奖项设置单人限领次数："
                             + "重置周期重置的是限领计数，没有限领就没有计数要重置，这个配置当前不产生任何效果"));
         }
-        if (!periodic && limitedItemCount > 0) {
-            vo.getIssueList().add(PoolConfigIssueDTO.warn("LIMIT_NEVER_RESETS",
-                    "池内有 " + limitedItemCount + " 个奖项设置了单人限领，但重置周期是「活动期间」："
+        if (!periodic && shape.limitedItemCount() > 0) {
+            vo.getIssueList().add(HealthIssue.warn("LIMIT_NEVER_RESETS",
+                    "池内有 " + shape.limitedItemCount() + " 个奖项设置了单人限领，但重置周期是「活动期间」："
                             + "用户在整个活动内中够次数后将永不恢复。限量大奖可以这么配，日常玩法通常应选按天/周/月"));
         }
-
-        int danger = (int) vo.getIssueList().stream().filter(i -> "DANGER".equals(i.getLevel())).count();
-        int warn = (int) vo.getIssueList().stream().filter(i -> "WARN".equals(i.getLevel())).count();
-        vo.setDangerCount(danger);
-        vo.setWarnCount(warn);
-        return vo;
     }
 
     private String resetPeriodText(String resetPeriod) {

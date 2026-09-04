@@ -4,6 +4,7 @@ import solvela.enums.ActivityStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 一个奖项的库存看板行。
@@ -81,5 +82,5 @@ public class PrizeItemStockDTO {
     private List<String> poolCodeList;
 
     /** 本奖项的体检告警 */
-    private List<PrizeItemIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 }

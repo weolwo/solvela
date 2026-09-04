@@ -3,6 +3,7 @@ package solvela.lottery.prizerule.domain.dto;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 单条奖级规则的赔付模型与体检结果。
@@ -64,5 +65,5 @@ public class LotteryPrizeRuleAnalysisDTO {
     private BigDecimal expectedCost;
 
     /** 本条规则的体检告警，空表示没问题 */
-    private List<PrizeRuleIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 }

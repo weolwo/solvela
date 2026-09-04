@@ -4,6 +4,7 @@ import solvela.enums.LotteryConfigStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 彩票玩法一览行：表字段 + 号码空间占用 + 运营实况 + 体检结论。
@@ -95,5 +96,5 @@ public class LotteryConfigBoardDTO {
     private Integer warnCount;
 
     /** 体检告警明细 */
-    private List<LotteryConfigIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 }

@@ -3,6 +3,7 @@ package solvela.draw.prizemapping.domain.dto;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 奖池里的一个坑位：概率区间 + 奖品 + 库存 + 体检。
@@ -76,5 +77,5 @@ public class DrawPoolSlotDTO {
     private BigDecimal expectedCostPerDraw;
 
     /** 本坑位的体检告警 */
-    private List<DrawPoolIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 }

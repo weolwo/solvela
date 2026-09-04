@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 奖池配置一览行：表里的可编辑字段 + 「这个池现在能不能正常抽」的结论。
@@ -87,5 +88,5 @@ public class PrizePoolBoardDTO {
     private Integer warnCount;
 
     /** 体检告警明细 */
-    private List<PoolConfigIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 }

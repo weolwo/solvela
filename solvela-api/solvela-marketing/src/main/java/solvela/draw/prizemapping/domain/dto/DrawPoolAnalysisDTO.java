@@ -5,6 +5,7 @@ import solvela.enums.PrizePoolStatusEnum;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.base.stat.HealthIssue;
 
 /**
  * 一个奖池的完整概率结构 + 赔付模型 + 体检结论。
@@ -76,7 +77,7 @@ public class DrawPoolAnalysisDTO {
     private Integer warnCount;
 
     /** 奖池维度的体检告警 */
-    private List<DrawPoolIssueDTO> issueList;
+    private List<HealthIssue> issueList;
 
     /** 坑位明细，按 sortWeight 升序 —— 顺序即概率区间的累加顺序 */
     private List<DrawPoolSlotDTO> slotList;
