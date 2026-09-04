@@ -59,12 +59,8 @@ public class ScriptEditService {
      *   <li><b>内容确实变了</b> —— 与已有版本一字不差时不产生新版本。</li>
      * </ol>
      *
-     * <p>🔴 <b>场景在同一个编码下不许改。</b>改场景意味着入参和返回值契约整个换掉，
-     * 而挂载点是按场景校验后才挂上去的 —— 悄悄换掉场景等于让所有已有挂载失效，
-     * 且要等真有用户触发时才炸。要换场景，请用一个新的脚本编码。
-     *
-     * <p>第一版会自动激活：此时这个编码还没被任何东西挂载（挂载要求先有激活版本），
-     * 激活它不改变任何线上行为，却省掉一次「保存完为什么用不了」的困惑。
+     * <p>三条规矩分别写在 {@link #checkSceneUnchanged}、{@link #checkContentIsNew}
+     * 与 {@link #newVersion} 上。
      *
      * @return 新版本的行 id
      */
@@ -73,26 +69,63 @@ public class ScriptEditService {
         ScriptScene scene = ScriptScene.of(command.scene()).orElseThrow(() -> new BusinessException(
                 "场景 [" + command.scene() + "] 不存在，合法值见 /script/scene/list"));
 
+        // 同一编码的全部历史版本，倒序 —— 后面三件事都要它：判场景、判重复、算新版本号
         List<Script> versions = scriptManager.lambdaQuery()
                 .eq(Script::getScriptCode, command.scriptCode())
                 .orderByDesc(Script::getVersion)
                 .list();
-
-        if (!versions.isEmpty()) {
-            String existingScene = versions.getFirst().getScene();
-            if (!existingScene.equals(scene.name())) {
-                throw new BusinessException(String.format(
-                        "脚本 [%s] 已有版本的场景是 %s，不能改成 %s。"
-                                + "换场景等于换掉入参与返回值契约，已有挂载会全部失效 —— 请改用一个新的脚本编码。",
-                        command.scriptCode(), existingScene, scene.name()));
-            }
-        }
+        checkSceneUnchanged(command, versions, scene);
 
         // UNTRUSTED：内容直接来自后台请求。check() 只走语法树、不产生编译缓存，
         // 但来源标注仍要如实写 —— 让「这段内容是谁给的」在任何调用点都一目了然
         scriptEngine.check(ExecutableScript.untrusted(command.scriptCode(), command.content()));
 
         String hash = sha256(command.content());
+        checkContentIsNew(versions, hash);
+
+        boolean first = versions.isEmpty();
+        Script row = newVersion(command, scene, versions, hash);
+        scriptManager.save(row);
+
+        if (first) {
+            // 第一版自动激活：此时这个编码还没被任何东西挂载（挂载要求先有激活版本），
+            // 激活它不改变任何线上行为，却省掉一次「保存完为什么用不了」的困惑
+            scriptStore.evict(command.scriptCode());
+            log.info("[ScriptEngine] 脚本 [{}] 首版已保存并自动激活（操作人 {}）",
+                    command.scriptCode(), command.operator());
+        } else {
+            log.info("[ScriptEngine] 脚本 [{}] 保存 v{}，未激活（操作人 {}）",
+                    command.scriptCode(), row.getVersion(), command.operator());
+        }
+        return row.getId();
+    }
+
+    /**
+     * 🔴 <b>场景在同一个编码下不许改。</b>
+     *
+     * <p>改场景意味着入参和返回值契约整个换掉，而挂载点是按场景校验后才挂上去的 ——
+     * 悄悄换掉场景等于让所有已有挂载失效，且要等真有用户触发时才炸。
+     */
+    private void checkSceneUnchanged(ScriptSaveCommand command, List<Script> versions, ScriptScene scene) {
+        if (versions.isEmpty()) {
+            return;
+        }
+        String existingScene = versions.getFirst().getScene();
+        if (!existingScene.equals(scene.name())) {
+            throw new BusinessException(String.format(
+                    "脚本 [%s] 已有版本的场景是 %s，不能改成 %s。"
+                            + "换场景等于换掉入参与返回值契约，已有挂载会全部失效 —— 请改用一个新的脚本编码。",
+                    command.scriptCode(), existingScene, scene.name()));
+        }
+    }
+
+    /**
+     * 内容一字不差就不建新版本。
+     *
+     * <p>拦掉是因为「保存了却没生效」几乎总是这个原因：运营改完发现不对，改回去再保存，
+     * 于是攒出一串内容相同的版本，而线上跑的仍是那个激活的旧版。直说该去点激活。
+     */
+    private void checkContentIsNew(List<Script> versions, String hash) {
         versions.stream()
                 .filter(version -> hash.equals(version.getContentHash()))
                 .findFirst()
@@ -101,7 +134,15 @@ public class ScriptEditService {
                             "内容与 v%d 一字不差，没有产生新版本。要让它生效，直接激活 v%d 即可",
                             same.getVersion(), same.getVersion()));
                 });
+    }
 
+    /**
+     * 组装新版本行。
+     *
+     * <p>{@code params_schema} 与 {@code return_type} <b>不人工维护</b>，直接由场景契约生成 ——
+     * 两处定义必然漂移，一处生成不会。
+     */
+    private Script newVersion(ScriptSaveCommand command, ScriptScene scene, List<Script> versions, String hash) {
         boolean first = versions.isEmpty();
         Script row = new Script();
         row.setScriptCode(command.scriptCode());
@@ -113,7 +154,6 @@ public class ScriptEditService {
         row.setVersion(first ? 1 : versions.getFirst().getVersion() + 1);
         row.setActiveFlag(first ? Boolean.TRUE : null);
         row.setSource(ScriptSourceEnum.MANUAL);
-        // params_schema 不人工维护，直接由场景契约生成 —— 两处定义必然漂移，一处生成不会
         row.setParamsSchema(JsonUtils.toJson(scene.getParams().stream()
                 .map(param -> Map.of(
                         "name", param.name(),
@@ -126,17 +166,7 @@ public class ScriptEditService {
         row.setChangeLog(command.changeLog());
         row.setCreateBy(command.operator());
         row.setUpdateBy(command.operator());
-        scriptManager.save(row);
-
-        if (first) {
-            scriptStore.evict(command.scriptCode());
-            log.info("[ScriptEngine] 脚本 [{}] 首版已保存并自动激活（操作人 {}）",
-                    command.scriptCode(), command.operator());
-        } else {
-            log.info("[ScriptEngine] 脚本 [{}] 保存 v{}，未激活（操作人 {}）",
-                    command.scriptCode(), row.getVersion(), command.operator());
-        }
-        return row.getId();
+        return row;
     }
 
     /**

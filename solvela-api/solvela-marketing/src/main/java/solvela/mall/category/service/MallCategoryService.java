@@ -109,44 +109,10 @@ public class MallCategoryService {
     public Long save(MallCategorySaveCommand form, String operator) {
         long parentId = form.getParentId() == null ? ROOT_PARENT_ID : form.getParentId();
         String categoryName = StringUtils.trim(form.getCategoryName());
+        MallCategory existing = loadExisting(form.getId());
 
-        MallCategory existing = form.getId() == null ? null : mallCategoryManager.getById(form.getId());
-        if (form.getId() != null && existing == null) {
-            throw new BusinessException("分类不存在，可能已被删除");
-        }
-
-        // ---------- 层级约束 ----------
-        if (!isRoot(parentId)) {
-            MallCategory parent = mallCategoryManager.getById(parentId);
-            if (parent == null) {
-                throw new BusinessException("上级分类不存在");
-            }
-            if (!isRoot(parent.getParentId())) {
-                throw new BusinessException("分类最多两级，不能挂在二级分类下面");
-            }
-            if (existing != null) {
-                if (parentId == existing.getId()) {
-                    throw new BusinessException("不能把分类挂到它自己下面");
-                }
-                // 自己有子分类，却要变成二级 —— 那些子分类就成了三级
-                long childCount = mallCategoryManager.lambdaQuery()
-                        .eq(MallCategory::getParentId, existing.getId()).count();
-                if (childCount > 0) {
-                    throw new BusinessException("该分类下还有 " + childCount + " 个子分类，不能改成二级分类");
-                }
-            }
-        }
-
-        // ---------- 同级重名 ----------
-        boolean nameTaken = mallCategoryManager.lambdaQuery()
-                .eq(MallCategory::getParentId, parentId)
-                .eq(MallCategory::getCategoryName, categoryName)
-                .ne(existing != null, MallCategory::getId, existing == null ? null : existing.getId())
-                .exists();
-        if (nameTaken) {
-            // 不加这一条的话，运营手滑建两个「数码3C」，C 端会出现两个一模一样的宫格
-            throw new BusinessException("同级下已有名为「" + categoryName + "」的分类");
-        }
+        checkDepth(parentId, existing);
+        checkNameFree(parentId, categoryName, existing);
 
         MallCategory entity = new MallCategory();
         entity.setId(form.getId());
@@ -156,15 +122,68 @@ public class MallCategoryService {
         entity.setSort(form.getSort() == null ? 0 : form.getSort());
         entity.setStatus(form.getStatus() == null ? EnableStatusEnum.ENABLED : form.getStatus());
         // create_time / update_time 一律不设：铁律 9，只认数据库时钟
+        entity.setUpdateBy(operator);
         if (existing == null) {
             entity.setCreateBy(operator);
-            entity.setUpdateBy(operator);
             mallCategoryDao.insert(entity);
         } else {
-            entity.setUpdateBy(operator);
             mallCategoryDao.updateById(entity);
         }
         return entity.getId();
+    }
+
+    private MallCategory loadExisting(Long id) {
+        if (id == null) {
+            return null;
+        }
+        MallCategory existing = mallCategoryManager.getById(id);
+        if (existing == null) {
+            throw new BusinessException("分类不存在，可能已被删除");
+        }
+        return existing;
+    }
+
+    /**
+     * 层级约束：挂到根下面永远合法，挂到别人下面则要保证那个「别人」是一级分类，
+     * 且自己名下不能已经带着子分类。
+     */
+    private void checkDepth(long parentId, MallCategory existing) {
+        if (isRoot(parentId)) {
+            return;
+        }
+        MallCategory parent = mallCategoryManager.getById(parentId);
+        if (parent == null) {
+            throw new BusinessException("上级分类不存在");
+        }
+        if (!isRoot(parent.getParentId())) {
+            throw new BusinessException("分类最多两级，不能挂在二级分类下面");
+        }
+        if (existing == null) {
+            return;
+        }
+        if (parentId == existing.getId()) {
+            throw new BusinessException("不能把分类挂到它自己下面");
+        }
+        // 自己有子分类，却要变成二级 —— 那些子分类就成了三级
+        long childCount = mallCategoryManager.lambdaQuery()
+                .eq(MallCategory::getParentId, existing.getId()).count();
+        if (childCount > 0) {
+            throw new BusinessException("该分类下还有 " + childCount + " 个子分类，不能改成二级分类");
+        }
+    }
+
+    /**
+     * 同级重名。不加这一条的话，运营手滑建两个「数码3C」，C 端会出现两个一模一样的宫格。
+     */
+    private void checkNameFree(long parentId, String categoryName, MallCategory existing) {
+        boolean taken = mallCategoryManager.lambdaQuery()
+                .eq(MallCategory::getParentId, parentId)
+                .eq(MallCategory::getCategoryName, categoryName)
+                .ne(existing != null, MallCategory::getId, existing == null ? null : existing.getId())
+                .exists();
+        if (taken) {
+            throw new BusinessException("同级下已有名为「" + categoryName + "」的分类");
+        }
     }
 
     /**
@@ -180,20 +199,32 @@ public class MallCategoryService {
     public Integer batchSave(MallCategoryBatchSaveCommand form, String operator) {
         long parentId = form.getParentId() == null ? ROOT_PARENT_ID : form.getParentId();
         List<MallCategoryBatchItemCommand> itemList = form.getCategoryList();
-
-        // ---------- 上级校验 ----------
+        // 挂在根下的这一批还能再带一层子级；挂在一级分类下的就已经用满两级了
         boolean underRoot = isRoot(parentId);
-        if (!underRoot) {
-            MallCategory parent = mallCategoryManager.getById(parentId);
-            if (parent == null) {
-                throw new BusinessException("上级分类不存在");
-            }
-            if (!isRoot(parent.getParentId())) {
-                throw new BusinessException("分类最多两级，不能挂在二级分类下面");
-            }
-        }
 
-        // ---------- 层级与数量 ----------
+        checkBatchParent(parentId, underRoot);
+        checkBatchDepthAndSize(itemList, underRoot);
+        checkBatchNames(parentId, itemList);
+        return insertBatch(itemList, parentId, operator);
+    }
+
+    private void checkBatchParent(long parentId, boolean underRoot) {
+        if (underRoot) {
+            return;
+        }
+        MallCategory parent = mallCategoryManager.getById(parentId);
+        if (parent == null) {
+            throw new BusinessException("上级分类不存在");
+        }
+        if (!isRoot(parent.getParentId())) {
+            throw new BusinessException("分类最多两级，不能挂在二级分类下面");
+        }
+    }
+
+    /**
+     * 层级与数量：整批的总条数（父 + 子）要在上限之内，且谁都不能凑出第三级。
+     */
+    private void checkBatchDepthAndSize(List<MallCategoryBatchItemCommand> itemList, boolean underRoot) {
         int total = 0;
         for (MallCategoryBatchItemCommand item : itemList) {
             List<MallCategoryBatchItemCommand> children = childrenOf(item);
@@ -212,12 +243,15 @@ public class MallCategoryService {
             throw new BusinessException("一次最多新建 " + MallConst.MAX_CATEGORY_BATCH
                     + " 个分类，当前 " + total + " 个，请分批提交");
         }
+    }
 
-        // ---------- 重名：本批内部 + 与库里已有 ----------
-        //
-        // 两处都要查。只查库里的话，本批里写了两个「数码3C」会一路走到 insert，
-        // 由唯一索引在第二条上抛 SQL 异常 —— 事务是回滚了，但运营看到的是英文堆栈，
-        // 而且不知道是哪两行撞了。
+    /**
+     * 重名：<b>本批内部与库里已有都要查</b>。
+     *
+     * <p>只查库里的话，本批里写了两个「数码3C」会一路走到 insert，由唯一索引在第二条上
+     * 抛 SQL 异常 —— 事务是回滚了，但运营看到的是英文堆栈，而且不知道是哪两行撞了。
+     */
+    private void checkBatchNames(long parentId, List<MallCategoryBatchItemCommand> itemList) {
         Set<String> existingNames = listChildNames(parentId);
         Set<String> batchNames = new HashSet<>();
         for (MallCategoryBatchItemCommand item : itemList) {
@@ -237,8 +271,14 @@ public class MallCategoryService {
                 }
             }
         }
+    }
 
-        // ---------- 落库：先父后子 ----------
+    /**
+     * 落库：先父后子。
+     *
+     * @return 实际创建的条数
+     */
+    private int insertBatch(List<MallCategoryBatchItemCommand> itemList, long parentId, String operator) {
         int created = 0;
         for (int i = 0; i < itemList.size(); i++) {
             MallCategoryBatchItemCommand item = itemList.get(i);

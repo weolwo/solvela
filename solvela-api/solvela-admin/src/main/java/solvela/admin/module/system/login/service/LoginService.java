@@ -112,97 +112,106 @@ public class LoginService {
     @Resource
     private TokenStore tokenStore;
     /**
-     * 员工登录
+     * 一次登录尝试的现场：谁、从哪、用什么设备。
+     *
+     * <p>这四个值在整条链路上原样传给每一次写日志 —— 改造前 {@code saveLoginLog}
+     * 有 6 个参数，其中 4 个每次都一样，真正变化的只有「结果」和「备注」。
+     * 收成一个值之后，写日志的地方读起来就是它本来的意思：{@code attempt.fail("密码错误")}。
+     */
+    private record LoginAttempt(EmployeeEntity employee, String ip, String userAgent, LoginDeviceEnum device) {
+    }
+
+    /**
+     * 员工登录。
+     *
+     * <p>顺序有约束：<b>账号状态在验密码之前</b>（被禁用的账号不该还能用来试探密码对不对），
+     * <b>双因子在验密码之前</b>（否则邮箱验证码就成了密码错误之后才需要过的一道门，
+     * 等于没有）。
      *
      * @return 返回用户登录信息
      */
     public LoginResultVO login(LoginForm loginForm, String ip, String userAgent) {
-
         LoginDeviceEnum loginDeviceEnum = SolvelaEnumUtil.getEnumByValue(loginForm.getLoginDevice(), LoginDeviceEnum.class);
         if (loginDeviceEnum == null) {
             throw new BusinessException("登录设备暂不支持！");
         }
-        // 验证登录名
         EmployeeEntity employeeEntity = employeeService.getByLoginName(loginForm.getLoginName());
         if (null == employeeEntity) {
+            // 登录名不存在与密码错误<b>必须给同一句话</b>：分开说等于把「这个账号存在」白送出去
             throw new BusinessException("登录名或密码错误！");
         }
-
-        // 验证账号状态
-        if (employeeEntity.getDeletedFlag()) {
-            saveLoginLog(employeeEntity, ip, userAgent, "账号已删除", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
-            throw new BusinessException("您的账号已被删除,请联系工作人员！");
-        }
-
-        if (employeeEntity.getDisabledFlag()) {
-            saveLoginLog(employeeEntity, ip, userAgent, "账号已禁用", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
-            throw new BusinessException("您的账号已被禁用,请联系工作人员！");
-        }
+        LoginAttempt attempt = new LoginAttempt(employeeEntity, ip, userAgent, loginDeviceEnum);
+        checkAccountUsable(attempt);
 
         // 解密前端加密的密码
         String requestPassword = apiEncryptService.decrypt(loginForm.getPassword());
-
-        // 验证密码 是否为万能密码
-        String superPassword = configService.getConfigValue(ConfigKeyEnum.SUPER_PASSWORD);
-        boolean superPasswordFlag = superPassword.equals(requestPassword);
+        // 万能密码：运维通道，它绕开等保失败锁定与邮箱双因子，所以每一次使用都要在登录日志上留名
+        boolean superPasswordFlag = configService.getConfigValue(ConfigKeyEnum.SUPER_PASSWORD).equals(requestPassword);
 
         // 校验双因子登录（不通过直接抛）
         validateEmailCode(loginForm, employeeEntity, superPasswordFlag);
 
-        AccessToken accessToken;
-        if (superPasswordFlag) {
+        AccessToken accessToken = superPasswordFlag
+                ? tokenStore.issue(employeeEntity.getEmployeeId(), true,
+                        loginDeviceEnum.getDesc(), SUPER_PASSWORD_TOKEN_TTL)
+                : authenticateAndIssue(attempt, requestPassword);
 
-            accessToken = tokenStore.issue(employeeEntity.getEmployeeId(), true,
-                    loginDeviceEnum.getDesc(), SUPER_PASSWORD_TOKEN_TTL);
-
-        } else {
-
-            // 按照等保登录要求，进行登录失败次数校验；已锁定会直接抛 LOGIN_FAIL_LOCK
-            LoginFailEntity loginFailEntity = securityLoginService.checkLogin(
-                    employeeEntity.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE);
-
-            // 密码错误
-            if (!PasswordCipher.matches(employeeService.generateSaltPassword(requestPassword, employeeEntity.getEmployeeUid()), employeeEntity.getLoginPwd())) {
-                // 记录登录失败
-                saveLoginLog(employeeEntity, ip, userAgent, "密码错误", LoginLogResultEnum.LOGIN_FAIL, loginDeviceEnum);
-                // 记录等级保护次数
-                String msg = securityLoginService.recordLoginFail(employeeEntity.getEmployeeId(),
-                        UserTypeEnum.ADMIN_EMPLOYEE, employeeEntity.getLoginName(), loginFailEntity);
-                // msg 非空说明等保开了失败锁定，里面写着「还剩几次 / 锁到什么时候」——
-                // 这句话必须原样给用户，否则他不知道再错一次会发生什么
-                throw msg == null
-                        ? new BusinessException("登录名或密码错误！")
-                        : new BusinessException(UserErrorCode.LOGIN_FAIL_WILL_LOCK, msg);
-            }
-
-            accessToken = tokenStore.issue(employeeEntity.getEmployeeId(), false, loginDeviceEnum.getDesc());
-
-            // 移除邮箱验证码
-            deleteEmailCode(employeeEntity.getEmployeeId());
-        }
-
-        // 获取员工信息
         RequestEmployee requestEmployee = loginManager.loadLoginInfo(employeeEntity);
-
-        // 移除登录失败
         securityLoginService.removeLoginFail(employeeEntity.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE);
+        saveLoginLog(attempt, LoginLogResultEnum.LOGIN_SUCCESS,
+                superPasswordFlag ? "万能密码登录" : StringConst.EMPTY);
 
-        // 获取登录结果信息
-        String token = accessToken.value();
         LoginResultVO loginResultVO = getLoginResult(requestEmployee, superPasswordFlag);
-
-        //保存登录记录
-        saveLoginLog(employeeEntity, ip, userAgent, superPasswordFlag ? "万能密码登录" : StringConst.EMPTY, LoginLogResultEnum.LOGIN_SUCCESS, loginDeviceEnum);
-
-        // 设置 token
-        loginResultVO.setToken(token);
-
-        // 更新用户权限
+        loginResultVO.setToken(accessToken.value());
         loginManager.loadUserPermission(employeeEntity.getEmployeeId());
-
         return loginResultVO;
     }
 
+    /**
+     * 账号状态。
+     *
+     * <p>两种不可用分开写日志、分开给文案：员工看到「已删除」和「已禁用」要找的人不一样。
+     * 但两种都<b>先落一条失败日志再抛</b> —— 一个被禁用的账号在被反复尝试登录，
+     * 是安全事件，不是噪音。
+     */
+    private void checkAccountUsable(LoginAttempt attempt) {
+        if (attempt.employee().getDeletedFlag()) {
+            saveLoginLog(attempt, LoginLogResultEnum.LOGIN_FAIL, "账号已删除");
+            throw new BusinessException("您的账号已被删除,请联系工作人员！");
+        }
+        if (attempt.employee().getDisabledFlag()) {
+            saveLoginLog(attempt, LoginLogResultEnum.LOGIN_FAIL, "账号已禁用");
+            throw new BusinessException("您的账号已被禁用,请联系工作人员！");
+        }
+    }
+
+    /**
+     * 验密码并签发令牌，全程受<b>等保失败锁定</b>约束。
+     *
+     * <p>{@code checkLogin} 在已锁定时直接抛，所以进到密码比对这一步的一定是「还能试」的状态。
+     */
+    private AccessToken authenticateAndIssue(LoginAttempt attempt, String requestPassword) {
+        EmployeeEntity employee = attempt.employee();
+        LoginFailEntity loginFailEntity = securityLoginService.checkLogin(
+                employee.getEmployeeId(), UserTypeEnum.ADMIN_EMPLOYEE);
+
+        String salted = employeeService.generateSaltPassword(requestPassword, employee.getEmployeeUid());
+        if (!PasswordCipher.matches(salted, employee.getLoginPwd())) {
+            saveLoginLog(attempt, LoginLogResultEnum.LOGIN_FAIL, "密码错误");
+            String msg = securityLoginService.recordLoginFail(employee.getEmployeeId(),
+                    UserTypeEnum.ADMIN_EMPLOYEE, employee.getLoginName(), loginFailEntity);
+            // msg 非空说明等保开了失败锁定，里面写着「还剩几次 / 锁到什么时候」——
+            // 这句话必须原样给用户，否则他不知道再错一次会发生什么
+            throw msg == null
+                    ? new BusinessException("登录名或密码错误！")
+                    : new BusinessException(UserErrorCode.LOGIN_FAIL_WILL_LOCK, msg);
+        }
+
+        AccessToken accessToken = tokenStore.issue(employee.getEmployeeId(), false, attempt.device().getDesc());
+        // 验证码是一次性的：登录成功即作废，否则同一个码在有效期内能再登一次
+        deleteEmailCode(employee.getEmployeeId());
+        return accessToken;
+    }
 
     /**
      * 获取登录结果信息
@@ -269,16 +278,16 @@ public class LoginService {
     /**
      * 保存登录日志
      */
-    private void saveLoginLog(EmployeeEntity employeeEntity, String ip, String userAgent, String remark, LoginLogResultEnum result, LoginDeviceEnum loginDeviceEnum) {
+    private void saveLoginLog(LoginAttempt attempt, LoginLogResultEnum result, String remark) {
         LoginLogEntity loginEntity = LoginLogEntity.builder()
-                .userId(employeeEntity.getEmployeeId())
+                .userId(attempt.employee().getEmployeeId())
                 .userType(UserTypeEnum.ADMIN_EMPLOYEE)
-                .userName(employeeEntity.getActualName())
-                .userAgent(userAgent)
-                .loginIp(ip)
-                .loginIpRegion(SolvelaIpUtil.getRegion(ip))
+                .userName(attempt.employee().getActualName())
+                .userAgent(attempt.userAgent())
+                .loginIp(attempt.ip())
+                .loginIpRegion(SolvelaIpUtil.getRegion(attempt.ip()))
                 .remark(remark)
-                .loginDevice(loginDeviceEnum.getDesc())
+                .loginDevice(attempt.device().getDesc())
                 .loginResult(result)
                 .createTime(LocalDateTime.now())
                 .build();

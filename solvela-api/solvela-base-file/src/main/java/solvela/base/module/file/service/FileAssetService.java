@@ -145,6 +145,9 @@ public class FileAssetService {
      */
     private static final String DOWNLOAD_PATH_MATCH = "/file/download/";
 
+    /** 对齐 t_file.original_name 的列长度 */
+    private static final int ORIGINAL_NAME_MAX_LENGTH = 200;
+
     // ------------------------------------------------------------------ 上传
 
     /**
@@ -152,12 +155,42 @@ public class FileAssetService {
      *
      * <p><b>刻意不加 {@code @Transactional}</b>：这个方法既写库又写对象存储，而对象存储不参与
      * 数据库事务。加了事务只会制造一种错觉 —— 真正的一致性靠下面的写入顺序和 TEMP 状态保证。
+     *
+     * <p>三关的<b>先后顺序是安全约束</b>：先看大小，再嗅探真实类型，最后由类型反推扩展名。
+     * 顺序见各自的方法注释。
      */
     public FileEntity upload(UploadSource file, String categoryCode, String operator) {
         FileCategoryEntity category = requireCategory(categoryCode);
         FileImageProperties.Rule rule = imageProperties.ruleOf(category.getCategoryCode());
 
-        // ── 第一关：大小。必须在读任何字节之前，否则类型嗅探本身就成了攻击面
+        long size = checkSize(file, category, rule);
+        String originalName = checkName(file.originalName());
+        String contentType = detectAllowedType(file);
+
+        // 第三关：扩展名从 MIME 反推，不从用户文件名取。
+        // 用户传 evil.html 而内容是 PNG 时存成 .png —— 这一条直接掐死存储型 XSS
+        String extension = extensionOf(contentType);
+        StorageKey storageKey = keyGenerator.generate(category.getCategoryCode(), extension);
+
+        FileEntity entity = newEntity(category, storageKey, originalName, extension, contentType, size, operator);
+        if (IMAGE_MIME_TYPES.contains(contentType)) {
+            readImageSize(file, entity);
+            // 尺寸不合规必须在上传时就拦下来。等运营把 banner 发布出去、页面变形了才发现，
+            // 那时已经要走一遍下线-重传-重新发布的流程
+            checkImageRule(entity, rule, category.getCategoryName());
+        }
+
+        store(entity, file, storageKey, size, contentType);
+        return entity;
+    }
+
+    /**
+     * 第一关：大小。<b>必须在读任何字节之前</b>，否则类型嗅探本身就成了攻击面 ——
+     * 一个几个 G 的文件光是嗅探就能把内存吃穿。
+     *
+     * @return 文件字节数
+     */
+    private long checkSize(UploadSource file, FileCategoryEntity category, FileImageProperties.Rule rule) {
         long size = file.size();
         if (size <= 0) {
             throw new BusinessException("上传文件不能为空");
@@ -170,26 +203,31 @@ public class FileAssetService {
             throw new BusinessException("「" + category.getCategoryName() + "」分类的文件最大为 "
                     + rule.getMaxSizeKb() + " KB");
         }
+        return size;
+    }
 
-        String originalName = file.originalName();
+    /** 文件名只做长度与空值校验 —— 它<b>不参与</b>类型判定，也不决定存储路径 */
+    private String checkName(String originalName) {
         if (originalName == null || originalName.isBlank()) {
             throw new BusinessException("上传文件名称不能为空");
         }
-        if (originalName.length() > 200) {
-            throw new BusinessException("文件名称最大长度为 200");
+        if (originalName.length() > ORIGINAL_NAME_MAX_LENGTH) {
+            throw new BusinessException("文件名称最大长度为 " + ORIGINAL_NAME_MAX_LENGTH);
         }
+        return originalName;
+    }
 
-        // ── 第二关：真实类型。信内容不信扩展名、不信 Content-Type
+    /** 第二关：真实类型。<b>信内容，不信扩展名、不信 Content-Type</b> —— 后两者都是客户端说了算的 */
+    private String detectAllowedType(UploadSource file) {
         String contentType = FileMimeTypeUtil.detect(file);
         if (!ALLOWED_MIME_TYPES.contains(contentType)) {
             throw new BusinessException("禁止上传此文件类型：" + contentType);
         }
+        return contentType;
+    }
 
-        // ── 第三关：扩展名从 MIME 反推，不从用户文件名取。
-        //    用户传 evil.html 而内容是 PNG 时存成 .png —— 这一条直接掐死存储型 XSS
-        String extension = extensionOf(contentType);
-        StorageKey storageKey = keyGenerator.generate(category.getCategoryCode(), extension);
-
+    private FileEntity newEntity(FileCategoryEntity category, StorageKey storageKey, String originalName,
+                                 String extension, String contentType, long size, String operator) {
         FileEntity entity = new FileEntity();
         entity.setCategoryId(category.getCategoryId());
         entity.setStorageKey(storageKey.value());
@@ -201,17 +239,18 @@ public class FileAssetService {
         entity.setStatus(FileStatusEnum.TEMP);
         entity.setDeletedFlag(false);
         entity.setCreateBy(operator);
-        if (IMAGE_MIME_TYPES.contains(contentType)) {
-            readImageSize(file, entity);
-            // 尺寸不合规必须在上传时就拦下来。等运营把 banner 发布出去、页面变形了才发现，
-            // 那时已经要走一遍下线-重传-重新发布的流程
-            checkImageRule(entity, rule, category.getCategoryName());
-        }
+        return entity;
+    }
 
-        // 先落库再写对象存储。反过来的话，写完字节而落库失败会留下一份「没有任何记录指向它」
-        // 的孤儿字节 —— 清理任务扫的是库，永远发现不了它。
-        // 反之留下一条指向不存在对象的 TEMP 记录是无害的：到期清理会删掉它，
-        // 而删除一个不存在的对象本身是幂等的。
+    /**
+     * <b>先落库再写对象存储</b>，顺序不能反。
+     *
+     * <p>反过来的话，写完字节而落库失败会留下一份「没有任何记录指向它」的孤儿字节 ——
+     * 清理任务扫的是库，永远发现不了它。反之留下一条指向不存在对象的 TEMP 记录是无害的：
+     * 到期清理会删掉它，而删除一个不存在的对象本身是幂等的。
+     */
+    private void store(FileEntity entity, UploadSource file, StorageKey storageKey,
+                       long size, String contentType) {
         fileDao.insert(entity);
         try (InputStream in = file.open()) {
             objectStorage.put(storageKey, in, size, ObjectMeta.of(contentType));
@@ -219,7 +258,6 @@ public class FileAssetService {
             fileDao.deleteById(entity.getFileId());
             throw new BusinessException("文件上传失败：" + e.getMessage());
         }
-        return entity;
     }
 
     /**

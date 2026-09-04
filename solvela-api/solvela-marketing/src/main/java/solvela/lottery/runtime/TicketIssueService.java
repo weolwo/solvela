@@ -122,30 +122,49 @@ public class TicketIssueService {
      * @param requestId   幂等键，可为空；传了则同一个 requestId 只会发出一个号码
      */
     public TicketObtainDTO obtain(String lotteryCode, String issueNo, Long memberId, String requestId) {
-        // 1. 幂等防重
-        if (StringUtils.isNotBlank(requestId)) {
-            boolean first = redissonClient.getBucket(LotteryCacheKey.request(requestId), StringCodec.INSTANCE)
-                    .setIfAbsent("1", REQUEST_DEDUP_TTL);
-            if (!first) {
-                throw new BusinessException("请求处理中或已处理，请勿重复提交");
-            }
-        }
-
+        checkNotDuplicate(requestId);
         // 会员号必须真实存在；顺带取回账号 —— 它既是记录上的展示快照，也是签名要素。
         // 一次领号只查一次，不在用到名字的每个地方各查一次。
         String memberName = memberService.requireMemberName(memberId);
+        acquireRateLimit(lotteryCode, memberId);
 
-        // 2. 防刷限流
-        // 🔴 限流 key 用会员号：账号可改，改完就是一个全新的 key，限流当场归零
+        LotteryConfig config = requireOnlineConfig(lotteryCode);
+        LotteryIssue issue = requireSellableIssue(lotteryCode, issueNo);
+
+        return issueTicket(config, issue, memberId, memberName);
+    }
+
+    /**
+     * 幂等防重。<b>先于限流</b>：一次网络重试不该白白消耗一个令牌。
+     */
+    private void checkNotDuplicate(String requestId) {
+        if (StringUtils.isBlank(requestId)) {
+            return;
+        }
+        boolean first = redissonClient.getBucket(LotteryCacheKey.request(requestId), StringCodec.INSTANCE)
+                .setIfAbsent("1", REQUEST_DEDUP_TTL);
+        if (!first) {
+            throw new BusinessException("请求处理中或已处理，请勿重复提交");
+        }
+    }
+
+    /**
+     * 防刷限流。
+     *
+     * <p>🔴 限流 key 用<b>会员号</b>不用账号：账号可改，改完就是一个全新的 key，限流当场归零。
+     */
+    private void acquireRateLimit(String lotteryCode, Long memberId) {
         RRateLimiter limiter = redissonClient.getRateLimiter(LotteryCacheKey.rateLimit(lotteryCode, memberId));
-        if (limiter.trySetRate(RateType.OVERALL, RATE_LIMIT_PER_INTERVAL, RATE_LIMIT_INTERVAL_SECONDS, RateIntervalUnit.SECONDS)) {
+        if (limiter.trySetRate(RateType.OVERALL, RATE_LIMIT_PER_INTERVAL,
+                RATE_LIMIT_INTERVAL_SECONDS, RateIntervalUnit.SECONDS)) {
             limiter.expire(RATE_LIMITER_TTL);
         }
         if (!limiter.tryAcquire()) {
             throw new BusinessException("操作太频繁，请稍后再试");
         }
+    }
 
-        // 3. 玩法与期号校验
+    private LotteryConfig requireOnlineConfig(String lotteryCode) {
         LotteryConfig config = lotteryConfigService.getByLotteryCode(lotteryCode);
         if (config == null) {
             throw new BusinessException("彩票玩法不存在：" + lotteryCode);
@@ -153,6 +172,16 @@ public class TicketIssueService {
         if (config.getStatus() != LotteryConfigStatusEnum.ONLINE) {
             throw new BusinessException("彩票玩法未上线，暂不能领号");
         }
+        return config;
+    }
+
+    /**
+     * 期号必须存在、待开奖，且当前落在售卖窗口内。
+     *
+     * <p>售卖窗口用<b>数据库时钟</b>判定（铁律 9/10：不引第二个时钟源）——
+     * 应用服务器的时钟与库不一致时，会出现「页面显示可领、领号被拒」这种查无可查的现象。
+     */
+    private LotteryIssue requireSellableIssue(String lotteryCode, String issueNo) {
         LotteryIssue issue = lotteryIssueManager.lambdaQuery()
                 .eq(LotteryIssue::getLotteryCode, lotteryCode)
                 .eq(LotteryIssue::getIssueNo, issueNo).one();
@@ -162,7 +191,6 @@ public class TicketIssueService {
         if (issue.getStatus() != IssueStatusEnum.WAIT) {
             throw new BusinessException("该期已开奖或正在核销，不能再领号");
         }
-        // 售卖窗口用数据库时钟判定（铁律 9/10：不引第二个时钟源）
         LocalDateTime now = lotteryIssueDao.selectDbNow();
         if (issue.getSaleStartTime() != null && now.isBefore(issue.getSaleStartTime())) {
             throw new BusinessException("该期尚未开始发售");
@@ -170,10 +198,20 @@ public class TicketIssueService {
         if (issue.getSaleEndTime() != null && now.isAfter(issue.getSaleEndTime())) {
             throw new BusinessException("该期已停止发售");
         }
+        return issue;
+    }
 
+    /**
+     * 取游标 -> 算号 -> 签名 -> 落库，撞唯一索引时换下一个游标重试。
+     *
+     * <p>游标与号码是<b>双射</b>关系（FPE 加密），同一个游标必然算出同一个号码、
+     * 不同游标必然算出不同号码 —— 所以正常情况下这个循环只会走一次。
+     */
+    private TicketObtainDTO issueTicket(LotteryConfig config, LotteryIssue issue, Long memberId, String memberName) {
+        String lotteryCode = config.getLotteryCode();
+        String issueNo = issue.getIssueNo();
         FpeCipher cipher = fpeCipherFactory.create(lotteryCode, issueNo, config.getNumberLength());
 
-        // 4~7. 取游标 -> 算号 -> 落库。撞唯一索引时换下一个游标重试
         for (int attempt = 0; attempt < DUPLICATE_RETRY_LIMIT; attempt++) {
             long cursor = lotterySequenceService.nextCursor(lotteryCode, issueNo);
             if (cursor > config.getTotalCount()) {
@@ -182,8 +220,8 @@ public class TicketIssueService {
             }
             long sequenceNo = lotterySequenceService.toSequenceNo(cursor, config.getTotalCount(), cipher.domain());
             String ticketNumber = cipher.encrypt(sequenceNo);
-
             String securitySign = ticketSignService.sign(lotteryCode, issueNo, sequenceNo, ticketNumber, memberName);
+
             try {
                 return ticketPersistService.persist(
                         config, issue, memberId, memberName, sequenceNo, ticketNumber, securitySign);

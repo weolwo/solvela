@@ -13,6 +13,7 @@ import solvela.lottery.LotteryPrizeRule;
 import solvela.lottery.prizerule.manager.LotteryPrizeRuleManager;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.settle.domain.SettleResultDTO;
+import solvela.base.stat.StatRow;
 import solvela.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +59,10 @@ public class LotterySettleService {
     private final LotteryIssueDao lotteryIssueDao;
     private final LotteryPrizeRuleManager lotteryPrizeRuleManager;
     private final LotteryRecordDao lotteryRecordDao;
-    private final LotteryDispatchService lotteryDispatchService;
+    private final LotteryDispatchService lotteryDispatchService;
+
+
+
 
     /**
      * 单批认领上限。十万级记录一次性 UPDATE 会撑爆 undo log 与锁等待，
@@ -100,6 +104,9 @@ public class LotterySettleService {
     /**
      * 执行开奖核销。
      *
+     * <p>三步：定案开奖号码 -> 按奖级逐级认领 -> 剩下的一律标未中奖。
+     * 顺序不能反：认领是「取最高奖级」，而最高奖级的含义完全来自认领顺序。
+     *
      * @param issueId       期号ID
      * @param winningNumber 开奖号码；期号已处于「核销中」时本参数被忽略（号码早已定案）
      */
@@ -116,25 +123,51 @@ public class LotterySettleService {
             throw new BusinessException("彩票玩法不存在：" + issue.getLotteryCode());
         }
 
-        String finalNumber;
-        if (issue.getStatus() == IssueStatusEnum.STAGED) {
-            // 断点续跑：号码早已定案，忽略入参，避免「中途换号」这种最坏情况
-            finalNumber = issue.getWinningNumber();
-            log.warn("[彩票开奖] 期号 {} 处于核销中，按已定案号码 {} 续跑", issue.getIssueNo(), finalNumber);
-        } else {
-            String error = checkNumber(winningNumber, config.getNumberLength());
-            if (error != null) {
-                throw new BusinessException(error);
-            }
-            // 抢闸门：两个人同时点，第二个人 rows=0 直接退出，不会重复核销
-            int rows = lotteryIssueDao.startSettle(issueId, IssueStatusEnum.WAIT, IssueStatusEnum.STAGED, winningNumber);
-            if (rows == 0) {
-                throw new BusinessException("开奖失败：该期状态已被其他操作变更，请刷新后重试");
-            }
-            finalNumber = winningNumber;
-        }
+        String finalNumber = decideWinningNumber(issue, config, winningNumber);
+        int claimed = claimByRules(issue, finalNumber);
+        int lose = markRestAsLose(issue);
 
-        // 按奖级升序逐级认领 —— 顺序就是「取最高奖级」的保证
+        // settle_time 没有 ON UPDATE CURRENT_TIMESTAMP 兜底，必须显式写（铁律 9 的例外分支）
+        lotteryIssueDao.finishSettle(issueId, IssueStatusEnum.STAGED, IssueStatusEnum.OPENED);
+
+        StatRow summary = StatRow.of(lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo()));
+        log.info("[彩票开奖] 期号 {} 核销完成，开奖号码 {}，中奖 {} 张、未中奖 {} 张",
+                issue.getIssueNo(), finalNumber, claimed, lose);
+        return new SettleResultDTO(issue.getIssueNo(), finalNumber, claimed, lose,
+                summary.count("total"), summary.count("waitDispatch"));
+    }
+
+    /**
+     * 定案开奖号码，并把期号推进到「核销中」。
+     *
+     * <p>两条路：<b>断点续跑</b>时号码早已定案，忽略入参 —— 中途换号是这条链路上最坏的情况，
+     * 已经按旧号认领过的那批票会和后面的对不上，且无法回滚。
+     * <b>首次开奖</b>则用条件更新抢闸门：两个人同时点，第二个人 rows=0 直接退出，不会重复核销。
+     */
+    private String decideWinningNumber(LotteryIssue issue, LotteryConfig config, String winningNumber) {
+        if (issue.getStatus() == IssueStatusEnum.STAGED) {
+            log.warn("[彩票开奖] 期号 {} 处于核销中，按已定案号码 {} 续跑",
+                    issue.getIssueNo(), issue.getWinningNumber());
+            return issue.getWinningNumber();
+        }
+        String error = checkNumber(winningNumber, config.getNumberLength());
+        if (error != null) {
+            throw new BusinessException(error);
+        }
+        int rows = lotteryIssueDao.startSettle(issue.getId(), IssueStatusEnum.WAIT,
+                IssueStatusEnum.STAGED, winningNumber);
+        if (rows == 0) {
+            throw new BusinessException("开奖失败：该期状态已被其他操作变更，请刷新后重试");
+        }
+        return winningNumber;
+    }
+
+    /**
+     * 按奖级<b>升序</b>逐级认领 —— 这个顺序就是「一张票只中最高一级」的全部实现。
+     *
+     * @return 认领出去的票数
+     */
+    private int claimByRules(LotteryIssue issue, String finalNumber) {
         List<LotteryPrizeRule> rules = lotteryPrizeRuleManager.lambdaQuery()
                 .eq(LotteryPrizeRule::getLotteryCode, issue.getLotteryCode())
                 .orderByAsc(LotteryPrizeRule::getPrizeLevel).list();
@@ -149,8 +182,18 @@ public class LotterySettleService {
             }
             claimed += claimAll(issue, matchRule, rule, finalNumber);
         }
+        return claimed;
+    }
 
-        // 剩下的一律未中奖
+    /**
+     * 认领之后剩下的号码一律标为未中奖。
+     *
+     * <p>分批扫，一轮不足一批就说明扫完了 —— 单期号码量可以到十万级，
+     * 一条 UPDATE 全表扫会把行锁持有到分钟级。
+     *
+     * @return 标记为未中奖的票数
+     */
+    private int markRestAsLose(LotteryIssue issue) {
         int lose = 0;
         for (int round = 0; round < MAX_BATCH_ROUNDS; round++) {
             int n = lotteryRecordDao.markNoWin(issue.getLotteryCode(), issue.getIssueNo(), BATCH_SIZE);
@@ -159,15 +202,7 @@ public class LotterySettleService {
                 break;
             }
         }
-
-        // settle_time 没有 ON UPDATE CURRENT_TIMESTAMP 兜底，必须显式写（铁律 9 的例外分支）
-        lotteryIssueDao.finishSettle(issueId, IssueStatusEnum.STAGED, IssueStatusEnum.OPENED);
-
-        Map<String, Object> summary = lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo());
-        log.info("[彩票开奖] 期号 {} 核销完成，开奖号码 {}，中奖 {} 张、未中奖 {} 张", issue.getIssueNo(), finalNumber, claimed, lose);
-
-        return new SettleResultDTO(issue.getIssueNo(), finalNumber, claimed, lose,
-                toLong(summary.get("total")), toLong(summary.get("waitDispatch")));
+        return lose;
     }
 
     /**
@@ -231,9 +266,5 @@ public class LotterySettleService {
             throw new BusinessException("该期尚未开奖完成，不能派奖");
         }
         return lotteryDispatchService.dispatchIssue(issue.getLotteryCode(), issue.getIssueNo());
-    }
-
-    private long toLong(Object value) {
-        return value == null ? 0L : Long.parseLong(value.toString());
     }
 }
