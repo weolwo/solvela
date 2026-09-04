@@ -119,51 +119,20 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
 
     /**
      * 【极其核心】真正的发货引擎！
-     * 必须是 public！因为运营后台点击“审批通过”后，也要调用这个方法！
+     *
+     * <p>必须是 public：运营后台点「审批通过」之后也要重入这个方法。
+     *
+     * <p>整段包 try/catch 是<b>刻意的</b>：这里是发奖链路的末端，抛出去没有人再接，
+     * 而一个未捕获的异常会让发奖记录永远停在 0-等待执行。所以任何意外都要落成 FAIL。
      */
     @ScriptFunction(name = "_doDispatch", description = "奖励派发")
     public void doDispatch(PrizeLog prizeLog) {
         log.info(">>>> [执行发货] 开始派发奖品，LogId: {}, 类型: {}", prizeLog.getId(), prizeLog.getPrizeType());
-
         try {
-            // A. 通过工厂获取具体的发货策略（完全消灭 switch/if-else）
+            // 工厂选策略，彻底消灭 switch/if-else
             IPrizeHandler handler = strategyFactory.getHandler(prizeLog.getPrizeType());
-
-            // B. 执行发货，拿到标准结果
-            DispatchOutcome outcome = handler.dispatch(prizeLog);
-
-            // C. 只有「当场就失败」才由这里落终态。
-            //    成功路径刻意不写 status=1：资产下发已被挪到提案事务提交之后（方案A），
-            //    此刻真实结果还没出来，这里若抢先写 1，会把 AssetDispatchEngine 随后回写的真实状态覆盖掉，
-            //    表现为「发奖记录显示成功、用户其实没收到」（预算耗尽那批就是这么被写成成功的）。
-            //    成功路径的终态由 AssetDispatchEngine.updateStatusByExternalBizNo 回写；
-            //    若提案进了人工审批池，则合理地停在 0-等待执行。
-            if (!outcome.ok()) {
-                prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
-                // 提案侧被拒 —— 原因来自会员服务，会落库并可能展示给用户，
-                // 这正是「同步调用」而不是发消息的理由：拒绝的原因当场就要拿到
-                prizeLog.setProposalStatus(PrizeProposalStatusEnum.REJECTED);
-                prizeLog.setFailReason(SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH));
-                log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
-                updateQuietly(prizeLog);
-            } else if (isNoDeliveryNeeded(prizeLog)) {
-                // 0 值奖品（谢谢参与这类占位奖）压根不会生成提案，引擎不会跑，
-                // 状态没人回写就会永远悬在 0-等待执行。它本就是当场的终态，这里直接落成功
-                prizeLog.setStatus(PrizeDispatchStatusEnum.SUCCESS);
-                updateQuietly(prizeLog);
-                log.info("【无需发放】LogId: {}, 奖品价值为0，直接判成功", prizeLog.getId());
-            } else {
-                // 已受理 ≠ 用户拿到了：提案可能进人工审批池，资产入账也在提案事务提交之后。
-                // 所以这里只落【提案侧】的状态，status 留给终态回写 ——
-                // 抢先写 status=1 会造成「记录显示成功、用户其实没收到」，这个坑踩过一次
-                prizeLog.setProposalStatus(PrizeProposalStatusEnum.ACCEPTED);
-                prizeLog.setProposalId(outcome.proposalId());
-                updateQuietly(prizeLog);
-                log.info("【发货已受理】LogId: {}, 提案ID: {}, 最终状态由资产分发引擎回写",
-                        prizeLog.getId(), outcome.proposalId());
-            }
+            applyOutcome(prizeLog, handler.dispatch(prizeLog));
         } catch (Exception e) {
-            // 捕获不可预知的异常（如网络超时、空指针），防止影响整个应用的稳定性
             log.error("【发奖异常】执行策略时发生严重错误，LogId: {}", prizeLog.getId(), e);
             prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
             // 必须截断：异常 message 动辄几百字，直接塞 varchar(128) 会抛 Data too long，
@@ -171,6 +140,45 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             prizeLog.setFailReason(SolvelaStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH));
             updateQuietly(prizeLog);
         }
+    }
+
+    /**
+     * 把派发结果落到发奖记录上。三条路，区别全在<b>谁来写最终的 status</b>：
+     *
+     * <ul>
+     *   <li><b>当场失败</b> —— 由这里落 FAIL，没有后续了；</li>
+     *   <li><b>无需发放</b>（0 值占位奖）—— 压根不会生成提案，引擎不会跑，
+     *       没人回写就会永远悬在 0-等待执行。它本就是当场的终态，这里直接落成功；</li>
+     *   <li><b>已受理</b> —— 这里<b>只落提案侧状态</b>，status 留空等回写。</li>
+     * </ul>
+     *
+     * <p>🔴 最后一条是踩出来的：已受理 ≠ 用户拿到了。提案可能进人工审批池，
+     * 资产入账也在提案事务提交之后。此刻抢先写 status=1，会把
+     * {@code AssetDispatchEngine} 随后回写的真实状态覆盖掉 ——
+     * 表现为「发奖记录显示成功、用户其实没收到」（预算耗尽那批就是这么被写成成功的）。
+     */
+    private void applyOutcome(PrizeLog prizeLog, DispatchOutcome outcome) {
+        if (!outcome.ok()) {
+            prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
+            // 提案侧被拒 —— 原因来自会员服务，会落库并可能展示给用户，
+            // 这正是「同步调用」而不是发消息的理由：拒绝的原因当场就要拿到
+            prizeLog.setProposalStatus(PrizeProposalStatusEnum.REJECTED);
+            prizeLog.setFailReason(SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH));
+            log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
+            updateQuietly(prizeLog);
+            return;
+        }
+        if (isNoDeliveryNeeded(prizeLog)) {
+            prizeLog.setStatus(PrizeDispatchStatusEnum.SUCCESS);
+            updateQuietly(prizeLog);
+            log.info("【无需发放】LogId: {}, 奖品价值为0，直接判成功", prizeLog.getId());
+            return;
+        }
+        prizeLog.setProposalStatus(PrizeProposalStatusEnum.ACCEPTED);
+        prizeLog.setProposalId(outcome.proposalId());
+        updateQuietly(prizeLog);
+        log.info("【发货已受理】LogId: {}, 提案ID: {}, 最终状态由资产分发引擎回写",
+                prizeLog.getId(), outcome.proposalId());
     }
 
     /**

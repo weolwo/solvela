@@ -280,7 +280,19 @@ public class ActivityConfigService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void wizardCreate(ActivityWizardCreateCommand form) {
-        // ---------- 1. 活动校验 ----------
+        List<ActivityWizardCreateCommand.WizardPrizeCommand> prizeList =
+                form.getPrizeList() == null ? List.of() : form.getPrizeList();
+
+        checkActivity(form);
+        checkPrizes(prizeList);
+
+        ActivityConfig activityConfig = SolvelaBeanUtil.copy(form, ActivityConfig.class);
+        activityConfig.setStatus(ActivityStatusEnum.NOT_START);
+        activityConfigDao.insert(activityConfig);
+        insertPrizes(form.getActivityCode(), prizeList);
+    }
+
+    private void checkActivity(ActivityWizardCreateCommand form) {
         validateDataEndTime(form.getStartTime(), form.getEndTime(), form.getDataEndTime());
         if (!SolvelaCodeUtil.isValidBizCode(form.getActivityCode())) {
             throw new BusinessException("活动" + SolvelaCodeUtil.BIZ_CODE_MESSAGE);
@@ -288,10 +300,12 @@ public class ActivityConfigService {
         if (getByActivityCode(form.getActivityCode()) != null) {
             throw new BusinessException("活动编码已存在：" + form.getActivityCode());
         }
+    }
 
-        // ---------- 2. 奖品全量预校验（插入前一次验完） ----------
-        List<ActivityWizardCreateCommand.WizardPrizeCommand> prizeList =
-                form.getPrizeList() == null ? List.of() : form.getPrizeList();
+    /**
+     * 奖品全量预校验，<b>一条都不能留到插入阶段</b> —— 理由见 {@link #wizardCreate} 的方法注释。
+     */
+    private void checkPrizes(List<ActivityWizardCreateCommand.WizardPrizeCommand> prizeList) {
         Set<String> batchCodes = new HashSet<>();
         for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
             if (!SolvelaCodeUtil.isValidBizCode(prize.getPrizeCode())) {
@@ -304,20 +318,18 @@ public class ActivityConfigService {
             if (prizeConfigService.existsByPrizeCode(prize.getPrizeCode())) {
                 throw new BusinessException("奖品编码已存在：" + prize.getPrizeCode());
             }
-            String matchError = prizeConfigService.checkPromotionConfigMatch(prize.getPromotionConfigId(), prize.getPrizeType());
+            String matchError = prizeConfigService.checkPromotionConfigMatch(
+                    prize.getPromotionConfigId(), prize.getPrizeType());
             if (matchError != null) {
                 throw new BusinessException("奖品「" + prize.getPrizeName() + "」" + matchError);
             }
         }
+    }
 
-        // ---------- 3. 落库 ----------
-        ActivityConfig activityConfig = SolvelaBeanUtil.copy(form, ActivityConfig.class);
-        activityConfig.setStatus(ActivityStatusEnum.NOT_START);
-        activityConfigDao.insert(activityConfig);
-
+    private void insertPrizes(String activityCode, List<ActivityWizardCreateCommand.WizardPrizeCommand> prizeList) {
         for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
             PrizeConfigAddCommand addForm = SolvelaBeanUtil.copy(prize, PrizeConfigAddCommand.class);
-            addForm.setActivityCode(form.getActivityCode());
+            addForm.setActivityCode(activityCode);
             try {
                 prizeConfigService.add(addForm);
             } catch (BusinessException e) {

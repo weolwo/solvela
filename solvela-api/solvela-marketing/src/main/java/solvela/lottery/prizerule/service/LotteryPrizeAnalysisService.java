@@ -88,12 +88,30 @@ public class LotteryPrizeAnalysisService {
      * 也让「概览统计的是筛选后的全量」这件事天然成立。
      */
     public LotteryPrizeAnalysisResultDTO analysis(LotteryPrizeRuleQuery queryForm) {
-        // ---- 1. 三次查询把料备齐，之后不再碰数据库 ----
+        List<LotteryPrizeAnalysisDTO> all = analyseAll(queryForm);
+
+        // 排序即优先级：已上线 + 有 DANGER 的玩法是真在流血，必须第一眼看见
+        all.sort(Comparator
+                .comparing((LotteryPrizeAnalysisDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
+                .thenComparing(v -> v.getLotteryStatus() == LotteryConfigStatusEnum.ONLINE ? 0 : 1)
+                .thenComparing(LotteryPrizeAnalysisDTO::getTotalExpectedCost, Comparator.reverseOrder()));
+        if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
+            all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).toList();
+        }
+        return summarize(all, queryForm);
+    }
+
+    /**
+     * 三次查询把料备齐，之后不再碰数据库；再按玩法分组逐个分析。
+     *
+     * <p>奖级规则表里可能挂着一个已经不存在的玩法（{@code configMap.get} 给 null）——
+     * 那种照样要出现在列表里，由 {@code analyseOne} 报「玩法配置不存在」。
+     */
+    private List<LotteryPrizeAnalysisDTO> analyseAll(LotteryPrizeRuleQuery queryForm) {
         List<LotteryPrizeRule> ruleList = lotteryPrizeRuleManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getLotteryCode()),
                         LotteryPrizeRule::getLotteryCode, queryForm.getLotteryCode())
                 .list();
-
         Map<String, LotteryConfig> configMap = lotteryConfigManager.lambdaQuery().list().stream()
                 .collect(Collectors.toMap(LotteryConfig::getLotteryCode, Function.identity(), (a, b) -> a));
 
@@ -103,7 +121,6 @@ public class LotteryPrizeAnalysisService {
                 : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, prizeCodes).list().stream()
                         .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
 
-        // ---- 2. 按玩法分组，逐玩法分析 ----
         Map<String, List<LotteryPrizeRule>> grouped = ruleList.stream()
                 .collect(Collectors.groupingBy(LotteryPrizeRule::getLotteryCode, LinkedHashMap::new, Collectors.toList()));
 
@@ -111,19 +128,14 @@ public class LotteryPrizeAnalysisService {
         for (Map.Entry<String, List<LotteryPrizeRule>> entry : grouped.entrySet()) {
             all.add(analyseOne(entry.getKey(), entry.getValue(), configMap.get(entry.getKey()), prizeMap));
         }
+        return all;
+    }
 
-        // ---- 3. 排序：有危险告警的置顶，其次已上线的，最后按预计赔付从高到低 ----
-        // 排序即优先级：已上线 + 有 DANGER 的玩法是真在流血，必须第一眼看见
-        all.sort(Comparator
-                .comparing((LotteryPrizeAnalysisDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(v -> v.getLotteryStatus() == LotteryConfigStatusEnum.ONLINE ? 0 : 1)
-                .thenComparing(LotteryPrizeAnalysisDTO::getTotalExpectedCost, Comparator.reverseOrder()));
-
-        if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
-            all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).collect(Collectors.toList());
-        }
-
-        // ---- 4. 概览按筛选后的全量算，再切页 ----
+    /**
+     * 概览按<b>筛选后的全量</b>算，再切页 —— 卡片上的数字与列表翻到第几页无关。
+     */
+    private LotteryPrizeAnalysisResultDTO summarize(List<LotteryPrizeAnalysisDTO> all,
+                                                    LotteryPrizeRuleQuery queryForm) {
         LotteryPrizeAnalysisResultDTO result = new LotteryPrizeAnalysisResultDTO();
         result.setLotteryCount(all.size());
         result.setRuleCount(all.stream().mapToInt(v -> v.getRuleList().size()).sum());

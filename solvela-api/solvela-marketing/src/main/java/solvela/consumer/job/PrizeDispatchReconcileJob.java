@@ -104,14 +104,27 @@ public class PrizeDispatchReconcileJob implements SolvelaJob {
                     pending.size(), stale);
         }
 
+        String result = String.format("重投 %d 笔；已受理但无终态 %d 笔（只报不改）",
+                retryAll(pending, ctx), stale);
+        log.info("【发奖对账】{}", result);
+        return result;
+    }
+
+    /**
+     * 逐条重投。
+     *
+     * <p>复用 {@code doDispatch} 这个发货入口：它本来就是 public 的（后台审批通过后也调它），
+     * 状态怎么落、被拒时原因写哪里，全部与正常链路完全一致 ——
+     * <b>对账任务自己再写一遍状态处理，是漂移的开始</b>。
+     *
+     * @return 实际重投出去的笔数
+     */
+    private int retryAll(List<PrizeLog> pending, SolvelaJobContext ctx) {
         int retried = 0;
         for (PrizeLog prizeLog : pending) {
             // 超时靠中断实现，每条开头自查一次
             ctx.checkCancelled();
             try {
-                // 复用发货入口：它本来就是 public 的（后台审批通过后也调它），
-                // 状态怎么落、被拒时原因写哪里，全部与正常链路完全一致 ——
-                // 对账任务自己再写一遍状态处理，是漂移的开始
                 prizeDispatchHandler.doDispatch(prizeLog);
                 retried++;
             } catch (Exception e) {
@@ -119,9 +132,6 @@ public class PrizeDispatchReconcileJob implements SolvelaJob {
                 log.error("【发奖对账】重投失败，LogId: {}", prizeLog.getId(), e);
             }
         }
-
-        String result = String.format("重投 %d 笔；已受理但无终态 %d 笔（只报不改）", retried, stale);
-        log.info("【发奖对账】{}", result);
-        return result;
+        return retried;
     }
 }

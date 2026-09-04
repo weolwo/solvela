@@ -214,12 +214,22 @@ public class MarketingStatService {
 
     // ───────────────────────── 板块四：事件健康度 ─────────────────────────
 
+    /**
+     * 事件健康度：这段时间进来的事件，推进了多少、丢弃了多少，丢弃里有多少要人管。
+     */
     public EventHealthDTO eventHealth(Integer days) {
         int span = normalizeDays(days);
         LocalDateTime fromTime = LocalDate.now().minusDays(span - 1L).atStartOfDay();
 
         EventHealthDTO vo = new EventHealthDTO();
         vo.setDays(span);
+        fillFlowTypeCount(vo, fromTime);
+        fillDiscardStat(vo, fromTime);
+        return vo;
+    }
+
+    /** 推进 / 丢弃两个总数。两者互斥且穷尽，加起来就是这段时间收到的事件数 */
+    private void fillFlowTypeCount(EventHealthDTO vo, LocalDateTime fromTime) {
         vo.setAdvanceCount(0);
         vo.setDiscardCount(0);
         for (Map<String, Object> row : marketingStatDao.eventFlowTypeCount(fromTime)) {
@@ -233,7 +243,15 @@ public class MarketingStatService {
                 vo.setDiscardCount(cnt);
             }
         }
+    }
 
+    /**
+     * 丢弃原因分布，以及其中<b>需要人介入</b>的那部分合计。
+     *
+     * <p>正常业务拦截（没资格、已达上限）数量远大于异常，不把异常量单独拎出来，
+     * 它会被彻底淹没 —— 而那才是要立刻有人看的。
+     */
+    private void fillDiscardStat(EventHealthDTO vo, LocalDateTime fromTime) {
         List<EventHealthDTO.DiscardItem> items = marketingStatDao.discardStat(fromTime);
         int attention = 0;
         for (EventHealthDTO.DiscardItem item : items) {
@@ -253,7 +271,6 @@ public class MarketingStatService {
         }
         vo.setDiscardList(items);
         vo.setAttentionCount(attention);
-        return vo;
     }
 
     // ───────────────────────── 板块五：用户维度 ─────────────────────────

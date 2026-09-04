@@ -98,8 +98,18 @@ public class DrawActivityRefProvider implements ActivityRefProvider {
         if (pools.isEmpty()) {
             return;
         }
+        // 顺序不能反：映射行引用的是物资的自增主键，必须先把物资插完拿到新旧 ID 的对应关系
+        Map<String, String> poolCodeMap = copyPools(pools, targetActivityCode);
+        Map<Long, Long> itemIdMap = copyItems(sourceActivityCode, targetActivityCode, prizeCodeMap);
+        copyMappings(pools, poolCodeMap, itemIdMap);
+    }
 
-        // 1. 奖池：重新发 pool_code
+    /**
+     * 奖池：<b>重新发 pool_code</b>。它全局唯一，抄过去会直接撞 uk_pool_code。
+     *
+     * @return 源编码 -> 新编码，第三步重指向映射行要用
+     */
+    private Map<String, String> copyPools(List<PrizePoolConfig> pools, String targetActivityCode) {
         Map<String, String> poolCodeMap = new LinkedHashMap<>();
         for (PrizePoolConfig source : pools) {
             PrizePoolConfig copy = SolvelaBeanUtil.copy(source, PrizePoolConfig.class);
@@ -111,8 +121,19 @@ public class DrawActivityRefProvider implements ActivityRefProvider {
             prizePoolConfigManager.save(copy);
             poolCodeMap.put(source.getPoolCode(), copy.getPoolCode());
         }
+        return poolCodeMap;
+    }
 
-        // 2. 物资：prize_code 重映射 + 水位归零。同时记下新旧主键，第 3 步要用
+    /**
+     * 物资：prize_code 按调用方给的映射重指向，<b>库存水位与乐观锁版本号归零</b>。
+     *
+     * <p>{@code used_stock} 抄过来，新活动开局库存就少一半，而页面上只显示「总库存」，
+     * 完全看不出来。{@code version} 同理，它是乐观锁的计数器，跟业务无关。
+     *
+     * @return 源主键 -> 新主键
+     */
+    private Map<Long, Long> copyItems(String sourceActivityCode, String targetActivityCode,
+                                      Map<String, String> prizeCodeMap) {
         List<PrizePoolItem> items = prizePoolItemManager.lambdaQuery()
                 .eq(PrizePoolItem::getActivityCode, sourceActivityCode).list();
         Map<Long, Long> itemIdMap = new LinkedHashMap<>();
@@ -129,8 +150,14 @@ public class DrawActivityRefProvider implements ActivityRefProvider {
             prizePoolItemManager.save(copy);
             itemIdMap.put(source.getId(), copy.getId());
         }
+        return itemIdMap;
+    }
 
-        // 3. 概率映射：pool_code 与 prize_item_id 双重映射
+    /**
+     * 概率映射：pool_code 与 prize_item_id <b>双重重指向</b>，两个都得查得到才抄。
+     */
+    private void copyMappings(List<PrizePoolConfig> pools, Map<String, String> poolCodeMap,
+                              Map<Long, Long> itemIdMap) {
         List<String> sourcePoolCodes = pools.stream().map(PrizePoolConfig::getPoolCode).toList();
         List<PoolPrizeMapping> mappings = poolPrizeMappingManager.lambdaQuery()
                 .in(PoolPrizeMapping::getPoolCode, sourcePoolCodes).list();

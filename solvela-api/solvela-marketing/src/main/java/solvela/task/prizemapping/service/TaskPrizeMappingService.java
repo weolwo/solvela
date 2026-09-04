@@ -102,6 +102,13 @@ public class TaskPrizeMappingService {
      * @param ladder 该任务的完整阶梯（理论上不会为 null，列表行就是从里面查出来的）
      */
     private List<String> checkIssues(TaskPrizeMappingDTO vo, List<TaskPrizeMapping> ladder) {
+        List<String> issues = checkStage(vo);
+        checkAgainstPreviousStage(vo, ladder, issues);
+        return issues;
+    }
+
+    /** 这一档自己的问题：奖品、达标条件、计算类型 */
+    private List<String> checkStage(TaskPrizeMappingDTO vo) {
         List<String> issues = new ArrayList<>();
 
         // 奖品对不上：PrizeConfigService.getByActivityCodeAndPrizeCode 返回 null 时，
@@ -122,12 +129,22 @@ public class TaskPrizeMappingService {
             issues.add("计算类型 " + vo.getPrizeMode() + " 尚未实现，实际按奖品配置的固定值发放");
         }
 
+        return issues;
+    }
+
+    /**
+     * 与<b>上一档</b>比出来的问题：单看这一行永远发现不了。
+     *
+     * <p>第一档没有上一档，整条阶梯只有一档时也无从比较，两种情况都直接返回。
+     */
+    private void checkAgainstPreviousStage(TaskPrizeMappingDTO vo, List<TaskPrizeMapping> ladder,
+                                           List<String> issues) {
         if (ladder == null || ladder.size() <= 1) {
-            return issues;
+            return;
         }
         int index = indexOf(ladder, vo.getId());
         if (index <= 0) {
-            return issues;
+            return;
         }
         TaskPrizeMapping prev = ladder.get(index - 1);
 
@@ -143,7 +160,6 @@ public class TaskPrizeMappingService {
         if (vo.getStageTarget() != null && prevTarget != null && vo.getStageTarget().compareTo(prevTarget) <= 0) {
             issues.add("达标值未高于上一档（上一档 " + prevTarget.toPlainString() + "），达标时会连同本档一起发放");
         }
-        return issues;
     }
 
     private int indexOf(List<TaskPrizeMapping> ladder, Long id) {

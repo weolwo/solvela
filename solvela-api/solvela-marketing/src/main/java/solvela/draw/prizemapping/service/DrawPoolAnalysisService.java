@@ -91,7 +91,37 @@ public class DrawPoolAnalysisService {
      * 先算全量再切页最简单，也让「概览统计的是筛选后的全量」天然成立。
      */
     public DrawPoolAnalysisResultDTO analysis(PoolPrizeMappingQuery queryForm) {
-        // ---- 1. 备料，之后不再碰数据库 ----
+        Materials materials = loadMaterials(queryForm);
+        List<DrawPoolAnalysisDTO> all = analyseAll(materials);
+
+        // 排序即优先级：未闭环（现在就在报错）> 有危险告警 > 已上线
+        all.sort(Comparator
+                .comparing((DrawPoolAnalysisDTO v) -> Boolean.TRUE.equals(v.getProbabilityClosed()) ? 1 : 0)
+                .thenComparing(v -> v.getDangerCount() > 0 ? 0 : 1)
+                .thenComparing(v -> v.getActivityStatus() == ActivityStatusEnum.ONLINE ? 0 : 1)
+                .thenComparing(DrawPoolAnalysisDTO::getPoolCode));
+        if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
+            all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).toList();
+        }
+        return summarize(all, queryForm);
+    }
+
+    /**
+     * 一次把料备齐，之后<b>不再碰数据库</b>。
+     *
+     * @param poolMap 本次筛选范围内的奖池，编码 -> 配置
+     * @param grouped 坑位映射按奖池分组。key 未必在 {@code poolMap} 里 ——
+     *                那种就是孤儿映射，见 {@link #analyseAll}
+     */
+    private record Materials(List<PrizePoolConfig> pools,
+                             Map<String, PrizePoolConfig> poolMap,
+                             Map<String, List<PoolPrizeMapping>> grouped,
+                             Map<Long, PrizePoolItem> itemMap,
+                             Map<String, PrizeConfig> prizeMap,
+                             Map<String, ActivityConfig> activityMap) {
+    }
+
+    private Materials loadMaterials(PoolPrizeMappingQuery queryForm) {
         List<PrizePoolConfig> pools = prizePoolConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
                         PrizePoolConfig::getActivityCode, queryForm.getActivityCode())
@@ -101,69 +131,72 @@ public class DrawPoolAnalysisService {
         Map<String, PrizePoolConfig> poolMap = pools.stream()
                 .collect(Collectors.toMap(PrizePoolConfig::getPoolCode, Function.identity(), (a, b) -> a));
 
-        /*
-         * 坑位映射表里没有 activity_code，活动维度只能通过奖池换算过来。
-         * 按活动筛选时用「本活动的奖池编码集合」去捞映射，而不是不带条件全捞回来再过滤 ——
-         * 后者在映射行多起来之后是笔无谓的开销。
-         * 集合为空说明这个活动一个奖池都没有，直接给空列表，不能漏掉 in 条件把全表捞回来。
-         */
-        boolean scopeByActivity = StringUtils.isNotBlank(queryForm.getActivityCode());
-        List<PoolPrizeMapping> mappings;
-        if (scopeByActivity && poolMap.isEmpty()) {
-            mappings = List.of();
-        } else {
-            mappings = poolPrizeMappingManager.lambdaQuery()
-                    .eq(StringUtils.isNotBlank(queryForm.getPoolCode()),
-                            PoolPrizeMapping::getPoolCode, queryForm.getPoolCode())
-                    .in(scopeByActivity, PoolPrizeMapping::getPoolCode, poolMap.keySet())
-                    .list();
-        }
-
-        Map<Long, PrizePoolItem> itemMap = prizePoolItemManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity(), (a, b) -> a));
-        Map<String, PrizeConfig> prizeMap = prizeConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
-        Map<String, ActivityConfig> activityMap = activityConfigManager.lambdaQuery().list().stream()
-                .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a));
-
-        /*
-         * 坑位映射可能指向一个已经不存在的奖池（孤儿映射）——
-         * 那些行同样要露头，否则运营只会以为「映射没了」，而不是「奖池没了」。
-         *
-         * ⚠️ 孤儿映射只在「不按活动筛选」时才会出现：它挂靠的奖池都没了，
-         * 自然也就无从判断属于哪个活动。所以清空活动筛选是发现孤儿的唯一入口。
-         */
-        Map<String, List<PoolPrizeMapping>> grouped = mappings.stream()
+        Map<String, List<PoolPrizeMapping>> grouped = loadMappings(queryForm, poolMap).stream()
                 .collect(Collectors.groupingBy(PoolPrizeMapping::getPoolCode, LinkedHashMap::new, Collectors.toList()));
 
-        List<DrawPoolAnalysisDTO> all = new ArrayList<>();
-        for (PrizePoolConfig pool : pools) {
-            all.add(analyseOne(pool.getPoolCode(), pool,
-                    grouped.getOrDefault(pool.getPoolCode(), List.of()),
-                    itemMap, prizeMap, activityMap));
+        return new Materials(pools, poolMap, grouped,
+                prizePoolItemManager.lambdaQuery().list().stream()
+                        .collect(Collectors.toMap(PrizePoolItem::getId, Function.identity(), (a, b) -> a)),
+                prizeConfigManager.lambdaQuery().list().stream()
+                        .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a)),
+                activityConfigManager.lambdaQuery().list().stream()
+                        .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a)));
+    }
+
+    /**
+     * 坑位映射表里<b>没有 activity_code</b>，活动维度只能通过奖池换算过来。
+     *
+     * <p>按活动筛选时用「本活动的奖池编码集合」去捞映射，而不是不带条件全捞回来再过滤 ——
+     * 后者在映射行多起来之后是笔无谓的开销。集合为空说明这个活动一个奖池都没有，
+     * 直接给空列表：<b>不能漏掉 in 条件把全表捞回来</b>。
+     */
+    private List<PoolPrizeMapping> loadMappings(PoolPrizeMappingQuery queryForm,
+                                                Map<String, PrizePoolConfig> poolMap) {
+        boolean scopeByActivity = StringUtils.isNotBlank(queryForm.getActivityCode());
+        if (scopeByActivity && poolMap.isEmpty()) {
+            return List.of();
         }
-        for (Map.Entry<String, List<PoolPrizeMapping>> entry : grouped.entrySet()) {
-            if (!poolMap.containsKey(entry.getKey())) {
-                all.add(analyseOne(entry.getKey(), null, entry.getValue(), itemMap, prizeMap, activityMap));
+        return poolPrizeMappingManager.lambdaQuery()
+                .eq(StringUtils.isNotBlank(queryForm.getPoolCode()),
+                        PoolPrizeMapping::getPoolCode, queryForm.getPoolCode())
+                .in(scopeByActivity, PoolPrizeMapping::getPoolCode, poolMap.keySet())
+                .list();
+    }
+
+    /**
+     * 逐池分析，外加<b>孤儿映射</b>：坑位还在、它挂靠的奖池已经没了。
+     *
+     * <p>那些行同样要露头，否则运营只会以为「映射没了」，而不是「奖池没了」。
+     *
+     * <p>⚠️ 孤儿映射只在「不按活动筛选」时才会出现：它挂靠的奖池都没了，
+     * 自然也就无从判断属于哪个活动。所以清空活动筛选是发现孤儿的唯一入口。
+     */
+    private List<DrawPoolAnalysisDTO> analyseAll(Materials materials) {
+        List<DrawPoolAnalysisDTO> all = new ArrayList<>();
+        for (PrizePoolConfig pool : materials.pools()) {
+            all.add(analyseOne(pool.getPoolCode(), pool,
+                    materials.grouped().getOrDefault(pool.getPoolCode(), List.of()),
+                    materials.itemMap(), materials.prizeMap(), materials.activityMap()));
+        }
+        for (Map.Entry<String, List<PoolPrizeMapping>> entry : materials.grouped().entrySet()) {
+            if (!materials.poolMap().containsKey(entry.getKey())) {
+                all.add(analyseOne(entry.getKey(), null, entry.getValue(),
+                        materials.itemMap(), materials.prizeMap(), materials.activityMap()));
             }
         }
+        return all;
+    }
 
-        // ---- 2. 排序即优先级：未闭环（现在就在报错）> 有危险告警 > 已上线 ----
-        all.sort(Comparator
-                .comparing((DrawPoolAnalysisDTO v) -> Boolean.TRUE.equals(v.getProbabilityClosed()) ? 1 : 0)
-                .thenComparing(v -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(v -> v.getActivityStatus() == ActivityStatusEnum.ONLINE ? 0 : 1)
-                .thenComparing(DrawPoolAnalysisDTO::getPoolCode));
-
-        if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
-            all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).collect(Collectors.toList());
-        }
-
+    /**
+     * 概览按<b>筛选后的全量</b>算，再切页 —— 卡片上的数字与列表翻到第几页无关。
+     */
+    private DrawPoolAnalysisResultDTO summarize(List<DrawPoolAnalysisDTO> all, PoolPrizeMappingQuery queryForm) {
         DrawPoolAnalysisResultDTO result = new DrawPoolAnalysisResultDTO();
         result.setPoolCount(all.size());
         result.setSlotCount(all.stream().mapToInt(v -> v.getSlotList().size()).sum());
         result.setDangerCount(all.stream().mapToInt(DrawPoolAnalysisDTO::getDangerCount).sum());
         result.setWarnCount(all.stream().mapToInt(DrawPoolAnalysisDTO::getWarnCount).sum());
+        // 未闭环的池现在就在报错，单独占一个数字，不和其他告警混在一起
         result.setBrokenPoolCount((int) all.stream()
                 .filter(v -> !Boolean.TRUE.equals(v.getProbabilityClosed())).count());
         result.setTotalExpectedCostPerDraw(all.stream().map(DrawPoolAnalysisDTO::getExpectedCostPerDraw)

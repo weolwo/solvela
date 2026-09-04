@@ -68,6 +68,24 @@ public class LotteryConfigBoardService {
     private static final BigDecimal SPACE_WARN_THRESHOLD = new BigDecimal("0.9");
 
     public LotteryConfigBoardResultDTO board(LotteryConfigQuery queryForm) {
+        List<LotteryConfigBoardDTO> all = analyseAll(queryForm);
+
+        // 排序即优先级：已上线且有危险告警的排最前 —— 那是正在流血的。
+        // 先排再筛：筛选保序，两者顺序不影响结果，但排序要的是可变列表
+        all.sort(Comparator
+                .comparing((LotteryConfigBoardDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
+                .thenComparing(v -> v.getStatus() == LotteryConfigStatusEnum.ONLINE ? 0 : 1)
+                .thenComparing(LotteryConfigBoardDTO::getSoldTotal, Comparator.reverseOrder()));
+        if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
+            all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).toList();
+        }
+        return summarize(all, queryForm);
+    }
+
+    /**
+     * 五次查询把料备齐，之后不再碰数据库；再逐个玩法体检。
+     */
+    private List<LotteryConfigBoardDTO> analyseAll(LotteryConfigQuery queryForm) {
         List<LotteryConfig> configs = lotteryConfigManager.lambdaQuery()
                 .eq(StringUtils.isNotBlank(queryForm.getActivityCode()),
                         LotteryConfig::getActivityCode, queryForm.getActivityCode())
@@ -97,19 +115,16 @@ public class LotteryConfigBoardService {
                     ruleCountMap.getOrDefault(config.getLotteryCode(), 0L),
                     StatRow.of(recordStatMap.get(config.getLotteryCode())), dbNow));
         }
+        return all;
+    }
 
-        if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
-            all = all.stream().filter(v -> v.getDangerCount() > 0 || v.getWarnCount() > 0).collect(Collectors.toList());
-        }
-
-        // 排序即优先级：已上线且有危险告警的排最前 —— 那是正在流血的
-        all.sort(Comparator
-                .comparing((LotteryConfigBoardDTO v) -> v.getDangerCount() > 0 ? 0 : 1)
-                .thenComparing(v -> v.getStatus() == LotteryConfigStatusEnum.ONLINE ? 0 : 1)
-                .thenComparing(LotteryConfigBoardDTO::getSoldTotal, Comparator.reverseOrder()));
-
+    /**
+     * 概览按<b>筛选后的全量</b>算，再切页 —— 卡片上的数字与列表翻到第几页无关。
+     */
+    private LotteryConfigBoardResultDTO summarize(List<LotteryConfigBoardDTO> all, LotteryConfigQuery queryForm) {
         LotteryConfigBoardResultDTO result = new LotteryConfigBoardResultDTO();
         result.setLotteryCount(all.size());
+        // 「现在真能卖」的完整条件：已上线、没有危险告警、且手上还有待开奖的期号
         result.setSellableCount((int) all.stream()
                 .filter(v -> v.getStatus() == LotteryConfigStatusEnum.ONLINE && v.getDangerCount() == 0
                         && v.getWaitIssueCount() > 0).count());

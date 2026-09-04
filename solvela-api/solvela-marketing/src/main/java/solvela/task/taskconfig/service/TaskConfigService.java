@@ -74,22 +74,51 @@ public class TaskConfigService {
     @Transactional(rollbackFor = Exception.class)
     public Long wizardSubmit(TaskConfigWizardSubmitCommand form) {
         TaskConfigWizardConfigCommand configForm = form.getTaskConfig();
+        ConfigJson configJson = resolveConfigJson(configForm);
 
-        // 1. 模板必须存在
+        TaskConfig taskConfig = SolvelaBeanUtil.copy(configForm, TaskConfig.class);
+        taskConfig.setRuleConfig(configJson.ruleConfig());
+        taskConfig.setUiConfig(configJson.uiConfig());
+        taskConfig.setStatus(TaskConfigStatusEnum.PENDING);
+        taskConfigDao.insert(taskConfig);
+
+        // 子表批量落库（insertBatch 由 CustomizedBaseMapper 提供）
+        taskPrizeMappingDao.insertBatch(buildMappingList(form, taskConfig.getId()));
+
+        // 返回主表ID，前端成功页据此定位刚创建的任务
+        return taskConfig.getId();
+    }
+
+    /**
+     * 两个 JSON 列的最终形态。它们成对产生：taskType 写进 ruleConfig、副标题写进 uiConfig，
+     * 都发生在同一次校验之后，分开算会漏掉其中一半。
+     */
+    private record ConfigJson(String ruleConfig, String uiConfig) {
+    }
+
+    /**
+     * 模板校验 + 配置归一。<b>新建与更新共用一份</b> ——
+     * 改造前这段在 wizardSubmit 与 wizardUpdate 里各写了一遍，
+     * 而它管着「taskType 由服务端强制覆写」这条防伪造的规则，两份实现漂一次就等于开了个口子。
+     *
+     * <p>三件事：模板必须存在；按模板 ui_schema 校验参数（必填、visibleWhen 可见性、
+     * image 参数归属）；taskType 以模板为准强制覆写，副标题与规则说明并进 ui_config。
+     */
+    private ConfigJson resolveConfigJson(TaskConfigWizardConfigCommand configForm) {
         TaskTemplate template = taskTemplateService.getByTemplateCode(configForm.getTemplateCode());
         if (template == null) {
             throw new BusinessException("任务模板不存在：" + configForm.getTemplateCode());
         }
 
-        // 2. 按模板 ui_schema 校验参数（必填、visibleWhen 可见性、image 参数归属）
         Map<String, Object> ruleConfig = new HashMap<>(configForm.getRuleConfig());
-        Map<String, Object> uiConfig = configForm.getUiConfig() == null ? new HashMap<>() : new HashMap<>(configForm.getUiConfig());
+        Map<String, Object> uiConfig = configForm.getUiConfig() == null
+                ? new HashMap<>() : new HashMap<>(configForm.getUiConfig());
         String paramError = checkParamBySchema(template.getUiSchema(), ruleConfig, uiConfig);
         if (paramError != null) {
             throw new BusinessException(paramError);
         }
 
-        // 3. taskType 以模板为准，服务端强制覆写，防止前端伪造；副标题/规则说明并入 ui_config 存储
+        // 🔴 taskType 以模板为准，服务端强制覆写，防止前端伪造
         ruleConfig.put(KEY_TASK_TYPE, template.getTaskType());
         if (StringUtils.isNotBlank(configForm.getTaskDesc())) {
             uiConfig.put(KEY_TASK_DESC, configForm.getTaskDesc());
@@ -97,19 +126,7 @@ public class TaskConfigService {
         if (StringUtils.isNotBlank(configForm.getRuleDesc())) {
             uiConfig.put(KEY_RULE_DESC, configForm.getRuleDesc());
         }
-
-        // 4. 主表落库
-        TaskConfig taskConfig = SolvelaBeanUtil.copy(configForm, TaskConfig.class);
-        taskConfig.setRuleConfig(JsonUtils.toJson(ruleConfig));
-        taskConfig.setUiConfig(JsonUtils.toJson(uiConfig));
-        taskConfig.setStatus(TaskConfigStatusEnum.PENDING);
-        taskConfigDao.insert(taskConfig);
-
-        // 5. 子表批量落库（insertBatch 由 CustomizedBaseMapper 提供）
-        taskPrizeMappingDao.insertBatch(buildMappingList(form, taskConfig.getId()));
-
-        // 返回主表ID，前端成功页据此定位刚创建的任务
-        return taskConfig.getId();
+        return new ConfigJson(JsonUtils.toJson(ruleConfig), JsonUtils.toJson(uiConfig));
     }
 
     /**
@@ -190,35 +207,17 @@ public class TaskConfigService {
         }
 
         TaskConfigWizardConfigCommand configForm = form.getTaskConfig();
-        // 模板可改：按表单传来的模板校验参数。换模板意味着 rule_config 整套按新 ui_schema 重填，
+        // 模板可改：换模板意味着 rule_config 整套按新 ui_schema 重填，
         // 向导那边切模板时已经用新模板的默认值重建了 ruleParams，这里只需照新模板验一遍
-        TaskTemplate template = taskTemplateService.getByTemplateCode(configForm.getTemplateCode());
-        if (template == null) {
-            throw new BusinessException("任务模板不存在：" + configForm.getTemplateCode());
-        }
-
-        Map<String, Object> ruleConfig = new HashMap<>(configForm.getRuleConfig());
-        Map<String, Object> uiConfig = configForm.getUiConfig() == null ? new HashMap<>() : new HashMap<>(configForm.getUiConfig());
-        String paramError = checkParamBySchema(template.getUiSchema(), ruleConfig, uiConfig);
-        if (paramError != null) {
-            throw new BusinessException(paramError);
-        }
-
-        ruleConfig.put(KEY_TASK_TYPE, template.getTaskType());
-        if (StringUtils.isNotBlank(configForm.getTaskDesc())) {
-            uiConfig.put(KEY_TASK_DESC, configForm.getTaskDesc());
-        }
-        if (StringUtils.isNotBlank(configForm.getRuleDesc())) {
-            uiConfig.put(KEY_RULE_DESC, configForm.getRuleDesc());
-        }
+        ConfigJson configJson = resolveConfigJson(configForm);
 
         TaskConfig update = SolvelaBeanUtil.copy(configForm, TaskConfig.class);
         update.setId(exist.getId());
         // 唯一锁定项：归属活动。换活动会让阶梯里的 prize_code 全部失效（奖品按活动隔离），
         // 那是「重建一个任务」而不是改配置。前端把这个下拉置灰了，服务端再兜一道
         update.setActivityCode(exist.getActivityCode());
-        update.setRuleConfig(JsonUtils.toJson(ruleConfig));
-        update.setUiConfig(JsonUtils.toJson(uiConfig));
+        update.setRuleConfig(configJson.ruleConfig());
+        update.setUiConfig(configJson.uiConfig());
         // status 不在更新范围内：MyBatis-Plus 默认 NOT_NULL 策略会把 null 字段排除出 UPDATE
         update.setStatus(null);
         taskConfigDao.updateById(update);
