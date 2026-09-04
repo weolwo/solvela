@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.base.domain.PageResult;
+import solvela.base.stat.Checkup;
+import solvela.base.stat.Rate;
+import solvela.base.stat.StatRow;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
@@ -16,11 +19,8 @@ import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
 import solvela.member.service.MemberService;
 import solvela.exception.BusinessException;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 奖励记录表 Service
@@ -39,8 +39,6 @@ public class PrizeLogService {
      * 会员号 -> 账号：发奖流水要落展示快照
      */
     private final MemberService memberService;
-
-    private static final int RATE_SCALE = 4;
 
     private static final long MINUTES_PER_HOUR = 60L;
 
@@ -69,134 +67,152 @@ public class PrizeLogService {
      * 钱有没有真到用户手上是账务域的事。
      */
     public PrizeLogFunnelDTO funnel(PrizeLogQuery queryForm) {
-        Map<String, Object> row = prizeLogDao.selectFunnel(queryForm);
-        PrizeLogFunnelDTO vo = new PrizeLogFunnelDTO();
+        StatRow row = StatRow.of(prizeLogDao.selectFunnel(queryForm));
 
-        long total = toLong(row.get("totalCount"));
-        long success = toLong(row.get("successCount"));
-        long waiting = toLong(row.get("waitingCount"));
-        long failed = toLong(row.get("failedCount"));
-        long approvePending = toLong(row.get("approvePendingCount"));
-        long approveRejected = toLong(row.get("approveRejectedCount"));
-        long approveOldestMinutes = toLong(row.get("approveOldestMinutes"));
-        long stuckWaiting = toLong(row.get("stuckWaitingCount"));
+        PrizeLogFunnelDTO vo = new PrizeLogFunnelDTO();
+        fillOverview(row, vo);
+        vo.setTypeList(typeStats(queryForm));
+        vo.setPrizeList(prizeStats(queryForm));
+        vo.setFailReasonList(failReasons(queryForm, row.count("failedCount")));
+        vo.setIssueList(checkup(row));
+        return vo;
+    }
+
+    /**
+     * 发放总量与审批池现状。
+     */
+    private void fillOverview(StatRow row, PrizeLogFunnelDTO vo) {
+        long total = row.count("totalCount");
+        long success = row.count("successCount");
+        long approvePending = row.count("approvePendingCount");
 
         vo.setTotalCount(total);
-        vo.setMemberCount(toLong(row.get("memberCount")));
+        vo.setMemberCount(row.count("memberCount"));
         vo.setSuccessCount(success);
-        vo.setWaitingCount(waiting);
-        vo.setFailedCount(failed);
+        vo.setWaitingCount(row.count("waitingCount"));
+        vo.setFailedCount(row.count("failedCount"));
         /*
          * 分母用「记录总数」而不是「已收口的」：待审批、卡在等待执行本身就是一种结果
          * （用户就是没拿到奖），把它们剔出分母会让这个比率虚高 —— 而运营要问的恰恰是
          * 「一百条发奖记录里最后有几条真发出去了」。
          */
-        vo.setSuccessRate(rate(success, total));
-        vo.setApproveNoneCount(toLong(row.get("approveNoneCount")));
-        vo.setApprovePendingCount(approvePending);
-        vo.setApprovePassedCount(toLong(row.get("approvePassedCount")));
-        vo.setApproveRejectedCount(approveRejected);
-        // 没有积压时 SQL 里的 MIN(...) 是 NULL，被 COALESCE 兜成 0；这里不要再解读成「等了 0 分钟」
-        vo.setApproveOldestMinutes(approvePending == 0 ? 0L : approveOldestMinutes);
-        vo.setStuckWaitingCount(stuckWaiting);
+        vo.setSuccessRate(Rate.share(success, total));
 
-        // ---- 奖励类型维度：条数与价值双口径 ----
+        vo.setApproveNoneCount(row.count("approveNoneCount"));
+        vo.setApprovePendingCount(approvePending);
+        vo.setApprovePassedCount(row.count("approvePassedCount"));
+        vo.setApproveRejectedCount(row.count("approveRejectedCount"));
+        // 没有积压时 SQL 里的 MIN(...) 是 NULL，被 COALESCE 兜成 0；这里不要再解读成「等了 0 分钟」
+        vo.setApproveOldestMinutes(approvePending == 0 ? 0L : row.count("approveOldestMinutes"));
+        vo.setStuckWaitingCount(row.count("stuckWaitingCount"));
+    }
+
+    /**
+     * 奖励类型维度：<b>条数与价值双口径</b>。
+     *
+     * <p>价值必须按类型分开算 —— 积分、优惠券、实物的「1000」不是同一个量纲，
+     * 把它们加在一起得到的合计数没有任何意义。
+     */
+    private List<PrizeLogFunnelDTO.PrizeTypeStatDTO> typeStats(PrizeLogQuery queryForm) {
         List<PrizeLogFunnelDTO.PrizeTypeStatDTO> typeList = new ArrayList<>();
-        for (Map<String, Object> stat : prizeLogDao.selectPrizeTypeStat(queryForm)) {
+        for (StatRow stat : StatRow.of(prizeLogDao.selectPrizeTypeStat(queryForm))) {
+            long logCount = stat.count("logCount");
+            long success = stat.count("successCount");
+
             PrizeLogFunnelDTO.PrizeTypeStatDTO item = new PrizeLogFunnelDTO.PrizeTypeStatDTO();
-            long logCount = toLong(stat.get("logCount"));
-            long typeSuccess = toLong(stat.get("successCount"));
-            long badValue = toLong(stat.get("badValueCount"));
-            item.setPrizeType(stat.get("prizeType") == null ? null : String.valueOf(stat.get("prizeType")));
+            item.setPrizeType(stat.text("prizeType"));
             item.setLogCount(logCount);
-            item.setSuccessCount(typeSuccess);
-            item.setSuccessRate(rate(typeSuccess, logCount));
-            item.setSuccessValue(toDecimal(stat.get("successValue")));
-            item.setWaitingValue(toDecimal(stat.get("waitingValue")));
-            item.setFailedValue(toDecimal(stat.get("failedValue")));
-            item.setBadValueCount(badValue);
+            item.setSuccessCount(success);
+            item.setSuccessRate(Rate.share(success, logCount));
+            item.setSuccessValue(stat.amount("successValue"));
+            item.setWaitingValue(stat.amount("waitingValue"));
+            item.setFailedValue(stat.amount("failedValue"));
+            item.setBadValueCount(stat.count("badValueCount"));
             typeList.add(item);
         }
-        vo.setTypeList(typeList);
+        return typeList;
+    }
 
-        // ---- 奖品维度分布 ----
+    /**
+     * 奖品维度分布：哪个奖发得最多、哪个奖最容易发失败。
+     */
+    private List<PrizeLogFunnelDTO.PrizeStatDTO> prizeStats(PrizeLogQuery queryForm) {
         List<PrizeLogFunnelDTO.PrizeStatDTO> prizeList = new ArrayList<>();
-        for (Map<String, Object> stat : prizeLogDao.selectPrizeStat(queryForm)) {
+        for (StatRow stat : StatRow.of(prizeLogDao.selectPrizeStat(queryForm))) {
+            long logCount = stat.count("logCount");
+            long success = stat.count("successCount");
+
             PrizeLogFunnelDTO.PrizeStatDTO item = new PrizeLogFunnelDTO.PrizeStatDTO();
-            long logCount = toLong(stat.get("logCount"));
-            long prizeSuccess = toLong(stat.get("successCount"));
-            item.setPrizeCode(stat.get("prizeCode") == null ? null : String.valueOf(stat.get("prizeCode")));
-            item.setPrizeName(stat.get("prizeName") == null ? null : String.valueOf(stat.get("prizeName")));
-            item.setPrizeType(stat.get("prizeType") == null ? null : String.valueOf(stat.get("prizeType")));
+            item.setPrizeCode(stat.text("prizeCode"));
+            item.setPrizeName(stat.text("prizeName"));
+            item.setPrizeType(stat.text("prizeType"));
             item.setLogCount(logCount);
-            item.setSuccessCount(prizeSuccess);
-            item.setWaitingCount(toLong(stat.get("waitingCount")));
-            item.setFailedCount(toLong(stat.get("failedCount")));
-            item.setPendingCount(toLong(stat.get("pendingCount")));
-            item.setSuccessRate(rate(prizeSuccess, logCount));
+            item.setSuccessCount(success);
+            item.setWaitingCount(stat.count("waitingCount"));
+            item.setFailedCount(stat.count("failedCount"));
+            item.setPendingCount(stat.count("pendingCount"));
+            item.setSuccessRate(Rate.share(success, logCount));
             prizeList.add(item);
         }
-        vo.setPrizeList(prizeList);
+        return prizeList;
+    }
 
-        // ---- 失败原因分布 ----
+    /**
+     * 失败原因分布。
+     *
+     * @param failedTotal 失败总数，用作占比分母 —— 这一列回答的是「发失败的那些里它占多少」
+     */
+    private List<PrizeLogFunnelDTO.FailReasonDTO> failReasons(PrizeLogQuery queryForm, long failedTotal) {
         List<PrizeLogFunnelDTO.FailReasonDTO> failReasonList = new ArrayList<>();
-        for (Map<String, Object> stat : prizeLogDao.selectFailReasonStat(queryForm)) {
+        for (StatRow stat : StatRow.of(prizeLogDao.selectFailReasonStat(queryForm))) {
+            long count = stat.count("failCount");
+
             PrizeLogFunnelDTO.FailReasonDTO item = new PrizeLogFunnelDTO.FailReasonDTO();
-            long count = toLong(stat.get("failCount"));
-            item.setFailReason(stat.get("failReason") == null ? null : String.valueOf(stat.get("failReason")));
+            item.setFailReason(stat.text("failReason"));
             item.setFailCount(count);
-            item.setFailShare(rate(count, failed));
+            item.setFailShare(Rate.share(count, failedTotal));
             failReasonList.add(item);
         }
-        vo.setFailReasonList(failReasonList);
+        return failReasonList;
+    }
 
-        // ---- 流程与一致性体检 ----
-        List<String> issues = new ArrayList<>();
-        long rejectedButSent = toLong(row.get("rejectedButSentCount"));
-        if (rejectedButSent > 0) {
-            issues.add("有 " + rejectedButSent + " 条记录「已驳回」却又是「已发出」：驳回的意思是这个奖不该发，"
-                    + "钱却出去了。审批驳回只改 approve_status、不会回滚已经发出的派发，"
-                    + "出现这种组合要么是先发后驳，要么是有人手工改过状态，必须逐条核对");
-        }
-        if (approvePending > 0 && approveOldestMinutes >= MINUTES_PER_DAY) {
-            issues.add("待审批里最久的一条已经挂了 " + (approveOldestMinutes / MINUTES_PER_HOUR) + " 小时："
-                    + "approve_mode=1 的奖唯一的出口就是有人来点「通过」，没人点它就一直停在这里，"
-                    + "对用户就是「奖一直没到」");
-        }
-        if (stuckWaiting > 0) {
-            issues.add("有 " + stuckWaiting + " 条记录不在等审批却停在「等待执行」超过 30 分钟："
-                    + "这不一定是故障 —— 提案进了财务审批池时，发奖记录本就合理地停在等待执行。"
-                    + "但工程里没有任何重试/补偿任务，真断链了也不会自己恢复，"
-                    + "请拿这些记录的「来源单号」去提案记录页确认提案到底走到哪一步了");
-        }
-        long badValue = toLong(row.get("badValueCount"));
-        if (badValue > 0) {
-            issues.add("有 " + badValue + " 条记录的奖励体值不是数字：四个发奖策略开头都是 new BigDecimal(prizeValue)，"
-                    + "解析不了就当场发奖失败；而且这批行的价值没有计入上面的「已发出价值」，"
-                    + "也就是说页面上的金额是偏小的 —— 少算了多少只能逐条看，因为它们压根算不出来");
-        }
-        long noExternalBizNo = toLong(row.get("noExternalBizNoCount"));
-        if (noExternalBizNo > 0) {
-            issues.add("有 " + noExternalBizNo + " 条记录没有外部单号：跨系统防重全靠 uk_external_biz 唯一索引，"
-                    + "而 MySQL 允许多个 NULL —— 这些行不受防重保护，同一笔奖重投一次就会再发一遍");
-        }
-        long failedNoReason = toLong(row.get("failedNoReasonCount"));
-        if (failedNoReason > 0) {
-            issues.add("有 " + failedNoReason + " 条记录发放失败却没有失败原因：客诉与排查时拿不出依据，"
-                    + "也没法归到上面的失败原因分布里");
-        }
-        long successWithFailReason = toLong(row.get("successWithFailReasonCount"));
-        if (successWithFailReason > 0) {
-            issues.add("有 " + successWithFailReason + " 条记录「已发出」却带着失败原因：与状态自相矛盾，"
-                    + "多半是失败后被人工改成了成功而没有清掉原因");
-        }
-        long expiredWaiting = toLong(row.get("expiredWaitingCount"));
-        if (expiredWaiting > 0) {
-            issues.add("有 " + expiredWaiting + " 条记录已过有效期却还停在「等待执行」：这时候再发出去也没意义了，"
-                    + "需要人工确认是补发还是作废");
-        }
-        vo.setIssueList(issues);
-        return vo;
+    /**
+     * 流程与一致性体检。
+     */
+    private List<String> checkup(StatRow row) {
+        long approvePending = row.count("approvePendingCount");
+        long approveOldestMinutes = row.count("approveOldestMinutes");
+        return new Checkup()
+                .countIf(row.count("rejectedButSentCount"),
+                        "有 {} 条记录「已驳回」却又是「已发出」：驳回的意思是这个奖不该发，"
+                                + "钱却出去了。审批驳回只改 approve_status、不会回滚已经发出的派发，"
+                                + "出现这种组合要么是先发后驳，要么是有人手工改过状态，必须逐条核对")
+                .when(approvePending > 0 && approveOldestMinutes >= MINUTES_PER_DAY,
+                        "待审批里最久的一条已经挂了 {} 小时：approve_mode=1 的奖唯一的出口就是有人来点「通过」，"
+                                + "没人点它就一直停在这里，对用户就是「奖一直没到」",
+                        approveOldestMinutes / MINUTES_PER_HOUR)
+                .countIf(row.count("stuckWaitingCount"),
+                        "有 {} 条记录不在等审批却停在「等待执行」超过 30 分钟："
+                                + "这不一定是故障 —— 提案进了财务审批池时，发奖记录本就合理地停在等待执行。"
+                                + "但工程里没有任何重试/补偿任务，真断链了也不会自己恢复，"
+                                + "请拿这些记录的「来源单号」去提案记录页确认提案到底走到哪一步了")
+                .countIf(row.count("badValueCount"),
+                        "有 {} 条记录的奖励体值不是数字：四个发奖策略开头都是 new BigDecimal(prizeValue)，"
+                                + "解析不了就当场发奖失败；而且这批行的价值没有计入上面的「已发出价值」，"
+                                + "也就是说页面上的金额是偏小的 —— 少算了多少只能逐条看，因为它们压根算不出来")
+                .countIf(row.count("noExternalBizNoCount"),
+                        "有 {} 条记录没有外部单号：跨系统防重全靠 uk_external_biz 唯一索引，"
+                                + "而 MySQL 允许多个 NULL —— 这些行不受防重保护，同一笔奖重投一次就会再发一遍")
+                .countIf(row.count("failedNoReasonCount"),
+                        "有 {} 条记录发放失败却没有失败原因：客诉与排查时拿不出依据，"
+                                + "也没法归到上面的失败原因分布里")
+                .countIf(row.count("successWithFailReasonCount"),
+                        "有 {} 条记录「已发出」却带着失败原因：与状态自相矛盾，"
+                                + "多半是失败后被人工改成了成功而没有清掉原因")
+                .countIf(row.count("expiredWaitingCount"),
+                        "有 {} 条记录已过有效期却还停在「等待执行」：这时候再发出去也没意义了，"
+                                + "需要人工确认是补发还是作废")
+                .issues();
     }
 
     /**
@@ -220,28 +236,5 @@ public class PrizeLogService {
 
     public int save(PrizeLog prizeLog) {
         return prizeLogDao.insert(prizeLog);
-    }
-
-    private BigDecimal rate(long part, long total) {
-        if (total <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(part).divide(BigDecimal.valueOf(total), RATE_SCALE, RoundingMode.HALF_UP);
-    }
-
-    private long toLong(Object value) {
-        return value == null ? 0L : ((Number) value).longValue();
-    }
-
-    /**
-     * 金额统一保留两位。CAST 出来的 DECIMAL(18,4) 直接透出会变成「5830.0000 积分」，
-     * 多出来的两位没有意义。
-     */
-    private BigDecimal toDecimal(Object value) {
-        if (value == null) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal decimal = value instanceof BigDecimal bd ? bd : new BigDecimal(value.toString());
-        return decimal.setScale(2, RoundingMode.HALF_UP);
     }
 }

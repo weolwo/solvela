@@ -4,22 +4,21 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.stat.Checkup;
+import solvela.base.stat.Rate;
+import solvela.base.stat.StatRow;
 import solvela.lottery.constant.LotteryConst;
 import solvela.lottery.record.dao.LotteryRecordDao;
 import solvela.lottery.record.domain.query.LotteryRecordQuery;
 import solvela.lottery.record.domain.dto.LotteryRecordFunnelDTO;
 import solvela.lottery.record.domain.dto.LotteryRecordDTO;
 import solvela.prize.PrizeConfig;
-import solvela.prize.prizeconfig.manager.PrizeConfigManager;
+import solvela.prize.prizeconfig.service.PrizeCatalog;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 用户号码记录 Service —— <b>只读</b>。
@@ -48,9 +47,7 @@ import java.util.stream.Collectors;
 public class LotteryRecordService {
 
     private final LotteryRecordDao lotteryRecordDao;
-    private final PrizeConfigManager prizeConfigManager;
-
-    private static final int RATE_SCALE = 4;
+    private final PrizeCatalog prizeCatalog;
 
     /**
      * 分页查询
@@ -69,17 +66,26 @@ public class LotteryRecordService {
      * 中奖只是第一步，奖品要经派发链路真正到用户手上才算完。
      */
     public LotteryRecordFunnelDTO funnel(LotteryRecordQuery queryForm) {
-        Map<String, Object> row = lotteryRecordDao.selectFunnel(queryForm);
-        LotteryRecordFunnelDTO vo = new LotteryRecordFunnelDTO();
+        StatRow row = StatRow.of(lotteryRecordDao.selectFunnel(queryForm));
 
-        long total = toLong(row.get("totalCount"));
-        long wait = toLong(row.get("waitCount"));
-        long lose = toLong(row.get("loseCount"));
-        long win = toLong(row.get("winCount"));
-        long members = toLong(row.get("memberCount"));
+        LotteryRecordFunnelDTO vo = new LotteryRecordFunnelDTO();
+        fillOverview(row, vo);
+        vo.setIssueList(checkup(row));
+        vo.setPrizeLevelList(prizeLevels(queryForm, row.count("winCount")));
+        return vo;
+    }
+
+    /**
+     * 号码总量、开奖结果分布，以及中奖之后的派发进度。
+     */
+    private void fillOverview(StatRow row, LotteryRecordFunnelDTO vo) {
+        long total = row.count("totalCount");
+        long lose = row.count("loseCount");
+        long win = row.count("winCount");
+        long members = row.count("memberCount");
 
         vo.setTotalCount(total);
-        vo.setWaitCount(wait);
+        vo.setWaitCount(row.count("waitCount"));
         vo.setLoseCount(lose);
         vo.setWinCount(win);
         vo.setMemberCount(members);
@@ -87,88 +93,66 @@ public class LotteryRecordService {
          * 中奖率的分母用「已开奖」而不是「全部」：未开奖的号码还没揭晓，
          * 把它们算进分母会让活动刚开始时的中奖率无限接近 0，那个数字没有意义。
          */
-        vo.setWinRate(rate(win, lose + win));
-        vo.setTicketPerMember(members == 0 ? BigDecimal.ZERO
-                : BigDecimal.valueOf(total).divide(BigDecimal.valueOf(members), 2, RoundingMode.HALF_UP));
+        vo.setWinRate(Rate.share(win, lose + win));
+        vo.setTicketPerMember(Rate.average(total, members));
 
-        vo.setDispatchWaitCount(toLong(row.get("dispatchWaitCount")));
-        vo.setDispatchedCount(toLong(row.get("dispatchedCount")));
-        vo.setDispatchFailedCount(toLong(row.get("dispatchFailedCount")));
+        vo.setDispatchWaitCount(row.count("dispatchWaitCount"));
+        vo.setDispatchedCount(row.count("dispatchedCount"));
+        vo.setDispatchFailedCount(row.count("dispatchFailedCount"));
+    }
 
-        // ---- 一致性体检：专门用来发现被手工改坏或链路出错的记录 ----
-        List<String> issues = new ArrayList<>();
-        long failed = toLong(row.get("dispatchFailedCount"));
-        if (failed > 0) {
-            issues.add("有 " + failed + " 张号码已中奖但派发失败：用户看到自己中了奖、系统也认，但奖品没发出去。"
-                    + "请到「派发记录」查看失败原因并重新触发派奖");
-        }
-        long winButNoPrize = toLong(row.get("winButNoPrize"));
-        if (winButNoPrize > 0) {
-            issues.add("有 " + winButNoPrize + " 张号码已中奖但没有奖品编码：派奖时不知道该发什么，"
-                    + "通常是核销时奖级规则里的 prize_code 为空");
-        }
-        long winButLevelNone = toLong(row.get("winButLevelNone"));
-        if (winButLevelNone > 0) {
-            issues.add("有 " + winButLevelNone + " 张号码标记为已中奖，奖级却是 " + LotteryConst.PRIZE_LEVEL_NONE
-                    + "（未中奖占位）：用户端按奖级排序会把它们沉到最底，看起来像没中奖");
-        }
-        long loseButHasLevel = toLong(row.get("loseButHasLevel"));
-        if (loseButHasLevel > 0) {
-            issues.add("有 " + loseButHasLevel + " 张号码未中奖却带着有效奖级：与中奖状态自相矛盾，"
-                    + "多半是历史数据或人工改动留下的");
-        }
-        long noSign = toLong(row.get("noSign"));
-        if (noSign > 0) {
-            issues.add("有 " + noSign + " 张号码的防篡改签名为空：这些号码无法自证真伪，"
-                    + "用户申诉时拿不出凭据");
-        }
-        vo.setIssueList(issues);
+    /**
+     * 一致性体检：专门用来发现被手工改坏或链路出错的记录。
+     */
+    private List<String> checkup(StatRow row) {
+        return new Checkup()
+                .countIf(row.count("dispatchFailedCount"),
+                        "有 {} 张号码已中奖但派发失败：用户看到自己中了奖、系统也认，但奖品没发出去。"
+                                + "请到「派发记录」查看失败原因并重新触发派奖")
+                .countIf(row.count("winButNoPrize"),
+                        "有 {} 张号码已中奖但没有奖品编码：派奖时不知道该发什么，"
+                                + "通常是核销时奖级规则里的 prize_code 为空")
+                .countIf(row.count("winButLevelNone"),
+                        "有 {} 张号码标记为已中奖，奖级却是 {}（未中奖占位）："
+                                + "用户端按奖级排序会把它们沉到最底，看起来像没中奖",
+                        LotteryConst.PRIZE_LEVEL_NONE)
+                .countIf(row.count("loseButHasLevel"),
+                        "有 {} 张号码未中奖却带着有效奖级：与中奖状态自相矛盾，"
+                                + "多半是历史数据或人工改动留下的")
+                .countIf(row.count("noSign"),
+                        "有 {} 张号码的防篡改签名为空：这些号码无法自证真伪，"
+                                + "用户申诉时拿不出凭据")
+                .issues();
+    }
 
-        // ---- 奖级分布 ----
-        List<Map<String, Object>> stats = lotteryRecordDao.selectPrizeLevelStat(queryForm);
-        List<String> codes = stats.stream()
-                .map(s -> s.get("prizeCode"))
-                .filter(java.util.Objects::nonNull)
-                .map(String::valueOf)
-                .distinct()
-                .toList();
-        Map<String, PrizeConfig> prizeMap = codes.isEmpty() ? Map.of()
-                : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, codes).list().stream()
-                        .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
+    /**
+     * 奖级分布：各奖级各中了几注、发出去多少价值。
+     *
+     * @param winTotal 中奖总数，用作占比分母 —— 这一列回答的是「中出来的奖里它占多少」
+     */
+    private List<LotteryRecordFunnelDTO.PrizeLevelStatDTO> prizeLevels(LotteryRecordQuery queryForm, long winTotal) {
+        List<StatRow> stats = StatRow.of(lotteryRecordDao.selectPrizeLevelStat(queryForm));
+        Map<String, PrizeConfig> prizeMap = prizeCatalog.mapByCodes(stats.stream().map(s -> s.text("prizeCode")).toList());
 
         List<LotteryRecordFunnelDTO.PrizeLevelStatDTO> levelList = new ArrayList<>();
-        for (Map<String, Object> stat : stats) {
+        for (StatRow stat : stats) {
+            String code = stat.text("prizeCode");
+            long count = stat.count("winCount");
+
             LotteryRecordFunnelDTO.PrizeLevelStatDTO item = new LotteryRecordFunnelDTO.PrizeLevelStatDTO();
-            Object levelValue = stat.get("prizeLevel");
-            item.setPrizeLevel(levelValue == null ? null : ((Number) levelValue).intValue());
-            String code = stat.get("prizeCode") == null ? null : String.valueOf(stat.get("prizeCode"));
+            item.setPrizeLevel(stat.intValue("prizeLevel"));
             item.setPrizeCode(code);
-            long count = toLong(stat.get("winCount"));
             item.setWinCount(count);
-            item.setWinShare(rate(count, win));
+            item.setWinShare(Rate.share(count, winTotal));
+            // 奖品可能已被删除，那时只能显示编码
             PrizeConfig prize = code == null ? null : prizeMap.get(code);
             if (prize != null) {
                 item.setPrizeName(prize.getPrizeName());
                 item.setPrizeType(prize.getPrizeType());
-                if (prize.getPrizeValue() != null) {
-                    item.setIssuedValue(prize.getPrizeValue().multiply(BigDecimal.valueOf(count))
-                            .setScale(2, RoundingMode.HALF_UP));
-                }
+                item.setIssuedValue(PrizeCatalog.issuedValue(prize, count));
             }
             levelList.add(item);
         }
-        vo.setPrizeLevelList(levelList);
-        return vo;
-    }
-
-    private BigDecimal rate(long part, long total) {
-        if (total <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(part).divide(BigDecimal.valueOf(total), RATE_SCALE, RoundingMode.HALF_UP);
-    }
-
-    private long toLong(Object value) {
-        return value == null ? 0L : ((Number) value).longValue();
+        return levelList;
     }
 }

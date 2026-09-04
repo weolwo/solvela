@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
+import solvela.base.stat.Checkup;
+import solvela.base.stat.Rate;
+import solvela.base.stat.StatRow;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.sonicexcel.SolvelaExcelUtil;
@@ -21,10 +24,6 @@ import solvela.ledger.logistic.domain.excel.PhysicalDeliveryShipImportRow;
 import solvela.ledger.logistic.domain.command.PhysicalDeliveryUpdateCommand;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryStatDTO;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
-
-import static solvela.ledger.stat.LedgerStatSupport.rate;
-import static solvela.ledger.stat.LedgerStatSupport.toLong;
-import static solvela.ledger.stat.LedgerStatSupport.toStr;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,27 +80,32 @@ public class PhysicalDeliveryService {
      * <p><b>积压那一组数字刻意不跟时间范围走</b>：它是存量 ——
      * 限制在今天，压了三天的那些单子会正好从页面上消失，
      * 而那恰恰是这个页面唯一需要有人动手的东西。
-     *
-     * <p>待发货拆成两类：收件信息没补全的（想发也发不了，要催用户）和地址齐了等发货的
-     * （运营今天真正能干的活）。实物是三段式履约，status=0 里天然混着这两种。
      */
     public PhysicalDeliveryStatDTO stat(LedgerStatQuery form) {
+        StatRow newRow = StatRow.of(physicalDeliveryDao.selectNewStat(form));
+        StatRow row = StatRow.of(physicalDeliveryDao.selectStatusStat());
+
         PhysicalDeliveryStatDTO vo = new PhysicalDeliveryStatDTO();
+        vo.setNewCount(newRow.count("newCount"));
+        vo.setNewMemberCount(newRow.count("newMemberCount"));
+        fillStatusStock(row, vo);
+        vo.setSourceList(sourceStats());
+        vo.setIssueList(checkup(row));
+        return vo;
+    }
 
-        Map<String, Object> newRow = physicalDeliveryDao.selectNewStat(form);
-        vo.setNewCount(toLong(newRow.get("newCount")));
-        vo.setNewMemberCount(toLong(newRow.get("newMemberCount")));
-
-        // ---- 履约状态：全量，不受时间范围影响 ----
-        Map<String, Object> row = physicalDeliveryDao.selectStatusStat();
-        long total = toLong(row.get("totalCount"));
-        long pending = toLong(row.get("pendingCount"));
-        long pendingNoAddress = toLong(row.get("pendingNoAddressCount"));
-        long delivered = toLong(row.get("deliveredCount"));
-        long signed = toLong(row.get("signedCount"));
-        long returned = toLong(row.get("returnedCount"));
-        long cancelled = toLong(row.get("cancelledCount"));
-        long oldestMinutes = toLong(row.get("pendingOldestMinutes"));
+    /**
+     * 履约状态存量：全量，不受时间范围影响。
+     *
+     * <p>待发货拆成两类：收件信息没补全的（想发也发不了，要催用户）和地址齐了等发货的
+     * （运营今天真正能干的活）。实物是三段式履约，status=0 里天然混着这两种，
+     * 不拆开的话「待发货 80 单」会让仓库以为有 80 单可发。
+     */
+    private void fillStatusStock(StatRow row, PhysicalDeliveryStatDTO vo) {
+        long total = row.count("totalCount");
+        long pending = row.count("pendingCount");
+        long pendingNoAddress = row.count("pendingNoAddressCount");
+        long cancelled = row.count("cancelledCount");
 
         vo.setTotalCount(total);
         vo.setPendingCount(pending);
@@ -109,60 +113,67 @@ public class PhysicalDeliveryService {
         // 地址齐了、就等发货的那一部分：这才是运营今天能干的活
         vo.setPendingReadyCount(pending - pendingNoAddress);
         // 没有积压时 SQL 里的 MIN(...) 是 NULL，被 COALESCE 兜成 0；不要解读成「等了 0 分钟」
-        vo.setPendingOldestMinutes(pending == 0 ? 0L : oldestMinutes);
-        vo.setDeliveredCount(delivered);
-        vo.setSignedCount(signed);
-        vo.setReturnedCount(returned);
+        vo.setPendingOldestMinutes(pending == 0 ? 0L : row.count("pendingOldestMinutes"));
+        vo.setDeliveredCount(row.count("deliveredCount"));
+        vo.setSignedCount(row.count("signedCount"));
+        vo.setReturnedCount(row.count("returnedCount"));
         vo.setCancelledCount(cancelled);
         /*
          * 发货率的分母剔掉已作废：那些单子是被主动撤回的（页面「删除」= UPDATE status=-1），
          * 算成「没发出去」会平白拉低发货率，而运营根本没法把它们发出去。
          */
         vo.setValidCount(total - cancelled);
-        vo.setDeliveredRate(rate(delivered + signed, total - cancelled));
+        vo.setDeliveredRate(Rate.share(row.count("deliveredCount") + row.count("signedCount"), total - cancelled));
+    }
 
-        // ---- 来源分布 ----
+    /**
+     * 来源分布：哪条业务线的实物奖压得最多。同样是全量存量。
+     */
+    private List<PhysicalDeliveryStatDTO.SourceStatDTO> sourceStats() {
         List<PhysicalDeliveryStatDTO.SourceStatDTO> sourceList = new ArrayList<>();
-        for (Map<String, Object> stat : physicalDeliveryDao.selectSourceStat()) {
+        for (StatRow stat : StatRow.of(physicalDeliveryDao.selectSourceStat())) {
+            long count = stat.count("deliveryCount");
+            long cancelled = stat.count("cancelledCount");
+
             PhysicalDeliveryStatDTO.SourceStatDTO item = new PhysicalDeliveryStatDTO.SourceStatDTO();
-            long count = toLong(stat.get("deliveryCount"));
-            item.setSourceType(toStr(stat, "sourceType"));
+            item.setSourceType(stat.text("sourceType"));
             item.setDeliveryCount(count);
-            long sourceCancelled = toLong(stat.get("cancelledCount"));
-            item.setPendingCount(toLong(stat.get("pendingCount")));
-            item.setCancelledCount(sourceCancelled);
-            item.setDeliveredRate(rate(toLong(stat.get("shippedCount")), count - sourceCancelled));
+            item.setPendingCount(stat.count("pendingCount"));
+            item.setCancelledCount(cancelled);
+            // 分母同样剔掉已作废，与上面那个总发货率是同一个口径
+            item.setDeliveredRate(Rate.share(stat.count("shippedCount"), count - cancelled));
             sourceList.add(item);
         }
-        vo.setSourceList(sourceList);
+        return sourceList;
+    }
 
-        // ---- 体检 ----
-        List<String> issues = new ArrayList<>();
-        if (pendingNoAddress > 0) {
-            issues.add("有 " + pendingNoAddress + " 单待发货是因为「收件信息还没补全」：实物是三段式履约，"
-                    + "中奖时用户还没填地址，履约单先落、收件信息后补 —— 这批单子想发也发不了，"
-                    + "要去催用户填地址，不是仓库的活。剩下 " + (pending - pendingNoAddress) + " 单是地址齐了等发货的");
-        }
-        if (pending > 0 && oldestMinutes >= MINUTES_PER_DAY) {
-            issues.add("最久的一单待发货已经压了 " + (oldestMinutes / MINUTES_PER_HOUR) + " 小时："
-                    + "履约单不会自己往下走，没人发就一直是待发货，用户那边看到的就是「奖到手了但东西没来」");
-        }
-        long shippedNoLogisticsNo = toLong(row.get("shippedNoLogisticsNo"));
-        if (shippedNoLogisticsNo > 0) {
-            issues.add("有 " + shippedNoLogisticsNo + " 单状态是已发货/已签收却没有物流单号："
-                    + "用户查不到件，客服也查不到，出了纠纷拿不出发货凭证");
-        }
-        long returnedNoLogisticsNo = toLong(row.get("returnedNoLogisticsNo"));
-        if (returnedNoLogisticsNo > 0) {
-            issues.add("有 " + returnedNoLogisticsNo + " 单异常退回却没有物流单号：退回这件事本身无从追溯，"
-                    + "东西到底回没回来只能靠人问");
-        }
-        if (returned > 0) {
-            issues.add("有 " + returned + " 单异常退回：这是终态，不会有任何流程再推进它们，"
-                    + "东西既没到用户手上也没重新发出，需要人工决定是补发还是作废");
-        }
-        vo.setIssueList(issues);
-        return vo;
+    /**
+     * 履约体检：全是「单子卡住了但没人会发现」的情形。
+     */
+    private List<String> checkup(StatRow row) {
+        long pending = row.count("pendingCount");
+        long pendingNoAddress = row.count("pendingNoAddressCount");
+        long oldestMinutes = row.count("pendingOldestMinutes");
+        return new Checkup()
+                .countIf(pendingNoAddress,
+                        "有 {} 单待发货是因为「收件信息还没补全」：实物是三段式履约，"
+                                + "中奖时用户还没填地址，履约单先落、收件信息后补 —— 这批单子想发也发不了，"
+                                + "要去催用户填地址，不是仓库的活。剩下 {} 单是地址齐了等发货的",
+                        pending - pendingNoAddress)
+                .when(pending > 0 && oldestMinutes >= MINUTES_PER_DAY,
+                        "最久的一单待发货已经压了 {} 小时："
+                                + "履约单不会自己往下走，没人发就一直是待发货，用户那边看到的就是「奖到手了但东西没来」",
+                        oldestMinutes / MINUTES_PER_HOUR)
+                .countIf(row.count("shippedNoLogisticsNo"),
+                        "有 {} 单状态是已发货/已签收却没有物流单号："
+                                + "用户查不到件，客服也查不到，出了纠纷拿不出发货凭证")
+                .countIf(row.count("returnedNoLogisticsNo"),
+                        "有 {} 单异常退回却没有物流单号：退回这件事本身无从追溯，"
+                                + "东西到底回没回来只能靠人问")
+                .countIf(row.count("returnedCount"),
+                        "有 {} 单异常退回：这是终态，不会有任何流程再推进它们，"
+                                + "东西既没到用户手上也没重新发出，需要人工决定是补发还是作废")
+                .issues();
     }
 
     /**
@@ -221,176 +232,244 @@ public class PhysicalDeliveryService {
     /**
      * 导入 —— 新增模式：整行新建履约单，等价于批量点「新建」。
      *
-     * <p>全表校验通过才落库（{@code @Transactional} + 先攒后插）：导入是一次操作，
-     * "成功 470 条失败 30 条"这种半截状态没法让人判断该补哪些行，只能整批退回重来。
+     * <p>三段校验全过才落库（{@code @Transactional} + 先攒后插）：导入是一次操作，
+     * 「成功 470 条失败 30 条」这种半截状态没法让人判断该补哪些行，只能整批退回重来。
+     * 三段分别管<b>行内</b>（必填、超长）、<b>行间</b>（文件自查重、账号能不能换成会员号）、
+     * <b>与库内</b>（这单是不是已经存在）—— 一次把三类问题全报出来，运营改一遍就能过。
      */
     @Transactional(rollbackFor = Exception.class)
     public String importAdd(InputStream file) {
-        SonicReadResult<PhysicalDeliveryImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryImportRow.class);
-        if (result.hasError()) {
-            throw new BusinessException("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
-        }
-        if (result.isEmpty()) {
-            throw new BusinessException("数据为空");
-        }
+        List<PhysicalDeliveryImportRow> dataList = readRows(file, PhysicalDeliveryImportRow.class);
+        RowErrors errors = new RowErrors();
 
-        List<PhysicalDeliveryImportRow> dataList = result.data();
-        List<String> errorList = new ArrayList<>();
-        Set<String> fileKeySet = new HashSet<>();
-
-        for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryImportRow row = dataList.get(i);
-            String rowNo = rowLabel(i);
-
-            if (SolvelaStringUtil.isBlank(row.memberName())) {
-                errorList.add(rowNo + "「会员账号」不能为空");
-            }
-            if (SolvelaStringUtil.isBlank(row.sourceBizId())) {
-                errorList.add(rowNo + "「来源单号」不能为空");
-            }
-            if (SolvelaStringUtil.isBlank(row.sourceType())) {
-                errorList.add(rowNo + "「来源类型」不能为空");
-            }
-            // 🔴 收件三项要落进密文列，上限由密文列宽反推（算式见 PiiCipher.cipherTextLength）。
-            //    这里逐行拦，是因为再往下就是 MySQL 非严格模式的<b>静默截断</b> ——
-            //    表现是「导入成功了，但那几行读出来解密失败」，而且那几行救不回来。
-            checkPiiLength(errorList, rowNo, "收件人姓名", row.receiverName(), RECEIVER_NAME_MAX);
-            checkPiiLength(errorList, rowNo, "收件人电话", row.receiverPhone(), RECEIVER_PHONE_MAX);
-            checkPiiLength(errorList, rowNo, "收件详细地址", row.receiverAddress(), RECEIVER_ADDRESS_MAX);
-            // 文件内自查重：同一批里出现两行同键，逐行插入时才炸就说不清是哪两行冲突了
-            if (SolvelaStringUtil.isNotBlank(row.sourceBizId()) && SolvelaStringUtil.isNotBlank(row.sourceType())
-                    && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
-                errorList.add(rowNo + "与文件中其它行的「来源单号 + 来源类型」重复");
-            }
-        }
-
+        checkAddRows(dataList, errors);
         // 账号 -> 会员号：Excel 里运营填的是账号（没人记得住 10 位会员号），
         // 而落库的关联键是 member_id，必须在这里换一次。
-        // 🔴 一次批量查完，不逐行点查：一次导入几百行就是几百次往返。
-        // 🔴 查不到的账号必须逐行报错退回，不能跳过、更不能置空 ——
-        //    换键之前一个拼错的账号会静默生成一张永远查不到主人的履约单，
-        //    这次正好把那个口子一起堵上。
-        Map<String, Long> memberIdMap = memberService.mapMemberIdByNames(
-                dataList.stream().map(PhysicalDeliveryImportRow::memberName).toList());
-        for (int i = 0; i < dataList.size(); i++) {
-            String rowMemberName = dataList.get(i).memberName();
-            if (SolvelaStringUtil.isNotBlank(rowMemberName) && !memberIdMap.containsKey(rowMemberName)) {
-                errorList.add(rowLabel(i) + "「会员账号」" + rowMemberName + " 不存在");
-            }
-        }
+        Map<String, Long> memberIdMap = resolveMemberIds(dataList, errors);
+        checkNotExisting(dataList, errors);
+        errors.throwIfAny();
 
-        // 与库内已有履约单查重：撞唯一键 uk_t_biz_phy_dlv_src 的行，
-        // 说明这单已经存在，该走「回填模式」而不是新增
-        Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
-                .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
-        for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryImportRow row = dataList.get(i);
-            if (SolvelaStringUtil.isNotBlank(row.sourceBizId()) && SolvelaStringUtil.isNotBlank(row.sourceType())
-                    && existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
-                errorList.add(rowLabel(i) + "对应的履约单已存在，请改用「回填物流」模式");
-            }
-        }
-
-        if (!errorList.isEmpty()) {
-            throw new BusinessException(describe(errorList));
-        }
-
-        for (PhysicalDeliveryImportRow row : dataList) {
-            // 逐个 set 而不是 SolvelaBeanUtil.copy：导入表单是 record，访问器叫 memberName() 不叫
-            // getMemberName()，Spring BeanUtils 认 JavaBean getter，拷过去会是一个空对象
-            PhysicalDelivery entity = new PhysicalDelivery();
-            entity.setMemberId(memberIdMap.get(row.memberName()));
-            // 账号同时作为展示快照落库（履约单是单据，记的是「导入当时那个账号」）
-            entity.setMemberName(row.memberName());
-            entity.setSourceBizId(row.sourceBizId());
-            entity.setSourceType(row.sourceType());
-            entity.setReceiverName(row.receiverName());
-            entity.setReceiverPhone(row.receiverPhone());
-            entity.setReceiverAddress(row.receiverAddress());
-            entity.setLogisticsCompany(row.logisticsCompany());
-            entity.setLogisticsNo(row.logisticsNo());
-            entity.setStatus(DeliveryStatusEnum.PENDING);
-            physicalDeliveryDao.insert(entity);
-        }
+        dataList.forEach(row -> physicalDeliveryDao.insert(toEntity(row, memberIdMap.get(row.memberName()))));
         return "成功导入 " + dataList.size() + " 条";
     }
 
     /**
-     * 导入 —— 回填模式：按 (发奖提案ID, 来源类型) 匹配已有履约单，回填物流信息与状态。
+     * 新增模式的行内校验 + 文件内自查重。
+     */
+    private void checkAddRows(List<PhysicalDeliveryImportRow> dataList, RowErrors errors) {
+        Set<String> fileKeySet = new HashSet<>();
+        for (int i = 0; i < dataList.size(); i++) {
+            PhysicalDeliveryImportRow row = dataList.get(i);
+
+            if (SolvelaStringUtil.isBlank(row.memberName())) {
+                errors.add(i, "「会员账号」不能为空");
+            }
+            if (SolvelaStringUtil.isBlank(row.sourceBizId())) {
+                errors.add(i, "「来源单号」不能为空");
+            }
+            if (SolvelaStringUtil.isBlank(row.sourceType())) {
+                errors.add(i, "「来源类型」不能为空");
+            }
+            // 🔴 收件三项要落进密文列，上限由密文列宽反推（算式见 PiiCipher.cipherTextLength）。
+            //    这里逐行拦，是因为再往下就是 MySQL 非严格模式的静默截断 ——
+            //    表现是「导入成功了，但那几行读出来解密失败」，而且那几行救不回来。
+            checkPiiLength(errors, i, "收件人姓名", row.receiverName(), RECEIVER_NAME_MAX);
+            checkPiiLength(errors, i, "收件人电话", row.receiverPhone(), RECEIVER_PHONE_MAX);
+            checkPiiLength(errors, i, "收件详细地址", row.receiverAddress(), RECEIVER_ADDRESS_MAX);
+            // 文件内自查重：同一批里出现两行同键，逐行插入时才炸就说不清是哪两行冲突了
+            if (hasKey(row.sourceBizId(), row.sourceType())
+                    && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errors.add(i, "与文件中其它行的「来源单号 + 来源类型」重复");
+            }
+        }
+    }
+
+    /**
+     * 账号 -> 会员号。
+     *
+     * <p>🔴 一次批量查完，不逐行点查：一次导入几百行就是几百次往返。
+     *
+     * <p>🔴 查不到的账号必须逐行报错退回，不能跳过、更不能置空 ——
+     * 换键之前一个拼错的账号会静默生成一张永远查不到主人的履约单。
+     */
+    private Map<String, Long> resolveMemberIds(List<PhysicalDeliveryImportRow> dataList, RowErrors errors) {
+        Map<String, Long> memberIdMap = memberService.mapMemberIdByNames(
+                dataList.stream().map(PhysicalDeliveryImportRow::memberName).toList());
+        for (int i = 0; i < dataList.size(); i++) {
+            String memberName = dataList.get(i).memberName();
+            if (SolvelaStringUtil.isNotBlank(memberName) && !memberIdMap.containsKey(memberName)) {
+                errors.add(i, "「会员账号」" + memberName + " 不存在");
+            }
+        }
+        return memberIdMap;
+    }
+
+    /**
+     * 与库内已有履约单查重：撞唯一键 uk_t_biz_phy_dlv_src 的行，
+     * 说明这单已经存在，该走「回填模式」而不是新增。
+     */
+    private void checkNotExisting(List<PhysicalDeliveryImportRow> dataList, RowErrors errors) {
+        Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
+                .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
+        for (int i = 0; i < dataList.size(); i++) {
+            PhysicalDeliveryImportRow row = dataList.get(i);
+            if (hasKey(row.sourceBizId(), row.sourceType())
+                    && existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errors.add(i, "对应的履约单已存在，请改用「回填物流」模式");
+            }
+        }
+    }
+
+    /**
+     * 逐个 set 而不是 {@code SolvelaBeanUtil.copy}：导入行模型是 record，访问器叫
+     * {@code memberName()} 不叫 {@code getMemberName()}，Spring BeanUtils 认 JavaBean getter，
+     * 拷过去会是一个空对象 —— 而且不报错。
+     */
+    private PhysicalDelivery toEntity(PhysicalDeliveryImportRow row, Long memberId) {
+        PhysicalDelivery entity = new PhysicalDelivery();
+        entity.setMemberId(memberId);
+        // 账号同时作为展示快照落库（履约单是单据，记的是「导入当时那个账号」）
+        entity.setMemberName(row.memberName());
+        entity.setSourceBizId(row.sourceBizId());
+        entity.setSourceType(row.sourceType());
+        entity.setReceiverName(row.receiverName());
+        entity.setReceiverPhone(row.receiverPhone());
+        entity.setReceiverAddress(row.receiverAddress());
+        entity.setLogisticsCompany(row.logisticsCompany());
+        entity.setLogisticsNo(row.logisticsNo());
+        entity.setStatus(DeliveryStatusEnum.PENDING);
+        return entity;
+    }
+
+    /**
+     * 导入 —— 回填模式：按 (来源单号, 来源类型) 匹配已有履约单，回填物流信息与状态。
      *
      * <p>匹配不到的行报错退回，<b>不新建</b>：履约单是提案发奖时生成的，
      * 凭一张 Excel 凭空造单等于绕过提案与预算，是资损口子。
      */
     @Transactional(rollbackFor = Exception.class)
     public String importShip(InputStream file) {
-        SonicReadResult<PhysicalDeliveryShipImportRow> result = SolvelaExcelUtil.importExcel(file, PhysicalDeliveryShipImportRow.class);
+        List<PhysicalDeliveryShipImportRow> dataList = readRows(file, PhysicalDeliveryShipImportRow.class);
+        RowErrors errors = new RowErrors();
+
+        checkShipRows(dataList, errors);
+        Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
+                .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
+        for (int i = 0; i < dataList.size(); i++) {
+            PhysicalDeliveryShipImportRow row = dataList.get(i);
+            if (hasKey(row.sourceBizId(), row.sourceType())
+                    && !existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errors.add(i, "找不到对应的履约单（来源单号 + 来源类型）");
+            }
+        }
+        errors.throwIfAny();
+
+        for (PhysicalDeliveryShipImportRow row : dataList) {
+            PhysicalDelivery exist = existMap.get(uniqueKey(row.sourceBizId(), row.sourceType()));
+            physicalDeliveryDao.updateById(toShipUpdate(row, exist.getId()));
+        }
+        return "成功回填 " + dataList.size() + " 条";
+    }
+
+    /**
+     * 回填模式的行内校验 + 文件内自查重。
+     */
+    private void checkShipRows(List<PhysicalDeliveryShipImportRow> dataList, RowErrors errors) {
+        Set<String> fileKeySet = new HashSet<>();
+        for (int i = 0; i < dataList.size(); i++) {
+            PhysicalDeliveryShipImportRow row = dataList.get(i);
+
+            if (SolvelaStringUtil.isBlank(row.sourceBizId())) {
+                errors.add(i, "「来源单号」不能为空");
+            }
+            if (SolvelaStringUtil.isBlank(row.sourceType())) {
+                errors.add(i, "「来源类型」不能为空");
+            }
+            if (hasKey(row.sourceBizId(), row.sourceType())
+                    && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
+                errors.add(i, "与文件中其它行的「来源单号 + 来源类型」重复");
+            }
+            // 状态列为空表示「这次不改状态」，只回填单号；填了就必须是合法值（模板里是下拉，正常填不错）
+            if (row.status() != null && DeliveryStatusEnum.resolve(row.status()) == null) {
+                errors.add(i, "「状态」取值非法");
+            }
+            if (SolvelaStringUtil.isBlank(row.logisticsCompany()) && SolvelaStringUtil.isBlank(row.logisticsNo())
+                    && row.status() == null) {
+                errors.add(i, "物流公司、物流单号、状态至少要填一项");
+            }
+        }
+    }
+
+    /**
+     * 回填只带上这次真要改的列：<b>空值一律不覆盖</b>。
+     * 回填表通常只填变动的那几列，null 在这里是「不改」而不是「清空」。
+     */
+    private PhysicalDelivery toShipUpdate(PhysicalDeliveryShipImportRow row, Long id) {
+        PhysicalDelivery update = new PhysicalDelivery();
+        update.setId(id);
+        if (SolvelaStringUtil.isNotBlank(row.logisticsCompany())) {
+            update.setLogisticsCompany(row.logisticsCompany());
+        }
+        if (SolvelaStringUtil.isNotBlank(row.logisticsNo())) {
+            update.setLogisticsNo(row.logisticsNo());
+        }
+        // Excel 行模型刻意保持 Integer（那是文件格式的边界，单元格里是人手填的文本），
+        // 到这里做一次显式转换。合法性已经在上面的校验里保证过，null 表示不改状态。
+        update.setStatus(DeliveryStatusEnum.resolve(row.status()));
+        return update;
+    }
+
+    /**
+     * 读文件并挡掉「压根没法开始校验」的两种情况：解析就失败了、以及一行数据都没有。
+     *
+     * <p>这一步的错误与后面的行校验不是一类：解析失败说明文件格式对不上（多半是拿旧模板填的），
+     * 报出来的是「第几行第几列读不出来」，跟业务规则无关。
+     */
+    private <T> List<T> readRows(InputStream file, Class<T> rowType) {
+        SonicReadResult<T> result = SolvelaExcelUtil.importExcel(file, rowType);
         if (result.hasError()) {
             throw new BusinessException("有 " + result.errors().size() + " 行数据有误：" + result.describeErrors(5));
         }
         if (result.isEmpty()) {
             throw new BusinessException("数据为空");
         }
+        return result.data();
+    }
 
-        List<PhysicalDeliveryShipImportRow> dataList = result.data();
-        List<String> errorList = new ArrayList<>();
-        Set<String> fileKeySet = new HashSet<>();
+    /** 复合键两列都填了才谈得上查重 —— 缺列的行上面已经单独报过错了 */
+    private boolean hasKey(String sourceBizId, String sourceType) {
+        return SolvelaStringUtil.isNotBlank(sourceBizId) && SolvelaStringUtil.isNotBlank(sourceType);
+    }
 
-        for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryShipImportRow row = dataList.get(i);
-            String rowNo = rowLabel(i);
+    /**
+     * 导入过程中攒下来的行级错误。
+     *
+     * <p>攒而不是遇到第一个就抛，是导入这件事的核心体验：一次把问题全报出来，
+     * 运营改一遍就能过；抛第一个的话，五处错就要来回五次。
+     *
+     * <p>行号在这里统一翻译：{@code data()} 的下标 0 对应 Excel 里肉眼可见的第 2 行
+     * （第 1 行是表头）。各处自己拼 {@code "第 " + (i + 2) + " 行"} 的话，
+     * 早晚有一处忘了 +2，而那种错报出来比不报还误导人。
+     */
+    private static final class RowErrors {
 
-            if (SolvelaStringUtil.isBlank(row.sourceBizId())) {
-                errorList.add(rowNo + "「来源单号」不能为空");
-            }
-            if (SolvelaStringUtil.isBlank(row.sourceType())) {
-                errorList.add(rowNo + "「来源类型」不能为空");
-            }
-            if (SolvelaStringUtil.isNotBlank(row.sourceBizId()) && SolvelaStringUtil.isNotBlank(row.sourceType())
-                    && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
-                errorList.add(rowNo + "与文件中其它行的「来源单号 + 来源类型」重复");
-            }
-            // 状态列为空表示"这次不改状态"，只回填单号；填了就必须是合法值（模板里是下拉，正常填不错）
-            if (row.status() != null && DeliveryStatusEnum.resolve(row.status()) == null) {
-                errorList.add(rowNo + "「状态」取值非法");
-            }
-            if (SolvelaStringUtil.isBlank(row.logisticsCompany()) && SolvelaStringUtil.isBlank(row.logisticsNo())
-                    && row.status() == null) {
-                errorList.add(rowNo + "物流公司、物流单号、状态至少要填一项");
-            }
+        /** 一次最多展示几条。全量堆到弹窗里没人读得完，也塞不下 */
+        private static final int DISPLAY_LIMIT = 5;
+
+        private final List<String> messages = new ArrayList<>();
+
+        void add(int index, String message) {
+            messages.add("第 " + (index + 2) + " 行" + message);
         }
 
-        Map<String, PhysicalDelivery> existMap = loadExisting(dataList.stream()
-                .map(r -> new String[]{r.sourceBizId(), r.sourceType()}).toList());
-        for (int i = 0; i < dataList.size(); i++) {
-            PhysicalDeliveryShipImportRow row = dataList.get(i);
-            if (SolvelaStringUtil.isNotBlank(row.sourceBizId()) && SolvelaStringUtil.isNotBlank(row.sourceType())
-                    && !existMap.containsKey(uniqueKey(row.sourceBizId(), row.sourceType()))) {
-                errorList.add(rowLabel(i) + "找不到对应的履约单（来源单号 + 来源类型）");
+        void throwIfAny() {
+            if (messages.isEmpty()) {
+                return;
             }
+            String head = String.join("；", messages.subList(0, Math.min(DISPLAY_LIMIT, messages.size())));
+            throw new BusinessException(messages.size() <= DISPLAY_LIMIT
+                    ? head : head + "……等 " + messages.size() + " 处");
         }
-
-        if (!errorList.isEmpty()) {
-            throw new BusinessException(describe(errorList));
-        }
-
-        for (PhysicalDeliveryShipImportRow row : dataList) {
-            PhysicalDelivery exist = existMap.get(uniqueKey(row.sourceBizId(), row.sourceType()));
-
-            PhysicalDelivery update = new PhysicalDelivery();
-            update.setId(exist.getId());
-            // 空值一律不覆盖：回填表通常只填变动的那几列，null 在这里是"不改"而不是"清空"
-            if (SolvelaStringUtil.isNotBlank(row.logisticsCompany())) {
-                update.setLogisticsCompany(row.logisticsCompany());
-            }
-            if (SolvelaStringUtil.isNotBlank(row.logisticsNo())) {
-                update.setLogisticsNo(row.logisticsNo());
-            }
-            // Excel 行模型刻意保持 Integer（那是文件格式的边界，单元格里是人手填的文本），
-            // 到这里做一次显式转换。合法性已经在上面的校验里保证过，null 表示不改状态。
-            update.setStatus(DeliveryStatusEnum.resolve(row.status()));
-            physicalDeliveryDao.updateById(update);
-        }
-        return "成功回填 " + dataList.size() + " 条";
     }
 
     /**
@@ -475,22 +554,9 @@ public class PhysicalDeliveryService {
         return null;
     }
 
-    private void checkPiiLength(List<String> errorList, String rowNo, String label, String value, int max) {
+    private void checkPiiLength(RowErrors errors, int index, String label, String value, int max) {
         if (value != null && value.length() > max) {
-            errorList.add(rowNo + "「" + label + "」超长（最多 " + max + " 个字，当前 " + value.length() + "）");
+            errors.add(index, "「" + label + "」超长（最多 " + max + " 个字，当前 " + value.length() + "）");
         }
-    }
-
-    /**
-     * data() 里的下标 → Excel 里肉眼可见的行号：0 行是表头，所以第 i 条数据在第 i+2 行。
-     */
-    private String rowLabel(int index) {
-        return "第 " + (index + 2) + " 行";
-    }
-
-    private String describe(List<String> errorList) {
-        int limit = 5;
-        String head = String.join("；", errorList.subList(0, Math.min(limit, errorList.size())));
-        return errorList.size() <= limit ? head : head + "……等 " + errorList.size() + " 处";
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.code.BizErrorCode;
 import solvela.base.domain.PageResult;
+import solvela.base.stat.Checkup;
+import solvela.base.stat.StatRow;
 import solvela.exception.BusinessException;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.enums.PrizeTypeEnum;
@@ -30,9 +32,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import static solvela.ledger.stat.LedgerStatSupport.*;
 
 /**
  * （只抛异常，绝不返回 DTO）
@@ -50,6 +49,11 @@ public class MemberWalletService {
     private final MemberWalletDao memberWalletDao;
     private final MemberAssetTransactionDao memberAssetTransactionDao;
     /**
+     * 钱包页的「本期变动」就是交易明细页的那张表，整段直接调过来 ——
+     * 口径、字段、小数位都只有一份实现
+     */
+    private final MemberAssetTransactionService memberAssetTransactionService;
+    /**
      * 只用来取流水上的<b>账号展示快照</b>。钱包本身只认 member_id，
      * 不需要名字；是流水（单据类）要把「当时那个账号」记下来。
      */
@@ -62,54 +66,56 @@ public class MemberWalletService {
      * 没有历史切片。按 create_time 筛出来的是「今天新开的钱包」，那几个账户的余额加起来
      * 既不是今天发出去的钱、也不是用户现在手上的钱 —— 是一个什么都不回答的数字。
      *
-     * <p>「本期变动」直接调交易明细页的那条 SQL（{@code selectAssetFlowStat}），
-     * 不在钱包这边另写一份：同一个口径两处实现，早晚会漂成两个对不上的数。
+     * <p>「本期变动」直接调交易明细页的那个方法，不在钱包这边另写一份：
+     * 同一个口径两处实现，早晚会漂成两个对不上的数。
      */
     public MemberWalletStatDTO stat(LedgerStatQuery form) {
+        StatRow row = StatRow.of(memberWalletDao.selectStat());
+
         MemberWalletStatDTO vo = new MemberWalletStatDTO();
+        vo.setWalletCount(row.count("walletCount"));
+        vo.setMemberCount(row.count("memberCount"));
+        vo.setFrozenCount(row.count("frozenCount"));
+        vo.setAssetList(assetBalances());
+        vo.setFlowList(memberAssetTransactionService.assetFlows(form));
+        vo.setIssueList(checkup(row));
+        return vo;
+    }
 
-        Map<String, Object> row = memberWalletDao.selectStat();
-        vo.setWalletCount(toLong(row.get("walletCount")));
-        vo.setMemberCount(toLong(row.get("memberCount")));
-        vo.setFrozenCount(toLong(row.get("frozenCount")));
-
-        // ---- 资产存量：余额只在同一资产类型内可加 ----
+    /**
+     * 资产存量：一行一种资产。<b>余额只在同一资产类型内可加</b>，
+     * 所以没有跨类型的合计列 —— 积分与现金加起来的那个数不是钱。
+     */
+    private List<MemberWalletStatDTO.AssetBalanceDTO> assetBalances() {
         List<MemberWalletStatDTO.AssetBalanceDTO> assetList = new ArrayList<>();
-        for (Map<String, Object> stat : memberWalletDao.selectAssetBalanceStat()) {
+        for (StatRow stat : StatRow.of(memberWalletDao.selectAssetBalanceStat())) {
+            long walletCount = stat.count("walletCount");
+            BigDecimal totalBalance = stat.amount("totalBalance");
+
             MemberWalletStatDTO.AssetBalanceDTO item = new MemberWalletStatDTO.AssetBalanceDTO();
-            long walletCount = toLong(stat.get("walletCount"));
-            BigDecimal totalBalance = toDecimal(stat.get("totalBalance"));
-            item.setAssetType(toStr(stat, "assetType"));
+            item.setAssetType(stat.text("assetType"));
             item.setWalletCount(walletCount);
             item.setTotalBalance(totalBalance);
             item.setAvgBalance(walletCount == 0 ? BigDecimal.ZERO
                     : totalBalance.divide(BigDecimal.valueOf(walletCount), 2, RoundingMode.HALF_UP));
-            item.setFrozenBalance(toDecimal(stat.get("frozenBalance")));
+            item.setFrozenBalance(stat.amount("frozenBalance"));
             assetList.add(item);
         }
-        vo.setAssetList(assetList);
+        return assetList;
+    }
 
-        // ---- 本期变动：复用交易明细页的 SQL 与转换 ----
-        List<MemberAssetTransactionStatDTO.AssetFlowDTO> flowList = new ArrayList<>();
-        for (Map<String, Object> stat : memberAssetTransactionDao.selectAssetFlowStat(form)) {
-            flowList.add(MemberAssetTransactionService.toAssetFlow(stat));
-        }
-        vo.setFlowList(flowList);
-
-        // ---- 体检 ----
-        List<String> issues = new ArrayList<>();
-        long negativeBalance = toLong(row.get("negativeBalanceCount"));
-        if (negativeBalance > 0) {
-            issues.add("有 " + negativeBalance + " 个钱包余额是负数：扣减走的是 deductBalanceWithVersion"
-                    + "（条件里带 balance >= amount），正常扣不出负数 —— 出现说明有人绕过钱包服务直接改了库");
-        }
-        long frozenWithBalance = toLong(row.get("frozenWithBalanceCount"));
-        if (frozenWithBalance > 0) {
-            issues.add("有 " + frozenWithBalance + " 个账户被冻结但里面还有余额：钱在账上，"
-                    + "用户既取不出也用不了，冻结久了就是客诉 —— 这个数没人主动查就一直不会有人发现");
-        }
-        vo.setIssueList(issues);
-        return vo;
+    /**
+     * 钱包体检：两条都是「钱在账上但用户拿不到/不该有」的情形。
+     */
+    private List<String> checkup(StatRow row) {
+        return new Checkup()
+                .countIf(row.count("negativeBalanceCount"),
+                        "有 {} 个钱包余额是负数：扣减走的是 deductBalanceWithVersion"
+                                + "（条件里带 balance >= amount），正常扣不出负数 —— 出现说明有人绕过钱包服务直接改了库")
+                .countIf(row.count("frozenWithBalanceCount"),
+                        "有 {} 个账户被冻结但里面还有余额：钱在账上，"
+                                + "用户既取不出也用不了，冻结久了就是客诉 —— 这个数没人主动查就一直不会有人发现")
+                .issues();
     }
 
     /**

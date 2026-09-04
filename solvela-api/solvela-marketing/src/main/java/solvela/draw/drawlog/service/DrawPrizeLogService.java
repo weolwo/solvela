@@ -4,21 +4,19 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import solvela.base.domain.PageResult;
 import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.stat.Rate;
+import solvela.base.stat.StatRow;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 import solvela.draw.drawlog.domain.query.DrawPrizeLogQuery;
 import solvela.draw.drawlog.domain.dto.DrawFunnelDTO;
 import solvela.draw.drawlog.domain.dto.DrawPrizeLogDTO;
 import solvela.prize.PrizeConfig;
-import solvela.prize.prizeconfig.manager.PrizeConfigManager;
+import solvela.prize.prizeconfig.service.PrizeCatalog;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 抽奖流水 Service —— <b>只读</b>。
@@ -43,9 +41,7 @@ import java.util.stream.Collectors;
 public class DrawPrizeLogService {
 
     private final DrawPrizeLogDao drawPrizeLogDao;
-    private final PrizeConfigManager prizeConfigManager;
-
-    private static final int RATE_SCALE = 4;
+    private final PrizeCatalog prizeCatalog;
 
     /**
      * 分页查询
@@ -64,63 +60,65 @@ public class DrawPrizeLogService {
      * 对用户体验的含义完全不同，偏高就说明奖池缺货或兜底失效。
      */
     public DrawFunnelDTO funnel(DrawPrizeLogQuery queryForm) {
-        Map<String, Object> row = drawPrizeLogDao.selectFunnel(queryForm);
+        StatRow row = StatRow.of(drawPrizeLogDao.selectFunnel(queryForm));
+
         DrawFunnelDTO vo = new DrawFunnelDTO();
-        long total = toLong(row.get("totalCount"));
-        long hit = toLong(row.get("hitCount"));
-        long noStock = toLong(row.get("noStockCount"));
-        long members = toLong(row.get("memberCount"));
+        fillOverview(row, vo);
+        vo.setPrizeHitList(prizeHits(queryForm, row.count("hitCount")));
+        return vo;
+    }
+
+    /**
+     * 总量与三个比率。
+     *
+     * <p>四种结局（中奖 / 未中奖 / 库存不足 / 异常）互斥且穷尽，加起来就是总抽奖数 ——
+     * 页面上它们并排显示，对不上就是漏了一种结局没落流水。
+     */
+    private void fillOverview(StatRow row, DrawFunnelDTO vo) {
+        long total = row.count("totalCount");
+        long hit = row.count("hitCount");
+        long noStock = row.count("noStockCount");
+        long members = row.count("memberCount");
 
         vo.setTotalCount(total);
         vo.setHitCount(hit);
-        vo.setMissCount(toLong(row.get("missCount")));
+        vo.setMissCount(row.count("missCount"));
         vo.setNoStockCount(noStock);
-        vo.setErrorCount(toLong(row.get("errorCount")));
+        vo.setErrorCount(row.count("errorCount"));
         vo.setMemberCount(members);
-        vo.setHitRate(rate(hit, total));
-        vo.setNoStockRate(rate(noStock, total));
-        vo.setDrawPerMember(members == 0 ? BigDecimal.ZERO
-                : BigDecimal.valueOf(total).divide(BigDecimal.valueOf(members), 2, RoundingMode.HALF_UP));
+        vo.setHitRate(Rate.share(hit, total));
+        vo.setNoStockRate(Rate.share(noStock, total));
+        vo.setDrawPerMember(Rate.average(total, members));
+    }
 
-        // 奖品名称与单价来自资产大库；奖品可能已被删除，那时只能显示编码
-        List<Map<String, Object>> hits = drawPrizeLogDao.selectPrizeHit(queryForm);
-        List<String> codes = hits.stream().map(h -> String.valueOf(h.get("prizeCode"))).toList();
-        Map<String, PrizeConfig> prizeMap = codes.isEmpty() ? Map.of()
-                : prizeConfigManager.lambdaQuery().in(PrizeConfig::getPrizeCode, codes).list().stream()
-                        .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a));
+    /**
+     * 奖品维度分布：哪个奖发得最多、发出去多少价值。
+     *
+     * @param hitTotal 中奖总数，用作占比分母 —— 这一列回答的是「发出去的奖里它占多少」，
+     *                 分母是中奖数而不是总抽奖数
+     */
+    private List<DrawFunnelDTO.PrizeHitDTO> prizeHits(DrawPrizeLogQuery queryForm, long hitTotal) {
+        List<StatRow> hits = StatRow.of(drawPrizeLogDao.selectPrizeHit(queryForm));
+        Map<String, PrizeConfig> prizeMap = prizeCatalog.mapByCodes(hits.stream().map(h -> h.text("prizeCode")).toList());
 
         List<DrawFunnelDTO.PrizeHitDTO> prizeHitList = new ArrayList<>();
-        for (Map<String, Object> h : hits) {
+        for (StatRow hit : hits) {
+            String code = hit.text("prizeCode");
+            long count = hit.count("hitCount");
+
             DrawFunnelDTO.PrizeHitDTO item = new DrawFunnelDTO.PrizeHitDTO();
-            String code = String.valueOf(h.get("prizeCode"));
-            long count = toLong(h.get("hitCount"));
             item.setPrizeCode(code);
             item.setHitCount(count);
-            // 分母用中奖数而非总抽奖数：这一列回答的是「发出去的奖里它占多少」
-            item.setHitShare(rate(count, hit));
+            item.setHitShare(Rate.share(count, hitTotal));
+            // 奖品可能已被删除，那时只能显示编码
             PrizeConfig prize = prizeMap.get(code);
             if (prize != null) {
                 item.setPrizeName(prize.getPrizeName());
                 item.setPrizeType(prize.getPrizeType());
-                if (prize.getPrizeValue() != null) {
-                    item.setIssuedValue(prize.getPrizeValue().multiply(BigDecimal.valueOf(count))
-                            .setScale(2, RoundingMode.HALF_UP));
-                }
+                item.setIssuedValue(PrizeCatalog.issuedValue(prize, count));
             }
             prizeHitList.add(item);
         }
-        vo.setPrizeHitList(prizeHitList);
-        return vo;
-    }
-
-    private BigDecimal rate(long part, long total) {
-        if (total <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(part).divide(BigDecimal.valueOf(total), RATE_SCALE, RoundingMode.HALF_UP);
-    }
-
-    private long toLong(Object value) {
-        return value == null ? 0L : ((Number) value).longValue();
+        return prizeHitList;
     }
 }
