@@ -25,6 +25,18 @@ import java.lang.reflect.Method;
 import java.util.Objects;
 
 /**
+ * {@link RedisLock} 的实现：在方法外面包一把 Redisson 分布式锁。
+ *
+ * <h3>⚠️ 切点曾经写的是 {@code com.*.annotation.RedisLock}</h3>
+ * 那是包名改成 {@code solvela.*} 之前留下的，<b>它匹配不到任何方法</b> ——
+ * 也就是说这个切面一直没有生效过。当时没被发现是因为全工程还没有任何地方用
+ * {@code @RedisLock}（动账链路自己在 {@code AbstractAssetHandler} 里手写了加锁）。
+ * 但这种失效是<b>静默的</b>：下一个给方法加上注解的人不会收到任何提示，
+ * 只会得到一个没有锁的临界区。切点已订正为注解的真实全限定名。
+ *
+ * <p>加锁必须<b>包在事务外面</b>（{@code @Order(HIGHEST_PRECEDENCE)}）：
+ * 反过来的话锁在事务提交之前就释放了，下一个线程读到的还是旧数据，等于没锁。
+ *
  * @author: blue
  * @date: 2024-06-09
  * @version: 1.0
@@ -42,7 +54,7 @@ public class RedisLockAspect {
 
     private final RedissonClient redissonClient;
 
-    @Around("@annotation(com.*.annotation.RedisLock)")
+    @Around("@annotation(solvela.base.annotation.RedisLock)")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         RedisLock annotation = method.getAnnotation(RedisLock.class);

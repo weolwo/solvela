@@ -100,42 +100,14 @@ public class ProposalRecordService {
     public Long addProposal(ProposalRecordAddCommand req) {
         log.info(">>>> [风控提案域] 收到提案申请，来源: {}, 单号: {}", req.getSourceType(), req.getSourceBizId());
 
-        // 1. 获取底层资产（优惠）配置
-        PromotionConfig config = promotionConfigService.getById(req.getPromotionConfigId());
-        if (config == null || config.getStatus() == EnableStatusEnum.DISABLED) {
-            log.error("【提案阻断】优惠配置不存在或已停用, ID: {}", req.getPromotionConfigId());
-            throw new BusinessException("资产配置异常");
-        }
+        PromotionConfig config = requireEnabledConfig(req.getPromotionConfigId());
+        checkRisk(req, config);
 
-        // ==========================================
-        // 2. 【核心】风控责任链前置校验 (防刷、防超发)
-        // ==========================================
-        RiskContext riskContext = new RiskContext(req, config);
-        RiskResult riskResult = riskChainEngine.execute(riskContext);
-
-        if (!riskResult.isPassed()) {
-            log.warn("【风控拦截】提案未通过安全校验: {}", riskResult.getReason());
-            /*
-             * 落地一条 status=80(风控拦截) 的提案记录，用于合规审计和客诉排查。
-             * ruleCode 必须一起落库：文案是给用户看的、会改，编码才是漏斗聚类的判据
-             * （此前它只进了日志，于是漏斗只能按 remark 自由文本聚类）。
-             */
-            saveProposal(req, config, ProposalStatusEnum.RISK_BLOCKED,
-                    "风控拦截: " + riskResult.getReason(), riskResult.getRuleCode());
-            throw new BusinessException(riskResult.getReason());
-        }
-
-        // ==========================================
-        // 3. 计算提案的初始审批状态
-        // ==========================================
         ProposalStatusEnum targetStatus = calculateInitStatus(req.getAmount(), config);
-
-        // ==========================================
-        // 4. 落地正式提案记录 (依赖 uk_t_prm_prop_tsk_stg 防重)
-        // ==========================================
         ProposalRecord proposal;
         try {
-            // 没被拦截，risk_code 留空 —— 它只在 status=80 时有意义
+            // 没被拦截，risk_code 留空 —— 它只在 status=80 时有意义。
+            // 防重靠 uk_t_prm_prop_tsk_stg
             proposal = saveProposal(req, config, targetStatus, "提案生成成功", null);
         } catch (DuplicateKeyException e) {
             log.warn("【提案防重】该业务单号已存在提案记录，直接忽略: {}", req.getSourceBizId());
@@ -145,18 +117,47 @@ public class ProposalRecordService {
             return null;
         }
 
-        // ==========================================
-        // 5. 【分流】判断是否需要立即加钱
-        // ==========================================
+        // 分流：免审的当场发钱，触发阈值的驻留在审批池，等财务在后台调 approve()
         if (targetStatus == ProposalStatusEnum.PENDING_EXECUTE) {
             log.info("【提案免审】金额未触发审批阈值，提交后立即调起底层资产服务发钱! 提案ID: {}", proposal.getId());
             dispatchAfterCommit(proposal, config);
         } else {
             log.info("【提案挂起】金额触发审批阈值，进入人工审核池。提案ID: {}, 状态: {}", proposal.getId(), targetStatus);
-            // 流程驻留在此，等待财务人员在后台调用 approve() 接口
         }
-
         return proposal.getId();
+    }
+
+    /**
+     * 底层资产（优惠）配置。它同时是预算与审批阈值的载体，缺了它整条链路无从判定。
+     */
+    private PromotionConfig requireEnabledConfig(Long promotionConfigId) {
+        PromotionConfig config = promotionConfigService.getById(promotionConfigId);
+        if (config == null || config.getStatus() == EnableStatusEnum.DISABLED) {
+            log.error("【提案阻断】优惠配置不存在或已停用, ID: {}", promotionConfigId);
+            throw new BusinessException("资产配置异常");
+        }
+        return config;
+    }
+
+    /**
+     * 风控责任链前置校验（防刷、防超发）。
+     *
+     * <p>⚠️ 被拦时<b>先落一条 status=80 的提案记录再抛</b>，那条记录是合规审计与客诉排查的
+     * 唯一证据 —— 本方法所在事务的 {@code noRollbackFor = BusinessException.class}
+     * 就是为了它，见 {@link #addProposal} 的方法注释。
+     *
+     * <p>{@code ruleCode} 必须跟着一起落库：文案是给用户看的、会改，编码才是漏斗聚类的判据。
+     * 此前它只进了日志，于是拦截原因分布只能按 remark 自由文本聚类。
+     */
+    private void checkRisk(ProposalRecordAddCommand req, PromotionConfig config) {
+        RiskResult riskResult = riskChainEngine.execute(new RiskContext(req, config));
+        if (riskResult.isPassed()) {
+            return;
+        }
+        log.warn("【风控拦截】提案未通过安全校验: {}", riskResult.getReason());
+        saveProposal(req, config, ProposalStatusEnum.RISK_BLOCKED,
+                "风控拦截: " + riskResult.getReason(), riskResult.getRuleCode());
+        throw new BusinessException(riskResult.getReason());
     }
 
     /**

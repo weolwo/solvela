@@ -11,10 +11,18 @@ import jakarta.annotation.Resource;
 import java.util.concurrent.TimeUnit;
 
 /**
- * AbstractLockedAssetHandler：是个没感情的保安，只管加锁放行。
- * WalletAssetHandler：是个翻译官（Facade），负责把 Service 的异常翻译成 DispatchOutcome 返回给上一层的分发引擎。
- * MemberWalletService：是个纯粹的数据库协调者，只管开事务和抛异常。
- * MemberWallet (Entity)：是个有血有肉的领域专家，知道自己有没有被冻结，知道自己加完钱是多少。
+ * 所有资产下发策略的加锁骨架。<b>只管加锁与放行，不认识任何一种资产</b>。
+ *
+ * <h3>这一层为什么单独存在</h3>
+ * 动账链路上有四层，各自只知道一件事，谁也不越界：
+ * <ul>
+ *   <li><b>本类</b> —— 拿锁、放行、无论如何都释放。锁的粒度由子类给，它不关心；</li>
+ *   <li><b>各 handler（门面）</b> —— 把 Service 抛的领域异常翻译成引擎认识的
+ *       {@link DispatchOutcome}；</li>
+ *   <li><b>各 Service</b> —— 只管开事务、协调 DAO、抛异常，不知道 DispatchOutcome 是什么；</li>
+ *   <li><b>实体</b> —— 知道自己有没有被冻结、加完钱是多少（充血模型）。</li>
+ * </ul>
+ * 把加锁写进每个 handler 也能跑，但那样「忘了释放锁」和「锁键拼错」就有四份机会发生。
  */
 @Slf4j
 public abstract class AbstractAssetHandler implements IAssetHandler {
