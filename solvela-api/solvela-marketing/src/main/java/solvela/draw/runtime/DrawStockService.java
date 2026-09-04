@@ -8,7 +8,10 @@ import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 抽奖库存 Redis 服务：预热 + Lua 原子预扣（防超发第一道防线）
@@ -87,6 +90,45 @@ public class DrawStockService {
     public Integer getRemainStock(String activityCode, long prizeItemId) {
         Object value = redissonClient.getBucket(DrawCacheKey.stock(activityCode, prizeItemId), StringCodec.INSTANCE).get();
         return value == null ? null : Integer.parseInt(value.toString());
+    }
+
+    /**
+     * 批量取剩余库存，<b>一次往返</b>。
+     *
+     * <p>看板页要给每一行显示 Redis 口径的剩余量。逐行调 {@link #getRemainStock} 的话，
+     * 一页 200 行就是 200 次串行往返 —— 单次 GET 再快，串起来也是几百毫秒，
+     * 而这几百毫秒全花在「把一列显示出来」上。
+     *
+     * <p>用 MGET 而不是 pipeline：MGET 是一条命令、一次 RTT，语义也正好是这里要的
+     * 「一把取回，取不到的那几个当作没有」。
+     *
+     * @return 奖项 id -> 剩余量。<b>key 不存在的奖项不会出现在返回值里</b> ——
+     * 「缓存里没有」与「剩余 0」是两件事，前者说明这个奖项还没预热过
+     */
+    public Map<Long, Integer> getRemainStocks(String activityCode, Collection<Long> prizeItemIds) {
+        if (prizeItemIds == null || prizeItemIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Long> keyToItemId = new LinkedHashMap<>();
+        for (Long itemId : prizeItemIds) {
+            if (itemId != null) {
+                keyToItemId.put(DrawCacheKey.stock(activityCode, itemId), itemId);
+            }
+        }
+        if (keyToItemId.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Object> raw = redissonClient.getBuckets(StringCodec.INSTANCE)
+                .get(keyToItemId.keySet().toArray(new String[0]));
+        Map<Long, Integer> remains = new LinkedHashMap<>();
+        raw.forEach((key, value) -> {
+            Long itemId = keyToItemId.get(key);
+            if (itemId != null && value != null) {
+                remains.put(itemId, Integer.parseInt(value.toString()));
+            }
+        });
+        return remains;
     }
 
     /**

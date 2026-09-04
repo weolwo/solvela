@@ -306,6 +306,10 @@ public class ActivityConfigService {
      * 奖品全量预校验，<b>一条都不能留到插入阶段</b> —— 理由见 {@link #wizardCreate} 的方法注释。
      */
     private void checkPrizes(List<ActivityWizardCreateCommand.WizardPrizeCommand> prizeList) {
+        // 一次问清「这批编码里哪些已被占用」，而不是逐个 exists —— 20 个奖品就是 20 次查询
+        Set<String> takenCodes = prizeConfigService.filterExistingPrizeCodes(
+                prizeList.stream().map(ActivityWizardCreateCommand.WizardPrizeCommand::getPrizeCode).toList());
+
         Set<String> batchCodes = new HashSet<>();
         for (ActivityWizardCreateCommand.WizardPrizeCommand prize : prizeList) {
             if (!SolvelaCodeUtil.isValidBizCode(prize.getPrizeCode())) {
@@ -315,7 +319,7 @@ public class ActivityConfigService {
             if (!batchCodes.add(prize.getPrizeCode())) {
                 throw new BusinessException("本次提交的奖品编码重复：" + prize.getPrizeCode());
             }
-            if (prizeConfigService.existsByPrizeCode(prize.getPrizeCode())) {
+            if (takenCodes.contains(prize.getPrizeCode())) {
                 throw new BusinessException("奖品编码已存在：" + prize.getPrizeCode());
             }
             String matchError = prizeConfigService.checkPromotionConfigMatch(

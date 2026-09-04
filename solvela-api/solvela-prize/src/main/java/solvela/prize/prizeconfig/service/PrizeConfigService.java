@@ -23,9 +23,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 奖品配置表 Service
@@ -240,6 +244,54 @@ public class PrizeConfigService {
                 .eq(PrizeConfig::getActivityCode, activityCode)
                 .eq(PrizeConfig::getPrizeCode, prizeCode)
                 .one();
+    }
+
+    /**
+     * 「活动 + 一批奖品编码」批量查，<b>一次往返</b>。
+     *
+     * <p>给「拿着一整批编码逐个校验」的地方用：向导保存、工作台保存、彩票奖级保存、
+     * 彩票批量派奖。它们改造前都在循环里调 {@link #getByActivityCodeAndPrizeCode} ——
+     * 20 个奖品就是 20 次查询，而这几条路里有一条在运行态。
+     *
+     * @return 奖品编码 -> 配置。查不到的编码不会出现在返回值里，调用方据此报「不存在」
+     */
+    public Map<String, PrizeConfig> mapByActivityCodeAndPrizeCodes(String activityCode, Collection<String> prizeCodes) {
+        List<String> wanted = distinctNonBlank(prizeCodes);
+        if (wanted.isEmpty()) {
+            return Map.of();
+        }
+        return prizeConfigManager.lambdaQuery()
+                .eq(PrizeConfig::getActivityCode, activityCode)
+                .in(PrizeConfig::getPrizeCode, wanted)
+                .list().stream()
+                .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (first, ignored) -> first));
+    }
+
+    /**
+     * 这批编码里<b>已经被占用</b>的那些（全局，不分活动）——
+     * {@link #existsByPrizeCode} 的批量版。
+     */
+    public Set<String> filterExistingPrizeCodes(Collection<String> prizeCodes) {
+        List<String> wanted = distinctNonBlank(prizeCodes);
+        if (wanted.isEmpty()) {
+            return Set.of();
+        }
+        return prizeConfigManager.lambdaQuery()
+                .in(PrizeConfig::getPrizeCode, wanted)
+                .list().stream()
+                .map(PrizeConfig::getPrizeCode)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * null 与空串不能进 in 条件：MyBatis-Plus 会把它们拼成一个永远不匹配的值，
+     * 而调用方要的是「这一条我另有判断」，不是「查不到」
+     */
+    private List<String> distinctNonBlank(Collection<String> codes) {
+        if (codes == null) {
+            return List.of();
+        }
+        return codes.stream().filter(StringUtils::isNotBlank).distinct().toList();
     }
 
     /**

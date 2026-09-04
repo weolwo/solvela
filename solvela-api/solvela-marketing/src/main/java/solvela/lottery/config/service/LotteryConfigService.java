@@ -361,6 +361,11 @@ public class LotteryConfigService {
      * 奖级规则逐条校验。五条里每一条都对应一种「配得下去、开奖时才出事」的形态。
      */
     private void checkRules(List<LotteryWorkbenchRuleCommand> ruleList, LotteryWorkbenchSaveCommand form) {
+        // 本活动资产大库里有哪些，一次查完
+        Map<String, PrizeConfig> known = prizeConfigService.mapByActivityCodeAndPrizeCodes(
+                form.getActivityCode(),
+                ruleList.stream().map(LotteryWorkbenchRuleCommand::getPrizeCode).toList());
+
         Set<Integer> levels = new HashSet<>();
         Set<String> prizeCodes = new HashSet<>();
         for (LotteryWorkbenchRuleCommand rule : ruleList) {
@@ -384,7 +389,7 @@ public class LotteryConfigService {
             if (!prizeCodes.add(rule.getPrizeCode())) {
                 throw new BusinessException("奖品 " + rule.getPrizeCode() + " 被多个奖级重复绑定");
             }
-            if (prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), rule.getPrizeCode()) == null) {
+            if (!known.containsKey(rule.getPrizeCode())) {
                 throw new BusinessException("奖级 " + rule.getPrizeLevel()
                         + " 绑定的奖品不存在于本活动的资产大库：" + rule.getPrizeCode());
             }

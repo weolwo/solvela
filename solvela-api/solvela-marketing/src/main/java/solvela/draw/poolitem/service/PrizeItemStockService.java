@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -94,9 +95,12 @@ public class PrizeItemStockService {
                 .collect(Collectors.groupingBy(PoolPrizeMapping::getPrizeItemId,
                         Collectors.mapping(PoolPrizeMapping::getPoolCode, Collectors.toList())));
 
+        // Redis 剩余量一把取回。逐行取的话一页 200 行就是 200 次串行往返
+        Map<String, Map<Long, Integer>> cachedStocks = loadCachedStocks(items);
+
         List<PrizeItemStockDTO> all = new ArrayList<>();
         for (PrizePoolItem item : items) {
-            all.add(analyseOne(item, prizeMap, activityMap, poolsByItem));
+            all.add(analyseOne(item, prizeMap, activityMap, poolsByItem, cachedStocks));
         }
 
         if (Boolean.TRUE.equals(queryForm.getOnlyIssue())) {
@@ -132,10 +136,11 @@ public class PrizeItemStockService {
      */
     private PrizeItemStockDTO analyseOne(PrizePoolItem item, Map<String, PrizeConfig> prizeMap,
                                         Map<String, ActivityConfig> activityMap,
-                                        Map<Long, List<String>> poolsByItem) {
+                                        Map<Long, List<String>> poolsByItem,
+                                        Map<String, Map<Long, Integer>> cachedStocks) {
         PrizeItemStockDTO vo = fillIdentity(item, activityMap, poolsByItem);
         Integer remainDb = fillStock(item, vo);
-        checkStockDrift(item, vo, remainDb);
+        checkStockDrift(item, vo, remainDb, cachedStocks);
         fillPrize(item, prizeMap, vo, remainDb);
         checkLedger(item, vo, remainDb);
         vo.setWhiteListCount(parseWhiteListCount(item.getWhiteList()));
@@ -169,6 +174,26 @@ public class PrizeItemStockService {
     }
 
     /**
+     * 一次把这一页所有奖项的 Redis 剩余量取回来。
+     *
+     * <p>按活动分组是因为库存 key 带活动编码（{@code DrawCacheKey.stock}）——
+     * 不分组就凑不出正确的 key。一个活动一次 MGET，通常整页也就一两个活动。
+     *
+     * @return 活动编码 -> (奖项 id -> 剩余量)。Redis 里没有的奖项不会出现在里面
+     */
+    private Map<String, Map<Long, Integer>> loadCachedStocks(List<PrizePoolItem> items) {
+        Map<String, List<Long>> itemIdsByActivity = items.stream()
+                .filter(item -> item.getActivityCode() != null)
+                .collect(Collectors.groupingBy(PrizePoolItem::getActivityCode,
+                        Collectors.mapping(PrizePoolItem::getId, Collectors.toList())));
+
+        Map<String, Map<Long, Integer>> stocks = new HashMap<>();
+        itemIdsByActivity.forEach((activityCode, itemIds) ->
+                stocks.put(activityCode, drawStockService.getRemainStocks(activityCode, itemIds)));
+        return stocks;
+    }
+
+    /**
      * DB 口径的剩余量与消耗率。
      *
      * @return DB 剩余量；不限量的奖项没有这个概念，返回 null
@@ -192,8 +217,11 @@ public class PrizeItemStockService {
      * <p>运行态的扣减是双层的：Redis Lua 原子预扣扛并发，DB 条件更新做最终一致性兜底。
      * 真正决定「还能不能抽到」的是 Redis 里的剩余量，{@code used_stock} 只是事后对账用的。
      */
-    private void checkStockDrift(PrizePoolItem item, PrizeItemStockDTO vo, Integer remainDb) {
-        Integer cached = drawStockService.getRemainStock(item.getActivityCode(), item.getId());
+    private void checkStockDrift(PrizePoolItem item, PrizeItemStockDTO vo, Integer remainDb,
+                                 Map<String, Map<Long, Integer>> cachedStocks) {
+        Integer cached = cachedStocks
+                .getOrDefault(item.getActivityCode(), Map.of())
+                .get(item.getId());
         vo.setRemainStockCache(cached);
         if (cached == null || remainDb == null) {
             return;

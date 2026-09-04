@@ -27,9 +27,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -118,7 +121,8 @@ public class DrawPoolAnalysisService {
                              Map<String, List<PoolPrizeMapping>> grouped,
                              Map<Long, PrizePoolItem> itemMap,
                              Map<String, PrizeConfig> prizeMap,
-                             Map<String, ActivityConfig> activityMap) {
+                             Map<String, ActivityConfig> activityMap,
+                             Map<String, Map<Long, Integer>> cachedStocks) {
     }
 
     private Materials loadMaterials(PoolPrizeMappingQuery queryForm) {
@@ -140,7 +144,40 @@ public class DrawPoolAnalysisService {
                 prizeConfigManager.lambdaQuery().list().stream()
                         .collect(Collectors.toMap(PrizeConfig::getPrizeCode, Function.identity(), (a, b) -> a)),
                 activityConfigManager.lambdaQuery().list().stream()
-                        .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a)));
+                        .collect(Collectors.toMap(ActivityConfig::getActivityCode, Function.identity(), (a, b) -> a)),
+                loadCachedStocks(pools, grouped));
+    }
+
+    /**
+     * 一次把这一页会用到的 Redis 剩余量全取回来。
+     *
+     * <p>逐个坑位调 {@code getRemainStock} 的话，一页 10 个池 x 8 个坑位就是 80 次串行往返 ——
+     * 而这一列只是给运营看「Redis 与 DB 对不对得上」。
+     *
+     * <p>库存 key 带活动编码，所以按活动分组各发一次 MGET。孤儿映射（奖池已不存在）
+     * 无从判断活动，它们本来也查不了缓存，直接跳过。
+     *
+     * @return 活动编码 -> (奖项 id -> 剩余量)
+     */
+    private Map<String, Map<Long, Integer>> loadCachedStocks(List<PrizePoolConfig> pools,
+                                                             Map<String, List<PoolPrizeMapping>> grouped) {
+        Map<String, Set<Long>> itemIdsByActivity = new HashMap<>();
+        for (PrizePoolConfig pool : pools) {
+            if (pool.getActivityCode() == null) {
+                continue;
+            }
+            for (PoolPrizeMapping mapping : grouped.getOrDefault(pool.getPoolCode(), List.of())) {
+                if (mapping.getPrizeItemId() != null) {
+                    itemIdsByActivity.computeIfAbsent(pool.getActivityCode(), key -> new LinkedHashSet<>())
+                            .add(mapping.getPrizeItemId());
+                }
+            }
+        }
+
+        Map<String, Map<Long, Integer>> stocks = new HashMap<>();
+        itemIdsByActivity.forEach((activityCode, itemIds) ->
+                stocks.put(activityCode, drawStockService.getRemainStocks(activityCode, itemIds)));
+        return stocks;
     }
 
     /**
@@ -176,12 +213,14 @@ public class DrawPoolAnalysisService {
         for (PrizePoolConfig pool : materials.pools()) {
             all.add(analyseOne(pool.getPoolCode(), pool,
                     materials.grouped().getOrDefault(pool.getPoolCode(), List.of()),
-                    materials.itemMap(), materials.prizeMap(), materials.activityMap()));
+                    materials.itemMap(), materials.prizeMap(), materials.activityMap(),
+                    materials.cachedStocks()));
         }
         for (Map.Entry<String, List<PoolPrizeMapping>> entry : materials.grouped().entrySet()) {
             if (!materials.poolMap().containsKey(entry.getKey())) {
                 all.add(analyseOne(entry.getKey(), null, entry.getValue(),
-                        materials.itemMap(), materials.prizeMap(), materials.activityMap()));
+                        materials.itemMap(), materials.prizeMap(), materials.activityMap(),
+                    materials.cachedStocks()));
             }
         }
         return all;
@@ -217,13 +256,14 @@ public class DrawPoolAnalysisService {
      */
     private DrawPoolAnalysisDTO analyseOne(String poolCode, PrizePoolConfig pool, List<PoolPrizeMapping> mappings,
                                           Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap,
-                                          Map<String, ActivityConfig> activityMap) {
+                                          Map<String, ActivityConfig> activityMap,
+                                          Map<String, Map<Long, Integer>> cachedStocks) {
         DrawPoolAnalysisDTO vo = new DrawPoolAnalysisDTO();
         vo.setPoolCode(poolCode);
         vo.setIssueList(new ArrayList<>());
 
         String activityCode = fillIdentity(poolCode, pool, activityMap, vo);
-        PoolScan scan = scanSlots(mappings, activityCode, itemMap, prizeMap);
+        PoolScan scan = scanSlots(mappings, activityCode, itemMap, prizeMap, cachedStocks);
         scan.fill(vo);
         checkPool(vo, scan);
 
@@ -282,7 +322,8 @@ public class DrawPoolAnalysisService {
     }
 
     private PoolScan scanSlots(List<PoolPrizeMapping> mappings, String activityCode,
-                               Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap) {
+                               Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap,
+                               Map<String, Map<Long, Integer>> cachedStocks) {
         // 坑位顺序 = 概率区间的累加顺序，与引擎 DrawExecuteService 取快照时的排序一致
         List<PoolPrizeMapping> sorted = mappings.stream()
                 .sorted(Comparator.comparing(m -> m.getSortWeight() == null ? Integer.MAX_VALUE : m.getSortWeight()))
@@ -296,7 +337,7 @@ public class DrawPoolAnalysisService {
         int fallbackCount = 0;
 
         for (PoolPrizeMapping mapping : sorted) {
-            SlotScan scanned = scanSlot(mapping, acc, activityCode, itemMap, prizeMap);
+            SlotScan scanned = scanSlot(mapping, acc, activityCode, itemMap, prizeMap, cachedStocks);
             DrawPoolSlotDTO slot = scanned.slot();
             BigDecimal prob = probabilityOf(mapping);
 
@@ -328,7 +369,8 @@ public class DrawPoolAnalysisService {
     }
 
     private SlotScan scanSlot(PoolPrizeMapping mapping, BigDecimal rangeMin, String activityCode,
-                              Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap) {
+                              Map<Long, PrizePoolItem> itemMap, Map<String, PrizeConfig> prizeMap,
+                              Map<String, Map<Long, Integer>> cachedStocks) {
         BigDecimal prob = probabilityOf(mapping);
 
         DrawPoolSlotDTO slot = new DrawPoolSlotDTO();
@@ -351,7 +393,7 @@ public class DrawPoolAnalysisService {
             return new SlotScan(slot, false, BigDecimal.ZERO);
         }
 
-        boolean hasStock = fillStock(slot, item, prob, activityCode);
+        boolean hasStock = fillStock(slot, item, prob, activityCode, cachedStocks);
         BigDecimal expectedCost = fillPrize(slot, item, prizeMap, prob);
         return new SlotScan(slot, hasStock, expectedCost);
     }
@@ -374,7 +416,8 @@ public class DrawPoolAnalysisService {
      *
      * @return 这个坑位现在还能不能发出东西
      */
-    private boolean fillStock(DrawPoolSlotDTO slot, PrizePoolItem item, BigDecimal prob, String activityCode) {
+    private boolean fillStock(DrawPoolSlotDTO slot, PrizePoolItem item, BigDecimal prob, String activityCode,
+                              Map<String, Map<Long, Integer>> cachedStocks) {
         slot.setPrizeCode(item.getPrizeCode());
         slot.setTotalStock(item.getTotalStock());
         slot.setUsedStock(item.getUsedStock());
@@ -394,7 +437,7 @@ public class DrawPoolAnalysisService {
         }
 
         if (activityCode != null) {
-            Integer cached = drawStockService.getRemainStock(activityCode, item.getId());
+            Integer cached = cachedStocks.getOrDefault(activityCode, Map.of()).get(item.getId());
             slot.setRemainStockCache(cached);
             if (cached != null && remainDb != null && cached.intValue() != remainDb.intValue()) {
                 slot.getIssueList().add(HealthIssue.danger("STOCK_DRIFT",

@@ -262,12 +262,17 @@ public class PrizePoolConfigService {
      * @return 提交上来的物资编码集合 —— 后面奖池校验、删除存量、结构锁都要拿它做判断
      */
     private Set<String> checkItems(DrawWorkbenchSaveCommand form) {
+        // 本活动资产大库里有哪些，一次查完 —— 逐个查的话一个池子几十个奖项就是几十次往返
+        Map<String, PrizeConfig> known = prizeConfigService.mapByActivityCodeAndPrizeCodes(
+                form.getActivityCode(),
+                form.getPrizeItemList().stream().map(DrawWorkbenchPoolItemCommand::getPrizeCode).toList());
+
         Set<String> itemCodes = new HashSet<>();
         for (DrawWorkbenchPoolItemCommand item : form.getPrizeItemList()) {
             if (!itemCodes.add(item.getPrizeCode())) {
                 throw new BusinessException("奖品编码重复：" + item.getPrizeCode());
             }
-            if (prizeConfigService.getByActivityCodeAndPrizeCode(form.getActivityCode(), item.getPrizeCode()) == null) {
+            if (!known.containsKey(item.getPrizeCode())) {
                 throw new BusinessException("奖品不存在于本活动的资产大库：" + item.getPrizeCode());
             }
         }

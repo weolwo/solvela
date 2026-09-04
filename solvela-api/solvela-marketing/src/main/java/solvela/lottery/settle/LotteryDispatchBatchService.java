@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 派奖的单批事务单元，单独成 Bean。
@@ -48,11 +49,16 @@ public class LotteryDispatchBatchService {
      */
     @Transactional(rollbackFor = Exception.class)
     public int dispatchBatch(LotteryConfig config, List<LotteryRecord> batch) {
+        // 整批的奖品配置一次查完。改造前是逐条查，一批 500 条就是 500 次往返，
+        // 而这是运行态派奖路径上的循环
+        Map<String, PrizeConfig> prizeMap = prizeConfigService.mapByActivityCodeAndPrizeCodes(
+                config.getActivityCode(),
+                batch.stream().map(LotteryRecord::getPrizeCode).toList());
+
         List<Long> dispatchedIds = new ArrayList<>(batch.size());
         for (LotteryRecord record : batch) {
             // prize_code 是核销时快照进记录的，这里不回查规则表 —— 规则可能已被改动
-            PrizeConfig prize = prizeConfigService.getByActivityCodeAndPrizeCode(
-                    config.getActivityCode(), record.getPrizeCode());
+            PrizeConfig prize = prizeMap.get(record.getPrizeCode());
             if (prize == null) {
                 // 奖品被删：标记为投递失败而不是反复重试，让它在报表里可见
                 log.error("[彩票派奖] 奖品配置不存在，记录 {} 标记为投递失败：activityCode={}, prizeCode={}",
