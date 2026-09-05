@@ -2,6 +2,14 @@ package solvela.activity.runtime;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.stream.Collectors;
+import java.util.Objects;
+import solvela.enums.EnableStatusEnum;
+import solvela.prize.prizeconfig.service.PrizeCatalog;
+import solvela.prize.PrizeConfig;
+import solvela.draw.poolitem.manager.PrizePoolItemManager;
+import solvela.draw.PrizePoolItem;
+import solvela.marketing.api.ActivityPrizeView;
 import solvela.marketing.api.ActivityBriefView;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +48,10 @@ public class ActivityRuntimeService {
 
     private final ActivityDisplayService activityDisplayService;
 
+    private final PrizePoolItemManager prizePoolItemManager;
+
+    private final PrizeCatalog prizeCatalog;
+
     public ActivityRuleView getActivityRule(String activityCode) {
         ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
         if (activity == null) {
@@ -47,7 +59,7 @@ public class ActivityRuntimeService {
         }
         // 展示配置允许没有：活动建出来还没配过展示，详情页该正常打开，只是没有图和副标题
         ActivityDisplay display = activityDisplayService.getByActivityId(activity.getId());
-        return toView(activity, display);
+        return toView(activity, display, prizesOf(activityCode));
     }
 
     /**
@@ -96,13 +108,57 @@ public class ActivityRuntimeService {
     }
 
     /**
+     * 活动的奖品盘面。<b>来源是奖池，不是运营手写的 JSON。</b>
+     *
+     * <h3>🔴 为什么必须从 t_prize_pool_item 取</h3>
+     * 抽奖引擎真正抽的就是这张表。此前 C 端的转盘是从
+     * {@code t_activity_display.extra_config} 里一段手写 JSON 解析的 —— 第二个源，
+     * 两个后果都发生过：没写就是空盘（用户点进活动页什么都没有），
+     * 写了但对不上就是「转出一个奖池里没有的奖」。
+     * <b>展示的奖品必须和会发的奖品同源。</b>
+     *
+     * <h3>顺序按 sort_weight，再按 id 兜底</h3>
+     * 奖池项本身没有排序列，而盘面顺序是运营要控制的东西，所以按奖品配置的
+     * {@code sort_weight} 排。相同权重按 id —— 没有兜底的话，
+     * 每次查询返回的扇区顺序都可能不一样，转盘会「转一次换一个样」。
+     *
+     * <p>奖池项引用了一个<b>已停用或已删除</b>的奖品配置时，那一格直接不出：
+     * 它抽不中（引擎那边同样会跳过），画在盘面上等于骗人。
+     */
+    private List<ActivityPrizeView> prizesOf(String activityCode) {
+        List<PrizePoolItem> items = prizePoolItemManager.lambdaQuery()
+                .eq(PrizePoolItem::getActivityCode, activityCode)
+                .list();
+        if (items.isEmpty()) {
+            return List.of();
+        }
+        Map<String, PrizeConfig> prizes = prizeCatalog.mapByCodes(
+                items.stream().map(PrizePoolItem::getPrizeCode).collect(Collectors.toSet()));
+
+        return items.stream()
+                .map(item -> prizes.get(item.getPrizeCode()))
+                .filter(Objects::nonNull)
+                .filter(prize -> EnableStatusEnum.ENABLED == prize.getStatus())
+                .sorted(Comparator
+                        .comparingInt((PrizeConfig p) -> p.getSortWeight() == null ? 0 : p.getSortWeight())
+                        .thenComparing(PrizeConfig::getId))
+                .map(prize -> new ActivityPrizeView(
+                        prize.getPrizeCode(),
+                        prize.getPrizeName(),
+                        prize.getPrizeType(),
+                        prize.getPrizeLevel() == null ? 0 : prize.getPrizeLevel()))
+                .toList();
+    }
+
+    /**
      * 拼成 C 端的形状。
      *
      * <p>🔴 <b>逐字段拷贝，不要换成 BeanUtil.copy</b>：这里正在做的事是「决定哪些字段可以出公网」，
      * 而反射拷贝的语义是「有同名的就给」。以后谁往 entity 上加一个内部字段，
      * 拷贝版会<b>自动</b>把它下发出去，没有任何提示 —— 这一层的价值恰恰在于它不自动。
      */
-    private static ActivityRuleView toView(ActivityConfig activity, ActivityDisplay display) {
+    private static ActivityRuleView toView(ActivityConfig activity, ActivityDisplay display,
+                                           List<ActivityPrizeView> prizes) {
         return new ActivityRuleView(
                 activity.getActivityCode(),
                 activity.getActivityName(),
@@ -119,6 +175,7 @@ public class ActivityRuntimeService {
                 display == null ? null : display.getShareTitle(),
                 display == null ? null : display.getShareDesc(),
                 display == null ? null : display.getExtraConfig(),
-                display == null ? null : display.getRuleContent());
+                display == null ? null : display.getRuleContent(),
+                prizes);
     }
 }

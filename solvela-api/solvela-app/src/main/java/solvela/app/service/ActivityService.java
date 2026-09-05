@@ -3,6 +3,7 @@ package solvela.app.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import solvela.app.domain.ActivityPrizeItem;
 import solvela.app.domain.ActivityView;
 import solvela.app.domain.DrawRequest;
 import solvela.app.domain.DrawView;
@@ -11,6 +12,7 @@ import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityDrawCmd;
+import solvela.marketing.api.ActivityPrizeView;
 import solvela.marketing.api.ActivityRuleView;
 import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.DrawResultView;
@@ -60,8 +62,28 @@ public class ActivityService {
                 view.subTitle(), view.themeColor(),
                 view.mainImageId(), view.bgImageId(), view.shareImageId(),
                 view.shareTitle(), view.shareDesc(), view.extraConfig(), view.ruleContent(),
+                view.prizes().stream().map(ActivityService::toPrize).toList(),
                 // 用服务端时钟算：客户端自己判等于把判据抄一份到前端，而它算的是客户端的时钟
                 view.joinable(now), view.claimable(now));
+    }
+
+    /**
+     * 奖品 → 转盘的一格。
+     *
+     * <p>🔴 把 {@code prizeType == MARKER} 翻成一个布尔而不是原样下发类型：
+     * 端上不该认识 {@code PrizeTypeEnum} 的取值 —— 那是域里的字典，
+     * 域里加一种奖品类型时，前端的映射表会静默说错话。
+     * 端上只需要回答一个问题：<b>这一格是不是「谢谢参与」</b>。
+     *
+     * <p>{@code featured} 同理：运营配的是 {@code prize_level}（1 最高），
+     * 「要不要描金」是展示决定，在这一层做完。
+     */
+    private static ActivityPrizeItem toPrize(ActivityPrizeView prize) {
+        return new ActivityPrizeItem(
+                prize.prizeCode(),
+                prize.prizeName(),
+                "MARKER".equals(prize.prizeType()),
+                prize.prizeLevel() == 1);
     }
 
     /**

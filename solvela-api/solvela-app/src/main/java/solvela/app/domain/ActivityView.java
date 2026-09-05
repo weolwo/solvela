@@ -33,6 +33,8 @@ import java.time.LocalDateTime;
  * @param shareTitle   分享标题
  * @param shareDesc    分享描述
  * @param extraConfig  扩展配置 JSON 原文
+ * @param prizes       奖品盘面。<b>来源是奖池</b>（抽奖引擎真正抽的那张表），
+ *                     不是运营手写的 extraConfig JSON。非抽奖玩法为空列表
  * @param ruleContent  规则正文
  * @param joinable     此刻能不能参与（服务端时钟算的）
  * @param claimable    此刻能不能领奖
@@ -53,6 +55,7 @@ public record ActivityView(
         String shareDesc,
         String extraConfig,
         String ruleContent,
+        java.util.List<ActivityPrizeItem> prizes,
         boolean joinable,
         boolean claimable) {
 }

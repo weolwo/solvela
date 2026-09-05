@@ -3,6 +3,7 @@ package solvela.marketing.api;
 import solvela.enums.ActivityStatusEnum;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * C 端看到的活动：基础信息 + 时间 + 状态 + 展示配置 + 规则正文。
@@ -52,7 +53,8 @@ public record ActivityRuleView(
         String shareTitle,
         String shareDesc,
         String extraConfig,
-        String ruleContent) {
+        String ruleContent,
+        List<ActivityPrizeView> prizes) {
 
     /**
      * 此刻还能不能<b>参与</b>（抽奖、累计任务进度）。
