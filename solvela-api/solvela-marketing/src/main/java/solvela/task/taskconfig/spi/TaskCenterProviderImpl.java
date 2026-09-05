@@ -54,11 +54,28 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
 
     @Override
     public List<TaskCenterItem> listTasks(String activityCode, Long memberId) {
+        /*
+         * 🔴 判据是「status != 3 已下线」+ 时间窗，<b>不是 status == 2 生效中</b>。
+         *
+         * 这一条必须和运行态（TaskEventService.findSubscribedConfigs）逐字一致 ——
+         * 那边的注释写着「全工程没有任何地方把 status 从 1 改成 2，wizardSubmit
+         * 落的就是 1」。本方法原先判 == ACTIVE，于是任务中心<b>结构性永远为空</b>：
+         * 运营配得再对也不会出现一条，而接口 200、日志干净、一点异常都没有。
+         *
+         * 比空更糟的是<b>两边判据不一致</b>时的样子：运行态判 != 3，所以进度照常在涨，
+         * 而展示判 == 2，所以用户看不见 —— 他在完成一个不存在的任务。
+         * 真要引入「草稿态不展示」，那就得连运行态一起改，否则又会分叉。
+         *
+         * 时间窗这里按 now() 判（运行态按事件发生时间判，那是为了让迟到的事件
+         * 按它发生时的状态算）：没开始和已结束的任务对用户没有意义，
+         * 显示出来只会让他点一个做不了的东西。
+         */
+        LocalDateTime now = LocalDateTime.now();
         List<TaskConfig> tasks = taskConfigManager.lambdaQuery()
                 .eq(TaskConfig::getActivityCode, activityCode)
-                // 只出生效中的：待生效与已下线的任务对用户没有意义，
-                // 显示出来只会让他点一个做不了的东西
-                .eq(TaskConfig::getStatus, TaskConfigStatusEnum.ACTIVE)
+                .ne(TaskConfig::getStatus, TaskConfigStatusEnum.OFFLINE)
+                .and(w -> w.isNull(TaskConfig::getStartTime).or().le(TaskConfig::getStartTime, now))
+                .and(w -> w.isNull(TaskConfig::getEndTime).or().ge(TaskConfig::getEndTime, now))
                 .list();
         if (tasks.isEmpty()) {
             return List.of();
