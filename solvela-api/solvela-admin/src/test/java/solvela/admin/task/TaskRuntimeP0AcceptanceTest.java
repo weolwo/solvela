@@ -171,10 +171,28 @@ class TaskRuntimeP0AcceptanceTest {
                         .orderByAsc(TaskRecordFlow::getId));
     }
 
-    private List<PrizeLog> prizeLogsOf() {
+    /**
+     * <b>本条任务记录</b>发出的奖励，不是这个会员的全部奖励。
+     *
+     * <h3>为什么必须按记录过滤（2026-09-05 修）</h3>
+     * 原来是 {@code WHERE member_id = ?}，也就是把该会员名下<b>所有任务</b>的发奖都数进来。
+     * 而「一个事件推进多个任务」正是 {@link TaskEventService#handle} 返回 {@code List} 的设计 ——
+     * 库里只要还有第二个监听同一事件（如 DAILY_SIGN）的任务配置，它达标时也会发一条奖，
+     * 于是「单档任务应恰好发 1 条」就红了，红的却不是被测的那条链路。
+     *
+     * <p>实测：一次运行里该会员有 6 条记录、跨 4 个配置，其中 cfg=41（本用例的）发了
+     * {@code PP0SCORE01}、cfg=51（另一个 DAILY_SIGN 任务）发了 {@code PWH4JFUDJJ}。
+     * 产品行为是对的，是断言的范围错了。
+     *
+     * <p>过滤靠 {@code external_biz_no} 的前缀：它由
+     * {@link TaskConst#buildSourceBizId(Long, Integer)} 拼成 {@code recordId:stage}，
+     * 所以 {@code recordId + ":%"} 精确圈定一条记录的全部档位。
+     * （{@code 10016:%} 不会误伤 {@code 100161:1} —— 冒号必须紧跟。）
+     */
+    private List<PrizeLog> prizeLogsOf(Long recordId) {
         return jdbcTemplate.query(
                 "SELECT id, member_id, member_name, prize_code, prize_name, external_biz_no, status, fail_reason"
-                        + " FROM t_prize_log WHERE member_id = ? ORDER BY id",
+                        + " FROM t_prize_log WHERE member_id = ? AND external_biz_no LIKE ? ORDER BY id",
                 (rs, i) -> {
                     PrizeLog log = new PrizeLog();
                     log.setId(rs.getLong("id"));
@@ -187,22 +205,22 @@ class TaskRuntimeP0AcceptanceTest {
                     log.setStatus(SolvelaEnumUtil.getEnumByValue(rs.getInt("status"), PrizeDispatchStatusEnum.class));
                     log.setFailReason(rs.getString("fail_reason"));
                     return log;
-                }, memberId);
+                }, memberId, recordId + ":%");
     }
 
     /**
      * 派奖走 {@code @TransactionalEventListener(AFTER_COMMIT)} + 异步线程池，
      * 需要等它落库。轮询而不是固定 sleep，失败时给出的是「等了多久还没有」而不是玄学抖动。
      */
-    private List<PrizeLog> awaitPrizeLogs(int expected) throws InterruptedException {
+    private List<PrizeLog> awaitPrizeLogs(int expected, Long recordId) throws InterruptedException {
         for (int i = 0; i < 60; i++) {
-            List<PrizeLog> logs = prizeLogsOf();
+            List<PrizeLog> logs = prizeLogsOf(recordId);
             if (logs.size() >= expected) {
                 return logs;
             }
             TimeUnit.MILLISECONDS.sleep(250);
         }
-        return prizeLogsOf();
+        return prizeLogsOf(recordId);
     }
 
     // ==================== 判据 1：单档 ====================
@@ -235,7 +253,7 @@ class TaskRuntimeP0AcceptanceTest {
                 "第3次应达标，实际 status=" + record.getStatus());
         assertNotNull(record.getCompleteTime(), "达标时间必须落库（complete_time 没有 ON UPDATE 兜底，要显式写）");
 
-        List<PrizeLog> logs = awaitPrizeLogs(1);
+        List<PrizeLog> logs = awaitPrizeLogs(1, record.getId());
         assertEquals(1, logs.size(), "单档任务应恰好发 1 条奖励，实际 " + logs.size());
         assertEquals(TaskConst.buildSourceBizId(record.getId(), 1), logs.get(0).getExternalBizNo());
 
@@ -243,7 +261,7 @@ class TaskRuntimeP0AcceptanceTest {
         taskEventService.handle(event("DAILY_SIGN", "sign-4", null, DAY_1.plusDays(3)));
         assertEquals(0, new BigDecimal(3).compareTo(recordOf(config.getId()).getCurrentMetric()),
                 "达标后进度不应再涨");
-        assertEquals(1, prizeLogsOf().size(), "第4次事件不能产生第二条发奖记录");
+        assertEquals(1, prizeLogsOf(record.getId()).size(), "第4次事件不能产生第二条发奖记录");
     }
 
     // ==================== 判据 2：阶梯（v1 会空过的那条） ====================
@@ -266,7 +284,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertNotNull(record);
         assertEquals(0, new BigDecimal(5).compareTo(record.getCurrentMetric()));
 
-        List<PrizeLog> logs = awaitPrizeLogs(2);
+        List<PrizeLog> logs = awaitPrizeLogs(2, record.getId());
         assertEquals(2, logs.size(),
                 "阶梯任务必须发出 2 条奖励。只有 1 条 = 第二档被 uk_external_biz 当成重复派发吞掉了"
                         + "（方案 §4.3），实际: " + logs.stream().map(PrizeLog::getExternalBizNo).toList());
@@ -282,7 +300,7 @@ class TaskRuntimeP0AcceptanceTest {
         // 重投：幂等生效，不产生第三条
         taskEventService.handle(event("ORDER_PAID", "order-5", null, DAY_1.plusDays(4)));
         TimeUnit.MILLISECONDS.sleep(500);
-        assertEquals(2, prizeLogsOf().size(), "重投第二档事件后仍应是 2 条");
+        assertEquals(2, prizeLogsOf(record.getId()).size(), "重投第二档事件后仍应是 2 条");
     }
 
     // ==================== 判据 3：事件幂等 ====================
@@ -407,7 +425,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertEquals(0, new BigDecimal("3").compareTo(record.getCurrentMetric()));
         assertTrue(record.getStatus().atLeast(TaskRecordStatusEnum.COMPLETED), "连续3天应达标");
 
-        assertEquals(1, awaitPrizeLogs(1).size());
+        assertEquals(1, awaitPrizeLogs(1, record.getId()).size());
     }
 
     @Test
