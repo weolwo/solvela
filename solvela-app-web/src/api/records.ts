@@ -1,4 +1,4 @@
-import type { Id } from '@/types/contract'
+import { type Id, type Raw, toId } from '@/types/contract'
 
 import { request } from './http'
 
@@ -48,6 +48,11 @@ export interface OrderItem {
   createTime: string
 }
 
+/** 反序列化边界：Long 小值下发为数字，在这里归一成字符串。见 types/contract.ts 的 Raw */
+function normalizeRecord(raw: Raw<RecordItem>): RecordItem {
+  return { ...raw, recordId: toId(raw.recordId) }
+}
+
 /** 兑换记录。走商城，不走 /records —— 它是商城的东西 */
 export function fetchExchangeRecords(): Promise<OrderItem[]> {
   return request<OrderItem[]>({ url: '/mall/order' })
@@ -55,7 +60,7 @@ export function fetchExchangeRecords(): Promise<OrderItem[]> {
 
 /** 优惠记录。底层是提案记录，但「提案」是运营的词，C 端不出现 */
 export function fetchPromoRecords(): Promise<RecordItem[]> {
-  return request<RecordItem[]>({ url: '/records/promo' })
+  return request<Raw<RecordItem>[]>({ url: '/records/promo' }).then((l) => l.map(normalizeRecord))
 }
 
 /**
@@ -66,8 +71,8 @@ export function fetchPromoRecords(): Promise<RecordItem[]> {
  *   而他明明在这个活动里中过奖，只是那条排在第 21 位。
  */
 export function fetchPrizeRecords(activityCode?: string): Promise<RecordItem[]> {
-  return request<RecordItem[]>({
+  return request<Raw<RecordItem>[]>({
     url: '/records/prize',
     params: activityCode === undefined ? {} : { activityCode },
-  })
+  }).then((l) => l.map(normalizeRecord))
 }

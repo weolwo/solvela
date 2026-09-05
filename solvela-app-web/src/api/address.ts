@@ -1,4 +1,4 @@
-import type { Id } from '@/types/contract'
+import { type Id, type Raw, toId } from '@/types/contract'
 
 import { request } from './http'
 
@@ -54,18 +54,23 @@ export function formatAddressLine(address: Address): string {
  * 我的地址，<b>默认那条排最前</b>（兑换页取第 0 条作预选，这个顺序就是「默认」的含义）。
  * 手机号是脱敏值。
  */
+/** 反序列化边界：Long 小值下发为数字，在这里归一成字符串。见 types/contract.ts 的 Raw */
+function normalize(raw: Raw<Address>): Address {
+  return { ...raw, id: toId(raw.id) }
+}
+
 export function fetchAddresses(): Promise<Address[]> {
-  return request<Address[]>({ url: '/address' })
+  return request<Raw<Address>[]>({ url: '/address' }).then((list) => list.map(normalize))
 }
 
 /** 取一条。不存在或不是自己的，后端一律回 404（不给探测者区分信号） */
 export function fetchAddress(addressId: Id): Promise<Address> {
-  return request<Address>({ url: `/address/${addressId}` })
+  return request<Raw<Address>>({ url: `/address/${addressId}` }).then(normalize)
 }
 
 /** 新增。<b>第一条地址自动成为默认</b>，不用再点一次「设为默认」 */
 export function createAddress(input: AddressInput): Promise<Address> {
-  return request<Address>({ url: '/address', method: 'POST', data: input })
+  return request<Raw<Address>>({ url: '/address', method: 'POST', data: input }).then(normalize)
 }
 
 /**
@@ -75,7 +80,9 @@ export function createAddress(input: AddressInput): Promise<Address> {
  * 不该把 `138****8000` 回填给用户改，一提交就把星号存进库了。
  */
 export function updateAddress(addressId: Id, input: AddressInput): Promise<Address> {
-  return request<Address>({ url: `/address/${addressId}`, method: 'PUT', data: input })
+  return request<Raw<Address>>({ url: `/address/${addressId}`, method: 'PUT', data: input }).then(
+    normalize,
+  )
 }
 
 /**

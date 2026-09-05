@@ -1,4 +1,4 @@
-import type { Id } from '@/types/contract'
+import { type Id, type Raw, toId } from '@/types/contract'
 
 import { request } from './http'
 
@@ -53,6 +53,11 @@ export interface TaskItem {
  * 返回全部生效中的任务，没做过的也给：任务中心要回答的是「还有什么可做」。
  * 没有任务型活动时返回空数组，不是 404。
  */
+/** 反序列化边界：Long 小值下发为数字，在这里归一成字符串。见 types/contract.ts 的 Raw */
+function normalize(raw: Raw<TaskItem>): TaskItem {
+  return { ...raw, taskId: toId(raw.taskId) }
+}
+
 export function fetchTasks(): Promise<TaskItem[]> {
-  return request<TaskItem[]>({ url: '/task' })
+  return request<Raw<TaskItem>[]>({ url: '/task' }).then((list) => list.map(normalize))
 }

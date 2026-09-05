@@ -34,6 +34,28 @@ export type DateTimeString = Brand<string, 'DateTimeString'>
 export type DateString = Brand<string, 'DateString'>
 
 /**
+ * 后端<b>原始</b>响应的形状：`Id` 位置实际是 `string | number`。
+ *
+ * 🔴 这不是防御性编程，是契约本身：LongJsonSerializer 对 |v| ≤ 2^53-1 的 Long
+ * 输出 JSON <b>数字</b>，超出才输出字符串。所以一个 `skuId` 在类型上是字符串、
+ * 运行时却是 `6`——而 `6 === '6'` 恒 false。
+ *
+ * 2026-09-05 就是这么炸的：兑换页拿 URL query 里的 `sku`（永远是字符串）
+ * 去和详情里的 `skuId`（数字）比，永远找不到，于是「请先回上一页选择规格」，
+ * 而用户明明选了。TypeScript 一个字都没报，因为它以为两边都是 Id。
+ *
+ * 用法：给 fetch 的返回标 `Raw<T>`，再过一遍 normalize 把 id 收成字符串。
+ * 嵌套的对象/数组字段这个映射管不到，要在 normalize 里手动递归。
+ */
+export type Raw<T> = {
+  [K in keyof T]: T[K] extends Id
+    ? string | number
+    : T[K] extends Id | null
+      ? string | number | null
+      : T[K]
+}
+
+/**
  * 把后端下发的主键归一成 {@link Id}。
  *
  * 接受 number 是因为 LongJsonSerializer 对小值输出数字 —— 这是契约的一部分，不是脏数据。

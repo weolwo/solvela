@@ -1,4 +1,4 @@
-import type { Id, Money } from '@/types/contract'
+import { type Id, type Money, type Raw, toId } from '@/types/contract'
 
 import { request } from './http'
 
@@ -278,9 +278,44 @@ export interface RedeemResult {
  * 读路径已接通真实接口
  * ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ * 反序列化边界
+ *
+ * 🔴 后端的 Long 在 |v| ≤ 2^53-1 时下发的是 JSON **数字**（LongJsonSerializer），
+ * 所以 `skuId` 在类型上是字符串、运行时却是 6。下面这几个函数是唯一的收口处：
+ * 过了这里，往后不再出现 number 型 ID。
+ *
+ * 这不是洁癖。2026-09-05 的现场：兑换页拿 URL query 里的 sku（永远是字符串）
+ * 去和详情里的 skuId（数字）比，`6 === '6'` 恒 false，于是永远提示
+ * 「请先回上一页选择规格」，而用户明明选了。TypeScript 一个字都没报。
+ * ------------------------------------------------------------------ */
+
+function normalizeCategory(raw: Raw<MallCategory>): MallCategory {
+  return { ...raw, id: toId(raw.id), parentId: toId(raw.parentId) }
+}
+
+function normalizeBrief(raw: Raw<CommodityBrief>): CommodityBrief {
+  return { ...raw, commodityId: toId(raw.commodityId), categoryId: toId(raw.categoryId) }
+}
+
+function normalizeSku(raw: Raw<CommoditySku>): CommoditySku {
+  return { ...raw, skuId: toId(raw.skuId) }
+}
+
+/** 详情比列表多一层：skus 是嵌套数组，Raw<T> 的映射管不到，要手动递归 */
+function normalizeDetail(raw: Raw<CommodityDetail>): CommodityDetail {
+  return {
+    ...raw,
+    commodityId: toId(raw.commodityId),
+    categoryId: toId(raw.categoryId),
+    skus: (raw.skus as unknown as Raw<CommoditySku>[]).map(normalizeSku),
+  }
+}
+
 /** 商品分类。只出启用中的，按运营排的顺序。匿名可访问 */
-export function fetchCategories(): Promise<MallCategory[]> {
-  return request<MallCategory[]>({ url: '/mall/category' })
+export async function fetchCategories(): Promise<MallCategory[]> {
+  const list = await request<Raw<MallCategory>[]>({ url: '/mall/category' })
+  return list.map(normalizeCategory)
 }
 
 /** 商品列表的查询条件。字段对齐后端 `MallCommodityPageCmd` 与那条组合索引 */
@@ -306,13 +341,18 @@ export interface CommodityPage {
  * 立刻就是错的（只能搜到当前页）—— 所以关键词与分类要作为参数传下去，
  * 不要拿回来自己 filter。
  */
-export function fetchCommodities(query: CommodityQuery = {}): Promise<CommodityPage> {
-  return request<CommodityPage>({ url: '/mall/commodity', params: query })
+export async function fetchCommodities(query: CommodityQuery = {}): Promise<CommodityPage> {
+  const page = await request<{ list: Raw<CommodityBrief>[]; total: number }>({
+    url: '/mall/commodity',
+    params: query,
+  })
+  return { list: page.list.map(normalizeBrief), total: page.total }
 }
 
 /** 商品详情。不存在或已下架 → 后端回 404，这里抛 ApiError */
-export function fetchCommodityDetail(commodityId: Id): Promise<CommodityDetail> {
-  return request<CommodityDetail>({ url: `/mall/commodity/${commodityId}` })
+export async function fetchCommodityDetail(commodityId: Id): Promise<CommodityDetail> {
+  const raw = await request<Raw<CommodityDetail>>({ url: `/mall/commodity/${commodityId}` })
+  return normalizeDetail(raw)
 }
 
 /**
@@ -321,8 +361,9 @@ export function fetchCommodityDetail(commodityId: Id): Promise<CommodityDetail> 
  * <p>⚠️ <b>已下架的不出现</b>：收藏行还在库里（用户可能还想着它会回来），
  * 但列表不展示一个点不进去的卡片。
  */
-export function fetchFavorites(): Promise<CommodityBrief[]> {
-  return request<CommodityBrief[]>({ url: '/mall/favorite' })
+export async function fetchFavorites(): Promise<CommodityBrief[]> {
+  const list = await request<Raw<CommodityBrief>[]>({ url: '/mall/favorite' })
+  return list.map(normalizeBrief)
 }
 
 /**
