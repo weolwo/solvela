@@ -102,6 +102,20 @@ public interface MallApi {
     @PostExchange("/redeem")
     MallRedeemResult redeem(@RequestBody MallRedeemCmd cmd);
 
+    /**
+     * 我的兑换记录，按下单时间倒序。
+     *
+     * <p>只取 limit 条，<b>不分页</b> —— 与奖品记录、优惠记录同一个判断。
+     * 真要分页时该配一个游标而不是 pageNum：按时间倒序的列表用 offset 分页，
+     * 新数据进来会让第二页重复出现第一页的行。
+     *
+     * <p>🔴 <b>全部状态都出</b>，包括「已取消」和「履约失败」。
+     * 只出成功的等于把「我兑的东西呢」这个问题藏起来 ——
+     * 而那正是用户点进这一页最想知道的事。
+     */
+    @GetExchange("/order")
+    List<MallOrderView> listMyOrders(@RequestParam Long memberId, @RequestParam int limit);
+
     /* ---------------- 收货地址簿 ---------------- */
 
     /**

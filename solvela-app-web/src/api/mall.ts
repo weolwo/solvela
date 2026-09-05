@@ -28,9 +28,12 @@ import { request } from './http'
  * 积分用 `number`，现金用 {@link Money}（十进制字符串，运算走 utils/money）。
  * 混为一谈的代价是「45000.00 积分」这种展示，或者更糟 —— 拿 Decimal 去算一个整数。
  *
- * <h3>为什么没有图</h3>
- * 网关还没暴露文件下载接口。商品只给 `coverFileId`，页面拿不到就画占位块。
- * 分类图标同理（`iconFileId`）—— <b>不是前端映射的图标名</b>，是运营配的一张图。
+ * <h3>图片下发的是 URL，不是 file_id</h3>
+ * 服务端已经把 file_id 批量换成了可直接访问的地址（`coverUrl` / `iconUrl` /
+ * `skuCoverUrl` / `bannerUrls`），端上直接塞进 `<img src>` 即可。
+ *
+ * 🔴 <b>为 null 是正常的</b>，表示这个位置没配图或文件已被删。
+ * 那时画占位块，<b>不要拼一个 URL 去试</b> —— 拼出来的只会是图裂。
  */
 
 /* ------------------------------------------------------------------ *
@@ -49,7 +52,7 @@ export interface MallCategory {
   parentId: Id
   categoryName: string
   /** 分类图标的 file_id。网关还没暴露文件下载，现在恒为 null */
-  iconFileId: string | null
+  iconUrl: string | null
   sort: number
 }
 
@@ -84,7 +87,7 @@ export interface CommodityBrief {
   /** 副标题/一句话卖点 */
   commodityIntro: string | null
   /** 封面图 file_id。现在恒为 null，页面画占位块 */
-  coverFileId: string | null
+  coverUrl: string | null
   payType: PayType
   /** 兑换所需积分。**整数** */
   pointsPrice: number
@@ -119,7 +122,7 @@ export interface CommoditySku {
    */
   skuAttrs: Record<string, string>
   /** 该规格专属图。为空则用商品封面 */
-  skuCoverFileId: string | null
+  skuCoverUrl: string | null
   /** 本规格所需积分。后端已把「继承商品基准价」算好，这里一定有值 */
   pointsPrice: number
   cashPrice: Money
@@ -137,7 +140,7 @@ export interface CommodityDetail extends CommodityBrief {
   /** 兑换须知：券的核销说明、实物的发货时效等。C 端下单页固定展示 */
   exchangeNotice: string | null
   /** 轮播图 file_id 列表。来自 t_file_relation，现在恒为空数组 */
-  bannerFileIds: string[]
+  bannerUrls: string[]
   limitPeriod: LimitPeriod
   /** 周期内单会员限兑件数。0 = 不限制 */
   limitCount: number

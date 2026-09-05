@@ -147,8 +147,16 @@ function categoryInitial(name: string): string {
           :aria-pressed="activeCategory === cat.id"
           @click="selectCategory(cat.id)"
         >
-          <!-- 等文件下载接口通了，这一块换成 <img :src="…iconFileId"> -->
-          <span class="cats__chip cats__chip--text">{{ categoryInitial(cat.categoryName) }}</span>
+          <img
+            v-if="cat.iconUrl !== null"
+            class="cats__chip cats__chip--img"
+            :src="cat.iconUrl"
+            :alt="cat.categoryName"
+            loading="lazy"
+          />
+          <span v-else class="cats__chip cats__chip--text">{{
+            categoryInitial(cat.categoryName)
+          }}</span>
           <span class="cats__label">{{ cat.categoryName }}</span>
         </button>
       </div>
@@ -293,6 +301,11 @@ function categoryInitial(name: string): string {
   transition:
     background-color 0.15s ease,
     color 0.15s ease;
+}
+
+.cats__chip--img {
+  /* 图标是运营配的方图，裁成圆角方块和文字兜底那版对齐 */
+  object-fit: cover;
 }
 
 .cats__chip--text {

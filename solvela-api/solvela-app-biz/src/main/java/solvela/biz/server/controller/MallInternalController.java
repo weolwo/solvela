@@ -11,6 +11,7 @@ import solvela.marketing.api.MallCommodityBriefView;
 import solvela.marketing.api.MallCommodityDetailView;
 import solvela.marketing.api.MallCommodityPageCmd;
 import solvela.marketing.api.MallCommodityPageView;
+import solvela.marketing.api.MallOrderView;
 import solvela.marketing.api.MallRedeemCmd;
 import solvela.marketing.api.MallRedeemResult;
 
@@ -66,6 +67,11 @@ public class MallInternalController implements MallApi {
     @Override
     public MallRedeemResult redeem(MallRedeemCmd cmd) {
         return mallClientFacade.redeem(cmd);
+    }
+
+    @Override
+    public List<MallOrderView> listMyOrders(Long memberId, int limit) {
+        return mallClientFacade.listMyOrders(memberId, limit);
     }
 
     @Override

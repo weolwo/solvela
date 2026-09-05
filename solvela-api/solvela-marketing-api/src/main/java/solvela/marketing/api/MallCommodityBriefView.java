@@ -16,6 +16,8 @@ import java.math.BigDecimal;
  * @param payType        只有 POINTS(1) 与 POINTS_CASH(2)，<b>没有纯现金商品</b>
  * @param originalPrice  划线原价。🔴 <b>这是「值多少钱」，不是「原来要多少积分」</b> ——
  *                       DDL 列注释原文「仅前端展示『价值￥199』，纯积分商品可留 0」
+ * @param coverUrl       封面图的可直接访问 URL，没有图时为 null。
+ *                       🔴 <b>是 URL 不是 file_id</b> —— C 端没有按 id 换 URL 的接口
  * @param favorite       当前会员有没有收藏。<b>未登录时恒 false</b>
  * @param availableStock 各 SKU 可用库存之和。0 表示整个商品已兑完
  */
@@ -26,7 +28,7 @@ public record MallCommodityBriefView(
         String commodityType,
         String commodityName,
         String commodityIntro,
-        Long coverFileId,
+        String coverUrl,
         MallPayTypeEnum payType,
         Integer pointsPrice,
         BigDecimal cashPrice,

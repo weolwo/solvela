@@ -17,9 +17,9 @@ import { toId, toMoney } from '@/types/contract'
  */
 
 export const CATEGORIES: MallCategory[] = [
-  { id: toId('1'), parentId: toId('0'), categoryName: '数码3C', iconFileId: null, sort: 1 },
-  { id: toId('2'), parentId: toId('0'), categoryName: '服饰', iconFileId: null, sort: 2 },
-  { id: toId('5'), parentId: toId('0'), categoryName: '虚拟权益', iconFileId: null, sort: 5 },
+  { id: toId('1'), parentId: toId('0'), categoryName: '数码3C', iconUrl: null, sort: 1 },
+  { id: toId('2'), parentId: toId('0'), categoryName: '服饰', iconUrl: null, sort: 2 },
+  { id: toId('5'), parentId: toId('0'), categoryName: '虚拟权益', iconUrl: null, sort: 5 },
 ]
 
 function brief(
@@ -41,7 +41,7 @@ function brief(
     commodityType: type,
     commodityName: name,
     commodityIntro: null,
-    coverFileId: null,
+    coverUrl: null,
     payType,
     pointsPrice: points,
     cashPrice: toMoney(cash),
@@ -53,7 +53,12 @@ function brief(
 
 /** 7002 是「积分 + 现金」那件，用来验两种对价都写得出来 */
 export const COMMODITIES: CommodityBrief[] = [
-  brief('7001', '样例·Redmi Note 4', '1', 'PHYSICAL', 1, 45000, '0', '1299.00', 12),
+  // 🔴 7001 刻意有图、7002 刻意没图：渲染 <img> 和退回首字占位是两条路，
+  //    都要有断言盯着。这个功能上线前就是「占位块从没变成图」，没人发现
+  {
+    ...brief('7001', '样例·Redmi Note 4', '1', 'PHYSICAL', 1, 45000, '0', '1299.00', 12),
+    coverUrl: 'http://127.0.0.1:1024/support/file/public/mall_commodity/demo.png',
+  },
   brief(
     '7002',
     '样例·Apple Watch Series 6',
@@ -81,7 +86,7 @@ function sku(
     skuId: toId(id),
     skuCode: `DEMOSKU${id}`,
     skuAttrs: attrs,
-    skuCoverFileId: null,
+    skuCoverUrl: null,
     pointsPrice: points,
     cashPrice: toMoney(cash),
     availableStock: stock,
@@ -116,7 +121,7 @@ export function detailOf(commodityId: string): CommodityDetail {
       base.commodityType === 'PHYSICAL'
         ? '兑换成功后 15 个工作日内寄出，节假日顺延。'
         : '兑换后权益实时到账，有效期 90 天。',
-    bannerFileIds: [],
+    bannerUrls: [],
     limitPeriod: 'DAILY',
     limitCount: 2,
     remainingCount: 2,

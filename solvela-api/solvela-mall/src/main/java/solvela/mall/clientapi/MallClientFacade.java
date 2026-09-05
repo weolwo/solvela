@@ -6,10 +6,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.enums.EnableStatusEnum;
+import solvela.base.module.file.service.FileAssetService;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCategory;
 import solvela.mall.MallCommodity;
+import solvela.mall.MallOrder;
 import solvela.mall.MallFavorite;
 import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
@@ -19,6 +21,7 @@ import solvela.mall.category.manager.MallCategoryManager;
 import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.exchangelimit.manager.MallExchangeLimitManager;
 import solvela.mall.favorite.manager.MallFavoriteManager;
+import solvela.mall.order.manager.MallOrderManager;
 import solvela.mall.sku.manager.MallSkuManager;
 import solvela.marketing.api.MallAddressCmd;
 import solvela.marketing.api.MallApi;
@@ -29,6 +32,7 @@ import solvela.marketing.api.MallCommodityDetailView;
 import solvela.marketing.api.MallCommodityPageCmd;
 import solvela.marketing.api.MallCommodityPageView;
 import solvela.marketing.api.MallCommoditySkuView;
+import solvela.marketing.api.MallOrderView;
 import solvela.marketing.api.MallRedeemCmd;
 import solvela.marketing.api.MallRedeemResult;
 
@@ -60,6 +64,11 @@ public class MallClientFacade implements MallApi {
     /** 一页最多给多少。不封顶的话一个 {@code pageSize=100000} 就能把内存打爆 */
     private static final int MAX_PAGE_SIZE = 50;
 
+    /** 兑换记录一次最多回多少条。挡住调用方传一个巨大的 limit 把库拖垮 */
+    private static final int MAX_ORDER_LIMIT = 100;
+
+    private final FileAssetService fileAssetService;
+    private final MallOrderManager mallOrderManager;
     private final MallCategoryManager mallCategoryManager;
     private final MallCommodityManager mallCommodityManager;
     private final MallSkuManager mallSkuManager;
@@ -72,13 +81,16 @@ public class MallClientFacade implements MallApi {
 
     @Override
     public List<MallCategoryView> listCategories() {
-        return mallCategoryManager.lambdaQuery()
+        List<MallCategory> categories = mallCategoryManager.lambdaQuery()
                 .eq(MallCategory::getStatus, EnableStatusEnum.ENABLED)
                 .orderByAsc(MallCategory::getSort)
                 .orderByAsc(MallCategory::getId)
-                .list().stream()
+                .list();
+        Map<Long, String> icons = urlsOf(
+                categories.stream().map(MallCategory::getIconFileId).toList());
+        return categories.stream()
                 .map(c -> new MallCategoryView(c.getId(), c.getParentId(), c.getCategoryName(),
-                        c.getIconFileId(), c.getSort()))
+                        urlFor(icons, c.getIconFileId()), c.getSort()))
                 .toList();
     }
 
@@ -119,8 +131,11 @@ public class MallClientFacade implements MallApi {
         Set<Long> favorites = favoriteIds(cmd.memberId(),
                 list.stream().map(MallCommodity::getId).toList());
 
+        // 封面 URL 一次批量换完 —— 逐行调 urlOf 就是 N+1，而列表页每次进都会打
+        Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
+
         return new MallCommodityPageView(
-                list.stream().map(c -> toBrief(c, stocks, favorites)).toList(),
+                list.stream().map(c -> toBrief(c, stocks, favorites, covers)).toList(),
                 page.getTotal());
     }
 
@@ -162,10 +177,19 @@ public class MallClientFacade implements MallApi {
         int stock = skus.stream().mapToInt(s -> nullToZero(s.getAvailableStock())).sum();
         boolean favorite = !favoriteIds(memberId, List.of(commodityId)).isEmpty();
 
+        /*
+         * 主图和各 SKU 的图一起换 —— 详情页的 SKU 常有十几个，
+         * 一个一个换就是十几次查询，而它们本来可以是一次。
+         */
+        List<Long> imageIds = new java.util.ArrayList<>();
+        imageIds.add(commodity.getCoverFileId());
+        skus.forEach(sku -> imageIds.add(sku.getSkuCoverFileId()));
+        Map<Long, String> images = urlsOf(imageIds);
+
         return new MallCommodityDetailView(
                 commodity.getId(), commodity.getCommodityCode(), commodity.getCategoryId(),
                 commodity.getCommodityType(), commodity.getCommodityName(),
-                commodity.getCommodityIntro(), commodity.getCoverFileId(),
+                commodity.getCommodityIntro(), urlFor(images, commodity.getCoverFileId()),
                 commodity.getPayType(), commodity.getPointsPrice(), commodity.getCashPrice(),
                 commodity.getOriginalPrice(), favorite, stock,
                 // 轮播图走 t_file_relation，等文件引用登记接上后填；现在是空列表
@@ -173,7 +197,7 @@ public class MallClientFacade implements MallApi {
                 commodity.getDetailContent(), commodity.getExchangeNotice(),
                 commodity.getLimitPeriod(), commodity.getLimitCount(),
                 remainingCount(commodity, memberId),
-                skus.stream().map(MallClientFacade::toSkuView).toList());
+                skus.stream().map(sku -> toSkuView(sku, images)).toList());
     }
 
     /**
@@ -227,8 +251,9 @@ public class MallClientFacade implements MallApi {
         // 按收藏时间倒序还原顺序 —— IN 查出来的顺序是不确定的
         Map<Long, MallCommodity> byId = list.stream()
                 .collect(Collectors.toMap(MallCommodity::getId, Function.identity()));
+        Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull)
-                .map(c -> toBrief(c, stocks, favorites))
+                .map(c -> toBrief(c, stocks, favorites, covers))
                 .toList();
     }
 
@@ -266,6 +291,38 @@ public class MallClientFacade implements MallApi {
     @Override
     public MallRedeemResult redeem(MallRedeemCmd cmd) {
         return mallRedeemService.redeem(cmd);
+    }
+
+    /* ---------------- 兑换记录 ---------------- */
+
+    /**
+     * 我的兑换记录。<b>字段全部取订单快照</b>，一次商品表都不查 ——
+     * 那些列当初冗余进订单，就是为了这一页在商品改名改价之后仍然是对的。
+     *
+     * <p>唯一要外查的是封面图 URL（订单存的是 file_id），一次批量换完。
+     */
+    @Override
+    public List<MallOrderView> listMyOrders(Long memberId, int limit) {
+        if (memberId == null) {
+            return List.of();
+        }
+        int size = Math.min(Math.max(limit, 1), MAX_ORDER_LIMIT);
+        List<MallOrder> orders = mallOrderManager.lambdaQuery()
+                .eq(MallOrder::getMemberId, memberId)
+                .orderByDesc(MallOrder::getCreateTime)
+                // 同一秒下的多单按 id 兜底，保证顺序稳定
+                .orderByDesc(MallOrder::getId)
+                .last("LIMIT " + size)
+                .list();
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, String> covers = urlsOf(orders.stream().map(MallOrder::getCoverFileId).toList());
+        return orders.stream().map(o -> new MallOrderView(
+                o.getOrderNo(), o.getCommodityId(), o.getCommodityName(), o.getCommodityType(),
+                urlFor(covers, o.getCoverFileId()), MallSkuAttrs.parse(o.getSkuAttrs()),
+                o.getQuantity(), o.getPayPoints(), o.getPayCash(),
+                o.getStatus(), o.getFailReason(), o.getCreateTime())).toList();
     }
 
     /* ---------------- 地址簿 ---------------- */
@@ -318,6 +375,42 @@ public class MallClientFacade implements MallApi {
                         Collectors.summingInt(s -> nullToZero(s.getAvailableStock()))));
     }
 
+    /**
+     * 一批 file_id 换成可直接访问的 URL。<b>一次批量，不逐个换。</b>
+     *
+     * <p>null 与重复的 id 先滤掉：前者是「这个位置没配图」（合法，端上画占位），
+     * 后者在列表页很常见（同一张兜底图挂在多个商品上）。
+     *
+     * <p>换不出来的 id <b>不会出现在返回的 map 里</b>，于是 {@code map.get(id)}
+     * 给 null，端上照常画占位块。这比返回一个拼出来的 URL 好：
+     * 文件被删了就该没有图，而不是一个 404 的图裂。
+     */
+    private Map<Long, String> urlsOf(Collection<Long> fileIds) {
+        Set<Long> ids = fileIds.stream().filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        return ids.isEmpty() ? Map.of() : fileAssetService.batchUrl(ids);
+    }
+
+    /**
+     * 从「id → URL」里取一个，<b>id 为 null 时直接给 null</b>。
+     *
+     * <h3>🔴 不能写成 map.get(id)</h3>
+     * {@link #urlsOf} 在这批 id 全为 null 时返回 {@code Map.of()}，
+     * 而<b>不可变 map 的 get(null) 会抛 NPE</b> ——
+     * {@code ImmutableCollections.MapN.get} 对空 map 显式做了
+     * {@code Objects.requireNonNull(key)}，非空时也会去调 {@code key.hashCode()}。
+     *
+     * <p>这不是理论风险：分类图标绝大多数没配（{@code icon_file_id} 可空），
+     * 于是「一个分类都没配图标」是最常见的情况，而它会让整个分类接口 500。
+     * 2026-09-05 就是这么炸的。
+     *
+     * <p>用 HashMap 兜住能让 get(null) 不抛，但那是<b>靠实现类的宽容</b>，
+     * 下一个人把 urlsOf 的返回换成不可变 map 就又炸了。在取值这一侧判才是对的。
+     */
+    private static String urlFor(Map<Long, String> urls, Long fileId) {
+        return fileId == null ? null : urls.get(fileId);
+    }
+
     /** 这一批商品里我收藏了哪些。一次 IN 查完，不逐个判 */
     private Set<Long> favoriteIds(Long memberId, Collection<Long> commodityIds) {
         if (memberId == null || commodityIds.isEmpty()) {
@@ -330,10 +423,10 @@ public class MallClientFacade implements MallApi {
     }
 
     private static MallCommodityBriefView toBrief(MallCommodity c, Map<Long, Integer> stocks,
-                                                  Set<Long> favorites) {
+                                                  Set<Long> favorites, Map<Long, String> covers) {
         return new MallCommodityBriefView(
                 c.getId(), c.getCommodityCode(), c.getCategoryId(), c.getCommodityType(),
-                c.getCommodityName(), c.getCommodityIntro(), c.getCoverFileId(),
+                c.getCommodityName(), c.getCommodityIntro(), urlFor(covers, c.getCoverFileId()),
                 c.getPayType(), c.getPointsPrice(), c.getCashPrice(), c.getOriginalPrice(),
                 favorites.contains(c.getId()), stocks.getOrDefault(c.getId(), 0));
     }
@@ -345,9 +438,10 @@ public class MallClientFacade implements MallApi {
      * 用 0 当「未设置」就分不清「没填」和「真免费」了。所以继承逻辑必须在这里做，
      * <b>端上拿到的一定是算好的值</b>。
      */
-    private static MallCommoditySkuView toSkuView(MallSku sku) {
+    private static MallCommoditySkuView toSkuView(MallSku sku, Map<Long, String> images) {
         return new MallCommoditySkuView(
-                sku.getId(), sku.getSkuCode(), MallSkuAttrs.parse(sku.getSkuAttrs()), sku.getSkuCoverFileId(),
+                sku.getId(), sku.getSkuCode(), MallSkuAttrs.parse(sku.getSkuAttrs()),
+                urlFor(images, sku.getSkuCoverFileId()),
                 sku.getSkuPointsPrice(), sku.getSkuCashPrice(),
                 nullToZero(sku.getAvailableStock()));
     }

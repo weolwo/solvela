@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import type { CommodityBrief } from '@/api/mall'
@@ -25,10 +25,13 @@ import { formatCost, formatWorth } from '@/utils/cost'
  * 不存在一个可以算百分比的基准。`original_price` 是「值多少钱」（价值 ¥1,999），
  * 拿它和积分价相除得不到任何有意义的数。
  *
- * <h3>为什么没有图</h3>
- * 网关还没暴露文件下载接口，`coverFileId` 现在恒为 null。
- * 占位块用商品名首字，和 MineView 头像的首字兜底同一套做法 ——
- * 比一个灰方块有辨识度，也不会被误认成图裂了。
+ * <h3>没有图时画首字，不画灰方块</h3>
+ * `coverUrl` 为 null 是正常的（没配图，或文件被删）。占位块用商品名首字，
+ * 和 MineView 头像的首字兜底同一套做法 —— 比一个灰方块有辨识度，
+ * 也不会被误认成图裂了。
+ *
+ * <p>图加载失败时<b>退回同一个占位块</b>：一张裂图比没有图更像 bug，
+ * 而用户对此无能为力。
  */
 
 const props = defineProps<{
@@ -55,14 +58,28 @@ const cost = computed(() =>
 const worth = computed(() => formatWorth(props.commodity.originalPrice))
 
 const soldOut = computed(() => props.commodity.availableStock <= 0)
+
+/*
+ * 图加载失败就退回首字占位。不用 v-if 判 URL 就够了 ——
+ * 服务端给的 URL 指向一个已被删掉的文件时，请求会 404 而 URL 本身非空。
+ */
+const coverBroken = ref(false)
 </script>
 
 <template>
   <article class="card">
     <RouterLink class="card__link" :to="{ name: 'product', params: { id: commodity.commodityId } }">
       <div class="card__media">
-        <!-- 商品图占位。等文件下载接口通了，这一块换成 <img :src="…coverFileId"> -->
-        <span class="card__initial" aria-hidden="true">{{ initial }}</span>
+        <img
+          v-if="commodity.coverUrl !== null && !coverBroken"
+          class="card__img"
+          :src="commodity.coverUrl"
+          :alt="commodity.commodityName"
+          loading="lazy"
+          decoding="async"
+          @error="coverBroken = true"
+        />
+        <span v-else class="card__initial" aria-hidden="true">{{ initial }}</span>
         <span v-if="soldOut" class="card__out">已兑完</span>
       </div>
 
@@ -109,6 +126,14 @@ const soldOut = computed(() => props.commodity.availableStock <= 0)
   outline: 2px solid var(--sv-color-primary);
   outline-offset: -2px;
   border-radius: var(--sv-radius-lg);
+}
+
+.card__img {
+  width: 100%;
+  height: 100%;
+  /* 商品图长宽比不一：cover 让卡片始终是正方形，不被一张竖图撑变形 */
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 .card__media {

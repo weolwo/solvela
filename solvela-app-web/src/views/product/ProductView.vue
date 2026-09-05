@@ -126,6 +126,17 @@ const limitText = computed(() => {
 })
 
 /** 占位块上的字：优先取「样例·」这类前缀之后的首字 */
+/*
+ * 主图：选中 SKU 有自己的图就用它，否则用商品主图。
+ * 「选了红色就该看到红色那张」—— 而多数 SKU 并不单独配图，所以要回退。
+ */
+const heroImage = computed(
+  () => chosenSku.value?.skuCoverUrl ?? detail.data.value?.coverUrl ?? null,
+)
+
+// 图 404 时退回首字占位，理由同 ProductCard
+const heroBroken = ref(false)
+
 const initial = computed(() => {
   const name = detail.data.value?.commodityName ?? ''
   const tail = name.split('·').pop() ?? name
@@ -199,11 +210,19 @@ function goBack(): void {
 
     <template v-else-if="detail.data.value !== null">
       <!--
-        主图区。bannerFileIds 为空时只有一张占位块，不画图集圆点 ——
-        一个滑不动的轮播比没有更糟。等文件下载接口通了换成图集。
+        主图区。这里只画一张：bannerUrls 目前恒为空（轮播图走 t_file_relation，
+        服务端还没接上那张表），而一个滑不动的轮播比没有更糟。
       -->
       <div class="media">
-        <span class="media__initial" aria-hidden="true">{{ initial }}</span>
+        <img
+          v-if="heroImage !== null && !heroBroken"
+          class="media__img"
+          :src="heroImage"
+          :alt="detail.data.value.commodityName"
+          decoding="async"
+          @error="heroBroken = true"
+        />
+        <span v-else class="media__initial" aria-hidden="true">{{ initial }}</span>
         <button
           class="media__fav"
           type="button"
@@ -396,6 +415,13 @@ function goBack(): void {
 }
 
 /* ---- 主图 ---- */
+.media__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .media {
   position: relative;
   display: flex;

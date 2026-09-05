@@ -18,7 +18,7 @@ public record MallCommoditySkuView(
         Long skuId,
         String skuCode,
         Map<String, String> skuAttrs,
-        Long skuCoverFileId,
+        String skuCoverUrl,
         Integer pointsPrice,
         BigDecimal cashPrice,
         Integer availableStock) {

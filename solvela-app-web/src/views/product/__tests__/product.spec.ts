@@ -130,6 +130,35 @@ describe('ProductView', () => {
   it('没有图集时不画滑不动的圆点', async () => {
     const w = await mountDetail()
     expect(w.find('.sv-carousel').exists()).toBe(false)
+  })
+
+  it('🔴 有主图就渲染 <img>，src 直接用服务端给的 URL', async () => {
+    const w = await mountDetail('7001')
+    const img = w.find('.media__img')
+    /*
+     * 这条断言存在的理由：这个功能第一版就是一个永远不变的占位块，
+     * 契约下发的是 file_id 而 C 端没有按 id 换 URL 的接口 ——
+     * 于是商城的图一张都没显示过，而所有测试都是绿的。
+     */
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe(
+      'http://127.0.0.1:1024/support/file/public/mall_commodity/demo.png',
+    )
+    // 有图时不该同时画占位
+    expect(w.find('.media__initial').exists()).toBe(false)
+  })
+
+  it('没配图时退回商品名首字占位，不画图裂', async () => {
+    const w = await mountDetail('7002')
+    expect(w.find('.media__img').exists()).toBe(false)
+    expect(w.find('.media__initial').exists()).toBe(true)
+  })
+
+  it('主图加载失败时退回占位块', async () => {
+    const w = await mountDetail('7001')
+    // URL 非空但文件已被删 —— 浏览器发 404，img 触发 error
+    await w.find('.media__img').trigger('error')
+    expect(w.find('.media__img').exists()).toBe(false)
     expect(w.find('.media__initial').exists()).toBe(true)
   })
 
