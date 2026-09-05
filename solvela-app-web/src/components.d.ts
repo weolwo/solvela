@@ -23,6 +23,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Section: typeof import('./ui/Section.vue')['default']
+    Sheet: typeof import('./ui/Sheet.vue')['default']
     TabBar: typeof import('./ui/TabBar.vue')['default']
   }
 }

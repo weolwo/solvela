@@ -64,6 +64,12 @@ export interface TaskItem {
   rewardText: string | null
   /** 档位，按阈值升序。单档任务也有一条 */
   stages: TaskStage[]
+  /** 规则一句话，如「连续完成 5 次，中断即清零」。<b>由后端拼</b>，前端不认识 taskType */
+  ruleText: string
+  /** 周期：每日 / 每周 / 仅一次 / 不限 */
+  periodText: string
+  /** 截止提示，如「9月30日 23:59」。不限时为 null，不画那一行 */
+  deadlineText: string | null
   /** 「去完成」跳哪。为空表示没有跳转入口（比如「每日登录」，用户已经在里面了） */
   actionUrl: string | null
 }

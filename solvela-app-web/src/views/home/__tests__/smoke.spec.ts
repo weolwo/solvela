@@ -90,6 +90,9 @@ vi.mock('@/api/task', () => ({
           { target: '1', rewardText: '积分188', reached: true },
           { target: '5', rewardText: '红包8', reached: false },
         ],
+        ruleText: '连续完成 5 次，中断即清零',
+        periodText: '不限',
+        deadlineText: '9月30日 23:59',
         actionUrl: null,
       },
       {
@@ -102,6 +105,9 @@ vi.mock('@/api/task', () => ({
         finished: false,
         rewardText: '+20 积分',
         stages: [{ target: '1', rewardText: '+20 积分', reached: false }],
+        ruleText: '完成一次即达标',
+        periodText: '每日',
+        deadlineText: null,
         actionUrl: '/mall',
       },
       {
@@ -114,6 +120,9 @@ vi.mock('@/api/task', () => ({
         finished: true,
         rewardText: '+50 积分',
         stages: [{ target: '1', rewardText: '+50 积分', reached: true }],
+        ruleText: '完成一次即达标',
+        periodText: '仅一次',
+        deadlineText: null,
         actionUrl: null,
       },
       /*
@@ -130,6 +139,9 @@ vi.mock('@/api/task', () => ({
         finished: false,
         rewardText: '+188 积分',
         stages: [{ target: '5', rewardText: '+188 积分', reached: false }],
+        ruleText: '连续完成 5 次，中断即清零',
+        periodText: '每日',
+        deadlineText: null,
         actionUrl: '/signIn',
       },
     ]),
@@ -357,6 +369,43 @@ describe('Tasks', () => {
     const link = w.findComponent({ name: 'RouterLink' })
     // <a href> 对站内路径是整页刷新：白屏一次，内存里的状态全丢
     expect(link.exists()).toBe(true)
+  })
+
+  it('🔴 点任务行打开详情，规则/周期/截止/档位都在里面', async () => {
+    const w = mount(Tasks, { global })
+    await settle()
+
+    // 详情没打开时不该有弹层
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+
+    await w.findAll('.task__open')[0]?.trigger('click')
+    await settle()
+
+    const sheet = document.querySelector('[role="dialog"]')
+    expect(sheet).not.toBeNull()
+    const text = sheet?.textContent ?? ''
+    expect(text).toContain('样例·每日签到')
+    // 规则由后端拼 —— 容错次数这类信息前端拼不出来
+    expect(text).toContain('连续完成 5 次，中断即清零')
+    expect(text).toContain('9月30日 23:59')
+    expect(text).toContain('积分188')
+    expect(text).toContain('红包8')
+    /*
+     * 🔴 详情里也不能出现「领取」：任务达标即自动发奖，
+     * 状态机里没有 CLAIMED。这条断言和列表那条是一对。
+     */
+    expect(text).not.toContain('领取')
+  })
+
+  it('「去完成」是行按钮的兄弟节点，点它不会连带打开详情', async () => {
+    const w = mount(Tasks, { global })
+    await settle()
+    /*
+     * 交互元素套交互元素是无效 HTML，而且点链接会连带触发外层按钮。
+     * ProductCard 当初就是这么踩的（收藏按钮曾套在 RouterLink 里）。
+     */
+    expect(w.find('.task__open .task__go').exists()).toBe(false)
+    expect(w.find('.task__go').exists()).toBe(true)
   })
 
   it('单档任务不画阶梯 —— 它的奖励在右侧那行摘要里', async () => {

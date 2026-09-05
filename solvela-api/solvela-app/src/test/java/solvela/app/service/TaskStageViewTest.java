@@ -8,6 +8,7 @@ import solvela.marketing.api.TaskCenterItem;
 import solvela.marketing.api.TaskStageView;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -75,12 +76,35 @@ class TaskStageViewTest {
     }
 
     @Test
+    @DisplayName("规则与周期直接透传，网关不重拼 —— 字典在域里")
+    void 规则文案透传() {
+        TaskView view = translate(signInTask(BigDecimal.ZERO));
+        assertAll(
+                // 容错次数是连续型独有的关键信息：断一次到底会不会清零，用户要知道
+                () -> assertEquals("连续完成 5 次，中断即清零", view.ruleText()),
+                () -> assertEquals("不限", view.periodText()));
+    }
+
+    @Test
+    @DisplayName("截止时间格式化成人话；不限时给 null，前端就不画那一行")
+    void 截止提示() {
+        assertEquals("9月30日 23:59", translate(signInTask(BigDecimal.ZERO)).deadlineText());
+
+        TaskCenterItem noDeadline = new TaskCenterItem(
+                49L, "每日浏览", "DAILY", BigDecimal.ONE, BigDecimal.ZERO, null,
+                List.of(new TaskStageView(1, BigDecimal.ONE, "积分10", false)),
+                "完成一次即达标", "每日", null, null, null, 90);
+        // null 而不是「长期有效」之类的话：画不画那一行是前端的事
+        assertNull(translate(noDeadline).deadlineText());
+    }
+
+    @Test
     @DisplayName("单档任务照旧给一行摘要，不画阶梯")
     void 单档给摘要() {
         TaskCenterItem item = new TaskCenterItem(
                 49L, "每日浏览", "DAILY", BigDecimal.ONE, BigDecimal.ZERO, null,
                 List.of(new TaskStageView(1, BigDecimal.ONE, "积分10", false)),
-                null, 90);
+                "完成一次即达标", "每日", null, null, null, 90);
         TaskView view = translate(item);
 
         assertAll(
@@ -99,7 +123,8 @@ class TaskStageViewTest {
                 List.of(
                         new TaskStageView(1, one, "积分188", current.compareTo(one) >= 0),
                         new TaskStageView(2, five, "红包8", current.compareTo(five) >= 0)),
-                "/signIn", 60);
+                "连续完成 5 次，中断即清零", "不限", null,
+                LocalDateTime.of(2026, 9, 30, 23, 59), "/signIn", 60);
     }
 
     private static TaskView translate(TaskCenterItem item) {

@@ -172,6 +172,52 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
                 }, Collectors.toList())));
     }
 
+    /**
+     * 规则一句话。<b>由域侧拼，不是前端拼。</b>
+     *
+     * <p>taskType / tolerance 是域里的字典，前端照着拼就是第二份规则表 ——
+     * 域里加一种玩法时它会静默说错话。与「状态文案由后端给」同一条理由。
+     *
+     * <p>用 switch 表达式且<b>不写 default</b>：{@code TaskTypeEnum} 新增取值时
+     * 这里编译不过，而不是悄悄落进一句放之四海皆准的废话。
+     */
+    private static String ruleText(TaskConfig task) {
+        TaskRuleConfig rule = TaskRuleConfig.parse(task.getRuleConfig());
+        BigDecimal target = rule.target();
+        String amount = target == null ? "?" : target.stripTrailingZeros().toPlainString();
+        return switch (rule.taskType()) {
+            case SIMPLE -> "完成一次即达标";
+            case COUNT -> "累计完成 " + amount + " 次";
+            case AMOUNT -> "累计金额满 " + amount;
+            case STREAK -> {
+                int tolerance = rule.tolerance();
+                // 容错次数是连续型独有的关键信息：断一次到底会不会清零，用户要知道
+                yield tolerance <= 0
+                        ? "连续完成 " + amount + " 次，中断即清零"
+                        : "连续完成 " + amount + " 次，最多可断 " + tolerance + " 次";
+            }
+        };
+    }
+
+    /**
+     * 周期。<b>字典在域里</b>（TaskConst.LIMIT_*），前端不该认识这些字符串。
+     *
+     * <p>认不出的取值原样返回而不是编一句话 —— 那是配置里出现了字典外的值，
+     * 显示原文至少让人看得出「这儿不对」。
+     */
+    private static String periodText(String limitType) {
+        if (limitType == null || limitType.isBlank()) {
+            return "不限";
+        }
+        return switch (limitType) {
+            case TaskConst.LIMIT_DAILY -> "每日";
+            case TaskConst.LIMIT_WEEKLY -> "每周";
+            case TaskConst.LIMIT_ONCE -> "仅一次";
+            case TaskConst.LIMIT_UNLIMITED -> "不限";
+            default -> limitType;
+        };
+    }
+
     /** 档位的中间形态：阈值与奖励名在这里定下来，达没达标要等会员进度才知道 */
     private record Stage(int level, BigDecimal target, String rewardText) {
     }
@@ -196,6 +242,10 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
                 // 状态则保留 null：「还没开始」和「进行中 0 次」是两件事
                 record == null ? null : record.getStatus(),
                 stageViews,
+                ruleText(task),
+                periodText(task.getLimitType()),
+                task.getStartTime(),
+                task.getEndTime(),
                 task.getActionUrl(),
                 task.getSortWeight());
     }

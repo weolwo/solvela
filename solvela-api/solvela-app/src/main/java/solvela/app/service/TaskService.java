@@ -10,6 +10,8 @@ import solvela.marketing.api.TaskCenterItem;
 import solvela.marketing.api.TaskStageView;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -22,6 +24,9 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TaskService {
+
+    private static final DateTimeFormatter DEADLINE =
+            DateTimeFormatter.ofPattern("M月d日 HH:mm");
 
     private final ActivityApi activityApi;
 
@@ -50,7 +55,21 @@ public class TaskService {
                 item.status() == TaskRecordStatusEnum.DISPATCHED,
                 summary(item),
                 item.stages().stream().map(TaskService::toStage).toList(),
+                item.ruleText(),
+                item.periodText(),
+                deadline(item.endTime()),
                 item.actionUrl());
+    }
+
+    /**
+     * 截止提示。<b>只说结束时间，不说开始时间</b> ——
+     * 用户看得到这个任务就说明它已经开始了，多一行「9月1日开始」没有任何用处。
+     *
+     * <p>不带年份：C 端任务的窗口以天/周计，写上年份反而更难扫读。
+     * 真有跨年的长期任务时再说 —— 那时该显示的多半也不是这个格式。
+     */
+    private static String deadline(LocalDateTime endTime) {
+        return endTime == null ? null : endTime.format(DEADLINE);
     }
 
     private static TaskStageItem toStage(TaskStageView stage) {

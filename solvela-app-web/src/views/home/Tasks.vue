@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { fetchTasks, type TaskItem, type TaskStage } from '@/api/task'
@@ -101,6 +101,23 @@ function stageLabel(task: TaskItem, stage: TaskStage): string {
   return format(money(stage.target), decimals)
 }
 
+/* ---- 详情 ---- */
+
+/**
+ * 当前展开详情的那个任务。
+ *
+ * 🔴 存的是<b>整条任务</b>而不是 id：详情要显示的东西列表已经全带在手上了
+ *（档位、规则、周期、截止时间），再按 id 去查一次等于让同一份数据有两个源，
+ * 而它们迟早会不一致 —— 列表说 3/5、详情说 2/5，没人知道哪个对。
+ */
+const detail = ref<TaskItem | null>(null)
+const detailOpen = ref(false)
+
+function openDetail(task: TaskItem): void {
+  detail.value = task
+  detailOpen.value = true
+}
+
 /** 有分组的任务排在一起。没有分组的归到「其他」，但只在真的存在分组时才分区 */
 const grouped = computed(() => {
   const list = tasks.data.value ?? []
@@ -138,52 +155,67 @@ const grouped = computed(() => {
 
           <Card>
             <div v-for="task in group.items" :key="task.taskId" class="task">
-              <span class="task__icon" :class="{ 'task__icon--done': task.finished }">
-                <Icon :name="task.finished ? 'check' : 'task'" :size="20" />
-              </span>
+              <!--
+                🔴 只有「图文那半」是按钮，「去完成」是它的兄弟节点，不是子节点。
+                交互元素套交互元素是无效 HTML，而且点链接会连带触发外层按钮 ——
+                ProductCard 当初就是这么踩的（收藏按钮曾经套在 RouterLink 里）。
 
-              <div class="task__main">
-                <p class="task__title">{{ task.taskName }}</p>
+                用 button 而不是给 div 加 @click：后者键盘按不到，
+                读屏也不会说这是个可以按的东西。
+              -->
+              <button
+                class="task__open"
+                type="button"
+                :aria-label="`查看「${task.taskName}」详情`"
+                @click="openDetail(task)"
+              >
+                <span class="task__icon" :class="{ 'task__icon--done': task.finished }">
+                  <Icon :name="task.finished ? 'check' : 'task'" :size="20" />
+                </span>
 
-                <!--
+                <div class="task__main">
+                  <p class="task__title">{{ task.taskName }}</p>
+
+                  <!--
                   阶梯任务：每一档一行，已达标的打勾。
                   单档任务不画这块 —— 它的奖励在右侧那行摘要里，画阶梯是多余的。
                 -->
-                <ul v-if="task.stages.length > 1" class="ladder">
-                  <li
-                    v-for="stage in task.stages"
-                    :key="stage.target"
-                    class="ladder__item"
-                    :class="{ 'ladder__item--reached': stage.reached }"
-                  >
-                    <Icon
-                      class="ladder__mark"
-                      :name="stage.reached ? 'check' : 'star'"
-                      :size="14"
-                    />
-                    <span class="ladder__target">{{ stageLabel(task, stage) }}</span>
-                    <span class="ladder__reward">{{ stage.rewardText }}</span>
-                  </li>
-                </ul>
+                  <ul v-if="task.stages.length > 1" class="ladder">
+                    <li
+                      v-for="stage in task.stages"
+                      :key="stage.target"
+                      class="ladder__item"
+                      :class="{ 'ladder__item--reached': stage.reached }"
+                    >
+                      <Icon
+                        class="ladder__mark"
+                        :name="stage.reached ? 'check' : 'star'"
+                        :size="14"
+                      />
+                      <span class="ladder__target">{{ stageLabel(task, stage) }}</span>
+                      <span class="ladder__reward">{{ stage.rewardText }}</span>
+                    </li>
+                  </ul>
 
-                <div v-if="showsProgress(task)" class="task__progress">
-                  <!--
+                  <div v-if="showsProgress(task)" class="task__progress">
+                    <!--
                     进度条用 role="progressbar" 而不是干画一个 div：读屏用户听到的
                     是「进度 1，最小 0，最大 3」，不是一句什么都没有的空元素。
                   -->
-                  <div
-                    class="task__track"
-                    role="progressbar"
-                    :aria-valuenow="Number(task.current)"
-                    aria-valuemin="0"
-                    :aria-valuemax="Number(task.target)"
-                  >
-                    <span class="task__fill" :style="{ width: `${progressPercent(task)}%` }" />
+                    <div
+                      class="task__track"
+                      role="progressbar"
+                      :aria-valuenow="Number(task.current)"
+                      aria-valuemin="0"
+                      :aria-valuemax="Number(task.target)"
+                    >
+                      <span class="task__fill" :style="{ width: `${progressPercent(task)}%` }" />
+                    </div>
+                    <span class="task__count">{{ progressText(task) }}</span>
                   </div>
-                  <span class="task__count">{{ progressText(task) }}</span>
+                  <p v-else class="task__status">{{ task.statusText }}</p>
                 </div>
-                <p v-else class="task__status">{{ task.statusText }}</p>
-              </div>
+              </button>
 
               <div class="task__side">
                 <span v-if="task.rewardText !== null" class="task__reward">
@@ -220,10 +252,111 @@ const grouped = computed(() => {
         </div>
       </div>
     </Section>
+
+    <!--
+      任务详情。内容全部来自列表已经拿到的那条数据 —— 不再发一次请求，
+      也就不存在「列表说 3/5、详情说 2/5」这种两个源不一致的情况。
+    -->
+    <Sheet v-model="detailOpen" :title="detail?.taskName ?? '任务详情'">
+      <template v-if="detail !== null">
+        <dl class="meta">
+          <div class="meta__row">
+            <dt class="meta__key">规则</dt>
+            <dd class="meta__val">{{ detail.ruleText }}</dd>
+          </div>
+          <div class="meta__row">
+            <dt class="meta__key">周期</dt>
+            <dd class="meta__val">{{ detail.periodText }}</dd>
+          </div>
+          <div class="meta__row">
+            <dt class="meta__key">进度</dt>
+            <dd class="meta__val">{{ progressText(detail) }} · {{ detail.statusText }}</dd>
+          </div>
+          <!-- 不限时不画这一行，而不是写一句「长期有效」占位 -->
+          <div v-if="detail.deadlineText !== null" class="meta__row">
+            <dt class="meta__key">截止</dt>
+            <dd class="meta__val">{{ detail.deadlineText }}</dd>
+          </div>
+        </dl>
+
+        <h3 class="detail__subtitle">奖励</h3>
+        <ul class="ladder ladder--detail">
+          <li
+            v-for="stage in detail.stages"
+            :key="stage.target"
+            class="ladder__item"
+            :class="{ 'ladder__item--reached': stage.reached }"
+          >
+            <Icon class="ladder__mark" :name="stage.reached ? 'check' : 'star'" :size="14" />
+            <span class="ladder__target">{{ stageLabel(detail, stage) }}</span>
+            <span class="ladder__reward">{{ stage.rewardText }}</span>
+            <span v-if="stage.reached" class="ladder__got">已达标</span>
+          </li>
+        </ul>
+
+        <!--
+          🔴 这里没有「领取」：达标即自动发奖。说明这一点比留白好 ——
+          用户看到「已达标」却找不到领取入口，第一反应是自己漏了一步。
+        -->
+        <p class="detail__note">达标后奖励自动发放，可在「我的 → 优惠记录」查看。</p>
+      </template>
+    </Sheet>
   </div>
 </template>
 
 <style scoped>
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 18px;
+}
+
+.meta__row {
+  display: flex;
+  gap: 12px;
+}
+
+.meta__key {
+  flex: none;
+  width: 44px;
+  font-size: 13px;
+  color: var(--sv-text-tertiary);
+}
+
+.meta__val {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sv-text-primary);
+}
+
+.detail__subtitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sv-text-secondary);
+}
+
+.ladder--detail .ladder__item {
+  font-size: 13px;
+}
+
+.ladder__got {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.detail__note {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sv-text-secondary);
+  background: var(--sv-bg-fill);
+  border-radius: var(--sv-radius-sm);
+}
+
 .ladder {
   display: flex;
   flex-direction: column;
@@ -286,6 +419,22 @@ const grouped = computed(() => {
   align-items: flex-start;
   gap: var(--sv-space-md);
   padding: var(--sv-space-md);
+}
+
+.task__open {
+  /* 按钮要长得和原来那半行一模一样 —— 它是「行」，不是「一个按钮」 */
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 12px;
+  align-items: center;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .task__icon {

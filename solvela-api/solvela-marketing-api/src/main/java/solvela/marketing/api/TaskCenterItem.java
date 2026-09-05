@@ -3,6 +3,7 @@ package solvela.marketing.api;
 import solvela.enums.TaskRecordStatusEnum;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.List;
 
@@ -36,6 +37,12 @@ import java.util.List;
  *                     旧版把它压成一个 rewardText（各档奖励名用「/」拼起来），
  *                     用户看不出哪个奖对应哪一档，也看不出自己已经拿到了第一档。
  *                     <p>无档位任务也有一条，前端渲染成和以前一样的单行奖励
+ * @param ruleText     规则一句话，如「连续完成 5 次，中断即清零」。<b>由域侧拼</b> ——
+ *                     taskType / tolerance 是域里的字典，前端照着拼就是第二份规则表，
+ *                     域里加一种玩法时它会静默说错话
+ * @param periodText   周期，如「每日」「每周」「仅一次」「不限」。同样由域侧拼
+ * @param startTime    任务自身的起止时间，<b>为 null 表示不限</b>。
+ * @param endTime      详情页要显示「什么时候截止」—— 这是用户决定现在做不做的依据
  * @param actionUrl    「去完成」跳哪，运营配的。为空表示这个任务没有跳转入口
  *                     （比如「每日登录」，用户已经在里面了）
  * @param sortWeight   排序权重，由运营配。<b>调用方按它排，不要自己发明顺序</b>
@@ -48,6 +55,10 @@ public record TaskCenterItem(
         BigDecimal current,
         TaskRecordStatusEnum status,
         List<TaskStageView> stages,
+        String ruleText,
+        String periodText,
+        LocalDateTime startTime,
+        LocalDateTime endTime,
         String actionUrl,
         Integer sortWeight) {
 }
