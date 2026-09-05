@@ -1,5 +1,10 @@
 package solvela.activity.runtime;
 
+import solvela.marketing.api.ActivityBriefView;
+import solvela.enums.ActivityTypeEnum;
+import solvela.activity.spi.TaskCenterProvider;
+import solvela.marketing.api.TaskCenterItem;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -71,9 +76,55 @@ public class ActivityFacade implements ActivityApi {
      */
     private final ObjectProvider<ActivityPlayMountProvider> playMountProviders;
 
+    /**
+     * 任务中心的 SPI 实现。用 {@code ObjectProvider} 注入而不是 Map ——
+     * 见 {@code ActivityRefProvider} 注释里那三次「枚举键 Map 静默失效」的教训。
+     */
+    private final ObjectProvider<TaskCenterProvider> taskCenterProviders;
+
     @Override
     public ActivityRuleView getActivityRule(String activityCode) {
         return activityRuntimeService.getActivityRule(activityCode);
+    }
+
+    @Override
+    public List<ActivityBriefView> listOpenActivities() {
+        return activityRuntimeService.listOpenActivities();
+    }
+
+    /**
+     * 我的全部任务：遍历当前可见的任务型活动，把各自的任务合成一份。
+     *
+     * <p>循环发生在<b>本进程内</b>：每个活动的任务查询本身是批量的（见
+     * {@code TaskCenterProviderImpl}），而任务型活动通常只有个位数。
+     * 让网关去循环调单活动接口才是真正的 N+1 —— 那是跨进程的。
+     */
+    @Override
+    public List<TaskCenterItem> getMyTasks(Long memberId) {
+        return activityConfigService.listVisibleForClient().stream()
+                .filter(activity -> ActivityTypeEnum.TASK
+                        == ActivityTypeEnum.resolve(activity.getActivityType()))
+                .flatMap(activity -> getTaskCenter(activity.getActivityCode(), memberId).stream())
+                .toList();
+    }
+
+    /**
+     * 任务中心。<b>按活动的玩法类型分派给对应的 SPI 实现</b>，活动域自己不认识任务。
+     *
+     * <p>活动不存在、不是任务型、或那个玩法还没有实现 provider，一律返回空列表 ——
+     * 对用户都是「这儿没有任务」，而抛异常跨进程后会变成 5xx。
+     */
+    @Override
+    public List<TaskCenterItem> getTaskCenter(String activityCode, Long memberId) {
+        ActivityConfig activity = activityConfigService.getByActivityCode(activityCode);
+        if (activity == null) {
+            return List.of();
+        }
+        ActivityTypeEnum type = ActivityTypeEnum.resolve(activity.getActivityType());
+        TaskCenterProvider provider = taskCenterProviders.stream()
+                .filter(p -> type == p.supportType())
+                .findFirst().orElse(null);
+        return provider == null ? List.of() : provider.listTasks(activityCode, memberId);
     }
 
     @Override

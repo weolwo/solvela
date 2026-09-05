@@ -10,6 +10,7 @@ import solvela.base.stat.StatRow;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.domain.command.PrizeLogAddCommand;
 import solvela.prize.prizelog.domain.query.PrizeLogQuery;
@@ -33,6 +34,15 @@ import java.util.List;
 @Service
 public class PrizeLogService {
 
+    /**
+     * 「最近记录」的硬上限。
+     *
+     * <p>🔴 {@code limit} 是调用方给的，而这条 SQL 用的是 {@code last("LIMIT " + n)} ——
+     * 拼进 SQL 的数字必须自己夹住，否则一个 {@code limit=1000000} 就能把内存打爆。
+     * 这里同时也是产品判断：「最近记录」超过一百条就该走分页接口了。
+     */
+    private static final int MAX_RECENT = 100;
+
     private final PrizeLogDao prizeLogDao;
 
     /**
@@ -50,6 +60,25 @@ public class PrizeLogService {
     /**
      * 分页查询
      */
+    /**
+     * 某个会员<b>最近</b>的奖励记录，按时间倒序。给 C 端「我的」页用。
+     *
+     * <p>只取 limit 条，不分页 —— 见 {@code PrizeRecordApi.listRecentRecords} 的注释。
+     * 走 {@code idx_prize_log_(member_id, activity_code)} 的前缀。
+     *
+     * <p>⚠️ 返回<b>实体</b>，字段裁剪由调用方做。这一层不该知道哪个端要看什么。
+     */
+    public List<PrizeLog> listRecentByMember(Long memberId, int limit) {
+        if (memberId == null || limit <= 0) {
+            return List.of();
+        }
+        return prizeLogDao.selectList(new LambdaQueryWrapper<PrizeLog>()
+                .eq(PrizeLog::getMemberId, memberId)
+                // 按 id 倒序即时间倒序（自增），比按 create_time 排少一个索引
+                .orderByDesc(PrizeLog::getId)
+                .last("LIMIT " + Math.min(limit, MAX_RECENT)));
+    }
+
     public PageResult<PrizeLogDTO> queryPage(PrizeLogQuery queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<PrizeLogDTO> list = prizeLogDao.queryPage(page, queryForm);

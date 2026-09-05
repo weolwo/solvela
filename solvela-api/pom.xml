@@ -51,6 +51,12 @@
              改由 PrizeDispatchBypassTest 断言守着（绕过 PrizeEventPublisher 会让派发跑进事务里）。 -->
         <module>solvela-marketing</module>
 
+        <!-- 积分商城。2026-09-05 从 solvela-marketing 拆出来 —— 它和 activity/draw/lottery/task
+             不是一类：那四个是「玩法」，共享活动/奖池/编排脚本；商城是「交易」，
+             邻居是钱包与履约。拆时确认过零耦合（互不引用，模块外只有 admin 用）。
+             🔴 它不许依赖 solvela-marketing，理由见 solvela-mall/pom.xml -->
+        <module>solvela-mall</module>
+
         <!-- HTTP 层。刻意排在业务域之后：域模块不认识它，只有端认识。
              2026-08-31：solvela-web 已并入 solvela-admin —— 它只有管理端一个使用方
              （模块外 84 处引用全在 admin），而独立成 artifact 反而是条隐患：

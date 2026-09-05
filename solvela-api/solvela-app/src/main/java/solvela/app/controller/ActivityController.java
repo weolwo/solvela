@@ -14,6 +14,9 @@ import solvela.app.auth.CurrentMember;
 import solvela.app.domain.ActivityView;
 import solvela.app.domain.DrawRequest;
 import solvela.app.domain.DrawView;
+import solvela.app.domain.PromoView;
+
+import java.util.List;
 import solvela.app.service.ActivityService;
 
 /**
@@ -42,6 +45,19 @@ public class ActivityController {
      * <p>{@code @Anonymous}：<b>没登录也能看</b>。活动页是分享出去的入口，
      * 要求先登录才能看一眼，等于把分享链路掐断 —— 抽奖那一步再要求登录不迟。
      */
+    /**
+     * 当前可见的活动列表。
+     *
+     * <p>{@code @Anonymous}：<b>没登录也能看</b>，和活动详情同一个理由 ——
+     * 首页焦点位是所有人的入口，要求先登录才能看一眼等于把新用户挡在门外。
+     * 参与那一步（抽奖）再要求登录。
+     */
+    @Anonymous
+    @GetMapping
+    public List<PromoView> listOpen() {
+        return activityService.listOpen();
+    }
+
     @Anonymous
     @GetMapping("/{activityCode}")
     public ActivityView getActivity(@PathVariable String activityCode) {

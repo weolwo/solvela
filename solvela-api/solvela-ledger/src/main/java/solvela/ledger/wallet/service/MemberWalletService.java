@@ -21,6 +21,7 @@ import solvela.ledger.MemberAssetTransaction;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 import solvela.ledger.transaction.service.MemberAssetTransactionService;
 import solvela.ledger.wallet.dao.MemberWalletDao;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import solvela.ledger.MemberWallet;
 import solvela.ledger.wallet.domain.dto.MemberWalletDTO;
 import solvela.ledger.wallet.domain.query.MemberWalletQuery;
@@ -58,6 +59,29 @@ public class MemberWalletService {
      * 不需要名字；是流水（单据类）要把「当时那个账号」记下来。
      */
     private final MemberService memberService;
+
+    /**
+     * 某个会员的全部钱包。给 C 端「我的资产」用（{@code AssetApi.listAssets}）。
+     *
+     * <p>没有钱包记录时返回<b>空列表</b> —— 新注册、还没拿过任何奖励的用户就是这个状态，
+     * 它是正常的，不该翻成异常或 null 让调用方去判。
+     *
+     * <p>按 asset_type 排序而不是按 id：id 顺序取决于「哪种资产先被创建」，
+     * 也就是取决于用户第一次拿到的是积分还是现金 —— 那会让不同用户的
+     * 「我的资产」列表顺序不一样，而且同一个用户也可能因为一次补发就变了。
+     *
+     * <p>⚠️ 返回的是<b>实体</b>，字段裁剪由调用方做。这一层不该知道哪个端要看什么，
+     * 见 {@code MemberWalletDTO} 类注释里那段「DTO 是领域能查出来的全部，
+     * VO 是某个端决定给出去的那一部分」。
+     */
+    public List<MemberWallet> listByMember(Long memberId) {
+        if (memberId == null) {
+            return List.of();
+        }
+        return memberWalletDao.selectList(new LambdaQueryWrapper<MemberWallet>()
+                .eq(MemberWallet::getMemberId, memberId)
+                .orderByAsc(MemberWallet::getAssetType));
+    }
 
     /**
      * 钱包统计：用户手上现在有多少资产（存量，全量），以及这段时间变动了多少（跟时间范围走）。

@@ -2,6 +2,8 @@ package solvela.mall;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
+import solvela.crypto.PiiTypeHandler;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
@@ -17,7 +19,16 @@ import lombok.Data;
  */
 
 @Data
-@TableName("t_mall_address")
+/**
+ * 🔴 {@code autoResultMap = true} 不能删：收件三列挂了 {@link PiiTypeHandler}，
+ * 而 MyBatis-Plus <b>只在写的时候用 typeHandler，读的时候要靠 autoResultMap 才会用</b>。
+ * 少了它的表现是「存进去是密文，查出来还是密文」，且不报任何错。
+ *
+ * <p>与 {@code t_physical_delivery} 用的是<b>同一套 PiiTypeHandler、同一把密钥</b> ——
+ * mall.sql「附」第 ① 条写着：两边各写一套加密，将来「同一个地址在两张表里对不上」
+ * 会非常难查。
+ */
+@TableName(value = "t_mall_address", autoResultMap = true)
 public class MallAddress {
 
     /**
@@ -34,16 +45,19 @@ public class MallAddress {
     /**
      * 收件人姓名【密文】
      */
+    @TableField(typeHandler = PiiTypeHandler.class)
     private String receiverName;
 
     /**
      * 收件人电话【密文】
      */
+    @TableField(typeHandler = PiiTypeHandler.class)
     private String receiverPhone;
 
     /**
      * 详细门牌地址【密文】
      */
+    @TableField(typeHandler = PiiTypeHandler.class)
     private String detailAddress;
 
     /**

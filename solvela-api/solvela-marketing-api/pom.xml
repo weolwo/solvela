@@ -19,8 +19,12 @@
 
     <!--
     这个模块是**将来那个 app-activity 服务的门面**，粒度对齐服务、不对齐今天的 maven 模块：
-    活动在 solvela-activity、抽奖/任务/彩票/商城在 solvela-marketing、奖品在 solvela-prize，
+    活动/抽奖/任务/彩票在 solvela-marketing、商城在 solvela-mall、奖品在 solvela-prize，
     它们将来在同一个进程里，所以共用一份契约。不会再有 solvela-marketing-api。
+
+    2026-09-05：商城的域层拆成了独立的 solvela-mall 模块，但**契约仍然留在这里**——
+    正是上面那条「粒度对齐服务」：拆的是 maven 模块，不是服务，商城和玩法将来还在同一个进程。
+    真到要把商城独立成服务的那天，才是把 MallApi 拆出去的时候，那一步会连着一个进程壳。
 
     🔴 里面按【实现归属】分成多个接口，不是一个大接口：
       - ActivityQueryApi → solvela-activity 实现

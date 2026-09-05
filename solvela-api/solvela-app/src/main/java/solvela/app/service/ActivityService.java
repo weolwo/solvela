@@ -18,6 +18,8 @@ import solvela.marketing.api.DrawResultView;
 import java.util.List;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import solvela.app.domain.PromoView;
 
 /**
  * 活动的接入层：<b>翻译 + 组装</b>，没有业务逻辑。
@@ -39,6 +41,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ActivityService {
 
+    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     private final ActivityApi activityApi;
 
     /**
@@ -58,6 +62,40 @@ public class ActivityService {
                 view.shareTitle(), view.shareDesc(), view.extraConfig(), view.ruleContent(),
                 // 用服务端时钟算：客户端自己判等于把判据抄一份到前端，而它算的是客户端的时钟
                 view.joinable(now), view.claimable(now));
+    }
+
+    /**
+     * C 端可见的活动列表。首页焦点位与活动中心用同一个接口 ——
+     * 「精选前三条」是<b>页面</b>的取舍，不是两个接口。
+     *
+     * <p>没有活动时返回空列表，不是 404：新环境、活动都下线了，都是正常状态。
+     *
+     * <p>顺序<b>照域给的原样透出</b>，网关不重排 —— 重排一次就是第二份排序规则。
+     */
+    public List<PromoView> listOpen() {
+        LocalDateTime now = LocalDateTime.now();
+        return activityApi.listOpenActivities().stream()
+                .map(brief -> new PromoView(
+                        brief.activityCode(),
+                        brief.activityName(),
+                        brief.subTitle(),
+                        brief.themeColor(),
+                        format(brief.startTime()),
+                        format(brief.endTime()),
+                        brief.mainImageId(),
+                        // 用服务端时钟算：客户端自己判等于把判据抄一份到前端，而它算的是客户端的时钟
+                        brief.joinable(now)))
+                .toList();
+    }
+
+    /**
+     * 时间统一按 {@code yyyy-MM-dd HH:mm:ss} 的字符串下发，<b>不带时区</b> ——
+     * 全站契约就是这个（见前端 types/contract 的 DateTimeString）。
+     * 这里显式格式化而不是让 Jackson 去猜，是因为「猜」的结果取决于全局配置，
+     * 改一次全局配置就会把所有接口的时间格式一起改掉。
+     */
+    private static String format(LocalDateTime time) {
+        return time == null ? null : time.format(DATE_TIME);
     }
 
     /**

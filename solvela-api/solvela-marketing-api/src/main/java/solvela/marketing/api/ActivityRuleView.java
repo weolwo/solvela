@@ -64,18 +64,14 @@ public record ActivityRuleView(
      * 不能靠客户端这个方法 —— 它算的是客户端的时钟。
      */
     public boolean joinable(LocalDateTime now) {
-        LocalDateTime deadline = dataEndTime == null ? endTime : dataEndTime;
-        return status == ActivityStatusEnum.ONLINE
-                && (startTime == null || !now.isBefore(startTime))
-                && (deadline == null || !now.isAfter(deadline));
+        // 判据抽到 ActivityWindow：列表页的 ActivityBriefView 用的是同一份，不许各判一遍
+        return ActivityWindow.joinable(status, startTime, dataEndTime, endTime, now);
     }
 
     /**
      * 此刻还能不能<b>领奖</b>。数据截止之后到活动结束之前，这里仍然是 true。
      */
     public boolean claimable(LocalDateTime now) {
-        return status == ActivityStatusEnum.ONLINE
-                && (startTime == null || !now.isBefore(startTime))
-                && (endTime == null || !now.isAfter(endTime));
+        return ActivityWindow.claimable(status, startTime, endTime, now);
     }
 }

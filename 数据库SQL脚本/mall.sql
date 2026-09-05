@@ -39,8 +39,18 @@ SET NAMES utf8mb4;
 --   · 扣积分走 t_member_wallet + t_member_asset_transaction。后者有
 --     UNIQUE(biz_ref_id, asset_type)，下单时把 biz_ref_id 传 order_no，
 --     **重复扣款天然幂等，不要另造去重表**
---   · 履约复用 sa/ledger/handler 那套：实物落 t_physical_delivery，
---     券落 t_member_coupon。所以 commodity_type 直接对齐 PrizeTypeEnum
+--   · 履约落的是同一批表：实物落 t_physical_delivery，券落 t_member_coupon。
+--     所以 commodity_type 直接对齐 PrizeTypeEnum
+--     【2026-09-05 落地补正】复用的是**表**，不是 sa/ledger/handler 那几个类：
+--       它们的入参是 ProposalRecord，而商城不走提案（见下一条）。为了复用而
+--       硬造一条假提案、再硬编一条假的优惠配置（promotion_config_id 是 NOT NULL），
+--       是拿数据的正确性换代码行数。实际做法是 AssetGrantApi（契约在
+--       solvela-member-api）+ AssetGrantApiService（实现在 solvela-ledger）——
+--       同一批表的第二个入口，source_type='MALL'，运营的发货台/物流导入一行不改。
+--     ⚠️ 券那张表**没有** UNIQUE(source_type, source_biz_id)，只有普通索引 idx_source。
+--       所以重复发券在库这一层拦不住，幂等全靠商城侧 10→20 那次条件 UPDATE。
+--       补唯一键之前，t_member_coupon 的 source_biz_id 商城侧已按「单号:序号」写入
+--      （一单兑 N 张就是 N 行），格式与奖品链路的 external_biz_no 一致。
 --   · 🔴 **商城不走 t_proposal_record**。提案带审批/预算/风控，那是「发钱的闸门」；
 --     商城是用户花自己的积分，走审批没道理。但履约要走既有链路，见 §5 的对接说明
 --
@@ -107,9 +117,12 @@ SET NAMES utf8mb4;
 -- ----------------------------------------------------------------------------
 
 -- 商城专属文件分类。category_tag='商城' 是素材库列表的排除依据
-INSERT INTO `t_file_category` (`category_code`, `category_name`, `category_tag`, `sort`)
-VALUES ('MALL_COMMODITY', '商城商品图', '商城', 100)
-ON DUPLICATE KEY UPDATE `category_name` = VALUES(`category_name`);
+-- public_flag=1：商品图是要给 C 端匿名用户看的，必须显式开这个口子。
+-- 这一列默认 0（私有），见 2026-09-05 的「文件分类-公开标记」迁移脚本。
+INSERT INTO `t_file_category` (`category_code`, `category_name`, `category_tag`, `sort`, `public_flag`)
+VALUES ('MALL_COMMODITY', '商城商品图', '商城', 100, 1)
+ON DUPLICATE KEY UPDATE `category_name` = VALUES(`category_name`),
+                        `public_flag`   = VALUES(`public_flag`);
 
 -- 🔴 内置分类保护要把它加进去，否则运营删掉这个分类，历史商品图全成孤儿：
 --    FileCategoryService 的 SYSTEM_CODES 补上 "MALL_COMMODITY"

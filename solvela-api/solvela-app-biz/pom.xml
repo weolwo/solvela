@@ -52,6 +52,13 @@
             <artifactId>solvela-marketing</artifactId>
             <version>3.0.0</version>
         </dependency>
+
+        <!-- 商城域。C 端的 MallApi 实现（MallClientFacade）在这里 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-mall</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-prize</artifactId>

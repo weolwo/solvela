@@ -21,26 +21,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 前五个是同一个领域的不同玩法（发奖），而 <b>mall 是电商</b> ——
  * 商品、SKU、库存、订单，跟「抽奖发奖」没有任何领域关系，它只是恰好也归运营管。
  *
- * <p>2026-09-04 实测：mall 的 41 个源文件对外只认识 enums / base / exception 与一处 member，
- * 而<b>模块内没有任何一个字认识 mall</b>。也就是说这条缝今天是干净的，
- * 将来要把商城拆成独立模块（甚至独立服务）是<b>移动文件 + 加一个 pom</b>，不是重写。
+ * <p>2026-09-04 立这条测试时两边还在同一个模块里，量出来的结果是缝完全干净
+ *（mall 的 41 个源文件对外只认识 enums / base / exception 与一处 member，
+ * 而模块内没有任何一个字认识 mall）。<b>2026-09-05 商城已经拆成 solvela-mall。</b>
  *
- * <p>但干净是不会自己保持的：两边在同一个模块、同一个进程、同一个库，
- * 明天有人在抽奖里直接 {@code new MallOrderService()} 拿商品名，
- * 今天完全跑得通，坏的是拆的那一天。这个测试就是那条缝剩下的全部保障。
+ * <h3>拆完之后这个测试还剩什么用</h3>
+ * 第一道闸门变成了 pom：{@code solvela-marketing} 的依赖里<b>刻意没有</b> solvela-mall，
+ * 引用不到就是编译不过。和 {@link LedgerBoundaryTest} 守 marketing↔ledger 是同一个形状。
  *
- * <h3>两个方向都要守</h3>
- * <ul>
- *   <li><b>玩法 -> 商城</b>：抽奖/任务/彩票要商品信息，说明该走一个契约接口，
- *       而不是直接调商城的 service；</li>
- *   <li><b>商城 -> 玩法</b>：商城要发一个奖，同样该走既有的发奖契约
- *       （{@code UserPrizeEvent} / {@code MemberProposalApi}），
- *       而不是反手去调 draw 的运行态。</li>
- * </ul>
+ * <p>那为什么还留着这个测试 —— 因为 pom 是<b>可以被加回来的</b>，而加的那一刻没有任何提示。
+ * 这条测试就是加回来之后会红的那个东西。它读的是 class 常量池，
+ * 所以连「反射按字符串拿 solvela.mall.xxx」这种绕过编译期的写法也拦得住。
  *
- * <p>⚠️ 与 {@code LedgerBoundaryTest} 的区别：那条缝是<b>已经确定要拆</b>的服务边界，
- * 这条只是「保持可拆」。所以这里不禁 pom 依赖（同一个模块，无从禁起），
- * 只禁两个包之间的直接引用。
+ * <h3>反方向在另一个模块里守</h3>
+ * 「商城不许反手去调玩法的运行态」搬去了 {@code solvela-mall} 的 {@code PlayBoundaryTest} ——
+ * 必须在那边，因为它要扫的是<b>商城自己的</b> target/classes。
+ * 留在这里的话拆完就成了空扫，而空扫是会通过的（见 {@link #scan} 末尾那条断言的理由）。
  *
  * @Author alaric
  * @Date 2026-09-04
@@ -48,10 +44,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MallBoundaryTest {
 
     private static final String MALL = "solvela/mall/";
-
-    /** 营销玩法的几个包。mall 不该认识它们中的任何一个 */
-    private static final List<String> PLAY_PACKAGES = List.of(
-            "solvela/draw/", "solvela/task/", "solvela/lottery/", "solvela/activity/", "solvela/stat/");
 
     @Test
     @DisplayName("🔴 玩法侧（draw/task/lottery/activity/stat）不许引用商城")
@@ -76,31 +68,6 @@ class MallBoundaryTest {
                 玩法要用商品信息，请先定一个契约接口（对齐 MemberProposalApi 的做法），
                 直接调商城的 service 在今天完全能跑，坏的是拆的那一天：
                 那些调用点要一个个找出来重写，而它们不会有任何标记。
-                """.formatted(String.join("\n  ", offenders.stream().distinct().toList())));
-    }
-
-    @Test
-    @DisplayName("🔴 商城不许反手去调玩法的运行态")
-    void 商城不许直接调玩法() throws IOException {
-        List<String> offenders = new ArrayList<>();
-        scan((name, bytes) -> {
-            if (!isUnder(name, MALL)) {
-                return;
-            }
-            for (String play : PLAY_PACKAGES) {
-                if (bytes.contains(play)) {
-                    offenders.add(name + "  ->  " + play.replace('/', '.'));
-                }
-            }
-        });
-
-        assertTrue(offenders.isEmpty(), () -> """
-                商城直接引用了营销玩法：
-                  %s
-
-                商城要发奖（比如下单送积分），走既有的发奖契约 —— UserPrizeEvent 或
-                MemberProposalApi，与四个 @PrizeStrategy handler 用的是同一条路。
-                反手去调 draw/task 的运行态，等于把电商域和玩法域焊死。
                 """.formatted(String.join("\n  ", offenders.stream().distinct().toList())));
     }
 

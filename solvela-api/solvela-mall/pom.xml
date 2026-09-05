@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>solvela-mall</artifactId>
+    <name>solvela-mall</name>
+
+    <!--
+      积分商城：分类、商品与 SKU、兑换订单、限兑、收藏、收货地址簿。
+      **是兑换，不是电商** —— 没有购物车、没有多商品合单，一单一 SKU（见 mall.sql 的开头一段）。
+
+      【2026-09-05 从 solvela-marketing 拆出来】
+      拆之前 solvela/mall 是 solvela-marketing 里的一个包，和 activity / draw / lottery / task 平级。
+      拆的时候确认过三件事，所以是一次<b>零风险</b>的搬运：
+        · 商城<b>不引用</b>任何兄弟玩法域（activity / draw / lottery / task / stat / dispatch）；
+        · 兄弟玩法域<b>也不引用</b>商城；
+        · 模块外只有 solvela-admin 引用它。
+      实体（solvela.mall.MallOrder 等 7 个）留在 solvela-model，枚举留在 solvela-contract ——
+      和其它每个域的摆法一致，没有跟着搬。
+
+      【⚠️ 这一拆和父 pom 里 2026-08-31 那条记载是相反方向的】
+      那次把 solvela-activity 与 solvela-consumer <b>合并进</b> solvela-marketing，
+      判据写的是「三者的进程足迹完全相同，合并不改变任何进程的 classpath」。
+      商城的足迹（admin + app-biz）与 marketing 完全一样，按同一条判据本不该拆。
+      拆的理由是另一条：<b>商城和玩法不是一类东西</b> —— activity / draw / lottery / task 是「玩法」，
+      共享活动、奖池、编排脚本那一套；商城是「交易」，它的邻居是钱包与履约，不是奖池。
+      秒杀真上线时要独立扛流量，那时的进程足迹就不一样了。
+
+      🔴 <b>所以本模块不许依赖 solvela-marketing。</b>一旦依赖上，上面那条理由就失效了，
+      而且会把编排脚本引擎、奖池、活动这一整套拖进商城的 classpath。
+      商城要用活动能力（比如「兑换算任务进度」），走事件或 SPI，不要直接依赖。
+
+      【为什么是模块而不是包】
+      同一个 jar 里的包之间可以随手互相引用，编译器不拦、code review 也未必看得出来。
+      模块的依赖列表是编译器在守的：本模块 pom 里没写的东西，这里引不进来。
+      将来若真拆成独立服务，这些 dependency 就是那时的 RPC 调用方向。
+    -->
+
+    <dependencies>
+
+        <!-- 实体（MallOrder / MallSku / MallAddress …）与 solvela.exception。7 个实体全在这 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-model</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- C 端契约 MallApi 就在这里（粒度对齐服务：商城与玩法将来同进程）。
+             ⚠️ 只有接口与 record，不会把营销的实现带进来 —— 那条禁令见文件头 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-marketing-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- MallCommodityStatusEnum / MallOrderStatusEnum / MallPayTypeEnum，26 处引用 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-contract</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!--
+          基础设施。按实际用到的列，不写聚合门面 —— 那是把 S3 SDK 和 Excel 引擎
+          背进每个进程的最短路径（父 pom 2026-08-31 那条记着这个）。
+          归因：core（PageResult / SolvelaBeanUtil / 编码工具）、data（Mapper 与分页）、
+          file（商品图的引用登记，见 mall.sql「附」第 ③ 条）。
+          不要 redis：一处都没用到。
+        -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-file</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!--
+          资产扣减的契约（AssetDebitApi）。🔴 <b>刻意只依赖 -api，不依赖 solvela-ledger</b>：
+          LedgerBoundaryTest 守的是「将来资产会独立成服务」那条边界。
+          直接调 MemberWalletService 今天完全跑得通，坏的是拆的那一天 ——
+          那些调用点要一个个找出来重写，而它们不会有任何标记。
+          走契约的话：今天解析成同进程的 bean，拆出去解析成 HTTP 代理，调用方一行不改。
+        -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 下单要拿会员账号做展示快照（t_mall_order.member_name） -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

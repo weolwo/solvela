@@ -74,6 +74,12 @@
             <artifactId>solvela-marketing</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!-- 积分商城域。2026-09-05 从 solvela-marketing 拆出，admin 的 module/mall 接入层用它 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-mall</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <!-- 会员/钱包/券/活动/奖品的领域层。此前是靠 solvela-marketing 传递进来的，
              但自从 common-api 的 15 个后台 controller 搬到本模块之后，
              本模块<b>直接</b>依赖了它的 service/form/vo —— 直接用到就直接声明，

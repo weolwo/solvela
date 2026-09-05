@@ -76,8 +76,18 @@ class EnumMigrationRatchetTest {
     private static final List<String> STATUS_WORDS =
             List.of("STATUS", "MODE", "RESULT", "TYPE", "STATE", "APPROVE", "PAY", "DISPATCH");
 
-    /** 带这些词的一律不算：长度/精度这类算术常量，只是碰巧撞词 */
-    private static final List<String> NOT_STATUS_WORDS = List.of("LENGTH", "SCALE", "SIZE");
+    /**
+     * 带这些词的一律不算：长度/精度/时长这类<b>算术常量</b>，只是碰巧撞词。
+     *
+     * <p>时间单位那四个是 2026-09-05 补的：{@code MallRedeemService.PAY_EXPIRE_MINUTES}
+     *（待支付超时 30 分钟）撞上了 {@code PAY}。它是个时长，不是状态 ——
+     * 而状态常量<b>不会</b>以时间单位结尾，所以这条放行是精确的，不是给棘轮开口子。
+     *
+     * <p>⚠️ 往这里加词要谨慎：加错一个词就会让一整类真正的状态常量隐身。
+     * 判据是「这个词能不能唯一地说明它是量纲，而不是取值」。
+     */
+    private static final List<String> NOT_STATUS_WORDS =
+            List.of("LENGTH", "SCALE", "SIZE", "MINUTES", "SECONDS", "HOURS", "DAYS");
 
     /**
      * 尚未枚举化的列留下的常量，<b>只许删，不许加</b> —— 现在是空的。

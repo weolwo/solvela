@@ -1,5 +1,10 @@
 package solvela.activity.runtime;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import solvela.marketing.api.ActivityBriefView;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import solvela.activity.ActivityConfig;
@@ -43,6 +48,51 @@ public class ActivityRuntimeService {
         // 展示配置允许没有：活动建出来还没配过展示，详情页该正常打开，只是没有图和副标题
         ActivityDisplay display = activityDisplayService.getByActivityId(activity.getId());
         return toView(activity, display);
+    }
+
+    /**
+     * C 端可见的活动列表。
+     *
+     * <p>展示配置<b>一次批量取</b>（{@code mapByActivityIds}），不是逐条查 ——
+     * 这是 C 端首页每次进都会打的接口，逐条查就是 N+1。
+     */
+    public List<ActivityBriefView> listOpenActivities() {
+        List<ActivityConfig> activities = activityConfigService.listVisibleForClient();
+        if (activities.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, ActivityDisplay> displays = activityDisplayService.mapByActivityIds(
+                activities.stream().map(ActivityConfig::getId).toList());
+        /*
+         * 进行中的排在未开始的前面，组内保持 DAO 给的开始时间倒序。
+         *
+         * 🔴 用【一次算好的 now】排序，不要在比较器里反复 LocalDateTime.now()：
+         * 那样比较器不满足传递性，Java 的排序在元素多时会直接抛
+         * "Comparison method violates its general contract"。
+         */
+        LocalDateTime now = LocalDateTime.now();
+        return activities.stream()
+                .map(activity -> toBriefView(activity, displays.get(activity.getId())))
+                .sorted(Comparator.comparing((ActivityBriefView v) -> !v.joinable(now)))
+                .toList();
+    }
+
+    /**
+     * 拼成列表的形状。<b>同样逐字段拷贝</b>，理由见 {@link #toView} ——
+     * 这一层的价值就在于它不自动。
+     */
+    private static ActivityBriefView toBriefView(ActivityConfig activity, ActivityDisplay display) {
+        return new ActivityBriefView(
+                activity.getActivityCode(),
+                activity.getActivityName(),
+                activity.getActivityType(),
+                activity.getStatus(),
+                activity.getStartTime(),
+                activity.getDataEndTime(),
+                activity.getEndTime(),
+                display == null ? null : display.getSubTitle(),
+                display == null ? null : display.getThemeColor(),
+                display == null ? null : display.getMainImageId());
     }
 
     /**

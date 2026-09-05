@@ -4,9 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.activity.runtime.ActivityFacade;
 import solvela.marketing.api.ActivityApi;
+import solvela.marketing.api.ActivityBriefView;
+import solvela.marketing.api.TaskCenterItem;
 import solvela.marketing.api.ActivityDrawCmd;
 import solvela.marketing.api.ActivityRuleView;
 import solvela.marketing.api.DrawResultView;
+
+import java.util.List;
 
 /**
  * {@link ActivityApi} 的 HTTP 薄壳。
@@ -30,6 +34,21 @@ import solvela.marketing.api.DrawResultView;
 public class ActivityInternalController implements ActivityApi {
 
     private final ActivityFacade activityFacade;
+
+    @Override
+    public List<ActivityBriefView> listOpenActivities() {
+        return activityFacade.listOpenActivities();
+    }
+
+    @Override
+    public List<TaskCenterItem> getTaskCenter(String activityCode, Long memberId) {
+        return activityFacade.getTaskCenter(activityCode, memberId);
+    }
+
+    @Override
+    public List<TaskCenterItem> getMyTasks(Long memberId) {
+        return activityFacade.getMyTasks(memberId);
+    }
 
     @Override
     public ActivityRuleView getActivityRule(String activityCode) {

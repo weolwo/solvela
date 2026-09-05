@@ -90,6 +90,31 @@ public class ActivityConfigService {
      * 绕过页面直接 POST 依然进得来。这是刻意的 —— 给活动延期是正常运营操作，
      * 过期只该是提醒，不该是硬拦。
      */
+    /**
+     * C 端可见的活动：<b>上线中</b>且还没结束的（含未开始）。
+     *
+     * <p>与 {@link #queryOptionList} 的区别：那个是给<b>运营下拉框</b>用的，
+     * 判据是「此刻能不能配置」，所以放行了 DRAFT 之类的状态；
+     * 这个是给<b>C 端用户</b>看的，只能是 ONLINE —— 用户看到一个草稿活动就是事故。
+     * 两个方法的判据不同，所以刻意不合成一个带布尔开关的。
+     *
+     * <p>⚠️ <b>这张表没有排序权重列</b>，所以这里只给出稳定的默认序（开始时间倒序），
+     * 「进行中的排在未开始的前面」由 {@code ActivityRuntimeService.listOpenActivities} 排。
+     * 真要让运营控制首页焦点位的顺序，那是加一列 {@code sort_weight} 的事 ——
+     * 现在没加是因为活动数量是十位数，且还没有人提出要手工控顺序。
+     * <b>网关不重排</b>：重排一次就是第二份排序规则。
+     */
+    public List<ActivityConfig> listVisibleForClient() {
+        return activityConfigManager.lambdaQuery()
+                .eq(ActivityConfig::getStatus, ActivityStatusEnum.ONLINE)
+                // 已结束的不出现：用户点进去只会看到一个空页面
+                .ge(ActivityConfig::getEndTime, LocalDateTime.now())
+                .orderByDesc(ActivityConfig::getStartTime)
+                // 开始时间相同时按 id 兜底，保证分页/重复请求的顺序稳定
+                .orderByDesc(ActivityConfig::getId)
+                .list();
+    }
+
     public List<ActivityConfigDTO> queryOptionList(String activityType, Boolean includeInactive) {
         boolean keepAll = Boolean.TRUE.equals(includeInactive);
         List<ActivityConfig> list = activityConfigManager.lambdaQuery()

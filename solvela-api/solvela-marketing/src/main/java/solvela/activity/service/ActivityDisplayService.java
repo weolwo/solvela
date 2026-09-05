@@ -1,5 +1,10 @@
 package solvela.activity.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import solvela.base.util.SolvelaCollectionUtil;
+import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Collectors;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.activity.dao.ActivityDisplayDao;
@@ -48,6 +53,24 @@ public class ActivityDisplayService {
 
     public ActivityDisplay getByActivityId(Long activityId) {
         return activityDisplayDao.getByActivityId(activityId);
+    }
+
+    /**
+     * 批量取展示配置，给活动<b>列表</b>用。
+     *
+     * <p>🔴 列表里逐条调 {@link #getByActivityId} 就是 N+1 —— 十条活动十次查询，
+     * 而这是 C 端首页每次进都会打的接口。本方法一次 IN 查完。
+     *
+     * <p>返回 {@code activityId -> display}。没配展示的活动<b>不在 map 里</b>，
+     * 调用方按 null 处理即可（活动建出来还没配展示是正常状态，见 getActivityRule 的注释）。
+     */
+    public Map<Long, ActivityDisplay> mapByActivityIds(Collection<Long> activityIds) {
+        if (SolvelaCollectionUtil.isEmpty(activityIds)) {
+            return Map.of();
+        }
+        return activityDisplayDao.selectList(new LambdaQueryWrapper<ActivityDisplay>()
+                        .in(ActivityDisplay::getActivityId, activityIds)).stream()
+                .collect(Collectors.toMap(ActivityDisplay::getActivityId, d -> d, (a, b) -> a));
     }
 
     /**
