@@ -460,9 +460,46 @@ public class MallClientFacade implements MallApi {
     }
 
     private static MallAddressView toAddressView(MallAddress a) {
-        return new MallAddressView(a.getId(), a.getReceiverName(), a.getReceiverPhone(),
+        return new MallAddressView(a.getId(), a.getReceiverName(), maskPhone(a.getReceiverPhone()),
                 a.getProvince(), a.getCity(), a.getDistrict(), a.getDetailAddress(),
                 Boolean.TRUE.equals(a.getIsDefault()));
+    }
+
+    /**
+     * 手机号脱敏：{@code 13800008000 → 138****8000}。
+     *
+     * <h3>🔴 契约早就承诺了这件事，只是没做</h3>
+     * {@link MallAddressView#receiverPhone} 的注释白纸黑字写着「<b>脱敏值</b>（138****8000）」，
+     * 而这里一直传的是解密后的明文。<b>文档承诺了而代码没做</b>是最难发现的一类问题 ——
+     * 读代码的人会相信注释，然后在别处基于「它已经脱敏了」做决定。
+     *
+     * <p>就算这一页只有用户自己看得到（后台没有地址簿入口，所有查询都带 memberId），
+     * 脱敏仍然值得做：响应会经过日志、浏览器历史、截图，以及将来任何一层代理。
+     * 而对本人来说，{@code 138****8000} 足够从几条地址里认出是哪一条 ——
+     * 这正是这一页要回答的唯一问题。
+     *
+     * <p>前端<b>刻意不回填手机号</b>（编辑时留空 = 不改），所以脱敏值不会被存回库里。
+     * 这两处是一对，改任何一边之前先看另一边。
+     *
+     * <h3>号码格式不敢假设</h3>
+     * 不写死「11 位」：库里已经有非大陆号码（菲律宾的地址）。
+     * 规则是「留头 3 尾 4」，短号则只留尾 2，再短就全遮 ——
+     * <b>任何情况下露出的字符都不会比原号码多</b>。
+     */
+    static String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return phone;
+        }
+        String trimmed = phone.trim();
+        int len = trimmed.length();
+        if (len <= 2) {
+            // 两位以内没有「部分遮蔽」可言，全遮
+            return "*".repeat(len);
+        }
+        if (len < 8) {
+            return "*".repeat(len - 2) + trimmed.substring(len - 2);
+        }
+        return trimmed.substring(0, 3) + "****" + trimmed.substring(len - 4);
     }
 
     private static MallAddress toAddress(MallAddressCmd cmd) {
