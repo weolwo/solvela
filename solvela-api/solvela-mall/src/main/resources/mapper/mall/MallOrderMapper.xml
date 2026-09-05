@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.mall.order.dao.MallOrderDao">
+
+    <resultMap id="MallOrderDTO" type="solvela.mall.order.domain.dto.MallOrderDTO">
+            <result column="id" property="id" />
+            <result column="order_no" property="orderNo" />
+            <result column="member_id" property="memberId" />
+            <result column="member_name" property="memberName" />
+            <result column="commodity_id" property="commodityId" />
+            <result column="commodity_code" property="commodityCode" />
+            <result column="sku_id" property="skuId" />
+            <result column="sku_code" property="skuCode" />
+            <result column="commodity_type" property="commodityType" />
+            <result column="asset_ref" property="assetRef" />
+            <result column="commodity_name" property="commodityName" />
+            <result column="cover_file_id" property="coverFileId" />
+            <result column="sku_attrs" property="skuAttrs" />
+            <result column="quantity" property="quantity" />
+            <result column="points_price" property="pointsPrice" />
+            <result column="cash_price" property="cashPrice" />
+            <result column="pay_points" property="payPoints" />
+            <result column="pay_cash" property="payCash" />
+            <result column="address_id" property="addressId" />
+            <result column="status" property="status" />
+            <result column="expire_time" property="expireTime" />
+            <result column="pay_time" property="payTime" />
+            <result column="finish_time" property="finishTime" />
+            <result column="cancel_time" property="cancelTime" />
+            <result column="source_type" property="sourceType" />
+            <result column="source_biz_id" property="sourceBizId" />
+            <result column="fulfill_ref_id" property="fulfillRefId" />
+            <result column="fail_reason" property="failReason" />
+            <result column="remark" property="remark" />
+            <result column="create_by" property="createBy" />
+            <result column="create_time" property="createTime" />
+            <result column="update_by" property="updateBy" />
+            <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="base_columns">
+                id, 
+                order_no, 
+                member_id, 
+                member_name, 
+                commodity_id, 
+                commodity_code, 
+                sku_id, 
+                sku_code, 
+                commodity_type, 
+                asset_ref, 
+                commodity_name, 
+                cover_file_id, 
+                sku_attrs, 
+                quantity, 
+                points_price, 
+                cash_price, 
+                pay_points, 
+                pay_cash, 
+                address_id, 
+                status, 
+                expire_time, 
+                pay_time, 
+                finish_time, 
+                cancel_time, 
+                source_type, 
+                source_biz_id, 
+                fulfill_ref_id, 
+                fail_reason, 
+                remark, 
+                create_by, 
+                create_time, 
+                update_by, 
+                update_time
+    </sql>
+
+    <!-- 条件项单独抽出来，不带 <where> —— 排行榜要在同一个 <where> 里追加自己的过滤，
+         直接在 </where> 后面拼 AND 的话，一个筛选都没选时会变成 FROM xxx AND ... 语法错误 -->
+    <sql id="query_condition_items">
+                        <if test="queryForm.orderNo != null and queryForm.orderNo != ''">
+                            AND order_no = #{queryForm.orderNo}
+                        </if>
+                        <!--
+                          🔴 按会员查一律用 member_id，<b>不要用 member_name</b>。
+                          DDL 那一列的注释原文就是「展示快照，非关联键，不要用于查询」：
+                          它身上没有任何索引，WHERE member_name = ? 是全表扫；
+                          而给它建索引更糟 —— 关联键会就此悄悄退回 member_name，
+                          改名断链的问题原样复活。Service 已经把账号换算成会员号了。
+                        -->
+                        <if test="queryForm.memberId != null">
+                            AND member_id = #{queryForm.memberId}
+                        </if>
+                        <if test="queryForm.commodityCode != null and queryForm.commodityCode != ''">
+                            AND commodity_code = #{queryForm.commodityCode}
+                        </if>
+                        <if test="queryForm.commodityName != null and queryForm.commodityName != ''">
+                            AND commodity_name LIKE CONCAT('%', #{queryForm.commodityName}, '%')
+                        </if>
+                        <if test="queryForm.commodityType != null and queryForm.commodityType != ''">
+                            AND commodity_type = #{queryForm.commodityType}
+                        </if>
+                        <if test="queryForm.status != null">
+                            AND status = #{queryForm.status}
+                        </if>
+                        <if test="queryForm.sourceType != null and queryForm.sourceType != ''">
+                            AND source_type = #{queryForm.sourceType}
+                        </if>
+                        <if test="queryForm.createTimeBegin != null">
+                            AND create_time &gt;= #{queryForm.createTimeBegin}
+                        </if>
+                        <!--
+                          🔴 结束日期要用「< 次日零点」。createTimeEnd 是 LocalDate，
+                          绑进 datetime 列是当天 00:00:00 —— 写成 <= 的话「截止到今天」
+                          查不到今天的任何一单，而且不报错。
+                        -->
+                        <if test="queryForm.createTimeEnd != null">
+                            AND create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+                        </if>
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+            <include refid="query_condition_items"/>
+        </where>
+    </sql>
+
+    <!--
+      「实际扣款成功」的订单：待支付(0)、已取消(40) 不算。
+      把它们的金额算进消耗，得到的是「如果所有人都付了会花多少」，那不是消耗。
+      已退款(50) 仍然计入 —— 它确实扣过，退款是另一笔账，混在一起会让「消耗了多少积分」
+      这个数随退款进度来回跳。
+    -->
+    <!--
+        下面这些 status 字面量对应 MallOrderStatusEnum（0/10/20/30/40/50/60）。
+        聚合表达式没法引用 Java 枚举 —— SUM(CASE WHEN ...) 是在库里算的，
+        改枚举取值时必须回来手动同步这里，编译器帮不上忙。
+    -->
+    <sql id="paid_statuses">
+        status NOT IN (0, 40)
+    </sql>
+
+    <select id="queryPage" resultMap="MallOrderDTO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_mall_order
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="queryList" resultMap="MallOrderDTO">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_mall_order
+        <include refid="query_conditions"/>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 一趟 SQL 出全部指标。条件复用 query_conditions，与列表看的是同一批数据 -->
+    <select id="queryStat" resultType="solvela.mall.order.domain.dto.MallOrderStatDTO">
+        SELECT
+            COUNT(1)                                                              AS orderCount,
+            COUNT(DISTINCT member_id)                                             AS memberCount,
+            IFNULL(SUM(quantity), 0)                                              AS quantitySum,
+            SUM(CASE WHEN status = 30 THEN 1 ELSE 0 END)                          AS finishedCount,
+            SUM(CASE WHEN status IN (10, 20) THEN 1 ELSE 0 END)                   AS processingCount,
+            SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END)                   AS cancelledCount,
+            SUM(CASE WHEN status = 60 THEN 1 ELSE 0 END)                          AS failedCount,
+            IFNULL(SUM(CASE WHEN <include refid="paid_statuses"/> THEN pay_points ELSE 0 END), 0) AS payPointsSum,
+            IFNULL(SUM(CASE WHEN <include refid="paid_statuses"/> THEN pay_cash   ELSE 0 END), 0) AS payCashSum
+        FROM t_mall_order
+        <include refid="query_conditions"/>
+    </select>
+
+    <!--
+      兑换商品排行。按<b>件数</b>排而不是订单数：一单可以兑多件，按订单数排会让
+      「一单兑 10 件」排在「10 单各兑 1 件」后面 —— 而消耗掉的库存是一样的。
+
+      排除待支付与已取消：那些是「想兑但没兑成」，算进热销榜会让一个被大量刷单
+      然后全部超时取消的商品冲到榜首。
+    -->
+    <select id="queryCommodityRank" resultType="solvela.mall.order.domain.dto.MallOrderRankDTO">
+        SELECT
+            commodity_id                AS commodityId,
+            MAX(commodity_name)         AS commodityName,
+            MAX(commodity_code)         AS commodityCode,
+            IFNULL(SUM(quantity), 0)    AS quantitySum,
+            COUNT(1)                    AS orderCount,
+            COUNT(DISTINCT member_id)   AS memberCount,
+            IFNULL(SUM(pay_points), 0)  AS payPointsSum
+        FROM t_mall_order
+        <where>
+            <include refid="query_condition_items"/>
+            AND <include refid="paid_statuses"/>
+        </where>
+        GROUP BY commodity_id
+        ORDER BY quantitySum DESC, orderCount DESC
+        LIMIT #{topN}
+    </select>
+
+
+</mapper>
