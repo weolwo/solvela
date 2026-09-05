@@ -24,6 +24,21 @@ import { request } from './http'
  */
 
 /** 任务中心里的一条 */
+/**
+ * 任务的一个档位。
+ *
+ * 🔴 阶梯任务的价值全在这里：「签到 1 天得 188 积分、连签 5 天再得 8 元」是两件事。
+ * 旧版把各档奖励名用「/」拼成一句 rewardText，用户看不出哪个奖对应哪一档，
+ * 也看不出自己已经拿到了第一档。
+ */
+export interface TaskStage {
+  /** 达标阈值。十进制字符串——金额型任务的阈值是小数 */
+  target: string
+  rewardText: string
+  /** 本周期内已达标 */
+  reached: boolean
+}
+
 export interface TaskItem {
   taskId: Id
   taskName: string
@@ -40,8 +55,15 @@ export interface TaskItem {
   statusText: string
   /** 是否已经拿到奖励。只用来选样式，不直接展示 */
   finished: boolean
-  /** 奖励文案，如「+10 积分」。多档任务用「/」连起来。由后端拼，前端不拼 */
+  /**
+   * 一行奖励摘要，如「+10 积分」。<b>只有单档任务才有</b>，多档为 null。
+   *
+   * 🔴 多档不再拼成「A / B」：那样用户看不出哪个奖对应哪一档，
+   * 也看不出自己已经拿到了第一档。多档看 {@link TaskItem.stages}。
+   */
   rewardText: string | null
+  /** 档位，按阈值升序。单档任务也有一条 */
+  stages: TaskStage[]
   /** 「去完成」跳哪。为空表示没有跳转入口（比如「每日登录」，用户已经在里面了） */
   actionUrl: string | null
 }

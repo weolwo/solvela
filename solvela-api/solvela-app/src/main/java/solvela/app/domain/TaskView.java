@@ -29,5 +29,6 @@ public record TaskView(
         String statusText,
         boolean finished,
         String rewardText,
+        java.util.List<TaskStageItem> stages,
         String actionUrl) {
 }

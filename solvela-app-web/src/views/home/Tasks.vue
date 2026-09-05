@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { fetchTasks, type TaskItem } from '@/api/task'
+import { fetchTasks, type TaskItem, type TaskStage } from '@/api/task'
 import { useAsync } from '@/composables/useAsync'
 import { compare, format, money } from '@/utils/money'
 
@@ -44,6 +44,17 @@ function progressPercent(task: TaskItem): number {
 function progressText(task: TaskItem): string {
   const decimals = task.target.includes('.') ? 2 : 0
   return `${format(money(task.current), decimals)}/${format(money(task.target), decimals)}`
+}
+
+/**
+ * 档位的阈值文案。
+ *
+ * 小数位跟着<b>任务的目标</b>而不是这一档的阈值走 —— 否则同一个任务里
+ * 会出现「1 次」和「5.00 次」两种写法。理由同 progressText。
+ */
+function stageLabel(task: TaskItem, stage: TaskStage): string {
+  const decimals = task.target.includes('.') ? 2 : 0
+  return format(money(stage.target), decimals)
 }
 
 /** 有分组的任务排在一起。没有分组的归到「其他」，但只在真的存在分组时才分区 */
@@ -89,6 +100,27 @@ const grouped = computed(() => {
 
               <div class="task__main">
                 <p class="task__title">{{ task.taskName }}</p>
+
+                <!--
+                  阶梯任务：每一档一行，已达标的打勾。
+                  单档任务不画这块 —— 它的奖励在右侧那行摘要里，画阶梯是多余的。
+                -->
+                <ul v-if="task.stages.length > 1" class="ladder">
+                  <li
+                    v-for="stage in task.stages"
+                    :key="stage.target"
+                    class="ladder__item"
+                    :class="{ 'ladder__item--reached': stage.reached }"
+                  >
+                    <Icon
+                      class="ladder__mark"
+                      :name="stage.reached ? 'check' : 'star'"
+                      :size="14"
+                    />
+                    <span class="ladder__target">{{ stageLabel(task, stage) }}</span>
+                    <span class="ladder__reward">{{ stage.rewardText }}</span>
+                  </li>
+                </ul>
 
                 <div v-if="showsProgress(task)" class="task__progress">
                   <!--
@@ -136,6 +168,43 @@ const grouped = computed(() => {
 </template>
 
 <style scoped>
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ladder__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sv-text-tertiary);
+}
+
+/* 已拿到的那档要看得出来 —— 否则用户签到 1 天拿了奖，界面上毫无变化 */
+.ladder__item--reached {
+  color: var(--sv-color-success);
+}
+
+.ladder__mark {
+  flex: none;
+}
+
+.ladder__target {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder__reward {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tasks {
   display: flex;
   flex-direction: column;

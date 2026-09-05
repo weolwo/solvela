@@ -72,15 +72,24 @@ vi.mock('@/api/promo', () => {
 vi.mock('@/api/task', () => ({
   fetchTasks: () =>
     Promise.resolve([
+      /*
+       * 阶梯任务，取自真实配置（任务 51）：1 天得积分188、连签 5 天再得红包8。
+       * 多档时 rewardText 为 null —— 后端不再把两档拼成「A / B」，
+       * 那样用户看不出哪个奖对应哪一档，也看不出自己已经拿到了第一档。
+       */
       {
         taskId: '1',
         taskName: '样例·每日签到',
         taskGroup: null,
-        target: '3',
+        target: '5',
         current: '1',
         statusText: '进行中',
         finished: false,
-        rewardText: '+10 积分',
+        rewardText: null,
+        stages: [
+          { target: '1', rewardText: '积分188', reached: true },
+          { target: '5', rewardText: '红包8', reached: false },
+        ],
         actionUrl: null,
       },
       {
@@ -92,6 +101,7 @@ vi.mock('@/api/task', () => ({
         statusText: '未开始',
         finished: false,
         rewardText: '+20 积分',
+        stages: [{ target: '1', rewardText: '+20 积分', reached: false }],
         actionUrl: '/mall',
       },
       {
@@ -103,6 +113,7 @@ vi.mock('@/api/task', () => ({
         statusText: '已发奖',
         finished: true,
         rewardText: '+50 积分',
+        stages: [{ target: '1', rewardText: '+50 积分', reached: true }],
         actionUrl: null,
       },
     ]),
@@ -268,7 +279,8 @@ describe('Tasks', () => {
     await settle()
     const html = w.html()
     expect(html).toContain('样例·每日签到')
-    expect(html).toContain('+10 积分')
+    // 单档任务照旧给一行摘要
+    expect(html).toContain('+20 积分')
 
     /*
      * 🔴 这条是这个用例真正的价值：后端任务达标即自动发奖，
@@ -281,8 +293,37 @@ describe('Tasks', () => {
 
     // 进度条只给「目标 > 1 且还没发奖」的任务画
     expect(w.findAll('[role="progressbar"]')).toHaveLength(1)
-    expect(w.find('[role="progressbar"]').attributes('aria-valuemax')).toBe('3')
-    expect(html).toContain('1/3')
+    // 满格值是**最高档的阈值**（5），不是 rule_config 里那个数
+    expect(w.find('[role="progressbar"]').attributes('aria-valuemax')).toBe('5')
+    expect(html).toContain('1/5')
+  })
+
+  it('🔴 阶梯任务把每一档分开画，已达标的那档看得出来', async () => {
+    const w = mount(Tasks, { global })
+    await settle()
+
+    const stages = w.findAll('.ladder__item')
+    expect(stages).toHaveLength(2)
+    /*
+     * 旧版把两档压成「积分188 / 红包8」一句话：用户看不出哪个奖对应哪一档，
+     * 更看不出签到 1 天之后自己已经拿到了第一档。
+     */
+    expect(stages[0]?.text()).toContain('积分188')
+    expect(stages[1]?.text()).toContain('红包8')
+    // 阈值要各自写出来，否则「1 天」和「5 天」的区别就没了
+    expect(stages[0]?.text()).toContain('1')
+    expect(stages[1]?.text()).toContain('5')
+
+    // 已达标的那档要有视觉区别 —— 不然拿到了 188 积分，界面上毫无变化
+    expect(stages[0]?.classes()).toContain('ladder__item--reached')
+    expect(stages[1]?.classes()).not.toContain('ladder__item--reached')
+  })
+
+  it('单档任务不画阶梯 —— 它的奖励在右侧那行摘要里', async () => {
+    const w = mount(Tasks, { global })
+    await settle()
+    // 三个任务里只有第一个是多档的
+    expect(w.findAll('.ladder')).toHaveLength(1)
   })
 
   it('状态文案直接用后端给的，前端不做映射', async () => {

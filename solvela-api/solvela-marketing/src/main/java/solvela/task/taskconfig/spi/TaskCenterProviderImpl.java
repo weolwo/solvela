@@ -6,11 +6,13 @@ import solvela.activity.spi.TaskCenterProvider;
 import solvela.enums.ActivityTypeEnum;
 import solvela.enums.TaskConfigStatusEnum;
 import solvela.marketing.api.TaskCenterItem;
+import solvela.marketing.api.TaskStageView;
 import solvela.prize.prizeconfig.service.PrizeCatalog;
 import solvela.prize.PrizeConfig;
 import solvela.task.TaskConfig;
 import solvela.task.TaskPrizeMapping;
 import solvela.task.TaskRecord;
+import solvela.task.constant.TaskConst;
 import solvela.task.prizemapping.manager.TaskPrizeMappingManager;
 import solvela.task.record.manager.TaskRecordManager;
 import solvela.task.runtime.TaskPeriodResolver;
@@ -83,10 +85,11 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
 
         List<Long> taskIds = tasks.stream().map(TaskConfig::getId).toList();
         Map<Long, TaskRecord> records = currentRecords(taskIds, memberId, tasks);
-        Map<Long, String> rewards = rewardTexts(taskIds);
+        Map<Long, List<Stage>> stages = stagesOf(taskIds);
 
         return tasks.stream()
-                .map(task -> toItem(task, records.get(task.getId()), rewards.get(task.getId())))
+                .map(task -> toItem(task, records.get(task.getId()),
+                        stages.getOrDefault(task.getId(), List.of())))
                 // 排序权重是运营配的，按它排；权重相同按 id 兜底，保证顺序稳定
                 .sorted(Comparator
                         .comparing((TaskCenterItem i) -> i.sortWeight() == null ? 0 : i.sortWeight())
@@ -139,7 +142,7 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
      *
      * <p>奖品名走 {@link PrizeCatalog#mapByCodes}（一次批量），不是逐个查。
      */
-    private Map<Long, String> rewardTexts(List<Long> taskIds) {
+    private Map<Long, List<Stage>> stagesOf(List<Long> taskIds) {
         List<TaskPrizeMapping> mappings = taskPrizeMappingManager.lambdaQuery()
                 .in(TaskPrizeMapping::getTaskConfigId, taskIds)
                 .orderByAsc(TaskPrizeMapping::getStageLevel)
@@ -155,23 +158,63 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
                     PrizeConfig prize = prizes.get(mapping.getPrizeCode());
                     // 奖品配置被删了：回显编码而不是空串 —— 空串会让整条任务看着没有奖励，
                     // 而那是运营配置的问题，不该表现成「这个任务白做」
-                    return prize == null ? mapping.getPrizeCode() : prize.getPrizeName();
-                }, Collectors.joining(" / "))));
+                    String reward = prize == null ? mapping.getPrizeCode() : prize.getPrizeName();
+                    /*
+                     * 🔴 阈值取 stage_condition，不是 rule_config.targetCount。
+                     * 那一列才是 TaskPrizeDispatcher 发奖时真正判的东西 ——
+                     * 展示的判据必须和发放的判据同源，否则运营把档位改成 1/3/7
+                     * 而没动 targetCount 时，进度条会满了却不发奖。
+                     */
+                    BigDecimal target = TaskRuleConfig.parse(mapping.getStageCondition())
+                            .decimal(TaskConst.STAGE_KEY_TARGET);
+                    return new Stage(mapping.getStageLevel() == null ? 1 : mapping.getStageLevel(),
+                            target, reward);
+                }, Collectors.toList())));
     }
 
-    private static TaskCenterItem toItem(TaskConfig task, TaskRecord record, String rewardText) {
-        BigDecimal target = TaskRuleConfig.parse(task.getRuleConfig()).target();
+    /** 档位的中间形态：阈值与奖励名在这里定下来，达没达标要等会员进度才知道 */
+    private record Stage(int level, BigDecimal target, String rewardText) {
+    }
+
+    private static TaskCenterItem toItem(TaskConfig task, TaskRecord record, List<Stage> stages) {
+        // 没有记录 = 还没开始做，进度是 0 而不是 null
+        BigDecimal current = record == null ? BigDecimal.ZERO : record.getCurrentMetric();
+
+        List<TaskStageView> stageViews = stages.stream()
+                .sorted(Comparator.comparingInt(Stage::level))
+                // 达没达标按「当前周期的进度 >= 本档阈值」判，和发奖那边同一个比较
+                .map(stage -> new TaskStageView(stage.level(), stage.target(), stage.rewardText(),
+                        stage.target() != null && current.compareTo(stage.target()) >= 0))
+                .toList();
+
         return new TaskCenterItem(
                 task.getId(),
                 task.getTaskName(),
                 task.getTaskGroup(),
-                target,
-                // 没有记录 = 还没开始做，进度是 0 而不是 null
-                record == null ? BigDecimal.ZERO : record.getCurrentMetric(),
+                resolveTarget(task, stageViews),
+                current,
                 // 状态则保留 null：「还没开始」和「进行中 0 次」是两件事
                 record == null ? null : record.getStatus(),
-                rewardText,
+                stageViews,
                 task.getActionUrl(),
                 task.getSortWeight());
+    }
+
+    /**
+     * 进度条的满格值：<b>最高档的阈值</b>。
+     *
+     * <p>没有配档位时才退回 {@code rule_config} 的目标 —— 那时也没有奖可发，
+     * 进度条只是个进度条。
+     *
+     * <p>🔴 有档位却用 rule_config.targetCount 是错的：那两个是不同的源，
+     * 而发奖判的是档位。运营把档位改成 1/3/7 却没动 targetCount=5，
+     * 表现就是进度到 5 时进度条满了、第三档的奖却还没发。
+     */
+    private static BigDecimal resolveTarget(TaskConfig task, List<TaskStageView> stages) {
+        return stages.stream()
+                .map(TaskStageView::target)
+                .filter(java.util.Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElseGet(() -> TaskRuleConfig.parse(task.getRuleConfig()).target());
     }
 }

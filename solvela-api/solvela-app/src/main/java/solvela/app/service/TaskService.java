@@ -2,10 +2,12 @@ package solvela.app.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import solvela.app.domain.TaskStageItem;
 import solvela.app.domain.TaskView;
 import solvela.enums.TaskRecordStatusEnum;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.TaskCenterItem;
+import solvela.marketing.api.TaskStageView;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -46,8 +48,25 @@ public class TaskService {
                 plain(item.current()),
                 statusText(item.status()),
                 item.status() == TaskRecordStatusEnum.DISPATCHED,
-                item.rewardText(),
+                summary(item),
+                item.stages().stream().map(TaskService::toStage).toList(),
                 item.actionUrl());
+    }
+
+    private static TaskStageItem toStage(TaskStageView stage) {
+        return new TaskStageItem(plain(stage.target()), stage.rewardText(), stage.reached());
+    }
+
+    /**
+     * 一行摘要，给<b>只有一个档位</b>的任务用（绝大多数任务是这种）。
+     *
+     * <p>🔴 多档位<b>不</b>在这里拼成「A / B」。那正是这次要修掉的展示：
+     * 「签到 1 天得 188 积分、连签 5 天再得 8 元」压成一个斜杠串之后，
+     * 用户看不出哪个奖对应哪一档，更看不出自己已经拿到了第一档。
+     * 多档位由前端按 stages 画阶梯，这里给 null，前端就不画那行摘要。
+     */
+    private static String summary(TaskCenterItem item) {
+        return item.stages().size() == 1 ? item.stages().getFirst().rewardText() : null;
     }
 
     /**
