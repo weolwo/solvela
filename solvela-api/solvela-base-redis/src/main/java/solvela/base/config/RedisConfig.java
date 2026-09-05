@@ -145,29 +145,14 @@ public class RedisConfig {
      * cacheManager()，不经过它们。
      */
 
-    @Bean
-    public HashOperations<String, String, Object> hashOperations(RedisTemplate<String, Object> redisTemplate) {
-        return redisTemplate.opsForHash();
-    }
-
-    @Bean
-    public ValueOperations<String, String> valueOperations(RedisTemplate<String, String> redisTemplate) {
-        return redisTemplate.opsForValue();
-    }
-
-    @Bean
-    public ListOperations<String, Object> listOperations(RedisTemplate<String, Object> redisTemplate) {
-        return redisTemplate.opsForList();
-    }
-
-    @Bean
-    public SetOperations<String, Object> setOperations(RedisTemplate<String, Object> redisTemplate) {
-        return redisTemplate.opsForSet();
-    }
-
-    @Bean
-    public ZSetOperations<String, Object> zSetOperations(RedisTemplate<String, Object> redisTemplate) {
-        return redisTemplate.opsForZSet();
-    }
+    /*
+     * 这里原先还有 hashOperations / valueOperations / listOperations / setOperations /
+     * zSetOperations 五个 @Bean，随 RedisService 的瘦身一起删除（2026-09-05）。
+     *
+     * 它们的唯一消费方是 RedisService 里那批纯转发方法（mset/mget 等），而那批方法
+     * 从落地起就没有调用方。要用 Hash/List/Set，直接在业务类里 redisTemplate.opsForXxx()
+     * 即可 —— 把 opsForXxx 的结果做成 Bean 并不带来任何抽象，只是让「这段代码碰了 Redis
+     * 的哪种结构」从调用处消失，看代码时还要回来查一遍注入的是什么。
+     */
 
 }

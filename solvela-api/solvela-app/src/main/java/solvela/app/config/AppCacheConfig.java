@@ -30,8 +30,8 @@ import java.time.Duration;
  * 网关的缓存。<b>只有一个缓存：认证热路径的会员身份</b>（{@code MemberPrincipalLoader}）。
  *
  * <h3>为什么网关自己写，而不是用 base-redis 的 RedisConfig</h3>
- * base-redis 那个 {@code @Configuration} 里有 9 个 bean（RedisTemplate、5 个 Operations、
- * Redisson…），网关<b>一个都用不到</b> —— 它只要 {@code StringRedisTemplate}
+ * base-redis 那个 {@code @Configuration} 里有 RedisTemplate、缓存管理器、Redisson
+ * 这一批 bean，网关<b>一个都用不到</b> —— 它只要 {@code StringRedisTemplate}
  * （Spring Boot 自动配置就给）加这里的缓存管理器。
  *
  * <p>而依赖 base-redis 的代价是 27 个传递 jar：<b>Redisson 加 9 个 netty</b>、
