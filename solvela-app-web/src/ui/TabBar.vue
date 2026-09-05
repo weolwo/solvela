@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { IconName } from './SvIcon.vue'
+import type { IconName } from './Icon.vue'
 
 /**
  * 底部主导航。
@@ -11,9 +11,13 @@ import type { IconName } from './SvIcon.vue'
  * 让每个页面自己写一个魔法数的话，改高度要改 N 处，而漏改的表现是内容被压住。
  */
 
+/*
+ * 「优惠」原来是这里的第二个 tab。活动列表搬进首页顶部的「活动中心」之后它被去掉了 ——
+ * 同一份数据留两个入口，迟早会出现「一边改了一边没改」。
+ * 老路径 /promo 在 router 里 redirect 到活动中心，收藏过的链接不会失效。
+ */
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'home', label: '首页', icon: 'home' },
-  { name: 'promo', label: '优惠', icon: 'gift' },
   { name: 'mine', label: '我的', icon: 'user' },
 ]
 </script>
@@ -27,7 +31,7 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
       active-class="sv-tabbar__item--active"
       :to="{ name: tab.name }"
     >
-      <SvIcon :name="tab.icon" :size="24" />
+      <Icon :name="tab.icon" :size="24" />
       <span class="sv-tabbar__label">{{ tab.label }}</span>
     </RouterLink>
   </nav>

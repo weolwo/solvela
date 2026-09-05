@@ -21,7 +21,7 @@ const id = useId()
   <div class="sv-checkbox">
     <input :id="id" v-model="model" class="sv-checkbox__native" type="checkbox" />
     <span class="sv-checkbox__box" aria-hidden="true">
-      <SvIcon name="check" :size="14" />
+      <Icon name="check" :size="14" />
     </span>
     <label class="sv-checkbox__label" :for="id">{{ label }}</label>
   </div>

@@ -8,7 +8,7 @@ const router = useRouter()
   <div class="page">
     <p class="page__code">404</p>
     <p class="page__text">页面不存在</p>
-    <SvButton class="page__action" :block="false" @click="router.replace('/')">回到首页</SvButton>
+    <Button class="page__action" :block="false" @click="router.replace('/')">回到首页</Button>
   </div>
 </template>
 

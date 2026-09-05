@@ -14,7 +14,7 @@
 
 <template>
   <div class="page">
-    <SvNavBar title="设置" />
+    <NavBar title="设置" />
 
     <div class="page__body">
       <p class="page__empty">设置项正在建设中，敬请期待</p>

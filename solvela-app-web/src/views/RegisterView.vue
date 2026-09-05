@@ -105,7 +105,7 @@ async function goLogin(): Promise<void> {
     </header>
 
     <form class="page__form" novalidate @submit.prevent="submit">
-      <SvField
+      <Field
         v-model="phone"
         icon="phone"
         type="tel"
@@ -114,7 +114,7 @@ async function goLogin(): Promise<void> {
         :maxlength="11"
         :error="phoneError"
       />
-      <SvField
+      <Field
         v-model="password"
         icon="lock"
         type="password"
@@ -123,7 +123,7 @@ async function goLogin(): Promise<void> {
         :hint="PASSWORD_HINT"
         :error="passwordError"
       />
-      <SvField
+      <Field
         v-model="confirmPassword"
         icon="lock"
         type="password"
@@ -138,10 +138,10 @@ async function goLogin(): Promise<void> {
         <span v-if="errorTraceId !== null" class="page__trace">（编号 {{ errorTraceId }}）</span>
       </p>
 
-      <SvButton type="submit" :loading="submitting" class="page__submit">注册</SvButton>
+      <Button type="submit" :loading="submitting" class="page__submit">注册</Button>
 
       <!-- 号已被占用是唯一一种「用户下一步很明确」的失败，给个直达按钮比让他找返回键强 -->
-      <SvButton v-if="phoneTaken" variant="text" @click="goLogin">该手机号已注册，去登录</SvButton>
+      <Button v-if="phoneTaken" variant="text" @click="goLogin">该手机号已注册，去登录</Button>
     </form>
 
     <p class="page__alt">

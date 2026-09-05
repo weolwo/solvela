@@ -96,7 +96,7 @@ async function submit(): Promise<void> {
       自己监听 keyup.enter 做不到后者。
     -->
     <form class="page__form" novalidate @submit.prevent="submit">
-      <SvField
+      <Field
         v-model="phone"
         icon="phone"
         type="tel"
@@ -105,7 +105,7 @@ async function submit(): Promise<void> {
         :maxlength="11"
         :error="phoneError"
       />
-      <SvField
+      <Field
         v-model="password"
         icon="lock"
         type="password"
@@ -120,10 +120,10 @@ async function submit(): Promise<void> {
         <span v-if="errorTraceId !== null" class="page__trace">（编号 {{ errorTraceId }}）</span>
       </p>
 
-      <SvButton type="submit" :loading="submitting" class="page__submit">登录</SvButton>
+      <Button type="submit" :loading="submitting" class="page__submit">登录</Button>
 
       <div class="page__options">
-        <SvCheckbox v-model="remember" label="记住我" />
+        <Checkbox v-model="remember" label="记住我" />
         <!--
           忘记密码还没有页面。做成灰色不可点，而不是给一个点了没反应的蓝色链接——
           后者是在骗用户，他会一直点。等找回流程做完再放开
@@ -138,7 +138,7 @@ async function submit(): Promise<void> {
       </RouterLink>
     </p>
 
-    <SvResult :open="succeeded" text="登录成功" />
+    <Result :open="succeeded" text="登录成功" />
   </div>
 </template>
 

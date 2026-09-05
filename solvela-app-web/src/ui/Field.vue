@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue'
 
-import type { IconName } from './SvIcon.vue'
+import type { IconName } from './Icon.vue'
 
 /**
  * 表单里的一个输入框：**胶囊填充式，左图标，密码可切明文**。
@@ -64,7 +64,7 @@ const message = computed(() => props.error ?? props.hint)
 <template>
   <div class="sv-field">
     <div class="sv-field__box" :class="{ 'sv-field__box--invalid': error !== undefined }">
-      <SvIcon v-if="icon !== undefined" :name="icon" :size="20" class="sv-field__icon" />
+      <Icon v-if="icon !== undefined" :name="icon" :size="20" class="sv-field__icon" />
 
       <input
         :id="inputId"
@@ -94,7 +94,7 @@ const message = computed(() => props.error ?? props.hint)
         :aria-pressed="revealed"
         @click="revealed = !revealed"
       >
-        <SvIcon :name="revealed ? 'eye' : 'eye-off'" :size="20" />
+        <Icon :name="revealed ? 'eye' : 'eye-off'" :size="20" />
       </button>
     </div>
 

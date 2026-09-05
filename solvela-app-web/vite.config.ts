@@ -58,9 +58,6 @@ export default defineConfig(({ mode }) => {
           // Vite 8 的 manualChunks 只接受函数形式，对象形式的类型已被移除。
           // 用 includes 而不是正则：rollup 的 id 一律是正斜杠，正则只会引入转义噪音。
           manualChunks(id: string) {
-            if (id.includes('node_modules/@varlet/')) {
-              return 'varlet'
-            }
             if (
               id.includes('node_modules/vue/') ||
               id.includes('node_modules/vue-router/') ||

@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { fetchPromos } from '@/api/home'
+import { RouterLink } from 'vue-router'
+
+import { fetchPromos } from '@/api/promo'
 import { useAsync } from '@/composables/useAsync'
+
+/**
+ * 活动中心。首页三个 tab 里的第三个。
+ *
+ * <p>这一页原来是底部导航的「优惠」（PromoView）。搬进首页顶部 tab 之后底部那个入口
+ * 就去掉了 —— 同一份数据留两个入口，迟早会出现「一边改了一边没改」。
+ * 老路径 `/promo` 在 router 里 redirect 到这里，收藏过的链接不会失效。
+ */
 
 const promos = useAsync(fetchPromos)
 </script>
 
 <template>
-  <div class="page">
-    <header class="page__head">
-      <h1 class="page__title">优惠</h1>
-      <p class="page__subtitle">当前进行中的活动</p>
-    </header>
-
-    <SvSection
+  <div class="activities">
+    <Section
       title="进行中"
       :loading="promos.loading.value"
       :error="promos.error.value"
@@ -22,13 +27,19 @@ const promos = useAsync(fetchPromos)
     >
       <div class="list">
         <!--
-          ⚠️ 卡片现在【不是链接】：活动详情页还没有（那是抽奖页那一整块）。
-          做成能点但点了没反应的链接是在骗用户，所以先渲染成 div。
-          详情页落地后改成 <RouterLink :to="{ name: 'activity', params: { code } }">，
-          并且只给 joinable 的那些加链接 —— joinable 由服务端时钟算好下发，
-          不让客户端拿本地时间自己判。
+          只有 joinable 的活动才渲染成链接（RouterLink）。未开始的仍是 div ——
+          做成能点但点进去啥也参与不了的链接是在骗用户。
+          joinable 由服务端时钟算好下发，不让客户端拿本地时间自己判。
         -->
-        <div v-for="promo in promos.data.value ?? []" :key="promo.activityCode" class="promo">
+        <component
+          :is="promo.joinable ? RouterLink : 'div'"
+          v-for="promo in promos.data.value ?? []"
+          :key="promo.activityCode"
+          class="promo"
+          :to="
+            promo.joinable ? { name: 'activity', params: { code: promo.activityCode } } : undefined
+          "
+        >
           <div class="promo__body">
             <div class="promo__row">
               <h3 class="promo__name">{{ promo.activityName }}</h3>
@@ -39,36 +50,16 @@ const promos = useAsync(fetchPromos)
             <p v-if="promo.subTitle !== null" class="promo__sub">{{ promo.subTitle }}</p>
             <p class="promo__time">{{ promo.endTime }} 结束</p>
           </div>
-        </div>
+          <Icon v-if="promo.joinable" name="chevron" :size="18" class="promo__arrow" />
+        </component>
       </div>
-    </SvSection>
+    </Section>
   </div>
 </template>
 
 <style scoped>
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sv-space-lg);
-  padding: calc(var(--sv-safe-top) + var(--sv-space-lg)) var(--sv-space-page) var(--sv-space-lg);
-}
-
-.page__head {
-  padding: 0 var(--sv-space-xs);
-}
-
-.page__title {
-  margin: 0;
-  font-size: var(--sv-font-title);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.page__subtitle {
-  margin: var(--sv-space-sm) 0 0;
-  color: var(--sv-text-secondary);
-  font-size: var(--sv-font-caption);
+.activities {
+  padding: var(--sv-space-md) var(--sv-space-page) 0;
 }
 
 .list {
@@ -88,9 +79,24 @@ const promos = useAsync(fetchPromos)
   text-decoration: none;
 }
 
+/* :active 只在链接态有意义（div 版点了不跳） */
+a.promo:active {
+  background: var(--sv-bg-pressed);
+}
+
+a.promo:focus-visible {
+  outline: 2px solid var(--sv-color-primary);
+  outline-offset: -2px;
+}
+
 .promo__body {
   flex: 1;
   min-width: 0;
+}
+
+.promo__arrow {
+  flex: none;
+  color: var(--sv-text-placeholder);
 }
 
 .promo__row {

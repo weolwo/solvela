@@ -24,7 +24,7 @@ const showTabBar = computed(() => route.meta.tab === true)
     </RouterView>
   </div>
 
-  <SvTabBar v-if="showTabBar" />
+  <TabBar v-if="showTabBar" />
 </template>
 
 <style scoped>

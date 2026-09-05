@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
 
-import type { IconName } from './SvIcon.vue'
+import type { IconName } from './Icon.vue'
 
 /**
  * 设置类列表的一行：左图标 + 标题 +（可选）右侧值 + 箭头。
@@ -40,10 +40,10 @@ withDefaults(
     :to="to"
     :type="to === undefined ? 'button' : undefined"
   >
-    <SvIcon :name="icon" :size="20" class="sv-cell__icon" />
+    <Icon :name="icon" :size="20" class="sv-cell__icon" />
     <span class="sv-cell__title">{{ title }}</span>
     <span v-if="value !== undefined" class="sv-cell__value">{{ value }}</span>
-    <SvIcon v-if="arrow" name="chevron" :size="18" class="sv-cell__arrow" />
+    <Icon v-if="arrow" name="chevron" :size="18" class="sv-cell__arrow" />
   </component>
 </template>
 

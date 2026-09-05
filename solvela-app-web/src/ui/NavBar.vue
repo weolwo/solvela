@@ -20,7 +20,7 @@ const router = useRouter()
 <template>
   <header class="sv-navbar">
     <button class="sv-navbar__back" type="button" aria-label="返回" @click="router.back()">
-      <SvIcon name="chevron" :size="22" style="transform: scaleX(-1)" />
+      <Icon name="chevron" :size="22" style="transform: scaleX(-1)" />
     </button>
     <h1 class="sv-navbar__title">{{ title }}</h1>
     <!-- 占位保持标题居中：左边按钮占了空间，右边补一个等宽的空块抵消 -->

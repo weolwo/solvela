@@ -23,7 +23,24 @@ export interface CarouselItem {
   subtitle: string | null
   /** 卡片背景色（十六进制）。为空则用品牌渐变兜底 */
   themeColor: string | null
+  /**
+   * 行动按钮的文案。为 null 则整张卡只是展示，不出按钮。
+   *
+   * <p>这里<b>只有文案，没有跳转目标</b>：点了去哪是页面的事，由 `cta` 事件带着
+   * item 抛出去。让轮播认识路由，等于让一个展示组件替调用方做导航决策 ——
+   * 换个页面复用它就得改组件。
+   */
+  ctaLabel: string | null
 }
+
+/**
+ * 行动按钮被点了，带上那张卡的 {@link CarouselItem.id}。
+ *
+ * <p>抛 id 而不是整个 item：调用方本来就有这份数据，把对象再递回去除了让它
+ * 多做一次成员访问没有别的用 —— 而从 .vue 里 import 出来的类型在 eslint 的
+ * 类型解析下会退化成 any（Wheel 那边不用 ref 调方法是同一个原因）。
+ */
+const emit = defineEmits<{ cta: [id: string] }>()
 
 const props = withDefaults(
   defineProps<{
@@ -189,6 +206,19 @@ onBeforeUnmount(stopAutoplay)
         >
           <p class="sv-carousel__title">{{ item.title }}</p>
           <p v-if="item.subtitle !== null" class="sv-carousel__subtitle">{{ item.subtitle }}</p>
+          <!--
+            非当前张要 tabindex="-1"：它在 DOM 里但被 translate 挪出了视口，
+            不排除的话 Tab 会跳到一个看不见的按钮上，焦点凭空消失。
+          -->
+          <button
+            v-if="item.ctaLabel !== null"
+            class="sv-carousel__cta"
+            type="button"
+            :tabindex="items[active]?.id === item.id ? undefined : -1"
+            @click="emit('cta', item.id)"
+          >
+            {{ item.ctaLabel }}
+          </button>
         </div>
       </div>
     </div>
@@ -232,7 +262,7 @@ onBeforeUnmount(stopAutoplay)
   padding: var(--sv-space-lg);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   background: linear-gradient(150deg, #ff6a4d, var(--sv-color-primary) 55%, #d92f1f);
   color: var(--sv-text-on-primary);
 }
@@ -254,6 +284,29 @@ onBeforeUnmount(stopAutoplay)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sv-carousel__cta {
+  align-self: flex-start;
+  margin-top: var(--sv-space-md);
+  border: 0;
+  padding: 6px var(--sv-space-md);
+  border-radius: var(--sv-radius-pill);
+  background: var(--sv-bg-surface);
+  color: var(--sv-color-primary);
+  font: inherit;
+  font-size: var(--sv-font-footnote);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sv-carousel__cta:active {
+  opacity: 0.8;
+}
+
+.sv-carousel__cta:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
 .sv-carousel__dots {

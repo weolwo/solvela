@@ -25,7 +25,7 @@ defineProps<{
       <div v-if="open" class="sv-result" role="status" aria-live="polite">
         <div class="sv-result__card">
           <div class="sv-result__badge">
-            <SvIcon name="check" :size="34" />
+            <Icon name="check" :size="34" />
           </div>
           <p class="sv-result__text">{{ text }}</p>
         </div>

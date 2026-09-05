@@ -11,18 +11,18 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    Button: typeof import('./ui/Button.vue')['default']
+    Card: typeof import('./ui/Card.vue')['default']
+    Carousel: typeof import('./ui/Carousel.vue')['default']
+    Cell: typeof import('./ui/Cell.vue')['default']
+    Checkbox: typeof import('./ui/Checkbox.vue')['default']
+    Field: typeof import('./ui/Field.vue')['default']
+    Icon: typeof import('./ui/Icon.vue')['default']
+    NavBar: typeof import('./ui/NavBar.vue')['default']
+    Result: typeof import('./ui/Result.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    SvButton: typeof import('./ui/SvButton.vue')['default']
-    SvCard: typeof import('./ui/SvCard.vue')['default']
-    SvCarousel: typeof import('./ui/SvCarousel.vue')['default']
-    SvCell: typeof import('./ui/SvCell.vue')['default']
-    SvCheckbox: typeof import('./ui/SvCheckbox.vue')['default']
-    SvField: typeof import('./ui/SvField.vue')['default']
-    SvIcon: typeof import('./ui/SvIcon.vue')['default']
-    SvNavBar: typeof import('./ui/SvNavBar.vue')['default']
-    SvResult: typeof import('./ui/SvResult.vue')['default']
-    SvSection: typeof import('./ui/SvSection.vue')['default']
-    SvTabBar: typeof import('./ui/SvTabBar.vue')['default']
+    Section: typeof import('./ui/Section.vue')['default']
+    TabBar: typeof import('./ui/TabBar.vue')['default']
   }
 }
