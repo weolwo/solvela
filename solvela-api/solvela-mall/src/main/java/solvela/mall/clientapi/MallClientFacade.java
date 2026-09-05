@@ -16,6 +16,7 @@ import solvela.mall.MallFavorite;
 import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
 import solvela.mall.order.service.MallRedeemService;
+import solvela.mall.constant.MallConst;
 import solvela.mall.constant.MallSkuAttrs;
 import solvela.mall.category.manager.MallCategoryManager;
 import solvela.mall.commodity.manager.MallCommodityManager;
@@ -178,10 +179,17 @@ public class MallClientFacade implements MallApi {
         boolean favorite = !favoriteIds(memberId, List.of(commodityId)).isEmpty();
 
         /*
-         * 主图和各 SKU 的图一起换 —— 详情页的 SKU 常有十几个，
-         * 一个一个换就是十几次查询，而它们本来可以是一次。
+         * 主图、轮播图、各 SKU 的图<b>一起换</b> —— 详情页的 SKU 常有十几个，
+         * 加上几张轮播图，一个一个换就是二十次查询，而它们本来可以是一次。
+         *
+         * 🔴 轮播图的 biz_type 是 MALL_COMMODITY_BANNER，<b>不是</b> MALL_COMMODITY。
+         * mall.sql 里那句「复用 t_file_relation(biz_type='MALL_COMMODITY')」写漏了后缀：
+         * 后台保存时把封面登记成 MALL_COMMODITY、把轮播图登记成 MALL_COMMODITY_BANNER
+         * （见 MallCommoditySaveCommand），拿前者查只会查到封面自己。
          */
-        List<Long> imageIds = new java.util.ArrayList<>();
+        List<Long> bannerIds = fileAssetService.listBizFileIds(
+                MallConst.BIZ_TYPE_BANNER, commodity.getId());
+        List<Long> imageIds = new java.util.ArrayList<>(bannerIds);
         imageIds.add(commodity.getCoverFileId());
         skus.forEach(sku -> imageIds.add(sku.getSkuCoverFileId()));
         Map<Long, String> images = urlsOf(imageIds);
@@ -192,8 +200,13 @@ public class MallClientFacade implements MallApi {
                 commodity.getCommodityIntro(), urlFor(images, commodity.getCoverFileId()),
                 commodity.getPayType(), commodity.getPointsPrice(), commodity.getCashPrice(),
                 commodity.getOriginalPrice(), favorite, stock,
-                // 轮播图走 t_file_relation，等文件引用登记接上后填；现在是空列表
-                List.of(),
+                /*
+                 * 轮播图，按 t_file_relation.sort 排 —— 那一列的注释原文就是「轮播图必需」。
+                 * 换不出 URL 的（文件被删）直接滤掉：宁可少一张，
+                 * 也不要在图集里留一个永远转不出来的位置。
+                 */
+                bannerIds.stream().map(id -> urlFor(images, id))
+                        .filter(java.util.Objects::nonNull).toList(),
                 commodity.getDetailContent(), commodity.getExchangeNotice(),
                 commodity.getLimitPeriod(), commodity.getLimitCount(),
                 remainingCount(commodity, memberId),

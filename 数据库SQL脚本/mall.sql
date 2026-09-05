@@ -198,7 +198,11 @@ CREATE TABLE `t_mall_commodity`
     `commodity_name`  varchar(128)   NOT NULL COMMENT '商品名称',
     `commodity_intro` varchar(255)            DEFAULT NULL COMMENT '副标题/一句话卖点',
     `cover_file_id`   bigint         NOT NULL COMMENT '封面主图 file_id（建议 800x800）',
-    -- 轮播图不在这里，复用 t_file_relation(biz_type='MALL_COMMODITY', biz_id=本表id, sort)
+    -- 轮播图不在这里，复用 t_file_relation(biz_type='MALL_COMMODITY_BANNER', biz_id=本表id, sort)
+    -- 🔴 后缀不能漏：封面登记成 MALL_COMMODITY、轮播图登记成 MALL_COMMODITY_BANNER，
+    --    是**两组**（见 MallCommoditySaveCommand）。拿 MALL_COMMODITY 去查轮播图
+    --    会查到封面自己，而且不报错 —— 表现是图集里出现一张和主图一模一样的图。
+    --   （2026-09-05 补正：此处原文漏了 _BANNER 后缀。）
     -- —— 那张表的 sort 列注释原文就是「附件顺序，轮播图必需」，专门为此存在，不要重复造图册表
     `detail_content`  mediumtext COMMENT '图文详情，富文本HTML。禁止 base64 内联图片（对齐 t_activity_display.rule_content）',
     `exchange_notice` varchar(1024)           DEFAULT NULL COMMENT '兑换须知：券的核销说明、实物的发货时效等。C端下单页固定展示',
