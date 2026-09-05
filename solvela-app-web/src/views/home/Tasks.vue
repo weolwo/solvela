@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 
 import { fetchTasks, type TaskItem, type TaskStage } from '@/api/task'
 import { useAsync } from '@/composables/useAsync'
@@ -21,7 +22,50 @@ import { compare, format, money } from '@/utils/money'
  * 这里只用 `finished` 选个样式。
  */
 
+const router = useRouter()
 const tasks = useAsync(fetchTasks)
+
+/**
+ * 「去完成」跳哪。<b>跳不到就返回 null，不画那个按钮。</b>
+ *
+ * <h3>🔴 actionUrl 是运营在后台填的自由文本</h3>
+ * 它完全可能指向一个不存在的页面 —— 任务 51 填的是 `/signIn`，
+ * 而路由表里没有这一条，点下去落到 catch-all，用户看到 404。
+ *
+ * <p>这一页开头那段注释写着「画一个点了什么都不会发生的按钮比不画更糟」，
+ * 但那句话此前只对「领取」成立。<b>一个通向 404 的按钮是同一件事的另一种形状</b>，
+ * 而且更糟：用户会以为是自己的问题，或者以为任务系统坏了。
+ *
+ * <h3>站内路径必须走 RouterLink</h3>
+ * 原先一律用 &lt;a href&gt;，对站内路径是错的：那是<b>整页刷新</b>，
+ * 离开 SPA 再向服务器要一次，白屏一下不说，登录态之外的内存状态全丢。
+ * 站外链接才该用 &lt;a&gt;。
+ */
+function actionTarget(task: TaskItem): { to: string; external: boolean } | null {
+  const url = task.actionUrl
+  if (url === null || url.trim() === '' || task.finished) {
+    return null
+  }
+  const trimmed = url.trim()
+  if (/^https?:\/\//i.test(trimmed)) {
+    return { to: trimmed, external: true }
+  }
+  try {
+    const resolved = router.resolve(trimmed)
+    /*
+     * 两种「不存在」都要认出来：
+     *   · matched 为空 —— 压根没有路由匹配上；
+     *   · 落到 catch-all（name === 'not-found'）—— 真实路由表里那条兜底规则
+     *     会把任何路径都匹配上，所以只看 matched 是不够的。
+     * 两条都判，才不会把 404 递给用户。
+     */
+    const missing = resolved.matched.length === 0 || resolved.name === 'not-found'
+    return missing ? null : { to: trimmed, external: false }
+  } catch {
+    // resolve 对畸形输入会抛。运营填错了不该让整页崩掉
+    return null
+  }
+}
 
 /** 进度条只对多次任务有意义：目标为 1 的任务画一根 0% 或 100% 的条纯属噪音 */
 function showsProgress(task: TaskItem): boolean {
@@ -150,13 +194,25 @@ const grouped = computed(() => {
                   有 actionUrl 的任务给一个「去完成」，没有的（比如每日登录）就不画 ——
                   一个点了没去处的按钮比没有更糟。
                 -->
-                <a
-                  v-if="!task.finished && task.actionUrl !== null && task.actionUrl !== ''"
-                  class="task__go"
-                  :href="task.actionUrl"
-                >
-                  去完成
-                </a>
+                <template v-if="actionTarget(task) !== null">
+                  <!-- 站内走 RouterLink（不整页刷新），站外才用 a -->
+                  <RouterLink
+                    v-if="!actionTarget(task)!.external"
+                    class="task__go"
+                    :to="actionTarget(task)!.to"
+                  >
+                    去完成
+                  </RouterLink>
+                  <a
+                    v-else
+                    class="task__go"
+                    :href="actionTarget(task)!.to"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    去完成
+                  </a>
+                </template>
                 <span v-else-if="task.finished" class="task__done">{{ task.statusText }}</span>
               </div>
             </div>

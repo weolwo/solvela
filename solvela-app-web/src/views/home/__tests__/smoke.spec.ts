@@ -116,6 +116,22 @@ vi.mock('@/api/task', () => ({
         stages: [{ target: '1', rewardText: '+50 积分', reached: true }],
         actionUrl: null,
       },
+      /*
+       * 运营填了一个路由表里没有的地址（真实配置：任务 51 填的是 /signIn，
+       * 而 C 端至今没有签到页）。这一条用来验「不画通向 404 的按钮」。
+       */
+      {
+        taskId: '4',
+        taskName: '样例·连续签到',
+        taskGroup: null,
+        target: '5',
+        current: '0',
+        statusText: '未开始',
+        finished: false,
+        rewardText: '+188 积分',
+        stages: [{ target: '5', rewardText: '+188 积分', reached: false }],
+        actionUrl: '/signIn',
+      },
     ]),
 }))
 
@@ -291,8 +307,8 @@ describe('Tasks', () => {
     // 而 Tasks.vue 的注释里正好有「没有「领取」按钮」这句话
     expect(w.text()).not.toContain('领取')
 
-    // 进度条只给「目标 > 1 且还没发奖」的任务画
-    expect(w.findAll('[role="progressbar"]')).toHaveLength(1)
+    // 进度条只给「目标 > 1 且还没发奖」的任务画：签到(5) 与连续签到(5) 两条
+    expect(w.findAll('[role="progressbar"]')).toHaveLength(2)
     // 满格值是**最高档的阈值**（5），不是 rule_config 里那个数
     expect(w.find('[role="progressbar"]').attributes('aria-valuemax')).toBe('5')
     expect(html).toContain('1/5')
@@ -317,6 +333,30 @@ describe('Tasks', () => {
     // 已达标的那档要有视觉区别 —— 不然拿到了 188 积分，界面上毫无变化
     expect(stages[0]?.classes()).toContain('ladder__item--reached')
     expect(stages[1]?.classes()).not.toContain('ladder__item--reached')
+  })
+
+  it('🔴 actionUrl 指向不存在的路由时不画「去完成」，不能把 404 递给用户', async () => {
+    const w = mount(Tasks, { global })
+    await settle()
+
+    /*
+     * 运营填的是自由文本。任务 51 真填了 /signIn，而路由表里没有 ——
+     * 原先原样渲染成链接，点下去落到 catch-all，用户看到 404，
+     * 还会以为是自己的问题或者任务系统坏了。
+     */
+    expect(w.text()).toContain('样例·连续签到')
+    const links = w.findAll('.task__go')
+    // 三个候选里只有 /mall 那条是能跳的：signIn 不存在，已完成的那条不画
+    expect(links).toHaveLength(1)
+    expect(links[0]?.attributes('href')).toBe('/mall')
+  })
+
+  it('站内链接走 RouterLink，不是整页刷新的 <a>', async () => {
+    const w = mount(Tasks, { global })
+    await settle()
+    const link = w.findComponent({ name: 'RouterLink' })
+    // <a href> 对站内路径是整页刷新：白屏一次，内存里的状态全丢
+    expect(link.exists()).toBe(true)
   })
 
   it('单档任务不画阶梯 —— 它的奖励在右侧那行摘要里', async () => {
