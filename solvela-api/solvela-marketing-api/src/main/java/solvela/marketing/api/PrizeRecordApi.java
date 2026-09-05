@@ -33,7 +33,17 @@ public interface PrizeRecordApi {
      *
      * <p>没有记录时返回<b>空列表，不是 null</b> —— 新用户就是这个状态。
      */
+    /**
+     * 我的奖励记录，按时间倒序。
+     *
+     * @param activityCode 只看这一个活动的记录，<b>为空表示不限</b>。
+     *                     活动专题页要的是「我在这个活动里得过什么」——
+     *                     而过滤必须在服务端做：客户端拿最近 20 条再筛，
+     *                     在参与多个活动的用户身上会筛出空列表，
+     *                     而他明明中过奖，只是那条排在第 21 位
+     */
     @GetExchange("/record")
     List<PrizeRecordView> listRecentRecords(@RequestParam Long memberId,
+                                            @RequestParam(required = false) String activityCode,
                                             @RequestParam int limit);
 }

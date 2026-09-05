@@ -15,6 +15,7 @@ import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.MallApi;
 import solvela.marketing.api.PrizeRecordApi;
 import solvela.member.api.AssetApi;
+import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.MemberAuthApi;
 
 import java.time.Duration;
@@ -85,6 +86,21 @@ public class DownstreamClientConfig {
     @Bean
     public MallApi mallApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(3), MallApi.class);
+    }
+
+    /**
+     * 优惠记录（提案记录）。<b>3 秒</b>：一次带条件的列表查询。
+     *
+     * <p>🔴 注册的是<b>只读</b>的 {@link ProposalRecordApi}，
+     * 不是带 {@code createProposal} 的 {@code MemberProposalApi} ——
+     * 那个能造一笔发放，不该在公网入口的容器里存在一个可注入的 bean。
+     * 与 {@link AssetApi} / {@code AssetDebitApi} 那对是同一条规矩。
+     *
+     * <p>实现在 solvela-risk，今天与营销同进程，所以复用同一个 base-url。
+     */
+    @Bean
+    public ProposalRecordApi proposalRecordApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(3), ProposalRecordApi.class);
     }
 
     @Bean

@@ -23,8 +23,8 @@ public class PrizeRecordInternalController implements PrizeRecordApi {
     private final PrizeLogService prizeLogService;
 
     @Override
-    public List<PrizeRecordView> listRecentRecords(Long memberId, int limit) {
-        return prizeLogService.listRecentByMember(memberId, limit).stream()
+    public List<PrizeRecordView> listRecentRecords(Long memberId, String activityCode, int limit) {
+        return prizeLogService.listRecentByMember(memberId, activityCode, limit).stream()
                 .map(log -> new PrizeRecordView(
                         log.getId(),
                         log.getPrizeName(),

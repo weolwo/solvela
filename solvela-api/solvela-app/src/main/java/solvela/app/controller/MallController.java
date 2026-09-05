@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.Anonymous;
 import solvela.app.auth.CurrentMember;
+import solvela.app.domain.OrderView;
 import solvela.app.domain.RedeemRequest;
 import solvela.app.domain.RedeemResultView;
+import solvela.app.service.OrderService;
 import solvela.app.service.RedeemService;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
@@ -49,6 +51,7 @@ public class MallController {
 
     private final MallApi mallApi;
     private final RedeemService redeemService;
+    private final OrderService orderService;
 
     @Anonymous
     @GetMapping("/category")
@@ -106,6 +109,16 @@ public class MallController {
     @PostMapping("/redeem")
     public RedeemResultView redeem(@RequestBody @Valid RedeemRequest request) {
         return redeemService.redeem(CurrentMember.require().memberId(), request);
+    }
+
+    /**
+     * 我的兑换记录。<b>全部状态都出</b>，包括已取消与发放失败 ——
+     * 只出成功的等于把「我兑的东西呢」这个问题藏起来，
+     * 而那正是用户点进这一页最想知道的事。
+     */
+    @GetMapping("/order")
+    public List<OrderView> listMyOrders() {
+        return orderService.listMyOrders(CurrentMember.require().memberId());
     }
 
     /* ---------------- 收藏。要登录 ---------------- */

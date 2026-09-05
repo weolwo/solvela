@@ -11,6 +11,7 @@ import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.apache.commons.lang3.StringUtils;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.domain.command.PrizeLogAddCommand;
 import solvela.prize.prizelog.domain.query.PrizeLogQuery;
@@ -69,11 +70,26 @@ public class PrizeLogService {
      * <p>⚠️ 返回<b>实体</b>，字段裁剪由调用方做。这一层不该知道哪个端要看什么。
      */
     public List<PrizeLog> listRecentByMember(Long memberId, int limit) {
+        return listRecentByMember(memberId, null, limit);
+    }
+
+    /**
+     * 同上，但可以只看<b>某一个活动</b>的记录。给活动专题页用。
+     *
+     * <p>🔴 过滤放在 SQL 里而不是查回来再筛：那个索引就是
+     * {@code (member_id, activity_code)}，正好是这个查询的形状。
+     * 「查最近 20 条再按活动筛」在参与多个活动的用户身上会筛出空列表 ——
+     * 而他明明在这个活动里中过奖，只是那条记录排在第 21 位。
+     *
+     * @param activityCode 为空表示不限活动
+     */
+    public List<PrizeLog> listRecentByMember(Long memberId, String activityCode, int limit) {
         if (memberId == null || limit <= 0) {
             return List.of();
         }
         return prizeLogDao.selectList(new LambdaQueryWrapper<PrizeLog>()
                 .eq(PrizeLog::getMemberId, memberId)
+                .eq(StringUtils.isNotBlank(activityCode), PrizeLog::getActivityCode, activityCode)
                 // 按 id 倒序即时间倒序（自增），比按 create_time 排少一个索引
                 .orderByDesc(PrizeLog::getId)
                 .last("LIMIT " + Math.min(limit, MAX_RECENT)));

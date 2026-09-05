@@ -3,40 +3,71 @@ import type { Id } from '@/types/contract'
 import { request } from './http'
 
 /**
- * 我的记录（奖励发放记录）。对应 <b>prize 域</b>，2026-09-05 已接通真实接口。
+ * 「我的记录」。<b>三种记录是三件事，各走各的接口。</b>
  *
- * <h3>三种玩法共用一张表，所以这里只有一个接口</h3>
- * 抽奖、任务、彩票的发奖都落在 `t_prize_log`（表上有 activity_type 列），
- * 所以「我的记录」是一张表的查询，不是跨三个玩法的聚合。
+ * <ul>
+ *   <li><b>兑换记录</b>（{@link fetchExchangeRecords}）—— 我花积分换了什么</li>
+ *   <li><b>优惠记录</b>（{@link fetchPromoRecords}）—— 平台要发给我什么，含还在路上的</li>
+ *   <li><b>奖励记录</b>（{@link fetchPrizeRecords}）—— 我在某个活动里中了什么。
+ *       它属于活动，所以展示在活动专题页而不是「我的」</li>
+ * </ul>
  *
- * <h3>失败原因不下发</h3>
- * 后端有 `failReason`，但那是<b>内部原因</b>（「资产账户冻结」「奖池库存不足」），
- * 对用户既没有可操作性，又暴露内部结构。所以 `statusText` 里只有
- * 「发放失败，请联系客服」—— 真正的原因客服按记录 id 在后台查得到。
+ * 合并成一个「全部记录」是这里的旧做法，问题是三者的状态机、金额口径、
+ * 该显示什么完全不同，合成一个列表之后每条只能显示最小公约数。
  */
 
-/** 一条奖励发放记录 */
+/** 奖励记录 / 优惠记录共用的形状：服务端已经把状态翻成人话了 */
 export interface RecordItem {
   recordId: Id
-  /** 给用户看的标题，就是奖品名 */
   title: string
-  /** 展示用的状态文案，由后端给 —— 前端做映射表就是第二份状态机 */
   statusText: string
-  /** 只用于选颜色，不直接展示 */
   status: 'PENDING' | 'DONE' | 'FAILED'
-  /** 数量/面值，字符串。实物类没有面值时为 null */
+  /** 面值。实物类没有，为 null */
   amount: string | null
   createTime: string
 }
 
 /**
- * 我最近的奖励记录，按时间倒序。
+ * 一条兑换记录。
  *
- * <p>⚠️ <b>只有最近若干条，没有分页</b>。「全部记录」是另一页的事，
- * 那时才需要分页，而分页形状由那一页的需求定（要不要跳页），现在不预先猜。
- *
- * <p>没有记录时返回空数组，不是 404 —— 新用户就是这个状态。
+ * 🔴 `cost` 是服务端拼好的整句（「45,000 积分 + ¥299.00」）。
+ * 让端上自己拼积分和现金那两半，三个页面就会拼出三种样子。
  */
-export function fetchRecords(): Promise<RecordItem[]> {
-  return request<RecordItem[]>({ url: '/records' })
+export interface OrderItem {
+  orderNo: string
+  commodityName: string
+  coverUrl: string | null
+  /** 规格，如 ["颜色：曜石黑", "尺码：L"]。无规格商品是空数组 */
+  specs: string[]
+  quantity: number
+  cost: string
+  statusText: string
+  status: 'PENDING' | 'DONE' | 'FAILED'
+  /** 状态之外还要说的那句（「积分未退回」）。没有就是 null，别画那一行 */
+  hint: string | null
+  createTime: string
+}
+
+/** 兑换记录。走商城，不走 /records —— 它是商城的东西 */
+export function fetchExchangeRecords(): Promise<OrderItem[]> {
+  return request<OrderItem[]>({ url: '/mall/order' })
+}
+
+/** 优惠记录。底层是提案记录，但「提案」是运营的词，C 端不出现 */
+export function fetchPromoRecords(): Promise<RecordItem[]> {
+  return request<RecordItem[]>({ url: '/records/promo' })
+}
+
+/**
+ * 奖励记录。
+ *
+ * @param activityCode 只看这一个活动的。<b>过滤在服务端做</b> ——
+ *   拿最近 20 条回来再筛，在参与多个活动的用户身上会筛出空列表，
+ *   而他明明在这个活动里中过奖，只是那条排在第 21 位。
+ */
+export function fetchPrizeRecords(activityCode?: string): Promise<RecordItem[]> {
+  return request<RecordItem[]>({
+    url: '/records/prize',
+    params: activityCode === undefined ? {} : { activityCode },
+  })
 }

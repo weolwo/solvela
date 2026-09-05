@@ -111,6 +111,30 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/redeem/RedeemView.vue'),
     meta: { title: '确认兑换' },
   },
+  /*
+   * ---- 我的记录：两页，各进各的 ----
+   *
+   * 「我的」页只放入口，不直接铺记录列表：那一页本来就要放钱包、收藏、
+   * 地址簿、设置，再铺一段列表会把它变成一个什么都有、什么都看不清的页面。
+   *
+   * 兑换（我花积分换的）和优惠（平台发给我的）分成两页，是因为它们的
+   * 状态机、金额口径、用户想知道的事完全不同 —— 合成一页每条只能显示最小公约数。
+   *
+   * 🔴 奖励记录<b>不在这里</b>：它是「我在某个活动里中了什么」，
+   * 属于活动，展示在活动专题页上（按 activityCode 过滤）。
+   */
+  {
+    path: '/records/exchange',
+    name: 'records-exchange',
+    component: () => import('@/views/records/ExchangeRecordsView.vue'),
+    meta: { title: '兑换记录' },
+  },
+  {
+    path: '/records/promo',
+    name: 'records-promo',
+    component: () => import('@/views/records/PromoRecordsView.vue'),
+    meta: { title: '优惠记录' },
+  },
   // ---- 我的收藏：从「我的」进去。要登录（默认）——收藏本来就是「我的」东西 ----
   {
     path: '/favorites',

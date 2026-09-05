@@ -11,6 +11,7 @@ import {
   type DrawOutcome,
 } from '@/api/activity'
 import { ApiError } from '@/api/errors'
+import { fetchPrizeRecords } from '@/api/records'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/datetime'
@@ -42,6 +43,20 @@ const rawCode = route.params.code
 const activityCode = (Array.isArray(rawCode) ? rawCode[0] : rawCode) ?? ''
 
 const detail = useAsync(() => fetchActivityDetail(activityCode))
+
+/*
+ * 这个活动里我中过什么。
+ *
+ * 🔴 放在活动页而不是「我的」：奖励记录天然属于活动 ——
+ * 用户抽完奖第一件想确认的是「刚才那个到账没有」，而他此刻就在这一页上。
+ * 过滤由服务端按 activityCode 做，不是拿最近 20 条回来再筛：
+ * 参与多个活动的用户会筛出空列表，而他明明在这个活动里中过奖。
+ *
+ * 未登录不查 —— 这一页是匿名可看的，而记录是「我的」东西。
+ */
+const records = useAsync(() =>
+  auth.isLoggedIn ? fetchPrizeRecords(activityCode) : Promise.resolve([]),
+)
 
 /* ---- 转盘驱动：不调子组件方法，用「自增计数器 + 目标索引」驱动，停下 emit rest ---- */
 const spinCounter = ref(0)
@@ -112,6 +127,16 @@ const dismissButton = useTemplateRef<HTMLButtonElement>('dismissButton')
 
 function closeResult(): void {
   result.value = null
+  /*
+   * 关掉结果弹窗时刷一次记录 —— 刚中的那个奖此刻才该出现在列表里。
+   * 不刷的话用户会看到「中奖了」和一个不含它的记录列表，
+   * 而那正是他会去问客服的场景。
+   *
+   * 放在关闭而不是开奖那一刻：开奖是异步发奖，那时记录可能还没落库。
+   */
+  if (auth.isLoggedIn) {
+    void records.reload()
+  }
 }
 
 function onOverlayKeydown(event: KeyboardEvent): void {
@@ -216,6 +241,32 @@ function goBack(): void {
       </template>
     </div>
 
+    <!--
+      我的奖励记录。登录后才有 —— 这一页匿名可看，而记录是「我的」东西。
+      放在这里是因为用户抽完奖第一件想确认的就是「刚才那个到账没有」。
+    -->
+    <Section
+      v-if="auth.isLoggedIn"
+      title="我的中奖记录"
+      :loading="records.loading.value"
+      :error="records.error.value"
+      :empty="(records.data.value ?? []).length === 0"
+      empty-text="还没有中奖记录"
+      @retry="records.reload"
+    >
+      <Card>
+        <div v-for="item in records.data.value ?? []" :key="item.recordId" class="rec">
+          <div class="rec__main">
+            <p class="rec__title">{{ item.title }}</p>
+            <p class="rec__time">{{ item.createTime }}</p>
+          </div>
+          <span class="rec__status" :class="`rec__status--${item.status.toLowerCase()}`">
+            {{ item.statusText }}
+          </span>
+        </div>
+      </Card>
+    </Section>
+
     <!-- 抽奖结果 -->
     <Teleport to="body">
       <Transition name="prize">
@@ -257,6 +308,52 @@ function goBack(): void {
 </template>
 
 <style scoped>
+.rec {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.rec + .rec {
+  border-top: 1px solid var(--sv-border-subtle);
+}
+
+.rec__main {
+  min-width: 0;
+}
+
+.rec__title {
+  margin: 0;
+  font-size: 15px;
+  color: var(--sv-text-primary);
+}
+
+.rec__time {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--sv-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rec__status {
+  flex: none;
+  font-size: 12px;
+}
+
+.rec__status--pending {
+  color: var(--sv-color-warning);
+}
+
+.rec__status--done {
+  color: var(--sv-color-success);
+}
+
+.rec__status--failed {
+  color: var(--sv-color-danger);
+}
+
 /*
  * 专题页是活动视觉：深色夜空一套自成体系的颜色，不走 --sv-* 那套浅色平台变量。
  * 间距 / 圆角 / 字号仍然用 token。

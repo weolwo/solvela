@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { fetchAssets } from '@/api/assets'
-import { fetchRecords } from '@/api/records'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -16,11 +15,10 @@ const theme = useThemeStore()
 const loggingOut = ref(false)
 
 /*
- * 资产与订单记录原来在首页。首页改成商城/任务/活动三个 tab 之后它们搬到这里 ——
+ * 资产原来在首页。首页改成商城/任务/活动三个 tab 之后它搬到这里 ——
  * 语义上本来就更对：这些是「我的」东西，不是逛的东西。
  */
 const assets = useAsync(fetchAssets)
-const records = useAsync(fetchRecords)
 
 /**
  * 主资产（列表第一项）单独放大展示。哪一项是主资产由**后端的顺序**决定，
@@ -113,32 +111,18 @@ async function handleLogout(): Promise<void> {
       </div>
     </div>
 
-    <Section
-      title="订单记录"
-      :loading="records.loading.value"
-      :error="records.error.value"
-      :empty="(records.data.value ?? []).length === 0"
-      empty-text="还没有记录，去商城或活动中心看看"
-      @retry="records.reload"
-    >
-      <Card>
-        <div v-for="item in records.data.value ?? []" :key="item.recordId" class="record">
-          <div class="record__main">
-            <p class="record__title">{{ item.title }}</p>
-            <p class="record__time">{{ item.createTime }}</p>
-          </div>
-          <div class="record__side">
-            <!-- 面值可能带小数（现金红包），走 money 工具；实物类没有面值 -->
-            <span v-if="item.amount !== null" class="record__amount">
-              +{{ formatWithSeparator(money(item.amount)) }}
-            </span>
-            <span class="record__status" :class="`record__status--${item.status.toLowerCase()}`">
-              {{ item.statusText }}
-            </span>
-          </div>
-        </div>
-      </Card>
-    </Section>
+    <!--
+      🔴 记录只放入口，不在这一页铺列表。
+      这一页要放钱包、记录、收藏、地址簿、设置 —— 再铺一段列表，
+      它就变成一个什么都有、什么都看不清的页面，而记录本身也只能显示前几条。
+
+      奖励记录不在这里：它是「我在某个活动里中了什么」，属于活动，
+      展示在活动专题页上。
+    -->
+    <Card>
+      <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
+      <Cell icon="gift" title="优惠记录" :to="{ name: 'records-promo' }" />
+    </Card>
 
     <Card>
       <Cell icon="heart" title="我的收藏" :to="{ name: 'favorites' }" />
