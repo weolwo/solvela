@@ -47,6 +47,21 @@ public class FileCategoryEntity {
 
     private Integer sort;
 
+    /**
+     * 这个分类下的文件是否<b>免登录可读</b>（走 /file/public/**）。
+     *
+     * <p>🔴 <b>默认 false，公开要显式开口子。</b>反过来写的话，
+     * 新建一个分类忘了设置就是默默裸奔，而那个方向的错误是数据泄露；
+     * 设错成 false 的表现只是「图裂了」—— 看得见、改一下就好。
+     * 与 C 端路由「默认需登录、公开页标 anonymous」是同一条取向。
+     *
+     * <p>为什么是 DB 列而不是像 {@code SYSTEM_CODES} 那样写死在代码里：
+     * 那个名单回答的是「代码有没有硬编码引用这个分类」，只有代码知道；
+     * 而「该不该免登录可见」是运营<b>新建分类时</b>的业务决定，
+     * 代码不知道运营明天会建什么分类。放代码里等于每加一个分类都要发版。
+     */
+    private Boolean publicFlag;
+
     private String createBy;
 
     private LocalDateTime createTime;

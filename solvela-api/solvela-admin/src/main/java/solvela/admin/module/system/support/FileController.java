@@ -125,7 +125,7 @@ public class FileController extends SupportBaseController {
      * <p>缓存头敢写 immutable，是因为 storageKey 不可变、永不覆盖（红线 1）。
      * 换图 = 换 key = 换 URL，所以浏览器和 CDN 缓存一年也不会拿到过期内容。
      */
-    @Operation(summary = "读取文件（免登录，给C端与富文本用） @author 1024")
+    @Operation(summary = "读取文件（免登录，仅公开分类，给C端与富文本用） @author 1024")
     @GetMapping(FileConfig.PUBLIC_FILE_PATH + "/**")
     public void publicAccess(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String uri = request.getRequestURI();
@@ -135,7 +135,10 @@ public class FileController extends SupportBaseController {
 
         FileEntity file;
         try {
-            file = fileAssetService.findByStorageKey(new StorageKey(storageKey).value());
+            // 🔴 必须走 findPublicByStorageKey：它把「分类是否公开」压进了同一条 SQL。
+            //    用 findByStorageKey 再自己 if 的话，那个 if 是可以被忘掉的，
+            //    而忘掉的表现是这个免登录端点吐出私有文件，且不报任何错。
+            file = fileAssetService.findPublicByStorageKey(new StorageKey(storageKey).value());
         } catch (IllegalArgumentException e) {
             // 非法 key（穿越尝试等）与不存在同样处理，不给探测者任何区分信号
             file = null;

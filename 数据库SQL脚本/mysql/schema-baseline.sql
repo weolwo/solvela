@@ -461,6 +461,7 @@ CREATE TABLE `t_file_category` (
   `category_name` varchar(50) COLLATE utf8mb4_general_ci NOT NULL COMMENT '显示名称，可随时改',
   `category_tag` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '标签，选择器里分组用',
   `sort` int NOT NULL DEFAULT '0' COMMENT '排序，小的在前',
+  `public_flag` tinyint NOT NULL DEFAULT '0' COMMENT '该分类下的文件是否免登录可读：0-否(默认), 1-是。公开要显式开口子',
   `create_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',

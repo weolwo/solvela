@@ -135,6 +135,29 @@ class FileAssetServiceTest {
     }
 
     @Test
+    @DisplayName("🔴 免登录读取口走的是「公开分类」查询，不是普通按 key 查")
+    void publicLookupGoesThroughPublicCategoryQuery() {
+        FileEntity found = file(3L, "activity/202608/10/c.jpg");
+        when(fileDao.selectPublicByStorageKey("activity/202608/10/c.jpg")).thenReturn(found);
+        assertThat(service.findPublicByStorageKey("activity/202608/10/c.jpg")).isSameAs(found);
+
+        /*
+         * 私有分类下的文件：那条 join 查不出来，于是这里是 null。
+         * 关键在于它和「文件不存在」返回同一个值 —— 端点一律 404，
+         * 探测者没法用响应差异枚举出哪些 key 有效。
+         */
+        when(fileDao.selectPublicByStorageKey("verify/202609/05/idcard.jpg")).thenReturn(null);
+        assertThat(service.findPublicByStorageKey("verify/202609/05/idcard.jpg")).isNull();
+
+        /*
+         * 🔴 这一条是这个测试真正的价值：确认它<b>没有</b>退回 selectOne 那条普通查询。
+         * 有人把 findPublicByStorageKey 的实现改回 findByStorageKey 时，
+         * 上面两条断言仍然会绿（mock 都能配出来），只有这一条会红。
+         */
+        verify(fileDao, never()).selectOne(any());
+    }
+
+    @Test
     @DisplayName("扩展名从嗅探MIME反推：内容是PNG但命名 evil.html，也存成 .png")
     void extensionComesFromSniffedMime() {
         FileEntity saved = service.upload(png("evil.html"), "BANNER", null);

@@ -117,7 +117,8 @@ file:
     mode: local
     # 公开文件的 URL 前缀。C 端用户是匿名的、永远带不上 token，活动展示图就靠它。
     # 不配则一律退回要登录态的下载接口 —— 管理端仍然能看图（带 token 取字节），但 C 端会全是叉。
-    # 本地模式指向 /support/file/public/：它会查 visibility，私有文件一律 404。
+    # 本地模式指向 /support/file/public/：它只放行 public_flag=1 的分类，其余一律 404
+    # （2026-09-05 补上；此前这句注释描述的 visibility 判断并不存在，见「文件分类-公开标记.sql」）。
     # 上了对象存储/CDN 之后，换成 CDN 域名 + 同一个 storageKey 即可，业务代码与前端都不用动。
     public-url-prefix: http://127.0.0.1:1024/support/file/public/
     local:

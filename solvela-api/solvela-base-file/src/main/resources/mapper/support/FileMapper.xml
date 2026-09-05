@@ -23,6 +23,21 @@
         t_file.create_time
     </sql>
 
+    <!--
+      免登录读取用：storageKey 命中 且 所属分类被标为公开，两个条件在一条 SQL 里。
+      走 t_file 的 storage_key 唯一索引，再按 category_id 主键 join，两次点查。
+      这里要的是完整 FileEntity（下载要 content_type / file_size），
+      所以直接 t_file.*，与上面 voColumns 那份裁剪列表用途不同。
+    -->
+    <select id="selectPublicByStorageKey" resultType="solvela.base.module.file.domain.entity.FileEntity">
+        SELECT t_file.*
+        FROM t_file
+                 JOIN t_file_category c ON c.category_id = t_file.category_id
+        WHERE t_file.storage_key = #{storageKey}
+          AND t_file.deleted_flag = 0
+          AND c.public_flag = 1
+    </select>
+
     <!-- 分页查询 -->
     <select id="queryPage" resultType="solvela.base.module.file.domain.vo.FileVO">
         SELECT

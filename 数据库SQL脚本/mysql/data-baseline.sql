@@ -620,14 +620,14 @@ INSERT INTO `t_config` (`config_id`, `config_name`, `config_key`, `config_value`
 -- t_file_category  文件分类。代码按 category_code 引用，缺了直接抛异常（7 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_file_category`;
-INSERT INTO `t_file_category` (`category_id`, `category_code`, `category_name`, `category_tag`, `sort`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
-(1, 'COMMON', '通用', '系统', 10, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
-(2, 'NOTICE', '公告', '系统', 20, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
-(3, 'HELP_DOC', '帮助中心', '系统', 30, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
-(4, 'FEEDBACK', '意见反馈', '系统', 40, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
-(6, 'ACTIVITY', '活动素材', '营销', 5, NULL, '2026-08-10 10:20:21', NULL, '2026-08-10 10:20:21'),
-(7, 'CONTENT', '正文配图', '营销', 6, NULL, '2026-08-10 11:01:30', NULL, '2026-08-10 11:01:30'),
-(8, 'MALL_COMMODITY', '商城商品图', '商城', 100, NULL, '2026-08-22 11:18:13', NULL, '2026-08-22 11:18:13');
+INSERT INTO `t_file_category` (`category_id`, `category_code`, `category_name`, `category_tag`, `sort`, `public_flag`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
+(1, 'COMMON', '通用', '系统', 10, 1, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
+(2, 'NOTICE', '公告', '系统', 20, 1, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
+(3, 'HELP_DOC', '帮助中心', '系统', 30, 1, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
+(4, 'FEEDBACK', '意见反馈', '系统', 40, 1, NULL, '2026-08-09 16:10:36', NULL, '2026-08-09 16:10:36'),
+(6, 'ACTIVITY', '活动素材', '营销', 5, 1, NULL, '2026-08-10 10:20:21', NULL, '2026-08-10 10:20:21'),
+(7, 'CONTENT', '正文配图', '营销', 6, 1, NULL, '2026-08-10 11:01:30', NULL, '2026-08-10 11:01:30'),
+(8, 'MALL_COMMODITY', '商城商品图', '商城', 100, 1, NULL, '2026-08-22 11:18:13', NULL, '2026-08-22 11:18:13');
 
 -- -----------------------------------------------------------------------------------
 -- t_solvela_job  定时任务定义。缺了任务不会注册（9 行）

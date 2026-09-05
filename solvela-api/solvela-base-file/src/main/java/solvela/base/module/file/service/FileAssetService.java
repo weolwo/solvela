@@ -413,6 +413,16 @@ public class FileAssetService {
                 .eq(FileEntity::getDeletedFlag, false));
     }
 
+    /**
+     * 按 storageKey 取<b>公开分类下</b>的文件。免登录读取端点只能用这个，
+     * 不要用 {@link #findByStorageKey} 之后自己判 —— 理由见 {@code FileDao} 里那段。
+     *
+     * @return 不存在、已删、或所属分类不公开，一律 null
+     */
+    public FileEntity findPublicByStorageKey(String storageKey) {
+        return fileDao.selectPublicByStorageKey(storageKey);
+    }
+
     public PageResult<FileVO> queryPage(FileQueryForm queryForm) {
         Page<?> page = SolvelaPageUtil.convert2PageQuery(queryForm);
         List<FileVO> list = fileDao.queryPage(page, queryForm);
@@ -673,6 +683,20 @@ public class FileAssetService {
         return urlOf(file, variant);
     }
 
+    /**
+     * ⚠️ <b>这里没有判分类的 public_flag。</b>
+     *
+     * <p>2026-09-05 给 {@code /file/public/**} 补上公开分类闸门之后，
+     * 一个<b>私有分类</b>下的文件在这里仍然会拿到 `前缀 + storageKey` 的 URL，
+     * 而那条 URL 现在会 404。今天不会发生 —— 七个分类全部是 public_flag=1 的运营素材。
+     *
+     * <p>🔴 <b>第一个建私有分类的人要回来处理这里</b>：应当在非公开分类时退回
+     * {@code DOWNLOAD_PATH + fileId}（登录态下载接口），管理端照常能看图。
+     * 之所以现在不做，是因为正确的做法要么把 public_flag 一起查出来（改几处查询），
+     * 要么在这里缓存分类表 —— 而 {@link #urlOfVo} 是在列表循环里逐行调的，
+     * 顺手加一次查询就是 N+1，本类别处已经为这个问题写过好几段注释。
+     * 等真有私有分类时再按「哪种读法」一次做对，比现在猜一个便宜。
+     */
     private String urlOf(FileEntity file, ImageVariant variant) {
         if (publicUrlPrefix.isBlank()) {
             // 前缀没配就走后端下载接口 —— 猜一个前缀拼出打不开的 URL，比多走一跳后端难排查得多

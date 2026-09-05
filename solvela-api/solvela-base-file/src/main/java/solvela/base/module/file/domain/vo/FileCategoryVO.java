@@ -35,4 +35,7 @@ public class FileCategoryVO {
 
     /** 是否内置分类（内置的不允许删除、不允许改编码） */
     private Boolean systemFlag;
+
+    /** 该分类的文件是否免登录可读。运营在分类表单里勾 */
+    private Boolean publicFlag;
 }

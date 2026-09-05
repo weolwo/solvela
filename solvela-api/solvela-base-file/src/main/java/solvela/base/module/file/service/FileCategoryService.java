@@ -77,6 +77,7 @@ public class FileCategoryService {
             vo.setFileCount(counts.getOrDefault(entity.getCategoryId(), 0L));
             // 前端据此把内置分类的删除按钮灰掉，而不是等点了之后收一个报错
             vo.setSystemFlag(SYSTEM_CODES.contains(entity.getCategoryCode()));
+            vo.setPublicFlag(Boolean.TRUE.equals(entity.getPublicFlag()));
             return vo;
         }).toList();
     }
@@ -91,6 +92,12 @@ public class FileCategoryService {
         form.setCategoryCode(code);
         form.setCategoryId(null);
         form.setSort(form.getSort() == null ? nextSort() : form.getSort());
+        /*
+         * 🔴 没传就是私有。默认公开的话，新建一个分类忘了设置就是默默裸奔，
+         * 而那个方向的错误是数据泄露；设成私有的表现只是「C 端图裂了」——
+         * 看得见、改一下就好。与 C 端路由「默认需登录、公开页标 anonymous」同一条取向。
+         */
+        form.setPublicFlag(Boolean.TRUE.equals(form.getPublicFlag()));
         form.setCreateBy(operator);
         form.setUpdateBy(form.getCreateBy());
         fileCategoryDao.insert(form);
