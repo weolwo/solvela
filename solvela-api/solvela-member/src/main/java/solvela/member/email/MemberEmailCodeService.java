@@ -21,6 +21,7 @@ import solvela.member.util.MemberEmailUtil;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * 邮箱验证码：<b>只管邮箱那一半</b>。
@@ -57,6 +58,17 @@ public class MemberEmailCodeService {
     private final VerificationCodeProperties properties;
 
     private final SystemEnvironment systemEnvironment;
+
+    /**
+     * 发信专用线程池。用 {@code @Resource(name=...)} 精确指定，不能按类型注入 ——
+     * 容器里有多个 {@code AsyncTaskExecutor}（solvela-async-executor、task-event-executor
+     * 以及本模块的 email-send-executor），按类型会歧义，而误注入到派奖那个池
+     * 正是 {@link EmailSendExecutorConfig} 刻意要避开的事。
+     *
+     * <p>{@code @RequiredArgsConstructor} 不便带 {@code @Qualifier}，故走字段注入。
+     */
+    @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
+    private org.springframework.core.task.AsyncTaskExecutor emailSendExecutor;
 
     /**
      * 🔴 生产环境不许用 LOG 通道，<b>启动即失败</b>。
@@ -131,21 +143,47 @@ public class MemberEmailCodeService {
             return EmailCodeSendResult.ok();
         }
 
+        // 🔴 真正的 SMTP 投递挪到专用线程池，不阻塞请求线程。
+        //    原因见 EmailSendExecutorConfig：同步发一封信 ~3.4s，而网关调本服务
+        //    的读超时只有 1s —— 同步发的话「信发出去了、用户却看到 500」。
+        //    响应由前面那几步（限频/场景）决定，它们都是毫秒级的。
+        Map<String, Object> params = new HashMap<>();
+        params.put("code", issued.code());
+        params.put("minutes", properties.ttl().toMinutes());
+        MailTemplateCodeEnum template = templateOf(scene);
+        String maskedEmail = MemberEmailUtil.mask(email);
         try {
-            Map<String, Object> params = new HashMap<>();
-            params.put("code", issued.code());
-            params.put("minutes", properties.ttl().toMinutes());
-            mailService.sendMail(templateOf(scene), params, Collections.singletonList(email));
-        } catch (Exception e) {
-            // 🔴 把刚存的码删掉：留着它会让冷却生效，于是用户在收不到信的同时
-            //    还被告知「请稍后再试」
+            emailSendExecutor.execute(() -> deliver(scene, email, hash, template, params, maskedEmail));
+        } catch (RejectedExecutionException e) {
+            // 队列都排不下（SMTP 持续变慢时才会到这一步）。同 catch 里的处理：
+            // 把刚存的码删掉，否则用户收不到信还被冷却挡住。submit 在请求线程上同步发生，
+            // 所以这个失败是【当场可感知】的，不会静默丢。
             codeStore.discard(CHANNEL, scene.name(), hash);
-            log.error("【邮箱验证码】发送失败, scene: {}, email: {}", scene, MemberEmailUtil.mask(email), e);
+            log.error("【邮箱验证码】发送队列已满，本次丢弃, scene: {}, email: {}", scene, maskedEmail, e);
             return EmailCodeSendResult.fail(EmailCodeFailReason.SEND_FAILED);
         }
 
-        log.info("【邮箱验证码】已发送, scene: {}, email: {}", scene, MemberEmailUtil.mask(email));
+        // 「已受理」不等于「已送达」—— 见 EmailCodeSendResult.ok() 的注释（防枚举本就如此）。
+        // 真实的送达/失败在 deliver() 里落日志。
         return EmailCodeSendResult.ok();
+    }
+
+    /**
+     * 在发信线程池里真正投递。<b>任何异常都不能逃出去</b> ——
+     * 异步任务的异常不会沿栈上抛，逃出去只会被线程池吞掉，变成静默失败。
+     *
+     * <p>发失败时把刚存的码删掉：留着它冷却会生效，于是用户在收不到信的同时
+     * 还被告知「请稍后再试」。删掉之后用户可以立刻重发。
+     */
+    private void deliver(EmailCodeScene scene, String email, String hash,
+                         MailTemplateCodeEnum template, Map<String, Object> params, String maskedEmail) {
+        try {
+            mailService.sendMail(template, params, Collections.singletonList(email));
+            log.info("【邮箱验证码】已发送, scene: {}, email: {}", scene, maskedEmail);
+        } catch (Exception e) {
+            codeStore.discard(CHANNEL, scene.name(), hash);
+            log.error("【邮箱验证码】发送失败, scene: {}, email: {}", scene, maskedEmail, e);
+        }
     }
 
     /** 校验并<b>消费</b>验证码。通过之后同一个码不能再用第二次。 */

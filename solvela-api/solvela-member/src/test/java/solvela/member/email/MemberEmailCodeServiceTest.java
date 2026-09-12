@@ -85,6 +85,7 @@ class MemberEmailCodeServiceTest {
         SystemEnvironment env = new SystemEnvironment(false, "solvela", SystemEnvironmentEnum.DEV);
         service = new MemberEmailCodeService(new VerificationCodeStore(redisService, properties),
                 mailService, piiHasher, properties, env);
+        injectSyncExecutor(service);
 
         when(piiHasher.hash(anyString())).thenReturn(HASH);
         when(redisService.generateRedisKey(anyString(), anyString()))
@@ -201,8 +202,38 @@ class MemberEmailCodeServiceTest {
 
         EmailCodeSendResult r = service.send(EmailCodeScene.LOGIN, EMAIL, "10.0.0.1");
 
-        assertEquals(EmailCodeFailReason.SEND_FAILED, r.reason());
+        // 🔴 发信改异步之后，「失败」不再同步回给调用方：
+        //    响应表示「已受理」，真正的投递在发信线程池里跑（防枚举本就要求
+        //    「已受理 ≠ 已送达」，见 EmailCodeSendResult.ok()）。
+        //    这里的执行器是同步的（injectSyncExecutor），所以 deliver 已经跑完、
+        //    也已经把码删了 —— 被保护的行为没变，变的只是它不再体现在返回值里。
+        assertTrue(r.success(), "发信失败不再同步暴露给调用方，响应仍是『已受理』");
         assertTrue(store.isEmpty(), "码没删掉的话，60 秒内用户既收不到信、也不能重发");
+    }
+
+    @Test
+    @DisplayName("🔴 发信队列排满 → 当场返回失败并删码（唯一会同步暴露发送失败的路径）")
+    void 队列满时同步失败并删码() {
+        captureSets();
+        // 换一个「一提交就拒绝」的执行器，模拟队列打满
+        org.springframework.core.task.AsyncTaskExecutor rejecting = task -> {
+            throw new java.util.concurrent.RejectedExecutionException("queue full");
+        };
+        try {
+            java.lang.reflect.Field f =
+                    MemberEmailCodeService.class.getDeclaredField("emailSendExecutor");
+            f.setAccessible(true);
+            f.set(service, rejecting);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+
+        EmailCodeSendResult r = service.send(EmailCodeScene.LOGIN, EMAIL, "10.0.0.1");
+
+        // 提交在请求线程上同步发生，所以「连队列都排不下」这种情况【当场可感知】，
+        // 不会静默丢。此时也要删码，理由同上。
+        assertEquals(EmailCodeFailReason.SEND_FAILED, r.reason());
+        assertTrue(store.isEmpty(), "被拒时也要删码，否则用户被冷却挡住却什么都没收到");
     }
 
     // ============================== 校验 ==============================
@@ -338,6 +369,7 @@ class MemberEmailCodeServiceTest {
                 prod ? SystemEnvironmentEnum.PROD : SystemEnvironmentEnum.DEV);
         MemberEmailCodeService s = new MemberEmailCodeService(new VerificationCodeStore(redisService, properties),
                 mailService, piiHasher, properties, env);
+        injectSyncExecutor(s);
         s.checkTransport();
         return s;
     }
@@ -380,5 +412,24 @@ class MemberEmailCodeServiceTest {
     @DisplayName("默认是 REAL —— 新的调试开关不该默认生效")
     void 默认real() {
         assertEquals(VerificationCodeProperties.Transport.REAL, new VerificationCodeProperties().getEmailTransport());
+    }
+
+    /**
+     * 生产上发信走专用线程池（EmailSendExecutorConfig），字段注入。
+     * 测试里塞一个【同步】执行器：Runnable 当场在本线程跑完 ——
+     * 这样「信有没有发出去」「发失败有没有把码删掉」这些断言不用去等异步，
+     * 而被验证的逻辑（提交/拒绝/删码）与生产完全一致。
+     */
+    private static void injectSyncExecutor(MemberEmailCodeService target) {
+        org.springframework.core.task.AsyncTaskExecutor sync =
+                new org.springframework.core.task.support.TaskExecutorAdapter(Runnable::run);
+        try {
+            java.lang.reflect.Field f =
+                    MemberEmailCodeService.class.getDeclaredField("emailSendExecutor");
+            f.setAccessible(true);
+            f.set(target, sync);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("注入同步执行器失败", e);
+        }
     }
 }
