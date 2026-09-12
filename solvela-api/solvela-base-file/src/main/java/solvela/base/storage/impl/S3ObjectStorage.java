@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -98,8 +99,40 @@ public final class S3ObjectStorage implements ObjectStorage, PresignCapable {
             if (e.statusCode() == 404) {
                 throw StorageException.notFound(key, e);
             }
+            /*
+             * 🔴 416 = 起点已经超过文件长度。这【不是错误】，是「要的那段是空的」。
+             *
+             * 本地与内存实现对同一个请求返回的是一个长度为 0 的对象
+             *（见 ObjectStorageContractTest 的「起点越界」一条），
+             * S3 却按 HTTP 语义回 416。原样往上抛的话：
+             *   · 契约在三个实现之间就不成立了 —— 而那套契约存在的全部意义，
+             *     就是保证「拿内存实现写的业务单测」在生产上也成立；
+             *   · 它还会被归成 corrupted（「读取对象失败」），
+             *     于是用户发一个越界的 Range 头，服务端报 500 并在日志里
+             *     喊存储损坏 —— 而存储好得很。
+             *
+             * 2026-09-12 拿真 MinIO 跑那套契约时发现的，此前 S3 这条路
+             * 一次都没被契约验过。
+             */
+            if (e.statusCode() == 416) {
+                return emptyTail(key);
+            }
             throw StorageException.corrupted("读取对象失败：" + key, e);
         }
+    }
+
+    /**
+     * 起点越界时返回的那个空片段。
+     *
+     * <p>还要再 head 一次是为了拿对象总长 —— 调用方要靠它拼
+     * {@code Content-Range}。多这一次请求只发生在「客户端给了个越界 Range」
+     * 这条罕见路径上，正常读取不受影响。
+     */
+    private StoredObject emptyTail(StorageKey key) {
+        HeadObjectResponse head = client.headObject(
+                HeadObjectRequest.builder().bucket(bucket).key(key.value()).build());
+        long total = head.contentLength() == null ? 0 : head.contentLength();
+        return new StoredObject(InputStream.nullInputStream(), 0, total, head.contentType());
     }
 
     /**

@@ -125,7 +125,10 @@ server:
 # 文件上传 配置
 file:
   storage:
-    mode: local
+    # local = 存本机磁盘；cloud = 存 S3 协议的对象存储（本地就是 docker compose 里那个 MinIO）。
+    # 默认 local：不是所有人都会把 MinIO 起起来，而起不来时 cloud 模式是【启动即失败】。
+    # 要用 MinIO：docker compose up -d minio，然后 .env 里写 FILE_STORAGE_MODE=cloud。
+    mode: ${FILE_STORAGE_MODE:local}
     # 公开文件的 URL 前缀。C 端用户是匿名的、永远带不上 token，活动展示图就靠它。
     # 不配则一律退回要登录态的下载接口 —— 管理端仍然能看图（带 token 取字节），但 C 端会全是叉。
     # 本地模式指向 /support/file/public/：它只放行 public_flag=1 的分类，其余一律 404
@@ -136,14 +139,20 @@ file:
       upload-path: /home/solvela/upload/   #文件上传目录
       url-prefix:
     cloud:
-      region: oss-cn-hangzhou
-      endpoint: https://oss-cn-hangzhou.aliyuncs.com
-      bucket-name: 1024lab-smart-admin
-      access-key:
-      secret-key:
+      # 默认值对着 docker compose 里的 MinIO。换阿里云 OSS / AWS S3 只改这几个值，
+      # 业务代码与前端都不动 —— 上面那个 public-url-prefix 也不用动，理由见 path-style 那段。
+      region: ${FILE_STORAGE_CLOUD_REGION:us-east-1}
+      endpoint: ${FILE_STORAGE_CLOUD_ENDPOINT:http://127.0.0.1:9000}
+      bucket-name: ${MINIO_BUCKET:solvela}
+      access-key: ${MINIO_ROOT_USER:}
+      secret-key: ${MINIO_ROOT_PASSWORD:}
       private-url-expire-seconds: 3600
-      # 云计算厂商支持公开的文件访问模式；minio默认是不支持的，对于minio用户可以配置为空
-      public-url-prefix: https://1024lab-smart-admin.oss-cn-hangzhou.aliyuncs.com/
+      # 🔴 MinIO 必须开【路径寻址】：bucket 放 URL 路径里（endpoint/bucket/key），
+      #    而不是塞进主机名（bucket.endpoint/key）。
+      #    配错时的表现不像存储问题 —— 它会去解析 solvela.127.0.0.1:9000，
+      #    报出来的是 UnknownHostException，看着像网络坏了。
+      #    上真的 OSS/S3 时置 false（它们用的是虚拟主机寻址）。
+      path-style-access: ${FILE_STORAGE_CLOUD_PATH_STYLE_ACCESS:true}
 
 # open api配置
 springdoc:

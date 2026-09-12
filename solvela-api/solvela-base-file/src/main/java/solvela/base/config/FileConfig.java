@@ -80,8 +80,22 @@ public class FileConfig {
     @Value("${file.storage.cloud.private-url-expire-seconds}")
     private Long cloudPrivateUrlExpireSeconds;
 
-    @Value("${file.storage.cloud.public-url-prefix}")
-    private String cloudPublicUrlPrefix;
+    /**
+     * 用<b>路径寻址</b>（{@code endpoint/bucket/key}）还是<b>虚拟主机寻址</b>
+     *（{@code bucket.endpoint/key}）。
+     *
+     * <h3>🔴 MinIO / 本地对象存储必须开，公有云保持关</h3>
+     * 虚拟主机寻址要求 {@code bucket.endpoint} 这个域名解析得出来。
+     * 阿里云、AWS 这些厂商给每个桶都配了泛解析，所以关着是对的；
+     * 而本地 MinIO 的 endpoint 是 {@code http://127.0.0.1:9000}，
+     * {@code solvela.127.0.0.1:9000} 谁也解析不出来 —— 不开这一项，
+     * <b>每一次上传都会卡在 DNS 上</b>，报的还是 UnknownHostException 这种
+     * 看不出跟对象存储有关的错。
+     *
+     * <p>默认 false 是为了不改动现有的云厂商配置。
+     */
+    @Value("${file.storage.cloud.path-style-access:false}")
+    private boolean cloudPathStyleAccess;
 
     @Value("${file.storage.local.upload-path}")
     private String localUploadPath;

@@ -147,8 +147,6 @@ file:
       access-key:
       secret-key:
       private-url-expire-seconds: 3600
-      # 云计算厂商支持公开的文件访问模式；minio默认是不支持的，对于minio用户可以配置为空
-      public-url-prefix: https://1024lab-smart-admin.oss-cn-hangzhou.aliyuncs.com/
 
 # open api配置
 springdoc:

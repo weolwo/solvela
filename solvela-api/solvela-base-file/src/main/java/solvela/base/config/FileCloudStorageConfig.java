@@ -51,10 +51,7 @@ public class FileCloudStorageConfig {
                 .credentialsProvider(
                         StaticCredentialsProvider.create(
                                 AwsBasicCredentials.create(fileConfig.getCloudAccessKey(), fileConfig.getCloudSecretKey())))
-                .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(false)
-                        .chunkedEncodingEnabled(false)
-                        .build())
+                .serviceConfiguration(storageConfiguration())
                 .build();
     }
 
@@ -70,10 +67,23 @@ public class FileCloudStorageConfig {
                 .credentialsProvider(
                         StaticCredentialsProvider.create(
                                 AwsBasicCredentials.create(fileConfig.getCloudAccessKey(), fileConfig.getCloudSecretKey())))
-                .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(false)
-                        .chunkedEncodingEnabled(false)
-                        .build())
+                .serviceConfiguration(storageConfiguration())
+                .build();
+    }
+
+    /**
+     * 客户端与预签名器<b>必须用同一份配置</b>。
+     *
+     * <p>分开写两遍的后果很隐蔽：上传走客户端、访问走预签名 URL，
+     * 两边寻址方式不一致时<b>上传是成功的</b>，只是生成出来的 URL 打不开 ——
+     * 而那要等到有人点开一张图才发现。这也是 2026-09-12 把它抽成一个方法的理由：
+     * 原先那两段一模一样的配置，正是「改一处忘另一处」的标准形状。
+     */
+    private S3Configuration storageConfiguration() {
+        return S3Configuration.builder()
+                // MinIO 等本地对象存储要 true，公有云保持 false。见 FileConfig 的说明
+                .pathStyleAccessEnabled(fileConfig.isCloudPathStyleAccess())
+                .chunkedEncodingEnabled(false)
                 .build();
     }
 

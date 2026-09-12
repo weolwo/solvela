@@ -64,6 +64,19 @@
             <artifactId>solvela-base-data</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!--
+            对象存储（S3 协议：MinIO / 阿里云 OSS / AWS S3）。
+
+            🔴 它在 solvela-base-file 里是 optional 的，所以【必须由最终打包的应用显式引一次】。
+               不引的话 file.storage.mode=cloud 会在启动时 ClassNotFoundException，
+               而 mode=local 一切正常 —— 也就是说这个缺失只在切云存储那天才暴露。
+               这是 optional 依赖的既定代价：换来的是不用云存储的进程不背这 31 个 jar / 8.4MB。
+        -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-base-file</artifactId>

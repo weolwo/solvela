@@ -78,6 +78,67 @@ services:
       retries: 10
       start_period: 10s
 
+  # ────────────────────────────────────────────────────────────────────
+  # 对象存储。图片和附件放这里，不再落在应用容器的磁盘上。
+  #
+  # 🔴 为什么要它：mode=local 时文件写在 app 容器的 /home/solvela/upload。
+  #    那意味着应用一换机器/一重建镜像，图就没了；也没法多副本 —— 两个 app
+  #    各写各的盘，用户传的图有一半刷不出来。
+  #
+  # ⚠️ 和 mysql/redis 一样【不对公网映射端口】。9000 只在内网里对 app 可见，
+  #    9001 那个控制台默认也只绑回环，本地调试用。
+  # ────────────────────────────────────────────────────────────────────
+  minio:
+    # 🔴 从 quay.io 拉，不是 Docker Hub。
+    #    2026-09-12 实测：docker.io/minio/minio 在本机被拒（pull access denied），
+    #    而同一台机器上 localstack、adobe/s3mock 这些非官方镜像都拉得动 ——
+    #    所以不是「非官方镜像一律禁」那种策略问题。quay.io 是 MinIO 自己的另一个
+    #    发布源，拉得到。哪天 Docker Hub 那条恢复了，换回去也行。
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?请在 .env 里设置}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?请在 .env 里设置}
+      TZ: Asia/Shanghai
+    volumes:
+      - minio-data:/data
+    ports:
+      # 只绑回环：本地开发要用浏览器开控制台，以及让【跑在容器外】的
+      # dev 后端连得上 9000。生产上把这两行去掉。
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # 一次性任务：建桶。跑完就退出，不常驻。
+  #
+  # 🔴 桶【保持私有】，不设 anonymous download。
+  #    这个系统的文件分类上有 public_flag，公开与否是【一条一条】定的；
+  #    把整个桶开成公共读，等于所有私有附件（身份证、凭证）也一起裸奔。
+  #    C 端要看的公开图走应用的 /support/file/public/，那条路会校验 public_flag；
+  #    私有文件走预签名 URL。两条都不需要桶是公共的。
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-solvela}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      mc mb --ignore-existing local/$$MINIO_BUCKET &&
+      echo '[minio-init] 桶已就绪：'$$MINIO_BUCKET' （保持私有，不开匿名读）'
+      "
+    restart: "no"
+
   app:
     build:
       context: ./solvela-api
@@ -89,6 +150,8 @@ services:
         condition: service_healthy   # 等库真的建好，不是等端口通
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       TZ: Asia/Shanghai
       # 覆盖 prod/solvela-base.yaml 里写死的 127.0.0.1 —— 容器里那是它自己
@@ -99,6 +162,30 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # ---- 对象存储（MinIO）----
+      #
+      # 这个镜像跑的是 **prod** 配置，而 prod/solvela-base.yaml 里的 cloud 那一段
+      # 是对着公有云写的。所以这里【每一项都要显式覆盖】，不能指望 yaml 的默认值。
+      # （dev 那份 yaml 是对着 MinIO 写的，从 IDE 起的时候什么都不用配 ——
+      #   两边命名不同是因为面对的是两份 yaml，不是随手写的，别去「统一」。）
+      #
+      # ⚠️ 容器内用服务名 minio:9000，不是 127.0.0.1 —— 那在容器里指它自己。
+      #    要让应用真的用对象存储，还得把 FILE_STORAGE_MODE 改成 cloud，
+      #    见 .env.example 里那一段。
+      FILE_STORAGE_MODE: ${FILE_STORAGE_MODE:-local}
+      FILE_STORAGE_CLOUD_ENDPOINT: http://minio:9000
+      FILE_STORAGE_CLOUD_BUCKET_NAME: ${MINIO_BUCKET:-solvela}
+      FILE_STORAGE_CLOUD_ACCESS_KEY: ${MINIO_ROOT_USER}
+      FILE_STORAGE_CLOUD_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # MinIO 不分区域，但 SigV4 的签名里带着它，两边对不上会被拒。
+      # prod yaml 里写的是 oss-cn-hangzhou，必须覆盖掉。
+      FILE_STORAGE_CLOUD_REGION: us-east-1
+      # 🔴 本地对象存储必须走路径寻址，见 FileConfig.cloudPathStyleAccess。
+      #    这里【尤其】不能漏：endpoint 是主机名 minio，虚拟主机寻址会去解析
+      #    solvela.minio —— 报 UnknownHostException，看着像网络坏了。
+      #    （本机用 127.0.0.1 时这一项配错也看不出来：IP 没有子域名，
+      #      SDK 会自己退回路径寻址。这就是「本机好好的，一进容器图全挂」。）
+      FILE_STORAGE_CLOUD_PATH_STYLE_ACCESS: "true"
     ports:
       # 只有这一个对外。上了域名和 HTTPS 之后改成 "127.0.0.1:1024:1024"，
       # 由 nginx/caddy 反代，别让应用端口直接对公网。
@@ -116,5 +203,6 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  minio-data:
   app-logs:
   app-upload:
