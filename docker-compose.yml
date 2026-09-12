@@ -346,6 +346,12 @@ services:
     # ⚠️ 刻意【不发布端口】。理由见文件开头那段 —— 这是 nginx 那份
     #    真实 IP 归一化能成立的前提。本地要看页面就临时加一行
     #    "127.0.0.1:8080:8080"，用完删掉。
+    volumes:
+      # 🔴 管理端 Basic Auth 的口令文件（bcrypt）。挂载进来、不进镜像 ——
+      #    进镜像等于把口令随镜像分发。文件缺失时 nginx 对 :8081 的请求会 500，
+      #    这是刻意的「fail closed」：宁可管理端打不开，也不要没密码就敞开。
+      #    生成方式见 deploy/README.md。
+      - ./deploy/nginx/admin.htpasswd:/etc/nginx/admin.htpasswd:ro
     healthcheck:
       # alpine 自带 busybox wget；这个镜像里没有 curl
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]

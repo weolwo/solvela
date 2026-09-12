@@ -35,3 +35,6 @@ target/
 
 # Cloudflare 隧道凭据。泄露 = 任何人都能把流量接到你的域名上
 deploy/cloudflared/credentials.json
+
+# 管理端 Basic Auth 口令文件（bcrypt）。挂载进容器，不进镜像/仓库
+deploy/nginx/admin.htpasswd
