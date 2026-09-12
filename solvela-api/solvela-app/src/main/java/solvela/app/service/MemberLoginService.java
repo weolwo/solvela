@@ -15,6 +15,7 @@ import solvela.app.domain.EmailBindRequest;
 import solvela.app.domain.EmailCodeRequest;
 import solvela.app.domain.SmsCodeRequest;
 import solvela.member.api.SmsCodeSendCmd;
+import solvela.member.api.SmsScene;
 import solvela.member.api.SmsCodeSendResult;
 import solvela.app.domain.MemberLoginRequest;
 import solvela.app.domain.MemberRegisterRequest;
@@ -181,8 +182,10 @@ public class MemberLoginService {
      * 这一层的措辞才继续成立。
      */
     public void sendSmsCode(SmsCodeRequest request, String ip) {
-        SmsCodeSendResult result = memberAuthApi.sendSmsCode(
-                new SmsCodeSendCmd(request.scene(), request.phone(), ip));
+        SmsCodeSendResult result = memberAuthApi.sendSmsCode(new SmsCodeSendCmd(
+                request.scene(), request.phone(), ip,
+                // BIND 场景要知道「是谁在绑」，其余三个是匿名接口。判据同邮箱那条
+                request.scene() == SmsScene.BIND ? CurrentMember.memberIdOrNull() : null));
         if (!result.success()) {
             throw translateSmsCode(result);
         }
@@ -288,7 +291,7 @@ public class MemberLoginService {
      */
     public PasswordResetView resetPassword(PasswordResetRequest request, String ip) {
         MemberPasswordResetResult result = memberAuthApi.resetPassword(new MemberPasswordResetCmd(
-                request.email(), request.code(), request.newPassword(),
+                request.typeOrDefault(), request.identity(), request.code(), request.newPassword(),
                 ip, CurrentDevice.deviceIdOrNull()));
         if (!result.success()) {
             throw translateReset(result);
@@ -303,6 +306,11 @@ public class MemberLoginService {
             case EMAIL_CODE_EXPIRED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码已失效，请重新获取");
             case EMAIL_CODE_MISMATCH -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误");
             case EMAIL_CODE_LOCKED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误次数过多，请重新获取");
+            // 措辞与邮箱那三条一致：用户看到的是「验证码」，不需要知道它从哪条通道来
+            case BAD_PHONE_FORMAT -> new ApiException(ApiErrors.INVALID_ARGUMENT, "手机号格式不正确");
+            case SMS_CODE_EXPIRED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码已失效，请重新获取");
+            case SMS_CODE_MISMATCH -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误");
+            case SMS_CODE_LOCKED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误次数过多，请重新获取");
             // 文案从域里取，不在这里再写一遍规则 —— 两份措辞迟早对不上
             case WEAK_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, MemberPasswordPolicy.HINT);
             // 走到这一档说明码猜对了但账号不存在。含糊成「验证码错误」即可 ——

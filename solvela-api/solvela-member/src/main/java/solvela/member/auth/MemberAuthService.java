@@ -105,6 +105,8 @@ public class MemberAuthService implements MemberAuthApi {
 
     private final MemberSmsCodeService smsCodeService;
 
+    private final solvela.member.sms.MemberSmsCodeIssuer smsCodeIssuer;
+
     private final solvela.member.device.DeviceDispositionService dispositionService;
     private final MemberEmailBindService emailBindService;
 
@@ -322,13 +324,13 @@ public class MemberAuthService implements MemberAuthApi {
     /**
      * 发一条短信验证码。逻辑全在 {@link MemberSmsCodeService}，本方法只是契约的落点。
      *
-     * <p>这里<b>没有</b>邮箱那边的 issuer 那一层：issuer 的全部职责是「该不该静默」，
-     * 而短信目前不需要那个决定（见 {@link MemberAuthApi#sendSmsCode} 的注释）。
-     * 先不建一个只会转发的类。
+     * <p>2026-09-10 起走 {@link solvela.member.sms.MemberSmsCodeIssuer}，
+     * 与邮箱那条对称 —— 手机号找回密码和绑定手机号落地之后，
+     * 「该不该静默」这个决定才真的有了内容。
      */
     @Override
     public SmsCodeSendResult sendSmsCode(SmsCodeSendCmd cmd) {
-        return smsCodeService.send(cmd.scene(), cmd.phone(), cmd.clientIp());
+        return smsCodeIssuer.issue(cmd.scene(), cmd.phone(), cmd.clientIp(), cmd.currentMemberId());
     }
 
     /**

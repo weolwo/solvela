@@ -13,9 +13,20 @@ package solvela.member.api;
  * @param deviceId    验签通过的设备号，允许为 null
  */
 public record MemberPasswordResetCmd(
-        String email,
+        /**
+         * 找回方式。不传按 {@link PasswordResetType#EMAIL_CODE} 兜底 ——
+         * 那是 2026-09-10 之前唯一的一条，兜底成它才不会改变老调用点的行为。
+         */
+        PasswordResetType resetType,
+        /** 邮箱或手机号。<b>刻意不叫 email</b>，理由见 {@link PasswordResetType} */
+        String identity,
         String code,
         String newPassword,
         String clientIp,
         String deviceId) {
+
+    /** 不传时按最早的那条通道兜底 —— 域里也有同样的兜底，两处一致。 */
+    public PasswordResetType typeOrDefault() {
+        return resetType == null ? PasswordResetType.EMAIL_CODE : resetType;
+    }
 }

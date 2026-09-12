@@ -17,7 +17,11 @@ import solvela.member.api.MemberPasswordPolicy;
 import solvela.member.api.PasswordResetFailReason;
 import solvela.member.auth.MemberAuthDao;
 import solvela.member.device.DeviceGuard;
+import solvela.member.api.PasswordResetType;
+import solvela.member.api.SmsScene;
+import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.util.MemberEmailUtil;
+import solvela.member.util.MemberPhoneUtil;
 
 /**
  * 用邮箱验证码重置密码。
@@ -46,6 +50,8 @@ public class MemberPasswordResetService {
 
     private final MemberEmailCodeService emailCodeService;
 
+    private final MemberSmsCodeService smsCodeService;
+
     private final MemberTokenStore tokenStore;
 
     private final DeviceGuard deviceGuard;
@@ -64,23 +70,31 @@ public class MemberPasswordResetService {
      */
     @Transactional(rollbackFor = Exception.class)
     public MemberPasswordResetResult reset(MemberPasswordResetCmd cmd) {
-        String email = MemberEmailUtil.normalize(cmd.email());
-        if (email == null) {
-            return MemberPasswordResetResult.fail(PasswordResetFailReason.BAD_EMAIL_FORMAT);
+        PasswordResetType type = cmd.typeOrDefault();
+
+        /*
+         * 规范化 → 验码 → 强度 → 查人。四步的顺序对两条通道完全一样，
+         * 只有「用哪个工具规范化」和「码走哪条通道」不同。
+         * 用 switch 表达式：新增找回方式时【编译不过】，
+         * 而不是悄悄落进某个兜底分支去按邮箱规范化一个手机号。
+         */
+        String identity = switch (type) {
+            case EMAIL_CODE -> MemberEmailUtil.normalize(cmd.identity());
+            case SMS_CODE -> MemberPhoneUtil.normalize(cmd.identity());
+        };
+        if (identity == null) {
+            return MemberPasswordResetResult.fail(switch (type) {
+                case EMAIL_CODE -> PasswordResetFailReason.BAD_EMAIL_FORMAT;
+                case SMS_CODE -> PasswordResetFailReason.BAD_PHONE_FORMAT;
+            });
         }
 
-        EmailCodeVerifyResult codeResult =
-                emailCodeService.verify(EmailCodeScene.RESET_PASSWORD, email, cmd.code());
-        if (codeResult != EmailCodeVerifyResult.OK) {
+        PasswordResetFailReason codeProblem = verifyCode(type, identity, cmd.code());
+        if (codeProblem != null) {
             // 验证码错也算一次设备失败：「一台机器在挨个试不同账号的重置码」
             // 是很强的信号，而它只有在这里记得下来
             deviceGuard.recordLoginFailure(cmd.deviceId());
-            return MemberPasswordResetResult.fail(switch (codeResult) {
-                case NOT_FOUND -> PasswordResetFailReason.EMAIL_CODE_EXPIRED;
-                case MISMATCH -> PasswordResetFailReason.EMAIL_CODE_MISMATCH;
-                case TOO_MANY_ATTEMPTS -> PasswordResetFailReason.EMAIL_CODE_LOCKED;
-                case OK -> throw new IllegalStateException("不可能走到：OK 已在上面判掉");
-            });
+            return MemberPasswordResetResult.fail(codeProblem);
         }
 
         // 强度校验排在验证码【之后】：它不查存储也不泄露信息，本可以更靠前，
@@ -90,7 +104,11 @@ public class MemberPasswordResetService {
             return MemberPasswordResetResult.fail(PasswordResetFailReason.WEAK_PASSWORD);
         }
 
-        Member member = memberAuthDao.selectForLoginByEmail(piiHasher.hash(email));
+        String hashHex = piiHasher.hash(identity);
+        Member member = switch (type) {
+            case EMAIL_CODE -> memberAuthDao.selectForLoginByEmail(hashHex);
+            case SMS_CODE -> memberAuthDao.selectForLogin(hashHex);
+        };
         if (member == null) {
             // 走到这里说明他猜中了一个六位数（百万分之一，只有 5 次机会）——
             // 不构成可用的枚举手段，见 PasswordResetFailReason.ACCOUNT_NOT_FOUND
@@ -108,8 +126,36 @@ public class MemberPasswordResetService {
         //    30 天有效期的令牌照样能用，而用户以为自己已经把人赶出去了
         int revoked = tokenStore.revokeAll(member.getMemberId());
 
-        log.info("【重置密码】成功, memberId: {}, 吊销会话 {} 个, email: {}",
-                member.getMemberId(), revoked, MemberEmailUtil.mask(email));
+        log.info("【重置密码】成功, memberId: {}, 通道: {}, 吊销会话 {} 个, 身份: {}",
+                member.getMemberId(), type, revoked, mask(type, identity));
         return MemberPasswordResetResult.ok(revoked);
+    }
+
+    /** 验码。通过返回 null，失败返回对应原因。 */
+    private PasswordResetFailReason verifyCode(PasswordResetType type, String identity, String code) {
+        return switch (type) {
+            case EMAIL_CODE -> switch (emailCodeService.verify(
+                    EmailCodeScene.RESET_PASSWORD, identity, code)) {
+                case OK -> null;
+                case NOT_FOUND -> PasswordResetFailReason.EMAIL_CODE_EXPIRED;
+                case MISMATCH -> PasswordResetFailReason.EMAIL_CODE_MISMATCH;
+                case TOO_MANY_ATTEMPTS -> PasswordResetFailReason.EMAIL_CODE_LOCKED;
+            };
+            case SMS_CODE -> switch (smsCodeService.verify(
+                    SmsScene.RESET_PASSWORD, identity, code)) {
+                case OK -> null;
+                case NOT_FOUND -> PasswordResetFailReason.SMS_CODE_EXPIRED;
+                case MISMATCH -> PasswordResetFailReason.SMS_CODE_MISMATCH;
+                case TOO_MANY_ATTEMPTS -> PasswordResetFailReason.SMS_CODE_LOCKED;
+            };
+        };
+    }
+
+    /** 日志里只放打过码的身份 —— 这条日志会长期留存，明文一次都不该出现在里面。 */
+    private static String mask(PasswordResetType type, String identity) {
+        return switch (type) {
+            case EMAIL_CODE -> MemberEmailUtil.mask(identity);
+            case SMS_CODE -> MemberPhoneUtil.mask(identity);
+        };
     }
 }

@@ -21,6 +21,7 @@ import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberPasswordResetCmd;
+import solvela.member.api.PasswordResetType;
 import solvela.member.api.MemberPasswordResetResult;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
@@ -128,7 +129,7 @@ class PasswordResetTest {
 
     private MemberPasswordResetResult reset(String code, String newPassword) {
         return memberAuthService.resetPassword(
-                new MemberPasswordResetCmd(email, code, newPassword, freshIp(), null));
+                new MemberPasswordResetCmd(PasswordResetType.EMAIL_CODE, email, code, newPassword, freshIp(), null));
     }
 
     private boolean canLogin(String password) {

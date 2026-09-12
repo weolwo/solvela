@@ -289,8 +289,17 @@ export interface PasswordResetResult {
   revokedSessions: number
 }
 
+/**
+ * 找回方式。与 `LoginType` / `RegisterType` 一个路数：
+ * 一个 `identity` 字段 + 一个类型枚举，而不是并排两个 email / phone 字段。
+ */
+export const PASSWORD_RESET_TYPES = ['SMS_CODE', 'EMAIL_CODE'] as const
+export type PasswordResetType = (typeof PASSWORD_RESET_TYPES)[number]
+
 export async function resetPassword(payload: {
-  email: string
+  resetType: PasswordResetType
+  /** 邮箱或手机号。**刻意不叫 email** —— 「继续叫 email 但有时候放的是手机号」是个会骗人的字段名 */
+  identity: string
   code: string
   newPassword: string
 }): Promise<PasswordResetResult> {

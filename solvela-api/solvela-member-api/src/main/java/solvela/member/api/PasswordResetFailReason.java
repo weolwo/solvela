@@ -20,6 +20,20 @@ public enum PasswordResetFailReason {
     /** 新密码不符合强度要求。文案从 {@link MemberPasswordPolicy#HINT} 取，不在这里再写一遍。 */
     WEAK_PASSWORD,
 
+    // ------------------------------------------------------------------ 手机号找回（2026-09-10）
+
+    /** 手机号格式不对。 */
+    BAD_PHONE_FORMAT,
+
+    /** 没有待校验的短信验证码：从没发过，或已过期。 */
+    SMS_CODE_EXPIRED,
+
+    /** 短信验证码错误。 */
+    SMS_CODE_MISMATCH,
+
+    /** 短信验证码连续输错次数用尽，已作废，必须重新发送。 */
+    SMS_CODE_LOCKED,
+
     /**
      * 这个邮箱没有对应的会员。
      *
