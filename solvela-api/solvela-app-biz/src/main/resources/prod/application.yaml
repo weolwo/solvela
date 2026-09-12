@@ -51,8 +51,16 @@ solvela:
 spring.rabbitmq:
   host: ${RABBITMQ_HOST:127.0.0.1}
   port: ${RABBITMQ_PORT:5672}
-  username: ${RABBITMQ_USERNAME}
-  password: ${RABBITMQ_PASSWORD}
+  # 🔴 给了空默认值，是因为本服务当前【零发布、零消费】（见 MqConfig 类注释：
+  #    发奖那条链路合并进程后已是进程内调用，拓扑声明连同 6 个 bean 一并删了）。
+  #    没有默认值时这两行会让应用【启动即失败】—— 为一个没人用的 broker 立一道
+  #    必须翻越的墙，结果只会是部署时被迫起一个 389MB 的空 RabbitMQ。
+  #    连接是惰性的：没有 listener 就不会去连，所以不配也不会有后台重连日志。
+  #
+  # ⚠️ 真要用 MQ 时（补了 publisher / listener），把这两个默认值删掉改回必填，
+  #    并在 docker-compose.yml 里补 rabbitmq 服务 —— 那时「连不上就起不来」是对的。
+  username: ${RABBITMQ_USERNAME:}
+  password: ${RABBITMQ_PASSWORD:}
   listener:
     simple:
       default-requeue-rejected: false

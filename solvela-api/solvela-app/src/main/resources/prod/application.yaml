@@ -118,7 +118,7 @@ solvela:
       #    同环境两边的 keys 必须逐字一致，否则一边签的另一边验不过。
       key-version: 1
       keys:
-        1: "Pd7sJfP1gUoT6iNmB3wZHn4tWqL9zXbE2vRcM5yK"
+        1: ${SOLVELA_AUTH_DEVICE_KEY_V1}
   member:
     session:
       # 令牌有效期与并发会话数已于 2026-08-30 从 solvela.app.auth 搬到这里 ——

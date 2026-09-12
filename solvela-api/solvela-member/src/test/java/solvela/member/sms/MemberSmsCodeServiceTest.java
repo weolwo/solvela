@@ -214,4 +214,43 @@ class MemberSmsCodeServiceTest {
     void 非生产可以LOG() {
         service(VerificationCodeProperties.Transport.LOG, SystemEnvironmentEnum.DEV).checkTransport();
     }
+
+    @Test
+    @DisplayName("生产 + REAL + 没厂商 + 【显式声明】了 → 放行（「只用邮箱」是合法的部署形态）")
+    void 显式声明之后可以没有厂商() {
+        when(smsSender.available()).thenReturn(false);
+        properties.setAllowMissingSmsVendor(true);
+
+        service(VerificationCodeProperties.Transport.REAL, SystemEnvironmentEnum.PROD)
+                .checkTransport();
+    }
+
+    @Test
+    @DisplayName("🔴 那个开关【只】放行「没厂商」，放行不了 LOG 通道")
+    void 显式声明救不了LOG通道() {
+        properties.setAllowMissingSmsVendor(true);
+        MemberSmsCodeService service =
+                service(VerificationCodeProperties.Transport.LOG, SystemEnvironmentEnum.PROD);
+
+        /*
+         * 两件事的性质完全不同，不能用同一个开关一起放行：
+         *
+         *   · 没接厂商 = 这条功能【不可用】。用户收不到码，注册不了 —— 看得见，会有人报。
+         *   · LOG 通道 = 这条功能【看起来能用，但每个人的验证码都躺在日志里】。
+         *     拿到日志（或 ELK 权限）的人可以接管任意账号，而且没有任何迹象。
+         *
+         * 一个是缺功能，一个是开后门。所以 allow-missing-sms-vendor 名字里
+         * 写的是 vendor，它也只该管 vendor 这一件事。
+         */
+        assertThrows(IllegalStateException.class, service::checkTransport,
+                "「允许没有厂商」不等于「允许把验证码打进生产日志」——" 
+                        + "这个开关一旦能兼管两件事，迟早有人为了让服务起来而配上它");
+    }
+
+    @Test
+    @DisplayName("默认【不】放行 —— 这个开关必须是有人主动配上去的")
+    void 默认不放行() {
+        assertFalse(new VerificationCodeProperties().isAllowMissingSmsVendor(),
+                "默认值一旦是 true，那道启动闸就等于不存在了");
+    }
 }

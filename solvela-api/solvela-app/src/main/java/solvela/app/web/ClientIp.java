@@ -16,7 +16,12 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 public final class ClientIp {
 
-    private static final String[] HEADERS = {
+    /**
+     * 🔴 这份清单与 {@code deploy/nginx/snippets/proxy-upstream.conf} 里
+     * nginx 处理的那一份【必须逐个对上】，由 ClientIpHeaderCoverageTest 盯着。
+     * 包级可见就是为了让那条测试读得到 —— 别改回 private。
+     */
+    static final String[] HEADERS = {
             "X-Forwarded-For", "X-Real-IP", "Proxy-Client-IP", "WL-Proxy-Client-IP"
     };
 

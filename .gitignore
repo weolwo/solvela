@@ -32,3 +32,6 @@ target/
 # docker compose 的明文口令文件，只提交 .env.example
 .env
 .env.local
+
+# Cloudflare 隧道凭据。泄露 = 任何人都能把流量接到你的域名上
+deploy/cloudflared/credentials.json

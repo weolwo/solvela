@@ -1,14 +1,105 @@
-# Solvela 一键部署：MySQL + Redis + 后端
+# Solvela 一键部署。
 #
-#     cp .env.example .env     # 先改掉里面的密码
+#     cp .env.example .env     # 先把里面每一处 change-me 都改掉
 #     docker compose up -d
-#     docker compose logs -f app
+#     docker compose logs -f admin
 #
-# ⚠️ 安全上最要紧的一条：mysql 和 redis 都【没有】ports 映射。
-#    它们只在 compose 创建的内网里对 app 可见，公网上扫不到。
-#    很多人图省事写了 "3306:3306"，机器挂上公网当天就会被爆破 —— 不要加。
-#    真要连库调试，用 SSH 隧道：
-#        ssh -L 3306:127.0.0.1:3306 user@server   # 配合下面注释里的临时 ports
+# ┌─ 进程拓扑 ────────────────────────────────────────────────────────────┐
+# │                                                                      │
+# │   公网 ──► Cloudflare 边缘 ──► cloudflared（隧道，出站连接）            │
+# │                                    │                                 │
+# │                                    ▼                                 │
+# │            app.<域名>  ──►  web:8080 ─┬─► /            静态站(C端)      │
+# │                                       ├─► /api/        app-gateway    │
+# │                                       └─► /support/... admin（图片）   │
+# │                                                                      │
+# │          admin.<域名>  ──►  web:8081 ─┬─► /            静态站(管理端)   │
+# │                                       └─► /api/        admin          │
+# │                                                                      │
+# │   app-gateway ──HTTP──► app-biz        （C端网关转发给C端业务）         │
+# │   admin / app-biz ──► mysql / redis / minio                          │
+# └──────────────────────────────────────────────────────────────────────┘
+#
+# 🔴 安全上最要紧的一条：**没有任何服务对公网发布端口**。
+#
+#    mysql / redis / minio 从一开始就没有 ports —— 写了 "3306:3306" 的机器
+#    挂上公网当天就会被爆破。
+#
+#    三个后端进程和 web 也【一个都不发布】：外面唯一的入口是 cloudflared，
+#    而隧道是【出站】连接 —— 你家路由器不需要开任何入站端口，
+#    公网上也扫不到这台机器。这比"开个 443 加防火墙"要干净得多。
+#
+#    ⚠️ 这同时是 nginx 那份真实 IP 归一化能成立的前提：
+#       只有 cloudflared 够得着 web，才能保证 CF-Connecting-IP 是 Cloudflare 写的。
+#       一旦给 web 加上 ports 映射并对外开放，任何人都能直接伪造那个头。
+#       要本地调试就用 127.0.0.1 前缀绑定（见 minio 那两行的写法）。
+#
+#    真要连库调试：ssh -L 3306:127.0.0.1:3306 user@server
+
+# ---------------------------------------------------------------------------
+# 三个后端进程共享的环境变量。
+#
+# 用锚点而不是各写一遍：这些值里有一半是【三个进程必须逐字一致】的 ——
+# 尤其是设备令牌密钥（网关签发、admin 与 app-biz 验证，不一致的表现是
+# 「网关签的令牌到下游验不过」，而两边日志都不报错）。
+# 抄三遍就一定会有改漏的那天。
+#
+# ⚠️ 网关（app-gateway）用不到其中的数据库与加密密钥 —— 它 2026-09-01 摘掉了
+#    全部 base 模块，连 MySQL 驱动都没有。多给几个没人读的环境变量是无害的，
+#    而按进程裁剪清单的代价是「哪天网关要用了，忘了加」。
+# ---------------------------------------------------------------------------
+x-backend-env: &backend-env
+  TZ: Asia/Shanghai
+
+  # 覆盖 prod yaml 里写死的 127.0.0.1 —— 在容器里那指的是它自己
+  SPRING_DATASOURCE_URL: >-
+    jdbc:mysql://mysql:3306/solvela?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&allowMultiQueries=true
+  SPRING_DATASOURCE_USERNAME: root
+  SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  # ---- 密钥。全部必填，缺一个就启动失败 ----
+  # 这是刻意的：这几把钥匙给了默认值的话，忘配的人会用一个全世界都知道的密钥
+  # 把用户地址加密进库、给设备签名 —— 功能完全正常，而整套设计的前提直接归零，
+  # 且没有任何迹象。宁可起不来。各自的含义见 .env.example。
+  SOLVELA_CRYPTO_PII_SECRET_KEY: ${SOLVELA_CRYPTO_PII_SECRET_KEY}
+  SOLVELA_CRYPTO_PII_HMAC_KEY:   ${SOLVELA_CRYPTO_PII_HMAC_KEY}
+  SOLVELA_MEMBER_ID_SECRET_KEY:  ${SOLVELA_MEMBER_ID_SECRET_KEY}
+  SOLVELA_AUTH_DEVICE_KEY_V1:    ${SOLVELA_AUTH_DEVICE_KEY_V1}
+
+  # ---- 发信 ----
+  # ⚠️ Cloudflare Email Routing 只能【收】信，发信要单独的 SMTP 服务商。
+  SMTP_HOST:     ${SMTP_HOST:-}
+  SMTP_PORT:     ${SMTP_PORT:-465}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+
+  # ---- 对象存储 ----
+  FILE_STORAGE_MODE: ${FILE_STORAGE_MODE:-local}
+  FILE_STORAGE_CLOUD_ENDPOINT: http://minio:9000
+  FILE_STORAGE_CLOUD_BUCKET_NAME: ${MINIO_BUCKET:-solvela}
+  FILE_STORAGE_CLOUD_ACCESS_KEY: ${MINIO_ROOT_USER}
+  FILE_STORAGE_CLOUD_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+  FILE_STORAGE_CLOUD_REGION: us-east-1
+  FILE_STORAGE_CLOUD_PATH_STYLE_ACCESS: "true"
+
+  # 🔴 C 端图片的 URL 前缀。桶是私有的，图片由 admin 进程从 MinIO 流出来，
+  #    所以这里填的是【C 端自己的域名】+ 那个免登录端点，而不是 MinIO 地址。
+  #    不填的话所有图片会退回要登录态的下载接口 —— 管理端还能看，C 端全是叉。
+  FILE_STORAGE_PUBLIC_URL_PREFIX: ${FILE_STORAGE_PUBLIC_URL_PREFIX:-}
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+  build:
+    context: ./solvela-api
+    dockerfile: Dockerfile.distroless
+
+# ⚠️ depends_on 【不放】在上面的锚点里：YAML 的 << 合并是整键覆盖，
+#    服务里再写一个 depends_on 会把锚点那份整个顶掉而不是合并 ——
+#    表现是「明明写了等 mysql，还是起来就连不上库」。所以三个服务各写各的。
+
 
 services:
   mysql:
@@ -139,12 +230,21 @@ services:
       "
     restart: "no"
 
-  app:
+  # =========================================================================
+  # 管理端 :1024 —— 也是文件模块与定时任务的所在地
+  # =========================================================================
+  admin:
+    <<: *backend-common
     build:
       context: ./solvela-api
       dockerfile: Dockerfile.distroless
+      args:
+        MODULE: solvela-admin
+        APP_PORT: "1024"
     image: solvela-admin:3.0.0-distroless
-    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      HEALTH_URL: http://127.0.0.1:1024/
     depends_on:
       mysql:
         condition: service_healthy   # 等库真的建好，不是等端口通
@@ -152,57 +252,137 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    environment:
-      TZ: Asia/Shanghai
-      # 覆盖 prod/solvela-base.yaml 里写死的 127.0.0.1 —— 容器里那是它自己
-      SPRING_DATASOURCE_URL: >-
-        jdbc:mysql://mysql:3306/solvela?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&allowMultiQueries=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: "6379"
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
-      # ---- 对象存储（MinIO）----
-      #
-      # 这个镜像跑的是 **prod** 配置，而 prod/solvela-base.yaml 里的 cloud 那一段
-      # 是对着公有云写的。所以这里【每一项都要显式覆盖】，不能指望 yaml 的默认值。
-      # （dev 那份 yaml 是对着 MinIO 写的，从 IDE 起的时候什么都不用配 ——
-      #   两边命名不同是因为面对的是两份 yaml，不是随手写的，别去「统一」。）
-      #
-      # ⚠️ 容器内用服务名 minio:9000，不是 127.0.0.1 —— 那在容器里指它自己。
-      #    要让应用真的用对象存储，还得把 FILE_STORAGE_MODE 改成 cloud，
-      #    见 .env.example 里那一段。
-      FILE_STORAGE_MODE: ${FILE_STORAGE_MODE:-local}
-      FILE_STORAGE_CLOUD_ENDPOINT: http://minio:9000
-      FILE_STORAGE_CLOUD_BUCKET_NAME: ${MINIO_BUCKET:-solvela}
-      FILE_STORAGE_CLOUD_ACCESS_KEY: ${MINIO_ROOT_USER}
-      FILE_STORAGE_CLOUD_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      # MinIO 不分区域，但 SigV4 的签名里带着它，两边对不上会被拒。
-      # prod yaml 里写的是 oss-cn-hangzhou，必须覆盖掉。
-      FILE_STORAGE_CLOUD_REGION: us-east-1
-      # 🔴 本地对象存储必须走路径寻址，见 FileConfig.cloudPathStyleAccess。
-      #    这里【尤其】不能漏：endpoint 是主机名 minio，虚拟主机寻址会去解析
-      #    solvela.minio —— 报 UnknownHostException，看着像网络坏了。
-      #    （本机用 127.0.0.1 时这一项配错也看不出来：IP 没有子域名，
-      #      SDK 会自己退回路径寻址。这就是「本机好好的，一进容器图全挂」。）
-      FILE_STORAGE_CLOUD_PATH_STYLE_ACCESS: "true"
-    ports:
-      # 只有这一个对外。上了域名和 HTTPS 之后改成 "127.0.0.1:1024:1024"，
-      # 由 nginx/caddy 反代，别让应用端口直接对公网。
-      - "${APP_PORT:-1024}:1024"
     volumes:
-      - app-logs:/home/logs
-      - app-upload:/home/solvela/upload
+      - admin-logs:/home/logs
+      # FILE_STORAGE_MODE=local 时文件落在这里。切到 cloud 之后这个卷就只剩历史文件，
+      # 但【不要删】：切换之前上传的那些，storageKey 还指向本地磁盘。
+      - admin-upload:/home/solvela/upload
     # 实测：限 1GB 能正常启动，稳态占用 529MB。
-    # 1GB 内存的小机器上 MySQL 也要 ~400MB，三个服务挤一台会 OOM —— 建议 2GB 起。
     deploy:
       resources:
         limits:
-          memory: ${APP_MEMORY:-1g}
+          memory: ${ADMIN_MEMORY:-1g}
+
+  # =========================================================================
+  # C 端网关 :1025 —— 唯一直面 C 端用户的后端进程
+  # =========================================================================
+  # 它没有数据库驱动、没有 base 模块（2026-09-01 摘干净的），
+  # 只连 Redis（会话与身份缓存），业务一律转发给 app-biz。
+  app-gateway:
+    <<: *backend-common
+    build:
+      context: ./solvela-api
+      dockerfile: Dockerfile.distroless
+      args:
+        MODULE: solvela-app
+        APP_PORT: "1025"
+    image: solvela-app:3.0.0-distroless
+    environment:
+      <<: *backend-env
+      HEALTH_URL: http://127.0.0.1:1025/
+      # 两个键刻意都留着、都指向 app-biz：网关认的是 MemberAuthApi / ActivityApi
+      # 两个契约，将来资产域真拆出去时只改这里的一个 URL，代码一行不动。
+      MEMBER_SERVICE_URL: http://app-biz:1026
+      MARKETING_SERVICE_URL: http://app-biz:1026
+    depends_on:
+      redis:
+        condition: service_healthy
+      app-biz:
+        condition: service_healthy
+    volumes:
+      - gateway-logs:/home/logs
+    deploy:
+      resources:
+        limits:
+          memory: ${GATEWAY_MEMORY:-768m}
+
+  # =========================================================================
+  # C 端业务 :1026 —— 会员、营销、奖品、资产、商城
+  # =========================================================================
+  # 只被 app-gateway 调用，不对外。**不开定时任务**（那是 admin 独占的，
+  # 多一个进程跑 @Scheduled 就是发奖和结算重复执行，而多发的那份没人会来报）。
+  app-biz:
+    <<: *backend-common
+    build:
+      context: ./solvela-api
+      dockerfile: Dockerfile.distroless
+      args:
+        MODULE: solvela-app-biz
+        APP_PORT: "1026"
+    image: solvela-app-biz:3.0.0-distroless
+    environment:
+      <<: *backend-env
+      HEALTH_URL: http://127.0.0.1:1026/
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - biz-logs:/home/logs
+    deploy:
+      resources:
+        limits:
+          memory: ${BIZ_MEMORY:-1g}
+
+  # =========================================================================
+  # 静态站 + 反向代理。:8080 = C端，:8081 = 管理端
+  # =========================================================================
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    image: solvela-web:3.0.0
+    restart: unless-stopped
+    depends_on:
+      admin:
+        condition: service_healthy
+      app-gateway:
+        condition: service_healthy
+    # ⚠️ 刻意【不发布端口】。理由见文件开头那段 —— 这是 nginx 那份
+    #    真实 IP 归一化能成立的前提。本地要看页面就临时加一行
+    #    "127.0.0.1:8080:8080"，用完删掉。
+    healthcheck:
+      # alpine 自带 busybox wget；这个镜像里没有 curl
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # =========================================================================
+  # Cloudflare 隧道。整套部署里唯一与公网有关的东西
+  # =========================================================================
+  # 它建立的是【出站】连接，所以路由器不用开任何入站端口，公网也扫不到这台机器。
+  #
+  # 路由规则（哪个域名去哪个端口）在 deploy/cloudflared/config.yml 里，
+  # 跟着代码库走 —— 而不是在 Cloudflare 控制台点出来的。
+  # 点出来的配置没人 review、换机器要重点一遍、出问题时也看不出改过什么。
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # 不锁版本：隧道客户端要跟着 Cloudflare 的协议走，锁死版本迟早连不上。
+    # --no-autoupdate 是因为容器里自更新没意义（重建镜像才是升级方式）。
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    depends_on:
+      web:
+        condition: service_healthy
+    volumes:
+      - ./deploy/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      # 隧道凭据。`cloudflared tunnel create` 生成的那个 json，
+      # 默认在 ~/.cloudflared/<隧道UUID>.json。
+      # 🔴 这个文件【不要提交】—— .gitignore 里已经挡了。
+      - ./deploy/cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
 
 volumes:
   mysql-data:
   redis-data:
   minio-data:
-  app-logs:
-  app-upload:
+  # 三个进程各自的日志卷。合成一个的话，三份 Spring 日志会写进同一个目录，
+  # 而它们的文件名是一样的（按 project.name 分了子目录，但轮转文件会打架）。
+  admin-logs:
+  gateway-logs:
+  biz-logs:
+  admin-upload:

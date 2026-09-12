@@ -1,0 +1,62 @@
+# ===========================================================================
+# Cloudflare 隧道的路由表。**整个部署里唯一写着域名的文件。**
+# ===========================================================================
+#
+# 这份配置跟着代码库走，而不是在 Cloudflare 控制台点出来的（那种叫
+# remote-managed tunnel，用一个 TUNNEL_TOKEN 就能跑，更省事）。
+# 选这条路的理由：路由规则是配置，配置要能被 review、能跟着分支走、
+# 换机器时能原样复现。点出来的那份没人看得见，出问题时也说不清改过什么。
+#
+# ---------------------------------------------------------------------------
+# 怎么把它跑起来（一次性，在这台机器上）：
+#
+#   1) 登录（会开浏览器让你选域名授权）
+#        cloudflared tunnel login
+#
+#   2) 建隧道，记下它打印出来的 UUID
+#        cloudflared tunnel create solvela
+#
+#   3) 把凭据放到本目录（上一步生成在 ~/.cloudflared/<UUID>.json）
+#        cp ~/.cloudflared/<UUID>.json deploy/cloudflared/credentials.json
+#
+#   4) 把下面的 tunnel: 换成那个 UUID
+#
+#   5) 建 DNS 记录（三条，各跑一次）
+#        cloudflared tunnel route dns solvela app.taozicn.me
+#        cloudflared tunnel route dns solvela admin.taozicn.me
+#        cloudflared tunnel route dns solvela taozicn.me
+#
+#   6) docker compose up -d
+#
+# ⚠️ 第 5 步建的是 CNAME，指向 <UUID>.cfargotunnel.com，且是「橙云」代理状态。
+#    不要在控制台把它改成灰云 —— 灰云等于绕过 Cloudflare，
+#    而 CF-Connecting-IP 就是 Cloudflare 写的，绕过之后 nginx 那份
+#    真实 IP 归一化会全部取到空值（退回 cloudflared 的容器地址，不会出错，
+#    只是所有人的 IP 都一样）。
+# ---------------------------------------------------------------------------
+
+tunnel: CHANGE-ME-TUNNEL-UUID
+credentials-file: /etc/cloudflared/credentials.json
+
+# 隧道到 web 这一跳是容器内网的明文 HTTP，没有必要上 TLS：
+# 它不经过任何外部网络。用户那一侧的 HTTPS 由 Cloudflare 边缘终止。
+ingress:
+  # ---- C 端 ----
+  - hostname: app.taozicn.me
+    service: http://web:8080
+
+  # 裸域也指向 C 端：用户十有八九会直接敲 taozicn.me
+  - hostname: taozicn.me
+    service: http://web:8080
+
+  # ---- 管理端 ----
+  # 🔴 这条【必须】在 Cloudflare Zero Trust 里加一条 Access 策略保护，
+  #    否则管理端登录页就是对全公网开放的。具体见 deploy/README.md。
+  #    隧道本身不做鉴权 —— 它只是一条管子。
+  - hostname: admin.taozicn.me
+    service: http://web:8081
+
+  # 🔴 兜底规则，**必须是最后一条，且不能删**。
+  #    cloudflared 要求 ingress 的最后一条没有 hostname；缺了它启动就失败。
+  #    返回 404 而不是转发到某个服务：没配过的域名不该撞进 C 端站点。
+  - service: http_status:404

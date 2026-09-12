@@ -101,7 +101,18 @@ class FileCloudStorageWiringMinioTest {
                             assertThat(object.stream().readAllBytes()).isEqualTo(payload);
                         }
                     } finally {
-                        storage.delete(key);
+                        /*
+                         * ⚠️ 清理【不能抛】。放在 finally 里直接调的话，
+                         * 一旦 put 本身失败（比如凭据不对），delete 也会失败，
+                         * 而它抛出的异常会把上面那个真正的原因整个盖掉 ——
+                         * 报出来的是「删除对象失败」，查的人被指向完全错误的方向。
+                         * 2026-09-12 踩过：MinIO 换了密码，报的却是删除失败。
+                         */
+                        try {
+                            storage.delete(key);
+                        } catch (RuntimeException ignored) {
+                            // 探针文件留在桶里也无妨，比盖掉真实错误强
+                        }
                     }
                 });
     }
@@ -153,7 +164,18 @@ class FileCloudStorageWiringMinioTest {
                                         + "看着像网络坏了")
                                 .isTrue();
                     } finally {
-                        storage.delete(key);
+                        /*
+                         * ⚠️ 清理【不能抛】。放在 finally 里直接调的话，
+                         * 一旦 put 本身失败（比如凭据不对），delete 也会失败，
+                         * 而它抛出的异常会把上面那个真正的原因整个盖掉 ——
+                         * 报出来的是「删除对象失败」，查的人被指向完全错误的方向。
+                         * 2026-09-12 踩过：MinIO 换了密码，报的却是删除失败。
+                         */
+                        try {
+                            storage.delete(key);
+                        } catch (RuntimeException ignored) {
+                            // 探针文件留在桶里也无妨，比盖掉真实错误强
+                        }
                     }
                 });
     }

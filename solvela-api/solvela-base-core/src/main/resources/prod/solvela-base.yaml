@@ -39,10 +39,13 @@ spring:
           max-wait: 30000ms
   # 邮件，置以SSL的方式发送, 这个需要使用这种方式并且端口是465
   mail:
-    host: smtp.163.com
-    port: 465
-    username: lab1024@163.com
-    password: LAB1024LAB
+    host: ${SMTP_HOST:smtp.163.com}
+    port: ${SMTP_PORT:465}
+    # 留空默认：不配也能启动，但发信会在运行时失败（报错明确）。
+    # 不设成必填是因为「发不出邮件」不该让整个后台起不来 —— 与下面那几把密钥的取舍相反，
+    # 那几把一旦用错默认值是【静默的】灾难，这个是【当场可见】的故障。
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
     test-connection: false
     properties:
       mail:
@@ -205,6 +208,19 @@ solvela:
       #    手机号验证码要上线，先接厂商，见 SmsSender 的类注释。
       email-transport: REAL
       sms-transport: REAL
+
+      # ⚠️⚠️ 临时开关：还没接短信服务商，但仍允许启动。
+      #
+      # 本站目前【只用邮箱】：注册、登录、找回密码、改邮箱都走邮箱，链路是完整的。
+      # 而手机号那几条路（注册 / 登录 / 绑定 / 短信找回密码）现在走到哪一步都会抛异常，
+      # 对用户是 500 —— 所以 C 端不能暴露任何手机号入口。
+      #
+      # 🔴 接好厂商之后【把这一行删掉】，别留着。
+      #    留着的话，将来厂商配置出问题、SmsSender 变成不可用时，
+      #    本该拦下来的启动会被这一行放行，而表现又变回「用户点一下报 500」。
+      #
+      # 每次启动都会打一条 WARN 提醒它还在。
+      allow-missing-sms-vendor: true
     register:
       # 🔴 手机号注册是否必须验短信验证码。
       #
@@ -247,7 +263,7 @@ solvela:
       #      secret-key: ${SOLVELA_MEMBER_ID_SECRET_KEY}
       #    下面这个是本 profile 的独立随机串，四个环境刻意不同 ——
       #    环境之间号段重合是正常的，但映射不同可以避免测试号被误认成生产号。
-      secret-key: "opjoIo7msAvn4mT4gJqoo3LQJelWXaiKvW6nt1wB"
+      secret-key: ${SOLVELA_MEMBER_ID_SECRET_KEY}
       # 号段大小：一次向 t_member_id_seq 批发多少个内部序号。
       # 库里 t_member_id_seq.step 的值优先于这里，方便运维临时调整而不用发版。
       step: 1000
@@ -266,7 +282,7 @@ solvela:
       # ⚠️ 不配的话应用<b>启动即失败</b>（PiiCipher 的构造器直接抛），
       #    刻意不给默认密钥：给了就会有人忘了配，然后用一个全世界都知道的密钥把用户地址加密进库。
       #    四个环境的串刻意不同：拿测试库的备份不该能解开生产的数据。
-      secret-key: "Rt5bJyN8xVqL3wZcE1oKdS7mUaH6pGfI9nTrB4My"
+      secret-key: ${SOLVELA_CRYPTO_PII_SECRET_KEY}
 
       # -----------------------------------------------------------------
       # 🔴 摘要密钥（PiiHasher）：与上面的加密密钥刻意分开
@@ -283,7 +299,7 @@ solvela:
       #    密钥和摘要躺在一起，HMAC 就退化成了纯哈希，等于没加。
       #      hmac-key: ${SOLVELA_CRYPTO_PII_HMAC_KEY}
       # ⚠️ 不配的话应用启动即失败（PiiHasher 构造器直接抛），理由同 secret-key。
-      hmac-key: "Ws3qNbY7mZjT1xKfL5dVcH9pEaR2uG6oI8tXrM4y"
+      hmac-key: ${SOLVELA_CRYPTO_PII_HMAC_KEY}
 
   # -------------------------------------------------------------------
   # 🔴 设备令牌的签名密钥（DeviceTokenCodec）
@@ -313,7 +329,7 @@ solvela:
     device:
       key-version: 1
       keys:
-        1: "Pd7sJfP1gUoT6iNmB3wZHn4tWqL9zXbE2vRcM5yK"
+        1: ${SOLVELA_AUTH_DEVICE_KEY_V1}
 # 动态脚本引擎
 script:
   # 底层引擎实现，目前仅 qlexpress

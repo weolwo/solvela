@@ -1,6 +1,16 @@
 # syntax=docker/dockerfile:1
 #
-# solvela-admin 生产镜像（distroless 版）。与 Dockerfile 的区别只在最后一段的基座：
+# 生产镜像（distroless 版）。**三个后端进程共用这一个 Dockerfile**，靠 MODULE 参数区分：
+#
+#     --build-arg MODULE=solvela-admin     管理端    :1024
+#     --build-arg MODULE=solvela-app       C端网关   :1025
+#     --build-arg MODULE=solvela-app-biz   C端业务   :1026
+#
+# 三个进程的构建过程【完全一致】（同一棵源码树、同一次 mvn package），
+# 差别只有「拷哪个 jar」。拆成三份 Dockerfile 的话，以后换基座、调 JVM 参数、
+# 改探针都要改三处 —— 而漏改一处的表现是「有个服务的行为和另外两个不一样」。
+#
+# 与 Dockerfile 的区别只在最后一段的基座：
 #     debian:bookworm-slim (113MB) + apt 装 tzdata/ca-certificates/curl (16MB)
 #  →  gcr.io/distroless/base-debian12:nonroot (33MB，自带 glibc/tzdata/ca-certificates/nonroot 用户)
 #
@@ -13,18 +23,25 @@
 # ① 构建
 # ============================================================================
 FROM maven:3.9-eclipse-temurin-25 AS build
+
+
 WORKDIR /src
-COPY pom.xml ./
-COPY solvela-base/pom.xml       solvela-base/
-COPY common-api/pom.xml    common-api/
-COPY solvela-marketing/pom.xml  solvela-marketing/
-COPY solvela-admin/pom.xml      solvela-admin/
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -Pprod -DskipTests dependency:go-offline -Dsilent=true || true
+
+# 这里原先有一段「先 COPY 各模块 pom.xml 再 dependency:go-offline」的依赖预取，
+# 2026-09-12 删掉了：它列的是 solvela-base / common-api / solvela-marketing /
+# solvela-admin 四个模块，而仓库早就是二十多个模块了。名字对不上时 go-offline 会失败，
+# 又被后面的 `|| true` 无声吞掉 —— 这段预取一次都没成功过。
+#
+# 「照着模块列表抄一份」这种写法注定会过期，而过期了不报错、只是悄悄变慢，
+# 属于最难发现的那一类。真正在起作用的是下面的 --mount=type=cache：
+# .m2 在多次构建之间共享，依赖只在第一次下载，删掉预取不影响增量构建。
 COPY . .
+# 🔴 这一层【刻意不引用 MODULE】：三个镜像的 mvn package 是同一条命令，
+#    Docker 的缓存键因此完全一致 —— 打完 admin 再打网关和 biz 时，这一层直接命中，
+#    整棵源码树只编译【一次】。把 `cp 某个 jar` 写进这一层的话，缓存键就带上了模块名，
+#    三个镜像要各自完整编译一遍（每次好几分钟）。挑哪个 jar 挪到下面的 extract 段去做。
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -Pprod -DskipTests clean package \
- && cp solvela-admin/target/solvela-admin-prod-*.jar /app.jar
+    mvn -B -Pprod -DskipTests clean package
 
 # ============================================================================
 # ② jlink 裁剪运行时（模块清单的来龙去脉见 Dockerfile 里的长注释，此处不重复）
@@ -44,17 +61,33 @@ import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
 
-/** 容器存活探针。退出码 0 表示健康。distroless 里没有 curl，只能这么来。 */
+/**
+ * 容器存活探针。退出码 0 表示健康。distroless 里没有 curl，只能这么来。
+ *
+ * 🔴 判据是「状态码 < 500」，不是「等于 200」。
+ *
+ * 探的是【这个进程还在正常应答吗】，不是某个业务接口对不对。要求 200 的话，
+ * 得为三个服务各找一个免登录且必然返回 200 的端点 —— 而那些端点是业务代码，
+ * 随时会被改路径或加上鉴权，改的人完全想不到会把探针一起弄坏。
+ *
+ * 404（没这个路由）和 401（要登录）都证明容器是活的：连接建上了、
+ * DispatcherServlet 在应答。该判死的是连不上（进程没起来，这里抛异常）
+ * 和 5xx（进程还在但已经不工作了）。
+ */
 public class HealthCheck {
     public static void main(String[] args) {
-        String url = args.length > 0 ? args[0] : "http://127.0.0.1:1024/login/getTwoFactorLoginFlag";
+        String url = System.getenv("HEALTH_URL");
+        if (url == null || url.isBlank()) {
+            url = "http://127.0.0.1:"
+                    + System.getenv().getOrDefault("SERVER_PORT", "1024") + "/";
+        }
         try {
             HttpResponse<Void> r = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(2)).build()
                     .send(HttpRequest.newBuilder(URI.create(url))
                             .timeout(Duration.ofSeconds(2)).GET().build(),
                           HttpResponse.BodyHandlers.discarding());
-            System.exit(r.statusCode() == 200 ? 0 : 1);
+            System.exit(r.statusCode() < 500 ? 0 : 1);
         } catch (Exception e) {
             System.exit(1);
         }
@@ -66,7 +99,11 @@ EOF
 # ③ Spring Boot 分层解包
 # ============================================================================
 FROM eclipse-temurin:25-jdk-noble AS extract
-COPY --from=build /app.jar /app.jar
+
+# 要打包哪个进程：solvela-admin(管理端) / solvela-app(C端网关) / solvela-app-biz(C端业务)。
+# 挑 jar 这一步放在这里而不是 build 段，理由见上面那段注释。
+ARG MODULE=solvela-admin
+COPY --from=build /src/${MODULE}/target/${MODULE}-prod-*.jar /app.jar
 RUN java -Djarmode=tools -jar /app.jar extract --layers --launcher --destination /extracted
 
 # 【约束二】distroless 没有 shell，跑不了 RUN mkdir/chown，
@@ -110,7 +147,11 @@ COPY --from=extract --chown=65532:65532 /extracted/snapshot-dependencies/ ./
 COPY --from=extract --chown=65532:65532 /extracted/application/           ./
 
 USER nonroot:nonroot
-EXPOSE 1024
+
+# 端口按服务顺排：admin 1024 / app 1025(网关) / app-biz 1026。
+# EXPOSE 只是元数据，真正决定监听端口的是各模块 prod/application.yaml 里的 server.port。
+ARG APP_PORT=1024
+EXPOSE ${APP_PORT}
 
 VOLUME ["/home/logs", "/home/solvela/upload"]
 

@@ -15,8 +15,12 @@ public class SolvelaServletUtil {
     /**
      * 取客户端 IP 时依次尝试的请求头，顺序与原 JakartaServletUtil 一致。
      * 前面的优先级更高：X-Forwarded-For 是标准做法，后面几个是各家反代/容器的历史遗留写法。
+     *
+     * 🔴 这份清单与 deploy/nginx/snippets/proxy-upstream.conf 里 nginx 处理的
+     * 那一份【必须逐个对上】，由 ClientIpHeaderCoverageTest 盯着。
+     * 包级可见是为了让那条测试读得到 —— 别改回 private。
      */
-    private static final String[] CLIENT_IP_HEADERS = {
+    static final String[] CLIENT_IP_HEADERS = {
             "X-Forwarded-For",
             "X-Real-IP",
             "Proxy-Client-IP",

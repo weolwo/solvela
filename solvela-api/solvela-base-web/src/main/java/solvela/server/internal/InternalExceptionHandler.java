@@ -8,6 +8,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import solvela.base.trace.Trace;
 import solvela.exception.BusinessException;
 
@@ -60,6 +62,34 @@ public class InternalExceptionHandler {
     public ResponseEntity<InternalError> handleBadRequest(Exception e, HttpServletRequest request) {
         log.warn("[Internal] {} {} 入参不合法: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
         return build(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", e.getMessage());
+    }
+
+    /**
+     * 🔴 <b>路由不存在 = 404，不是 500。</b>
+     *
+     * <p>不单独处理的话它会掉进下面那个 {@code Throwable} 兜底里 ——
+     * 而本类的兜底注释写着「真正的意外」。路由不存在不是意外，它和上面那条
+     * 「网关传的 body 不合法」是同一类：<b>调用方的问题</b>。
+     *
+     * <p>为什么这件事值得单独一条：本服务的调用方是网关，而网关的
+     * {@code RestClient} 是<b>按状态码</b>决定「这次调用成没成」的。
+     * 把它报成 500，一个拼错的 {@code @HttpExchange} 路径就会表现成
+     * 「下游服务故障」—— 于是走重试、触发熔断、在 APM 里压低成功率，
+     * 而真正该做的是改那行路径。方向完全反了。
+     *
+     * <p>顺带一层：不打堆栈。扫描器和探针一天能打出成千上万个 404，
+     * 每个都灌一条堆栈进 error.log 的话，真正的故障会被淹掉 ——
+     * 2026-09-12 部署时就是先看到几百条这个才发现的。
+     */
+    // ⚠️ 两个都要认，它们是同一件事的两种抛法：
+    //    NoResourceFoundException  —— 有静态资源处理器时（真实进程里就是它）
+    //    NoHandlerFoundException   —— 没有静态资源处理器时（如 standalone MockMvc）
+    //    只认一个的话，测试绿而线上红，或者反过来 —— 两种都发生过。
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<InternalError> handleNoRoute(Exception e,
+                                                       HttpServletRequest request) {
+        log.warn("[Internal] {} {} 路由不存在", request.getMethod(), request.getRequestURI());
+        return build(HttpStatus.NOT_FOUND, "NO_SUCH_ROUTE", e.getMessage());
     }
 
     /**

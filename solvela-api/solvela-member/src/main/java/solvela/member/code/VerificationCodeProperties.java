@@ -120,6 +120,28 @@ public class VerificationCodeProperties {
      */
     private Transport smsTransport = Transport.REAL;
 
+    /**
+     * <b>明知没接短信厂商，仍然允许生产环境启动。</b>默认 false。
+     *
+     * <h3>这不是降级开关，是一句「我知道」</h3>
+     * {@code MemberSmsCodeService} 的启动闸拦的是<b>失手</b>：配了 REAL 却没接厂商，
+     * 不拦的话要等第一个真实用户点「获取验证码」才暴露，表现是一个 500，
+     * 而那一刻没人在看日志。
+     *
+     * <p>但「这个站暂时只用邮箱」是一个<b>合法的部署形态</b> ——
+     * 邮箱注册 / 登录 / 找回密码都是完整的。原来的闸没给这种形态留出口，
+     * 于是只能靠改代码或改环境名绕过去，那比留一个开关糟糕得多。
+     *
+     * <p>🔴 <b>开了它，短信这条路仍然是一堵墙</b>（见 {@link
+     * solvela.member.sms.UnavailableSmsSender}）：任何真的走到发短信那一步的请求
+     * 都会抛异常、对用户是 500。所以开这个开关时<b>必须同时保证 C 端不提供手机号入口</b>，
+     * 否则你只是把「启动失败」换成了「用户点一下报 500」—— 后者更难发现。
+     *
+     * <p>每次启动都会打一条 WARN，刻意的：临时开关最容易变成永久状态，
+     * 而唯一能防住这件事的是让它在每份启动日志里都刺眼。
+     */
+    private boolean allowMissingSmsVendor = false;
+
     /** 送达通道。 */
     public enum Transport {
 

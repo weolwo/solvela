@@ -98,10 +98,22 @@ public class MemberSmsCodeService {
             //    不在这里拦的话，它要等到第一个真实用户点「获取验证码」才暴露 ——
             //    表现是一个 500，而那一刻没人在看日志。启动时炸，部署的人当场就知道。
             if (systemEnvironment.isProd() && !smsSender.available()) {
+                //『只用邮箱』是一个合法的部署形态，但必须是【说出口的】那种合法。
+                // 见 VerificationCodeProperties#allowMissingSmsVendor 的说明。
+                if (properties.isAllowMissingSmsVendor()) {
+                    log.warn("【短信】没有接入任何服务商，而 allow-missing-sms-vendor=true —— "
+                            + "本次启动放行。🔴 手机号注册 / 登录 / 绑定 / 找回密码这几条路"
+                            + "现在【走到哪一步都会抛异常】，对用户是 500。"
+                            + "请确认 C 端没有暴露任何手机号入口。接好厂商后把这个开关删掉。");
+                    return;
+                }
                 throw new IllegalStateException(
                         "solvela.member.code.sms-transport=REAL，但没有任何 SmsSender 实现："
                                 + "短信一条也发不出去，手机号注册 / 登录会全线失败。"
-                                + "接好厂商并加一个 @Component SmsSender 实现，再上生产。");
+                                + "接好厂商并加一个 @Component SmsSender 实现，再上生产。"
+                                + "确实只打算用邮箱的话，显式配 "
+                                + "solvela.member.code.allow-missing-sms-vendor=true —— "
+                                + "但那条路上的请求仍然会 500，C 端不要暴露手机号入口。");
             }
             return;
         }
