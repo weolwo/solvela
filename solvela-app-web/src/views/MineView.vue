@@ -129,11 +129,10 @@ async function handleLogout(): Promise<void> {
       <Cell icon="home" title="地址簿" :to="{ name: 'address-list' }" />
       <Cell icon="settings" title="设置" :to="{ name: 'settings' }" />
       <!--
-        主题只有一套皮肤，所以是只读行：右边显示当前值，不给箭头。
-        箭头意味着「可以点进去」，而现在点进去没有第二个选项可选。
-        第二套皮肤落地后把 arrow 打开、加上 to 即可
+        2026-09-12 放开：深色模式和 iOS 皮肤都落地了，这一行终于有得选。
+        它在此之前是只读的 —— 只有一套皮肤时给箭头等于骗人，点进去没有第二个选项。
       -->
-      <Cell icon="palette" title="主题" :value="theme.label" :arrow="false" />
+      <Cell icon="palette" title="主题" :value="theme.label" :to="{ name: 'theme' }" />
     </Card>
 
     <Card>

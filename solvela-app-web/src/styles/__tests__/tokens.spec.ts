@@ -62,14 +62,20 @@ function definedTokens(): Set<string> {
   return defined
 }
 
-/** 用到了哪些：`var(--sv-xxx)`，连同它的 fallback 一起看 */
+/**
+ * 用到了哪些：`var(--sv-xxx)`，连同它的 fallback 一起看。
+ *
+ * 🔴 必须匹配到收尾的 `)` 或 `,`，不能只匹配名字。
+ * 只匹配名字的话，注释里写的 `var(--sv-radius-*)` 这种<b>通配符说明</b>
+ * 会被当成一个叫 `--sv-radius-` 的变量报出来 —— 2026-09-12 就误报过一次。
+ */
 function usedTokens(): Map<string, string[]> {
   const used = new Map<string, string[]>()
   for (const file of files) {
     const text = readFileSync(file, 'utf8')
-    for (const m of text.matchAll(/var\(\s*(--sv-[a-z0-9-]+)\s*(,)?/g)) {
+    for (const m of text.matchAll(/var\(\s*(--sv-[a-z0-9-]+)\s*([,)])/g)) {
       // 带 fallback 的（var(--x, red)）不算问题：取不到也有兜底
-      if (m[2] !== undefined) {
+      if (m[2] === ',') {
         continue
       }
       const name = m[1]!

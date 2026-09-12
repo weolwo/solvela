@@ -99,6 +99,12 @@ const routes: RouteRecordRaw[] = [
     meta: { anonymous: true, title: '重置密码' },
   },
   {
+    path: '/settings/theme',
+    name: 'theme',
+    component: () => import('@/views/ThemeView.vue'),
+    meta: { title: '主题' },
+  },
+  {
     path: '/settings/phone',
     name: 'phone-bind',
     component: () => import('@/views/PhoneBindView.vue'),

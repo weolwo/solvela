@@ -44,7 +44,7 @@ defineProps<{
   justify-content: center;
   padding: var(--sv-space-page);
   /* 遮罩很淡：这是一次成功反馈，不是需要用户决策的弹窗，不该把页面压黑 */
-  background: rgb(24 36 49 / 12%);
+  background: var(--sv-shadow-overlay);
   backdrop-filter: blur(2px);
 }
 

@@ -19,6 +19,14 @@
   --sv-color-success: #64bb5c;
   --sv-color-danger: #e84026;
   --sv-color-warning: #ffa500;
+  /*
+   * 语义色的浅底，状态胶囊用。
+   * 🔴 必须是独立 token，不能在组件里写 rgb(... / 12%)：
+   * 那个透明度是按【浅色卡片】调的，盖到深色卡片上几乎看不见。
+   */
+  --sv-color-success-soft: rgb(100 187 92 / 14%);
+  --sv-color-danger-soft: rgb(232 64 38 / 10%);
+  --sv-color-warning-soft: rgb(255 165 0 / 12%);
 
   /*
    * ---- 文字 ----
@@ -41,6 +49,8 @@
   --sv-border-color: rgb(24 36 49 / 8%);
   /* 需要看得见的描边（复选框未选中态）。--sv-border-color 那个 8% 太淡，画不出方框 */
   --sv-border-strong: rgb(24 36 49 / 22%);
+  /* 浮层投影。深色下要换成更深的黑，否则近黑的影子落在近黑的卡上等于没有 */
+  --sv-shadow-overlay: rgb(24 36 49 / 12%);
 
   /* ---- 圆角 ---- */
   --sv-radius-sm: 8px;
@@ -79,7 +89,116 @@
 }
 
 /*
- * ── 想换成 iOS 观感时，改这几个值就够 ──
+ * ════════════════════════════════════════════════════════════════════
+ * 深色。
+ *
+ * 🔴 只在这里重定义【颜色】，结构（圆角/间距/尺寸/字号）一个都不动 ——
+ *    深色是换一套色，不是换一套布局。混在一起改的话，
+ *    以后调间距要在两个地方改，而漏掉的那处只在深色下看得出来。
+ *
+ * 🔴 这里只认 data-appearance="dark"，【不写 prefers-color-scheme 媒体查询】。
+ *    「跟随系统」由 stores/theme.ts 解析成 light / dark 之后再打到 <html> 上。
+ *    两边都写的话，同一套深色值要复制两份（媒体查询里一份、属性选择器里一份），
+ *    而改漏一份的表现是「手动选深色是对的，跟随系统时有几个颜色不对」。
+ * ════════════════════════════════════════════════════════════════════
+ */
+:root[data-appearance='dark'] {
+  /* 主色提亮一档：#ff4d3a 在深底上偏暗，对比度不够 */
+  --sv-color-primary: #ff6b5a;
+  --sv-color-primary-pressed: #e35446;
+  /* 浅底从「接近白」翻成「接近黑」，透明度也要加大才看得见 */
+  --sv-color-primary-soft: rgb(255 107 90 / 18%);
+
+  --sv-color-success: #7cc975;
+  --sv-color-danger: #ff6a52;
+  --sv-color-warning: #ffb733;
+  --sv-color-success-soft: rgb(124 201 117 / 18%);
+  --sv-color-danger-soft: rgb(255 106 82 / 16%);
+  --sv-color-warning-soft: rgb(255 183 51 / 18%);
+
+  /*
+   * 🔴 正文不是纯白。纯白配纯黑在 OLED 上会「发光」，长时间看很累 ——
+   *    与浅色那边「正文不是纯黑」是同一条道理，只是反过来。
+   */
+  --sv-text-primary: #e6e9ed;
+  --sv-text-secondary: rgb(230 233 237 / 70%);
+  /*
+   * 🔴 深色这一档比浅色那边高（55% vs 40%），不是笔误。
+   * 同样的透明度盖在深底上，看起来比盖在白底上淡得多 ——
+   * 照抄 40% 的话，这行字与卡片的对比度只有 3.26:1，小字远低于 WCAG AA 的 4.5。
+   * 55% 把它抬到 4.6 左右。
+   */
+  --sv-text-placeholder: rgb(230 233 237 / 55%);
+  --sv-text-on-primary: #ffffff;
+
+  /*
+   * 🔴 卡片比页面【浅】，不是深。深色下靠「越靠前越亮」表达层次，
+   *    照搬浅色那套（卡片更白、页面更灰）会得到一张糊在一起的页面。
+   */
+  --sv-bg-page: #14181d;
+  --sv-bg-surface: #1e242b;
+  --sv-bg-pressed: rgb(230 233 237 / 8%);
+  --sv-bg-fill: #272e36;
+  --sv-border-color: rgb(230 233 237 / 10%);
+  --sv-border-strong: rgb(230 233 237 / 26%);
+  --sv-shadow-overlay: rgb(0 0 0 / 45%);
+}
+
+/*
+ * ════════════════════════════════════════════════════════════════════
+ * iOS 皮肤。
+ *
+ * 🔴 只改【结构】和那一个纯黑正文，其余颜色不碰 ——
+ *    这样它和深色能自由组合：深色那一段写在本段【之前】，
+ *    两者选择器权重相同，源码顺序决定谁赢……
+ *
+ *    ⚠️ 所以顺序不能反：本段必须在深色段【之后】，否则 iOS 的
+ *    --sv-text-primary: #000 会盖掉深色的浅灰正文，
+ *    得到一张「深底黑字」的页面 —— 那种页面不会报错，只是读不了。
+ *    下面那条 [data-appearance='dark'] 的补丁就是专门修这一格的。
+ * ════════════════════════════════════════════════════════════════════
+ */
+:root[data-skin='ios'] {
+  /* iOS 正文是纯黑，鸿蒙是近黑带蓝 —— 就这一个色号决定了整页的调子 */
+  --sv-text-primary: #000000;
+  --sv-bg-page: #f2f2f7;
+
+  /* 内缩分组的圆角更小 */
+  --sv-radius-lg: 10px;
+  /* iOS 更紧 */
+  --sv-space-page: 16px;
+  /* iOS 主按钮更高；44pt 是行高标准 */
+  --sv-control-height: 50px;
+  --sv-row-height: 44px;
+  /* Large Title */
+  --sv-font-title: 32px;
+}
+
+/*
+ * iOS + 深色：把上面那两个【浅色专属】的值再翻回来。
+ * 只有这两格需要补 —— 其余都是结构值，深浅通用。
+ */
+:root[data-skin='ios'][data-appearance='dark'] {
+  --sv-text-primary: #e6e9ed;
+  --sv-bg-page: #000000;
+  --sv-bg-surface: #1c1c1e;
+}
+
+/*
+ * ── iOS 皮肤还差的那两处，要动组件不是动变量 ──
+ *
+ * 下面两条是 2026-09-12 上这套皮肤时【明知道没做】的：
+ *
+ *   · iOS 的表单行有可见标签（「手机号」「密码」在左侧），所以要给 Field 传 label；
+ *     鸿蒙这版不传，靠 placeholder。
+ *   · iOS 主按钮是 12px 圆角矩形，不是胶囊 —— 要把 Button 的
+ *     --sv-radius-pill 换成 --sv-radius-md。
+ *
+ * 两者都要在组件里按皮肤分支，而不是改一个变量就完事。
+ * 所以现在这套 iOS 皮肤是【色调与间距像，控件形状还不像】。
+ * 想做全的话从这两条开始。
+ *
+ * ── 原始对照表（值已经落进上面的 [data-skin='ios'] 了）──
  *
  *   --sv-text-primary : #182431 -> #000000        （iOS 正文是纯黑）
  *   --sv-bg-page      : #f1f3f5 -> #f2f2f7        （systemGroupedBackground）

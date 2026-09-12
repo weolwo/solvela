@@ -2,56 +2,160 @@ import { defineStore } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
 
 /**
- * 主题（换肤）。
+ * 主题。**两个互相独立的维度**，不要混成一个。
  *
- * <h3>🔴 目前只有一套皮肤，这里是"接口先立住"</h3>
- * theme.css 顶上写着「活动换皮肤时要能只改这一层」—— 这个 store 就是那个开关将来的家。
- * 换肤的做法是在 `<html>` 上打一个 `data-theme`，由 CSS 覆盖 `--sv-*` 变量，
- * 组件一行都不用改。
+ * <table>
+ *   <tr><td></td><td>外观 appearance</td><td>皮肤 skin</td></tr>
+ *   <tr><td>管什么</td><td>深浅（一套颜色）</td><td>平台观感（圆角/间距/尺寸）</td></tr>
+ *   <tr><td>谁在用</td><td>用户，随时会切</td><td>基本不切，选一次</td></tr>
+ *   <tr><td>取值</td><td>system / light / dark</td><td>default / ios</td></tr>
+ * </table>
  *
- * <p>现在只有 `default` 一个值，所以「我的」页面里那个入口是**只读展示**，
- * 不是一个点了没反应的按钮。等第二套皮肤落地再放开选择。
+ * 合成一个枚举（「浅色」「深色」「iOS 浅色」「iOS 深色」）的话，
+ * 加第三套皮肤要写六个值，而且「我现在是不是深色」这个问题要靠字符串匹配来答。
  *
- * <p>⚠️ 注意这不是「深色模式」。深色模式要为每个 `--sv-*` 再定义一套值
- * 并处理 `prefers-color-scheme`，是独立的一件事；换肤是活动运营的诉求。
- * 两者共用这套机制，但不要混为一谈。
+ * <h3>🔴 「跟随系统」在这里解析掉，不留给 CSS</h3>
+ * 打到 {@code <html>} 上的 {@code data-appearance} <b>永远是 light 或 dark</b>，
+ * 不会是 system。这样 theme.css 里只需要一段 {@code [data-appearance='dark']}；
+ * 交给 CSS 的话，同一套深色值要在媒体查询里再抄一份，
+ * 而改漏一份的表现是「手动选深色是对的，跟随系统时有几个颜色不对」。
+ *
+ * <p>代价是要自己监听系统变化 —— 见下面的 matchMedia 订阅。
  */
 
-export const THEMES = [{ id: 'default', label: '默认' }] as const
+export const APPEARANCES = [
+  { id: 'system', label: '跟随系统' },
+  { id: 'light', label: '浅色' },
+  { id: 'dark', label: '深色' },
+] as const
 
-export type ThemeId = (typeof THEMES)[number]['id']
+export type AppearanceId = (typeof APPEARANCES)[number]['id']
 
-const STORAGE_KEY = 'solvela.app.theme'
+export const SKINS = [
+  { id: 'default', label: '默认', hint: '鸿蒙风格：大圆角、胶囊按钮' },
+  { id: 'ios', label: 'iOS 风格', hint: '小圆角、更紧的留白' },
+] as const
 
-function read(): ThemeId {
+export type SkinId = (typeof SKINS)[number]['id']
+
+const APPEARANCE_KEY = 'solvela.app.appearance'
+const SKIN_KEY = 'solvela.app.skin'
+
+/**
+ * 隐私模式 / 禁用站点数据时，访问 storage 会直接抛（不是返回 null）。
+ * 与 token-storage 同一个处理：不能让它掀翻整个应用。
+ */
+function safeRead(key: string): string | null {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    // 存的值可能是被删掉的旧皮肤，认不出就回默认，不能让页面变成没有变量的裸样式
-    return THEMES.some((t) => t.id === saved) ? (saved as ThemeId) : 'default'
+    return localStorage.getItem(key)
   } catch {
-    // 隐私模式下 localStorage 会直接抛
-    return 'default'
+    return null
+  }
+}
+
+function safeWrite(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // 存不下就只在本次会话生效，不影响使用
+  }
+}
+
+/** 存的值可能是被删掉的旧主题，认不出就回默认 —— 不能让页面变成没有变量的裸样式 */
+function readAppearance(): AppearanceId {
+  const saved = safeRead(APPEARANCE_KEY)
+  return APPEARANCES.some((a) => a.id === saved) ? (saved as AppearanceId) : 'system'
+}
+
+function readSkin(): SkinId {
+  const saved = safeRead(SKIN_KEY)
+  return SKINS.some((s) => s.id === saved) ? (saved as SkinId) : 'default'
+}
+
+const DARK_QUERY = '(prefers-color-scheme: dark)'
+
+function systemPrefersDark(): boolean {
+  try {
+    return window.matchMedia(DARK_QUERY).matches
+  } catch {
+    // 老浏览器 / 测试环境里可能没有 matchMedia。当成浅色 —— 那是更安全的默认
+    return false
   }
 }
 
 export const useThemeStore = defineStore('theme', () => {
-  const current = ref<ThemeId>(read())
+  const appearance = ref<AppearanceId>(readAppearance())
+  const skin = ref<SkinId>(readSkin())
+  /** 系统当前是不是深色。只有 appearance='system' 时用得上 */
+  const systemDark = ref(systemPrefersDark())
 
-  const label = computed(() => THEMES.find((t) => t.id === current.value)?.label ?? '默认')
-
-  /** 主题落到 <html> 的 data-theme 上，CSS 据它覆盖 --sv-* */
-  watchEffect(() => {
-    document.documentElement.dataset['theme'] = current.value
-    try {
-      localStorage.setItem(STORAGE_KEY, current.value)
-    } catch {
-      // 存不下就只在本次会话生效，不影响使用
-    }
-  })
-
-  function select(id: ThemeId): void {
-    current.value = id
+  /**
+   * 系统深浅变了要跟着变。
+   *
+   * 🔴 不订阅的话，用户在「跟随系统」下切换手机的深色模式，
+   * 页面要等到下次刷新才跟上 —— 而他多半会以为这个开关坏了。
+   */
+  try {
+    window.matchMedia(DARK_QUERY).addEventListener('change', (e) => {
+      systemDark.value = e.matches
+    })
+  } catch {
+    // 没有 matchMedia 就没有系统偏好可跟随，保持浅色
   }
 
-  return { current, label, select }
+  /** 最终生效的深浅。**只会是 light 或 dark** */
+  const resolvedAppearance = computed<'light' | 'dark'>(() => {
+    if (appearance.value === 'system') {
+      return systemDark.value ? 'dark' : 'light'
+    }
+    return appearance.value
+  })
+
+  const isDark = computed(() => resolvedAppearance.value === 'dark')
+
+  const appearanceLabel = computed(
+    () => APPEARANCES.find((a) => a.id === appearance.value)?.label ?? '跟随系统',
+  )
+  const skinLabel = computed(() => SKINS.find((s) => s.id === skin.value)?.label ?? '默认')
+
+  /** 「我的」页那一行右侧显示的当前值。两个维度都要，只显示一个说不清 */
+  const label = computed(() =>
+    skin.value === 'default'
+      ? appearanceLabel.value
+      : `${skinLabel.value} · ${appearanceLabel.value}`,
+  )
+
+  watchEffect(() => {
+    const root = document.documentElement
+    root.dataset['appearance'] = resolvedAppearance.value
+    root.dataset['skin'] = skin.value
+    /*
+     * 🔴 同步告诉浏览器，让它把滚动条、表单控件、默认背景也切过去。
+     * 不设的话，深色页面上会出现一条亮白的滚动条和白色的原生下拉框 ——
+     * 那不是我们的 CSS 管得到的部分。
+     */
+    root.style.colorScheme = resolvedAppearance.value
+  })
+
+  function selectAppearance(id: AppearanceId): void {
+    appearance.value = id
+    safeWrite(APPEARANCE_KEY, id)
+  }
+
+  function selectSkin(id: SkinId): void {
+    skin.value = id
+    safeWrite(SKIN_KEY, id)
+  }
+
+  return {
+    appearance,
+    skin,
+    resolvedAppearance,
+    isDark,
+    appearanceLabel,
+    skinLabel,
+    label,
+    selectAppearance,
+    selectSkin,
+  }
 })

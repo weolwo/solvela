@@ -193,25 +193,26 @@ const orders = useAsync(fetchExchangeRecords)
 }
 
 .order__status--pending {
-  background: rgb(255 165 0 / 12%);
+  background: var(--sv-color-warning-soft);
   color: var(--sv-color-warning);
 }
 
 .order__status--done {
-  background: rgb(100 187 92 / 14%);
+  background: var(--sv-color-success-soft);
   color: var(--sv-color-success);
 }
 
 .order__status--failed {
-  background: rgb(232 64 38 / 10%);
+  background: var(--sv-color-danger-soft);
   color: var(--sv-color-danger);
 }
 
+/* 件数、单号、时间都是真实信息 —— 判据见 SessionsView 的 .card__meta */
 .order__qty,
 .order__no,
 .order__time {
   font-size: var(--sv-font-footnote);
-  color: var(--sv-text-placeholder);
+  color: var(--sv-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 

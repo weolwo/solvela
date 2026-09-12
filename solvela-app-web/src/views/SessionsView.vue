@@ -320,9 +320,15 @@ onMounted(load)
   line-height: 1.6;
 }
 
+/*
+ * 🔴 用 secondary 而不是 placeholder。
+ * 这两行装的是【真实信息】（登录地点、登录时间），不是占位提示 ——
+ * placeholder 那一档在浅色下与白卡只有 2.41:1 的对比度，小字远低于 AA 的 4.5。
+ * 2026-09-12 做深色时量出来的，浅色那边一直也不达标，只是没人量过。
+ */
 .card__meta {
   margin-top: 3px;
-  color: var(--sv-text-placeholder);
+  color: var(--sv-text-secondary);
   font-size: var(--sv-font-footnote);
   overflow: hidden;
   text-overflow: ellipsis;

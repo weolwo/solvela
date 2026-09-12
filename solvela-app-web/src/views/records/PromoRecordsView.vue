@@ -153,10 +153,11 @@ const records = useAsync(fetchPromoRecords)
   white-space: nowrap;
 }
 
+/* 时间是真实信息，不是占位提示 —— 判据见 SessionsView 的 .card__meta */
 .card__time {
   margin: 3px 0 0;
   font-size: var(--sv-font-footnote);
-  color: var(--sv-text-placeholder);
+  color: var(--sv-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -188,17 +189,17 @@ const records = useAsync(fetchPromoRecords)
 }
 
 .card__status--pending {
-  background: rgb(255 165 0 / 12%);
+  background: var(--sv-color-warning-soft);
   color: var(--sv-color-warning);
 }
 
 .card__status--done {
-  background: rgb(100 187 92 / 14%);
+  background: var(--sv-color-success-soft);
   color: var(--sv-color-success);
 }
 
 .card__status--failed {
-  background: rgb(232 64 38 / 10%);
+  background: var(--sv-color-danger-soft);
   color: var(--sv-color-danger);
 }
 </style>
