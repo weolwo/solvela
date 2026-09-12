@@ -22,8 +22,24 @@ const model = defineModel<string>({ required: true })
 const props = withDefaults(
   defineProps<{
     placeholder: string
-    /** 左侧图标。它承担了原来 label 的职责，所以这一版不用可见标签 */
+    /** 左侧图标。鸿蒙这版靠它 + placeholder 说明这一栏要填什么，不用可见标签 */
     icon?: IconName
+    /**
+     * 左侧可见标签。<b>只在 iOS 皮肤下显示</b>，鸿蒙皮肤下它在 DOM 里但不可见。
+     *
+     * <h3>🔴 为什么是 CSS 控制显隐，不是读 store 判断</h3>
+     * 读 store 的话，src/ui 下的基础组件就依赖了业务层的状态 ——
+     * 而它们现在一个都不依赖。皮肤本来就是「一个 data-skin 属性 + 一层 CSS」，
+     * 显隐也该由同一层管。
+     *
+     * <h3>传短词，不要把 placeholder 原样搬过来</h3>
+     * 标签占的是左边固定的一列，「新手机号收到的验证码」这种长句会把输入框挤没。
+     * 长提示留给 placeholder 或 hint —— 那两处本来就是横着排的。
+     *
+     * <p>不传的字段在 iOS 下保持「只有 placeholder」的样子。
+     * 那也是 iOS 的常见形态（搜索框、验证码行），不是漏做。
+     */
+    label?: string | undefined
     type?: 'text' | 'tel' | 'password'
     /** 常态提示，一直显示。如注册页那句密码规则 */
     hint?: string | undefined
@@ -59,12 +75,23 @@ const inputType = computed(() => (isPassword.value && revealed.value ? 'text' : 
 const inputMode = computed(() => (props.type === 'tel' ? 'numeric' : undefined))
 
 const message = computed(() => props.error ?? props.hint)
+
+const labeled = computed(() => props.label !== undefined && props.label !== '')
 </script>
 
 <template>
   <div class="sv-field">
-    <div class="sv-field__box" :class="{ 'sv-field__box--invalid': error !== undefined }">
+    <div
+      class="sv-field__box"
+      :class="{ 'sv-field__box--invalid': error !== undefined, 'sv-field__box--labeled': labeled }"
+    >
       <Icon v-if="icon !== undefined" :name="icon" :size="20" class="sv-field__icon" />
+
+      <!--
+        iOS 那套表单行的左侧标签。用 <label for> 而不是 <span>：
+        点标签能聚焦到输入框，这是浏览器免费给的，自己写 @click 反而更容易漏。
+      -->
+      <label v-if="labeled" class="sv-field__label" :for="inputId">{{ label }}</label>
 
       <input
         :id="inputId"
@@ -133,11 +160,45 @@ const message = computed(() => props.error ?? props.hint)
   height: var(--sv-field-height);
   padding: 0 var(--sv-space-md);
   border: 1px solid transparent;
-  border-radius: var(--sv-radius-pill);
+  border-radius: var(--sv-radius-field);
   background: var(--sv-bg-fill);
   transition:
     border-color 0.15s ease,
     background-color 0.15s ease;
+}
+
+/*
+ * ── iOS 皮肤：左侧可见标签 ──
+ *
+ * 默认整段不显示 —— 鸿蒙这版靠图标 + placeholder，多一个标签只会让每行更挤。
+ */
+.sv-field__label {
+  display: none;
+}
+
+:root[data-skin='ios'] .sv-field__label {
+  display: block;
+  flex: none;
+  color: var(--sv-text-primary);
+  font-size: var(--sv-font-body);
+  cursor: pointer;
+}
+
+/*
+ * 🔴 有标签时把 placeholder 藏掉。
+ * 两处写着同一个词（标签「手机号」+ 占位「手机号」）是最没用的一种重复，
+ * 而且它会让人以为输入框里已经有内容了。
+ *
+ * 用 transparent 而不是清空 placeholder 属性：属性还在，读屏和
+ * aria-label 照常工作，只是不画出来。
+ */
+:root[data-skin='ios'] .sv-field__box--labeled .sv-field__input::placeholder {
+  color: transparent;
+}
+
+/* 有标签时输入靠右对齐 —— iOS 分组表单行就是这么排的 */
+:root[data-skin='ios'] .sv-field__box--labeled .sv-field__input {
+  text-align: right;
 }
 
 /* 聚焦时描一圈主色。边框始终占位（transparent），所以不会在聚焦瞬间抖动 */

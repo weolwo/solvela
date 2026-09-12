@@ -71,7 +71,7 @@ withDefaults(
   height: var(--sv-control-height);
   padding: 0 var(--sv-space-lg);
   border: 0;
-  border-radius: var(--sv-radius-pill);
+  border-radius: var(--sv-radius-control);
   font-size: var(--sv-font-body);
   font-weight: 500;
   cursor: pointer;

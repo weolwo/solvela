@@ -213,6 +213,7 @@ onMounted(load)
           <Field
             v-model="email"
             icon="user"
+            label="新邮箱"
             placeholder="新邮箱"
             autocomplete="email"
             :error="emailError"
@@ -251,6 +252,7 @@ onMounted(load)
               v-model="currentPassword"
               icon="lock"
               type="password"
+              label="当前密码"
               placeholder="当前密码"
               autocomplete="current-password"
               :error="proofError"
@@ -259,6 +261,7 @@ onMounted(load)
               <Field
                 v-model="oldEmail"
                 icon="user"
+                label="原邮箱"
                 placeholder="当前绑定的邮箱"
                 autocomplete="email"
                 hint="填你现在绑定的那个邮箱，验证码会发到那里"
