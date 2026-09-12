@@ -1081,4 +1081,21 @@ INSERT INTO `t_table_column` (`table_column_id`, `user_id`, `user_type`, `table_
 (8, 1, 1, 20009, '[{"columnKey":"jobId","showFlag":false,"sort":1,"width":50},{"columnKey":"jobName","showFlag":true,"sort":2},{"columnKey":"handlerName","showFlag":false,"sort":3},{"columnKey":"triggerType","showFlag":true,"sort":4,"width":110},{"columnKey":"triggerValue","showFlag":true,"sort":5,"width":150},{"columnKey":"lastJob","showFlag":true,"sort":6,"width":180},{"columnKey":"nextJob","showFlag":true,"sort":7,"width":150},{"columnKey":"enabledFlag","showFlag":true,"sort":8,"width":100},{"columnKey":"param","showFlag":false,"sort":9},{"columnKey":"remark","showFlag":true,"sort":10},{"columnKey":"sort","showFlag":false,"sort":11,"width":65},{"columnKey":"updateName","showFlag":true,"sort":12,"width":90},{"columnKey":"updateTime","showFlag":false,"sort":13,"width":150},{"columnKey":"action","showFlag":false,"sort":14,"width":170}]', '2026-08-12 19:05:40', '2026-08-12 19:05:40'),
 (9, 1, 1, 50032, '[{"columnKey":"id","showFlag":false,"sort":1},{"columnKey":"memberId","showFlag":false,"sort":3,"width":130},{"columnKey":"memberName","showFlag":true,"sort":4},{"columnKey":"taskConfigId","showFlag":true,"sort":5},{"columnKey":"activityCode","showFlag":true,"sort":6},{"columnKey":"periodKey","showFlag":true,"sort":7},{"columnKey":"validStartTime","showFlag":true,"sort":8},{"columnKey":"validEndTime","showFlag":true,"sort":9},{"columnKey":"currentMetric","showFlag":true,"sort":10},{"columnKey":"status","showFlag":true,"sort":11},{"columnKey":"progressData","showFlag":true,"sort":12},{"columnKey":"ruleSnapshot","showFlag":true,"sort":13},{"columnKey":"prizeSnapshot","showFlag":true,"sort":14},{"columnKey":"completeTime","showFlag":true,"sort":15},{"columnKey":"createBy","showFlag":false,"sort":16},{"columnKey":"createTime","showFlag":true,"sort":17},{"columnKey":"updateBy","showFlag":false,"sort":18},{"columnKey":"updateTime","showFlag":false,"sort":19},{"columnKey":"action","showFlag":true,"sort":20,"width":190}]', '2026-08-22 17:28:22', '2026-08-22 11:08:27');
 
+-- =====================================================================================
+-- 会员号发号序列的唯一一行。
+--
+-- 🔴 这行是【必须】的，不是可选种子数据。t_member_id_seq 是单行表，发号靠
+--    UPDATE ... WHERE id = 1 推进水位。这一行不存在时，UPDATE 匹配 0 行、
+--    LAST_INSERT_ID() 返回 0，算出的号段是 [-1000, 0) —— 于是【第一个注册的
+--    用户】就撞上 BusinessException「会员号已耗尽或序号非法：-1000」，注册全线失败。
+--
+--    2026-09-12 上线首个注册请求即命中：schema-baseline 建了表，而这份 data-baseline
+--    的 dump 漏掉了这张表的数据（它是运行时才被 UPDATE 的表，dump 时可能被当成空表跳过）。
+--    member.sql 域脚本里一直有这行，基线脚本没同步过来。
+--
+--    next_seq=0：第一次批发得到号段 [0, 1000)，起始内部序号 0（MemberIdCodec 接受 [0,CAPACITY)）。
+--    step=1000：与 schema 默认值一致，库里的值优先于应用配置。
+-- =====================================================================================
+INSERT INTO `t_member_id_seq` (`id`, `next_seq`, `step`) VALUES (1, 0, 1000);
+
 SET FOREIGN_KEY_CHECKS = 1;

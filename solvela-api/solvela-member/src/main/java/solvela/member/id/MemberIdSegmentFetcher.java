@@ -44,7 +44,18 @@ public class MemberIdSegmentFetcher {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
     public Segment fetch() {
         int step = resolveStep();
-        memberIdSeqDao.advance(step);
+        int rows = memberIdSeqDao.advance(step);
+        // 🔴 advance 是 UPDATE ... WHERE id = 1。匹配 0 行 = 那唯一的种子行不存在。
+        //    不在这里拦的话，LAST_INSERT_ID() 会返回 0，算出号段 [-step, 0)，
+        //    序号 -1000 一路带到 MemberIdCodec 才炸成「序号非法：-1000」——
+        //    离真正的原因（表没初始化）隔了好几层，谁看都以为是发号逻辑坏了。
+        //    2026-09-12 上线首个注册就是这么炸的（data-baseline 漏了那行 seed）。
+        if (rows == 0) {
+            throw new IllegalStateException(
+                    "t_member_id_seq 没有 id=1 的种子行，无法发号。"
+                            + "执行一次：INSERT INTO t_member_id_seq (id, next_seq, step) VALUES (1, 0, 1000); "
+                            + "新环境请确认 data-baseline.sql 跑过（它包含这行）。");
+        }
         long end = memberIdSeqDao.lastSegmentEnd();
         Segment segment = new Segment(end - step, end);
         log.info("[会员发号] 批发新号段 [{}, {})，step={}", segment.start(), segment.end(), step);
