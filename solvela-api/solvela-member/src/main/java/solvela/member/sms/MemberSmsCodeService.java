@@ -10,6 +10,7 @@ import solvela.member.api.SmsCodeFailReason;
 import solvela.member.api.SmsScene;
 import solvela.member.api.SmsCodeSendResult;
 import solvela.member.api.SmsCodeVerifyResult;
+import solvela.member.api.SmsDelivery;
 import solvela.member.code.CodeIssueOutcome;
 import solvela.member.code.CodeVerifyOutcome;
 import solvela.member.code.VerificationCodeProperties;
@@ -123,12 +124,17 @@ public class MemberSmsCodeService {
      * 因为它不查任何存储、不泄露任何信息 —— 让一个手滑打错号码的用户
      * 去消耗当天配额没有道理，而短信那个配额是真花钱的。
      *
-     * <p>⚠️ 与邮箱不同，这里<b>没有 SUPPRESS 那一档</b>。
-     * 目前三个场景里只有注册是匿名的，而注册的「这个号已被占用」本来就藏不掉
-     * （见 {@code RegisterFailReason.PHONE_TAKEN}）。将来加手机号登录/重置时，
-     * 要照邮箱那边补上 SUPPRESS —— 否则发码接口会变成账号枚举器。
+     * <p>🔴 发不发由调用方（{@link MemberSmsCodeIssuer}）决定，本方法只执行。
+     * SUPPRESS 时<b>码照存、配额照扣</b>，只是不真的发出去 ——
+     * 不存的话，攻击者能从「验码返回什么」反推出这个号有没有账号。
      */
     public SmsCodeSendResult send(SmsScene scene, String rawPhone, String clientIp) {
+        return send(scene, rawPhone, clientIp, SmsDelivery.DELIVER);
+    }
+
+    /** 带投递决定的那个。外部入口一律走 {@link MemberSmsCodeIssuer}，不要直接调这个。 */
+    public SmsCodeSendResult send(SmsScene scene, String rawPhone, String clientIp,
+                                  SmsDelivery delivery) {
         String phone = MemberPhoneUtil.normalize(rawPhone);
         if (phone == null) {
             return SmsCodeSendResult.fail(SmsCodeFailReason.BAD_PHONE_FORMAT);
@@ -142,6 +148,11 @@ public class MemberSmsCodeService {
                 case DAILY_LIMIT -> SmsCodeSendResult.dailyLimit(issued.retryAfterSeconds());
                 case OK -> throw new IllegalStateException("不可能走到：OK 已在上面判掉");
             };
+        }
+
+        if (delivery == SmsDelivery.SUPPRESS) {
+            // 码已经存进去了，只是不发。返回成功 —— 与真发出去时一模一样
+            return SmsCodeSendResult.ok();
         }
 
         if (properties.getSmsTransport() == VerificationCodeProperties.Transport.LOG) {

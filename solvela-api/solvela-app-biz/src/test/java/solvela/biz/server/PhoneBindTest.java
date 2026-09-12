@@ -91,8 +91,13 @@ class PhoneBindTest {
 
     /** 发一条 BIND 场景的短信码并读回来。test profile 走 LOG 通道，不需要厂商 */
     private String bindCode(String phone) {
+        /*
+         * 🔴 带上 memberId。BIND 场景的投递判断看的是「被【别人】占了没有」——
+         * 不带的话它退化成「有没有人占」，于是给【自己的旧号码】发码会被静默拦掉，
+         * 而那正是没设过密码的会员唯一能换绑的路。
+         */
         assertTrue(memberAuthService.sendSmsCode(
-                new SmsCodeSendCmd(SmsScene.BIND, phone, freshIp())).success());
+                new SmsCodeSendCmd(SmsScene.BIND, phone, freshIp(), memberId)).success());
         String key = redisService.generateRedisKey("mbr:code:",
                 "sms:BIND:" + piiHasher.hash(MemberPhoneUtil.normalize(phone)));
         String stored = redisService.get(key);

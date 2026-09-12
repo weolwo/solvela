@@ -68,6 +68,21 @@ public interface MemberRegisterDao {
                                         @Param("currentMemberId") Long currentMemberId);
 
     /**
+     * 这个手机号是否被<b>别人</b>占用（排除指定会员自己）。
+     *
+     * <p>与 {@link #countByEmailHashExcludingMember} 一字不差的理由：
+     * 换绑手机号时要给<b>自己的旧号码</b>发一次验证码，按「有没有人占」判的话
+     * 那条短信永远发不出去 —— 而那条路正是没设过密码的会员唯一能换绑的方式。
+     */
+    @Select("""
+            SELECT COUNT(1) FROM t_member
+             WHERE phone_hash = UNHEX(#{phoneHashHex})
+               AND (#{currentMemberId} IS NULL OR member_id <> #{currentMemberId})
+            """)
+    int countByPhoneHashExcludingMember(@Param("phoneHashHex") String phoneHashHex,
+                                        @Param("currentMemberId") Long currentMemberId);
+
+    /**
      * 建会员。
      *
      * <p>{@code create_by} 不填 —— DDL 注释：「后台导入时有值，<b>自主注册为空</b>」。

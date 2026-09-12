@@ -158,7 +158,7 @@ class PhoneRegisterSmsTest {
         String first = TestSmsCode.issue(memberAuthService, redisService, piiHasher, phone, ip);
 
         SmsCodeSendResult again = memberAuthService.sendSmsCode(
-                new SmsCodeSendCmd(SmsScene.REGISTER, phone, ip));
+                new SmsCodeSendCmd(SmsScene.REGISTER, phone, ip, null));
 
         assertEquals(false, again.success());
         assertTrue(again.retryAfterSeconds() > 0, "被冷却挡住时要告诉用户还差多少秒");
@@ -170,7 +170,7 @@ class PhoneRegisterSmsTest {
     @DisplayName("手机号格式不对 → 不发、也不消耗任何配额")
     void 格式不对() {
         SmsCodeSendResult result = memberAuthService.sendSmsCode(
-                new SmsCodeSendCmd(SmsScene.REGISTER, "not-a-phone", freshIp()));
+                new SmsCodeSendCmd(SmsScene.REGISTER, "not-a-phone", freshIp(), null));
 
         assertEquals(false, result.success());
     }

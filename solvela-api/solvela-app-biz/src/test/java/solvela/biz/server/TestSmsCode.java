@@ -35,7 +35,7 @@ final class TestSmsCode {
     static String issue(MemberAuthService authService, RedisService redisService,
                         PiiHasher piiHasher, String phone, String clientIp) {
         assertTrue(authService.sendSmsCode(
-                        new SmsCodeSendCmd(SmsScene.REGISTER, phone, clientIp)).success(),
+                        new SmsCodeSendCmd(SmsScene.REGISTER, phone, clientIp, null)).success(),
                 "前提不成立：短信验证码没发出去");
         String key = redisService.generateRedisKey("mbr:code:",
                 "sms:" + SmsScene.REGISTER.name() + ":" + piiHasher.hash(MemberPhoneUtil.normalize(phone)));
