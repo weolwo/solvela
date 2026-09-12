@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
+import solvela.base.util.SolvelaStringUtil;
 
 import java.io.File;
 import java.io.StringWriter;
@@ -52,8 +53,57 @@ public class MailService {
     @Resource
     private SystemEnvironment systemEnvironment;
 
-    @Value("${spring.mail.username}")
+    /**
+     * 发件地址（信头里的 From）。
+     *
+     * <h3>🔴 它【不等于】SMTP 用户名，这一点踩过</h3>
+     * 原先这里直接读 {@code spring.mail.username}。163 / QQ / Gmail 的用户名
+     * 恰好就是邮箱地址，所以一直没事 —— 但那是巧合，不是规律。
+     *
+     * <p>Resend 的 SMTP 用户名是<b>字面量 {@code resend}</b>，密码才是 API Key。
+     * 照旧读 username 的话，{@code setFrom("resend")} 会直接失败，
+     * 而这要等到第一封验证码邮件才暴露。AWS SES 也是同一形状（用户名是一串
+     * IAM 凭据 ID）。
+     *
+     * <p>所以拆成独立配置项，缺省仍回落到 username —— 163 那类配置一行都不用改。
+     *
+     * <p>可以带显示名：{@code Solvela <noreply@example.com>}。
+     * ⚠️ 地址的域名必须是在服务商那里<b>验证过</b>的，否则会被拒（Resend 是 403）。
+     */
+    @Value("${solvela.mail.from:${spring.mail.username:}}")
     private String clientMail;
+
+    /**
+     * 配了 SMTP 却给了个不是邮箱的 From —— 启动就拦下来。
+     *
+     * <p>不拦的话，表现是「注册页点了获取验证码，转圈，然后失败」，
+     * 而服务端日志里是一句 SMTP 协议错误，没人会想到是 From 写错了。
+     *
+     * <p>只在「已经配了 SMTP 用户名」时才检查：没配 SMTP 是合法状态
+     * （发信功能没开），那种情况下 From 为空是正常的，不该拦启动。
+     */
+    @jakarta.annotation.PostConstruct
+    void checkFromAddress() {
+        validateFrom(smtpUsername, clientMail);
+    }
+
+    /** 抽成静态方法只为了能直接测 —— 这个类是字段注入的，构造不出来。 */
+    static void validateFrom(String smtpUsername, String from) {
+        // 没配 SMTP 是合法状态（发信功能没开），那时 From 为空是正常的，不该拦启动
+        if (SolvelaStringUtil.isBlank(smtpUsername)) {
+            return;
+        }
+        if (from == null || !from.contains("@")) {
+            throw new IllegalStateException(
+                    "发件地址不是一个邮箱：solvela.mail.from=\"" + from + "\"。"
+                            + "它默认回落到 spring.mail.username，而有些服务商的 SMTP 用户名"
+                            + "不是邮箱地址（Resend 是字面量 resend，AWS SES 是一串凭据 ID）。"
+                            + "请显式配置 solvela.mail.from，用一个在服务商那里验证过的域名下的地址。");
+        }
+    }
+
+    @Value("${spring.mail.username:}")
+    private String smtpUsername;
 
 
     /**

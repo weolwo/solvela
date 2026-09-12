@@ -35,7 +35,7 @@
 #    只是所有人的 IP 都一样）。
 # ---------------------------------------------------------------------------
 
-tunnel: CHANGE-ME-TUNNEL-UUID
+tunnel: 98ba9b26-7eaa-42d2-aa74-bbcb097ceebc
 credentials-file: /etc/cloudflared/credentials.json
 
 # 隧道到 web 这一跳是容器内网的明文 HTTP，没有必要上 TLS：

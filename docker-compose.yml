@@ -75,6 +75,8 @@ x-backend-env: &backend-env
   SMTP_PORT:     ${SMTP_PORT:-465}
   SMTP_USERNAME: ${SMTP_USERNAME:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  # 🔴 发件地址不等于 SMTP 用户名 —— Resend 的用户名是字面量 resend
+  MAIL_FROM:     ${MAIL_FROM:-}
 
   # ---- 对象存储 ----
   FILE_STORAGE_MODE: ${FILE_STORAGE_MODE:-local}
