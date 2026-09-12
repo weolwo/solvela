@@ -192,7 +192,14 @@ solvela:
       # 因为一个后台账号能改配置、能发奖、能看会员手机号。
       # 改这个值只影响新签发的令牌，已有令牌的 TTL 不会跟着变。
       token-ttl: 30d
-      header: Authorization
+      # 🔴 【不用 Authorization】：管理端上线时前面加了一层 nginx Basic Auth
+      #    作为网络级闸门（deploy/nginx），Basic Auth 占的就是 Authorization 头。
+      #    若 app token 也放 Authorization：登录后 admin-web 每个请求带上 token 时，
+      #    要么覆盖掉浏览器的 Basic 凭据（nginx 回 401、反复弹认证框），要么
+      #    nginx 把 Basic 的 Authorization 透传给后端、后端拿它当 token（判定未登录）。
+      #    2026-09-12 上线实测两头都踩到。换个自己的头就两不相干。
+      #    ⚠️ 改这里必须同步 admin-web 的 TOKEN_HEADER（src/lib/axios.js）。
+      header: X-Access-Token
       scheme: Bearer
       # true = 新登录挤掉该账号的旧会话（对应原 sa-token 的 is-concurrent: false）。
       # 一个后台账号同时在多处登录，多半意味着账号被共用或被盗，
