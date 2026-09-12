@@ -60,9 +60,18 @@
     </springProfile>
 
     <springProfile name="prod">
+        <!--
+            🔴 CONSOLE 必须在：容器里 docker logs / docker compose logs 全靠 stdout。
+               2026-09-12 之前 prod 没挂 CONSOLE，docker logs 只有启动 banner，
+               排查全得进容器 tail 文件 —— 与 Docker 的用法完全拧着。
+
+            ⚠️ 【不要】再挂 INFO_FILE：ASYNC_INFO 已经包着 INFO_FILE 了
+               （见上面的 appender 定义）。原来两个都挂，导致每条 INFO 写进 app.log
+               两遍 —— 日志文件里所有行都是重复的。dev 块一直是对的，这里对齐它。
+        -->
         <root level="INFO">
+            <appender-ref ref="CONSOLE" />
             <appender-ref ref="ASYNC_INFO" />
-            <appender-ref ref="INFO_FILE" />
             <appender-ref ref="ERROR_FILE" />
         </root>
         <logger name="solvela" level="INFO"/>
