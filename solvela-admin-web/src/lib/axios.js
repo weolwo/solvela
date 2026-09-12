@@ -24,7 +24,11 @@ import _ from 'lodash';
 import LocalStorageKeyConst from '/@/constants/local-storage-key-const';
 
 // token的消息头
-const TOKEN_HEADER = 'Authorization';
+// 🔴 【不用 Authorization】：入口的 nginx Basic Auth 占着那个头（部署时的网络级闸门）。
+// 放 Authorization 的话，登录后每个请求都用 token 覆盖掉浏览器的 Basic 凭据 ——
+// nginx 验不过回 401、浏览器又弹认证框，成死循环。换个自己的头就两不相干。
+// ⚠️ 改这里必须同步改后端 solvela.admin.auth.header（AdminAuthProperties 默认值）。
+const TOKEN_HEADER = 'X-Access-Token';
 
 /**
  * 响应体是密文的标记。
