@@ -132,7 +132,7 @@
           -->
           <a-form-item v-if="isCustomPeriod" label="限制窗口" name="limitRange">
             <a-range-picker
-              v-model:value="limitRange"
+              v-model:value="form.limitRange"
               style="width: 100%"
               :show-time="RANGE_SHOW_TIME"
               :placeholder="['开始时间', '结束时间']"
@@ -253,15 +253,14 @@
 
   /**
    * a-range-picker 用一个 [start, end] 数组，而接口是两个平铺字段。
-   * 用可写 computed 桥接，省掉「选完时间再手动同步两个字段」那种一定会漏的写法。
+   *
+   * 🔴 这里曾经是个可写 computed（读写 limitStartTime / limitEndTime），
+   * 但校验规则挂在 name="limitRange" 上，而 a-form 是按 name 去 :model 里取值的 ——
+   * form 上根本没有 limitRange 这个 key，取到的永远是 undefined，
+   * 于是「选了时间照样提示 限制窗口 必填」。改成 form 上的真字段：
+   * 校验取得到值，change 也能触发重校验；回填在 show() 里做，
+   * 拆回两个平铺字段在 save() 里做。
    */
-  const limitRange = computed({
-    get: () => (form.limitStartTime && form.limitEndTime ? [form.limitStartTime, form.limitEndTime] : []),
-    set: (val) => {
-      form.limitStartTime = val?.[0];
-      form.limitEndTime = val?.[1];
-    },
-  });
 
   // ------------------------ 互斥规则 ------------------------
 
@@ -346,6 +345,8 @@
     if (rowData && !_.isEmpty(rowData)) {
       Object.assign(form, rowData);
     }
+    // 编辑时把两个平铺字段合成区间控件认的数组
+    form.limitRange = form.limitStartTime && form.limitEndTime ? [form.limitStartTime, form.limitEndTime] : undefined;
     mutexIdList.value = parseMutexRule(form.mutexRule);
     loadMutexOptions();
     activeGroups.value = [...DEFAULT_GROUPS];
@@ -381,6 +382,7 @@
     limitPeriod: undefined, //限制周期：LIFETIME / DAILY / WEEKLY / MONTHLY / CUSTOM
     limitStartTime: undefined, //限制窗口开始时间，仅 CUSTOM 用
     limitEndTime: undefined, //限制窗口结束时间，仅 CUSTOM 用
+    limitRange: undefined, //上面两个字段的表单形态（[开始, 结束]），提交前会拆回去，不上传
     identifyLimit: undefined, //同周期内，单会员ID最多领取次数 (-1为不限)
     phoneLimit: undefined, //同周期内，单手机号最多领取次数 (-1为不限)
     ipLimit: undefined, //同周期内，单IP地址最多领取次数 (-1为不限)
@@ -417,7 +419,7 @@
     // 实物那一档字段是隐藏的，规则要整条摘掉 —— 留着就是「填不了却提示必填」
     ...(isPhysical.value ? {} : { singleMaxAmount: [{ required: true, message: '单次最大金额 必填' }] }),
     limitPeriod: [{ required: true, message: '限制周期 必填' }],
-    // 自定义窗口的起止时间：校验挂在桥接用的 limitRange 上，与模板里的 name 对齐
+    // 自定义窗口的起止时间：校验挂在 form.limitRange 上，与模板里的 name、:model 里的 key 三者对齐
     ...(isCustomPeriod.value
       ? { limitRange: [{ required: true, message: '限制窗口 必填', type: 'array', len: 2 }] }
       : {}),
@@ -466,9 +468,13 @@
   async function save() {
     SolvelaLoading.show();
     try {
+      // limitRange 只是区间控件的表单形态，拆回接口认的两个平铺字段
+      const [limitStartTime, limitEndTime] = form.limitRange || [];
       // 不适用的那一侧补 -1（不限制）：后端两个字段都是 @NotNull，不能留空
       const params = {
         ...form,
+        limitStartTime,
+        limitEndTime,
         totalQuota: isQuotaBased.value ? form.totalQuota : UNLIMITED,
         totalAmount: isQuotaBased.value ? UNLIMITED : form.totalAmount,
         // 实物固定 0（不设金额兜底）：字段在页面上是隐藏的，
@@ -478,6 +484,7 @@
       // usedQuota / usedAmount 是运行态计数器，后端表单已去掉，这里也不往上传
       delete params.usedQuota;
       delete params.usedAmount;
+      delete params.limitRange;
 
       // 互斥规则回写成 json 文本（列类型是 json）。空选择存 null 而不是 "[]"，
       // 详情页那句 `detail.mutexRule || '无'` 才显示得对
