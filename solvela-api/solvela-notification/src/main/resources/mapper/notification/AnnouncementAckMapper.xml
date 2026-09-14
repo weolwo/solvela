@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.notification.dao.AnnouncementAckDao">
+
+    <!--
+      记一次确认。INSERT IGNORE：用户在弹窗上连点两下、或者两个端同时确认，
+      第二次被主键 (announcement_id, member_id) 挡住就好 ——
+      那是一次正常的重复点击，不该报错给用户看。
+
+      返回 1 = 第一次确认，0 = 之前已确认过。
+    -->
+    <insert id="ack">
+        INSERT IGNORE INTO t_announcement_ack (announcement_id, member_id, ack_time, ack_ip)
+        VALUES (#{announcementId}, #{memberId}, #{ackTime}, #{ackIp})
+    </insert>
+
+    <!-- 按 announcement_id 聚合，走复合主键的前缀 -->
+    <select id="countByAnnouncement" resultType="long">
+        SELECT COUNT(*)
+        FROM t_announcement_ack
+        WHERE announcement_id = #{announcementId}
+    </select>
+
+    <delete id="deleteByAnnouncement">
+        DELETE FROM t_announcement_ack
+        WHERE announcement_id = #{announcementId}
+    </delete>
+
+</mapper>

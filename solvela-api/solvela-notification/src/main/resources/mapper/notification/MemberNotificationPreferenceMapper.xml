@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.notification.dao.MemberNotificationPreferenceDao">
+
+    <!--
+      upsert。偏好行是懒创建的（用户第一次改设置才有），所以不能先查后写 ——
+      用户两个端同时改设置时会插两行，主键会拦住，但报出来是个吓人的
+      DuplicateKeyException，而这只是一次正常并发。
+
+      ⚠️ 这个文件 2026-09-15 曾经【整个漏掉过】：编译期无感（mapper XML 不参与编译）、
+         单元测试也发现不了（NotificationPreferenceServiceTest 把 Dao mock 掉了），
+         一直到真库起服务调 /preference 才炸出
+         Invalid bound statement (not found)。
+         现在由 NotificationMapperBindingTest 在启动时把每个 Dao 方法都点一遍名。
+    -->
+    <insert id="upsert">
+        INSERT INTO t_member_notification_preference (member_id, trade_enabled, marketing_enabled)
+        VALUES (#{memberId}, #{tradeEnabled}, #{marketingEnabled})
+        ON DUPLICATE KEY UPDATE trade_enabled     = VALUES(trade_enabled),
+                                marketing_enabled = VALUES(marketing_enabled)
+    </insert>
+
+</mapper>

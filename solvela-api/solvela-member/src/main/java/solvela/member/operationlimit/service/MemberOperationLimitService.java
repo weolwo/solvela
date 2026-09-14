@@ -7,10 +7,14 @@ import solvela.member.operationlimit.MemberOperationLimitProperties;
 import solvela.enums.MemberOperationLimitStatusEnum;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberOperationUnlockTypeEnum;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.member.operationlimit.dao.MemberOperationLimitDao;
 import solvela.member.MemberOperationLimit;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -38,18 +42,36 @@ public class MemberOperationLimitService {
      */
     private static final String FAIL_COUNT_KEY_PREFIX = "member:operation-limit:fail";
 
+    /**
+     * 通知里展示解冻时间的格式。
+     *
+     * <p>不用 ISO 的 {@code 2026-09-14T15:04:05} —— 那个 T 会让用户以为是乱码。
+     */
+    private static final DateTimeFormatter UNLOCK_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     private final MemberOperationLimitDao memberOperationLimitDao;
 
     private final MemberOperationLimitProperties properties;
 
     private final RedisService redisService;
 
+    /**
+     * 通知：账号被限制时告诉用户一声。
+     *
+     * <p>此前用户被限制之后<b>什么提示都没有</b> —— 只能自己反复试、试到怀疑账号被盗，
+     * 然后打客服。而「还要等多久」恰恰是这个功能最该说清楚的一件事。
+     */
+    private final NotificationService notificationService;
+
     public MemberOperationLimitService(MemberOperationLimitDao memberOperationLimitDao,
                                        MemberOperationLimitProperties properties,
-                                       RedisService redisService) {
+                                       RedisService redisService,
+                                       NotificationService notificationService) {
         this.memberOperationLimitDao = memberOperationLimitDao;
         this.properties = properties;
         this.redisService = redisService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -103,6 +125,23 @@ public class MemberOperationLimitService {
         this.clearFail(memberId, operationType);
         log.info("会员操作限制触发 memberId={} operation={} 到期={} 原因={}",
                 memberId, operationType.getDesc(), limit.getExpireTime(), reason);
+
+        // 告诉用户一声。ACCOUNT_LIMITED 属于 SYSTEM 分类，用户关不掉免打扰 ——
+        // 「你被限制了、到什么时候」不该是可以被静音的东西。
+        //
+        // ⚠️ send() 永不抛异常，所以这里不需要 try-catch，也不会因为模板没配
+        //    就让限制记不下来。反过来，如果上面那条 insert 所在的事务回滚了，
+        //    这条通知也跟着回滚 —— 那是对的，没被限制却收到「你被限制了」更糟。
+        //
+        // 🔴 reason 是给客服看的内部措辞，【刻意不传给用户】：它可能含
+        //    「连续5次密码错误」这类对攻击者有用的信息。用户只需要知道
+        //    受限的操作类型和恢复时间。
+        notificationService.send(NotifyRequest.of(NotificationTemplateEnum.ACCOUNT_LIMITED, memberId)
+                .param("limitType", operationType.getDesc())
+                .param("unlockTime", limit.getExpireTime().format(UNLOCK_TIME_FORMATTER))
+                .bizRefId(String.valueOf(limit.getId()))
+                .build());
+
         return limit;
     }
 

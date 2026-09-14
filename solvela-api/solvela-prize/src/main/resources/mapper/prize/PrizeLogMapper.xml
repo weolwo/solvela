@@ -270,6 +270,17 @@
           and status = 0
     </update>
 
+    <!--
+      发中奖通知要用：回写点只有来源单号，而通知要奖品名和数量。
+      走 uk_external_biz 唯一索引，一次主键级查询。
+    -->
+    <select id="selectByExternalBizNo" resultType="solvela.prize.PrizeLog">
+        select *
+        from t_prize_log
+        where external_biz_no = #{externalBizNo}
+        limit 1
+    </select>
+
     <!-- 发奖审批流转，条件更新防止两个运营同时点通过导致重复派发 -->
     <update id="updateApproveStatus">
         update t_prize_log

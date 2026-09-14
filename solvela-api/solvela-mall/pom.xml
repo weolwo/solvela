@@ -111,6 +111,15 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 通知：超时取消退积分、履约失败都要告诉用户一声
+             （MallOrderCancelService / MallFulfillService）。
+             notification 排在全部业务域之前，不反向认识 mall -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-notification</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
         <dependency>
             <groupId>org.projectlombok</groupId>

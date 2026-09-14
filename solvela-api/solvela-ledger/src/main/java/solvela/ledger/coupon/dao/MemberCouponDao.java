@@ -4,6 +4,7 @@ import java.util.List;
 
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
+import solvela.ledger.coupon.domain.dto.MemberCouponExpiringDTO;
 import solvela.ledger.coupon.domain.query.MemberCouponQuery;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -90,6 +91,22 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      * @return 实际更新行数
      */
     int expireCouponBatch(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+
+    /**
+     * 即将过期的券，<b>按会员聚合</b>：一个会员一行，带张数与最近一张的失效时间。
+     *
+     * <p>🔴 聚合在 SQL 里做，不是捞出全部券再在 Java 里 group —— 后者会把
+     * 「N 张券」变成「N 行内存」，而这正是 {@code CouponExpiringNotifyJob} 要避免的：
+     * 一个人 8 张券要发<b>一条</b>通知，不是 8 条。SQL 聚合让这件事在数据层就定了形，
+     * 调用方想写错都难。
+     *
+     * @param from 窗口起点（通常是 now，排除已经过期的）
+     * @param to   窗口终点（now + N 天）
+     */
+    List<MemberCouponExpiringDTO> selectExpiringGroupByMember(@Param("from") java.time.LocalDateTime from,
+                                                              @Param("to") java.time.LocalDateTime to,
+                                                              @Param("limit") int limit,
+                                                              @Param("offset") int offset);
 
     /*
      * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。

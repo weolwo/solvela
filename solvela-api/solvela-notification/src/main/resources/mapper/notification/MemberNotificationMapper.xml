@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.notification.dao.MemberNotificationDao">
+
+    <resultMap id="MemberNotificationDTO" type="solvela.notification.domain.dto.MemberNotificationDTO">
+        <result column="id" property="id"/>
+        <result column="template_code" property="templateCode"/>
+        <result column="category" property="category"/>
+        <result column="summary" property="summary"/>
+        <result column="read_flag" property="readFlag"/>
+        <result column="read_time" property="readTime"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!--
+      🔴 列表【刻意不查 params / template_version】。
+      它们只有详情页渲染时才用得上，而列表一页几十条 ——
+      多查两列 json 就是把这张亿级表的每次分页都变宽一截。
+    -->
+    <sql id="list_columns">
+        id,
+        template_code,
+        category,
+        summary,
+        read_flag,
+        read_time,
+        create_time
+    </sql>
+
+    <!--
+      🔴 member_id 必须在最前且必填：它是 idx_member_read 的第一列。
+      少了它这张表的任何查询都是全表扫。
+    -->
+    <sql id="query_conditions">
+        <where>
+            member_id = #{queryForm.memberId}
+            <if test="queryForm.unreadOnly != null and queryForm.unreadOnly">
+                AND read_flag = 0
+            </if>
+            <if test="queryForm.category != null">
+                AND category = #{queryForm.category}
+            </if>
+            <if test="queryForm.templateCode != null and queryForm.templateCode != ''">
+                AND template_code = #{queryForm.templateCode}
+            </if>
+        </where>
+    </sql>
+
+    <!--
+      按 id 倒序而不是 create_time：自增 id 与时间同序，而 id 正好是
+      idx_member_read(member_id, read_flag, id) 的末位 —— 排序直接吃索引，不用 filesort。
+    -->
+    <select id="queryPage" resultMap="MemberNotificationDTO">
+        SELECT
+        <include refid="list_columns"/>
+        FROM t_member_notification
+        <include refid="query_conditions"/>
+        ORDER BY id DESC
+    </select>
+
+    <select id="countUnread" resultType="long">
+        SELECT COUNT(*)
+        FROM t_member_notification
+        WHERE member_id = #{memberId}
+          AND read_flag = 0
+    </select>
+
+    <!--
+      条件里带 member_id 是【越权保护】：只按 id 更新的话，
+      改一个数字就能把别人的通知标成已读。
+      带 read_flag = 0 是幂等：重复点第二次影响行数就是 0。
+    -->
+    <update id="markRead">
+        UPDATE t_member_notification
+        SET read_flag = 1,
+            read_time = #{now}
+        WHERE id = #{id}
+          AND member_id = #{memberId}
+          AND read_flag = 0
+    </update>
+
+    <update id="markAllRead">
+        UPDATE t_member_notification
+        SET read_flag = 1,
+            read_time = #{now}
+        WHERE member_id = #{memberId}
+          AND read_flag = 0
+    </update>
+
+    <!--
+      走 idx_create_time。ORDER BY id 是为了让每批删的是连续的一段，
+      减少 gap lock 的范围；LIMIT 让单批可控 —— 一次删几十万行会长时间持有行锁、
+      撑爆 binlog，一个清理任务不该有能力影响线上业务。
+    -->
+    <delete id="deleteExpiredBatch">
+        DELETE FROM t_member_notification
+        WHERE create_time &lt; #{before}
+        ORDER BY id
+        LIMIT #{limit}
+    </delete>
+
+    <select id="countExpired" resultType="long">
+        SELECT COUNT(*)
+        FROM t_member_notification
+        WHERE create_time &lt; #{before}
+    </select>
+
+</mapper>

@@ -93,12 +93,16 @@ import solvela.base.listener.Ip2RegionListener;
         "solvela.auth",
         // 资产域 + 风控与提案。⚠️ 见类注释：这是将来要拆出去的那一半，
         // 边界靠 LedgerBoundaryTest 守，不是靠这里
-        "solvela.ledger", "solvela.risk"
+        "solvela.ledger", "solvela.risk",
+        // 通知（站内信）。member 与 ledger 都注入 NotificationService，
+        // 漏了它的表现是启动即 NoSuchBeanDefinitionException 并指名道姓说缺哪个 ——
+        // 这正是显式扫描清单想要的失败方式
+        "solvela.notification"
 })
 @MapperScan(value = {
         "solvela.base", "solvela.activity", "solvela.draw", "solvela.task", "solvela.lottery",
         "solvela.mall", "solvela.stat", "solvela.prize", "solvela.scriptengine",
-        "solvela.member", "solvela.ledger", "solvela.risk"
+        "solvela.member", "solvela.ledger", "solvela.risk", "solvela.notification"
         // ⚠️ 这里【没有】 solvela.dispatch：删掉死掉的 PrizeDispatchOutboxDao 之后，
         // 那个包里一个 @Mapper 都不剩了。它仍在上面的 @ComponentScan 里
         // （LocalPrizeEventPublisher 在那儿）

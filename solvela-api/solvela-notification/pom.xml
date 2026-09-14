@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>solvela-notification</artifactId>
+    <name>solvela-notification</name>
+    <description>通知与公告（消息中心）：模板化的定向通知，以及将来的全员公告。</description>
+
+    <!--
+      【为什么排在 base 之后、member 之前】
+      它的使用方是 member（账号冻结）、ledger（发货 / 券将过期）、marketing（中奖）、
+      mall（履约失败）—— 四个业务域都要调它，所以它必须排在四者之前。
+      排错了 Maven 会直接报循环依赖，这条边界是编译器在守。
+
+      <p>反过来说：<b>本模块永远不许依赖任何业务域</b>。它只收 memberId + 参数，
+      不查会员、不查订单、不查奖品。一旦它反向依赖了 member，上面那个顺序就成环了，
+      整个营销侧都编译不过 —— 那是个很吵但很及时的报错。
+
+      【为什么不做成事件监听而是直接依赖】
+      仓库里已有一套 GlobalEventDispatcher（@TransactionalEventListener AFTER_COMMIT），
+      那是给<b>发奖</b>用的：一个事件要触发资产变动，必须等事务提交、必须能重试。
+      通知不一样 —— 它是业务操作的一部分，<b>业务回滚了通知就该跟着回滚</b>
+      （发货事务失败了还发一条「已发货」是错的）。所以同步、进同一个事务，
+      而不是 AFTER_COMMIT。详见 NotificationService 的类注释。
+    -->
+
+    <dependencies>
+        <!-- 实体（NotificationTemplate / MemberNotification）与枚举。
+             contract 由 model 传递过来，本模块直接用到 NotificationCategoryEnum 等 4 处，
+             按「用什么就声明什么」的规矩单独列出来，不指望别人替你带 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-contract</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-model</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 基础设施，只要这两块：
+             · core —— SolvelaTemplateUtil（渲染）、JSON 工具、Job SPI
+             · data —— MyBatis-Plus、Dao 基类（两张表都要持久化）
+
+             🔴 刻意不要 base-file / base-redis / base-mq：
+             本模块会被四个业务域依赖，等于跟着进 admin 与 app-biz 两个进程。
+             多背一个 base-file 就是把 S3 SDK 和 Excel 引擎同时塞进这两个进程，
+             而这里一处都没用到。模板缓存现在用进程内 Map（见 NotificationTemplateService），
+             真要换 Redis 时再加 base-redis，那时它是一行 pom 的事。 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

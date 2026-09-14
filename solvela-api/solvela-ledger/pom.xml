@@ -77,6 +77,14 @@
         </dependency>
 
 
+        <!-- 通知：履约单转「已发货」时给会员发站内信（PhysicalDeliveryService）。
+             notification 排在全部业务域之前，只收 memberId + 参数，不反向认识 ledger -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-notification</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- provided：编译期注解处理器，不进运行包。provided 不传递，每个模块各自声明 -->
         <dependency>
             <groupId>org.projectlombok</groupId>

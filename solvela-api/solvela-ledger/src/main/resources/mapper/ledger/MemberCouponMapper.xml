@@ -233,6 +233,26 @@
         LIMIT 分批不是性能优化 —— 一次 UPDATE 掉几十万行会长时间持有行锁、撑爆 binlog，
         一个收口任务不该有能力影响线上业务。
     -->
+    <!--
+      即将过期的券，按会员聚合。一个会员一行 —— 8 张券要发【一条】通知不是 8 条，
+      所以聚合在这里做，调用方拿到的形状本身就不允许写成一券一条。
+
+      分页用 limit/offset 而不是游标：这是每天跑一次的离线任务，
+      结果集在一次执行内是稳定的（窗口是固定的 from/to），offset 不会漏也不会重。
+    -->
+    <select id="selectExpiringGroupByMember" resultType="solvela.ledger.coupon.domain.dto.MemberCouponExpiringDTO">
+        SELECT member_id          AS memberId,
+               COUNT(*)           AS count,
+               MIN(valid_end_time) AS nearestExpireTime
+        FROM t_member_coupon
+        WHERE status = 0
+          AND valid_end_time &gt;= #{from}
+          AND valid_end_time &lt; #{to}
+        GROUP BY member_id
+        ORDER BY member_id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
     <update id="expireCouponBatch">
         UPDATE t_member_coupon
         SET status = 2

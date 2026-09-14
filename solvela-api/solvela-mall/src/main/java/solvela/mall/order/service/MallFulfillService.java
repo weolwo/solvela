@@ -6,6 +6,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import solvela.enums.NotificationTemplateEnum;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
 import solvela.mall.MallAddress;
 import solvela.mall.MallOrder;
 import solvela.mall.address.service.MallAddressService;
@@ -64,6 +67,7 @@ public class MallFulfillService {
     private final MallOrderDao mallOrderDao;
     private final MallAddressService mallAddressService;
     private final AssetGrantApi assetGrantApi;
+    private final NotificationService notificationService;
 
     /**
      * 履约一单。<b>可以随便重复调</b> —— 抢不到 {@code 10 → 20} 就什么都不做。
@@ -140,6 +144,26 @@ public class MallFulfillService {
         mallOrderDao.markFailed(orderNo, failReason);
         // 用户付了积分却没拿到东西，这一条必须能被告警抓到
         log.error("【商城履约失败】{} 商品[{}] 原因: {}", orderNo, order.getCommodityCode(), failReason);
+        notifyFulfillFailed(orderNo, order, failReason);
+    }
+
+    /**
+     * 履约失败告诉用户一声。
+     *
+     * <p>🔴 <b>文案里绝不能说「积分已退回」</b>：本方法所在的这条路<b>刻意不退积分</b>
+     * （见 {@code MallOrderDao.markFailed} 的注释 —— 东西还欠着用户，不是没买，
+     * 运营补配一下券模就能重发）。真正的退款是超时取消那条路，用的是另一个模板
+     * {@code ORDER_CANCELLED}。
+     *
+     * <p>两条文案混了，用户会按「钱回来了」去理解一次「我们欠着你」，然后再兑一单。
+     */
+    private void notifyFulfillFailed(String orderNo, MallOrder order, String failReason) {
+        notificationService.send(NotifyRequest.of(NotificationTemplateEnum.ORDER_FULFILL_FAILED, order.getMemberId())
+                .param("orderNo", orderNo)
+                .param("commodityName", order.getCommodityName())
+                .param("failReason", failReason)
+                .bizRefId(orderNo)
+                .build());
     }
 
     /**

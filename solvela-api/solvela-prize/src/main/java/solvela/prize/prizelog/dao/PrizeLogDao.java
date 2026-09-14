@@ -47,6 +47,15 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
                                     @Param("failReason") String failReason);
 
     /**
+     * 按来源单号取一条发奖流水。走 {@code uk_external_biz} 唯一索引。
+     *
+     * <p>加它是为了发「中奖通知」：回写点只拿得到来源单号，而通知要奖品名和数量。
+     * <b>只在状态真的发生迁移时才调</b>（{@code updateStatusByExternalBizNo} 返回 &gt; 0），
+     * 所以重复投递不会多查这一次。
+     */
+    PrizeLog selectByExternalBizNo(@Param("externalBizNo") String externalBizNo);
+
+    /**
      * 发奖审批流转：只有当前审批状态等于 fromApproveStatus 才更新
      * <p>
      * 条件更新即并发闸门，防止两个运营同时点通过导致重复派发。

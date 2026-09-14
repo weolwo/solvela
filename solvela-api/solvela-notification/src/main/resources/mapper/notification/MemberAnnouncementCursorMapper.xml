@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.notification.dao.MemberAnnouncementCursorDao">
+
+    <!--
+      推进游标。两个关键点，缺一个都会出问题：
+
+      ① INSERT ... ON DUPLICATE KEY UPDATE —— 游标行是懒创建的，用户第一次读公告时
+         还没有这一行。先查后写会在多端同时打开时插两行（主键会拦住，但报出来是个
+         吓人的 DuplicateKeyException，而这只是一次正常并发）。
+
+      ② 🔴 GREATEST —— 游标只能前进不能后退。用户在手机上读到 100、电脑上那个页面
+         还停在 50，两边都推游标的话，不加 GREATEST 会把已读退回 50，
+         表现是「读过的公告又变未读了」。这种 bug 只在多端用户身上偶发，极难复现。
+    -->
+    <insert id="advance">
+        INSERT INTO t_member_announcement_cursor (member_id, last_read_id)
+        VALUES (#{memberId}, #{lastReadId})
+        ON DUPLICATE KEY UPDATE last_read_id = GREATEST(last_read_id, VALUES(last_read_id))
+    </insert>
+
+</mapper>

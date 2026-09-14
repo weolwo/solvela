@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.notification.dao.NotificationTemplateDao">
+
+    <sql id="base_columns">
+        template_code,
+        version,
+        category,
+        title_template,
+        content_template,
+        param_keys,
+        status,
+        create_by,
+        create_time,
+        update_by,
+        update_time
+    </sql>
+
+    <!--
+      「当前启用的最新版本」：过滤 status=1，取最大 version。
+      走主键 (template_code, version) 的前缀，是一次索引倒序扫第一行。
+    -->
+    <select id="selectLatestEnabled" resultType="solvela.notification.NotificationTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_notification_template
+        WHERE template_code = #{templateCode}
+          AND status = 1
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+    <!--
+      🔴 这里【刻意不过滤 status】。
+
+      模板被停用之后，指向它的历史通知仍然要能渲染出来 —— 停用的意思是
+      「以后不再用它发新通知」，不是「过去发的都作废」。
+      加上 status=1 的后果是：运营停用一个模板，用户收件箱里那批老通知
+      全部变成空白，而且不报错。
+    -->
+    <select id="selectByCodeAndVersion" resultType="solvela.notification.NotificationTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_notification_template
+        WHERE template_code = #{templateCode}
+          AND version = #{version}
+    </select>
+
+    <!--
+      缓存预热用。ORDER BY version ASC 是有意的：调用方按顺序 put 进 map，
+      后面的覆盖前面的，最终留下的就是每个 code 的最大版本。
+    -->
+    <select id="selectAllEnabled" resultType="solvela.notification.NotificationTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_notification_template
+        WHERE status = 1
+        ORDER BY template_code, version ASC
+    </select>
+
+    <!--
+      🔴 不过滤 status：停用过的版本也占着号。过滤掉的话，停用 v2 之后
+      新增会又拿到 2，撞主键 (template_code, version)。
+    -->
+    <select id="selectMaxVersion" resultType="java.lang.Integer">
+        SELECT MAX(version)
+        FROM t_notification_template
+        WHERE template_code = #{templateCode}
+    </select>
+
+    <!--
+      🔴 复合主键 (template_code, version)，所以按主键的操作必须在这里显式写。
+      MyBatis-Plus 的 updateById / selectById / deleteById 对这个实体生成不出来
+      （实体上没有 @TableId，单主键注解也表达不了复合主键），
+      调了会在运行期抛 Invalid bound statement (not found) —— 而编译期毫无迹象。
+    -->
+    <update id="disableVersion">
+        UPDATE t_notification_template
+        SET status = 0
+        WHERE template_code = #{templateCode}
+          AND version = #{version}
+          AND status = 1
+    </update>
+
+    <delete id="deleteVersion">
+        DELETE FROM t_notification_template
+        WHERE template_code = #{templateCode}
+          AND version = #{version}
+    </delete>
+
+</mapper>

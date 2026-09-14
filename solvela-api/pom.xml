@@ -38,6 +38,12 @@
         <module>solvela-base-mq</module>
         <module>solvela-base-web</module>
 
+        <!-- 通知与公告。排在业务域之前：member / ledger / marketing / mall
+             四个域都要调它发通知，所以它必须在四者之前。
+             反过来：它永远不许依赖任何业务域 —— 只收 memberId + 参数，
+             不查会员、不查订单。真写反了 Maven 会直接报循环依赖 -->
+        <module>solvela-notification</module>
+
         <!-- 业务域。按域拆而不是按"将来谁用"拆：prize 横跨活动侧与资产侧，
              硬塞进任何一端都会造出新的环 -->
         <module>solvela-member</module>

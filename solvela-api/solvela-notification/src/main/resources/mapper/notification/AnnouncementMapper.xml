@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.notification.dao.AnnouncementDao">
+
+    <sql id="base_columns">
+        id, title, content, category, force_ack,
+        audience_type, audience_rule,
+        publish_time, expire_time, status,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <!--
+      🔴 「当前可见」的三个条件，各处 include 这一段，别各写一遍。
+      少任何一个的表现：
+        · 少 status      → 下架的公告还在显示
+        · 少 publish_time → 预发布的提前泄露
+        · 少 expire_time  → 过期的永远占着红点，而且未读数要扫全部历史
+    -->
+    <sql id="visible_conditions">
+        status = 1
+        AND publish_time &lt;= #{now}
+        AND expire_time &gt; #{now}
+    </sql>
+
+    <!--
+      人群判定。🔴 存的是【规则】不是名单 —— 物化名单就回到「用户数 × 公告数」了。
+
+      判定放在 SQL 里而不是捞出来在 Java 里过滤：后者会让分页彻底失效
+      （数据库返回 20 条、过滤剩 3 条，页码就对不上）。
+
+      ⚠️ memberCreateTime 可能为空（理论上不该，但别让一个空值把整页公告吞掉），
+      为空时只放行 ALL。
+    -->
+    <sql id="audience_conditions">
+        AND (
+            audience_type = 'ALL'
+            <if test="memberCreateTime != null">
+                OR (audience_type = 'REGISTER_BEFORE'
+                    AND #{memberCreateTime} &lt; JSON_UNQUOTE(JSON_EXTRACT(audience_rule, '$.before')))
+                OR (audience_type = 'REGISTER_AFTER'
+                    AND #{memberCreateTime} &gt;= JSON_UNQUOTE(JSON_EXTRACT(audience_rule, '$.after')))
+            </if>
+        )
+    </sql>
+
+    <!--
+      公告 tab 列表。按 id 倒序，游标翻页用 lastId 而不是 offset ——
+      公告会持续新增，offset 分页在第 2 页会重复看到被挤下来的那一条。
+    -->
+    <select id="selectVisible" resultType="solvela.notification.Announcement">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_announcement
+        WHERE
+        <include refid="visible_conditions"/>
+        <include refid="audience_conditions"/>
+        <if test="lastId != null">
+            AND id &lt; #{lastId}
+        </if>
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!--
+      未读数。🔴 注意这个 count 的量级跟着【公告条数】走，不跟用户数走 ——
+      公告一年几百条，所以它永远是小数量级。这正是读扩散模型的意义：
+      如果给每个用户存一份公告副本，这里就变成在一张 N×M 的表上 count。
+    -->
+    <select id="countUnread" resultType="long">
+        SELECT COUNT(*)
+        FROM t_announcement
+        WHERE
+        <include refid="visible_conditions"/>
+        <include refid="audience_conditions"/>
+        AND id &gt; #{lastReadId}
+    </select>
+
+    <select id="selectMaxVisibleId" resultType="java.lang.Long">
+        SELECT MAX(id)
+        FROM t_announcement
+        WHERE
+        <include refid="visible_conditions"/>
+    </select>
+
+    <!--
+      待确认的强制确认公告。LEFT JOIN + IS NULL 而不是 NOT IN 子查询：
+      强制确认公告一年就几条，右表也极小，join 更直白。
+
+      🔴 这是唯一一处「按会员过滤公告」的查询，而它之所以便宜，正是因为
+      ack 表只存【确认过的】——如果当初给全人群预建了待确认行，
+      这里就变成在一张 N×M 表上做范围扫描。
+    -->
+    <select id="selectPendingAck" resultType="solvela.notification.Announcement">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_announcement a
+        LEFT JOIN t_announcement_ack ack
+               ON ack.announcement_id = a.id AND ack.member_id = #{memberId}
+        WHERE a.force_ack = 1
+          AND a.status = 1
+          AND a.publish_time &lt;= #{now}
+          AND a.expire_time &gt; #{now}
+          AND ack.member_id IS NULL
+          AND (
+              a.audience_type = 'ALL'
+              <if test="memberCreateTime != null">
+                  OR (a.audience_type = 'REGISTER_BEFORE'
+                      AND #{memberCreateTime} &lt; JSON_UNQUOTE(JSON_EXTRACT(a.audience_rule, '$.before')))
+                  OR (a.audience_type = 'REGISTER_AFTER'
+                      AND #{memberCreateTime} &gt;= JSON_UNQUOTE(JSON_EXTRACT(a.audience_rule, '$.after')))
+              </if>
+          )
+        ORDER BY a.id
+    </select>
+
+    <delete id="deleteExpiredBefore">
+        DELETE FROM t_announcement
+        WHERE expire_time &lt; #{before}
+        ORDER BY id
+        LIMIT #{limit}
+    </delete>
+
+</mapper>

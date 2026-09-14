@@ -14,6 +14,7 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.base.sonicexcel.error.SonicReadResult;
 import solvela.enums.DeliveryStatusEnum;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.domain.command.PhysicalDeliveryAddCommand;
@@ -30,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.InputStream;
 
 import solvela.member.service.MemberService;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
 import solvela.exception.BusinessException;
 
 import java.util.ArrayList;
@@ -51,6 +54,12 @@ import java.util.Set;
 public class PhysicalDeliveryService {
 
     private final PhysicalDeliveryDao physicalDeliveryDao;
+
+    /**
+     * 通知：履约单转成「已发货」时告诉会员一声。
+     * 方向没问题 —— notification 排在全部业务域之前，它不认识 ledger。
+     */
+    private final NotificationService notificationService;
 
     /**
      * 会员号 -> 账号：履约单要落展示快照，导入还要按账号反查会员号
@@ -201,8 +210,14 @@ public class PhysicalDeliveryService {
         if (tooLong != null) {
             throw new BusinessException(tooLong);
         }
+        // 发通知要判断「是不是刚转成已发货」，而那需要旧状态 —— 所以先读一次。
+        // 这是后台手工改单的路径，频率极低，多一次按主键的 SELECT 无所谓
+        PhysicalDelivery before = physicalDeliveryDao.selectById(updateForm.getId());
+
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(updateForm, PhysicalDelivery.class);
         physicalDeliveryDao.updateById(physicalDelivery);
+
+        notifyIfJustShipped(before, physicalDelivery);
     }
 
     /**
@@ -366,7 +381,11 @@ public class PhysicalDeliveryService {
 
         for (PhysicalDeliveryShipImportRow row : dataList) {
             PhysicalDelivery exist = existMap.get(uniqueKey(row.sourceBizId(), row.sourceType()));
-            physicalDeliveryDao.updateById(toShipUpdate(row, exist.getId()));
+            PhysicalDelivery update = toShipUpdate(row, exist.getId());
+            physicalDeliveryDao.updateById(update);
+            // 批量回填是发货通知真正的主路径（后台手工改单只是补漏），
+            // 所以这里不能漏。exist 就是旧行，判状态迁移不用再查库
+            notifyIfJustShipped(exist, update);
         }
         return "成功回填 " + dataList.size() + " 条";
     }
@@ -398,6 +417,48 @@ public class PhysicalDeliveryService {
                 errors.add(i, "物流公司、物流单号、状态至少要填一项");
             }
         }
+    }
+
+    /**
+     * 状态<b>刚</b>从「非已发货」变成「已发货」时，给会员发一条站内信。
+     *
+     * <h3>为什么要判「刚」</h3>
+     * 后台改单和批量回填都可能对一张<b>已经是已发货</b>的单再更新一次
+     * （补个运单号、改个承运商）。不判迁移的话，用户每被改一次就收一条
+     * 「您的商品已发货」—— 这正是消息中心变成垃圾场的典型起手式。
+     *
+     * <h3>为什么参数里没有商品名</h3>
+     * 拿不到。{@code t_physical_delivery} 上只有 {@code source_biz_id}，
+     * 而查商品要让本模块依赖 {@code solvela-mall} —— 那条缝是<b>单向</b>的
+     * （mall → ledger），由 {@code MallLedgerBoundaryTest} 守着。
+     * 真要显示商品名，正解是给本表加一个商品名快照列（由 mall 建履约单时写进来）。
+     *
+     * <p>⚠️ 空值不覆盖的语义在这里要接住：回填行可能只填了状态没填运单号，
+     * 那两列要从旧行上取，否则通知里就是两个原样保留的 {@code ${...}}。
+     */
+    private void notifyIfJustShipped(PhysicalDelivery before, PhysicalDelivery after) {
+        if (before == null || after == null) {
+            return;
+        }
+        if (after.getStatus() != DeliveryStatusEnum.DELIVERED || before.getStatus() == DeliveryStatusEnum.DELIVERED) {
+            return;
+        }
+        if (before.getMemberId() == null) {
+            return;
+        }
+
+        String company = after.getLogisticsCompany() != null ? after.getLogisticsCompany() : before.getLogisticsCompany();
+        String no = after.getLogisticsNo() != null ? after.getLogisticsNo() : before.getLogisticsNo();
+
+        // send() 永不抛异常：通知发不出去不该让发货这件事失败。
+        // 反过来，本方法跑在调用方的事务里 —— 回填整批回滚时通知也跟着回滚，
+        // 「没发货却收到已发货」比「发了货没收到通知」严重得多
+        notificationService.send(NotifyRequest.of(NotificationTemplateEnum.DELIVERY_SHIPPED, before.getMemberId())
+                .param("sourceBizId", before.getSourceBizId())
+                .param("logisticsCompany", company)
+                .param("logisticsNo", no)
+                .bizRefId(before.getSourceBizId())
+                .build());
     }
 
     /**

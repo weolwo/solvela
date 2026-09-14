@@ -16,6 +16,9 @@ import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.member.MemberOperationLimit;
 import solvela.member.operationlimit.MemberOperationLimitProperties;
 import solvela.member.operationlimit.dao.MemberOperationLimitDao;
+import solvela.enums.NotificationTemplateEnum;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
 
 import java.time.LocalDateTime;
 
@@ -61,6 +64,8 @@ class MemberOperationLimitServiceTest {
     private MemberOperationLimitDao memberOperationLimitDao;
     @Mock
     private RedisService redisService;
+    @Mock
+    private NotificationService notificationService;
 
     private MemberOperationLimitProperties properties;
     private MemberOperationLimitService service;
@@ -68,7 +73,8 @@ class MemberOperationLimitServiceTest {
     @BeforeEach
     void setUp() {
         properties = new MemberOperationLimitProperties();
-        service = new MemberOperationLimitService(memberOperationLimitDao, properties, redisService);
+        service = new MemberOperationLimitService(memberOperationLimitDao, properties, redisService,
+                notificationService);
         when(redisService.generateRedisKey(anyString(), anyString())).thenReturn("k");
         when(memberOperationLimitDao.selectActive(anyLong(), any(), any())).thenReturn(null);
     }
@@ -83,6 +89,8 @@ class MemberOperationLimitServiceTest {
 
         assertNull(service.recordFail(MEMBER_ID, LOGIN, "连续登录失败"));
         verify(memberOperationLimitDao, never()).insert(any(MemberOperationLimit.class));
+        // 没落限制就不该发通知 —— 否则用户每输错一次密码都收一条「账号受限」
+        verify(notificationService, never()).send(any(NotifyRequest.class));
     }
 
     @Test
@@ -202,5 +210,46 @@ class MemberOperationLimitServiceTest {
         limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
         limit.setExpireTime(LocalDateTime.now().plusSeconds(seconds));
         return limit;
+    }
+
+    // ------------------------------------------------------------------ 限制通知
+
+    @Test
+    @DisplayName("触发限制时发一条站内信，且不把内部 reason 透给用户")
+    void 触发限制发通知() {
+        when(redisService.increment(anyString(), anyLong()))
+                .thenReturn((long) properties.getFailMaxTimes());
+
+        service.recordFail(MEMBER_ID, LOGIN, "连续5次密码错误");
+
+        ArgumentCaptor<NotifyRequest> captor = ArgumentCaptor.forClass(NotifyRequest.class);
+        verify(notificationService).send(captor.capture());
+        NotifyRequest request = captor.getValue();
+
+        assertEquals(MEMBER_ID, request.memberId());
+        assertEquals(NotificationTemplateEnum.ACCOUNT_LIMITED, request.template());
+        assertEquals(LOGIN.getDesc(), request.params().get("limitType"));
+        assertNotNull(request.params().get("unlockTime"));
+
+        // 🔴 reason 是给客服看的内部措辞，可能含「连续5次密码错误」这类对攻击者
+        //    有用的信息。用户只需要知道受限类型和恢复时间。
+        //    这条断言守的是「以后别顺手把 reason 加进参数」
+        assertFalse(request.params().containsValue("连续5次密码错误"));
+    }
+
+    @Test
+    @DisplayName("已在限制中：不重复发通知")
+    void 已在限制中不重复发通知() {
+        when(redisService.increment(anyString(), anyLong()))
+                .thenReturn((long) properties.getFailMaxTimes());
+        MemberOperationLimit active = new MemberOperationLimit();
+        active.setMemberId(MEMBER_ID);
+        active.setExpireTime(LocalDateTime.now().plusMinutes(10));
+        when(memberOperationLimitDao.selectActive(anyLong(), any(), any())).thenReturn(active);
+
+        service.recordFail(MEMBER_ID, LOGIN, "连续登录失败");
+
+        // 被限期间用户会反复重试，每次都发一条就是刷屏
+        verify(notificationService, never()).send(any(NotifyRequest.class));
     }
 }

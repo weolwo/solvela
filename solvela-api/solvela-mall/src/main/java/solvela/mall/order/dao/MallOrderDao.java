@@ -100,6 +100,37 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
             """)
     int markFailed(@Param("orderNo") String orderNo, @Param("failReason") String failReason);
 
+    /**
+     * 待支付(0) → 已取消(40)。<b>超时释放 job 唯一的闸门。</b>
+     *
+     * <p>🔴 {@code AND status = 0} 不是防御性写法，是<b>并发闸</b>：
+     * 用户正在支付、job 同时到点，两边都想改这一行。带上它之后只有一个能改成功，
+     * 另一个拿到 0 行 —— 而 job 拿到 0 行就<b>必须整单放弃补偿</b>，
+     * 否则会给一个刚支付成功的订单退积分。
+     *
+     * @return 1 表示本次成功取消（可以继续退款/放库存），0 表示已被别人改过
+     */
+    @Update("""
+            UPDATE t_mall_order
+               SET status = 40, cancel_time = NOW(), fail_reason = #{reason}
+             WHERE order_no = #{orderNo} AND status = 0
+            """)
+    int markCancelled(@Param("orderNo") String orderNo, @Param("reason") String reason);
+
+    /**
+     * 捞出已经超时的待支付单。
+     *
+     * <p>按 {@code expire_time} 升序：最早过期的先处理，避免一批堆积时
+     * 新单反复插队、老单永远轮不上。
+     */
+    @Select("""
+            SELECT * FROM t_mall_order
+             WHERE status = 0 AND expire_time IS NOT NULL AND expire_time < #{now}
+             ORDER BY expire_time
+             LIMIT #{limit}
+            """)
+    List<MallOrder> selectExpiredUnpaid(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+
     /** 按订单号取单。order_no 上有唯一键，一定是 0 或 1 行 */
     @Select("SELECT * FROM t_mall_order WHERE order_no = #{orderNo}")
     MallOrder getByOrderNo(@Param("orderNo") String orderNo);

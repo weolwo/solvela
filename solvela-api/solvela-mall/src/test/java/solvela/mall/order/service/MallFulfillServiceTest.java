@@ -13,6 +13,7 @@ import solvela.mall.MallAddress;
 import solvela.mall.MallOrder;
 import solvela.mall.address.service.MallAddressService;
 import solvela.mall.order.dao.MallOrderDao;
+import solvela.notification.service.NotificationService;
 import solvela.member.api.AssetGrantApi;
 import solvela.member.api.AssetGrantCmd;
 import solvela.member.api.AssetGrantReason;
@@ -56,6 +57,8 @@ class MallFulfillServiceTest {
     private MallAddressService mallAddressService;
     @Mock
     private AssetGrantApi assetGrantApi;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private MallFulfillService service;
