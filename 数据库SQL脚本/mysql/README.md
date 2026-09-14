@@ -7,26 +7,55 @@
 ## 🔴 新环境部署：两个文件，按顺序
 
 ```
-mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（67 张表）
+mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（73 张表）
 mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子数据（菜单/字典/权限等）
 ```
 
 跑完就能登录并正常使用。之后按需执行造数脚本（都可重复执行，见 `*造数*.sql`）。
 
-当前文件实测（2026-09-08 由 DumpSchema 重新导出后数出来）：`schema-baseline` 135 条语句
-（67 DROP + 67 CREATE + 1 SET NAMES），`data-baseline` 36 条语句、17 条 INSERT
-覆盖 16 张配置表共 576 行；其中菜单 329 / 角色菜单 139 / 员工 12 /
-文件分类 7（含 COMMON、NOTICE、HELP_DOC、FEEDBACK 四个内置 code）/
-定时任务 9 / 任务事件 9，**业务表全部为 0 行**（基线不带任何测试数据）。
+## ✅ 2026-09-15：空库执行已实测通过
 
-> ⚠️ 上面这组数是**从文件里数出来的**，不是空库执行验证的结果。
-> 最近一次「空库执行零失败」的验证对应的是 75 张表那一版，此后基线被改过，
-> 换环境前请自己再跑一次 `tools/VerifyFreshInstall.java`。
+```
+tools/VerifyFreshInstall.java  ->  RESULT: PASS
+  schema-baseline.sql  ->  ok=146  fail=0
+  data-baseline.sql    ->  ok=41   fail=0
+```
+
+这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
+（工具建一个 `_fresh_probe` 库、执行两个基线、逐项核对，跑完删库）。
+
+当前基线：**73 张表**；`data-baseline` **20 条 INSERT、20 张配置表共 472 行**。
+关键种子数据到位情况（验证工具逐项核对过）：
+
+| 表 | 行数 | 缺了会怎样 |
+|---|---|---|
+| `t_menu` | 279 | 后台登录进去是空白 |
+| `t_role_menu` | 74 | 任何角色都看不到菜单 |
+| `t_employee` | 12 | 无法登录 |
+| `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
+| `t_solvela_job` | 9 | 定时任务不会注册 |
+| `t_task_event` | 9 | 任务事件识别不了 |
+| `t_notification_template` | 6 | 发不出任何站内信，**而且不报错** |
+| `t_member_id_seq` | 1 | **第一个注册的用户就撞 -1000** |
+
+业务表（会员/活动/任务记录/流水/通知/公告）全部 0 行 —— 基线不带任何测试数据。
+
+> 🔴 **2026-09-15 修掉了工具里两个会静默丢数据的坑**，两个都是「重新导出一次就丢一次」：
+>
+> 1. **`t_member_id_seq` 曾经是手工粘进基线的**，而 `DumpSeedData` 的清单里没有它 ——
+>    每次重新导出都会把它丢掉，而丢掉的后果是第一个注册的用户直接失败。
+>    现在它由工具**固定输出**（`MEMBER_ID_SEQ_BLOCK`），而且刻意**不从库里 dump**：
+>    开发库的 `next_seq` 是运行态水位（已经到 95000 了），基线要的是种子值 0，两者不是一回事。
+> 2. **`t_mail_template` 同样在基线里却不在清单里**，已补进 `SEED`。
+>
+> 另外 `VerifyFreshInstall` 里还留着一条对 `t_serial_number` 的检查，而那张表
+> 2026-08-31 就随功能下掉了 —— 于是这个工具**每次跑到那里都抛异常**，
+> 它后面的「业务表应当为空」校验从来没有真正执行过。已一并修掉。
 
 | 文件 | 内容 | 不含 |
 |---|---|---|
-| `schema-baseline.sql` | 67 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 16 张配置表、576 行种子数据 | 会员/活动/任务记录/流水/日志等业务数据 |
+| `schema-baseline.sql` | 73 张表的结构 | 任何数据 |
+| `data-baseline.sql` | 20 张配置表、472 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。

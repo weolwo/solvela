@@ -34,8 +34,8 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-09-08
--- 表数量：67 张
+-- 生成时间：2026-09-15
+-- 表数量：73 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -1272,6 +1272,97 @@ CREATE TABLE `t_script_ref` (
   UNIQUE KEY `uk_script_ref_point` (`ref_type`,`ref_id`,`ref_slot`,`ref_key`),
   KEY `idx_script_ref_code` (`script_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='脚本引用关系表。存在的唯一理由：回答「改这个脚本会影响哪些业务对象」';
+
+
+-- =====================================================================================
+-- 通知中心（6 张）
+-- =====================================================================================
+
+DROP TABLE IF EXISTS `t_notification_template`;
+CREATE TABLE `t_notification_template` (
+  `template_code` varchar(64) NOT NULL COMMENT '模板编码：跨环境稳定，代码引用它。取值见 NotificationTemplateEnum',
+  `version` int NOT NULL COMMENT '版本号。? 编辑=新增版本，永不原地改 —— 历史通知靠它锁定当年措辞',
+  `category` varchar(32) NOT NULL COMMENT '分类：SYSTEM/TRADE/MARKETING。只影响C端tab分组与免打扰粒度，不参与存储决策',
+  `title_template` varchar(128) NOT NULL COMMENT '标题模板，${key} 占位符',
+  `content_template` text NOT NULL COMMENT '正文模板，${key} 占位符',
+  `param_keys` json DEFAULT NULL COMMENT '本版本用到的占位符清单。运行期校验用，跟着version走，是权威（枚举那份是编译期文档）',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '1-启用 0-停用。? 只停用不删除：删了历史通知就渲染不出来',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`template_code`,`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='通知模板：按版本不可变';
+
+DROP TABLE IF EXISTS `t_member_notification`;
+CREATE TABLE `t_member_notification` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `template_code` varchar(64) NOT NULL COMMENT '模板编码',
+  `template_version` int NOT NULL COMMENT '模板版本：指向发送当时那一版。? 没有它，改模板就会追溯篡改历史通知',
+  `params` json DEFAULT NULL COMMENT '渲染参数。? 只存显示值不存id —— 存id就要join，而奖品可能已下架改名，又绕回篡改历史',
+  `summary` varchar(128) NOT NULL COMMENT '发送时就渲染好的短摘要。列表页直接用，零渲染零查模板表',
+  `category` varchar(32) NOT NULL COMMENT '模板分类快照：tab分组与免打扰按它过滤',
+  `biz_ref_id` varchar(64) DEFAULT NULL COMMENT '关联业务单号：prize_code/order_no等。不建索引，纯排查用',
+  `read_flag` tinyint NOT NULL DEFAULT '0' COMMENT '0-未读 1-已读。通知侧已读是逐条的，跳读天然支持',
+  `read_time` datetime DEFAULT NULL COMMENT '已读时间',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_member_read` (`member_id`,`read_flag`,`id`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员通知（站内信）：定向，一人一条';
+
+DROP TABLE IF EXISTS `t_member_notification_preference`;
+CREATE TABLE `t_member_notification_preference` (
+  `member_id` bigint NOT NULL COMMENT '会员号：一人一行，直接做主键',
+  `trade_enabled` tinyint NOT NULL DEFAULT '1' COMMENT '交易物流类：1-接收 0-关闭',
+  `marketing_enabled` tinyint NOT NULL DEFAULT '1' COMMENT '活动营销类：1-接收 0-关闭',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`member_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员通知免打扰偏好：一人一行';
+
+DROP TABLE IF EXISTS `t_announcement`;
+CREATE TABLE `t_announcement` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `title` varchar(128) NOT NULL COMMENT '标题',
+  `content` text NOT NULL COMMENT '正文。运营手写，不用模板——公告本来就一行，没有冗余可省',
+  `category` varchar(32) NOT NULL COMMENT '分类：SYSTEM/TRADE/MARKETING',
+  `force_ack` tinyint NOT NULL DEFAULT '0' COMMENT '0-普通公告 1-强制确认（弹窗+留痕）',
+  `audience_type` varchar(32) NOT NULL DEFAULT 'ALL' COMMENT '人群：ALL / REGISTER_BEFORE / REGISTER_AFTER',
+  `audience_rule` json DEFAULT NULL COMMENT '? 存规则不存名单。物化名单就回到「用户数×公告数」了',
+  `publish_time` datetime NOT NULL COMMENT '生效时间，未到不展示',
+  `expire_time` datetime NOT NULL COMMENT '? 必填。未读计算的过滤条件 + 归档依据，允许为空等于两条全废',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '1-发布 0-下架',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_visible` (`status`,`publish_time`,`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='公告：一条内容一行，读扩散';
+
+DROP TABLE IF EXISTS `t_member_announcement_cursor`;
+CREATE TABLE `t_member_announcement_cursor` (
+  `member_id` bigint NOT NULL COMMENT '会员号：一人一行，直接做主键',
+  `last_read_id` bigint NOT NULL DEFAULT '0' COMMENT '此id及以前的公告全部视为已读。不支持跳读，所以只需这一个bigint',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`member_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='公告已读游标：一人一行，与公告条数无关';
+
+DROP TABLE IF EXISTS `t_announcement_ack`;
+CREATE TABLE `t_announcement_ack` (
+  `announcement_id` bigint NOT NULL COMMENT '公告id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `ack_time` datetime NOT NULL COMMENT '确认时间：合规留痕，只增不改',
+  `ack_ip` varchar(64) DEFAULT NULL COMMENT '确认时IP，合规场景可能要',
+  PRIMARY KEY (`announcement_id`,`member_id`),
+  KEY `idx_member` (`member_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='强制确认公告的确认记录：仅 force_ack=1 的公告产生';
 
 
 -- =====================================================================================

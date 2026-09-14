@@ -26,6 +26,31 @@ public class DumpSeedData {
      * 刻意<b>不含</b>任何业务/运营/日志数据（会员、活动、任务记录、流水、各类 log），
      * 那些是跑造数脚本或真实使用产生的，进基线只会让新环境一开张就带着别人的测试数据。
      */
+
+    /**
+     * 会员号发号序列的种子行。固定输出，不从库里 dump —— 理由见下面 SQL 注释。
+     */
+    static final String MEMBER_ID_SEQ_BLOCK = """
+
+-- =====================================================================================
+-- 会员号发号序列的唯一一行。
+--
+-- \uD83D\uDD34 这行是【必须】的，不是可选种子数据。t_member_id_seq 是单行表，发号靠
+--    UPDATE ... WHERE id = 1 推进水位。这一行不存在时，UPDATE 匹配 0 行、
+--    LAST_INSERT_ID() 返回 0，算出的号段是 [-1000, 0) —— 于是【第一个注册的
+--    用户】就撞上 BusinessException「会员号已耗尽或序号非法：-1000」，注册全线失败。
+--
+-- \uD83D\uDD34 本块由 DumpSeedData 【固定输出】，不是从库里 dump 的：
+--    开发库的 next_seq 是运行态水位（早就几万了），而基线要的是种子值 0。
+--    历史上它是手工粘进基线的，于是每次重新导出都被丢掉一次。
+--
+--    next_seq=0：第一次批发得到号段 [0, 1000)，起始内部序号 0（MemberIdCodec 接受 [0,CAPACITY)）。
+--    step=1000：与 schema 默认值一致，库里的值优先于应用配置。
+-- =====================================================================================
+DELETE FROM `t_member_id_seq`;
+INSERT INTO `t_member_id_seq` (`id`, `next_seq`, `step`) VALUES (1, 0, 1000);
+""";
+
     static final LinkedHashMap<String, String> SEED = new LinkedHashMap<>();
     static {
         SEED.put("t_menu",                  "菜单树。没有它后台登录进去是空白");
@@ -44,6 +69,15 @@ public class DumpSeedData {
         SEED.put("t_solvela_job",             "定时任务定义。缺了任务不会注册");
         SEED.put("t_task_event",            "任务事件定义（v3.47.0 灌入）");
         SEED.put("t_notice_type",           "公告类型");
+        // 2026-09-15 补：通知模板是配置数据，不是业务数据。
+        // 缺了不报错，只是每条通知都在 NotificationService 里落一行
+        // 「模板未配置或已全部停用」的 error 日志，然后用户什么都收不到 ——
+        // 与 t_file_category / t_task_event 是同一性质的东西。
+        SEED.put("t_notification_template", "通知模板。缺了发不出任何站内信，而且不报错");
+        // 2026-09-15 补：此前【不在清单里，却在基线文件里】——
+        // 说明它是某次手工粘进去的，而本工具每次导出都会把它丢掉。
+        // 邮箱验证码发不出去 = 新环境注册不了，与 t_file_category 同一性质。
+        SEED.put("t_mail_template",         "邮件模板。缺了邮箱验证码发不出去");
         SEED.put("t_code_generator_config", "代码生成器配置（开发工具，可选）");
         SEED.put("t_table_column",          "列配置（开发工具，可选）");
     }
@@ -122,6 +156,19 @@ SET FOREIGN_KEY_CHECKS = 0;
                 }
                 totalRows += values.size();
             }
+
+            // -----------------------------------------------------------------
+            // 🔴 t_member_id_seq 【刻意不进 SEED 清单】，而是在这里写死输出。
+            //
+            //    它是【运行态计数器】：开发库里 next_seq 早被 UPDATE 推到几万，
+            //    dump 出来的话，新环境一开张就从那个水位开始发号。
+            //    基线要的是【种子值】next_seq = 0，两者不是一回事。
+            //
+            //    此前这一块是有人手工粘进基线文件的，于是【每次重新导出都会被丢掉】——
+            //    而丢掉的后果不是少一行数据，是第一个注册的用户直接失败（见下面的注释）。
+            //    固化在工具里，就不再依赖谁记得粘回去。
+            // -----------------------------------------------------------------
+            out.append(MEMBER_ID_SEQ_BLOCK);
 
             out.append("\nSET FOREIGN_KEY_CHECKS = 1;\n");
             if (!empty.isEmpty()) {

@@ -70,6 +70,11 @@ public class DumpSchema {
             "t_lottery_config","t_lottery_issue","t_lottery_prize_rule",
             "t_lottery_record","t_lottery_number_pool"));
         GROUPS.put("脚本引擎", List.of("t_script","t_script_ref"));
+        GROUPS.put("通知中心", List.of(
+            // 2026-09-15 新增。两半存储模型完全不同，但同属一个域：
+            //   定向通知是写扩散（一人一条），公告是读扩散（一条内容一行 + 一人一个游标）
+            "t_notification_template", "t_member_notification", "t_member_notification_preference",
+            "t_announcement", "t_member_announcement_cursor", "t_announcement_ack"));
         GROUPS.put("积分商城", List.of(
             "t_mall_category","t_mall_commodity","t_mall_sku","t_mall_order",
             "t_mall_exchange_limit","t_mall_address","t_mall_favorite"));

@@ -50,7 +50,11 @@ public class VerifyFreshInstall {
                 {"t_solvela_job",     "1",   "定时任务定义：为 0 则任务不会注册"},
                 {"t_dict_data",     "1",   "字典项"},
                 {"t_task_event",    "1",   "任务事件定义"},
-                {"t_serial_number", "1",   "单号生成器定义"},
+                // 2026-09-15 删：t_serial_number 已于 2026-08-31 随功能一起下掉（全仓零引用），
+                // 而这条检查一直留着 —— 每次跑到这里都会招 Table doesn't exist 异常，
+                // 它后面的「业务表应当为空」校验从来没有真正执行过。
+                {"t_notification_template", "1", "通知模板：为 0 发不出任何站内信，而且不报错"},
+                {"t_member_id_seq", "1", "会员发号种子行：为 0 则第一个注册的用户就撞 -1000"},
             };
             boolean allOk = true;
             for (String[] chk : checks) {
@@ -65,7 +69,10 @@ public class VerifyFreshInstall {
             // 业务表必须是空的 —— 基线不该带别人的测试数据
             System.out.println("\n=== 业务表应当为空（基线不带业务数据）===");
             String[] biz = {"t_member", "t_member_wallet", "t_member_asset_transaction",
-                            "t_task_record", "t_prize_log", "t_activity_config", "t_lottery_record"};
+                            "t_task_record", "t_prize_log", "t_activity_config", "t_lottery_record",
+                            // 2026-09-15 补：通知与公告都是业务数据。
+                            // 模板（t_notification_template）是配置，在上面那组里，两者别混。
+                            "t_member_notification", "t_announcement", "t_announcement_ack"};
             for (String t : biz) {
                 try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM `" + t + "`")) {
                     r.next(); long n = r.getLong(1);
