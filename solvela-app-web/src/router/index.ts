@@ -122,6 +122,26 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/SessionsView.vue'),
     meta: { title: '登录设备' },
   },
+  {
+    path: '/settings/notification',
+    name: 'notification-preference',
+    component: () => import('@/views/messages/NotificationPreferenceView.vue'),
+    meta: { title: '消息设置' },
+  },
+  // ---- 消息中心。两个 tab（通知 / 公告）在同一个页面里，它们的已读语义不同，
+  //      合成一个列表会让用户看到两种行为，那看着就是 bug ----
+  {
+    path: '/messages',
+    name: 'messages',
+    component: () => import('@/views/messages/MessagesView.vue'),
+    meta: { title: '消息' },
+  },
+  {
+    path: '/messages/:id',
+    name: 'message-detail',
+    component: () => import('@/views/messages/MessageDetailView.vue'),
+    meta: { title: '消息详情' },
+  },
   // ---- 活动专题页：从「优惠」点进去。分享入口，匿名可看（对齐后端 @Anonymous），
   //      抽奖那一步再要求登录 ----
   {

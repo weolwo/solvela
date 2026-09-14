@@ -61,6 +61,16 @@ public interface MemberDao extends BaseMapper<Member> {
     /**
      * 按账号取会员号（走 uk_mbr_name）。查不到返回 null。
      */
+    /**
+     * 注册时间。公告的人群规则（REGISTER_BEFORE / REGISTER_AFTER）判定用。
+     *
+     * <p>只取一列而不是整行：调用它的是公告列表这条<b>高频读路径</b>，
+     * 而 {@code t_member} 那一行里有四列密文（手机、邮箱及各自的 hash），
+     * 整行捞回来等于每次列表都白白解密一遍。
+     */
+    @Select("SELECT create_time FROM t_member WHERE member_id = #{memberId}")
+    java.time.LocalDateTime selectCreateTimeById(@Param("memberId") Long memberId);
+
     @Select("SELECT member_id FROM t_member WHERE member_name = #{memberName}")
     Long selectMemberIdByName(@Param("memberName") String memberName);
 

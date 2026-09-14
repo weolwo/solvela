@@ -20,6 +20,7 @@ import solvela.member.api.AssetApi;
 import solvela.member.api.DeviceApi;
 import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.MemberAuthApi;
+import solvela.member.api.NotificationApi;
 
 import java.time.Duration;
 
@@ -120,6 +121,18 @@ public class DownstreamClientConfig {
     @Bean
     public ProposalRecordApi proposalRecordApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(3), ProposalRecordApi.class);
+    }
+
+    /**
+     * 消息中心。契约在 {@code solvela-member-api}（通知是挂在会员身上的东西），
+     * 但实现今天在 app-biz，所以 base-url 复用 member 那个 —— 两个键现在都指向同一个进程。
+     *
+     * <p>2 秒：收件箱是一次带分页的索引查询加一次 count，比主键点查重，
+     * 但它挂在用户点开消息中心的路径上，拖长了就是转圈。
+     */
+    @Bean
+    public NotificationApi notificationApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(2), NotificationApi.class);
     }
 
     @Bean

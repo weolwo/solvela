@@ -152,6 +152,17 @@ public class MemberService {
     }
 
     /**
+     * 会员号 → 注册时间。查不到返回 null。
+     *
+     * <p>公告的人群规则判定用（REGISTER_BEFORE / REGISTER_AFTER）。
+     * 返回 null 时调用方<b>只放行 ALL 人群</b> —— 宁可少发一条定向公告，
+     * 也不要把一条本该定向的公告发给全体。
+     */
+    public java.time.LocalDateTime getCreateTime(Long memberId) {
+        return memberId == null ? null : memberDao.selectCreateTimeById(memberId);
+    }
+
+    /**
      * 账号 → 会员号。查不到返回 null。
      */
     public Long getMemberId(String memberName) {

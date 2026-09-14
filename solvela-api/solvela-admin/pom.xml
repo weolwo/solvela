@@ -132,6 +132,15 @@
             <version>3.0.0</version>
         </dependency>
         <!-- 本模块大量用 @Data / @Slf4j。lombok 是 provided，不传递，每个模块各自声明 -->
+        <!-- 通知中心：模板与公告的后台维护
+             （NotificationTemplateController / AnnouncementAdminController）。
+             此前靠 member/ledger/mall 传递过来 —— 用什么就声明什么 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-notification</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

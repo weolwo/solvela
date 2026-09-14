@@ -127,6 +127,14 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- 通知中心：NotificationInternalController 直接用它的三个 Service。
+             此前靠 member/ledger/mall 传递过来 —— 用什么就声明什么，别指望别人替你带 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-notification</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

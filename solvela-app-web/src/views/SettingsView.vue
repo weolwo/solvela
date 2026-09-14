@@ -23,6 +23,12 @@
         <Cell icon="phone" title="手机号" :to="{ name: 'phone-bind' }" />
         <Cell icon="user" title="邮箱" :to="{ name: 'email-bind' }" />
         <Cell icon="lock" title="登录设备" :to="{ name: 'sessions' }" />
+        <!--
+          消息设置：只有交易和活动两个开关。
+          🔴 没有「系统通知」那一档 —— 账号被冻结这种事不该能被静音，
+          服务端的契约里压根没有那个字段，所以这里也画不出那个开关。
+        -->
+        <Cell icon="settings" title="消息设置" :to="{ name: 'notification-preference' }" />
       </div>
     </div>
   </div>
