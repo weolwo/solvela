@@ -73,7 +73,9 @@ const ANNOUNCEMENTS: AnnouncementItem[] = [
   },
 ]
 
-const readAnnouncementSpy = vi.fn(() => Promise.resolve())
+// 形参要显式声明：spy 的签名决定了调用处的类型检查，
+// 写成 vi.fn(() => ...) 的话传 id 进去 tsc 会报 Expected 0 arguments
+const readAnnouncementSpy = vi.fn((_id: string) => Promise.resolve())
 const readAllNotificationsSpy = vi.fn(() => Promise.resolve(2))
 
 vi.mock('@/api/notification', async (importOriginal) => {

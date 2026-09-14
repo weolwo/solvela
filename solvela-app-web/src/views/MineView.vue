@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { fetchAssets } from '@/api/assets'
+import { fetchUnreadCount } from '@/api/notification'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -19,6 +20,23 @@ const loggingOut = ref(false)
  * 语义上本来就更对：这些是「我的」东西，不是逛的东西。
  */
 const assets = useAsync(fetchAssets)
+
+/**
+ * 消息未读数。
+ *
+ * 🔴 **服务端把通知和公告两个数加好再下发**，端上不要自己拉两个相加 ——
+ * 那样迟早漏掉公告那一半，而漏了只表现为「红点偏小」，没人会去对账。
+ *
+ * 拉不到就当 0：消息入口本身是要显示的，为一次接口抖动把整行藏起来
+ * 是拿次要目标伤害主要目标。
+ */
+const unread = useAsync(() => fetchUnreadCount().catch(() => 0))
+
+/** 0 条不显示 —— 在入口上写「0 条未读」只是噪声 */
+const unreadLabel = computed(() => {
+  const n = unread.data.value ?? 0
+  return n > 0 ? `${n > 99 ? '99+' : n} 条未读` : undefined
+})
 
 /**
  * 主资产（列表第一项）单独放大展示。哪一项是主资产由**后端的顺序**决定，
@@ -119,6 +137,17 @@ async function handleLogout(): Promise<void> {
       奖励记录不在这里：它是「我在某个活动里中了什么」，属于活动，
       展示在活动专题页上。
     -->
+    <!--
+      消息入口。单独一张卡、排在记录之前 —— 它是「平台要告诉你的事」，
+      而下面几组是「你自己要去翻的东西」，两者不是一类。
+
+      ⚠️ 2026-09-15 补：此前消息中心的路由、页面、接口都做好了，却**没有任何
+      地方能点进去** —— 只能手输 URL。做完一个页面记得回头问一句「用户怎么到这」。
+    -->
+    <Card>
+      <Cell icon="gift" title="消息" :value="unreadLabel" :to="{ name: 'messages' }" />
+    </Card>
+
     <Card>
       <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
       <Cell icon="gift" title="优惠记录" :to="{ name: 'records-promo' }" />
