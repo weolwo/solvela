@@ -44,11 +44,15 @@ public interface AssetGrantApi {
      * 付款事务提交后才发起履约，失败留在 60 等重试，<b>积分不回退</b>（东西还欠着，不是没买）。
      *
      * <h3>幂等由调用方的单据状态保证</h3>
-     * 实物这一侧有 {@code uk_t_biz_phy_dlv_src(source_biz_id, source_type)} 兜底，
-     * 现金这一侧有 {@code UNIQUE(biz_ref_id, asset_type)} 兜底。
-     * <b>但券那张表今天没有唯一键</b>（{@code t_member_coupon} 只有普通索引
-     * {@code idx_source}），所以调用方必须先用一次条件 UPDATE 抢到「履约中」再调本接口 ——
-     * 商城的 {@code MallFulfillService} 就是这么做的。
+     * 三条通道各有一道数据库兜底：实物 {@code uk_t_biz_phy_dlv_src(source_biz_id, source_type)}、
+     * 现金 {@code UNIQUE(biz_ref_id, asset_type)}、券 {@code uk_source(source_type, source_biz_id)}。
+     *
+     * <p>⚠️ 券那一道是 2026-09-15 才补上的，此前<b>只有普通索引</b> {@code idx_source} ——
+     * 也就是说券这一侧当时是三条里唯一没有兜底的。但<b>调用方的纪律不变</b>：
+     * 先用一次条件 UPDATE 抢到「履约中」再调本接口（商城的 {@code MallFulfillService}
+     * 就是这么做的）。数据库唯一键是<b>最后一道</b>，不是第一道 ——
+     * 靠它挡重复意味着每次重复都要先走完一遍发放逻辑再被拒，
+     * 而那趟里可能已经扣了预算。
      *
      * <p>🔴 收件三要素是<b>明文</b>传的，落库时由 ledger 侧的 PiiTypeHandler 加密。
      * 这个接口只跑在服务端内部，不要把它的入参写进任何面向用户的日志。

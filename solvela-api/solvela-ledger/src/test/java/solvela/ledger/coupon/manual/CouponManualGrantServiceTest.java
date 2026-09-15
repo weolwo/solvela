@@ -128,7 +128,7 @@ class CouponManualGrantServiceTest {
         verify(couponIssueService, times(2)).newCoupon(captor.capture());
         List<String> bizIds = captor.getAllValues().stream().map(CouponIssueCmd::sourceBizId).toList();
 
-        // 只用「工单号:序号」的话，第二个人会撞上 uk_manual_src，而且不报错 ——
+        // 只用「工单号:序号」的话，第二个人会撞上 uk_source，而且不报错 ——
         // 运营看到的是「成功 1 跳过 1」，以为第二个人上次已经发过了
         assertEquals(List.of(TICKET + ":11:1", TICKET + ":22:1"), bizIds);
     }
@@ -137,7 +137,7 @@ class CouponManualGrantServiceTest {
     @DisplayName("🔴 重复提交：撞唯一键 = 已经发过，算跳过不算失败")
     void 重复提交是跳过不是失败() {
         when(memberCouponDao.insert(any(MemberCoupon.class)))
-                .thenThrow(new DuplicateKeyException("uk_manual_src"));
+                .thenThrow(new DuplicateKeyException("uk_source"));
 
         ManualCouponGrantResult result = service.grant(cmd(List.of(1L), 1), OPERATOR);
 

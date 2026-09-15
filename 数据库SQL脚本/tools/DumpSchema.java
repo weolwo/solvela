@@ -3,6 +3,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * 从当前库导出「唯一权威的全量表结构」——新环境执行这一个文件即可建好所有表。
@@ -19,6 +20,17 @@ public class DumpSchema {
 
     /** 手工备份表等垃圾，不进基线 */
     static final List<String> EXCLUDE_PREFIX = List.of("t_menu_26", "t_menu_2608");
+
+    /**
+     * 🔴 备份表的<b>命名约定</b>：{@code <原表名>_dup_<日期>} / {@code _bak_} / {@code _backup_}。
+     *
+     * <p>按名字认，而不是每出现一张就往 {@link #EXCLUDE_PREFIX} 里加一条 ——
+     * 那份清单只会越来越长，而且漏加一次的表现是它<b>静悄悄进了基线</b>，
+     * 于是全新安装会凭空多出一张别人某天的备份表。
+     *
+     * <p>⚠️ 反过来说：<b>想让备份表不进基线，就得按这个格式起名</b>。
+     */
+    static final Pattern BACKUP_TABLE = Pattern.compile(".+_(dup|bak|backup)_\\d{6,8}$");
 
     /** 按业务域分组，让基线文件本身可读 */
     static final LinkedHashMap<String, List<String>> GROUPS = new LinkedHashMap<>();
@@ -104,7 +116,8 @@ public class DumpSchema {
             }
             List<String> excluded = new ArrayList<>();
             all.removeIf(t -> {
-                boolean bad = EXCLUDE_PREFIX.stream().anyMatch(t::startsWith);
+                boolean bad = EXCLUDE_PREFIX.stream().anyMatch(t::startsWith)
+                        || BACKUP_TABLE.matcher(t).matches();
                 if (bad) excluded.add(t);
                 return bad;
             });

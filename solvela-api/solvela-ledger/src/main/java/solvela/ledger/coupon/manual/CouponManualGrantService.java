@@ -48,10 +48,15 @@ import java.util.Objects;
  * </ul>
  *
  * <h3>幂等靠数据库，不靠先查一遍</h3>
- * {@code uk_manual_src} 是一个只对 {@code source_type='MANUAL'} 生效的函数唯一索引
- *（库里已有 53 组 PROPOSAL 的重复，所以加不了全表唯一键）。
- * 最真实的故障就是运营双击、或者网络慢了再点一次 ——
- * 先查再插在并发下挡不住，条件交给数据库才挡得住。
+ * {@code uk_source(source_type, source_biz_id)}。最真实的故障就是运营双击、
+ * 或者网络慢了再点一次 —— 先查再插在并发下挡不住，条件交给数据库才挡得住。
+ *
+ * <p>幂等键是 {@code <工单号>:<会员号>:<序号>}：会员号<b>必须</b>在里面，
+ * 否则一个工单发给 5 个人会在第二个人身上撞键，表现是「只有第一个人收到了」。
+ *
+ * <p>⚠️ 2026-09-15 之前这里是一个<b>只对 MANUAL 生效</b>的函数索引
+ *（{@code uk_manual_src}），因为当时库里有 53 组 PROPOSAL 重复、建不出全表唯一键。
+ * 那 53 组清掉之后换成了普通唯一键，发奖那条路也跟着被管起来了。
  *
  * @Author alaric
  * @Date 2026-09-15
@@ -166,7 +171,7 @@ public class CouponManualGrantService {
                 memberCouponDao.insert(coupon);
                 last = coupon;
             } catch (DuplicateKeyException e) {
-                // uk_manual_src 挡住的重复提交。第一张就撞上说明整个人都发过了
+                // uk_source 挡住的重复提交。第一张就撞上说明整个人都发过了
                 if (seq == 1) {
                     log.info("【人工发券】会员 {} 在工单 {} 下已经发过了，跳过", memberId, cmd.bizRefId());
                     return GrantOutcome.ALREADY;

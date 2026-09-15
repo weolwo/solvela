@@ -47,10 +47,13 @@ SET NAMES utf8mb4;
 --       是拿数据的正确性换代码行数。实际做法是 AssetGrantApi（契约在
 --       solvela-member-api）+ AssetGrantApiService（实现在 solvela-ledger）——
 --       同一批表的第二个入口，source_type='MALL'，运营的发货台/物流导入一行不改。
---     ⚠️ 券那张表**没有** UNIQUE(source_type, source_biz_id)，只有普通索引 idx_source。
---       所以重复发券在库这一层拦不住，幂等全靠商城侧 10→20 那次条件 UPDATE。
---       补唯一键之前，t_member_coupon 的 source_biz_id 商城侧已按「单号:序号」写入
---      （一单兑 N 张就是 N 行），格式与奖品链路的 external_biz_no 一致。
+--     ✅ 2026-09-15 补上了 uk_source (source_type, source_biz_id)，见
+--       「优惠券-发券防重唯一键.sql」。此前券表**只有普通索引 idx_source**，
+--       重复发券在库这一层拦不住，幂等全靠商城侧 10→20 那次条件 UPDATE。
+--       ⚠️ 那次条件 UPDATE **仍然要做**：唯一键是最后一道，不是第一道 ——
+--       靠它挡重复意味着每次重复都要先走完一遍发放逻辑再被拒。
+--       商城侧的 source_biz_id 一直是「单号:序号」（一单兑 N 张就是 N 行），
+--       格式与奖品链路的 external_biz_no 一致，所以加键时一行都不用改。
 --   · 🔴 **商城不走 t_proposal_record**。提案带审批/预算/风控，那是「发钱的闸门」；
 --     商城是用户花自己的积分，走审批没道理。但履约要走既有链路，见 §5 的对接说明
 --

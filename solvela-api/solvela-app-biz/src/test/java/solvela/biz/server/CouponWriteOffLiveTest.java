@@ -22,6 +22,7 @@ import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -196,6 +197,9 @@ class CouponWriteOffLiveTest {
                 () -> assertEquals(steep.getId(), result.unusable().get(0).couponId()));
     }
 
+    /** 幂等键的序号。@Transactional 会回滚，但同一个用例里的两张必须先能插进去 */
+    private static final AtomicLong SEQ = new AtomicLong();
+
     /** 造一张无门槛减 20 的现金券，直接入库 */
     private MemberCoupon insertCoupon() {
         MemberCoupon coupon = new MemberCoupon();
@@ -206,7 +210,14 @@ class CouponWriteOffLiveTest {
         coupon.setCouponName("单元测试用券");
         coupon.setStatus(CouponStatusEnum.UNUSED);
         coupon.setSourceType("TEST");
-        coupon.setSourceBizId("live-test");
+        /*
+         * 🔴 每张券一个不同的 source_biz_id。
+         *
+         *    原来这里写死 "live-test"，一个用例连造两张就是两行相同的
+         *    (source_type, source_biz_id) —— 2026-09-15 补上 uk_source 之后
+         *    当场撞键。撞得好：那正是这个键要挡的形状，只是以前没人挡得住。
+         */
+        coupon.setSourceBizId("live-test:" + SEQ.incrementAndGet());
         coupon.setValidStartTime(LocalDateTime.now().minusDays(1));
         coupon.setValidEndTime(LocalDateTime.now().plusDays(10));
         coupon.setTemplateVersion(1);

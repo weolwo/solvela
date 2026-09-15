@@ -48,8 +48,19 @@ public class CouponAssetHandler implements IAssetHandler {
             log.info(">>>> [发券成功] 提案ID: {}, 券模: {}", proposal.getId(), assetRef);
             return DispatchOutcome.success();
         } catch (DuplicateKeyException e) {
-            // 幂等：同一提案重复发券视为成功。判失败的话引擎会把预算还回去，
-            // 而券其实已经在上一次发出去了 —— 券发了、预算退了，两边永远对不平
+            /*
+             * 幂等：同一提案重复发券视为成功。判失败的话引擎会把预算还回去，
+             * 而券其实已经在上一次发出去了 —— 券发了、预算退了，两边永远对不平。
+             *
+             * 🔴 这段 catch 在 2026-09-15 之前是【死代码】：t_member_coupon 上
+             *    压根没有唯一键可违反，只有普通索引 idx_source。也就是说
+             *    「重发一个提案就多一张券」这件事，不报错、不告警、没人发现。
+             *
+             *    补上的是 uk_source (source_type, source_biz_id)，脚本
+             *    「优惠券-发券防重唯一键.sql」。真库上的守卫在
+             *    CouponSourceIdempotencyLiveTest —— 那条测的不是「接住之后处理得对」
+             *    （那个 mock 就能演），而是【异常真的会被抛出来】。
+             */
             log.warn("【防重拦截】该提案已发过券: {}", proposal.getId());
             return DispatchOutcome.success();
         }
@@ -83,7 +94,16 @@ public class CouponAssetHandler implements IAssetHandler {
                 // 提案落库时已经把「当时那个账号」记下来了
                 proposal.getMemberName(),
                 SOURCE_TYPE_PROPOSAL,
-                // 溯源提案ID：客服拿着一张券要回答「这是哪次活动发的」，靠的就是这一列
+                /*
+                 * 溯源提案ID：客服拿着一张券要回答「这是哪次活动发的」，靠的就是这一列。
+                 * 它同时是 uk_source 的幂等键。
+                 *
+                 * ⚠️ 这是唯一一个【没有序号】的来源（人工发券是「工单号:会员号:序号」，
+                 *    商城是「订单号:序号」）。今天成立，因为一个提案确实只发一张券。
+                 *    哪天要「一个提案发 N 张」，必须先给这里加序号 ——
+                 *    否则第二张会撞唯一键，而 catch 会把它当成重复提交默默吞掉，
+                 *    表现是「说好发 3 张，用户只收到 1 张」。
+                 */
                 proposal.getId().toString(),
                 proposal.getAssetName()));
     }
