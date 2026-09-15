@@ -15,6 +15,7 @@ import solvela.app.web.Trace;
 import solvela.trace.DeviceContract;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.MallApi;
+import solvela.marketing.api.RechargeApi;
 import solvela.marketing.api.PrizeRecordApi;
 import solvela.member.api.AssetApi;
 import solvela.member.api.CouponQueryApi;
@@ -101,6 +102,21 @@ public class DownstreamClientConfig {
     @Bean
     public CouponQueryApi couponQueryApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(2), CouponQueryApi.class);
+    }
+
+    /**
+     * 充话费（外部场景消费）。<b>3 秒</b>：下单要试算券 + 锁券，比主键点查重。
+     *
+     * <p>⚠️ 今天运营商那一端是<b>假的</b>，而且假充值配到生产会让 app-biz
+     * <b>启动失败</b>（{@code ExternalRechargeService.checkTransport}）——
+     * 那道闸在域里，网关这一侧不做任何环境判断。
+     *
+     * <p>契约在 {@code solvela-marketing-api}：外部场景和商城将来同属
+     * app-activity 那个服务，所以共用同一个 base-url。
+     */
+    @Bean
+    public RechargeApi rechargeApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(3), RechargeApi.class);
     }
 
     /**

@@ -155,6 +155,8 @@ async function handleLogout(): Promise<void> {
         （路由、页面、接口都做好了，却没有任何地方能点进去）。
       -->
       <Cell icon="receipt" title="我的券包" :to="{ name: 'coupons' }" />
+      <!-- 券的第一个「非商城」出口。⚠️ 今天运营商那一端是假的，页面上写着 -->
+      <Cell icon="phone" title="充话费" :to="{ name: 'recharge' }" />
       <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
       <Cell icon="gift" title="优惠记录" :to="{ name: 'records-promo' }" />
     </Card>

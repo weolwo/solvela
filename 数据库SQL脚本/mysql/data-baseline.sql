@@ -520,7 +520,7 @@ INSERT INTO `t_file_category` (`category_id`, `category_code`, `category_name`, 
 (8, 'MALL_COMMODITY', '商城商品图', '商城', 100, 1, NULL, '2026-08-22 11:18:13', NULL, '2026-09-05 02:32:13');
 
 -- -----------------------------------------------------------------------------------
--- t_solvela_job  定时任务定义。缺了任务不会注册（10 行）
+-- t_solvela_job  定时任务定义。缺了任务不会注册（11 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_solvela_job`;
 INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `job_group`, `trigger_type`, `trigger_value`, `next_trigger_time`, `prev_trigger_time`, `trigger_version`, `jitter_seconds`, `enabled_flag`, `param`, `preset_code`, `timeout_seconds`, `retry_times`, `retry_interval`, `misfire_strategy`, `misfire_threshold_sec`, `block_strategy`, `last_execute_time`, `last_execute_log_id`, `sort`, `remark`, `deleted_flag`, `update_name`, `create_time`, `update_time`, `app_env`, `alarm_receiver`, `continuous_fail_count`, `handler_missing_flag`, `terminal_flag`, `owner_biz_type`, `owner_biz_code`, `source`, `manual_modified_flag`) VALUES
@@ -532,8 +532,9 @@ INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
 (10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-09-16 03:10:00', '2026-09-15 03:10:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:10:00', 9166, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
 (11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-09-16 03:20:00', '2026-09-15 03:20:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:20:00', 9168, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 18:40:00', '2026-09-15 15:40:00', 973, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 15:30:00', 9235, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 18:30:50', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(13, 'JOBCOUPLCK', '【账务】优惠券卡单释放', 'couponStuckLockRelease', 'BUSINESS', 'cron', '0 5/30 * * * *', '2026-09-15 19:05:00', '2026-09-15 18:35:00', 6, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 18:36:31', 9237, 0, '每 30 分钟把锁定超过 120 分钟仍未确认的券放回未使用；支持 dryRun 试运行。阈值不要调到 60 分钟以下', 0, 'system', '2026-09-15 05:47:06', '2026-09-15 18:36:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 20:30:00', '2026-09-15 20:20:00', 975, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 15:30:00', 9240, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 20:27:05', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(13, 'JOBCOUPLCK', '【账务】优惠券卡单释放', 'couponStuckLockRelease', 'BUSINESS', 'cron', '0 5/30 * * * *', '2026-09-15 20:35:00', '2026-09-15 19:05:00', 7, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 18:36:31', 9239, 0, '每 30 分钟把锁定超过 120 分钟仍未确认的券放回未使用；支持 dryRun 试运行。阈值不要调到 60 分钟以下', 0, 'system', '2026-09-15 05:47:06', '2026-09-15 20:10:47', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(14, 'JOBEXTEXP', '【外部场景】超时单取消', 'externalOrderExpire', 'BUSINESS', 'cron', '0 2/10 * * * *', '2026-09-15 20:21:40', NULL, 0, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', NULL, NULL, 0, '每 10 分钟取消超时未支付的外部场景单，并把锁定的券放回去；支持 dryRun 试运行', 0, 'system', '2026-09-15 20:20:40', '2026-09-15 20:27:05', 'dev', NULL, 0, 1, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
 -- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）
@@ -577,7 +578,7 @@ INSERT INTO `t_mail_template` (`template_code`, `template_subject`, `template_co
 ('member_reset_password_code', '重置密码验证码', '<!DOCTYPE HTML><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/></head><body>\n<div style="margin:0 auto;width:690px;font-family:Helvetica,Arial,sans-serif;line-height:28px;">\n  <h2>重置密码验证码</h2>\n  <p>有人正在用这个邮箱<b>重置账号密码</b>。请在重置页面输入：</p>\n  <p style="font-size:28px;letter-spacing:6px;"><b>${code}</b></p>\n  <p>验证码 ${minutes} 分钟内有效。</p>\n  <p><b>拿到这串数字就能改掉你的密码。</b>不要告诉任何人，包括自称客服的人。</p>\n  <p style="color:#b00;"><b>如果这不是你本人的操作，请立即登录并修改密码</b> ——\n     有人知道你的邮箱地址，并且正在尝试接管你的账号。</p>\n</div></body></html>', 'freemarker', 0, '2026-09-09 04:25:48', '2026-09-09 04:25:48');
 
 -- -----------------------------------------------------------------------------------
--- t_coupon_template  优惠券模板。缺了发券查不到规则（5 行）
+-- t_coupon_template  优惠券模板。缺了发券查不到规则（6 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_coupon_template`;
 INSERT INTO `t_coupon_template` (`coupon_code`, `version`, `coupon_name`, `discount_type`, `discount_value`, `min_amount`, `max_discount`, `deduct_target`, `scope_type`, `scope_refs`, `valid_days`, `valid_end_time`, `remark`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
@@ -585,7 +586,8 @@ INSERT INTO `t_coupon_template` (`coupon_code`, `version`, `coupon_name`, `disco
 ('CU4XN6VTLQ', 1, '满100减20优惠券', 'FIXED', 20.00, 100.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
 ('PK144782FR', 1, '商城优惠券100', 'FIXED', 100.00, 0.00, NULL, 'SCORE', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
 ('PNIX3HHMDN', 1, '商城优惠券100', 'FIXED', 100.00, 0.00, NULL, 'SCORE', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
-('PP0COUPON1', 1, 'P0-20元券', 'FIXED', 20.00, 0.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30');
+('PP0COUPON1', 1, 'P0-20元券', 'FIXED', 20.00, 0.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
+('RECHARGE10', 1, '话费充值满100减10', 'FIXED', 10.00, 100.00, NULL, 'CASH', 'EXTERNAL', '["MOBILE_RECHARGE"]', 30, NULL, '阶段 7 种子：外部场景券的第一张。上线前请运营核对面额与门槛', 1, 'system', '2026-09-15 20:20:40', NULL, '2026-09-15 20:20:40');
 
 -- -----------------------------------------------------------------------------------
 -- t_code_generator_config  代码生成器配置（开发工具，可选）（31 行）

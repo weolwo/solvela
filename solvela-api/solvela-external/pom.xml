@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>solvela</groupId>
+        <artifactId>solvela-parent</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>solvela-external</artifactId>
+    <name>solvela-external</name>
+    <description>外部场景消费：充话费等。券的第一个非商城出口。</description>
+
+    <!--
+      【为什么是一个新模块，而不是塞进 solvela-mall】
+      商城单挂着商品、SKU、库存、限购、收货地址、履约单引用 —— 充话费一个都没有。
+      硬塞的结果是一张有一半列永远为 NULL 的表，以及每一处判空都要写成
+      「如果是外部场景就跳过」。两种单据的生命周期也不一样：商城要发货，
+      这里要调外部接口。
+
+      <p>拆出来的代价是多一个 maven 模块，收益是<b>下一个外部场景</b>
+      （视频会员、加油卡…）不用再碰商城一行代码。
+
+      🔴 它和 solvela-mall <b>互不依赖</b>，和当初 mall 从 marketing 拆出来时
+      同一条纪律。两者的共同点只有「都用券」，而那是通过 member-api 的契约。
+
+      【为什么不依赖 solvela-ledger】
+      券是资产。和商城一样，只能走 member-api 的契约
+      （MallLedgerBoundaryTest 那条缝对本模块同样成立，
+      ExternalLedgerBoundaryTest 守着）。
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-contract</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-model</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-data</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 本域对外的契约（RechargeApi）。粒度对齐【服务】不对齐模块：
+             外部场景和商城将来同属 app-activity 那个服务，契约就该在一起 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-marketing-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- 券的三阶段核销：只认契约，不认 ledger 的实现 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!-- 会员账号快照（下单时记「当时是谁」） -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-member</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!-- 充值结果要告诉用户 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-notification</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

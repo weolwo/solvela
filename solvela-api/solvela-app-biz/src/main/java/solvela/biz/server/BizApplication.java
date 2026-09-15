@@ -97,12 +97,16 @@ import solvela.base.listener.Ip2RegionListener;
         // 通知（站内信）。member 与 ledger 都注入 NotificationService，
         // 漏了它的表现是启动即 NoSuchBeanDefinitionException 并指名道姓说缺哪个 ——
         // 这正是显式扫描清单想要的失败方式
-        "solvela.notification"
+        "solvela.notification",
+        // 外部场景消费（充话费）。2026-09-15 券闭环阶段 7 新增 ——
+        // 它是券的第一个非商城出口，和 solvela.mall 互不依赖
+        "solvela.external"
 })
 @MapperScan(value = {
         "solvela.base", "solvela.activity", "solvela.draw", "solvela.task", "solvela.lottery",
         "solvela.mall", "solvela.stat", "solvela.prize", "solvela.scriptengine",
-        "solvela.member", "solvela.ledger", "solvela.risk", "solvela.notification"
+        "solvela.member", "solvela.ledger", "solvela.risk", "solvela.notification",
+        "solvela.external"
         // ⚠️ 这里【没有】 solvela.dispatch：删掉死掉的 PrizeDispatchOutboxDao 之后，
         // 那个包里一个 @Mapper 都不剩了。它仍在上面的 @ComponentScan 里
         // （LocalPrizeEventPublisher 在那儿）

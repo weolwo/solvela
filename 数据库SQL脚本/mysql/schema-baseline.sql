@@ -35,7 +35,7 @@ SET NAMES utf8mb4;
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
 -- 生成时间：2026-09-15
--- 表数量：75 张
+-- 表数量：76 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -1591,4 +1591,38 @@ CREATE TABLE `t_mall_favorite` (
   KEY `idx_mall_fav_mbr_time` (`member_id`,`create_time`),
   KEY `idx_mall_fav_cmd` (`commodity_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-商品收藏';
+
+
+-- =====================================================================================
+-- 外部场景消费（1 张）
+-- =====================================================================================
+
+DROP TABLE IF EXISTS `t_external_order`;
+CREATE TABLE `t_external_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `order_no` varchar(64) NOT NULL COMMENT '单号。服务端生成，同时是锁券与幂等的键',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
+  `scene_code` varchar(32) NOT NULL COMMENT '场景码，如 MOBILE_RECHARGE。券的 scope_refs 按它匹配',
+  `target_account` varchar(255) NOT NULL COMMENT '充值目标【密文】：手机号 / 账号。与 t_physical_delivery 同一套 PiiTypeHandler',
+  `target_masked` varchar(32) DEFAULT NULL COMMENT '打码后的目标，如 138****8888。给列表展示用，省一次解密',
+  `original_amount` decimal(10,2) NOT NULL COMMENT '抵扣前应付（用户选的面额）',
+  `coupon_id` bigint DEFAULT NULL COMMENT '用掉的会员券 id。软引用，不加外键。NULL=没用券',
+  `coupon_discount` decimal(10,2) DEFAULT NULL COMMENT '券抵扣了多少。冗余，权威在 t_coupon_write_off',
+  `pay_amount` decimal(10,2) NOT NULL COMMENT '实付 = 抵扣前 - 券抵扣',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '0-待支付 10-待执行 20-执行中 30-成功 40-已取消 60-失败',
+  `expire_time` datetime DEFAULT NULL COMMENT '待支付超时时间，到点由 job 取消并放回券',
+  `pay_time` datetime DEFAULT NULL COMMENT '支付时间',
+  `finish_time` datetime DEFAULT NULL COMMENT '执行完成时间',
+  `external_ref_no` varchar(128) DEFAULT NULL COMMENT '外部流水号（运营商返回的）。对账靠它',
+  `fail_reason` varchar(255) DEFAULT NULL COMMENT '失败原因',
+  `create_by` varchar(64) DEFAULT NULL,
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_by` varchar(64) DEFAULT NULL,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
+  KEY `idx_member` (`member_id`,`id`),
+  KEY `idx_expire` (`status`,`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='外部场景消费单：充话费等。券的第一个非商城出口';
 

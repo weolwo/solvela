@@ -135,6 +135,13 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!-- 外部场景消费（充话费）。券的第一个非商城出口，2026-09-15 阶段 7 新增 -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-external</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

@@ -84,6 +84,10 @@ public class DumpSchema {
         GROUPS.put("积分商城", List.of(
             "t_mall_category","t_mall_commodity","t_mall_sku","t_mall_order",
             "t_mall_exchange_limit","t_mall_address","t_mall_favorite"));
+        // 2026-09-15 券使用闭环阶段 7：外部场景消费（充话费等）。
+        // 单开一组而不是塞进「积分商城」—— 它和商城互不依赖，
+        // 共同点只有「都用券」，归在一起会让人以为它们共享单据模型。
+        GROUPS.put("外部场景消费", List.of("t_external_order"));
     }
 
     public static void main(String[] a) throws Exception {
