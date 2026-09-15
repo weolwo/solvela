@@ -1,10 +1,10 @@
 package solvela.ledger.grant;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -16,6 +16,8 @@ import solvela.exception.BusinessException;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.coupon.dao.MemberCouponDao;
+import solvela.ledger.coupon.issue.CouponIssueService;
+import solvela.ledger.coupon.template.service.CouponTemplateService;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.wallet.service.MemberWalletService;
 import solvela.member.api.AssetGrantCmd;
@@ -69,8 +71,36 @@ class AssetGrantApiServiceTest {
     @Mock
     private MemberService memberService;
 
-    @InjectMocks
+    /**
+     * 券模板查询。本测试里一律返回 null（mock 的默认行为）—— 走的是
+     * <b>没有模板</b>的降级路径，那正是下面两条券用例要验的东西：
+     * 券名兜底、一份一行。有模板时的规则快照由 {@code CouponIssueServiceTest} 单独验。
+     */
+    @Mock
+    private CouponTemplateService couponTemplateService;
+
     private AssetGrantApiService service;
+
+    /**
+     * 🔴 手工装配，不用 {@code @InjectMocks}。
+     *
+     * <p>因为 {@link CouponIssueService} 在这里必须是<b>真的</b>而不是一个哑 mock：
+     * 券名怎么定、有效期怎么算，2026-09-15 阶段 2 之后住在那个类里了。
+     * 塞个 mock 让它返回一张编好的券，下面那两条断言就只是在验「我 mock 里写了什么」——
+     * 而它们本来要守的是用户可见的契约：券名必须是商品名而不是编码。
+     *
+     * <p>而它又没法写成字段初始化式：字段初始化跑在构造期，那时候 Mockito
+     * 还没把 {@code @Mock} 填进来，{@code couponTemplateService} 还是 null。
+     */
+    @BeforeEach
+    void setUp() {
+        service = new AssetGrantApiService(
+                physicalDeliveryDao,
+                memberCouponDao,
+                new CouponIssueService(couponTemplateService),
+                memberWalletService,
+                memberService);
+    }
 
     /* ---------------- 实物 ---------------- */
 

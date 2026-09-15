@@ -27,6 +27,35 @@
     </template>
   </a-alert>
 
+  <!--
+    体检：会发券但没有模板的配置点。
+
+    🔴 发券侧找不到模板时是【照发】的，只是规则列全空 —— 因为拒发会在运行期
+       把一个在架商品变成兑换必失败（库里就有这种商品：兑换凭证类的券本来
+       就没有「减多少」这回事）。但降级如果没人看得见，就成了这个项目一直在
+       骂的那种「不报错，只是没生效」：券照发、用户照收，直到有人拿它去抵扣
+       才发现减不出钱。日志里那条 ERROR 要有人去翻才看得到，所以摆在这里。
+  -->
+  <a-alert v-if="gaps.length" type="error" show-icon class="mb-4">
+    <template #message>
+      有 {{ gaps.length }} 个配置点会发券，但<b>没有券模板</b> —— 它们发出去的券没有任何规则，用不了。
+    </template>
+    <template #description>
+      <div v-for="gap in gaps" :key="gap.sourceType + gap.sourceCode" class="text-sm">
+        <a-tag :color="gap.sourceType === 'PRIZE' ? 'purple' : 'blue'">
+          {{ gap.sourceType === 'PRIZE' ? '奖品配置' : '商城商品' }}
+        </a-tag>
+        <b>{{ gap.sourceName }}</b>
+        <span class="text-slate-500">（{{ gap.sourceCode }}）</span>
+        → 券编码 <code>{{ gap.couponCode }}</code>
+      </div>
+      <div class="mt-2 text-xs text-slate-500">
+        ⚠️ 如果它发的是<b>兑换凭证</b>（比如视频会员年卡）而不是折扣券，那本来就没有「减多少」这回事，
+        可以不管 —— 但要知道它在这张单子上。
+      </div>
+    </template>
+  </a-alert>
+
   <a-card size="small" :bordered="false" :bodyStyle="{ padding: '16px' }">
     <a-row justify="end" class="mb-3">
       <a-button type="primary" @click="onAdd">
@@ -287,7 +316,23 @@
     }
   }
 
-  onMounted(loadList);
+  /** 会发券但没模板的配置点。见模板顶部那段红字 */
+  const gaps = ref([]);
+
+  async function loadGaps() {
+    try {
+      gaps.value = (await couponTemplateApi.missing()) || [];
+    } catch (err) {
+      // 体检失败不该挡住主列表 —— 它是提示，不是这个页面的主体
+      solvelaSentry.captureError(err);
+      gaps.value = [];
+    }
+  }
+
+  onMounted(() => {
+    void loadList();
+    void loadGaps();
+  });
 
   /**
    * 把规则拼成一句人话。
@@ -430,6 +475,8 @@
       message.success(`已保存为 v${version}（只对之后发出去的券生效）`);
       drawerOpen.value = false;
       await loadList();
+      // 刚补的模板可能正好填上了体检里的某个洞
+      await loadGaps();
     } catch (err) {
       solvelaSentry.captureError(err);
     } finally {
@@ -444,6 +491,8 @@
       await couponTemplateApi.disable(record.couponCode, record.version);
       message.success('已停用');
       await loadList();
+      // 停掉最后一个启用版 = 又多了一个没有模板的发券点
+      await loadGaps();
     } catch (err) {
       solvelaSentry.captureError(err);
     } finally {

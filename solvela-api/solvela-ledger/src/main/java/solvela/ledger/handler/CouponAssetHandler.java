@@ -1,19 +1,18 @@
 package solvela.ledger.handler;
 
-import solvela.enums.CouponStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import solvela.anno.AssetStrategy;
 import solvela.dispatch.DispatchOutcome;
 import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.coupon.dao.MemberCouponDao;
+import solvela.ledger.coupon.issue.CouponIssueCmd;
+import solvela.ledger.coupon.issue.CouponIssueService;
 import solvela.ledger.MemberCoupon;
 import solvela.risk.ProposalRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -22,19 +21,14 @@ public class CouponAssetHandler implements IAssetHandler {
     @Resource
     private MemberCouponDao memberCouponDao;
 
-
     /**
-     * 券类型默认值。
-     * TODO 产品规则待定：t_prize_config 没有券类型字段，定了之后应从奖品配置（或其 ext JSON）读取
+     * 规则与有效期都由它从券模板读出来并快照进券行。
+     *
+     * <p>原来这里挂着两个写死的常量（{@code GENERAL} 和 30 天）和两条
+     * 「等产品规则定下来」的 TODO。规则就是券模板，2026-09-15 阶段 2 接上了。
      */
-    private static final String DEFAULT_COUPON_TYPE = "GENERAL";
-
-    /**
-     * 券有效期默认天数。
-     * TODO 产品规则待定：UserPrizeEvent.validUntil 和 t_prize_log.valid_until 都预留了字段却从没赋过值，
-     * 等确定是「按固定天数」还是「按活动结束时间」后改为读配置
-     */
-    private static final int DEFAULT_VALID_DAYS = 30;
+    @Resource
+    private CouponIssueService couponIssueService;
 
     private static final String SOURCE_TYPE_PROPOSAL = "PROPOSAL";
 
@@ -62,40 +56,35 @@ public class CouponAssetHandler implements IAssetHandler {
     }
 
     /**
-     * 拼一张券。
+     * 拼一张券 —— 规则、券名、有效期<b>全部来自券模板</b>（{@link CouponIssueService}）。
      *
-     * <p>🔴 {@code couponCode / couponType / validStartTime / validEndTime} 四列在 DDL 里
-     * 都是 NOT NULL 且无默认值：漏任意一个，MySQL 在严格模式下会以
-     * 「Field 'xxx' doesn't have a default value」整条拒绝，而那是运行期才炸的。
+     * <h3>提案的 assetName 现在只是<b>兜底</b>了</h3>
+     * 模板存在时用模板名，因为<b>名字和规则必须是同一个人配的</b> ——
+     * 让活动侧的展示名盖过模板名，就会出现一张叫「无门槛券」而
+     * {@code min_amount=100} 的券，用户看着名字去用，被拦下来，然后来找客服。
+     *
+     * <p>⚠️ 但 assetName 这条通路<b>仍然要传</b>：没有模板时它就是券名。
+     * 而且它身上还背着一个线上事故 —— 这里原来写的是
+     * {@code proposal.getRemark()}，而 remark 在
+     * {@code ProposalRecordService.saveProposal} 里被固定写成「提案生成成功」，
+     * 于是发出去的券全都叫「提案生成成功」（306 张，2026-09-15 阶段 0 清掉了）。
+     * 根因不是随手写错：依赖方向从「账务→营销」翻转之后，名称这条信息没有了
+     * 搬运通道，remark 是当时唯一够得着的字段。正解是让提案携带展示名，
+     * 而不是让账务域回头去查营销域的表 —— v3.45.0 已经这么改了。
+     *
+     * <p>🔴 <b>不要</b>把兜底改回 remark：remark 会被执行引擎改写成失败原因，
+     * 那会让重试后发出的券叫「预算已耗尽」。券编码难看，但稳定且可追溯。
      */
     private MemberCoupon buildCoupon(ProposalRecord proposal, String assetRef) {
-        MemberCoupon coupon = new MemberCoupon();
-        coupon.setMemberId(proposal.getMemberId());
-        // 展示快照直接沿用提案上的那一份，不再查会员表：提案落库时已经把「当时那个账号」记下来了
-        coupon.setMemberName(proposal.getMemberName());
-
-        coupon.setCouponCode(assetRef);
-        coupon.setCouponType(DEFAULT_COUPON_TYPE);
-        // 券名取提案自带的展示名（v3.45.0 起由营销侧下传），取不到才回退用券模编码。
-        //
-        // 🔴 这里原来写的是 proposal.getRemark() —— 而 remark 在 ProposalRecordService.saveProposal
-        //    里被固定写成「提案生成成功」，于是<b>发出去的券全都叫「提案生成成功」</b>，
-        //    是用户可见的错误文案。根因不是随手写错：依赖方向从「账务->营销」翻转之后
-        //    （见本类第 42~44 行），名称这条信息没有了搬运通道，remark 是当时唯一够得着的字段。
-        //    正解是让提案携带展示名，而不是让账务域回头去查营销域的表。
-        //
-        //    回退用 assetRef 而不是继续用 remark：编码至少是稳定且可追溯的，
-        //    而 remark 会被执行引擎改写成失败原因 —— 那会让重试后发出的券叫「预算已耗尽」。
-        coupon.setCouponName(StringUtils.isNotBlank(proposal.getAssetName())
-                ? proposal.getAssetName() : assetRef);
-        LocalDateTime now = LocalDateTime.now();
-        coupon.setValidStartTime(now);
-        coupon.setValidEndTime(now.plusDays(DEFAULT_VALID_DAYS));
-
-        coupon.setSourceType(SOURCE_TYPE_PROPOSAL);
-        // 溯源提案ID：客服拿着一张券要回答「这是哪次活动发的」，靠的就是这一列
-        coupon.setSourceBizId(proposal.getId().toString());
-        coupon.setStatus(CouponStatusEnum.UNUSED);
-        return coupon;
+        return couponIssueService.newCoupon(new CouponIssueCmd(
+                assetRef,
+                proposal.getMemberId(),
+                // 展示快照直接沿用提案上的那一份，不再查会员表：
+                // 提案落库时已经把「当时那个账号」记下来了
+                proposal.getMemberName(),
+                SOURCE_TYPE_PROPOSAL,
+                // 溯源提案ID：客服拿着一张券要回答「这是哪次活动发的」，靠的就是这一列
+                proposal.getId().toString(),
+                proposal.getAssetName()));
     }
 }

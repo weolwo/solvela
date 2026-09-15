@@ -9,7 +9,11 @@ import solvela.coupon.CouponTemplate;
 import solvela.enums.CouponDeductTargetEnum;
 import solvela.enums.CouponDiscountTypeEnum;
 import solvela.enums.CouponScopeTypeEnum;
+import solvela.enums.CouponStatusEnum;
 import solvela.exception.BusinessException;
+import solvela.ledger.MemberCoupon;
+import solvela.ledger.coupon.issue.CouponIssueCmd;
+import solvela.ledger.coupon.issue.CouponIssueService;
 import solvela.ledger.coupon.template.dao.CouponTemplateDao;
 import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
@@ -18,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -61,6 +66,9 @@ class CouponTemplateLiveTest {
 
     @Autowired
     private CouponWriteOffDao couponWriteOffDao;
+
+    @Autowired
+    private CouponIssueService couponIssueService;
 
     @Test
     @DisplayName("🔴 建一版、读回来、再建一版、停用 —— 每个字段都真的落到了库里")
@@ -172,6 +180,47 @@ class CouponTemplateLiveTest {
         // 没有任何核销时返回 null，调用方按 0 处理 —— 这正是 Dao 注释里承诺的行为
         assertNull(couponWriteOffDao.sumConfirmedAmount(
                 LocalDateTime.now().minusYears(50), LocalDateTime.now().minusYears(49)));
+    }
+
+    @Test
+    @DisplayName("🔴 发券侧真的会去读模板：库里的规则一路快照到券行上")
+    void 发券时从真库读模板并快照() {
+        // 先用测试自己的模板，避免依赖种子数据的具体数值（运营随时会改）
+        couponTemplateService.save(fixedTemplate());
+
+        MemberCoupon coupon = couponIssueService.newCoupon(new CouponIssueCmd(
+                TEST_CODE, 1001L, "tester", "PROPOSAL", "live-test", "活动侧的展示名"));
+
+        assertAll(
+                // 模板名赢过活动侧展示名 —— 名字和规则必须是同一个人配的
+                () -> assertEquals("单元测试用券", coupon.getCouponName()),
+                () -> assertEquals(1, coupon.getTemplateVersion()),
+                () -> assertEquals(CouponDiscountTypeEnum.FIXED, coupon.getDiscountType()),
+                () -> assertEquals(0, new BigDecimal("20.00").compareTo(coupon.getDiscountValue())),
+                () -> assertEquals(0, new BigDecimal("100.00").compareTo(coupon.getMinAmount())),
+                () -> assertEquals(CouponDeductTargetEnum.CASH, coupon.getDeductTarget()),
+                () -> assertEquals(CouponScopeTypeEnum.ALL, coupon.getScopeType()),
+                () -> assertEquals(CouponStatusEnum.UNUSED, coupon.getStatus()),
+                // 模板写的是「发券后 30 天」
+                () -> assertTrue(coupon.getValidEndTime().isAfter(LocalDateTime.now().plusDays(29))));
+    }
+
+    @Test
+    @DisplayName("种子里那 5 条模板，每一条都发得出一张带规则的券")
+    void 五条种子模板都能发出带规则的券() {
+        List<CouponTemplate> seeds = couponTemplateService.listLatest().stream()
+                .filter(t -> !TEST_CODE.equals(t.getCouponCode()))
+                .toList();
+        assertFalse(seeds.isEmpty(), "库里应当有种子模板");
+
+        for (CouponTemplate seed : seeds) {
+            MemberCoupon coupon = couponIssueService.newCoupon(new CouponIssueCmd(
+                    seed.getCouponCode(), 1001L, "tester", "PROPOSAL", "live-test", null));
+            // 规则列非空 = 这个券编码真的匹配上了模板。为空说明发出去的券没有规则
+            assertNotNull(coupon.getDiscountType(), seed.getCouponCode() + " 没有匹配到模板");
+            assertNotNull(coupon.getDiscountValue(), seed.getCouponCode() + " 没有抵扣值");
+            assertNotNull(coupon.getValidEndTime(), seed.getCouponCode() + " 没有有效期");
+        }
     }
 
     private static CouponTemplate fixedTemplate() {

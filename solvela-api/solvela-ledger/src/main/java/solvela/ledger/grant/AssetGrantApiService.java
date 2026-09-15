@@ -7,13 +7,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import solvela.code.BizErrorCode;
-import solvela.enums.CouponStatusEnum;
 import solvela.enums.DeliveryStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import solvela.exception.BusinessException;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.coupon.dao.MemberCouponDao;
+import solvela.ledger.coupon.issue.CouponIssueCmd;
+import solvela.ledger.coupon.issue.CouponIssueService;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.wallet.service.MemberWalletService;
 import solvela.member.api.AssetGrantApi;
@@ -23,7 +24,6 @@ import solvela.member.api.AssetGrantResult;
 import solvela.member.service.MemberService;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 /**
  * {@link AssetGrantApi} 的实现：把「把东西真正发给用户」这件事暴露给服务端内部的调用方。
@@ -57,21 +57,20 @@ public class AssetGrantApiService implements AssetGrantApi {
 
     private final PhysicalDeliveryDao physicalDeliveryDao;
     private final MemberCouponDao memberCouponDao;
+    private final CouponIssueService couponIssueService;
     private final MemberWalletService memberWalletService;
     private final MemberService memberService;
 
-    /**
-     * 券有效期默认天数。
+    /*
+     * 2026-09-15 阶段 2 删掉了这里的 COUPON_VALID_DAYS(30) 和 DEFAULT_COUPON_TYPE。
      *
-     * <p>与 {@code CouponAssetHandler} 里那个常量取值一致但<b>刻意各存一份</b>：
-     * 那边的注释挂着「等确定是按固定天数还是按活动结束时间」的 TODO ——
-     * 商城的券没有活动可依，规则定下来的那天两边会分道扬镳。
-     * 现在合并等于将来要拆，而拆的时候没人记得它们本来就不是一回事。
+     * 它们原来和 CouponAssetHandler 里那两个常量取值一致但刻意各存一份，理由是
+     * 「规则定下来的那天两边会分道扬镳 —— 商城的券没有活动可依」。
+     *
+     * 规则定下来了，就是券模板：有效期由模板的「发券后 N 天 / 固定失效时间」说了算，
+     * 两条路都去问同一张表，于是它们合流而不是分道。兜底的 30 天现在只剩
+     * CouponIssueService 里那一份，且只在【没有模板】的降级路径上用得到。
      */
-    private static final int COUPON_VALID_DAYS = 30;
-
-    /** 券类型。t_prize_config 没有券类型字段，商城这边同样没有，先给通用值 */
-    private static final String DEFAULT_COUPON_TYPE = "GENERAL";
 
     @Override
     public AssetGrantResult grant(AssetGrantCmd cmd) {
@@ -184,27 +183,24 @@ public class AssetGrantApiService implements AssetGrantApi {
         }
 
         String memberName = memberService.requireMemberName(cmd.memberId());
-        LocalDateTime now = LocalDateTime.now();
         int quantity = cmd.quantityOrOne();
         Long firstId = null;
 
         for (int seq = 1; seq <= quantity; seq++) {
-            MemberCoupon coupon = new MemberCoupon();
-            coupon.setMemberId(cmd.memberId());
-            coupon.setMemberName(memberName);
-            coupon.setCouponCode(assetRef);
-            coupon.setCouponType(DEFAULT_COUPON_TYPE);
             /*
-             * 券名会直接显示给用户。取不到就回退用编码 ——
-             * 编码难看但稳定可追溯，而拿备注顶替会让用户收到一张叫「提案生成成功」的券
-             *（CouponAssetHandler 里那段红字记的就是这个线上事故）。
+             * 规则、券名、有效期全部由券模板决定（2026-09-15 阶段 2）。
+             *
+             * 🔴 每一份都单独 build 一次，不是 build 一次复用 N 次：
+             *    MyBatis-Plus 的 insert 会把自增主键<b>回写进实体</b>，
+             *    复用同一个对象的话第二次 insert 带着上一次的 id 进去。
              */
-            coupon.setCouponName(StringUtils.isNotBlank(cmd.assetName()) ? cmd.assetName() : assetRef);
-            coupon.setValidStartTime(now);
-            coupon.setValidEndTime(now.plusDays(COUPON_VALID_DAYS));
-            coupon.setSourceType(cmd.sourceType());
-            coupon.setSourceBizId(cmd.bizRefId() + ":" + seq);
-            coupon.setStatus(CouponStatusEnum.UNUSED);
+            MemberCoupon coupon = couponIssueService.newCoupon(new CouponIssueCmd(
+                    assetRef,
+                    cmd.memberId(),
+                    memberName,
+                    cmd.sourceType(),
+                    cmd.bizRefId() + ":" + seq,
+                    cmd.assetName()));
 
             memberCouponDao.insert(coupon);
             if (firstId == null) {

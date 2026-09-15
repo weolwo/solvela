@@ -28,6 +28,18 @@ export const couponTemplateApi = {
     return getRequest(`/couponTemplate/versions?couponCode=${encodeURIComponent(couponCode)}`);
   },
 
+  /**
+   * 体检：会发券但没有模板的配置点。
+   *
+   * 🔴 发券侧找不到模板时是**照发**的（规则列全空），不是拒发 ——
+   * 拒发会在运行期把一个在架商品变成兑换必失败。但降级必须看得见，
+   * 否则就成了「不报错，只是没生效」：券照发、用户照收，
+   * 直到有人拿它去抵扣才发现减不出钱。这个接口就是那半个「看得见」。
+   */
+  missing: () => {
+    return getRequest('/couponTemplate/missing');
+  },
+
   /** 新增一版。版本号由服务端算「当前最大版本 + 1」，前端不要传 */
   save: (param) => {
     return postRequest('/couponTemplate/save', param);

@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.admin.auth.CurrentEmployee;
+import solvela.admin.module.ledger.coupontemplate.domain.CouponTemplateGapVO;
+import solvela.admin.module.ledger.coupontemplate.service.CouponTemplateHealthService;
 import solvela.coupon.CouponTemplate;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
 import solvela.web.RequiresPermission;
@@ -43,6 +45,7 @@ import java.util.List;
 public class CouponTemplateController {
 
     private final CouponTemplateService couponTemplateService;
+    private final CouponTemplateHealthService couponTemplateHealthService;
 
     @Operation(summary = "模板列表（每个编码取最新启用版）")
     @GetMapping("/list")
@@ -70,6 +73,24 @@ public class CouponTemplateController {
     public int save(@RequestBody @Valid CouponTemplate template) {
         template.setCreateBy(CurrentEmployee.nameOrNull());
         return couponTemplateService.save(template);
+    }
+
+    /**
+     * 会发券但没有模板的配置点。
+     *
+     * <h3>🔴 它是「降级看得见」的那一半</h3>
+     * 发券侧找不到模板时<b>照发</b>，只是规则列全空 —— 因为拒发会在运行期
+     * 把一个在架商品变成兑换必失败。但降级如果没人看得见，就变成了
+     * 「不报错，只是没生效」：券照发、用户照收，直到有人拿它去抵扣才发现减不出钱。
+     *
+     * <p>日志里那条 ERROR 要有人去翻才看得到，所以这里给运营一个不用翻日志的入口。
+     * 页面顶部直接把它列出来。
+     */
+    @Operation(summary = "体检：会发券但没有模板的配置点")
+    @GetMapping("/missing")
+    @RequiresPermission("couponTemplate:query")
+    public List<CouponTemplateGapVO> missing() {
+        return couponTemplateHealthService.listGaps();
     }
 
     @Operation(summary = "停用某一版（不删除 —— 删了就查不到历史券当时的规则）")
