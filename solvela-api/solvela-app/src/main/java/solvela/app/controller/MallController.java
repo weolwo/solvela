@@ -116,6 +116,21 @@ public class MallController {
      * 只出成功的等于把「我兑的东西呢」这个问题藏起来，
      * 而那正是用户点进这一页最想知道的事。
      */
+    /**
+     * 支付一笔待支付的订单。
+     *
+     * <h3>⚠️ 今天背后是<b>假支付</b></h3>
+     * 点一下就算付了，不动任何真钱。它配到生产会让服务<b>启动失败</b>
+     *（{@code MallPayService.checkTransport}）—— 那道闸在域里，不在这一层。
+     *
+     * <p>🔴 会员号从登录态取，<b>不接受客户端传</b>：少了这一条就是
+     * 「可以支付别人的订单」。
+     */
+    @PostMapping("/order/{orderNo}/pay")
+    public RedeemResultView pay(@PathVariable String orderNo) {
+        return redeemService.pay(CurrentMember.require().memberId(), orderNo);
+    }
+
     @GetMapping("/order")
     public List<OrderView> listMyOrders() {
         return orderService.listMyOrders(CurrentMember.require().memberId());

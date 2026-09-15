@@ -116,6 +116,22 @@ public interface MallApi {
     @GetExchange("/order")
     List<MallOrderView> listMyOrders(@RequestParam Long memberId, @RequestParam int limit);
 
+    /**
+     * 支付一笔待支付的订单。
+     *
+     * <h3>⚠️ 今天这背后是<b>假支付</b>：点一下就算付了，不动任何真钱</h3>
+     * 全仓没有支付网关。它存在是因为 {@code POINTS_CASH} 那条路在此之前是死路 ——
+     * 订单落在 0-待支付，没有任何东西能把它推到 10-待履约，必然被超时 job 取消。
+     *
+     * <p>🔴 假支付<b>配到生产会启动失败</b>（{@code MallPayService.checkTransport}）。
+     * 接了真网关之后，回调落到的是同一个方法 —— 差别只在「凭什么认为付过了」。
+     *
+     * <p>{@code memberId} 由<b>调用方从登录态取</b>并进校验条件。
+     * 少了它就是「可以支付别人的订单」。
+     */
+    @PostExchange("/order/{orderNo}/pay")
+    MallPayResult pay(@PathVariable String orderNo, @RequestParam Long memberId);
+
     /* ---------------- 收货地址簿 ---------------- */
 
     /**

@@ -16,6 +16,8 @@ import solvela.mall.MallFavorite;
 import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
 import solvela.mall.order.service.MallRedeemService;
+import solvela.mall.pay.MallPayService;
+import solvela.marketing.api.MallPayResult;
 import solvela.mall.constant.MallConst;
 import solvela.mall.constant.MallSkuAttrs;
 import solvela.mall.category.manager.MallCategoryManager;
@@ -77,6 +79,7 @@ public class MallClientFacade implements MallApi {
     private final MallExchangeLimitManager mallExchangeLimitManager;
     private final MallAddressService mallAddressService;
     private final MallRedeemService mallRedeemService;
+    private final MallPayService mallPayService;
 
     /* ---------------- 分类 ---------------- */
 
@@ -326,6 +329,10 @@ public class MallClientFacade implements MallApi {
      * 那一段有明确的步骤顺序与回滚语义，不该被混进这个装配门面。
      */
     @Override
+    public MallPayResult pay(String orderNo, Long memberId) {
+        return mallPayService.pay(orderNo, memberId);
+    }
+
     public MallRedeemResult redeem(MallRedeemCmd cmd) {
         return mallRedeemService.redeem(cmd);
     }

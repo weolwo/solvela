@@ -9,6 +9,8 @@ import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.marketing.api.MallApi;
+import solvela.marketing.api.MallPayReason;
+import solvela.marketing.api.MallPayResult;
 import solvela.marketing.api.MallRedeemCmd;
 import solvela.marketing.api.MallRedeemReason;
 import solvela.marketing.api.MallRedeemResult;
@@ -26,6 +28,38 @@ import solvela.marketing.api.MallRedeemResult;
 public class RedeemService {
 
     private final MallApi mallApi;
+
+    /**
+     * 支付一笔待支付的订单。
+     *
+     * <h3>⚠️ 今天这背后是<b>假支付</b>：点一下就算付了，不动任何真钱</h3>
+     * 它存在是因为 {@code POINTS_CASH} 那条路在此之前是死路 —— 订单落在待支付，
+     * 没有任何东西能把它推到待履约，必然被超时 job 取消。
+     *
+     * <p>🔴 假支付配到生产会<b>启动失败</b>，拦在域那一侧
+     *（{@code MallPayService.checkTransport}），不靠这一层记得。
+     */
+    public RedeemResultView pay(Long memberId, String orderNo) {
+        MallPayResult result = mallApi.pay(orderNo, memberId);
+        if (!result.accepted()) {
+            throw translatePay(result.reason());
+        }
+        // 付完就是待履约。措辞和下单成功那一条保持一致，用户读到的是同一句话
+        return new RedeemResultView(result.orderNo(), MallOrderStatusEnum.PENDING.getValue(),
+                message(MallOrderStatusEnum.PENDING));
+    }
+
+    private static ApiException translatePay(MallPayReason reason) {
+        return switch (reason) {
+            // 不存在和不是你的合并成一句 —— 分开的话这个接口能用来探测别人的订单号
+            case ORDER_NOT_FOUND -> new ApiException(ApiErrors.NOT_FOUND, "订单不存在");
+            case ORDER_NOT_PAYABLE ->
+                    new ApiException(ApiErrors.CONFLICT, "这单已经不能支付了，请回订单列表看看");
+            // 功能没做，不是坏了 —— 如实说，别让用户以为是自己操作有问题
+            case PAY_NOT_AVAILABLE ->
+                    new ApiException(ApiErrors.CONFLICT, "在线支付暂未开放，该订单暂时无法支付");
+        };
+    }
 
     public RedeemResultView redeem(Long memberId, RedeemRequest request) {
         MallRedeemResult result = mallApi.redeem(new MallRedeemCmd(
@@ -95,8 +129,6 @@ public class RedeemService {
              */
             case COUPON_UNUSABLE ->
                     new ApiException(ApiErrors.CONFLICT, "这张券用不了了，请换一张或不使用优惠券");
-            case COUPON_NOT_SUPPORTED ->
-                    new ApiException(ApiErrors.CONFLICT, "该商品暂不支持使用优惠券");
             case INTERNAL -> {
                 // 这是我们自己的问题，用户没有任何办法让它发生，所以必须留痕
                 log.error("【兑换】域侧返回 INTERNAL —— 去营销服务的日志里找真正的原因");

@@ -163,11 +163,11 @@ public class MallRedeemService {
          * ④ 用券。放在占限购之后、扣款之前 ——
          *    它和库存、限购是同一类「已占资源」，失败要一起回滚。
          */
-        CouponUse couponUse = applyCoupon(cmd, commodity, orderNo, originalPoints, hangs);
+        CouponUse couponUse = applyCoupon(cmd, commodity, sku, orderNo, originalPoints, quantity, hangs);
         if (couponUse.problem() != null) {
             return reject(couponUse.problem());
         }
-        int payPoints = originalPoints - couponUse.discountPoints();
+        int payPoints = originalPoints - couponUse.discountPoints(hangs);
 
         MallRedeemReason debitProblem = debitPoints(cmd.memberId(), commodity, orderNo, payPoints);
         if (debitProblem != null) {
@@ -176,8 +176,11 @@ public class MallRedeemService {
 
         MallOrder order = buildOrder(cmd, commodity, sku, quantity, orderNo, payPoints, hangs, address);
         order.setCouponId(couponUse.couponId());
-        order.setCouponDiscount(couponUse.couponId() == null
-                ? null : BigDecimal.valueOf(couponUse.discountPoints()));
+        order.setCouponDiscount(couponUse.couponId() == null ? null : couponUse.discount());
+        if (couponUse.couponId() != null && hangs) {
+            // 抵现金：实付现金 = 原本的应付现金 - 抵扣。不能减成负数
+            order.setPayCash(order.getPayCash().subtract(couponUse.discount()).max(BigDecimal.ZERO));
+        }
         mallOrderManager.save(order);
 
         confirmCouponIfSettled(order, couponUse);
@@ -192,12 +195,17 @@ public class MallRedeemService {
      * @param couponId       锁上的券；没用券时为 null
      * @param discountPoints 抵扣掉的积分。没用券时为 0
      */
-    private record CouponUse(Long couponId, int discountPoints, MallRedeemReason problem) {
+    private record CouponUse(Long couponId, BigDecimal discount, MallRedeemReason problem) {
 
-        static final CouponUse NONE = new CouponUse(null, 0, null);
+        static final CouponUse NONE = new CouponUse(null, BigDecimal.ZERO, null);
 
         static CouponUse rejected(MallRedeemReason problem) {
-            return new CouponUse(null, 0, problem);
+            return new CouponUse(null, BigDecimal.ZERO, problem);
+        }
+
+        /** 抵掉的积分。抵现金的券在这里是 0 —— 积分那一部分没被动过 */
+        int discountPoints(boolean deductsCash) {
+            return deductsCash ? 0 : discount.intValue();
         }
     }
 
@@ -208,32 +216,37 @@ public class MallRedeemService {
      * 客户端只说「用哪张券」。让它传抵扣额，「减多少」就成了客户端说了算 ——
      * 那是一个可以直接刷钱的口子，而且不会有任何报错。
      *
-     * <h3>⚠️ 阶段 4 只做「券抵扣积分」</h3>
-     * {@code POINTS_CASH} 落的是<b>待支付</b>单，而支付回调至今一行代码都没有 ——
-     * 于是没有任何地方能把券从「锁定中」推到「已使用」。放开的话表现会是：
-     * 用户付了钱，券被兜底任务放回券包，这一单等于白给了折扣。
-     * 等假支付做出来（方案阶段 6）再放开。
+     * <h3>🔴 抵积分还是抵现金，<b>由订单的付款方式决定</b>（2026-09-15 阶段 6）</h3>
+     * 纯积分单抵积分；{@code POINTS_CASH} 单抵<b>现金</b> —— 现金是用户真正掏出去的
+     * 那一部分，折扣落在那里才是用户能感知到的优惠。
      *
-     * <p>{@code deduct_target = CASH} 的券同理：全仓没有支付链路，抵不了现金。
-     * 试算入参写死 {@code SCORE}，那些券会带着
-     * {@code DEDUCT_TARGET_MISMATCH} 回到不可用列表里 —— <b>用户仍然看得见它们</b>。
+     * <p>⚠️ 这条规则的代价是：{@code SCORE} 券在 {@code POINTS_CASH} 单上用不了
+     *（会带着 {@code DEDUCT_TARGET_MISMATCH} 出现在不可用列表里，用户仍然看得见）。
+     * 要让两种券都能用在混合单上，就得先回答「先抵哪一部分」「能不能两部分都抵」——
+     * 那和「券叠加」是同一类没有标准答案的产品问题，需要产品定，
+     * 而它们每一个都能造出资损。所以这里选了一条<b>确定的、说得清的</b>规则。
+     *
+     * <p>阶段 4 曾经<b>完全禁止</b> {@code POINTS_CASH} 用券，因为那时没有任何地方
+     * 能把券从「锁定中」推到「已使用」—— 券会被兜底任务放回去，这一单白给折扣。
+     * 阶段 6 的假支付（{@code MallPayService}）补上了那个确认点，所以这里放开了。
      */
-    private CouponUse applyCoupon(MallRedeemCmd cmd, MallCommodity commodity,
-                                  String orderNo, int originalPoints, boolean hangs) {
+    private CouponUse applyCoupon(MallRedeemCmd cmd, MallCommodity commodity, MallSku sku,
+                                  String orderNo, int originalPoints, int quantity, boolean hangs) {
         if (cmd.couponId() == null) {
             return CouponUse.NONE;
         }
-        if (hangs) {
-            return CouponUse.rejected(MallRedeemReason.COUPON_NOT_SUPPORTED);
-        }
-        if (originalPoints <= 0) {
-            // 0 分商品用券没有意义，而且会算出一张「减 0」的核销流水
+
+        // 混合支付单抵现金，纯积分单抵积分
+        BigDecimal payAmount = hangs
+                ? resolveCash(sku, commodity).multiply(BigDecimal.valueOf(quantity))
+                : BigDecimal.valueOf(originalPoints);
+        if (payAmount.signum() <= 0) {
+            // 0 元 / 0 分的商品用券没有意义，而且会算出一张「减 0」的核销流水
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
 
-        BigDecimal payAmount = BigDecimal.valueOf(originalPoints);
         CouponTrialView trial = couponQueryApi.trial(new CouponTrialQuery(
-                cmd.memberId(), payAmount, "SCORE",
+                cmd.memberId(), payAmount, hangs ? "CASH" : "SCORE",
                 commodity.getCommodityCode(), String.valueOf(commodity.getCategoryId()), null));
 
         // 只认用户点的那一张：试算的推荐是给页面看的，下单要用的是用户实际选的
@@ -247,21 +260,21 @@ public class MallRedeemService {
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
 
-        int discountPoints = chosen.discountAmount().intValue();
-        if (discountPoints <= 0) {
+        BigDecimal discount = chosen.discountAmount();
+        if (discount == null || discount.signum() <= 0) {
             // 算出来减 0，用券就没有意义 —— 让它落单反而会在券包里留下一张「已使用」的空账
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
 
         CouponWriteOffView locked = couponWriteOffApi.lock(new CouponLockCmd(
                 cmd.couponId(), cmd.memberId(), BIZ_TYPE_COUPON, orderNo, null,
-                payAmount, BigDecimal.valueOf(discountPoints)));
+                payAmount, discount));
         if (!locked.ok()) {
             // 试算到锁定之间的窗口里被另一笔单抢走了。对用户就是「这张券用不了，换一张」
             log.info("【商城用券】券 {} 锁不上：{}，订单 {}", cmd.couponId(), locked.message(), orderNo);
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
-        return new CouponUse(cmd.couponId(), discountPoints, null);
+        return new CouponUse(cmd.couponId(), discount, null);
     }
 
     /**

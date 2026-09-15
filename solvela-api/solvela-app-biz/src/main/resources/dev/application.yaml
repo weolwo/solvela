@@ -43,6 +43,13 @@ spring:
 # 2026-08-31 随 solvela-app-member 撤销搬过来
 # ---------------------------------------------------------------------------
 solvela:
+  mall:
+    pay:
+      # 🔴 假支付：点「去支付」立刻算成功，【不动任何真钱】。
+      #    只有非生产环境能配这个值 —— 配到生产会启动失败（MallPayService.checkTransport）。
+      #    它存在是因为 POINTS_CASH 那条路在此之前是死路：订单落在待支付，
+      #    没有任何东西能把它推到待履约，必然被超时任务取消。
+      transport: FAKE
   member:
     session:
       token-ttl: 30d

@@ -101,6 +101,26 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
     int markFailed(@Param("orderNo") String orderNo, @Param("failReason") String failReason);
 
     /**
+     * 待支付(0) → 待履约(10)，落支付时间。<b>支付的幂等闸门。</b>
+     *
+     * <p>🔴 {@code AND status = 0} 和 {@code markCancelled} 里那个是<b>同一把闸的两侧</b>：
+     * 用户正在支付、超时 job 同时到点，两边都想改这一行。带上它之后只有一个能改成功。
+     *
+     * <p>谁赢都对，而且两边的后续动作都必须跟着这个结果走：
+     * 支付赢了 → job 拿到 0 行，整单放弃补偿（否则会给一个刚支付成功的订单退积分）；
+     * job 赢了 → 支付拿到 0 行，必须<b>原路退款</b>而不是假装成功
+     *（今天是假支付，没有真钱要退；接了真网关之后这里就是退款的入口）。
+     *
+     * @return 1 表示本次成功付掉（可以继续转库存、确认券、投履约），0 表示已被别人改过
+     */
+    @Update("""
+            UPDATE t_mall_order
+               SET status = 10, pay_time = NOW()
+             WHERE order_no = #{orderNo} AND status = 0
+            """)
+    int markPaid(@Param("orderNo") String orderNo);
+
+    /**
      * 待支付(0) → 已取消(40)。<b>超时释放 job 唯一的闸门。</b>
      *
      * <p>🔴 {@code AND status = 0} 不是防御性写法，是<b>并发闸</b>：

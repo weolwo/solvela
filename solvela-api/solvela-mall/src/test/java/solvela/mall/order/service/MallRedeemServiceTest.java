@@ -531,19 +531,29 @@ class MallRedeemServiceTest {
     }
 
     @Test
-    @DisplayName("⚠️ 积分+现金暂不支持用券：没有支付回调，券会被兜底任务放回去")
-    void 待支付单不支持用券() {
+    @DisplayName("🔴 积分+现金单：券抵的是【现金】，不是积分（阶段 6）")
+    void 混合支付单用券抵现金() {
         commodity.setPayType(MallPayTypeEnum.POINTS_CASH);
-        commodity.setCashPrice(new BigDecimal("9.90"));
+        commodity.setCashPrice(new BigDecimal("50.00"));
+        stubCouponUsable(10);
 
         MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
 
-        /*
-         * 放开的话表现是：用户付了钱，券被兜底任务放回券包，这一单等于白给了折扣。
-         * 等假支付做出来（方案阶段 6）再放开。
-         */
-        assertEquals(MallRedeemReason.COUPON_NOT_SUPPORTED, result.reason());
-        verify(couponQueryApi, never()).trial(any());
+        ArgumentCaptor<CouponTrialQuery> trialCaptor = ArgumentCaptor.forClass(CouponTrialQuery.class);
+        verify(couponQueryApi).trial(trialCaptor.capture());
+        MallOrder order = savedOrder();
+        assertAll(
+                () -> assertTrue(result.accepted()),
+                // 抵扣对象按【订单的付款方式】定：混合单抵现金 —— 那是用户真正掏出去的部分
+                () -> assertEquals("CASH", trialCaptor.getValue().deductTarget()),
+                () -> assertEquals(0, new BigDecimal("50.00").compareTo(trialCaptor.getValue().payAmount())),
+                // 现金被减掉，积分【一分没动】
+                () -> assertEquals(0, new BigDecimal("40.00").compareTo(order.getPayCash())),
+                () -> assertEquals(5000, order.getPayPoints()),
+                () -> assertEquals(0, new BigDecimal("10").compareTo(order.getCouponDiscount())));
+
+        // 混合单落的是待支付，券要等【付款】那一刻才确认 —— 这里不该确认
+        verify(couponWriteOffApi, never()).confirm(any());
     }
 
     @Test

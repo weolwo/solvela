@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+
+import { ApiError } from '@/api/errors'
+import { payOrder } from '@/api/mall'
 import { fetchExchangeRecords } from '@/api/records'
 import { useAsync } from '@/composables/useAsync'
 
@@ -26,6 +30,37 @@ import { useAsync } from '@/composables/useAsync'
  */
 
 const orders = useAsync(fetchExchangeRecords)
+
+/**
+ * 「去支付」。
+ *
+ * ⚠️ 后端今天是**假支付**：点一下就算付了，不动任何真钱。
+ * 前端这一侧不做任何环境判断 —— 那道闸在后端（配到生产会启动失败），
+ * 判断散在两处的话总有一处会忘。
+ *
+ * 🔴 付完必须**重拉整页**，不能本地把这一单改成「待履约」：
+ * 这一单可能刚好被超时 job 取消了、库存也可能变了，本地猜一个状态
+ * 只会让用户看到一个和服务端不一致的页面，而他会按那个去做下一步。
+ */
+const paying = ref<string | null>(null)
+const payError = ref('')
+
+async function onPay(orderNo: string): Promise<void> {
+  if (paying.value !== null) {
+    return
+  }
+  paying.value = orderNo
+  payError.value = ''
+  try {
+    await payOrder(orderNo)
+    await orders.reload()
+  } catch (error) {
+    // 「这单已经不能支付了」是预期内的（超时取消 / 已付过），按人话提示
+    payError.value = error instanceof ApiError ? error.message : '支付失败，请稍后再试'
+  } finally {
+    paying.value = null
+  }
+}
 </script>
 
 <template>
@@ -81,6 +116,24 @@ const orders = useAsync(fetchExchangeRecords)
           <div class="order__foot">
             <span class="order__no">单号 {{ order.orderNo }}</span>
             <span class="order__time">{{ order.createTime }}</span>
+          </div>
+
+          <!--
+            待支付才画这个按钮，而「能不能支付」是【服务端】给的 payable ——
+            前端按 status 自己推的话，状态机改一次就会有一个端开始给出错的按钮。
+          -->
+          <div v-if="order.payable" class="order__pay">
+            <p v-if="payError !== '' && paying === null" class="order__pay-error" role="alert">
+              {{ payError }}
+            </p>
+            <Button
+              size="small"
+              :loading="paying === order.orderNo"
+              :disabled="paying !== null"
+              @click="onPay(order.orderNo)"
+            >
+              去支付
+            </Button>
           </div>
         </Card>
       </Section>
@@ -184,6 +237,21 @@ const orders = useAsync(fetchExchangeRecords)
  * 状态做成小胶囊而不是一行彩色字 —— 与优惠记录同一个处理。
  * 一行彩字在卡片里会和数量抢注意力，而胶囊读起来是「一个标签」。
  */
+.order__pay {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sv-space-sm);
+  margin-top: var(--sv-space-sm);
+}
+
+.order__pay-error {
+  flex: 1;
+  margin: 0;
+  font-size: var(--sv-font-footnote);
+  color: var(--sv-color-danger);
+}
+
 .order__status {
   padding: 1px 8px;
   border-radius: var(--sv-radius-pill);

@@ -45,6 +45,14 @@ export interface OrderItem {
   status: 'PENDING' | 'DONE' | 'FAILED'
   /** 状态之外还要说的那句（「积分未退回」）。没有就是 null，别画那一行 */
   hint: string | null
+  /**
+   * 能不能点「去支付」。
+   *
+   * 🔴 由**服务端**判，前端不要按 status 自己推 ——
+   * 「哪些状态可以支付」是状态机的一部分，各端各推一份的话，
+   * 状态机改一次就会有一个端开始给出错的按钮。
+   */
+  payable: boolean
   createTime: string
 }
 

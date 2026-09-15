@@ -13,6 +13,7 @@ import solvela.marketing.api.MallCommodityPageCmd;
 import solvela.marketing.api.MallCommodityPageView;
 import solvela.marketing.api.MallOrderView;
 import solvela.marketing.api.MallRedeemCmd;
+import solvela.marketing.api.MallPayResult;
 import solvela.marketing.api.MallRedeemResult;
 
 import java.util.List;
@@ -72,6 +73,11 @@ public class MallInternalController implements MallApi {
     @Override
     public List<MallOrderView> listMyOrders(Long memberId, int limit) {
         return mallClientFacade.listMyOrders(memberId, limit);
+    }
+
+    @Override
+    public MallPayResult pay(String orderNo, Long memberId) {
+        return mallClientFacade.pay(orderNo, memberId);
     }
 
     @Override

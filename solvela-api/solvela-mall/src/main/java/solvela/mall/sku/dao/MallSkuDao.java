@@ -64,6 +64,27 @@ public interface MallSkuDao extends BaseMapper<MallSku> {
             """)
     int lock(@Param("skuId") Long skuId, @Param("quantity") int quantity);
 
+    /**
+     * 支付成功：把<b>锁定</b>的那份转成<b>已售</b>。
+     *
+     * <p>🔴 必须是一条 UPDATE 里同时减 {@code locked_stock}、加 {@code sold_count}。
+     * 拆成两条的话中间那一瞬间库存是虚高的 —— 另一笔单会在那一刻抢到本不存在的货，
+     * 而超卖出来的那一件要等发货时才被发现。
+     *
+     * <p>{@code locked_stock >= qty} 防止减成负数：如果这一单的锁定已经被超时 job
+     * 放回去了，这里会影响 0 行 —— 调用方据此知道「这单其实已经不算数了」。
+     *
+     * @return 1 表示转成功，0 表示锁定份额已经不在了
+     */
+    @Update("""
+            UPDATE t_mall_sku
+               SET locked_stock = locked_stock - #{quantity},
+                   sold_count = sold_count + #{quantity}
+             WHERE id = #{skuId}
+               AND locked_stock >= #{quantity}
+            """)
+    int confirmLocked(@Param("skuId") Long skuId, @Param("quantity") int quantity);
+
     /** 取消 / 超时释放：把锁定的放回去。{@code locked_stock >= qty} 防止减成负数 */
     @Update("""
             UPDATE t_mall_sku

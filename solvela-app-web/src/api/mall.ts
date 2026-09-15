@@ -245,7 +245,6 @@ export type RedeemRejectReason =
   | 'ADDRESS_REQUIRED'
   | 'ADDRESS_NOT_FOUND'
   | 'COUPON_UNUSABLE'
-  | 'COUPON_NOT_SUPPORTED'
 
 export interface RedeemRequest {
   skuId: Id
@@ -410,4 +409,20 @@ export function toggleFavorite(commodityId: Id, favorite: boolean): Promise<void
  */
 export function redeem(payload: RedeemRequest): Promise<RedeemResult> {
   return request<RedeemResult>({ url: '/mall/redeem', method: 'POST', data: payload })
+}
+
+/**
+ * 支付一笔待支付的订单。
+ *
+ * ⚠️ **今天背后是假支付**：点一下就算付了，不动任何真钱。
+ * 它存在是因为 `POINTS_CASH` 那条路在此之前是死路 —— 订单落在待支付，
+ * 没有任何东西能把它推到待履约，必然被超时 job 取消。
+ *
+ * 🔴 假支付配到生产会让**服务启动失败**，那道闸在后端。前端这一侧
+ * 不做任何环境判断 —— 判断散在两处的话，总有一处会忘。
+ *
+ * <p>单子已被超时取消、或者已经付过，都会回 4xx 带一句人话，按 message 提示即可。
+ */
+export function payOrder(orderNo: string): Promise<RedeemResult> {
+  return request<RedeemResult>({ url: `/mall/order/${orderNo}/pay`, method: 'POST' })
 }

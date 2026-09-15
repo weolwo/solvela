@@ -48,6 +48,8 @@ public class OrderService {
                 statusText(order.status()),
                 status(order.status()),
                 hint(order.status()),
+                // 只有待支付能点「去支付」。这一判断留在服务端，端上不自己推
+                MallOrderStatusEnum.UNPAID == order.status(),
                 format(order.createTime()));
     }
 
