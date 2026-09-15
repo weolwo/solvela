@@ -50,6 +50,14 @@ solvela:
       #    它存在是因为 POINTS_CASH 那条路在此之前是死路：订单落在待支付，
       #    没有任何东西能把它推到待履约，必然被超时任务取消。
       transport: FAKE
+  external:
+    recharge:
+      # 🔴 假充值：下单、扣券、标成功，【但话费不会到账】。
+      #    只有非生产环境能配这个值 —— 配到生产会启动失败
+      #    （ExternalRechargeService.checkTransport）。
+      #    它比假支付还危险一档：用户花了钱、券也用了、系统说成功，
+      #    而每一张表看起来都正常，用户要查话费余额才发现。
+      transport: FAKE
   member:
     session:
       token-ttl: 30d
