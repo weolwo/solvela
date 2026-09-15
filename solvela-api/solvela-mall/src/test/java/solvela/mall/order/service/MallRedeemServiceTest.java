@@ -30,12 +30,20 @@ import solvela.marketing.api.MallRedeemCmd;
 import solvela.marketing.api.MallRedeemReason;
 import solvela.marketing.api.MallRedeemResult;
 import solvela.member.api.AssetDebitApi;
+import solvela.member.api.CouponLockCmd;
+import solvela.member.api.CouponQueryApi;
+import solvela.member.api.CouponTrialQuery;
+import solvela.member.api.CouponTrialView;
+import solvela.member.api.CouponWriteOffApi;
+import solvela.member.api.CouponWriteOffCmd;
+import solvela.member.api.CouponWriteOffView;
 import solvela.member.api.AssetDebitCmd;
 import solvela.member.api.AssetDebitReason;
 import solvela.member.api.AssetDebitResult;
 import solvela.member.service.MemberService;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -53,6 +61,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -111,9 +120,15 @@ class MallRedeemServiceTest {
     @Mock
     private AssetDebitApi assetDebitApi;
     @Mock
+    private CouponQueryApi couponQueryApi;
+    @Mock
+    private CouponWriteOffApi couponWriteOffApi;
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private MallRedeemService service;
+
+    private static final Long COUPON_ID = 777L;
 
     private MallCommodity commodity;
     private MallSku sku;
@@ -122,7 +137,7 @@ class MallRedeemServiceTest {
     void setUp() {
         service = spy(new MallRedeemService(mallCommodityManager, mallSkuManager, mallSkuDao,
                 mallExchangeLimitDao, mallOrderManager, mallAddressService, memberService,
-                assetDebitApi, eventPublisher));
+                assetDebitApi, couponQueryApi, couponWriteOffApi, eventPublisher));
         // 没有活动事务，真调会抛 NoTransactionException；spy 成空实现后它变成一次可断言的调用
         doNothing().when(service).markRollbackOnly();
 
@@ -252,7 +267,7 @@ class MallRedeemServiceTest {
     @Test
     @DisplayName("数量夹在 1..20：null/0 当 1，超上限截到 20")
     void 数量夹取() {
-        service.redeem(new MallRedeemCmd(MEMBER_ID, SKU_ID, null, null));
+        service.redeem(MallRedeemCmd.withoutCoupon(MEMBER_ID, SKU_ID, null, null));
         verify(mallSkuDao).sell(SKU_ID, 1);
 
         reset();
@@ -318,7 +333,7 @@ class MallRedeemServiceTest {
         commodity.setCommodityType("PHYSICAL");
 
         assertRejectedWithoutTouchingAnything(
-                service.redeem(new MallRedeemCmd(MEMBER_ID, SKU_ID, 1, null)),
+                service.redeem(MallRedeemCmd.withoutCoupon(MEMBER_ID, SKU_ID, 1, null)),
                 MallRedeemReason.ADDRESS_REQUIRED);
     }
 
@@ -428,8 +443,136 @@ class MallRedeemServiceTest {
         assertRolledBackAndNothingCommitted();
     }
 
+    // ------------------------------------------------------------------ 用券（阶段 4）
+
+    @Test
+    @DisplayName("🔴 用券：实付 = 原价 - 抵扣，券在扣款【之前】锁上，落单后确认")
+    void 用券抵扣积分() {
+        stubCouponUsable(1000);
+
+        MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
+
+        assertTrue(result.accepted());
+        MallOrder order = savedOrder();
+        assertAll(
+                // 5000 分的商品，券减 1000 → 实付 4000
+                () -> assertEquals(4000, order.getPayPoints()),
+                () -> assertEquals(COUPON_ID, order.getCouponId()),
+                () -> assertEquals(0, new BigDecimal("1000").compareTo(order.getCouponDiscount())),
+                // 扣的是抵扣后的钱。扣原价的话券等于白用了，而且不报错
+                () -> assertEquals(0, new BigDecimal("4000").compareTo(debitAmount())));
+
+        // 锁券必须在扣款之前：它和库存、限购是同一类「已占资源」，失败要一起回滚
+        InOrder ordered = inOrder(couponWriteOffApi, assetDebitApi, mallOrderManager);
+        ordered.verify(couponWriteOffApi).lock(any());
+        ordered.verify(assetDebitApi).debit(any());
+        ordered.verify(mallOrderManager).save(any(MallOrder.class));
+    }
+
+    @Test
+    @DisplayName("🔴 抵扣额是服务端重新试算的，客户端连这个字段都没有")
+    void 抵扣额由服务端算() {
+        stubCouponUsable(1000);
+
+        service.redeem(cmdWithCoupon(COUPON_ID));
+
+        ArgumentCaptor<CouponLockCmd> captor = ArgumentCaptor.forClass(CouponLockCmd.class);
+        verify(couponWriteOffApi).lock(captor.capture());
+        // 让客户端报「减多少」就是一个可以直接刷钱的口子，而且不会有任何报错
+        assertEquals(0, new BigDecimal("1000").compareTo(captor.getValue().discountAmount()));
+        // 抵扣前金额也要落进流水，否则退款不知道退多少、财务对不了账
+        assertEquals(0, new BigDecimal("5000").compareTo(captor.getValue().payAmount()));
+    }
+
+    @Test
+    @DisplayName("🔴 订单落成待履约 = 积分已经扣了没有回头路，这一刻就确认券")
+    void 落单后立刻确认券() {
+        stubCouponUsable(1000);
+
+        MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
+
+        ArgumentCaptor<CouponWriteOffCmd> captor = ArgumentCaptor.forClass(CouponWriteOffCmd.class);
+        verify(couponWriteOffApi).confirm(captor.capture());
+        /*
+         * 不确认的话券会一直挂在「锁定中」，兜底任务 120 分钟后把它放回去 ——
+         * 于是变成「积分扣了、折扣享了、券还在」。
+         * bizRefId 必须是订单号：条件更新是 WHERE locked_biz_id = ?
+         */
+        assertEquals(result.orderNo(), captor.getValue().bizRefId());
+    }
+
+    @Test
+    @DisplayName("券在试算里不可用 → 拒绝并回滚，不会悄悄按原价下单")
+    void 券不可用时拒绝并回滚() {
+        when(couponQueryApi.trial(any()))
+                .thenReturn(new CouponTrialView(List.of(), List.of(), null));
+
+        MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
+
+        // 悄悄按原价下单的话，用户会发现自己多花了积分而券还在 —— 那是投诉
+        assertEquals(MallRedeemReason.COUPON_UNUSABLE, result.reason());
+        assertRolledBackAndNothingCommitted();
+        verify(couponWriteOffApi, never()).lock(any());
+    }
+
+    @Test
+    @DisplayName("🔴 试算到锁定之间被别的单抢走了 → 拒绝并回滚")
+    void 券锁不上时拒绝并回滚() {
+        stubCouponUsable(1000);
+        when(couponWriteOffApi.lock(any()))
+                .thenReturn(new CouponWriteOffView(false, false, null, "券已被使用或不可用"));
+
+        MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
+
+        assertEquals(MallRedeemReason.COUPON_UNUSABLE, result.reason());
+        // 锁不上却继续扣抵扣后的钱，就是平台白送了 1000 分
+        assertRolledBackAndNothingCommitted();
+        verify(assetDebitApi, never()).debit(any());
+    }
+
+    @Test
+    @DisplayName("⚠️ 积分+现金暂不支持用券：没有支付回调，券会被兜底任务放回去")
+    void 待支付单不支持用券() {
+        commodity.setPayType(MallPayTypeEnum.POINTS_CASH);
+        commodity.setCashPrice(new BigDecimal("9.90"));
+
+        MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
+
+        /*
+         * 放开的话表现是：用户付了钱，券被兜底任务放回券包，这一单等于白给了折扣。
+         * 等假支付做出来（方案阶段 6）再放开。
+         */
+        assertEquals(MallRedeemReason.COUPON_NOT_SUPPORTED, result.reason());
+        verify(couponQueryApi, never()).trial(any());
+    }
+
+    @Test
+    @DisplayName("不用券时一次都不该碰券的接口")
+    void 不用券就不碰券接口() {
+        service.redeem(cmd(1));
+
+        verifyNoInteractions(couponQueryApi, couponWriteOffApi);
+        assertNull(savedOrder().getCouponId());
+    }
+
+    /** 让试算返回一张能减 {@code discount} 分的券，并让锁定成功 */
+    private void stubCouponUsable(int discount) {
+        CouponTrialView.Item item = new CouponTrialView.Item(
+                COUPON_ID, "测试券", BigDecimal.valueOf(discount), true, null, null, null);
+        when(couponQueryApi.trial(any()))
+                .thenReturn(new CouponTrialView(List.of(item), List.of(), item));
+        when(couponWriteOffApi.lock(any()))
+                .thenReturn(new CouponWriteOffView(true, false, BigDecimal.valueOf(discount), null));
+        when(couponWriteOffApi.confirm(any()))
+                .thenReturn(new CouponWriteOffView(true, false, BigDecimal.valueOf(discount), null));
+    }
+
     private MallRedeemCmd cmd(int quantity) {
-        return new MallRedeemCmd(MEMBER_ID, SKU_ID, quantity, ADDRESS_ID);
+        return MallRedeemCmd.withoutCoupon(MEMBER_ID, SKU_ID, quantity, ADDRESS_ID);
+    }
+
+    private MallRedeemCmd cmdWithCoupon(Long couponId) {
+        return new MallRedeemCmd(MEMBER_ID, SKU_ID, 1, ADDRESS_ID, couponId);
     }
 
     private MallOrder savedOrder() {
@@ -447,6 +590,6 @@ class MallRedeemServiceTest {
     /** 同一条用例里跑第二遍时清掉调用记录，避免 verify 撞上一轮的调用 */
     private void reset() {
         org.mockito.Mockito.clearInvocations(service, mallSkuDao, mallExchangeLimitDao,
-                assetDebitApi, mallOrderManager, eventPublisher);
+                assetDebitApi, couponQueryApi, couponWriteOffApi, mallOrderManager, eventPublisher);
     }
 }

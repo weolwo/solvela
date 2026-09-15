@@ -190,6 +190,15 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/records/PromoRecordsView.vue'),
     meta: { title: '优惠记录' },
   },
+  // ---- 我的券包：从「我的」进去。要登录（默认）----
+  //      🔴 券包里只能看，不能「用」：券什么时候被消耗掉只能由下单那条链路决定。
+  //         所以这一页没有任何按钮会改变券的状态，服务端那侧也没把核销接口接到网关上。
+  {
+    path: '/coupons',
+    name: 'coupons',
+    component: () => import('@/views/coupon/CouponWalletView.vue'),
+    meta: { title: '我的券包' },
+  },
   // ---- 我的收藏：从「我的」进去。要登录（默认）——收藏本来就是「我的」东西 ----
   {
     path: '/favorites',

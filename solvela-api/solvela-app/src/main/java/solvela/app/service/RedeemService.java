@@ -29,7 +29,8 @@ public class RedeemService {
 
     public RedeemResultView redeem(Long memberId, RedeemRequest request) {
         MallRedeemResult result = mallApi.redeem(new MallRedeemCmd(
-                memberId, request.skuId(), request.quantityOrOne(), request.addressId()));
+                memberId, request.skuId(), request.quantityOrOne(), request.addressId(),
+                request.couponId()));
 
         if (!result.accepted()) {
             throw translate(result.reason());
@@ -87,6 +88,15 @@ public class RedeemService {
             case ADDRESS_REQUIRED -> new ApiException(ApiErrors.CONFLICT, "请选择收货地址");
             case ADDRESS_NOT_FOUND ->
                     new ApiException(ApiErrors.CONFLICT, "收货地址已失效，请重新选择");
+            /*
+             * 券的几种失效原因合并成一句：过期了、被别的单锁着、已经用掉了，
+             * 对用户的下一步动作是同一个 —— 换一张。分得更细只会让文案
+             * 变成一份需要维护的状态机。要排查的话日志里有具体状态。
+             */
+            case COUPON_UNUSABLE ->
+                    new ApiException(ApiErrors.CONFLICT, "这张券用不了了，请换一张或不使用优惠券");
+            case COUPON_NOT_SUPPORTED ->
+                    new ApiException(ApiErrors.CONFLICT, "该商品暂不支持使用优惠券");
             case INTERNAL -> {
                 // 这是我们自己的问题，用户没有任何办法让它发生，所以必须留痕
                 log.error("【兑换】域侧返回 INTERNAL —— 去营销服务的日志里找真正的原因");

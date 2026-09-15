@@ -69,6 +69,17 @@ public class MallOrderDTO {
     /** 实付现金合计 */
     private BigDecimal payCash;
 
+    /** 用掉的会员券 id，null = 没用券 */
+    private Long couponId;
+
+    /**
+     * 券抵扣了多少。
+     *
+     * <p>订单详情要显示「原价 5000 分，券减 1000 分，实付 4000 分」——
+     * 原价从 {@code pointsPrice × quantity} 算，不另存一份。
+     */
+    private BigDecimal couponDiscount;
+
     /** 收货地址id(软引用t_mall_address)，仅PHYSICAL有值。收件信息快照在t_physical_delivery，不在本表 */
     private Long addressId;
 

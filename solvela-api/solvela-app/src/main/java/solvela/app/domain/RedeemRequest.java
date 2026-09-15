@@ -18,6 +18,9 @@ import jakarta.validation.constraints.NotNull;
  *                  {@code t_member_asset_transaction} 的唯一键上。
  * @param quantity  件数。不传等于 1。上限在服务端，这里也卡一道 ——
  *                  一个 {@code quantity=99999} 不该走到域里去
+ * @param couponId  要用的券，不用券不传。
+ *                  <p>🔴 <b>刻意没有「抵扣多少」这个字段</b>：客户端只说用哪张，
+ *                  减多少由服务端重新试算。让客户端报数就是一个直接刷钱的口子。
  */
 public record RedeemRequest(
         @NotBlank(message = "缺少请求标识") String requestId,
@@ -25,7 +28,8 @@ public record RedeemRequest(
         @Min(value = 1, message = "兑换件数至少为 1")
         @Max(value = 20, message = "一次最多兑 20 件")
         Integer quantity,
-        Long addressId) {
+        Long addressId,
+        Long couponId) {
 
     /** 不传等于 1。校验注解对 null 不生效，所以归一放在这里 */
     public int quantityOrOne() {

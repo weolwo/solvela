@@ -165,6 +165,23 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
     int releaseCoupon(@Param("couponId") Long couponId, @Param("bizRefId") String bizRefId);
 
     /**
+     * 券包：按 tab 取会员的券。
+     *
+     * <p>tab 的划分和 {@code status} <b>不是一一对应</b>：
+     * 「可用」既要排除已用已过期，也要排除<b>正被某一笔订单锁着</b>的（status=4）——
+     * 那张券此刻点不动，列进「可用」只会让用户点进去发现用不了。
+     * 「已失效」则把已过期和已作废合成一档：对用户都是「这张没了」。
+     *
+     * @param statuses 要哪些状态。由服务层按 tab 翻译，Dao 不认识 tab 这个概念
+     * @param now      数据库时钟。可用 tab 还要按有效期再筛一次 —— 过期收口任务
+     *                 每天才跑一次，中间那段时间里 status 还是 0 但券其实已经过期了
+     */
+    List<MemberCoupon> selectWallet(@Param("memberId") Long memberId,
+                                    @Param("statuses") List<Integer> statuses,
+                                    @Param("excludeExpired") boolean excludeExpired,
+                                    @Param("now") java.time.LocalDateTime now);
+
+    /**
      * 卡在「锁定中」超过 {@code before} 的券。给兜底释放任务用。
      *
      * <p>⚠️ 这里<b>判不了对应单据是不是已经终态</b> —— 账务域不能依赖商城域

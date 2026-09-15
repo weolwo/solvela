@@ -17,6 +17,7 @@ import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.MallApi;
 import solvela.marketing.api.PrizeRecordApi;
 import solvela.member.api.AssetApi;
+import solvela.member.api.CouponQueryApi;
 import solvela.member.api.DeviceApi;
 import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.MemberAuthApi;
@@ -83,6 +84,23 @@ public class DownstreamClientConfig {
     @Bean
     public AssetApi assetApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(1), AssetApi.class);
+    }
+
+    /**
+     * 券包与选券试算。<b>2 秒</b>：券包是按 member_id 的索引扫描，
+     * 比余额那种主键点查重，但比商品列表轻。
+     *
+     * <p>🔴 这里只代理<b>只读</b>的 {@link CouponQueryApi}。
+     * 核销那一半（{@code CouponWriteOffApi}）能直接消耗用户的券，
+     * 网关这一侧<b>刻意连代理 bean 都没有</b> —— 券什么时候被用掉，
+     * 只能由下单那条链路决定，不能由公网入口决定。
+     *
+     * <p>契约在 {@code solvela-member-api}：券是资产，将来和会员同属 app-member 服务。
+     * 今天它和营销跑在同一个 app-biz 进程里，所以 base-url 复用 marketing 那个。
+     */
+    @Bean
+    public CouponQueryApi couponQueryApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(2), CouponQueryApi.class);
     }
 
     /**

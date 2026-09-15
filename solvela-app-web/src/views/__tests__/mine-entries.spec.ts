@@ -38,6 +38,8 @@ vi.mock('@/api/notification', () => ({
 /** 这一页上应该存在的入口：路由名 → 给人看的名字 */
 const ENTRIES: [string, string][] = [
   ['messages', '消息'],
+  // 2026-09-15 阶段 4：券第一次能被用掉了。找不到券的话，能用也等于没有
+  ['coupons', '我的券包'],
   ['records-exchange', '兑换记录'],
   ['records-promo', '优惠记录'],
   ['favorites', '我的收藏'],

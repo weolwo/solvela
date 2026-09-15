@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { type Address, fetchAddresses, formatAddressLine } from '@/api/address'
 import { fetchAssets } from '@/api/assets'
+import { type CouponTrialItem, trialCoupons } from '@/api/coupons'
 import { ApiError } from '@/api/errors'
 import { fetchCommodityDetail, OrderStatus, redeem, type RedeemResult } from '@/api/mall'
 import { useAsync } from '@/composables/useAsync'
@@ -128,9 +129,88 @@ function goPickAddress(): void {
   })
 }
 
+/* ---- 选券 ---- */
+/*
+ * 🔴 试算是【服务端】算的，这一页一个金额都不重算。
+ *
+ *    前端自己按券面规则算一遍看着很省一次请求，但那段逻辑（门槛、封顶、
+ *    不能超过应付、向下取整）在服务端也有一份 —— 两份迟早不一致，
+ *    而不一致的表现是「页面显示减 30，实际扣的时候只减了 20」。
+ *
+ * ⚠️ 试算结果不是承诺：从这里到点确认之间，券可能在另一个端上被用掉。
+ *    真正作数的是下单时服务端重新试算并锁定的那一次，
+ *    所以下单请求里只有「用哪张」，没有「减多少」。
+ */
+/*
+ * 这里<b>没有</b>用 useAsync：那个composable 一构造就发请求，
+ * 而 sku 要等商品详情回来才知道 —— 立刻发一次等于带着空 skuId 去问一遍。
+ * 触发时机由下面那个 watch 管。
+ */
+const usableCoupons = ref<CouponTrialItem[]>([])
+const unusableCoupons = ref<CouponTrialItem[]>([])
+const trialLoading = ref(false)
+
+/** 用户选中的券。null = 不使用优惠券，这是默认 */
+const chosenCouponId = ref<Id | null>(null)
+const couponPickerOpen = ref(false)
+
+async function reloadTrial(skuId: Id): Promise<void> {
+  trialLoading.value = true
+  try {
+    const outcome = await trialCoupons({ commodityId, skuId, quantity: quantity.value })
+    usableCoupons.value = outcome.usable
+    unusableCoupons.value = outcome.unusable
+  } catch {
+    /*
+     * 选券挂了不该挡住兑换本身 —— 用户还是可以不用券把单下了。
+     * 静默降级成「没有可用券」，而不是把整页变成错误态。
+     */
+    usableCoupons.value = []
+    unusableCoupons.value = []
+  } finally {
+    trialLoading.value = false
+  }
+}
+
+const chosenCoupon = computed<CouponTrialItem | null>(
+  () => usableCoupons.value.find((item) => item.couponId === chosenCouponId.value) ?? null,
+)
+
+/**
+ * 规格或件数一变就重新试算 —— 门槛是按<b>整单</b>判的。
+ *
+ * 🔴 顺带把已选的券清掉：换了规格之后，原来那张可能已经不满足门槛了。
+ * 不清的话，用户会带着一张用不了的券去下单，然后被后端拒掉，
+ * 而页面上那张券还好端端地显示着「可减 1000」。
+ */
+watch(
+  [() => sku.value?.skuId, quantity],
+  ([skuId]) => {
+    chosenCouponId.value = null
+    couponPickerOpen.value = false
+    if (skuId !== undefined) {
+      void reloadTrial(skuId)
+    }
+  },
+  { immediate: true },
+)
+
+function pickCoupon(couponId: Id | null): void {
+  chosenCouponId.value = couponId
+  couponPickerOpen.value = false
+}
+
 /* ---- 账单 ---- */
-/** 实付积分 = 单价 × 件数。积分是整数，直接乘 */
-const payPoints = computed(() => (sku.value?.pointsPrice ?? 0) * quantity.value)
+/** 抵扣前的积分 = 单价 × 件数。积分是整数，直接乘 */
+const originalPoints = computed(() => (sku.value?.pointsPrice ?? 0) * quantity.value)
+
+/** 券减了多少积分。没选券就是 0 */
+const couponDiscount = computed(() =>
+  chosenCoupon.value === null ? 0 : Number(chosenCoupon.value.discountAmount),
+)
+
+/** 实付积分 = 抵扣前 - 券抵扣。服务端还会再算一遍，这里只为把话说清楚 */
+const payPoints = computed(() => Math.max(0, originalPoints.value - couponDiscount.value))
 
 /** 实付现金 = 单价 × 件数。**金额必须走 Decimal**，不许用 JS 原生乘 */
 const payCash = computed<Money>(() =>
@@ -207,6 +287,11 @@ async function onConfirm(): Promise<void> {
        * 两种错法的代价差这么远，默认方向就该是「带上」。
        */
       addressId: address.value?.addressId ?? null,
+      /*
+       * 只报「用哪张」，不报「减多少」—— 后者由服务端重新试算。
+       * 让客户端报数就是一个可以直接刷钱的口子。
+       */
+      couponId: chosenCouponId.value,
       requestId: crypto.randomUUID(),
     })
     result.value = outcome
@@ -304,11 +389,74 @@ function goRecords(): void {
           </button>
         </Section>
 
+        <!--
+          选券。
+          🔴 用不了的券也列出来，置灰 + 一句原因 ——
+             用户手里有券却在下单页看不到它，第一反应是系统坏了，
+             而真实原因往往只是「没到门槛」，那一句话能省掉一次客服。
+        -->
+        <Section
+          v-if="usableCoupons.length > 0 || unusableCoupons.length > 0"
+          title="优惠券"
+          :loading="trialLoading"
+          :error="null"
+          :empty="false"
+          empty-text=""
+        >
+          <button type="button" class="coupon-row" @click="couponPickerOpen = !couponPickerOpen">
+            <span v-if="chosenCoupon !== null" class="coupon-row__on">
+              {{ chosenCoupon.couponName }} · 减 {{ chosenCoupon.discountAmount }}
+            </span>
+            <span v-else-if="usableCoupons.length > 0" class="coupon-row__hint">
+              有 {{ usableCoupons.length }} 张可用
+            </span>
+            <span v-else class="coupon-row__muted">暂无可用券</span>
+            <Icon name="chevron" :size="18" class="coupon-row__arrow" />
+          </button>
+
+          <ul v-if="couponPickerOpen" class="picks">
+            <li>
+              <button type="button" class="pick" @click="pickCoupon(null)">
+                <span class="pick__name">不使用优惠券</span>
+                <Icon v-if="chosenCouponId === null" name="check" :size="16" />
+              </button>
+            </li>
+            <li v-for="item in usableCoupons" :key="item.couponId">
+              <button type="button" class="pick" @click="pickCoupon(item.couponId)">
+                <span class="pick__main">
+                  <span class="pick__name">{{ item.couponName }}</span>
+                  <span class="pick__save">可减 {{ item.discountAmount }} 积分</span>
+                </span>
+                <Icon v-if="chosenCouponId === item.couponId" name="check" :size="16" />
+              </button>
+            </li>
+            <!-- 不可用的：点不动，但看得见，而且说得出为什么 -->
+            <li v-for="item in unusableCoupons" :key="item.couponId">
+              <span class="pick pick--off">
+                <span class="pick__main">
+                  <span class="pick__name">{{ item.couponName }}</span>
+                  <span class="pick__why">{{ item.reasonDesc }}</span>
+                </span>
+              </span>
+            </li>
+          </ul>
+        </Section>
+
         <!-- 付出什么 -->
         <div class="bill">
           <div class="bill__row">
             <span>消耗积分</span>
             <span class="bill__value">{{ formatPoints(payPoints) }}</span>
+          </div>
+          <!--
+            抵扣单独一行，而不是把「消耗积分」直接改小。
+            直接改小的话用户看不出券生效了没有 —— 而那正是他点确认前要确认的事。
+          -->
+          <div v-if="couponDiscount > 0" class="bill__row bill__row--sub">
+            <span>券抵扣</span>
+            <span class="bill__value bill__value--cut">
+              -{{ formatPoints(couponDiscount) }}（原价 {{ formatPoints(originalPoints) }}）
+            </span>
           </div>
           <div class="bill__row bill__row--sub">
             <span>当前余额</span>
@@ -339,6 +487,101 @@ function goRecords(): void {
 </template>
 
 <style scoped>
+.coupon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--sv-space-sm);
+  padding: var(--sv-space-md);
+  border: 0;
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-bg-surface);
+  font-size: var(--sv-font-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.coupon-row__on {
+  color: var(--sv-color-primary);
+  font-weight: 500;
+}
+
+.coupon-row__hint {
+  color: var(--sv-text-primary);
+}
+
+.coupon-row__muted {
+  color: var(--sv-text-placeholder);
+}
+
+.coupon-row__arrow {
+  flex: none;
+  color: var(--sv-text-placeholder);
+}
+
+.picks {
+  margin: var(--sv-space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-bg-surface);
+  overflow: hidden;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--sv-space-sm);
+  padding: var(--sv-space-md);
+  border: 0;
+  border-top: 1px solid var(--sv-border-color);
+  background: none;
+  font-size: var(--sv-font-caption);
+  text-align: left;
+  color: var(--sv-text-primary);
+  cursor: pointer;
+}
+
+.picks > li:first-child .pick {
+  border-top: 0;
+}
+
+/* 不可用的券压暗且不可点，但【留在列表里】—— 见模板上那段红字 */
+.pick--off {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pick__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pick__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick__save {
+  font-size: var(--sv-font-footnote);
+  color: var(--sv-color-primary);
+}
+
+.pick__why {
+  font-size: var(--sv-font-footnote);
+  color: var(--sv-text-secondary);
+}
+
+.bill__value--cut {
+  color: var(--sv-color-primary);
+}
+
 .page {
   display: flex;
   flex-direction: column;

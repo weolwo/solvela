@@ -114,6 +114,27 @@ public class MallOrder {
     private BigDecimal payCash;
 
     /**
+     * 用掉的会员券 id。软引用，不加外键；{@code null} = 这一单没用券。
+     *
+     * <p>券行永远不会被物理删除（账务流水只增不改），所以悬空的风险本来就不存在，
+     * 加外键换来的只是一次跨表锁。与 {@link #addressId} 同一个做法。
+     */
+    private Long couponId;
+
+    /**
+     * 券抵扣了多少（阶段 4 只抵积分）。
+     *
+     * <p>⚠️ <b>权威在 {@code t_coupon_write_off}</b>，这里是冗余 ——
+     * 订单详情要显示「原价 5000 分，券减 1000 分，实付 4000 分」，
+     * 为这一行去 join 一张流水表，等于把每次看订单都变成一次对账。
+     *
+     * <p>🔴 三个数之间有恒等式，体检 SQL 可以直接按它找出对不上的单：
+     * {@code points_price × quantity - coupon_discount = pay_points}。
+     * 所以<b>不另加一列存原价</b> —— 多一列就多一处会不一致的地方。
+     */
+    private BigDecimal couponDiscount;
+
+    /**
      * 收货地址id(软引用t_mall_address)，仅PHYSICAL有值。收件信息快照在t_physical_delivery，不在本表
      */
     private Long addressId;

@@ -244,6 +244,8 @@ export type RedeemRejectReason =
   | 'POINTS_NOT_ENOUGH'
   | 'ADDRESS_REQUIRED'
   | 'ADDRESS_NOT_FOUND'
+  | 'COUPON_UNUSABLE'
+  | 'COUPON_NOT_SUPPORTED'
 
 export interface RedeemRequest {
   skuId: Id
@@ -251,6 +253,16 @@ export interface RedeemRequest {
   quantity: number
   /** 收货地址 id。**PHYSICAL 必填**，其余传 null */
   addressId: Id | null
+  /**
+   * 要用的券 id，不用券传 null。
+   *
+   * 🔴 <b>刻意没有「抵扣多少」这个字段</b>：只说用哪张，减多少由服务端
+   * 重新试算。让客户端报数就是一个可以直接刷钱的口子，而且不会有任何报错。
+   *
+   * ⚠️ 券可能在「看到试算结果」和「点确认」之间被别处用掉 ——
+   * 那时后端回 4xx 带一句「这张券用不了了」，按 message 提示即可。
+   */
+  couponId: Id | null
   /**
    * 幂等键，<b>客户端生成，一次点击一个</b>。
    *

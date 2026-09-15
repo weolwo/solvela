@@ -21,6 +21,9 @@
             <result column="cash_price" property="cashPrice" />
             <result column="pay_points" property="payPoints" />
             <result column="pay_cash" property="payCash" />
+            <!-- 2026-09-15 阶段 4：这一单用了哪张券、减了多少。权威在 t_coupon_write_off -->
+            <result column="coupon_id" property="couponId" />
+            <result column="coupon_discount" property="couponDiscount" />
             <result column="address_id" property="addressId" />
             <result column="status" property="status" />
             <result column="expire_time" property="expireTime" />
@@ -57,6 +60,8 @@
                 cash_price, 
                 pay_points, 
                 pay_cash, 
+                coupon_id, 
+                coupon_discount, 
                 address_id, 
                 status, 
                 expire_time, 

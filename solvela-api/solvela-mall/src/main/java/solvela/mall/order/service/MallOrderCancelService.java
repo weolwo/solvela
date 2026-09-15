@@ -15,6 +15,9 @@ import solvela.mall.order.dao.MallOrderDao;
 import solvela.mall.sku.dao.MallSkuDao;
 import solvela.member.api.AssetDebitApi;
 import solvela.member.api.AssetDebitCmd;
+import solvela.member.api.CouponWriteOffApi;
+import solvela.member.api.CouponWriteOffCmd;
+import solvela.member.api.CouponWriteOffView;
 import solvela.member.api.AssetDebitResult;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
@@ -85,11 +88,18 @@ public class MallOrderCancelService {
 
     private static final String CANCEL_REASON = "超时未支付，自动取消";
 
+    /**
+     * 券核销流水里的业务类型。与 {@code MallRedeemService.BIZ_TYPE_COUPON} 一致 ——
+     * 锁定和释放必须落在同一个 bizType 下，否则按单号对账时两半对不上。
+     */
+    private static final String BIZ_TYPE_COUPON = "MALL";
+
     private final MallOrderDao mallOrderDao;
     private final MallSkuDao mallSkuDao;
     private final MallExchangeLimitDao mallExchangeLimitDao;
     private final MallCommodityDao mallCommodityDao;
     private final AssetDebitApi assetDebitApi;
+    private final CouponWriteOffApi couponWriteOffApi;
     private final NotificationService notificationService;
 
     /**
@@ -119,6 +129,18 @@ public class MallOrderCancelService {
         // ④ 退积分
         int refunded = refundPoints(order);
 
+        /*
+         * ⑤ 把券放回去。
+         *
+         * 🔴 这一步和退积分是<b>同一件事的两半</b>：用户为这一单付出的是
+         *    「积分 + 一张券」，只退积分等于把券白扣了 —— 而且不报错，
+         *    只有用户会发现券包里少了一张。
+         *
+         * ⚠️ 必须挂在这里，不要另写一条券的取消路径。两条路迟早分叉，
+         *    而分叉的表现是「有的取消退券、有的不退」，谁也说不清哪个是对的。
+         */
+        releaseCoupon(order);
+
         // ⑤ 告诉用户一声。积分静悄悄退回去的话，用户只会看到订单莫名消失、数字莫名变了
         notificationService.send(NotifyRequest.of(NotificationTemplateEnum.ORDER_CANCELLED, order.getMemberId())
                 .param("orderNo", orderNo)
@@ -129,6 +151,34 @@ public class MallOrderCancelService {
 
         log.info("【商城超时取消】{} 已取消，退还积分 {}，放回库存 {} 件", orderNo, refunded, order.getQuantity());
         return true;
+    }
+
+    /**
+     * 把这一单用掉的券放回「未使用」。
+     *
+     * <p>⚠️ {@code bizRefId} 传的是<b>订单号本身</b>，和锁定时一样 ——
+     * 这一点和退积分刚好相反（那边要加 {@code :REFUND} 后缀，否则被唯一键
+     * 当重复提交挡掉）。券这边的条件更新是 {@code WHERE locked_biz_id = ?}，
+     * <b>传了别的单号就什么都不会发生，而且不报错</b>。
+     *
+     * <p>释放失败不抛：到这一步订单已经取消、积分已经退了，为一张券把整个
+     * 取消事务回滚，用户会看到「订单还在但积分已经回来了」，那更糟。
+     * 打 ERROR 等兜底任务和人工核对 —— 而兜底任务本来就会在 120 分钟后
+     * 把它放回去，所以这条的真实后果只是「晚一点回来」。
+     */
+    private void releaseCoupon(MallOrder order) {
+        if (order.getCouponId() == null) {
+            return;
+        }
+        CouponWriteOffView released = couponWriteOffApi.release(new CouponWriteOffCmd(
+                order.getCouponId(), BIZ_TYPE_COUPON, order.getOrderNo(), CANCEL_REASON));
+        if (released.ok()) {
+            log.info("【商城超时取消】{} 的券 {} 已放回未使用", order.getOrderNo(), order.getCouponId());
+            return;
+        }
+        log.error("【商城超时取消】🔴 {} 的券 {} 放不回去：{}。"
+                        + "兜底任务会在锁定超时后接手，但请人工确认用户的券回来了",
+                order.getOrderNo(), order.getCouponId(), released.message());
     }
 
     private void releaseStock(MallOrder order) {

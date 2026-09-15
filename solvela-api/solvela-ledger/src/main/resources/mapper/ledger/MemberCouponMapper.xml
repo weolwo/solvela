@@ -359,4 +359,23 @@
         LIMIT #{limit}
     </select>
 
+
+    <!--
+        券包。可用 tab 还要按有效期再筛一次 ——
+        过期收口任务每天才跑一次，中间那段时间里 status 还是 0 但券其实已经过期了，
+        不筛的话用户会在「可用」里看到一张点进去用不了的券。
+    -->
+    <select id="selectWallet" resultType="solvela.ledger.MemberCoupon">
+        SELECT
+        <include refid="full_columns"/>
+        FROM t_member_coupon
+        WHERE member_id = #{memberId}
+        AND status IN
+        <foreach collection="statuses" item="st" open="(" separator="," close=")">#{st}</foreach>
+        <if test="excludeExpired">
+            AND valid_end_time &gt; #{now}
+        </if>
+        ORDER BY valid_end_time, id DESC
+    </select>
+
 </mapper>

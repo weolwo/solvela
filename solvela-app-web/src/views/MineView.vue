@@ -149,6 +149,12 @@ async function handleLogout(): Promise<void> {
     </Card>
 
     <Card>
+      <!--
+        🔴 券包必须有入口。2026-09-15 阶段 4：券第一次能被用掉了，
+        而用户找不到自己的券的话，能用也等于没有 —— 消息中心刚踩过这个坑
+        （路由、页面、接口都做好了，却没有任何地方能点进去）。
+      -->
+      <Cell icon="receipt" title="我的券包" :to="{ name: 'coupons' }" />
       <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
       <Cell icon="gift" title="优惠记录" :to="{ name: 'records-promo' }" />
     </Card>

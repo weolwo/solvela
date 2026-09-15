@@ -24,6 +24,13 @@ import solvela.marketing.api.MallRedeemReason;
 import solvela.marketing.api.MallRedeemResult;
 import solvela.member.api.AssetDebitApi;
 import solvela.member.api.AssetDebitCmd;
+import solvela.member.api.CouponLockCmd;
+import solvela.member.api.CouponQueryApi;
+import solvela.member.api.CouponTrialQuery;
+import solvela.member.api.CouponTrialView;
+import solvela.member.api.CouponWriteOffApi;
+import solvela.member.api.CouponWriteOffCmd;
+import solvela.member.api.CouponWriteOffView;
 import solvela.member.api.AssetDebitResult;
 import solvela.member.service.MemberService;
 
@@ -76,6 +83,16 @@ public class MallRedeemService {
 
     private static final String BIZ_TYPE = "MALL_EXCHANGE";
 
+    /**
+     * 券核销流水里的业务类型。
+     *
+     * <p>⚠️ 和 {@link #BIZ_TYPE} 刻意不同：那个是<b>资产流水</b>的归因
+     *（{@code t_member_asset_transaction}），这个是<b>券核销流水</b>的
+     *（{@code t_coupon_write_off}）。两张表各自的取值域不该被绑在一起 ——
+     * 哪天资产流水要细分兑换类型，券那边不该跟着变。
+     */
+    private static final String BIZ_TYPE_COUPON = "MALL";
+
     /** 一次最多兑几件。不封的话一个 quantity=99999 会把库存条件判断变成一次巨额扣减 */
     private static final int MAX_QUANTITY = 20;
 
@@ -89,6 +106,8 @@ public class MallRedeemService {
     private final MallAddressService mallAddressService;
     private final MemberService memberService;
     private final AssetDebitApi assetDebitApi;
+    private final CouponQueryApi couponQueryApi;
+    private final CouponWriteOffApi couponWriteOffApi;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -136,19 +155,144 @@ public class MallRedeemService {
             return reject(MallRedeemReason.EXCHANGE_LIMITED);
         }
 
-        // 订单号先生成：它同时是扣积分的幂等键，必须在扣款之前就定下来
+        // 订单号先生成：它同时是扣积分与锁券的幂等键，必须在扣款之前就定下来
         String orderNo = generateOrderNo();
-        int payPoints = resolvePoints(sku, commodity) * quantity;
+        int originalPoints = resolvePoints(sku, commodity) * quantity;
+
+        /*
+         * ④ 用券。放在占限购之后、扣款之前 ——
+         *    它和库存、限购是同一类「已占资源」，失败要一起回滚。
+         */
+        CouponUse couponUse = applyCoupon(cmd, commodity, orderNo, originalPoints, hangs);
+        if (couponUse.problem() != null) {
+            return reject(couponUse.problem());
+        }
+        int payPoints = originalPoints - couponUse.discountPoints();
+
         MallRedeemReason debitProblem = debitPoints(cmd.memberId(), commodity, orderNo, payPoints);
         if (debitProblem != null) {
             return reject(debitProblem);
         }
 
         MallOrder order = buildOrder(cmd, commodity, sku, quantity, orderNo, payPoints, hangs, address);
+        order.setCouponId(couponUse.couponId());
+        order.setCouponDiscount(couponUse.couponId() == null
+                ? null : BigDecimal.valueOf(couponUse.discountPoints()));
         mallOrderManager.save(order);
+
+        confirmCouponIfSettled(order, couponUse);
         publishFulfillment(order);
 
         return MallRedeemResult.ofAccepted(orderNo, order.getStatus());
+    }
+
+    /**
+     * 用券的结果。{@code problem != null} 即被拒。
+     *
+     * @param couponId       锁上的券；没用券时为 null
+     * @param discountPoints 抵扣掉的积分。没用券时为 0
+     */
+    private record CouponUse(Long couponId, int discountPoints, MallRedeemReason problem) {
+
+        static final CouponUse NONE = new CouponUse(null, 0, null);
+
+        static CouponUse rejected(MallRedeemReason problem) {
+            return new CouponUse(null, 0, problem);
+        }
+    }
+
+    /**
+     * ④ 用券：试算 → 锁定。
+     *
+     * <h3>🔴 抵扣额由<b>服务端重新试算</b>，不信客户端传的数</h3>
+     * 客户端只说「用哪张券」。让它传抵扣额，「减多少」就成了客户端说了算 ——
+     * 那是一个可以直接刷钱的口子，而且不会有任何报错。
+     *
+     * <h3>⚠️ 阶段 4 只做「券抵扣积分」</h3>
+     * {@code POINTS_CASH} 落的是<b>待支付</b>单，而支付回调至今一行代码都没有 ——
+     * 于是没有任何地方能把券从「锁定中」推到「已使用」。放开的话表现会是：
+     * 用户付了钱，券被兜底任务放回券包，这一单等于白给了折扣。
+     * 等假支付做出来（方案阶段 6）再放开。
+     *
+     * <p>{@code deduct_target = CASH} 的券同理：全仓没有支付链路，抵不了现金。
+     * 试算入参写死 {@code SCORE}，那些券会带着
+     * {@code DEDUCT_TARGET_MISMATCH} 回到不可用列表里 —— <b>用户仍然看得见它们</b>。
+     */
+    private CouponUse applyCoupon(MallRedeemCmd cmd, MallCommodity commodity,
+                                  String orderNo, int originalPoints, boolean hangs) {
+        if (cmd.couponId() == null) {
+            return CouponUse.NONE;
+        }
+        if (hangs) {
+            return CouponUse.rejected(MallRedeemReason.COUPON_NOT_SUPPORTED);
+        }
+        if (originalPoints <= 0) {
+            // 0 分商品用券没有意义，而且会算出一张「减 0」的核销流水
+            return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
+        }
+
+        BigDecimal payAmount = BigDecimal.valueOf(originalPoints);
+        CouponTrialView trial = couponQueryApi.trial(new CouponTrialQuery(
+                cmd.memberId(), payAmount, "SCORE",
+                commodity.getCommodityCode(), String.valueOf(commodity.getCategoryId()), null));
+
+        // 只认用户点的那一张：试算的推荐是给页面看的，下单要用的是用户实际选的
+        CouponTrialView.Item chosen = trial.usable().stream()
+                .filter(item -> cmd.couponId().equals(item.couponId()))
+                .findFirst()
+                .orElse(null);
+        if (chosen == null) {
+            log.info("【商城用券】券 {} 不在可用列表里，会员 {} 订单 {}",
+                    cmd.couponId(), cmd.memberId(), orderNo);
+            return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
+        }
+
+        int discountPoints = chosen.discountAmount().intValue();
+        if (discountPoints <= 0) {
+            // 算出来减 0，用券就没有意义 —— 让它落单反而会在券包里留下一张「已使用」的空账
+            return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
+        }
+
+        CouponWriteOffView locked = couponWriteOffApi.lock(new CouponLockCmd(
+                cmd.couponId(), cmd.memberId(), BIZ_TYPE_COUPON, orderNo, null,
+                payAmount, BigDecimal.valueOf(discountPoints)));
+        if (!locked.ok()) {
+            // 试算到锁定之间的窗口里被另一笔单抢走了。对用户就是「这张券用不了，换一张」
+            log.info("【商城用券】券 {} 锁不上：{}，订单 {}", cmd.couponId(), locked.message(), orderNo);
+            return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
+        }
+        return new CouponUse(cmd.couponId(), discountPoints, null);
+    }
+
+    /**
+     * 订单一旦落成<b>待履约</b>，积分就已经扣掉且没有回头路了 —— 这时候确认券。
+     *
+     * <h3>🔴 为什么不是等履约完成再确认</h3>
+     * 履约失败那条路<b>刻意不退积分</b>（「东西还欠着用户，不是没买」，
+     * 见 {@code MallOrderDao.markFailed}）。既然积分不退，券也不该退 ——
+     * 否则用户会拿到一个自相矛盾的结果：券回来了，积分没回来。
+     *
+     * <p>而如果在那之前一直挂着「锁定中」，兜底任务会在 120 分钟后把它放回去，
+     * 于是变成「积分扣了、折扣享了、券还在」。两种都是漏钱，方向相反。
+     *
+     * <p>所以确认点是<b>资产结清的那一刻</b>，不是履约成功的那一刻。
+     *
+     * <h3>⚠️ 确认失败只能告警，不能回滚</h3>
+     * 到这一步积分已经扣了、订单已经落了。为了一张券把整单回滚，是拿一次
+     * 确定的成功去换一次确定的失败。所以这里打 ERROR 等人工核对 ——
+     * 而且这条几乎不可能发生：券是本事务几行之前刚锁上的。
+     */
+    private void confirmCouponIfSettled(MallOrder order, CouponUse couponUse) {
+        if (couponUse.couponId() == null || MallOrderStatusEnum.PENDING != order.getStatus()) {
+            return;
+        }
+        CouponWriteOffView confirmed = couponWriteOffApi.confirm(new CouponWriteOffCmd(
+                couponUse.couponId(), BIZ_TYPE_COUPON, order.getOrderNo(), null));
+        if (!confirmed.ok()) {
+            log.error("【商城用券】🔴 券 {} 确认失败：{}。订单 {} 已按抵扣后金额扣了积分，"
+                            + "但券没被标成已使用 —— 用户可能把它再用一次，请人工核对",
+                    couponUse.couponId(), confirmed.message(), order.getOrderNo());
+        }
     }
 
     /** 收货地址的解析结果。{@code problem != null} 即被拒，两者必有其一为 null */

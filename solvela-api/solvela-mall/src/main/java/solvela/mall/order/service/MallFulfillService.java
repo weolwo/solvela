@@ -133,6 +133,18 @@ public class MallFulfillService {
      *
      * <p>🔴 <b>失败不退积分</b> —— 东西还欠着用户，不是没买。退了等于把一次
      * 「我们没发出去」变成「这单不算数」，而用户那边看到的是积分回来了、东西没了。
+     *
+     * <h3>🔴 同理，失败也<b>不放券</b>（2026-09-15 阶段 4）</h3>
+     * 这里刻意<b>没有</b>调 {@code CouponWriteOffApi.release}。券在下单落成
+     * 待履约的那一刻就已经确认掉了（{@code MallRedeemService.confirmCouponIfSettled}）——
+     * 因为那一刻积分已经扣了、没有回头路。
+     *
+     * <p>只放券不退积分，用户会拿到一个自相矛盾的结果：券回来了，积分没回来。
+     * 两个一起退，那就是把「我们欠着你」变成了「这单不算数」，而这条路
+     * 刻意不这么做。所以<b>两个都不动</b>是唯一自洽的选择。
+     *
+     * <p>真正会放券的是超时取消那条路（{@code MallOrderCancelService}），
+     * 它同时退积分 —— 那一条才是「这单不算数」。
      */
     private void settle(String orderNo, MallOrder order, AssetGrantResult result) {
         if (result.accepted()) {
