@@ -99,9 +99,21 @@
 
       <a-form-item :wrapper-col="{ offset: 4 }">
         <a-space>
-          <a-button type="primary" :loading="sending" @click="onSend">发送</a-button>
-          <a-button @click="onReset">重置</a-button>
+          <!--
+            🔴 发出去的站内信收不回来，所以点「发送」不能直接发 ——
+            先弹一个确认，把「发给几个人、标题是什么」摆出来让人核对一眼。
+            这一步同时也解决了「点完不知道发没发、于是又点一次」：
+            确认框本身就是一个明确的分界。
+          -->
+          <a-button type="primary" :loading="sending" :disabled="justSent" @click="onConfirmSend">
+            {{ justSent ? '已发送' : '发送' }}
+          </a-button>
+          <a-button @click="onReset">{{ justSent ? '再发一条' : '重置' }}</a-button>
         </a-space>
+        <div v-if="justSent" class="mt-2 text-xs text-slate-500">
+          已经发过了。要再发一条请点「再发一条」—— 这一步是刻意的，
+          防的是「不确定发没发、于是又点一次」，而站内信重复发出去收不回来。
+        </div>
       </a-form-item>
     </a-form>
   </a-card>
@@ -109,17 +121,27 @@
   <!--
     结果逐个报成败，不给一个笼统的「成功」——
     一次发 50 个人其中 3 个没发出去，只说「成功」的话运营永远不知道那 3 个人没收到。
+
+    ⚠️ 这张卡放在表单【上面】：放下面的话，表单一长它就在折叠线以下，
+    而「看不见结果」正是让人以为没发出去、于是又点一次的直接原因。
   -->
-  <a-card v-if="result !== null" size="small" :bordered="false" class="mt-4" title="发送结果">
+  <a-card v-if="result !== null" size="small" :bordered="false" class="mb-4" title="发送结果">
     <a-result
       :status="result.failed.length === 0 ? 'success' : 'warning'"
       :title="`成功 ${result.sent} 条${result.failed.length > 0 ? `，失败 ${result.failed.length} 条` : ''}`"
     >
       <template v-if="result.failed.length > 0" #subTitle>
-        以下会员没收到（原因见服务端日志，通常是模板没配或被免打扰拦下）：
+        以下会员没收到（原因见服务端日志，通常是模板没配）：
         <div class="mt-2">
           <a-tag v-for="id in result.failed" :key="id" color="red">{{ id }}</a-tag>
         </div>
+      </template>
+      <template v-if="result.failed.length > 0" #extra>
+        <!--
+          把失败的填回收件人框，而不是自动重发 —— 失败原因多半是模板没配，
+          自动重发只会再失败一次。让人先看一眼再决定。
+        -->
+        <a-button @click="onRefillFailed">把失败的填回收件人</a-button>
       </template>
     </a-result>
   </a-card>
@@ -127,7 +149,7 @@
 
 <script setup>
   import { ref, reactive, computed, onMounted } from 'vue';
-  import { message } from 'ant-design-vue';
+  import { message, Modal } from 'ant-design-vue';
   import { manualNotifyApi } from '/@/api/business/notification/manual-notify-api';
   import { notificationTemplateApi } from '/@/api/business/notification/notification-template-api';
   import { SolvelaLoading } from '/@/components/framework/solvela-loading';
@@ -139,6 +161,14 @@
   const formRef = ref();
   const sending = ref(false);
   const result = ref(null);
+  /**
+   * 刚发过一次，发送按钮置灰直到点「再发一条」。
+   *
+   * 🔴 站内信发出去收不回来，而这个页面最容易出的事故就是
+   * 「点完不知道发没发、于是又点一次」—— 用户那边收到两条一模一样的消息。
+   * 服务端没有做去重（那需要在一张亿级表上加索引），所以这道闸在端上。
+   */
+  const justSent = ref(false);
 
   const formDefault = {
     recipients: '',
@@ -230,7 +260,14 @@
 
   // ------------------------ 发送 ------------------------
 
-  async function onSend() {
+  /**
+   * 点「发送」先弹确认，不直接发。
+   *
+   * 站内信是**不可逆的对外动作** —— 发错了收不回来。确认框把「发给几个人、
+   * 标题是什么」摆出来让人核对一眼，同时它本身就是一个明确的分界：
+   * 见过这个框才算发过，不会再有「我到底点了没有」的疑问。
+   */
+  async function onConfirmSend() {
     try {
       await formRef.value.validateFields();
     } catch (err) {
@@ -239,11 +276,25 @@
     }
 
     const { memberIds, memberNames } = parsedRecipients.value;
-    if (memberIds.length + memberNames.length > MAX_RECIPIENTS) {
+    const count = memberIds.length + memberNames.length;
+    if (count > MAX_RECIPIENTS) {
       // 前端先挡一道，省一次白跑的请求。服务端那道才是真正的闸
       message.error(`一次最多 ${MAX_RECIPIENTS} 个收件人，要发给更多人请用「公告管理」`);
       return;
     }
+
+    const title = form.mode === 'MANUAL' ? form.title : `模板 ${form.templateCode}`;
+    Modal.confirm({
+      title: `确认发送给 ${count} 个会员？`,
+      content: `内容：${title}。站内信发出去收不回来，请核对收件人。`,
+      okText: '确认发送',
+      cancelText: '再看看',
+      onOk: onSend,
+    });
+  }
+
+  async function onSend() {
+    const { memberIds, memberNames } = parsedRecipients.value;
 
     sending.value = true;
     SolvelaLoading.show();
@@ -259,9 +310,15 @@
         bizRefId: form.bizRefId,
       });
 
+      justSent.value = true;
+
       if (result.value.failed.length === 0) {
+        // 全成功就把表单清掉 —— 内容还留在框里是「看着像没发出去」最大的来源。
+        // 但【不清结果卡片】，那是唯一的凭据
         message.success(`已发送 ${result.value.sent} 条`);
+        clearForm();
       } else {
+        // 部分失败时【保留表单】：运营多半要改点什么再发一次，清掉等于让他重填
         message.warning(`成功 ${result.value.sent} 条，失败 ${result.value.failed.length} 条`);
       }
     } catch (err) {
@@ -272,9 +329,30 @@
     }
   }
 
-  function onReset() {
+  /** 只清内容，不动结果卡片 —— 发完之后那张卡是唯一的凭据 */
+  function clearForm() {
     Object.assign(form, formDefault);
     form.params = {};
+  }
+
+  function onReset() {
+    clearForm();
     result.value = null;
+    justSent.value = false;
+  }
+
+  /**
+   * 把失败的会员号填回收件人框。
+   *
+   * 不自动重发：失败原因多半是模板没配，自动重发只会再失败一次，
+   * 而且会让人以为「系统在帮我重试」。让他先看一眼再决定。
+   */
+  function onRefillFailed() {
+    if (result.value === null || result.value.failed.length === 0) {
+      return;
+    }
+    form.recipients = result.value.failed.join('\n');
+    justSent.value = false;
+    message.info(`已填回 ${result.value.failed.length} 个失败的会员号`);
   }
 </script>
