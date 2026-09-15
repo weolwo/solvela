@@ -90,6 +90,63 @@ public class MemberCoupon {
      */
     private LocalDateTime usedTime;
 
+    // ------------------------------------------------------------------
+    // 以下是 2026-09-15「券使用闭环」阶段 1 新增的列。
+    //
+    // 🔴 规则【快照】进来，而不是只存模板引用。
+    //    券模板改了，用户手里那张不能跟着变 —— 运营把「满100减20」改成
+    //    「满200减20」之后，如果核销读的是模板当前值，用户手里的券就贬值了。
+    //    那不是显示问题，是资损与信任问题。
+    //
+    //    而且核销在支付路径上，快照换来零 join。与本项目「单据存快照」的
+    //    既有约定一致（t_mall_order 存商品名、单价快照）。
+    // ------------------------------------------------------------------
+
+    /** 发券时的模板版本。排查用 —— 核销不读它，规则已经快照在下面几列里了 */
+    private Integer templateVersion;
+
+    /** 规则快照：FIXED-固定金额 / PERCENT-百分比 */
+    private solvela.enums.CouponDiscountTypeEnum discountType;
+
+    /** 规则快照：FIXED 时是抵扣额；PERCENT 时是折扣率（20 表示减 20%） */
+    private java.math.BigDecimal discountValue;
+
+    /** 规则快照：最低消费门槛，0 表示无门槛 */
+    private java.math.BigDecimal minAmount;
+
+    /** 规则快照：最高抵扣。PERCENT 时必填，不设上限就是资损口子 */
+    private java.math.BigDecimal maxDiscount;
+
+    /** 规则快照：CASH-抵现金 / SCORE-抵积分。🔴 两者不可比，试算时别跨类选最优 */
+    private solvela.enums.CouponDeductTargetEnum deductTarget;
+
+    /** 规则快照：适用范围 */
+    private solvela.enums.CouponScopeTypeEnum scopeType;
+
+    /** 规则快照：范围明细，json 数组 */
+    private String scopeRefs;
+
+    /**
+     * 锁定它的单据号。
+     *
+     * <p>两个用途：兜底释放 job 靠它判断「这一笔还在不在」，
+     * 以及<b>幂等</b> —— 同一笔订单重复调锁定，看到已经是自己就直接放行。
+     */
+    private String lockedBizId;
+
+    /** 锁定时间。兜底 job 按它判超时 */
+    private java.time.LocalDateTime lockedTime;
+
+    /**
+     * 本次实际抵扣额。核销时写、释放时清空。
+     *
+     * <p>⚠️ <b>权威在 {@code t_coupon_write_off}</b>，这里是冗余 ——
+     * 为了券包「已使用」那个 tab 能零 join 显示「已抵扣 ¥20」，
+     * 和 {@code t_member_notification.summary} 是同一个理由。
+     * 两者不一致时以流水为准。
+     */
+    private java.math.BigDecimal discountAmount;
+
     /**
      * 创建人
      */

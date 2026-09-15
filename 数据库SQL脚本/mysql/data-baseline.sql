@@ -30,7 +30,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- -----------------------------------------------------------------------------------
--- t_menu  菜单树。没有它后台登录进去是空白（279 行）
+-- t_menu  菜单树。没有它后台登录进去是空白（281 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_menu`;
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
@@ -313,7 +313,9 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (605, '公告管理', 2, 601, 2, '/notification/announcement/list', '/business/notification/announcement-list.vue', 1, NULL, NULL, NULL, NULL, 0, NULL, 1, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53'),
 (606, '查询', 3, 605, 1, NULL, NULL, 1, 'announcement:query', 'announcement:query', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53'),
 (607, '编辑 / 下架', 3, 605, 2, NULL, NULL, 1, 'announcement:save', 'announcement:save', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53'),
-(608, '删除（含确认留痕）', 3, 605, 3, NULL, NULL, 1, 'announcement:delete', 'announcement:delete', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53');
+(608, '删除（含确认留痕）', 3, 605, 3, NULL, NULL, 1, 'announcement:delete', 'announcement:delete', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53'),
+(609, '人工发送', 2, 601, 3, '/notification/manual-notify/send', '/business/notification/manual-notify.vue', 1, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04'),
+(610, '发送', 3, 609, 1, NULL, NULL, 1, 'manualNotify:send', 'manualNotify:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04');
 
 -- -----------------------------------------------------------------------------------
 -- t_role  角色（5 行）
@@ -525,7 +527,7 @@ INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
 (10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-09-16 03:10:00', '2026-09-15 03:10:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:10:00', 9166, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
 (11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-09-16 03:20:00', '2026-09-15 03:20:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:20:00', 9168, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 06:50:00', '2026-09-15 06:40:00', 931, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 06:40:00', 9189, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 06:40:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 12:10:00', '2026-09-15 12:00:00', 960, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 12:00:00', 9218, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 12:00:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
 -- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）
@@ -544,13 +546,14 @@ INSERT INTO `t_task_event` (`id`, `event_code`, `event_name`, `metric_source`, `
 -- [跳过] t_notice_type : Table 'solvela.t_notice_type' doesn't exist
 
 -- -----------------------------------------------------------------------------------
--- t_notification_template  通知模板。缺了发不出任何站内信，而且不报错（6 行）
+-- t_notification_template  通知模板。缺了发不出任何站内信，而且不报错（7 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_notification_template`;
 INSERT INTO `t_notification_template` (`template_code`, `version`, `category`, `title_template`, `content_template`, `param_keys`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
 ('ACCOUNT_LIMITED', 1, 'SYSTEM', '账号使用受限提醒', '您的账号因「${limitType}」被限制部分功能，预计 ${unlockTime} 自动恢复。如有疑问请联系客服。', '["limitType", "unlockTime"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('COUPON_EXPIRING', 1, 'TRADE', '您有优惠券即将过期', '您有 ${count} 张优惠券即将过期，最近一张将于 ${nearestExpireTime} 失效，别忘了使用哦~', '["count", "nearestExpireTime"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('DELIVERY_SHIPPED', 1, 'TRADE', '您的商品已发货', '您的订单 ${sourceBizId} 已发货。承运：${logisticsCompany}，运单号：${logisticsNo}。请留意物流信息。', '["sourceBizId", "logisticsCompany", "logisticsNo"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
+('MANUAL', 1, 'SYSTEM', '${title}', '${content}', '["title", "content"]', 1, 'system', '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04'),
 ('ORDER_CANCELLED', 1, 'TRADE', '订单已取消，积分已退回', '您的订单 ${orderNo}（${commodityName}）因超时未支付已取消，${refundPoints} 积分已原路退回您的账户。', '["orderNo", "commodityName", "refundPoints"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('ORDER_FULFILL_FAILED', 1, 'TRADE', '兑换未能完成', '很抱歉，您的订单 ${orderNo}（${commodityName}）暂时未能完成兑换：${failReason}。我们会尽快处理，您的权益不受影响。', '["orderNo", "commodityName", "failReason"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('PRIZE_WON', 1, 'MARKETING', '恭喜您中奖啦', '您获得的 ${prizeName} ×${amount} 已发放到您的账户，快去看看吧~', '["prizeName", "amount"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48');
@@ -565,6 +568,17 @@ INSERT INTO `t_mail_template` (`template_code`, `template_subject`, `template_co
 ('member_login_code', '登录验证码', '<!DOCTYPE HTML><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/></head><body>\n<div style="margin:0 auto;width:690px;font-family:Helvetica,Arial,sans-serif;line-height:28px;">\n  <h2>登录验证码</h2>\n  <p>你正在<b>登录</b>。请在登录页面输入：</p>\n  <p style="font-size:28px;letter-spacing:6px;"><b>${code}</b></p>\n  <p>验证码 ${minutes} 分钟内有效。</p>\n  <p><b>不要把这串数字告诉任何人</b>，包括自称客服的人 —— 我们不会向你索要验证码。</p>\n  <p>如果这不是你本人的操作，可能有人正在尝试登录你的账号，建议尽快修改密码。</p>\n</div></body></html>', 'freemarker', 0, '2026-09-09 04:25:48', '2026-09-09 04:25:48'),
 ('member_register_code', '注册验证码', '<!DOCTYPE HTML><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/></head><body>\n<div style="margin:0 auto;width:690px;font-family:Helvetica,Arial,sans-serif;line-height:28px;">\n  <h2>注册验证码</h2>\n  <p>你正在用这个邮箱<b>注册账号</b>。请在注册页面输入：</p>\n  <p style="font-size:28px;letter-spacing:6px;"><b>${code}</b></p>\n  <p>验证码 ${minutes} 分钟内有效。</p>\n  <p>如果这不是你本人的操作，说明有人填错了邮箱地址，忽略这封邮件即可 —— 不会有账号被创建。</p>\n</div></body></html>', 'freemarker', 0, '2026-09-09 04:25:48', '2026-09-09 04:25:48'),
 ('member_reset_password_code', '重置密码验证码', '<!DOCTYPE HTML><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/></head><body>\n<div style="margin:0 auto;width:690px;font-family:Helvetica,Arial,sans-serif;line-height:28px;">\n  <h2>重置密码验证码</h2>\n  <p>有人正在用这个邮箱<b>重置账号密码</b>。请在重置页面输入：</p>\n  <p style="font-size:28px;letter-spacing:6px;"><b>${code}</b></p>\n  <p>验证码 ${minutes} 分钟内有效。</p>\n  <p><b>拿到这串数字就能改掉你的密码。</b>不要告诉任何人，包括自称客服的人。</p>\n  <p style="color:#b00;"><b>如果这不是你本人的操作，请立即登录并修改密码</b> ——\n     有人知道你的邮箱地址，并且正在尝试接管你的账号。</p>\n</div></body></html>', 'freemarker', 0, '2026-09-09 04:25:48', '2026-09-09 04:25:48');
+
+-- -----------------------------------------------------------------------------------
+-- t_coupon_template  优惠券模板。缺了发券查不到规则（5 行）
+-- -----------------------------------------------------------------------------------
+DELETE FROM `t_coupon_template`;
+INSERT INTO `t_coupon_template` (`coupon_code`, `version`, `coupon_name`, `discount_type`, `discount_value`, `min_amount`, `max_discount`, `deduct_target`, `scope_type`, `scope_refs`, `valid_days`, `valid_end_time`, `remark`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
+('0ZXXLZ0RZ1', 1, '满100减20优惠券', 'FIXED', 20.00, 100.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
+('CU4XN6VTLQ', 1, '满100减20优惠券', 'FIXED', 20.00, 100.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
+('PK144782FR', 1, '商城优惠券100', 'FIXED', 100.00, 0.00, NULL, 'SCORE', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
+('PNIX3HHMDN', 1, '商城优惠券100', 'FIXED', 100.00, 0.00, NULL, 'SCORE', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
+('PP0COUPON1', 1, 'P0-20元券', 'FIXED', 20.00, 0.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30');
 
 -- -----------------------------------------------------------------------------------
 -- t_code_generator_config  代码生成器配置（开发工具，可选）（31 行）

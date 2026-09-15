@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.ledger.coupon.template.dao.CouponWriteOffDao">
+
+    <sql id="base_columns">
+        id, coupon_id, member_id, action,
+        biz_type, biz_ref_id, scene_code,
+        original_amount, discount_amount, deduct_target,
+        remark, create_by, create_time
+    </sql>
+
+    <!-- 一张券的完整时间线。走 idx_coupon -->
+    <select id="selectByCoupon" resultType="solvela.coupon.CouponWriteOff">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_write_off
+        WHERE coupon_id = #{couponId}
+        ORDER BY id DESC
+    </select>
+
+    <!-- 🔴 对账入口：按单据号反查用了哪张券、减了多少。走 idx_biz -->
+    <select id="selectByBiz" resultType="solvela.coupon.CouponWriteOff">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_write_off
+        WHERE biz_type = #{bizType}
+          AND biz_ref_id = #{bizRefId}
+        ORDER BY id
+    </select>
+
+    <!--
+      本期核销金额。只算 CONFIRM ——
+      LOCK 还没成交、RELEASE 是撤销，都不该计入。
+    -->
+    <select id="sumConfirmedAmount" resultType="java.math.BigDecimal">
+        SELECT SUM(discount_amount)
+        FROM t_coupon_write_off
+        WHERE action = 'CONFIRM'
+          AND create_time &gt;= #{from}
+          AND create_time &lt; #{to}
+    </select>
+
+</mapper>

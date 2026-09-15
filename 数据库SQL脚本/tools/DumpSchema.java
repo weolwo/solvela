@@ -52,7 +52,10 @@ public class DumpSchema {
             "t_physical_delivery","t_proposal_record","t_promotion_config",
             // 2026-09-08 补：此前不在任何组里，每次导出都掉进「未分类」。
             // 它是优惠配置的分组（见 mysql/优惠配置分组-建表与菜单.sql），跟着 t_promotion_config 走
-            "t_promotion_group"));
+            "t_promotion_group",
+            // 2026-09-15 券使用闭环阶段 1：规则住模板、核销走流水。
+            // 与 t_member_coupon 同域，放一起
+            "t_coupon_template", "t_coupon_write_off"));
         GROUPS.put("营销 - 活动与奖品", List.of(
             "t_activity_config","t_activity_display","t_prize_config","t_prize_log",
             "t_prize_pool_config","t_prize_pool_item","t_pool_prize_mapping",
@@ -75,6 +78,9 @@ public class DumpSchema {
             //   定向通知是写扩散（一人一条），公告是读扩散（一条内容一行 + 一人一个游标）
             "t_notification_template", "t_member_notification", "t_member_notification_preference",
             "t_announcement", "t_member_announcement_cursor", "t_announcement_ack"));
+        // 2026-09-15 券使用闭环阶段 1。券模板与核销流水跟着
+        // t_member_coupon 走（都在账务域），所以归进「账务 / 履约」那一组 ——
+        // 见下方。这里不单开一组，避免券的三张表散在两个地方。
         GROUPS.put("积分商城", List.of(
             "t_mall_category","t_mall_commodity","t_mall_sku","t_mall_order",
             "t_mall_exchange_limit","t_mall_address","t_mall_favorite"));

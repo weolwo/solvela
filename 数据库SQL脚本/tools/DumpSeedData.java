@@ -78,6 +78,9 @@ INSERT INTO `t_member_id_seq` (`id`, `next_seq`, `step`) VALUES (1, 0, 1000);
         // 说明它是某次手工粘进去的，而本工具每次导出都会把它丢掉。
         // 邮箱验证码发不出去 = 新环境注册不了，与 t_file_category 同一性质。
         SEED.put("t_mail_template",         "邮件模板。缺了邮箱验证码发不出去");
+        // 2026-09-15 补：券模板是配置数据。缺了发券链路查不到规则，
+        // 发出去的券就回到「只有名字没有规则」那个状态。
+        SEED.put("t_coupon_template",       "优惠券模板。缺了发券查不到规则");
         SEED.put("t_code_generator_config", "代码生成器配置（开发工具，可选）");
         SEED.put("t_table_column",          "列配置（开发工具，可选）");
     }

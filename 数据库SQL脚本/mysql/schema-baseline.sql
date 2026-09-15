@@ -35,7 +35,7 @@ SET NAMES utf8mb4;
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
 -- 生成时间：2026-09-15
--- 表数量：73 张
+-- 表数量：75 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -616,7 +616,7 @@ CREATE TABLE `t_device` (
 
 
 -- =====================================================================================
--- 账务 / 履约（7 张）
+-- 账务 / 履约（9 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_member_wallet`;
@@ -674,9 +674,22 @@ CREATE TABLE `t_member_coupon` (
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `template_version` int NOT NULL DEFAULT '1' COMMENT '发券时的模板版本，排查用',
+  `discount_type` varchar(16) NOT NULL DEFAULT 'FIXED' COMMENT '规则快照：FIXED-固定金额/PERCENT-百分比',
+  `discount_value` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '规则快照：抵扣额或折扣率',
+  `min_amount` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '规则快照：最低消费门槛，0=无门槛',
+  `max_discount` decimal(10,2) DEFAULT NULL COMMENT '规则快照：最高抵扣。PERCENT 必填',
+  `deduct_target` varchar(16) NOT NULL DEFAULT 'CASH' COMMENT '规则快照：CASH-抵现金/SCORE-抵积分',
+  `scope_type` varchar(16) NOT NULL DEFAULT 'ALL' COMMENT '规则快照：ALL/COMMODITY/CATEGORY/EXTERNAL',
+  `scope_refs` json DEFAULT NULL COMMENT '规则快照：范围明细',
+  `locked_biz_id` varchar(64) DEFAULT NULL COMMENT '锁定它的单据号。兜底释放与幂等都靠它',
+  `locked_time` datetime DEFAULT NULL COMMENT '锁定时间，兜底 job 按它判超时',
+  `discount_amount` decimal(10,2) DEFAULT NULL COMMENT '本次实际抵扣额。核销写、释放清。权威在流水表，这里冗余给券包列表零 join',
   PRIMARY KEY (`id`),
   KEY `idx_source` (`source_type`,`source_biz_id`),
-  KEY `idx_mbr_sts` (`member_id`,`status`)
+  KEY `idx_mbr_sts` (`member_id`,`status`),
+  KEY `idx_member_status` (`member_id`,`status`,`valid_end_time`),
+  KEY `idx_locked` (`status`,`locked_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员优惠券';
 
 DROP TABLE IF EXISTS `t_physical_delivery`;
@@ -783,6 +796,50 @@ CREATE TABLE `t_promotion_group` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_group_code` (`group_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='优惠配置分组';
+
+DROP TABLE IF EXISTS `t_coupon_template`;
+CREATE TABLE `t_coupon_template` (
+  `coupon_code` varchar(64) NOT NULL COMMENT '券模编码：跨环境稳定，发券时引用它',
+  `version` int NOT NULL COMMENT '版本号。? 改规则=新增版本，永不原地改',
+  `coupon_name` varchar(128) NOT NULL COMMENT '券名，如「满100减20」',
+  `discount_type` varchar(16) NOT NULL COMMENT 'FIXED-固定金额 / PERCENT-百分比',
+  `discount_value` decimal(10,2) NOT NULL COMMENT 'FIXED=抵扣额；PERCENT=折扣率(20 表示减20%)',
+  `min_amount` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '最低消费门槛，0=无门槛。低于它这张券用不了',
+  `max_discount` decimal(10,2) DEFAULT NULL COMMENT '最高抵扣。? PERCENT 必填 —— 不设上限的「8折」碰上一台iPhone就是资损',
+  `deduct_target` varchar(16) NOT NULL COMMENT 'CASH-抵现金 / SCORE-抵积分。? 两者不可比，别跨类选最优',
+  `scope_type` varchar(16) NOT NULL DEFAULT 'ALL' COMMENT 'ALL/COMMODITY/CATEGORY/EXTERNAL',
+  `scope_refs` json DEFAULT NULL COMMENT '范围明细。ALL 时为空。CATEGORY 优于 COMMODITY——绑商品id每上新品都要改券',
+  `valid_days` int DEFAULT NULL COMMENT '发券后N天过期。与 valid_end_time 二选一',
+  `valid_end_time` datetime DEFAULT NULL COMMENT '固定失效时间（如活动结束）。与 valid_days 二选一',
+  `remark` varchar(255) DEFAULT NULL COMMENT '运营备注',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '1-启用 0-停用。? 只停用不删除：删了历史券查不到当时的规则',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`coupon_code`,`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='优惠券模板：规则按版本不可变';
+
+DROP TABLE IF EXISTS `t_coupon_write_off`;
+CREATE TABLE `t_coupon_write_off` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `coupon_id` bigint NOT NULL COMMENT '会员券 id',
+  `member_id` bigint NOT NULL COMMENT '会员号。冗余一列，按人查时不用回表',
+  `action` varchar(16) NOT NULL COMMENT 'LOCK-锁定 / CONFIRM-核销 / RELEASE-释放',
+  `biz_type` varchar(32) NOT NULL COMMENT 'MALL-商城订单 / EXTERNAL-外部场景',
+  `biz_ref_id` varchar(64) NOT NULL COMMENT '订单号 / 外部单号',
+  `scene_code` varchar(32) DEFAULT NULL COMMENT '外部场景码，如 MOBILE_RECHARGE。biz_type=MALL 时为空',
+  `original_amount` decimal(10,2) NOT NULL COMMENT '抵扣前应付',
+  `discount_amount` decimal(10,2) NOT NULL COMMENT '? 本次实际抵扣额。退款要按它退，财务要按它对账',
+  `deduct_target` varchar(16) NOT NULL COMMENT 'CASH / SCORE 快照',
+  `remark` varchar(255) DEFAULT NULL COMMENT '释放原因等',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '操作人。人工核销才有值',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_coupon` (`coupon_id`,`id`),
+  KEY `idx_biz` (`biz_type`,`biz_ref_id`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='优惠券核销流水：只增不改';
 
 
 -- =====================================================================================

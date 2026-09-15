@@ -30,6 +30,22 @@ public enum CouponStatusEnum implements BaseEnum {
      * 已作废：运营主动撤销
      */
     VOIDED(3, "已作废"),
+
+    /**
+     * 锁定中：用户提交了订单但还没支付 / 履约完成。
+     *
+     * <h3>🔴 为什么必须有这一档</h3>
+     * 核销不能一步到位。用户下单用了一张券，订单后来失败或超时取消 ——
+     * 一步核销的话券就白没了。
+     *
+     * <p>这和「商城超时取消要退积分」是<b>完全同构</b>的问题：积分有
+     * {@code debit} / {@code refund} 一对，券就必须有锁定 / 释放一对。
+     *
+     * <p>配套的两列在 {@code t_member_coupon} 上：{@code locked_biz_id}
+     *（被哪一笔锁的，同时是幂等依据）与 {@code locked_time}
+     *（兜底 job 按它判超时释放）。
+     */
+    LOCKED(4, "锁定中"),
     ;
 
     private final Integer value;

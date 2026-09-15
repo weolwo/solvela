@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.ledger.coupon.template.dao.CouponTemplateDao">
+
+    <sql id="base_columns">
+        coupon_code, version, coupon_name,
+        discount_type, discount_value, min_amount, max_discount,
+        deduct_target, scope_type, scope_refs,
+        valid_days, valid_end_time, remark, status,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <!--
+      「当前启用的最新版本」：过滤 status=1，取最大 version。
+      走主键 (coupon_code, version) 的前缀，是一次索引倒序扫第一行。
+    -->
+    <select id="selectLatestEnabled" resultType="solvela.coupon.CouponTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_template
+        WHERE coupon_code = #{couponCode}
+          AND status = 1
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+    <!--
+      🔴 这里【刻意不过滤 status】。
+
+      模板停用之后，运营仍然要能回答「用户手里这张券当时是什么规则」。
+      停用的意思是「以后不再用它发新券」，不是「过去发的都查不到了」。
+    -->
+    <select id="selectByCodeAndVersion" resultType="solvela.coupon.CouponTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_template
+        WHERE coupon_code = #{couponCode}
+          AND version = #{version}
+    </select>
+
+    <select id="selectVersions" resultType="solvela.coupon.CouponTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_template
+        WHERE coupon_code = #{couponCode}
+        ORDER BY version DESC
+    </select>
+
+    <!-- 升序：调用方按顺序放进 map 时，同 code 的新版覆盖旧版 -->
+    <select id="selectAllEnabled" resultType="solvela.coupon.CouponTemplate">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_template
+        WHERE status = 1
+        ORDER BY coupon_code, version ASC
+    </select>
+
+    <!--
+      🔴 不过滤 status：停用过的版本也占着号。过滤掉的话，停用 v2 之后
+      新增会又拿到 2，撞主键 (coupon_code, version)。
+    -->
+    <select id="selectMaxVersion" resultType="java.lang.Integer">
+        SELECT MAX(version)
+        FROM t_coupon_template
+        WHERE coupon_code = #{couponCode}
+    </select>
+
+    <!--
+      🔴 复合主键，不能用 MyBatis-Plus 的 updateById —— 那个方法对本实体
+      根本生成不出来（实体上没有 @TableId），调了会在运行期抛
+      Invalid bound statement，而编译期毫无迹象。
+    -->
+    <update id="disableVersion">
+        UPDATE t_coupon_template
+        SET status = 0
+        WHERE coupon_code = #{couponCode}
+          AND version = #{version}
+          AND status = 1
+    </update>
+
+</mapper>

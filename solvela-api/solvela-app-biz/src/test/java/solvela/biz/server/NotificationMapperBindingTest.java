@@ -11,6 +11,8 @@ import solvela.notification.dao.MemberAnnouncementCursorDao;
 import solvela.notification.dao.MemberNotificationDao;
 import solvela.notification.dao.MemberNotificationPreferenceDao;
 import solvela.notification.dao.NotificationTemplateDao;
+import solvela.ledger.coupon.template.dao.CouponTemplateDao;
+import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -47,6 +49,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 只查绑定，<b>不查 SQL 写得对不对</b>：列名拼错、条件写反，这里一样过。
  * 那些要靠 {@code NotificationLiveTest} 那种真库用例。
  *
+ * <h3>⚠️ 本测试已经不只管通知了</h3>
+ * 2026-09-15 把券模块的两个 Dao 也纳了进来 —— {@code CouponTemplate} 同样是
+ * 复合主键（{@code coupon_code + version}），踩的是同一个坑。
+ * 类名保持不变是为了不打断 git 历史，但它实际上是「本仓 mapper 绑定守卫」。
+ *
  * @Author alaric
  * @Date 2026-09-15
  */
@@ -60,7 +67,11 @@ class NotificationMapperBindingTest {
             MemberNotificationPreferenceDao.class,
             AnnouncementDao.class,
             MemberAnnouncementCursorDao.class,
-            AnnouncementAckDao.class);
+            AnnouncementAckDao.class,
+            // 2026-09-15 券模块跟着纳进来。CouponTemplate 也是复合主键
+            //（coupon_code + version），和通知模板同一个坑
+            CouponTemplateDao.class,
+            CouponWriteOffDao.class);
 
     @Autowired
     private SqlSessionFactory sqlSessionFactory;
