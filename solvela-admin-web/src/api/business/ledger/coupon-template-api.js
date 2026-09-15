@@ -17,6 +17,31 @@
  */
 import { postRequest, getRequest } from '/@/lib/axios';
 
+/**
+ * 人工发券 api 封装。
+ *
+ * 🔴 和券模板刻意分开一个对象：配规则和**直接给用户发钱**是两件事，
+ * 权限点也是分开的（couponTemplate:save vs manualCoupon:send）。
+ * 放在一起的话，下次有人给整个对象加一个「批量」方法时不会意识到自己越了哪条线。
+ */
+export const manualCouponApi = {
+  /**
+   * 发券。
+   *
+   * @param param.memberIds   会员号数组
+   * @param param.memberNames 会员账号数组。查不到会整批拒绝，不是跳过
+   * @param param.couponCode  券模编码。必须有启用中的模板，否则服务端直接拒
+   * @param param.quantity    每人几张，默认 1，上限 10
+   * @param param.bizRefId    工单号 / 批次号。🔴 防重发的唯一依据，不能为空
+   * @param param.reason      发券原因，会原样显示给用户
+   * @returns { granted, skipped, failed, couponName }
+   *          —— skipped 是「本来就发过」，那是幂等不是失败，两者必须分得开
+   */
+  send: (param) => {
+    return postRequest('/manualCoupon/send', param);
+  },
+};
+
 export const couponTemplateApi = {
   /** 模板列表，每个券编码取最新启用版 */
   list: () => {

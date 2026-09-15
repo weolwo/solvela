@@ -30,7 +30,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- -----------------------------------------------------------------------------------
--- t_menu  菜单树。没有它后台登录进去是空白（284 行）
+-- t_menu  菜单树。没有它后台登录进去是空白（286 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_menu`;
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
@@ -318,7 +318,9 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (610, '发送', 3, 609, 1, NULL, NULL, 1, 'manualNotify:send', 'manualNotify:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04'),
 (611, '券模板', 2, 308, 4, '/ledger/coupon-template/list', '/business/ledger/coupon-template/coupon-template-list.vue', 1, NULL, NULL, 'TagsOutlined', NULL, 0, NULL, 1, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
 (612, '查询', 3, 611, 1, NULL, NULL, 1, 'couponTemplate:query', 'couponTemplate:query', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
-(613, '新增版本 / 停用', 3, 611, 2, NULL, NULL, 1, 'couponTemplate:save', 'couponTemplate:save', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03');
+(613, '新增版本 / 停用', 3, 611, 2, NULL, NULL, 1, 'couponTemplate:save', 'couponTemplate:save', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
+(614, '人工发券', 2, 308, 5, '/ledger/manual-coupon', '/business/ledger/coupon-template/manual-coupon.vue', 1, NULL, NULL, 'SendOutlined', NULL, 0, NULL, 1, 1, 0, 0, 1, '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20'),
+(615, '发券', 3, 614, 1, NULL, NULL, 1, 'manualCoupon:send', 'manualCoupon:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20');
 
 -- -----------------------------------------------------------------------------------
 -- t_role  角色（5 行）
@@ -530,8 +532,8 @@ INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
 (10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-09-16 03:10:00', '2026-09-15 03:10:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:10:00', 9166, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
 (11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-09-16 03:20:00', '2026-09-15 03:20:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:20:00', 9168, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 13:10:00', '2026-09-15 13:00:00', 966, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 12:50:00', 9224, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 13:06:16', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(13, 'JOBCOUPLCK', '【账务】优惠券卡单释放', 'couponStuckLockRelease', 'BUSINESS', 'cron', '0 5/30 * * * *', '2026-09-15 13:49:29', NULL, 0, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', NULL, NULL, 0, '每 30 分钟把锁定超过 120 分钟仍未确认的券放回未使用；支持 dryRun 试运行。阈值不要调到 60 分钟以下', 0, 'system', '2026-09-15 05:47:06', '2026-09-15 13:48:29', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 18:40:00', '2026-09-15 15:40:00', 973, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 15:30:00', 9235, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 18:30:50', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(13, 'JOBCOUPLCK', '【账务】优惠券卡单释放', 'couponStuckLockRelease', 'BUSINESS', 'cron', '0 5/30 * * * *', '2026-09-15 19:05:00', '2026-09-15 18:35:00', 6, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 18:36:31', 9237, 0, '每 30 分钟把锁定超过 120 分钟仍未确认的券放回未使用；支持 dryRun 试运行。阈值不要调到 60 分钟以下', 0, 'system', '2026-09-15 05:47:06', '2026-09-15 18:36:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
 -- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）
@@ -550,12 +552,13 @@ INSERT INTO `t_task_event` (`id`, `event_code`, `event_name`, `metric_source`, `
 -- [跳过] t_notice_type : Table 'solvela.t_notice_type' doesn't exist
 
 -- -----------------------------------------------------------------------------------
--- t_notification_template  通知模板。缺了发不出任何站内信，而且不报错（7 行）
+-- t_notification_template  通知模板。缺了发不出任何站内信，而且不报错（8 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_notification_template`;
 INSERT INTO `t_notification_template` (`template_code`, `version`, `category`, `title_template`, `content_template`, `param_keys`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
 ('ACCOUNT_LIMITED', 1, 'SYSTEM', '账号使用受限提醒', '您的账号因「${limitType}」被限制部分功能，预计 ${unlockTime} 自动恢复。如有疑问请联系客服。', '["limitType", "unlockTime"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('COUPON_EXPIRING', 1, 'TRADE', '您有优惠券即将过期', '您有 ${count} 张优惠券即将过期，最近一张将于 ${nearestExpireTime} 失效，别忘了使用哦~', '["count", "nearestExpireTime"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
+('COUPON_GRANTED', 1, 'MARKETING', '您收到一张优惠券', '您收到一张「${couponName}」。${reason}有效期至 ${validEndTime}，记得在券包里查看。', '["couponName", "reason", "validEndTime"]', 1, 'system', '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20'),
 ('DELIVERY_SHIPPED', 1, 'TRADE', '您的商品已发货', '您的订单 ${sourceBizId} 已发货。承运：${logisticsCompany}，运单号：${logisticsNo}。请留意物流信息。', '["sourceBizId", "logisticsCompany", "logisticsNo"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('MANUAL', 1, 'SYSTEM', '${title}', '${content}', '["title", "content"]', 1, 'system', '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04'),
 ('ORDER_CANCELLED', 1, 'TRADE', '订单已取消，积分已退回', '您的订单 ${orderNo}（${commodityName}）因超时未支付已取消，${refundPoints} 积分已原路退回您的账户。', '["orderNo", "commodityName", "refundPoints"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),

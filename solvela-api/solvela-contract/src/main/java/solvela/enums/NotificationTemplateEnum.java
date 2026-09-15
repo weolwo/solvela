@@ -131,6 +131,22 @@ public enum NotificationTemplateEnum {
      */
     COUPON_EXPIRING("COUPON_EXPIRING", NotificationCategoryEnum.TRADE,
             List.of("count", "nearestExpireTime")),
+
+    /**
+     * 人工发券（2026-09-15 阶段 5）。
+     *
+     * <p>🔴 <b>发了必须告诉用户</b>。券静悄悄躺进券包的话，客服为一次投诉补的
+     * 那张券用户根本不知道 —— 于是补偿没有起到补偿的作用，他还会再投诉一次。
+     *
+     * <p>分类是 {@code MARKETING} 而不是 {@code SYSTEM}：它是一次营销/补偿动作，
+     * 用户<b>可以</b>把这类关掉。系统类是关不掉的，那一档要留给账号安全这种
+     * 「关掉就出事」的消息。
+     *
+     * <p>参数里有 {@code reason} —— 客服填的那句「就您 9 月 12 日的问题补偿」。
+     * 没有它，用户收到的是一张来路不明的券。
+     */
+    COUPON_GRANTED("COUPON_GRANTED", NotificationCategoryEnum.MARKETING,
+            List.of("couponName", "reason", "validEndTime")),
     ;
 
     /**

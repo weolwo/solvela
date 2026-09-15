@@ -686,6 +686,7 @@ CREATE TABLE `t_member_coupon` (
   `locked_time` datetime DEFAULT NULL COMMENT '锁定时间，兜底 job 按它判超时',
   `discount_amount` decimal(10,2) DEFAULT NULL COMMENT '本次实际抵扣额。核销写、释放清。权威在流水表，这里冗余给券包列表零 join',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_manual_src` (((case when (`source_type` = _utf8mb4'MANUAL') then `source_biz_id` end))),
   KEY `idx_source` (`source_type`,`source_biz_id`),
   KEY `idx_mbr_sts` (`member_id`,`status`),
   KEY `idx_member_status` (`member_id`,`status`,`valid_end_time`),
