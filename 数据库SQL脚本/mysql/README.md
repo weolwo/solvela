@@ -62,6 +62,31 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
 > 要发到公开仓库或交付外部前，先把非必要账号删掉、只留一个 admin。
 
+### 🔴 用别的客户端跑脚本前先看一眼钟
+
+本项目的 MySQL **服务端跑在 UTC**（`@@system_time_zone = UTC`）。
+应用的连接串里有 `forceConnectionTimeZoneToSession=true`，所以**应用**的会话时区
+被强制成 `Asia/Shanghai` —— `NOW()`、`ctx.dbNow()` 和 JVM 的 `LocalDateTime.now()`
+三者是一致的。
+
+但用 mysql 客户端或别的工具直连时，没带这个参数的话会话时区就是 `SYSTEM = UTC`，
+于是脚本里的 `NOW()` 比应用写进去的时间**早 8 小时** —— 不报错，只是日期时间
+悄悄差了一截。
+
+执行任何带 `NOW()` / `CURDATE()` 的脚本之前，先跑这一句确认：
+
+```sql
+SELECT NOW(), @@session.time_zone;
+```
+
+`NOW()` 应当和你的本地时间一致。不一致就在连接串里补上
+`serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true`。
+
+> 2026-09-15 的「存量券作废重发」就踩了这个：248 张重发券的有效期整体早了 8 小时
+> （也就是**短了 8 小时**），靠一个订正脚本重算才修回来。
+
+---
+
 ### 这个文件是怎么来的、为什么必须有它
 
 `schema-baseline.sql` 是**从开发库用 `SHOW CREATE TABLE` 逐表导出**的，

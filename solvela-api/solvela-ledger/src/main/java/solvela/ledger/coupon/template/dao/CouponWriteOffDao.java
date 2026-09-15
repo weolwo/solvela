@@ -43,4 +43,19 @@ public interface CouponWriteOffDao extends BaseMapper<CouponWriteOff> {
      * @return 没有任何核销时返回 null，调用方按 0 处理
      */
     BigDecimal sumConfirmedAmount(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /**
+     * 这一笔对这张券的<b>锁定</b>那一行。
+     *
+     * <h3>为什么确认/释放要回头读它</h3>
+     * 流水表的 {@code original_amount} 是 NOT NULL —— 但确认和释放的调用方
+     * 未必知道订单金额（超时取消那条路拿到的只有订单号）。让它们都带着金额
+     * 传进来，就等于要求每个调用方都记住一份本该由券自己记住的东西，
+     * 而漏传的表现是<b>流水里的抵扣前金额是个编出来的数</b>，对账时才发现。
+     *
+     * <p>锁定那一行本来就有这两个金额，回头抄一份是最短也最诚实的路径。
+     *
+     * @return 没有对应锁定行时返回 null —— 那说明调用方在确认一笔它没锁过的券
+     */
+    CouponWriteOff selectLockRow(@Param("couponId") Long couponId, @Param("bizRefId") String bizRefId);
 }

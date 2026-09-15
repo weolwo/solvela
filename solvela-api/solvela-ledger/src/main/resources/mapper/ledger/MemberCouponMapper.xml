@@ -261,4 +261,102 @@
         LIMIT #{limit}
     </update>
 
+
+    <!--
+        ==================== 三阶段核销（2026-09-15 阶段 3） ====================
+
+        🔴 锁定 / 确认 / 释放三条 UPDATE 的 WHERE 里都带着状态，
+           那不是防御性写法，是并发闸本身：
+           先 SELECT 再 UPDATE 的话，两笔订单会同时看到「未使用」，
+           然后都以为自己锁上了 —— 一张券被两单用掉，而且不报错。
+    -->
+
+    <!--
+        带规则快照的完整列。base_columns 是老的展示列，刻意不动它：
+        那个被 queryPage / queryList 复用，加列会改变管理端列表的返回形状。
+    -->
+    <sql id="full_columns">
+        id, member_id, member_name, coupon_code, coupon_type, coupon_name,
+        status, source_type, source_biz_id, valid_start_time, valid_end_time, used_time,
+        template_version, discount_type, discount_value, min_amount, max_discount,
+        deduct_target, scope_type, scope_refs,
+        locked_biz_id, locked_time, discount_amount,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <!--
+        试算候选：会员手上所有未使用且在有效期内的券。
+
+        ⚠️ 不在这里筛门槛和适用范围 —— 试算要能回答「你这张券为什么用不了」。
+           筛掉的话用户只看到券凭空消失，第一反应是系统坏了，
+           而真实原因往往只是「没到门槛」，那一句话能省掉一次客服。
+    -->
+    <select id="selectUsableCandidates" resultType="solvela.ledger.MemberCoupon">
+        SELECT
+        <include refid="full_columns"/>
+        FROM t_member_coupon
+        WHERE member_id = #{memberId}
+          AND status = 0
+          AND valid_start_time &lt;= #{now}
+          AND valid_end_time &gt; #{now}
+        ORDER BY valid_end_time, id
+    </select>
+
+    <!--
+        锁定。status = 0 是并发闸，member_id 顺手挡住越权用别人的券。
+        discount_amount 在这里就写下来 —— 确认时不用再算一遍，
+        而「算两遍得出不同结果」是这类代码最典型的资损来源。
+    -->
+    <update id="lockCoupon">
+        UPDATE t_member_coupon
+        SET status          = 4,
+            locked_biz_id   = #{bizRefId},
+            locked_time     = #{now},
+            discount_amount = #{discountAmount}
+        WHERE id = #{couponId}
+          AND member_id = #{memberId}
+          AND status = 0
+    </update>
+
+    <!--
+        确认。locked_biz_id 必须对上 —— 少了这个条件，A 单锁的券会被 B 单确认掉。
+        locked_time / locked_biz_id 刻意【保留】：券用掉之后还要能回答
+        「是被哪一笔用掉的」，清了就只剩流水表一个来源。
+    -->
+    <update id="confirmCoupon">
+        UPDATE t_member_coupon
+        SET status    = 1,
+            used_time = #{now}
+        WHERE id = #{couponId}
+          AND status = 4
+          AND locked_biz_id = #{bizRefId}
+    </update>
+
+    <!--
+        释放。清掉锁定痕迹和冗余的抵扣额 —— 券回到「干净的未使用」，
+        下一笔订单才能重新锁它。
+        这一次锁定发生过的事实不会丢：它在 t_coupon_write_off 里。
+    -->
+    <update id="releaseCoupon">
+        UPDATE t_member_coupon
+        SET status          = 0,
+            locked_biz_id   = NULL,
+            locked_time     = NULL,
+            discount_amount = NULL
+        WHERE id = #{couponId}
+          AND status = 4
+          AND locked_biz_id = #{bizRefId}
+    </update>
+
+    <!-- 卡在锁定中的券。按 locked_time 升序：卡最久的先放回去 -->
+    <select id="selectStuckLocked" resultType="solvela.ledger.MemberCoupon">
+        SELECT
+        <include refid="full_columns"/>
+        FROM t_member_coupon
+        WHERE status = 4
+          AND locked_time &lt; #{before}
+        ORDER BY locked_time
+        LIMIT #{limit}
+    </select>
+
 </mapper>

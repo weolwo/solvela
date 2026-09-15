@@ -40,4 +40,24 @@
           AND create_time &lt; #{to}
     </select>
 
+
+    <!--
+        这一笔对这张券的锁定行。确认/释放时回头抄 original_amount / discount_amount ——
+        让每个调用方自己带金额进来，漏传的表现是流水里的金额是个编出来的数，
+        而那要等对账时才发现。
+
+        取最后一行：同一张券同一笔单据【可以】锁定多次
+        （锁了 → 释放 → 又锁），最后那次才是当前这次。
+    -->
+    <select id="selectLockRow" resultType="solvela.coupon.CouponWriteOff">
+        SELECT
+        <include refid="base_columns"/>
+        FROM t_coupon_write_off
+        WHERE coupon_id = #{couponId}
+          AND biz_ref_id = #{bizRefId}
+          AND action = 'LOCK'
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
 </mapper>

@@ -108,6 +108,72 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
                                                               @Param("limit") int limit,
                                                               @Param("offset") int offset);
 
+    // ==================== 三阶段核销（2026-09-15 阶段 3） ====================
+
+    /**
+     * 会员当前<b>未使用</b>的券，带规则快照。给试算用。
+     *
+     * <p>⚠️ 刻意<b>不</b>在 SQL 里过滤「门槛够不够 / 适用范围对不对」——
+     * 试算要能回答「你手上这张券<b>为什么</b>用不了」。在 SQL 里筛掉，用户就只看到
+     * 券凭空消失了，第一反应是系统坏了，而真实原因往往只是「没到门槛」。
+     *
+     * <p>过期券不在这里：它们由 {@code couponExpire} 任务收口成 2-已过期。
+     *
+     * @param now 数据库时钟。有效期判断只认一个钟（铁律 9）
+     */
+    List<MemberCoupon> selectUsableCandidates(@Param("memberId") Long memberId,
+                                              @Param("now") java.time.LocalDateTime now);
+
+    /**
+     * 锁定：0-未使用 → 4-锁定中。
+     *
+     * <h3>🔴 条件更新本身就是并发闸</h3>
+     * {@code WHERE status = 0} 让两笔订单抢同一张券时只有一笔能成 ——
+     * 另一笔拿到 0 行，当场知道自己没抢到。先查再改的话，两笔都会看到「未使用」，
+     * 然后都以为自己锁上了，最后一张券被两单用掉。
+     *
+     * <p>{@code member_id} 也在条件里：越权用别人的券这一条就挡住了，
+     * 而且不需要先查一次再比对。
+     *
+     * @return 1=锁上了，0=没抢到（已被别人锁、已用掉、或不是这个人的券）
+     */
+    int lockCoupon(@Param("couponId") Long couponId,
+                   @Param("memberId") Long memberId,
+                   @Param("bizRefId") String bizRefId,
+                   @Param("discountAmount") java.math.BigDecimal discountAmount,
+                   @Param("now") java.time.LocalDateTime now);
+
+    /**
+     * 确认：4-锁定中 → 1-已使用。
+     *
+     * <p>条件里带着 {@code locked_biz_id = #{bizRefId}}：只有<b>锁它的那一笔</b>
+     * 能确认它。少了这个条件，A 单锁的券会被 B 单确认掉。
+     *
+     * @return 1=确认了，0=它已经不是「被这一笔锁着」的状态了
+     */
+    int confirmCoupon(@Param("couponId") Long couponId,
+                      @Param("bizRefId") String bizRefId,
+                      @Param("now") java.time.LocalDateTime now);
+
+    /**
+     * 释放：4-锁定中 → 0-未使用，并清掉锁定痕迹与冗余的抵扣额。
+     *
+     * <p>同样只有锁它的那一笔能释放。
+     *
+     * @return 1=放回去了，0=它已经不是「被这一笔锁着」的状态了
+     */
+    int releaseCoupon(@Param("couponId") Long couponId, @Param("bizRefId") String bizRefId);
+
+    /**
+     * 卡在「锁定中」超过 {@code before} 的券。给兜底释放任务用。
+     *
+     * <p>⚠️ 这里<b>判不了对应单据是不是已经终态</b> —— 账务域不能依赖商城域
+     *（有架构守卫测试盯着）。所以只能按时间兜底，阈值要比订单自己的支付超时
+     * 宽得多，详见 {@code CouponStuckLockReleaseJob}。
+     */
+    List<MemberCoupon> selectStuckLocked(@Param("before") java.time.LocalDateTime before,
+                                         @Param("limit") int limit);
+
     /*
      * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。
      * 账务与审计流水删掉就再也查不回来，事后连"少了什么"都不知道。

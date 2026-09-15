@@ -11,6 +11,7 @@ import solvela.notification.dao.MemberAnnouncementCursorDao;
 import solvela.notification.dao.MemberNotificationDao;
 import solvela.notification.dao.MemberNotificationPreferenceDao;
 import solvela.notification.dao.NotificationTemplateDao;
+import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.coupon.template.dao.CouponTemplateDao;
 import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 
@@ -71,7 +72,10 @@ class NotificationMapperBindingTest {
             // 2026-09-15 券模块跟着纳进来。CouponTemplate 也是复合主键
             //（coupon_code + version），和通知模板同一个坑
             CouponTemplateDao.class,
-            CouponWriteOffDao.class);
+            CouponWriteOffDao.class,
+            // 2026-09-15 阶段 3：三阶段核销的 SQL 全是手写的条件更新，
+            // 而那三条 WHERE 就是并发闸本身 —— 绑不上的话核销整条路都是死的
+            MemberCouponDao.class);
 
     @Autowired
     private SqlSessionFactory sqlSessionFactory;
