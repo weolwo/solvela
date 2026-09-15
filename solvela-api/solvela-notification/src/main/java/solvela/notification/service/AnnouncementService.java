@@ -104,11 +104,31 @@ public class AnnouncementService {
      * <p>🔴 <b>只在这里写 ack 行</b>。绝不要在公告发布时给全人群预建待确认行 ——
      * 那是「广播写扩散」的复刻，行数 = 人群数 × 必读公告数。
      *
+     * <h3>🔴 确认之后必须把游标也推过去</h3>
+     * 「确认留痕」和「已读游标」是<b>两套状态</b>：前者在 {@code t_announcement_ack}，
+     * 后者在 {@code t_member_announcement_cursor}。2026-09-15 之前这里只写了留痕、
+     * 没推游标，于是用户在弹窗上点完「我已阅读并知悉」，回到公告 tab 那条<b>还是未读</b>
+     * —— 两个事实对不上，而红点在说谎。
+     *
+     * <p>修法不是给 unread 再加一条「acked 也算已读」的规则（那会让未读语义
+     * 变成「游标 OR ack」两套并存），而是认下一件事：<b>确认这个动作本身就蕴含
+     * 「我读过了」</b>，所以它走和 {@link #markRead} 完全一样的那条路。
+     *
+     * <p>⚠️ 随之而来的是游标模型固有的性质：推到这一条，<b>比它更旧的公告也一并算已读</b>。
+     * 这和用户在列表里点开它是同一个结果 —— 整个设计从一开始就不支持跳读。
+     *
      * @param ackIp 确认时 IP，合规场景可能要。拿不到就传 null，不要为它编一个值
      * @return 是否是第一次确认（false = 重复点击，已被主键挡住）
      */
     public boolean ack(Long announcementId, Long memberId, String ackIp) {
-        return announcementAckDao.ack(announcementId, memberId, LocalDateTime.now(), ackIp) > 0;
+        boolean first = announcementAckDao.ack(announcementId, memberId, LocalDateTime.now(), ackIp) > 0;
+
+        // 🔴 无论是不是第一次都要推：重复点击时 ack 被主键挡住返回 0，
+        //    但游标可能还没推过去（比如上一次推游标那步失败了）。
+        //    advance 自己是幂等的（GREATEST，只前进不后退），多调一次无害。
+        memberAnnouncementCursorDao.advance(memberId, announcementId);
+
+        return first;
     }
 
     /**

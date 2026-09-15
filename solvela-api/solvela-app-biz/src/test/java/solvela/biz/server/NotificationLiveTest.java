@@ -8,15 +8,19 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.NotificationTemplate;
+import solvela.notification.Announcement;
+import solvela.notification.dao.AnnouncementDao;
 import solvela.notification.dao.NotificationTemplateDao;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.domain.dto.MemberNotificationDTO;
 import solvela.notification.domain.dto.MemberNotificationDetailDTO;
 import solvela.notification.domain.query.MemberNotificationQuery;
+import solvela.notification.service.AnnouncementService;
 import solvela.notification.service.NotificationInboxService;
 import solvela.notification.service.NotificationPreferenceService;
 import solvela.notification.service.NotificationService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,6 +62,14 @@ class NotificationLiveTest {
     private NotificationTemplateDao notificationTemplateDao;
     @Autowired
     private NotificationPreferenceService notificationPreferenceService;
+    @Autowired
+    private AnnouncementService announcementService;
+    @Autowired
+    private AnnouncementDao announcementDao;
+    @Autowired
+    private solvela.notification.dao.AnnouncementAckDao announcementAckDao;
+    @Autowired
+    private solvela.notification.dao.MemberAnnouncementCursorDao memberAnnouncementCursorDao;
 
     @Test
     @DisplayName("真库：发一条账号受限通知，读回来，正文按模板渲染")
@@ -189,5 +201,70 @@ class NotificationLiveTest {
             // 恢复默认，别让造数影响后续
             notificationPreferenceService.save(MEMBER_ID, true, true);
         }
+    }
+
+    @Test
+    @DisplayName("🔴 真库：确认强制公告之后，它不能还是未读")
+    void 确认之后就不该再未读() {
+        Announcement announcement = new Announcement();
+        announcement.setTitle("[实测]强制确认-游标");
+        announcement.setContent("点了确认就该算读过");
+        announcement.setCategory(NotificationCategoryEnum.SYSTEM);
+        announcement.setForceAck(1);
+        announcement.setAudienceType("ALL");
+        announcement.setPublishTime(LocalDateTime.now().minusHours(1));
+        announcement.setExpireTime(LocalDateTime.now().plusDays(30));
+        announcement.setStatus(1);
+        announcementDao.insert(announcement);
+
+        try {
+            // 造数会员没有游标行 = 全部未读
+            assertTrue(announcementService.countUnread(MEMBER_ID, null) > 0, "新公告应当是未读");
+            // ⚠️ 只断言【自己造的那条】，不断言整个列表为空 ——
+            // 开发库里可能还躺着别人发的公告，断言「空」会被无关数据搞红
+            assertTrue(pendingContains(announcement.getId()), "应当出现在待确认弹窗里");
+
+            assertTrue(announcementService.ack(announcement.getId(), MEMBER_ID, "127.0.0.1"), "首次确认");
+
+            /*
+             * 🔴 这条就是 2026-09-15 那个 bug：
+             *
+             * 「确认留痕」（t_announcement_ack）和「已读游标」
+             * （t_member_announcement_cursor）是两套状态。修之前 ack() 只写了留痕、
+             * 没推游标，于是用户在弹窗上点完「我已阅读并知悉」，回到公告 tab
+             * 那条还是红点 —— 两个事实对不上，而红点在说谎。
+             *
+             * 修法不是给 unread 再加一条「acked 也算已读」的规则（那会让未读语义
+             * 变成「游标 OR ack」两套并存），而是认下：确认本身就蕴含「读过了」。
+             */
+            assertTrue(announcementService.currentReadCursor(MEMBER_ID) >= announcement.getId(),
+                    "确认之后游标没推过去 —— 那条公告会一直显示未读");
+            assertEquals(0, announcementService.countUnread(MEMBER_ID, null),
+                    "确认过的公告仍然算未读");
+            assertFalse(pendingContains(announcement.getId()),
+                    "确认过还在待确认弹窗里 —— 用户会被反复弹");
+
+            /*
+             * ⚠️ 顺带把一条容易搞混的语义钉住：游标推过去只让公告【不再未读】，
+             * 不等于【已确认】。库里别人发的、比这条更旧的强制确认公告，
+             * 会因为游标而不再显示红点，但仍然留在待确认弹窗里 —— 这是对的：
+             * 强制确认要的是「你点了那个按钮」这个证据，不是「你划过去了」。
+             */
+
+            // 重复点击：ack 返回 false（被主键挡住），但状态不该回退
+            assertFalse(announcementService.ack(announcement.getId(), MEMBER_ID, "127.0.0.1"),
+                    "重复确认应当返回 false");
+            assertEquals(0, announcementService.countUnread(MEMBER_ID, null), "重复确认把已读状态弄回退了");
+        } finally {
+            announcementAckDao.deleteByAnnouncement(announcement.getId());
+            announcementDao.deleteById(announcement.getId());
+            memberAnnouncementCursorDao.deleteById(MEMBER_ID);
+        }
+    }
+
+    /** 待确认弹窗里有没有这一条。不断言整个列表为空 —— 开发库里可能有别人发的公告 */
+    private boolean pendingContains(Long announcementId) {
+        return announcementService.pendingAck(MEMBER_ID, null).stream()
+                .anyMatch(row -> row.getId().equals(announcementId));
     }
 }
