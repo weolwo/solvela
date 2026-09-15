@@ -30,7 +30,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- -----------------------------------------------------------------------------------
--- t_menu  菜单树。没有它后台登录进去是空白（281 行）
+-- t_menu  菜单树。没有它后台登录进去是空白（284 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_menu`;
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
@@ -315,7 +315,10 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (607, '编辑 / 下架', 3, 605, 2, NULL, NULL, 1, 'announcement:save', 'announcement:save', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53'),
 (608, '删除（含确认留痕）', 3, 605, 3, NULL, NULL, 1, 'announcement:delete', 'announcement:delete', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-14 22:42:53', NULL, '2026-09-14 22:42:53'),
 (609, '人工发送', 2, 601, 3, '/notification/manual-notify/send', '/business/notification/manual-notify.vue', 1, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04'),
-(610, '发送', 3, 609, 1, NULL, NULL, 1, 'manualNotify:send', 'manualNotify:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04');
+(610, '发送', 3, 609, 1, NULL, NULL, 1, 'manualNotify:send', 'manualNotify:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 00:04:04', NULL, '2026-09-15 00:04:04'),
+(611, '券模板', 2, 308, 4, '/ledger/coupon-template/list', '/business/ledger/coupon-template/coupon-template-list.vue', 1, NULL, NULL, 'TagsOutlined', NULL, 0, NULL, 1, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
+(612, '查询', 3, 611, 1, NULL, NULL, 1, 'couponTemplate:query', 'couponTemplate:query', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
+(613, '新增版本 / 停用', 3, 611, 2, NULL, NULL, 1, 'couponTemplate:save', 'couponTemplate:save', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03');
 
 -- -----------------------------------------------------------------------------------
 -- t_role  角色（5 行）
@@ -527,7 +530,7 @@ INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
 (10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-09-16 03:10:00', '2026-09-15 03:10:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:10:00', 9166, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
 (11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-09-16 03:20:00', '2026-09-15 03:20:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:20:00', 9168, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 12:10:00', '2026-09-15 12:00:00', 960, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 12:00:00', 9218, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 12:00:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 12:20:00', '2026-09-15 12:10:00', 961, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 12:10:00', 9219, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 12:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
 -- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）

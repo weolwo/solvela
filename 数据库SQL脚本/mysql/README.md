@@ -7,7 +7,7 @@
 ## 🔴 新环境部署：两个文件，按顺序
 
 ```
-mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（73 张表）
+mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（75 张表）
 mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子数据（菜单/字典/权限等）
 ```
 
@@ -17,25 +17,26 @@ mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子�
 
 ```
 tools/VerifyFreshInstall.java  ->  RESULT: PASS
-  schema-baseline.sql  ->  ok=146  fail=0
-  data-baseline.sql    ->  ok=41   fail=0
+  schema-baseline.sql  ->  ok=150  fail=0
+  data-baseline.sql    ->  ok=43   fail=0
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
 （工具建一个 `_fresh_probe` 库、执行两个基线、逐项核对，跑完删库）。
 
-当前基线：**73 张表**；`data-baseline` **20 条 INSERT、20 张配置表共 472 行**。
+当前基线：**75 张表**；`data-baseline` **21 条 INSERT、20 张配置表共 483 行**。
 关键种子数据到位情况（验证工具逐项核对过）：
 
 | 表 | 行数 | 缺了会怎样 |
 |---|---|---|
-| `t_menu` | 279 | 后台登录进去是空白 |
+| `t_menu` | 284 | 后台登录进去是空白 |
 | `t_role_menu` | 74 | 任何角色都看不到菜单 |
 | `t_employee` | 12 | 无法登录 |
 | `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
 | `t_solvela_job` | 9 | 定时任务不会注册 |
 | `t_task_event` | 9 | 任务事件识别不了 |
-| `t_notification_template` | 6 | 发不出任何站内信，**而且不报错** |
+| `t_notification_template` | 7 | 发不出任何站内信，**而且不报错** |
+| `t_coupon_template` | 5 | 发出去的券没有面额/门槛，**而且不报错** |
 | `t_member_id_seq` | 1 | **第一个注册的用户就撞 -1000** |
 
 业务表（会员/活动/任务记录/流水/通知/公告）全部 0 行 —— 基线不带任何测试数据。
@@ -54,8 +55,8 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 
 | 文件 | 内容 | 不含 |
 |---|---|---|
-| `schema-baseline.sql` | 73 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 20 张配置表、472 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
+| `schema-baseline.sql` | 75 张表的结构 | 任何数据 |
+| `data-baseline.sql` | 20 张配置表、483 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
