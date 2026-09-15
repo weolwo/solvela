@@ -63,6 +63,26 @@ public class MemberCouponStatDTO {
     /** 本期核销涉及的会员数（去重） */
     private Long usedMemberCount;
 
+    /**
+     * 本期核销<b>金额</b>合计：这些券一共给用户省了多少。
+     *
+     * <p>🔴 这个数在 2026-09-15 券闭环之前<b>根本算不出来</b> —— 实际减了多少
+     * 没有任何地方记，而它恰恰是财务唯一关心的那个数：张数是活动效果，金额是成本。
+     * 现在它来自 {@code t_coupon_write_off} 里 CONFIRM 那些行的 {@code discount_amount}。
+     *
+     * <h3>⚠️ 它和 {@link #usedCount} 可能对不齐，而那不是漏算</h3>
+     * 张数走 {@code t_member_coupon.used_time}，金额走核销流水的 {@code create_time}。
+     * 三阶段核销上线<b>之前</b>用掉的券没有流水行 —— 有 used_time、没有金额。
+     * 所以历史区间上会出现「张数 &gt; 0 而金额为 0」，那是真实的历史。
+     *
+     * <h3>⚠️ 现金和积分混在一个数里</h3>
+     * 券有 {@code deduct_target}：有的抵现金、有的抵积分，而<b>两者不可加</b>
+     *（1 积分 ≠ 1 元，汇率是业务定义还会变）。今天这里是个合计值，
+     * 只适合看趋势，<b>不要拿它当财务口径</b>。真要对账得按 deduct_target 拆开 ——
+     * 那一步等有人真的要拿它报数时再做，现在拆只是凭空多两个没人看的数。
+     */
+    private BigDecimal usedAmount;
+
     // ---------------- 券库存（全量，不受时间范围影响） ----------------
 
     /** 券总张数（全量） */

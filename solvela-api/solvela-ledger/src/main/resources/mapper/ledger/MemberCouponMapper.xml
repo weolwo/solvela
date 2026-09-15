@@ -15,6 +15,17 @@
         <result column="valid_start_time" property="validStartTime"/>
         <result column="valid_end_time" property="validEndTime"/>
         <result column="used_time" property="usedTime"/>
+        <!-- 2026-09-15 补：规则快照与锁定状态。此前管理端列表看不到「这张券减多少」 -->
+        <result column="template_version" property="templateVersion"/>
+        <result column="discount_type" property="discountType"/>
+        <result column="discount_value" property="discountValue"/>
+        <result column="min_amount" property="minAmount"/>
+        <result column="max_discount" property="maxDiscount"/>
+        <result column="deduct_target" property="deductTarget"/>
+        <result column="scope_type" property="scopeType"/>
+        <result column="locked_biz_id" property="lockedBizId"/>
+        <result column="locked_time" property="lockedTime"/>
+        <result column="discount_amount" property="discountAmount"/>
         <result column="create_by" property="createBy"/>
         <result column="create_time" property="createTime"/>
         <result column="update_by" property="updateBy"/>
@@ -33,7 +44,17 @@
                 source_biz_id, 
                 valid_start_time, 
                 valid_end_time, 
-                used_time, 
+                used_time,
+                template_version,
+                discount_type,
+                discount_value,
+                min_amount,
+                max_discount,
+                deduct_target,
+                scope_type,
+                locked_biz_id,
+                locked_time,
+                discount_amount,
                 create_by, 
                 create_time, 
                 update_by, 
@@ -272,16 +293,19 @@
     -->
 
     <!--
-        带规则快照的完整列。base_columns 是老的展示列，刻意不动它：
-        那个被 queryPage / queryList 复用，加列会改变管理端列表的返回形状。
+        实体级的完整列 = 展示列 + scope_refs。
+
+        ⚠️ 2026-09-15 改：此前这里把所有列又抄了一遍，理由是「base_columns 是老的
+        展示列，加列会改变管理端列表的返回形状」。后来发现那个「不改形状」本身就是
+        bug —— 管理端列表因此看不到「这张券减多少」，而 C 端券包看得到。
+        补完 base_columns 之后两份列表只差一个 scope_refs，留着两份就是等它们跑偏。
+
+        🔴 scope_refs 只在这里、不在 base_columns 里：它是一段 json 明细，
+        列表页不展示它（展示的是 scope_type 那个档位），而试算和核销要用它匹配范围。
+        DTO 里也刻意没有这个字段 —— 让它进列表响应体只是凭空多一段没人看的 json。
     -->
     <sql id="full_columns">
-        id, member_id, member_name, coupon_code, coupon_type, coupon_name,
-        status, source_type, source_biz_id, valid_start_time, valid_end_time, used_time,
-        template_version, discount_type, discount_value, min_amount, max_discount,
-        deduct_target, scope_type, scope_refs,
-        locked_biz_id, locked_time, discount_amount,
-        create_by, create_time, update_by, update_time
+        <include refid="base_columns"/>, scope_refs
     </sql>
 
     <!--

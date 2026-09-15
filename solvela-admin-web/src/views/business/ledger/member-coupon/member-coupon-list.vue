@@ -47,7 +47,18 @@
             {{ num(stat.usedCount) }}
             <span class="solvela-stat-card-unit">张</span>
           </div>
-          <div class="solvela-stat-card-foot">涉及 {{ num(stat.usedMemberCount) }} 名会员</div>
+          <!--
+            🔴 金额这一行在 2026-09-15 券闭环之前根本算不出来 ——
+               实际减了多少没有任何地方记。张数是活动效果，金额是成本。
+            ⚠️ 现金和积分混在一个数里（券的 deduct_target 有两种，而 1 积分 ≠ 1 元），
+               所以只适合看趋势，不要拿它当财务口径。
+          -->
+          <div class="solvela-stat-card-foot">
+            涉及 {{ num(stat.usedMemberCount) }} 名会员 · 抵扣
+            <a-tooltip title="来自核销流水里 CONFIRM 那些行的实际抵扣额。⚠️ 现金券与积分券混在一个合计里（1 积分 ≠ 1 元），只适合看趋势，不要当财务口径。另：2026-09-15 三阶段核销上线之前用掉的券没有流水行，历史区间会出现「有张数、没金额」">
+              <b>{{ num(stat.usedAmount) }}</b>
+            </a-tooltip>
+          </div>
         </div>
       </a-col>
       <a-col :span="5">
@@ -183,9 +194,35 @@
       :loading="tableLoading"
       :pagination="false"
     >
-      <template #bodyCell="{ text, column }">
+      <template #bodyCell="{ text, column, record }">
         <template v-if="column.dataIndex === 'status'">
           <a-tag :color="couponStatusOf(text).color">{{ couponStatusOf(text).desc }}</a-tag>
+        </template>
+
+        <template v-if="column.dataIndex === 'rule'">
+          <!--
+            没有规则要【如实说】，不要拼成「无门槛减 0」—— 那会让人以为它能用。
+
+            🔴 用 == null（宽松）不是 === null：它同时挡住 null 和 undefined。
+               2026-09-15 联调时就栽在这里 —— 后端漏装新版本 jar，字段整个没下发，
+               undefined !== null 于是走进了 else 分支，渲染成「无门槛 减 undefined」。
+               字段缺失和字段为空在这一列上是同一种处理：都没有规则可显示。
+          -->
+          <span v-if="record.discountType == null" class="text-slate-400">无规则</span>
+          <span v-else>
+            {{ describeRule(record) }}
+            <a-tag v-if="record.templateVersion" class="ml-1">v{{ record.templateVersion }}</a-tag>
+          </span>
+        </template>
+
+        <template v-if="column.dataIndex === 'discountAmount'">
+          <span v-if="text">{{ text }}</span>
+          <span v-else class="text-slate-400">—</span>
+        </template>
+
+        <template v-if="column.dataIndex === 'lockedBizId'">
+          <span v-if="text">{{ text }}</span>
+          <span v-else class="text-slate-400">—</span>
         </template>
       </template>
     </a-table>
@@ -242,6 +279,27 @@
 
   // ---------------------------- 表格列 ----------------------------
 
+  const DEDUCT_TARGET_LABEL = { CASH: '现金', SCORE: '积分' };
+
+  /**
+   * 把规则快照拼成一句人话。
+   *
+   * ⚠️ 措辞要和券模板页、C 端券包<b>一致</b> —— 同一张券在三个地方
+   * 显示成三种说法，客服和用户对不上话。
+   *
+   * 🔴 这里读的是【券行上的快照】，不是模板当前值：用户手里那张券当时是什么规则，
+   * 只有这几列答得了。去查模板会查到改版之后的值。
+   */
+  function describeRule(record) {
+    const target = DEDUCT_TARGET_LABEL[record.deductTarget] ?? '';
+    const threshold = Number(record.minAmount) > 0 ? `满 ${record.minAmount} ` : '无门槛 ';
+    if (record.discountType === 'PERCENT') {
+      const cap = record.maxDiscount ? `，最高减 ${record.maxDiscount} ${target}` : '';
+      return `${threshold}减 ${record.discountValue}%${cap}`;
+    }
+    return `${threshold}减 ${record.discountValue} ${target}`;
+  }
+
   const columns = ref([
     {
       title: 'id',
@@ -277,6 +335,30 @@
     {
       title: '状态',
       dataIndex: 'status',
+      ellipsis: true,
+    },
+    /*
+     * 🔴 规则这一列补于 2026-09-15。
+     *
+     *    此前 C 端券包能看到「满 100 减 20」，而【管理端看不到】——
+     *    客服拿着用户的截图问「这张券到底减多少」，后台答不上来，
+     *    只能去翻券模板，而模板是会改版的，翻到的可能根本不是这张券当时那一版。
+     *    快照当初就是为了解决这个，只是读出口漏了一半。
+     */
+    {
+      title: '规则',
+      dataIndex: 'rule',
+      width: 200,
+    },
+    {
+      title: '实际抵扣',
+      dataIndex: 'discountAmount',
+      width: 100,
+    },
+    {
+      // 客服排查「用户说券不见了」时最有用的一列：券在锁定中时用户点不动它
+      title: '锁定单号',
+      dataIndex: 'lockedBizId',
       ellipsis: true,
     },
     {

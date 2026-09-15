@@ -11,9 +11,11 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
 import solvela.ledger.coupon.domain.query.MemberCouponQuery;
+import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 import solvela.ledger.coupon.domain.dto.MemberCouponStatDTO;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +31,7 @@ import java.util.List;
 public class MemberCouponService {
 
     private final MemberCouponDao memberCouponDao;
+    private final CouponWriteOffDao couponWriteOffDao;
 
     /**
      * 分页查询
@@ -57,7 +60,7 @@ public class MemberCouponService {
 
         MemberCouponStatDTO vo = new MemberCouponStatDTO();
         fillIssued(issued, vo);
-        fillUsed(StatRow.of(memberCouponDao.selectUsedStat(form)), vo);
+        fillUsed(StatRow.of(memberCouponDao.selectUsedStat(form)), form, vo);
         fillStock(stock, vo);
         vo.setCouponList(couponStats(form));
         vo.setSourceList(sourceStats(form, issuedCount));
@@ -81,9 +84,22 @@ public class MemberCouponService {
      * <p>⚠️ 走的是 {@code used_time} 这一列，和上面那批<b>不是同一批券</b>：
      * 今天核销的多半是前几周发的。两个数不要相减，差值没有任何含义。
      */
-    private void fillUsed(StatRow used, MemberCouponStatDTO vo) {
+    private void fillUsed(StatRow used, LedgerStatQuery form, MemberCouponStatDTO vo) {
         vo.setUsedCount(used.count("usedCount"));
         vo.setUsedMemberCount(used.count("usedMemberCount"));
+        /*
+         * 🔴 金额来自核销流水，不是从券表上算的。
+         *
+         *    券表上那个 discount_amount 是【冗余】列，而且释放时会被清掉 ——
+         *    拿它做合计，一张「锁了又放」的券会贡献 0、一张已核销的券会贡献一次，
+         *    看起来对，但只要有人改了那一列的清空时机就会悄悄错。
+         *    权威在流水表，这里就去问权威。
+         *
+         *    没有任何核销时 SUM 返回 null，按 0 处理 —— 前端拿到 null 会显示成空白，
+         *    而「本期没人用券」和「这个指标坏了」在页面上必须长得不一样。
+         */
+        BigDecimal amount = couponWriteOffDao.sumConfirmedAmount(form);
+        vo.setUsedAmount(amount == null ? BigDecimal.ZERO : amount);
     }
 
     /** 券库存：全量，不受时间范围影响 */

@@ -16,9 +16,11 @@ import solvela.ledger.coupon.issue.CouponIssueCmd;
 import solvela.ledger.coupon.issue.CouponIssueService;
 import solvela.ledger.coupon.template.dao.CouponTemplateDao;
 import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -167,19 +169,39 @@ class CouponTemplateLiveTest {
     }
 
     /**
-     * 核销流水表还没有任何写入方（那是阶段 3），这里只验它的查询 SQL 跑得通。
+     * 核销流水的查询 SQL 跑得通。
      *
-     * <p>⚠️ 这些断言是「空结果」，不是「正确结果」—— 真正的核销语义要等
-     * 三阶段核销接口做出来之后才谈得上验。
+     * <p>⚠️ 这里断言的是「空结果」，不是「正确结果」—— 真正的核销语义由
+     * {@code CouponWriteOffLiveTest} 验（那边真锁真确认真释放）。
      */
     @Test
-    @DisplayName("核销流水的查询 SQL 跑得通（阶段 3 之前还没有写入方）")
+    @DisplayName("核销流水的查询 SQL 跑得通")
     void 核销流水查询可用() {
         assertTrue(couponWriteOffDao.selectByCoupon(-1L).isEmpty());
         assertTrue(couponWriteOffDao.selectByBiz("MALL_ORDER", "NOT_EXIST").isEmpty());
-        // 没有任何核销时返回 null，调用方按 0 处理 —— 这正是 Dao 注释里承诺的行为
-        assertNull(couponWriteOffDao.sumConfirmedAmount(
-                LocalDateTime.now().minusYears(50), LocalDateTime.now().minusYears(49)));
+    }
+
+    @Test
+    @DisplayName("🔴 本期核销【金额】：时间窗在 SQL 里算，没有核销时返回 null 由调用方兜 0")
+    void 本期核销金额() {
+        // 一个远古窗口：那时候还没有这个系统，一定是空的
+        LedgerStatQuery ancient = new LedgerStatQuery();
+        ancient.setStatDateBegin(LocalDate.of(2000, 1, 1));
+        ancient.setStatDateEnd(LocalDate.of(2000, 1, 2));
+        /*
+         * 返回 null 而不是 0 —— 这是 SUM 在空集上的行为，Dao 注释里承诺了，
+         * 而 MemberCouponService 负责把它兜成 0。
+         * 前端拿到 null 会显示成空白，而「本期没人用券」和「这个指标坏了」
+         * 在页面上必须长得不一样。
+         */
+        assertNull(couponWriteOffDao.sumConfirmedAmount(ancient));
+
+        /*
+         * 两个日期都不传：SQL 里用数据库的 CURDATE() 落到当天（铁律 9）。
+         * 这里只断言「跑得通」不断言具体金额 —— 当天有没有核销取决于开发库状态，
+         * 钉死一个数字就是钉死一个明天会变的东西。
+         */
+        couponWriteOffDao.sumConfirmedAmount(new LedgerStatQuery());
     }
 
     @Test

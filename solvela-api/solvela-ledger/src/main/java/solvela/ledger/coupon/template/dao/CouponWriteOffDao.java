@@ -35,14 +35,25 @@ public interface CouponWriteOffDao extends BaseMapper<CouponWriteOff> {
                                      @Param("bizRefId") String bizRefId);
 
     /**
-     * 某段时间内的核销金额合计。
+     * 本期核销<b>金额</b>合计。
      *
-     * <p>管理端现有的券统计里有个「本期核销」口径，在本表出现之前它<b>永远是 0</b>，
-     * 而且就算券能用了也算不出<b>金额</b> —— 因为实际减了多少没人记。
+     * <p>管理端的券统计一直有个「本期核销」口径，但在本表出现之前它只数得出
+     * <b>张数</b> —— 实际减了多少没人记，所以金额算不出来。这个方法补的就是那一半。
+     *
+     * <h3>⚠️ 时间窗在 SQL 里算，不在 Java 里算</h3>
+     * 和 {@code MemberCouponDao} 那几个统计口径共用同一套约定：两个日期都为 null 时
+     * 用数据库的 {@code CURDATE()} 落到当天（铁律 9：时间只认数据库一个钟）。
+     * 在 Java 里算 {@code LocalDate.now()} 会引入第二个时钟源。
+     *
+     * <h3>⚠️ 它和「本期核销张数」可能对不齐，而那不是 bug</h3>
+     * 张数走的是 {@code t_member_coupon.used_time}，金额走的是本表 CONFIRM 行的
+     * {@code create_time}。两者在同一次核销里是同一时刻，但<b>2026-09-15 三阶段核销
+     * 上线之前用掉的券没有流水行</b> —— 那批券有 used_time、没有金额。
+     * 所以历史区间上会出现「张数 &gt; 0 而金额为 0」，那是真实的历史，不是漏算。
      *
      * @return 没有任何核销时返回 null，调用方按 0 处理
      */
-    BigDecimal sumConfirmedAmount(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+    BigDecimal sumConfirmedAmount(@Param("form") solvela.ledger.stat.domain.query.LedgerStatQuery form);
 
     /**
      * 这一笔对这张券的<b>锁定</b>那一行。

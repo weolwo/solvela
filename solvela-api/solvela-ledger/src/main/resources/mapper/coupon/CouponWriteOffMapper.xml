@@ -31,13 +31,21 @@
     <!--
       本期核销金额。只算 CONFIRM ——
       LOCK 还没成交、RELEASE 是撤销，都不该计入。
+      把 RELEASE 也算进去的话，一次「锁了又放」会凭空贡献一笔核销额。
+
+      时间窗与 MemberCouponMapper 的 stat_window_used 写法一致：
+      两个日期都为 null 时用数据库的 CURDATE() 落到当天（铁律 9）；
+      jdbcType=DATE 不能省，否则传 null 时 MyBatis 会抛「JdbcType OTHER」；
+      结束日用 &lt; 次日零点，写 &lt;= 会把结束日当天的核销整天筛掉。
     -->
     <select id="sumConfirmedAmount" resultType="java.math.BigDecimal">
+        <![CDATA[
         SELECT SUM(discount_amount)
         FROM t_coupon_write_off
         WHERE action = 'CONFIRM'
-          AND create_time &gt;= #{from}
-          AND create_time &lt; #{to}
+          AND create_time >= COALESCE(#{form.statDateBegin,jdbcType=DATE}, CURDATE())
+          AND create_time < DATE_ADD(COALESCE(#{form.statDateEnd,jdbcType=DATE}, CURDATE()), INTERVAL 1 DAY)
+        ]]>
     </select>
 
 
