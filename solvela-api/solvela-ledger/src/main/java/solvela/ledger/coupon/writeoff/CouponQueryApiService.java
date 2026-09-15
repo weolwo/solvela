@@ -94,27 +94,30 @@ public class CouponQueryApiService implements CouponQueryApi {
 
     @Override
     public CouponTrialView trial(CouponTrialQuery query) {
-        CouponDeductTargetEnum deductTarget = parseDeductTarget(query.deductTarget());
-        if (deductTarget == null) {
-            /*
-             * 抵扣对象认不出来就返回空，不猜一个默认值。
-             *
-             * 猜 CASH 的后果是：一个本该抵积分的订单会把用户的现金券算进来，
-             * 然后锁定时才发现对不上 —— 或者更糟，对上了。
-             */
-            log.error("【券试算】认不出抵扣对象 {}，会员 {} —— 调用方传了个域里没有的值",
-                    query.deductTarget(), query.memberId());
-            return new CouponTrialView(List.of(), List.of(), null);
+        /*
+         * ⚠️ 两个应付都可以为 null（这一单没有那一侧），但不能【都】为 null ——
+         *    那样一张券都用不了，调用方多半是漏传了。返回空而不是抛：
+         *    试算是只读的，为它让整个下单页 500 不值得。
+         */
+        if (isBlank(query.payPoints()) && isBlank(query.payCash())) {
+            log.error("【券试算】积分和现金都没传，会员 {} —— 调用方漏传了应付金额", query.memberId());
+            return new CouponTrialView(List.of(), List.of());
         }
 
         CouponTrialResult result = couponWriteOffService.trial(new CouponTrialCmd(
-                query.memberId(), query.payAmount(), deductTarget,
+                query.memberId(), query.payPoints(), query.payCash(),
                 query.commodityRef(), query.categoryRef(), query.sceneCode()));
 
         return new CouponTrialView(
-                result.usable().stream().map(CouponQueryApiService::toItem).toList(),
-                result.unusable().stream().map(CouponQueryApiService::toItem).toList(),
-                result.recommended() == null ? null : toItem(result.recommended()));
+                result.groups().stream()
+                        .map(g -> new CouponTrialView.Group(g.deductTarget().name(),
+                                g.items().stream().map(CouponQueryApiService::toItem).toList()))
+                        .toList(),
+                result.unusable().stream().map(CouponQueryApiService::toItem).toList());
+    }
+
+    private static boolean isBlank(java.math.BigDecimal amount) {
+        return amount == null || amount.signum() <= 0;
     }
 
     static CouponTrialView.Item toItem(CouponTrialItem item) {
@@ -124,7 +127,8 @@ public class CouponQueryApiService implements CouponQueryApi {
                 // 人话版本一起带出去：调用方不该为了显示一句「未达到使用门槛」
                 // 而去维护一份原因码到文案的映射 —— 那份映射一定会和枚举跑偏
                 item.reason() == null ? null : item.reason().getDesc(),
-                item.validEndTime());
+                item.validEndTime(),
+                item.deductTarget() == null ? null : item.deductTarget().name());
     }
 
     private static MemberCouponView toView(MemberCoupon coupon) {
@@ -170,13 +174,4 @@ public class CouponQueryApiService implements CouponQueryApi {
         return threshold + "减 " + coupon.getDiscountValue().stripTrailingZeros().toPlainString() + unit;
     }
 
-    /** 认不出来返回 null，由调用方决定怎么办 —— 不要在这里兜一个默认值 */
-    static CouponDeductTargetEnum parseDeductTarget(String raw) {
-        for (CouponDeductTargetEnum value : CouponDeductTargetEnum.values()) {
-            if (value.name().equals(raw)) {
-                return value;
-            }
-        }
-        return null;
-    }
 }

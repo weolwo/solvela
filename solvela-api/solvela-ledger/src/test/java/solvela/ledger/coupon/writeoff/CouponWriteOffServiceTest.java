@@ -26,6 +26,8 @@ import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,12 +84,41 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.selectUsableCandidates(anyLong(), any())).thenReturn(List.of(fixed, percent));
 
         // 150 元：固定额 20，百分比 min(30,50)=30 —— 百分比赢
-        CouponTrialResult result = service.trial(mallCmd("150"));
+        CouponTrialResult result = service.trial(cashCmd("150"));
 
         assertAll(
-                () -> assertEquals(2, result.usable().size()),
-                () -> assertEquals(2L, result.recommended().couponId()),
-                () -> assertEquals(new BigDecimal("30.00"), result.recommended().discountAmount()),
+                () -> assertEquals(1, result.groups().size()),
+                () -> assertEquals(CouponDeductTargetEnum.CASH, result.groups().get(0).deductTarget()),
+                () -> assertEquals(2, result.allUsable().size()),
+                () -> assertEquals(2L, result.groups().get(0).recommended().couponId()),
+                () -> assertEquals(new BigDecimal("30.00"),
+                        result.groups().get(0).recommended().discountAmount()),
+                () -> assertTrue(result.unusable().isEmpty()));
+    }
+
+    @Test
+    @DisplayName("🔴 混合支付单上积分券照样能用 —— 它抵积分那一半，不和现金券比大小")
+    void 混合单两种券各抵各的() {
+        MemberCoupon cash = coupon(1L, "满100减20", CouponDiscountTypeEnum.FIXED, "20", null, "100");
+        MemberCoupon score = coupon(2L, "减30积分", CouponDiscountTypeEnum.FIXED, "30", null, "0");
+        score.setDeductTarget(CouponDeductTargetEnum.SCORE);
+        when(memberCouponDao.selectUsableCandidates(anyLong(), any())).thenReturn(List.of(cash, score));
+
+        // 500 积分 + 150 元的混合单
+        CouponTrialResult result = service.trial(CouponTrialCmd.forMall(
+                MEMBER_ID, new BigDecimal("500"), new BigDecimal("150"), "SKU1", "CAT1"));
+
+        Map<CouponDeductTargetEnum, CouponTrialResult.Group> byTarget = result.groups().stream()
+                .collect(Collectors.toMap(CouponTrialResult.Group::deductTarget, g -> g));
+        assertAll(
+                // 🔴 曾经这里只有 CASH 一组：入口先挑了一个抵扣对象，
+                //    「混合单只抵现金」把积分券整个挡在了门外
+                () -> assertEquals(2, result.groups().size()),
+                () -> assertEquals(new BigDecimal("20.00"),
+                        byTarget.get(CouponDeductTargetEnum.CASH).recommended().discountAmount()),
+                // 积分抵扣不留小数位 —— 积分本来就没有「分」
+                () -> assertEquals(new BigDecimal("30"),
+                        byTarget.get(CouponDeductTargetEnum.SCORE).recommended().discountAmount()),
                 () -> assertTrue(result.unusable().isEmpty()));
     }
 
@@ -100,7 +131,7 @@ class CouponWriteOffServiceTest {
         sooner.setValidEndTime(LocalDateTime.now().plusDays(3));
         when(memberCouponDao.selectUsableCandidates(anyLong(), any())).thenReturn(List.of(later, sooner));
 
-        assertEquals(2L, service.trial(mallCmd("150")).recommended().couponId());
+        assertEquals(2L, service.trial(cashCmd("150")).groups().get(0).recommended().couponId());
     }
 
     @Test
@@ -113,16 +144,16 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.selectUsableCandidates(anyLong(), any()))
                 .thenReturn(List.of(below, noRule, scoreCoupon));
 
-        CouponTrialResult result = service.trial(mallCmd("150"));
+        CouponTrialResult result = service.trial(cashCmd("150"));
 
         assertAll(
-                () -> assertTrue(result.usable().isEmpty()),
-                () -> assertNull(result.recommended()),
+                () -> assertTrue(result.groups().isEmpty()),
+                () -> assertTrue(result.allUsable().isEmpty()),
                 () -> assertEquals(3, result.unusable().size()),
                 () -> assertEquals(CouponUnusableReason.BELOW_MIN_AMOUNT, result.unusable().get(0).reason()),
                 // 规则列为 NULL = 没有模板可读，和「配成了减 0」是两回事
                 () -> assertEquals(CouponUnusableReason.NO_RULE, result.unusable().get(1).reason()),
-                // 1 积分 ≠ 1 元，不替用户跨类换算
+                // 这一单没有积分部分，抵积分的券无处可抵
                 () -> assertEquals(CouponUnusableReason.DEDUCT_TARGET_MISMATCH,
                         result.unusable().get(2).reason()));
     }
@@ -136,13 +167,13 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.selectUsableCandidates(anyLong(), any())).thenReturn(List.of(scoped));
 
         assertEquals(1, service.trial(
-                CouponTrialCmd.forMall(MEMBER_ID, new BigDecimal("150"),
-                        CouponDeductTargetEnum.CASH, "SKU1", "CAT1")).usable().size());
+                CouponTrialCmd.forMall(MEMBER_ID, null, new BigDecimal("150"),
+                        "SKU1", "CAT1")).allUsable().size());
 
         // CAT10 不该命中 CAT1 —— 所以匹配时两边都裹上引号
         assertEquals(1, service.trial(
-                CouponTrialCmd.forMall(MEMBER_ID, new BigDecimal("150"),
-                        CouponDeductTargetEnum.CASH, "SKU1", "CAT10")).unusable().size());
+                CouponTrialCmd.forMall(MEMBER_ID, null, new BigDecimal("150"),
+                        "SKU1", "CAT10")).unusable().size());
     }
 
     @Test
@@ -155,7 +186,7 @@ class CouponWriteOffServiceTest {
 
         // 放行等于把一张「本该限定」的券变成了全场通用券
         assertEquals(CouponUnusableReason.SCOPE_MISMATCH,
-                service.trial(mallCmd("150")).unusable().get(0).reason());
+                service.trial(cashCmd("150")).unusable().get(0).reason());
     }
 
     /* ---------------- 锁定 ---------------- */
@@ -296,9 +327,9 @@ class CouponWriteOffServiceTest {
 
     /* ---------------- fixtures ---------------- */
 
-    private static CouponTrialCmd mallCmd(String payAmount) {
-        return CouponTrialCmd.forMall(MEMBER_ID, new BigDecimal(payAmount),
-                CouponDeductTargetEnum.CASH, "SKU1", "CAT1");
+    /** 只有现金那一侧的商城单 */
+    private static CouponTrialCmd cashCmd(String payCash) {
+        return CouponTrialCmd.forMall(MEMBER_ID, null, new BigDecimal(payCash), "SKU1", "CAT1");
     }
 
     private static CouponWriteOff lockRow() {

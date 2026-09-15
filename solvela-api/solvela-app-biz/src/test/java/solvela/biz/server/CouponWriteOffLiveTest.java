@@ -16,6 +16,7 @@ import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 import solvela.ledger.coupon.writeoff.CouponWriteOffService;
 import solvela.ledger.coupon.writeoff.domain.CouponTrialCmd;
+import solvela.ledger.coupon.writeoff.domain.CouponTrialItem;
 import solvela.ledger.coupon.writeoff.domain.CouponTrialResult;
 import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
 
@@ -182,12 +183,14 @@ class CouponWriteOffLiveTest {
         memberCouponDao.updateById(steep);
 
         CouponTrialResult result = couponWriteOffService.trial(CouponTrialCmd.forMall(
-                TEST_MEMBER_ID, new BigDecimal("150.00"), CouponDeductTargetEnum.CASH, "SKU1", "CAT1"));
+                TEST_MEMBER_ID, null, new BigDecimal("150.00"), "SKU1", "CAT1"));
+        CouponTrialItem best = result.groups().get(0).recommended();
 
         assertAll(
-                () -> assertEquals(1, result.usable().size()),
-                () -> assertEquals(cheap.getId(), result.recommended().couponId()),
-                () -> assertEquals(0, new BigDecimal("20.00").compareTo(result.recommended().discountAmount())),
+                () -> assertEquals(1, result.allUsable().size()),
+                () -> assertEquals(CouponDeductTargetEnum.CASH, result.groups().get(0).deductTarget()),
+                () -> assertEquals(cheap.getId(), best.couponId()),
+                () -> assertEquals(0, new BigDecimal("20.00").compareTo(best.discountAmount())),
                 // 用不了的那张也回来了，带着原因 —— 券凭空消失才是最让用户困惑的
                 () -> assertEquals(1, result.unusable().size()),
                 () -> assertEquals(steep.getId(), result.unusable().get(0).couponId()));

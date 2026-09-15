@@ -126,8 +126,9 @@ public class ExternalRechargeService {
      * 券模板里 {@code scope_type = EXTERNAL} 的那一档就是按它匹配的。
      */
     public CouponTrialView trial(Long memberId, BigDecimal amount) {
+        // 充值只有现金这一侧：积分那个位置传 null，积分券会带着原因回到不可用列表里
         return couponQueryApi.trial(new CouponTrialQuery(
-                memberId, amount, "CASH", null, null, sceneProperties.getSceneCode()));
+                memberId, null, amount, null, null, sceneProperties.getSceneCode()));
     }
 
     // ------------------------------------------------------------------ 下单
@@ -165,7 +166,7 @@ public class ExternalRechargeService {
 
         if (cmd.couponId() != null) {
             CouponTrialView trial = trial(cmd.memberId(), amount);
-            CouponTrialView.Item chosen = trial.usable().stream()
+            CouponTrialView.Item chosen = trial.allUsable().stream()
                     .filter(item -> cmd.couponId().equals(item.couponId()))
                     .findFirst()
                     .orElse(null);

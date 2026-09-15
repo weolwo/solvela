@@ -61,15 +61,34 @@ export interface CouponTrialItem {
    */
   reasonDesc: string | null
   validEndTime: string | null
+  /**
+   * 这张券减的是哪一半。
+   *
+   * 🔴 混合支付单（积分 + 现金）上，账单要按它决定把抵扣落在积分侧还是现金侧。
+   * 一律当成减积分的话，用现金券的单会显示成「积分少扣了」，而实际扣的是现金。
+   */
+  deductTarget: 'CASH' | 'SCORE'
 }
 
+/** 同一个抵扣对象下的可用券 */
+export interface CouponTrialGroup {
+  deductTarget: 'CASH' | 'SCORE'
+  /** 已按能减多少从大到小排好，第一张就是<b>本组</b>最优 */
+  items: CouponTrialItem[]
+}
+
+/**
+ * 试算结果：**按抵扣对象分组**。
+ *
+ * 🔴 没有「全局最优」这个字段，也不该有：一张减 10 积分的券和一张减 5 元的券，
+ * 谁更划算系统答不了 —— 1 积分 ≠ 1 元，而汇率是业务定义、还会变。
+ * 组内排序，跨组让用户自己挑。
+ */
 export interface CouponTrialResult {
-  /** 能用的券，已按能减多少从大到小排好，第一张就是最优 */
-  usable: CouponTrialItem[]
+  /** 这一单没有的那一侧不会出现（纯积分单就只有 SCORE 一组） */
+  groups: CouponTrialGroup[]
   /** 用不了的券，每张带着原因。**要展示，别过滤** */
   unusable: CouponTrialItem[]
-  /** 最优券；一张能用的都没有时为 null */
-  recommended: CouponTrialItem | null
 }
 
 /**

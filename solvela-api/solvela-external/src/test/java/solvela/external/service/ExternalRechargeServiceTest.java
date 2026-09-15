@@ -143,8 +143,9 @@ class ExternalRechargeServiceTest {
         assertAll(
                 // scope_type = EXTERNAL 的券就是按它匹配的 —— 这一档在阶段 1 建出来就是为了这一天
                 () -> assertEquals("MOBILE_RECHARGE", query.sceneCode()),
-                () -> assertEquals("CASH", query.deductTarget()),
-                () -> assertEquals(0, new BigDecimal("100").compareTo(query.payAmount())),
+                // 充话费掏的是真钱，没有积分那一侧 —— 积分券在这里本来就无处可抵
+                () -> assertEquals(null, query.payPoints()),
+                () -> assertEquals(0, new BigDecimal("100").compareTo(query.payCash())),
                 // 外部场景没有商品和类目，传上去只会让 scope 匹配出莫名其妙的结果
                 () -> assertEquals(null, query.commodityRef()),
                 () -> assertEquals(null, query.categoryRef()));
@@ -208,7 +209,7 @@ class ExternalRechargeServiceTest {
     @DisplayName("券不可用 → 拒绝，不会悄悄按原价下单")
     void 券不可用时拒绝() {
         when(couponQueryApi.trial(any()))
-                .thenReturn(new CouponTrialView(List.of(), List.of(), null));
+                .thenReturn(new CouponTrialView(List.of(), List.of()));
 
         // 悄悄按原价下单的话，用户会发现自己多花了钱而券还在
         assertEquals(RechargeReason.COUPON_UNUSABLE,
@@ -305,9 +306,10 @@ class ExternalRechargeServiceTest {
 
     private void stubCouponUsable(BigDecimal discount) {
         CouponTrialView.Item item = new CouponTrialView.Item(
-                COUPON_ID, "话费券", discount, true, null, null, null);
+                COUPON_ID, "话费券", discount, true, null, null, null, "CASH");
         when(couponQueryApi.trial(any()))
-                .thenReturn(new CouponTrialView(List.of(item), List.of(), item));
+                .thenReturn(new CouponTrialView(
+                        List.of(new CouponTrialView.Group("CASH", List.of(item))), List.of()));
     }
 
     private static RechargeCmd cmd(BigDecimal amount, Long couponId) {

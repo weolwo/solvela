@@ -505,7 +505,7 @@ class MallRedeemServiceTest {
     @DisplayName("券在试算里不可用 → 拒绝并回滚，不会悄悄按原价下单")
     void 券不可用时拒绝并回滚() {
         when(couponQueryApi.trial(any()))
-                .thenReturn(new CouponTrialView(List.of(), List.of(), null));
+                .thenReturn(new CouponTrialView(List.of(), List.of()));
 
         MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
 
@@ -531,11 +531,31 @@ class MallRedeemServiceTest {
     }
 
     @Test
-    @DisplayName("🔴 积分+现金单：券抵的是【现金】，不是积分（阶段 6）")
-    void 混合支付单用券抵现金() {
+    @DisplayName("积分+现金单用现金券：减现金，积分一分没动")
+    void 混合支付单用现金券抵现金() {
         commodity.setPayType(MallPayTypeEnum.POINTS_CASH);
         commodity.setCashPrice(new BigDecimal("50.00"));
-        stubCouponUsable(10);
+        stubCouponUsable(10, "CASH");
+
+        MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
+
+        MallOrder order = savedOrder();
+        assertAll(
+                () -> assertTrue(result.accepted()),
+                () -> assertEquals(0, new BigDecimal("40.00").compareTo(order.getPayCash())),
+                () -> assertEquals(5000, order.getPayPoints()),
+                () -> assertEquals(0, new BigDecimal("10").compareTo(order.getCouponDiscount())));
+
+        // 混合单落的是待支付，券要等【付款】那一刻才确认 —— 这里不该确认
+        verify(couponWriteOffApi, never()).confirm(any());
+    }
+
+    @Test
+    @DisplayName("🔴 积分+现金单用积分券：减【积分】—— 曾经这张券在混合单上根本用不了")
+    void 混合支付单用积分券抵积分() {
+        commodity.setPayType(MallPayTypeEnum.POINTS_CASH);
+        commodity.setCashPrice(new BigDecimal("50.00"));
+        stubCouponUsable(1000, "SCORE");
 
         MallRedeemResult result = service.redeem(cmdWithCoupon(COUPON_ID));
 
@@ -544,15 +564,17 @@ class MallRedeemServiceTest {
         MallOrder order = savedOrder();
         assertAll(
                 () -> assertTrue(result.accepted()),
-                // 抵扣对象按【订单的付款方式】定：混合单抵现金 —— 那是用户真正掏出去的部分
-                () -> assertEquals("CASH", trialCaptor.getValue().deductTarget()),
-                () -> assertEquals(0, new BigDecimal("50.00").compareTo(trialCaptor.getValue().payAmount())),
-                // 现金被减掉，积分【一分没动】
-                () -> assertEquals(0, new BigDecimal("40.00").compareTo(order.getPayCash())),
-                () -> assertEquals(5000, order.getPayPoints()),
-                () -> assertEquals(0, new BigDecimal("10").compareTo(order.getCouponDiscount())));
+                /*
+                 * 🔴 两个应付都要传上去。此前这里只传【一个】应付 + 一个抵扣对象，
+                 *    混合单被硬性定成「只抵现金」，于是积分券直接不可用 ——
+                 *    用户手里的积分券在混合单上凭空消失。
+                 */
+                () -> assertEquals(5000, trialCaptor.getValue().payPoints().intValue()),
+                () -> assertEquals(0, new BigDecimal("50.00").compareTo(trialCaptor.getValue().payCash())),
+                // 积分被减掉，现金【一分没动】
+                () -> assertEquals(4000, order.getPayPoints()),
+                () -> assertEquals(0, new BigDecimal("50.00").compareTo(order.getPayCash())));
 
-        // 混合单落的是待支付，券要等【付款】那一刻才确认 —— 这里不该确认
         verify(couponWriteOffApi, never()).confirm(any());
     }
 
@@ -565,12 +587,18 @@ class MallRedeemServiceTest {
         assertNull(savedOrder().getCouponId());
     }
 
-    /** 让试算返回一张能减 {@code discount} 分的券，并让锁定成功 */
+    /** 让试算返回一张能减 {@code discount} 分的<b>积分</b>券，并让锁定成功 */
     private void stubCouponUsable(int discount) {
+        stubCouponUsable(discount, "SCORE");
+    }
+
+    /** 让试算返回一张券，{@code deductTarget} 决定它抵积分还是抵现金 */
+    private void stubCouponUsable(int discount, String deductTarget) {
         CouponTrialView.Item item = new CouponTrialView.Item(
-                COUPON_ID, "测试券", BigDecimal.valueOf(discount), true, null, null, null);
+                COUPON_ID, "测试券", BigDecimal.valueOf(discount), true, null, null, null, deductTarget);
         when(couponQueryApi.trial(any()))
-                .thenReturn(new CouponTrialView(List.of(item), List.of(), item));
+                .thenReturn(new CouponTrialView(
+                        List.of(new CouponTrialView.Group(deductTarget, List.of(item))), List.of()));
         when(couponWriteOffApi.lock(any()))
                 .thenReturn(new CouponWriteOffView(true, false, BigDecimal.valueOf(discount), null));
         when(couponWriteOffApi.confirm(any()))

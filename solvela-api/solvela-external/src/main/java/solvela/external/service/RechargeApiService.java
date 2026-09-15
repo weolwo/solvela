@@ -71,7 +71,7 @@ public class RechargeApiService implements RechargeApi {
     public RechargeTrialView trial(Long memberId, BigDecimal amount) {
         CouponTrialView view = externalRechargeService.trial(memberId, amount);
         return new RechargeTrialView(
-                view.usable().stream().map(RechargeApiService::toItem).toList(),
+                view.allUsable().stream().map(RechargeApiService::toItem).toList(),
                 view.unusable().stream().map(RechargeApiService::toItem).toList());
     }
 

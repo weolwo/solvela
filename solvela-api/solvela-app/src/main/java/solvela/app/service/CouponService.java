@@ -3,6 +3,7 @@ package solvela.app.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.app.domain.CouponTrialRequest;
+import solvela.enums.MallPayTypeEnum;
 import solvela.marketing.api.MallApi;
 import solvela.marketing.api.MallCommodityDetailView;
 import solvela.marketing.api.MallCommoditySkuView;
@@ -34,16 +35,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class CouponService {
-
-    /**
-     * 商城订单目前<b>只能抵积分</b>。
-     *
-     * <p>{@code CASH} 的券要抵的是现金，而全仓没有任何支付回调代码 ——
-     * 抵了也没有地方能把它结算掉。那些券会带着
-     * {@code DEDUCT_TARGET_MISMATCH} 出现在不可用列表里，<b>用户仍然看得见</b>，
-     * 只是点不动。等假支付做出来（方案阶段 6）再放开。
-     */
-    private static final String DEDUCT_TARGET_SCORE = "SCORE";
 
     private final CouponQueryApi couponQueryApi;
     private final MallApi mallApi;
@@ -83,14 +74,29 @@ public class CouponService {
          */
         BigDecimal payAmount = BigDecimal.valueOf((long) sku.pointsPrice() * request.quantityOrOne());
 
+        /*
+         * 🔴 两个应付都传：积分券减积分、现金券减现金，由券自己的 deduct_target 决定。
+         *
+         *    只有 payType=2（积分+现金）才真的要付现金 —— 纯积分商品即使配了
+         *    cash_price 也不收，传上去会让现金券误判为可用。
+         */
+        BigDecimal payCash = MallPayTypeEnum.POINTS_CASH == commodity.payType()
+                ? money(sku.cashPrice()).multiply(BigDecimal.valueOf(request.quantityOrOne()))
+                : BigDecimal.ZERO;
+
         return couponQueryApi.trial(new CouponTrialQuery(
-                memberId, payAmount, DEDUCT_TARGET_SCORE,
+                memberId, payAmount, payCash,
                 commodity.commodityCode(),
                 commodity.categoryId() == null ? null : String.valueOf(commodity.categoryId()),
                 null));
     }
 
     private static CouponTrialView emptyTrial() {
-        return new CouponTrialView(List.of(), List.of(), null);
+        return new CouponTrialView(List.of(), List.of());
+    }
+
+    /** SKU 的现金价可能为 null（没配就是不收现金） */
+    private static BigDecimal money(BigDecimal raw) {
+        return raw == null ? BigDecimal.ZERO : raw;
     }
 }

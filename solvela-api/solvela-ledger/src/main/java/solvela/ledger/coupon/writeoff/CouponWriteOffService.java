@@ -22,7 +22,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 券的三阶段核销：<b>试算 → 锁定 → 确认 / 释放</b>。
@@ -77,29 +79,49 @@ public class CouponWriteOffService {
         List<MemberCoupon> candidates =
                 memberCouponDao.selectUsableCandidates(cmd.memberId(), LocalDateTime.now());
 
-        List<CouponTrialItem> usable = new ArrayList<>();
+        /*
+         * 🔴 按券自己的 deduct_target 分组，而不是按入参挑定的一个。
+         *
+         *    混合支付单（积分 + 现金）上两种券都用得上，各减各的那一半 ——
+         *    一单一券的前提下只有一张券，它的 deduct_target 就唯一决定了抵哪边。
+         */
+        Map<CouponDeductTargetEnum, List<CouponTrialItem>> usableByTarget = new EnumMap<>(CouponDeductTargetEnum.class);
         List<CouponTrialItem> unusable = new ArrayList<>();
 
         for (MemberCoupon coupon : candidates) {
+            CouponDeductTargetEnum target = coupon.getDeductTarget();
             CouponUnusableReason reason = checkUsable(coupon, cmd);
             if (reason != null) {
                 unusable.add(CouponTrialItem.unusable(coupon.getId(), coupon.getCouponCode(),
-                        coupon.getCouponName(), reason, coupon.getValidEndTime()));
+                        coupon.getCouponName(), reason, coupon.getValidEndTime(), target));
                 continue;
             }
+            // checkUsable 已经保证这一侧有应付，所以这里不会是 null
+            BigDecimal payable = cmd.payableFor(target);
             BigDecimal discount = CouponDiscountCalculator.compute(
                     coupon.getDiscountType(), coupon.getDiscountValue(), coupon.getMaxDiscount(),
-                    coupon.getDeductTarget(), cmd.payAmount());
-            usable.add(CouponTrialItem.usable(coupon.getId(), coupon.getCouponCode(),
-                    coupon.getCouponName(), discount, coupon.getValidEndTime()));
+                    target, payable);
+            usableByTarget.computeIfAbsent(target, k -> new ArrayList<>())
+                    .add(CouponTrialItem.usable(coupon.getId(), coupon.getCouponCode(),
+                            coupon.getCouponName(), discount, coupon.getValidEndTime(), target));
         }
 
-        // 抵扣额从大到小；平局选先过期的那张
-        usable.sort(Comparator.comparing(CouponTrialItem::discountAmount).reversed()
-                .thenComparing(CouponTrialItem::validEndTime)
-                .thenComparing(CouponTrialItem::couponId));
+        List<CouponTrialResult.Group> groups = new ArrayList<>();
+        usableByTarget.forEach((target, items) -> {
+            /*
+             * 组内：抵扣额从大到小；平局选先过期的那张 ——
+             * 用户手上的券整体价值最大化。选 id 小的或随便一张，
+             * 结果是用户攒了一堆快过期的券却总在用新的。
+             *
+             * 🔴 只在组内排，【不跨组】：10 积分和 5 块钱谁更划算系统答不了。
+             */
+            items.sort(Comparator.comparing(CouponTrialItem::discountAmount).reversed()
+                    .thenComparing(CouponTrialItem::validEndTime)
+                    .thenComparing(CouponTrialItem::couponId));
+            groups.add(CouponTrialResult.Group.of(target, items));
+        });
 
-        return CouponTrialResult.of(usable, unusable);
+        return new CouponTrialResult(List.copyOf(groups), List.copyOf(unusable));
     }
 
     /**
@@ -120,17 +142,33 @@ public class CouponWriteOffService {
                 || coupon.getDeductTarget() == null) {
             return CouponUnusableReason.NO_RULE;
         }
-        // 抵现金的券和抵积分的券不可比。不换算 —— 1 积分 ≠ 1 元，汇率是业务定义还会变
-        if (coupon.getDeductTarget() != cmd.deductTarget()) {
+        /*
+         * 这一单有没有它能抵的那一部分。
+         *
+         * 🔴 不换算：1 积分 ≠ 1 元，汇率是业务定义还会变。
+         *    纯积分单上的现金券、纯现金单上的积分券，都落在这里 ——
+         *    它们仍然会带着原因返回给用户看，只是点不动。
+         */
+        BigDecimal payable = cmd.payableFor(coupon.getDeductTarget());
+        if (payable == null || payable.signum() <= 0) {
             return CouponUnusableReason.DEDUCT_TARGET_MISMATCH;
         }
         if (!scopeMatches(coupon, cmd)) {
             return CouponUnusableReason.SCOPE_MISMATCH;
         }
-        // 门槛按订单原价判。一单一券时「原价还是折后价」这个问题不存在 ——
-        // 只有一次折扣，没有歧义。要做叠加的话这是第一个必须先定的口径
+        /*
+         * 门槛按【这一侧的】原价判：积分券比 payPoints，现金券比 payCash。
+         *
+         * ⚠️ 拿另一侧去比是个很容易写出来的错：一张「满 100 元可用」的现金券
+         *    碰上「5000 积分 + 9.9 元」的单子，用积分那一侧比就过了门槛，
+         *    然后在 9.9 元上减 10 元 —— 虽然有「抵扣不超过应付」兜着不会变负数，
+         *    但那一单等于白送。
+         *
+         * 一单一券时「原价还是折后价」这个问题不存在（只有一次折扣）。
+         * 要做叠加的话那是第一个必须先定的口径。
+         */
         BigDecimal minAmount = coupon.getMinAmount();
-        if (minAmount != null && cmd.payAmount().compareTo(minAmount) < 0) {
+        if (minAmount != null && payable.compareTo(minAmount) < 0) {
             return CouponUnusableReason.BELOW_MIN_AMOUNT;
         }
         return null;

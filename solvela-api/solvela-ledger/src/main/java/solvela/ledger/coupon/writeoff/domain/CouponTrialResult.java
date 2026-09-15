@@ -1,38 +1,55 @@
 package solvela.ledger.coupon.writeoff.domain;
 
+import solvela.enums.CouponDeductTargetEnum;
+
 import java.util.List;
 
 /**
- * 试算结果。
+ * 试算结果：<b>按抵扣对象分组</b>，每组内推荐一张。
  *
- * <h3>🔴 可用与不可用刻意分成两个列表</h3>
- * 混在一起的话，调用方最省事的写法就是把整个列表铺出来，然后用户看到一堆点不动的券；
- * 而真要区分，又得每个调用方自己写一遍过滤。分开之后「哪些能用」和
- * 「哪些为什么不能用」都是现成的，想写错都难。
+ * <h3>🔴 为什么分组，而不是给一个「全局最优」</h3>
+ * 一张减 10 积分的券和一张减 5 元的券，<b>谁更划算系统答不了</b> ——
+ * 1 积分 ≠ 1 元，而汇率是业务定义、还会变。硬给一个全局最优，
+ * 就是替用户做了一个它没有依据的决定。所以组内排序，<b>跨组让用户自己挑</b>。
  *
- * <h3>⚠️ 这里<b>只有一个</b> {@code deductTarget}，和方案 §4.1 的写法不同</h3>
- * §4.1 说试算输出要按 {@code deduct_target} <b>分组</b>、跨组让用户自己挑。
- * 落地时改成了<b>入参就要求指定抵扣对象</b>，理由是：一笔订单的应付本来就是确定的，
- * 纯积分单只可能抵积分。返回两组，等于把「1 积分值多少钱」这个问题推给调用方，
- * 而调用方同样答不了 —— 那正是 §4.1 想避免的事，只是换了个地方发生。
+ * <h3>⚠️ 2026-09-15 改回了这个形状</h3>
+ * 阶段 4 曾经简化成「入参指定一个抵扣对象、返回一个扁平列表」，
+ * 理由是「一笔订单的应付本来就是确定的」。那对纯积分单成立，
+ * 对<b>混合支付单</b>（积分 + 现金）不成立 —— 当时为此定了条
+ * 「混合单只抵现金」的规则，把 {@code SCORE} 券挡在了门外，
+ * 而那条规则是把叠加场景的顾虑套错了地方。
  *
- * <p>抵扣对象对不上的券不会被藏起来：它们出现在 {@link #unusable} 里，
- * 带着 {@link CouponUnusableReason#DEDUCT_TARGET_MISMATCH}。
+ * <p>不可比的是<b>推荐</b>，不是<b>可用性</b>。现在两种券都参与试算，
+ * 只是不跨组比大小。
  *
- * @param usable      能用的券，<b>按抵扣额从大到小</b>，平局时快过期的在前
- * @param unusable    用不了的券，每张带着原因
- * @param recommended 最优券（= {@code usable} 的第一张）；一张能用的都没有时为 null
+ * @param groups   按抵扣对象分的组。<b>这一单没有的那一侧不会出现</b>
+ *                 （纯积分单就只有 SCORE 一组）
+ * @param unusable 用不了的券，每张带着原因。<b>要展示，别过滤</b> ——
+ *                 用户手里有券却看不到它，第一反应是系统坏了
  *
  * @Author alaric
  * @Date 2026-09-15
  * @Copyright weolwo
  */
-public record CouponTrialResult(List<CouponTrialItem> usable,
-                                List<CouponTrialItem> unusable,
-                                CouponTrialItem recommended) {
+public record CouponTrialResult(List<Group> groups, List<CouponTrialItem> unusable) {
 
-    public static CouponTrialResult of(List<CouponTrialItem> usable, List<CouponTrialItem> unusable) {
-        return new CouponTrialResult(List.copyOf(usable), List.copyOf(unusable),
-                usable.isEmpty() ? null : usable.get(0));
+    /**
+     * 一个抵扣对象下的可用券。
+     *
+     * @param items       组内的券，<b>按抵扣额从大到小</b>，平局时快过期的在前
+     * @param recommended 组内最优（= {@code items} 的第一张）
+     */
+    public record Group(CouponDeductTargetEnum deductTarget,
+                        List<CouponTrialItem> items,
+                        CouponTrialItem recommended) {
+
+        public static Group of(CouponDeductTargetEnum deductTarget, List<CouponTrialItem> items) {
+            return new Group(deductTarget, List.copyOf(items), items.get(0));
+        }
+    }
+
+    /** 全部可用券拍平。调用方要按 couponId 找回用户选的那张时用得上 */
+    public List<CouponTrialItem> allUsable() {
+        return groups.stream().flatMap(g -> g.items().stream()).toList();
     }
 }

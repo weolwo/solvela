@@ -4,13 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { type Address, fetchAddresses, formatAddressLine } from '@/api/address'
 import { fetchAssets } from '@/api/assets'
-import { type CouponTrialItem, trialCoupons } from '@/api/coupons'
+import { type CouponTrialGroup, type CouponTrialItem, trialCoupons } from '@/api/coupons'
 import { ApiError } from '@/api/errors'
 import { fetchCommodityDetail, OrderStatus, redeem, type RedeemResult } from '@/api/mall'
 import { useAsync } from '@/composables/useAsync'
 import { type Id, toId, type Money } from '@/types/contract'
 import { formatCash, formatPoints } from '@/utils/cost'
-import { compare, formatWithSeparator, money, mul, sub, ZERO } from '@/utils/money'
+import { compare, formatWithSeparator, isNegative, isZero, money, mul, sub, ZERO } from '@/utils/money'
 
 /**
  * 兑换确认页。<b>没有购物车</b>，一单一 SKU。
@@ -146,9 +146,19 @@ function goPickAddress(): void {
  * 而 sku 要等商品详情回来才知道 —— 立刻发一次等于带着空 skuId 去问一遍。
  * 触发时机由下面那个 watch 管。
  */
-const usableCoupons = ref<CouponTrialItem[]>([])
+/*
+ * 🔴 按抵扣对象分组存，不拍平成一个列表。
+ *    混合支付单上两种券都能用，而「减 10 积分」和「减 5 元」谁更划算
+ *    系统答不了 —— 拍平之后按 discountAmount 排序，等于拿积分和人民币比大小。
+ */
+const couponGroups = ref<CouponTrialGroup[]>([])
 const unusableCoupons = ref<CouponTrialItem[]>([])
 const trialLoading = ref(false)
+
+/** 全部可用券拍平。只用来数数和按 couponId 找回用户选的那张，**不用来排序** */
+const usableCoupons = computed<CouponTrialItem[]>(() =>
+  couponGroups.value.flatMap((group) => group.items),
+)
 
 /** 用户选中的券。null = 不使用优惠券，这是默认 */
 const chosenCouponId = ref<Id | null>(null)
@@ -158,14 +168,14 @@ async function reloadTrial(skuId: Id): Promise<void> {
   trialLoading.value = true
   try {
     const outcome = await trialCoupons({ commodityId, skuId, quantity: quantity.value })
-    usableCoupons.value = outcome.usable
+    couponGroups.value = outcome.groups
     unusableCoupons.value = outcome.unusable
   } catch {
     /*
      * 选券挂了不该挡住兑换本身 —— 用户还是可以不用券把单下了。
      * 静默降级成「没有可用券」，而不是把整页变成错误态。
      */
-    usableCoupons.value = []
+    couponGroups.value = []
     unusableCoupons.value = []
   } finally {
     trialLoading.value = false
@@ -204,18 +214,38 @@ function pickCoupon(couponId: Id | null): void {
 /** 抵扣前的积分 = 单价 × 件数。积分是整数，直接乘 */
 const originalPoints = computed(() => (sku.value?.pointsPrice ?? 0) * quantity.value)
 
-/** 券减了多少积分。没选券就是 0 */
+/**
+ * 券减了多少<b>积分</b>。选的是现金券时为 0。
+ *
+ * 🔴 靠的是券自己的 deductTarget，不是「这一单是不是混合支付」。
+ * 一律当成减积分的话，用现金券的单会显示成「积分少扣了」，而实际扣的是现金。
+ */
 const couponDiscount = computed(() =>
-  chosenCoupon.value === null ? 0 : Number(chosenCoupon.value.discountAmount),
+  chosenCoupon.value === null || chosenCoupon.value.deductTarget !== 'SCORE'
+    ? 0
+    : Number(chosenCoupon.value.discountAmount),
+)
+
+/** 券减了多少<b>现金</b>。选的是积分券时为 0 */
+const couponDiscountCash = computed<Money>(() =>
+  chosenCoupon.value === null || chosenCoupon.value.deductTarget !== 'CASH'
+    ? ZERO
+    : money(chosenCoupon.value.discountAmount),
 )
 
 /** 实付积分 = 抵扣前 - 券抵扣。服务端还会再算一遍，这里只为把话说清楚 */
 const payPoints = computed(() => Math.max(0, originalPoints.value - couponDiscount.value))
 
-/** 实付现金 = 单价 × 件数。**金额必须走 Decimal**，不许用 JS 原生乘 */
-const payCash = computed<Money>(() =>
+/** 抵扣前的现金 = 单价 × 件数。**金额必须走 Decimal**，不许用 JS 原生乘 */
+const originalCash = computed<Money>(() =>
   sku.value === null ? ZERO : mul(money(sku.value.cashPrice), quantity.value),
 )
+
+/** 实付现金 = 抵扣前 - 券抵扣。不能减成负数 */
+const payCash = computed<Money>(() => {
+  const left = sub(originalCash.value, couponDiscountCash.value)
+  return isNegative(left) ? ZERO : left
+})
 
 const needsPayment = computed(() => detail.data.value?.payType === 2)
 
@@ -406,6 +436,7 @@ function goRecords(): void {
           <button type="button" class="coupon-row" @click="couponPickerOpen = !couponPickerOpen">
             <span v-if="chosenCoupon !== null" class="coupon-row__on">
               {{ chosenCoupon.couponName }} · 减 {{ chosenCoupon.discountAmount }}
+              {{ chosenCoupon.deductTarget === 'SCORE' ? '积分' : '元' }}
             </span>
             <span v-else-if="usableCoupons.length > 0" class="coupon-row__hint">
               有 {{ usableCoupons.length }} 张可用
@@ -421,15 +452,29 @@ function goRecords(): void {
                 <Icon v-if="chosenCouponId === null" name="check" :size="16" />
               </button>
             </li>
-            <li v-for="item in usableCoupons" :key="item.couponId">
-              <button type="button" class="pick" @click="pickCoupon(item.couponId)">
-                <span class="pick__main">
-                  <span class="pick__name">{{ item.couponName }}</span>
-                  <span class="pick__save">可减 {{ item.discountAmount }} 积分</span>
-                </span>
-                <Icon v-if="chosenCouponId === item.couponId" name="check" :size="16" />
-              </button>
-            </li>
+            <!--
+              🔴 按抵扣对象分组列，不拍平成一个列表。
+                 拍平之后要么按 discountAmount 排序（等于拿积分和人民币比大小），
+                 要么让用户在一串「减 20」里分不出哪张减的是钱。
+                 只有一组时组名不显示 —— 纯积分单上它是废话。
+            -->
+            <template v-for="group in couponGroups" :key="group.deductTarget">
+              <li v-if="couponGroups.length > 1" class="picks__group">
+                {{ group.deductTarget === 'SCORE' ? '抵扣积分' : '抵扣现金' }}
+              </li>
+              <li v-for="item in group.items" :key="item.couponId">
+                <button type="button" class="pick" @click="pickCoupon(item.couponId)">
+                  <span class="pick__main">
+                    <span class="pick__name">{{ item.couponName }}</span>
+                    <span class="pick__save">
+                      可减 {{ item.discountAmount }}
+                      {{ group.deductTarget === 'SCORE' ? '积分' : '元' }}
+                    </span>
+                  </span>
+                  <Icon v-if="chosenCouponId === item.couponId" name="check" :size="16" />
+                </button>
+              </li>
+            </template>
             <!-- 不可用的：点不动，但看得见，而且说得出为什么 -->
             <li v-for="item in unusableCoupons" :key="item.couponId">
               <span class="pick pick--off">
@@ -465,6 +510,13 @@ function goRecords(): void {
           <div v-if="needsPayment" class="bill__row">
             <span>需支付现金</span>
             <span class="bill__value">{{ formatCash(payCash) }}</span>
+          </div>
+          <!-- 抵现金的券同样要单独列一行，理由和上面那行一样：用户要看得出券生效了 -->
+          <div v-if="needsPayment && !isZero(couponDiscountCash)" class="bill__row bill__row--sub">
+            <span>券抵扣</span>
+            <span class="bill__value bill__value--cut">
+              -{{ formatCash(couponDiscountCash) }}（原价 {{ formatCash(originalCash) }}）
+            </span>
           </div>
         </div>
 
@@ -546,6 +598,18 @@ function goRecords(): void {
 }
 
 .picks > li:first-child .pick {
+  border-top: 0;
+}
+
+/* 组名。只有混合支付单（两组并列）才出现 */
+.picks__group {
+  padding: var(--sv-space-sm) var(--sv-space-md) var(--sv-space-xs);
+  border-top: 1px solid var(--sv-border-color);
+  font-size: var(--sv-font-caption);
+  color: var(--sv-text-secondary);
+}
+
+.picks__group + li .pick {
   border-top: 0;
 }
 

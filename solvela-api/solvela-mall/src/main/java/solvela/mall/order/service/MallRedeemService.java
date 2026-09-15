@@ -167,7 +167,7 @@ public class MallRedeemService {
         if (couponUse.problem() != null) {
             return reject(couponUse.problem());
         }
-        int payPoints = originalPoints - couponUse.discountPoints(hangs);
+        int payPoints = originalPoints - couponUse.discountPoints();
 
         MallRedeemReason debitProblem = debitPoints(cmd.memberId(), commodity, orderNo, payPoints);
         if (debitProblem != null) {
@@ -177,9 +177,9 @@ public class MallRedeemService {
         MallOrder order = buildOrder(cmd, commodity, sku, quantity, orderNo, payPoints, hangs, address);
         order.setCouponId(couponUse.couponId());
         order.setCouponDiscount(couponUse.couponId() == null ? null : couponUse.discount());
-        if (couponUse.couponId() != null && hangs) {
+        if (couponUse.deductsCash()) {
             // 抵现金：实付现金 = 原本的应付现金 - 抵扣。不能减成负数
-            order.setPayCash(order.getPayCash().subtract(couponUse.discount()).max(BigDecimal.ZERO));
+            order.setPayCash(order.getPayCash().subtract(couponUse.discountCash()).max(BigDecimal.ZERO));
         }
         mallOrderManager.save(order);
 
@@ -192,20 +192,34 @@ public class MallRedeemService {
     /**
      * 用券的结果。{@code problem != null} 即被拒。
      *
-     * @param couponId       锁上的券；没用券时为 null
-     * @param discountPoints 抵扣掉的积分。没用券时为 0
+     * @param couponId    锁上的券；没用券时为 null
+     * @param discount    实际抵掉多少。<b>单位由 {@code deductsCash} 决定</b>：元 或 积分
+     * @param deductsCash 这张券抵的是现金那一半还是积分那一半
+     * @param problem     被拒的原因；{@code null} = 没被拒
      */
-    private record CouponUse(Long couponId, BigDecimal discount, MallRedeemReason problem) {
+    private record CouponUse(Long couponId, BigDecimal discount, boolean deductsCash,
+                             MallRedeemReason problem) {
 
-        static final CouponUse NONE = new CouponUse(null, BigDecimal.ZERO, null);
+        static final CouponUse NONE = new CouponUse(null, BigDecimal.ZERO, false, null);
 
         static CouponUse rejected(MallRedeemReason problem) {
-            return new CouponUse(null, BigDecimal.ZERO, problem);
+            return new CouponUse(null, BigDecimal.ZERO, false, problem);
         }
 
-        /** 抵掉的积分。抵现金的券在这里是 0 —— 积分那一部分没被动过 */
-        int discountPoints(boolean deductsCash) {
+        /**
+         * 抵掉的积分。抵现金的券在这里是 0 —— 积分那一部分没被动过。
+         *
+         * <p>🔴 靠的是<b>券自己的</b> deduct_target，不是订单的付款方式。
+         * 2026-09-15 之前这里看的是「是不是混合单」，于是混合单上的积分券
+         * 会被错误地当成现金券去减现金。
+         */
+        int discountPoints() {
             return deductsCash ? 0 : discount.intValue();
+        }
+
+        /** 抵掉的现金。抵积分的券在这里是 0 */
+        BigDecimal discountCash() {
+            return deductsCash ? discount : BigDecimal.ZERO;
         }
     }
 
@@ -216,15 +230,16 @@ public class MallRedeemService {
      * 客户端只说「用哪张券」。让它传抵扣额，「减多少」就成了客户端说了算 ——
      * 那是一个可以直接刷钱的口子，而且不会有任何报错。
      *
-     * <h3>🔴 抵积分还是抵现金，<b>由订单的付款方式决定</b>（2026-09-15 阶段 6）</h3>
-     * 纯积分单抵积分；{@code POINTS_CASH} 单抵<b>现金</b> —— 现金是用户真正掏出去的
-     * 那一部分，折扣落在那里才是用户能感知到的优惠。
+     * <h3>🔴 抵积分还是抵现金，由<b>券自己的</b> {@code deduct_target} 决定</h3>
+     * 2026-09-15 改。阶段 6 曾经定了条「混合单只抵现金」的规则，把 {@code SCORE} 券
+     * 挡在了混合单外面，理由是「要让两种券都能用就得先回答先抵哪一部分」。
      *
-     * <p>⚠️ 这条规则的代价是：{@code SCORE} 券在 {@code POINTS_CASH} 单上用不了
-     *（会带着 {@code DEDUCT_TARGET_MISMATCH} 出现在不可用列表里，用户仍然看得见）。
-     * 要让两种券都能用在混合单上，就得先回答「先抵哪一部分」「能不能两部分都抵」——
-     * 那和「券叠加」是同一类没有标准答案的产品问题，需要产品定，
-     * 而它们每一个都能造出资损。所以这里选了一条<b>确定的、说得清的</b>规则。
+     * <p><b>那个理由是错的</b>：一单一券的前提下只有一张券，它的 {@code deduct_target}
+     * 就唯一决定了抵哪一半，根本不存在「先抵哪部分」这个问题 ——
+     * 那是把<b>叠加</b>场景的顾虑套到了非叠加场景上。
+     *
+     * <p>现在两个应付都传给试算，积分券减 {@code payPoints}、现金券减 {@code payCash}。
+     * 不可比的是<b>推荐</b>（10 积分和 5 块钱谁更划算答不了），不是可用性。
      *
      * <p>阶段 4 曾经<b>完全禁止</b> {@code POINTS_CASH} 用券，因为那时没有任何地方
      * 能把券从「锁定中」推到「已使用」—— 券会被兜底任务放回去，这一单白给折扣。
@@ -236,21 +251,22 @@ public class MallRedeemService {
             return CouponUse.NONE;
         }
 
-        // 混合支付单抵现金，纯积分单抵积分
-        BigDecimal payAmount = hangs
+        BigDecimal payPoints = BigDecimal.valueOf(originalPoints);
+        // 只有混合支付单才真的要付现金；纯积分单的 cash_price 即使配了也不收
+        BigDecimal payCash = hangs
                 ? resolveCash(sku, commodity).multiply(BigDecimal.valueOf(quantity))
-                : BigDecimal.valueOf(originalPoints);
-        if (payAmount.signum() <= 0) {
-            // 0 元 / 0 分的商品用券没有意义，而且会算出一张「减 0」的核销流水
+                : BigDecimal.ZERO;
+        if (payPoints.signum() <= 0 && payCash.signum() <= 0) {
+            // 0 元 0 分的商品用券没有意义，而且会算出一张「减 0」的核销流水
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
 
         CouponTrialView trial = couponQueryApi.trial(new CouponTrialQuery(
-                cmd.memberId(), payAmount, hangs ? "CASH" : "SCORE",
+                cmd.memberId(), payPoints, payCash,
                 commodity.getCommodityCode(), String.valueOf(commodity.getCategoryId()), null));
 
         // 只认用户点的那一张：试算的推荐是给页面看的，下单要用的是用户实际选的
-        CouponTrialView.Item chosen = trial.usable().stream()
+        CouponTrialView.Item chosen = trial.allUsable().stream()
                 .filter(item -> cmd.couponId().equals(item.couponId()))
                 .findFirst()
                 .orElse(null);
@@ -266,6 +282,13 @@ public class MallRedeemService {
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
 
+        /*
+         * 流水里的「抵扣前金额」要记【这一侧的】应付：现金券记 payCash，积分券记 payPoints。
+         * 记错了对账时看到的是「在 5000 积分上减了 10 元」这种读不懂的行。
+         */
+        boolean deductsCash = "CASH".equals(chosen.deductTarget());
+        BigDecimal payAmount = deductsCash ? payCash : payPoints;
+
         CouponWriteOffView locked = couponWriteOffApi.lock(new CouponLockCmd(
                 cmd.couponId(), cmd.memberId(), BIZ_TYPE_COUPON, orderNo, null,
                 payAmount, discount));
@@ -274,7 +297,7 @@ public class MallRedeemService {
             log.info("【商城用券】券 {} 锁不上：{}，订单 {}", cmd.couponId(), locked.message(), orderNo);
             return CouponUse.rejected(MallRedeemReason.COUPON_UNUSABLE);
         }
-        return new CouponUse(cmd.couponId(), discount, null);
+        return new CouponUse(cmd.couponId(), discount, deductsCash, null);
     }
 
     /**
