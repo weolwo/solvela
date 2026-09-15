@@ -33,6 +33,8 @@ public record RenderedNotification(
         String content,
         String summary,
         String paramsJson,
-        String bizRefId
+        String bizRefId,
+        /** 人工发送的操作人，落进 create_by；系统发送为 null */
+        String operator
 ) {
 }

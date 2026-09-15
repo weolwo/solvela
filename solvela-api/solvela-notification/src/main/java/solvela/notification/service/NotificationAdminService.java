@@ -9,9 +9,14 @@ import solvela.notification.NotificationTemplate;
 import solvela.notification.dao.AnnouncementAckDao;
 import solvela.notification.dao.AnnouncementDao;
 import solvela.notification.dao.NotificationTemplateDao;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.domain.command.ManualNotifyCommand;
+import solvela.notification.domain.command.ManualNotifyResult;
+import solvela.enums.NotificationTemplateEnum;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 管理端用：模板与公告的维护。
@@ -36,9 +41,22 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NotificationAdminService {
 
+    /**
+     * 🔴 人工发送单次收件人上限。
+     *
+     * <p>不是性能考虑 —— 是<b>怕这个入口变成「用写扩散做广播」的后门</b>。
+     * 一次贴 10 万个会员号，就是整套设计最想避免的那件事（10 万行去表达
+     * 一条信息），而且它还绕过了公告的人群规则与免打扰。
+     *
+     * <p>超了不是截断而是<b>直接拒绝</b>，并在错误信息里指向公告 ——
+     * 截断会让运营以为发成功了，而实际只发了前 200 个。
+     */
+    public static final int MANUAL_MAX_RECIPIENTS = 200;
+
     private final NotificationTemplateDao notificationTemplateDao;
     private final AnnouncementDao announcementDao;
     private final AnnouncementAckDao announcementAckDao;
+    private final NotificationService notificationService;
 
     // ------------------------------------------------------------------ 模板
 
@@ -88,6 +106,91 @@ public class NotificationAdminService {
         // 🔴 不能用 updateById：本实体是复合主键，那个基类方法根本生成不出来，
         //    调了会在运行期抛 Invalid bound statement。详见 Dao 上 disableVersion 的注释
         notificationTemplateDao.disableVersion(templateCode, version);
+    }
+
+    // ------------------------------------------------------------------ 人工发送
+
+    /**
+     * 人工发一条站内信给指定会员。
+     *
+     * <h3>它补的是一个真实的缺口</h3>
+     * 管理端此前只有「广播给所有人」（公告）和「定义系统触发的模板」，
+     * <b>没有「发给某个人」</b> —— 客服想补一句说明都做不到，只能去改库。
+     *
+     * <h3>🔴 走的是和系统发送完全同一条路</h3>
+     * 调的是 {@link NotificationService#send}，所以模板查询、版本锁定、参数渲染、
+     * 摘要生成、免打扰判定一个不少。<b>不要在这里另写一条插库的捷径</b> ——
+     * 那会造出第二套发送语义，而两套语义迟早分叉（比如免打扰只在其中一条上生效）。
+     *
+     * <h3>逐个发，不批量插</h3>
+     * 收件人上限只有 {@value #MANUAL_MAX_RECIPIENTS}，逐个调的代价是可以接受的；
+     * 换来的是<b>一个人发失败不影响其他人</b>，而且能逐个报出谁没收到。
+     * 批量插入做不到这一点 —— 它只能给一个笼统的成败。
+     *
+     * @param operator 操作人，落进 {@code create_by}。<b>必填</b> ——
+     *                 人工发送不留痕的话，事后没法回答「这条是谁发的」
+     */
+    public ManualNotifyResult sendManual(ManualNotifyCommand cmd, String operator) {
+        List<Long> memberIds = cmd.getMemberIds() == null ? List.of() : cmd.getMemberIds().stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (memberIds.isEmpty()) {
+            throw new IllegalArgumentException("收件人不能为空");
+        }
+        if (memberIds.size() > MANUAL_MAX_RECIPIENTS) {
+            throw new IllegalArgumentException(
+                    "一次最多发给 " + MANUAL_MAX_RECIPIENTS + " 个会员，本次 " + memberIds.size()
+                            + " 个。要发给更多人请改用「公告」—— 那是一条内容一行，"
+                            + "而这里是一人一条，人一多就是在用写扩散做广播。");
+        }
+        if (operator == null || operator.isBlank()) {
+            // 人工发送不留痕，事后就回答不了「这条是谁发的」
+            throw new IllegalArgumentException("操作人不能为空");
+        }
+
+        NotificationTemplateEnum template = resolveTemplate(cmd.getTemplateCode());
+        Map<String, Object> params = cmd.getParams() == null ? Map.of() : cmd.getParams();
+
+        int sent = 0;
+        List<Long> failed = new java.util.ArrayList<>();
+        for (Long memberId : memberIds) {
+            NotifyRequest.Builder builder = NotifyRequest.of(template, memberId)
+                    .bizRefId(cmd.getBizRefId())
+                    .operator(operator);
+            params.forEach(builder::param);
+
+            // send() 永不抛异常，返回 false 表示这一个没发出去（模板没配、被免打扰拦下等）
+            if (notificationService.send(builder.build())) {
+                sent++;
+            } else {
+                failed.add(memberId);
+            }
+        }
+
+        log.info("【人工发送】操作人:{} 模板:{} 收件人:{} 成功:{} 失败:{}",
+                operator, template.getCode(), memberIds.size(), sent, failed.size());
+        return new ManualNotifyResult(sent, failed);
+    }
+
+    /**
+     * 模板编码 → 枚举。不填默认 {@code MANUAL}（自定义文本）。
+     *
+     * <p>🔴 只认枚举里有的。编一个代码里没有的编码出来，那条通知永远发不出去
+     * （{@code NotificationService} 查不到模板就落一行 error 日志然后返回 false），
+     * 而运营会以为发成功了。这里直接拒绝，把失败提前到点「发送」那一刻。
+     */
+    private NotificationTemplateEnum resolveTemplate(String templateCode) {
+        if (templateCode == null || templateCode.isBlank()) {
+            return NotificationTemplateEnum.MANUAL;
+        }
+        for (NotificationTemplateEnum value : NotificationTemplateEnum.values()) {
+            if (value.getCode().equals(templateCode)) {
+                return value;
+            }
+        }
+        throw new IllegalArgumentException("模板编码不存在：" + templateCode);
     }
 
     // ------------------------------------------------------------------ 公告

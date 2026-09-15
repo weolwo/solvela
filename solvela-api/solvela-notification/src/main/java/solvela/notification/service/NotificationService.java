@@ -125,7 +125,8 @@ public class NotificationService {
                 content,
                 toSummary(content),
                 JsonUtils.toJson(params),
-                request.bizRefId());
+                request.bizRefId(),
+                request.operator());
 
         // ------------------------------------------------------------------
         // 免打扰：用户关掉了这个 category 就到此为止。

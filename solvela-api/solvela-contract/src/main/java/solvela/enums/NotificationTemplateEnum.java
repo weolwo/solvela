@@ -32,6 +32,31 @@ import java.util.List;
 public enum NotificationTemplateEnum {
 
     /**
+     * 人工发送：客服 / 运营在后台手动发给某个（或某几个）会员的一条站内信。
+     *
+     * <h3>它是唯一一个「正文由发送方现填」的模板</h3>
+     * 占位符就是 {@code ${title}} 和 {@code ${content}}，也就是说真正的文字
+     * 落在 {@code params} 里，而不是模板里。
+     *
+     * <p>这看着像是绕开了模板化，其实不是 —— <b>模板化要省的是「同一段文字存 N 遍」</b>。
+     * 人工发送一次只面向个位数到几百个会员，那段文字本来就没有重复可消除。
+     * 为它单开一张带 content 列的表，或者给 {@code t_member_notification} 加一个
+     * 常年为空的 content 列，都是更差的选择：多一套存储模型，而省不下任何东西。
+     *
+     * <h3>🔴 归在 SYSTEM，意味着用户关不掉</h3>
+     * 人工触达通常是「针对你这个人的事」（工单答复、账号说明、补偿通知），
+     * 不该被免打扰静音。
+     *
+     * <p>⚠️ 代价是它成了一条绕过免打扰的路：运营拿它群发营销文案，用户关了
+     * 也照样收到。挡这件事靠的不是技术而是<b>留痕 + 条数上限</b> ——
+     * {@code create_by} 记着是谁发的，且单次收件人有硬上限
+     * （见 {@code NotificationAdminService.MANUAL_MAX_RECIPIENTS}）。
+     * 真要发给所有人，那是公告该干的事。
+     */
+    MANUAL("MANUAL", NotificationCategoryEnum.SYSTEM,
+            List.of("title", "content")),
+
+    /**
      * 中奖：抽奖 / 任务 / 彩票三条链路共用。
      *
      * <p>发送点是 {@code LocalPrizeDispatchResultPublisher} —— 资产<b>真的到账</b>那一刻，

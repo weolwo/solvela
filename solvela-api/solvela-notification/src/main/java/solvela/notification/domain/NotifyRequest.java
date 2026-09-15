@@ -26,6 +26,10 @@ import java.util.Map;
  * @param memberId  收件人会员号
  * @param params    渲染参数。🔴 只放<b>显示值</b>，不要放 id（理由见 {@code MemberNotification#params}）
  * @param bizRefId  关联业务单号，可空。纯排查用 —— 用户说「我没收到」时拿它对账
+ * @param operator  <b>人工发送</b>时的操作人，落进 {@code create_by}。
+ *                  系统自动发送时为 null —— 那一列为空正好等于「不是人发的」，
+ *                  比编一个 "system" 字符串更有信息量（事后查「哪些是人工发的」
+ *                  就是一句 {@code where create_by is not null}）
  *
  * @Author alaric
  * @Date 2026-09-14
@@ -34,7 +38,8 @@ public record NotifyRequest(
         NotificationTemplateEnum template,
         Long memberId,
         Map<String, Object> params,
-        String bizRefId
+        String bizRefId,
+        String operator
 ) {
 
     public NotifyRequest {
@@ -68,6 +73,7 @@ public record NotifyRequest(
         private final Long memberId;
         private final Map<String, Object> params = new LinkedHashMap<>();
         private String bizRefId;
+        private String operator;
 
         private Builder(NotificationTemplateEnum template, Long memberId) {
             this.template = template;
@@ -86,8 +92,14 @@ public record NotifyRequest(
             return this;
         }
 
+        /** 人工发送时填操作人。系统发送不要调它 —— 留空才表示「不是人发的」 */
+        public Builder operator(String operator) {
+            this.operator = operator;
+            return this;
+        }
+
         public NotifyRequest build() {
-            return new NotifyRequest(template, memberId, params, bizRefId);
+            return new NotifyRequest(template, memberId, params, bizRefId, operator);
         }
     }
 }

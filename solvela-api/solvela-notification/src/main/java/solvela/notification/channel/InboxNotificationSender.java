@@ -59,6 +59,9 @@ public class InboxNotificationSender implements NotificationSender {
         entity.setCategory(notification.category());
         entity.setBizRefId(notification.bizRefId());
         entity.setReadFlag(0);
+        // 人工发送才有操作人。系统发送留空 —— 那一列为空正好等于「不是人发的」，
+        // 事后查人工发过什么就是一句 where create_by is not null
+        entity.setCreateBy(notification.operator());
         // create_time / update_time 走 DDL 的 DEFAULT CURRENT_TIMESTAMP，
         // 不在这里取 JVM 时钟 —— 同一条记录的时间应该只有一个来源
 

@@ -15,7 +15,10 @@ import solvela.notification.domain.NotifyRequest;
 import solvela.notification.domain.dto.MemberNotificationDTO;
 import solvela.notification.domain.dto.MemberNotificationDetailDTO;
 import solvela.notification.domain.query.MemberNotificationQuery;
+import solvela.notification.domain.command.ManualNotifyCommand;
+import solvela.notification.domain.command.ManualNotifyResult;
 import solvela.notification.service.AnnouncementService;
+import solvela.notification.service.NotificationAdminService;
 import solvela.notification.service.NotificationInboxService;
 import solvela.notification.service.NotificationPreferenceService;
 import solvela.notification.service.NotificationService;
@@ -61,9 +64,13 @@ class NotificationLiveTest {
     @Autowired
     private NotificationTemplateDao notificationTemplateDao;
     @Autowired
+    private solvela.notification.dao.MemberNotificationDao memberNotificationDao;
+    @Autowired
     private NotificationPreferenceService notificationPreferenceService;
     @Autowired
     private AnnouncementService announcementService;
+    @Autowired
+    private NotificationAdminService notificationAdminService;
     @Autowired
     private AnnouncementDao announcementDao;
     @Autowired
@@ -266,5 +273,74 @@ class NotificationLiveTest {
     private boolean pendingContains(Long announcementId) {
         return announcementService.pendingAck(MEMBER_ID, null).stream()
                 .anyMatch(row -> row.getId().equals(announcementId));
+    }
+
+    // ------------------------------------------------------------------ 人工发送
+
+    private ManualNotifyCommand manualCmd(java.util.List<Long> memberIds) {
+        ManualNotifyCommand cmd = new ManualNotifyCommand();
+        cmd.setMemberIds(memberIds);
+        cmd.setParams(java.util.Map.of("title", "工单答复", "content", "您反馈的问题已处理，补偿 100 积分"));
+        cmd.setBizRefId("TICKET-9527");
+        return cmd;
+    }
+
+    @Test
+    @DisplayName("真库：人工发一条，正文由发送方现填，且留下操作人")
+    void 人工发送() {
+        try {
+            ManualNotifyResult result =
+                    notificationAdminService.sendManual(manualCmd(List.of(MEMBER_ID)), "客服小王");
+
+            assertEquals(1, result.sent());
+            assertTrue(result.allSent());
+
+            MemberNotificationQuery query = new MemberNotificationQuery();
+            query.setMemberId(MEMBER_ID);
+            MemberNotificationDTO latest = notificationInboxService.queryPage(new Page<>(1, 1), query).get(0);
+
+            assertEquals("MANUAL", latest.getTemplateCode());
+            // MANUAL 归在 SYSTEM —— 人工触达是「针对你这个人的事」，不该被免打扰静音
+            assertEquals(NotificationCategoryEnum.SYSTEM, latest.getCategory());
+            assertTrue(latest.getSummary().contains("补偿 100 积分"), "实际: " + latest.getSummary());
+
+            MemberNotificationDetailDTO detail = notificationInboxService.detail(latest.getId(), MEMBER_ID);
+            assertEquals("工单答复", detail.getTitle());
+            assertFalse(detail.getContent().contains("${"), "正文里还有没替换掉的占位符: " + detail.getContent());
+        } finally {
+            memberNotificationDao.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                    solvela.notification.MemberNotification>()
+                    .eq(solvela.notification.MemberNotification::getMemberId, MEMBER_ID));
+        }
+    }
+
+    @Test
+    @DisplayName("🔴 收件人超上限直接拒绝，不是截断 —— 这个入口不能变成广播后门")
+    void 人工发送有硬上限() {
+        List<Long> tooMany = java.util.stream.LongStream
+                .range(0, NotificationAdminService.MANUAL_MAX_RECIPIENTS + 1)
+                .boxed()
+                .toList();
+
+        /*
+         * 🔴 截断会让运营以为发成功了，而实际只发了前 200 个。
+         *    所以是拒绝，并在错误信息里指向公告 —— 一次要发给几万人，
+         *    那是「一条内容一行」该干的事，不是「一人一条」。
+         */
+        IllegalArgumentException e = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> notificationAdminService.sendManual(manualCmd(tooMany), "客服小王"));
+        assertTrue(e.getMessage().contains("公告"), "错误信息应当指向公告这条出路，实际: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("🔴 人工发送不填操作人直接拒绝 —— 不留痕就回答不了「这是谁发的」")
+    void 人工发送必须留痕() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> notificationAdminService.sendManual(manualCmd(List.of(MEMBER_ID)), null));
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> notificationAdminService.sendManual(manualCmd(List.of(MEMBER_ID)), "  "));
     }
 }
