@@ -110,6 +110,25 @@ public class PrizeConfigService {
         if (PrizeTypeEnum.MARKER.name().equals(prizeType)) {
             return null;
         }
+        /*
+         * 彩票同样不挂优惠配置，理由和标记<b>同源但不相同</b>：
+         *
+         *   · 相同的那一半 —— 一张号码不动账、不进提案。LotteryPrizeHandler 直接调发号引擎，
+         *     ledger 侧刻意没有对应的 @AssetStrategy。审批阈值对它没有意义。
+         *
+         *   · 不同的那一半 —— 标记是【真的没有预算】（谢谢参与要发多少有多少），
+         *     而彩票【有预算，只是不在这里】：单期发行上限是 t_lottery_config.total_count，
+         *     由领号引擎的 Redis 游标强制执行（超了即售罄，且游标绝不回滚）。
+         *
+         * 🔴 所以别给彩票建一条优惠配置来"管预算"：那会变成两个预算口径，
+         *    而真正拦得住的只有引擎那一个。另一个只会在对账时让人以为发超了。
+         *
+         * 真正会动账的是<b>开奖之后</b>：号码中奖 → 按中奖规则的 prize_code 再走一次
+         * 正常发奖链路，那一次的奖品该挂什么配置就挂什么。发号和兑奖是两件事。
+         */
+        if (PrizeTypeEnum.LOTTERY.name().equals(prizeType)) {
+            return null;
+        }
         // 其余类型必须挂：这条「必填」刻意放在领域校验里而不是 Form 的 @NotNull 上 ——
         // 是否必填取决于 prizeType，而 bean validation 看不到字段之间的关系。
         if (promotionConfigId == null) {

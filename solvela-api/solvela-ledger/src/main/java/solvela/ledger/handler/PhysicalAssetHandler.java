@@ -43,6 +43,10 @@ public class PhysicalAssetHandler implements IAssetHandler {
         // 泛化成字符串单号之后，商城兑换实物才能以 source_type='MALL' + 订单号 走同一张表。
         delivery.setSourceBizId(String.valueOf(proposal.getId()));
         delivery.setSourceType(SOURCE_TYPE_PROPOSAL);
+        // 奖品名快照：C 端「我的实物奖品」靠它显示「这是什么」。
+        // 不存的话那一页只剩一个单号，用户认不出是哪一件东西 ——
+        // 而资产域没法 join 回提案表去补（marketing ↮ ledger 那条缝）
+        delivery.setPrizeName(proposal.getAssetName());
         // 此时收件三要素为空，运营列表用 status=0 AND receiver_address IS NULL
         // 筛出「待用户补地址」的单子
         delivery.setStatus(DeliveryStatusEnum.PENDING);

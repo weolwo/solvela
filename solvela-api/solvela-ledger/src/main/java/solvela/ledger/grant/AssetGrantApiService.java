@@ -134,6 +134,8 @@ public class AssetGrantApiService implements AssetGrantApi {
         delivery.setMemberName(memberService.requireMemberName(cmd.memberId()));
         delivery.setSourceType(cmd.sourceType());
         delivery.setSourceBizId(cmd.bizRefId());
+        // 商品名快照，理由同 PhysicalAssetHandler 那一处
+        delivery.setPrizeName(cmd.assetName());
         // 明文进来，PiiTypeHandler 落库时加密 —— 与中奖补填地址那条路同一套密钥
         delivery.setReceiverName(cmd.receiverName());
         delivery.setReceiverPhone(cmd.receiverPhone());

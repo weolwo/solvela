@@ -72,6 +72,23 @@ public class PhysicalDelivery {
     private String sourceType;
 
     /**
+     * 奖品 / 商品名 —— <b>快照</b>，不是外键。
+     *
+     * <p>创建时从上游抄下来（中奖链路抄 {@code proposal.getAssetName()}，
+     * 商城链路抄 {@code cmd.assetName()}），上游改名之后<b>刻意不跟着变</b>：
+     * 履约单是单据，记的是「当时发的是什么」。和 {@link #memberName} 同一个模式。
+     *
+     * <p>🔴 <b>为什么必须存一份，而不是查上游</b>：上游那两张表
+     * （{@code t_proposal_record} / {@code t_mall_order}）分别在风控域和商城域，
+     * 而本表在资产域 —— marketing ↮ ledger、mall ↮ ledger 两条缝都有架构测试守着，
+     * 拿着 {@code source_biz_id} 也查不出人来。
+     *
+     * <p>存量单这一列是 {@code NULL}（加列之前的单子补不出来，
+     * 见 {@code 实物履约-补奖品名与C端补填.sql} §2），C 端按兜底文案显示。
+     */
+    private String prizeName;
+
+    /**
      * 收件人姓名【<b>密文落库</b>，见 {@link PiiTypeHandler}】。
      * 中奖时未知，由用户后续补填 —— 所以可空，不是忘了加约束。
      */
