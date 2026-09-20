@@ -155,9 +155,22 @@ async function handleLogout(): Promise<void> {
         （路由、页面、接口都做好了，却没有任何地方能点进去）。
       -->
       <Cell icon="receipt" title="我的券包" :to="{ name: 'coupons' }" />
+      <!--
+        等级放在最前：它是「我是谁」，其余几项是「我有什么」。
+        🔴 保级缓冲期的提示只在这一页里 —— 用户不点进来就永远不知道自己快掉级了。
+        （真要做挽留，下一步是站内信推送，不能只靠他自己想起来点。）
+      -->
+      <Cell icon="star" title="我的等级" :to="{ name: 'grade' }" />
       <!-- 券的第一个「非商城」出口。⚠️ 今天运营商那一端是假的，页面上写着 -->
       <Cell icon="phone" title="充话费" :to="{ name: 'recharge' }" />
       <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
+      <!--
+        实物奖品单独一个入口，不并进「兑换记录」：那一页是「我花积分买了什么」，
+        而这一页回答的是「我的东西寄到哪了」，还带一个要用户动手的待办（填地址）。
+        混在一起的话，中奖的实物根本不在兑换记录里 —— 它压根不是一笔兑换。
+      -->
+      <Cell icon="home" title="我的实物奖品" :to="{ name: 'deliveries' }" />
+      <Cell icon="star" title="我的彩票" :to="{ name: 'lottery-tickets' }" />
       <Cell icon="gift" title="优惠记录" :to="{ name: 'records-promo' }" />
     </Card>
 

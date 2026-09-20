@@ -3,6 +3,10 @@ package solvela.biz.server.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.activity.runtime.ActivityFacade;
+import solvela.marketing.api.LotteryObtainResult;
+import solvela.marketing.api.LotteryBoardView;
+import solvela.marketing.api.LotteryTicketView;
+import solvela.marketing.api.LotteryIssueView;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityBriefView;
 import solvela.marketing.api.TaskCenterItem;
@@ -58,5 +62,25 @@ public class ActivityInternalController implements ActivityApi {
     @Override
     public DrawResultView draw(ActivityDrawCmd cmd) {
         return activityFacade.draw(cmd);
+    }
+
+    @Override
+    public LotteryIssueView getLotteryIssue(String lotteryCode, Long memberId) {
+        return activityFacade.getLotteryIssue(lotteryCode, memberId);
+    }
+
+    @Override
+    public List<LotteryTicketView> getMyLotteryTickets(Long memberId, int limit) {
+        return activityFacade.getMyLotteryTickets(memberId, limit);
+    }
+
+    @Override
+    public LotteryBoardView getLotteryBoard(String activityCode, Long memberId) {
+        return activityFacade.getLotteryBoard(activityCode, memberId);
+    }
+
+    @Override
+    public LotteryObtainResult obtainLotteryTicket(ActivityDrawCmd cmd) {
+        return activityFacade.obtainLotteryTicket(cmd);
     }
 }

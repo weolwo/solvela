@@ -53,6 +53,7 @@ public class MemberService {
     private final MemberDao memberDao;
     private final MemberManager memberManager;
     private final MemberTokenStore tokenStore;
+    private final MemberAudienceProperties audienceProperties;
 
 
     /**
@@ -160,6 +161,39 @@ public class MemberService {
      */
     public java.time.LocalDateTime getCreateTime(Long memberId) {
         return memberId == null ? null : memberDao.selectCreateTimeById(memberId);
+    }
+
+    /**
+     * 是不是<b>新会员</b> —— 这个口径的唯一定义处。
+     *
+     * <h3>为什么这个判断必须住在会员域</h3>
+     * 任务引擎那边（{@code TaskEventContext.isNewMember}）要这个答案，但它<b>不该自己算</b>：
+     * 「营销域不拥有会员数据」，而且「新会员」的定义（注册 7 天内？首单前？）
+     * 是一个<b>会员域的业务概念</b>。让打点的适配层去写
+     * {@code createTime.isAfter(now.minusDays(7))}，从那一刻起这个口径就有了两份，
+     * 而它们会在某次只改了一边时静默地不一致。
+     *
+     * <h3>🔴 查不到返回 {@code null}，不要返回 false</h3>
+     * 两者在下游是<b>完全不同</b>的处理：
+     * <ul>
+     *   <li>{@code null} = 「不知道」 —— 配了人群的任务会<b>丢弃该事件并写明原因</b>
+     *       （{@code TaskDiscardCode} 里那条「要去找上游修的」），运营在流水里看得见；</li>
+     *   <li>{@code false} = 「确定是老会员」 —— 限新会员的任务会判成<b>人群不匹配</b>，
+     *       同样不计入，但那是一句<b>错误的结论</b>，而且看起来像正常业务。</li>
+     * </ul>
+     * 一个查不到的会员号本来就是异常（关联键指向不存在的主体），
+     * 把它伪装成"老会员"等于把异常变成了业务事实。
+     *
+     * @return {@code null} 表示查不到该会员，调用方应当如实往下传
+     */
+    public Boolean isNewMember(Long memberId) {
+        java.time.LocalDateTime createTime = getCreateTime(memberId);
+        if (createTime == null) {
+            log.warn("【会员人群】查不到会员的注册时间，无法判定新老, memberId: {}", memberId);
+            return null;
+        }
+        return createTime.isAfter(
+                java.time.LocalDateTime.now().minus(audienceProperties.getNewMemberWithin()));
     }
 
     /**

@@ -5,8 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import solvela.base.event.BizEventPublisher;
 import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.event.BizActionCodes;
+import solvela.event.BizActionEvent;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
@@ -80,6 +83,14 @@ public class MemberRegisterService {
     private final DeviceGuard deviceGuard;
     private final MemberEmailCodeService emailCodeService;
     private final MemberSmsCodeService smsCodeService;
+    /**
+     * 业务动作广播。本域只负责说「有人注册成功了」—— 谁关心谁订阅。
+     *
+     * <p>🔴 注意这里注入的<b>不是</b>任务引擎：{@code solvela-member} 排在
+     * {@code solvela-marketing} 之前，物理上引用不到它（写反了 Maven 直接报循环依赖）。
+     * 翻译成任务事件是营销侧防腐层（{@code BizActionEventListener}）的活。
+     */
+    private final BizEventPublisher bizEventPublisher;
 
     /**
      * 注册。
@@ -233,6 +244,22 @@ public class MemberRegisterService {
                     ? RegisterFailReason.EMAIL_TAKEN
                     : RegisterFailReason.PHONE_TAKEN);
         }
+
+        /*
+         * 广播「注册成功」。
+         *
+         * 🔴 必须在【本方法的事务内】发：接住它的监听器挂在 AFTER_COMMIT 上，
+         *    注册事务回滚时这个事件就不会投递 —— 所以不存在
+         *    「号没建成但新人任务已经发了奖」。
+         *    挪到事务外的后果不是收不到（监听器开了 fallbackExecution），
+         *    而是【收得太早】：建号失败回滚了，奖却已经发出去了。
+         *
+         * 幂等键用 memberId：一个会员一辈子只注册一次，天然唯一。
+         * 不传的话服务端会按「事件自然日」兜底，那对注册来说恰好也不会出错，
+         * 但那是运气 —— 依赖兜底规则和依赖一个真单号是两回事。
+         */
+        bizEventPublisher.publish(BizActionEvent.of(
+                BizActionCodes.MEMBER_REGISTER, memberId, String.valueOf(memberId)));
 
         log.info("【会员注册】成功, memberId: {}, source: {}, ip: {}", memberId, registerSource, cmd.clientIp());
         return MemberRegisterResult.ok(new MemberIdentity(

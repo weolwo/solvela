@@ -17,6 +17,10 @@ import {
   LIMIT_TYPE_OPTIONS,
   TARGET_AUDIENCE_ENUM,
   TARGET_AUDIENCE_OPTIONS,
+  AUDIENCE_MODE_GRADE,
+  audienceGradeOf,
+  buildAudienceGrade,
+  targetAudienceOf,
 } from '/src/constants/business/task/task-config-const';
 
 // ---------------------------- 页面路由（与菜单配置的「路由地址」保持一致） ----------------------------
@@ -91,6 +95,8 @@ export function toEventOptions(list) {
 
 // 同上：这三本字典描述的是 t_task_config 的列，向导和列表页共用，唯一出处放在常量目录
 export { TASK_GROUP_ENUM, TASK_GROUP_OPTIONS, LIMIT_TYPE_ENUM, LIMIT_TYPE_OPTIONS, TARGET_AUDIENCE_ENUM, TARGET_AUDIENCE_OPTIONS };
+// 「等级 ≥ N」人群：门槛值编在取值串里，所以要带上解析/拼装两个函数
+export { AUDIENCE_MODE_GRADE, audienceGradeOf, buildAudienceGrade, targetAudienceOf };
 
 export const DEFAULT_LIMIT_COUNT = 1;
 

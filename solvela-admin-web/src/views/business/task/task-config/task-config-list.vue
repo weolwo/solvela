@@ -91,7 +91,7 @@
           <span>{{ taskGroupOf(text) }}</span>
         </template>
         <template v-if="column.dataIndex === 'targetAudience'">
-          <span>{{ targetAudienceOf(text) }}</span>
+          <span>{{ targetAudienceOf(text, gradeNames) }}</span>
         </template>
         <template v-if="column.dataIndex === 'limitType'">
           <span>{{ limitTypeOf(text) }}</span>
@@ -106,12 +106,7 @@
     </a-table>
     <!---------- 表格 end ----------->
 
-    <TablePagination
-      v-model:pageNum="queryForm.pageNum"
-      v-model:pageSize="queryForm.pageSize"
-      :total="total"
-      @change="queryData"
-    />
+    <TablePagination v-model:pageNum="queryForm.pageNum" v-model:pageSize="queryForm.pageSize" :total="total" @change="queryData" />
 
     <!---------- 详情抽屉：只读，主表 + 奖励阶梯子表 ----------->
     <a-drawer :title="`任务详情 · ${detail.taskName || ''}`" :width="760" :open="detailVisible" @close="detailVisible = false">
@@ -125,7 +120,7 @@
         <a-descriptions-item label="模板Code">{{ detail.templateCode }}</a-descriptions-item>
         <a-descriptions-item label="触发事件">{{ detail.triggerEvent }}</a-descriptions-item>
         <a-descriptions-item label="任务分组">{{ taskGroupOf(detail.taskGroup) }}</a-descriptions-item>
-        <a-descriptions-item label="目标人群">{{ targetAudienceOf(detail.targetAudience) }}</a-descriptions-item>
+        <a-descriptions-item label="目标人群">{{ targetAudienceOf(detail.targetAudience, gradeNames) }}</a-descriptions-item>
         <a-descriptions-item label="参与频次">{{ limitTypeOf(detail.limitType) }}（{{ detail.limitCount }} 次）</a-descriptions-item>
         <a-descriptions-item label="开始时间">{{ detail.startTime || '长期有效' }}</a-descriptions-item>
         <a-descriptions-item label="结束时间">{{ detail.endTime || '长期有效' }}</a-descriptions-item>
@@ -180,6 +175,7 @@
   import { TABLE_ID_CONST } from '/@/constants/support/table-id-const';
   import { taskApi } from '/@/api/business/task/task-api';
   import { taskPrizeMappingApi } from '/src/api/business/prize/task-prize-mapping-api';
+  import { memberGradeApi } from '/@/api/business/member/member-grade-api';
   import { toEventOptions } from '../task-wizard/task-wizard-const';
   import { prizeModeOf } from '/src/constants/business/prize/task-prize-mapping-const';
   import QueryActions from '/@/components/framework/query-actions/index.vue';
@@ -375,6 +371,23 @@
     }
   }
 
+  /**
+   * 等级号 -> 等级名，只为把「等级人群」那一列显示成人话。
+   *
+   * 拉不到就退化成「等级 2 及以上」（targetAudienceOf 自己兜底），不影响列表可用 ——
+   * 为一个显示名让整个任务列表打不开不划算。
+   */
+  const gradeNames = ref({});
+
+  async function loadGradeNames() {
+    try {
+      const list = (await memberGradeApi.listConfig()) || [];
+      gradeNames.value = Object.fromEntries(list.map((item) => [item.gradeCode, item.gradeName]));
+    } catch (e) {
+      solvelaSentry.captureError(e);
+    }
+  }
+
   // 支持从任务配置向导成功页跳转而来：按 query 回填查询条件，直接定位刚创建的任务
   onMounted(() => {
     const { taskName, activityCode } = route.query;
@@ -385,6 +398,7 @@
       queryForm.activityCode = activityCode;
     }
     loadEventOptions();
+    loadGradeNames();
     queryData();
   });
 

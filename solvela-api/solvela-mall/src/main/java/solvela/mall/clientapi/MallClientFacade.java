@@ -5,6 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import solvela.member.api.DeliveryReceiverCmd;
+import solvela.member.api.DeliveryFillResult;
+import solvela.member.api.DeliveryApi;
+import solvela.marketing.api.MallDeliveryFillResult;
 import solvela.enums.EnableStatusEnum;
 import solvela.base.module.file.service.FileAssetService;
 import solvela.enums.MallCommodityStatusEnum;
@@ -80,6 +84,14 @@ public class MallClientFacade implements MallApi {
     private final MallAddressService mallAddressService;
     private final MallRedeemService mallRedeemService;
     private final MallPayService mallPayService;
+    /**
+     * 资产域的履约单契约。
+     *
+     * <p>🔴 这<b>不是</b> solvela-ledger —— 商城的 pom 里刻意没有它
+     * （{@code MallLedgerBoundaryTest} 守着）。这里注入的是 member-api 里的接口，
+     * 今天解析成同进程的 bean，资产域独立出去之后解析成 HTTP 代理，本类一行不改。
+     */
+    private final DeliveryApi deliveryApi;
 
     /* ---------------- 分类 ---------------- */
 
@@ -370,6 +382,57 @@ public class MallClientFacade implements MallApi {
     }
 
     /* ---------------- 地址簿 ---------------- */
+
+    /**
+     * 用地址簿里的一个地址补填履约单。<b>本类唯一一处跨到资产域的调用。</b>
+     *
+     * <h3>为什么是商城来做这件事</h3>
+     * 只有商城解析得了 {@code addressId} —— 地址簿是它的表。
+     * 资产域收的是<b>明文三件套</b>，不认识地址 id。
+     * 分工与 {@code MallFulfillService.buildCmd} 完全一致，那条路已经跑通很久了。
+     */
+    @Override
+    public MallDeliveryFillResult fillDeliveryAddress(Long deliveryId, Long memberId, Long addressId) {
+        /*
+         * 🔴 getOwned 带 memberId —— 少了它，这个接口就成了
+         *    「拿别人的 addressId 去猜别人住哪」：填进去之后再查一次履约单就读出来了。
+         */
+        MallAddress address = mallAddressService.getOwned(addressId, memberId);
+        if (address == null) {
+            // 不存在和不是你的给同一句话，否则能拿它探测别人的地址 id
+            return new MallDeliveryFillResult(false, "收货地址不存在");
+        }
+        /*
+         * ⚠️ 这里传的是【解密后的明文】—— address 实体上的三列挂了 PiiTypeHandler，
+         *    读出来就是明文。资产域落库时自己再加密一次。
+         *
+         *    别顺手在这里脱敏：脱敏值是给【看】的，寄快递要的是真号码。
+         *    下发给 C 端的那条路才脱敏（toAddressView），两者刻意不共用。
+         */
+        DeliveryFillResult result = deliveryApi.fillReceiver(new DeliveryReceiverCmd(
+                deliveryId, memberId,
+                address.getReceiverName(),
+                address.getReceiverPhone(),
+                fullAddress(address)));
+        // 措辞原样透传：同一件事不该有两种说法
+        return new MallDeliveryFillResult(result.accepted(), result.message());
+    }
+
+    /**
+     * 省市区 + 详细门牌拼成一条。
+     *
+     * <p>⚠️ 与 {@code MallFulfillService.fullAddress} 是同一段逻辑的第二份。
+     * 抽不掉的原因很土：那个类在 {@code order} 包、本类在 {@code clientapi} 包，
+     * 而它只有四行。真要合并该往下沉成一个 {@code MallAddressUtil}，
+     * <b>连同 MallFulfillService 一起改</b> —— 只改一边就是制造漂移。
+     */
+    private static String fullAddress(MallAddress address) {
+        String joined = org.apache.commons.lang3.StringUtils.defaultString(address.getProvince())
+                + org.apache.commons.lang3.StringUtils.defaultString(address.getCity())
+                + org.apache.commons.lang3.StringUtils.defaultString(address.getDistrict())
+                + org.apache.commons.lang3.StringUtils.defaultString(address.getDetailAddress());
+        return org.apache.commons.lang3.StringUtils.trimToNull(joined);
+    }
 
     @Override
     public List<MallAddressView> listAddresses(Long memberId) {

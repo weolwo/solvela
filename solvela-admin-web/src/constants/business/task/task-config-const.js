@@ -83,11 +83,41 @@ export const TARGET_AUDIENCE_ENUM = {
   OLD_MEMBER: 'OLD_MEMBER',
 };
 
+/**
+ * 「等级 ≥ N」人群的取值前缀，整串形如 GRADE_GTE_2。对齐后端 TaskConst.AUDIENCE_GRADE_GTE_PREFIX。
+ *
+ * 🔴 等级不能穷举成枚举：它是配置，运营随时加一档。所以门槛值编在取值串里，
+ *    页面上的可选项必须来自 memberGradeApi.listConfig()，不能在这里写死。
+ */
+export const AUDIENCE_GRADE_GTE_PREFIX = 'GRADE_GTE_';
+
+/** 单选按钮里代表「等级门槛」这一档的哨兵值。它不是 target_audience 的合法取值，只用于 UI */
+export const AUDIENCE_MODE_GRADE = 'LEVEL';
+
 export const TARGET_AUDIENCE_OPTIONS = [
   { value: TARGET_AUDIENCE_ENUM.ALL, label: '全部会员' },
   { value: TARGET_AUDIENCE_ENUM.NEW_MEMBER, label: '新会员' },
   { value: TARGET_AUDIENCE_ENUM.OLD_MEMBER, label: '老会员' },
+  { value: AUDIENCE_MODE_GRADE, label: '等级门槛' },
 ];
+
+/** GRADE_GTE_2 -> 2；不是这个形状返回 null。与后端 TaskConst.levelThresholdOf 同口径 */
+export function audienceGradeOf(value) {
+  if (typeof value !== 'string' || !value.startsWith(AUDIENCE_GRADE_GTE_PREFIX)) {
+    return null;
+  }
+  const raw = value.slice(AUDIENCE_GRADE_GTE_PREFIX.length);
+  // 只认纯数字：GRADE_GTE_2.5 / GRADE_GTE_ 2 / GRADE_GTE_-1 都按写坏处理，
+  // 与后端一致 —— 猜一个数出来会让「配错的等级专享」静默变成「所有人可做」
+  if (!/^\d+$/.test(raw)) {
+    return null;
+  }
+  return Number(raw);
+}
+
+export function buildAudienceGrade(level) {
+  return `${AUDIENCE_GRADE_GTE_PREFIX}${level}`;
+}
 
 export function configStatusOf(value) {
   return Object.values(CONFIG_STATUS_ENUM).find((i) => i.value === value) || { desc: '-', color: 'default' };
@@ -101,7 +131,20 @@ export function limitTypeOf(value) {
   return LIMIT_TYPE_OPTIONS.find((i) => i.value === value)?.label || value || '-';
 }
 
-export function targetAudienceOf(value) {
+/**
+ * 人群取值 -> 中文。
+ *
+ * @param value      t_task_config.target_audience 的原值
+ * @param gradeNames 等级号 -> 等级名，可选。传了就显示「银卡会员及以上」，
+ *                   没传退化成「等级 2 及以上」—— 退化态也要是人话，
+ *                   直接显示 GRADE_GTE_2 等于把库里的取值糊在页面上
+ */
+export function targetAudienceOf(value, gradeNames) {
+  const level = audienceGradeOf(value);
+  if (level !== null) {
+    const name = gradeNames?.[level];
+    return name ? `${name}及以上` : `等级 ${level} 及以上`;
+  }
   return TARGET_AUDIENCE_OPTIONS.find((i) => i.value === value)?.label || value || '-';
 }
 
@@ -114,6 +157,10 @@ export default {
   LIMIT_TYPE_OPTIONS,
   TARGET_AUDIENCE_ENUM,
   TARGET_AUDIENCE_OPTIONS,
+  AUDIENCE_GRADE_GTE_PREFIX,
+  AUDIENCE_MODE_GRADE,
+  audienceGradeOf,
+  buildAudienceGrade,
   configStatusOf,
   taskGroupOf,
   limitTypeOf,

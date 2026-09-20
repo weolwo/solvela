@@ -68,7 +68,7 @@ class TaskProgressStrategyTest {
 
     private TaskEventContext event(LocalDateTime time, String amountValue) {
         return new TaskEventContext("DAILY_SIGN", 5579345309L, "tester", "biz-1",
-                amountValue == null ? null : new BigDecimal(amountValue), time, null, Map.of());
+                amountValue == null ? null : new BigDecimal(amountValue), time, null, null, Map.of());
     }
 
     private TaskRuleConfig rule(Map<String, Object> raw) {

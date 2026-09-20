@@ -199,10 +199,32 @@
         <div v-show="currentStep === WIZARD_STEP.AUDIENCE">
           <a-card size="small" title="受众与时间" class="mb-4">
             <a-form-item label="目标人群 target_audience" :name="['audience', 'targetAudience']">
-              <a-radio-group v-model:value="wizardForm.audience.targetAudience" :options="TARGET_AUDIENCE_OPTIONS" option-type="button" />
-              <div v-if="wizardForm.audience.targetAudience !== TARGET_AUDIENCE_ENUM.ALL" class="text-xs text-orange-600! mt-1">
-                ⚠️ 选择非「全部会员」后，<b>上游上报事件时必须携带会员属性 isNewMember</b>，
+              <a-radio-group v-model:value="audienceMode" :options="TARGET_AUDIENCE_OPTIONS" option-type="button" />
+
+              <!--
+                等级门槛：选项必须来自接口。等级是配置，运营随时加一档 ——
+                在前端写死一份等级字典，加档那天这里就会缺一项。
+              -->
+              <div v-if="audienceMode === AUDIENCE_MODE_GRADE" class="mt-2">
+                <a-select v-model:value="audienceGrade" :options="gradeOptions" style="width: 260px" placeholder="选择最低等级" />
+                <span class="text-xs text-gray-500 ml-2">存成 {{ wizardForm.audience.targetAudience }}</span>
+              </div>
+
+              <!--
+                🔴 两种人群的前提完全不同，不能共用一句提示：
+                新/老会员要上游带 isNewMember；等级是服务端自己去会员域问的，上游什么都不用改。
+                共用一句的话，运营会以为配等级专享也得先找埋点开发，于是干脆不用。
+              -->
+              <div
+                v-if="audienceMode === TARGET_AUDIENCE_ENUM.NEW_MEMBER || audienceMode === TARGET_AUDIENCE_ENUM.OLD_MEMBER"
+                class="text-xs text-orange-600! mt-1"
+              >
+                ⚠️ 选择「新会员 / 老会员」后，<b>上游上报事件时必须携带会员属性 isNewMember</b>，
                 否则该任务收到的事件会被丢弃（丢弃原因可在任务记录的「事件流水」里看到）。 请与埋点开发确认后再使用。
+              </div>
+              <div v-else-if="audienceMode === AUDIENCE_MODE_GRADE" class="text-xs text-gray-500 mt-1">
+                等级由服务端在处理事件时向会员域取，<b>上游埋点不需要任何改动</b>。 等级不够的会员，事件会被丢弃并在「事件流水」里写明「要求几级 /
+                他几级」。
               </div>
             </a-form-item>
             <a-row :gutter="16">
@@ -316,6 +338,7 @@
   import { taskApi } from '/@/api/business/task/task-api';
   import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { prizeConfigApi } from '/src/api/business/prize/prize-config-api';
+  import { memberGradeApi } from '/@/api/business/member/member-grade-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
   import SolvelaRichEditor from '/@/components/framework/wangeditor/index.vue';
   import SchemaFormRenderer from './SchemaFormRenderer.vue';
@@ -330,6 +353,10 @@
     LIMIT_TYPE_OPTIONS,
     TARGET_AUDIENCE_ENUM,
     TARGET_AUDIENCE_OPTIONS,
+    AUDIENCE_MODE_GRADE,
+    audienceGradeOf,
+    buildAudienceGrade,
+    targetAudienceOf,
     STAGE_CONDITION_UNIT,
     isSchemaParamVisible,
     splitSchemaValues,
@@ -587,7 +614,7 @@
     templateName: selectedTemplate.value?.templateName || '-',
     taskType: selectedTemplate.value?.taskType || '-',
     taskGroupLabel: optionLabel(TASK_GROUP_OPTIONS, wizardForm.base.taskGroup),
-    audienceLabel: optionLabel(TARGET_AUDIENCE_OPTIONS, wizardForm.audience.targetAudience),
+    audienceLabel: targetAudienceOf(wizardForm.audience.targetAudience, gradeNames.value),
     limitLabel: optionLabel(LIMIT_TYPE_OPTIONS, wizardForm.limit.limitType),
     timeText: wizardForm.audience.longTerm
       ? '长期有效'
@@ -903,11 +930,67 @@
     { immediate: true }
   );
 
+  // ==================== 目标人群：等级门槛 ====================
+
+  /** 等级配置。必须来自接口 —— 等级是配置，运营随时加一档 */
+  const memberGrades = ref([]);
+
+  const gradeOptions = computed(() =>
+    memberGrades.value
+      .filter((item) => item.status === 1)
+      // 等级 0 的门槛是 0，「等级 0 及以上」就是全部会员 —— 那已经有 ALL 这个选项了，
+      // 留着它只会让运营配出一个看起来是专享、实际人人可做的任务
+      .filter((item) => item.gradeCode > 0)
+      .map((item) => ({ value: item.gradeCode, label: `${item.gradeName}（等级 ${item.gradeCode}）及以上` }))
+  );
+
+  const gradeNames = computed(() => Object.fromEntries(memberGrades.value.map((item) => [item.gradeCode, item.gradeName])));
+
+  /**
+   * 单选按钮的选中项。
+   *
+   * 🔴 真值仍然只有 wizardForm.audience.targetAudience 一个 —— 这里是它的视图。
+   * 另起一个 ref 存「模式」的话，草稿恢复、编辑回显、「再建一个」三条路径
+   * 都得各自记得同步它，而漏掉任何一条都表现为「打开是全部会员，提交的却是等级专享」。
+   */
+  const audienceMode = computed({
+    get() {
+      return audienceGradeOf(wizardForm.audience.targetAudience) === null ? wizardForm.audience.targetAudience : AUDIENCE_MODE_GRADE;
+    },
+    set(mode) {
+      if (mode !== AUDIENCE_MODE_GRADE) {
+        wizardForm.audience.targetAudience = mode;
+        return;
+      }
+      // 切到「等级门槛」时先落一个可用的档，避免 targetAudience 停在 'LEVEL' 这个哨兵值上被提交
+      const first = gradeOptions.value[0];
+      wizardForm.audience.targetAudience = buildAudienceGrade(first ? first.value : 1);
+    },
+  });
+
+  const audienceGrade = computed({
+    get: () => audienceGradeOf(wizardForm.audience.targetAudience),
+    set: (level) => {
+      wizardForm.audience.targetAudience = buildAudienceGrade(level);
+    },
+  });
+
+  async function loadMemberGrades() {
+    try {
+      memberGrades.value = (await memberGradeApi.listConfig()) || [];
+    } catch (e) {
+      // 拉不到等级不该让整个向导挂掉：其余三种人群照常可用，
+      // 「等级门槛」那一项会是个空下拉 —— 空下拉是看得见的，静默失败不是
+      solvelaSentry.captureError(e);
+    }
+  }
+
   onMounted(() => {
     // 活动大类与模板都来自服务端，两者互不依赖，并行拉取
     loadActivityOptions();
     loadTaskTemplates();
     loadEventOptions();
+    loadMemberGrades();
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 

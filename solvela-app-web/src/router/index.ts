@@ -208,6 +208,42 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/coupon/CouponWalletView.vue'),
     meta: { title: '我的券包' },
   },
+  // ---- 我的实物奖品：从「我的」进去。要登录（默认）----
+  //      🔴 这一页补的是实物履约三段式里一直缺的第 ②「用户补填收货信息」：
+  //         中了实物奖之后用户侧此前是断的 —— 看不到，也填不了地址。
+  {
+    path: '/deliveries',
+    name: 'deliveries',
+    component: () => import('@/views/delivery/DeliveryView.vue'),
+    meta: { title: '我的实物奖品' },
+  },
+  // ---- 我的等级：从「我的」进去。要登录（默认）----
+  //      🔴 这一页补的是保级机制唯一的用户侧出口：此前等级到期、进入三个月宽限、
+  //         期间成长值双倍 —— 用户全程无感。挽留机制感知不到就等于没做。
+  {
+    path: '/grade',
+    name: 'grade',
+    component: () => import('@/views/grade/GradeView.vue'),
+    meta: { title: '我的等级' },
+  },
+  // ---- 彩票活动页。匿名可看（分享入口），领号才要登录 ----
+  //      🔴 入口仍是 /activity/:code —— 分享出去的链接都是那个形状。
+  //         ActivityView 拿到 activityType 之后 replace 到这里来。
+  {
+    path: '/lottery/activity/:code',
+    name: 'lottery-activity',
+    component: () => import('@/views/lottery/LotteryActivityView.vue'),
+    meta: { title: '彩票', anonymous: true },
+  },
+  // ---- 我的彩票：从「我的」进去。要登录（默认）----
+  //      🔴 号码只能从奖品派发拿到，这一页没有任何「购买」入口 ——
+  //         后端的领号引擎刻意没有资产扣减，买一张是产品决策不是加个按钮。
+  {
+    path: '/lottery/tickets',
+    name: 'lottery-tickets',
+    component: () => import('@/views/lottery/LotteryTicketsView.vue'),
+    meta: { title: '我的彩票' },
+  },
   // ---- 我的收藏：从「我的」进去。要登录（默认）——收藏本来就是「我的」东西 ----
   {
     path: '/favorites',

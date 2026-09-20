@@ -90,8 +90,9 @@ return baseScore            // ❌ 会被当成两条语句
 
 | 函数 | 说明 |
 |---|---|
-| `member_info()` | 当前会员资料 map：`memberId/memberName/nickname/gender/status/registerSource/registerTime/registerDays/birthday/birthdayToday/inviteId/invited`。**一次执行只查一次库**，写几遍都行 |
+| `member_info()` | 当前会员资料 map：`memberId/memberName/nickname/gender/status/registerSource/registerTime/registerDays/birthday/birthdayToday/inviteId/invited/level`。**一次执行只查一次库**，写几遍都行 |
 | `member_registerDays()` / `member_isNewMember(7)` | 注册天数 / N 天内注册。阈值由脚本给——几天算新人是**活动**的判据 |
+| `member_level()` / `member_levelAtLeast(3)` | 会员等级（0 起）/ 是否达到某一档。门槛由脚本给，同上——几级算高等级是**活动**的判据 |
 | `prize_countWon([活动编码])` / `prize_hasWon('PRIZE_CODE')` | 中奖次数 / 有没有中过某个奖。活动编码可选，不传就是全部活动累计 |
 | `prize_listRecent(10, [活动编码])` | 最近的中奖明细，每条一个 map，上限 50 条 |
 | `draw_countDrawn()` / `draw_executeDrawByScript(池)` / `draw_executeMultiDrawByScript(池, 次数)` | 抽奖。后两个**有副作用** |
@@ -101,6 +102,19 @@ return baseScore            // ❌ 会被当成两条语句
 `member_infoOf(memberId)` 这种重载是刻意的——那等于让脚本查任意人的资料、拿别人的记录放宽自己的限制。
 
 **有副作用的函数一次执行只准调一次**（发奖、领号合计），且应当是脚本的最后一步。
+
+**等级专享**就是靠 `member_levelAtLeast` 表达的——这是会员等级的第一版权益之一：
+
+```
+// 白金及以上走专属奖池，其余走普通池
+if (member_levelAtLeast(3)) {
+    return draw_executeDrawByScript('POOL_PLATINUM');
+}
+return draw_executeDrawByScript('POOL_NORMAL');
+```
+
+⚠️ 等级是**配置**（运营随时加一档），所以脚本里写的是数字而不是「白金」两个字。
+改档位名不影响脚本，**加一档要回头看看这些数字**——`levelAtLeast(3)` 的含义会跟着变。
 
 ## 时间 / 字符串 / JSON
 

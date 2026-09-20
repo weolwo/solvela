@@ -3,11 +3,14 @@ package solvela.app.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.CurrentMember;
 import solvela.app.domain.TaskView;
 import solvela.app.service.TaskService;
+import solvela.member.api.MemberSignApi;
+import solvela.member.api.MemberSignResult;
 
 import java.util.List;
 
@@ -31,6 +34,15 @@ public class TaskController {
     private final TaskService taskService;
 
     /**
+     * 签到。
+     *
+     * <p>🔴 它在<b>会员</b>契约里，不在任务契约里 —— 签到是会员自己的行为，
+     * 不是任务的一部分（见 {@link MemberSignApi} 的类注释）。
+     * 放在本控制器上只是因为<b>用户是在任务中心点它的</b>，那是 UI 的事实，不是领域的。
+     */
+    private final MemberSignApi memberSignApi;
+
+    /**
      * 我的全部任务：当前可见的任务型活动下的任务，合成一份。
      *
      * <p>没有任务型活动、或都没配任务时返回<b>空数组</b>，不是 404。
@@ -42,5 +54,31 @@ public class TaskController {
     @GetMapping
     public List<TaskView> listMyTasks() {
         return taskService.listMyTasks(CurrentMember.require().memberId());
+    }
+
+    /**
+     * 签到。一天只算一次，重复点<b>不是错误</b>。
+     *
+     * <h3>🔴 memberId 从登录态取，绝不接受客户端传</h3>
+     * 让客户端传的话，任何人都能替别人签到 —— 而签到会推任务进度、
+     * 进度达标会自动发奖，那条路的终点是真的资产。
+     * 与本仓其他 C 端写接口同一条规矩。
+     *
+     * <h3>返回"今天是不是第一次"，而不是"涨了多少进度"</h3>
+     * 进度是异步推的（{@code task-event-executor}），签到返回的那一刻它可能还没算完。
+     * 硬要同步返回就得让签到接口去等任务引擎 —— 那等于把那道异步隔离拆了，
+     * 任务系统抖一下签到按钮就转圈。端上要看进度，刷新一次任务列表即可。
+     */
+    @PostMapping("/sign")
+    public MemberSignResult sign() {
+        return memberSignApi.sign(CurrentMember.require().memberId());
+    }
+
+    /**
+     * 今天签过没有。给按钮状态用 —— 页面进来时问一次，决定按钮是「签到」还是「已签到」。
+     */
+    @GetMapping("/sign/today")
+    public boolean signedToday() {
+        return memberSignApi.signedToday(CurrentMember.require().memberId());
     }
 }

@@ -83,8 +83,7 @@ vi.mock('@/api/notification', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/notification')>()
   return {
     ...actual,
-    fetchNotifications: () =>
-      Promise.resolve({ list: NOTIFICATIONS, total: 2, unreadCount: 1 }),
+    fetchNotifications: () => Promise.resolve({ list: NOTIFICATIONS, total: 2, unreadCount: 1 }),
     fetchAnnouncements: (lastId?: string) =>
       Promise.resolve(lastId === undefined ? ANNOUNCEMENTS : []),
     readAnnouncement: (id: string) => readAnnouncementSpy(id),

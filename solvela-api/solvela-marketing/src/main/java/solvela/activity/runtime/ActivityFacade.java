@@ -1,5 +1,10 @@
 package solvela.activity.runtime;
 
+import solvela.marketing.api.LotteryObtainResult;
+import solvela.marketing.api.LotteryBoardView;
+import solvela.marketing.api.LotteryTicketView;
+import solvela.marketing.api.LotteryIssueView;
+import solvela.lottery.clientapi.LotteryClientService;
 import solvela.marketing.api.ActivityBriefView;
 import solvela.enums.ActivityTypeEnum;
 import solvela.activity.spi.TaskCenterProvider;
@@ -70,6 +75,14 @@ public class ActivityFacade implements ActivityApi {
     private final ActivityRuntimeService activityRuntimeService;
 
     private final ScriptRuntime scriptRuntime;
+
+    /**
+     * 彩票的会员侧。<b>直接注入具体类</b>，不走 SPI ——
+     * 彩票和本类在同一个模块（solvela-marketing）里，没有依赖倒置的必要。
+     * 任务那边用 {@code ObjectProvider<TaskCenterProvider>} 是因为
+     * 那个契约当初是给 common-api 定的，两者的处境不一样。
+     */
+    private final LotteryClientService lotteryClientService;
 
     /**
      * 各玩法回答「脚本挂在哪」。由 solvela-marketing 注册（依赖倒置，见 {@link ActivityPlayMountProvider}）。
@@ -241,5 +254,129 @@ public class ActivityFacade implements ActivityApi {
         LocalDateTime deadline = activity.getDataEndTime() == null
                 ? activity.getEndTime() : activity.getDataEndTime();
         return deadline == null || !now.isAfter(deadline);
+    }
+
+    /* ---------------- 彩票 ---------------- */
+
+    /**
+     * 一个彩票玩法的当前一期。一行转发 —— 判据全在
+     * {@code LotteryClientService}，本类不重复一遍。
+     */
+    @Override
+    public LotteryIssueView getLotteryIssue(String lotteryCode, Long memberId) {
+        return lotteryClientService.getCurrentIssue(lotteryCode, memberId);
+    }
+
+    /** 我的彩票号码。同上，一行转发 */
+    @Override
+    public List<LotteryTicketView> getMyLotteryTickets(Long memberId, int limit) {
+        return lotteryClientService.getMyTickets(memberId, limit);
+    }
+
+    /** 彩票活动页的全部数据。聚合在本进程内做，网关不去循环调 */
+    @Override
+    public LotteryBoardView getLotteryBoard(String activityCode, Long memberId) {
+        return lotteryClientService.getBoard(activityCode, memberId);
+    }
+
+    /**
+     * 参与彩票活动：领一个号码。
+     *
+     * <h3>🔴 为什么不能复用 {@link #draw}</h3>
+     * 两者跑的是<b>同一个编排脚本</b>（活动的 {@code ACTIVITY_PLAY} 挂载点），
+     * 区别只在脚本最后一步调的是谁：抽奖脚本返回 {@code DrawResultView}，
+     * 彩票脚本返回 {@code lottery_issue(...)} 的 Map。
+     *
+     * <p>而 {@code draw} 拿到不是 {@code DrawResultView} 的返回会<b>抛异常</b>
+     * （它认定那是「挂错脚本」的配置事故）——
+     * <b>这正是彩票活动此前点「参与」会 5xx 的原因</b>：链路上每一环都在，
+     * 只有最后这一步没人把 Map 翻成结果。
+     *
+     * <h3>限购与资格判断都在脚本里</h3>
+     * 本方法不判，发号引擎也不判（它的类注释写着「消耗多少积分、单人限购几张，
+     * 都由上游业务算完再调进来」）。脚本用 {@code lottery_countMine} 自己拦。
+     */
+    @Override
+    public LotteryObtainResult obtainLotteryTicket(ActivityDrawCmd cmd) {
+        ActivityConfig activity = activityConfigService.getByActivityCode(cmd.activityCode());
+        if (activity == null) {
+            return LotteryObtainResult.reject("活动不存在");
+        }
+        if (!joinable(activity, LocalDateTime.now())) {
+            return LotteryObtainResult.reject("活动不在进行中");
+        }
+
+        ActivityPlayMountProvider.PlayMount mount = resolveMount(activity);
+        if (mount == null) {
+            log.warn("[彩票-参与] 活动是 {} 类型但没有可用的玩法配置, activityCode: {}",
+                    activity.getActivityType(), activity.getActivityCode());
+            return LotteryObtainResult.reject("活动还没配置好，请稍后再来");
+        }
+
+        Object result;
+        try {
+            result = scriptRuntime.evaluate(
+                    mount.point(), mount.refId(), playContext(activity, cmd), Object.class)
+                    .orElse(null);
+        } catch (BusinessException e) {
+            /*
+             * 脚本里抛出来的都是「现在领不了」：单人限购满了、人群不符、
+             * 以及领号引擎的售罄 / 停售 / 限流。它们是<b>预期内</b>的拒绝，
+             * 不是事故 —— 原样把话传给用户，别在这里换一套说法。
+             */
+            log.info("[彩票-参与] 被拒绝, activityCode: {}, memberId: {}, 原因: {}",
+                    cmd.activityCode(), cmd.memberId(), e.getMessage());
+            return LotteryObtainResult.reject(e.getMessage());
+        }
+
+        if (result == null) {
+            // 玩法配置有了却没挂编排脚本 —— 运营配置没做完，不是用户的问题
+            log.warn("[彩票-参与] 未挂玩法编排脚本, 挂载点: {}, 业务对象: {}",
+                    mount.point().getTitle(), mount.refId());
+            return LotteryObtainResult.reject("活动还没配置好，请稍后再来");
+        }
+        return toObtainResult(activity, result);
+    }
+
+    /**
+     * 把脚本的返回翻成领号结果。
+     *
+     * <p>🔴 {@code lottery_issue} 刻意返回 {@code Map} 而不是 DTO ——
+     * 脚本引擎的隔离策略下脚本读不到普通对象的字段（<b>而且不报错，只是拿到 null</b>）。
+     * 所以这里按键名取，键名的权威定义在 {@code LotteryScriptFunctions.issue} 里。
+     */
+    private static LotteryObtainResult toObtainResult(ActivityConfig activity, Object result) {
+        if (result instanceof Map<?, ?> map && map.get("ticketNumber") != null) {
+            return LotteryObtainResult.ok(
+                    String.valueOf(map.get("lotteryCode")),
+                    String.valueOf(map.get("issueNo")),
+                    String.valueOf(map.get("ticketNumber")));
+        }
+        /*
+         * 🔴 脚本返回一个【字符串】= 它决定不发，字符串就是给用户看的那句话。
+         *
+         * 没有这条的话，「单人限购满了」这种最常见的判断在脚本里<b>无路可走</b>：
+         *   · return null      → 被当成「没挂脚本」，用户看到「活动还没配置好」；
+         *   · 返回别的 map     → 被当成挂错脚本，直接 500。
+         * 两种都在说谎 —— 而限购是运营配活动时第一个会写的规则。
+         *
+         * 让脚本自己给措辞是有意的：限购几张、为什么不给，都是运营的决定，
+         * 措辞也该是他的。引擎硬编一句「您已达上限」只会让所有活动长一个样。
+         */
+        if (result instanceof String message && !message.isBlank()) {
+            return LotteryObtainResult.reject(message);
+        }
+        /*
+         * 脚本返回了别的东西。最可能的是把【抽奖脚本】挂到了彩票活动上 ——
+         * 那是配置事故，而且是运营完全看不出来的一种：两种脚本挂在同一个挂载点上，
+         * 后台那一侧长得一模一样。所以报错要把「我拿到的是什么」说出来。
+         */
+        throw new BusinessException(String.format(
+                "活动 [%s] 的玩法编排脚本返回了 %s，而彩票活动要的是："
+                        + "领号结果（含 ticketNumber 的 map），或者一句拒绝理由（字符串）。"
+                        + "多半是把抽奖脚本挂到了这个活动的 ACTIVITY_PLAY 上，"
+                        + "或者脚本最后一步没有返回 lottery_issue(...) 的结果。",
+                activity.getActivityCode(),
+                result.getClass().getSimpleName()));
     }
 }

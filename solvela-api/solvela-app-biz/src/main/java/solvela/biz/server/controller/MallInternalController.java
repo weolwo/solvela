@@ -3,6 +3,7 @@ package solvela.biz.server.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.mall.clientapi.MallClientFacade;
+import solvela.marketing.api.MallDeliveryFillResult;
 import solvela.marketing.api.MallAddressCmd;
 import solvela.marketing.api.MallAddressView;
 import solvela.marketing.api.MallApi;
@@ -78,6 +79,11 @@ public class MallInternalController implements MallApi {
     @Override
     public MallPayResult pay(String orderNo, Long memberId) {
         return mallClientFacade.pay(orderNo, memberId);
+    }
+
+    @Override
+    public MallDeliveryFillResult fillDeliveryAddress(Long deliveryId, Long memberId, Long addressId) {
+        return mallClientFacade.fillDeliveryAddress(deliveryId, memberId, addressId);
     }
 
     @Override

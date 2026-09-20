@@ -89,3 +89,35 @@ function normalize(raw: Raw<TaskItem>): TaskItem {
 export function fetchTasks(): Promise<TaskItem[]> {
   return request<Raw<TaskItem>[]>({ url: '/task' }).then((list) => list.map(normalize))
 }
+
+/**
+ * 签到结果。
+ *
+ * 🔴 <b>没有「涨了多少进度」这个字段</b>，这是后端设计不是漏了：
+ * 进度是异步推的，签到返回的那一刻可能还没算完。要看进度就重新拉一次任务列表。
+ */
+export interface SignResult {
+  /** 今天<b>第一次</b>签到。false = 今天已经签过了，本次什么都没发生 */
+  firstToday: boolean
+}
+
+/**
+ * 签到。
+ *
+ * <h3>🔴 重复签到<b>不是错误</b></h3>
+ * 后端返回 200 + `firstToday: false`，不是 4xx。所以这里不要 catch 之后
+ * 显示「签到失败」—— 用户今天已经签过了是一个完全正常的结果。
+ *
+ * <h3>它推的是任务进度，不是「签到积分」</h3>
+ * 签到本身不发任何奖。它广播一个业务动作，由后台配的<b>签到任务</b>去接
+ * （「连续签到 3 天」之类）—— 所以运营没配任务时，签到照样能点、能显示已签到，
+ * 只是不会有奖励。这是刻意的：一个按钮的可用性不该取决于运营配没配活动。
+ */
+export function sign(): Promise<SignResult> {
+  return request<SignResult>({ url: '/task/sign', method: 'POST' })
+}
+
+/** 今天签过没有。给按钮状态用 */
+export function fetchSignedToday(): Promise<boolean> {
+  return request<boolean>({ url: '/task/sign/today' })
+}

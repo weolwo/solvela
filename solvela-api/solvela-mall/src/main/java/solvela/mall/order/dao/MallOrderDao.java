@@ -154,4 +154,33 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
     /** 按订单号取单。order_no 上有唯一键，一定是 0 或 1 行 */
     @Select("SELECT * FROM t_mall_order WHERE order_no = #{orderNo}")
     MallOrder getByOrderNo(@Param("orderNo") String orderNo);
+
+    /**
+     * 窗口内<b>已经扣款成功</b>的订单，供打点反查补推用（{@code MallOrderAuditProvider}）。
+     *
+     * <h3>🔴 判据 {@code status NOT IN (0, 40)} 和统计口径是<b>同一份</b></h3>
+     * 它就是 {@code MallOrderMapper.xml} 里 {@code paid_statuses} 那个片段的字面复制：
+     * 待支付(0) 与已取消(40) 不算，其余都算过款（已退款(50) 也算 ——
+     * 它确实扣过，退款是另一笔账）。
+     *
+     * <p>另写一套判断是漂移的开始：宽了会给一批没付钱的单补出任务进度，
+     * 窄了则补不全 —— 而"补不全"的表现和"根本没配这个任务"一模一样，不会有人发现。
+     *
+     * <p>按 {@code pay_time} 筛而不是 {@code create_time}：两条路的付款时刻差得很远 ——
+     * 纯积分单落单即付款，混合单可能挂十几分钟才付。按创建时间筛会让后者
+     * 在它真正付款的那个窗口里查不到。
+     *
+     * <p>正序返回：一批补推时先补早的，和 {@code selectExpiredUnpaid} 同一个理由。
+     */
+    @Select("""
+            SELECT * FROM t_mall_order
+             WHERE pay_time IS NOT NULL
+               AND pay_time >= #{from} AND pay_time <= #{to}
+               AND status NOT IN (0, 40)
+             ORDER BY pay_time
+             LIMIT #{limit}
+            """)
+    List<MallOrder> selectSettledBetween(@Param("from") java.time.LocalDateTime from,
+                                         @Param("to") java.time.LocalDateTime to,
+                                         @Param("limit") int limit);
 }

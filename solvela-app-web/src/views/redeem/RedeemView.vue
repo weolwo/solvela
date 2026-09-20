@@ -10,7 +10,16 @@ import { fetchCommodityDetail, OrderStatus, redeem, type RedeemResult } from '@/
 import { useAsync } from '@/composables/useAsync'
 import { type Id, toId, type Money } from '@/types/contract'
 import { formatCash, formatPoints } from '@/utils/cost'
-import { compare, formatWithSeparator, isNegative, isZero, money, mul, sub, ZERO } from '@/utils/money'
+import {
+  compare,
+  formatWithSeparator,
+  isNegative,
+  isZero,
+  money,
+  mul,
+  sub,
+  ZERO,
+} from '@/utils/money'
 
 /**
  * 兑换确认页。<b>没有购物车</b>，一单一 SKU。

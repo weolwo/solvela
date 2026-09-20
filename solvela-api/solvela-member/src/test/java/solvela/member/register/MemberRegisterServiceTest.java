@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DuplicateKeyException;
+import solvela.base.event.BizEventPublisher;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
@@ -87,6 +88,12 @@ class MemberRegisterServiceTest {
     private MemberEmailCodeService emailCodeService;
     @Mock
     private MemberSmsCodeService smsCodeService;
+    /**
+     * 打点用的广播口。本测试<b>不断言它</b> —— 注册成功要不要推任务进度，
+     * 是任务域的判断，不该由注册的单测来钉。这里只是让构造器能装上。
+     */
+    @Mock
+    private BizEventPublisher bizEventPublisher;
 
     private MemberRegisterProperties properties;
     private MemberRegisterService service;
@@ -95,7 +102,8 @@ class MemberRegisterServiceTest {
     void setUp() {
         properties = new MemberRegisterProperties();
         service = new MemberRegisterService(memberRegisterDao, memberIdAllocator, properties,
-                redisService, piiHasher, piiCipher, deviceGuard, emailCodeService, smsCodeService);
+                redisService, piiHasher, piiCipher, deviceGuard, emailCodeService, smsCodeService,
+                bizEventPublisher);
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);
         when(piiCipher.encrypt(PHONE)).thenReturn("加密后的号");

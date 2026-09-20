@@ -36,4 +36,18 @@
         ORDER BY id ASC
     </select>
 
+    <!--
+      反查对账用：这批单号里哪些已经有流水。
+      DISTINCT 是必须的 —— 一个单号在 N 个订阅该事件的任务下各有一行。
+    -->
+    <select id="selectReportedBizIds" resultType="java.lang.String">
+        SELECT DISTINCT event_biz_id
+        FROM t_task_record_flow
+        WHERE event_code = #{eventCode}
+        AND event_biz_id IN
+        <foreach collection="bizIds" item="bizId" open="(" separator="," close=")">
+            #{bizId}
+        </foreach>
+    </select>
+
 </mapper>

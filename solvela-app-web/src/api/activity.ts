@@ -53,6 +53,15 @@ export interface WheelConfig {
 export interface ActivityDetail {
   activityCode: string
   activityName: string
+  /**
+   * 玩法类型：`BASIC` / `DRAW` / `TASK` / `LOTTERY`。
+   *
+   * 🔴 这是<b>路由分流</b>用的，不是给页面做 if 的：
+   * 不同玩法是不同的页面（转盘 vs 彩票），而不是同一页的两种样子。
+   * `/activity/:code` 是所有玩法共用的入口（分享链接都是这个形状），
+   * 由 ActivityView 拿到类型之后 replace 到对应的页面去。
+   */
+  activityType: string
   subTitle: string | null
   /** 主题色（十六进制），没配为 null */
   themeColor: string | null
@@ -98,6 +107,7 @@ export const MAX_DRAW_TIMES = 10
 interface RawActivityView {
   activityCode: string
   activityName: string
+  activityType: string
   subTitle: string | null
   themeColor: string | null
   endTime: string
@@ -124,6 +134,7 @@ export async function fetchActivityDetail(activityCode: string): Promise<Activit
   return {
     activityCode: view.activityCode,
     activityName: view.activityName,
+    activityType: view.activityType,
     subTitle: view.subTitle,
     themeColor: view.themeColor,
     endTime: toDateTime(view.endTime),

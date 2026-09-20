@@ -38,11 +38,20 @@ vi.mock('@/api/notification', () => ({
 /** 这一页上应该存在的入口：路由名 → 给人看的名字 */
 const ENTRIES: [string, string][] = [
   ['messages', '消息'],
+  // 2026-09-20 阶段 4：保级缓冲期唯一的用户侧出口。
+  // 没有这个入口的话，「等级到期 → 三个月宽限 → 成长值双倍」全程用户无感，
+  // 而那套挽留机制正是做等级体系要换的东西
+  ['grade', '我的等级'],
   // 2026-09-15 阶段 4：券第一次能被用掉了。找不到券的话，能用也等于没有
   ['coupons', '我的券包'],
   // 2026-09-15 阶段 7：券的第一个非商城出口
   ['recharge', '充话费'],
   ['records-exchange', '兑换记录'],
+  // 2026-09-18：实物履约三段式里第 ② 步的入口。做完页面却忘了给入口，
+  // 正是这条测试当初为之而生的那个事故
+  ['deliveries', '我的实物奖品'],
+  // 2026-09-18：彩票玩法后端全建成了，而会员此前拿不到也看不到
+  ['lottery-tickets', '我的彩票'],
   ['records-promo', '优惠记录'],
   ['favorites', '我的收藏'],
   ['address-list', '地址簿'],
@@ -82,10 +91,19 @@ describe('「我的」页的入口', () => {
 
     // Cell 传的是【命名路由对象】（{ name: 'messages' }），不是路径字符串 ——
     // 所以要取 to.name，String(to) 会得到 [object Object]
+    //
+    // ⚠️ props() 的返回类型是 any，不标注的话整条链都会变成 any，
+    //    @typescript-eslint/no-unsafe-* 会在下一行的 to.name 上报出来。
+    //    标成 RouterLink 真正接受的那两种形状，而不是 `as any` 了事。
+    //
+    //    分支判 `typeof to === 'string'` 而不是判 'object'：后者在 else 里
+    //    只把「不带 name 的对象」排除掉了，to 仍然可能是对象，于是 String(to)
+    //    还是会得到 [object Object] —— no-base-to-string 报的就是这个。
+    //    按字符串正面判，两个分支才都是确定的。
     const targets = w
       .findAllComponents({ name: 'RouterLink' })
-      .map((l) => l.props('to'))
-      .map((to) => (typeof to === 'object' && to !== null && 'name' in to ? String(to.name) : String(to)))
+      .map((l) => l.props('to') as string | { name?: string })
+      .map((to) => (typeof to === 'string' ? to : String(to.name)))
 
     expect(
       targets.includes(name),

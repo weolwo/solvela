@@ -44,6 +44,31 @@ const activityCode = (Array.isArray(rawCode) ? rawCode[0] : rawCode) ?? ''
 
 const detail = useAsync(() => fetchActivityDetail(activityCode))
 
+/**
+ * 彩票活动走另一页。
+ *
+ * <h3>🔴 为什么分流在这里，而不是在活动列表里</h3>
+ * `/activity/:code` 是<b>所有玩法共用的入口</b> —— 分享出去的链接、二维码、
+ * 站外投放都是这个形状。只在列表里按类型分流的话，那些链接会落到这一页，
+ * 而这一页是转盘：用户看到的是一个转不动的空转盘，不是彩票。
+ *
+ * <p>用 `replace` 不用 `push`：用户按返回该回到他来的地方（列表 / 站外），
+ * 而不是又落回这个中转页再被弹走一次。
+ *
+ * <p>代价是彩票活动多一次 `/activity/:code` 请求。可以靠给列表也带上
+ * activityType 来省掉，但那要改网关的 PromoView —— 为省一次点查改契约不划算，
+ * 而且分流点会变成两处。
+ */
+watch(
+  () => detail.data.value,
+  (data) => {
+    if (data?.activityType === 'LOTTERY') {
+      void router.replace({ name: 'lottery-activity', params: { code: activityCode } })
+    }
+  },
+  { immediate: true },
+)
+
 /*
  * 这个活动里我中过什么。
  *

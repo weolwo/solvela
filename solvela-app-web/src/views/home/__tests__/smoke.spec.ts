@@ -145,6 +145,17 @@ vi.mock('@/api/task', () => ({
         actionUrl: '/signIn',
       },
     ]),
+  /*
+   * 签到。默认「今天还没签」—— 那是按钮可点的那一面，
+   * 也是这一页进来时的常态。
+   *
+   * 🔴 mock 一个模块就得把这一页用到的【每一个】导出都列上：
+   * 漏一个的表现不是断言失败，而是 setup 阶段直接抛
+   * 「fetchSignedToday is not a function」，整个 spec 文件 9 个用例一起红 ——
+   * 而报错位置指向 useAsync，看不出根因在这个 mock 里少了一行。
+   */
+  fetchSignedToday: () => Promise.resolve(false),
+  sign: () => Promise.resolve({ firstToday: true }),
 }))
 
 /*

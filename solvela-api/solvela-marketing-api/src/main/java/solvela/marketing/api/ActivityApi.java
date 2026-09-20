@@ -25,8 +25,8 @@ import java.util.List;
  *   claimPrize(cmd)                领取奖励                           ⏳
  *   getPrizeRecord(qry)            我的奖励：可领的 + 历史记录          ⏳
  *   getTaskCenter(code, memberId)  我的任务中心                       ✅ 已实现
- *   getLotteryIssue(code)          当前期号                           ⏳
- *   getLotteryRecord(qry)          我的彩票记录                       ⏳
+ *   getLotteryIssue(code)          当前期号                           ✅ 已实现
+ *   getMyLotteryTickets(memberId)  我的彩票号码                       ✅ 已实现
  * </pre>
  * <b>方法一个一个加，跟着实现走</b>：先把七个签名摆上来再让实现抛
  * {@code UnsupportedOperationException}，等于给前端一份会骗人的接口文档。
@@ -121,4 +121,73 @@ public interface ActivityApi {
      */
     @PostExchange("/draw")
     DrawResultView draw(@RequestBody ActivityDrawCmd cmd);
+
+    /* ---------------- 彩票 ---------------- */
+
+    /**
+     * 一个彩票玩法的当前一期。
+     *
+     * <h3>🔴 返回里的 {@code issueNo} 可能是 null，那不是错误</h3>
+     * 上一期开完奖、下一期还没开售，中间本来就有空窗。
+     * 端上这时候该说「下一期敬请期待」，而不是转圈或报错。
+     *
+     * <p>玩法本身不存在时返回 {@code null} —— 那才是「查不到」。
+     *
+     * @param memberId 会员号。<b>只用来数「我这期有几张」</b>，不传就是 0 ——
+     *                 未登录也看得到期号信息，那是活动的公开面
+     */
+    @GetExchange("/lottery/{lotteryCode}/issue")
+    LotteryIssueView getLotteryIssue(@PathVariable String lotteryCode,
+                                     @RequestParam(required = false) Long memberId);
+
+    /**
+     * 彩票活动页要的全部数据，<b>一次给完</b>。
+     *
+     * <p>本期 / 中奖规则 / 往期开奖 / 我这期的号码 —— 四块在页面上同时出现，
+     * 分四个接口会让首屏等最慢的那个，中途还会出现半成品状态。
+     * 它们在服务端是四次本地查询，合起来只有一次跨进程往返。
+     *
+     * <p>🔴 活动不存在、不是彩票型、或没挂上线的彩票玩法 → 返回 {@code null}。
+     * 对端上是同一件事：这一页没东西可画。
+     *
+     * @param memberId 会员号，可空。<b>只影响「我这期的号码」那一块</b> ——
+     *                 活动页匿名可看，那是分享链路的前提
+     */
+    @GetExchange("/lottery/board/{activityCode}")
+    LotteryBoardView getLotteryBoard(@PathVariable String activityCode,
+                                     @RequestParam(required = false) Long memberId);
+
+    /**
+     * 参与彩票活动：领一个号码。
+     *
+     * <h3>🔴 它和 {@link #draw} 走<b>同一个编排脚本</b>，但要的返回不一样</h3>
+     * 两者都跑活动的 {@code ACTIVITY_PLAY} 脚本。区别在于脚本最后一步调的是谁：
+     * 抽奖脚本返回 {@code DrawResultView}，彩票脚本返回 {@code lottery_issue(...)} 的 Map。
+     *
+     * <p>{@code draw} 拿到 Map 会<b>抛异常</b>（它明确要求返回抽奖结果），
+     * 所以彩票不能复用它 —— 这正是彩票活动此前点「参与」会 5xx 的原因。
+     *
+     * <p>单人限购、人群资格<b>都在脚本里判</b>，本接口不管：
+     * 发号引擎那一侧刻意没有限购逻辑（它的类注释写着「消耗多少积分、单人限购几张，
+     * 都由上游业务算完再调进来」）。
+     *
+     * <p>🔴 脚本<b>拒绝</b>时返回一个字符串，那就是给用户看的那句话 ——
+     * 限购几张、为什么不给，是运营的决定，措辞也该是他的。
+     * 引擎硬编一句「您已达上限」只会让所有活动长一个样。
+     */
+    @PostExchange("/lottery/obtain")
+    LotteryObtainResult obtainLotteryTicket(@RequestBody ActivityDrawCmd cmd);
+
+    /**
+     * 我的彩票号码，跨玩法跨期一起给。
+     *
+     * <p>排序：<b>中奖的在最前</b>（奖级升序），然后才是最新的 ——
+     * 用户点进来最想知道的是「我中了没有」，不是「我最近领了什么」。
+     * 这个排序和管理端 {@code selectMyTickets} 是同一个口径。
+     *
+     * <p>没有就返回空数组，不是 404。
+     */
+    @GetExchange("/lottery/ticket/mine")
+    List<LotteryTicketView> getMyLotteryTickets(@RequestParam Long memberId,
+                                               @RequestParam int limit);
 }

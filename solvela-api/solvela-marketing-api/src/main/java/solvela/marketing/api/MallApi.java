@@ -141,6 +141,31 @@ public interface MallApi {
      *（与 {@code t_physical_delivery} 同一套 PiiTypeHandler、同一把密钥），
      * 解密后在应用层截，<b>不存第二份明文脱敏值</b>。
      */
+    /**
+     * 用地址簿里的一个地址，去补填一张<b>实物履约单</b>的收件信息。
+     *
+     * <h3>🔴 为什么这个方法长在商城契约上，而履约单是资产域的</h3>
+     * 因为解析 {@code addressId} 只有商城做得到：地址簿是 {@code t_mall_address}，
+     * 而资产域（{@code solvela-ledger}）一个字都不认识商城
+     * （{@code MallLedgerBoundaryTest} 守着）。
+     *
+     * <p>所以分工照 {@code MallFulfillService} 已经跑通的那条路走：
+     * <b>谁拥有地址，谁负责解析成三个明文字段</b>，再通过
+     * {@code DeliveryApi.fillReceiver} 把它们传给资产域 ——
+     * 那边收明文三件套、落库时自己加密，不认识地址簿。
+     *
+     * <p><b>换个方向都不行</b>：让资产域收 addressId，它查不出人来；
+     * 让网关先读地址再转发，读回来的手机号是<b>脱敏值</b>（{@code 138****8000}），
+     * 拿它当收件电话等于把包裹寄给一个打不通的号码。
+     *
+     * <p>⚠️ 地址必须是<b>本人的</b>（{@code getOwned} 带 memberId），
+     * 否则这个接口就成了「用别人的地址 id 猜别人住哪」。
+     */
+    @PostExchange("/delivery/{deliveryId}/address")
+    MallDeliveryFillResult fillDeliveryAddress(@PathVariable Long deliveryId,
+                                               @RequestParam Long memberId,
+                                               @RequestParam Long addressId);
+
     @GetExchange("/address")
     List<MallAddressView> listAddresses(@RequestParam Long memberId);
 

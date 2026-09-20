@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
-import { fetchTasks, type TaskItem, type TaskStage } from '@/api/task'
+import { fetchSignedToday, fetchTasks, sign, type TaskItem, type TaskStage } from '@/api/task'
 import { useAsync } from '@/composables/useAsync'
 import { compare, format, money } from '@/utils/money'
 
@@ -24,6 +24,59 @@ import { compare, format, money } from '@/utils/money'
 
 const router = useRouter()
 const tasks = useAsync(fetchTasks)
+
+/* ---- 签到 ---- */
+
+/**
+ * 今天签过没有。
+ *
+ * <h3>🔴 签到和任务列表是<b>两个</b>请求，不是一个</h3>
+ * 看起来把它塞进 `/task` 的返回里能省一次往返，但那会把两件事绑死：
+ * 签到属于<b>会员域</b>（它只是"今天来过"这个事实），任务中心属于营销域。
+ * 合在一起之后，运营没配任何任务时 `/task` 返回空数组 ——
+ * 而签到按钮会跟着一起消失，尽管它本来就该能点。
+ *
+ * <p>后端那边也是这么分的：签到走 MemberSignApi，任务走 ActivityApi。
+ */
+const signedToday = useAsync(fetchSignedToday)
+
+const signing = ref(false)
+/** 刚签完要说的那句话。null = 不显示。它只活到下一次进页面 */
+const signHint = ref<string | null>(null)
+
+/**
+ * 签到。
+ *
+ * <h3>🔴 重复点不是错误</h3>
+ * 后端返回 200 + `firstToday: false`。所以这里按"今天已签到"提示，
+ * 而不是丢进 catch 显示"签到失败" —— 后者会让一个完全正常的结果看起来像故障。
+ *
+ * <h3>签完要重新拉一次任务列表，但<b>不保证</b>能看到进度</h3>
+ * 进度是异步推的（后端丢进 task-event-executor）。这一次 reload 多半能拿到新进度，
+ * 但赶上队列繁忙时也可能还是旧的 —— 那不是 bug。
+ * 所以提示语写的是"签到成功"，不是"已获得 X 积分"：
+ * 前者我们确定，后者我们不知道。
+ */
+async function doSign(): Promise<void> {
+  if (signing.value) {
+    return
+  }
+  signing.value = true
+  signHint.value = null
+  try {
+    const result = await sign()
+    signedToday.data.value = true
+    signHint.value = result.firstToday ? '签到成功' : '今天已经签过了'
+    if (result.firstToday) {
+      // 只有真签上了才值得再拉一次列表 —— 重复点什么都没变
+      await tasks.reload()
+    }
+  } catch {
+    signHint.value = '签到失败，请稍后再试'
+  } finally {
+    signing.value = false
+  }
+}
 
 /**
  * 「去完成」跳哪。<b>跳不到就返回 null，不画那个按钮。</b>
@@ -141,6 +194,38 @@ const grouped = computed(() => {
 
 <template>
   <div class="tasks">
+    <!--
+      签到。放在任务列表【上面】而不是列表里的一条：
+      它不是一个任务，而是一个动作 —— 用户点它是为了推进"签到类"任务的进度。
+      混进列表里的话，它会和「连续签到 3 天」那条任务并排出现，
+      看起来像两个签到入口。
+
+      ⚠️ 这块【不依赖】任务列表是否为空：运营没配签到任务时它照样能点，
+      只是点了不会有奖励。按钮的可用性不该取决于运营配没配活动。
+    -->
+    <Card>
+      <div class="sign">
+        <div class="sign__main">
+          <p class="sign__title">每日签到</p>
+          <!-- 有话说的时候说话，没有就说明这个按钮是干嘛的 —— 不留空行 -->
+          <p class="sign__text">
+            {{
+              signHint ??
+              (signedToday.data.value === true ? '今天已签到' : '签到可推进签到任务的进度')
+            }}
+          </p>
+        </div>
+        <Button
+          :block="false"
+          :loading="signing"
+          :disabled="signedToday.data.value === true"
+          @click="doSign"
+        >
+          {{ signedToday.data.value === true ? '已签到' : '签到' }}
+        </Button>
+      </div>
+    </Card>
+
     <Section
       title="我的任务"
       :loading="tasks.loading.value"
@@ -305,6 +390,30 @@ const grouped = computed(() => {
 </template>
 
 <style scoped>
+.sign {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-md);
+  padding: var(--sv-space-md);
+}
+
+.sign__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.sign__title {
+  margin: 0;
+  font-size: var(--sv-font-caption);
+  font-weight: 600;
+}
+
+.sign__text {
+  margin: var(--sv-space-xs) 0 0;
+  color: var(--sv-text-secondary);
+  font-size: var(--sv-font-footnote);
+}
+
 .meta {
   display: flex;
   flex-direction: column;

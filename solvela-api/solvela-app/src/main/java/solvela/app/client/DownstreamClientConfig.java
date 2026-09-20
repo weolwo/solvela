@@ -19,9 +19,12 @@ import solvela.marketing.api.RechargeApi;
 import solvela.marketing.api.PrizeRecordApi;
 import solvela.member.api.AssetApi;
 import solvela.member.api.CouponQueryApi;
+import solvela.member.api.DeliveryApi;
 import solvela.member.api.DeviceApi;
 import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.MemberAuthApi;
+import solvela.member.api.MemberGradeApi;
+import solvela.member.api.MemberSignApi;
 import solvela.member.api.NotificationApi;
 
 import java.time.Duration;
@@ -172,6 +175,61 @@ public class DownstreamClientConfig {
     @Bean
     public ActivityApi activityApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(3), ActivityApi.class);
+    }
+
+    /**
+     * 每日签到。<b>1 秒</b>，与会员认证同一档：一次 Redis 自增加一次会员存在性点查，
+     * 比主键点查重不了多少，而它挂在用户点按钮的路径上 —— 拖长了就是按钮一直转圈。
+     *
+     * <p>⚠️ 签到会顺带广播一个业务动作，由营销侧翻译成任务进度，
+     * 但那一段是<b>异步</b>的（{@code task-event-executor}），不占这 1 秒。
+     * 所以这里不需要按"营销"那一档给 3 秒 —— 真给了，反而会在任务系统抖动时
+     * 让签到接口陪着一起慢。
+     *
+     * <p>契约在 {@code solvela-member-api}：签到是挂在会员身上的行为，
+     * 所以走会员服务的 base-url，与 {@link MemberAuthApi} 同一个键。
+     */
+    /**
+     * 实物履约单（我的实物奖品）。<b>2 秒</b>：按 member_id 的索引扫描，
+     * 实物单量天然很小，比券包还轻。
+     *
+     * <p>契约在 {@code solvela-member-api}：履约单是资产，将来和会员同属
+     * app-member 服务。今天它和营销跑在同一个 app-biz 进程里，
+     * 所以 base-url 复用 marketing 那个 —— 与 {@link AssetApi} / {@link CouponQueryApi} 一致。
+     *
+     * <p>🔴 这里代理的是<b>整个</b> {@link DeliveryApi}，含写方法 {@code fillReceiver}。
+     * 那和券那边只代理只读的 {@code CouponQueryApi} 不同，理由是：
+     * 补填收货信息<b>本来就该由用户发起</b>，它不像核销那样能消耗资产。
+     * 但网关<b>不直接调</b> {@code fillReceiver} —— C 端那条路走
+     * {@code MallApi.fillDeliveryAddress}（只有商城解析得了 addressId），
+     * 这个 bean 存在是为了将来（比如客服端代填）有一条明确的路，而不是让人临时造一条。
+     */
+    @Bean
+    public DeliveryApi deliveryApi(@Value("${solvela.client.marketing.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(2), DeliveryApi.class);
+    }
+
+    /**
+     * 会员等级 —— <b>只读</b>。
+     *
+     * <p>契约里一个写方法都没有，是刻意的：等级是派生状态，跟着成长值走。
+     * 给 C 端开写口等于给刷等级开门。人工调级只在管理端。
+     *
+     * <p>base-url 走 member 那个：等级表属于会员域（{@code t_member_grade} /
+     * {@code t_member_growth}），与 {@code MemberSignApi} 同一侧 ——
+     * 而不是像履约单那样跟着资产走。
+     *
+     * <p>超时给 2 秒而不是 1：等级页一次要带回完整阶梯与每一档的权益，
+     * 比签到那种单点写重一些。
+     */
+    @Bean
+    public MemberGradeApi memberGradeApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(2), MemberGradeApi.class);
+    }
+
+    @Bean
+    public MemberSignApi memberSignApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(1), MemberSignApi.class);
     }
 
     /**
