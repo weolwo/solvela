@@ -52,7 +52,14 @@ DELETE m FROM t_member m
    AND NOT EXISTS (SELECT 1 FROM t_member_coupon            x WHERE x.member_id = m.member_id)
    AND NOT EXISTS (SELECT 1 FROM t_physical_delivery        x WHERE x.member_id = m.member_id)
    AND NOT EXISTS (SELECT 1 FROM t_draw_prize_log           x WHERE x.member_id = m.member_id)
-   AND NOT EXISTS (SELECT 1 FROM t_lottery_record           x WHERE x.member_id = m.member_id);
+   AND NOT EXISTS (SELECT 1 FROM t_lottery_record           x WHERE x.member_id = m.member_id)
+   -- 2026-09-20 补：会员等级域那四张。漏了它们的后果和上面那段注释说的一模一样 ——
+   -- 会员被删掉，而 t_member_growth 里那行成长值还在，成了一笔查不到主人的账。
+   -- 验收用例 givenGrowthGrade() 会给测试会员建成长值行，所以这不是理论风险。
+   AND NOT EXISTS (SELECT 1 FROM t_member_growth            x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_member_growth_log        x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_member_grade_log         x WHERE x.member_id = m.member_id)
+   AND NOT EXISTS (SELECT 1 FROM t_member_period_summary    x WHERE x.member_id = m.member_id);
 DELETE FROM t_task_prize_mapping WHERE task_config_id IN
     (SELECT id FROM (SELECT id FROM t_task_config WHERE task_name LIKE 'P0验收-%') t);
 DELETE FROM t_task_config   WHERE task_name LIKE 'P0验收-%';
@@ -106,21 +113,21 @@ VALUES
 -- 三、任务模板（T=任务模板前缀）
 --     🔴 ui_schema 的参数键用<b>契约主形态</b> targetCount，不要再用存量模板那个 targetDays。
 --        键名是第②层的契约不是自由文本：起错名字的后果是「进度照涨、永远不完成」，且零报错。
---     rule_script 本期不执行（已降级为兜底通道），给一段说明性内容占位即可。
+--     ⚠️ 2026-09-18 订正：rule_script 这一列<b>已经从 t_task_template 上删掉了</b>
+--        （内容归档在 docs/归档-任务模板rule_script删列前内容.md）。本脚本此前还在插它，
+--        于是整份造数从这一句起就报 `Unknown column 'rule_script'` 中断 ——
+--        已经灌过数的库看不出来，新环境重灌则是直接失败。
 -- -------------------------------------------------------------------------------------
-INSERT INTO t_task_template (template_code, template_name, task_type, trigger_event, ui_schema, rule_script)
+INSERT INTO t_task_template (template_code, template_name, task_type, trigger_event, ui_schema)
 VALUES
 ('TP0COUNT01', 'P0-累计签到', 'COUNT', 'DAILY_SIGN',
- '{"icon":"📅","desc":"累计签到N天送奖励","version":1,"params":[{"key":"targetCount","label":"累计签到目标","widget":"number","min":1,"unit":"天","default":3,"required":true}]}',
- '// P0 阶段进度由 CountTaskStrategy 计算，本脚本不参与运行态（rule_script 已降级为兜底通道）'),
+ '{"icon":"📅","desc":"累计签到N天送奖励","version":1,"params":[{"key":"targetCount","label":"累计签到目标","widget":"number","min":1,"unit":"天","default":3,"required":true}]}'),
 
 ('TP0LADDER1', 'P0-阶梯签到', 'COUNT', 'DAILY_SIGN',
- '{"icon":"🪜","desc":"阶梯奖励：3次送积分、5次再送券","version":1,"params":[{"key":"targetCount","label":"最高档目标","widget":"number","min":1,"unit":"次","default":5,"required":true}]}',
- '// 同上，阶梯由 t_task_prize_mapping 的 stage_level 表达'),
+ '{"icon":"🪜","desc":"阶梯奖励：3次送积分、5次再送券","version":1,"params":[{"key":"targetCount","label":"最高档目标","widget":"number","min":1,"unit":"次","default":5,"required":true}]}'),
 
 ('TP0STREAK1', 'P0-连续签到', 'STREAK', 'DAILY_SIGN',
- '{"icon":"🔥","desc":"连续签到N天，断签清零","version":1,"params":[{"key":"targetCount","label":"连续签到目标","widget":"number","min":1,"unit":"天","default":3,"required":true},{"key":"tolerance","label":"允许断签次数","widget":"number","min":0,"default":0}]}',
- '// STREAK 由 StreakTaskStrategy 计算：断档归零再+1，容忍度由 tolerance 控制');
+ '{"icon":"🔥","desc":"连续签到N天，断签清零","version":1,"params":[{"key":"targetCount","label":"连续签到目标","widget":"number","min":1,"unit":"天","default":3,"required":true},{"key":"tolerance","label":"允许断签次数","widget":"number","min":0,"default":0}]}');
 
 
 -- -------------------------------------------------------------------------------------
@@ -179,6 +186,15 @@ VALUES
  '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
 ('AP0TASKRUN', 'P0验收-限老会员', 'TP0COUNT01', 'AUDIENCE_TEST', 'DAILY', 'OLD_MEMBER',
  'UNLIMITED', 1, '{"taskType":"COUNT","targetCount":1}', 80, 1,
+ '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
+
+-- 等级人群（会员等级的第一版权益：高等级专享任务）。
+-- 🔴 target_audience 用 GRADE_GTE_2 这种带值的取值，门槛写在串里 ——
+--    等级是配置（运营随时加一档），穷举成枚举值是不可能的。
+--    ⚠️ 它订阅的是同一个 AUDIENCE_TEST 事件，所以「限新/限老」那两条用例
+--       也会命中它；那两条只断言自己那两个任务，互不影响。
+('AP0TASKRUN', 'P0验收-限银卡以上', 'TP0COUNT01', 'AUDIENCE_TEST', 'DAILY', 'GRADE_GTE_2',
+ 'UNLIMITED', 1, '{"taskType":"COUNT","targetCount":1}', 85, 1,
  '2026-01-01 00:00:00', '2099-12-31 23:59:59'),
 
 -- 参与轮次：每日最多 2 轮，目标 1 次 —— 一个事件完成一轮，第 3 个事件应被判「本周期已达上限」

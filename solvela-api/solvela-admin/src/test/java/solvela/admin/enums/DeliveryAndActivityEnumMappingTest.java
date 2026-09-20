@@ -41,6 +41,10 @@ class DeliveryAndActivityEnumMappingTest {
     @Autowired
     private ActivityConfigDao activityConfigDao;
 
+    /** 直接读列，用来和 TypeHandler 装配出来的枚举对账 */
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @Test
     @DisplayName("履约单：负值状态 -1 也能正确装配成枚举")
     void 履约单装配() {
@@ -74,12 +78,33 @@ class DeliveryAndActivityEnumMappingTest {
             assertNotNull(e.getStatus(), "status 装配成了 null");
         }
 
-        // 库里是 0×7 / 1×1：绝大多数活动还没上线过
         long notStart = list.stream().filter(e -> e.getStatus() == ActivityStatusEnum.NOT_START).count();
         long online = list.stream().filter(e -> e.getStatus() == ActivityStatusEnum.ONLINE).count();
         assertTrue(notStart > 0, "一条「未开始」都没有");
         assertTrue(online > 0, "一条「上线」都没有");
-        assertTrue(notStart > online, "「未开始」(" + notStart + ") 不比「上线」(" + online + ") 多，取值口径多半反了");
+
+        /*
+         * 「取值口径有没有反」直接按 status 列比对，<b>不靠两档的数量多少</b>。
+         *
+         * 🔴 2026-09-18 订正：这里原本断言「未开始的条数多于上线的条数」，
+         *    注释写着「库里是 0×7 / 1×1」—— 那是某一天联调库的快照。
+         *    每跑一次造数脚本、每上线一个活动，这个比例都会变；今天它是 6:6，
+         *    于是测试红了，而<b>枚举装配本身一点问题都没有</b>。
+         *    这种「断言环境数据长什么样」的用例迟早会红，而且红的时候指不出真问题。
+         */
+        for (ActivityConfig e : list) {
+            Integer raw = rawStatusOf(e.getActivityCode());
+            assertNotNull(raw, "查不到 " + e.getActivityCode() + " 的原始 status");
+            assertEquals(raw, e.getStatus().getValue(),
+                    "活动 " + e.getActivityCode() + " 的 status 列是 " + raw
+                            + "，却装配成了 " + e.getStatus() + "(" + e.getStatus().getValue() + ") —— 取值口径反了");
+        }
+    }
+
+    /** 绕开枚举直接读 status 列：装配对不对，只能拿没经过 TypeHandler 的原值来比 */
+    private Integer rawStatusOf(String activityCode) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM t_activity_config WHERE activity_code = ?", Integer.class, activityCode);
     }
 
     @Test

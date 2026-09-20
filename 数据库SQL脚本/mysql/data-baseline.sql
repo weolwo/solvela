@@ -23,14 +23,14 @@ SET NAMES utf8mb4;
 --    先把非必要账号删掉，只留一个 admin。
 --
 -- 生成方式：数据库SQL脚本/tools/DumpSeedData.java
--- 生成时间：2026-09-15
+-- 生成时间：2026-09-21
 -- =====================================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- -----------------------------------------------------------------------------------
--- t_menu  菜单树。没有它后台登录进去是空白（286 行）
+-- t_menu  菜单树。没有它后台登录进去是空白（293 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_menu`;
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
@@ -320,7 +320,14 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (612, '查询', 3, 611, 1, NULL, NULL, 1, 'couponTemplate:query', 'couponTemplate:query', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
 (613, '新增版本 / 停用', 3, 611, 2, NULL, NULL, 1, 'couponTemplate:save', 'couponTemplate:save', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 04:14:03', NULL, '2026-09-15 04:14:03'),
 (614, '人工发券', 2, 308, 5, '/ledger/manual-coupon', '/business/ledger/coupon-template/manual-coupon.vue', 1, NULL, NULL, 'SendOutlined', NULL, 0, NULL, 1, 1, 0, 0, 1, '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20'),
-(615, '发券', 3, 614, 1, NULL, NULL, 1, 'manualCoupon:send', 'manualCoupon:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20');
+(615, '发券', 3, 614, 1, NULL, NULL, 1, 'manualCoupon:send', 'manualCoupon:send', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20'),
+(616, '会员成长值', 2, 462, 5, '/member/member-grade/growth-list', '/business/member/member-grade/member-growth-list.vue', 1, NULL, NULL, 'RiseOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-18 08:52:12', NULL, '2026-09-20 02:38:32'),
+(617, '等级配置', 2, 462, 6, '/member/member-grade/config-list', '/business/member/member-grade/member-grade-config-list.vue', 1, NULL, NULL, 'TrophyOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-18 08:52:13', NULL, '2026-09-20 02:38:32'),
+(618, '等级变更留痕', 2, 462, 8, '/member/member-grade/grade-log-list', '/business/member/member-grade/member-grade-log-list.vue', 1, NULL, NULL, 'HistoryOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-18 08:52:13', NULL, '2026-09-20 23:42:56'),
+(619, '查询', 3, 616, NULL, NULL, NULL, 1, 'memberGrade:query', 'memberGrade:query', NULL, 616, 0, NULL, 0, 1, 0, 0, 1, '2026-09-18 08:52:13', NULL, '2026-09-20 02:38:32'),
+(620, '等级配置', 3, 616, NULL, NULL, NULL, 1, 'memberGrade:config', 'memberGrade:config', NULL, 616, 0, NULL, 0, 1, 0, 0, 1, '2026-09-18 08:52:13', NULL, '2026-09-20 02:38:32'),
+(621, '人工调级', 3, 616, NULL, NULL, NULL, 1, 'memberGrade:adjust', 'memberGrade:adjust', NULL, 616, 0, NULL, 0, 1, 0, 0, 1, '2026-09-18 08:52:13', NULL, '2026-09-20 02:38:32'),
+(622, '等级权益', 2, 462, 7, '/member/member-grade/privilege-list', '/business/member/member-grade/member-grade-privilege-list.vue', 1, NULL, NULL, 'GiftOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-09-20 23:42:56', NULL, '2026-09-20 23:42:56');
 
 -- -----------------------------------------------------------------------------------
 -- t_role  角色（5 行）
@@ -520,7 +527,7 @@ INSERT INTO `t_file_category` (`category_id`, `category_code`, `category_name`, 
 (8, 'MALL_COMMODITY', '商城商品图', '商城', 100, 1, NULL, '2026-08-22 11:18:13', NULL, '2026-09-05 02:32:13');
 
 -- -----------------------------------------------------------------------------------
--- t_solvela_job  定时任务定义。缺了任务不会注册（11 行）
+-- t_solvela_job  定时任务定义。缺了任务不会注册（19 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_solvela_job`;
 INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `job_group`, `trigger_type`, `trigger_value`, `next_trigger_time`, `prev_trigger_time`, `trigger_version`, `jitter_seconds`, `enabled_flag`, `param`, `preset_code`, `timeout_seconds`, `retry_times`, `retry_interval`, `misfire_strategy`, `misfire_threshold_sec`, `block_strategy`, `last_execute_time`, `last_execute_log_id`, `sort`, `remark`, `deleted_flag`, `update_name`, `create_time`, `update_time`, `app_env`, `alarm_receiver`, `continuous_fail_count`, `handler_missing_flag`, `terminal_flag`, `owner_biz_type`, `owner_biz_code`, `source`, `manual_modified_flag`) VALUES
@@ -530,26 +537,35 @@ INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `
 (7, 'OPC42XIGVU', '【临时】misfire 验证任务', '_jobZombieScan', 'BUSINESS', 'one_time', '2026-08-12 07:10:00', NULL, '2026-08-12 07:10:00', 1, 0, 1, NULL, 'LIGHT', 30, 0, 30, 'SKIP', 60, 'DISCARD', NULL, NULL, 999, '实测 misfire 用，验完即删', 1, '管理员', '2026-08-12 08:12:25', '2026-08-12 08:13:47', 'dev', NULL, 0, 0, 1, NULL, NULL, 'MANUAL', 0),
 (8, 'WLNC0DAYUN', '【临时】重试链验证', '_devFailJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, NULL, 'CUSTOM', 10, 2, 5, 'SKIP', 60, 'DISCARD', NULL, 7982, 998, '验证失败重试链，验完即删', 1, '管理员', '2026-08-12 08:17:02', '2026-08-12 18:09:00', 'dev', NULL, 6, 0, 0, NULL, NULL, 'MANUAL', 0),
 (9, 'AWN3ODB7XZ', '【临时】慢任务验证', '_devSlowJob', 'BUSINESS', 'cron', '0 0 4 1 1 *', '2027-01-01 04:00:00', NULL, 0, 0, 1, '{"sleepSeconds":30}', 'CUSTOM', 5, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 8006, 997, '超时中断验证', 1, '管理员', '2026-08-12 18:25:56', '2026-08-12 18:28:52', 'dev', NULL, 1, 0, 0, NULL, NULL, 'MANUAL', 0),
-(10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-09-16 03:10:00', '2026-09-15 03:10:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:10:00', 9166, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:10:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-09-16 03:20:00', '2026-09-15 03:20:00', 22, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:20:00', 9168, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 03:20:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-15 20:30:00', '2026-09-15 20:20:00', 975, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 15:30:00', 9240, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-15 20:27:05', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(13, 'JOBCOUPLCK', '【账务】优惠券卡单释放', 'couponStuckLockRelease', 'BUSINESS', 'cron', '0 5/30 * * * *', '2026-09-15 20:35:00', '2026-09-15 19:05:00', 7, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 18:36:31', 9239, 0, '每 30 分钟把锁定超过 120 分钟仍未确认的券放回未使用；支持 dryRun 试运行。阈值不要调到 60 分钟以下', 0, 'system', '2026-09-15 05:47:06', '2026-09-15 20:10:47', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
-(14, 'JOBEXTEXP', '【外部场景】超时单取消', 'externalOrderExpire', 'BUSINESS', 'cron', '0 2/10 * * * *', '2026-09-15 20:21:40', NULL, 0, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', NULL, NULL, 0, '每 10 分钟取消超时未支付的外部场景单，并把锁定的券放回去；支持 dryRun 试运行', 0, 'system', '2026-09-15 20:20:40', '2026-09-15 20:27:05', 'dev', NULL, 0, 1, 0, NULL, NULL, 'MANUAL', 0);
+(10, 'JOBCOUPEXP', '【账务】优惠券过期收口', 'couponExpire', 'BUSINESS', 'cron', '0 10 3 * * *', '2026-09-22 03:10:00', '2026-09-21 03:10:00', 27, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:10:00', 9381, 0, '每天 03:10 把过了有效期仍未使用的券置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-21 07:16:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(11, 'JOBTASKEXP', '【任务】任务记录过期收口', 'taskRecordExpire', 'BUSINESS', 'cron', '0 20 3 * * *', '2026-09-22 03:20:00', '2026-09-21 03:20:00', 27, 0, 1, NULL, 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-15 03:20:00', 9382, 0, '每天 03:20 把过了有效期仍在进行中的任务记录置为已过期；支持 dryRun 试运行', 0, 'system', '2026-08-18 14:44:11', '2026-09-21 07:16:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(12, 'JOBPROPSTK', '【风控】提案卡单扫描', 'proposalStuckScan', 'OPS', 'cron', '0 */10 * * * *', '2026-09-21 07:50:00', '2026-09-21 07:40:00', 1052, 0, 1, '{"stuckMinutes": 30, "warnThreshold": 0}', 'NORMAL', 0, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-21 07:40:00', 9401, 0, '每 10 分钟扫一次卡在下发的提案，只报不修（自动重发需要下发侧先有幂等键）', 0, 'system', '2026-08-18 14:44:11', '2026-09-21 07:40:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(13, 'JOBCOUPLCK', '【账务】优惠券卡单释放', 'couponStuckLockRelease', 'BUSINESS', 'cron', '0 5/30 * * * *', '2026-09-21 08:05:00', '2026-09-21 07:35:00', 45, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-21 07:35:00', 9398, 0, '每 30 分钟把锁定超过 120 分钟仍未确认的券放回未使用；支持 dryRun 试运行。阈值不要调到 60 分钟以下', 0, 'system', '2026-09-15 05:47:06', '2026-09-21 07:35:01', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(14, 'JOBEXTEXP', '【外部场景】超时单取消', 'externalOrderExpire', 'BUSINESS', 'cron', '0 2/10 * * * *', '2026-09-15 20:21:40', NULL, 0, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', NULL, NULL, 0, '每 10 分钟取消超时未支付的外部场景单，并把锁定的券放回去；支持 dryRun 试运行', 0, 'system', '2026-09-15 20:20:40', '2026-09-15 20:27:05', 'dev', NULL, 0, 1, 0, NULL, NULL, 'MANUAL', 0),
+(16, 'JOBMALLEXP', '【商城】超时未支付订单释放', 'mallOrderExpire', 'BUSINESS', 'cron', '0 3/5 * * * *', '2026-09-21 07:48:00', '2026-09-21 07:43:00', 13, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-21 07:43:00', 9402, 10, '到点取消并放回积分/库存/限购额度', 0, 'system', '2026-09-20 07:45:00', '2026-09-21 07:43:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(17, 'JOBPRZRECN', '【发奖】跨服务对账与重投', 'prizeDispatchReconcile', 'BUSINESS', 'cron', '0 7/15 * * * *', '2026-09-21 07:52:00', '2026-09-21 07:37:00', 6, 0, 1, NULL, 'NORMAL', 600, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-21 07:37:00', 9399, 20, '只处理 10 分钟前的记录 —— 刚落库那条可能正被线程池处理，捞它等于和自己抢', 0, 'system', '2026-09-20 07:45:00', '2026-09-21 07:37:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(18, 'JOBBIZRECN', '【任务打点】漏投反查与补推', 'bizActionReconcile', 'BUSINESS', 'cron', '0 15/30 * * * *', '2026-09-21 07:45:00', '2026-09-20 16:45:00', 3, 0, 1, NULL, 'NORMAL', 600, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-20 16:18:49', 9380, 30, '往回看 24 小时，与流水求差集补推。重推被唯一键兜着，安全', 0, 'system', '2026-09-20 07:45:00', '2026-09-21 07:16:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(19, 'JOBNOTICLN', '【通知】站内信保留期清理', 'memberNotificationClean', 'BUSINESS', 'cron', '0 30 3 * * *', '2026-09-22 03:30:00', '2026-09-21 03:30:00', 1, 0, 1, NULL, 'NORMAL', 600, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 9383, 40, '默认保留 180 天', 0, 'system', '2026-09-20 07:45:00', '2026-09-21 07:16:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(20, 'JOBMQLOGCL', '【基础】消息接收记录清理', 'mqMessageLogClean', 'SYSTEM', 'cron', '0 40 3 * * *', '2026-09-22 03:40:00', '2026-09-21 03:40:00', 1, 0, 1, NULL, 'NORMAL', 300, 0, 30, 'SKIP', 300, 'DISCARD', NULL, 9384, 50, '默认保留 7 天', 0, 'system', '2026-09-20 07:45:00', '2026-09-21 07:16:31', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(21, 'JOBCOUPNTF', '【通知】优惠券即将过期提醒', 'couponExpiringNotify', 'BUSINESS', 'cron', '0 0 10 * * *', '2026-09-21 10:00:00', NULL, 0, 0, 1, '{"dryRun": true}', 'NORMAL', 600, 0, 30, 'SKIP', 300, 'DISCARD', NULL, NULL, 60, '⚠️ 非幂等且会发站内信。首次挂载为 dryRun，确认量级后把 param 置空', 0, 'system', '2026-09-20 07:45:00', '2026-09-20 07:45:00', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(23, 'JOBGRDSETL', '【会员】等级期末结算与保级判定', 'memberGradeSettle', 'BUSINESS', 'cron', '0 25 * * * *', '2026-09-21 08:25:00', '2026-09-21 07:25:00', 6, 0, 1, NULL, 'NORMAL', 900, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-21 07:25:00', 9394, 5, '⚠️ 首次为 dryRun。确认待结算人数后把 param 置空放开 —— 它会真降级', 0, 'system', '2026-09-20 07:55:46', '2026-09-21 07:25:01', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0),
+(24, 'JOBGRWRECN', '【会员】成长值对账', 'memberGrowthReconcile', 'BUSINESS', 'cron', '0 50 * * * *', '2026-09-21 07:50:00', '2026-09-21 07:21:51', 5, 0, 1, NULL, 'NORMAL', 900, 0, 30, 'SKIP', 300, 'DISCARD', '2026-09-21 07:21:51', 9391, 6, '只报不改。发现漂移会打 ERROR 并带样本；autoFix 是手工动作，不要常开', 0, 'system', '2026-09-20 23:16:02', '2026-09-20 23:21:56', 'dev', NULL, 0, 0, 0, NULL, NULL, 'MANUAL', 0);
 
 -- -----------------------------------------------------------------------------------
--- t_task_event  任务事件定义（v3.47.0 灌入）（9 行）
+-- t_task_event  任务事件定义（v3.47.0 灌入）（10 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_task_event`;
 INSERT INTO `t_task_event` (`id`, `event_code`, `event_name`, `metric_source`, `payload_schema`, `biz_id_required`, `is_high_frequency`, `discard_log_flag`, `remark`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
-(1, 'DAILY_SIGN', '每日签到', 'NONE', '{"fields": []}', 0, 0, 1, '天然无单号，按事件自然日兜底幂等（一天算一次）', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
-(2, 'ORDER_PAID', '订单支付成功', 'NONE', '{"fields": [{"key": "orderId", "desc": "订单号", "type": "string"}]}', 1, 0, 1, '🔴 必须带 eventBizId=订单号，否则同一天多笔订单只会算一笔', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
-(3, 'MEMBER_REGISTER', '会员注册', 'NONE', '{"fields": []}', 0, 0, 1, '一个会员一辈子一次，无需单号', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
+(1, 'DAILY_SIGN', '每日签到', 'NONE', '{"fields": []}', 0, 0, 1, '天然无单号，按事件自然日兜底幂等（一天算一次）。生产者：MemberSignService.sign（C 端 POST /task/sign）', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-09-20 23:27:29'),
+(2, 'ORDER_PAID', '订单支付成功', 'NONE', '{"fields": [{"key": "orderNo", "desc": "订单号", "type": "string"}, {"key": "payPoints", "desc": "实付积分", "type": "decimal"}, {"key": "payCash", "desc": "实付现金", "type": "decimal"}, {"key": "quantity", "desc": "件数", "type": "int"}, {"key": "commodityCode", "desc": "商品编码", "type": "string"}, {"key": "skuCode", "desc": "SKU 编码", "type": "string"}]}', 1, 0, 1, '🔴 必须带 eventBizId=订单号，否则同一天多笔订单只会算一笔。生产者：MallPayService.pay（混合单）与 MallRedeemService.redeem（纯积分单）', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-09-20 23:27:29'),
+(3, 'MEMBER_REGISTER', '会员注册', 'NONE', '{"fields": []}', 0, 0, 1, '一个会员一辈子一次。生产者：MemberRegisterService.createMember，幂等键=会员号', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-09-20 23:27:29'),
 (4, 'PAGE_VIEW', '页面浏览', 'NONE', '{"fields": [{"key": "pageId", "desc": "页面标识", "type": "string"}]}', 0, 1, 0, '高频事件：discard_log_flag 关掉，否则不匹配的浏览会把流水表写爆', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
 (5, 'GOODS_SHARE', '分享商品', 'NONE', '{"fields": [{"key": "goodsId", "desc": "商品ID", "type": "string"}]}', 0, 0, 1, '本次新增，用来演示「加事件只加一行数据、前端零改动」', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
-(6, 'ORDER_AMOUNT', '订单金额累计', 'payAmount', '{"fields": [{"key": "orderId", "desc": "订单号", "type": "string"}, {"key": "payAmount", "desc": "实付金额", "type": "decimal"}]}', 1, 0, 1, 'AMOUNT 类任务用；未显式传 amount 时从 payload.payAmount 取', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
+(6, 'ORDER_AMOUNT', '订单金额累计', 'payPoints', '{"fields": [{"key": "orderNo", "desc": "订单号", "type": "string"}, {"key": "payPoints", "desc": "实付积分", "type": "decimal"}, {"key": "payCash", "desc": "实付现金", "type": "decimal"}, {"key": "quantity", "desc": "件数", "type": "int"}, {"key": "commodityCode", "desc": "商品编码", "type": "string"}, {"key": "skuCode", "desc": "SKU 编码", "type": "string"}]}', 1, 0, 1, 'AMOUNT 类任务用。生产者：MallPayService.pay（混合单）与 MallRedeemService.redeem（纯积分单）——🔴 两个产生点，改一处必须想另一处', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-09-20 23:27:29'),
 (7, 'CONCURRENT_ADD', '并发累加(验收专用)', 'payAmount', '{"fields": [{"key": "payAmount", "desc": "金额", "type": "decimal"}]}', 1, 0, 1, 'P0 判据4 专用，生产环境可停用', 1, NULL, '2026-08-01 05:12:16', NULL, '2026-08-22 09:49:51'),
-(17, 'AUDIENCE_TEST', '人群过滤验收', 'NONE', '{"fields": []}', 0, 0, 1, 'P0 验收专用：同一个事件同时命中「限新会员」和「限老会员」两个任务，一次验两个分支', 1, NULL, '2026-08-01 10:14:21', NULL, '2026-08-22 09:49:51'),
-(18, 'ROUND_TEST', '参与轮次验收', 'NONE', '{"fields": []}', 1, 0, 1, 'P0 验收专用：每轮用不同 eventBizId，验 limit_count 轮次推进与用尽', 1, NULL, '2026-08-01 10:14:21', NULL, '2026-08-22 09:49:51');
+(32, 'AUDIENCE_TEST', '人群过滤验收', 'NONE', '{"fields": []}', 0, 0, 1, 'P0 验收专用：同一个事件同时命中「限新会员」和「限老会员」两个任务，一次验两个分支', 1, NULL, '2026-09-20 08:12:56', NULL, '2026-09-20 08:12:56'),
+(33, 'ROUND_TEST', '参与轮次验收', 'NONE', '{"fields": []}', 1, 0, 1, 'P0 验收专用：每轮用不同 eventBizId，验 limit_count 轮次推进与用尽', 1, NULL, '2026-09-20 08:12:56', NULL, '2026-09-20 08:12:56'),
+(34, 'RECHARGE_PAID', '充值成功', 'NONE', '{"fields": [{"key": "orderNo", "desc": "外部消费单号", "type": "string"}, {"key": "sceneCode", "desc": "场景编码", "type": "string"}, {"key": "payAmount", "desc": "实付金额", "type": "decimal"}, {"key": "originalAmount", "desc": "原价", "type": "decimal"}]}', 1, 0, 1, '🔴 必须带 eventBizId=外部消费单号。生产者：ExternalRechargeService.payAndExecute —— 打点在 markSuccess【之后】，收了钱不等于充值成功', 1, NULL, '2026-09-20 23:27:29', NULL, '2026-09-20 23:27:29');
 -- [跳过] t_notice_type : Table 'solvela.t_notice_type' doesn't exist
 
 -- -----------------------------------------------------------------------------------
@@ -588,6 +604,38 @@ INSERT INTO `t_coupon_template` (`coupon_code`, `version`, `coupon_name`, `disco
 ('PNIX3HHMDN', 1, '商城优惠券100', 'FIXED', 100.00, 0.00, NULL, 'SCORE', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
 ('PP0COUPON1', 1, 'P0-20元券', 'FIXED', 20.00, 0.00, NULL, 'CASH', 'ALL', NULL, 30, NULL, '按券名反推，上线前请运营核对', 1, 'system', '2026-09-15 04:04:30', NULL, '2026-09-15 04:04:30'),
 ('RECHARGE10', 1, '话费充值满100减10', 'FIXED', 10.00, 100.00, NULL, 'CASH', 'EXTERNAL', '["MOBILE_RECHARGE"]', 30, NULL, '阶段 7 种子：外部场景券的第一张。上线前请运营核对面额与门槛', 1, 'system', '2026-09-15 20:20:40', NULL, '2026-09-15 20:20:40');
+
+-- -----------------------------------------------------------------------------------
+-- t_member_grade  会员等级定义。缺了所有人恒为 0 级，且只有告警不报错（5 行）
+-- -----------------------------------------------------------------------------------
+DELETE FROM `t_member_grade`;
+INSERT INTO `t_member_grade` (`id`, `grade_code`, `grade_name`, `threshold`, `icon_file_id`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
+(1, 0, '普通会员', 0, NULL, 1, 'seed', '2026-09-18 05:00:41', NULL, '2026-09-18 05:00:41'),
+(2, 1, '银卡会员', 1000, NULL, 1, 'seed', '2026-09-18 05:00:41', '管理员', '2026-09-20 10:49:15'),
+(3, 2, '金卡会员', 5000, NULL, 1, 'seed', '2026-09-18 05:00:41', NULL, '2026-09-18 05:00:41'),
+(4, 3, '白金会员', 20000, NULL, 1, 'seed', '2026-09-18 05:00:41', NULL, '2026-09-18 05:00:41'),
+(5, 4, '钻石会员', 60000, NULL, 1, 'seed', '2026-09-18 05:00:41', NULL, '2026-09-18 08:56:46');
+
+-- -----------------------------------------------------------------------------------
+-- t_grade_privilege  等级权益【纯展示】。缺了等级页空白，用户不知道自己在保什么（15 行）
+-- -----------------------------------------------------------------------------------
+DELETE FROM `t_grade_privilege`;
+INSERT INTO `t_grade_privilege` (`id`, `grade_code`, `privilege_code`, `privilege_name`, `description`, `icon_file_id`, `action_url`, `sort`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
+(1, 0, 'PUBLIC_ACTIVITY', '全部公开活动', '参与平台所有公开活动', NULL, NULL, 100, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(2, 1, 'EXCLUSIVE_TASK', '银卡专享任务', '解锁仅银卡及以上可做的任务', NULL, NULL, 100, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(3, 1, 'ACTIVITY_PRIORITY', '活动优先参与', '热门活动优先开放', NULL, NULL, 90, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(4, 2, 'EXCLUSIVE_TASK', '金卡专享任务', '解锁仅金卡及以上可做的任务', NULL, NULL, 100, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(5, 2, 'EXCLUSIVE_POOL', '专享奖池', '抽奖走金卡专属奖池', NULL, NULL, 90, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(6, 2, 'BIRTHDAY_GIFT', '生日礼', '生日当天领取专属礼包', NULL, NULL, 80, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(7, 3, 'EXCLUSIVE_TASK', '白金专享任务', '解锁仅白金及以上可做的任务', NULL, NULL, 100, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(8, 3, 'EXCLUSIVE_POOL', '专享奖池', '抽奖走白金专属奖池', NULL, NULL, 90, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(9, 3, 'BIRTHDAY_GIFT', '生日礼', '生日当天领取专属礼包', NULL, NULL, 80, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(10, 3, 'MONTHLY_COUPON', '每月专属券', '每月 1 号自动发放专属优惠券', NULL, NULL, 70, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(11, 4, 'EXCLUSIVE_TASK', '钻石专享任务', '解锁仅钻石可做的任务', NULL, NULL, 100, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(12, 4, 'EXCLUSIVE_POOL', '最高奖池', '抽奖走最高等级奖池', NULL, NULL, 90, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(13, 4, 'BIRTHDAY_GIFT', '生日礼', '生日当天领取专属礼包', NULL, NULL, 80, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(14, 4, 'MONTHLY_COUPON', '每月专属券', '每月 1 号自动发放专属优惠券', NULL, NULL, 70, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14'),
+(15, 4, 'PRIORITY_SERVICE', '专属客服', '专属通道，优先响应', NULL, NULL, 60, 1, 'seed', '2026-09-20 02:23:14', NULL, '2026-09-20 02:23:14');
 
 -- -----------------------------------------------------------------------------------
 -- t_code_generator_config  代码生成器配置（开发工具，可选）（31 行）

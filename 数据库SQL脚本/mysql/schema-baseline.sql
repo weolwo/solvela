@@ -34,8 +34,8 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-09-15
--- 表数量：76 张
+-- 生成时间：2026-09-20
+-- 表数量：82 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -481,7 +481,7 @@ CREATE TABLE `t_file_relation` (
 
 
 -- =====================================================================================
--- 会员域（6 张）
+-- 会员域（12 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_member`;
@@ -615,6 +615,128 @@ CREATE TABLE `t_device` (
   KEY `idx_dev_ip` (`register_ip`,`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备注册表（服务端签发，不带 member_id）';
 
+DROP TABLE IF EXISTS `t_member_grade`;
+CREATE TABLE `t_member_grade` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `grade_code` int NOT NULL COMMENT '等级值：0 起，数字越大越高。0 必须存在（新会员的落点）',
+  `grade_name` varchar(32) NOT NULL COMMENT '等级名：普通会员/银卡/金卡/白金/钻石',
+  `threshold` bigint NOT NULL COMMENT '周期内成长值门槛（含）。level=0 必须为 0',
+  `icon_file_id` bigint DEFAULT NULL COMMENT '等级图标 file_id，走文件模块',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_mbr_gd_code` (`grade_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员等级定义';
+
+DROP TABLE IF EXISTS `t_member_growth`;
+CREATE TABLE `t_member_growth` (
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键，一人一行',
+  `current_grade` int NOT NULL DEFAULT '0' COMMENT '当前等级。缓冲期内取 protect_grade，不等于 f(current_period_value)',
+  `grade_since` datetime DEFAULT NULL COMMENT '当前等级是什么时候到的',
+  `period_start` datetime NOT NULL COMMENT '本考核周期开始：入会日（或上一周期结束日）',
+  `period_end` datetime NOT NULL COMMENT '本考核周期结束：period_start + 12 个月',
+  `current_period_value` bigint NOT NULL DEFAULT '0' COMMENT '本周期累计成长值【冗余：可由流水求和得出，但判级是热路径。必须有对账任务】',
+  `total_value` bigint NOT NULL DEFAULT '0' COMMENT '终身累计成长值【只展示，不参与定级】',
+  `protect_until` datetime DEFAULT NULL COMMENT '保级缓冲到期时刻；为空表示不在缓冲期',
+  `protect_grade` int DEFAULT NULL COMMENT '缓冲期要保住的等级',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`member_id`),
+  KEY `idx_t_mbr_gr_period_end` (`period_end`),
+  KEY `idx_t_mbr_gr_protect` (`protect_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员成长值与等级';
+
+DROP TABLE IF EXISTS `t_member_growth_log`;
+CREATE TABLE `t_member_growth_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `delta` bigint NOT NULL COMMENT '本次增减的成长值（已乘倍率）',
+  `base_value` bigint NOT NULL COMMENT '倍率之前的基数 —— 客诉时要能说清"为什么是 200 不是 100"',
+  `multiplier` int NOT NULL DEFAULT '1' COMMENT '本次倍率：1-常态, 2-保级缓冲期',
+  `after_period_value` bigint NOT NULL COMMENT '变动后的周期累计值（对账锚点）',
+  `source` varchar(32) NOT NULL COMMENT '来源：SCORE_EARNED / 将来的 BIND_PHONE 等',
+  `biz_type` varchar(64) DEFAULT NULL COMMENT '上游业务类型，如 PROPOSAL_REWARD。白名单判据就是它',
+  `biz_id` varchar(64) NOT NULL COMMENT '上游业务单号：幂等键',
+  `period_tag` varchar(32) NOT NULL COMMENT '计入哪个周期（period_start 的 yyyyMMdd）。? 保级期的加速计入【上一周期】',
+  `remark` varchar(255) DEFAULT NULL COMMENT 'C 端展示摘要',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_mbr_gr_log_src` (`source`,`biz_id`),
+  KEY `idx_t_mbr_gr_log_mbr` (`member_id`,`create_time`),
+  KEY `idx_t_mbr_gr_log_period` (`member_id`,`period_tag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员成长值流水';
+
+DROP TABLE IF EXISTS `t_member_grade_log`;
+CREATE TABLE `t_member_grade_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `old_grade` int NOT NULL COMMENT '变更前等级',
+  `new_grade` int NOT NULL COMMENT '变更后等级',
+  `change_type` varchar(32) NOT NULL COMMENT '类型：UPGRADE-升级, DOWNGRADE-降级, KEEP-保级, MANUAL-人工调整, RISK_REVOKE-风控扣回',
+  `period_value` bigint NOT NULL COMMENT '变更时的周期成长值快照 —— 事后复盘唯一的依据',
+  `reason` varchar(255) DEFAULT NULL COMMENT '原因。人工调整时必填',
+  `operator` varchar(64) DEFAULT NULL COMMENT '操作人：系统变更为空，人工调整记员工',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_t_mbr_gd_log_mbr` (`member_id`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员等级变更留痕';
+
+DROP TABLE IF EXISTS `t_member_period_summary`;
+CREATE TABLE `t_member_period_summary` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `member_id` bigint NOT NULL COMMENT '会员号：关联键',
+  `period_no` varchar(32) NOT NULL COMMENT '周期标识 = period_start 的 yyyyMMdd。? 必须与 t_member_growth_log.period_tag 同口径，对账靠它 JOIN',
+  `period_start` datetime NOT NULL COMMENT '该周期实际开始时间',
+  `period_end` datetime NOT NULL COMMENT '该周期实际结束时间',
+  `final_growth_value` bigint NOT NULL COMMENT '期末最终成长值。清零前的那个数，事后唯一凭证',
+  `grade_before` int NOT NULL COMMENT '结算前的等级',
+  `settled_grade` int NOT NULL COMMENT '期末结算定下的等级',
+  `settle_result` varchar(32) NOT NULL COMMENT '结算结果：UPGRADE-升级, KEEP-保持, DOWNGRADE-降级, PROTECT_START-进入保级缓冲, PROTECT_KEPT-缓冲期内保住了, PROTECT_FAILED-缓冲期满没保住',
+  `next_grade` int DEFAULT NULL COMMENT '结算时的下一档等级。已是最高档为空',
+  `next_threshold` bigint DEFAULT NULL COMMENT '下一档门槛的【当时快照】。⚠️ 必须存：运营改过门槛之后，拿今天的配置回算会算出另一个答案',
+  `protect_grade` int DEFAULT NULL COMMENT '该周期若处于保级缓冲，保的是哪一档',
+  `settled_at` datetime NOT NULL COMMENT '结算发生的时刻（不是周期结束时刻 —— job 可能晚跑）',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_mbr_ps_period` (`member_id`,`period_no`),
+  KEY `idx_t_mbr_ps_mbr` (`member_id`,`period_start`),
+  KEY `idx_t_mbr_ps_settled` (`settled_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员周期结算快照';
+
+DROP TABLE IF EXISTS `t_grade_privilege`;
+CREATE TABLE `t_grade_privilege` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `grade_code` int NOT NULL COMMENT '等级值，关联 t_member_grade.grade_code。⚠️ 关联的是业务键不是自增 id —— 自增 id 换环境会变',
+  `privilege_code` varchar(64) NOT NULL COMMENT '权益编码：EXCLUSIVE_TASK/EXCLUSIVE_POOL/BIRTHDAY_GIFT/MONTHLY_COUPON/PRIORITY_SERVICE…。? 它是【文档】，没有任何引擎读它',
+  `privilege_name` varchar(64) NOT NULL COMMENT '权益名，直接展示给用户',
+  `description` varchar(255) DEFAULT NULL COMMENT '权益说明，等级页的第二行小字',
+  `icon_file_id` bigint DEFAULT NULL COMMENT '权益图标 file_id，走文件模块',
+  `action_url` varchar(255) DEFAULT NULL COMMENT '点进去跳哪儿。为空表示纯展示、不可点',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '展示顺序，越大越靠前',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_gd_priv_code` (`grade_code`,`privilege_code`),
+  KEY `idx_t_gd_priv_grade` (`grade_code`,`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='等级权益【纯展示，不驱动逻辑】';
+
 
 -- =====================================================================================
 -- 账务 / 履约（9 张）
@@ -700,6 +822,7 @@ CREATE TABLE `t_physical_delivery` (
   `member_name` varchar(32) DEFAULT NULL COMMENT '会员账号【展示快照，非关联键，不要用于查询】',
   `source_biz_id` varchar(64) NOT NULL COMMENT '来源单号：PROPOSAL 存提案ID / MALL 存订单号。只认单号，不认上游业务',
   `source_type` varchar(64) NOT NULL COMMENT '来源类型',
+  `prize_name` varchar(128) DEFAULT NULL COMMENT '奖品/商品名【快照】：创建时从上游抄下来，上游改名不跟着变',
   `receiver_name` varchar(255) DEFAULT NULL COMMENT '收件人姓名【密文】：中奖时未知，由用户后续补填',
   `receiver_phone` varchar(255) DEFAULT NULL COMMENT '收件人电话【密文】：中奖时未知，由用户后续补填',
   `receiver_address` varchar(512) DEFAULT NULL COMMENT '收件详细地址【密文】：中奖时未知，由用户后续补填',

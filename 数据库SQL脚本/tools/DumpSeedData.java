@@ -81,6 +81,16 @@ INSERT INTO `t_member_id_seq` (`id`, `next_seq`, `step`) VALUES (1, 0, 1000);
         // 2026-09-15 补：券模板是配置数据。缺了发券链路查不到规则，
         // 发出去的券就回到「只有名字没有规则」那个状态。
         SEED.put("t_coupon_template",       "优惠券模板。缺了发券查不到规则");
+        // 2026-09-18 补：会员等级是配置数据 —— 门槛、档数、等级名都在后台改，
+        // 所以它不可能是枚举，也就必须跟着基线走。
+        // 🔴 缺了之后【不报错】：MemberGradeResolver 对每一次判级打一条
+        //    「一条启用中的等级配置都没有，全部按 0 级处理」的告警，然后所有人恒为 0 级。
+        //    与 t_task_event / t_coupon_template 是同一性质的东西。
+        SEED.put("t_member_grade",          "会员等级定义。缺了所有人恒为 0 级，且只有告警不报错");
+        // 2026-09-20 补：权益从 t_member_grade.benefits 那一列拆出来独立成表。
+        // 它是【纯展示】的，缺了不影响任何逻辑 —— 但等级页会空着，
+        // 而「用户看不见自己在保什么」等于整套保级机制白做。
+        SEED.put("t_grade_privilege",       "等级权益【纯展示】。缺了等级页空白，用户不知道自己在保什么");
         SEED.put("t_code_generator_config", "代码生成器配置（开发工具，可选）");
         SEED.put("t_table_column",          "列配置（开发工具，可选）");
     }

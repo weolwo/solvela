@@ -58,7 +58,12 @@ public class DumpSchema {
             // 2026-09-07 新增。它【没有 member_id】——一台设备登多个号是要发现的信号，
             // 不是要建的约束。归在会员域是因为它的 Dao 和读者都在这儿，
             // 而且查询时几乎总是和 t_member_login_log.device_id 一起出现。
-            "t_device"));
+            "t_device",
+            // 2026-09-18 会员等级。四张都归会员域：等级是【会员属性】，
+            // 成长值也在会员域 —— 它不能放钱包，因为 <modules> 里 member 排在
+            // ledger 之前，会员域物理上读不到钱包表。
+            "t_member_grade","t_member_growth","t_member_growth_log","t_member_grade_log",
+            "t_member_period_summary","t_grade_privilege"));
         GROUPS.put("账务 / 履约", List.of(
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config",
