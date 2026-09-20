@@ -98,6 +98,7 @@ class TaskRuntimeP0AcceptanceTest {
     private static final String TASK_HIGH_FREQ = "P0验收-高频丢弃";
     private static final String TASK_NEW_ONLY = "P0验收-限新会员";
     private static final String TASK_OLD_ONLY = "P0验收-限老会员";
+    private static final String TASK_GRADE_ONLY = "P0验收-限银卡以上";
     private static final String TASK_ROUNDS = "P0验收-每日两轮";
 
     private static final LocalDateTime DAY_1 = LocalDateTime.of(2026, 4, 1, 10, 0);
@@ -143,7 +144,7 @@ class TaskRuntimeP0AcceptanceTest {
 
     private TaskEventContext event(String eventCode, String bizId, String amount, LocalDateTime time) {
         return new TaskEventContext(eventCode, memberId, member, bizId,
-                amount == null ? null : new BigDecimal(amount), time, null, Map.of("from", "P0AcceptanceTest"));
+                amount == null ? null : new BigDecimal(amount), time, null, null, Map.of("from", "P0AcceptanceTest"));
     }
 
     /** 该任务下本会员的全部记录（多轮时会有多条） */
@@ -496,14 +497,26 @@ class TaskRuntimeP0AcceptanceTest {
     void p1_metricSourceExtractsAmountFromPayload() throws InterruptedException {
         TaskConfig config = configOf(TASK_AMOUNT);
         TaskEvent def = taskEventDefService.getEnabledByCode("ORDER_AMOUNT");
-        assertEquals("payAmount", def.getMetricSource(), "前提确认：该事件的计量来源是 payload.payAmount");
+        /*
+         * 🔴 计量来源是 payPoints，不是 payAmount —— 2026-09-21 订正。
+         *
+         * 商城真实链路（MallPayService.pay / MallRedeemService.redeem）发出的 payload 里
+         * 只有 payPoints / payCash，【从来没有 payAmount 这个字段】。也就是说
+         * metric_source 写成 payAmount 的那段时间里，AMOUNT 类任务在真实订单上
+         * 一次都没走过 payload 这条分支 —— 它一直取到 null，然后靠调用方显式传
+         * amount 兜着。本用例当时也是显式构造 payAmount 才过的，所以它绿着，
+         * 而线上那条路是死的。
+         *
+         * 用真实字段名写这个用例，才叫「验的是生产形态」。
+         */
+        assertEquals("payPoints", def.getMetricSource(), "前提确认：该事件的计量来源是 payload.payPoints");
 
         TaskEventReportCommand form = new TaskEventReportCommand();
         form.setEventCode("ORDER_AMOUNT");
         form.setMemberId(memberId);
         form.setEventBizId("order-metric-001");
-        // 刻意不设 amount，只给 payload
-        form.setPayload(Map.of("orderId", "order-metric-001", "payAmount", 200));
+        // 刻意不设 amount，只给 payload —— 验的就是「没人显式传时，按 metric_source 去 payload 里取」
+        form.setPayload(Map.of("orderNo", "order-metric-001", "payPoints", 200));
         assertDoesNotThrow(() -> taskEventService.report(form));
 
         // report 是异步的，轮询等落库
@@ -513,7 +526,7 @@ class TaskRuntimeP0AcceptanceTest {
         TaskRecord record = recordOf(config.getId());
         assertNotNull(record, "事件应已被处理");
         assertEquals(0, new BigDecimal("200").compareTo(record.getCurrentMetric()),
-                "金额应从 payload.payAmount 取到，实际 " + record.getCurrentMetric());
+                "金额应从 payload.payPoints 取到，实际 " + record.getCurrentMetric());
     }
 
     @Test
@@ -567,7 +580,7 @@ class TaskRuntimeP0AcceptanceTest {
      */
     private TaskEventContext audienceEvent(String bizId, Boolean isNewMember) {
         return new TaskEventContext("AUDIENCE_TEST", memberId, member, bizId, null, DAY_1, isNewMember,
-                Map.of("from", "P0AcceptanceTest"));
+                null, Map.of("from", "P0AcceptanceTest"));
     }
 
     private TaskAdvanceResult resultOf(List<TaskAdvanceResult> all, Long taskConfigId, List<TaskConfig> configs) {
@@ -632,6 +645,76 @@ class TaskRuntimeP0AcceptanceTest {
         assertTrue(TaskDiscardCode.resolve(flows.get(0).getDiscardCode()).needsAttention());
     }
 
+    // ==================== 等级人群（会员等级的第一版权益） ====================
+
+    /**
+     * 给会员建一行成长值，等级由参数定。
+     *
+     * <p>🔴 必须真的写库，不能在 {@code TaskEventContext} 里塞一个等级：
+     * {@code handle()} 会按「有没有等级人群的任务」<b>重新解析</b>等级并覆盖掉传进来的值 ——
+     * 那正是这个设计要的（等级是服务端问会员域要的结论，不是上游能声明的东西），
+     * 所以测试也只能走同一条路。
+     */
+    private void givenGrowthGrade(int grade) {
+        jdbcTemplate.update("INSERT INTO t_member_growth (member_id, current_grade, grade_since, period_start,"
+                + " period_end, current_period_value, total_value)"
+                + " VALUES (?, ?, NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 12 MONTH), 0, 0)",
+                memberId, grade);
+    }
+
+    @Test
+    @DisplayName("🔴 等级人群：没攒过成长值的会员是 0 级，限银卡以上的任务拦住他")
+    void audienceGradeBelowThresholdIsBlocked() {
+        TaskConfig gradeOnly = configOf(TASK_GRADE_ONLY);
+        assertEquals("GRADE_GTE_2", gradeOnly.getTargetAudience(), "前提确认");
+        // 刻意不建成长值行：一个从没参与过的真实会员就是这样，他确定是 0 级
+        taskEventService.handle(audienceEvent("lvl-low", Boolean.FALSE));
+
+        assertNull(recordOf(gradeOnly.getId()), "0 级不该能做银卡专享任务");
+        List<TaskRecordFlow> blocked = flowsOf(gradeOnly.getId());
+        assertEquals(1, blocked.size(), "被等级拦下也要留痕");
+        assertEquals(TaskDiscardCode.AUDIENCE_MISMATCH.getValue(), blocked.get(0).getDiscardCode());
+        String reason = blocked.get(0).getDiscardReason();
+        assertTrue(reason.contains("2") && reason.contains("当前等级 0"),
+                "原因要同时说清「要求几级」和「他几级」，否则客服答不了：" + reason);
+    }
+
+    @Test
+    @DisplayName("等级人群：达标就放行 —— 证明拦的是等级，不是「一律拦」")
+    void audienceGradeAtThresholdPasses() {
+        TaskConfig gradeOnly = configOf(TASK_GRADE_ONLY);
+        givenGrowthGrade(2);
+
+        taskEventService.handle(audienceEvent("lvl-ok", Boolean.FALSE));
+
+        assertNotNull(recordOf(gradeOnly.getId()), "等级 2 正好达到 GRADE_GTE_2 的门槛，应当放行");
+    }
+
+    @Test
+    @DisplayName("等级人群：更高的等级也算达标（判据是 ≥，不是 ==）")
+    void audienceGradeAboveThresholdPasses() {
+        TaskConfig gradeOnly = configOf(TASK_GRADE_ONLY);
+        givenGrowthGrade(4);
+
+        taskEventService.handle(audienceEvent("lvl-high", Boolean.FALSE));
+
+        assertNotNull(recordOf(gradeOnly.getId()), "等级 4 高于门槛 2，应当放行");
+    }
+
+    @Test
+    @DisplayName("🔴 等级人群只影响自己：同一条事件上的其它任务照常推进")
+    void audienceGradeDoesNotAffectOtherTasks() {
+        TaskConfig gradeOnly = configOf(TASK_GRADE_ONLY);
+        TaskConfig oldOnly = configOf(TASK_OLD_ONLY);
+
+        // 0 级 + 老会员：等级任务该被拦，老会员任务该推进
+        taskEventService.handle(audienceEvent("lvl-mixed", Boolean.FALSE));
+
+        assertNull(recordOf(gradeOnly.getId()));
+        assertNotNull(recordOf(oldOnly.getId()),
+                "等级判定失败不该殃及同一事件上的别的任务 —— 影响面必须收敛在依赖它的那几个任务上");
+    }
+
     @Test
     @DisplayName("人群过滤：目标人群为 ALL 的任务不受影响（不传属性也照常推进）")
     void audienceAllIsUnaffected() {
@@ -654,7 +737,7 @@ class TaskRuntimeP0AcceptanceTest {
         String basePeriod = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", DAY_1);
 
         // 第 1 轮：周期键是裸键（不带 #1）—— 存量记录兼容的关键
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r1", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r1", null, DAY_1, null, null, Map.of()));
         List<TaskRecord> after1 = recordsOf(config.getId());
         assertEquals(1, after1.size());
         assertEquals(basePeriod, after1.get(0).getPeriodKey(),
@@ -662,7 +745,7 @@ class TaskRuntimeP0AcceptanceTest {
         assertTrue(after1.get(0).getStatus().atLeast(TaskRecordStatusEnum.COMPLETED), "目标为1，一个事件即达标");
 
         // 第 2 轮：新记录，周期键带 #2
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r2", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r2", null, DAY_1, null, null, Map.of()));
         List<TaskRecord> after2 = recordsOf(config.getId());
         assertEquals(2, after2.size(), "第 2 轮应新开一条记录");
         assertTrue(after2.stream().anyMatch(r -> (basePeriod + "#2").equals(r.getPeriodKey())),
@@ -670,7 +753,7 @@ class TaskRuntimeP0AcceptanceTest {
                         + after2.stream().map(TaskRecord::getPeriodKey).toList());
 
         // 第 3 轮：超出上限
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r3", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r3", null, DAY_1, null, null, Map.of()));
         assertEquals(2, recordsOf(config.getId()).size(), "超出上限不该再开新记录");
 
         TaskRecordFlow last = flowsOf(config.getId()).get(2);
@@ -685,12 +768,12 @@ class TaskRuntimeP0AcceptanceTest {
         TaskConfig config = configOf(TASK_ROUNDS);
 
         // DAY_1 用满 2 轮
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d1r1", null, DAY_1, null, Map.of()));
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d1r2", null, DAY_1, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d1r1", null, DAY_1, null, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d1r2", null, DAY_1, null, null, Map.of()));
         assertEquals(2, recordsOf(config.getId()).size(), "前提确认：第一天已用满 2 轮");
 
         // DAY_2 应该能重新开始
-        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d2r1", null, DAY_2, null, Map.of()));
+        taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "d2r1", null, DAY_2, null, null, Map.of()));
         List<TaskRecord> all = recordsOf(config.getId());
         assertEquals(3, all.size(), "换一天应重新计轮");
 

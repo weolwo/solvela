@@ -5,6 +5,7 @@ import solvela.enums.TaskConfigStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.json.JsonUtils;
+import solvela.member.grade.service.MemberGrowthService;
 import solvela.member.service.MemberService;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
@@ -63,6 +64,14 @@ public class TaskEventService {
      * 之后靠 {@code TaskEventContext} 往下传 —— 事件是高频入口，不能每落一条流水就查一次库。
      */
     private final MemberService memberService;
+
+    /**
+     * 只为「等级 ≥ N」的人群判定而存在，且<b>按需调用</b>（见 {@code withMemberGradeIfNeeded}）。
+     *
+     * <p>⚠️ 营销域不拥有会员数据，这里和 {@code memberService} 一样只是<b>问</b>会员域要一个结论，
+     * 不读会员档案、不缓存、不自己算等级 —— 「多少成长值算几级」是会员域的规则。
+     */
+    private final MemberGrowthService memberGrowthService;
     private final AsyncTaskExecutor taskEventExecutor;
 
     /**
@@ -79,6 +88,7 @@ public class TaskEventService {
                             TaskRecordAdvanceService taskRecordAdvanceService,
                             TaskEventDefService taskEventDefService,
                             MemberService memberService,
+                            MemberGrowthService memberGrowthService,
                             @Qualifier(TaskEventExecutorConfig.TASK_EVENT_EXECUTOR)
                             AsyncTaskExecutor taskEventExecutor) {
         this.taskConfigDao = taskConfigDao;
@@ -87,6 +97,7 @@ public class TaskEventService {
         this.taskRecordAdvanceService = taskRecordAdvanceService;
         this.taskEventDefService = taskEventDefService;
         this.memberService = memberService;
+        this.memberGrowthService = memberGrowthService;
         this.taskEventExecutor = taskEventExecutor;
     }
 
@@ -159,7 +170,39 @@ public class TaskEventService {
             log.debug("[任务事件] 没有任务订阅该事件。eventCode={}, memberId={}", ctx.eventCode(), ctx.memberId());
             return List.of();
         }
-        return configs.stream().map(config -> advanceWithRetry(config, ctx, eventDef)).toList();
+        TaskEventContext enriched = withMemberGradeIfNeeded(ctx, configs);
+        return configs.stream().map(config -> advanceWithRetry(config, enriched, eventDef)).toList();
+    }
+
+    /**
+     * 命中了「等级 ≥ N」人群的任务时，把会员等级补进上下文 —— <b>整条事件只查一次</b>。
+     *
+     * <h3>🔴 为什么不在 normalize 里无条件查</h3>
+     * 埋点是热路径，而<b>绝大多数任务不看等级</b>。无条件查等于给每一次埋点
+     * 都加一次点查，换来的只是少写这十几行。
+     *
+     * <h3>🔴 为什么也不在 checkAudience 里现查</h3>
+     * 那里是「每个任务配置一次」：同一条 {@code DAILY_SIGN} 会扇出到四五个任务上，
+     * 于是同一个会员的等级在一次埋点里被查四五遍。
+     *
+     * <h3>查不到就留 null，让人群判定去丢弃</h3>
+     * 这里<b>不抛</b>：等级查询挂掉不该让整条埋点链路断掉（别的任务还在正常推进）。
+     * 留 null 之后，配了等级人群的那个任务会丢弃事件<b>并写明原因</b>，
+     * 而不配等级的任务照常推进 —— 影响面正好收敛在真正依赖它的那几个任务上。
+     */
+    private TaskEventContext withMemberGradeIfNeeded(TaskEventContext ctx, List<TaskConfig> configs) {
+        boolean needed = configs.stream()
+                .anyMatch(config -> TaskConst.gradeThresholdOf(config.getTargetAudience()) != null);
+        if (!needed) {
+            return ctx;
+        }
+        try {
+            return ctx.withMemberGrade(memberGrowthService.currentGrade(ctx.memberId()));
+        } catch (RuntimeException e) {
+            log.error("[任务事件] 取会员等级失败，配了等级人群的任务本次会丢弃。memberId={}, eventCode={}",
+                    ctx.memberId(), ctx.eventCode(), e);
+            return ctx;
+        }
     }
 
     /**
@@ -244,6 +287,9 @@ public class TaskEventService {
                 resolveAmount(form, eventDef),
                 eventTime,
                 form.getIsNewMember(),
+                // 等级不在这里查：绝大多数任务不看等级，而埋点是热路径。
+                // 命中了等级人群的任务时由 handle() 按需补上，见 resolveMemberGrade
+                null,
                 form.getPayload());
     }
 
@@ -251,9 +297,18 @@ public class TaskEventService {
      * 取计量值：调用方显式传的 {@code amount} 优先；没传则按注册表的 {@code metric_source}
      * 去 payload 里找。
      *
-     * <p>这样上游可以只上报一份「订单支付」事件原文（含 payAmount），
+     * <p>这样上游可以只上报一份「订单支付」事件原文（含 payPoints / payCash），
      * 由注册表决定从哪个字段取金额 —— <b>换计量口径是改一行数据，不是改上游代码</b>，
      * 与「加事件只加一行数据」是同一个取向。
+     *
+     * <h3>🔴 但这份灵活性有个安静的失败模式</h3>
+     * {@code metric_source} 指向一个 payload 里<b>根本不存在</b>的字段时，这里返回
+     * {@code null}，任务就是不涨 —— 不报错、不打日志、不留痕。
+     * {@code ORDER_AMOUNT} 曾经指着 {@code payAmount}，而商城真实链路发的是
+     * {@code payPoints}，于是 AMOUNT 类任务在真实订单上<b>一次都没走过这条分支</b>，
+     * 整整一段时间没人发现（验收用例是自己显式构造 payAmount 的，一直绿着）。
+     *
+     * <p>改 {@code metric_source} 时，去核对一遍生产者真正发的字段名。
      */
     private BigDecimal resolveAmount(TaskEventReportCommand form, TaskEvent eventDef) {
         if (form.getAmount() != null) {
