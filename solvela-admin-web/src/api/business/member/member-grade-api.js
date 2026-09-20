@@ -28,6 +28,40 @@ export const memberGradeApi = {
     return getRequest(`/memberGrade/config/updateStatus?id=${id}&status=${status}`);
   },
 
+  // ---------------- 等级权益 ----------------
+  //
+  // 🔴 这几个口子改的是【展示文案】，不是权益本身。在这里加一条「专享折扣」
+  //    不会产生任何折扣 —— 真正的权益靠任务人群 GRADE_GTE_N、脚本
+  //    member_gradeAtLeast(n)、商城价格模型。页面上必须把这句话说给运营看。
+
+  /** 全部权益（含停用），按等级升序、同级 sort 倒序  @author alaric */
+  listPrivilege: () => {
+    return getRequest('/memberGrade/privilege/list');
+  },
+
+  /** 新增 / 编辑一条权益  @author alaric */
+  savePrivilege: (param) => {
+    return postRequest('/memberGrade/privilege/save', param);
+  },
+
+  /** 启用 / 停用一条权益  @author alaric */
+  updatePrivilegeStatus: (id, status) => {
+    return getRequest(`/memberGrade/privilege/updateStatus?id=${id}&status=${status}`);
+  },
+
+  /**
+   * 删除一条权益。⚠️ 是物理删。
+   *
+   * 🔴 这里有「删」而等级配置没有，不是不一致：唯一键 (grade_code, privilege_code)
+   *    会被停用的行继续占着，只给停用的话，运营停掉一条之后想重新加同编码的会撞键，
+   *    而他看到的只是一行「已停用」，不会想到那就是挡住他的东西。
+   *    删得起是因为这张表纯展示、没有任何流水指向它。
+   * @author alaric
+   */
+  deletePrivilege: (id) => {
+    return getRequest(`/memberGrade/privilege/delete?id=${id}`);
+  },
+
   // ---------------- 会员成长值 ----------------
 
   /** 会员成长值分页  @author alaric */

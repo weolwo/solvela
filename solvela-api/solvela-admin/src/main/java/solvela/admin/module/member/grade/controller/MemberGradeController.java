@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.admin.module.member.grade.domain.form.GradePrivilegeForm;
 import solvela.admin.module.member.grade.domain.form.MemberGrowthLogQueryForm;
 import solvela.admin.module.member.grade.domain.form.MemberGrowthQueryForm;
 import solvela.admin.module.member.grade.domain.form.MemberGradeAdjustForm;
@@ -19,6 +20,7 @@ import solvela.admin.module.member.grade.domain.form.MemberGradeLogQueryForm;
 import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.enums.EnableStatusEnum;
+import solvela.member.GradePrivilege;
 import solvela.member.MemberGrade;
 import solvela.member.grade.domain.dto.MemberGrowthDTO;
 import solvela.member.grade.domain.dto.MemberGrowthLogDTO;
@@ -26,6 +28,7 @@ import solvela.member.grade.domain.dto.MemberGradeLogDTO;
 import solvela.member.grade.domain.query.MemberGrowthLogQuery;
 import solvela.member.grade.domain.query.MemberGrowthQuery;
 import solvela.member.grade.domain.query.MemberGradeLogQuery;
+import solvela.member.grade.service.GradePrivilegeService;
 import solvela.member.grade.service.MemberGradeAdminService;
 import solvela.member.grade.service.MemberGradeConfigService;
 import solvela.admin.auth.CurrentEmployee;
@@ -54,6 +57,7 @@ public class MemberGradeController {
 
     private final MemberGradeAdminService memberGradeAdminService;
     private final MemberGradeConfigService memberGradeConfigService;
+    private final GradePrivilegeService gradePrivilegeService;
 
     // ==================== 等级配置 ====================
 
@@ -77,6 +81,50 @@ public class MemberGradeController {
     @RequiresPermission("memberGrade:config")
     public void updateConfigStatus(@RequestParam Long id, @RequestParam EnableStatusEnum status) {
         memberGradeConfigService.updateStatus(id, status, CurrentEmployee.nameOrNull());
+    }
+
+    // ==================== 等级权益 ====================
+    //
+    // 🔴 这几个口子改的是【展示文案】，不是权益本身。
+    //    在这里新增一条「专享折扣」不会产生任何折扣 —— 真正的权益靠
+    //    target_audience = GRADE_GTE_N、脚本 member_gradeAtLeast(n)、商城价格模型。
+    //    权限点沿用 memberGrade:config：它和「改等级门槛」是同一类运营动作，
+    //    都不涉及改某一个人的账（那是 memberGrade:adjust，单独的）。
+
+    @Operation(summary = "等级权益-全部（含停用），按等级升序 @author alaric")
+    @GetMapping("/privilege/list")
+    @RequiresPermission("memberGrade:query")
+    public List<GradePrivilege> listPrivilege() {
+        return gradePrivilegeService.listAll();
+    }
+
+    @Operation(summary = "等级权益-新增/编辑 @author alaric")
+    @PostMapping("/privilege/save")
+    @RequiresPermission("memberGrade:config")
+    public void savePrivilege(@RequestBody @Valid GradePrivilegeForm form) {
+        gradePrivilegeService.save(SolvelaBeanUtil.copy(form, GradePrivilege.class),
+                CurrentEmployee.nameOrNull());
+    }
+
+    @Operation(summary = "等级权益-启用/停用 @author alaric")
+    @GetMapping("/privilege/updateStatus")
+    @RequiresPermission("memberGrade:config")
+    public void updatePrivilegeStatus(@RequestParam Long id, @RequestParam EnableStatusEnum status) {
+        gradePrivilegeService.updateStatus(id, status, CurrentEmployee.nameOrNull());
+    }
+
+    /**
+     * 删除一条权益。
+     *
+     * <p>⚠️ 是物理删，不是软删 —— 唯一键 {@code (grade_code, privilege_code)}
+     * 会被停用的行继续占着，只给停用的话运营重新加同编码的会撞键，
+     * 而他根本不会想到是那条「已停用」的行挡着。理由见 {@code GradePrivilegeService#delete}。
+     */
+    @Operation(summary = "等级权益-删除（物理删） @author alaric")
+    @GetMapping("/privilege/delete")
+    @RequiresPermission("memberGrade:config")
+    public void deletePrivilege(@RequestParam Long id) {
+        gradePrivilegeService.delete(id, CurrentEmployee.nameOrNull());
     }
 
     // ==================== 会员成长值 ====================
