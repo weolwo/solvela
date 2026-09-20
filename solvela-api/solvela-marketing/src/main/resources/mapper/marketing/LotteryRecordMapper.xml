@@ -285,4 +285,40 @@
           AND issue_no = #{issueNo}
     </select>
 
+    <!--
+      C 端「我的彩票」。三张表 join：号码本身 + 玩法名 + 那一期的开奖结果。
+
+      🔴 两个 join 都是 LEFT：玩法或期号被删掉时，票还在用户手里。
+         用 INNER 的话那张票会从页面上凭空消失，而用户记得自己有 ——
+         「数据被删了」和「用户看不到自己的东西」是两个问题，不该合成一个。
+
+      排序口径与 selectMyTickets 一致：中奖的在最前（奖级升序），同奖级按最新在前。
+    -->
+    <select id="selectMyRecentTickets" resultType="solvela.lottery.record.domain.dto.MemberTicketDTO">
+        SELECT r.lottery_code    AS lotteryCode,
+               c.lottery_name    AS lotteryName,
+               r.issue_no        AS issueNo,
+               r.ticket_number   AS ticketNumber,
+               r.obtain_time     AS obtainTime,
+               r.win_status      AS winStatus,
+               r.prize_level     AS prizeLevel,
+               i.winning_number  AS winningNumber,
+               i.plan_draw_time  AS planDrawTime
+        FROM t_lottery_record r
+        LEFT JOIN t_lottery_config c ON c.lottery_code = r.lottery_code
+        LEFT JOIN t_lottery_issue  i ON i.lottery_code = r.lottery_code
+                                    AND i.issue_no = r.issue_no
+        WHERE r.member_id = #{memberId}
+        ORDER BY r.prize_level ASC, r.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countMyTickets" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM t_lottery_record
+        WHERE member_id = #{memberId}
+          AND lottery_code = #{lotteryCode}
+          AND issue_no = #{issueNo}
+    </select>
+
 </mapper>

@@ -38,7 +38,19 @@ public enum PrizeTypeEnum {
      */
     MARKER,
 
-    /** 彩票：给会员发一张号码（t_lottery_record）。派发策略尚未实现，见 prize-config-const.js */
+    /**
+     * 彩票：给会员发一张号码（{@code t_lottery_record}）。
+     *
+     * <p>派发策略是 {@code LotteryPrizeHandler} —— 它<b>不进提案</b>，
+     * 和 {@link #MARKER} 一样在 consumer 这一层就结束了：一张号码不是资产，
+     * 所以 ledger 侧刻意没有对应的 {@code @AssetStrategy}。
+     *
+     * <p>🔴 <b>配置只填 prize_code（彩票编码），不填期号</b>：
+     * 运营配奖品的那一刻，将来要发的那一期多半还不存在，发号时才挑当前在售的那一期。
+     *
+     * <p>真正动账的是<b>开奖之后</b>：号码中奖后按中奖规则的 {@code prize_code}
+     * 再走一次正常发奖链路。发号和兑奖是两件事，中间隔着一次开奖。
+     */
     LOTTERY,
 
     /** 自定义：预留，派发策略尚未实现 */

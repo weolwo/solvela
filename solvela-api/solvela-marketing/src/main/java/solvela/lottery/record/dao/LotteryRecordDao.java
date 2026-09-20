@@ -5,6 +5,7 @@ package solvela.lottery.record.dao;
         import solvela.lottery.LotteryRecord;
         import solvela.lottery.record.domain.query.LotteryRecordQuery;
         import solvela.lottery.record.domain.dto.LotteryRecordDTO;
+        import solvela.lottery.record.domain.dto.MemberTicketDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -75,6 +76,27 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
     List<LotteryRecord> selectMyTickets(@Param("lotteryCode") String lotteryCode,
                                         @Param("issueNo") String issueNo,
                                         @Param("memberId") Long memberId);
+
+    /**
+     * C 端「我的彩票」：<b>跨玩法、跨期</b>一起给，并把玩法名与开奖结果一次 join 回来。
+     *
+     * <h3>🔴 为什么要 join，而不是端上按 code + issue 再查</h3>
+     * 一个用户手里可能有十几张分属不同期的票，每张都要显示「玩法名 / 开奖号 / 开奖时间」——
+     * 不 join 的话那是十几次跨进程往返，而且首屏得等到最后一次回来才完整。
+     *
+     * <p>排序与 {@link #selectMyTickets} 同一口径：<b>中奖的在最前</b>（奖级升序），
+     * 同奖级按最新在前。用户点进来最想知道的是「我中了没有」。
+     *
+     * <p>⚠️ 两个 join 都用 LEFT：玩法或期号被删掉时，票本身还在用户手里 ——
+     * 用 INNER 的话那张票会从「我的彩票」里<b>凭空消失</b>，而用户记得自己有。
+     */
+    List<MemberTicketDTO> selectMyRecentTickets(@Param("memberId") Long memberId,
+                                                @Param("limit") int limit);
+
+    /** C 端：我在这一期已经有几张 */
+    Integer countMyTickets(@Param("lotteryCode") String lotteryCode,
+                           @Param("issueNo") String issueNo,
+                           @Param("memberId") Long memberId);
 
     /**
      * 按一条奖级规则认领中奖记录（开奖核销的核心动作）。
