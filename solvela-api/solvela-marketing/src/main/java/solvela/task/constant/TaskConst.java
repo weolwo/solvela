@@ -61,6 +61,39 @@ public final class TaskConst {
      */
     public static final String AUDIENCE_OLD_MEMBER = "OLD_MEMBER";
 
+    /**
+     * 目标人群：<b>会员等级 ≥ N</b>。整串形如 {@code GRADE_GTE_2}。
+     *
+     * <h3>🔴 门槛值写在取值里，不新增一列</h3>
+     * 等级是<b>配置</b>（运营随时加一档），所以「银卡专享」这件事没法穷举成枚举值。
+     * 把 N 编进取值里，加一档就是多一个可选项，{@code t_task_config} 一列都不用加 ——
+     * 而加列意味着存量行要回填、每一处读写要跟着改。
+     *
+     * <p>⚠️ 判据是<b>数字比较</b>，不是「这一档存不存在」：等级 2 被停用之后，
+     * {@code GRADE_GTE_2} 仍然表示「等级不低于 2」。停用一档不该顺带让一批任务失效。
+     */
+    public static final String AUDIENCE_GRADE_GTE_PREFIX = "GRADE_GTE_";
+
+    /**
+     * 从人群取值里解析出等级门槛。
+     *
+     * @return {@code GRADE_GTE_2} 返回 2；不是这个形状（含数字部分写错）返回 {@code null}
+     */
+    public static Integer gradeThresholdOf(String audience) {
+        if (audience == null || !audience.startsWith(AUDIENCE_GRADE_GTE_PREFIX)) {
+            return null;
+        }
+        String number = audience.substring(AUDIENCE_GRADE_GTE_PREFIX.length());
+        try {
+            int level = Integer.parseInt(number);
+            // 负数门槛等于没门槛，但它一定是配错的 —— 当作非法取值交给调用方去告警，
+            // 而不是在这里悄悄当成 0 放行
+            return level < 0 ? null : level;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     // ==================== t_task_config.limit_type ====================
 
     /**

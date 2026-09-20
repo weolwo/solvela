@@ -330,6 +330,32 @@ public class TaskRecordAdvanceService {
         if (audience == null || audience.isBlank() || TaskConst.AUDIENCE_ALL.equals(audience)) {
             return null;
         }
+
+        /*
+         * 等级人群（GRADE_GTE_N）—— 这是「高等级专享任务」，也就是会员等级的第一版权益。
+         *
+         * 🔴 判据是数字比较，不是「这一档还在不在」：等级 2 被停用之后 GRADE_GTE_2
+         *    仍然表示「等级不低于 2」。停用一档不该顺带让一批任务静默失效。
+         */
+        if (audience.startsWith(TaskConst.AUDIENCE_GRADE_GTE_PREFIX)) {
+            Integer required = TaskConst.gradeThresholdOf(audience);
+            if (required == null) {
+                /*
+                 * 🔴 写错的等级人群要【丢弃】，不能沿用下面那条「取值非法按不过滤处理」。
+                 *
+                 * 下面那条放行是对的 —— 一个不认识的人群取值多半是历史遗留，
+                 * 为它把用户的进度卡住不划算。但 GRADE_GTE_ 开头意味着运营
+                 * 【明确是在配等级专享】，只是数字写错了（GRADE_GTE_二、GRADE_GTE_）。
+                 * 这时放行的后果是普通会员领走白金专享奖，方向正好反了。
+                 */
+                log.warn("[任务推进] 等级人群配置非法，本次丢弃（不放行）。taskConfigId={}, targetAudience={}",
+                        config.getId(), audience);
+                return new AudienceCheck(TaskDiscardCode.AUDIENCE_UNKNOWN,
+                        "任务的等级人群配置非法（" + audience + "），无法判定，本次不计入");
+            }
+            return checkGrade(config, ctx, required);
+        }
+
         boolean wantNew = TaskConst.AUDIENCE_NEW_MEMBER.equals(audience);
         boolean wantOld = TaskConst.AUDIENCE_OLD_MEMBER.equals(audience);
         if (!wantNew && !wantOld) {
@@ -349,6 +375,32 @@ public class TaskRecordAdvanceService {
         if (wantOld && ctx.isNewMember()) {
             return new AudienceCheck(TaskDiscardCode.AUDIENCE_MISMATCH, "该任务仅限老会员参与");
         }
+        return null;
+    }
+
+    /**
+     * 等级门槛判定。
+     *
+     * <p>🔴 <b>等级解析不出来时丢弃，不放行。</b>与 {@code isNewMember} 那条完全同构：
+     * 放行等于「配了等级专享但所有人都能做」—— 运营看不出任何异常，
+     * 直到有人问「为什么普通会员也能领白金专享奖」才发现，那时奖已经发出去了。
+     *
+     * <p>⚠️ 这里<b>不</b>回头去查等级。上游（{@code TaskEventService.handle}）已经
+     * 按「有没有等级人群的任务」决定过查不查了；在这个方法里补查，等于把
+     * 「一次事件查一次」变成「一个任务配置查一次」—— 同一个 DAILY_SIGN
+     * 扇出到五个任务上就是五次。
+     */
+    private AudienceCheck checkGrade(TaskConfig config, TaskEventContext ctx, int required) {
+        if (ctx.memberGrade() == null) {
+            return new AudienceCheck(TaskDiscardCode.AUDIENCE_UNKNOWN,
+                    "任务限定了会员等级（≥ " + required + "），但本次取不到该会员的等级，无法判定，本次不计入");
+        }
+        if (ctx.memberGrade() < required) {
+            return new AudienceCheck(TaskDiscardCode.AUDIENCE_MISMATCH,
+                    "该任务仅限等级 " + required + " 及以上参与，当前等级 " + ctx.memberGrade());
+        }
+        log.debug("[任务推进] 等级人群通过。taskConfigId={}, memberId={}, 要求≥{}, 当前={}",
+                config.getId(), ctx.memberId(), required, ctx.memberGrade());
         return null;
     }
 

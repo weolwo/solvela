@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.member.grade.dao.MemberGrowthDao">
+
+    <resultMap id="MemberGrowthDTO" type="solvela.member.grade.domain.dto.MemberGrowthDTO">
+        <result column="member_id" property="memberId"/>
+        <result column="member_name" property="memberName"/>
+        <result column="nickname" property="nickname"/>
+        <result column="current_grade" property="currentGrade"/>
+        <result column="grade_since" property="gradeSince"/>
+        <result column="period_start" property="periodStart"/>
+        <result column="period_end" property="periodEnd"/>
+        <result column="current_period_value" property="currentPeriodValue"/>
+        <result column="total_value" property="totalValue"/>
+        <result column="protect_until" property="protectUntil"/>
+        <result column="protect_grade" property="protectGrade"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!--
+      带 g. 前缀：按账号搜那一条用了 EXISTS 子查询，里面出现了 t_member m，
+      不加前缀的话 member_id 在两张表都有，MySQL 直接报 ambiguous。
+    -->
+    <sql id="base_columns">
+        g.member_id,
+        g.current_grade,
+        g.grade_since,
+        g.period_start,
+        g.period_end,
+        g.current_period_value,
+        g.total_value,
+        g.protect_until,
+        g.protect_grade,
+        g.create_time,
+        g.update_time
+    </sql>
+
+    <!--
+      账号与昵称走子查询而不是 LEFT JOIN：FROM 里只留一张表，
+      MyBatis-Plus 分页排序（不带表前缀地拼 ORDER BY）就不会撞上 ambiguous。
+      列表一页几十行，逐行点一次会员表主键的代价可以忽略。
+    -->
+    <sql id="member_columns">
+        (SELECT m.member_name FROM t_member m WHERE m.member_id = g.member_id) AS member_name,
+        (SELECT m.nickname FROM t_member m WHERE m.member_id = g.member_id)    AS nickname
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+            <if test="queryForm.memberId != null">
+                AND g.member_id = #{queryForm.memberId}
+            </if>
+            <if test="queryForm.memberName != null and queryForm.memberName != ''">
+                AND EXISTS (SELECT 1 FROM t_member m
+                            WHERE m.member_id = g.member_id
+                              AND m.member_name LIKE CONCAT('%', #{queryForm.memberName}, '%'))
+            </if>
+            <if test="queryForm.gradeMin != null">
+                AND g.current_grade &gt;= #{queryForm.gradeMin}
+            </if>
+            <if test="queryForm.gradeMax != null">
+                AND g.current_grade &lt;= #{queryForm.gradeMax}
+            </if>
+            <!--
+              🔴 用 NOW() 而不是应用传进来的时间：缓冲期是否结束是数据库时钟说了算，
+              与 MemberGrowthService.inProtectPeriod 用的是同一个钟。
+              两个时钟源会让「列表说他在缓冲期、点进去说不在」。
+            -->
+            <if test="queryForm.inProtect != null and queryForm.inProtect">
+                AND g.protect_until IS NOT NULL AND g.protect_until &gt; NOW()
+            </if>
+            <if test="queryForm.inProtect != null and !queryForm.inProtect">
+                AND (g.protect_until IS NULL OR g.protect_until &lt;= NOW())
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MemberGrowthDTO">
+        SELECT
+        <include refid="base_columns"/>,
+        <include refid="member_columns"/>
+        FROM t_member_growth g
+        <include refid="query_conditions"/>
+        ORDER BY g.current_period_value DESC, g.member_id DESC
+    </select>
+
+</mapper>

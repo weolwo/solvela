@@ -23,6 +23,10 @@ import java.util.Map;
  *                    这个关联键，不读会员档案），「新/老」的定义也本就属于会员域的业务概念，
  *                    不该由任务引擎去猜。null = 上游没告知 —— 此时配了人群的任务会
  *                    <b>丢弃事件并写明原因</b>，而不是假装过滤生效了
+ * @param memberGrade 该会员当前的等级，<b>按需解析</b>。null = 没解析（这条事件没有等级人群的任务，
+ *                    最常见）或解析失败 —— 两种都会让配了等级人群的任务
+ *                    <b>丢弃事件并写明原因</b>，而不是假装过滤生效了。
+ *                    与 {@code isNewMember} 的取向一致：宁可丢一条可查的，不要放一条看不见的
  * @param payload    事件原文，落进流水的 event_payload 供客诉复盘
  * @author alaric
  * @date 2026-08-01
@@ -35,6 +39,7 @@ public record TaskEventContext(
         BigDecimal amount,
         LocalDateTime eventTime,
         Boolean isNewMember,
+        Integer memberGrade,
         Map<String, Object> payload) {
 
     /**
@@ -63,13 +68,27 @@ public record TaskEventContext(
      * 换一个 eventBizId（服务端兜底后回填），其余不变
      */
     public TaskEventContext withEventBizId(String bizId) {
-        return new TaskEventContext(eventCode, memberId, memberName, bizId, amount, eventTime, isNewMember, payload);
+        return new TaskEventContext(eventCode, memberId, memberName, bizId, amount, eventTime,
+                isNewMember, memberGrade, payload);
     }
 
     /**
      * 换一个金额（按事件注册表的 metric_source 从 payload 里取出来之后回填），其余不变
      */
     public TaskEventContext withAmount(BigDecimal newAmount) {
-        return new TaskEventContext(eventCode, memberId, memberName, eventBizId, newAmount, eventTime, isNewMember, payload);
+        return new TaskEventContext(eventCode, memberId, memberName, eventBizId, newAmount, eventTime,
+                isNewMember, memberGrade, payload);
+    }
+
+    /**
+     * 填上会员等级，其余不变。
+     *
+     * <p>🔴 <b>按需调用</b>：只有这条事件命中了配等级人群的任务才去解析。
+     * 无条件解析等于给每一次埋点都加一次点查，而绝大多数任务根本不看等级 ——
+     * 埋点是热路径，{@code DAILY_SIGN} 这种事件一次会扇出到四五个任务配置上。
+     */
+    public TaskEventContext withMemberGrade(Integer level) {
+        return new TaskEventContext(eventCode, memberId, memberName, eventBizId, amount, eventTime,
+                isNewMember, level, payload);
     }
 }

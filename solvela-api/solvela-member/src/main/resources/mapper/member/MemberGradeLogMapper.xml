@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.member.grade.dao.MemberGradeLogDao">
+
+    <resultMap id="MemberGradeLogDTO" type="solvela.member.grade.domain.dto.MemberGradeLogDTO">
+        <result column="id" property="id"/>
+        <result column="member_id" property="memberId"/>
+        <result column="member_name" property="memberName"/>
+        <result column="old_grade" property="oldGrade"/>
+        <result column="new_grade" property="newGrade"/>
+        <result column="change_type" property="changeType"/>
+        <result column="period_value" property="periodValue"/>
+        <result column="reason" property="reason"/>
+        <result column="operator" property="operator"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <sql id="base_columns">
+        l.id,
+        l.member_id,
+        l.old_grade,
+        l.new_grade,
+        l.change_type,
+        l.period_value,
+        l.reason,
+        l.operator,
+        l.create_time
+    </sql>
+
+    <sql id="member_columns">
+        (SELECT m.member_name FROM t_member m WHERE m.member_id = l.member_id) AS member_name
+    </sql>
+
+    <sql id="query_conditions">
+        <where>
+            <if test="queryForm.memberId != null">
+                AND l.member_id = #{queryForm.memberId}
+            </if>
+            <if test="queryForm.memberName != null and queryForm.memberName != ''">
+                AND EXISTS (SELECT 1 FROM t_member m
+                            WHERE m.member_id = l.member_id
+                              AND m.member_name LIKE CONCAT('%', #{queryForm.memberName}, '%'))
+            </if>
+            <if test="queryForm.changeType != null and queryForm.changeType != ''">
+                AND l.change_type = #{queryForm.changeType}
+            </if>
+            <if test="queryForm.operator != null and queryForm.operator != ''">
+                AND l.operator = #{queryForm.operator}
+            </if>
+            <if test="queryForm.createTimeBegin != null">
+                AND l.create_time &gt;= #{queryForm.createTimeBegin}
+            </if>
+            <!--
+              🔴 结束日期要用「< 次日零点」，不能用「<= 当天」。
+              createTimeEnd 是 LocalDate，绑进 datetime 列是当天 00:00:00 ——
+              「查今天」写成 <= 的话结果恒为 0，而且不报错。
+            -->
+            <if test="queryForm.createTimeEnd != null">
+                AND l.create_time &lt; DATE_ADD(#{queryForm.createTimeEnd}, INTERVAL 1 DAY)
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryPage" resultMap="MemberGradeLogDTO">
+        SELECT
+        <include refid="base_columns"/>,
+        <include refid="member_columns"/>
+        FROM t_member_grade_log l
+        <include refid="query_conditions"/>
+        ORDER BY l.id DESC
+    </select>
+
+</mapper>

@@ -3,6 +3,7 @@ package solvela.member.runtime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import solvela.member.Member;
+import solvela.member.grade.service.MemberGrowthService;
 import solvela.member.manager.MemberManager;
 import solvela.exception.BusinessException;
 import solvela.scriptengine.annotation.ScriptFunction;
@@ -59,6 +60,17 @@ public class MemberScriptFunctions implements ScriptFunctionHandler {
 
     private final MemberManager memberManager;
 
+    /**
+     * 等级住在 {@code t_member_growth}，不在 {@code t_member} 上 —— 它是派生状态，
+     * 跟着成长值走。所以取一次 {@code member_info()} 是<b>两次主键点查</b>。
+     *
+     * <p>⚠️ 刻意不做成「用到 level 才查」：那会让 {@code member_info()} 返回的 map
+     * <b>时有 level 时没有</b>（取决于同一次执行里谁先被调用），
+     * 而脚本里 {@code m.grade} 读不到字段时是静默的 null —— 运营看到的是
+     * 「这个判据有时灵有时不灵」，那比多一次点查糟得多。
+     */
+    private final MemberGrowthService memberGrowthService;
+
     @Override
     public ScriptDomain domain() {
         return ScriptDomain.MEMBER;
@@ -69,10 +81,47 @@ public class MemberScriptFunctions implements ScriptFunctionHandler {
      */
     @ScriptFunction(name = "info",
             description = "当前会员的资料，返回 map：memberId/memberName/nickname/gender/status/"
-                    + "registerSource/registerTime/registerDays/birthday/inviteId/invited。"
+                    + "registerSource/registerTime/registerDays/birthday/inviteId/invited/grade。"
                     + "一次执行只查一次库，写几遍都行。不含手机号等敏感字段")
     public Map<String, Object> info(EngineContext context) {
         return load(context, "member_info");
+    }
+
+    /**
+     * 当前会员的等级。
+     *
+     * <p>等价于 {@code member_info().level}，单独给一个是因为「等级专享」是
+     * 写脚本时最常用的一个判据，而 {@code member_info().level} 要多写一层。
+     */
+    @ScriptFunction(name = "grade",
+            description = "当前会员的等级（0 起，数字越大越高）。等价于 member_info().grade")
+    public Long grade(EngineContext context) {
+        return (Long) load(context, "member_grade").get("grade");
+    }
+
+    /**
+     * 等级是否达到某一档。
+     *
+     * <p>这是<b>会员等级的第一版权益</b>在脚本侧的入口：专享奖池、专享活动都靠它。
+     * <pre>
+     *   if (member_gradeAtLeast(3)) {
+     *       return draw_executeDrawByScript('POOL_PLATINUM');
+     *   }
+     * </pre>
+     *
+     * <p>🔴 门槛由脚本传，与 {@code member_isNewMember(days)} 同一个取向：
+     * 「几级算高等级」是<b>这个活动</b>的判据，不是会员域的属性 ——
+     * 中秋活动可能给银卡以上，年度大促可能只给白金以上。
+     */
+    @ScriptFunction(name = "gradeAtLeast",
+            description = "会员等级是否达到某一档，如 member_gradeAtLeast(3)。"
+                    + "门槛由脚本给：几级算高等级是活动的判据，不是会员的属性")
+    public Boolean gradeAtLeast(EngineContext context, int grade) {
+        if (grade < 0) {
+            throw new BusinessException("member_gradeAtLeast 的等级是 " + grade
+                    + "。等级从 0 起，这样写谁都满足，多半是参数写错了");
+        }
+        return (Long) load(context, "member_gradeAtLeast").get("grade") >= grade;
     }
 
     @ScriptFunction(name = "registerDays",
@@ -115,6 +164,7 @@ public class MemberScriptFunctions implements ScriptFunctionHandler {
                     + "。会员号来自系统上下文，查不到属于数据异常");
         }
         Map<String, Object> info = project(member);
+        info.put("grade", gradeOf(memberId));
         context.bindInternal(CACHE_KEY, info);
         return info;
     }
@@ -150,6 +200,18 @@ public class MemberScriptFunctions implements ScriptFunctionHandler {
      */
     private long daysSince(LocalDateTime registerTime) {
         return registerTime == null ? 0L : ChronoUnit.DAYS.between(registerTime.toLocalDate(), LocalDate.now());
+    }
+
+    /**
+     * 会员等级。<b>统一成 long</b>，因为脚本里的数字字面量是 long ——
+     * QLExpress 下 {@code m.grade >= 3} 两边类型不一致时的行为不值得赌。
+     *
+     * <p>查不到成长值行的会员是 0 级（他确实还没攒过任何成长值），
+     * 这一步由 {@code MemberGrowthService.currentGrade} 负责，不在这里猜。
+     */
+    private long gradeOf(Long memberId) {
+        Integer level = memberGrowthService.currentGrade(memberId);
+        return level == null ? 0L : level.longValue();
     }
 
     private boolean isBirthdayToday(LocalDate birthday) {

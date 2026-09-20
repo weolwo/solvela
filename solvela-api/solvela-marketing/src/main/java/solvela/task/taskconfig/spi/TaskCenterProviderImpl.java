@@ -1,12 +1,14 @@
 package solvela.task.taskconfig.spi;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import solvela.activity.spi.TaskCenterProvider;
 import solvela.enums.ActivityTypeEnum;
 import solvela.enums.TaskConfigStatusEnum;
 import solvela.marketing.api.TaskCenterItem;
 import solvela.marketing.api.TaskStageView;
+import solvela.member.grade.service.MemberGrowthService;
 import solvela.prize.prizeconfig.service.PrizeCatalog;
 import solvela.prize.PrizeConfig;
 import solvela.task.TaskConfig;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
  * 任务中心的价值恰恰是「告诉用户还有什么可做」。只回有进度记录的任务，
  * 用户第一次进来会看到一个空页面。
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TaskCenterProviderImpl implements TaskCenterProvider {
@@ -49,6 +52,14 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
     private final TaskPrizeMappingManager taskPrizeMappingManager;
     private final PrizeCatalog prizeCatalog;
 
+    /**
+     * 只为「等级 ≥ N」的任务该不该展示而存在，且<b>按需调用</b>。
+     *
+     * <p>⚠️ 与 {@code TaskEventService} 一样：营销域只是<b>问</b>会员域要一个结论，
+     * 不自己算等级 —— 「多少成长值算几级」是会员域的规则。
+     */
+    private final MemberGrowthService memberGrowthService;
+
     @Override
     public ActivityTypeEnum supportType() {
         return ActivityTypeEnum.TASK;
@@ -56,7 +67,7 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
 
     @Override
     public List<TaskCenterItem> listTasks(String activityCode, Long memberId) {
-        List<TaskConfig> tasks = queryVisibleTasks(activityCode);
+        List<TaskConfig> tasks = hideGradeLocked(queryVisibleTasks(activityCode), memberId);
         if (tasks.isEmpty()) {
             return List.of();
         }
@@ -101,6 +112,62 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
                 .and(w -> w.isNull(TaskConfig::getStartTime).or().le(TaskConfig::getStartTime, now))
                 .and(w -> w.isNull(TaskConfig::getEndTime).or().ge(TaskConfig::getEndTime, now))
                 .list();
+    }
+
+    /**
+     * 等级不够的「专享任务」不展示。
+     *
+     * <h3>🔴 不过滤的话，「专享」这两个字在用户那边是假的</h3>
+     * 人群过滤只作用在<b>事件推进</b>上：等级不够的人照样看得见这条任务，
+     * 点进去做完动作，进度纹丝不动 —— 页面上没有任何解释，
+     * 因为被丢弃的原因只写在 {@code t_task_record_flow} 里，那是给运营看的。
+     * 与 {@code queryVisibleTasks} 里「没开始和已结束的任务不展示」是同一条理由：
+     * 显示出来只会让他点一个做不了的东西。
+     *
+     * <h3>⚠️ 只能过滤等级人群，NEW_MEMBER / OLD_MEMBER 过滤不了</h3>
+     * 「几天算新人」是<b>上报方</b>的判据（{@code TaskEventContext.isNewMember} 由上游告知），
+     * 展示这条路上没有那个信息，猜一个出来会和运行态的判定对不上 ——
+     * 那比不过滤更糟。等级不一样：它是会员域的事实，这里问得到。
+     *
+     * <p>⚠️ 未登录（{@code memberId == null}）时一并隐藏：拿不到等级就等于不达标，
+     * 这是宽严之中该选严的一侧 —— 让游客看见一个登录后依然做不了的任务没有意义。
+     *
+     * <p>💡 更强的做法是<b>显示成「银卡可参与」的锁定态</b>：那才是等级体系要的抓手
+     * （看得见够不着，才有升级的理由）。但那要 C 端加一种任务卡片形态，
+     * 与等级页一起做更合适，见方案 §8 阶段 4。
+     */
+    private List<TaskConfig> hideGradeLocked(List<TaskConfig> tasks, Long memberId) {
+        boolean anyLevelGated = tasks.stream()
+                .anyMatch(task -> TaskConst.gradeThresholdOf(task.getTargetAudience()) != null);
+        if (!anyLevelGated) {
+            // 绝大多数活动一条等级任务都没有，不为它们多打一次库
+            return tasks;
+        }
+        Integer level = currentGradeQuietly(memberId);
+        return tasks.stream()
+                .filter(task -> {
+                    Integer required = TaskConst.gradeThresholdOf(task.getTargetAudience());
+                    return required == null || (level != null && level >= required);
+                })
+                .toList();
+    }
+
+    /**
+     * 取等级；取不到返回 {@code null}（= 按不达标处理）。
+     *
+     * <p>等级查询挂掉不该让整个任务中心打不开 —— 那会把一个「某几条任务看不见」的问题
+     * 放大成「整页空白」。
+     */
+    private Integer currentGradeQuietly(Long memberId) {
+        if (memberId == null) {
+            return null;
+        }
+        try {
+            return memberGrowthService.currentGrade(memberId);
+        } catch (RuntimeException e) {
+            log.error("[任务中心] 取会员等级失败，等级专享任务本次不展示。memberId={}", memberId, e);
+            return null;
+        }
     }
 
     /**
