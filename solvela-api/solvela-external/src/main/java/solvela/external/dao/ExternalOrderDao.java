@@ -102,6 +102,29 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
             """)
     List<ExternalOrder> selectExpiredUnpaid(@Param("now") LocalDateTime now, @Param("limit") int limit);
 
+    /**
+     * 窗口内<b>充值成功</b>的单，供打点反查补推用（{@code RechargeAuditProvider}）。
+     *
+     * <h3>🔴 判据必须是 status=30，和打点那一刻一致</h3>
+     * 打点发生在 {@code markSuccess} 之后，不是 {@code markPaid} 之后 ——
+     * 收了钱不等于充值成功，运营商那一步还可能失败(60)，而失败的单是要退的。
+     * 这里放宽到「付过款」会给一批充值失败的用户补出任务进度。
+     *
+     * <p>按 {@code finish_time} 筛：那是 markSuccess 写进去的那一刻，
+     * 也正是打点的 {@code occurredAt}。
+     */
+    @Select("""
+            SELECT * FROM t_external_order
+             WHERE status = 30
+               AND finish_time IS NOT NULL
+               AND finish_time >= #{from} AND finish_time <= #{to}
+             ORDER BY finish_time
+             LIMIT #{limit}
+            """)
+    List<ExternalOrder> selectSucceededBetween(@Param("from") LocalDateTime from,
+                                               @Param("to") LocalDateTime to,
+                                               @Param("limit") int limit);
+
     /** 我的外部单，新的在前 */
     @Select("""
             SELECT * FROM t_external_order

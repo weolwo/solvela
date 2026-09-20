@@ -7,7 +7,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.SystemEnvironment;
+import solvela.base.event.BizEventPublisher;
 import solvela.enums.ExternalOrderStatusEnum;
+import solvela.event.BizActionCodes;
+import solvela.event.BizActionEvent;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.external.ExternalOrder;
 import solvela.external.ExternalSceneProperties;
@@ -83,6 +86,14 @@ public class ExternalRechargeService {
     private final NotificationService notificationService;
     private final ExternalSceneProperties sceneProperties;
     private final SystemEnvironment systemEnvironment;
+    /**
+     * 业务动作广播。本域只说「有人在这里消费成功了」。
+     *
+     * <p>🔴 <b>不是</b>任务引擎。本模块排在 {@code solvela-marketing} 之后，
+     * pom 里加一行就能直连它 —— 那条缝由 {@code ExternalPlayBoundaryTest} 守着，
+     * 那个测试的失败信息里写着该怎么打点。
+     */
+    private final BizEventPublisher bizEventPublisher;
 
     /**
      * 🔴 生产环境不许用假充值，<b>启动即失败</b>。
@@ -262,6 +273,29 @@ public class ExternalRechargeService {
         externalOrderDao.markSuccess(orderNo, externalRefNo);
         log.warn("【充话费-FAKE】{} 标记为充值成功，外部流水 {} —— <话费不会到账>",
                 orderNo, externalRefNo);
+
+        /*
+         * 打点：这一笔外部消费成功了。
+         *
+         * 🔴 位置在 markSuccess 【之后】而不是 markPaid 之后，这是有意的：
+         *    markPaid 只说明钱收了，运营商那一步还可能失败（真接了运营商之后
+         *    那是一条异步回来的结果）。在支付点打点的话，一笔充值失败的单
+         *    也会给用户涨任务进度 —— 而失败的单是要退的。
+         *
+         * 🔴 仍然在本方法的事务内发布：AFTER_COMMIT 才投递，事务回滚时不会有事件。
+         *
+         * 幂等键用外部消费单号：重推安全，这是反查对账敢直接补推的前提。
+         */
+        bizEventPublisher.publish(new BizActionEvent(
+                BizActionCodes.RECHARGE_PAID, order.getMemberId(), orderNo,
+                null, LocalDateTime.now(),
+                java.util.Map.of(
+                        "orderNo", orderNo,
+                        "sceneCode", order.getSceneCode(),
+                        // 实付（抵扣之后）。「累计充值满 100 元」这类任务按它计量，
+                        // 由 t_task_event.metric_source 去挑，本类不设 amount
+                        "payAmount", order.getPayAmount() == null ? BigDecimal.ZERO : order.getPayAmount(),
+                        "originalAmount", order.getOriginalAmount() == null ? BigDecimal.ZERO : order.getOriginalAmount())));
 
         notifyResult(order, true);
         return RechargeResult.ofAccepted(orderNo, order.getPayAmount());

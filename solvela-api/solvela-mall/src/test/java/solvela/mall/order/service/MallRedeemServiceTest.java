@@ -15,6 +15,7 @@ import solvela.enums.EnableStatusEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
+import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCommodity;
 import solvela.mall.MallOrder;
@@ -125,6 +126,16 @@ class MallRedeemServiceTest {
     private CouponWriteOffApi couponWriteOffApi;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    /**
+     * 打点：这一单付掉了。
+     *
+     * <p>🔴 <b>纯积分单必须发、待支付的混合单必须不发</b> —— 见
+     * {@code 纯积分单落单即打点} / {@code 待支付的混合单不打点} 两个用例。
+     * 那是 ORDER_PAID 两个产生点里最容易漏的一半：纯积分单不经过
+     * {@code MallPayService}，落单那一刻资产就已经结清了。
+     */
+    @Mock
+    private MallOrderActionPublisher orderActionPublisher;
 
     private MallRedeemService service;
 
@@ -137,7 +148,8 @@ class MallRedeemServiceTest {
     void setUp() {
         service = spy(new MallRedeemService(mallCommodityManager, mallSkuManager, mallSkuDao,
                 mallExchangeLimitDao, mallOrderManager, mallAddressService, memberService,
-                assetDebitApi, couponQueryApi, couponWriteOffApi, eventPublisher));
+                assetDebitApi, couponQueryApi, couponWriteOffApi, eventPublisher,
+                orderActionPublisher));
         // 没有活动事务，真调会抛 NoTransactionException；spy 成空实现后它变成一次可断言的调用
         doNothing().when(service).markRollbackOnly();
 
@@ -189,6 +201,27 @@ class MallRedeemServiceTest {
     }
 
     @Test
+    @DisplayName("🔴 纯积分单落单即打点：它不经过支付，ORDER_PAID 只能在这里产生")
+    void 纯积分单落单即打点() {
+        service.redeem(cmd(1));
+
+        /*
+         * 为什么这条断言值得单独存在：
+         *
+         * ORDER_PAID 有【两个】产生点 —— 混合单在 MallPayService.pay，
+         * 纯积分单在这里。只埋前者是一个非常容易犯、而且【完全不报错】的错误：
+         * 纯积分是这个平台的主要兑换方式，漏掉它的表现是
+         * 「订单类任务基本不动」，只会以客诉的形式出现。
+         *
+         * 优惠券方案 §11.8 记着，阶段 4 少的正是同一个岔路口的同一半。
+         */
+        // ⚠️ savedOrder() 内部自己有一次 verify，不能写成 verify(x).f(savedOrder())：
+        //    verify 的参数里再套一个 verify，Mockito 会报 UnfinishedVerificationException
+        MallOrder order = savedOrder();
+        verify(orderActionPublisher).publishOrderPaid(order);
+    }
+
+    @Test
     @DisplayName("🔴 顺序不能换：先占库存、再占限兑、最后才扣钱")
     void 先占资源最后扣钱() {
         commodity.setLimitCount(3);
@@ -237,6 +270,18 @@ class MallRedeemServiceTest {
         // 钱还没收就发货等于白送。这条路要等支付回调把它推到 10
         verify(eventPublisher, never()).publishEvent(any(MallOrderPendingEvent.class));
         assertEquals(0, new BigDecimal("19.80").compareTo(order.getPayCash()), "现金部分要乘数量");
+
+        /*
+         * 🔴 也不能打点：钱还没收，这一单还不算「付掉了」。
+         *
+         * 这里发了的话，用户只要把商品加进购物车式地下个单、然后【不付钱】，
+         * 就能刷满「下单 N 次」的任务 —— 而超时 job 随后会把单取消，
+         * 进度却已经涨上去了，且不会退。
+         *
+         * 判据和履约刻意是同一个（status == PENDING），所以两条断言并排放：
+         * 将来有谁改了那个判据，会同时看到两个后果。
+         */
+        verify(orderActionPublisher, never()).publishOrderPaid(any());
     }
 
     @Test

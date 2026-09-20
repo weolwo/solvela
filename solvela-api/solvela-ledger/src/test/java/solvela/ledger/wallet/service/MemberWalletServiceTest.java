@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +70,15 @@ class MemberWalletServiceTest {
     private MemberAssetTransactionService memberAssetTransactionService;
     @Mock
     private MemberService memberService;
+    /**
+     * 「积分入账了」的广播。
+     *
+     * <p>🔴 <b>本类里每一条写 INCOME 流水的路径都必须调它</b> ——
+     * 漏掉一条的表现是「有些人的成长值莫名其妙比别人少」，不报错也不打日志。
+     * 下面那条 {@code 两条入账路径都要打点} 就是钉这件事的。
+     */
+    @Mock
+    private ScoreIncomeActionPublisher scoreIncomeActionPublisher;
 
     @InjectMocks
     private MemberWalletService service;
@@ -231,6 +241,38 @@ class MemberWalletServiceTest {
         MemberAssetTransaction txn = capturedTransaction();
         assertEquals(TransactionTypeEnum.INCOME, txn.getTransactionType());
         assertEquals(0, new BigDecimal("600").compareTo(txn.getBalanceAfter()));
+    }
+
+    @Test
+    @DisplayName("🔴 两条入账路径都要打点 —— 漏一条就是「有些人的成长值比别人少」")
+    void 两条入账路径都要打点() {
+        when(memberWalletDao.addBalanceWithVersion(eq(WALLET_ID), eq(AMOUNT), eq(3))).thenReturn(1);
+
+        /*
+         * 本类写 INCOME 流水的有两条路，而它们的调用方完全不同：
+         *   · executeWalletCharge —— 发奖入账（WalletChargeHandler）
+         *   · executeWalletRefund —— 【通用入账】：商城发积分走它，真正的退回也走它
+         *
+         * 只埋一条的表现是「有些人的成长值莫名其妙比别人少」——
+         * 不报错、不打日志，只会在某天被用户问出来。
+         * 这正是 ORDER_PAID 漏掉纯积分单的同一个形状。
+         */
+        service.executeWalletCharge(proposalOf(AMOUNT), PrizeTypeEnum.SCORE);
+        service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "MALL", "REF-1", "商城发积分");
+
+        verify(scoreIncomeActionPublisher, times(2))
+                .publishIfScoreIncome(any(MemberAssetTransaction.class));
+    }
+
+    @Test
+    @DisplayName("🔴 扣减不打点 —— 花积分不该影响等级，那正是成长值独立于余额的理由")
+    void 扣减不打点() {
+        when(memberWalletDao.deductBalanceWithVersion(eq(WALLET_ID), eq(AMOUNT), eq(3))).thenReturn(1);
+
+        service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "MALL", "ORD-1", "商城兑换");
+
+        verify(scoreIncomeActionPublisher, never())
+                .publishIfScoreIncome(any(MemberAssetTransaction.class));
     }
 
     private ProposalRecord proposalOf(BigDecimal amount) {

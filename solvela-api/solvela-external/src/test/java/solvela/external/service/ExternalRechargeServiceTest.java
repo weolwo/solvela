@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import solvela.base.event.BizEventPublisher;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.enums.ExternalOrderStatusEnum;
@@ -75,6 +76,12 @@ class ExternalRechargeServiceTest {
     private MemberService memberService;
     @Mock
     private NotificationService notificationService;
+    /**
+     * 打点用的广播口。本测试<b>不断言它</b> —— 充值成功要不要推任务进度，
+     * 是任务域的判断，不该由充值的单测来钉。这里只是让构造器能装上。
+     */
+    @Mock
+    private BizEventPublisher bizEventPublisher;
 
     private ExternalRechargeService service;
 
@@ -336,6 +343,7 @@ class ExternalRechargeServiceTest {
         properties.setTransport(transport);
         return new ExternalRechargeService(externalOrderDao, couponQueryApi, couponWriteOffApi,
                 memberService, notificationService, properties,
-                new SystemEnvironment(env == SystemEnvironmentEnum.PROD, "solvela", env));
+                new SystemEnvironment(env == SystemEnvironmentEnum.PROD, "solvela", env),
+                bizEventPublisher);
     }
 }

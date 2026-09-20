@@ -15,6 +15,7 @@ import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
 import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.exchangelimit.dao.MallExchangeLimitDao;
+import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.order.event.MallOrderPendingEvent;
 import solvela.mall.order.manager.MallOrderManager;
 import solvela.mall.sku.dao.MallSkuDao;
@@ -109,6 +110,12 @@ public class MallRedeemService {
     private final CouponQueryApi couponQueryApi;
     private final CouponWriteOffApi couponWriteOffApi;
     private final ApplicationEventPublisher eventPublisher;
+    /**
+     * 「这一单付掉了」的广播。纯积分单在<b>落单那一刻</b>就已经结清，
+     * 所以它的付款动作产生在这里，而不是在 {@code MallPayService} ——
+     * 那是 ORDER_PAID 的两个产生点里最容易被漏掉的一个。
+     */
+    private final MallOrderActionPublisher orderActionPublisher;
 
     /**
      * 兑换。
@@ -440,6 +447,19 @@ public class MallRedeemService {
     private void publishFulfillment(MallOrder order) {
         if (MallOrderStatusEnum.PENDING == order.getStatus()) {
             eventPublisher.publishEvent(new MallOrderPendingEvent(order.getOrderNo()));
+            /*
+             * 打点：这一单付掉了。
+             *
+             * 🔴 判据和履约<b>刻意是同一个</b>（status == PENDING），不是巧合：
+             *    「资产已经结清」这件事同时决定了「可以发货」和「算不算消费」。
+             *    payType=2 的混合单此刻落在 0-待支付，钱还没收 —— 它的 ORDER_PAID
+             *    由 MallPayService 在支付确认时发，不在这里。
+             *
+             * 两个 if 写在一起而不是分开两处，是为了让将来改判据的人
+             * 一次看到两个后果。分开写的话，改了履约那一半、忘了这一半，
+             * 表现是「发货了但任务进度不涨」，而且不报错。
+             */
+            orderActionPublisher.publishOrderPaid(order);
         }
     }
 

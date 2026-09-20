@@ -13,6 +13,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.enums.MallOrderStatusEnum;
+import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.MallOrder;
 import solvela.mall.order.dao.MallOrderDao;
 import solvela.mall.order.event.MallOrderPendingEvent;
@@ -65,6 +66,12 @@ class MallPayServiceTest {
     private CouponWriteOffApi couponWriteOffApi;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    /**
+     * 打点：这一单付掉了。混合单的 ORDER_PAID 产生在这里 ——
+     * 另一半（纯积分单）在 {@code MallRedeemServiceTest} 里钉。
+     */
+    @Mock
+    private MallOrderActionPublisher orderActionPublisher;
 
     private MallPayService service;
 
@@ -232,7 +239,8 @@ class MallPayServiceTest {
         MallPayProperties properties = new MallPayProperties();
         properties.setTransport(transport);
         return new MallPayService(mallOrderDao, mallSkuDao, couponWriteOffApi, eventPublisher,
-                properties, new SystemEnvironment(env == SystemEnvironmentEnum.PROD, "solvela", env));
+                properties, new SystemEnvironment(env == SystemEnvironmentEnum.PROD, "solvela", env),
+                orderActionPublisher);
     }
 
     private static MallOrder unpaidOrder() {

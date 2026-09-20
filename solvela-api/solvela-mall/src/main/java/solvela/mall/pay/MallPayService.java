@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.SystemEnvironment;
 import solvela.mall.MallOrder;
 import solvela.mall.order.dao.MallOrderDao;
+import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.order.event.MallOrderPendingEvent;
 import solvela.mall.sku.dao.MallSkuDao;
 import solvela.marketing.api.MallPayReason;
@@ -54,6 +55,16 @@ public class MallPayService {
     private final ApplicationEventPublisher eventPublisher;
     private final MallPayProperties payProperties;
     private final SystemEnvironment systemEnvironment;
+    /**
+     * 「这一单付掉了」的广播。本类只负责说这件事，不知道谁在听。
+     *
+     * <p>🔴 <b>不是</b>任务引擎：{@code solvela-mall} 的 pom 里刻意没有
+     * {@code solvela-marketing}，{@code PlayBoundaryTest} 扫字节码常量池守着这条缝。
+     *
+     * <p>翻译收在 {@link MallOrderActionPublisher} 里，和纯积分单那条路<b>共用同一段</b> ——
+     * 理由见那个类的注释（两条路径，漏一条就是「纯积分兑换不算进度」）。
+     */
+    private final MallOrderActionPublisher orderActionPublisher;
 
     /**
      * 🔴 生产环境不许用假支付，<b>启动即失败</b>。
@@ -145,6 +156,16 @@ public class MallPayService {
          * 事务回滚时事件根本不会投递，「单没付成但货已经发出去」在这个形状下不可能发生。
          */
         eventPublisher.publishEvent(new MallOrderPendingEvent(orderNo));
+
+        /*
+         * 打点：这一单付掉了。和上面那行一样是事务内发布、AFTER_COMMIT 才投递 ——
+         * 支付回滚时任务进度不会涨。
+         *
+         * 🔴 这是 ORDER_PAID 的【两个产生点之一】，另一个在 MallRedeemService：
+         *    纯积分单不经过本方法，落单那一刻就结清了。只埋这里等于
+         *    「纯积分兑换不算任务进度」，而那是这个平台的主要兑换方式。
+         */
+        orderActionPublisher.publishOrderPaid(order);
 
         log.warn("【商城假支付】{} 已标记为已支付（应付现金 {}）。"
                         + "🔴 这是假支付，没有任何真钱进账", orderNo, order.getPayCash());

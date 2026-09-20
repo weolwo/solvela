@@ -59,6 +59,14 @@ public class MemberWalletService {
      * 不需要名字；是流水（单据类）要把「当时那个账号」记下来。
      */
     private final MemberService memberService;
+    /**
+     * 「积分入账了」的广播。
+     *
+     * <p>🔴 <b>本类里每一个写 INCOME 流水的地方都要调它一次</b> ——
+     * 漏掉一处的表现是「有些人的成长值莫名其妙比别人少」，不报错也不打日志。
+     * 收在一个类里而不是各写一遍，理由见 {@link ScoreIncomeActionPublisher} 的类注释。
+     */
+    private final ScoreIncomeActionPublisher scoreIncomeActionPublisher;
 
     /**
      * 某个会员的全部钱包。给 C 端「我的资产」用（{@code AssetApi.listAssets}）。
@@ -181,6 +189,8 @@ public class MemberWalletService {
 
         MemberAssetTransaction txn = buildTransaction(proposal, assetType, amount, balanceAfter);
         memberAssetTransactionDao.insert(txn);
+        // 打点：积分入账。在事务内发，回滚时不会投递 —— 不存在「积分没到账但成长值涨了」
+        scoreIncomeActionPublisher.publishIfScoreIncome(txn);
     }
 
     /**
@@ -218,6 +228,7 @@ public class MemberWalletService {
         txn.setBizRefId(bizRefId);
         txn.setRemark(remark);
         memberAssetTransactionDao.insert(txn);
+
     }
 
     /**
@@ -253,6 +264,17 @@ public class MemberWalletService {
         txn.setBizRefId(bizRefId);
         txn.setRemark(remark);
         memberAssetTransactionDao.insert(txn);
+        /*
+         * 打点：积分入账。
+         *
+         * 🔴 这个方法名叫「退回」，但它实际是【通用入账】—— 商城发积分走的就是它
+         *    （见 AssetGrantApiService.grantWallet 的注释）。所以这里【必须】也打点，
+         *    否则商城发出去的积分不算成长值。
+         *
+         *    「真正的退回不算成长值」这条判据在【会员域】按 bizType 做，不在这里 ——
+         *    按方法名判会把商城那一半一起漏掉。
+         */
+        scoreIncomeActionPublisher.publishIfScoreIncome(txn);
     }
 
     private MemberAssetTransaction buildTransaction(ProposalRecord proposal, PrizeTypeEnum assetType, BigDecimal amount, BigDecimal balanceAfter) {
