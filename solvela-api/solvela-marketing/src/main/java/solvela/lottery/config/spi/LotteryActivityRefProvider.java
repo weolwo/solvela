@@ -67,7 +67,8 @@ public class LotteryActivityRefProvider implements ActivityRefProvider {
     }
 
     /**
-     * 彩票的「配置完备」= 活动下至少有一个玩法，<b>且每个玩法都能上线</b>。
+     * 彩票的「配置完备」= 活动下至少有一个玩法、<b>每个玩法都能上线</b>、
+     * <b>且至少有一个玩法真的已上线</b>。
      *
      * ⚠️ 这里必须用上线校验，不能只看 t_lottery_config 有没有记录：
      * 玩法完全可以在<b>没有配任何奖级规则</b>的情况下保存成功
@@ -89,6 +90,28 @@ public class LotteryActivityRefProvider implements ActivityRefProvider {
             if (notReady != null) {
                 return "玩法「" + config.getLotteryName() + "」" + notReady;
             }
+        }
+
+        /*
+         * 🔴 「能上线」不等于「已上线」，而 C 端只认后者。
+         *
+         * LotteryClientService.resolveByActivity 取的是<b>第一个 ONLINE 的玩法</b>，
+         * 一个都没上线时它返回 null，活动页就只剩一句「暂时没有可参与的彩票玩法」——
+         * 而活动本身在列表里是上线状态，运营完全不会想到去查玩法那一层。
+         * 2026-09-21「国庆彩票狂欢」就是这个样子：奖级配全了 4 条、
+         * checkOnlineReady 全绿，唯独玩法自己还躺在下线状态。
+         *
+         * ⚠️ 判据是「至少一个上线」，不是「全部上线」。
+         * 一个活动下挂多个玩法是正常的（在备的、退役的都可能留着下线状态），
+         * 要求全部上线会把「618仲夏夜幸运号」那种一上线一下线的正常活动也拦掉。
+         *
+         * ⚠️ 这条不会死锁：LotteryConfigService.online() 不校验活动状态，
+         * 运营可以先把玩法上线，再上线活动。
+         */
+        boolean anyOnline = configList.stream()
+                .anyMatch(c -> c.getStatus() == LotteryConfigStatusEnum.ONLINE);
+        if (!anyOnline) {
+            return "的彩票玩法都还没上线（用户点进去只会看到一页空态）";
         }
         return null;
     }
