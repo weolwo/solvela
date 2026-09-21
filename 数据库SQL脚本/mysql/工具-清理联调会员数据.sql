@@ -146,6 +146,15 @@ DROP TEMPORARY TABLE IF EXISTS tmp_clean_member;
 --    手工联调时随手编一个号（比如 9900000001）去调接口，就会造出这种行 ——
 --    删无可删，因为从来就没有「那个会员」可以删。
 --
+--    🔴 它还有第二个成因，比编号更容易中招：<b>token 比会员行活得久</b>。
+--    删掉 t_member 不会让他的登录态失效 —— 只要那个 token 还在浏览器里，
+--    之后<b>任何一次点击</b>（看一眼页面、点个公告确认）都会拿着这个
+--    已经不存在的会员号往库里写，而且每一行都是这个脚本再也选不中的。
+--    2026-09-21 就是这么又造出两行 t_announcement_ack / t_member_announcement_cursor 的。
+--
+--    ⚠️ 所以清完人之后，顺手把他的会话也清掉，别再用那个页面：
+--      redis-cli -n 1 --scan --pattern '*:{memberId}' | xargs redis-cli -n 1 del
+--
 --    ⚠️ 别编号，用注册接口真造一个。真要扫这种存量，按表点名删：
 --      SELECT 't_member_notification' t, COUNT(*) FROM t_member_notification
 --       WHERE member_id NOT IN (SELECT member_id FROM t_member);
