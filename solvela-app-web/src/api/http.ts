@@ -124,10 +124,30 @@ http.interceptors.response.use(
   },
 )
 
-/** 发请求并直接拿到业务数据（没有信封这一层） */
+/**
+ * 发请求并直接拿到业务数据（没有信封这一层）。
+ *
+ * <h3>🔴 空响应体要归一成 null</h3>
+ * 后端返回 {@code null} 时，HTTP 上是 <b>200 + Content-Length: 0 + 没有 Content-Type</b>；
+ * axios 拿不到可解析的东西，于是 {@code response.data} 是<b>空字符串</b>而不是 null。
+ *
+ * <p>后果很隐蔽：接口签名写着 {@code Promise<T | null>}，TypeScript 也认，
+ * 页面照着写 {@code data === null} 的判空 —— 而那个判据<b>永远不成立</b>。
+ * 于是代码走进「有数据」分支，对着一个空字符串读属性，
+ * 整个组件在 render 里抛 TypeError。
+ *
+ * <p>它不会在联调里被发现，因为只有<b>后端真的返回 null</b> 那一次才触发；
+ * 而那通常是「这个活动还没配玩法」这类正常的运营空态。
+ * 彩票活动页就是这么白屏的（2026-09-21）：骨架屏卡在那儿不动，
+ * 因为 Vue 在 patch 中途抛了，DOM 根本没走出加载态。
+ *
+ * <p>⚠️ 这里归一的是「<b>压根没有响应体</b>」。真要返回一个空字符串当数据的接口
+ * 不在本项目里 —— 那种也应该返回 {@code {"value": ""}} 而不是裸字符串。
+ * 没有响应体的接口走 {@link requestVoid}。
+ */
 export async function request<T>(config: AxiosRequestConfig): Promise<T> {
   const response = await http.request<T>(config)
-  return response.data
+  return (response.data === '' ? null : response.data) as T
 }
 
 /** 用于 204 之类没有响应体的接口 */

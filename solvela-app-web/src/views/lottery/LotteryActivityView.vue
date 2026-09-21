@@ -118,12 +118,18 @@ const placeholders = computed(() => {
         标题就用玩法名（还没拿到时先空着）—— Section 的 title 是必填的，
         而这一块本来就该有个头。拿「本期」当标题会和下面卡片里的玩法名打架。
       -->
+      <!--
+        ⚠️ 空态判据是 === null，这要求传输层把「空响应体」归一成 null ——
+        axios 拿到的是空字符串，见 api/http.ts 里 request 的注释。
+        2026-09-21 彩票活动页白屏就是这条判据没成立：走进了「有数据」分支，
+        对着空字符串读属性，在 render 里抛 TypeError。
+      -->
       <Section
         :title="board.data.value?.lotteryName ?? ''"
         :loading="board.loading.value"
         :error="board.error.value"
         :empty="board.data.value === null"
-        empty-text="这个活动还没配置彩票玩法"
+        empty-text="这个活动暂时没有可参与的彩票玩法"
         @retry="board.reload"
       >
         <template v-if="board.data.value !== null">
