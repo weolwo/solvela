@@ -57,7 +57,7 @@ public class CouponAssetHandler implements IAssetHandler {
              *    「重发一个提案就多一张券」这件事，不报错、不告警、没人发现。
              *
              *    补上的是 uk_source (source_type, source_biz_id)，脚本
-             *    「优惠券-发券防重唯一键.sql」。真库上的守卫在
+             *    {@code t_member_coupon.uk_source}（见 schema-baseline.sql）。真库上的守卫在
              *    CouponSourceIdempotencyLiveTest —— 那条测的不是「接住之后处理得对」
              *    （那个 mock 就能演），而是【异常真的会被抛出来】。
              */

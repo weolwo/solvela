@@ -68,7 +68,7 @@ public final class BizActionCodes {
      * <p>生产者：{@code ExternalRechargeService.payAndExecute}
      *
      * <p>⚠️ 这一条<b>不在</b> {@code data-baseline.sql} 的种子数据里，
-     * 由 {@code 任务打点-事件注册.sql} 补。没执行那个脚本时，
+     * 由 {@code data-baseline.sql} 的 {@code t_task_event} 种子提供。库里缺这一行时，
      * 打点会被防腐层<b>安静地忽略</b>（注册表查不到就返回），不会报错也不会刷日志。
      */
     public static final String RECHARGE_PAID = "RECHARGE_PAID";

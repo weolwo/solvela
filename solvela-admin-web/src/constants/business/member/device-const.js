@@ -1,7 +1,7 @@
 /**
  * 设备模块 枚举与常量。
  *
- * 取值口径的唯一真源是 DDL 注释（数据库SQL脚本/mysql/设备身份-建表与加列.sql）
+ * 取值口径的唯一真源是 DDL 注释（数据库SQL脚本/mysql/schema-baseline.sql 里的 t_device）
  * 与后端 `DeviceStatusEnum`，改动时三边一起改。
  *
  * @Date  2026-09-10

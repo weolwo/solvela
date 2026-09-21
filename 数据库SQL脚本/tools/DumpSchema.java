@@ -68,7 +68,7 @@ public class DumpSchema {
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config",
             // 2026-09-08 补：此前不在任何组里，每次导出都掉进「未分类」。
-            // 它是优惠配置的分组（见 mysql/优惠配置分组-建表与菜单.sql），跟着 t_promotion_config 走
+            // 它是优惠配置的分组（结构见 schema-baseline.sql 里的 t_promotion_group），跟着 t_promotion_config 走
             "t_promotion_group",
             // 2026-09-15 券使用闭环阶段 1：规则住模板、核销走流水。
             // 与 t_member_coupon 同域，放一起

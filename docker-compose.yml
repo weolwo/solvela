@@ -109,8 +109,10 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 里设置}
-      # 给 initdb 脚本一个默认库上下文：t_menu.sql / task.sql / activity.sql / lottery.sql
-      # 这四个脚本自己不带 USE 语句，没有这行会建到错误的库里去
+      # 给 initdb 脚本一个默认库上下文：两个基线自己不带 USE 语句，
+      # 没有这行会建到错误的库里去
+      # （2026-09-21：initdb 早已只挂 schema-baseline / data-baseline 两个文件，
+      #   此前这里点名的 t_menu.sql 等分域脚本已不在挂载列表里）
       MYSQL_DATABASE: solvela
       TZ: Asia/Shanghai
     command:

@@ -84,7 +84,8 @@ public class PhysicalDelivery {
      * 拿着 {@code source_biz_id} 也查不出人来。
      *
      * <p>存量单这一列是 {@code NULL}（加列之前的单子补不出来，
-     * 见 {@code 实物履约-补奖品名与C端补填.sql} §2），C 端按兜底文案显示。
+     * 那次迁移刻意不回填，见 {@code git log -- 数据库SQL脚本/mysql/实物履约-补奖品名与C端补填.sql}），
+     * C 端按兜底文案显示。
      */
     private String prizeName;
 

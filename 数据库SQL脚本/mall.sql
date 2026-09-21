@@ -48,7 +48,7 @@ SET NAMES utf8mb4;
 --       solvela-member-api）+ AssetGrantApiService（实现在 solvela-ledger）——
 --       同一批表的第二个入口，source_type='MALL'，运营的发货台/物流导入一行不改。
 --     ✅ 2026-09-15 补上了 uk_source (source_type, source_biz_id)，见
---       「优惠券-发券防重唯一键.sql」。此前券表**只有普通索引 idx_source**，
+--       `uk_source`（见 schema-baseline.sql）。此前券表**只有普通索引 idx_source**，
 --       重复发券在库这一层拦不住，幂等全靠商城侧 10→20 那次条件 UPDATE。
 --       ⚠️ 那次条件 UPDATE **仍然要做**：唯一键是最后一道，不是第一道 ——
 --       靠它挡重复意味着每次重复都要先走完一遍发放逻辑再被拒。
