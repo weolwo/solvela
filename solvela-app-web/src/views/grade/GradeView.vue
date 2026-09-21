@@ -1,34 +1,82 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
-import { fetchGrowthLog, fetchMyGrade, type GradeLadderItem } from '@/api/grade'
+import GradeCardDeck from './GradeCardDeck.vue'
+
+import { fetchGrowthLog, fetchMyGrade } from '@/api/grade'
 import { useAsync } from '@/composables/useAsync'
 
 /**
- * 我的会员等级。
+ * 会员中心。
  *
  * <h3>🔴 这一页最重要的不是「我是白金」，是「我快掉了」</h3>
  * 保级缓冲期在此之前对用户完全不可见：等级到期了、系统给了三个月宽限、
  * 这三个月成长值还是双倍的 —— 而他什么都不知道。
  * 一个用户感知不到的挽留机制等于没做，而这套等级体系要换的就是那个挽留。
  *
- * <p>所以缓冲期横幅放在最顶上，并且写清三件事：
- * <b>保的是哪一档、还差多少、什么时候截止</b>。只说「你在保级期」等于没说，
- * 用户不知道要做什么。
+ * <p>所以缓冲期横幅放在最顶上，在卡片之前，并且写清三件事：
+ * <b>保的是哪一档、还差多少、什么时候截止</b>。只说「你在保级期」等于没说。
  *
- * <h3>「在这一档」和「够得着这一档」要分开渲染</h3>
- * 缓冲期内用户<b>在</b>白金，但成长值<b>够不着</b>白金 —— 这正是他要被提醒的状态。
- * 把 `current` 和 `reached` 混成一个高亮，那句话就说不出来了。
+ * <h3>🔴 卡片式改版带进来一个新风险：用户会以为看到的都是自己的</h3>
+ * 滑到钻石卡，下面整块权益就换成钻石的 —— 如果不说，那看起来就像
+ * 「这些我都有」。一个让用户误以为自己有某项权益的页面，
+ * 比一个朴素的列表差得多：他会去用，然后发现用不了。
+ *
+ * <p>所以权益区的标题<b>始终带着档名</b>（「钻石会员的权益」而不是「我的权益」），
+ * 没解锁的那一档还要再说一次还差多少。看自己那一档时才说「你现在享有」。
+ *
+ * <h3>「在这一档」和「够得着这一档」仍然要分开</h3>
+ * 缓冲期内用户<b>在</b>白金，但成长值<b>够不着</b>白金。卡片上是两个独立的标
+ * （当前 / 未解锁），可以同时出现 —— 那正是他要被提醒的状态。
  *
  * <h3>明细一起拉，不做懒加载</h3>
- * `useAsync` 是「创建即加载」的（它的注释写着：三个 ref 加 try-catch 写到第三遍
- * 就会开始不一致）。为了省一次 `LIMIT 20` 的主键范围查询而在页面里手搓一份
- * 异步状态，正是那段注释要避免的事。而且「我这个数怎么来的」本来就是这一页的
- * 半个主题，藏在按钮后面反而更差。
+ * `useAsync` 是「创建即加载」的。为了省一次 `LIMIT 20` 的主键范围查询而在页面里
+ * 手搓一份异步状态，正是它那段注释要避免的事。而且「我这个数怎么来的」
+ * 本来就是这一页的半个主题。
  */
 
 const grade = useAsync(fetchMyGrade)
 const logs = useAsync(() => fetchGrowthLog(20))
+
+/** 用户自己那一档在阶梯里的下标。卡片组首次就停在这里 */
+const currentIndex = computed(() => {
+  const ladder = grade.data.value?.ladder ?? []
+  const hit = ladder.findIndex((i) => i.current)
+  return hit < 0 ? 0 : hit
+})
+
+/*
+ * 正在看第几张。null = 用户还没滑过，跟着 currentIndex 走。
+ *
+ * ⚠️ 不要初始化成 0：数据回来之前就渲染出「普通会员的权益」，
+ * 卡片定位完再闪一下换成用户自己那一档 —— 那一闪看起来像是降级了。
+ */
+const viewIndex = ref<number | null>(null)
+const shownIndex = computed(() => viewIndex.value ?? currentIndex.value)
+
+const shown = computed(() => grade.data.value?.ladder[shownIndex.value] ?? null)
+
+/**
+ * 正在看的这一档<b>是不是他的</b>。
+ *
+ * 🔴 不能只看 `reached`。保级缓冲期里他【在】白金但成长值【够不着】白金 ——
+ * 此刻这些权益他是<b>真的在享有</b>的，压暗成「未解锁」就是骗他，
+ * 而页面同一行还写着「这是你现在享有的权益」，自己跟自己打架。
+ */
+const shownIsMine = computed(() => {
+  const item = shown.value
+  return item !== null && (item.current || item.reached)
+})
+
+/** 正在看的这一档还差多少解锁。已解锁的是 0 */
+const shownGap = computed(() => {
+  const g = grade.data.value
+  const item = shown.value
+  if (g === null || item === null || item.reached) {
+    return 0
+  }
+  return Math.max(0, item.threshold - g.currentValue)
+})
 
 /**
  * 进度条：<b>已达成的最高一档</b> → 下一档 之间走到哪了。
@@ -50,22 +98,16 @@ const progress = computed(() => {
   }
   return Math.min(100, Math.max(0, Math.round(((g.currentValue - base) / span) * 100)))
 })
-
-function ladderClass(item: GradeLadderItem) {
-  return {
-    'ladder__item--current': item.current,
-    'ladder__item--reached': item.reached && !item.current,
-  }
-}
 </script>
 
 <template>
   <div class="page">
-    <NavBar title="我的等级" />
+    <NavBar title="会员中心" />
 
     <div class="page__body">
       <Section
-        title="当前等级"
+        class="hero"
+        title=""
         :loading="grade.loading.value"
         :error="grade.error.value"
         :empty="false"
@@ -74,7 +116,7 @@ function ladderClass(item: GradeLadderItem) {
       >
         <template v-if="grade.data.value !== null">
           <!--
-            🔴 缓冲期横幅：这一页真正的主角。
+            🔴 缓冲期横幅在卡片之前。
             三件事缺一不可 —— 保的是哪一档、还差多少、什么时候截止。
           -->
           <p v-if="grade.data.value.inProtect" class="protect">
@@ -87,61 +129,92 @@ function ladderClass(item: GradeLadderItem) {
             <b>×{{ grade.data.value.boostMultiplier }}</b>
           </p>
 
+          <!--
+            🔴 卡片组要破出页面内边距，贴到屏幕两边 —— 那是这类会员卡的观感来源，
+            左右邻居被屏幕边裁掉，而不是被一条看不见的内边距裁掉。
+            负边距写在这里而不是组件里：组件不该知道调用它的页面留了多少白。
+          -->
+          <div class="deck-bleed">
+            <GradeCardDeck
+              :items="grade.data.value.ladder"
+              :current-value="grade.data.value.currentValue"
+              :initial-index="currentIndex"
+              @update:index="viewIndex = $event"
+            />
+          </div>
+
+          <!--
+            进度条讲的始终是【用户自己】的进度，所以它在卡片外面，不随滑动变。
+            放进卡片里的话，滑到钻石卡时那条进度条会被读成「我离钻石还有这么近」。
+          -->
           <Card>
-            <p class="hero__name">{{ grade.data.value.gradeName }}</p>
-            <p class="hero__value">
-              本期成长值 <b>{{ grade.data.value.currentValue }}</b>
-              <span class="hero__total">· 累计 {{ grade.data.value.totalValue }}</span>
-            </p>
+            <div class="mine">
+              <p class="mine__value">
+                本期成长值 <b>{{ grade.data.value.currentValue }}</b>
+                <span class="mine__total">· 累计 {{ grade.data.value.totalValue }}</span>
+              </p>
 
-            <div class="bar" role="presentation">
-              <div class="bar__fill" :style="{ width: progress + '%' }"></div>
+              <div class="bar" role="presentation">
+                <div class="bar__fill" :style="{ width: progress + '%' }"></div>
+              </div>
+
+              <p v-if="grade.data.value.gapToNext !== null" class="mine__next">
+                距 {{ grade.data.value.nextGradeName }} 还差 <b>{{ grade.data.value.gapToNext }}</b>
+              </p>
+              <p v-else class="mine__next">已是最高等级</p>
+
+              <!-- 没参与过的人没有周期，不要显示一个空的「截止」 -->
+              <p v-if="grade.data.value.periodEnd !== null" class="mine__period">
+                本期截止 {{ grade.data.value.periodEnd }}
+              </p>
+              <p v-else class="mine__period">完成第一个任务就开始计算你的会员年度</p>
             </div>
-
-            <p v-if="grade.data.value.gapToNext !== null" class="hero__next">
-              距 {{ grade.data.value.nextGradeName }} 还差 <b>{{ grade.data.value.gapToNext }}</b>
-            </p>
-            <p v-else class="hero__next">已是最高等级</p>
-
-            <!-- 没参与过的人没有周期，不要显示一个空的「截止」 -->
-            <p v-if="grade.data.value.periodEnd !== null" class="hero__period">
-              本期截止 {{ grade.data.value.periodEnd }}
-            </p>
-            <p v-else class="hero__period">完成第一个任务就开始计算你的会员年度</p>
           </Card>
         </template>
       </Section>
 
-      <!-- 阶梯：看得见够不着，才有往上够的理由 -->
+      <!--
+        🔴 标题始终带档名。「我的权益」在滑到别档时就是一句假话，
+        而用户会照着它去用一个自己还没有的权益。
+      -->
       <Section
-        title="等级与权益"
-        :loading="grade.loading.value"
+        v-if="shown !== null"
+        :title="`${shown.gradeName}的权益`"
+        :loading="false"
         :error="null"
-        :empty="(grade.data.value?.ladder ?? []).length === 0"
-        empty-text="还没有配置等级"
-        @retry="grade.reload"
+        :empty="shown.privileges.length === 0"
+        :empty-text="`${shown.gradeName}这一档还没有配置权益`"
       >
         <Card>
+          <!--
+            ⚠️ 状态和数字分成两件东西：胶囊只放一个短状态，数字另起一行小字。
+            把整句话塞进胶囊会折成两行，看起来像一块报错提示 —— 第一版就是这样。
+          -->
+          <div class="own">
+            <span class="own__tag" :class="{ 'own__tag--locked': !shownIsMine }">
+              <template v-if="shown.current">你现在享有</template>
+              <template v-else-if="shown.reached">已达成</template>
+              <template v-else>未解锁</template>
+            </span>
+            <!--
+              🔴 当前档即使成长值不够，这些权益他也确实在享有（缓冲期就是干这个的），
+              但「暂未达标」必须说出来 —— 只说「你现在享有」会让他以为一切正常，
+              而他其实正要掉下去。
+            -->
+            <span v-if="shown.current && !shown.reached" class="own__note">
+              成长值暂未达标，还差 {{ shownGap }}
+            </span>
+            <span v-else-if="!shownIsMine" class="own__note">还差 {{ shownGap }} 成长值</span>
+          </div>
+
           <div
-            v-for="item in grade.data.value?.ladder ?? []"
-            :key="item.gradeCode"
-            class="ladder__item"
-            :class="ladderClass(item)"
+            v-for="p in shown.privileges"
+            :key="p.privilegeCode"
+            class="priv"
+            :class="{ 'priv--locked': !shownIsMine }"
           >
-            <div class="ladder__head">
-              <span class="ladder__name">{{ item.gradeName }}</span>
-              <span class="ladder__mark">
-                <template v-if="item.current">当前</template>
-                <template v-else-if="item.reached">已达成</template>
-                <template v-else>{{ item.threshold }} 成长值</template>
-              </span>
-            </div>
-            <ul v-if="item.privileges.length > 0" class="ladder__privileges">
-              <li v-for="p in item.privileges" :key="p.privilegeCode">
-                {{ p.privilegeName }}
-                <span v-if="p.description !== null" class="ladder__desc">{{ p.description }}</span>
-              </li>
-            </ul>
+            <p class="priv__name">{{ p.privilegeName }}</p>
+            <p v-if="p.description !== null" class="priv__desc">{{ p.description }}</p>
           </div>
         </Card>
       </Section>
@@ -178,125 +251,177 @@ function ladderClass(item: GradeLadderItem) {
 </template>
 
 <style scoped>
+/*
+  🔴 左右内边距。改版前这一页就漏了它 —— 所有文字一直贴着屏幕边，
+  而另外十几个页面都留了白。卡片挪到最上面之后这条缝更显眼，顺手补上。
+
+  ⚠️ 段与段之间也要有间距：Section 只管自己内部的 gap，
+  兄弟 Section 之间是 0 —— 不给的话标题会紧贴上一块的卡片底边。
+*/
+.page__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-lg);
+  padding: var(--sv-space-md) var(--sv-space-page) calc(var(--sv-safe-bottom) + var(--sv-space-lg));
+}
+
+/*
+  顶部这一块借 Section 拿的是它的「加载 / 出错 / 重试」四态，不是它的标题 ——
+  会员卡上面再压一行小标题，跟 NavBar 的「会员中心」重复。
+  所以标题传空串并在这里把那一行藏掉；藏的是 head，不是整个组件。
+*/
+.hero {
+  gap: var(--sv-space-md);
+}
+
+.hero :deep(.sv-section__head) {
+  display: none;
+}
+
+.deck-bleed {
+  margin-inline: calc(var(--sv-space-page) * -1);
+}
+
 .protect {
-  margin: 0 0 12px;
-  padding: 12px;
-  border-radius: 8px;
+  margin: 0;
+  padding: var(--sv-space-md);
+  border-radius: var(--sv-radius-md);
   background: var(--sv-color-warning-soft);
   color: var(--sv-color-warning);
   font-size: var(--sv-font-footnote);
   line-height: 1.6;
 }
 
-.hero__name {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+/*
+  ⚠️ Card 自己【没有】内边距（见 ui/Card.vue：只有圆角、底色、overflow），
+  内容得自己给。漏了这一层的后果是每一行都贴着卡片边 —— 第一版就是这样，
+  真机上一眼就看出来不对。
+*/
+.mine {
+  padding: var(--sv-space-md);
 }
 
-.hero__value {
-  margin: 4px 0 12px;
+.mine__value {
+  margin: 0 0 var(--sv-space-md);
   font-size: var(--sv-font-footnote);
 }
 
-.hero__total {
+.mine__total {
   margin-left: 6px;
-  opacity: 0.6;
+  color: var(--sv-text-secondary);
 }
 
 .bar {
-  height: 6px;
-  border-radius: 3px;
+  height: 8px;
+  border-radius: 999px;
   background: var(--sv-bg-fill);
   overflow: hidden;
 }
 
 .bar__fill {
   height: 100%;
+  border-radius: 999px;
   background: var(--sv-color-primary);
+  transition: width 0.3s ease;
 }
 
-.hero__next {
-  margin: 10px 0 0;
+.mine__next {
+  margin: var(--sv-space-md) 0 0;
   font-size: var(--sv-font-footnote);
 }
 
-.hero__period {
-  margin: 4px 0 0;
+.mine__period {
+  margin: var(--sv-space-xs) 0 0;
   font-size: var(--sv-font-caption);
-  opacity: 0.6;
+  color: var(--sv-text-secondary);
 }
 
-.ladder__item {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--sv-border-color);
-}
-
-.ladder__item:last-child {
-  border-bottom: none;
-}
-
-.ladder__item--reached .ladder__name {
-  color: var(--sv-color-primary);
-}
-
-.ladder__item--current {
-  background: var(--sv-color-primary-soft);
-  margin: 0 -12px;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.ladder__head {
+/*
+  ⚠️ 这一行是状态说明，不是报错。
+  第一版拿品牌色直接染整行字，而品牌色是红的 —— 一行红字顶在权益列表上面，
+  看起来像是加载失败。做成浅底小胶囊，它才读得出是「标签」而不是「警告」。
+*/
+.own {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sv-space-sm);
+  padding: var(--sv-space-md) var(--sv-space-md) 0;
 }
 
-.ladder__name {
+/*
+  ⚠️ 这是状态标签，不是报错。
+  第一版拿品牌色染了整行字，而品牌色是红的 —— 一行红字顶在权益列表上面，
+  看起来像加载失败。做成浅底小胶囊，才读得出是「标签」。
+*/
+.own__tag {
+  padding: 3px 10px;
+  border-radius: var(--sv-radius-pill);
+  background: var(--sv-color-primary-soft);
+  color: var(--sv-color-primary);
+  font-size: var(--sv-font-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.own__tag--locked {
+  background: var(--sv-bg-fill);
+  color: var(--sv-text-secondary);
+}
+
+.own__note {
+  font-size: var(--sv-font-caption);
+  color: var(--sv-text-secondary);
+}
+
+.priv {
+  padding: var(--sv-space-md);
+}
+
+.priv + .priv {
+  border-top: 1px solid var(--sv-border-color);
+}
+
+/* 未解锁那一档整体压暗：看得见，但一眼看出不是自己的 */
+.priv--locked {
+  opacity: 0.55;
+}
+
+.priv__name {
+  margin: 0;
   font-weight: 600;
 }
 
-.ladder__mark {
+.priv__desc {
+  margin: var(--sv-space-xs) 0 0;
   font-size: var(--sv-font-caption);
-  opacity: 0.7;
-}
-
-.ladder__privileges {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  font-size: var(--sv-font-caption);
-  opacity: 0.8;
-}
-
-.ladder__desc {
-  margin-left: 6px;
-  opacity: 0.7;
+  color: var(--sv-text-secondary);
 }
 
 .log {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--sv-border-color);
+  padding: var(--sv-space-md);
 }
 
-.log:last-child {
-  border-bottom: none;
+.log + .log {
+  border-top: 1px solid var(--sv-border-color);
 }
 
 .log__main {
   display: flex;
   justify-content: space-between;
+  gap: var(--sv-space-sm);
 }
 
 .log__delta {
   font-weight: 600;
   color: var(--sv-color-success);
+  white-space: nowrap;
 }
 
 .log__meta {
-  margin: 2px 0 0;
+  margin: var(--sv-space-xs) 0 0;
   font-size: var(--sv-font-caption);
-  opacity: 0.6;
+  color: var(--sv-text-secondary);
 }
 
 .log__boost {

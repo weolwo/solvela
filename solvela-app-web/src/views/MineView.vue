@@ -160,7 +160,7 @@ async function handleLogout(): Promise<void> {
         🔴 保级缓冲期的提示只在这一页里 —— 用户不点进来就永远不知道自己快掉级了。
         （真要做挽留，下一步是站内信推送，不能只靠他自己想起来点。）
       -->
-      <Cell icon="star" title="我的等级" :to="{ name: 'grade' }" />
+      <Cell icon="star" title="会员中心" :to="{ name: 'grade' }" />
       <!-- 券的第一个「非商城」出口。⚠️ 今天运营商那一端是假的，页面上写着 -->
       <Cell icon="phone" title="充话费" :to="{ name: 'recharge' }" />
       <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
