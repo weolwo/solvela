@@ -179,6 +179,25 @@ public class ActivityService {
             case ACTIVITY_NOT_OPEN -> new ApiException(ApiErrors.CONFLICT, "活动不在进行中");
             case DUPLICATE_REQUEST -> new ApiException(ApiErrors.CONFLICT, "请勿重复提交");
             case TOO_FREQUENT -> new ApiException(ApiErrors.OPERATION_LIMITED, "手速太快了，稍后再试");
+            /*
+             * 🔴 额度用完与防刷限流必须说不同的话。
+             *
+             * TOO_FREQUENT 是「等几秒就好」，而这个是「今天没有了」——
+             * 都说成「稍后再试」的话，用户会一直重试一个永远不会成功的动作，
+             * 而我们会收到一堆「你们这个抽奖是不是坏了」。
+             *
+             * ⚠️ 不说「明天再来」：周期是脚本与抽奖配置定的（DAY/WEEK/MONTH/ACTIVITY），
+             * 这里写死「明天」在按周的活动上就是错的。
+             */
+            case QUOTA_EXCEEDED ->
+                    new ApiException(ApiErrors.CONFLICT, "本期抽奖次数已用完");
+            /*
+             * 不符合参与条件。具体差在哪【不告诉用户】——
+             * 判据在脚本里（等级、人群、白名单），抖给前端等于把风控规则也抖出去。
+             * 真要让用户知道「差一级」，那是活动页该展示的东西，不是拒绝时才说。
+             */
+            case NOT_ELIGIBLE ->
+                    new ApiException(ApiErrors.CONFLICT, "你还不满足这个活动的参与条件");
             case NO_PLAY_CONFIG -> {
                 // 「玩法配置都没建」比「没挂脚本」更早一步，但对用户是同一句话。
                 // 分开打日志是为了让运维一眼看出该去建配置还是该去挂脚本

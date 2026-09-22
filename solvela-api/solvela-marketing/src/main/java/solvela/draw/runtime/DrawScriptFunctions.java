@@ -9,6 +9,7 @@ import solvela.draw.DrawConfig;
 import solvela.draw.DrawPrizeLog;
 import solvela.draw.drawconfig.service.DrawConfigService;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
+import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.ActivityPlayKeys;
 import solvela.marketing.api.DrawCmd;
 import solvela.marketing.api.DrawLimits;
@@ -186,7 +187,8 @@ public class DrawScriptFunctions implements ScriptFunctionHandler {
         }
         if (times <= 0) {
             throw new BusinessException("脚本给抽奖函数的次数是 " + times
-                    + "。抽 0 次不是一种玩法 —— 不想抽就 return null，由活动域翻译成「次数用完」");
+                    + "。抽 0 次不是一种玩法 —— 不想让他抽就 return draw_rejectQuotaExceeded()"
+                    + " 或 draw_rejectNotEligible()");
         }
         if (times > DrawLimits.MAX_TIMES) {
             throw new BusinessException("脚本给抽奖函数的次数是 " + times
@@ -198,5 +200,49 @@ public class DrawScriptFunctions implements ScriptFunctionHandler {
                 play.activityCode(), poolCode, play.memberId(), times);
         return activityDrawFacade.draw(
                 new DrawCmd(play.activityCode(), poolCode, play.memberId(), play.requestId(), times));
+    }
+
+    /**
+     * 拒绝本次抽奖：<b>本周期额度用完了</b>。
+     *
+     * <h3>🔴 它填的是「脚本算出了结论却说不出去」这个洞</h3>
+     * 在它出现之前，一份判了额度的脚本只有两条出路：{@code return null}
+     * —— 被 {@code ScriptScene.validateOutput} 当成违约抛出，用户看到一句
+     * <b>点名脚本的开发者向报错</b>（而 {@code executeMultiDrawByScript} 原先的报错文案
+     * 还在教人这么写，那句话本身是错的）；或者照抽 —— 额度形同虚设。
+     *
+     * <h3>⚠️ 为什么是两个具名函数，而不是一个 {@code draw_reject('字符串')}</h3>
+     * 脚本<b>不该能伪造任意拒绝原因</b>：一个能产出 {@code DUPLICATE_REQUEST} 的脚本，
+     * 会让幂等日志变成一堆解释不了的噪音。做成具名函数之后，
+     * 「脚本能造哪些拒绝」是<b>结构性</b>白名单 —— 写错函数名是引擎报「函数不存在」，
+     * 响亮且立刻；而写错字符串是运行期才发现，甚至可能撞上一个合法但语义不对的值。
+     *
+     * <p>无副作用：它什么都不改，只是造一个结果对象。可以在任意分支返回。
+     */
+    @ScriptFunction(name = "rejectQuotaExceeded",
+            description = "拒绝本次抽奖，理由是「本周期额度已用完」。用于脚本自己判额度"
+                    + "（配合 countDrawn 与 member_gradeAtLeast 做等级差异化额度）。"
+                    + "⚠️ 与防刷限流不是一回事：那个等几秒就好，这个要等到下个周期")
+    public DrawResultView rejectQuotaExceeded(ActivityPlayContext play) {
+        log.info("[抽奖-脚本] 额度用完，拒绝。activityCode: {}, memberId: {}",
+                play.activityCode(), play.memberId());
+        return DrawResultView.ofReject(DrawRejectReason.QUOTA_EXCEEDED);
+    }
+
+    /**
+     * 拒绝本次抽奖：<b>不符合参与条件</b>（等级不够、不在目标人群里）。
+     *
+     * <p>⚠️ 具体差在哪<b>只打日志，不告诉用户</b>：把判据抖给前端，
+     * 等于把风控与人群规则一起抖出去。对用户统一说「不满足参与条件」。
+     *
+     * <p>无副作用，理由同 {@link #rejectQuotaExceeded}。
+     */
+    @ScriptFunction(name = "rejectNotEligible",
+            description = "拒绝本次抽奖，理由是「不符合参与条件」。用于等级门槛、人群限定等判据。"
+                    + "具体判据只在脚本与日志里，不下发给端上")
+    public DrawResultView rejectNotEligible(ActivityPlayContext play) {
+        log.info("[抽奖-脚本] 不符合参与条件，拒绝。activityCode: {}, memberId: {}",
+                play.activityCode(), play.memberId());
+        return DrawResultView.ofReject(DrawRejectReason.NOT_ELIGIBLE);
     }
 }
