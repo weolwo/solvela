@@ -166,6 +166,33 @@ java -cp <mysql-connector.jar> SyncFromBaseline.java lottery.sql t_lottery_issue
 
 ---
 
+## 2026-09-22：`JOBEXTEXP` 撤下，因为它永远挂不上去
+
+上一条里看门狗报出的那个「执行器失联」就是它：`externalOrderExpire` 的 handler 在
+`solvela-external`，而**调度器只跑在 `solvela-admin` 里，admin 不依赖 external** ——
+库里有行、代码里有 handler，两边却永远见不到面。
+
+**产品决策（2026-09-22）**：话费代充只作为<b>演示业务</b>存在，不会真上
+（合规与资金风险极大，且毛利被压到一两个点）。为一个演示场景让 admin 多背一个模块不划算。
+所以撤掉 `t_solvela_job` 里那一行，handler 代码保留。
+
+⚠️ 撤掉之前确认过代价，不是永久泄漏：
+
+| 影响 | 结论 |
+|---|---|
+| 锁住的券 | **不会卡死** —— `CouponStuckLockReleaseJob` 约 2 小时后兜底放回，只是比正常的 15 分钟慢 |
+| 单据状态 | 停在「待支付」不翻成已取消。已确认下单路径**没有**「已有待支付单就拒绝」的校验，不挡用户下新单 |
+
+🔴 **别顺手补回那一行。** `checkHandlerMissing` 只看 `handler_missing_flag`，
+**不看 `enabled_flag`** —— 补一行再停用是没用的，看门狗照样每 5 分钟报一次。
+真要让它跑，不用动 admin：`solvela-app-biz` 已经依赖 `solvela-external`，
+把它起成 `--solvela.job.role=WORKER` 即可。理由与做法都写在
+`ExternalOrderExpireJob` 的类注释里。
+
+验证：重启 admin 后自检回到「调度健康，无异常」—— 是真跑了一轮，不是只看库里的标志位。
+
+---
+
 ## 2026-09-21：基线里躺着三个开发期验证任务，和一个被关掉的看门狗
 
 盘点定时任务时发现的，两条都**随基线发到每个新环境**：

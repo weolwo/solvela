@@ -36,6 +36,34 @@ import java.util.List;
  *
  * <p>⚠️ 时间一律取 {@link SolvelaJobContext#dbNow()}（铁律 9）。
  *
+ * <h3>🔴 它当前【没有挂载】—— t_solvela_job 里没有对应的行，别顺手补一行</h3>
+ * 补一行的后果不是「任务开始跑」，而是<b>调度健康自检每 5 分钟报一次执行器失联</b>：
+ * 调度器只跑在 solvela-admin 里，而 admin <b>不依赖 solvela-external</b>，
+ * 所以它扫不到这个 handler。2026-09-21 库里就躺着这么一行，
+ * 挂了一周从未执行，直到系统看门狗被重新打开才报出来。
+ *
+ * <h3>为什么不给 admin 加依赖</h3>
+ * 产品决策（2026-09-22）：话费代充只作为<b>演示业务</b>存在 ——
+ * 真做代充的合规与资金风险极大，不会上。为一个演示场景让 admin 多背一个模块，
+ * 换来的是 admin 的启动依赖和攻击面都变大，不划算。
+ *
+ * <h3>真要让它跑起来时，怎么做（不用动 admin）</h3>
+ * {@code solvela-app-biz} <b>已经依赖 solvela-external</b>，把它起成 WORKER 即可：
+ * <pre>
+ *   java -jar solvela-app-biz.jar --solvela.job.role=WORKER
+ * </pre>
+ * 然后往 {@code t_solvela_job} 插一行 {@code handler_name = 'externalOrderExpire'}。
+ * ⚠️ {@code next_trigger_time} 要写成 {@code NOW() + 8 小时}（服务端时钟是 UTC），
+ * 否则一上来就被判成「错过调度」直接 SKIP。
+ *
+ * <h3>⚠️ 不挂载的代价（已确认，不是永久泄漏）</h3>
+ * <ul>
+ *   <li><b>券不会卡死</b>：{@code CouponStuckLockReleaseJob} 会在约 2 小时后兜底放回，
+ *       只是用户要多等 —— 本来 15 分钟就该回来的；</li>
+ *   <li><b>单据停在「待支付」</b>：永远不翻成已取消。已确认下单路径<b>没有</b>
+ *       「已有待支付单就拒绝」的校验，所以不挡用户下新单。</li>
+ * </ul>
+ *
  * @author alaric
  * @date 2026-09-15
  */
