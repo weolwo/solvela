@@ -19,6 +19,7 @@
             <result column="cash_price" property="cashPrice" />
             <result column="limit_period" property="limitPeriod" />
             <result column="limit_count" property="limitCount" />
+            <result column="min_grade" property="minGrade" />
             <result column="start_time" property="startTime" />
             <result column="end_time" property="endTime" />
             <result column="status" property="status" />
@@ -55,6 +56,7 @@
                 c.cash_price,
                 c.limit_period,
                 c.limit_count,
+                c.min_grade,
                 c.start_time,
                 c.end_time,
                 c.status,

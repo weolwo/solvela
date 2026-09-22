@@ -59,6 +59,25 @@ const worth = computed(() => formatWorth(props.commodity.originalPrice))
 
 const soldOut = computed(() => props.commodity.availableStock <= 0)
 
+/**
+ * 专享商品的角标文案。不是专享就为空。
+ *
+ * 🔴 这一条<b>不藏商品</b>：一件看得见但换不了的商品，正是「够上去」的理由本身。
+ * 藏起来的话，用户永远不知道升到白金能换到什么 ——
+ * 而给用户一个够上去的理由，就是整套等级体系要换的东西。
+ * （任务中心那边是藏的，因为一个点不动的任务没有这种吸引力，两处刻意不同。）
+ *
+ * ⚠️ `gradeLocked` 是服务端算好的结论，端上不自己拿等级去比 ——
+ * 保级缓冲期那种「在白金但成长值够不着白金」端上判不了。
+ */
+const exclusiveTag = computed(() => {
+  const c = props.commodity
+  if (!c.gradeLocked) {
+    return ''
+  }
+  return c.minGradeName === null ? '等级专享' : `${c.minGradeName}专享`
+})
+
 /*
  * 图加载失败就退回首字占位。不用 v-if 判 URL 就够了 ——
  * 服务端给的 URL 指向一个已被删掉的文件时，请求会 404 而 URL 本身非空。
@@ -80,7 +99,12 @@ const coverBroken = ref(false)
           @error="coverBroken = true"
         />
         <span v-else class="card__initial" aria-hidden="true">{{ initial }}</span>
-        <span v-if="soldOut" class="card__out">已兑完</span>
+        <!--
+          兑完和专享同时成立时先说专享：对用户来说「我还不够格」
+          和「手慢了」的下一步动作完全不同。
+        -->
+        <span v-if="exclusiveTag !== ''" class="card__lock">{{ exclusiveTag }}</span>
+        <span v-else-if="soldOut" class="card__out">已兑完</span>
       </div>
 
       <h3 class="card__title">{{ commodity.commodityName }}</h3>
@@ -154,6 +178,19 @@ const coverBroken = ref(false)
 }
 
 /* 无货既有文字也有位置（压在图上），不是只把卡片调淡 —— 那样看不出是什么原因 */
+.card__lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 45%);
+  color: #f5d28a;
+  font-size: var(--sv-font-caption);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .card__out {
   position: absolute;
   top: var(--sv-space-xs);

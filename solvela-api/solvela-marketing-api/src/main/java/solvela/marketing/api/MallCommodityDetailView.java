@@ -39,5 +39,23 @@ public record MallCommodityDetailView(
         String limitPeriod,
         Integer limitCount,
         Integer remainingCount,
-        List<MallCommoditySkuView> skus) {
+        List<MallCommoditySkuView> skus,
+        /**
+         * 兑换需要的最低等级，{@code 0} = 不限。
+         *
+         * <p>⚠️ 端上<b>不要</b>拿它和用户等级自己比 —— 比较结果已经算好在
+         * {@link #gradeLocked} 里了。自己比的话，保级缓冲期那种
+         * 「他在白金但成长值够不着白金」的情况会被算错，
+         * 而端上根本拿不到判断这件事需要的数据。
+         */
+        Integer minGrade,
+        /** 专享商品的等级名，如「白金会员」。不限时为 null —— 端上用它拼「XX会员专享」 */
+        String minGradeName,
+        /**
+         * 这个人现在兑不兑得了。{@code true} = 看得见但换不了。
+         *
+         * <p>🔴 这是<b>服务端算好的结论</b>，不是给端上参考的。下单会再判一次 ——
+         * 界面只负责说清楚，拦是服务端的事。
+         */
+        boolean gradeLocked) {
 }

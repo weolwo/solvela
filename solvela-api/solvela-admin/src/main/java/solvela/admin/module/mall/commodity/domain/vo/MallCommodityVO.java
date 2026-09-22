@@ -68,6 +68,9 @@ public class MallCommodityVO {
     @Schema(description = "周期内单会员限兑件数：0-不限制")
     private Integer limitCount;
 
+    @Schema(description = "可兑换的最低会员等级：0-不限。低于这一档的会员看得见但兑不了")
+    private Integer minGrade;
+
     @Schema(description = "上架开始时间：默认值代表不限。不是秒杀场次")
     private LocalDateTime startTime;
 

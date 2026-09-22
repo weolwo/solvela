@@ -141,6 +141,7 @@ public class MallCommodityService {
         vo.setCashPrice(commodity.getCashPrice());
         vo.setLimitPeriod(commodity.getLimitPeriod());
         vo.setLimitCount(commodity.getLimitCount());
+        vo.setMinGrade(commodity.getMinGrade());
         vo.setStartTime(commodity.getStartTime());
         vo.setEndTime(commodity.getEndTime());
         vo.setStatus(commodity.getStatus());
@@ -516,6 +517,12 @@ public class MallCommodityService {
                 ? BigDecimal.ZERO : nullToZero(form.getCashPrice()));
         entity.setLimitPeriod(shelf.limitPeriod());
         entity.setLimitCount(form.getLimitCount() == null ? 0 : form.getLimitCount());
+        /*
+         * ⚠️ 不填按 0（不限）。负数也归 0 —— 那一列是 NOT NULL DEFAULT 0，
+         * 而「负的最低等级」没有任何语义，落库只会让 MallGradeGate 那边多一个分支去猜。
+         */
+        entity.setMinGrade(form.getMinGrade() == null || form.getMinGrade() < 0
+                ? 0 : form.getMinGrade());
         entity.setStartTime(shelf.startTime());
         entity.setEndTime(shelf.endTime());
         entity.setStatus(shelf.status());

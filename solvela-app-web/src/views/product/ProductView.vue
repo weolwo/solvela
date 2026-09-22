@@ -149,6 +149,13 @@ const blockedReason = computed<string | null>(() => {
   if (data === null) {
     return null
   }
+  /*
+   * 🔴 等级门槛排在库存前面：一个白金专享商品对普通会员，
+   * 说「已兑完」是错的 —— 他下一步的动作完全不同（等补货 vs 去升级）。
+   */
+  if (data.gradeLocked) {
+    return data.minGradeName === null ? '等级不足，暂不可兑' : `${data.minGradeName}专享`
+  }
   if (data.availableStock <= 0) {
     return '该商品已兑完'
   }

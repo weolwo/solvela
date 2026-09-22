@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
+import solvela.mall.commodity.MallGradeGate;
+import solvela.mall.commodity.MallPricing;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCommodity;
 import solvela.mall.MallOrder;
@@ -100,6 +102,7 @@ public class MallRedeemService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final MallCommodityManager mallCommodityManager;
+    private final MallGradeGate mallGradeGate;
     private final MallSkuManager mallSkuManager;
     private final MallSkuDao mallSkuDao;
     private final MallExchangeLimitDao mallExchangeLimitDao;
@@ -145,6 +148,23 @@ public class MallRedeemService {
         }
 
         // ---------- 以下是校验阶段：还没写任何东西，拒绝一律用 ofReject ----------
+
+        /*
+         * 🔴 等级门槛必须在这里判，不能挪到下面去。
+         *
+         * 下面几步会依次占住库存、限兑额度、券和积分；插在那之后的拒绝必须走
+         * reject() 回滚，而这一条用的是 ofReject —— 放错位置的后果不是报错，
+         * 是「库存扣了、限兑占了、订单没落，用户什么都没拿到」。
+         *
+         * 而它本身是一次纯读，放在最前面没有任何代价。
+         */
+        if (!mallGradeGate.canRedeem(cmd.memberId(), commodity)) {
+            log.info("【商城兑换】等级不足，拒绝。memberId={}, commodity={}, 要求等级={}, 当前等级={}",
+                    cmd.memberId(), commodity.getCommodityCode(),
+                    MallGradeGate.requiredGrade(commodity), mallGradeGate.gradeOf(cmd.memberId()));
+            return MallRedeemResult.ofReject(MallRedeemReason.GRADE_NOT_ENOUGH);
+        }
+
         AddressResolution addr = resolveAddress(cmd, commodity);
         if (addr.problem() != null) {
             return MallRedeemResult.ofReject(addr.problem());
@@ -512,25 +532,18 @@ public class MallRedeemService {
     }
 
     /**
-     * SKU 价为空则继承商品基准价。
+     * SKU 价为空则继承商品基准价 —— 规则本体在 {@link MallPricing}。
      *
-     * <p>DDL 刻意允许 NULL 而非默认 0 —— 0 是「免费兑换」的合法取值，
-     * 用 0 当「未设置」就分不清「没填」和「真免费」了。
+     * <p>🔴 这里<b>不要</b>再写一份。C 端展示走的是同一条规则，
+     * 两边分别实现的后果是「页面显示的价和实际扣的分对不上」，
+     * 而用户只看得到后者。2026-09-22 已经因此出过一次（兑换页显示 0 分）。
      */
     private static int resolvePoints(MallSku sku, MallCommodity commodity) {
-        Integer skuPrice = sku.getSkuPointsPrice();
-        if (skuPrice != null) {
-            return skuPrice;
-        }
-        return commodity.getPointsPrice() == null ? 0 : commodity.getPointsPrice();
+        return MallPricing.points(sku, commodity);
     }
 
     private static BigDecimal resolveCash(MallSku sku, MallCommodity commodity) {
-        BigDecimal skuPrice = sku.getSkuCashPrice();
-        if (skuPrice != null) {
-            return skuPrice;
-        }
-        return commodity.getCashPrice() == null ? BigDecimal.ZERO : commodity.getCashPrice();
+        return MallPricing.cash(sku, commodity);
     }
 
     private MallOrder buildOrder(MallRedeemCmd cmd, MallCommodity commodity, MallSku sku,

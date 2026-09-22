@@ -111,6 +111,19 @@ public class RedeemService {
             case SKU_NOT_FOUND, COMMODITY_OFF ->
                     new ApiException(ApiErrors.NOT_FOUND, "商品不存在或已下架");
             case OUT_OF_STOCK -> new ApiException(ApiErrors.CONFLICT, "手慢了，该规格已兑完");
+            /*
+             * 🔴 不要和「已下架」合并成「兑不了」。
+             *
+             * 那两件事用户的<b>下一步动作完全不同</b>：下架了只能换一件，
+             * 等级不够是「再攒一攒就能换」—— 而后者正是这套等级体系要换的东西，
+             * 说成「兑不了」等于把动机抹掉。
+             *
+             * ⚠️ 这里只说「等级不够」，不说差哪一档：差多少由商品详情接口给
+             * （minGradeName 字段），页面上那句「白金会员专享」比一条 toast 说得清楚。
+             * 走到这一步的多半是绕过界面直接打接口的，不值得为它再查一次等级。
+             */
+            case GRADE_NOT_ENOUGH ->
+                    new ApiException(ApiErrors.CONFLICT, "会员等级不够，这是件专享商品");
             case EXCHANGE_LIMITED -> new ApiException(ApiErrors.CONFLICT, "已达到该商品的兑换上限");
             // 差多少由前端算并展示 —— 它手上有余额和价格，比这里再查一次便宜
             case POINTS_NOT_ENOUGH -> new ApiException(ApiErrors.CONFLICT, "积分不足");

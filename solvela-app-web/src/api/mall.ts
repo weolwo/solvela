@@ -105,6 +105,18 @@ export interface CommodityBrief {
   favorite: boolean
   /** 各 SKU 可用库存之和。0 表示整个商品无货 */
   availableStock: number
+  /**
+   * 兑换需要的最低等级，`0` = 不限。
+   *
+   * ⚠️ **不要**拿它和用户等级自己比 —— 结论已经在 `gradeLocked` 里了。
+   * 自己比的话，保级缓冲期那种「他在白金但成长值够不着白金」会被算错，
+   * 而端上根本拿不到判断这件事需要的数据。
+   */
+  minGrade: number
+  /** 专享商品的等级名，如「白金会员」。不限时为 null */
+  minGradeName: string | null
+  /** 这个人现在兑不兑得了。`true` = 看得见但换不了 */
+  gradeLocked: boolean
 }
 
 /** 一个 SKU。对应 `t_mall_sku` */
@@ -128,6 +140,18 @@ export interface CommoditySku {
   cashPrice: Money
   /** `total_stock - locked_stock - sold_count`，DDL 里是虚拟列 */
   availableStock: number
+  /**
+   * 兑换需要的最低等级，`0` = 不限。
+   *
+   * ⚠️ **不要**拿它和用户等级自己比 —— 结论已经在 `gradeLocked` 里了。
+   * 自己比的话，保级缓冲期那种「他在白金但成长值够不着白金」会被算错，
+   * 而端上根本拿不到判断这件事需要的数据。
+   */
+  minGrade: number
+  /** 专享商品的等级名，如「白金会员」。不限时为 null */
+  minGradeName: string | null
+  /** 这个人现在兑不兑得了。`true` = 看得见但换不了 */
+  gradeLocked: boolean
 }
 
 /** 限兑周期。取值对齐 `t_promotion_config.limit_period` 的字典 */

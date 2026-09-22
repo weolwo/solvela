@@ -1,5 +1,6 @@
 package solvela.mall.clientapi;
 
+import java.math.BigDecimal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,10 @@ import solvela.marketing.api.MallDeliveryFillResult;
 import solvela.enums.EnableStatusEnum;
 import solvela.base.module.file.service.FileAssetService;
 import solvela.enums.MallCommodityStatusEnum;
+import solvela.member.MemberGrade;
+import solvela.member.grade.service.MemberGradeResolver;
+import solvela.mall.commodity.MallGradeGate;
+import solvela.mall.commodity.MallPricing;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCategory;
 import solvela.mall.MallCommodity;
@@ -78,6 +83,8 @@ public class MallClientFacade implements MallApi {
     private final MallOrderManager mallOrderManager;
     private final MallCategoryManager mallCategoryManager;
     private final MallCommodityManager mallCommodityManager;
+    private final MallGradeGate mallGradeGate;
+    private final MemberGradeResolver memberGradeResolver;
     private final MallSkuManager mallSkuManager;
     private final MallFavoriteManager mallFavoriteManager;
     private final MallExchangeLimitManager mallExchangeLimitManager;
@@ -150,8 +157,11 @@ public class MallClientFacade implements MallApi {
         // 封面 URL 一次批量换完 —— 逐行调 urlOf 就是 N+1，而列表页每次进都会打
         Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
 
+        // 等级视角同理：整页共用一份，不按商品逐个查
+        GradeLens lens = gradeLens(cmd.memberId());
+
         return new MallCommodityPageView(
-                list.stream().map(c -> toBrief(c, stocks, favorites, covers)).toList(),
+                list.stream().map(c -> toBrief(c, lens, stocks, favorites, covers)).toList(),
                 page.getTotal());
     }
 
@@ -197,7 +207,45 @@ public class MallClientFacade implements MallApi {
         return toDetailView(commodity, skus, bannerIds,
                 loadAllImages(commodity, skus, bannerIds),
                 !favoriteIds(memberId, List.of(commodityId)).isEmpty(),
-                remainingCount(commodity, memberId));
+                remainingCount(commodity, memberId), gradeLens(memberId));
+    }
+
+    /**
+     * 一次请求里的「等级视角」：这个人是几级、各档叫什么名字。
+     *
+     * <h3>🔴 每次请求只查一次，不是每件商品查一次</h3>
+     * 商品列表一页 20 条，按商品查的话就是 20 次会员等级查询 + 20 次等级配置查询 ——
+     * 而那两个答案在同一次请求里<b>完全不会变</b>。
+     * 这类「循环里查同一个东西」的写法不报错，只是列表页慢，
+     * 而慢到被发现时通常已经在生产上了。
+     */
+    private record GradeLens(int memberGrade, Map<Integer, String> gradeNames) {
+
+        boolean locked(MallCommodity commodity) {
+            return MallGradeGate.requiredGrade(commodity) > memberGrade;
+        }
+
+        /** 专享商品的等级名；不限时为 null，端上据此决定要不要出「专享」标 */
+        String nameOf(MallCommodity commodity) {
+            int required = MallGradeGate.requiredGrade(commodity);
+            return required == 0 ? null : gradeNames.get(required);
+        }
+    }
+
+    /**
+     * 装配等级视角。
+     *
+     * <p>⚠️ 等级名查不到时返回 null 而不是编一个（比如「等级 3」）：
+     * 运营删掉一档之后，端上显示「等级 3 专享」只会让人困惑，
+     * 而 null 会让专享标整个不出现 —— 商品仍然兑不了（服务端照拦），
+     * 只是不再宣传一个已经不存在的等级。
+     */
+    private GradeLens gradeLens(Long memberId) {
+        Map<Integer, String> names = memberGradeResolver.enabledGrades().stream()
+                .filter(g -> g.getGradeCode() != null && g.getGradeName() != null)
+                .collect(Collectors.toMap(MemberGrade::getGradeCode, MemberGrade::getGradeName,
+                        (a, b) -> a));
+        return new GradeLens(mallGradeGate.gradeOf(memberId), names);
     }
 
     /** 在售 SKU，按运营配的 sort 排；sort 相同按 id 兜底，保证两次请求顺序一致 */
@@ -218,7 +266,7 @@ public class MallClientFacade implements MallApi {
      */
     private MallCommodityDetailView toDetailView(MallCommodity commodity, List<MallSku> skus,
                                                  List<Long> bannerIds, Map<Long, String> images,
-                                                 boolean favorite, Integer remaining) {
+                                                 boolean favorite, Integer remaining, GradeLens lens) {
         int stock = skus.stream().mapToInt(s -> nullToZero(s.getAvailableStock())).sum();
         return new MallCommodityDetailView(
                 commodity.getId(), commodity.getCommodityCode(), commodity.getCategoryId(),
@@ -236,7 +284,9 @@ public class MallClientFacade implements MallApi {
                 commodity.getDetailContent(), commodity.getExchangeNotice(),
                 commodity.getLimitPeriod(), commodity.getLimitCount(),
                 remaining,
-                skus.stream().map(sku -> toSkuView(sku, images)).toList());
+                skus.stream().map(sku -> toSkuView(sku, commodity, images)).toList(),
+                MallGradeGate.requiredGrade(commodity), lens.nameOf(commodity),
+                lens.locked(commodity));
     }
 
     /**
@@ -304,8 +354,9 @@ public class MallClientFacade implements MallApi {
         Map<Long, MallCommodity> byId = list.stream()
                 .collect(Collectors.toMap(MallCommodity::getId, Function.identity()));
         Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
+        GradeLens lens = gradeLens(memberId);
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull)
-                .map(c -> toBrief(c, stocks, favorites, covers))
+                .map(c -> toBrief(c, lens, stocks, favorites, covers))
                 .toList();
     }
 
@@ -529,13 +580,15 @@ public class MallClientFacade implements MallApi {
                 .list().stream().map(MallFavorite::getCommodityId).collect(Collectors.toSet());
     }
 
-    private static MallCommodityBriefView toBrief(MallCommodity c, Map<Long, Integer> stocks,
+    private static MallCommodityBriefView toBrief(MallCommodity c, GradeLens lens,
+                                                  Map<Long, Integer> stocks,
                                                   Set<Long> favorites, Map<Long, String> covers) {
         return new MallCommodityBriefView(
                 c.getId(), c.getCommodityCode(), c.getCategoryId(), c.getCommodityType(),
                 c.getCommodityName(), c.getCommodityIntro(), urlFor(covers, c.getCoverFileId()),
                 c.getPayType(), c.getPointsPrice(), c.getCashPrice(), c.getOriginalPrice(),
-                favorites.contains(c.getId()), stocks.getOrDefault(c.getId(), 0));
+                favorites.contains(c.getId()), stocks.getOrDefault(c.getId(), 0),
+                MallGradeGate.requiredGrade(c), lens.nameOf(c), lens.locked(c));
     }
 
     /**
@@ -544,14 +597,33 @@ public class MallClientFacade implements MallApi {
      * <p>DDL 刻意允许 NULL 而非默认 0 —— 0 是「免费兑换」的合法取值，
      * 用 0 当「未设置」就分不清「没填」和「真免费」了。所以继承逻辑必须在这里做，
      * <b>端上拿到的一定是算好的值</b>。
+     *
+     * <h3>🔴 2026-09-22 订正：上面这句话此前是假的</h3>
+     * 这个方法原来把 {@code sku.getSkuPointsPrice()} <b>原样传出去</b>，nullable 照旧。
+     * 于是「继承」这件事跑到了端上，而两个页面只有一个做了：
+     * <ul>
+     *   <li>{@code ProductView.vue} 写了 {@code sku?.pointsPrice ?? 商品基准价}，蒙对了；</li>
+     *   <li>{@code RedeemView.vue} 写的是 {@code (sku?.pointsPrice ?? 0) * 数量} ——
+     *       <b>SKU 没填价时兑换页显示 0 分，而服务端照基准价扣</b>。</li>
+     * </ul>
+     * 库里现在就有这样一条（SKU 8「HUAWEI WATCH GT 7 Pro（46mm）」，基准价 19990），
+     * 只是它库存为 0 才没被点到。
+     *
+     * <p>⚠️ 判据是「价格由谁算」，不是「哪个页面写错了」：只要契约里还传 null，
+     * 每一个新页面都得自己记得继承一次，而忘记的那一次不报错，
+     * 只是<b>价格显示成 0</b> —— 这是最不该让端上自由发挥的那类值。
+     *
+     * <p>规则本体在 {@link MallPricing}，与下单扣减共用同一份。
      */
-    private static MallCommoditySkuView toSkuView(MallSku sku, Map<Long, String> images) {
+    private static MallCommoditySkuView toSkuView(MallSku sku, MallCommodity commodity,
+                                                  Map<Long, String> images) {
         return new MallCommoditySkuView(
                 sku.getId(), sku.getSkuCode(), MallSkuAttrs.parse(sku.getSkuAttrs()),
                 urlFor(images, sku.getSkuCoverFileId()),
-                sku.getSkuPointsPrice(), sku.getSkuCashPrice(),
+                MallPricing.points(sku, commodity), MallPricing.cash(sku, commodity),
                 nullToZero(sku.getAvailableStock()));
     }
+
 
     private static MallAddressView toAddressView(MallAddress a) {
         return new MallAddressView(a.getId(), a.getReceiverName(), maskPhone(a.getReceiverPhone()),

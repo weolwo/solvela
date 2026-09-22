@@ -34,7 +34,7 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-09-20
+-- 生成时间：2026-09-22
 -- 表数量：82 张
 -- =====================================================================================
 
@@ -1585,6 +1585,7 @@ CREATE TABLE `t_mall_commodity` (
   `cash_price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '基准兑换现金：pay_type=1 时恒为 0',
   `limit_period` varchar(32) NOT NULL DEFAULT 'LIFETIME' COMMENT '限兑周期：LIFETIME-终身, DAILY-每日, WEEKLY-每周, MONTHLY-每月',
   `limit_count` int NOT NULL DEFAULT '0' COMMENT '周期内单会员限兑件数：0-不限制',
+  `min_grade` int NOT NULL DEFAULT '0' COMMENT '可兑换的最低会员等级（t_member_grade.grade_code）。0=不限，人人可兑；N=等级≥N 才能兑。看得见但兑不了，见 MallGradeGate',
   `start_time` datetime NOT NULL DEFAULT '1970-01-01 00:00:00' COMMENT '上架开始时间：默认值代表不限。不是秒杀场次',
   `end_time` datetime NOT NULL DEFAULT '2099-12-31 23:59:59' COMMENT '上架结束时间：默认值代表不限。不是秒杀场次',
   `status` tinyint NOT NULL DEFAULT '2' COMMENT '状态：0-下架, 1-上架, 2-草稿。新建默认落草稿',

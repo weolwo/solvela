@@ -117,6 +117,19 @@ public class MallCommoditySaveForm {
     private Integer limitCount;
 
     /**
+     * 可兑换的最低会员等级（{@code t_member_grade.grade_code}）。{@code 0} = 不限。
+     *
+     * <p>⚠️ 设了之后，低于这一档的会员在 C 端<b>仍然看得见</b>这件商品，
+     * 只是标成「XX会员专享」且兑不了 —— 那正是让用户想往上够的地方。
+     *
+     * <p>🔴 别拿它当下架用（填个很大的数）：下架请用状态，
+     * 两者在 C 端说给用户的话完全不同。
+     */
+    @Schema(description = "可兑换的最低会员等级：0-不限")
+    @Min(value = 0, message = "专享等级不能为负")
+    private Integer minGrade;
+
+    /**
      * 商品的<b>上架有效期</b>，不是秒杀场次 —— DDL 把这个语义钉死过，别拿来当档期用。
      * 留空由服务端填哨兵值（列是 NOT NULL 的，理由见 {@code MallConst.SHELF_START_SENTINEL}）。
      */

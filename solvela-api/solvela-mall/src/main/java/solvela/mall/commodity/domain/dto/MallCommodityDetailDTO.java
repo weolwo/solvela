@@ -75,6 +75,9 @@ public class MallCommodityDetailDTO {
     /** 周期内单会员限兑件数：0-不限制 */
     private Integer limitCount;
 
+    /** 可兑换的最低会员等级；0=不限。低于这一档的会员看得见但兑不了 */
+    private Integer minGrade;
+
     /**
      * 哨兵值（1970 / 2099）表示「不限」。<b>原样下发不做转换</b> ——
      * 转成 null 的话，前端保存时再传回 null，服务端又填一次哨兵，来回翻译容易出错；

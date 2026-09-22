@@ -260,6 +260,18 @@
                 </a-form-item>
               </a-col>
 
+              <a-col :span="8">
+                <a-form-item label="专享等级">
+                  <a-select v-model:value="form.minGrade" :options="gradeOptions" placeholder="不限" style="width: 100%" />
+                  <!--
+                    ⚠️ 刻意不写「设了就看不见」：C 端是【看得见但兑不了】。
+                    藏起来的话用户永远不知道升上去能换到什么，
+                    而那正是等级体系要换的东西。
+                  -->
+                  <div class="form-tip mt-1">低于这一档的会员看得见但兑不了</div>
+                </a-form-item>
+              </a-col>
+
               <a-col :span="16">
                 <a-form-item label="兑换时间段">
                   <a-range-picker v-model:value="timeRange" show-time value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
@@ -276,6 +288,15 @@
                 </a-form-item>
               </a-col>
             </a-row>
+
+            <a-alert
+              v-if="form.minGrade > 0"
+              type="warning"
+              show-icon
+              class="mb-3"
+              :message="`专享商品：${gradeLabel} 及以上才能兑换`"
+              description="低于这一档的会员在 C 端仍然看得见这件商品，只是标成专享、兑换按钮不可点——藏起来的话用户永远不知道升上去能换到什么。服务端下单时会再拦一次，界面只负责说清楚。"
+            />
 
             <a-alert
               v-if="form.limitCount > 0"
@@ -313,6 +334,7 @@
   import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
   import { mallCommodityApi } from '/@/api/business/mall/mall-commodity-api';
   import { mallCategoryApi } from '/@/api/business/mall/mall-category-api';
+  import { memberGradeApi } from '/@/api/business/member/member-grade-api';
   import {
     COMMODITY_STATUS_ENUM,
     COMMODITY_TYPE_ENUM,
@@ -377,6 +399,7 @@
       cashPrice: 0,
       limitPeriod: LIMIT_PERIOD_ENUM.LIFETIME.value,
       limitCount: 0,
+      minGrade: 0,
       startTime: null,
       endTime: null,
       status: COMMODITY_STATUS_ENUM.DRAFT.value,
@@ -403,6 +426,39 @@
         BALANCE: '走 t_member_wallet 直接入账',
       })[form.commodityType] || ''
   );
+
+  /*
+   * 等级下拉。
+   *
+   * 🔴 从后端拉，不在前端写死一份等级表 —— 等级是【配置】出来的：
+   * 运营能加档、改名、停用。写死的那份改一次就和库里对不上，
+   * 而症状是「下拉里选的白金，存进去是个不存在的档」，商品从此谁都兑不了。
+   *
+   * ⚠️ 只列启用中的档。停用的档仍可能被存量商品引用，那种情况下
+   * gradeLabel 会退回「等级 N」，而不是假装它不存在。
+   */
+  const grades = ref([]);
+
+  const gradeOptions = computed(() => [
+    { value: 0, label: '不限（人人可兑）' },
+    ...grades.value
+      .filter((g) => g.status === 1 && g.gradeCode > 0)
+      .map((g) => ({ value: g.gradeCode, label: `${g.gradeName}（等级 ${g.gradeCode}）` })),
+  ]);
+
+  const gradeLabel = computed(() => {
+    const hit = grades.value.find((g) => g.gradeCode === form.minGrade);
+    return hit ? hit.gradeName : `等级 ${form.minGrade}`;
+  });
+
+  async function loadGrades() {
+    try {
+      grades.value = (await memberGradeApi.listConfig()) || [];
+    } catch (e) {
+      // 拉不到等级不该挡住整个商品编辑 —— 那时下拉只剩「不限」，等于维持现状
+      solvelaSentry.captureError(e);
+    }
+  }
 
   const periodLabel = computed(() => {
     const meta = Object.values(LIMIT_PERIOD_ENUM).find((p) => p.value === form.limitPeriod);
@@ -651,6 +707,7 @@
   onMounted(async () => {
     // 先分类后详情：详情回显要用分类列表把 categoryId 还原成级联路径
     await loadCategory();
+    await loadGrades();
     await loadDetail();
     refreshSkuErrors();
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -789,6 +846,7 @@
       commodityType: form.commodityType,
       payType: form.payType,
       limitPeriod: form.limitPeriod,
+      minGrade: form.minGrade ?? 0,
       limitCount: form.limitCount,
       isHome: form.isHome,
       sort: form.sort,

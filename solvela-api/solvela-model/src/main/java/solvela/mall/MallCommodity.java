@@ -115,6 +115,22 @@ public class MallCommodity {
     private Integer limitCount;
 
     /**
+     * 可兑换的最低会员等级，对应 {@code t_member_grade.grade_code}。
+     * {@code 0} = 不限，人人可兑。
+     *
+     * <h3>🔴 它是「兑不兑得了」，不是「看不看得见」</h3>
+     * 不达标的商品在 C 端<b>照常展示</b>，只是标成「XX会员专享」且兑换按钮不可点 ——
+     * 藏起来的话，用户永远不知道升到白金能换到什么，而
+     * <b>「给用户一个够上去的理由」正是这套等级体系要换的东西</b>。
+     * （任务中心那边是藏的，因为一个点不动的任务对用户没有任何吸引力，
+     * 而一件看得见的商品有。两处判断不同是刻意的。）
+     *
+     * <p>⚠️ 展示归展示，<b>服务端必须照样拦</b>：列表藏了/标了都不等于买不了，
+     * 直接打下单接口是绕不过去的那条路。守卫见 {@code MallGradeGate}。
+     */
+    private Integer minGrade;
+
+    /**
      * 上架开始时间：默认值代表不限。不是秒杀场次
      */
     private LocalDateTime startTime;

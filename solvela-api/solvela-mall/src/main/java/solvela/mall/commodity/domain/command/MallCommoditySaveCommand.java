@@ -92,6 +92,18 @@ public class MallCommoditySaveCommand {
     private Integer limitCount;
 
     /**
+     * 可兑换的最低会员等级（{@code t_member_grade.grade_code}）。{@code 0} = 不限。
+     *
+     * <p>⚠️ 设了之后，低于这一档的会员在 C 端<b>仍然看得见</b>这件商品，
+     * 只是标成「XX会员专享」且兑不了 —— 藏起来的话，用户永远不知道
+     * 升上去能换到什么，而那正是等级体系要换的东西。
+     *
+     * <p>🔴 不填按 0 处理。<b>不要</b>用「填了个很大的数」来下架商品，
+     * 下架请用状态 —— 那两件事在 C 端说给用户的话完全不同。
+     */
+    private Integer minGrade;
+
+    /**
      * 商品的<b>上架有效期</b>，不是秒杀场次 —— DDL 把这个语义钉死过，别拿来当档期用。
      * 留空由服务端填哨兵值（列是 NOT NULL 的，理由见 {@code MallConst.SHELF_START_SENTINEL}）。
      */

@@ -15,6 +15,7 @@ import solvela.enums.EnableStatusEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
+import solvela.mall.commodity.MallGradeGate;
 import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCommodity;
@@ -137,6 +138,13 @@ class MallRedeemServiceTest {
     @Mock
     private MallOrderActionPublisher orderActionPublisher;
 
+    /**
+     * 等级门槛守卫。默认放行（{@code minGrade} 不设 = 不限），
+     * 只有专门验专享商品的那条用例才把它桩成拒绝 —— 其余用例的语义都不该被它改变。
+     */
+    @Mock
+    private MallGradeGate mallGradeGate;
+
     private MallRedeemService service;
 
     private static final Long COUPON_ID = 777L;
@@ -146,10 +154,12 @@ class MallRedeemServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = spy(new MallRedeemService(mallCommodityManager, mallSkuManager, mallSkuDao,
-                mallExchangeLimitDao, mallOrderManager, mallAddressService, memberService,
+        service = spy(new MallRedeemService(mallCommodityManager, mallGradeGate, mallSkuManager,
+                mallSkuDao, mallExchangeLimitDao, mallOrderManager, mallAddressService, memberService,
                 assetDebitApi, couponQueryApi, couponWriteOffApi, eventPublisher,
                 orderActionPublisher));
+        // 默认不限等级：这个文件里绝大多数用例验的是别的东西，不该被等级门槛改变语义
+        when(mallGradeGate.canRedeem(any(), any())).thenReturn(true);
         // 没有活动事务，真调会抛 NoTransactionException；spy 成空实现后它变成一次可断言的调用
         doNothing().when(service).markRollbackOnly();
 
@@ -455,6 +465,38 @@ class MallRedeemServiceTest {
         commodity.setLimitCount(0);
         service.redeem(cmd(1));
         verify(mallExchangeLimitDao, never()).tryConsume(anyLong(), anyLong(), any(), anyInt(), anyInt());
+    }
+
+    // ------------------------------------------------------------------ 专享商品（等级门槛）
+
+    @Test
+    @DisplayName("🔴 等级不够：拒绝，且必须发生在占任何资源【之前】")
+    void 等级不够时拒绝且不占资源() {
+        /*
+         * 这条用例真正守的不是「会不会拒」，而是「在哪一步拒」。
+         *
+         * 等级判据是纯读，理应排在最前面。一旦有人把它挪到库存/限兑之后
+         * 却继续用 ofReject，后果是【库存扣了、限兑占了、订单没落】——
+         * 不报错、不打日志，只有库里那件商品少了一件。
+         * assertRejectedWithoutTouchingAnything 把这件事钉死。
+         */
+        when(mallGradeGate.canRedeem(any(), any())).thenReturn(false);
+
+        MallRedeemResult result = service.redeem(cmd(1));
+
+        assertRejectedWithoutTouchingAnything(result, MallRedeemReason.GRADE_NOT_ENOUGH);
+        // 连券都不该去试算：试算会锁券，而这一单根本走不下去
+        verify(couponQueryApi, never()).trial(any());
+    }
+
+    @Test
+    @DisplayName("等级够：照常兑换，门槛不影响正常路径")
+    void 等级够时正常兑换() {
+        when(mallGradeGate.canRedeem(any(), any())).thenReturn(true);
+
+        MallRedeemResult result = service.redeem(cmd(1));
+
+        assertTrue(result.accepted());
     }
 
     // ------------------------------------------------------------------ 断言辅助
