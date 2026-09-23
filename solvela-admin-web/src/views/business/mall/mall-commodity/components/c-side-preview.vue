@@ -1,165 +1,167 @@
 <!--
-  * C端效果预览（原型 docs/mall.html 的抽屉）
+  * C端效果预览
   *
   * 运营在后台填的是一堆分散的字段，但用户看到的是一屏。中间隔着想象力 ——
   * 「划线原价填了但纯积分商品不展示」「兑换须知写太长会被截断」这类问题，
   * 不摆出来就只能等上线后被投诉才发现。
   *
-  * 展示价取的是**最便宜那个在售 SKU 的价**，与 C 端同口径：
-  * 主表基准价只是 SKU 留空时的继承值，多规格商品实际卖的是 SKU 价。
+  * 【🔴 这一屏的价全部由服务端算好，本组件一个都不算】
+  * 它调的是 /mallCommodity/preview：服务端拿【当前表单】走
+  *   保存那条路的同一份映射（MallCommodityService.toEntity / toSkuEntity）
+  *   ＋ C 端详情页的同一个渲染（MallClientFacade.toDetailView）
+  * 渲染出来，不落库。所以「最低价取哪个规格」「折扣打几折」「要不要加『起』」
+  * 「专享锁不锁」，这里<b>没有任何一处在自己判断</b>。
   *
-  * 【🔴 它是 C 端渲染的第二份实现，会漂】
-  * app-web 与 admin-web 是两个应用，没法共享代码。2026-09-23 就吃过一次亏：
-  * 这里一直在取最低 SKU 价（对的），而真实 C 端发的是商品基准价（错的，
-  * 某件商品因此显示成真实价格的 100 倍）—— 两边对不上，而没有任何机制会发现。
-  * 所以下面每一处都标了「对齐 C 端的谁」，改 C 端时请回来看一眼。
+  * 为什么要这么绕：此前这里是一段自己算价的 JS，和真实 C 端漂过一次 ——
+  * 而且是【预览对、C 端错】（C 端发商品基准价，某件商品因此在列表上显示成
+  * 真实价格的 100 倍）。两份实现里哪一份对都无所谓，
+  * 问题是没有任何机制会发现它们不一样。
   *
-  * 【⚠️ 故意不还原的东西，改之前先读这份清单】
-  *   1. 等级价（折扣率 / 单品覆盖价）—— 预览是**未登录视角**。
-  *      要还原就得在 admin-web 里再写一份算价规则（取整方向、覆盖价优先级、
-  *      参与开关…），那正是上面那段说的「第二份实现」，只会多一处会漂的地方。
-  *      改成用一条提示说清「这件商品参不参与等级折扣」，不猜具体数字。
-  *   2. 规格可选性收窄（C 端选了颜色之后尺码会灰掉）—— 预览的规格是静态展示。
-  *   3. 本周期还可兑几件 —— 那要按会员算，预览没有会员。
-  *   4. 轮播图、图文详情 —— 抽屉里放不下，也不是这个预览要回答的问题。
+  * 【⚠️ 本组件仍然自己做的一件事：把数字写成人话】
+  * 「45,000 积分 + ¥299.00 起」这类文案在 C 端是 app-web/utils/cost.ts，
+  * 两个应用没法共享代码，所以这里还留着一份 formatPoints / formatCash / 折扣文案。
+  * 它们只管【逗号点在哪】，不管【钱是多少】——
+  * 漂了顶多是格式难看，不会再出现把价格显示成 100 倍那种事。改 cost.ts 时回来对一眼。
+  *
+  * 【⚠️ 和真实 C 端刻意不同的地方】
+  *   1. 没有会员：等级由运营在「预览身份」里选，收藏恒为 false，
+  *      「还可兑几件」按一个从没兑过的人算 —— 那是新用户看到的样子。
+  *   2. 新建商品还没有 id，查不到单品覆盖价（它按 commodity_id 配），
+  *      这时预览只反映全场折扣率。保存一次之后就准了，抽屉里有提示。
+  *   3. 规格是静态展示，不还原 C 端「选了颜色之后尺码会灰掉」那套可选性收窄。
+  *   4. 轮播图与图文详情不铺开 —— 抽屉里放不下，也不是这个预览要回答的问题。
   *
   * @Copyright  weolwo
 -->
 <template>
   <a-drawer :open="open" title="C端效果预览" width="420" placement="right" @update:open="(v) => $emit('update:open', v)">
-    <div class="phone">
-      <div class="phone-body">
-        <div class="phone-cover">
-          <FileThumb v-if="form.coverFileId" :file-id="form.coverFileId" :height="208" />
-          <span v-else class="phone-cover-empty">未设置主图</span>
-        </div>
-
-        <div class="phone-content">
-          <!--
-            对齐 C 端 utils/cost.ts 的 formatCost：
-            积分带千分位、现金半角 ¥ 带两位小数、各规格不同价时加「起」。
-            预览里写成另一种格式的话，运营看不出真实页面上数字会长什么样。
-          -->
-          <div class="flex items-baseline gap-2 flex-wrap">
-            <span class="price-main">{{ costText }}</span>
-            <!--
-              🔴 划线原价是「值多少钱」，不是「原来要多少积分」。
-              C 端走 formatWorth 输出「价值 ¥1,999.00」，<b>不划线</b>。
-              这里此前是一个划掉的裸数字 ￥1999 —— 那正是 cost.ts 那条红字
-              在防的读法（第一版前端把它当成积分原价）。
-            -->
-            <span v-if="worthText" class="price-worth">{{ worthText }}</span>
-          </div>
-
-          <!-- 对齐 C 端 ProductCard 的两个角标。缺了它们，运营配完专享等级看不出任何变化 -->
-          <div v-if="exclusiveTag || soldOut || gradePriceHint" class="flex items-center gap-2 mt-2 flex-wrap">
-            <span v-if="exclusiveTag" class="tag-lock">{{ exclusiveTag }}</span>
-            <span v-else-if="soldOut" class="tag-out">已兑完</span>
-            <span v-if="gradePriceHint" class="tag-grade">{{ gradePriceHint }}</span>
-          </div>
-
-          <div class="commodity-name">{{ form.commodityName || '未命名商品' }}</div>
-          <div class="commodity-intro">{{ form.commodityIntro }}</div>
-
-          <div class="flex items-center gap-2 mt-3 text-xs">
-            <a-tag v-if="form.limitCount > 0" color="orange">{{ periodLabel }}限 {{ form.limitCount }} 件</a-tag>
-            <a-tag color="blue">{{ typeLabel }}</a-tag>
-            <!--
-              ⚠️ 这里显示的是【库存】，不是「已兑 N 件」——
-              C 端任何页面都不显示已兑数（只在售罄时盖一个「已兑完」）。
-              预览多出一个 C 端没有的元素，会让运营以为用户看得到销量。
-            -->
-            <span class="form-tip">{{ soldOut ? '已兑完' : `现货 ${availableTotal} 件` }}</span>
-          </div>
-
-          <a-divider style="margin: 14px 0" />
-
-          <template v-if="specGroups.length">
-            <div v-for="spec in specGroups" :key="spec.name" class="mb-3">
-              <div class="spec-title">{{ spec.name }}</div>
-              <div class="flex flex-wrap gap-2">
-                <span v-for="v in spec.values" :key="v" class="spec-chip">{{ v }}</span>
-              </div>
-            </div>
-            <a-divider style="margin: 14px 0" />
-          </template>
-
-          <div class="notice-title">兑换须知</div>
-          <div class="notice-body">{{ form.exchangeNotice || '（未填写）' }}</div>
-        </div>
-      </div>
-      <!-- C 端在售罄/等级不够时按钮是不可点的，预览恒为可点会让人以为那两种态不存在 -->
-      <div class="phone-cta" :class="{ 'phone-cta--off': soldOut || exclusiveTag !== '' }">
-        {{ ctaText }}
-      </div>
+    <!--
+      等级选择器。C 端的价是跟人走的，没有它，预览只能回答「未登录看到什么」——
+      而运营刚配完的往往正是「白金看到什么」。
+    -->
+    <div class="preview-bar">
+      <span class="preview-bar-label">预览身份</span>
+      <a-select v-model:value="gradeCode" :options="gradeOptions" size="small" style="width: 190px" />
     </div>
+
+    <a-alert
+      v-if="payload && !payload.id"
+      type="info"
+      show-icon
+      class="mb-2"
+      message="这是个还没保存的新商品"
+      description="单品覆盖价按商品 id 配，新商品还没有 id，所以这一屏只反映全场折扣率。保存一次之后再看就准了。"
+    />
+
+    <a-spin :spinning="loading">
+      <div v-if="view" class="phone">
+        <div class="phone-body">
+          <div class="phone-cover">
+            <img v-if="view.coverUrl" class="phone-cover-img" :src="view.coverUrl" alt="" />
+            <span v-else class="phone-cover-empty">未设置主图</span>
+          </div>
+
+          <div class="phone-content">
+            <div class="flex items-baseline gap-2 flex-wrap">
+              <span class="price-main">{{ costText }}</span>
+              <span v-if="discountText" class="tag-discount">{{ discountText }}</span>
+            </div>
+
+            <!-- 两个划线位：先「原本要多少分」，再「值多少钱」。与 C 端详情页同序 -->
+            <div v-if="listText || worthText" class="flex items-baseline gap-2 flex-wrap price-was-row">
+              <s v-if="listText">{{ listText }}</s>
+              <s v-if="worthText">{{ worthText }}</s>
+            </div>
+
+            <div v-if="view.gradeLocked || soldOut" class="flex items-center gap-2 mt-2">
+              <span v-if="view.gradeLocked" class="tag-lock">{{ lockLabel }}</span>
+              <span v-else class="tag-out">已兑完</span>
+            </div>
+
+            <div class="commodity-name">{{ view.commodityName || '未命名商品' }}</div>
+            <div class="commodity-intro">{{ view.commodityIntro }}</div>
+
+            <div class="flex items-center gap-2 mt-3 text-xs flex-wrap">
+              <a-tag v-if="view.limitCount > 0" color="orange">{{ limitText }}</a-tag>
+              <a-tag color="blue">{{ typeLabel }}</a-tag>
+              <span class="form-tip">{{ soldOut ? '已兑完' : `现货 ${view.availableStock} 件` }}</span>
+            </div>
+
+            <a-divider style="margin: 14px 0" />
+
+            <template v-if="specGroups.length">
+              <div v-for="spec in specGroups" :key="spec.name" class="mb-3">
+                <div class="spec-title">{{ spec.name }}</div>
+                <div class="flex flex-wrap gap-2">
+                  <span v-for="v in spec.values" :key="v" class="spec-chip">{{ v }}</span>
+                </div>
+              </div>
+              <a-divider style="margin: 14px 0" />
+            </template>
+
+            <div class="notice-title">兑换须知</div>
+            <div class="notice-body">{{ view.exchangeNotice || '（未填写）' }}</div>
+          </div>
+        </div>
+        <div class="phone-cta" :class="{ 'phone-cta--off': soldOut || view.gradeLocked }">{{ ctaText }}</div>
+      </div>
+      <a-empty v-else-if="!loading" description="预览渲染不出来，多半是必填项还没填完" />
+    </a-spin>
   </a-drawer>
 </template>
 
 <script setup>
-  import { computed } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import { COMMODITY_TYPE_ENUM, LIMIT_PERIOD_ENUM, PAY_TYPE_ENUM } from '/@/constants/business/mall/mall-commodity-const';
-  import FileThumb from '/@/components/support/file-thumb/index.vue';
+  import { mallCommodityApi } from '/@/api/business/mall/mall-commodity-api';
+  import { solvelaSentry } from '/@/lib/solvela-sentry';
 
   const props = defineProps({
     open: { type: Boolean, default: false },
-    form: { type: Object, required: true },
-    skuList: { type: Array, default: () => [] },
-    /** 启用中的等级，用来把 minGrade 翻成「白金会员专享」。拿不到时退回「等级 N」 */
+    /** 编辑页当前的表单。与保存发出去的是同一份（见 buildPayload）。抽屉没开时为 null */
+    payload: { type: Object, default: null },
+    /** 启用中的等级，只用来渲染「预览身份」下拉 */
     grades: { type: Array, default: () => [] },
   });
   defineEmits(['update:open']);
 
-  /**
-   * 在售规格。
-   *
-   * ⚠️ 判据是 `=== 1`（ENABLED），不是 `!== 0` ——
-   * 服务端查的是 `sku_status = 1`，两边口径要一样。
-   * 编辑器新建的行一定带 skuStatus=1（见 sku-editor 的 buildRows），所以不会误伤。
-   */
-  const onSaleSkus = computed(() => props.skuList.filter((sku) => sku.skuStatus === 1));
+  const gradeCode = ref(0);
+  const view = ref(null);
+  const loading = ref(false);
 
-  /** SKU 留空就继承主表基准价 —— 对齐 MallPricing.listPoints */
-  function inherit(value, base) {
-    return value === null || value === undefined ? base || 0 : value;
+  const gradeOptions = computed(() => [
+    { value: 0, label: '未登录 / 普通会员' },
+    ...props.grades
+      .filter((g) => g.status === 1 && g.gradeCode > 0)
+      .map((g) => ({ value: g.gradeCode, label: `${g.gradeName}（等级 ${g.gradeCode}）` })),
+  ]);
+
+  async function load() {
+    if (!props.open || !props.payload) {
+      return;
+    }
+    loading.value = true;
+    try {
+      view.value = await mallCommodityApi.preview(props.payload, gradeCode.value);
+    } catch (e) {
+      /*
+       * 必填项没填完时服务端按 @Valid 打回来。这不是异常，是「还没到能预览的程度」——
+       * 但也没什么可画的，所以清空 view 让 a-empty 出来说一句人话。
+       */
+      view.value = null;
+      solvelaSentry.captureError(e);
+    } finally {
+      loading.value = false;
+    }
   }
 
-  /**
-   * 最便宜那个在售规格。<b>对齐 MallPricing.cheapest。</b>
-   *
-   * 🔴 按 (积分, 现金) <b>依次比</b>，不是各取各的最小值。
-   * 各取最小会拼出一个【没有任何规格真的这么卖】的组合：
-   * A 规格 8800 分 + ¥5000、B 规格 9000 分 + ¥100 → 拼成 8800 + ¥100。
-   * 这里此前就是各取各的。依次比总能指向一个真实存在的规格。
+  /*
+   * 开抽屉、换身份都要重拉。
+   * ⚠️ payload 也要盯：运营改完表单不关抽屉直接再点预览，靠的就是它。
    */
-  const cheapest = computed(() => {
-    const basePoints = props.form.pointsPrice || 0;
-    const baseCash = Number(props.form.cashPrice) || 0;
-    const skus = onSaleSkus.value;
-    if (!skus.length) {
-      // 一个在售规格都没有：退回主表基准价（同 MallPricing.cheapest 的空列表分支）
-      return { points: basePoints, cash: baseCash, varies: false };
-    }
-    let best = null;
-    let varies = false;
-    for (const sku of skus) {
-      const points = inherit(sku.skuPointsPrice, basePoints);
-      const cash = Number(inherit(sku.skuCashPrice, baseCash)) || 0;
-      if (best === null) {
-        best = { points, cash };
-        continue;
-      }
-      if (points !== best.points || cash !== best.cash) {
-        varies = true;
-      }
-      if (points < best.points || (points === best.points && cash < best.cash)) {
-        best = { points, cash };
-      }
-    }
-    return { ...best, varies };
-  });
+  watch(() => [props.open, gradeCode.value, props.payload], load, { immediate: true });
 
-  /* ---------- 展示格式：对齐 C 端 utils/cost.ts ---------- */
+  /* ---------- 以下只管把数字写成人话，不管数字是多少。对齐 app-web/utils/cost.ts ---------- */
 
   /** `45,000 积分` */
   function formatPoints(points) {
@@ -172,83 +174,81 @@
   }
 
   const costText = computed(() => {
-    const { points, cash, varies } = cheapest.value;
-    const base =
-      props.form.payType === PAY_TYPE_ENUM.POINTS_CASH.value
-        ? `${formatPoints(points)} + ${formatCash(cash)}`
-        : formatPoints(points);
-    // 各规格不同价时 C 端加「起」—— 不加的话运营看不出这是最低价
-    return varies ? `${base} 起` : base;
-  });
-
-  /** 🔴「价值 ¥1,999.00」，不划线 —— 它是「值多少钱」，不是「原来要多少积分」 */
-  const worthText = computed(() =>
-    Number(props.form.originalPrice) > 0 ? `价值 ${formatCash(props.form.originalPrice)}` : '',
-  );
-
-  /* ---------- 三个 C 端有、这里此前没有的态 ---------- */
-
-  const availableTotal = computed(() =>
-    onSaleSkus.value.reduce(
-      (sum, sku) => sum + Math.max(0, (sku.totalStock || 0) - (sku.lockedStock || 0) - (sku.soldCount || 0)),
-      0,
-    ),
-  );
-
-  const soldOut = computed(() => availableTotal.value <= 0);
-
-  /**
-   * 专享等级标。对齐 C 端 ProductCard.exclusiveTag。
-   *
-   * ⚠️ C 端是拿「这个会员够不够格」算的（服务端给的 gradeLocked），
-   * 而预览没有会员 —— 这里按<b>未登录</b>算，也就是只要设了门槛就显示锁。
-   * 那正是一个没登录的用户看到的样子。
-   */
-  const exclusiveTag = computed(() => {
-    const min = props.form.minGrade || 0;
-    if (min <= 0) {
+    const v = view.value;
+    if (!v) {
       return '';
     }
-    const hit = props.grades.find((g) => g.gradeCode === min);
-    return `${hit ? hit.gradeName : `等级 ${min}`}专享`;
+    const base =
+      v.payType === PAY_TYPE_ENUM.POINTS_CASH.value
+        ? `${formatPoints(v.pointsPrice)} + ${formatCash(v.cashPrice)}`
+        : formatPoints(v.pointsPrice);
+    // 各规格不同价时加「起」—— 不加的话运营看不出这是最低价
+    return v.priceVaries ? `${base} 起` : base;
   });
 
-  /**
-   * 等级价只给一句话，<b>不算具体数字</b>。
-   *
-   * 🔴 要算就得在 admin-web 里再写一份算价规则（取整方向、覆盖价优先级、
-   * 参与开关…），而这个组件的头部注释刚说过「第二份实现会漂」——
-   * 再加一份只会多一处会漂的地方。预览是未登录视角，这句话补上缺的那半信息。
+  /*
+   * 🔴 判据是两个价不相等，不是折扣率小于 100。
+   * 商品可以单独退出等级折扣，那时这个人的折扣率照样是 88 而这件商品一分没便宜 ——
+   * 按折扣率判会在一件没便宜的商品上挂出「8.8折」。同 cost.ts 的 formatDiscount。
    */
-  const gradePriceHint = computed(() => {
-    if (props.form.gradePriceFlag === 0) {
-      return '不参与等级折扣';
+  const discountText = computed(() => {
+    const v = view.value;
+    if (!v || v.listPointsPrice <= v.pointsPrice || v.gradeDiscountPercent >= 100 || v.gradeDiscountPercent <= 0) {
+      return '';
     }
-    return '高等级会员看到的价更低';
+    const tenths = v.gradeDiscountPercent / 10;
+    return `${Number.isInteger(tenths) ? tenths : tenths.toFixed(1)}折`;
   });
+
+  /** 划掉的挂牌积分价。没享到折扣就为空 */
+  const listText = computed(() => {
+    const v = view.value;
+    return v && v.listPointsPrice > v.pointsPrice ? formatPoints(v.listPointsPrice) : '';
+  });
+
+  /** 🔴「价值 ¥1,999.00」—— 它是「值多少钱」，不是「原来要多少积分」 */
+  const worthText = computed(() => {
+    const v = view.value;
+    return v && Number(v.originalPrice) > 0 ? `价值 ${formatCash(v.originalPrice)}` : '';
+  });
+
+  const soldOut = computed(() => (view.value ? view.value.availableStock <= 0 : false));
+
+  const lockLabel = computed(() => `${view.value?.minGradeName || '等级'}专享`);
 
   const ctaText = computed(() => {
-    if (exclusiveTag.value) {
-      return exclusiveTag.value;
+    if (view.value?.gradeLocked) {
+      return lockLabel.value;
     }
     return soldOut.value ? '已兑完' : '立即兑换';
   });
 
+  const limitText = computed(() => {
+    const v = view.value;
+    if (!v) {
+      return '';
+    }
+    const head = `${periodLabel.value}限 ${v.limitCount} 件`;
+    return v.remainingCount === null || v.remainingCount === undefined
+      ? head
+      : `${head}，还可兑 ${v.remainingCount} 件`;
+  });
+
   const typeLabel = computed(() => {
-    const meta = Object.values(COMMODITY_TYPE_ENUM).find((t) => t.value === props.form.commodityType);
-    return meta ? meta.desc : props.form.commodityType;
+    const meta = Object.values(COMMODITY_TYPE_ENUM).find((t) => t.value === view.value?.commodityType);
+    return meta ? meta.desc : view.value?.commodityType;
   });
 
   const periodLabel = computed(() => {
-    const meta = Object.values(LIMIT_PERIOD_ENUM).find((p) => p.value === props.form.limitPeriod);
+    const meta = Object.values(LIMIT_PERIOD_ENUM).find((p) => p.value === view.value?.limitPeriod);
     return meta ? meta.desc : '';
   });
 
-  /** 从 SKU 的 attrs 反推规格选择区，和 C 端渲染的是同一份数据 */
+  /** 规格分组从【服务端给的】SKU 列表推 —— 和 C 端 groupSkuAttributes 吃的是同一份数据 */
   const specGroups = computed(() => {
     const groups = [];
     const indexByName = new Map();
-    for (const sku of props.skuList) {
+    for (const sku of view.value?.skus || []) {
       for (const [name, value] of Object.entries(sku.skuAttrs || {})) {
         if (!indexByName.has(name)) {
           indexByName.set(name, groups.length);
@@ -306,16 +306,42 @@
     color: #f97316;
   }
 
-  /* 🔴 不划线：它是「值多少钱」，不是「原来要多少积分」。划一道就成了原价促销的读法 */
-  .price-worth {
-    margin-left: 4px;
+  .preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .preview-bar-label {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .phone-cover-img {
+    width: 100%;
+    height: 208px;
+    object-fit: contain;
+  }
+
+  .price-was-row {
+    margin-top: 2px;
     font-size: 12px;
     color: #94a3b8;
   }
 
+  .tag-discount {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #ff4d3a;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
   .tag-lock,
-  .tag-out,
-  .tag-grade {
+  .tag-out {
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;
@@ -332,10 +358,7 @@
     color: #64748b;
   }
 
-  .tag-grade {
-    background: #fff7e6;
-    color: #d46b08;
-  }
+
 
   .commodity-name {
     margin-top: 8px;

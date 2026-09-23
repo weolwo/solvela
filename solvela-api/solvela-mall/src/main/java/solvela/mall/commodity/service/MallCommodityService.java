@@ -21,6 +21,8 @@ import solvela.base.module.file.service.RichTextImageExtractor;
 import solvela.enums.PrizeTypeEnum;
 import solvela.mall.MallCategory;
 import solvela.mall.category.manager.MallCategoryManager;
+import solvela.mall.clientapi.MallClientFacade;
+import solvela.marketing.api.MallCommodityDetailView;
 import solvela.mall.commodity.dao.MallCommodityDao;
 import solvela.mall.MallCommodity;
 import solvela.mall.commodity.domain.query.MallCommodityQuery;
@@ -70,6 +72,12 @@ import java.util.stream.Collectors;
 public class MallCommodityService {
 
     private final MallCommodityDao mallCommodityDao;
+    /*
+     * ⚠️ 管理端服务注入了 C 端 facade，只为了【预览】——
+     *    目的正是让预览走 C 端那一份渲染，而不是在别处再写一份。
+     *    别拿它做别的事：保存/查询走的是本类自己的路。
+     */
+    private final MallClientFacade mallClientFacade;
     private final MallGradePriceDao mallGradePriceDao;
     private final MallCommodityManager mallCommodityManager;
     private final MallSkuManager mallSkuManager;
@@ -499,6 +507,98 @@ public class MallCommodityService {
      */
     private Long saveCommodity(MallCommoditySaveCommand form, MallCommodity existing,
                                String commodityCode, Shelf shelf, String operator) {
+        MallCommodity entity = toEntity(form, commodityCode, shelf);
+        /*
+         * ⚠️ 关掉等级折扣开关会让这件商品已配的覆盖价【一行都不生效】——
+         *    它们不会被删（运营可能只是临时关一下），但也不会有任何界面提示。
+         *    留一条 WARN 说清影响面，和 GradeEntitlementAdminService 停用配置那条同一个做法。
+         *
+         *    这一段留在保存里、没有跟着 toEntity 走：它是【写操作的副作用】，
+         *    而 toEntity 是纯映射，预览也要调 —— 预览一次就打一条 WARN 是噪音。
+         */
+        if (entity.getGradePriceFlag() == 0 && entity.getId() != null) {
+            long overrides = mallGradePriceDao.selectCount(new LambdaQueryWrapper<MallGradePrice>()
+                    .eq(MallGradePrice::getCommodityId, entity.getId()));
+            if (overrides > 0) {
+                log.warn("【商城商品】{} 关闭了等级折扣开关，但它还有 {} 行单品覆盖价 —— "
+                                + "那些价从现在起【不生效】，商品按挂牌价卖。要用它们请重新打开开关",
+                        entity.getCommodityCode(), overrides);
+            }
+        }
+        // create_time / update_time 一律不设：铁律 9，只认数据库时钟
+        entity.setUpdateBy(operator);
+        if (existing == null) {
+            entity.setSoldCount(0);
+            entity.setCreateBy(operator);
+            mallCommodityDao.insert(entity);
+        } else {
+            mallCommodityDao.updateById(entity);
+        }
+        return entity.getId();
+    }
+
+    /**
+     * 管理端「C 端预览」：把<b>编辑页当前的表单</b>渲染成 C 端详情页的样子。
+     *
+     * <h3>🔴 它不落库，也不自己算价</h3>
+     * 表单走的是保存那条路上<b>同一份映射</b>（{@link #toEntity} / {@link #toSkuEntity}），
+     * 渲染走的是 C 端详情页<b>同一个方法</b>（{@code MallClientFacade.renderPreview}
+     * 最终调的就是 {@code toDetailView}）。
+     *
+     * <p>在此之前预览是 admin-web 里的一段 JS，自己算最低价、自己拼对价文案，
+     * 结果和真实 C 端漂过一次 —— 而且是<b>预览对、C 端错</b>
+     *（C 端发商品基准价，某件商品因此显示成真实价格的 100 倍）。
+     * 两份实现里哪一份对都无所谓，问题是没有任何机制会发现它们不一样。
+     *
+     * <h3>⚠️ 库存要自己补</h3>
+     * {@code available_stock} 是数据库的虚拟列，草稿实体上是 null，
+     * 而渲染那边拿 null 当 0 —— 不补的话<b>每次预览都显示「已兑完」</b>。
+     * 已有的行按 {@code 投放 - 锁定 - 已售} 算，新加的行还没有任何占用，就是投放量。
+     *
+     * @param gradeCode 假装是几级；{@code 0} = 未登录 / 普通会员
+     */
+    public MallCommodityDetailView preview(MallCommoditySaveCommand form, int gradeCode) {
+        Shelf shelf = resolveShelf(form);
+        MallCommodity draft = toEntity(form, form.getCommodityCode(), shelf);
+
+        boolean pointsOnly = form.getPayType() == MallPayTypeEnum.POINTS;
+        List<MallCommoditySkuCommand> skuForms = form.getSkuList() == null
+                ? List.of() : form.getSkuList();
+        // 已有行的锁定/已售只能从库里拿：表单刻意不带这两个字段（见 toSkuEntity）
+        Map<Long, MallSku> existingById = draft.getId() == null ? Map.of()
+                : listDbSku(draft.getId()).stream()
+                        .collect(Collectors.toMap(MallSku::getId, java.util.function.Function.identity(),
+                                (a, b) -> a));
+
+        List<MallSku> draftSkus = new ArrayList<>();
+        for (int i = 0; i < skuForms.size(); i++) {
+            MallCommoditySkuCommand skuForm = skuForms.get(i);
+            MallSku sku = toSkuEntity(skuForm, draft.getId(), pointsOnly, i);
+            sku.setId(skuForm.getId());
+            MallSku existing = skuForm.getId() == null ? null : existingById.get(skuForm.getId());
+            int occupied = existing == null ? 0
+                    : nullToZero(existing.getLockedStock()) + nullToZero(existing.getSoldCount());
+            sku.setAvailableStock(Math.max(0, nullToZero(sku.getTotalStock()) - occupied));
+            draftSkus.add(sku);
+        }
+
+        List<Long> bannerIds = form.getBannerFileIds() == null ? List.of() : form.getBannerFileIds();
+        return mallClientFacade.renderPreview(draft, draftSkus, bannerIds, gradeCode);
+    }
+
+    /**
+     * 表单 → 主表实体的<b>纯映射</b>，不碰数据库。
+     *
+     * <h3>🔴 抽出来是为了让「预览」和「保存」用同一份映射</h3>
+     * C 端预览（{@link #preview}）渲染的是一个<b>还没落库</b>的草稿，
+     * 它必须和保存后的样子一致 —— 而「一致」唯一可靠的保证方式，
+     * 就是两边走同一段代码。
+     *
+     * <p>下面每一条兜底（现金价清零、minGrade 归 0、gradePriceFlag 默认 1…）
+     * 都会直接改变用户看到的价格与标签。各写一份的话，预览里是一个样、
+     * 存进去是另一个样，而<b>两边都不报错</b>。
+     */
+    private MallCommodity toEntity(MallCommoditySaveCommand form, String commodityCode, Shelf shelf) {
         MallCommodity entity = new MallCommodity();
         entity.setId(form.getId());
         entity.setCommodityCode(commodityCode);
@@ -537,35 +637,12 @@ public class MallCommodityService {
          */
         entity.setGradePriceFlag(form.getGradePriceFlag() == null || form.getGradePriceFlag() != 0
                 ? 1 : 0);
-        /*
-         * ⚠️ 关掉开关会让这件商品已配的覆盖价【一行都不生效】——
-         *    它们不会被删（运营可能只是临时关一下），但也不会有任何界面提示。
-         *    留一条 WARN 说清影响面，和 GradeEntitlementAdminService 停用配置那条同一个做法。
-         */
-        if (entity.getGradePriceFlag() == 0 && entity.getId() != null) {
-            long overrides = mallGradePriceDao.selectCount(new LambdaQueryWrapper<MallGradePrice>()
-                    .eq(MallGradePrice::getCommodityId, entity.getId()));
-            if (overrides > 0) {
-                log.warn("【商城商品】{} 关闭了等级折扣开关，但它还有 {} 行单品覆盖价 —— "
-                                + "那些价从现在起【不生效】，商品按挂牌价卖。要用它们请重新打开开关",
-                        entity.getCommodityCode(), overrides);
-            }
-        }
         entity.setStartTime(shelf.startTime());
         entity.setEndTime(shelf.endTime());
         entity.setStatus(shelf.status());
         entity.setIsHome(Boolean.TRUE.equals(form.getIsHome()));
         entity.setSort(form.getSort() == null ? 0 : form.getSort());
-        // create_time / update_time 一律不设：铁律 9，只认数据库时钟
-        entity.setUpdateBy(operator);
-        if (existing == null) {
-            entity.setSoldCount(0);
-            entity.setCreateBy(operator);
-            mallCommodityDao.insert(entity);
-        } else {
-            mallCommodityDao.updateById(entity);
-        }
-        return entity.getId();
+        return entity;
     }
 
     /**
@@ -581,17 +658,7 @@ public class MallCommodityService {
         List<MallCommoditySkuCommand> skuFormList = skuPlan.forms();
         for (int i = 0; i < skuFormList.size(); i++) {
             MallCommoditySkuCommand skuForm = skuFormList.get(i);
-            MallSku sku = new MallSku();
-            sku.setCommodityId(commodityId);
-            sku.setSkuAttrs(JsonUtils.toJson(skuForm.getSkuAttrs() == null
-                    ? new LinkedHashMap<String, String>() : skuForm.getSkuAttrs()));
-            sku.setSkuCoverFileId(skuForm.getSkuCoverFileId());
-            sku.setSkuPointsPrice(skuForm.getSkuPointsPrice());
-            sku.setSkuCashPrice(pointsOnly ? null : skuForm.getSkuCashPrice());
-            sku.setTotalStock(skuForm.getTotalStock());
-            sku.setSkuStatus(skuForm.getSkuStatus() == null ? EnableStatusEnum.ENABLED : skuForm.getSkuStatus());
-            // 顺序取表单里的行序 —— 运营拖动排序后期望 C 端就是那个顺序
-            sku.setSort(skuForm.getSort() == null ? i : skuForm.getSort());
+            MallSku sku = toSkuEntity(skuForm, commodityId, pointsOnly, i);
             sku.setUpdateBy(operator);
             if (skuForm.getId() == null) {
                 sku.setSkuCode(skuForm.getSkuCode());
@@ -607,6 +674,31 @@ public class MallCommodityService {
         if (!skuPlan.toDelete().isEmpty()) {
             mallSkuManager.removeByIds(skuPlan.toDelete().stream().map(MallSku::getId).toList());
         }
+    }
+
+    /**
+     * SKU 表单 → 实体的<b>纯映射</b>，不碰数据库。理由同 {@link #toEntity}：
+     * 预览与保存必须走同一段代码，否则「预览里是一个价、存进去是另一个价」，
+     * 而两边都不报错。
+     *
+     * <p>⚠️ <b>不设</b> {@code lockedStock} / {@code soldCount} / {@code availableStock}：
+     * 前两个只由下单与履约链路改（让编辑页写它们，等于让一次保存把在途订单的锁库存抹掉），
+     * 后者是虚拟列，写它会直接报错。
+     */
+    private MallSku toSkuEntity(MallCommoditySkuCommand skuForm, Long commodityId,
+                                boolean pointsOnly, int index) {
+        MallSku sku = new MallSku();
+        sku.setCommodityId(commodityId);
+        sku.setSkuAttrs(JsonUtils.toJson(skuForm.getSkuAttrs() == null
+                ? new LinkedHashMap<String, String>() : skuForm.getSkuAttrs()));
+        sku.setSkuCoverFileId(skuForm.getSkuCoverFileId());
+        sku.setSkuPointsPrice(skuForm.getSkuPointsPrice());
+        sku.setSkuCashPrice(pointsOnly ? null : skuForm.getSkuCashPrice());
+        sku.setTotalStock(skuForm.getTotalStock());
+        sku.setSkuStatus(skuForm.getSkuStatus() == null ? EnableStatusEnum.ENABLED : skuForm.getSkuStatus());
+        // 顺序取表单里的行序 —— 运营拖动排序后期望 C 端就是那个顺序
+        sku.setSort(skuForm.getSort() == null ? index : skuForm.getSort());
+        return sku;
     }
 
     /**

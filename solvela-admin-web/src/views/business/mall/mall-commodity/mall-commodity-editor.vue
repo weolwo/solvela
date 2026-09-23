@@ -418,7 +418,15 @@
       </div>
     </div>
 
-    <CSidePreview v-model:open="previewOpen" :form="form" :sku-list="form.skuList" :grades="grades" />
+    <!--
+      ⚠️ 预览发的是【当前表单】，状态固定按上架算：
+         预览要回答的是「上架之后长什么样」，而不是「草稿长什么样」。
+    -->
+    <CSidePreview
+      v-model:open="previewOpen"
+      :payload="previewOpen ? buildPayload(COMMODITY_STATUS_ENUM.ON.value) : null"
+      :grades="grades"
+    />
   </a-spin>
 </template>
 
@@ -964,6 +972,30 @@
    * 存草稿不校验，提交上架才校验。
    * 运营常常要先存一半（等设计出图、等券模编码），草稿卡校验的话这个动作就没意义了。
    */
+  /**
+   * 表单 → 请求体。
+   *
+   * 🔴 保存和 C 端预览<b>共用这一个</b>：预览发过去的必须和保存发过去的一模一样，
+   *    否则「预览里是一个样、存进去是另一个样」，而两边都不报错。
+   */
+  function buildPayload(targetStatus) {
+    return {
+      ...form,
+      id: commodityId.value,
+      status: targetStatus,
+      assetRef: isCoupon.value ? form.assetRef : null,
+      // 留空 = 长期在线，交给服务端填哨兵值
+      startTime: timeRange.value && timeRange.value[0] ? timeRange.value[0] : null,
+      endTime: timeRange.value && timeRange.value[1] ? timeRange.value[1] : null,
+      // 剔除三类不属于请求契约的字段：
+      //   rowKey                              前端的行标识
+      //   lockedStock / soldCount / available 运行态数据，只由下单和履约链路维护
+      // 后端的 SkuForm 本来就没有这几个字段（Jackson 配了忽略未知属性，发过去也只是被丢掉），
+      // 但发一份「看起来能改已售数量」的报文本身就是误导
+      skuList: form.skuList.map(({ rowKey, lockedStock, soldCount, availableStock, ...sku }) => sku),
+    };
+  }
+
   async function submit(targetStatus) {
     await skuEditorRef.value.ensureNotEmpty();
     await nextTick();
@@ -978,22 +1010,7 @@
 
     saving.value = true;
     try {
-      const param = {
-        ...form,
-        id: commodityId.value,
-        status: targetStatus,
-        assetRef: isCoupon.value ? form.assetRef : null,
-        // 留空 = 长期在线，交给服务端填哨兵值
-        startTime: timeRange.value && timeRange.value[0] ? timeRange.value[0] : null,
-        endTime: timeRange.value && timeRange.value[1] ? timeRange.value[1] : null,
-        // 剔除三类不属于请求契约的字段：
-        //   rowKey                              前端的行标识
-        //   lockedStock / soldCount / available 运行态数据，只由下单和履约链路维护
-        // 后端的 SkuForm 本来就没有这几个字段（Jackson 配了忽略未知属性，发过去也只是被丢掉），
-        // 但发一份「看起来能改已售数量」的报文本身就是误导
-        skuList: form.skuList.map(({ rowKey, lockedStock, soldCount, availableStock, ...sku }) => sku),
-      };
-      const res = await mallCommodityApi.save(param);
+      const res = await mallCommodityApi.save(buildPayload(targetStatus));
 
       const created = isCreate.value;
       commodityId.value = res;

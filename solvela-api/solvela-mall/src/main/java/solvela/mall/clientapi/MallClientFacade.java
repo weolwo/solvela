@@ -245,17 +245,67 @@ public class MallClientFacade implements MallApi {
      * 只是不再宣传一个已经不存在的等级。
      */
     private GradeLens gradeLens(Long memberId, java.util.Collection<Long> commodityIds) {
+        return gradeLensOf(mallGradeGate.gradeOf(memberId), commodityIds);
+    }
+
+    /**
+     * 直接按等级号装配视角。
+     *
+     * <p>⚠️ 与 {@link #gradeLens} 的区别只有一处：那个要先把 memberId 翻成等级
+     *（含保级缓冲期那套判断），这个是<b>已经知道等级</b>。
+     * 管理端的 C 端预览走这条 —— 它没有会员，只有运营选的一个「假装是几级」。
+     */
+    private GradeLens gradeLensOf(int grade, java.util.Collection<Long> commodityIds) {
         List<MemberGrade> grades = memberGradeResolver.enabledGrades();
         Map<Integer, String> names = grades.stream()
                 .filter(g -> g.getGradeCode() != null && g.getGradeName() != null)
                 .collect(Collectors.toMap(MemberGrade::getGradeCode, MemberGrade::getGradeName,
                         (a, b) -> a));
-        int grade = mallGradeGate.gradeOf(memberId);
         /*
          * ⚠️ 折扣走【已经在手上的】grades，不再查一次库 —— 这两个答案本来就是同一份数据。
          *    列表页一页 20 件，这里多查一次就是多 20 次（如果哪天有人把它挪进循环）。
          */
         return new GradeLens(grade, names, mallGradeDiscountResolver.of(grade, grades, commodityIds));
+    }
+
+    /**
+     * 管理端「C 端预览」：拿一个<b>还没落库的草稿</b>渲染出 C 端详情页的样子。
+     *
+     * <h3>🔴 它存在的全部理由是「不要有第二份实现」</h3>
+     * 在此之前预览是 admin-web 里的一段 JS，自己算最低价、自己拼对价文案。
+     * 那段代码和真实 C 端漂过一次：2026-09-23 发现<b>预览是对的、C 端是错的</b>
+     *（C 端发商品基准价，某件商品因此显示成真实价格的 100 倍），
+     * 两边对不上而没有任何机制会发现。
+     *
+     * <p>现在预览走的就是 {@link #toDetailView} —— 和 {@link #getCommodity} 同一个方法。
+     * 价格规则、角标、划线、「起」、专享锁，全都<b>不可能</b>再各算一份。
+     *
+     * <h3>⚠️ 三个和真实 C 端刻意不同的地方</h3>
+     * <ol>
+     *   <li><b>草稿没落库</b>，所以传进来的是表单映射出的瞬时实体，不是查出来的；</li>
+     *   <li><b>没有会员</b>，等级由运营在预览里选。收藏恒为 false，
+     *       「本周期还可兑几件」按<b>一个从没兑过的人</b>算 —— 那是新用户看到的样子；</li>
+     *   <li><b>新建商品还没有 id</b>，所以查不到单品覆盖价（它按 commodity_id 配）。
+     *       这时预览只反映折扣率。保存一次之后就准了。</li>
+     * </ol>
+     *
+     * @param gradeCode 假装是几级；{@code 0} = 未登录 / 普通会员
+     */
+    public MallCommodityDetailView renderPreview(MallCommodity draft, List<MallSku> draftSkus,
+                                                 List<Long> bannerIds, int gradeCode) {
+        /*
+         * 🔴 只留在售规格，和 listOnSaleSkus 同一个判据。
+         * 不过滤的话，一个停用的便宜规格会把预览价拉低 —— 而用户根本看不到它。
+         */
+        List<MallSku> onSale = draftSkus.stream()
+                .filter(sku -> EnableStatusEnum.ENABLED == sku.getSkuStatus())
+                .toList();
+        List<Long> ids = draft.getId() == null ? List.of() : List.of(draft.getId());
+        Integer remaining = draft.getLimitCount() == null || draft.getLimitCount() <= 0
+                ? null : draft.getLimitCount();
+        return toDetailView(draft, onSale, bannerIds,
+                loadAllImages(draft, onSale, bannerIds),
+                false, remaining, gradeLensOf(Math.max(0, gradeCode), ids));
     }
 
     /** 在售 SKU，按运营配的 sort 排；sort 相同按 id 兜底，保证两次请求顺序一致 */

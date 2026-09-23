@@ -48,6 +48,20 @@ export const mallCommodityApi = {
   },
 
   /**
+   * C 端预览：按【当前表单】渲染，不落库  @author alaric
+   *
+   * 🔴 返回的就是 C 端详情接口的那个 view（MallCommodityDetailView）——
+   *    价格、折扣角标、划线、「起」、专享锁全是服务端算好的。
+   *    预览组件只负责把它画出来，一个字都不要自己算，
+   *    否则又变成一份会和 C 端漂的实现（2026-09-23 已经吃过一次）。
+   *
+   * @param gradeCode 预览成几级；0 = 未登录 / 普通会员
+   */
+  preview: (param, gradeCode) => {
+    return postRequest(`/mallCommodity/preview?gradeCode=${gradeCode ?? 0}`, param);
+  },
+
+  /**
    * 上架 / 下架  @author  weolwo
    */
   updateStatus: (id, status) => {

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
@@ -24,6 +25,7 @@ import solvela.mall.commodity.domain.command.MallCommoditySaveCommand;
 import solvela.mall.commodity.domain.dto.MallCommodityDetailDTO;
 import solvela.admin.module.mall.commodity.domain.vo.MallCommodityVO;
 import solvela.mall.commodity.domain.dto.MallCommodityDTO;
+import solvela.marketing.api.MallCommodityDetailView;
 import solvela.mall.commodity.service.MallCommodityService;
 
 import java.util.List;
@@ -94,6 +96,31 @@ public class MallCommodityController {
     @RequiresPermission("mallCommodity:update")
     public Long save(@RequestBody @Valid MallCommoditySaveForm saveForm) {
         return mallCommodityService.save(SolvelaBeanUtil.deepCopy(saveForm, MallCommoditySaveCommand.class), CurrentEmployee.nameOrNull());
+    }
+
+    /**
+     * C 端预览：把编辑页<b>当前的表单</b>渲染成 C 端详情页的样子。
+     *
+     * <h3>🔴 不落库</h3>
+     * 收的是和 save 一模一样的表单，走的是和 save 一模一样的映射，
+     * 但只渲染、不写任何一张表。所以运营改了还没保存的东西也能预览。
+     *
+     * <p>权限点挂 update 而不是 query：它接受的是一份完整的商品表单，
+     * 能调它的人本来就能保存。
+     *
+     * <p>⚠️ 这个接口<b>不是</b>给 C 端用的 —— C 端走网关的 {@code /mall/commodity/{id}}。
+     * 两者最终调的是同一个渲染方法，这正是它存在的理由。
+     *
+     * @param gradeCode 预览成几级；不传按 0（未登录 / 普通会员）
+     */
+    @Operation(summary = "C端预览：按当前表单渲染，不落库 @author alaric")
+    @PostMapping("/preview")
+    @RequiresPermission("mallCommodity:update")
+    public MallCommodityDetailView preview(@RequestBody @Valid MallCommoditySaveForm saveForm,
+                                           @RequestParam(required = false) Integer gradeCode) {
+        return mallCommodityService.preview(
+                SolvelaBeanUtil.deepCopy(saveForm, MallCommoditySaveCommand.class),
+                gradeCode == null ? 0 : gradeCode);
     }
 
     @Operation(summary = "上架/下架 @author weolwo")
