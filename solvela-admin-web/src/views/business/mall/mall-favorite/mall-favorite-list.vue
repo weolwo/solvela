@@ -152,7 +152,13 @@
     { title: '收藏数', dataIndex: 'favoriteCount', width: 90 },
     { title: '已兑件数', dataIndex: 'soldCount', width: 100 },
     { title: '可用库存', dataIndex: 'availableStock', width: 100 },
-    { title: '积分', dataIndex: 'pointsPrice', width: 90 },
+    /*
+     * 🔴 列名是「最低积分价」不是「积分」：这里显示的是【最低在售规格】的价，
+     *    不是商品表上那个基准价（那一列只是 SKU 没填价时的继承来源）。
+     *    2026-09-23 之前显示的是基准价，对某件商品把价格放大了 100 倍 ——
+     *    而这一列正是运营判断「定价是不是偏高」的依据。
+     */
+    { title: '最低积分价', dataIndex: 'pointsPrice', width: 110 },
     { title: '商品状态', dataIndex: 'commodityStatus', width: 100 },
   ]);
 

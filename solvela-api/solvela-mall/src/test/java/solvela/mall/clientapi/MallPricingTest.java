@@ -439,4 +439,32 @@ class MallPricingTest {
                     path + " 只用了挂牌价，没走等级折扣");
         }
     }
+
+    /**
+     * 🔴 <b>SQL 里也不许直接把商品基准价当成「这件商品多少分」发出去。</b>
+     *
+     * <p>上面那条守的是 Java，而 2026-09-23 漏网的那一处在 XML 里：
+     * {@code MallFavoriteMapper} 的两段排行查询各写了一句
+     * {@code c.points_price AS pointsPrice}，完全绕过了 MallPricing。
+     * 库里有基准价 99999 而唯一在售规格只要 1000 的商品，于是管理端
+     * 「收藏统计」把价格显示成真实值的 <b>100 倍</b> ——
+     * 而那一列正是运营判断「定价是不是偏高」的依据。
+     *
+     * <p>⚠️ 这条只扫这一个文件，不扫全部 XML：{@code MallCommodityMapper} 里的
+     * {@code c.points_price} 是<b>对的</b>（那是商品配置本身，管理端编辑页要回显它），
+     * {@code MallOrderMapper} 里的是订单快照。
+     * 判据是「这个值会不会被当成『用户要付多少』发给人看」，不是「有没有出现这个列名」。
+     */
+    @Test
+    @DisplayName("🔴 收藏排行的价必须取最低在售规格，不许直接发 c.points_price")
+    void 收藏排行不发商品基准价() throws IOException {
+        String path = "src/main/resources/mapper/mall/MallFavoriteMapper.xml";
+        String sql = Files.readString(Path.of(path), StandardCharsets.UTF_8);
+        // 注释里会提到这个写法（讲它为什么错），所以先把注释剥掉再判
+        String code = sql.replaceAll("(?s)<!--.*?-->", "");
+        assertFalse(code.contains("c.points_price              AS pointsPrice"),
+                path + " 又把商品基准价当成售价发出去了 —— 要取各在售 SKU 的最低价");
+        assertTrue(code.contains("MIN(IFNULL(s2.sku_points_price"),
+                path + " 没有取最低在售规格价");
+    }
 }

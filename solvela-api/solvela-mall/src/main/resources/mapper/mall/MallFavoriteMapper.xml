@@ -30,7 +30,25 @@
             c.commodity_code            AS commodityCode,
             c.cover_file_id             AS coverFileId,
             c.status                    AS commodityStatus,
-            c.points_price              AS pointsPrice,
+            <!--
+              🔴 最低在售规格价，【不是】c.points_price。
+
+              商品表上那一列只是 SKU 没填价时的继承来源，不保证有人按它卖。
+              库里现在就有基准价 99999 而唯一在售规格只要 1000 的商品 ——
+              直接发基准价，这一列就把价格显示成真实值的 100 倍。
+
+              而这一列的用途恰恰是让运营判断「是不是定价偏高」（见上面那段注释）：
+              显示 99999、收藏一堆、没人兑，得出的结论会是「降价」，
+              而那件商品其实只要 1000 分。错在这里比错在 C 端卡片更贵 ——
+              它直接导向一个错误的运营动作。
+
+              ⚠️ 没有在售规格时（全下架/全售罄）落回 c.points_price：
+              那时没有「在售价」这回事，显示基准价至少是运营配过的那个数。
+            -->
+            IFNULL((SELECT MIN(IFNULL(s2.sku_points_price, c.points_price))
+                      FROM t_mall_sku s2
+                     WHERE s2.commodity_id = f.commodity_id AND s2.sku_status = 1),
+                   c.points_price)  AS pointsPrice,
             c.sold_count                AS soldCount,
             COUNT(1)                    AS favoriteCount,
             <!-- sku_status = 1 即 EnableStatusEnum.ENABLED；标量子查询里引用不了 Java 枚举，改值要手动同步 -->
@@ -57,7 +75,25 @@
             c.commodity_code            AS commodityCode,
             c.cover_file_id             AS coverFileId,
             c.status                    AS commodityStatus,
-            c.points_price              AS pointsPrice,
+            <!--
+              🔴 最低在售规格价，【不是】c.points_price。
+
+              商品表上那一列只是 SKU 没填价时的继承来源，不保证有人按它卖。
+              库里现在就有基准价 99999 而唯一在售规格只要 1000 的商品 ——
+              直接发基准价，这一列就把价格显示成真实值的 100 倍。
+
+              而这一列的用途恰恰是让运营判断「是不是定价偏高」（见上面那段注释）：
+              显示 99999、收藏一堆、没人兑，得出的结论会是「降价」，
+              而那件商品其实只要 1000 分。错在这里比错在 C 端卡片更贵 ——
+              它直接导向一个错误的运营动作。
+
+              ⚠️ 没有在售规格时（全下架/全售罄）落回 c.points_price：
+              那时没有「在售价」这回事，显示基准价至少是运营配过的那个数。
+            -->
+            IFNULL((SELECT MIN(IFNULL(s2.sku_points_price, c.points_price))
+                      FROM t_mall_sku s2
+                     WHERE s2.commodity_id = f.commodity_id AND s2.sku_status = 1),
+                   c.points_price)  AS pointsPrice,
             c.sold_count                AS soldCount,
             COUNT(1)                    AS favoriteCount,
             <!-- sku_status = 1 即 EnableStatusEnum.ENABLED，commodityStatus != 1 即「不是 MallCommodityStatusEnum.ON」；

@@ -30,7 +30,21 @@ public class MallFavoriteRankDTO {
     /** 商品状态：0-下架, 1-上架, 2-草稿 */
     private MallCommodityStatusEnum commodityStatus;
 
-    /** 基准兑换积分 */
+    /**
+     * <b>最低在售规格</b>所需积分，不是 {@code t_mall_commodity.points_price}。
+     *
+     * <p>🔴 2026-09-23 订正。商品表上那一列只是 SKU 没填价时的继承来源，
+     * 不保证有人按它卖 —— 库里就有基准价 99999 而唯一在售规格只要 1000 的商品，
+     * 这一列此前把它显示成真实值的 <b>100 倍</b>。
+     *
+     * <p>⚠️ 这一列是给运营判断「是不是定价偏高」用的（见类注释），
+     * 所以它必须是<b>用户真的会付的那个数</b>。显示 99999、收藏一堆、没人兑，
+     * 得出的结论会是「降价」，而那件商品其实只要 1000 分。
+     *
+     * <p>规则本体在 SQL 里（{@code MallFavoriteMapper.xml}）而不是
+     * {@code MallPricing}：这是管理端统计，没有会员上下文，不吃等级折扣，
+     * 而且拿 TOP N 行去内存里逐个算价会让「一次查完」变成 N+1。
+     */
     private Integer pointsPrice;
 
     /** 可用库存合计 */
