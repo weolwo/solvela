@@ -418,7 +418,7 @@
       </div>
     </div>
 
-    <CSidePreview v-model:open="previewOpen" :form="form" :sku-list="form.skuList" />
+    <CSidePreview v-model:open="previewOpen" :form="form" :sku-list="form.skuList" :grades="grades" />
   </a-spin>
 </template>
 
