@@ -42,7 +42,12 @@
             <span v-else class="anchor-ok">✓</span>
           </div>
         </a-card>
-        <div class="anchor-foot">积分商城，不是电商。<br />没有购物车、没有满减、没有会员等级差异化定价。</div>
+        <!--
+          ⚠️ 2026-09-23 订正：原文是「没有购物车、没有满减、没有会员等级差异化定价」，
+             而等级差异化定价这一条已经【做了】（等级折扣率 + 单品覆盖价）。
+             一句过期的边界说明比没有说明更糟 —— 它会让人绕开一个其实存在的能力。
+        -->
+        <div class="anchor-foot">积分商城，不是电商。<br />没有购物车、没有满减。<br />等级定价只有两种：全场折扣率 + 单品覆盖价。</div>
       </div>
 
       <!---------- 主表单 ----------->
@@ -321,6 +326,72 @@
               description="低于这一档的会员在 C 端仍然看得见这件商品，只是标成专享、兑换按钮不可点——藏起来的话用户永远不知道升上去能换到什么。服务端下单时会再拦一次，界面只负责说清楚。"
             />
 
+            <!----------------- 单品覆盖价 ----------------->
+            <a-divider orientation="left" class="mt-4">单品覆盖价</a-divider>
+            <a-alert
+              v-if="!form.id"
+              type="info"
+              show-icon
+              class="mb-3"
+              message="先保存商品，再配覆盖价"
+              description="覆盖价要挂在具体的商品和规格上，而这两样在保存之前还没有 id。"
+            />
+            <template v-else>
+              <!--
+                🔴 这段文字是这个功能唯一会被读到的说明。
+                   三条都是「不写就会配错、而且配错了不报错」的：
+                   优先级、落回的是折扣率不是原价、开关一票否决。
+              -->
+              <div class="form-tip mb-2">
+                给指定等级定死一个价，<b>优先于等级折扣率</b>，命中了就不再打折。<br />
+                解析顺序：规格覆盖价 &gt; 商品覆盖价 &gt; 挂牌价 × 等级折扣率。<br />
+                删掉一行，那一档<b>落回等级折扣率</b>，不是落回原价。
+              </div>
+              <a-alert
+                v-if="form.gradePriceFlag === 0 && gradePrices.length > 0"
+                type="error"
+                show-icon
+                class="mb-3"
+                message="下面这些价现在一分都不生效"
+                description="「等级折扣」开关是关的，它同时关掉折扣率和覆盖价——一个开关一种含义。要用这些价请先把开关打开。"
+              />
+              <a-table
+                size="small"
+                :dataSource="gradePrices"
+                :columns="gradePriceColumns"
+                rowKey="id"
+                bordered
+                :loading="gradePriceLoading"
+                :pagination="false"
+              >
+                <template #bodyCell="{ text, record, column }">
+                  <template v-if="column.dataIndex === 'gradeCode'">
+                    {{ gradeNameOf(record.gradeCode) }}
+                    <a-tag class="ml-1">等级 {{ record.gradeCode }}</a-tag>
+                  </template>
+                  <template v-else-if="column.dataIndex === 'skuId'">
+                    <span v-if="!record.skuId">整个商品</span>
+                    <span v-else>{{ skuLabelOf(record.skuId) }}</span>
+                  </template>
+                  <template v-else-if="column.dataIndex === 'pointsPrice'">
+                    <b>{{ record.pointsPrice }}</b> 积分
+                  </template>
+                  <template v-else-if="column.dataIndex === 'action'">
+                    <a-popconfirm title="删掉后这一档落回等级折扣率，确定？" @confirm="removeGradePrice(record)">
+                      <a-button type="link" size="small" danger>删除</a-button>
+                    </a-popconfirm>
+                  </template>
+                  <template v-else>{{ text ?? '—' }}</template>
+                </template>
+              </a-table>
+              <a-space class="mt-2" align="start">
+                <a-select v-model:value="gradePriceForm.gradeCode" :options="overrideGradeOptions" placeholder="等级" style="width: 190px" />
+                <a-select v-model:value="gradePriceForm.skuId" :options="overrideSkuOptions" style="width: 220px" />
+                <a-input-number v-model:value="gradePriceForm.pointsPrice" :min="0" :precision="0" placeholder="覆盖价" style="width: 140px" />
+                <a-button type="primary" :loading="gradePriceSaving" @click="saveGradePrice">添加 / 改价</a-button>
+              </a-space>
+            </template>
+
             <a-alert
               v-if="form.limitCount > 0"
               type="success"
@@ -357,6 +428,7 @@
   import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
   import { mallCommodityApi } from '/@/api/business/mall/mall-commodity-api';
   import { mallCategoryApi } from '/@/api/business/mall/mall-category-api';
+  import { mallGradePriceApi } from '/@/api/business/mall/mall-grade-price-api';
   import { memberGradeApi } from '/@/api/business/member/member-grade-api';
   import {
     COMMODITY_STATUS_ENUM,
@@ -475,6 +547,114 @@
     const hit = grades.value.find((g) => g.gradeCode === form.minGrade);
     return hit ? hit.gradeName : `等级 ${form.minGrade}`;
   });
+
+  /* ---------------- 单品覆盖价 ---------------- */
+
+  const gradePrices = ref([]);
+  const gradePriceLoading = ref(false);
+  const gradePriceSaving = ref(false);
+  const gradePriceForm = reactive({ gradeCode: undefined, skuId: 0, pointsPrice: undefined });
+
+  const gradePriceColumns = [
+    { title: '等级', dataIndex: 'gradeCode', width: 200 },
+    { title: '适用范围', dataIndex: 'skuId', width: 240 },
+    { title: '覆盖价', dataIndex: 'pointsPrice', width: 140 },
+    { title: '操作', dataIndex: 'action', width: 90 },
+  ];
+
+  /*
+   * ⚠️ 覆盖价的等级下拉【没有「不限」那一项】——
+   *    「不限」在专享等级那边的意思是 0 档，而 0 档不能配覆盖价
+   *    （新会员就享特价的话，升级这件事本身就不值钱了）。
+   *    两个下拉长得像但选项不同，是刻意的。
+   */
+  const overrideGradeOptions = computed(() =>
+    grades.value
+      .filter((g) => g.status === 1 && g.gradeCode > 0)
+      .map((g) => ({ value: g.gradeCode, label: `${g.gradeName}（等级 ${g.gradeCode}）` })),
+  );
+
+  const overrideSkuOptions = computed(() => [
+    { value: 0, label: '整个商品（所有规格）' },
+    ...form.skuList
+      .filter((sku) => sku.id)
+      .map((sku) => ({ value: sku.id, label: skuLabelOf(sku.id) })),
+  ]);
+
+  function gradeNameOf(code) {
+    const hit = grades.value.find((g) => g.gradeCode === code);
+    return hit ? hit.gradeName : `等级 ${code}`;
+  }
+
+  /*
+   * 规格名：`名 值` 成对拼，和 C 端兑换页一个写法。
+   *
+   * ⚠️ 只取 Object.values 的话，`{"16G":"1"}` 会显示成孤零零一个「1」——
+   *    联调截图里就是这样，运营根本认不出那是哪个规格。
+   *    无规格商品的 skuAttrs 是 {}，退回 skuCode。
+   */
+  function skuLabelOf(skuId) {
+    const sku = form.skuList.find((s) => s.id === skuId);
+    if (!sku) {
+      // 规格被删掉了，但覆盖价那一行还在 —— 显示 id 而不是假装它有名字
+      return `规格 ${skuId}（已不存在）`;
+    }
+    const attrs = sku.skuAttrs && typeof sku.skuAttrs === 'object' ? Object.entries(sku.skuAttrs) : [];
+    return attrs.length > 0 ? attrs.map(([k, v]) => `${k} ${v}`).join(' / ') : sku.skuCode;
+  }
+
+  async function loadGradePrices() {
+    if (!form.id) {
+      gradePrices.value = [];
+      return;
+    }
+    gradePriceLoading.value = true;
+    try {
+      gradePrices.value = (await mallGradePriceApi.list(form.id)) || [];
+    } catch (e) {
+      solvelaSentry.captureError(e);
+    } finally {
+      gradePriceLoading.value = false;
+    }
+  }
+
+  async function saveGradePrice() {
+    if (gradePriceForm.gradeCode === undefined || gradePriceForm.gradeCode === null) {
+      message.warning('请选择等级');
+      return;
+    }
+    if (gradePriceForm.pointsPrice === undefined || gradePriceForm.pointsPrice === null) {
+      // 0 是合法的（这一档免费），所以判的是「有没有填」，不是「大不大于 0」
+      message.warning('请填写覆盖价');
+      return;
+    }
+    gradePriceSaving.value = true;
+    try {
+      await mallGradePriceApi.save({
+        commodityId: form.id,
+        skuId: gradePriceForm.skuId || 0,
+        gradeCode: gradePriceForm.gradeCode,
+        pointsPrice: gradePriceForm.pointsPrice,
+      });
+      message.success('已保存');
+      gradePriceForm.pointsPrice = undefined;
+      loadGradePrices();
+    } catch (e) {
+      solvelaSentry.captureError(e);
+    } finally {
+      gradePriceSaving.value = false;
+    }
+  }
+
+  async function removeGradePrice(record) {
+    try {
+      await mallGradePriceApi.delete(record.id);
+      message.success('已删除，这一档落回等级折扣率');
+      loadGradePrices();
+    } catch (e) {
+      solvelaSentry.captureError(e);
+    }
+  }
 
   async function loadGrades() {
     try {
@@ -722,6 +902,11 @@
       timeRange.value = start || end ? [start, end] : [];
       categoryPath.value = resolveCategoryPath(categoryFlatList.value, detail.categoryId);
       await resetSnapshot();
+      /*
+       * ⚠️ 放在 resetSnapshot 之后：覆盖价是【独立保存】的，不进商品表单的快照，
+       *    否则「加了一行覆盖价」会被离开页面时的脏检查当成未保存的改动拦下来。
+       */
+      loadGradePrices();
     } catch (e) {
       solvelaSentry.captureError(e);
     } finally {

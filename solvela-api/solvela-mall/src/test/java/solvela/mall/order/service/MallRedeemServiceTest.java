@@ -171,7 +171,7 @@ class MallRedeemServiceTest {
                 orderActionPublisher));
         // 默认不限等级：这个文件里绝大多数用例验的是别的东西，不该被等级门槛改变语义
         when(mallGradeGate.canRedeem(any(), any())).thenReturn(true);
-        when(mallGradeDiscountResolver.forMember(any())).thenReturn(GradeDiscount.NONE);
+        when(mallGradeDiscountResolver.forMember(any(), any())).thenReturn(GradeDiscount.NONE);
         // 没有活动事务，真调会抛 NoTransactionException；spy 成空实现后它变成一次可断言的调用
         doNothing().when(service).markRollbackOnly();
 
@@ -513,9 +513,16 @@ class MallRedeemServiceTest {
 
     // ------------------------------------------------------------------ 等级价
 
-    /** 白金 9 折 */
+    /** 白金 9 折，没有覆盖价 */
     private void givenNinetyPercent() {
-        when(mallGradeDiscountResolver.forMember(any())).thenReturn(new GradeDiscount(3, 90));
+        when(mallGradeDiscountResolver.forMember(any(), any()))
+                .thenReturn(new GradeDiscount(3, 90, java.util.Map.of()));
+    }
+
+    /** 白金 9 折 + 这件商品的单品覆盖价 */
+    private void givenOverride(int price) {
+        when(mallGradeDiscountResolver.forMember(any(), any())).thenReturn(new GradeDiscount(3, 90,
+                java.util.Map.of(GradeDiscount.Key.ofCommodity(COMMODITY_ID), price)));
     }
 
     @Test
@@ -578,6 +585,29 @@ class MallRedeemServiceTest {
         verify(couponQueryApi).trial(captor.capture());
         assertEquals(0, BigDecimal.valueOf(4500).compareTo(captor.getValue().payPoints()),
                 "试算拿到的应付必须是【折后】的 4500，不是挂牌的 5000");
+    }
+
+    @Test
+    @DisplayName("🔴 单品覆盖价：让利一样记在 grade_discount 上，恒等式照样平")
+    void 覆盖价也落在同一列() {
+        /*
+         * 刻意【不】为覆盖价另开一列。
+         *
+         * 这一列回答的是「等级让了多少分」，而覆盖价让的也是同一笔钱 ——
+         * 分成两列之后，那个问题就要写成两列相加，而迟早有人只查其中一列。
+         * 要区分「打折让的」还是「特价让的」，看 grade_code 加当时的配置。
+         */
+        givenOverride(888);
+
+        service.redeem(cmd(1));
+
+        MallOrder order = savedOrder();
+        assertEquals(5000, order.getPointsPrice(), "挂牌价不受覆盖价影响");
+        assertEquals(4112, order.getGradeDiscount(), "5000 - 888");
+        assertEquals(888, order.getPayPoints(), "命中覆盖价就不再打 9 折");
+        assertEquals(order.getPayPoints(),
+                order.getPointsPrice() * order.getQuantity() - order.getGradeDiscount(),
+                "恒等式不成立 —— 体检 SQL 会把这一单标成脏数据");
     }
 
     @Test

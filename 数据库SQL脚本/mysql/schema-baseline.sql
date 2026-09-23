@@ -35,7 +35,7 @@ SET NAMES utf8mb4;
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
 -- 生成时间：2026-09-23
--- 表数量：84 张
+-- 表数量：85 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -1594,7 +1594,7 @@ CREATE TABLE `t_announcement_ack` (
 
 
 -- =====================================================================================
--- 积分商城（7 张）
+-- 积分商城（8 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_mall_category`;
@@ -1765,6 +1765,22 @@ CREATE TABLE `t_mall_favorite` (
   KEY `idx_mall_fav_mbr_time` (`member_id`,`create_time`),
   KEY `idx_mall_fav_cmd` (`commodity_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-商品收藏';
+
+DROP TABLE IF EXISTS `t_mall_grade_price`;
+CREATE TABLE `t_mall_grade_price` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `commodity_id` bigint NOT NULL COMMENT '关联 t_mall_commodity.id',
+  `sku_id` bigint NOT NULL DEFAULT '0' COMMENT '关联 t_mall_sku.id；0 = 整个商品（不是 NULL，理由见表头注释）',
+  `grade_code` int NOT NULL COMMENT '对应 t_member_grade.grade_code。不允许 0 档',
+  `points_price` int NOT NULL COMMENT '这一档就这个价（积分）。0 = 这一档免费',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_mall_gd_price` (`commodity_id`,`sku_id`,`grade_code`),
+  KEY `idx_t_mall_gd_price_cmd` (`commodity_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商城-等级覆盖价';
 
 
 -- =====================================================================================

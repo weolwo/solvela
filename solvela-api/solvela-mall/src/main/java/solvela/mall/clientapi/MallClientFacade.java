@@ -160,8 +160,8 @@ public class MallClientFacade implements MallApi {
         // 封面 URL 一次批量换完 —— 逐行调 urlOf 就是 N+1，而列表页每次进都会打
         Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
 
-        // 等级视角同理：整页共用一份，不按商品逐个查
-        GradeLens lens = gradeLens(cmd.memberId());
+        // 等级视角同理：整页共用一份，不按商品逐个查（覆盖价也一次 IN 查完）
+        GradeLens lens = gradeLens(cmd.memberId(), list.stream().map(MallCommodity::getId).toList());
 
         return new MallCommodityPageView(
                 list.stream().map(c -> toBrief(c, lens, stocks, favorites, covers)).toList(),
@@ -210,7 +210,7 @@ public class MallClientFacade implements MallApi {
         return toDetailView(commodity, skus, bannerIds,
                 loadAllImages(commodity, skus, bannerIds),
                 !favoriteIds(memberId, List.of(commodityId)).isEmpty(),
-                remainingCount(commodity, memberId), gradeLens(memberId));
+                remainingCount(commodity, memberId), gradeLens(memberId, List.of(commodityId)));
     }
 
     /**
@@ -244,7 +244,7 @@ public class MallClientFacade implements MallApi {
      * 而 null 会让专享标整个不出现 —— 商品仍然兑不了（服务端照拦），
      * 只是不再宣传一个已经不存在的等级。
      */
-    private GradeLens gradeLens(Long memberId) {
+    private GradeLens gradeLens(Long memberId, java.util.Collection<Long> commodityIds) {
         List<MemberGrade> grades = memberGradeResolver.enabledGrades();
         Map<Integer, String> names = grades.stream()
                 .filter(g -> g.getGradeCode() != null && g.getGradeName() != null)
@@ -255,7 +255,7 @@ public class MallClientFacade implements MallApi {
          * ⚠️ 折扣走【已经在手上的】grades，不再查一次库 —— 这两个答案本来就是同一份数据。
          *    列表页一页 20 件，这里多查一次就是多 20 次（如果哪天有人把它挪进循环）。
          */
-        return new GradeLens(grade, names, mallGradeDiscountResolver.of(grade, grades));
+        return new GradeLens(grade, names, mallGradeDiscountResolver.of(grade, grades, commodityIds));
     }
 
     /** 在售 SKU，按运营配的 sort 排；sort 相同按 id 兜底，保证两次请求顺序一致 */
@@ -284,7 +284,9 @@ public class MallClientFacade implements MallApi {
                 commodity.getCommodityIntro(), urlFor(images, commodity.getCoverFileId()),
                 commodity.getPayType(),
                 MallPricing.points(commodity, lens.discount()), MallPricing.listPoints(commodity),
-                lens.discount().percent(),
+                // 同 toBrief：发的是这件商品实际打了几折
+                MallPricing.effectivePercent(MallPricing.listPoints(commodity),
+                        MallPricing.points(commodity, lens.discount())),
                 commodity.getCashPrice(),
                 commodity.getOriginalPrice(), favorite, stock,
                 /*
@@ -367,7 +369,7 @@ public class MallClientFacade implements MallApi {
         Map<Long, MallCommodity> byId = list.stream()
                 .collect(Collectors.toMap(MallCommodity::getId, Function.identity()));
         Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
-        GradeLens lens = gradeLens(memberId);
+        GradeLens lens = gradeLens(memberId, ids);
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull)
                 .map(c -> toBrief(c, lens, stocks, favorites, covers))
                 .toList();
@@ -606,7 +608,14 @@ public class MallClientFacade implements MallApi {
                  * 用户会看到列表 10000、点进去 8800，而没有任何地方解释这一跳。
                  */
                 MallPricing.points(c, lens.discount()), MallPricing.listPoints(c),
-                lens.discount().percent(),
+                /*
+                 * 🔴 发出去的是【这件商品实际打了几折】，不是这个人的折扣率。
+                 * 配了覆盖价的商品，折扣率还是 92 而实际价可能是 888 —— 按折扣率
+                 * 挂「9.2折」就是在一件打了 0.9 折的商品上说假话；反过来，
+                 * 退出等级折扣的商品折扣率仍是 92 而价格一分没少，同样是假话。
+                 */
+                MallPricing.effectivePercent(MallPricing.listPoints(c),
+                        MallPricing.points(c, lens.discount())),
                 c.getCashPrice(), c.getOriginalPrice(),
                 favorites.contains(c.getId()), stocks.getOrDefault(c.getId(), 0),
                 MallGradeGate.requiredGrade(c), lens.nameOf(c), lens.locked(c));

@@ -198,7 +198,8 @@ public class MallRedeemService {
          * ⚠️ 折扣按【会员】取一次，不在循环里 —— 这里本来就只有一件商品，
          *    但写法要和列表页保持一致，见 MallGradeDiscountResolver 的注释。
          */
-        GradeDiscount discount = mallGradeDiscountResolver.forMember(cmd.memberId());
+        GradeDiscount discount = mallGradeDiscountResolver.forMember(
+                cmd.memberId(), java.util.List.of(commodity.getId()));
         int listPoints = MallPricing.listPoints(sku, commodity);
         int gradedPoints = MallPricing.points(sku, commodity, discount);
         int originalPoints = gradedPoints * quantity;

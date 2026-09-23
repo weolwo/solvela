@@ -3,6 +3,7 @@ package solvela.mall.commodity.service;
 import solvela.enums.MallPayTypeEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.EnableStatusEnum;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,8 @@ import solvela.mall.MallCommodity;
 import solvela.mall.commodity.domain.query.MallCommodityQuery;
 import solvela.mall.commodity.domain.command.MallCommoditySaveCommand;
 import solvela.mall.commodity.domain.command.MallCommoditySkuCommand;
+import solvela.mall.MallGradePrice;
+import solvela.mall.commodity.dao.MallGradePriceDao;
 import solvela.mall.commodity.domain.dto.MallCommodityDetailDTO;
 import solvela.mall.commodity.domain.dto.MallCommoditySkuDTO;
 import solvela.mall.commodity.domain.dto.MallCommodityDTO;
@@ -67,6 +70,7 @@ import java.util.stream.Collectors;
 public class MallCommodityService {
 
     private final MallCommodityDao mallCommodityDao;
+    private final MallGradePriceDao mallGradePriceDao;
     private final MallCommodityManager mallCommodityManager;
     private final MallSkuManager mallSkuManager;
     private final MallCategoryManager mallCategoryManager;
@@ -533,6 +537,20 @@ public class MallCommodityService {
          */
         entity.setGradePriceFlag(form.getGradePriceFlag() == null || form.getGradePriceFlag() != 0
                 ? 1 : 0);
+        /*
+         * ⚠️ 关掉开关会让这件商品已配的覆盖价【一行都不生效】——
+         *    它们不会被删（运营可能只是临时关一下），但也不会有任何界面提示。
+         *    留一条 WARN 说清影响面，和 GradeEntitlementAdminService 停用配置那条同一个做法。
+         */
+        if (entity.getGradePriceFlag() == 0 && entity.getId() != null) {
+            long overrides = mallGradePriceDao.selectCount(new LambdaQueryWrapper<MallGradePrice>()
+                    .eq(MallGradePrice::getCommodityId, entity.getId()));
+            if (overrides > 0) {
+                log.warn("【商城商品】{} 关闭了等级折扣开关，但它还有 {} 行单品覆盖价 —— "
+                                + "那些价从现在起【不生效】，商品按挂牌价卖。要用它们请重新打开开关",
+                        entity.getCommodityCode(), overrides);
+            }
+        }
         entity.setStartTime(shelf.startTime());
         entity.setEndTime(shelf.endTime());
         entity.setStatus(shelf.status());
@@ -711,6 +729,17 @@ public class MallCommodityService {
         // 两组引用都要解除。漏一组，那些图会永远显示「正被 1 处业务引用」而删不掉
         fileAssetService.releaseRelation(MallConst.BIZ_TYPE, id);
         fileAssetService.releaseRelation(MallConst.BIZ_TYPE_BANNER, id);
+        /*
+         * 🔴 单品覆盖价跟着商品一起删。
+         *
+         * t_mall_grade_price 刻意不建外键（理由见那张表的注释：商品不会被物理删除，
+         * 加外键换来的只是每次改价一次跨表锁）—— 但「不会被物理删除」在这一行是假的，
+         * 这个方法就是在物理删除。不删的话它们就是一堆 commodity_id 指向空气的孤儿：
+         * 查不到、显示不出来，直到某天有人用同一个自增 id 建了新商品，
+         * 那件新商品会凭空带上前任的特价。
+         */
+        mallGradePriceDao.delete(new LambdaQueryWrapper<MallGradePrice>()
+                .eq(MallGradePrice::getCommodityId, id));
         mallCommodityDao.deleteById(id);
     }
 

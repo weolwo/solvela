@@ -9,6 +9,7 @@ import solvela.mall.commodity.MallPricing;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Map;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,8 +66,35 @@ class MallPricingTest {
         return c;
     }
 
-    /** 9 折 */
-    private static final GradeDiscount NINETY = new GradeDiscount(3, 90);
+    /** 9 折，没有覆盖价 */
+    private static final GradeDiscount NINETY = new GradeDiscount(3, 90, Map.of());
+
+    /*
+     * 🔴 这两个刻意【不叫】commodity / sku 去重载。
+     *
+     * 重载过一次，红了六条用例：`sku(8800, null)` 会优先匹配 (long, Integer)
+     * —— int 拓宽成 long 不用装箱，Java 认为它比装箱成 Integer 更合适 ——
+     * 于是 8800 成了 id，价格成了 null，整条用例静悄悄地在测另一件事。
+     * 名字带 WithId，这种事编译期就长得不一样。
+     */
+
+    /** 带 id 的商品 —— 覆盖价按 commodityId 找，没有 id 的商品永远命不中 */
+    private static MallCommodity commodityWithId(long id, Integer points) {
+        MallCommodity c = commodity(points, null);
+        c.setId(id);
+        return c;
+    }
+
+    private static MallSku skuWithId(long id, Integer points) {
+        MallSku s = sku(points, null);
+        s.setId(id);
+        return s;
+    }
+
+    /** 9 折 + 一张覆盖价表 */
+    private static GradeDiscount withOverrides(Map<GradeDiscount.Key, Integer> overrides) {
+        return new GradeDiscount(3, 90, overrides);
+    }
 
     @Test
     @DisplayName("SKU 填了价就用 SKU 的（不同规格可以不同价）")
@@ -129,7 +157,7 @@ class MallPricingTest {
          */
         assertEquals(9000, MallPricing.points(sku(10001, null), commodity(null, null), NINETY));
         // 88 折的 1 分 = 0.88 → 0。一件 1 分的东西对白金免费，是取整方向的必然结果，不是 bug
-        assertEquals(0, MallPricing.points(sku(1, null), commodity(null, null), new GradeDiscount(4, 88)));
+        assertEquals(0, MallPricing.points(sku(1, null), commodity(null, null), new GradeDiscount(4, 88, Map.of())));
     }
 
     @Test
@@ -146,7 +174,7 @@ class MallPricingTest {
         MallSku sku = sku(10000, null);
         MallCommodity c = commodity(null, null);
         assertEquals(10000, MallPricing.points(sku, c, GradeDiscount.NONE));
-        assertEquals(10000, MallPricing.points(sku, c, new GradeDiscount(4, 100)));
+        assertEquals(10000, MallPricing.points(sku, c, new GradeDiscount(4, 100, Map.of())));
         assertEquals(10000, MallPricing.points(sku, c, null));
     }
 
@@ -183,6 +211,92 @@ class MallPricingTest {
                         "cash(...) 收了 GradeDiscount —— 现金打折要先把退款和发票口径想清楚");
             }
         }
+    }
+
+    // ------------------------------------------------------------ 单品覆盖价
+
+    @Test
+    @DisplayName("🔴 命中覆盖价就不再打折 —— 两个都算一遍等于打了两次折")
+    void 覆盖价不叠加折扣() {
+        /*
+         * 运营配「白金特价 888」的意思是 888，不是 888 再打 9.2 折。
+         * 叠加不会报错，只是每一单都比运营以为的少收一点，而对账时看不出来 ——
+         * 那个数看起来就像一个正常的折后价。
+         */
+        GradeDiscount d = withOverrides(Map.of(GradeDiscount.Key.ofCommodity(7L), 888));
+        assertEquals(888, MallPricing.points(commodityWithId(7L, 10000), d));
+        assertEquals(888, MallPricing.points(sku(null, null), commodityWithId(7L, 10000), d));
+    }
+
+    @Test
+    @DisplayName("🔴 规格覆盖价优先于商品覆盖价 —— 和 sku 价优先于商品价同一条规则")
+    void 规格覆盖优先() {
+        /*
+         * 倒过来的话，给整个商品配了特价之后，单独给某个规格配的那一条【永远不生效】，
+         * 而运营只会看到它好好地存在于列表里。
+         */
+        GradeDiscount d = withOverrides(Map.of(
+                GradeDiscount.Key.ofCommodity(7L), 888,
+                new GradeDiscount.Key(7L, 70L), 666));
+        assertEquals(666, MallPricing.points(skuWithId(70L, null), commodityWithId(7L, 10000), d));
+        // 没配规格覆盖价的那个规格，落回商品覆盖价
+        assertEquals(888, MallPricing.points(skuWithId(71L, null), commodityWithId(7L, 10000), d));
+    }
+
+    @Test
+    @DisplayName("⚠️ 列表页只看得到商品级覆盖价 —— 那里没有「选中哪个规格」这回事")
+    void 列表页看不到规格覆盖() {
+        GradeDiscount d = withOverrides(Map.of(new GradeDiscount.Key(7L, 70L), 666));
+        // 只配了规格覆盖价时，列表页落回折扣率
+        assertEquals(9000, MallPricing.points(commodityWithId(7L, 10000), d));
+        assertEquals(666, MallPricing.points(skuWithId(70L, null), commodityWithId(7L, 10000), d));
+    }
+
+    @Test
+    @DisplayName("🔴 覆盖价高于挂牌价时按挂牌价走 —— 高等级不能反而更贵")
+    void 覆盖价不许加价() {
+        /*
+         * 保存那一层拦了，但那是拿【当时】的挂牌价比的。
+         * 运营之后把商品调便宜，那一行就悄悄变成了「白金比谁都贵」，
+         * 而没有任何地方会再检查一次。
+         */
+        GradeDiscount d = withOverrides(Map.of(GradeDiscount.Key.ofCommodity(7L), 20000));
+        assertEquals(10000, MallPricing.points(commodityWithId(7L, 10000), d));
+    }
+
+    @Test
+    @DisplayName("覆盖价 0 = 这一档免费；负数按 0 算，不会算出负价")
+    void 覆盖价的边界() {
+        assertEquals(0, MallPricing.points(commodityWithId(7L, 10000),
+                withOverrides(Map.of(GradeDiscount.Key.ofCommodity(7L), 0))));
+        // 负价一路走到扣款就是【给用户加分】
+        assertEquals(0, MallPricing.points(commodityWithId(7L, 10000),
+                withOverrides(Map.of(GradeDiscount.Key.ofCommodity(7L), -500))));
+    }
+
+    @Test
+    @DisplayName("🔴 商品退出等级折扣时，覆盖价也不生效 —— 一个开关一种含义")
+    void 退出开关同时关掉覆盖价() {
+        /*
+         * 只关折扣率的话，运营关掉开关后发现价格还是变了，
+         * 而界面上没有任何东西解释这件事。
+         */
+        MallCommodity out = optedOut(10000);
+        out.setId(7L);
+        assertEquals(10000, MallPricing.points(out,
+                withOverrides(Map.of(GradeDiscount.Key.ofCommodity(7L), 888))));
+    }
+
+    @Test
+    @DisplayName("🔴 发给端上的折扣率算的是两个价之比，不是会员的折扣率")
+    void 实际折扣率() {
+        // 888/10000 → 8.88% → 四舍五入 9 → 端上写「0.9折」
+        assertEquals(9, MallPricing.effectivePercent(10000, 888));
+        assertEquals(92, MallPricing.effectivePercent(10000, 9200));
+        // 没便宜就是 100，端上据此不出角标
+        assertEquals(100, MallPricing.effectivePercent(10000, 10000));
+        assertEquals(100, MallPricing.effectivePercent(10000, 12000), "算不出加价");
+        assertEquals(100, MallPricing.effectivePercent(0, 0), "0 分商品不出角标");
     }
 
     /**

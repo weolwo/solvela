@@ -104,7 +104,11 @@ public class DumpSchema {
         // 见下方。这里不单开一组，避免券的三张表散在两个地方。
         GROUPS.put("积分商城", List.of(
             "t_mall_category","t_mall_commodity","t_mall_sku","t_mall_order",
-            "t_mall_exchange_limit","t_mall_address","t_mall_favorite"));
+            "t_mall_exchange_limit","t_mall_address","t_mall_favorite",
+            // 2026-09-23 单品覆盖价。归商城而不是会员域：它按【商品】配，
+            // 会员域那边只出一个折扣率（t_member_grade.points_discount）。
+            // 换句话说，等级价的两半刻意分开放 —— 全场普惠在会员域，单品特价在商城。
+            "t_mall_grade_price"));
         // 2026-09-15 券使用闭环阶段 7：外部场景消费（充话费等）。
         // 单开一组而不是塞进「积分商城」—— 它和商城互不依赖，
         // 共同点只有「都用券」，归在一起会让人以为它们共享单据模型。

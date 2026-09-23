@@ -19,6 +19,13 @@ import java.math.BigDecimal;
  * {@code RedeemView.vue} 写的是 {@code ?? 0}，SKU 没填价时兑换页显示 <b>0 分</b>，
  * 服务端照基准价扣。库里当时就有这样一条 SKU，只是库存为 0 才没被点到。
  *
+ * <h3>🔴 三层解析顺序（2026-09-23）</h3>
+ * <pre>规格覆盖价 &gt; 商品覆盖价 &gt; 挂牌价 × 等级折扣率</pre>
+ * 前两级刻意抄了 {@code sku_points_price} &gt; {@code points_price} ——
+ * 这个库里「规格盖商品」已经是一条认识，覆盖价不该另发明一套。
+ * <b>命中覆盖价就不再打折</b>：两个都算一遍等于打了两次折，
+ * 而运营配「白金特价 888」的意思是 888，不是 888 再打 9.2 折。
+ *
  * <h3>🔴 两个价，名字必须分得开（2026-09-23 加等级价时立的）</h3>
  * <ul>
  *   <li>{@link #listPoints} —— <b>挂牌价</b>。谁来看都一样，落订单快照用它</li>
@@ -89,20 +96,64 @@ public final class MallPricing {
      * 展示与扣减走的是同一行代码，所以「显示 9000 实扣 9001」这种事结构上不可能发生。
      */
     public static int points(MallSku sku, MallCommodity commodity, GradeDiscount discount) {
-        return apply(listPoints(sku, commodity), commodity, discount);
+        return apply(listPoints(sku, commodity), commodity, sku == null ? 0L : nullToZero(sku.getId()),
+                discount);
     }
 
-    /** 商品基准价的折后版，列表页用。规则同 {@link #points(MallSku, MallCommodity, GradeDiscount)} */
+    /**
+     * 商品基准价的等级价，列表页用。
+     *
+     * <p>⚠️ 列表页没有「选中哪个规格」，所以这里只看得到<b>商品级</b>覆盖价。
+     * 规格覆盖价要到详情页才生效 —— 于是列表上的价和点进去选完规格的价可以不一样，
+     * 那和「运营给规格配了差价」是同一类事，不是 bug。
+     */
     public static int points(MallCommodity commodity, GradeDiscount discount) {
-        return apply(listPoints(commodity), commodity, discount);
+        return apply(listPoints(commodity), commodity, 0L, discount);
     }
 
-    private static int apply(int list, MallCommodity commodity, GradeDiscount discount) {
-        if (list <= 0 || discount == null || !discount.applies() || !participates(commodity)) {
+    /**
+     * 三层解析都在这里，<b>而且只在这里</b>。
+     *
+     * <p>🔴 覆盖价<b>不允许高于挂牌价</b>：真配高了按挂牌价走。
+     * 保存那一层已经拦了（{@code MallGradePriceService}），但那是拿<b>当时</b>的挂牌价比的 ——
+     * 运营之后把商品调便宜，那一行就悄悄变成了「高等级反而更贵」。
+     * 这里取 min 是兜底，方向朝着用户。
+     */
+    private static int apply(int list, MallCommodity commodity, long skuId, GradeDiscount discount) {
+        if (discount == null || !participates(commodity)) {
+            return list;
+        }
+        Integer override = commodity.getId() == null
+                ? null : discount.overrideOf(commodity.getId(), skuId);
+        if (override != null) {
+            return Math.min(Math.max(override, 0), list);
+        }
+        if (list <= 0 || !discount.applies()) {
             return list;
         }
         // long 运算：list 最大到 int 上限，× 100 会溢出
         return (int) ((long) list * discount.percent() / PERCENT_BASE);
+    }
+
+    /**
+     * 这件商品对这个人实际打了几折，用于端上那个「8.8折」角标。{@code 100} = 没便宜。
+     *
+     * <p>🔴 <b>算的是两个价之比，不是会员的折扣率。</b>
+     * 配了覆盖价的商品，会员折扣率还是 92，而实际价可能是 888/10000 —— 挂「9.2折」
+     * 就是在一件其实打了 0.9 折的商品上说假话。反过来，商品退出等级折扣时
+     * 折扣率仍是 92 而价格一分没少，挂上去同样是假话。
+     *
+     * <p>⚠️ 四舍五入。只用于<b>写字</b>，不参与算价 —— 价是 {@link #points} 说了算。
+     */
+    public static int effectivePercent(int listPoints, int actualPoints) {
+        if (listPoints <= 0 || actualPoints >= listPoints) {
+            return PERCENT_BASE;
+        }
+        return (int) Math.round((double) actualPoints * PERCENT_BASE / listPoints);
+    }
+
+    private static long nullToZero(Long v) {
+        return v == null ? 0L : v;
     }
 
     /**
@@ -114,6 +165,8 @@ public final class MallPricing {
      * 反过来会让一件本该有等级价的商品悄悄按原价卖。
      */
     public static boolean participates(MallCommodity commodity) {
+        // ⚠️ 这一条同时关掉折扣率【和】覆盖价：一个开关一种含义。
+        //    只关折扣率的话，运营关掉开关后发现价格还是变了，而界面上没有任何解释。
         if (commodity == null) {
             return false;
         }
