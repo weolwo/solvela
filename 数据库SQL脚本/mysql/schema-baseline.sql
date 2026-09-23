@@ -34,8 +34,8 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-09-22
--- 表数量：82 张
+-- 生成时间：2026-09-23
+-- 表数量：84 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -481,7 +481,7 @@ CREATE TABLE `t_file_relation` (
 
 
 -- =====================================================================================
--- 会员域（12 张）
+-- 会员域（14 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_member`;
@@ -736,6 +736,52 @@ CREATE TABLE `t_grade_privilege` (
   UNIQUE KEY `uk_t_gd_priv_code` (`grade_code`,`privilege_code`),
   KEY `idx_t_gd_priv_grade` (`grade_code`,`sort`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='等级权益【纯展示，不驱动逻辑】';
+
+DROP TABLE IF EXISTS `t_grade_entitlement`;
+CREATE TABLE `t_grade_entitlement` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `entitlement_code` varchar(32) NOT NULL COMMENT '权益编码：10 位大写字母+数字，全局唯一（铁律 8）',
+  `entitlement_name` varchar(64) NOT NULL COMMENT '权益名。会显示给用户，如「白金生日礼」',
+  `entitlement_type` varchar(32) NOT NULL COMMENT '类型：BIRTHDAY-生日礼(一年一次), MONTHLY-月度券(一月一次)',
+  `min_grade` int NOT NULL DEFAULT '0' COMMENT '需要的最低等级（t_member_grade.grade_code）。判据是 >=，不是 =：白金的月度券钻石也该有',
+  `asset_type` varchar(32) NOT NULL COMMENT '资产类型：COUPON/BALANCE/SCORE，对齐 PrizeTypeEnum',
+  `asset_ref` varchar(64) DEFAULT NULL COMMENT 'COUPON 存券模板编码；BALANCE 存面额来源标识',
+  `asset_name` varchar(128) NOT NULL COMMENT '展示名。券名会直接显示给用户，取不到时不要拿备注顶替',
+  `quantity` int NOT NULL DEFAULT '1' COMMENT '发几份',
+  `amount` decimal(18,4) DEFAULT NULL COMMENT 'BALANCE 的单份面额；实发 amount × quantity',
+  `claim_days` int NOT NULL DEFAULT '30' COMMENT '生成后多少天内可领，过期作废',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：0-停用, 1-启用',
+  `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_gd_ent_code` (`entitlement_code`),
+  KEY `idx_t_gd_ent_type` (`entitlement_type`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员等级-权益配置（会真的发出东西，与纯展示的 t_grade_privilege 分开）';
+
+DROP TABLE IF EXISTS `t_grade_entitlement_grant`;
+CREATE TABLE `t_grade_entitlement_grant` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `entitlement_id` bigint NOT NULL COMMENT '权益配置 id',
+  `entitlement_code` varchar(32) NOT NULL COMMENT '权益编码【快照】：配置改名之后，历史记录仍是当时那个',
+  `member_id` bigint NOT NULL COMMENT '会员号（关联键）',
+  `period_key` varchar(16) NOT NULL COMMENT '周期键：BIRTHDAY 用 yyyy，MONTHLY 用 yyyyMM',
+  `grade_code` int NOT NULL COMMENT '生成时的会员等级【快照】',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0-待领取, 1-已领取, 2-已过期',
+  `expire_time` datetime NOT NULL COMMENT '领取截止时间。到点由 job 置为已过期',
+  `claim_time` datetime DEFAULT NULL COMMENT '领取时间',
+  `grant_biz_id` varchar(64) NOT NULL COMMENT '发放单号：领取时作为 AssetGrantCmd.bizRefId，是跨域防重的键',
+  `grant_result` varchar(255) DEFAULT NULL COMMENT '发放结果/失败原因，便于排查',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_t_gd_ent_grant` (`member_id`,`entitlement_id`,`period_key`),
+  UNIQUE KEY `uk_t_gd_ent_biz` (`grant_biz_id`),
+  KEY `idx_t_gd_ent_mine` (`member_id`,`status`,`expire_time`),
+  KEY `idx_t_gd_ent_expire` (`status`,`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员等级-权益发放记录，同时是「待领取」列表';
 
 
 -- =====================================================================================

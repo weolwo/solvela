@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 
 import GradeCardDeck from './GradeCardDeck.vue'
 
+import { claimEntitlement, fetchMyEntitlements, type MemberEntitlement } from '@/api/entitlement'
+import { ApiError } from '@/api/errors'
 import { fetchGrowthLog, fetchMyGrade } from '@/api/grade'
 import { useAsync } from '@/composables/useAsync'
 
@@ -37,6 +39,49 @@ import { useAsync } from '@/composables/useAsync'
 
 const grade = useAsync(fetchMyGrade)
 const logs = useAsync(() => fetchGrowthLog(20))
+const entitlements = useAsync(fetchMyEntitlements)
+
+/* ---- 领取 ---- */
+
+/** 正在领哪一条。用 id 而不是布尔：一次只能点一个，但要知道是哪个在转圈 */
+const claiming = ref<number | null>(null)
+const claimHint = ref('')
+
+/**
+ * 领取一份。
+ *
+ * 🔴 成功之后**重新拉整块**，不本地改状态：
+ * 「领没领到」的真相在服务端（发放那一步可能失败并写了原因），
+ * 本地猜一个只会和服务端不一致，而用户会按那个去判断自己到底拿没拿到。
+ */
+async function onClaim(item: MemberEntitlement): Promise<void> {
+  if (claiming.value !== null) {
+    return
+  }
+  claiming.value = item.grantId
+  claimHint.value = ''
+  try {
+    const got = await claimEntitlement(item.grantId)
+    claimHint.value = `已领取：${got.assetName}`
+    await entitlements.reload()
+  } catch (error) {
+    // 文案一律用服务端给的：「已经领过了」「已过期」都是它算出来的
+    claimHint.value = error instanceof ApiError ? error.message : '领取失败，请稍后再试'
+  } finally {
+    claiming.value = null
+  }
+}
+
+/** 状态文案。已过期的也要说清楚，否则用户只看到一条灰记录不知道发生了什么 */
+function statusText(item: MemberEntitlement): string {
+  if (item.status === 1) {
+    return item.claimTime === null ? '已领取' : `已领取 · ${item.claimTime.slice(0, 10)}`
+  }
+  if (item.status === 2) {
+    return '已过期'
+  }
+  return `${item.expireTime.slice(0, 10)} 前领取`
+}
 
 /** 用户自己那一档在阶梯里的下标。卡片组首次就停在这里 */
 const currentIndex = computed(() => {
@@ -171,6 +216,55 @@ const progress = computed(() => {
             </div>
           </Card>
         </template>
+      </Section>
+
+      <!--
+        🔴 「我的权益」放在卡片之后、阶梯权益之前。
+        上面那块是「这一档有什么」（展示），这一块是「我现在有什么能领」（真东西）——
+        两者挨着，用户才看得出保级换来的是什么。
+      -->
+      <Section
+        v-if="(entitlements.data.value ?? []).length > 0"
+        title="我的权益"
+        :loading="entitlements.loading.value"
+        :error="entitlements.error.value"
+        :empty="false"
+        empty-text=""
+        @retry="entitlements.reload"
+      >
+        <Card>
+          <p v-if="claimHint !== ''" class="claim-hint" role="status">{{ claimHint }}</p>
+          <div
+            v-for="item in entitlements.data.value ?? []"
+            :key="item.grantId"
+            class="ent"
+            :class="{ 'ent--done': item.status !== 0 }"
+          >
+            <div class="ent__main">
+              <!--
+                权益名与资产名分开说：前者是「为什么给你」，后者是「给你什么」。
+                合并成一个的话只能二选一，而用户两件都想知道。
+              -->
+              <p class="ent__name">{{ item.entitlementName }}</p>
+              <p class="ent__asset">{{ item.assetName }}</p>
+              <p class="ent__meta">{{ statusText(item) }}</p>
+            </div>
+            <!--
+              🔴 :block="false" 不能省。Button 默认 block（width:100%），
+              放在 flex 行里会把同排的文字列挤成 0 宽，那一列就变成「每行一个字」竖着排 ——
+              组件注释里已经记过这个坑（2026-09-10 登录设备页），我还是踩了一次。
+            -->
+            <Button
+              v-if="item.status === 0"
+              :block="false"
+              :loading="claiming === item.grantId"
+              :disabled="claiming !== null && claiming !== item.grantId"
+              @click="onClaim(item)"
+            >
+              领取
+            </Button>
+          </div>
+        </Card>
       </Section>
 
       <!--
@@ -341,6 +435,51 @@ const progress = computed(() => {
   第一版拿品牌色直接染整行字，而品牌色是红的 —— 一行红字顶在权益列表上面，
   看起来像是加载失败。做成浅底小胶囊，它才读得出是「标签」而不是「警告」。
 */
+.claim-hint {
+  margin: 0;
+  padding: var(--sv-space-md) var(--sv-space-md) 0;
+  font-size: var(--sv-font-caption);
+  color: var(--sv-color-primary);
+}
+
+.ent {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-md);
+  padding: var(--sv-space-md);
+}
+
+.ent + .ent {
+  border-top: 1px solid var(--sv-border-color);
+}
+
+/* 已领取/已过期压暗，但不藏 —— 藏了用户会以为「刚才那个东西没了」 */
+.ent--done {
+  opacity: 0.55;
+}
+
+.ent__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ent__name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.ent__asset {
+  margin: 2px 0 0;
+  font-size: var(--sv-font-footnote);
+  color: var(--sv-color-primary);
+}
+
+.ent__meta {
+  margin: 2px 0 0;
+  font-size: var(--sv-font-caption);
+  color: var(--sv-text-secondary);
+}
+
 .own {
   display: flex;
   align-items: center;

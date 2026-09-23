@@ -15,7 +15,7 @@ SET NAMES utf8mb4;
 -- 【用法】改下面那一行的会员号，然后整份执行。
 --   mysql> SOURCE 数据库SQL脚本/mysql/工具-清理联调会员数据.sql;
 --
--- 【它覆盖哪些表】26 张。清单是拿 information_schema 穷举出来的，不是凭印象列的：
+-- 【它覆盖哪些表】27 张。清单是拿 information_schema 穷举出来的，不是凭印象列的：
 --   SELECT TABLE_NAME FROM information_schema.COLUMNS
 --    WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'member_id';
 --   —— 加新的会员关联表时，<b>重跑这句</b>再补，别靠记忆。
@@ -58,7 +58,13 @@ SELECT member_id FROM t_member WHERE member_name LIKE 'p0\_%';
 -- 分域列出来，加新表时照着补一行 —— 清单不全就等于没清。
 -- ---------------------------------------------------------------------------
 
--- 会员等级域（2026-09-20 新增的 4 张）
+-- 会员等级域（2026-09-20 新增的 4 张，2026-09-22 又加了权益发放记录）
+--
+-- ⚠️ t_grade_entitlement_grant 是【第三次】靠差集查出来补的（前两次是
+--    t_announcement_ack 那批和 t_external_order）。三次的原因完全一样：
+--    建了新表却没想起这份脚本。所以建带 member_id 的表时，顺手跑一次文件头那句
+--    information_schema 差集 —— 它每次都能查出来，而靠记忆每次都漏。
+DELETE FROM t_grade_entitlement_grant WHERE member_id IN (SELECT member_id FROM tmp_clean_member);
 DELETE FROM t_member_period_summary  WHERE member_id IN (SELECT member_id FROM tmp_clean_member);
 DELETE FROM t_member_grade_log       WHERE member_id IN (SELECT member_id FROM tmp_clean_member);
 DELETE FROM t_member_growth_log      WHERE member_id IN (SELECT member_id FROM tmp_clean_member);

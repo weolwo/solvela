@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.member.entitlement.dao.GradeEntitlementGrantDao">
+
+    <resultMap id="CandidateMap" type="solvela.member.entitlement.domain.EntitlementCandidate">
+        <result column="member_id" property="memberId"/>
+        <result column="grade_code" property="gradeCode"/>
+    </resultMap>
+
+    <!--
+      扫候选会员。
+
+      ⚠️ 从 t_member 出发 LEFT JOIN 成长值，不是反过来 —— 反过来会漏掉
+         【从没攒过成长值】的会员，他们没有成长值行但确实是 0 级的真实会员。
+
+      🔴 COALESCE(g.current_grade, 0)：没有成长值行 = 0 级，不是 NULL。
+         写成 g.current_grade >= 0 的话，NULL 比较恒为 false，那批人整批漏掉。
+    -->
+    <select id="selectCandidates" resultMap="CandidateMap">
+        SELECT m.member_id, COALESCE(g.current_grade, 0) AS grade_code
+        FROM t_member m
+        LEFT JOIN t_member_growth g ON g.member_id = m.member_id
+        WHERE m.member_id &gt; #{afterMemberId}
+        AND COALESCE(g.current_grade, 0) &gt;= #{minGrade}
+        <if test="birthMonth != null">
+            AND m.birthday IS NOT NULL
+            AND (
+            (MONTH(m.birthday) = #{birthMonth} AND DAY(m.birthday) = #{birthDay})
+            <if test="includeFeb29">
+                <!--
+                  平年的 2 月 28：把 2 月 29 出生的人也算作今天过生日。
+                  不做的话那批人四年里有三年收不到，而且不报错、没日志、没人会发现。
+                -->
+                OR (MONTH(m.birthday) = 2 AND DAY(m.birthday) = 29)
+            </if>
+            )
+        </if>
+        ORDER BY m.member_id
+        LIMIT #{limit}
+    </select>
+
+    <!--
+      到期未领 -> 已过期。
+
+      🔴 条件里的 status = 0 一个字都不能少：写漏了会把历史上所有【已领取】
+         的记录也改成「已过期」，而那是不可逆的 —— 领取时间还在，状态却说它过期了。
+    -->
+    <update id="expirePending">
+        UPDATE t_grade_entitlement_grant
+        SET status = 2
+        WHERE status = 0
+        AND expire_time &lt;= #{now}
+        LIMIT #{limit}
+    </update>
+
+    <!--
+      领取：条件更新抢占。
+
+      🔴 带 member_id 是【越权防线】，不是冗余条件：只用 id 的话，
+         改一个请求参数就能领走别人的权益。
+      🔴 带 status = 0 与 expire_time：两个请求同时点只有一个能抢到，
+         过期的那一刻之后也再抢不到。影响 0 行 = 没抢到，由调用方翻成人话。
+    -->
+    <update id="tryClaim">
+        UPDATE t_grade_entitlement_grant
+        SET status = 1, claim_time = #{now}
+        WHERE id = #{id}
+        AND member_id = #{memberId}
+        AND status = 0
+        AND expire_time &gt; #{now}
+    </update>
+
+    <update id="markResult">
+        UPDATE t_grade_entitlement_grant
+        SET grant_result = #{result}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

@@ -23,6 +23,7 @@ import solvela.member.api.DeliveryApi;
 import solvela.member.api.DeviceApi;
 import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.MemberAuthApi;
+import solvela.member.api.MemberEntitlementApi;
 import solvela.member.api.MemberGradeApi;
 import solvela.member.api.MemberSignApi;
 import solvela.member.api.NotificationApi;
@@ -225,6 +226,18 @@ public class DownstreamClientConfig {
     @Bean
     public MemberGradeApi memberGradeApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(2), MemberGradeApi.class);
+    }
+
+    /**
+     * 我的权益：列表是只读，<b>领取那一步会真的发出东西</b>（调资产域发放）。
+     *
+     * <p>⚠️ 超时给 5 秒而不是 2：领取那一步下游要走一次资产发放，
+     * 比纯查询重。超时太短的后果不是「慢」，是<b>发放已经成功而网关先超时了</b> ——
+     * 用户看到失败，再点一次。所幸发放单号在生成时就定死，重试不会多发。
+     */
+    @Bean
+    public MemberEntitlementApi memberEntitlementApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(5), MemberEntitlementApi.class);
     }
 
     @Bean

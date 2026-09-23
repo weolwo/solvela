@@ -63,7 +63,11 @@ public class DumpSchema {
             // 成长值也在会员域 —— 它不能放钱包，因为 <modules> 里 member 排在
             // ledger 之前，会员域物理上读不到钱包表。
             "t_member_grade","t_member_growth","t_member_growth_log","t_member_grade_log",
-            "t_member_period_summary","t_grade_privilege"));
+            "t_member_period_summary","t_grade_privilege",
+            // 2026-09-23 权益域。归会员域而不是账务域：这两张表只描述
+            // 「谁在哪个周期有资格领什么」，真正发出去的资产在 t_member_coupon /
+            // 钱包里。配置与凭证在这儿，资产在那儿，边界就是 AssetGrantApi。
+            "t_grade_entitlement","t_grade_entitlement_grant"));
         GROUPS.put("账务 / 履约", List.of(
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config",
