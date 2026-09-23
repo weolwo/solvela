@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDiscount, formatListPoints } from '@/utils/cost'
+import { formatCost, formatDiscount, formatListPoints } from '@/utils/cost'
+import { toMoney } from '@/types/contract'
 
 /**
  * 等级价的**展示**规则。
@@ -44,5 +45,27 @@ describe('等级折扣的展示', () => {
 
   it('🔴 折扣率是 0 也不出角标 —— 0 的字面意思是白送，那一定是脏数据', () => {
     expect(formatDiscount(0, 10000, 0)).toBe('')
+  })
+})
+
+/**
+ * 「起」：各在售规格不同价时，对价后面必须加。
+ *
+ * 🔴 卡片显示的是**最便宜那个在售规格**的价。不加「起」的话，
+ * 一个点进去选完规格发现要多付的用户会认为被骗了 ——
+ * 而他没有任何办法从卡片上看出来这是最低价。
+ */
+describe('各规格不同价时的「起」', () => {
+  it('纯积分商品：不同价加「起」，同价不加', () => {
+    expect(formatCost(1, 8800, toMoney('0'), true)).toBe('8,800 积分 起')
+    expect(formatCost(1, 8800, toMoney('0'), false)).toBe('8,800 积分')
+  })
+
+  it('积分+现金商品：「起」加在整串后面，不是夹在中间', () => {
+    expect(formatCost(2, 8800, toMoney('5000.00'), true)).toBe('8,800 积分 + ¥5,000.00 起')
+  })
+
+  it('⚠️ 不传 varies 时维持原样 —— 旧调用点不会凭空多出一个「起」', () => {
+    expect(formatCost(2, 8800, toMoney('5000.00'))).toBe('8,800 积分 + ¥5,000.00')
   })
 })

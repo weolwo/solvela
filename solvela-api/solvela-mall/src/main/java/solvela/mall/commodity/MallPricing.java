@@ -4,6 +4,7 @@ import solvela.mall.MallCommodity;
 import solvela.mall.MallSku;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 商城定价：<b>一件商品到底要多少分 / 多少钱，只有这一处说了算</b>。
@@ -73,9 +74,14 @@ public final class MallPricing {
     /**
      * 商品基准挂牌价，<b>不看 SKU</b>。
      *
-     * <p>列表页用它 —— 那里一件商品只占一行，没有「选了哪个规格」这回事。
-     * ⚠️ 所以列表上的价和详情页选中某个 SKU 之后的价<b>可以不一样</b>，
-     * 那是运营给规格配了差价，不是 bug。
+     * <h3>⚠️ 这不是「卡片上该显示的价」</h3>
+     * 它只是 SKU 没填价时的<b>继承来源</b>。卡片要显示的是
+     * {@link #cheapest}（最便宜那个在售规格的实际价）。
+     *
+     * <p>2026-09-23 之前卡片直接发的就是这个值，于是一台
+     * <b>实际要 ¥5000 的手机在列表上写着「¥0.00」</b> —— 商品表的现金基准价是 0，
+     * 真价配在每个 SKU 上。它和 2026-09-22 那次（兑换页显示 0 分）是同一个形状：
+     * 把「继承」这件事留在调用方，而某一条路忘了做。
      */
     public static int listPoints(MallCommodity commodity) {
         if (commodity == null || commodity.getPointsPrice() == null) {
@@ -172,6 +178,72 @@ public final class MallPricing {
         }
         Integer flag = commodity.getGradePriceFlag();
         return flag == null || flag != 0;
+    }
+
+    /**
+     * 卡片上该显示的价：<b>最便宜那个在售规格的实际价</b>。
+     *
+     * <h3>🔴 为什么不是商品基准价</h3>
+     * 商品表上的两个基准价只是 SKU 的<b>继承来源</b>，不保证有人按它卖。
+     * 库里现在就有 {@code cash_price = 0} 而每个 SKU 都是 5000 的商品 ——
+     * 直接发基准价，卡片就写着「8,800 积分 + ¥0.00」，而结账要 ¥5000。
+     * 卡片是用户决定要不要点进去的唯一依据，它<b>不能承诺一个结账兑现不了的数</b>。
+     *
+     * <h3>⚠️ 「最便宜」按 (积分, 现金) 依次比，而不是各取各的最小值</h3>
+     * 各取最小的话，会拼出一个<b>没有任何 SKU 真的这么卖</b>的组合
+     *（A 规格 8800 分 + ¥5000，B 规格 9000 分 + ¥100 → 拼成 8800 + ¥100）。
+     * 依次比总能指向一个真实存在的规格。
+     *
+     * @param onSaleSkus 在售 SKU。<b>空列表</b>时退回商品基准价 ——
+     *                   那种商品在 C 端本来就兑不了（库存为 0），
+     *                   但列表仍然要显示它，价显示成 0 比显示基准价更没意义
+     * @return 见 {@link CardPrice#varies}：各规格不同价时端上要加个「起」
+     */
+    public static CardPrice cheapest(MallCommodity commodity, List<MallSku> onSaleSkus,
+                                     GradeDiscount discount) {
+        if (onSaleSkus == null || onSaleSkus.isEmpty()) {
+            return new CardPrice(points(commodity, discount), listPoints(commodity),
+                    commodity == null || commodity.getCashPrice() == null
+                            ? BigDecimal.ZERO : commodity.getCashPrice(),
+                    false);
+        }
+        MallSku best = null;
+        int bestPoints = 0;
+        BigDecimal bestCash = BigDecimal.ZERO;
+        boolean varies = false;
+        for (MallSku sku : onSaleSkus) {
+            int p = points(sku, commodity, discount);
+            BigDecimal c = cash(sku, commodity);
+            if (best == null) {
+                best = sku;
+                bestPoints = p;
+                bestCash = c;
+                continue;
+            }
+            if (p != bestPoints || c.compareTo(bestCash) != 0) {
+                varies = true;
+            }
+            if (p < bestPoints || (p == bestPoints && c.compareTo(bestCash) < 0)) {
+                best = sku;
+                bestPoints = p;
+                bestCash = c;
+            }
+        }
+        /*
+         * 🔴 划线价取【同一个】规格的挂牌价，不是所有规格里最高的那个。
+         * 取最高的话，「原价 19,990 / 现价 8,800」这两个数会来自两个不同的规格，
+         * 划出来的折扣是编的。
+         */
+        return new CardPrice(bestPoints, listPoints(best, commodity), bestCash, varies);
+    }
+
+    /**
+     * 卡片上的一组价。
+     *
+     * @param varies 各在售规格<b>不同价</b>。端上据此在对价后面加「起」——
+     *               不加的话，一个点进去发现要多付的用户会认为被骗了
+     */
+    public record CardPrice(int points, int listPoints, BigDecimal cash, boolean varies) {
     }
 
     /**

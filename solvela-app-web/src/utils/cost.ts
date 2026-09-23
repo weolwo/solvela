@@ -44,9 +44,15 @@ export function formatCash(cash: Money): string {
  *
  * <p>刻意按 `payType` 分支而不是「cash 不为 0 就拼上」：
  * 后者在运营把现金价配成 0 的 payType=2 商品上会静默少显示一半信息。
+ *
+ * <h3>🔴 `varies` 是「各规格不同价」，必须加「起」</h3>
+ * 列表与详情顶部显示的是**最便宜那个在售规格**的价。不加「起」的话，
+ * 一个点进去选完规格发现要多付的用户会认为被骗了 ——
+ * 而他没有任何办法从卡片上看出来这是最低价。
  */
-export function formatCost(payType: 1 | 2, points: number, cash: Money): string {
-  return payType === 2 ? `${formatPoints(points)} + ${formatCash(cash)}` : formatPoints(points)
+export function formatCost(payType: 1 | 2, points: number, cash: Money, varies = false): string {
+  const cost = payType === 2 ? `${formatPoints(points)} + ${formatCash(cash)}` : formatPoints(points)
+  return varies ? `${cost} 起` : cost
 }
 
 /**

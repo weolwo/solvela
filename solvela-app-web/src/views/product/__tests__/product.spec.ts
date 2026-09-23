@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { CommodityQuery } from '@/api/mall'
@@ -33,6 +33,13 @@ window.matchMedia = (query: string) => ({
 /* eslint-disable-next-line @typescript-eslint/consistent-type-imports */
 type MallModule = typeof import('@/api/mall')
 
+/*
+ * 少数用例要改一两个字段（如 priceVaries）。放在模块作用域而不是给 mountDetail 加参数：
+ * mock 工厂是提升到文件顶部执行的，拿不到函数参数。
+ * ⚠️ 每个用例跑完要清空，否则会串到下一条 —— 见下面的 afterEach。
+ */
+let detailOverride: Record<string, unknown> = {}
+
 vi.mock('@/api/mall', async (importOriginal) => {
   const actual = await importOriginal<MallModule>()
   const fixtures = await import('@/testing/fixtures')
@@ -57,7 +64,7 @@ vi.mock('@/api/mall', async (importOriginal) => {
       }).map((c) => ({ ...c, favorite: favorites.has(c.commodityId) }))
       return Promise.resolve({ list, total: list.length })
     },
-    fetchCommodityDetail: (id: Id) => Promise.resolve(fixtures.detailOf(id)),
+    fetchCommodityDetail: (id: Id) => Promise.resolve({ ...fixtures.detailOf(id), ...detailOverride }),
     fetchFavorites: () =>
       Promise.resolve(
         fixtures.COMMODITIES.filter((c) => favorites.has(c.commodityId)).map((c) => ({
@@ -113,6 +120,11 @@ async function mountDetail(id = '7002') {
 }
 
 describe('ProductView', () => {
+  afterEach(() => {
+    detailOverride = {}
+  })
+
+
   it('渲染标题、价格、库存与评分', async () => {
     const w = await mountDetail()
     const html = w.html()
@@ -125,6 +137,28 @@ describe('ProductView', () => {
     // 限兑来自 limit_period / limit_count / remainingCount
     expect(html).toContain('每日限兑 2 件，还可兑 2 件')
     expect(html).toContain('兑换须知')
+  })
+
+  it('🔴 各规格不同价时对价带「起」，选全规格后「起」消失', async () => {
+    /*
+     * 这条钉住一个真实的写法坑：判「还没选规格」用的是 findSku 的返回值，
+     * 而它没选全时返回的是 null，【不是 undefined】——
+     * 第一版写的 `=== undefined` 永远为假，接口回 priceVaries=true
+     * 而页面上一个「起」字都没有，且没有任何报错。
+     */
+    detailOverride = { priceVaries: true }
+    const w = await mountDetail()
+    expect(w.find('.price__now').text()).toContain('起')
+
+    const colorOpts = w.findAll('.attr')[0]?.findAll('.opt') ?? []
+    await colorOpts[0]?.trigger('click')
+    // 只选了一项，还没选全 —— 仍然是「起」
+    expect(w.find('.price__now').text()).toContain('起')
+
+    const sizeOpts = w.findAll('.attr')[1]?.findAll('.opt') ?? []
+    await sizeOpts[0]?.trigger('click')
+    // 选全了就是确定的一个价，「起」该消失
+    expect(w.find('.price__now').text()).not.toContain('起')
   })
 
   it('没有图集时不画滑不动的圆点', async () => {

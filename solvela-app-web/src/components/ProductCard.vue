@@ -55,7 +55,12 @@ const initial = computed(() => {
 })
 
 const cost = computed(() =>
-  formatCost(props.commodity.payType, props.commodity.pointsPrice, props.commodity.cashPrice),
+  formatCost(
+    props.commodity.payType,
+    props.commodity.pointsPrice,
+    props.commodity.cashPrice,
+    props.commodity.priceVaries,
+  ),
 )
 
 /** 为空表示运营没配划线价，那一行整个不渲染 */

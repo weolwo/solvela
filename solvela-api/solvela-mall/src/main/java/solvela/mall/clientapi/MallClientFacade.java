@@ -153,7 +153,7 @@ public class MallClientFacade implements MallApi {
         Page<MallCommodity> page = mallCommodityManager.page(new Page<>(num, size), wrapper);
 
         List<MallCommodity> list = page.getRecords();
-        Map<Long, Integer> stocks = stockOf(list.stream().map(MallCommodity::getId).toList());
+        Map<Long, List<MallSku>> skus = onSaleSkusOf(list.stream().map(MallCommodity::getId).toList());
         Set<Long> favorites = favoriteIds(cmd.memberId(),
                 list.stream().map(MallCommodity::getId).toList());
 
@@ -164,7 +164,7 @@ public class MallClientFacade implements MallApi {
         GradeLens lens = gradeLens(cmd.memberId(), list.stream().map(MallCommodity::getId).toList());
 
         return new MallCommodityPageView(
-                list.stream().map(c -> toBrief(c, lens, stocks, favorites, covers)).toList(),
+                list.stream().map(c -> toBrief(c, lens, skus, favorites, covers)).toList(),
                 page.getTotal());
     }
 
@@ -277,17 +277,22 @@ public class MallClientFacade implements MallApi {
     private MallCommodityDetailView toDetailView(MallCommodity commodity, List<MallSku> skus,
                                                  List<Long> bannerIds, Map<Long, String> images,
                                                  boolean favorite, Integer remaining, GradeLens lens) {
-        int stock = skus.stream().mapToInt(s -> nullToZero(s.getAvailableStock())).sum();
+        int stock = stockOf(skus);
+        /*
+         * ⚠️ 详情页顶上那个价也是「最便宜那个规格」，和卡片同一条规则。
+         *    用户还没选规格时总要显示一个数，显示商品基准价的话，
+         *    从卡片点进来价格会当场变一次 —— 而他还什么都没做。
+         */
+        MallPricing.CardPrice price = MallPricing.cheapest(commodity, skus, lens.discount());
         return new MallCommodityDetailView(
                 commodity.getId(), commodity.getCommodityCode(), commodity.getCategoryId(),
                 commodity.getCommodityType(), commodity.getCommodityName(),
                 commodity.getCommodityIntro(), urlFor(images, commodity.getCoverFileId()),
                 commodity.getPayType(),
-                MallPricing.points(commodity, lens.discount()), MallPricing.listPoints(commodity),
+                price.points(), price.listPoints(),
                 // 同 toBrief：发的是这件商品实际打了几折
-                MallPricing.effectivePercent(MallPricing.listPoints(commodity),
-                        MallPricing.points(commodity, lens.discount())),
-                commodity.getCashPrice(),
+                MallPricing.effectivePercent(price.listPoints(), price.points()),
+                price.cash(), price.varies(),
                 commodity.getOriginalPrice(), favorite, stock,
                 /*
                  * 轮播图，按 t_file_relation.sort 排 —— 那一列的注释原文就是「轮播图必需」。
@@ -363,7 +368,7 @@ public class MallClientFacade implements MallApi {
          */
         List<MallCommodity> list = mallCommodityManager.list(
                 visibleCommodity().in(MallCommodity::getId, ids));
-        Map<Long, Integer> stocks = stockOf(ids);
+        Map<Long, List<MallSku>> skus = onSaleSkusOf(ids);
         Set<Long> favorites = Set.copyOf(ids);
         // 按收藏时间倒序还原顺序 —— IN 查出来的顺序是不确定的
         Map<Long, MallCommodity> byId = list.stream()
@@ -371,7 +376,7 @@ public class MallClientFacade implements MallApi {
         Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
         GradeLens lens = gradeLens(memberId, ids);
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull)
-                .map(c -> toBrief(c, lens, stocks, favorites, covers))
+                .map(c -> toBrief(c, lens, skus, favorites, covers))
                 .toList();
     }
 
@@ -536,7 +541,16 @@ public class MallClientFacade implements MallApi {
     /* ---------------- 装配 ---------------- */
 
     /** 商品粒度的可用库存 = 各 SKU 之和。一次查完，不逐个商品查 */
-    private Map<Long, Integer> stockOf(Collection<Long> commodityIds) {
+    /**
+     * 一页商品的在售 SKU，按商品分组。<b>一次查完。</b>
+     *
+     * <p>🔴 库存和价格都从这一份里算，<b>不要为价格再查一次</b>。
+     * 2026-09-23 之前这个方法叫 stockOf，查回全部 SKU 之后
+     * 只用来求了个库存和就把它们扔了 —— 而卡片的价当时直接发商品基准价，
+     * 于是一台实际要 ¥5000 的手机在列表上写着「¥0.00」。
+     * 数据本来就在手上，只是没人用。
+     */
+    private Map<Long, List<MallSku>> onSaleSkusOf(Collection<Long> commodityIds) {
         if (commodityIds.isEmpty()) {
             return Map.of();
         }
@@ -544,8 +558,12 @@ public class MallClientFacade implements MallApi {
                 .in(MallSku::getCommodityId, commodityIds)
                 .eq(MallSku::getSkuStatus, EnableStatusEnum.ENABLED)
                 .list().stream()
-                .collect(Collectors.groupingBy(MallSku::getCommodityId,
-                        Collectors.summingInt(s -> nullToZero(s.getAvailableStock()))));
+                .collect(Collectors.groupingBy(MallSku::getCommodityId));
+    }
+
+    /** 可用库存之和。空列表算 0 —— 那件商品已经兑完了 */
+    private static int stockOf(List<MallSku> skus) {
+        return skus == null ? 0 : skus.stream().mapToInt(s -> nullToZero(s.getAvailableStock())).sum();
     }
 
     /**
@@ -596,28 +614,34 @@ public class MallClientFacade implements MallApi {
     }
 
     private static MallCommodityBriefView toBrief(MallCommodity c, GradeLens lens,
-                                                  Map<Long, Integer> stocks,
+                                                  Map<Long, List<MallSku>> skus,
                                                   Set<Long> favorites, Map<Long, String> covers) {
+        List<MallSku> onSale = skus.getOrDefault(c.getId(), List.of());
+        /*
+         * 🔴 卡片的价是【最便宜那个在售规格的实际价】，不是商品表上那两列。
+         *
+         * 商品表上的基准价只是 SKU 的继承来源，不保证有人按它卖 ——
+         * 直接发它，一台实际要 ¥5000 的手机会在列表上写着「¥0.00」（库里真有这样的数据）。
+         * 而卡片是用户决定要不要点进去的唯一依据。
+         *
+         * 加等级价那次这里也踩过一半：原先发 c.getPointsPrice()，
+         * 于是「列表按原价、详情和下单按折后价」，用户看到列表 10000、点进去 8800。
+         */
+        MallPricing.CardPrice price = MallPricing.cheapest(c, onSale, lens.discount());
         return new MallCommodityBriefView(
                 c.getId(), c.getCommodityCode(), c.getCategoryId(), c.getCommodityType(),
                 c.getCommodityName(), c.getCommodityIntro(), urlFor(covers, c.getCoverFileId()),
                 c.getPayType(),
-                /*
-                 * 🔴 这里原先是 c.getPointsPrice() —— 直接把商品表那一列发出去。
-                 * 加等级价之后那样写就是「列表按原价、详情和下单按折后价」，
-                 * 用户会看到列表 10000、点进去 8800，而没有任何地方解释这一跳。
-                 */
-                MallPricing.points(c, lens.discount()), MallPricing.listPoints(c),
+                price.points(), price.listPoints(),
                 /*
                  * 🔴 发出去的是【这件商品实际打了几折】，不是这个人的折扣率。
                  * 配了覆盖价的商品，折扣率还是 92 而实际价可能是 888 —— 按折扣率
                  * 挂「9.2折」就是在一件打了 0.9 折的商品上说假话；反过来，
                  * 退出等级折扣的商品折扣率仍是 92 而价格一分没少，同样是假话。
                  */
-                MallPricing.effectivePercent(MallPricing.listPoints(c),
-                        MallPricing.points(c, lens.discount())),
-                c.getCashPrice(), c.getOriginalPrice(),
-                favorites.contains(c.getId()), stocks.getOrDefault(c.getId(), 0),
+                MallPricing.effectivePercent(price.listPoints(), price.points()),
+                price.cash(), price.varies(), c.getOriginalPrice(),
+                favorites.contains(c.getId()), stockOf(onSale),
                 MallGradeGate.requiredGrade(c), lens.nameOf(c), lens.locked(c));
     }
 

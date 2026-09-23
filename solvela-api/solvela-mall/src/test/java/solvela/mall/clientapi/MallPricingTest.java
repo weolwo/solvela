@@ -9,6 +9,7 @@ import solvela.mall.commodity.MallPricing;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -297,6 +298,118 @@ class MallPricingTest {
         assertEquals(100, MallPricing.effectivePercent(10000, 10000));
         assertEquals(100, MallPricing.effectivePercent(10000, 12000), "算不出加价");
         assertEquals(100, MallPricing.effectivePercent(0, 0), "0 分商品不出角标");
+    }
+
+    // ------------------------------------------------ 卡片上该显示哪个价
+
+    /** 带价的在售 SKU */
+    private static MallSku onSale(long id, Integer points, String cash) {
+        MallSku s = sku(points, cash == null ? null : new BigDecimal(cash));
+        s.setId(id);
+        return s;
+    }
+
+    @Test
+    @DisplayName("🔴 卡片发【最便宜那个在售规格】的价，不是商品基准价")
+    void 卡片取最便宜的规格() {
+        /*
+         * 这条对应一个真实的显示错误（2026-09-23 真机验证时发现）：
+         * 商品表的 cash_price 是 0，而每个 SKU 都是 5000 —— 卡片直接发基准价，
+         * 于是一台实际要 ¥5000 的手机在列表上写着「8,800 积分 + ¥0.00」。
+         * 卡片是用户决定要不要点进去的唯一依据，它不能承诺一个结账兑现不了的数。
+         */
+        MallCommodity c = commodityWithId(1L, 10000);
+        c.setCashPrice(BigDecimal.ZERO);
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c,
+                List.of(onSale(2L, null, "5000"), onSale(4L, null, "5000")), GradeDiscount.NONE);
+
+        assertEquals(10000, p.points());
+        assertEquals(0, new BigDecimal("5000").compareTo(p.cash()), "不能发商品基准价的 0");
+        assertFalse(p.varies(), "两个规格同价，不该加「起」");
+    }
+
+    @Test
+    @DisplayName("各规格不同价时 varies=true —— 端上据此加「起」")
+    void 不同价要加起() {
+        MallCommodity c = commodityWithId(1L, 10000);
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c,
+                List.of(onSale(2L, 9000, null), onSale(4L, 12000, null)), GradeDiscount.NONE);
+
+        assertEquals(9000, p.points(), "取最便宜的那个");
+        assertTrue(p.varies());
+    }
+
+    @Test
+    @DisplayName("🔴 「最便宜」按 (积分, 现金) 依次比，不是各取各的最小值")
+    void 最便宜必须是真实存在的规格() {
+        /*
+         * 各取最小的话会拼出 8800 + ¥100 —— 而没有任何一个规格真的这么卖。
+         * 用户点进去选哪个都对不上，那比显示贵一点更糟。
+         */
+        MallCommodity c = commodityWithId(1L, null);
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c,
+                List.of(onSale(2L, 8800, "5000"), onSale(4L, 9000, "100")), GradeDiscount.NONE);
+
+        assertEquals(8800, p.points());
+        assertEquals(0, new BigDecimal("5000").compareTo(p.cash()),
+                "现金要跟着选中的那个规格走，不能单独取最小");
+    }
+
+    @Test
+    @DisplayName("积分相同就比现金 —— 结果仍然指向一个真实的规格")
+    void 积分相同比现金() {
+        MallCommodity c = commodityWithId(1L, null);
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c,
+                List.of(onSale(2L, 8800, "5000"), onSale(4L, 8800, "100")), GradeDiscount.NONE);
+
+        assertEquals(0, new BigDecimal("100").compareTo(p.cash()));
+        assertTrue(p.varies(), "积分一样但现金不一样，也算不同价");
+    }
+
+    @Test
+    @DisplayName("🔴 划线价取【同一个】规格的挂牌价，不是所有规格里最高的")
+    void 划线价不跨规格() {
+        /*
+         * 取最高的话，「原价 19,990 / 现价 8,800」这两个数会来自两个不同的规格，
+         * 划出来的折扣是编的。
+         */
+        MallCommodity c = commodityWithId(1L, null);
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c,
+                List.of(onSale(2L, 10000, null), onSale(4L, 19990, null)), new GradeDiscount(3, 90, Map.of()));
+
+        assertEquals(9000, p.points(), "10000 × 9 折");
+        assertEquals(10000, p.listPoints(), "挂牌价是【那个规格的】10000，不是 19990");
+    }
+
+    @Test
+    @DisplayName("覆盖价也参与比价 —— 配了特价的规格可能反超成最便宜的那个")
+    void 覆盖价参与比价() {
+        MallCommodity c = commodityWithId(1L, null);
+        GradeDiscount d = withOverrides(Map.of(new GradeDiscount.Key(1L, 4L), 500));
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c,
+                List.of(onSale(2L, 10000, null), onSale(4L, 19990, null)), d);
+
+        assertEquals(500, p.points(), "本来更贵的 4 号规格因为覆盖价成了最便宜的");
+        assertEquals(19990, p.listPoints());
+    }
+
+    @Test
+    @DisplayName("⚠️ 一个在售规格都没有时退回商品基准价，不抛也不显示 0")
+    void 没有在售规格() {
+        MallCommodity c = commodityWithId(1L, 10000);
+        c.setCashPrice(new BigDecimal("12.50"));
+
+        MallPricing.CardPrice p = MallPricing.cheapest(c, List.of(), GradeDiscount.NONE);
+
+        assertEquals(10000, p.points());
+        assertEquals(0, new BigDecimal("12.50").compareTo(p.cash()));
+        assertFalse(p.varies());
     }
 
     /**

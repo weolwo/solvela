@@ -54,6 +54,14 @@ public record MallCommodityBriefView(
          */
         Integer gradeDiscountPercent,
         BigDecimal cashPrice,
+        /**
+         * 各在售规格<b>不同价</b>，端上要在对价后面加「起」。
+         *
+         * <p>🔴 这里发的价是<b>最便宜那个在售规格</b>的价，不是商品基准价 ——
+         * 基准价只是 SKU 的继承来源，不保证有人按它卖。
+         * 不加「起」的话，一个点进去发现要多付的用户会认为被骗了。
+         */
+        boolean priceVaries,
         BigDecimal originalPrice,
         boolean favorite,
         Integer availableStock,

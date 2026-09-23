@@ -95,10 +95,20 @@ const cost = computed(() => {
   if (data === null) {
     return ''
   }
-  // 选了 SKU 就按 SKU 的价（不同规格可以不同价），没选按商品基准价
-  const points = chosenSku.value?.pointsPrice ?? data.pointsPrice
-  const cash = chosenSku.value?.cashPrice ?? data.cashPrice
-  return formatCost(data.payType, points, cash)
+  /*
+   * 选了 SKU 就按 SKU 的价；没选按【最便宜那个规格】的价（服务端算好的），
+   * 并在不同价时加「起」—— 选中之后是确定的一个价，「起」就该消失。
+   */
+  /*
+   * ⚠️ findSku 没选全或找不到时返回的是 null，【不是 undefined】——
+   *    判 `=== undefined` 的话「起」永远不会出现（第一版就是这么写的，
+   *    接口回 priceVaries=true 而页面上一个「起」字都没有）。
+   *    这里判 `== null` 同时覆盖两种空。
+   */
+  const sku = chosenSku.value
+  const points = sku?.pointsPrice ?? data.pointsPrice
+  const cash = sku?.cashPrice ?? data.cashPrice
+  return formatCost(data.payType, points, cash, sku == null && data.priceVaries)
 })
 
 const worth = computed(() =>

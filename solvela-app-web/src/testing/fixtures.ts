@@ -52,6 +52,8 @@ function brief(
     listPointsPrice: points,
     gradeDiscountPercent: 100,
     cashPrice: toMoney(cash),
+    // 默认各规格同价：多数用例不关心这件事，默认带「起」会污染所有对价断言
+    priceVaries: false,
     originalPrice: toMoney(original),
     favorite,
     availableStock: stock,
