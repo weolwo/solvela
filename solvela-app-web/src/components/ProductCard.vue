@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import type { CommodityBrief } from '@/api/mall'
-import { formatCost, formatWorth } from '@/utils/cost'
+import { formatCost, formatDiscount, formatListPoints, formatWorth } from '@/utils/cost'
 
 /**
  * 一张商品卡。首页「精选好物」、商城网格、我的收藏三处用的是同一张 ——
@@ -20,10 +20,14 @@ import { formatCost, formatWorth } from '@/utils/cost'
  *（有的把点击算给外层链接，直接跳走）。所以卡片是 `RouterLink` 覆盖图文区，
  * 收藏按钮绝对定位压在图上，两者<b>平级</b>。
  *
- * <h3>没有折扣角标</h3>
- * 表里没有 `discount_percent` —— 积分商城的「优惠」是运营直接调低 `points_price`，
- * 不存在一个可以算百分比的基准。`original_price` 是「值多少钱」（价值 ¥1,999），
- * 拿它和积分价相除得不到任何有意义的数。
+ * <h3>折扣角标只有等级折扣这一种（2026-09-23）</h3>
+ * 在此之前这里写着「没有折扣角标」，理由是<b>不存在一个可以算百分比的基准</b> ——
+ * 运营的「优惠」就是直接调低 `points_price`，而 `original_price` 是「值多少钱」（现金），
+ * 拿它和积分价相除得不到任何有意义的数。那句话当时是对的。
+ *
+ * <p>等级价造出了那个基准：`listPointsPrice` 是挂牌价，`pointsPrice` 是这个人要付的价，
+ * 两者之差<b>就是这个人因为等级省下的分</b>。所以角标现在有了，但仅此一种 ——
+ * 运营调价<b>仍然</b>不产生角标，那不是优惠，那是改价。
  *
  * <h3>没有图时画首字，不画灰方块</h3>
  * `coverUrl` 为 null 是正常的（没配图，或文件被删）。占位块用商品名首字，
@@ -58,6 +62,20 @@ const cost = computed(() =>
 const worth = computed(() => formatWorth(props.commodity.originalPrice))
 
 const soldOut = computed(() => props.commodity.availableStock <= 0)
+
+/** 等级折扣角标，如 `8.8折`。这件商品没便宜就为空 */
+const discountTag = computed(() =>
+  formatDiscount(
+    props.commodity.pointsPrice,
+    props.commodity.listPointsPrice,
+    props.commodity.gradeDiscountPercent,
+  ),
+)
+
+/** 划掉的挂牌积分价。没享到折扣就为空 */
+const listCost = computed(() =>
+  formatListPoints(props.commodity.pointsPrice, props.commodity.listPointsPrice),
+)
 
 /**
  * 专享商品的角标文案。不是专享就为空。
@@ -109,7 +127,21 @@ const coverBroken = ref(false)
 
       <h3 class="card__title">{{ commodity.commodityName }}</h3>
       <p class="card__cost">{{ cost }}</p>
-      <p v-if="worth !== ''" class="card__worth">{{ worth }}</p>
+      <!--
+        🔴 折扣角标放在【划线那一行】，不放在价格行。
+        价格行是会截断的（「45,000 积分 + ¥299.00」放不下就 ellipsis），
+        角标塞进去之后，积分+现金的商品上它会被裁掉一半 —— 联调时就是这么发现的。
+        而且划线价本来就是解释折扣的那一行，角标贴着它反而更说得通。
+
+        两个划线位只放得下一个，享到等级折扣时优先显示「原本要多少分」：
+        「省了 1,600 积分」比「价值 ¥1,999」对这一刻的决定更有用 ——
+        后者说的是商品值不值，前者说的是【他因为是白金而少付了多少】。
+      -->
+      <p v-if="listCost !== ''" class="card__worth card__worth--deal">
+        <s class="card__worth-was">{{ listCost }}</s>
+        <span v-if="discountTag !== ''" class="card__discount">{{ discountTag }}</span>
+      </p>
+      <p v-else-if="worth !== ''" class="card__worth">{{ worth }}</p>
     </RouterLink>
 
     <button
@@ -266,5 +298,32 @@ const coverBroken = ref(false)
   color: var(--sv-text-placeholder);
   font-size: var(--sv-font-footnote);
   font-variant-numeric: tabular-nums;
+}
+
+.card__worth--deal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 划线只画在价上，不画在角标上 */
+.card__worth-was {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card__discount {
+  /* 🔴 不许被压缩：它是这张卡最该看见的东西，放不下就让划线价去截断 */
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: var(--sv-radius-sm);
+  background: var(--sv-color-primary);
+  color: var(--sv-text-on-primary);
+  font-size: var(--sv-font-footnote);
+  font-weight: 600;
+  text-decoration: none;
+  /* 角标不参与 tabular-nums：「8.8折」里的折字会被撑开 */
+  font-variant-numeric: normal;
 }
 </style>

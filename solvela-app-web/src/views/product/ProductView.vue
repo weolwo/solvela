@@ -7,7 +7,7 @@ import { useAsync } from '@/composables/useAsync'
 import { useFavorites } from '@/composables/useFavorites'
 import { useAuthStore } from '@/stores/auth'
 import { toId } from '@/types/contract'
-import { formatCost, formatWorth } from '@/utils/cost'
+import { formatCost, formatDiscount, formatListPoints, formatWorth } from '@/utils/cost'
 
 /**
  * 商品详情页。
@@ -104,6 +104,35 @@ const cost = computed(() => {
 const worth = computed(() =>
   detail.data.value === null ? '' : formatWorth(detail.data.value.originalPrice),
 )
+
+/*
+ * 等级折扣：两个价都要跟着选中的 SKU 走。
+ *
+ * ⚠️ 只让 pointsPrice 跟 SKU 走、listPointsPrice 用商品基准价的话，
+ * 选一个比基准价便宜的规格时会凭空多出一道划线 —— 那不是折扣，是规格差价。
+ */
+const listCost = computed(() => {
+  const data = detail.data.value
+  if (data === null) {
+    return ''
+  }
+  return formatListPoints(
+    chosenSku.value?.pointsPrice ?? data.pointsPrice,
+    chosenSku.value?.listPointsPrice ?? data.listPointsPrice,
+  )
+})
+
+const discountTag = computed(() => {
+  const data = detail.data.value
+  if (data === null) {
+    return ''
+  }
+  return formatDiscount(
+    chosenSku.value?.pointsPrice ?? data.pointsPrice,
+    chosenSku.value?.listPointsPrice ?? data.listPointsPrice,
+    data.gradeDiscountPercent,
+  )
+})
 
 const availableStock = computed(
   () => chosenSku.value?.availableStock ?? detail.data.value?.availableStock ?? 0,
@@ -255,11 +284,24 @@ function goBack(): void {
 
         <div class="price">
           <span class="price__now">{{ cost }}</span>
-          <s v-if="worth !== ''" class="price__was">{{ worth }}</s>
+          <span v-if="discountTag !== ''" class="price__discount">{{ discountTag }}</span>
           <!-- 库存既有颜色也有文字：只靠颜色区分对色觉障碍用户等于没区分 -->
           <span class="price__stock" :class="{ 'price__stock--out': availableStock <= 0 }">
             {{ availableStock > 0 ? `现货 ${availableStock} 件` : '已兑完' }}
           </span>
+        </div>
+
+        <!--
+          🔴 两道划线单独一行，不和现价挤在一起。
+          挤在一起的话 375px 下五个元素each自己换行 —— 联调截图里「9.2 折」
+          三个字都被拆成了两行。现价那一行只留【现价 + 折扣 + 库存】。
+
+          顺序有讲究：先「原本要多少分」（他因为等级省了多少），
+          再「价值 ¥xxx」（这东西值不值）—— 前者是此刻的决定依据。
+        -->
+        <div v-if="listCost !== '' || worth !== ''" class="price-was">
+          <s v-if="listCost !== ''">{{ listCost }}</s>
+          <s v-if="worth !== ''">{{ worth }}</s>
         </div>
 
         <p v-if="limitText !== ''" class="limit">{{ limitText }}</p>
@@ -518,10 +560,26 @@ function goBack(): void {
   font-variant-numeric: tabular-nums;
 }
 
-.price__was {
+.price-was {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sv-space-sm);
+  margin-top: 2px;
   color: var(--sv-text-placeholder);
   font-size: var(--sv-font-caption);
   font-variant-numeric: tabular-nums;
+}
+
+.price__discount {
+  /* 不许换行也不许被压缩：「9.2折」拆成两行比不显示还糟 */
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--sv-radius-sm);
+  background: var(--sv-color-primary);
+  color: var(--sv-text-on-primary);
+  font-size: var(--sv-font-footnote);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .price__stock {

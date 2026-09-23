@@ -20,6 +20,7 @@
             <result column="limit_period" property="limitPeriod" />
             <result column="limit_count" property="limitCount" />
             <result column="min_grade" property="minGrade" />
+            <result column="grade_price_flag" property="gradePriceFlag" />
             <result column="start_time" property="startTime" />
             <result column="end_time" property="endTime" />
             <result column="status" property="status" />
@@ -57,6 +58,7 @@
                 c.limit_period,
                 c.limit_count,
                 c.min_grade,
+                c.grade_price_flag,
                 c.start_time,
                 c.end_time,
                 c.status,

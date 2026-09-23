@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
+import solvela.mall.commodity.GradeDiscount;
+import solvela.mall.commodity.MallGradeDiscountResolver;
 import solvela.mall.commodity.MallGradeGate;
 import solvela.mall.commodity.MallPricing;
 import solvela.mall.MallAddress;
@@ -103,6 +105,7 @@ public class MallRedeemService {
 
     private final MallCommodityManager mallCommodityManager;
     private final MallGradeGate mallGradeGate;
+    private final MallGradeDiscountResolver mallGradeDiscountResolver;
     private final MallSkuManager mallSkuManager;
     private final MallSkuDao mallSkuDao;
     private final MallExchangeLimitDao mallExchangeLimitDao;
@@ -184,7 +187,22 @@ public class MallRedeemService {
 
         // 订单号先生成：它同时是扣积分与锁券的幂等键，必须在扣款之前就定下来
         String orderNo = generateOrderNo();
-        int originalPoints = resolvePoints(sku, commodity) * quantity;
+
+        /*
+         * 🔴 等级折扣在券之前算，顺序不能反。
+         *
+         * 等级价是【价】，券是【从价上减】—— 一件 10000 分的商品，白金 9 折 9000，
+         * 再用 1000 分的券，实付 8000。反过来（先减券再打折）实付会是 8100，
+         * 而且「9 折」这个说法对不上任何一个数字，用户算不明白，客服也解释不了。
+         *
+         * ⚠️ 折扣按【会员】取一次，不在循环里 —— 这里本来就只有一件商品，
+         *    但写法要和列表页保持一致，见 MallGradeDiscountResolver 的注释。
+         */
+        GradeDiscount discount = mallGradeDiscountResolver.forMember(cmd.memberId());
+        int listPoints = MallPricing.listPoints(sku, commodity);
+        int gradedPoints = MallPricing.points(sku, commodity, discount);
+        int originalPoints = gradedPoints * quantity;
+        int gradeDiscount = (listPoints - gradedPoints) * quantity;
 
         /*
          * ④ 用券。放在占限购之后、扣款之前 ——
@@ -201,7 +219,8 @@ public class MallRedeemService {
             return reject(debitProblem);
         }
 
-        MallOrder order = buildOrder(cmd, commodity, sku, quantity, orderNo, payPoints, hangs, address);
+        MallOrder order = buildOrder(cmd, commodity, sku, quantity, orderNo, payPoints, hangs, address,
+                listPoints, discount, gradeDiscount);
         order.setCouponId(couponUse.couponId());
         order.setCouponDiscount(couponUse.couponId() == null ? null : couponUse.discount());
         if (couponUse.deductsCash()) {
@@ -531,16 +550,16 @@ public class MallRedeemService {
         return "PHYSICAL".equals(commodity.getCommodityType());
     }
 
-    /**
-     * SKU 价为空则继承商品基准价 —— 规则本体在 {@link MallPricing}。
+    /*
+     * 🔴 这里刻意【没有】一个 resolvePoints 私有方法。
      *
-     * <p>🔴 这里<b>不要</b>再写一份。C 端展示走的是同一条规则，
-     * 两边分别实现的后果是「页面显示的价和实际扣的分对不上」，
-     * 而用户只看得到后者。2026-09-22 已经因此出过一次（兑换页显示 0 分）。
+     * 原先有一个，只是转调 MallPricing。2026-09-23 加等级价时删掉了：
+     * 一个叫 resolvePoints 的方法会让人以为它就是「算出这一单的价」，
+     * 于是补一个新维度时很可能只改它、不改 C 端那条路 ——
+     * 而那正是 2026-09-22 出事的形状（两边各算各的，用户只看得到扣的那个）。
+     * 现在两条路都直接写 MallPricing.points(sku, commodity, discount)，
+     * 少一个中间名字，就少一个可以分叉的地方。
      */
-    private static int resolvePoints(MallSku sku, MallCommodity commodity) {
-        return MallPricing.points(sku, commodity);
-    }
 
     private static BigDecimal resolveCash(MallSku sku, MallCommodity commodity) {
         return MallPricing.cash(sku, commodity);
@@ -548,7 +567,8 @@ public class MallRedeemService {
 
     private MallOrder buildOrder(MallRedeemCmd cmd, MallCommodity commodity, MallSku sku,
                                  int quantity, String orderNo, int payPoints,
-                                 boolean hangs, MallAddress address) {
+                                 boolean hangs, MallAddress address,
+                                 int listPoints, GradeDiscount discount, int gradeDiscount) {
         BigDecimal cashPrice = resolveCash(sku, commodity);
         MallOrder order = new MallOrder();
         order.setOrderNo(orderNo);
@@ -572,7 +592,14 @@ public class MallRedeemService {
         order.setCoverFileId(commodity.getCoverFileId());
         order.setSkuAttrs(sku.getSkuAttrs());
         order.setQuantity(quantity);
-        order.setPointsPrice(resolvePoints(sku, commodity));
+        /*
+         * 🔴 存的是【挂牌单价】，不是这个人实付的单价。
+         * 等级让掉的部分单独记在 gradeDiscount 上，恒等式见 MallOrder.couponDiscount：
+         *   points_price × quantity - grade_discount - coupon_discount = pay_points
+         */
+        order.setPointsPrice(listPoints);
+        order.setGradeCode(discount.gradeCode());
+        order.setGradeDiscount(gradeDiscount);
         order.setCashPrice(cashPrice);
         order.setPayPoints(payPoints);
         order.setPayCash(cashPrice.multiply(BigDecimal.valueOf(quantity)));

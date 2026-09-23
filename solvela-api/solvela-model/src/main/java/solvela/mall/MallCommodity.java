@@ -131,6 +131,23 @@ public class MallCommodity {
     private Integer minGrade;
 
     /**
+     * 参不参与等级折扣：{@code 0} = 不参与，{@code 1}（默认）= 参与。
+     *
+     * <h3>⚠️ 它和 {@link #minGrade} 是两件不相干的事</h3>
+     * {@code minGrade} 是「够不够格兑」，这一列是「兑的时候打不打折」。
+     * 一件不限等级的商品照样可以打等级折扣（谁来都能兑，白金便宜些），
+     * 一件白金专享的商品也可以不打折（本来就是给高等级的福利，不必再让一次）。
+     *
+     * <h3>🔴 默认参与，不是默认不参与</h3>
+     * 默认不参与的话，运营配完折扣率会发现<b>一件商品都没变便宜</b>，
+     * 然后来提一个「功能没生效」的 bug。默认参与，个别商品（成本价、秒杀品）再退出。
+     *
+     * <p>判断收在 {@code MallPricing.participates}，不在调用方 ——
+     * 两条路各判一次，漏判的那条会给成本价商品打折，而那是真实的钱。
+     */
+    private Integer gradePriceFlag;
+
+    /**
      * 上架开始时间：默认值代表不限。不是秒杀场次
      */
     private LocalDateTime startTime;

@@ -142,6 +142,7 @@ public class MallCommodityService {
         vo.setLimitPeriod(commodity.getLimitPeriod());
         vo.setLimitCount(commodity.getLimitCount());
         vo.setMinGrade(commodity.getMinGrade());
+        vo.setGradePriceFlag(commodity.getGradePriceFlag());
         vo.setStartTime(commodity.getStartTime());
         vo.setEndTime(commodity.getEndTime());
         vo.setStatus(commodity.getStatus());
@@ -523,6 +524,15 @@ public class MallCommodityService {
          */
         entity.setMinGrade(form.getMinGrade() == null || form.getMinGrade() < 0
                 ? 0 : form.getMinGrade());
+        /*
+         * 🔴 不填按【参与】(1)，不是按 0。
+         * 与 minGrade 那一行的方向刚好相反，因为两列的「空」含义不同：
+         * 没填最低等级 = 不限（对用户最宽松）；没填这一列 = 跟着全场走（DDL 默认值就是 1）。
+         * 按 0 存的话，新建的商品全都悄悄不参与等级折扣，
+         * 而运营配了折扣率之后会发现一件都没便宜。
+         */
+        entity.setGradePriceFlag(form.getGradePriceFlag() == null || form.getGradePriceFlag() != 0
+                ? 1 : 0);
         entity.setStartTime(shelf.startTime());
         entity.setEndTime(shelf.endTime());
         entity.setStatus(shelf.status());

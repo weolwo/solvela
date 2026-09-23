@@ -19,7 +19,10 @@ public record MallCommoditySkuView(
         String skuCode,
         Map<String, String> skuAttrs,
         String skuCoverUrl,
+        /** 这个规格、这个人要付的积分价，<b>已经含等级折扣</b>。端上直接显示 */
         Integer pointsPrice,
+        /** 这个规格的挂牌积分价，不含等级折扣。比 {@link #pointsPrice} 大时划一道 */
+        Integer listPointsPrice,
         BigDecimal cashPrice,
         Integer availableStock) {
 }

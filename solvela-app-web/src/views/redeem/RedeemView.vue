@@ -220,8 +220,23 @@ function pickCoupon(couponId: Id | null): void {
 }
 
 /* ---- 账单 ---- */
-/** 抵扣前的积分 = 单价 × 件数。积分是整数，直接乘 */
+/**
+ * 抵扣前的积分 = 单价 × 件数。积分是整数，直接乘。
+ *
+ * 🔴 这里的「单价」<b>已经是等级折后价</b>（服务端算好的 `pointsPrice`）。
+ * 端上不再乘一次折扣率 —— 取整方向在服务端，自己乘会和实际扣的分差一两分，
+ * 而那一两分会让这个页面上的账算不平。
+ */
 const originalPoints = computed(() => (sku.value?.pointsPrice ?? 0) * quantity.value)
+
+/** 等级折扣让掉的积分 = （挂牌价 - 折后价）× 件数。没享到折扣时为 0 */
+const gradeDiscount = computed(() => {
+  const s = sku.value
+  if (s === undefined || s === null) {
+    return 0
+  }
+  return Math.max(0, s.listPointsPrice - s.pointsPrice) * quantity.value
+})
 
 /**
  * 券减了多少<b>积分</b>。选的是现金券时为 0。
@@ -501,6 +516,15 @@ function goRecords(): void {
           <div class="bill__row">
             <span>消耗积分</span>
             <span class="bill__value">{{ formatPoints(payPoints) }}</span>
+          </div>
+          <!--
+            等级折扣也单独一行，理由同下面的券：直接把「消耗积分」改小的话，
+            用户不知道自己因为是白金少付了多少 —— 而让他知道这件事，
+            正是等级价存在的理由（券是「这次省了」，等级是「一直省」）。
+          -->
+          <div v-if="gradeDiscount > 0" class="bill__row bill__row--sub">
+            <span>等级优惠</span>
+            <span class="bill__value bill__value--cut">-{{ formatPoints(gradeDiscount) }}</span>
           </div>
           <!--
             抵扣单独一行，而不是把「消耗积分」直接改小。

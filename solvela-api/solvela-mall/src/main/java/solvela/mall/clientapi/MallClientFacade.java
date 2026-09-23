@@ -16,6 +16,8 @@ import solvela.enums.MallCommodityStatusEnum;
 import solvela.member.MemberGrade;
 import solvela.member.grade.service.MemberGradeResolver;
 import solvela.mall.commodity.MallGradeGate;
+import solvela.mall.commodity.GradeDiscount;
+import solvela.mall.commodity.MallGradeDiscountResolver;
 import solvela.mall.commodity.MallPricing;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCategory;
@@ -85,6 +87,7 @@ public class MallClientFacade implements MallApi {
     private final MallCommodityManager mallCommodityManager;
     private final MallGradeGate mallGradeGate;
     private final MemberGradeResolver memberGradeResolver;
+    private final MallGradeDiscountResolver mallGradeDiscountResolver;
     private final MallSkuManager mallSkuManager;
     private final MallFavoriteManager mallFavoriteManager;
     private final MallExchangeLimitManager mallExchangeLimitManager;
@@ -219,7 +222,8 @@ public class MallClientFacade implements MallApi {
      * 这类「循环里查同一个东西」的写法不报错，只是列表页慢，
      * 而慢到被发现时通常已经在生产上了。
      */
-    private record GradeLens(int memberGrade, Map<Integer, String> gradeNames) {
+    private record GradeLens(int memberGrade, Map<Integer, String> gradeNames,
+                             GradeDiscount discount) {
 
         boolean locked(MallCommodity commodity) {
             return MallGradeGate.requiredGrade(commodity) > memberGrade;
@@ -241,11 +245,17 @@ public class MallClientFacade implements MallApi {
      * 只是不再宣传一个已经不存在的等级。
      */
     private GradeLens gradeLens(Long memberId) {
-        Map<Integer, String> names = memberGradeResolver.enabledGrades().stream()
+        List<MemberGrade> grades = memberGradeResolver.enabledGrades();
+        Map<Integer, String> names = grades.stream()
                 .filter(g -> g.getGradeCode() != null && g.getGradeName() != null)
                 .collect(Collectors.toMap(MemberGrade::getGradeCode, MemberGrade::getGradeName,
                         (a, b) -> a));
-        return new GradeLens(mallGradeGate.gradeOf(memberId), names);
+        int grade = mallGradeGate.gradeOf(memberId);
+        /*
+         * ⚠️ 折扣走【已经在手上的】grades，不再查一次库 —— 这两个答案本来就是同一份数据。
+         *    列表页一页 20 件，这里多查一次就是多 20 次（如果哪天有人把它挪进循环）。
+         */
+        return new GradeLens(grade, names, mallGradeDiscountResolver.of(grade, grades));
     }
 
     /** 在售 SKU，按运营配的 sort 排；sort 相同按 id 兜底，保证两次请求顺序一致 */
@@ -272,7 +282,10 @@ public class MallClientFacade implements MallApi {
                 commodity.getId(), commodity.getCommodityCode(), commodity.getCategoryId(),
                 commodity.getCommodityType(), commodity.getCommodityName(),
                 commodity.getCommodityIntro(), urlFor(images, commodity.getCoverFileId()),
-                commodity.getPayType(), commodity.getPointsPrice(), commodity.getCashPrice(),
+                commodity.getPayType(),
+                MallPricing.points(commodity, lens.discount()), MallPricing.listPoints(commodity),
+                lens.discount().percent(),
+                commodity.getCashPrice(),
                 commodity.getOriginalPrice(), favorite, stock,
                 /*
                  * 轮播图，按 t_file_relation.sort 排 —— 那一列的注释原文就是「轮播图必需」。
@@ -284,7 +297,7 @@ public class MallClientFacade implements MallApi {
                 commodity.getDetailContent(), commodity.getExchangeNotice(),
                 commodity.getLimitPeriod(), commodity.getLimitCount(),
                 remaining,
-                skus.stream().map(sku -> toSkuView(sku, commodity, images)).toList(),
+                skus.stream().map(sku -> toSkuView(sku, commodity, lens.discount(), images)).toList(),
                 MallGradeGate.requiredGrade(commodity), lens.nameOf(commodity),
                 lens.locked(commodity));
     }
@@ -586,7 +599,15 @@ public class MallClientFacade implements MallApi {
         return new MallCommodityBriefView(
                 c.getId(), c.getCommodityCode(), c.getCategoryId(), c.getCommodityType(),
                 c.getCommodityName(), c.getCommodityIntro(), urlFor(covers, c.getCoverFileId()),
-                c.getPayType(), c.getPointsPrice(), c.getCashPrice(), c.getOriginalPrice(),
+                c.getPayType(),
+                /*
+                 * 🔴 这里原先是 c.getPointsPrice() —— 直接把商品表那一列发出去。
+                 * 加等级价之后那样写就是「列表按原价、详情和下单按折后价」，
+                 * 用户会看到列表 10000、点进去 8800，而没有任何地方解释这一跳。
+                 */
+                MallPricing.points(c, lens.discount()), MallPricing.listPoints(c),
+                lens.discount().percent(),
+                c.getCashPrice(), c.getOriginalPrice(),
                 favorites.contains(c.getId()), stocks.getOrDefault(c.getId(), 0),
                 MallGradeGate.requiredGrade(c), lens.nameOf(c), lens.locked(c));
     }
@@ -616,11 +637,13 @@ public class MallClientFacade implements MallApi {
      * <p>规则本体在 {@link MallPricing}，与下单扣减共用同一份。
      */
     private static MallCommoditySkuView toSkuView(MallSku sku, MallCommodity commodity,
-                                                  Map<Long, String> images) {
+                                                  GradeDiscount discount, Map<Long, String> images) {
         return new MallCommoditySkuView(
                 sku.getId(), sku.getSkuCode(), MallSkuAttrs.parse(sku.getSkuAttrs()),
                 urlFor(images, sku.getSkuCoverFileId()),
-                MallPricing.points(sku, commodity), MallPricing.cash(sku, commodity),
+                MallPricing.points(sku, commodity, discount),
+                MallPricing.listPoints(sku, commodity),
+                MallPricing.cash(sku, commodity),
                 nullToZero(sku.getAvailableStock()));
     }
 

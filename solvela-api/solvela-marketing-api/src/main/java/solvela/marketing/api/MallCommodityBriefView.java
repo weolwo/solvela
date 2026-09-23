@@ -30,7 +30,29 @@ public record MallCommodityBriefView(
         String commodityIntro,
         String coverUrl,
         MallPayTypeEnum payType,
+        /**
+         * 这个人要付的积分价，<b>已经含等级折扣</b>。
+         *
+         * <p>🔴 端上直接显示这个数，<b>不要</b>自己拿 {@link #listPointsPrice} 乘折扣率 ——
+         * 取整方向（向下）、商品退出等级折扣、折扣率越界兜底，三件事都在服务端，
+         * 端上算出来的数会和实际扣的分对不上。而用户只看得到扣的那个。
+         */
         Integer pointsPrice,
+        /**
+         * 挂牌积分价，<b>不含等级折扣</b>。等于 {@link #pointsPrice} 时说明这个人没享到折扣。
+         *
+         * <p>端上用途只有一个：比它大就在旁边划一道。
+         * ⚠️ 它<b>不是</b> {@link #originalPrice} —— 那个是「值多少钱」（现金），
+         * 这个是「原本要多少分」。两者一个划线位放一个，不要混。
+         */
+        Integer listPointsPrice,
+        /**
+         * 这个人的积分折扣率，{@code 100} = 没有折扣。端上用它拼「白金 8.8 折」。
+         *
+         * <p>⚠️ 整个请求里是同一个值，每件商品都带一份是为了让端上不必再传一遍上下文。
+         * 未登录、等级 0、这一档没配折扣率，都是 100。
+         */
+        Integer gradeDiscountPercent,
         BigDecimal cashPrice,
         BigDecimal originalPrice,
         boolean favorite,

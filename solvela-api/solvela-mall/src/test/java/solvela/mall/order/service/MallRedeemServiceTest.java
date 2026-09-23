@@ -15,6 +15,8 @@ import solvela.enums.EnableStatusEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
+import solvela.mall.commodity.GradeDiscount;
+import solvela.mall.commodity.MallGradeDiscountResolver;
 import solvela.mall.commodity.MallGradeGate;
 import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.MallAddress;
@@ -145,6 +147,14 @@ class MallRedeemServiceTest {
     @Mock
     private MallGradeGate mallGradeGate;
 
+    /**
+     * 等级折扣。默认 {@link GradeDiscount#NONE}（不打折）——
+     * 与 {@code mallGradeGate} 同一个理由：这个文件里绝大多数用例验的是别的东西，
+     * 不该被折扣改变语义。<b>只有等级价那几条用例把它桩成真折扣。</b>
+     */
+    @Mock
+    private MallGradeDiscountResolver mallGradeDiscountResolver;
+
     private MallRedeemService service;
 
     private static final Long COUPON_ID = 777L;
@@ -154,12 +164,14 @@ class MallRedeemServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = spy(new MallRedeemService(mallCommodityManager, mallGradeGate, mallSkuManager,
+        service = spy(new MallRedeemService(mallCommodityManager, mallGradeGate,
+                mallGradeDiscountResolver, mallSkuManager,
                 mallSkuDao, mallExchangeLimitDao, mallOrderManager, mallAddressService, memberService,
                 assetDebitApi, couponQueryApi, couponWriteOffApi, eventPublisher,
                 orderActionPublisher));
         // 默认不限等级：这个文件里绝大多数用例验的是别的东西，不该被等级门槛改变语义
         when(mallGradeGate.canRedeem(any(), any())).thenReturn(true);
+        when(mallGradeDiscountResolver.forMember(any())).thenReturn(GradeDiscount.NONE);
         // 没有活动事务，真调会抛 NoTransactionException；spy 成空实现后它变成一次可断言的调用
         doNothing().when(service).markRollbackOnly();
 
@@ -497,6 +509,86 @@ class MallRedeemServiceTest {
         MallRedeemResult result = service.redeem(cmd(1));
 
         assertTrue(result.accepted());
+    }
+
+    // ------------------------------------------------------------------ 等级价
+
+    /** 白金 9 折 */
+    private void givenNinetyPercent() {
+        when(mallGradeDiscountResolver.forMember(any())).thenReturn(new GradeDiscount(3, 90));
+    }
+
+    @Test
+    @DisplayName("🔴 订单恒等式：points_price × quantity - grade_discount - coupon_discount = pay_points")
+    void 订单恒等式成立() {
+        /*
+         * 这条是整个等级价最要紧的断言。
+         *
+         * 三个数任意一个算错，用例都会红；而线上算错的表现是【对不上账】——
+         * 不报错、不抛异常，只是月底一算发现让出去的分和记下来的对不上，
+         * 那时已经没有任何办法回溯是哪一单错的。
+         */
+        givenNinetyPercent();
+
+        service.redeem(cmd(2));
+
+        MallOrder order = savedOrder();
+        assertEquals(5000, order.getPointsPrice(), "存的是【挂牌单价】，不是折后价");
+        assertEquals(3, order.getGradeCode(), "等级要快照，事后反查会因为他掉级而变");
+        assertEquals(1000, order.getGradeDiscount(), "(5000 - 4500) × 2");
+        assertEquals(9000, order.getPayPoints(), "4500 × 2");
+
+        int couponDiscount = order.getCouponDiscount() == null ? 0 : order.getCouponDiscount().intValue();
+        assertEquals(order.getPayPoints(),
+                order.getPointsPrice() * order.getQuantity() - order.getGradeDiscount() - couponDiscount,
+                "恒等式不成立 —— 体检 SQL 会把这一单标成脏数据");
+    }
+
+    @Test
+    @DisplayName("🔴 实际扣的分就是折后价，不是挂牌价")
+    void 扣的是折后价() {
+        /*
+         * 订单上记什么是一回事，从用户账上扣多少是另一回事。
+         * 只改快照不改扣款的话，订单看起来打了折而用户被按原价扣 ——
+         * 而用户只看得到被扣的那个数。
+         */
+        givenNinetyPercent();
+
+        service.redeem(cmd(1));
+
+        assertEquals(0, BigDecimal.valueOf(4500).compareTo(debitAmount()));
+    }
+
+    @Test
+    @DisplayName("🔴 等级折扣在券之前：先打折再减券，不是先减券再打折")
+    void 折扣在券之前() {
+        /*
+         * 顺序反了实付会多 —— 10000 分的商品 9 折再减 1000 券 = 8000，
+         * 反过来 (10000-1000)×0.9 = 8100。而且「9 折」这个说法对不上任何一个数字，
+         * 用户拿计算器一算就算不明白，客服也解释不了。
+         *
+         * 断言的形状是：试算收到的「抵扣前应付」必须已经是折后的那个数。
+         */
+        givenNinetyPercent();
+        stubCouponUsable(1000);
+
+        service.redeem(cmdWithCoupon(COUPON_ID));
+
+        ArgumentCaptor<CouponTrialQuery> captor = ArgumentCaptor.forClass(CouponTrialQuery.class);
+        verify(couponQueryApi).trial(captor.capture());
+        assertEquals(0, BigDecimal.valueOf(4500).compareTo(captor.getValue().payPoints()),
+                "试算拿到的应付必须是【折后】的 4500，不是挂牌的 5000");
+    }
+
+    @Test
+    @DisplayName("不打折时 grade_code 与 grade_discount 都是 0，老单的形状不变")
+    void 不打折时两列为零() {
+        service.redeem(cmd(1));
+
+        MallOrder order = savedOrder();
+        assertEquals(0, order.getGradeCode());
+        assertEquals(0, order.getGradeDiscount());
+        assertEquals(5000, order.getPayPoints());
     }
 
     // ------------------------------------------------------------------ 断言辅助

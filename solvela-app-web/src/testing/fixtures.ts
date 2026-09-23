@@ -44,10 +44,21 @@ function brief(
     coverUrl: null,
     payType,
     pointsPrice: points,
+    /*
+     * ⚠️ 默认「没享到等级折扣」：挂牌价 = 实付价、折扣率 100。
+     * 要验折扣的用例自己覆盖这两个字段 —— 让默认样例带折扣的话，
+     * 所有不关心折扣的用例都会被一个划线价影响断言。
+     */
+    listPointsPrice: points,
+    gradeDiscountPercent: 100,
     cashPrice: toMoney(cash),
     originalPrice: toMoney(original),
     favorite,
     availableStock: stock,
+    // 默认不限等级：专享是少数，让它成为默认会让大多数用例莫名其妙地被锁
+    minGrade: 0,
+    minGradeName: null,
+    gradeLocked: false,
   }
 }
 
@@ -88,6 +99,7 @@ function sku(
     skuAttrs: attrs,
     skuCoverUrl: null,
     pointsPrice: points,
+    listPointsPrice: points,
     cashPrice: toMoney(cash),
     availableStock: stock,
   }

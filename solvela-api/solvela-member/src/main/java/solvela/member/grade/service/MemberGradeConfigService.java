@@ -41,6 +41,9 @@ public class MemberGradeConfigService {
     /** 新会员的落点。这一档的存在性和门槛都是硬约束 */
     private static final int BASE_GRADE = 0;
 
+    /** 折扣率的「不打折」取值 */
+    private static final int FULL_DISCOUNT = 100;
+
     private final MemberGradeDao memberGradeDao;
     private final MemberGrowthDao memberGrowthDao;
 
@@ -72,8 +75,9 @@ public class MemberGradeConfigService {
             form.setUpdateBy(operator);
             memberGradeDao.updateById(form);
         }
-        log.info("【会员等级】配置已保存：grade={}, name={}, threshold={}, 操作人={}",
-                form.getGradeCode(), form.getGradeName(), form.getThreshold(), operator);
+        log.info("【会员等级】配置已保存：grade={}, name={}, threshold={}, 商城积分折扣={}, 操作人={}",
+                form.getGradeCode(), form.getGradeName(), form.getThreshold(),
+                form.getPointsDiscount() == null ? "不打折" : form.getPointsDiscount() + "%", operator);
     }
 
     /**
@@ -127,6 +131,41 @@ public class MemberGradeConfigService {
         if (form.getGradeCode() == BASE_GRADE && form.getThreshold() != 0L) {
             // 0 档门槛不为 0，等于给新会员设了一道他还没开始就没过的线
             throw new BusinessException("最低档（等级 0）的门槛必须是 0");
+        }
+        checkPointsDiscount(form);
+    }
+
+    /**
+     * 🔴 商城积分折扣率：这一个数会<b>真的少收钱</b>，而且是全场一起。
+     *
+     * <p>与同表的等级名、图标不是一类字段 —— 那两个改错了只是显示难看，
+     * 这一个改错了，下一次兑换就按新折扣扣分，<b>所有参与等级折扣的商品一起变</b>。
+     *
+     * <p>三件事在这里拦：
+     * <ul>
+     *   <li><b>0</b> —— 字面意思是这一档全场白送。它几乎一定是想填 100 少按了个键，
+     *       而那个笔误的后果是不可逆的（分已经扣了、货已经发了）；</li>
+     *   <li><b>&gt; 100</b> —— 加价卖不是这套机制该有的能力。真要溢价请调商品价；</li>
+     *   <li><b>0 档打折</b> —— 新会员就享优惠，等级这件事本身就不值钱了。
+     *       而且它会让「升级能省多少」这句话在 0→1 之间是负的。</li>
+     * </ul>
+     * ⚠️ 允许为空：空 = 这一档不打折，与 100 等效。见 {@code MemberGrade.pointsDiscount}。
+     */
+    private void checkPointsDiscount(MemberGrade form) {
+        Integer percent = form.getPointsDiscount();
+        if (percent == null) {
+            return;
+        }
+        if (percent <= 0) {
+            throw new BusinessException("积分折扣率不能是 0 或负数 —— 0 的意思是这一档全场白送。"
+                    + "不打折请填 100 或留空");
+        }
+        if (percent > FULL_DISCOUNT) {
+            throw new BusinessException("积分折扣率不能大于 100 —— 那是加价卖，请改商品价");
+        }
+        if (form.getGradeCode() != null && form.getGradeCode() == BASE_GRADE && percent < FULL_DISCOUNT) {
+            throw new BusinessException("最低档（等级 0）不能打折 —— "
+                    + "新会员就享优惠的话，升级这件事本身就不值钱了");
         }
     }
 

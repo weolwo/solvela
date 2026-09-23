@@ -101,6 +101,21 @@ export interface CommodityBrief {
    * 所以划线位显示的是 `价值 ¥1,999`，<b>不是</b> `65,000 积分`。为 '0' 时不展示。
    */
   originalPrice: Money
+  /**
+   * 挂牌积分价，**不含等级折扣**。等于 `pointsPrice` 时说明这个人没享到折扣。
+   *
+   * 🔴 它**不是** `originalPrice` —— 那个是「值多少钱」（现金，`价值 ¥1,999`），
+   * 这个是「原本要多少分」。一个划线位只放一个，别混。
+   */
+  listPointsPrice: number
+  /**
+   * 这个人的积分折扣率，`100` = 没有折扣。用来拼「白金 8.8 折」。
+   *
+   * ⚠️ **不要**拿它自己去乘 `listPointsPrice` —— 取整方向（向下）、
+   * 商品退出等级折扣、折扣率越界兜底，三件事都在服务端。
+   * 算出来的数会和实际扣的分对不上，而用户只看得到扣的那个。
+   */
+  gradeDiscountPercent: number
   /** 当前会员有没有收藏。未登录时后端回 false */
   favorite: boolean
   /** 各 SKU 可用库存之和。0 表示整个商品无货 */
@@ -135,23 +150,24 @@ export interface CommoditySku {
   skuAttrs: Record<string, string>
   /** 该规格专属图。为空则用商品封面 */
   skuCoverUrl: string | null
-  /** 本规格所需积分。后端已把「继承商品基准价」算好，这里一定有值 */
+  /** 本规格所需积分，**已含等级折扣**。后端已把「继承商品基准价」算好，这里一定有值 */
   pointsPrice: number
+  /** 本规格的挂牌积分价，不含等级折扣。比 `pointsPrice` 大时划一道 */
+  listPointsPrice: number
   cashPrice: Money
   /** `total_stock - locked_stock - sold_count`，DDL 里是虚拟列 */
   availableStock: number
-  /**
-   * 兑换需要的最低等级，`0` = 不限。
+  /*
+   * 🔴 这里【没有】minGrade / minGradeName / gradeLocked。
    *
-   * ⚠️ **不要**拿它和用户等级自己比 —— 结论已经在 `gradeLocked` 里了。
-   * 自己比的话，保级缓冲期那种「他在白金但成长值够不着白金」会被算错，
-   * 而端上根本拿不到判断这件事需要的数据。
+   * 2026-09-22 加专享商品时它们被顺手写进了这个接口，但 `MallCommoditySkuView`
+   * 从来没有这三个字段 —— 也就是说 `sku.gradeLocked` 在运行时恒为 undefined，
+   * 而 TS 说它是 boolean。`undefined` 在 `v-if` 里是假，于是「等级不够」
+   * 那个分支永远不进，页面看起来正常，直到有人写 `!sku.gradeLocked` 反过来判。
+   *
+   * 等级门槛是【商品】级的，不是规格级的，所以正确的取法是
+   * `detail.gradeLocked`（见 CommodityBrief）。2026-09-23 删掉。
    */
-  minGrade: number
-  /** 专享商品的等级名，如「白金会员」。不限时为 null */
-  minGradeName: string | null
-  /** 这个人现在兑不兑得了。`true` = 看得见但换不了 */
-  gradeLocked: boolean
 }
 
 /** 限兑周期。取值对齐 `t_promotion_config.limit_period` 的字典 */

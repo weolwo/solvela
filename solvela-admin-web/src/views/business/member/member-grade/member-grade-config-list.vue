@@ -41,7 +41,7 @@
       <template #bodyCell="{ text, record, column }">
         <template v-if="column.dataIndex === 'gradeName'">
           <span class="name">{{ record.gradeName }}</span>
-          <a-tag class="ml-1">等级 {{ record.currentGrade }}</a-tag>
+          <a-tag class="ml-1">等级 {{ record.gradeCode }}</a-tag>
         </template>
 
         <template v-else-if="column.dataIndex === 'status'">
@@ -52,13 +52,23 @@
           <a-switch
             v-privilege="'memberGrade:config'"
             :checked="record.status === 1"
-            :disabled="record.currentGrade === 0"
+            :disabled="record.gradeCode === 0"
             :loading="switchingId === record.id"
             @change="(checked) => onToggle(record, checked)"
           />
-          <a-tooltip v-if="record.currentGrade === 0" title="最低档是新会员的落点，不能停用">
+          <a-tooltip v-if="record.gradeCode === 0" title="最低档是新会员的落点，不能停用">
             <span class="cell-sub ml-1">不可停用</span>
           </a-tooltip>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'pointsDiscount'">
+          <!--
+            🔴 这一列显示「8.8 折」而不是「88」。
+            运营填的是 88，但他要确认的是「白金打几折」——
+            让他自己把 88 换算成 8.8 折，是把一次心算放在一个会花钱的确认动作上。
+          -->
+          <span v-if="record.pointsDiscount == null || record.pointsDiscount >= 100" class="cell-sub">不打折</span>
+          <a-tag v-else color="red">{{ record.pointsDiscount / 10 }} 折</a-tag>
         </template>
 
         <template v-else-if="column.dataIndex === 'action'">
@@ -96,6 +106,28 @@
         <a-input-number v-model:value="form.threshold" :min="0" :disabled="form.gradeCode === 0" style="width: 100%" />
         <div class="cell-sub">必须随等级递增。等级 0 的门槛固定为 0</div>
       </a-form-item>
+      <!--
+        🔴 这一项和上面几项不是一类：等级名、图标改了只是显示变了，
+        这个改了【下一次兑换就按新折扣扣分】，全场参与等级折扣的商品一起变。
+        所以提示语里要把「会真的少收钱」说出来，而不是只写一句「1-100」。
+      -->
+      <a-form-item label="商城积分折扣">
+        <a-input-number
+          v-model:value="form.pointsDiscount"
+          :min="1"
+          :max="100"
+          :disabled="form.gradeCode === 0"
+          style="width: 100%"
+          placeholder="留空 = 不打折"
+        />
+        <div class="cell-sub">
+          填 88 = 8.8 折，100 或留空 = 不打折。<b>保存后立即对全场生效</b>，
+          个别商品可在商品编辑里单独退出。只打积分，不打现金。
+        </div>
+        <div v-if="form.gradeCode === 0" class="cell-sub">
+          等级 0 不能打折 —— 新会员就享优惠的话，升级这件事本身就不值钱了
+        </div>
+      </a-form-item>
     </a-form>
   </a-modal>
 </template>
@@ -110,6 +142,7 @@
   const columns = ref([
     { title: '等级', dataIndex: 'gradeName', width: 200 },
     { title: '成长值门槛', dataIndex: 'threshold', width: 130 },
+    { title: '商城积分折扣', dataIndex: 'pointsDiscount', width: 130 },
     { title: '状态', dataIndex: 'status', width: 140 },
     { title: '操作', dataIndex: 'action', width: 90 },
   ]);
@@ -120,7 +153,14 @@
   const formVisible = ref(false);
   const submitting = ref(false);
 
-  const formState = { id: null, gradeCode: undefined, gradeName: '', threshold: undefined };
+  const formState = {
+    id: null,
+    gradeCode: undefined,
+    gradeName: '',
+    threshold: undefined,
+    // undefined 而不是 100：留空是「没配」，与「明确配了不打折」在后台看起来不同
+    pointsDiscount: undefined,
+  };
   const form = reactive({ ...formState });
 
   async function queryData() {
@@ -156,7 +196,12 @@
     }
     submitting.value = true;
     try {
-      await memberGradeApi.saveConfig({ ...form, threshold });
+      /*
+       * ⚠️ 等级 0 的折扣强制清空。输入框是禁用的，但用户可能先填了 88 再把等级改成 0 ——
+       *    那时框里的值还在，提交上去会被服务端打回，而错误提示离操作已经隔了一步。
+       */
+      const pointsDiscount = form.gradeCode === 0 ? null : (form.pointsDiscount ?? null);
+      await memberGradeApi.saveConfig({ ...form, threshold, pointsDiscount });
       message.success('已保存');
       formVisible.value = false;
       queryData();

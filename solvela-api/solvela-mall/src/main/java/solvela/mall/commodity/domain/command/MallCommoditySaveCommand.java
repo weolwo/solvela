@@ -104,6 +104,14 @@ public class MallCommoditySaveCommand {
     private Integer minGrade;
 
     /**
+     * 参不参与等级折扣：0-不参与，1-参与（默认）。
+     *
+     * <p>与 {@code minGrade} 不相干：那个是「够不够格兑」，这个是「兑的时候打不打折」。
+     * 成本价商品、秒杀品填 0。
+     */
+    private Integer gradePriceFlag;
+
+    /**
      * 商品的<b>上架有效期</b>，不是秒杀场次 —— DDL 把这个语义钉死过，别拿来当档期用。
      * 留空由服务端填哨兵值（列是 NOT NULL 的，理由见 {@code MallConst.SHELF_START_SENTINEL}）。
      */

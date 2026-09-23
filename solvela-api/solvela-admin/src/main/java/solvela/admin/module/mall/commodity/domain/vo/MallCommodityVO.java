@@ -71,6 +71,9 @@ public class MallCommodityVO {
     @Schema(description = "可兑换的最低会员等级：0-不限。低于这一档的会员看得见但兑不了")
     private Integer minGrade;
 
+    @Schema(description = "参与等级折扣：0-不参与（成本价/秒杀品）, 1-参与")
+    private Integer gradePriceFlag;
+
     @Schema(description = "上架开始时间：默认值代表不限。不是秒杀场次")
     private LocalDateTime startTime;
 

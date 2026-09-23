@@ -1,6 +1,7 @@
 package solvela.admin.module.member.grade.domain.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -37,6 +38,18 @@ public class MemberGradeConfigForm {
     @NotNull(message = "请填写成长值门槛")
     @Min(value = 0, message = "门槛不能为负")
     private Long threshold;
+
+    /**
+     * 商城积分折扣率。
+     *
+     * <p>🔴 这里只拦「1-100 之外」。<b>「0 档不能打折」在
+     * {@code MemberGradeConfigService}</b> —— 那条要看 gradeCode，
+     * 而表单校验只看得见自己这一行的格式。
+     */
+    @Schema(description = "商城积分折扣率 1-100，如 90=9折。留空=不打折")
+    @Min(value = 1, message = "积分折扣率不能小于 1 —— 0 的意思是全场白送，不打折请留空或填 100")
+    @Max(value = 100, message = "积分折扣率不能大于 100 —— 那是加价卖")
+    private Integer pointsDiscount;
 
     @Schema(description = "等级图标 file_id")
     private Long iconFileId;
