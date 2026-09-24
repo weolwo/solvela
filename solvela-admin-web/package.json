@@ -9,6 +9,8 @@
   "scripts": {
     "localhost": "vite --mode localhost",
     "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build:test": "vite build  --base=/admin/ --mode test",
     "build:pre": "vite build  --mode pre",
     "build:prod": "vite build  --mode production"
@@ -54,11 +56,14 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.8",
+    "@vue/test-utils": "^2.5.0",
+    "jsdom": "^29.0.0",
     "less": "~4.8.1",
     "prettier": "~3.9.6",
     "rollup-plugin-visualizer": "^7.0.1",
     "terser": "~5.49.0",
-    "vite": "8.2.0"
+    "vite": "8.2.0",
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22.12.0"
