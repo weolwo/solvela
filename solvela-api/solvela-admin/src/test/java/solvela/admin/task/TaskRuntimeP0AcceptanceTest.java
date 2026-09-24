@@ -26,6 +26,7 @@ import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
 import solvela.task.tasktemplate.service.TaskTemplateService;
 import solvela.task.TaskConfig;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -119,6 +120,19 @@ class TaskRuntimeP0AcceptanceTest {
     /** 该会员的账号，仅用于落进流水的展示快照 */
     private String member;
 
+    @Autowired
+    private org.springframework.context.ApplicationContext applicationContext;
+
+    /** 本轮造出来的全部会员号，@AfterAll 统一清 */
+    private static final java.util.List<Long> createdMembers = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** @AfterAll 是静态的，拿不到注入的实例字段，这里存一份 */
+    private static org.springframework.jdbc.core.JdbcTemplate cleanerJdbc;
+
+    /** 两个异步池：base 的通用池 + 任务模块自己的事件池。收尾时要等它们都空 */
+    private static Object asyncExecutor;
+    private static Object taskEventExecutor;
+
     @BeforeEach
     void setUp() {
         long nano = System.nanoTime();
@@ -129,6 +143,51 @@ class TaskRuntimeP0AcceptanceTest {
         jdbcTemplate.update(
                 "INSERT INTO t_member (member_id, member_name, nickname) VALUES (?, ?, ?)",
                 memberId, member, member);
+        createdMembers.add(memberId);
+        cleanerJdbc = jdbcTemplate;
+        asyncExecutor = applicationContext.getBean(solvela.base.config.AsyncConfig.ASYNC_EXECUTOR_THREAD_NAME);
+        taskEventExecutor = applicationContext.getBean(
+                solvela.task.runtime.TaskEventExecutorConfig.TASK_EVENT_EXECUTOR);
+    }
+
+    /**
+     * 🔴 全部用例跑完之后统一清掉造出来的会员。
+     *
+     * <p>这个类<b>不能用 {@code @Transactional} 回滚</b> —— 它要验的正是
+     * {@code @TransactionalEventListener(AFTER_COMMIT)} + 异步派奖，回滚掉就什么都测不到。
+     * 所以只能自己收尾。
+     *
+     * <p>不收尾的代价是实测出来的：每跑一次全量测试留下 58 个 {@code p0_} 会员
+     * 和他们的全部下游数据（任务记录、流水、发奖、提案、钱包…）。
+     * 2026-09-24 清理时数出来 811 个 —— 大约 14 次全量的沉淀，
+     * 而且它们会混进所有按会员维度做的统计里。
+     *
+     * <h3>⚠️ 为什么是 {@code @AfterAll} 而不是 {@code @AfterEach}</h3>
+     * 先写的 {@code @AfterEach}，结果留下 300 多行<b>孤儿</b> ——
+     * 派奖是异步的，用例方法返回时线程池里还有没落库的活；
+     * 会员行删掉之后那些活才落地，于是变成「查不到主人的账」，
+     * 正是这份清理要消灭的东西，方向还反了。
+     *
+     * <p>放到 {@code @AfterAll}，异步有整轮的时间落地；再留一小段静默期兜住最后一个用例。
+     *
+     * <p>⚠️ 删哪些表由 {@link TestMemberCleaner} 从 information_schema 现查，
+     * 不是一份写死的清单 —— 那种清单在这个仓库已经漏过三次。
+     */
+    @AfterAll
+    static void 清掉造出来的会员数据() throws InterruptedException {
+        if (createdMembers.isEmpty() || cleanerJdbc == null) {
+            return;
+        }
+        /*
+         * 🔴 等两个异步池真的空下来，而不是 sleep 一个猜的数。
+         * 先写的 sleep(1500) 留下了 300 多行孤儿 —— 会员删了、异步的活才落库。
+         * 固定 sleep 是拿一个数字赌线程池的速度，赌输的表现是脏数据而不是用例变红。
+         */
+        TestMemberCleaner.awaitIdle(30_000, asyncExecutor, taskEventExecutor);
+        for (Long id : createdMembers) {
+            TestMemberCleaner.purge(cleanerJdbc, id);
+        }
+        createdMembers.clear();
     }
 
     // ==================== 工具 ====================

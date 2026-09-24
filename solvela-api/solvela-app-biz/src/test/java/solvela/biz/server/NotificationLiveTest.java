@@ -1,6 +1,8 @@
 package solvela.biz.server;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -77,6 +79,41 @@ class NotificationLiveTest {
     private solvela.notification.dao.AnnouncementAckDao announcementAckDao;
     @Autowired
     private solvela.notification.dao.MemberAnnouncementCursorDao memberAnnouncementCursorDao;
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    /** @AfterAll 是静态的，拿不到注入的实例字段，这里存一份 */
+    private static org.springframework.jdbc.core.JdbcTemplate cleanerJdbc;
+
+    @BeforeEach
+    void 记下清理入口() {
+        cleanerJdbc = jdbcTemplate;
+    }
+
+    /**
+     * 🔴 用完删掉这个造数会员的痕迹。
+     *
+     * <p>这个类打在开发库上（见类注释），而 {@link #MEMBER_ID} 是个编出来的号，
+     * {@code t_member} 里<b>并不存在</b>这个人。不删的话，每跑一次全量测试
+     * 就往通知两张表里留两行<b>孤儿</b> —— member_id 指向一个不存在的会员。
+     *
+     * <p>「查不到主人的账」正是 {@code 工具-清理联调会员数据.sql} 存在的理由，
+     * 而这里是在持续制造它。2026-09-24 清库时，全库仅剩的 2 行孤儿就是它留的。
+     *
+     * <p>⚠️ 放在 {@code @AfterAll} 而不是 {@code @AfterEach}：
+     * 几条用例之间是有依赖的（后面的会去查「最新一条」），逐条删会把它们打断。
+     */
+    @AfterAll
+    static void 清掉造数会员的通知() {
+        if (cleanerJdbc == null) {
+            return;
+        }
+        cleanerJdbc.update("DELETE FROM t_member_notification WHERE member_id = ?", MEMBER_ID);
+        cleanerJdbc.update("DELETE FROM t_member_notification_preference WHERE member_id = ?", MEMBER_ID);
+        cleanerJdbc.update("DELETE FROM t_member_announcement_cursor WHERE member_id = ?", MEMBER_ID);
+        cleanerJdbc.update("DELETE FROM t_announcement_ack WHERE member_id = ?", MEMBER_ID);
+    }
 
     @Test
     @DisplayName("真库：发一条账号受限通知，读回来，正文按模板渲染")

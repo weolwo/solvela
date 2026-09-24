@@ -1,10 +1,12 @@
 package solvela.admin.enums;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.draw.DrawPrizeLog;
 import solvela.draw.DrawConfig;
@@ -32,7 +34,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
+@Transactional
 class DrawEnumMappingTest {
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Autowired
     private PrizePoolConfigDao prizePoolConfigDao;
@@ -42,6 +48,20 @@ class DrawEnumMappingTest {
 
     @Autowired
     private DrawPrizeLogDao drawPrizeLogDao;
+
+    /**
+     * 🔴 用例自带数据，不再靠「开发库里碰巧有什么」。
+     *
+     * <p>原先这批断言吃的是压测/验收会员留下的存量行，2026-09-24 那批数据被清掉后
+     * 当场变红 —— 而它们在一个<b>全新环境上本来就跑不过</b>，只是一直没人验。
+     *
+     * <p>类上的 {@code @Transactional} 让这些行只活在用例执行期间，方法结束即回滚。
+     * 不回滚的话，这个修复就变成了它要解决的那个问题本身。
+     */
+    @BeforeEach
+    void 造夹具数据() {
+        EnumMappingFixture.seedDrawPrizeLog(jdbcTemplate);
+    }
 
     @Test
     @DisplayName("奖池配置：status 能从 int 列装配")
