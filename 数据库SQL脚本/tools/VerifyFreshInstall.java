@@ -41,6 +41,29 @@ public class VerifyFreshInstall {
                 totalFail += fail;
             }
 
+            // 🔴 基线的「规模」由工具自己数，不再手抄进 README。
+            //   2026-09-25 对账时 README 还写着「76 张表 / 489 行」，实际已经是 85 张 ——
+            //   每加一张表它就悄悄过期一次，而过期的数字比没有数字更误导人。
+            //   README 现在只引用这段输出。
+            System.out.println("\n=== 基线规模（README 的数字以这里为准）===");
+            List<String> allTables = new ArrayList<>();
+            try (ResultSet r = s.executeQuery(
+                    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '" + PROBE + "'"
+                            + " AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME")) {
+                while (r.next()) allTables.add(r.getString(1));
+            }
+            int seedTables = 0;
+            long seedRows = 0;
+            for (String t : allTables) {
+                try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM `" + t + "`")) {
+                    r.next();
+                    long n = r.getLong(1);
+                    if (n > 0) { seedTables++; seedRows += n; }
+                }
+            }
+            System.out.println("   建表      " + allTables.size() + " 张");
+            System.out.println("   种子数据  " + seedTables + " 张表 / " + seedRows + " 行");
+
             System.out.println("\n=== 关键种子数据到位情况 ===");
             String[][] checks = {
                 {"t_menu",          "1",   "菜单：为 0 后台登录进去是空白"},

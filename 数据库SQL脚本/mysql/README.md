@@ -7,34 +7,42 @@
 ## 🔴 新环境部署：两个文件，按顺序
 
 ```
-mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（76 张表）
+mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（85 张表）
 mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子数据（菜单/字典/权限等）
 ```
 
 跑完就能登录并正常使用。之后按需执行造数脚本（都可重复执行，见 `*造数*.sql`）。
 
-## ✅ 2026-09-15：空库执行已实测通过
+## ✅ 2026-09-25：空库执行已实测通过（复跑）
 
 ```
 tools/VerifyFreshInstall.java  ->  RESULT: PASS
-  schema-baseline.sql  ->  ok=152  fail=0
-  data-baseline.sql    ->  ok=43   fail=0
+  schema-baseline.sql  ->  ok=170  fail=0
+  data-baseline.sql    ->  ok=47   fail=0
+  建表      85 张
+  种子数据  22 张表 / 526 行
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
 （工具建一个 `_fresh_probe` 库、执行两个基线、逐项核对，跑完删库）。
 
-当前基线：**76 张表**；`data-baseline` **21 条 INSERT、20 张配置表共 489 行**。
+> 🔴 **2026-09-25：上面这些数字以前是手抄的，于是全都过期了** ——
+> README 写着「76 张表 / 489 行」，实际已经是 85 张 / 526 行；
+> `ok=152/43` 也停在权益域、商城等级价、单品覆盖价那几张表加进来之前。
+> 现在**规模由 `VerifyFreshInstall` 自己数并打印**（「基线规模」那一段），
+> 这里只负责粘贴它的输出。判据和 `TestMemberCleaner`、`DumpSchema` 一样：
+> **凡是能从库里查出来的，就不要让人去维护第二份。**
+
 关键种子数据到位情况（验证工具逐项核对过）：
 
 | 表 | 行数 | 缺了会怎样 |
 |---|---|---|
-| `t_menu` | 286 | 后台登录进去是空白 |
+| `t_menu` | 296 | 后台登录进去是空白 |
 | `t_role_menu` | 74 | 任何角色都看不到菜单 |
 | `t_employee` | 12 | 无法登录 |
 | `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
-| `t_solvela_job` | 9 | 定时任务不会注册 |
-| `t_task_event` | 9 | 任务事件识别不了 |
+| `t_solvela_job` | 16 | 定时任务不会注册 |
+| `t_task_event` | 10 | 任务事件识别不了 |
 | `t_notification_template` | 8 | 发不出任何站内信，**而且不报错** |
 | `t_coupon_template` | 6 | 发出去的券没有面额/门槛，**而且不报错** |
 | `t_member_id_seq` | 1 | **第一个注册的用户就撞 -1000** |
@@ -55,8 +63,8 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 
 | 文件 | 内容 | 不含 |
 |---|---|---|
-| `schema-baseline.sql` | 76 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 20 张配置表、489 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
+| `schema-baseline.sql` | 85 张表的结构 | 任何数据 |
+| `data-baseline.sql` | 22 张配置表、526 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
