@@ -1,0 +1,43 @@
+name: admin-web CI
+
+# 只在管理端前端有改动时触发：后端提交不该被前端流水线拖慢。
+# 与 app-web-ci.yml 同一条思路，两个文件刻意长得一样 —— 改一个记得看另一个。
+on:
+  push:
+    paths:
+      - 'solvela-admin-web/**'
+      - '.github/workflows/admin-web-ci.yml'
+  pull_request:
+    paths:
+      - 'solvela-admin-web/**'
+      - '.github/workflows/admin-web-ci.yml'
+
+defaults:
+  run:
+    working-directory: solvela-admin-web
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 版本以 solvela-admin-web/.nvmrc 为准，别在这里另写一个
+          node-version-file: solvela-admin-web/.nvmrc
+          cache: npm
+          cache-dependency-path: solvela-admin-web/package-lock.json
+
+      # 用 ci 而不是 install：锁文件说了算，不允许流水线里悄悄改依赖版本。
+      # 🔴 这也是 2026-09-25 把 package-lock.json 从 .gitignore 里拿出来的原因 ——
+      #    npm ci 没有锁文件根本跑不起来。
+      - run: npm ci
+
+      # 与本地 `npm run ci` 完全一致：test + build
+      #
+      # ⚠️ 这里比 app-web 少了 format:check / lint / typecheck 三步，不是漏写：
+      #    管理端是纯 JS（只有 jsconfig，没有 tsconfig），也还没有 eslint 配置。
+      #    开 checkJs 会在存量代码上炸出几千条，而「红着也得发版」的检查等于没有检查。
+      #    要补的正确顺序是先把新文件写成 .ts / 先引入 eslint，不是在这里加一行。
+      - run: npm run ci

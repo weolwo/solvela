@@ -11,6 +11,7 @@
     "dev": "vite",
     "test": "vitest run",
     "test:watch": "vitest",
+    "ci": "npm run test && npm run build:test",
     "build:test": "vite build  --base=/admin/ --mode test",
     "build:pre": "vite build  --mode pre",
     "build:prod": "vite build  --mode production"

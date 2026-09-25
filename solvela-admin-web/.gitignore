@@ -5,7 +5,12 @@ dist
 dist-ssr
 *.local
 .idea
-/package-lock.json
+# 🔴 package-lock.json 【要入库】。
+# 这一行原本是 /package-lock.json（从上游模板继承来的忽略），2026-09-25 去掉：
+# CI 用 npm ci，而 npm ci 没有锁文件根本跑不起来；
+# 退回 npm install 的话，流水线每次拉到的依赖版本都可能不一样 ——
+# 「本地过了 CI 没过」和「今天过了明天没过」都会变成常态，而且查不出原因。
+# app-web 那边一直是入库的，两个前端就该一致。
 # vite 重启会生成一批带时间戳的临时配置，按模式忽略（钉死单个文件名的话，换个时间戳就又冒出来一个）
 /vite.config.js.timestamp-*.mjs
 
