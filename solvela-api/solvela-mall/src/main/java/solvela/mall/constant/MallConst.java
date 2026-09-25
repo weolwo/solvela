@@ -87,6 +87,16 @@ public final class MallConst {
     /** 轮播图专用，见 {@link #BIZ_TYPE} 的说明 */
     public static final String BIZ_TYPE_BANNER = "MALL_COMMODITY_BANNER";
 
+    /**
+     * 分类图标的引用类型。
+     *
+     * <p>🔴 2026-09-25 补。在此之前分类图标<b>从来没有登记过引用</b>：
+     * 前端有上传口（{@code mall-category-form.vue} 的 ImageSlot），后端只把 fileId 存进
+     * {@code t_mall_category.icon_file_id} 就完事了，于是那些图一直停在 {@code TEMP}。
+     * 当时没出事只是因为<b>孤儿清理任务还没上线</b> —— 它一上线，C 端宫格导航的图标会集体变叉。
+     */
+    public static final String BIZ_TYPE_CATEGORY = "MALL_CATEGORY";
+
     /** 商品图上传落的素材分类编码（与素材库隔离，见 mall.sql「关于商品图片」一节） */
     public static final String FILE_CATEGORY_CODE = "MALL_COMMODITY";
 

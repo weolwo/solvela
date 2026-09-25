@@ -4,11 +4,15 @@ import solvela.enums.EnableStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import tools.jackson.core.type.TypeReference;
 import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.json.JsonUtils;
+import solvela.base.module.file.service.FileAssetService;
 import solvela.prize.prizeconfig.dao.PrizeConfigDao;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.domain.command.PrizeConfigAddCommand;
@@ -27,6 +31,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -38,6 +43,7 @@ import java.util.stream.Collectors;
  * @Date 2026-04-18 20:20:44
  * @Copyright weolwo
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class PrizeConfigService {
@@ -45,6 +51,21 @@ public class PrizeConfigService {
     private final PrizeConfigDao prizeConfigDao;
     private final PrizeConfigManager prizeConfigManager;
     private final PromotionConfigService promotionConfigService;
+    /** ext.images 里的图要登记引用，否则会被孤儿清理任务当垃圾删掉 */
+    private final FileAssetService fileAssetService;
+
+    /**
+     * 奖品扩展图的引用类型。
+     *
+     * <p>🔴 2026-09-25 补。{@code prize-config-form.vue} 的「扩展图片」是真上传
+     *（{@code ImageField} → {@code fileApi.uploadFileByCategory}），存成
+     * {@code ext} 这个 JSON 列里的 <code>{"images": {"名字": fileId}}</code>。
+     * 后端一直把 {@code ext} 当不透明字符串原样存，于是那些图从来没被登记过引用。
+     */
+    private static final String BIZ_TYPE = "PRIZE_CONFIG";
+
+    /** {@code ext} 里放图片的那个 key，与前端 {@code EXT_IMAGES_KEY} 必须一致 */
+    private static final String EXT_IMAGES_KEY = "images";
 
     /**
      * 查询活动下的全部奖品（含停用）：抽奖工作台回显时按 prizeCode 补名称/价值等展示信息
@@ -166,6 +187,79 @@ public class PrizeConfigService {
             prizeConfig.setPromotionConfigId(null);
         }
         prizeConfigDao.insert(prizeConfig);
+        confirmExtImages(prizeConfig.getId(), prizeConfig.getExt());
+    }
+
+    /**
+     * 登记 {@code ext.images} 里的图片引用。
+     *
+     * <p>⚠️ 解析不出来<b>不报错，也不当成「没有图」</b>：{@code ext} 是运营可以手填的
+     * 自由 JSON 列，格式五花八门。解析失败时直接<b>跳过这次登记</b>，让旧关系原样留着 ——
+     * 传空集合会把已有引用清掉，等于因为一个格式问题去删别人的图，
+     * 而 {@code img} 加载失败是静默的，没人会来投诉。
+     * <b>宁可多留一条引用，不可少留一条</b>，与 {@code RichTextImageExtractor} 同一取舍。
+     */
+    @SuppressWarnings("unchecked")
+    private void confirmExtImages(Long prizeConfigId, String ext) {
+        if (prizeConfigId == null) {
+            return;
+        }
+        if (StringUtils.isBlank(ext)) {
+            // 显式清空是有意义的：ext 被清掉就意味着图都不要了
+            fileAssetService.confirm(List.of(), BIZ_TYPE, prizeConfigId);
+            return;
+        }
+        Map<String, Object> parsed;
+        try {
+            parsed = JsonUtils.parseType(ext, new TypeReference<Map<String, Object>>() {
+            });
+        } catch (RuntimeException e) {
+            log.warn("[奖品] {} 的 ext 不是合法 JSON，本次跳过图片引用登记：{}", prizeConfigId, e.getMessage());
+            return;
+        }
+        if (parsed == null || !(parsed.get(EXT_IMAGES_KEY) instanceof Map<?, ?> images)) {
+            fileAssetService.confirm(List.of(), BIZ_TYPE, prizeConfigId);
+            return;
+        }
+        List<Long> fileIds = images.values().stream()
+                .map(PrizeConfigService::toFileId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        fileAssetService.confirm(fileIds, BIZ_TYPE, prizeConfigId);
+    }
+
+    /**
+     * ⚠️ 前端写进去的是数字，但这一列是自由 JSON，手工编辑过的会变成字符串
+     *（{@code "12"}）。只认 Number 的话那些图会被判成没人引用 —— 而后果是删文件。
+     */
+    private static Long toFileId(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String str && StringUtils.isNumeric(str.trim())) {
+            return Long.valueOf(str.trim());
+        }
+        return null;
+    }
+
+    /**
+     * 存量回填：把已有奖品的 {@code ext.images} 引用补进 {@code t_file_relation}。
+     *
+     * <p>🔴 <b>孤儿清理任务上线前必须跑一次。</b>补 {@code confirm} 只管住以后新存的，
+     * 在此之前配的扩展图依旧是「TEMP 且无引用」—— 清理任务眼里就是垃圾。
+     *
+     * <p>幂等：{@code confirm} 先清后建，跑几遍结果一样。
+     *
+     * @return 处理过的奖品配置数
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int backfillExtImageRelations() {
+        List<PrizeConfig> all = prizeConfigDao.selectList(null);
+        for (PrizeConfig config : all) {
+            confirmExtImages(config.getId(), config.getExt());
+        }
+        return all.size();
     }
 
     /**
@@ -202,6 +296,7 @@ public class PrizeConfigService {
         }
         PrizeConfig prizeConfig = SolvelaBeanUtil.copy(updateForm, PrizeConfig.class);
         prizeConfigDao.updateById(prizeConfig);
+        confirmExtImages(prizeConfig.getId(), prizeConfig.getExt());
 
         // 改成标记类之后，旧的 promotion_config_id 必须再补一条 UPDATE 显式清掉。
         // MyBatis-Plus 默认的 NOT_NULL 更新策略会把值为 null 的字段整个排除在 SET 之外，
@@ -244,6 +339,10 @@ public class PrizeConfigService {
             copy.setUpdateBy(null);
             copy.setUpdateTime(null);
             prizeConfigDao.insert(copy);
+            // ext 是照抄的，图也跟着被新奖品引用了 —— 不登记的话，
+            // 删掉源活动的奖品就会让这些图变成「没人引用」，随后被清理掉，
+            // 而复制出来的新奖品还指着它们
+            confirmExtImages(copy.getId(), copy.getExt());
             prizeCodeMap.put(source.getPrizeCode(), copy.getPrizeCode());
         }
         return prizeCodeMap;
@@ -316,22 +415,27 @@ public class PrizeConfigService {
     /**
      * 批量删除
      */
+    @Transactional(rollbackFor = Exception.class)
     public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
             return;
         }
 
         prizeConfigDao.deleteBatchIds(idList);
+        // 只解除关系，不删文件 —— copyForActivity 会让多个奖品指向同一张图
+        idList.forEach(id -> fileAssetService.releaseRelation(BIZ_TYPE, id));
     }
 
     /**
      * 单个删除
      */
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         if (null == id) {
             return;
         }
 
         prizeConfigDao.deleteById(id);
+        fileAssetService.releaseRelation(BIZ_TYPE, id);
     }
 }

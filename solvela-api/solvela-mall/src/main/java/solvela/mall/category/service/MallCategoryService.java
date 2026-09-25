@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.PageResult;
 import solvela.exception.BusinessException;
 import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.module.file.service.FileAssetService;
 import solvela.mall.category.dao.MallCategoryDao;
 import solvela.mall.MallCategory;
 import solvela.mall.category.domain.command.MallCategoryBatchItemCommand;
@@ -45,6 +46,8 @@ public class MallCategoryService {
     private final MallCategoryManager mallCategoryManager;
     /** 删除守卫要看这个分类下还有没有商品 */
     private final MallCommodityManager mallCommodityManager;
+    /** 分类图标要登记引用，否则会被孤儿清理任务当垃圾删掉 */
+    private final FileAssetService fileAssetService;
 
     /** 顶级分类的 parent_id */
     private static final long ROOT_PARENT_ID = 0L;
@@ -128,8 +131,69 @@ public class MallCategoryService {
             mallCategoryDao.insert(entity);
         } else {
             mallCategoryDao.updateById(entity);
+            clearIconIfRemoved(entity.getId(), form.getIconFileId());
         }
+        confirmIcon(entity.getId(), entity.getIconFileId());
         return entity.getId();
+    }
+
+    /**
+     * 🔴 把图标改成「不要了」时，必须再补一条 UPDATE 显式清掉这一列。
+     *
+     * <p>MyBatis-Plus 默认的 NOT_NULL 更新策略会把值为 null 的字段整个排除在 SET 之外，
+     * 所以上面那条 {@code updateById} <b>无论如何都清不掉它</b>。
+     *（{@code PrizeConfigService.update} 里的 {@code promotion_config_id} 是同一个坑。）
+     *
+     * <p>⚠️ 2026-09-25 实测出来的：移除图标并保存，{@code t_file_relation} 里的引用
+     * 正确地清掉了，而 {@code icon_file_id} 纹丝不动 —— 于是库里出现
+     * 「分类指着 147、而 147 没有任何人引用」这种自相矛盾的状态。
+     * 在孤儿清理任务上线之前这只是一个不生效的删除；<b>上线之后它会变成数据丢失</b>：
+     * 147 被当垃圾删掉，而分类还指着它，C 端那个格子从此是个叉。
+     *
+     * <p>不能图省事把该列标成 {@code FieldStrategy.ALWAYS}：{@link #updateStatus}
+     * 那种「只 set id + status」的局部更新会因此把其余列一并写成 null。
+     */
+    private void clearIconIfRemoved(Long categoryId, Long iconFileIdFromForm) {
+        if (iconFileIdFromForm != null) {
+            return;
+        }
+        mallCategoryManager.lambdaUpdate()
+                .eq(MallCategory::getId, categoryId)
+                .set(MallCategory::getIconFileId, null)
+                .update();
+    }
+
+    /**
+     * 登记（或解除）分类图标的引用。
+     *
+     * <p>⚠️ 图标为空时<b>也要调</b>，传空集合 —— 那表示「这个分类现在不引用任何图了」，
+     * {@code confirm} 会把旧的那行关系删掉。提前 return 的话，换过图标的分类会一直
+     * 挂着旧图的引用，旧图从此删不掉（删除守卫说「正被 1 处业务引用」），
+     * 而实际上没有人在用它。这个坑 {@code FileAssetService.confirm} 里有完整记录。
+     */
+    private void confirmIcon(Long categoryId, Long iconFileId) {
+        fileAssetService.confirm(
+                iconFileId == null ? List.of() : List.of(iconFileId),
+                MallConst.BIZ_TYPE_CATEGORY, categoryId);
+    }
+
+    /**
+     * 存量回填：把已有分类的图标引用补进 {@code t_file_relation}。
+     *
+     * <p>🔴 <b>孤儿清理任务上线前必须跑一次。</b>补 {@code confirm} 只管住以后新存的，
+     * 在此之前建的那些分类图标依旧是「TEMP 且无引用」—— 清理任务眼里就是垃圾。
+     *
+     * <p>幂等：{@code confirm} 本身是先清后建，跑几遍结果一样。
+     *
+     * @return 处理过的分类数（含图标为空的，它们会被显式清成 0 条引用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int backfillIconRelations() {
+        List<MallCategory> all = mallCategoryManager.lambdaQuery().list();
+        for (MallCategory category : all) {
+            confirmIcon(category.getId(), category.getIconFileId());
+        }
+        return all.size();
     }
 
     private MallCategory loadExisting(Long id) {
@@ -284,12 +348,18 @@ public class MallCategoryService {
             MallCategoryBatchItemCommand item = itemList.get(i);
             MallCategory parentEntity = toEntity(item, parentId, i, operator);
             mallCategoryDao.insert(parentEntity);
+            confirmIcon(parentEntity.getId(), parentEntity.getIconFileId());
             created++;
 
             List<MallCategoryBatchItemCommand> children = childrenOf(item);
             for (int j = 0; j < children.size(); j++) {
                 // 这里才拿得到父的自增 id —— 整个嵌套结构就是为了这一行
-                mallCategoryDao.insert(toEntity(children.get(j), parentEntity.getId(), j, operator));
+                MallCategory childEntity = toEntity(children.get(j), parentEntity.getId(), j, operator);
+                mallCategoryDao.insert(childEntity);
+                // ⚠️ 批量建分类这条路和单个保存是两套代码，图标登记两边都要有。
+                //    只补单个那条的话，「批量新建分类」建出来的图标依旧是孤儿 ——
+                //    而那恰恰是运营初始化商城时用的那条路，一次能建十几个。
+                confirmIcon(childEntity.getId(), childEntity.getIconFileId());
                 created++;
             }
         }
@@ -397,6 +467,9 @@ public class MallCategoryService {
                     + commodityCount + " 个商品，请先把它们移到别的分类；不想用了可以改为停用");
         }
         mallCategoryDao.deleteById(id);
+        // 只解除关系，不删文件 —— 同一张图标可能被别的分类复用，
+        // 是否真的该删由引用计数说了算（与 ActivityDisplayService.releaseFiles 同口径）
+        fileAssetService.releaseRelation(MallConst.BIZ_TYPE_CATEGORY, id);
     }
 
     private static int nullToZero(Integer value) {

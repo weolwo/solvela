@@ -71,4 +71,17 @@ public interface FileDao extends BaseMapper<FileEntity> {
      */
     List<Map<String, Object>> countGroupByCategory();
 
+    /**
+     * 孤儿文件 id：{@code TEMP} + 早于 {@code deadline} + 没有任何业务引用。
+     *
+     * <p>分批取，{@code limit} 由调用方给 —— 一次性捞出全部再删，会长时间持有行锁。
+     *
+     * @param deadline 保护期边界，<b>用库时钟算</b>（{@code ctx.dbNow()}）
+     */
+    List<Long> selectOrphanIds(@Param("deadline") java.time.LocalDateTime deadline,
+                               @Param("limit") int limit);
+
+    /** 与 {@link #selectOrphanIds} 同一套条件的计数，给试运行用 */
+    long countOrphans(@Param("deadline") java.time.LocalDateTime deadline);
+
 }

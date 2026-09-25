@@ -39,6 +39,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -720,6 +721,74 @@ public class FileAssetService {
         }
         return template.replace("{w}", String.valueOf(variant.width()))
                 .replace("{h}", String.valueOf(variant.height()));
+    }
+
+    // ------------------------------------------------------------------ 孤儿清理
+
+    /**
+     * 待清理的孤儿数量。给 {@code dryRun} 用。
+     */
+    public long countOrphans(LocalDateTime deadline) {
+        return fileDao.countOrphans(deadline);
+    }
+
+    /**
+     * 清一批孤儿：{@code TEMP} + 早于 {@code deadline} + 无任何业务引用。
+     *
+     * <h3>🔴 为什么一个一个删，而不是一条批量 UPDATE</h3>
+     * 删对象存储是<b>逐个的网络调用</b>，没有批量语义。一条 UPDATE 把 500 行标记删除、
+     * 然后循环删对象，中途失败就会留下「库里说删了、存储里还在」的字节 ——
+     * 而那些字节从此<b>没有任何线索能找回来</b>：查不到、列不出、也不会再被扫到。
+     *
+     * <p>逐个删（每个一小事务）的代价是慢，换来的是：任何一步失败，
+     * 那一个文件保持原样，下一轮还会被扫到。<b>慢是可以接受的，静默漏字节不行。</b>
+     *
+     * <h3>⚠️ 删之前再查一次引用</h3>
+     * 从 {@code selectOrphanIds} 拿到 id 到真正删它之间隔着若干次网络往返，
+     * 这期间完全可能有人保存了一个引用它的业务对象。这里再查一次 ——
+     * 多一次查询，换掉一整类「刚传上去的图被清理任务删了」的竞态。
+     *
+     * @return 实际删掉的条数
+     */
+    public int purgeOrphans(LocalDateTime deadline, int batchSize) {
+        List<Long> ids = fileDao.selectOrphanIds(deadline, batchSize);
+        int deleted = 0;
+        for (Long fileId : ids) {
+            if (purgeOne(fileId)) {
+                deleted++;
+            }
+        }
+        return deleted;
+    }
+
+    /**
+     * 删一个孤儿。<b>失败只记日志不抛</b> —— 一个删不掉的文件不该让整批停下来，
+     * 它下一轮还会被扫到。
+     */
+    private boolean purgeOne(Long fileId) {
+        try {
+            FileEntity file = fileDao.selectById(fileId);
+            if (file == null || Boolean.TRUE.equals(file.getDeletedFlag())
+                    || file.getStatus() != FileStatusEnum.TEMP) {
+                return false;
+            }
+            if (!fileRelationDao.listByFileIds(List.of(fileId)).isEmpty()) {
+                // 扫描之后、删除之前有人引用了它。这不是异常，是正常的并发
+                log.info("[File] 孤儿 {} 在清理前被业务引用，跳过", fileId);
+                return false;
+            }
+            FileEntity update = new FileEntity();
+            update.setFileId(fileId);
+            update.setDeletedFlag(true);
+            update.setUpdateBy("orphanClean");
+            fileDao.updateById(update);
+            // 放在最后：DB 回滚得了，删掉的字节回滚不了（与 delete() 同一顺序）
+            objectStorage.delete(new StorageKey(file.getStorageKey()));
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("[File] 清理孤儿 {} 失败，留到下一轮：{}", fileId, e.getMessage());
+            return false;
+        }
     }
 
     /**

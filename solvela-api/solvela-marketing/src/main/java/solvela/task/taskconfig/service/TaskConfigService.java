@@ -10,6 +10,8 @@ import solvela.base.domain.PageResult;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.module.file.service.FileAssetService;
+import solvela.base.module.file.service.RichTextImageExtractor;
 import solvela.task.prizemapping.dao.TaskPrizeMappingDao;
 import solvela.task.TaskPrizeMapping;
 import solvela.task.taskconfig.dao.TaskConfigDao;
@@ -34,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -50,6 +53,23 @@ public class TaskConfigService {
     private final TaskConfigDao taskConfigDao;
     private final TaskPrizeMappingDao taskPrizeMappingDao;
     private final TaskTemplateService taskTemplateService;
+    /** 规则说明富文本里的图要登记引用，否则会被孤儿清理任务当垃圾删掉 */
+    private final FileAssetService fileAssetService;
+
+    /**
+     * 规则说明富文本内嵌图的引用类型。
+     *
+     * <p>🔴 2026-09-25 补。向导里的「规则说明」是 wangEditor，插图会真的走
+     * {@code fileApi.uploadFileByCategory(..., CONTENT)} 上传到素材库，
+     * 但这边只把 HTML 塞进 {@code ui_config} 就完事了 —— 那些图一直停在 {@code TEMP}。
+     * 与 {@code ActivityDisplayService} / {@code MallCommodityService} 是同一件事，
+     * 只有这一处当初漏了。
+     *
+     * <p>⚠️ 模板里的 {@code image_upload} 控件<b>不在此列</b>：前端那个是占位交互
+     *（{@code SchemaFormRenderer.vue} 写着「仅写入 mock URL，不发起真实上传请求」），
+     * 根本没有文件产生。哪天它接了真实上传，这里要一起改。
+     */
+    private static final String BIZ_TYPE = "TASK_CONFIG";
 
     /**
      * image_upload 控件的参数值随 uiConfig 提交，与前端 splitSchemaValues 同一拆分语义
@@ -85,8 +105,69 @@ public class TaskConfigService {
         // 子表批量落库（insertBatch 由 CustomizedBaseMapper 提供）
         taskPrizeMappingDao.insertBatch(buildMappingList(form, taskConfig.getId()));
 
+        confirmRuleDescImages(taskConfig.getId(), configForm.getRuleDesc());
+
         // 返回主表ID，前端成功页据此定位刚创建的任务
         return taskConfig.getId();
+    }
+
+    /**
+     * 把规则说明正文里的图登记进 {@code t_file_relation}。
+     *
+     * <p>⚠️ 没有图时<b>也要调</b>（传空集合）：那表示「这次把图都删了」，
+     * {@code confirm} 会把旧关系清掉。提前 return 的话，删光图的任务会一直挂着旧引用，
+     * 那些图从此删不掉 —— 完整的踩坑记录在 {@code FileAssetService.confirm} 里。
+     */
+    private void confirmRuleDescImages(Long taskConfigId, String ruleDesc) {
+        Set<String> sources = RichTextImageExtractor.extractImageSources(ruleDesc);
+        List<Long> ids = sources.isEmpty() ? List.of() : fileAssetService.resolveFileIds(sources);
+        fileAssetService.confirm(ids, BIZ_TYPE, taskConfigId);
+    }
+
+    /**
+     * 存量回填：把已有任务配置的规则说明内嵌图补进 {@code t_file_relation}。
+     *
+     * <p>🔴 <b>孤儿清理任务上线前必须跑一次。</b>补 {@code confirm} 只管住以后新存的。
+     *
+     * <p>⚠️ 从 {@code ui_config} 这个 JSON 列里把 {@code ruleDesc} 读回来，
+     * 而不是从向导的入参 —— 存量数据只有库里这一份。
+     * 解析不出来的行<b>跳过而不是清空</b>：清空等于亲手把引用删掉，
+     * 然后清理任务就会去删那些图，方向正好反了。
+     *
+     * <p>幂等：{@code confirm} 先清后建，跑几遍结果一样。
+     *
+     * @return 处理过的任务配置数
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int backfillRuleDescRelations() {
+        List<TaskConfig> all = taskConfigDao.selectList(null);
+        int handled = 0;
+        for (TaskConfig config : all) {
+            String ruleDesc = readRuleDesc(config.getUiConfig());
+            if (ruleDesc == null) {
+                continue;
+            }
+            confirmRuleDescImages(config.getId(), ruleDesc);
+            handled++;
+        }
+        return handled;
+    }
+
+    /** @return ui_config 里的 ruleDesc；列为空或不是合法 JSON 时返回 null（调用方据此跳过） */
+    private String readRuleDesc(String uiConfigJson) {
+        if (StringUtils.isBlank(uiConfigJson)) {
+            // 空 ui_config 是明确的「没有规则说明」，可以放心清成 0 条引用
+            return "";
+        }
+        try {
+            Map<String, Object> uiConfig = JsonUtils.parseType(
+                    uiConfigJson, new TypeReference<Map<String, Object>>() {
+                    });
+            Object value = uiConfig == null ? null : uiConfig.get(KEY_RULE_DESC);
+            return value == null ? "" : String.valueOf(value);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /**
@@ -228,6 +309,8 @@ public class TaskConfigService {
                 .eq(TaskPrizeMapping::getTaskConfigId, exist.getId()));
         taskPrizeMappingDao.insertBatch(buildMappingList(form, exist.getId()));
 
+        confirmRuleDescImages(exist.getId(), configForm.getRuleDesc());
+
         return exist.getId();
     }
 
@@ -353,22 +436,27 @@ public class TaskConfigService {
     /**
      * 批量删除
      */
+    @Transactional(rollbackFor = Exception.class)
     public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
             return;
         }
 
         taskConfigDao.deleteBatchIds(idList);
+        // 只解除关系，不删文件 —— 同一张图可能被别的任务复用
+        idList.forEach(id -> fileAssetService.releaseRelation(BIZ_TYPE, id));
     }
 
     /**
      * 单个删除
      */
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         if (null == id){
             return;
         }
 
         taskConfigDao.deleteById(id);
+        fileAssetService.releaseRelation(BIZ_TYPE, id);
     }
 }

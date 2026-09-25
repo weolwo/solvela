@@ -58,6 +58,16 @@
             <artifactId>solvela-base-data</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!--
+          奖品配置的 ext.images 里存的是真实 fileId（后台表单能上传），
+          这些引用必须登记进 t_file_relation，否则孤儿清理任务会把它们删掉。
+          base-file 在模块顺序里排 36，prize 排 52 —— 是允许的方向，不成环。
+        -->
+        <dependency>
+            <groupId>solvela</groupId>
+            <artifactId>solvela-base-file</artifactId>
+            <version>3.0.0</version>
+        </dependency>
         <dependency>
             <groupId>solvela</groupId>
             <artifactId>solvela-member</artifactId>

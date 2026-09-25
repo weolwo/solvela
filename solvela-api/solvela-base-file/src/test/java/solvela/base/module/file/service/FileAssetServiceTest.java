@@ -32,6 +32,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -464,5 +465,95 @@ class FileAssetServiceTest {
         assertThatThrownBy(() -> service.upload(png("a.png"), "NOT_EXIST", null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("分类不存在");
+    }
+
+    // ------------------------------------------------------------------ 孤儿清理
+    //
+    // 这一组守的是「清理任务会不会删错东西」。它删的是字节，没有回收站 ——
+    // 每一条都对应一种真实可能发生的删错。
+
+    private static final LocalDateTime DEADLINE = LocalDateTime.of(2026, 9, 18, 0, 0);
+
+    /** 往内存存储里塞一份字节，好让「删掉了没有」这件事真的可断言 */
+    private void seed(String key) {
+        storage.put(new StorageKey(key), new java.io.ByteArrayInputStream(PNG),
+                PNG.length, ObjectMeta.of("image/png"));
+    }
+
+    /** TEMP + 未删除的文件，给孤儿清理用 */
+    private static FileEntity tempFile(Long id, String key) {
+        FileEntity entity = file(id, key);
+        entity.setStatus(FileStatusEnum.TEMP);
+        entity.setDeletedFlag(false);
+        return entity;
+    }
+
+    @Test
+    @DisplayName("孤儿清理：标记删除 + 真删对象，两件事都要做")
+    void purgeOrphansDeletesRowAndBytes() {
+        seed("common/202609/01/orphan.png");
+        when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9001L));
+        when(fileDao.selectById(9001L)).thenReturn(tempFile(9001L, "common/202609/01/orphan.png"));
+        when(fileRelationDao.listByFileIds(List.of(9001L))).thenReturn(List.of());
+
+        assertThat(service.purgeOrphans(DEADLINE, 200)).isEqualTo(1);
+
+        org.mockito.ArgumentCaptor<FileEntity> captor =
+                org.mockito.ArgumentCaptor.forClass(FileEntity.class);
+        verify(fileDao).updateById(captor.capture());
+        assertThat(captor.getValue().getDeletedFlag()).isTrue();
+        // 只软删、不删字节的话，存储只增不减，而且没有任何机制会回来收它
+        assertThat(storage.exists(new StorageKey("common/202609/01/orphan.png"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("🔴 扫到之后、删之前有人引用了它 —— 必须跳过，这是真实存在的竞态")
+    void purgeOrphansSkipsFileReferencedAfterScan() {
+        // selectOrphanIds 到真正删它之间隔着若干次往返，这期间完全可能有人保存了
+        // 一个引用它的业务对象。少这道检查，表现就是「刚配好的图第二天没了」
+        seed("common/202609/01/justused.png");
+        when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9002L));
+        when(fileDao.selectById(9002L)).thenReturn(tempFile(9002L, "common/202609/01/justused.png"));
+        FileRelationEntity relation = new FileRelationEntity();
+        relation.setFileId(9002L);
+        when(fileRelationDao.listByFileIds(List.of(9002L))).thenReturn(List.of(relation));
+
+        assertThat(service.purgeOrphans(DEADLINE, 200)).isZero();
+
+        verify(fileDao, never()).updateById(any(FileEntity.class));
+        assertThat(storage.exists(new StorageKey("common/202609/01/justused.png"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("🔴 CONFIRMED 的文件一律不碰，哪怕它被扫了出来")
+    void purgeOrphansNeverTouchesConfirmedFiles() {
+        // 业务确认过引用的文件，就算关系行被误删（或者查询条件哪天写漏了），
+        // 也不该由清理任务来判死刑。状态是最后一道闸
+        FileEntity confirmed = file(9003L, "common/202609/01/inuse.png");
+        confirmed.setStatus(FileStatusEnum.CONFIRMED);
+        confirmed.setDeletedFlag(false);
+        seed("common/202609/01/inuse.png");
+        when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9003L));
+        when(fileDao.selectById(9003L)).thenReturn(confirmed);
+
+        assertThat(service.purgeOrphans(DEADLINE, 200)).isZero();
+
+        verify(fileDao, never()).updateById(any(FileEntity.class));
+        assertThat(storage.exists(new StorageKey("common/202609/01/inuse.png"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("一个删不掉不该拖垮整批：后面的继续删，它留到下一轮")
+    void purgeOrphansKeepsGoingAfterOneFailure() {
+        // 清理任务一次扫几百个。一个文件因为存储抖动删失败就让整批停下来，
+        // 等于让一个偶发故障永久堵住清理 —— 而它是幂等的，下一轮还会扫到
+        seed("common/202609/01/b.png");
+        when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9004L, 9005L));
+        when(fileDao.selectById(9004L)).thenThrow(new IllegalStateException("连接池炸了"));
+        when(fileDao.selectById(9005L)).thenReturn(tempFile(9005L, "common/202609/01/b.png"));
+        when(fileRelationDao.listByFileIds(List.of(9005L))).thenReturn(List.of());
+
+        assertThat(service.purgeOrphans(DEADLINE, 200)).isEqualTo(1);
+        assertThat(storage.exists(new StorageKey("common/202609/01/b.png"))).isFalse();
     }
 }

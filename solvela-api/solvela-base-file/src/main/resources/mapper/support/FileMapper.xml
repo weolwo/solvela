@@ -119,4 +119,41 @@
         GROUP BY t_file.category_id
     </select>
 
+    <!--
+      孤儿：上传了、过了保护期、至今没有任何业务登记引用的 TEMP 文件。给清理任务用。
+
+      🔴 三个条件缺一不可，每一个都对应一种「删错」：
+        status = 1(TEMP)  —— CONFIRMED 的绝不碰。业务确认过引用的文件，
+                             哪怕关系行被误删也不该由清理任务来判死刑
+        create_time 早于  —— 保护期。用户正在填的表单里那些图还没提交，
+                             此刻它们既是 TEMP 又无引用，删了就是删活人的东西
+        没有 relation 行  —— 真正的判据
+
+      ⚠️ 用 NOT EXISTS 而不是 LEFT JOIN ... IS NULL：t_file_relation 的 idx_file
+         能被它直接用上，而且不会因为同一文件多条引用而产生重复行。
+
+      ⚠️ 走 idx_status_time(status, create_time)。别把 status 包进函数或做隐式转换，
+         那样索引就失效了 —— 而这张表是只增的。
+    -->
+    <select id="selectOrphanIds" resultType="java.lang.Long">
+        SELECT f.file_id
+        FROM t_file f
+        WHERE f.deleted_flag = 0
+          AND f.status = 1
+          AND f.create_time &lt; #{deadline}
+          AND NOT EXISTS (SELECT 1 FROM t_file_relation r WHERE r.file_id = f.file_id)
+        ORDER BY f.file_id
+        LIMIT #{limit}
+    </select>
+
+    <!-- 与 selectOrphanIds 同一套条件，给 dryRun 和日志用。条件改一处就要改两处 —— 有测试守着 -->
+    <select id="countOrphans" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_file f
+        WHERE f.deleted_flag = 0
+          AND f.status = 1
+          AND f.create_time &lt; #{deadline}
+          AND NOT EXISTS (SELECT 1 FROM t_file_relation r WHERE r.file_id = f.file_id)
+    </select>
+
 </mapper>

@@ -20,7 +20,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
   schema-baseline.sql  ->  ok=170  fail=0
   data-baseline.sql    ->  ok=47   fail=0
   建表      85 张
-  种子数据  22 张表 / 526 行
+  种子数据  22 张表 / 528 行
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
@@ -41,7 +41,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | `t_role_menu` | 74 | 任何角色都看不到菜单 |
 | `t_employee` | 12 | 无法登录 |
 | `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
-| `t_solvela_job` | 16 | 定时任务不会注册 |
+| `t_solvela_job` | 18 | 定时任务不会注册 |
 | `t_task_event` | 10 | 任务事件识别不了 |
 | `t_notification_template` | 8 | 发不出任何站内信，**而且不报错** |
 | `t_coupon_template` | 6 | 发出去的券没有面额/门槛，**而且不报错** |
@@ -64,7 +64,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | 文件 | 内容 | 不含 |
 |---|---|---|
 | `schema-baseline.sql` | 85 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 22 张配置表、526 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
+| `data-baseline.sql` | 22 张配置表、528 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
