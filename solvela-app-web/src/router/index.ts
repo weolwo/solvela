@@ -293,15 +293,19 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
+  /*
+   * 先恢复会话，再判断 —— 对匿名页也一样。
+   *
+   * 会话令牌在 HttpOnly cookie 里，页面脚本读不到，「登着没有」只能问服务端。
+   * 以前本地有令牌就能同步判断，现在不先 await 的话，刷新任何一个需要登录的页面
+   * 都会被当成未登录踢去登录页；匿名页（活动页）首屏也会按「未登录」渲染一遍。
+   * restore 本身很便宜：已登录直接返回，没有「上次登着」的提示时一个请求都不发。
+   */
+  await auth.restore()
+
   if (to.meta.anonymous === true) {
     return true
   }
-
-  if (!auth.isLoggedIn) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
-
-  await auth.restore()
 
   if (!auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }

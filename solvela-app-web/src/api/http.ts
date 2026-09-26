@@ -17,24 +17,27 @@ declare module 'axios' {
 /**
  * HTTP 客户端。
  *
- * 三条约定，改之前先看 errors.ts 的说明：
+ * 四条约定，改之前先看 errors.ts 的说明：
  *   1. 成功时 `response.data` **就是业务数据**，没有信封要剥。
  *   2. 失败时抛 {@link ApiError}，业务代码不接触 AxiosError。
  *   3. 只有 LOGIN_REQUIRED 触发「清会话 + 跳登录」。
  *      BAD_CREDENTIALS 同样是 401，但它是「这次密码输错了」，必须原样抛给登录页，
  *      否则用户会被弹回登录页而看不到「手机号或密码错误」这句提示。
+ *   4. 🔴 **凭证不经过这里。** 会话令牌与设备令牌都在服务端下发的 HttpOnly cookie 里，
+ *      同源请求由浏览器自动带上，页面脚本读不到、也不需要读。
+ *      以前它们存在 localStorage、由这里塞进 Authorization / X-Device-Token 头 ——
+ *      那意味着混进页面的任何一段脚本都能把它们读走，带回自己的机器长期使用。
+ *      原理见 docs/知识库/Web鉴权-Cookie与浏览器安全边界.md。
  */
 
-type TokenProvider = () => string | null
 type UnauthorizedHandler = () => void
-type DeviceTokenProvider = () => Promise<string | null>
+type DeviceEnsurer = () => Promise<void>
 /** 弹出二次验证、等用户完成。resolve(true) = 验证通过，调用方重试原请求；false = 用户放弃 */
 type StepUpHandler = () => Promise<boolean>
 
-let tokenProvider: TokenProvider = () => null
 let unauthorizedHandler: UnauthorizedHandler = () => {}
-/** 默认不带设备头：注入之前（比如单测里）行为退化成「没有设备身份」，而不是报错 */
-let deviceTokenProvider: DeviceTokenProvider = () => Promise.resolve(null)
+/** 默认不做：注入之前（比如单测里）行为退化成「没有设备身份」，而不是报错 */
+let deviceEnsurer: DeviceEnsurer = () => Promise.resolve()
 /** 默认「不处理」：注入之前（单测里、未登录）STEP_UP_REQUIRED 原样抛给调用方 */
 let stepUpHandler: StepUpHandler = () => Promise.resolve(false)
 
@@ -47,30 +50,15 @@ let stepUpHandler: StepUpHandler = () => Promise.resolve(false)
  */
 export const DEVICE_REGISTER_URL = '/device/register'
 
-/**
- * 设备令牌放在这个头里。对齐网关的 `solvela.app.device.header`
- * （`DeviceAuthProperties.DEFAULT_HEADER`）。
- *
- * 🔴 **不是 `X-Device-Id`**。那是另一个头，方向也不同：
- * <ul>
- *   <li>`X-Device-Token`（本项）客户端 → 网关，装的是**令牌**，网关要验签；</li>
- *   <li>`X-Device-Id` 网关 → 内部服务，装的是**验签通过的设备号**。
- *       令牌绝不原样透传下去 —— 那等于把凭证散给所有内部服务
- *       （见 DownstreamClientConfig 的注释）。</li>
- * </ul>
- *
- * 写错的代价是**静默的**：网关读不到这个头，就当作「没有设备身份」放行，
- * 请求全部成功，只是 device_id 恒为 NULL、覆盖率恒为 0% —— 而那正是
- * 整套设备方案唯一的产出。2026-09-10 第一版客户端就是这么错的。
- */
-const DEVICE_HEADER = 'X-Device-Token'
-
 /** 由 stores/auth 在初始化时注入，避免 http 反向依赖 store 造成循环引用 */
 export function configureHttp(options: {
-  getToken: TokenProvider
   onLoginRequired: UnauthorizedHandler
-  /** 可选：拿设备令牌。**不传就是「不带设备头」**，不是「沿用上一次」 */
-  ensureDeviceToken?: DeviceTokenProvider
+  /**
+   * 可选：确保这个浏览器已经有设备身份（HttpOnly cookie）。**不传就是「不管」**，不是「沿用上一次」。
+   *
+   * 每个请求发出前都会 await 它 —— 实现方必须把结果缓存住，只有冷启动那一次真的发请求。
+   */
+  ensureDevice?: DeviceEnsurer
   /**
    * 可选：服务端要求二次验证时怎么办。**不传就是「不处理，原样抛给调用方」**。
    *
@@ -78,14 +66,13 @@ export function configureHttp(options: {
    */
   onStepUpRequired?: StepUpHandler
 }): void {
-  tokenProvider = options.getToken
   unauthorizedHandler = options.onLoginRequired
   /*
    * 🔴 无条件赋值，不写成「传了才覆盖」。
-   * 后者会让第二次调用悄悄留着上一次的 provider —— 于是「我明明没配设备头」
-   * 和「实际带着上一次那个」同时成立，而这种状态没有任何办法从代码上看出来。
+   * 后者会让第二次调用悄悄留着上一次的实现 —— 于是「我明明没配」
+   * 和「实际还在用上一次那个」同时成立，而这种状态没有任何办法从代码上看出来。
    */
-  deviceTokenProvider = options.ensureDeviceToken ?? (() => Promise.resolve(null))
+  deviceEnsurer = options.ensureDevice ?? (() => Promise.resolve())
   // 同上：无条件赋值，不传就是回到「不处理」
   stepUpHandler = options.onStepUpRequired ?? (() => Promise.resolve(false))
 }
@@ -97,32 +84,17 @@ const http: AxiosInstance = axios.create({
 })
 
 http.interceptors.request.use(async (config) => {
-  const token = tokenProvider()
-  if (token !== null && token !== '') {
-    // header 名与 scheme 对齐 solvela-app 的 solvela.app.auth 配置
-    config.headers.Authorization = `Bearer ${token}`
-  }
-
   /*
-   * 🔴 领设备身份的那条请求自己不能带设备头，也不能在这里等设备 ——
-   * 它就是那个正在被等的东西，等它等于死锁。
+   * 🔴 领设备身份的那条请求自己不能等设备 —— 它就是那个正在被等的东西，等它等于死锁。
    * 后端对这条路由标了 @DeviceExempt，正是同一件事在服务端的表达。
    */
   if (config.url !== DEVICE_REGISTER_URL) {
     /*
-     * await 的代价只落在冷启动的头几个请求上：设备令牌一旦存进 localStorage，
-     * 之后每次都是同步读。
-     *
-     * 而不 await 的代价是永久的 —— 首屏那几个请求会一直没有设备号，
-     * 服务端那个「设备令牌覆盖率」指标就永远上不到 100%，
-     * 而它正是决定「能不能从 observe 切到 enforce」的唯一依据。
+     * 等设备 cookie 落地再发：注册、登录、活动页这些匿名请求也要带着设备身份 ——
+     * 防刷要防的正是它们。代价只落在冷启动的头几个请求上（结果由 ensureDevice 缓存）。
      */
-    const deviceToken = await deviceTokenProvider()
-    if (deviceToken !== null && deviceToken !== '') {
-      config.headers[DEVICE_HEADER] = deviceToken
-    }
+    await deviceEnsurer()
   }
-
   return config
 })
 

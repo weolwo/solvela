@@ -1,17 +1,15 @@
 /**
- * 令牌本地存储。
+ * 旧版本的令牌本地存储 —— **现在只剩迁移用途**。
  *
- * solvela-app 的令牌有效期是 30 天（solvela.app.auth.token-ttl）。
+ * 2026-09-26 起会话令牌改由服务端写进 HttpOnly cookie，前端不再保存、也读不到它。
+ * 以前存在这里的问题很具体：混进页面的任何一段脚本都能 `localStorage.getItem` 把它读走，
+ * 带回自己的机器用满 30 天。原理见 docs/知识库/Web鉴权-Cookie与浏览器安全边界.md。
  *
- * 同时存过期时间戳：后端在 LoginResult 里给了 expiresIn 就是为了让客户端**提前**处理，
- * 而不是等某次请求 401 了才反应过来。
+ * 升级后的第一次启动，stores/auth 会读出这里残留的旧令牌、交给服务端写进 cookie
+ * （/auth/session/adopt，同一个令牌，用户不掉线），然后清掉本地这份。
  *
- * <h3>「记住我」落在这里，而且是真的</h3>
- * 勾选 = localStorage（关掉浏览器还在，下次直接进）；
- * 不勾 = sessionStorage（标签页一关就没了，共用设备上不留痕）。
- *
- * 🔴 一个不改变任何行为的「记住我」勾选框比没有更糟 —— 用户以为自己在共用设备上
- * 关掉了持久登录，实际没有。所以要么按这个语义实现，要么把勾选框拿掉。
+ * 🔴 等最后一批旧令牌过期（2026-10-26 之后），连同 adopt 接口一起删掉本文件。
+ * **不要往回加 writeToken**：往 localStorage 写令牌，就是这次改造要消灭的东西。
  */
 
 const TOKEN_KEY = 'solvela.app.token'
@@ -20,9 +18,14 @@ const EXPIRES_AT_KEY = 'solvela.app.token.expiresAt'
 /** 提前多久就认为令牌不可用，避开临界点上正好过期 */
 const EXPIRY_SKEW_MS = 60_000
 
-export interface StoredToken {
+export interface LegacyToken {
   token: string
   expiresAt: number
+  /**
+   * 旧令牌存在 localStorage（用户勾了「记住我」）还是 sessionStorage。
+   * 迁移时据此决定下发持久 cookie 还是会话 cookie —— 让「关浏览器会不会掉线」在升级前后一致。
+   */
+  persisted: boolean
 }
 
 /**
@@ -37,13 +40,19 @@ function safe<T>(fn: () => T, fallback: T): T {
   }
 }
 
-/** 两个 storage 都要查：用户上次可能勾了、也可能没勾 */
-function stores(): Storage[] {
-  return safe(() => [localStorage, sessionStorage], [])
+function stores(): Array<{ store: Storage; persisted: boolean }> {
+  return safe(
+    () => [
+      { store: localStorage, persisted: true },
+      { store: sessionStorage, persisted: false },
+    ],
+    [],
+  )
 }
 
-export function readToken(): StoredToken | null {
-  for (const store of stores()) {
+/** 读出旧版本残留的令牌；没有或已过期返回 null（过期的顺手清掉） */
+export function readToken(): LegacyToken | null {
+  for (const { store, persisted } of stores()) {
     const token = safe(() => store.getItem(TOKEN_KEY), null)
     const expiresAtRaw = safe(() => store.getItem(EXPIRES_AT_KEY), null)
     if (token === null || token === '' || expiresAtRaw === null) {
@@ -54,29 +63,13 @@ export function readToken(): StoredToken | null {
       clearToken()
       return null
     }
-    return { token, expiresAt }
+    return { token, expiresAt, persisted }
   }
   return null
 }
 
-/**
- * @param persist true=记住我（localStorage）；false=只在本次会话（sessionStorage）
- */
-export function writeToken(token: string, expiresInSeconds: number, persist: boolean): StoredToken {
-  const expiresAt = Date.now() + expiresInSeconds * 1000
-  // 🔴 先清两边再写：从「记住」改成「不记住」时，localStorage 里那份必须消失，
-  //    否则用户取消了勾选，持久令牌却还留着 —— 正是这个开关要防的事
-  clearToken()
-  const store = persist ? safe(() => localStorage, null) : safe(() => sessionStorage, null)
-  if (store !== null) {
-    safe(() => store.setItem(TOKEN_KEY, token), undefined)
-    safe(() => store.setItem(EXPIRES_AT_KEY, String(expiresAt)), undefined)
-  }
-  return { token, expiresAt }
-}
-
 export function clearToken(): void {
-  for (const store of stores()) {
+  for (const { store } of stores()) {
     safe(() => store.removeItem(TOKEN_KEY), undefined)
     safe(() => store.removeItem(EXPIRES_AT_KEY), undefined)
   }

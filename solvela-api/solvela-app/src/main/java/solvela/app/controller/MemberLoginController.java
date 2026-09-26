@@ -2,6 +2,7 @@ package solvela.app.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,13 +13,18 @@ import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.Anonymous;
 import solvela.app.auth.CurrentMember;
 import solvela.app.auth.MemberPrincipal;
+import solvela.app.auth.RequestCredentials;
 import solvela.app.domain.EmailBindRequest;
 import solvela.app.domain.EmailCodeRequest;
 import solvela.app.domain.PhoneBindRequest;
+import solvela.app.domain.SessionAdoptRequest;
 import solvela.app.domain.SessionRevokeRequest;
 import solvela.member.api.MemberContactView;
 import solvela.app.domain.SmsCodeRequest;
 import solvela.auth.member.MemberSession;
+import solvela.auth.member.MemberSessionProperties;
+
+import java.time.Duration;
 
 import java.util.List;
 import solvela.app.domain.MemberLoginRequest;
@@ -45,6 +51,10 @@ public class MemberLoginController {
 
     private final MemberLoginService memberLoginService;
 
+    private final RequestCredentials credentials;
+
+    private final MemberSessionProperties sessionProperties;
+
     /**
      * 注册。两种方式共用这一条路由，由请求体里的 registerType 决定。
      * 成功后<b>直接返回令牌</b>，形状与登录完全一致 ——
@@ -64,8 +74,10 @@ public class MemberLoginController {
     @Anonymous
     @PostMapping("/register")
     public MemberResult register(@RequestBody @Valid MemberRegisterRequest request,
-                                 HttpServletRequest servletRequest) {
-        return memberLoginService.register(request, ClientIp.of(servletRequest));
+                                 HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        MemberResult result = memberLoginService.register(request, ClientIp.of(servletRequest));
+        // 注册页没有「记住我」：刚建号的人当然要留在登录态，固定持久 cookie
+        return request.cookieDelivery() ? deliverByCookie(result, true, servletResponse) : result;
     }
 
     /**
@@ -112,8 +124,34 @@ public class MemberLoginController {
      */
     @Anonymous
     @PostMapping("/login")
-    public MemberResult login(@RequestBody @Valid MemberLoginRequest request, HttpServletRequest servletRequest) {
-        return memberLoginService.login(request, ClientIp.of(servletRequest));
+    public MemberResult login(@RequestBody @Valid MemberLoginRequest request,
+                              HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        MemberResult result = memberLoginService.login(request, ClientIp.of(servletRequest));
+        return request.cookieDelivery() ? deliverByCookie(result, request.rememberMe(), servletResponse) : result;
+    }
+
+    /**
+     * 把 localStorage 里的旧令牌搬进 HttpOnly cookie。Web 端升级到 cookie 版本后<b>只调一次</b>。
+     *
+     * <p>🔴 <b>只有「请求头 → cookie」这一个方向。</b>任何「cookie → 响应体」的接口都不能存在：
+     * 那等于给混进页面的脚本一个把 HttpOnly 令牌取出来的出口，整套改造白做。
+     * 所以这里<b>只认请求头里的令牌</b>，返回 204、没有响应体。
+     *
+     * <p>搬的是<b>同一个</b>令牌，不重新签发：用户不会因为升级而掉线，
+     * 「我的登录设备」里也不会凭空多出一条会话。等最后一批旧令牌过期（30 天），本接口可以删掉。
+     */
+    @PostMapping("/session/adopt")
+    public ResponseEntity<Void> adoptSession(@RequestBody(required = false) SessionAdoptRequest request,
+                                             HttpServletRequest servletRequest,
+                                             HttpServletResponse servletResponse) {
+        CurrentMember.require();
+        RequestCredentials.Credential credential = credentials.session(servletRequest);
+        if (credential != null && !credential.fromCookie()) {
+            boolean remember = request != null && request.rememberMe();
+            credentials.writeSession(servletResponse, credential.value(),
+                    remember ? sessionProperties.tokenTtl() : null);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -164,9 +202,12 @@ public class MemberLoginController {
      * 硬造一个 {@code {"msg":"操作成功"}} 只是让客户端多写一次解析。
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest servletRequest) {
+    public ResponseEntity<Void> logout(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         MemberPrincipal member = CurrentMember.require();
         memberLoginService.logout(currentToken(servletRequest), member.memberId(), ClientIp.of(servletRequest));
+        // 先吊销再清 cookie：只清 cookie 的话令牌在服务端还活着，之前被复制走的那份照样能用。
+        // 🔴 设备 cookie 不动 —— 退出账号不等于换了一台机器
+        credentials.clearSession(servletResponse);
         return ResponseEntity.noContent().build();
     }
 
@@ -223,18 +264,30 @@ public class MemberLoginController {
     }
 
     /**
-     * 从请求头里取回当前令牌原文。
+     * 取回当前令牌原文（请求头或 HttpOnly cookie）。
      *
-     * <p>只有退出登录需要它 —— 吊销的对象是「这一个令牌」，而认证过滤器
-     * 只把解析结果（会员身份）传下来，不传凭证本身。
+     * <p>退出登录、「我的登录设备」标本机、「下线其他设备」保留本机，都要它 ——
+     * 认证过滤器只把解析结果（会员身份）传下来，不传凭证本身。
      * 凭证不进上下文是刻意的：进了就会被顺手写进日志或返回给前端。
+     *
+     * <p>🔴 必须走 {@link RequestCredentials}，不能自己读 {@code Authorization} 头：
+     * Web 端改用 cookie 之后，只读头会取到 null，「下线其他设备」就会把自己也踢掉。
      */
-    private static String currentToken(HttpServletRequest request) {
-        String raw = request.getHeader("Authorization");
-        if (raw == null) {
-            return null;
-        }
-        String trimmed = raw.trim();
-        return trimmed.regionMatches(true, 0, "Bearer ", 0, 7) ? trimmed.substring(7).trim() : trimmed;
+    private String currentToken(HttpServletRequest request) {
+        return credentials.sessionValue(request);
+    }
+
+    /**
+     * cookie 模式下的登录 / 注册：令牌只写进 HttpOnly cookie，<b>响应体里去掉</b>。
+     *
+     * <p>响应体里再带一份的话，混进页面的脚本包一层 fetch 就能截走它，HttpOnly 白做
+     * （知识库《Web鉴权》§5.1）。
+     *
+     * @param remember true 下发持久 cookie（与令牌同寿命），false 下发会话 cookie（关浏览器即失效）
+     */
+    private MemberResult deliverByCookie(MemberResult result, boolean remember, HttpServletResponse response) {
+        credentials.writeSession(response, result.accessToken(),
+                remember ? Duration.ofSeconds(result.expiresIn()) : null);
+        return result.withoutToken();
     }
 }

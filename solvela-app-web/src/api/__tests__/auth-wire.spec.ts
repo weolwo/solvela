@@ -30,7 +30,7 @@ vi.mock('../http', () => ({
 
 /** 后端真实会下发的形状：小值 Long 是数字 */
 const LOGIN_REPLY = {
-  accessToken: 'mb_xxx',
+  // cookie 模式下服务端不回令牌原文（它在 HttpOnly cookie 里）
   expiresIn: 2_592_000,
   member: {
     memberId: 1000000001,
@@ -54,7 +54,10 @@ beforeEach(() => {
 
 describe('登录', () => {
   it('🔴 发的是 identity / credential / loginType，不是 phone / password', async () => {
-    await login({ loginType: 'PHONE_PASSWORD', identity: '13800138000', credential: 'abcd1234' })
+    await login(
+      { loginType: 'PHONE_PASSWORD', identity: '13800138000', credential: 'abcd1234' },
+      true,
+    )
 
     expect(sentBody()).toMatchObject({
       loginType: 'PHONE_PASSWORD',
@@ -66,13 +69,13 @@ describe('登录', () => {
   })
 
   it('不传 loginType 时兜底成手机号密码 —— 与后端 typeOrDefault 一致', async () => {
-    await login({ identity: '13800138000', credential: 'abcd1234' })
+    await login({ identity: '13800138000', credential: 'abcd1234' }, true)
 
     expect(sentBody().loginType).toBe('PHONE_PASSWORD')
   })
 
   it('调用方给的 deviceType 覆盖默认值，而不是被默认值盖掉', async () => {
-    await login({ identity: '13800138000', credential: 'abcd1234', deviceType: 'APP' })
+    await login({ identity: '13800138000', credential: 'abcd1234', deviceType: 'APP' }, true)
 
     // 默认值写在展开之前正是为了这个：`{ ...默认, ...payload }`。
     // 顺序写反的话，调用方永远改不动 deviceType，而且没有任何报错
@@ -80,7 +83,7 @@ describe('登录', () => {
   })
 
   it('落地的 memberId 是字符串 —— 后端下发的是数字', async () => {
-    const result = await login({ identity: '13800138000', credential: 'abcd1234' })
+    const result = await login({ identity: '13800138000', credential: 'abcd1234' }, true)
 
     expect(result.member.memberId).toBe('1000000001')
   })
@@ -113,5 +116,26 @@ describe('注册', () => {
       emailCode: '123456',
     })
     expect(sentBody().password).toBeUndefined()
+  })
+})
+
+describe('🔴 令牌走 HttpOnly cookie', () => {
+  it('登录要求 cookie 下发，并把「记住我」原样交给服务端', async () => {
+    await login({ identity: 'a@example.com', credential: '123456' }, false)
+
+    // useCookie 丢了的话，服务端会照旧把令牌放进响应体 —— HttpOnly 等于白做
+    expect(sentBody()).toMatchObject({ useCookie: true, remember: false })
+  })
+
+  it('注册同样要求 cookie 下发', async () => {
+    await register({ registerType: 'EMAIL_CODE', identity: 'a@example.com', emailCode: '123456' })
+
+    expect(sentBody()).toMatchObject({ useCookie: true })
+  })
+
+  it('结果里没有令牌字段 —— 前端不该持有它', async () => {
+    const result = await login({ identity: 'a@example.com', credential: '123456' }, true)
+
+    expect(result).not.toHaveProperty('accessToken')
   })
 })

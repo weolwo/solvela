@@ -46,8 +46,14 @@ class DeviceFilterTest {
         return new DeviceTokenCodec(props);
     }
 
+    private static DeviceFilter newFilter(DeviceTokenCodec codec, DeviceAuthProperties properties) {
+        RequestCredentials credentials = new RequestCredentials(
+                new AuthProperties(null, null), properties, new WebCookieProperties(true, null, null, null));
+        return new DeviceFilter(codec, properties, credentials);
+    }
+
     private static DeviceFilter filter(DeviceAuthProperties.Mode mode) {
-        return new DeviceFilter(codec(), new DeviceAuthProperties(null, mode));
+        return newFilter(codec(), new DeviceAuthProperties(null, mode));
     }
 
     /** 跑一次过滤器，返回链路内部看到的设备身份（没有则 null）。 */
@@ -63,6 +69,35 @@ class DeviceFilterTest {
     }
 
     // ============================== 识别 ==============================
+    @Test
+    @DisplayName("Web 端：设备令牌在 HttpOnly cookie 里也认")
+    void cookie也认() throws Exception {
+        DeviceTokenCodec codec = codec();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-sv_dv", codec.issue(DEVICE_ID, "H5")));
+
+        DeviceIdentity identity = runFilter(
+                newFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
+
+        assertNotNull(identity, "Web 端改用 cookie 之后，只读请求头的话所有 Web 请求都会变成「没有设备」");
+        assertEquals(DEVICE_ID, identity.deviceId());
+    }
+
+    @Test
+    @DisplayName("请求头与 cookie 都有时，请求头优先 —— 明确写在头里的是调用方的本意")
+    void 请求头优先() throws Exception {
+        DeviceTokenCodec codec = codec();
+        String other = "fedcba9876543210fedcba9876543210";
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(DeviceAuthProperties.DEFAULT_HEADER, codec.issue(DEVICE_ID, "APP"));
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-sv_dv", codec.issue(other, "H5")));
+
+        DeviceIdentity identity = runFilter(
+                newFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
+
+        assertEquals(DEVICE_ID, identity.deviceId());
+    }
+
 
     @Test
     @DisplayName("带有效令牌 → 身份绑进作用域，字段与签发时一致")
@@ -73,7 +108,7 @@ class DeviceFilterTest {
         request.addHeader(DeviceAuthProperties.DEFAULT_HEADER, token);
 
         DeviceIdentity identity = runFilter(
-                new DeviceFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
+                newFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
 
         assertNotNull(identity);
         assertEquals(DEVICE_ID, identity.deviceId());
@@ -122,7 +157,7 @@ class DeviceFilterTest {
         request.addHeader("X-Sv-Dev", "  " + codec.issue(DEVICE_ID, "H5") + "  ");
 
         DeviceIdentity identity = runFilter(
-                new DeviceFilter(codec, new DeviceAuthProperties("X-Sv-Dev", DeviceAuthProperties.Mode.OFF)), request);
+                newFilter(codec, new DeviceAuthProperties("X-Sv-Dev", DeviceAuthProperties.Mode.OFF)), request);
 
         assertNotNull(identity, "配了别的头名就该读别的头");
         assertEquals("H5", identity.deviceType());
@@ -135,7 +170,7 @@ class DeviceFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(DeviceAuthProperties.DEFAULT_HEADER, codec.issue(DEVICE_ID, "APP"));
 
-        runFilter(new DeviceFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
+        runFilter(newFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
 
         assertFalse(CurrentDevice.isBound(),
                 "过滤器返回之后作用域必须已经失效 —— ThreadLocal 忘了清的那类事故就是这么来的");

@@ -95,9 +95,15 @@ export interface RegisterPayload {
   deviceType?: DeviceType
 }
 
+/**
+ * 登录 / 注册的结果。
+ *
+ * 🔴 **没有令牌。** 令牌由服务端写进 HttpOnly cookie，响应体里刻意不带 ——
+ * 带了的话，混进页面的脚本包一层 fetch 就能截走它，HttpOnly 等于白做
+ * （docs/知识库/Web鉴权-Cookie与浏览器安全边界.md §5.1）。
+ */
 export interface LoginResult {
-  accessToken: string
-  /** 有效期秒数。用来提前续期，而不是等 401 才反应 */
+  /** 有效期秒数 */
   expiresIn: number
   member: MemberProfile
 }
@@ -112,7 +118,6 @@ interface RawMemberProfile {
 }
 
 interface RawLoginResult {
-  accessToken: string
   expiresIn: number
   member: RawMemberProfile
 }
@@ -130,14 +135,13 @@ function normalizeMember(raw: RawMemberProfile): MemberProfile {
 
 function toLoginResult(raw: RawLoginResult): LoginResult {
   return {
-    accessToken: raw.accessToken,
     expiresIn: raw.expiresIn,
     member: normalizeMember(raw.member),
   }
 }
 
 /**
- * 注册。**返回形状与登录完全一致**，所以调用方走同一条「存令牌 + 存会员信息」的路。
+ * 注册。**返回形状与登录完全一致**，所以调用方走同一条「存会员信息」的路（令牌在 cookie 里）。
  *
  * 后端注册成功直接签令牌（见 MemberLoginController.register 的注释）——
  * 没有「注册完再登一次」这一步，那一步不产生任何信息，只多一次可能失败的调用。
@@ -152,18 +156,44 @@ export async function register(payload: RegisterPayload): Promise<LoginResult> {
   const raw = await request<RawLoginResult>({
     url: '/auth/register',
     method: 'POST',
-    data: { registerType: 'PHONE_PASSWORD', deviceType: 'H5', ...payload },
+    // useCookie：令牌只经 HttpOnly cookie 下发。注册页没有「记住我」，服务端固定持久 cookie
+    data: { registerType: 'PHONE_PASSWORD', deviceType: 'H5', ...payload, useCookie: true },
   })
   return toLoginResult(raw)
 }
 
-export async function login(payload: LoginPayload): Promise<LoginResult> {
+/**
+ * 登录。
+ *
+ * @param remember 「记住我」。true = 持久 cookie（关浏览器还在），
+ *                 false = 会话 cookie（关浏览器就没了，共用设备上不留痕）。由服务端下发，前端不再管存储
+ */
+export async function login(payload: LoginPayload, remember: boolean): Promise<LoginResult> {
   const raw = await request<RawLoginResult>({
     url: '/auth/login',
     method: 'POST',
-    data: { loginType: 'PHONE_PASSWORD', deviceType: 'H5', ...payload },
+    data: { loginType: 'PHONE_PASSWORD', deviceType: 'H5', ...payload, useCookie: true, remember },
   })
   return toLoginResult(raw)
+}
+
+/**
+ * 迁移：把旧版本存在 localStorage 里的会话令牌交给服务端，由它写进 HttpOnly cookie。
+ *
+ * 🔴 **只有这一个方向。** 服务端没有、也不能有「cookie → 响应体」的接口 ——
+ * 那等于给混进页面的脚本一个把 HttpOnly 令牌取出来的出口。本接口返回 204、没有响应体。
+ *
+ * 搬的是**同一个**令牌：用户不会因为升级而掉线。
+ *
+ * @param remember 旧令牌原来在 localStorage（记住我）还是 sessionStorage
+ */
+export async function adoptSession(legacyToken: string, remember: boolean): Promise<void> {
+  await requestVoid({
+    url: '/auth/session/adopt',
+    method: 'POST',
+    data: { remember },
+    headers: { Authorization: `Bearer ${legacyToken}` },
+  })
 }
 
 /**

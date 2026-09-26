@@ -146,10 +146,10 @@ describe('观察档二次验证', () => {
     await w.find('form').trigger('submit')
     await flushPromises()
 
-    // 这里 mock 的是 api 层的 login(payload)，只有一个入参；
-    // store 的 login(payload, remember) 是另一层，别把两者的签名搞混
+    // api 层的 login(payload, remember)：remember 由服务端决定下发持久还是会话 cookie
     expect(loginApi).toHaveBeenLastCalledWith(
       expect.objectContaining({ identity: '13800138000', verificationCode: '123456' }),
+      expect.any(Boolean),
     )
   })
 

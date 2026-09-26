@@ -1,6 +1,6 @@
 # 账号安全：方案评估 与 Web 端 Cookie 鉴权改造
 
-> 撰写 2026-09-26 · 状态：**§2.1 已实施（observe 档，2026-09-26），其余待决策**
+> 撰写 2026-09-26 · 状态：**§2.1 已实施（observe 档）、§3 已实施（2026-09-26），其余待决策**
 > 输入：一份外部"C 端设备信任 + 2FA + 风控"通用方案；本仓会员登录 / 设备 / 会话代码（结论均对着代码读过）。
 > 原理部分见知识库：`docs/知识库/Web鉴权-Cookie与浏览器安全边界.md`、`docs/知识库/设备身份-Web与原生的能力边界.md`。
 
@@ -71,7 +71,7 @@
 3. 确认可接受后改 `mode: enforce`。回退 = 改回 `observe`。
 
 **已知边界**：
-- 设备令牌 `dv_` 存在 localStorage，被 XSS / 恶意软件读走后，攻击者就是「老设备」。§3 的 HttpOnly cookie 改造堵 XSS 这一条。
+- 设备令牌被读走后，攻击者就是「老设备」。§3 落地后它在 HttpOnly cookie 里，XSS 读不走了；本机恶意软件仍能读 cookie 文件（知识库《Web鉴权》§2.4）。
 - 攻击者连邮箱一起拿下（密码复用）时挡不住。短信接入后可再加一个因子。
 - 「下线**某一台**设备」只踢会话、**不撤那台的信任**；要彻底清掉请用「下线其他设备」或重置密码。后续可在契约上加 `revokeDevice`。
 - enforce 档下会员服务不可用时，拦截点直接失败（不放行）—— 守资产出口的闸不能默认开门。
@@ -94,7 +94,38 @@
 
 ---
 
-## 3. Web 端 Cookie 鉴权改造（设计稿）
+## 3. Web 端 Cookie 鉴权改造 —— ✅ 已实施（2026-09-26）
+
+**落地时相对设计稿的修订**：
+- **来源校验对所有写请求生效，不只是「靠 cookie 认证的」。** 登录、注册这类匿名写接口也要挂，
+  否则 evil.com 能替受害者提交一次攻击者自己账号的登录（登录 CSRF，知识库《Web鉴权》§4.3）。
+  实现为拦截器 `CrossOriginGuardInterceptor`（排在所有拦截器最前），不需要记录「认证来源」。
+- **Web 端靠请求参数 `useCookie: true` 选择 cookie 下发**，不传则照旧在响应体返回令牌（App / Postman / 自动化测试）。
+- **前端「登着没有」靠一个本地提示 + 启动时 `/auth/me`。** 提示（`solvela.app.session.hint`）不是凭证，
+  只决定要不要去问服务端，避免每个匿名访客都白吃一个 401。
+- 服务端发现 cookie 里的令牌已失效时顺手清掉 cookie（页面脚本删不掉 HttpOnly cookie）。
+
+**实现落点**：`WebCookieProperties`（`solvela.app.cookie.*`）、`RequestCredentials`（全网关唯一读写凭证处）、
+`CrossOriginGuardInterceptor`、`MemberLoginController`（登录 / 注册 / 退出 / adopt）、`DeviceController`（复用 + cookie）；
+前端 `api/http.ts`、`api/device.ts`、`stores/auth.ts`、`router/index.ts`、`utils/session-hint.ts`。
+
+**配置**：
+| 键 | dev | test / pre / prod |
+|---|---|---|
+| `solvela.app.cookie.secure` | `false`（http://localhost，cookie 名不带 `__Host-`） | `true`（`__Host-sv_sess` / `__Host-sv_dv`） |
+| `solvela.app.cookie.cross-origin-guard` | `enforce` | `enforce` |
+| `solvela.app.cookie.trusted-origins` | vite 的 5273 两个地址 | 空（由 X-Forwarded-Proto + Host 算出） |
+
+⚠️ test / pre 的实际域名仓库里查不到，按 HTTPS 配了 `secure: true`。某个环境若走 http，表现是「登录成功、刷新就掉线」。
+
+**验证**：`CookieSessionTest`（13 条，真端口真 Redis）+ 前端 `stores/__tests__/auth.spec.ts` 等；
+并在浏览器端到端走通：注册 → 响应体 `accessToken: null`、`document.cookie` 为空 → 刷新仍登录 →
+从另一站点（127.0.0.1）发起的表单 POST 与 fetch 均 403 且不影响登录 → 退出后 `/auth/me` 401 →
+旧版 localStorage 令牌经 adopt 迁入 cookie、本地副本清除、用户不掉线。
+
+---
+
+以下为设计稿原文（保留作为取舍记录）。
 
 ### 3.1 前提条件（已核实）
 - **前端与 API 同源**：nginx 把 `/api` 反代到网关（`deploy/nginx/nginx.conf`），前端 `.env.*` 全是相对路径 `/api`。第一方 cookie，无 CORS / 第三方 cookie 问题。
@@ -158,7 +189,7 @@
 
 ## 4. 待拍板
 1. ~~先做 §2.1 还是 §3~~ —— 已先做 §2.1。
-2. §3 中 Web 端响应体不返回令牌（建议：是）。
-3. refresh_token 轮换放二期（建议：是）。
+2. ~~§3 中 Web 端响应体不返回令牌~~ —— 已按「是」实施。
+3. ~~refresh_token 轮换~~ —— 放二期。
 4. 是否有原生 App 计划——有则设备绑定按原生方式做（Keystore + attestation），见知识库《设备身份》§2。
 5. 是否评估商业风控（影子模式试用），挂进 `solvela-risk` 的 `RiskChainEngine` 作为发奖前的一个 filter。

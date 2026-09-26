@@ -5,13 +5,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import solvela.app.auth.AuthorizationInterceptor;
+import solvela.app.auth.CrossOriginGuardInterceptor;
 import solvela.app.auth.DeviceRequirementInterceptor;
 import solvela.app.auth.StepUpInterceptor;
 
 /**
  * C 端的 MVC 装配。
  *
- * <p>三个拦截器，<b>都没有路径白名单</b>。免登录靠方法上的 {@code @Anonymous}、
+ * <p>四个拦截器，<b>都没有路径白名单</b>。免登录靠方法上的 {@code @Anonymous}、
  * 免设备靠 {@code @DeviceExempt} —— 白名单按前缀匹配，加一条就可能连带放行
  * 未来新增的同前缀接口，而那件事不会有人收到通知。
  *
@@ -27,6 +28,8 @@ import solvela.app.auth.StepUpInterceptor;
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
+    private final CrossOriginGuardInterceptor crossOriginGuardInterceptor;
+
     private final DeviceRequirementInterceptor deviceRequirementInterceptor;
 
     private final AuthorizationInterceptor authorizationInterceptor;
@@ -35,6 +38,12 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 跨站写请求防护排最前：来源不对的请求，连「你是谁」都不必问。
+        // 它对所有写请求生效（含登录、注册），理由见 CrossOriginGuardInterceptor 类注释
+        registry.addInterceptor(crossOriginGuardInterceptor)
+                .addPathPatterns("/**")
+                .excludePathPatterns("/error");
+
         registry.addInterceptor(deviceRequirementInterceptor)
                 .addPathPatterns("/**")
                 // 同下：/error 必须放行，否则 404 会变成 401

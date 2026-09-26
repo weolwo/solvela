@@ -14,7 +14,8 @@ import solvela.auth.member.MemberTokenStore;
 import java.io.IOException;
 
 /**
- * 认证：把请求头里的令牌换成会员身份，绑进 {@link CurrentMember} 的作用域。
+ * 认证：把请求里的令牌（请求头或 HttpOnly cookie，见 {@link RequestCredentials}）换成会员身份，
+ * 绑进 {@link CurrentMember} 的作用域。
  *
  * <p><b>只做认证，不做授权。</b>没带令牌、令牌无效、会员已冻结 —— 一律当作匿名放行，
  * 由 {@link AuthorizationInterceptor} 去判断这个接口允不允许匿名。
@@ -36,12 +37,12 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 
     private final MemberTokenStore tokenStore;
     private final MemberPrincipalLoader principalLoader;
-    private final AuthProperties properties;
+    private final RequestCredentials credentials;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        MemberPrincipal principal = authenticate(request);
+        MemberPrincipal principal = authenticate(request, response);
 
         if (principal == null) {
             // 匿名。ScopedValue 不接受 null 值，所以不绑定 ——
@@ -64,36 +65,22 @@ public class AuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private MemberPrincipal authenticate(HttpServletRequest request) {
-        String token = readToken(request);
-        if (token == null) {
+    private MemberPrincipal authenticate(HttpServletRequest request, HttpServletResponse response) {
+        RequestCredentials.Credential credential = credentials.session(request);
+        if (credential == null) {
             return null;
         }
-        Long memberId = tokenStore.resolve(token);
+        Long memberId = tokenStore.resolve(credential.value());
         if (memberId == null) {
+            if (credential.fromCookie()) {
+                // 令牌过期或被吊销了，而浏览器还会一直带着它。顺手清掉：
+                // 页面脚本读不到 HttpOnly cookie，也就删不掉它，只有服务端能做这件事
+                credentials.clearSession(response);
+            }
             return null;
         }
         // 令牌有效但会员被冻结/注销时返回 null —— 状态判断收在 loader 里，
         // 「什么算一个可用身份」只有一个地方定义。
         return principalLoader.load(memberId);
-    }
-
-    private String readToken(HttpServletRequest request) {
-        String raw = request.getHeader(properties.header());
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String scheme = properties.scheme();
-        if (scheme.isBlank()) {
-            return raw.trim();
-        }
-        // 前缀比较忽略大小写：各家客户端库对 "Bearer" 的大小写并不统一
-        String prefix = scheme + " ";
-        if (raw.regionMatches(true, 0, prefix, 0, prefix.length())) {
-            return raw.substring(prefix.length()).trim();
-        }
-        // 没按约定带前缀的，也认 —— 拒绝它只会换来一轮「为什么 401」的排查，
-        // 而安全性并不依赖这个前缀。
-        return raw.trim();
     }
 }

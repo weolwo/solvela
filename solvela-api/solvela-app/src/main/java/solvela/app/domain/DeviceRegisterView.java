@@ -19,7 +19,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "设备注册结果")
 public record DeviceRegisterView(
 
-        @Schema(description = "设备令牌，客户端必须持久化")
+        @Schema(description = "设备令牌，客户端必须持久化。useCookie 时为 null —— 它已写进 HttpOnly cookie")
         String deviceToken,
 
         @Schema(description = "设备号，32 位 hex")

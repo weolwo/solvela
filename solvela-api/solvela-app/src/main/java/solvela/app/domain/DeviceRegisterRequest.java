@@ -37,5 +37,12 @@ public record DeviceRegisterRequest(
 
         @Schema(description = "应用版本，如 1.4.0")
         @Size(max = 64, message = "应用版本过长")
-        String appVersion) {
+        String appVersion,
+        @Schema(description = "Web 端传 true：凭证只经 HttpOnly cookie 下发，响应体里不带。"
+                + "App / 自动化测试不传，凭证照旧在响应体里")
+        Boolean useCookie) {
+
+    public boolean cookieDelivery() {
+        return Boolean.TRUE.equals(useCookie);
+    }
 }

@@ -53,6 +53,8 @@ public class DeviceFilter extends OncePerRequestFilter {
     private final DeviceTokenCodec deviceTokenCodec;
     private final DeviceAuthProperties properties;
 
+    private final RequestCredentials credentials;
+
     /**
      * observe 档的两个计数器。
      *
@@ -98,8 +100,9 @@ public class DeviceFilter extends OncePerRequestFilter {
     }
 
     private DeviceIdentity resolve(HttpServletRequest request) {
-        String raw = request.getHeader(properties.header());
-        if (raw == null || raw.isBlank()) {
+        // 请求头（App）或 HttpOnly cookie（Web），见 RequestCredentials
+        String raw = credentials.deviceValue(request);
+        if (raw == null) {
             return null;
         }
         // 验不过返回 null，不打日志：老版本客户端、清了缓存、有人在扫接口 —— 都是常态。

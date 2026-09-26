@@ -63,11 +63,11 @@ let stepUp: ReturnType<typeof vi.fn<() => Promise<boolean>>>
 
 beforeEach(() => {
   stepUp = vi.fn<() => Promise<boolean>>()
-  configureHttp({ getToken: () => 'mb_token', onLoginRequired: () => {}, onStepUpRequired: stepUp })
+  configureHttp({ onLoginRequired: () => {}, onStepUpRequired: stepUp })
 })
 
 afterEach(() => {
-  configureHttp({ getToken: () => null, onLoginRequired: () => {} })
+  configureHttp({ onLoginRequired: () => {} })
 })
 
 describe('二次验证', () => {
@@ -150,7 +150,7 @@ describe('二次验证', () => {
   })
 
   it('没注入处理函数（默认）→ 原样抛给调用方', async () => {
-    configureHttp({ getToken: () => 'mb_token', onLoginRequired: () => {} })
+    configureHttp({ onLoginRequired: () => {} })
     const { restore } = scriptedAdapter([{ status: 403, data: STEP_UP_BODY }])
     try {
       await expect(request({ url: '/address', method: 'POST' })).rejects.toMatchObject({

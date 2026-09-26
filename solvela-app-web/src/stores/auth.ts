@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 
 import {
+  adoptSession,
   fetchMe,
   login as loginApi,
   logout as logoutApi,
@@ -14,60 +15,68 @@ import { ensureDevice } from '@/api/device'
 import { ApiError } from '@/api/errors'
 import { configureHttp } from '@/api/http'
 import { finishStepUp, requestStepUp } from '@/composables/useStepUp'
-import { clearToken, readToken, writeToken } from '@/utils/token-storage'
+import { clearSessionHint, hasSessionHint, setSessionHint } from '@/utils/session-hint'
+import { clearToken, readToken } from '@/utils/token-storage'
 
+/**
+ * 登录态。
+ *
+ * <h3>🔴 这里没有令牌</h3>
+ * 会话令牌在服务端下发的 HttpOnly cookie 里，页面脚本读不到 —— 这是刻意的：
+ * 以前它存在 localStorage，混进页面的任何脚本都能把它读走、带回自己的机器用满 30 天。
+ *
+ * 代价是「现在登着吗」没法同步回答，要问服务端（`/auth/me`）。
+ * 所以 {@link isLoggedIn} 看的是「有没有会员资料」，由 {@link restore} 在启动时填上；
+ * 路由守卫先 await 它再判断。为了不让每个匿名访客都白吃一个 401，
+ * 只有本地有「上次登着」的提示时才去问（见 utils/session-hint）。
+ */
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(readToken()?.token ?? null)
   const member = shallowRef<MemberProfile | null>(null)
   const restoring = ref(false)
 
-  const isLoggedIn = computed(() => token.value !== null)
+  const isLoggedIn = computed(() => member.value !== null)
 
-  function setSession(
-    accessToken: string,
-    expiresIn: number,
-    profile: MemberProfile,
-    remember: boolean,
-  ): void {
-    writeToken(accessToken, expiresIn, remember)
-    token.value = accessToken
+  function setSession(profile: MemberProfile): void {
     member.value = profile
+    setSessionHint()
   }
 
+  /**
+   * 清掉本地的登录态。**清不掉 cookie** —— 那是 HttpOnly 的，只有服务端能清
+   * （退出登录接口、或服务端发现令牌失效时顺手清）。
+   */
   function clearSession(): void {
     // 会话没了，正在等的二次验证也就没有意义了 —— 按「放弃」结束，
     // 否则发起它的那个请求会一直挂着，按钮永远在转圈
     finishStepUp(false)
-    clearToken()
-    token.value = null
+    clearSessionHint()
     member.value = null
   }
 
   /**
-   * @param remember 「记住我」。true 存 localStorage（关掉浏览器还在），
-   *                 false 存 sessionStorage（标签页一关就没）。见 token-storage
+   * @param remember 「记住我」。true = 持久 cookie（关掉浏览器还在），
+   *                 false = 会话 cookie（关掉浏览器就没了）。由服务端按这个值下发
    */
   async function login(payload: LoginPayload, remember: boolean): Promise<void> {
     // 这里不吞异常：BAD_CREDENTIALS 必须原样抛给登录页去展示 message
-    const result = await loginApi(payload)
-    setSession(result.accessToken, result.expiresIn, result.member, remember)
+    const result = await loginApi(payload, remember)
+    setSession(result.member)
   }
 
   /**
-   * 注册成功即登录：后端直接把令牌一起返回了，所以这里与 login 走同一条 setSession。
+   * 注册成功即登录：服务端注册时直接签了会话 cookie。
    *
    * 同样不吞异常 —— CONFLICT（手机号已注册）必须原样抛给注册页，
    * 它要据此引导用户去登录，而不是只显示一行红字。
    */
   async function register(payload: RegisterPayload): Promise<void> {
     const result = await registerApi(payload)
-    // 注册没有「记住我」勾选框：刚创建账号的人当然要留在登录态，
-    // 再问一遍是多余的一步。所以固定持久化
-    setSession(result.accessToken, result.expiresIn, result.member, true)
+    setSession(result.member)
   }
 
   async function logout(): Promise<void> {
     try {
+      // 服务端吊销令牌并清 cookie。设备 cookie 不动 —— 退出账号不等于换了一台机器
       await logoutApi()
     } catch {
       // 服务端吊销失败不该把用户卡在登录态里，本地照样清干净
@@ -77,37 +86,74 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 冷启动恢复会话：本地有令牌就跟后端确认一次。
-   * 令牌已失效时后端返回 LOGIN_REQUIRED，拦截器会清会话，这里只需静默放行到登录页。
+   * 迁移：旧版本存在 localStorage / sessionStorage 里的令牌，交给服务端写进 HttpOnly cookie。
+   *
+   * <p>搬的是同一个令牌（用户不掉线），成功或服务端明确拒绝后都清掉本地那份 ——
+   * 留着它就是留着一份脚本读得到的凭证。只有网络失败时保留，下次启动再试。
    */
-  async function restore(): Promise<void> {
-    if (token.value === null || member.value !== null || restoring.value) {
+  async function migrateLegacySession(): Promise<void> {
+    const legacy = readToken()
+    if (legacy === null) {
+      return
+    }
+    try {
+      await adoptSession(legacy.token, legacy.persisted)
+      setSessionHint()
+      clearToken()
+    } catch (error) {
+      if (error instanceof ApiError && error.status !== null) {
+        // 服务端答复了（多半是令牌早已失效）：这份旧令牌没用了
+        clearToken()
+      }
+    }
+  }
+
+  let restoreTask: Promise<void> | null = null
+
+  async function doRestore(): Promise<void> {
+    await migrateLegacySession()
+    if (!hasSessionHint()) {
       return
     }
     restoring.value = true
     try {
       member.value = await fetchMe()
-    } catch (error) {
-      if (!(error instanceof ApiError && error.isLoginRequired)) {
-        clearSession()
-      }
+    } catch {
+      // LOGIN_REQUIRED：拦截器已经 clearSession（连提示一起擦掉），下次不会再问。
+      // 网络错误：提示留着，下一次导航再试 —— 不因为一次抖动就当成已退出
     } finally {
       restoring.value = false
     }
   }
 
+  /**
+   * 冷启动恢复会话。路由守卫每次导航都会调它，所以必须便宜：
+   * 已登录直接返回；并发调用共用同一次请求；没有「上次登着」的提示时一个请求都不发。
+   */
+  function restore(): Promise<void> {
+    if (member.value !== null) {
+      return Promise.resolve()
+    }
+    if (restoreTask === null) {
+      restoreTask = doRestore().finally(() => {
+        restoreTask = null
+      })
+    }
+    return restoreTask
+  }
+
   configureHttp({
-    getToken: () => token.value,
     onLoginRequired: clearSession,
     /*
-     * 🔴 设备身份【不受登录态影响】：这里注入的是一个与 token 无关的函数。
-     * 退出登录会清 token，但不碰设备令牌 —— 设备是设备，账号是账号。
-     * 清掉的话，「换个号登录 = 换一台机器」，那正是刷子最想要的效果。
+     * 🔴 设备身份【不受登录态影响】：退出登录只清会话，不碰设备 cookie ——
+     * 设备是设备，账号是账号。清掉的话，「换个号登录 = 换一台机器」，那正是刷子最想要的效果。
      */
-    ensureDeviceToken: async () => (await ensureDevice('H5'))?.token ?? null,
+    ensureDevice: async () => {
+      await ensureDevice('H5')
+    },
     // 新设备上加地址 / 充话费时，服务端要求先验一次邮箱码。弹框由 StepUpDialog 负责
     onStepUpRequired: requestStepUp,
   })
 
-  return { token, member, isLoggedIn, restoring, login, register, logout, restore, clearSession }
+  return { member, isLoggedIn, restoring, login, register, logout, restore, clearSession }
 })

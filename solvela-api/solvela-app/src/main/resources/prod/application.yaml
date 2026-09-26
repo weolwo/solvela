@@ -88,6 +88,14 @@ solvela:
       # 而那个比例是决定「能不能切 enforce」「要不要花钱买厂商指纹」的唯一依据，
       # 停在 off 就等于把整套方案的产出关着。
       mode: observe
+    cookie:
+      # Web 端凭证的 HttpOnly cookie 与跨站写请求防护（见 WebCookieProperties）。
+      # 🔴 secure 与 __Host- 前缀绑定：只有 HTTPS 下浏览器才会保存 Secure cookie。
+      #    某个环境走的是 http 而这里配了 true，表现是「登录成功、刷新就掉线」，服务端日志一切正常
+      secure: true
+      # 浏览器发起的跨源写请求一律 403（含登录、注册 —— 防登录 CSRF）。App / Postman 不带那两个头，不受影响
+      cross-origin-guard: enforce
+      # 「自己的源」由 X-Forwarded-Proto + Host 算出（nginx 原样透传），不需要额外配置
     step-up:
       # 🔴 敏感操作二次验证的灰度档：off | observe | enforce（见 StepUpProperties）
       #
