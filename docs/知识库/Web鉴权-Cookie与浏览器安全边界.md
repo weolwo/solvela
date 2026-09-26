@@ -278,6 +278,26 @@ evil.com 用攻击者自己的账号密码，替受害者的浏览器提交一�
 
 ---
 
+### 4.9 把这些防御落成响应头：几个一定会踩的坑
+
+XSS 的第二道防线（CSP）、点击劫持、强制 HTTPS，最终都是**响应头**。它们写错时页面照常工作，所以格外容易漏：
+
+- **nginx 的 `add_header` 不叠加继承。** 某个 `location` 里只要自己写了一条 `add_header`（比如静态资源的 `Cache-Control`），
+  server 级的 `add_header` 在那个 location 里**全部失效**。做法：把安全头放进一个 snippet，server 级和每个自带 `add_header`
+  的 location 各 include 一次。再加 `always`，否则 4xx / 5xx 响应上没有这些头。
+- **`frame-ancestors` 在 Report-Only 策略里会被浏览器直接忽略**，也不能写在 `<meta>` 里。
+  所以防点击劫持那一条必须**单独以强制方式下发**（`Content-Security-Policy: frame-ancestors 'self'` + `X-Frame-Options` 兜底），
+  其余策略才可以先 Report-Only 观察。多条 CSP 头并存时浏览器各自独立执行，互不冲突。
+- **`script-src 'self'` 不加 `'unsafe-inline'` 才有意义。** 它挡住的正是 `<script>...</script>` 与 `onerror=` 这类内联脚本 ——
+  富文本 XSS 最常见的形态。加了 `'unsafe-inline'` 这道防线就等于没有。
+  代价是自己页面里的内联脚本也要搬成同源文件（比如「JS 加载前先设深色主题」那段）。
+  `style-src` 则常常要留 `'unsafe-inline'`：富文本里的 `style="..."` 是排版，而 CSS 注入的危害远小于脚本。
+- **Report-Only 要有收报告的地方**（`report-uri`），否则违规只出现在用户自己的控制台里，你一条都看不到，
+  也就永远没有依据切成强制。收报告的接口是匿名写日志的，要限流。
+- **HSTS 先别加 `includeSubDomains` / `preload`。** 前者强制所有子域走 HTTPS，后者进了浏览器内置名单几乎撤不回来。
+  另外浏览器只在 HTTPS 响应上认 HSTS，本地 http 访问时被忽略。
+
+
 ## 5. 三种凭证存放方式
 
 | | localStorage + 请求头 | cookie（非 HttpOnly） | HttpOnly cookie |

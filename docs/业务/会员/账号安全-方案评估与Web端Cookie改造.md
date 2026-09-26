@@ -1,6 +1,6 @@
 # 账号安全：方案评估 与 Web 端 Cookie 鉴权改造
 
-> 撰写 2026-09-26 · 状态：**§2.1 已实施（observe 档）、§3 已实施（2026-09-26），其余待决策**
+> 撰写 2026-09-26 · 状态：**§2.1 已实施（observe 档）、§3 已实施、§4 浏览器安全头已实施（CSP 为 Report-Only），其余待决策**
 > 输入：一份外部"C 端设备信任 + 2FA + 风控"通用方案；本仓会员登录 / 设备 / 会话代码（结论均对着代码读过）。
 > 原理部分见知识库：`docs/知识库/Web鉴权-Cookie与浏览器安全边界.md`、`docs/知识库/设备身份-Web与原生的能力边界.md`。
 
@@ -185,9 +185,33 @@
 ### 3.9 工作量
 约 1.5 周：后端 3–4 天，前端 2–3 天，迁移 + 测试 + 联调 2 天。
 
+
+## 4. 浏览器安全响应头 —— ✅ 已实施（2026-09-27）
+
+HttpOnly 只是止损：有 XSS 时脚本偷不走令牌，但能**在页面里以用户身份直接发请求**，
+而且它跑在用户自己那台受信任设备上，资产出口二次验证也拦不住它。所以要在 XSS 本身上再加一道。
+
+| 头 | 作用 | 状态 |
+|---|---|---|
+| `Content-Security-Policy-Report-Only`（C 端） | `script-src 'self'`：内联脚本、`onerror=`、外域脚本不执行 | **Report-Only**，违规报到网关 `/csp-report`（日志搜【CSP 违规】，每分钟限 30 条） |
+| `Content-Security-Policy: frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN` | 防点击劫持 | **强制**（frame-ancestors 在 Report-Only 里会被忽略） |
+| `Strict-Transport-Security: max-age=31536000` | 强制 HTTPS | 强制；刻意不带 includeSubDomains / preload |
+| `X-Content-Type-Options: nosniff`、`Referrer-Policy` | 防 MIME 嗅探、不外泄路径 | 强制 |
+
+- 配置在 `deploy/nginx/snippets/security-headers.conf`（两站共用）与 `csp-app.conf`（C 端）。管理端暂不挂 CSP。
+- index.html 原来的内联主题脚本搬成了 `public/theme-init.js`（同步加载，深色模式不闪白）。
+- 验证：临时 nginx 容器上各 location（含 `/assets/`、502、history 路由、管理端 401）都带齐安全头；
+  浏览器里首屏零违规；注入的内联脚本与 `onerror` 均被识别；跨源 iframe 被拒、同源正常。
+
+**切 CSP 强制执行的步骤**：观察网关日志里的【CSP 违规】一段时间（Cloudflare 注入的脚本、富文本里嵌的视频 iframe 都可能出现），
+确认没有自己的资源被误报后，把 `csp-app.conf` 里的 `Content-Security-Policy-Report-Only` 改成 `Content-Security-Policy`。
+
+**后台富文本的 `v-html`（3 处）**：按「后台可信」保持不过滤；CSP 强制之后其中的内联脚本本来就不会执行。
+如需再加一道，做保存时检查（发现 `<script>`、`on*` 属性、`javascript:` 链接就拒绝保存，不改写内容）。
+
 ---
 
-## 4. 待拍板
+## 5. 待拍板
 1. ~~先做 §2.1 还是 §3~~ —— 已先做 §2.1。
 2. ~~§3 中 Web 端响应体不返回令牌~~ —— 已按「是」实施。
 3. ~~refresh_token 轮换~~ —— 放二期。

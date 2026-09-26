@@ -11,36 +11,11 @@
     <meta name="theme-color" content="#14181d" media="(prefers-color-scheme: dark)" />
     <title>Solvela</title>
     <!--
-      🔴 在 JS 加载【之前】就把主题打到 <html> 上。
-
-      不这么做的话，深色模式用户每次打开都会先看到一下白屏 ——
-      因为 CSS 的默认值是浅色，而 stores/theme.ts 要等整个 bundle
-      下载解析完才跑得到。那一闪在深色下非常刺眼，而且它不是 bug，
-      是「主题由 JS 决定」这个设计自带的。
-
-      所以这段是内联的、同步的、放在 <head> 里的 —— 三个条件缺一不可。
-      它和 stores/theme.ts 读的是同两个 key，那边是唯一真源，
-      这里只是把结果提前几百毫秒。
+      🔴 在 JS 加载【之前】就把主题打到 <html> 上，否则深色模式用户每次打开都会先白屏一下。
+      必须【同步】加载（不能 defer / async / type=module），放在 <head> 里 —— 见文件内注释。
+      是外部文件而不是内联脚本：nginx 下发的 CSP 不允许内联脚本（那正是它挡 XSS 的方式）。
     -->
-    <script>
-      ;(function () {
-        try {
-          var appearance = localStorage.getItem('solvela.app.appearance') || 'system'
-          var skin = localStorage.getItem('solvela.app.skin') || 'default'
-          if (appearance === 'system') {
-            appearance = window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light'
-          }
-          var root = document.documentElement
-          root.dataset.appearance = appearance
-          root.dataset.skin = skin
-          root.style.colorScheme = appearance
-        } catch (e) {
-          // 隐私模式下 localStorage 会抛。什么都不做 —— CSS 的默认值就是浅色
-        }
-      })()
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="app"></div>
