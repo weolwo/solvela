@@ -6,11 +6,12 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import solvela.app.auth.AuthorizationInterceptor;
 import solvela.app.auth.DeviceRequirementInterceptor;
+import solvela.app.auth.StepUpInterceptor;
 
 /**
  * C 端的 MVC 装配。
  *
- * <p>两个拦截器，<b>都没有路径白名单</b>。免登录靠方法上的 {@code @Anonymous}、
+ * <p>三个拦截器，<b>都没有路径白名单</b>。免登录靠方法上的 {@code @Anonymous}、
  * 免设备靠 {@code @DeviceExempt} —— 白名单按前缀匹配，加一条就可能连带放行
  * 未来新增的同前缀接口，而那件事不会有人收到通知。
  *
@@ -30,6 +31,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final AuthorizationInterceptor authorizationInterceptor;
 
+    private final StepUpInterceptor stepUpInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(deviceRequirementInterceptor)
@@ -43,6 +46,12 @@ public class WebConfig implements WebMvcConfigurer {
                 // 而转发也会再走一遍拦截器 —— 不放行的话，匿名用户访问一个不存在的路径
                 // 拿到的是 401 而不是 404，看起来像「这个接口需要登录」，
                 // 排查时会往完全错误的方向找。
+                .excludePathPatterns("/error");
+
+        // 二次验证排在授权之后：信任是「会员 × 设备」的关系，先有会员才谈得上。
+        // 只对标了 @StepUpRequired 的方法生效，其余请求在拦截器里第一行就放行，不调下游
+        registry.addInterceptor(stepUpInterceptor)
+                .addPathPatterns("/**")
                 .excludePathPatterns("/error");
     }
 }

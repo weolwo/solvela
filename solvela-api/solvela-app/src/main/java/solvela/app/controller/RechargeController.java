@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.CurrentMember;
+import solvela.app.auth.StepUpRequired;
 import solvela.app.domain.RechargeRequest;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
@@ -75,6 +76,7 @@ public class RechargeController {
     }
 
     /** 下单。抵扣额由服务端重新试算，请求里<b>没有</b>「减多少」这个字段 */
+    @StepUpRequired
     @PostMapping("/order")
     public RechargeOrderResult create(@RequestBody @Valid RechargeRequest request) {
         RechargeOrderResult result = rechargeApi.create(new RechargeOrderCmd(

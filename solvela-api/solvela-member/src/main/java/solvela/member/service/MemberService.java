@@ -15,6 +15,7 @@ import solvela.member.dao.MemberDao;
 import solvela.member.Member;
 import solvela.member.manager.MemberManager;
 import solvela.auth.member.MemberTokenStore;
+import solvela.member.stepup.DeviceTrustStore;
 import solvela.member.domain.query.MemberQuery;
 import solvela.member.domain.dto.MemberDTO;
 
@@ -53,6 +54,7 @@ public class MemberService {
     private final MemberDao memberDao;
     private final MemberManager memberManager;
     private final MemberTokenStore tokenStore;
+    private final DeviceTrustStore deviceTrustStore;
     private final MemberAudienceProperties audienceProperties;
 
 
@@ -110,6 +112,8 @@ public class MemberService {
 
         if (status == MemberStatusEnum.FROZEN) {
             int revoked = tokenStore.revokeAll(memberId);
+            // 被封期间登录过的设备里很可能就有导致被封的那台，解冻后不该还带着信任
+            deviceTrustStore.revoke(memberId, null);
             log.info("[会员冻结] memberId: {}, 操作人: {}, 吊销会话: {} 个", memberId, operator, revoked);
         }
         // 解冻不需要做什么：令牌已经在冻结时清光了，用户重新登录即可。

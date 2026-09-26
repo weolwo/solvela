@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.CurrentMember;
+import solvela.app.auth.StepUpRequired;
 import solvela.app.domain.AddressRequest;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
@@ -59,6 +60,7 @@ public class AddressController {
     }
 
     /** 新增。<b>第一条自动成为默认</b> */
+    @StepUpRequired
     @PostMapping
     public MallAddressView create(@RequestBody @Valid AddressRequest request) {
         return mallApi.createAddress(toCmd(request));
@@ -70,6 +72,7 @@ public class AddressController {
      * <p>⚠️ {@code receiverPhone} 留空表示<b>不修改手机号</b> —— 列表下发的是脱敏值，
      * 端上不该把 {@code 138****8000} 回填给用户改，一提交就把星号存进库了。
      */
+    @StepUpRequired
     @PutMapping("/{addressId}")
     public MallAddressView update(@PathVariable Long addressId,
                                   @RequestBody @Valid AddressRequest request) {

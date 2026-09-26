@@ -218,6 +218,7 @@ public class MemberEmailCodeService {
             case REGISTER -> MailTemplateCodeEnum.MEMBER_REGISTER_CODE;
             case LOGIN -> MailTemplateCodeEnum.MEMBER_LOGIN_CODE;
             case BIND -> MailTemplateCodeEnum.MEMBER_BIND_EMAIL_CODE;
+            case STEP_UP -> MailTemplateCodeEnum.MEMBER_STEP_UP_CODE;
             case RESET_PASSWORD -> MailTemplateCodeEnum.MEMBER_RESET_PASSWORD_CODE;
         };
     }

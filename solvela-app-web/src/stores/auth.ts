@@ -13,6 +13,7 @@ import {
 import { ensureDevice } from '@/api/device'
 import { ApiError } from '@/api/errors'
 import { configureHttp } from '@/api/http'
+import { finishStepUp, requestStepUp } from '@/composables/useStepUp'
 import { clearToken, readToken, writeToken } from '@/utils/token-storage'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -34,6 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearSession(): void {
+    // 会话没了，正在等的二次验证也就没有意义了 —— 按「放弃」结束，
+    // 否则发起它的那个请求会一直挂着，按钮永远在转圈
+    finishStepUp(false)
     clearToken()
     token.value = null
     member.value = null
@@ -101,6 +105,8 @@ export const useAuthStore = defineStore('auth', () => {
      * 清掉的话，「换个号登录 = 换一台机器」，那正是刷子最想要的效果。
      */
     ensureDeviceToken: async () => (await ensureDevice('H5'))?.token ?? null,
+    // 新设备上加地址 / 充话费时，服务端要求先验一次邮箱码。弹框由 StepUpDialog 负责
+    onStepUpRequired: requestStepUp,
   })
 
   return { token, member, isLoggedIn, restoring, login, register, logout, restore, clearSession }

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 
 import ForceAckDialog from '@/components/ForceAckDialog.vue'
+import StepUpDialog from '@/components/StepUpDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -40,6 +41,13 @@ const showTabBar = computed(() => route.meta.tab === true)
     服务端那边「没确认就一直返回」，机制自带催办，不需要端上守着。
   -->
   <ForceAckDialog v-if="auth.isLoggedIn" />
+
+  <!--
+    二次验证弹窗。与上面同一个理由挂在外壳上：加地址、充话费可能发生在任何页面。
+    由 http 拦截器唤起（服务端返回 STEP_UP_REQUIRED 时），验证通过后原请求自动重试。
+    只在登录后挂：二次验证本来就只发生在已登录的请求上。
+  -->
+  <StepUpDialog v-if="auth.isLoggedIn" />
 </template>
 
 <style scoped>

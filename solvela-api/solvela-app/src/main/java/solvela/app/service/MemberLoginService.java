@@ -16,6 +16,8 @@ import solvela.app.domain.EmailCodeRequest;
 import solvela.app.domain.SmsCodeRequest;
 import solvela.member.api.SmsCodeSendCmd;
 import solvela.member.api.SmsScene;
+import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.StepUpCmd;
 import solvela.member.api.SmsCodeSendResult;
 import solvela.app.domain.MemberLoginRequest;
 import solvela.app.domain.MemberRegisterRequest;
@@ -91,6 +93,7 @@ public class MemberLoginService {
     private final MemberAuthApi memberAuthApi;
     private final MemberPrincipalLoader principalLoader;
     private final MemberTokenStore tokenStore;
+    private final MemberStepUpApi stepUpApi;
 
     /**
      * 注册并<b>直接登录</b>。
@@ -152,6 +155,11 @@ public class MemberLoginService {
      * 「已发送到 xxx」之外的提示，更不要把域返回的成功与否解释成「这个邮箱存不存在」。
      */
     public void sendEmailCode(EmailCodeRequest request, String ip) {
+        // 🔴 二次验证码只能走 /auth/step-up/code（码寄到【已绑定】的邮箱）。
+        //    本接口的邮箱由客户端填，放行这个场景等于「给任意邮箱发一封安全验证信」
+        if (request.scene() == EmailCodeScene.STEP_UP) {
+            throw new ApiException(ApiErrors.INVALID_ARGUMENT, "不支持的验证码用途");
+        }
         EmailCodeSendResult result = memberAuthApi.sendEmailCode(new EmailCodeSendCmd(
                 request.scene(), request.email(), ip,
                 // BIND 场景要知道「是谁在绑」，其余三个是匿名接口
@@ -348,9 +356,19 @@ public class MemberLoginService {
         return tokenStore.revokeSession(memberId, sessionId);
     }
 
-    /** 下线除当前之外的所有会话。 */
-    public int revokeOtherSessions(Long memberId, String currentToken) {
-        return tokenStore.revokeOthers(memberId, currentToken);
+    /**
+     * 下线除当前之外的所有会话，并撤销其余设备的信任。
+     *
+     * <p>只踢会话不撤信任的话，被踢下去的那台设备（很可能正是用户怀疑的那台）
+     * 用密码重新登进来，仍然是「受信任设备」，加地址、充话费不用再验证。
+     *
+     * <p>先踢会话再撤信任：后一步是跨进程调用，失败时前一步已经生效 ——
+     * 用户最急的那件事（别人立刻掉线）不该被它拖住。
+     */
+    public int revokeOtherSessions(Long memberId, String currentToken, String ip) {
+        int revoked = tokenStore.revokeOthers(memberId, currentToken);
+        stepUpApi.revokeOthers(StepUpCmd.of(memberId, CurrentDevice.deviceIdOrNull(), ip));
+        return revoked;
     }
 
     public void logout(String tokenValue, Long memberId, String ip) {

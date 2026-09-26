@@ -84,6 +84,11 @@ public class MemberEmailCodeIssuer {
             case BIND -> memberRegisterDao.countByEmailHashExcludingMember(hash, currentMemberId) > 0
                     ? MailDelivery.SUPPRESS
                     : MailDelivery.DELIVER;
+            // 🔴 二次验证码只能由 MemberStepUpService 发到会员【已绑定】的邮箱，不走本类。
+            //    走到这里说明有人从公开发码接口（邮箱由客户端填）传了这个场景 ——
+            //    真寄出去就成了「给任意邮箱发一封看起来像安全验证的信」。
+            //    网关已经拒掉这个场景，这里是第二道：照常计限频，但不寄
+            case STEP_UP -> MailDelivery.SUPPRESS;
         };
         if (delivery == MailDelivery.SUPPRESS) {
             // 只打日志，不改返回值。这行日志是排查「用户说没收到码」时的唯一线索 ——

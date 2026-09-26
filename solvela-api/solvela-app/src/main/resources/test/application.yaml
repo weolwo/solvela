@@ -89,6 +89,20 @@ solvela:
       # 而那个比例是决定「能不能切 enforce」「要不要花钱买厂商指纹」的唯一依据，
       # 停在 off 就等于把整套方案的产出关着。
       mode: observe
+    step-up:
+      # 🔴 敏感操作二次验证的灰度档：off | observe | enforce（见 StepUpProperties）
+      #
+      # 不受信任的设备（该会员在这台设备上的首次登录不满 7 天、且没验证过）
+      # 调 @StepUpRequired 接口（新增/修改收货地址、充话费）时：
+      #   off      什么都不做
+      #   observe  照常判断、放行，把「本来会拦的」打成 WARN（搜【二次验证】命中但放行）
+      #   enforce  返回 403 STEP_UP_REQUIRED，客户端弹邮箱验证码、验证后重试
+      #
+      # ⚠️ 切 enforce 前客户端必须已经会处理 STEP_UP_REQUIRED，否则新设备上加不了地址且没有出路。
+      # 引号理由同上面的 device.mode：YAML 1.1 会把裸 off 解析成布尔。
+      #
+      # 2026-09-26 上线即 observe：先看新设备用户里有多少人会被打扰，再决定门槛与是否 enforce。
+      mode: observe
   auth:
     device:
       # -----------------------------------------------------------------

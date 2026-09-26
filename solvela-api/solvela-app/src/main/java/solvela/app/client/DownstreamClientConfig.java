@@ -26,6 +26,7 @@ import solvela.member.api.MemberAuthApi;
 import solvela.member.api.MemberEntitlementApi;
 import solvela.member.api.MemberGradeApi;
 import solvela.member.api.MemberSignApi;
+import solvela.member.api.MemberStepUpApi;
 import solvela.member.api.NotificationApi;
 
 import java.time.Duration;
@@ -238,6 +239,18 @@ public class DownstreamClientConfig {
     @Bean
     public MemberEntitlementApi memberEntitlementApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(5), MemberEntitlementApi.class);
+    }
+
+    /**
+     * 二次验证（设备信任）。<b>2 秒</b>：判断信任要查一次登录日志（按设备号走索引），
+     * 发码要读会员邮箱并投递到发信线程池 —— 都比主键点查重一点。
+     *
+     * <p>它挂在<b>加地址、充话费</b>的路径上（{@code StepUpInterceptor}），
+     * enforce 档下超时即拒绝 —— 那道闸守的是资产出口，判断不了不能默认放行。
+     */
+    @Bean
+    public MemberStepUpApi memberStepUpApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(2), MemberStepUpApi.class);
     }
 
     @Bean

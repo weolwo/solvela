@@ -210,7 +210,7 @@ public class MemberLoginController {
     @PostMapping("/sessions/revokeOthers")
     public ResponseEntity<Void> revokeOtherSessions(HttpServletRequest servletRequest) {
         memberLoginService.revokeOtherSessions(
-                CurrentMember.require().memberId(), currentToken(servletRequest));
+                CurrentMember.require().memberId(), currentToken(servletRequest), ClientIp.of(servletRequest));
         return ResponseEntity.noContent().build();
     }
 

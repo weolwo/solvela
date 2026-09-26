@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.auth.member.MemberTokenStore;
+import solvela.member.stepup.DeviceTrustStore;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiHasher;
 import solvela.enums.MemberStatusEnum;
@@ -53,6 +54,8 @@ public class MemberPasswordResetService {
     private final MemberSmsCodeService smsCodeService;
 
     private final MemberTokenStore tokenStore;
+
+    private final DeviceTrustStore deviceTrustStore;
 
     private final DeviceGuard deviceGuard;
 
@@ -125,6 +128,9 @@ public class MemberPasswordResetService {
         // 🔴 吊销全部会话，事务内。理由见类注释 —— 不吊销的话，攻击者手里那个
         //    30 天有效期的令牌照样能用，而用户以为自己已经把人赶出去了
         int revoked = tokenStore.revokeAll(member.getMemberId());
+        // 设备信任一并撤销：会话踢掉了，但攻击者那台设备若已「验证过」或「登录满 7 天」，
+        // 他改完密码重新登进来就直接是受信任设备，二次验证对他形同虚设
+        deviceTrustStore.revoke(member.getMemberId(), null);
 
         log.info("【重置密码】成功, memberId: {}, 通道: {}, 吊销会话 {} 个, 身份: {}",
                 member.getMemberId(), type, revoked, mask(type, identity));

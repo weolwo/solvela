@@ -2,6 +2,18 @@ import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
 import { toApiError } from './errors'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * 这条请求已经因为 STEP_UP_REQUIRED 验证过一次、正在重试。
+     *
+     * 🔴 有它才不会死循环：验证通过后重试仍然拿到 STEP_UP_REQUIRED（比如服务端没记住设备），
+     * 不带这个标记的话会再弹一次框、再重试一次，无穷无尽。
+     */
+    stepUpRetried?: boolean
+  }
+}
+
 /**
  * HTTP 客户端。
  *
@@ -16,11 +28,15 @@ import { toApiError } from './errors'
 type TokenProvider = () => string | null
 type UnauthorizedHandler = () => void
 type DeviceTokenProvider = () => Promise<string | null>
+/** 弹出二次验证、等用户完成。resolve(true) = 验证通过，调用方重试原请求；false = 用户放弃 */
+type StepUpHandler = () => Promise<boolean>
 
 let tokenProvider: TokenProvider = () => null
 let unauthorizedHandler: UnauthorizedHandler = () => {}
 /** 默认不带设备头：注入之前（比如单测里）行为退化成「没有设备身份」，而不是报错 */
 let deviceTokenProvider: DeviceTokenProvider = () => Promise.resolve(null)
+/** 默认「不处理」：注入之前（单测里、未登录）STEP_UP_REQUIRED 原样抛给调用方 */
+let stepUpHandler: StepUpHandler = () => Promise.resolve(false)
 
 /**
  * 领设备身份的那条路由。
@@ -55,6 +71,12 @@ export function configureHttp(options: {
   onLoginRequired: UnauthorizedHandler
   /** 可选：拿设备令牌。**不传就是「不带设备头」**，不是「沿用上一次」 */
   ensureDeviceToken?: DeviceTokenProvider
+  /**
+   * 可选：服务端要求二次验证时怎么办。**不传就是「不处理，原样抛给调用方」**。
+   *
+   * 见 {@link handleStepUp}：多个请求同时撞上时只弹一次框，验证通过后各自重试。
+   */
+  onStepUpRequired?: StepUpHandler
 }): void {
   tokenProvider = options.getToken
   unauthorizedHandler = options.onLoginRequired
@@ -64,6 +86,8 @@ export function configureHttp(options: {
    * 和「实际带着上一次那个」同时成立，而这种状态没有任何办法从代码上看出来。
    */
   deviceTokenProvider = options.ensureDeviceToken ?? (() => Promise.resolve(null))
+  // 同上：无条件赋值，不传就是回到「不处理」
+  stepUpHandler = options.onStepUpRequired ?? (() => Promise.resolve(false))
 }
 
 const http: AxiosInstance = axios.create({
@@ -120,9 +144,40 @@ http.interceptors.response.use(
       unauthorizedHandler()
     }
 
+    /*
+     * 二次验证：弹框 → 用户验证通过 → 原样重试。调用方完全感知不到中间这一段，
+     * 它 await 到的就是重试之后的结果 —— 页面代码一行都不用为二次验证改。
+     */
+    const config = error.config
+    if (apiError.isStepUpRequired && config !== undefined && config.stepUpRetried !== true) {
+      return handleStepUp().then((verified) =>
+        verified ? http.request({ ...config, stepUpRetried: true }) : Promise.reject(apiError),
+      )
+    }
+
     return Promise.reject(apiError)
   },
 )
+
+/**
+ * 在途的那一次二次验证。
+ *
+ * 🔴 没有它的话，一个页面同时发出的两个请求（比如保存地址后顺手刷新列表时又撞上一次）
+ * 会**各弹一个框**、各发一封验证码 —— 用户收到两封信，输了第一封的码，第二个框还挂着。
+ * 共用同一个 promise：只弹一次，验证通过后所有等着的请求各自重试。
+ */
+let stepUpInflight: Promise<boolean> | null = null
+
+function handleStepUp(): Promise<boolean> {
+  if (stepUpInflight === null) {
+    stepUpInflight = stepUpHandler()
+      .catch(() => false)
+      .finally(() => {
+        stepUpInflight = null
+      })
+  }
+  return stepUpInflight
+}
 
 /**
  * 发请求并直接拿到业务数据（没有信封这一层）。

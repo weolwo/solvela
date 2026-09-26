@@ -28,6 +28,14 @@ export const API_ERROR_CODES = [
   'DEVICE_VERIFICATION_REQUIRED',
   'ACCOUNT_DISABLED',
   'FORBIDDEN',
+  /**
+   * 🔴 在一台新设备上加收货地址 / 充话费，要先过一次邮箱验证码。
+   *
+   * **它不是失败**：身份有效、操作合法，只是还差一步。http.ts 会接住它、弹验证框、
+   * 验证通过后自动重试原请求 —— 页面代码不用为它写任何分支。
+   * 403 而不是 401：401 在这里的语义是「身份没了」，会被当成要重新登录。
+   */
+  'STEP_UP_REQUIRED',
   'OPERATION_LIMITED',
   'INVALID_ARGUMENT',
   'NOT_FOUND',
@@ -77,6 +85,11 @@ export class ApiError extends Error {
   /** 是否是「没有有效身份、需要重新登录」。注意 BAD_CREDENTIALS 同为 401 但**不属于**此类 */
   get isLoginRequired(): boolean {
     return this.code === 'LOGIN_REQUIRED'
+  }
+
+  /** 是否是「在这台设备上要先过一次二次验证」。见 API_ERROR_CODES 里的说明 */
+  get isStepUpRequired(): boolean {
+    return this.code === 'STEP_UP_REQUIRED'
   }
 }
 

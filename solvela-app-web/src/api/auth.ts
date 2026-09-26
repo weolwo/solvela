@@ -320,3 +320,24 @@ export async function fetchMe(): Promise<MemberProfile> {
   const raw = await request<RawMemberProfile>({ url: '/auth/me', method: 'POST' })
   return normalizeMember(raw)
 }
+
+// ------------------------------------------------------------------ 二次验证（step-up）
+
+/**
+ * 在一台新设备上加收货地址 / 充话费之前，发一封验证码到**已绑定**的邮箱。
+ *
+ * 🔴 没有 email 参数：码寄到哪由服务端按会员决定。让端上填的话，
+ * 偷到会话的人填自己的邮箱，这道验证就成了自己给自己发码。
+ *
+ * @returns 打过码的收件邮箱（形如 `a***@x.com`），要展示给用户看 ——
+ *          这是他判断「这个码是不是发给我的」的唯一依据
+ */
+export async function sendStepUpCode(): Promise<string> {
+  const view = await request<{ maskedEmail: string }>({ url: '/auth/step-up/code', method: 'POST' })
+  return view.maskedEmail
+}
+
+/** 提交二次验证码。通过后这台设备受信任，之后同类操作不再需要验证 */
+export async function verifyStepUp(code: string): Promise<void> {
+  await requestVoid({ url: '/auth/step-up/verify', method: 'POST', data: { code } })
+}

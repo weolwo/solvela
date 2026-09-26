@@ -70,4 +70,22 @@ class MemberAuthEndpointMappingTest {
         assertTrue(response.body().contains("BAD_CREDENTIALS"),
                 "期望域里的认证逻辑生效并返回 BAD_CREDENTIALS；实际 body: " + response.body());
     }
+
+    @Test
+    @DisplayName("二次验证端点已映射，且请求真的走到了域里")
+    void 二次验证端点已映射() throws Exception {
+        // 没带设备号 → 域里第一步就判 NO_DEVICE，不查库、不碰 Redis。
+        // 拿到它证明：路由到了薄壳 → 转发给了 MemberStepUpService
+        String body = "{\"memberId\":" + NOT_EXIST_MEMBER + ",\"clientIp\":\"127.0.0.1\"}";
+
+        HttpResponse<String> response = http.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/internal/member/step-up/check"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(), "实际 body: " + response.body());
+        assertTrue(response.body().contains("NO_DEVICE"), "实际 body: " + response.body());
+    }
 }

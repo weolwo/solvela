@@ -42,4 +42,12 @@ public enum MailTemplateCodeEnum {
      */
     MEMBER_RESET_PASSWORD_CODE,
 
+    /**
+     * 会员敏感操作二次验证码（新设备上新增收货地址、充话费之前）。
+     *
+     * <p>信里要写清楚<b>是哪一类操作在要这个码</b>，并明确「如果不是你本人在操作，
+     * 说明有人登录了你的账号，请立即修改密码」—— 收到这封信本身就是一次盗号告警。
+     */
+    MEMBER_STEP_UP_CODE,
+
 }
