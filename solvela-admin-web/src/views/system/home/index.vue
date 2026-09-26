@@ -6,7 +6,7 @@
   * 故直接把首页让给大屏，参与统计图作为其中一块保留下来。
   *
   * 口径与交互见 dashboard/marketing-dashboard.vue 的头注释，
-  * 以及 docs/营销中台-数据统计方案.md、docs/活动大屏原型.html（v2.1）。
+  * 以及 docs/业务/数据统计/营销中台-数据统计方案.md、docs/业务/数据统计/活动大屏原型.html（v2.1）。
   *
   * ⚠️ 数据来自 /marketingStat 的七个接口，权限串统一为 marketingStat:query，
   *    功能点见 数据库SQL脚本/mysql/sql-update-log/v3.52.0.sql —— 没执行的话

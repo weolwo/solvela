@@ -361,7 +361,7 @@ public record SonicContext(int rowIndex, int columnIndex, String title,
 ### 5.3 转换器的实例化策略（**本设计最关键的一条**）
 
 **阿里系与我们最实质的差异点。** EasyExcel 的 `Converter` 同样靠反射无参构造实例化，够不到 Spring 容器 ——
-这就是为什么 [GoodsService.java:196](../solvela-api/solvela-admin/src/main/java/sa/admin/module/business/goods/service/GoodsService.java)
+这就是为什么 [GoodsService.java:196](../../../solvela-api/solvela-admin/src/main/java/sa/admin/module/business/goods/service/GoodsService.java)
 到今天还在手写字典翻译：
 
 ```java

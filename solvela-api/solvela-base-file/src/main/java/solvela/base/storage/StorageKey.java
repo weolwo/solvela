@@ -9,7 +9,7 @@ package solvela.base.storage;
  * 入库的 key 多一个反斜杠、文件写对了位置但 URL 是废的」这种只在特定 OS 上犯的错。
  *
  * <p><b>key 里不含任何用户输入</b>，一个字符都不行。生成规则见
- * {@code docs/文件模块-架构设计文档.md} §7.1：{@code {categoryCode}/{yyyyMM}/{dd}/{snowflake}.{ext}}，
+ * {@code docs/架构/文件模块-架构设计文档.md} §7.1：{@code {categoryCode}/{yyyyMM}/{dd}/{snowflake}.{ext}}，
  * 其中扩展名从嗅探出的 MIME 反推，不从用户文件名取。
  *
  * @Date 2026-08-09

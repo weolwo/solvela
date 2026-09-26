@@ -58,7 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 任务中台运行态 P0 验收（真跑数据库，不是推断）。
  *
- * <p>对应 docs/任务中台-改进技术方案.md v2 §6 的四条验收判据。
+ * <p>对应 docs/业务/任务/任务中台-改进技术方案.md v2 §6 的四条验收判据。
  * <b>前置</b>：先执行 {@code sql-update-log/v3.44.0.sql} 与 {@code 任务模块-运行态联调造数.sql}。
  *
  * <p>刻意走 {@link TaskEventService#handle} 的<b>同步入口</b>而不是 HTTP 的 {@code report}：

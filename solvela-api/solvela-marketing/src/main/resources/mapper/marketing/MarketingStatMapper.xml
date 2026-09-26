@@ -3,7 +3,7 @@
 <mapper namespace="solvela.stat.dao.MarketingStatDao">
 
     <!--
-      ══ 口径（已与 docs/首页图表-口径确认清单.md 对齐，改这里必须同步那份文档）══
+      ══ 口径（已与 docs/业务/数据统计/首页图表-口径确认清单.md 对齐，改这里必须同步那份文档）══
 
       「参与」= 参与人数，按 member_id 去重（不是人次）。三种玩法各自的定义：
       ⚠️ v3.71.0 起去重键是 member_id 而不是 member_name —— 后者可改，改名之后

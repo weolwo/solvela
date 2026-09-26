@@ -13,7 +13,7 @@ import java.util.Arrays;
  * 它区分的是「进度如何累积」—— 也正是唯一真正需要不同 Java 代码路径的维度。
  * 一旦有人提出「加个 task_type 来支持新玩法」，那就是设计跑偏的信号：
  * 新玩法应该体现在 rule_config（第②层），不是体现在这里（第①层）。
- * 三层分离见 docs/任务中台-改进技术方案.md §3.2。
+ * 三层分离见 docs/业务/任务/任务中台-改进技术方案.md §3.2。
  *
  * <p>⚠️ 字段必须叫 {@code value} 且不要手写 getValue()：{@code @CheckEnum} 的校验器是用
  * {@code map(BaseEnum::getValue)} 建合法值白名单的，字段叫别的名字会让 Lombok 生成不出 getValue()，

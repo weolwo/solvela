@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * 营销统计 Controller
  *
- * <p>前缀与权限串遵循 docs/营销中台-数据统计方案.md §4 的约定：
+ * <p>前缀与权限串遵循 docs/业务/数据统计/营销中台-数据统计方案.md §4 的约定：
  * 统一前缀 /marketingStat，权限串写全（不要出现缺前缀的裸串）。
  *
  * <p>🔴 <b>全部接口共用一个权限串 {@code marketingStat:query}</b>：统计接口都是只读的，
