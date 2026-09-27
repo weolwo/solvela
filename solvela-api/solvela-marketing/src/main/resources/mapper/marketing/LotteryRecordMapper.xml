@@ -313,6 +313,12 @@
         LIMIT #{limit}
     </select>
 
+    <select id="countAllMyTickets" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM t_lottery_record
+        WHERE member_id = #{memberId}
+    </select>
+
     <select id="countMyTickets" resultType="java.lang.Integer">
         SELECT COUNT(1)
         FROM t_lottery_record

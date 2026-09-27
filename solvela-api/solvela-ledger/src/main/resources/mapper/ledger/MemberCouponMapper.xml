@@ -402,4 +402,14 @@
         ORDER BY valid_end_time, id DESC
     </select>
 
+    <!-- 「我的」页那一个数：口径必须和 selectWallet 的「可用」tab 逐字一致（status=0 且未过期），
+         否则用户看到「券包 3」点进去只有 2 张 -->
+    <select id="countUsable" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM t_member_coupon
+        WHERE member_id = #{memberId}
+          AND status = #{usableStatus}
+          AND valid_end_time &gt; #{now}
+    </select>
+
 </mapper>

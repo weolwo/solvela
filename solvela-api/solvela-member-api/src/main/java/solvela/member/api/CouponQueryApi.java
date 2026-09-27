@@ -40,6 +40,13 @@ public interface CouponQueryApi {
     List<MemberCouponView> listCoupons(@PathVariable Long memberId, @RequestParam String status);
 
     /**
+     * 可用券张数，口径与 {@link #listCoupons} 的 {@code USABLE} tab 相同。
+     * 给「我的」页的数字用 —— 为了一个数拉整份券包是浪费。
+     */
+    @GetExchange("/wallet/{memberId}/usable-count")
+    long countUsable(@PathVariable Long memberId);
+
+    /**
      * 试算：这一单能用哪些券、各能减多少、用不了的<b>为什么</b>用不了。
      *
      * <p>不改任何状态。

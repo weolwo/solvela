@@ -70,6 +70,11 @@ public class ActivityInternalController implements ActivityApi {
     }
 
     @Override
+    public long countMyLotteryTickets(Long memberId) {
+        return activityFacade.countMyLotteryTickets(memberId);
+    }
+
+    @Override
     public List<LotteryTicketView> getMyLotteryTickets(Long memberId, int limit) {
         return activityFacade.getMyLotteryTickets(memberId, limit);
     }

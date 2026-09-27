@@ -93,6 +93,12 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
     List<MemberTicketDTO> selectMyRecentTickets(@Param("memberId") Long memberId,
                                                 @Param("limit") int limit);
 
+    /**
+     * C 端「我的」页：我一共有几张，<b>跨玩法、跨期</b>，口径与 {@link #selectMyRecentTickets} 相同
+     * （只按 member_id，不 join —— 玩法或期号被删的票照样算，理由见那边的 LEFT JOIN 注释）。
+     */
+    long countAllMyTickets(@Param("memberId") Long memberId);
+
     /** C 端：我在这一期已经有几张 */
     Integer countMyTickets(@Param("lotteryCode") String lotteryCode,
                            @Param("issueNo") String issueNo,

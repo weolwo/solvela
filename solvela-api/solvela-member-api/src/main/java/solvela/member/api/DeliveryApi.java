@@ -47,6 +47,15 @@ public interface DeliveryApi {
     List<MemberDeliveryView> listMine(@RequestParam Long memberId, @RequestParam int limit);
 
     /**
+     * 我的实物履约单按状态数一数。
+     *
+     * <p>🔴 不能由调用方拿 {@link #listMine} 的结果去数：那个列表有条数上限，
+     * 单子多的会员数出来的是「最近 N 条里有几张」，而页面上写的是「待发货 N」。
+     */
+    @GetExchange("/summary")
+    DeliverySummaryView summary(@RequestParam Long memberId);
+
+    /**
      * 补填收件信息。
      *
      * <h3>为什么这件事必须存在</h3>

@@ -3,6 +3,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
+import type { MeSummary } from '@/api/me'
+
 import MineView from '../MineView.vue'
 
 /**
@@ -29,28 +31,25 @@ vi.mock('@/api/assets', () => ({
   fetchAssets: () => Promise.resolve([]),
 }))
 
-const unreadSpy = vi.fn(() => Promise.resolve(7))
-
-vi.mock('@/api/notification', () => ({
-  fetchUnreadCount: () => unreadSpy(),
-}))
-
 /*
- * 2026-09-27 重排后这一页要各拉一份列表来数数（券包 / 彩票 / 奖品 / 收藏）和等级名。
- * 🔴 漏 mock 一个的表现不是断言失败，而是 jsdom 里真发请求、整页卡在加载态。
+ * 这一页的数字一次从 /me/summary 拿（见 api/me.ts）。
+ * 🔴 漏 mock 的表现不是断言失败，而是 jsdom 里真发请求、整页卡在加载态。
  */
-const deliveriesSpy = vi.fn(() =>
-  Promise.resolve([
-    { deliveryId: '1', needAddress: true, status: 0 },
-    { deliveryId: '2', needAddress: false, status: 0 },
-    { deliveryId: '3', needAddress: false, status: 1 },
-  ]),
-)
-vi.mock('@/api/delivery', () => ({ fetchDeliveries: () => deliveriesSpy() }))
-vi.mock('@/api/coupons', () => ({ fetchCoupons: () => Promise.resolve([{}, {}, {}]) }))
-vi.mock('@/api/lottery', () => ({ fetchMyTickets: () => Promise.resolve([{}, {}]) }))
-vi.mock('@/api/mall', () => ({ fetchFavorites: () => Promise.resolve([{}]) }))
-vi.mock('@/api/grade', () => ({ fetchMyGrade: () => Promise.resolve({ gradeName: 'V2 白银' }) }))
+type Summary = MeSummary
+
+const FULL: Summary = {
+  unread: 7,
+  gradeName: 'V2 白银',
+  coupons: 3,
+  // 超过彩票列表上限（100）也照实显示 —— 这正是不再拿列表去数的原因
+  lotteryTickets: 120,
+  favorites: 1,
+  deliveries: { total: 5, needAddress: 1, pending: 1, shipped: 1 },
+}
+
+const summarySpy = vi.fn((): Promise<Summary> => Promise.resolve(FULL))
+
+vi.mock('@/api/me', () => ({ fetchMeSummary: () => summarySpy() }))
 
 /** 这一页上应该存在的入口：路由名 → 给人看的名字 */
 const ENTRIES: [string, string][] = [
@@ -93,7 +92,7 @@ const global = { plugins: [router] }
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  unreadSpy.mockClear()
+  summarySpy.mockClear()
 })
 
 async function settle(): Promise<void> {
@@ -128,11 +127,18 @@ describe('「我的」页的入口', () => {
     ).toBe(true)
   })
 
+  it('🔴 整页的数字只发一次请求', async () => {
+    mount(MineView, { global })
+    await settle()
+
+    // 第一版是各拉各的列表再数：5 个请求，而且实物单、彩票的列表有上限 —— 数出来是错的
+    expect(summarySpy).toHaveBeenCalledTimes(1)
+  })
+
   it('🔴 消息铃铛显示未读数，读屏能听到「几条未读」', async () => {
     const w = mount(MineView, { global })
     await settle()
 
-    expect(unreadSpy).toHaveBeenCalledTimes(1)
     // 服务端把通知和公告两个数加好再下发，端上不自己相加
     const bell = w.find('.profile__bell')
     expect(bell.find('.profile__badge').text()).toBe('7')
@@ -140,8 +146,8 @@ describe('「我的」页的入口', () => {
     expect(bell.attributes('aria-label')).toBe('消息，7 条未读')
   })
 
-  it('未读数拉不到时铃铛照样在，只是没有红点', async () => {
-    unreadSpy.mockImplementationOnce(() => Promise.reject(new Error('网络炸了')))
+  it('汇总整个拿不到时：数字全是「—」，铃铛、徽章、入口都还在', async () => {
+    summarySpy.mockImplementationOnce(() => Promise.reject(new Error('网络炸了')))
 
     const w = mount(MineView, { global })
     await settle()
@@ -149,6 +155,31 @@ describe('「我的」页的入口', () => {
     // 为一次接口抖动把入口藏起来，是拿次要目标伤害主要目标
     expect(w.find('.profile__bell').exists()).toBe(true)
     expect(w.find('.profile__badge').exists()).toBe(false)
+    expect(w.find('.profile__grade').text()).toContain('会员中心')
+    // 0 是一个确定的答案，不知道的时候不能说 0
+    expect(w.findAll('.stats__item').map((s) => s.text())).toEqual([
+      '—券包',
+      '—彩票',
+      '—奖品',
+      '—收藏',
+    ])
+    expect(w.findAll('.grid--3 .grid__count')).toHaveLength(0)
+  })
+
+  it('🔴 只有某一项为 null（那个下游没取到）时，只有那一项是「—」', async () => {
+    summarySpy.mockImplementationOnce(() =>
+      Promise.resolve({ ...FULL, lotteryTickets: null, deliveries: null }),
+    )
+
+    const w = mount(MineView, { global })
+    await settle()
+
+    expect(w.findAll('.stats__item').map((s) => s.text())).toEqual([
+      '3券包',
+      '—彩票',
+      '—奖品',
+      '1收藏',
+    ])
   })
 
   it('资产数字一眼可见：券包 / 彩票 / 奖品 / 收藏', async () => {
@@ -156,12 +187,12 @@ describe('「我的」页的入口', () => {
     await settle()
 
     const stats = w.findAll('.stats__item').map((s) => s.text())
-    expect(stats).toEqual(['3券包', '2彩票', '3奖品', '1收藏'])
+    expect(stats).toEqual(['3券包', '120彩票', '5奖品', '1收藏'])
     // 等级名在名字旁边
     expect(w.find('.profile__grade').text()).toContain('V2 白银')
   })
 
-  it('🔴 奖品按要不要我动手分组；「待填地址」用 needAddress，有数时变显眼', async () => {
+  it('奖品按要不要我动手分组；「待填地址」有数时变显眼', async () => {
     const w = mount(MineView, { global })
     await settle()
 
@@ -171,19 +202,8 @@ describe('「我的」页的入口', () => {
       '待发货',
       '已发货',
     ])
-    // needAddress 的那一单不能再被算进「待发货」—— 它此刻卡在用户，不在仓库
+    // 分组口径由资产域给，前端照抄，不按 status 自己推
     expect(groups.map((g) => g.find('.grid__count').text())).toEqual(['1', '1', '1'])
     expect(groups[0]?.classes()).toContain('grid__item--alert')
-  })
-
-  it('数字拉不到时显示「—」而不是 0，入口照样在', async () => {
-    deliveriesSpy.mockImplementationOnce(() => Promise.reject(new Error('网络炸了')))
-
-    const w = mount(MineView, { global })
-    await settle()
-
-    // 0 是一个确定的答案，不知道的时候不能说 0
-    expect(w.findAll('.stats__item')[2]?.text()).toBe('—奖品')
-    expect(w.findAll('.grid--3 .grid__count')).toHaveLength(0)
   })
 })

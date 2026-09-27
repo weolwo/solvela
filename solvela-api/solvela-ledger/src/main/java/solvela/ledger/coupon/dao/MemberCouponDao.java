@@ -182,6 +182,14 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
                                     @Param("now") java.time.LocalDateTime now);
 
     /**
+     * 可用券张数。口径与 {@link #selectWallet} 的「可用」tab 相同：未使用、且还没过有效期
+     * （锁定中的不算，理由同上）。给「我的」页的数字用，不拉整份列表。
+     */
+    long countUsable(@Param("memberId") Long memberId,
+                     @Param("usableStatus") int usableStatus,
+                     @Param("now") java.time.LocalDateTime now);
+
+    /**
      * 卡在「锁定中」超过 {@code before} 的券。给兜底释放任务用。
      *
      * <p>⚠️ 这里<b>判不了对应单据是不是已经终态</b> —— 账务域不能依赖商城域

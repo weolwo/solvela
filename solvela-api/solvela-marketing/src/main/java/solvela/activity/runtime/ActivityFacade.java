@@ -273,6 +273,11 @@ public class ActivityFacade implements ActivityApi {
         return lotteryClientService.getMyTickets(memberId, limit);
     }
 
+    @Override
+    public long countMyLotteryTickets(Long memberId) {
+        return lotteryClientService.countAllMine(memberId);
+    }
+
     /** 彩票活动页的全部数据。聚合在本进程内做，网关不去循环调 */
     @Override
     public LotteryBoardView getLotteryBoard(String activityCode, Long memberId) {

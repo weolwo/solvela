@@ -431,6 +431,21 @@ public class MallClientFacade implements MallApi {
     }
 
     @Override
+    public long countFavorites(Long memberId) {
+        if (memberId == null) {
+            return 0;
+        }
+        List<Long> ids = mallFavoriteManager.lambdaQuery()
+                .eq(MallFavorite::getMemberId, memberId)
+                .list().stream().map(MallFavorite::getCommodityId).toList();
+        if (ids.isEmpty()) {
+            return 0;
+        }
+        // 与 listFavorites 同一道可见性过滤 —— 下架的收藏不数
+        return mallCommodityManager.count(visibleCommodity().in(MallCommodity::getId, ids));
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void addFavorite(Long commodityId, Long memberId) {
         // 已收藏就什么都不做：前端连点两次是常态，uk_mall_fav_mbr_cmd 也会兜住

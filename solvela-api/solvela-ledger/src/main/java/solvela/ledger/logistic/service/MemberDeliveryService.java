@@ -13,6 +13,7 @@ import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.member.api.DeliveryFillResult;
 import solvela.member.api.DeliveryReceiverCmd;
+import solvela.member.api.DeliverySummaryView;
 import solvela.member.api.MemberDeliveryView;
 
 import java.util.List;
@@ -75,6 +76,37 @@ public class MemberDeliveryService implements DeliveryApi {
                         .orderByDesc(PhysicalDelivery::getId)
                         .last("limit " + size));
         return list.stream().map(MemberDeliveryService::toView).toList();
+    }
+
+    /**
+     * 按状态数一数。只取判定要用的两列，在应用层按 {@link #needAddress} 同一个函数分组 ——
+     * 不在 SQL 里再写一遍「待发货且地址为空」：两处写同一条规则，迟早一处先改。
+     * 一个会员的履约单是个位到几十的量级，取两列回来数比拼一条 CASE WHEN 更不容易口径漂移。
+     */
+    @Override
+    public DeliverySummaryView summary(Long memberId) {
+        if (memberId == null) {
+            return new DeliverySummaryView(0, 0, 0, 0);
+        }
+        List<PhysicalDelivery> rows = physicalDeliveryDao.selectList(
+                new LambdaQueryWrapper<PhysicalDelivery>()
+                        .select(PhysicalDelivery::getStatus, PhysicalDelivery::getReceiverAddress)
+                        // 🔴 memberId 必须进条件
+                        .eq(PhysicalDelivery::getMemberId, memberId));
+        long needAddress = 0;
+        long pending = 0;
+        long shipped = 0;
+        for (PhysicalDelivery row : rows) {
+            DeliveryStatusEnum status = row.getStatus();
+            if (needAddress(status, row)) {
+                needAddress++;
+            } else if (status == DeliveryStatusEnum.PENDING) {
+                pending++;
+            } else if (status == DeliveryStatusEnum.DELIVERED) {
+                shipped++;
+            }
+        }
+        return new DeliverySummaryView(rows.size(), needAddress, pending, shipped);
     }
 
     /**

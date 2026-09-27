@@ -40,6 +40,11 @@ public class CouponQueryInternalController implements CouponQueryApi {
     }
 
     @Override
+    public long countUsable(Long memberId) {
+        return couponQueryApiService.countUsable(memberId);
+    }
+
+    @Override
     public CouponTrialView trial(CouponTrialQuery query) {
         return couponQueryApiService.trial(query);
     }

@@ -93,6 +93,14 @@ public class CouponQueryApiService implements CouponQueryApi {
     }
 
     @Override
+    public long countUsable(Long memberId) {
+        if (memberId == null) {
+            return 0;
+        }
+        return memberCouponDao.countUsable(memberId, CouponStatusEnum.UNUSED.getValue(), LocalDateTime.now());
+    }
+
+    @Override
     public CouponTrialView trial(CouponTrialQuery query) {
         /*
          * ⚠️ 两个应付都可以为 null（这一单没有那一侧），但不能【都】为 null ——

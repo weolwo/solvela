@@ -4,12 +4,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import { useRouter } from 'vue-router'
 
 import { fetchAssets } from '@/api/assets'
-import { fetchCoupons } from '@/api/coupons'
-import { fetchDeliveries, type DeliveryItem } from '@/api/delivery'
-import { fetchMyGrade } from '@/api/grade'
-import { fetchMyTickets } from '@/api/lottery'
-import { fetchFavorites } from '@/api/mall'
-import { fetchUnreadCount } from '@/api/notification'
+import { fetchMeSummary } from '@/api/me'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -29,10 +24,10 @@ import { formatWithSeparator, money } from '@/utils/money'
  *   <li>常用服务宫格（一行四个）+ 设置。</li>
  * </ol>
  *
- * <h3>数字是各拉各的列表再数出来的</h3>
- * 第一版刻意不加后端汇总接口，先看排版对不对。代价是进这一页多 5 个请求 ——
- * 定稿后应当换成一个 `/me/summary` 一次给齐。
- * 任何一个数拉不到都只显示「—」，<b>入口本身永远在</b>：为一次接口抖动把入口藏掉，
+ * <h3>数字一次从 `/me/summary` 拿齐</h3>
+ * 第一版是各拉各的列表再数：多 5 个请求，而且数错 —— 实物单、彩票的列表有条数上限。
+ * 现在每个数由各自的域用 COUNT 口径给，网关拼好一次下发（见 api/me.ts）。
+ * 任何一个数拿不到都只显示「—」，<b>入口本身永远在</b>：为一次接口抖动把入口藏掉，
  * 是拿次要目标伤害主要目标（消息入口当初就是这么定的）。
  */
 
@@ -43,27 +38,21 @@ const theme = useThemeStore()
 const loggingOut = ref(false)
 
 const assets = useAsync(fetchAssets)
+const summary = useAsync(fetchMeSummary)
 
 /**
  * 消息未读数。🔴 服务端把通知和公告两个数加好再下发，端上不要自己拉两个相加 ——
- * 那样迟早漏掉公告那一半。拉不到就当 0，铃铛照样在。
+ * 那样迟早漏掉公告那一半。拿不到就不画红点，铃铛照样在。
  */
-const unread = useAsync(() => fetchUnreadCount().catch(() => 0))
-const unreadCount = computed(() => unread.data.value ?? 0)
+const unreadCount = computed(() => summary.data.value?.unread ?? 0)
 const unreadBadge = computed(() => (unreadCount.value > 99 ? '99+' : String(unreadCount.value)))
 
-/** 等级徽章。拉不到时显示「会员中心」—— 入口不能因为名字没拿到就消失 */
-const grade = useAsync(fetchMyGrade)
-const gradeLabel = computed(() => grade.data.value?.gradeName ?? '会员中心')
+/** 等级徽章。拿不到时显示「会员中心」—— 入口不能因为名字没拿到就消失 */
+const gradeLabel = computed(() => summary.data.value?.gradeName ?? '会员中心')
 
-const coupons = useAsync(() => fetchCoupons('USABLE'))
-const tickets = useAsync(fetchMyTickets)
-const deliveries = useAsync(fetchDeliveries)
-const favorites = useAsync(fetchFavorites)
-
-/** 加载中、出错都显示「—」：0 是一个确定的答案，不知道的时候不能说 0 */
-function countOf(list: readonly unknown[] | null): string {
-  return list === null ? '—' : String(list.length)
+/** 加载中、出错、这一项为 null 都显示「—」：0 是一个确定的答案，不知道的时候不能说 0 */
+function show(n: number | null | undefined): string {
+  return n === null || n === undefined ? '—' : String(n)
 }
 
 interface Stat {
@@ -72,12 +61,15 @@ interface Stat {
   to: RouteLocationRaw
 }
 
-const stats = computed<Stat[]>(() => [
-  { label: '券包', value: countOf(coupons.data.value), to: { name: 'coupons' } },
-  { label: '彩票', value: countOf(tickets.data.value), to: { name: 'lottery-tickets' } },
-  { label: '奖品', value: countOf(deliveries.data.value), to: { name: 'deliveries' } },
-  { label: '收藏', value: countOf(favorites.data.value), to: { name: 'favorites' } },
-])
+const stats = computed<Stat[]>(() => {
+  const s = summary.data.value
+  return [
+    { label: '券包', value: show(s?.coupons), to: { name: 'coupons' } },
+    { label: '彩票', value: show(s?.lotteryTickets), to: { name: 'lottery-tickets' } },
+    { label: '奖品', value: show(s?.deliveries?.total), to: { name: 'deliveries' } },
+    { label: '收藏', value: show(s?.favorites), to: { name: 'favorites' } },
+  ]
+})
 
 interface DeliveryGroup {
   label: string
@@ -89,24 +81,15 @@ interface DeliveryGroup {
 }
 
 /**
- * 实物奖品按「用户关心的那件事」分三组。
- *
- * 「待填地址」用 `needAddress` —— 那是后端给的<b>唯一判据</b>，不自己按 status 推。
- * 另外两组按 DeliveryItem.status 的文档值（0 待发货 / 1 已发货）只做计数，不决定任何按钮。
+ * 实物奖品按「用户关心的那件事」分三组。分组口径由资产域给（DeliverySummaryView），
+ * 前端不按 status 推 —— 状态机改一次，各端各推一份的那个端就会开始数错。
  */
 const deliveryGroups = computed<DeliveryGroup[]>(() => {
-  const list = deliveries.data.value
-  const count = (pred: (d: DeliveryItem) => boolean): number | null =>
-    list === null ? null : list.filter(pred).length
+  const d = summary.data.value?.deliveries ?? null
   return [
-    { label: '待填地址', icon: 'pin', count: count((d) => d.needAddress), alert: true },
-    {
-      label: '待发货',
-      icon: 'box',
-      count: count((d) => !d.needAddress && d.status === 0),
-      alert: false,
-    },
-    { label: '已发货', icon: 'truck', count: count((d) => d.status === 1), alert: false },
+    { label: '待填地址', icon: 'pin', count: d?.needAddress ?? null, alert: true },
+    { label: '待发货', icon: 'box', count: d?.pending ?? null, alert: false },
+    { label: '已发货', icon: 'truck', count: d?.shipped ?? null, alert: false },
   ]
 })
 

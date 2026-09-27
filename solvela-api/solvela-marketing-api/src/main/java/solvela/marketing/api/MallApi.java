@@ -70,6 +70,14 @@ public interface MallApi {
     List<MallCommodityBriefView> listFavorites(@RequestParam Long memberId);
 
     /**
+     * 我收藏的商品有几件，口径与 {@link #listFavorites} 相同 ——
+     * <b>只数仍然可见的</b>（下架的收藏行还在，但列表里不出现，这里也不数）。
+     * 否则「收藏 3」点进去只有 2 件。
+     */
+    @GetExchange("/favorite/count")
+    long countFavorites(@RequestParam Long memberId);
+
+    /**
      * 收藏 / 取消收藏。
      *
      * <p>幂等：重复收藏靠 {@code uk_mall_fav_mbr_cmd} 挡住（前端连点两次是常态）；

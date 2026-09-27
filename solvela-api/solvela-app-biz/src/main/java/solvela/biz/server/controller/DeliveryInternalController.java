@@ -6,6 +6,7 @@ import solvela.ledger.logistic.service.MemberDeliveryService;
 import solvela.member.api.DeliveryApi;
 import solvela.member.api.DeliveryFillResult;
 import solvela.member.api.DeliveryReceiverCmd;
+import solvela.member.api.DeliverySummaryView;
 import solvela.member.api.MemberDeliveryView;
 
 import java.util.List;
@@ -34,6 +35,11 @@ public class DeliveryInternalController implements DeliveryApi {
     @Override
     public List<MemberDeliveryView> listMine(Long memberId, int limit) {
         return memberDeliveryService.listMine(memberId, limit);
+    }
+
+    @Override
+    public DeliverySummaryView summary(Long memberId) {
+        return memberDeliveryService.summary(memberId);
     }
 
     @Override

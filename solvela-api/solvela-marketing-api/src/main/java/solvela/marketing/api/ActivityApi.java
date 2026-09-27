@@ -190,4 +190,12 @@ public interface ActivityApi {
     @GetExchange("/lottery/ticket/mine")
     List<LotteryTicketView> getMyLotteryTickets(@RequestParam Long memberId,
                                                @RequestParam int limit);
+
+    /**
+     * 我一共有几张号码，跨玩法跨期。给「我的」页的数字用。
+     *
+     * <p>🔴 不能拿 {@link #getMyLotteryTickets} 的结果去数：那个列表有条数上限。
+     */
+    @GetExchange("/lottery/ticket/mine/count")
+    long countMyLotteryTickets(@RequestParam Long memberId);
 }

@@ -107,6 +107,11 @@ public class LotteryClientService {
         return count == null ? 0 : count;
     }
 
+    /** 我一共有几张，跨玩法跨期。口径与 {@link #getMyTickets} 相同，只是不受条数上限 */
+    public long countAllMine(Long memberId) {
+        return memberId == null ? 0 : lotteryRecordDao.countAllMyTickets(memberId);
+    }
+
     /**
      * 我的彩票号码，跨玩法跨期一起给。
      *

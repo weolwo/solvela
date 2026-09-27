@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.CurrentMember;
+import solvela.app.service.UnreadCounter;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ClientIp;
 import solvela.app.web.ApiException;
@@ -50,6 +51,7 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationApi notificationApi;
+    private final UnreadCounter unreadCounter;
 
     // ------------------------------------------------------------------ 通知 tab
 
@@ -148,19 +150,10 @@ public class NotificationController {
 
     // ------------------------------------------------------------------ 红点与设置
 
-    /**
-     * 入口总红点 = 通知未读 + 公告未读。
-     *
-     * <p>两个数<b>在服务端加好</b>再下发：让三个客户端各加一遍，
-     * 迟早有一个漏掉公告那一半，而那种 bug 只会表现成「红点数偏小」，
-     * 没人会去对账。
-     */
+    /** 入口总红点 = 通知未读 + 公告未读，在服务端加好。口径见 {@link UnreadCounter} */
     @GetMapping("/unread-count")
     public long unreadCount() {
-        Long memberId = CurrentMember.require().memberId();
-        NotificationPageView page = notificationApi.page(
-                new NotificationPageCmd(memberId, null, null, 1, 1));
-        return page.unreadCount() + notificationApi.announcementUnread(memberId);
+        return unreadCounter.count(CurrentMember.require().memberId());
     }
 
     /** 免打扰设置。注意<b>没有</b>系统通知开关 —— 那一类关不掉 */

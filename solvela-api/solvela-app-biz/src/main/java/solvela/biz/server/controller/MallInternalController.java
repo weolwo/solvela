@@ -57,6 +57,11 @@ public class MallInternalController implements MallApi {
     }
 
     @Override
+    public long countFavorites(Long memberId) {
+        return mallClientFacade.countFavorites(memberId);
+    }
+
+    @Override
     public void addFavorite(Long commodityId, Long memberId) {
         mallClientFacade.addFavorite(commodityId, memberId);
     }
