@@ -90,7 +90,9 @@
 照 `DeviceGuard` 写法加两条规则，先 dry-run。
 
 ### 2.4 新设备登录通知 —— ✅ 已实施（2026-09-27）
-`NewDeviceLoginNotifier`：这台设备上从没成功登录过、且账号以前登录过（排除注册后首登）、且请求有设备号时，异步发邮件（`member_new_device_login`，无任何链接）+ SYSTEM 站内信（`NEW_DEVICE_LOGIN`，关不掉）。开关 `solvela.member.login.notify-new-device`。
+`NewDeviceLoginNotifier`：这台设备上从没成功登录过、且不是注册时用的那台（注册时把设备号记进 Redis）、且请求有设备号时，异步发邮件（`member_new_device_login`，无任何链接）+ SYSTEM 站内信（`NEW_DEVICE_LOGIN`，关不掉）。开关 `solvela.member.login.notify-new-device`。
+
+> 2026-09-27 上线实测修正：初版判据是「账号以前登录过」，但注册即登录且不写登录日志，一直用注册会话的会员在别处第一次登录时被当成新用户首登跳过——恰是盗号的典型场景。
 
 原设计稿：
 登录成功时设备对该会员为新，异步发邮件 / 站内信。邮件通道已有。
