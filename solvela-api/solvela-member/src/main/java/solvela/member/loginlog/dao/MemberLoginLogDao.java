@@ -44,6 +44,28 @@ public interface MemberLoginLogDao extends BaseMapper<MemberLoginLog> {
      */
     List<MemberLoginLogDTO> queryList(@Param("queryForm") MemberLoginLogQuery queryForm);
 
+    /**
+     * 该会员有没有过<b>任何</b>一次成功登录。新设备提醒用：一次都没有 = 注册后的第一次登录，不该提醒。
+     */
+    @Select("""
+            SELECT EXISTS(
+              SELECT 1 FROM t_member_login_log WHERE member_id = #{memberId} AND status = #{successStatus}
+            )
+            """)
+    boolean existsSuccessfulLogin(@Param("memberId") Long memberId, @Param("successStatus") int successStatus);
+
+    /**
+     * 该会员在<b>这台设备</b>上有没有过成功登录。走 {@code idx_mbr_log_device}。
+     */
+    @Select("""
+            SELECT EXISTS(
+              SELECT 1 FROM t_member_login_log
+               WHERE device_id = #{deviceId} AND member_id = #{memberId} AND status = #{successStatus}
+            )
+            """)
+    boolean existsSuccessfulLoginOnDevice(@Param("memberId") Long memberId,
+                                          @Param("deviceId") String deviceId,
+                                          @Param("successStatus") int successStatus);
 
     /**
      * 这台设备上，该会员有没有一次<b>足够早</b>的成功登录 —— 设备信任的「老交情」那一档。

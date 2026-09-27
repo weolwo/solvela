@@ -104,6 +104,7 @@ public class MemberAuthService implements MemberAuthApi {
     private final DeviceGuard deviceGuard;
     private final LoginIpGuard loginIpGuard;
     private final LoginChallengeStore challengeStore;
+    private final NewDeviceLoginNotifier newDeviceLoginNotifier;
     private final MemberEmailCodeService emailCodeService;
     private final MemberEmailCodeIssuer emailCodeIssuer;
 
@@ -247,6 +248,9 @@ public class MemberAuthService implements MemberAuthApi {
             saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "同一设备关联账号过多");
             return MemberAuthResult.deviceLimited(fanout.retryAfterSeconds());
         }
+
+        // 🔴 必须在写本次成功日志【之前】判断：写了之后「这台设备登过没有」永远是「登过」
+        newDeviceLoginNotifier.onLoginSucceeded(member.getMemberId(), cmd.deviceId(), cmd.deviceType(), cmd.clientIp());
 
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_SUCCESS, null);
         return MemberAuthResult.ok(toIdentity(member));

@@ -89,7 +89,10 @@
 `LoginIpGuard`：每 IP 每小时 60 次 / 失败 20 次 / 不存在账号 10 次（`solvela.member.login.ip-guard.*`），排在查会员之前，超限回 `IP_LIMITED`（措辞说「当前网络」而非账号）。
 照 `DeviceGuard` 写法加两条规则，先 dry-run。
 
-### 2.4 新设备登录通知（约 1–2 人日）
+### 2.4 新设备登录通知 —— ✅ 已实施（2026-09-27）
+`NewDeviceLoginNotifier`：这台设备上从没成功登录过、且账号以前登录过（排除注册后首登）、且请求有设备号时，异步发邮件（`member_new_device_login`，无任何链接）+ SYSTEM 站内信（`NEW_DEVICE_LOGIN`，关不掉）。开关 `solvela.member.login.notify-new-device`。
+
+原设计稿：
 登录成功时设备对该会员为新，异步发邮件 / 站内信。邮件通道已有。
 
 ### 前置依赖

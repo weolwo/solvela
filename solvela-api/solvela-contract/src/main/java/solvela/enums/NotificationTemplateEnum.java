@@ -123,6 +123,17 @@ public enum NotificationTemplateEnum {
             List.of("limitType", "unlockTime")),
 
     /**
+     * 新设备登录提醒：账号在一台从没登录过的设备上登录成功了。
+     *
+     * <p>发送点是 {@code NewDeviceLoginNotifier}（会员域登录收尾）。同时还会发一封邮件 ——
+     * 站内信要登进来才看得到，而盗号者登进来之后可以先把它标成已读；邮件在主人自己的邮箱里。
+     *
+     * <p>归在 {@link NotificationCategoryEnum#SYSTEM}：「有人在别的设备上登了你的号」不该能被免打扰关掉。
+     */
+    NEW_DEVICE_LOGIN("NEW_DEVICE_LOGIN", NotificationCategoryEnum.SYSTEM,
+            List.of("loginTime", "deviceType", "location")),
+
+    /**
      * 优惠券即将过期。
      *
      * <p>🔴 <b>必须合并发送</b>：一个人有 8 张券要过期，发<b>一条</b>

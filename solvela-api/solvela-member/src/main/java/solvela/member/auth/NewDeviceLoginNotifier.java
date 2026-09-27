@@ -1,0 +1,130 @@
+package solvela.member.auth;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.stereotype.Component;
+import solvela.base.mail.MailService;
+import solvela.base.mail.MailTemplateCodeEnum;
+import solvela.base.util.SolvelaIpUtil;
+import solvela.base.util.SolvelaStringUtil;
+import solvela.crypto.PiiCipher;
+import solvela.enums.LoginLogResultEnum;
+import solvela.enums.NotificationTemplateEnum;
+import solvela.member.Member;
+import solvela.member.email.EmailSendExecutorConfig;
+import solvela.member.loginlog.dao.MemberLoginLogDao;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 新设备登录提醒：账号在一台<b>从没登录成功过</b>的设备上登录成功时，给主人发一封邮件 + 一条站内信。
+ *
+ * <h3>为什么要它</h3>
+ * 「我的登录设备」能看到异常登录，但前提是主人自己想起来去翻。盗号者登进来的那一刻就通知他，
+ * 他才有机会在东西被搬走之前改密码、下线其他设备。
+ *
+ * <h3>什么时候发</h3>
+ * <ul>
+ *   <li>这台设备上该会员<b>从没</b>成功登录过；</li>
+ *   <li>并且该会员<b>以前</b>成功登录过（在别的设备上）—— 否则就是注册后的第一次登录，
+ *       给每个新用户发一封「异地登录」告警只会教会他们忽略这类信；</li>
+ *   <li>请求有设备号 —— 没有设备身份就判断不了「新不新」，宁可不发也不乱发。</li>
+ * </ul>
+ * 判断必须在写本次成功日志<b>之前</b>做（调用方保证）。
+ *
+ * <h3>发送是异步的</h3>
+ * 两个存在性查询在登录线程里做（主键 / 索引点查），发信与站内信丢到发信线程池 ——
+ * 它们慢或失败都不该拖住、更不该搞砸一次成功的登录。
+ *
+ * <h3>为什么邮件、站内信都发</h3>
+ * 站内信要登进来才看得到，而盗号者登进来之后能先把它标成已读；邮件在主人自己的邮箱里。
+ *
+ * @Date 2026-09-27
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class NewDeviceLoginNotifier {
+
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    private final MemberLoginLogDao loginLogDao;
+
+    private final MemberAuthDao memberAuthDao;
+
+    private final PiiCipher piiCipher;
+
+    private final MailService mailService;
+
+    private final NotificationService notificationService;
+
+    /** 发信线程池。容器里有多个 AsyncTaskExecutor，按名字精确注入，理由同 MemberEmailCodeService */
+    @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
+    private AsyncTaskExecutor sendExecutor;
+
+    /** 总开关：误发成灾时的回退，不用发版 */
+    @Value("${solvela.member.login.notify-new-device:true}")
+    private boolean enabled;
+
+    /**
+     * 登录成功时调用（写本次成功日志之前）。任何异常都只记日志，绝不影响登录。
+     */
+    public void onLoginSucceeded(Long memberId, String deviceId, String deviceType, String clientIp) {
+        if (!enabled || memberId == null || SolvelaStringUtil.isBlank(deviceId)) {
+            return;
+        }
+        try {
+            int success = LoginLogResultEnum.LOGIN_SUCCESS.getValue();
+            if (!loginLogDao.existsSuccessfulLogin(memberId, success)
+                    || loginLogDao.existsSuccessfulLoginOnDevice(memberId, deviceId, success)) {
+                return;
+            }
+            String loginTime = LocalDateTime.now().format(TIME);
+            String location = regionOf(clientIp);
+            String device = SolvelaStringUtil.isBlank(deviceType) ? "未知设备" : deviceType;
+            log.info("【新设备登录】发送提醒, memberId: {}, deviceId: {}, 地点: {}", memberId, deviceId, location);
+            sendExecutor.execute(() -> deliver(memberId, loginTime, device, location, deviceId));
+        } catch (Exception e) {
+            log.error("【新设备登录】判断失败，本次不提醒, memberId: {}", memberId, e);
+        }
+    }
+
+    private void deliver(Long memberId, String loginTime, String device, String location, String deviceId) {
+        Map<String, Object> params = Map.of("loginTime", loginTime, "deviceType", device, "location", location);
+        // 站内信：send() 自己吞异常
+        notificationService.send(NotifyRequest.of(NotificationTemplateEnum.NEW_DEVICE_LOGIN, memberId)
+                .param("loginTime", loginTime)
+                .param("deviceType", device)
+                .param("location", location)
+                .bizRefId(deviceId)
+                .build());
+        // 邮件：没绑邮箱就只有站内信
+        try {
+            Member member = memberAuthDao.selectForEmailBind(memberId);
+            if (member == null || SolvelaStringUtil.isEmpty(member.getEmail())) {
+                return;
+            }
+            mailService.sendMail(MailTemplateCodeEnum.MEMBER_NEW_DEVICE_LOGIN, params,
+                    List.of(piiCipher.decrypt(member.getEmail())));
+        } catch (Exception e) {
+            log.error("【新设备登录】提醒邮件发送失败, memberId: {}", memberId, e);
+        }
+    }
+
+    /** IP 归属地；解析不出来时说「未知地点」，不把 IP 原样发给用户（那对他没意义） */
+    private static String regionOf(String ip) {
+        try {
+            String region = SolvelaIpUtil.getRegion(ip);
+            return SolvelaStringUtil.isBlank(region) ? "未知地点" : region;
+        } catch (Exception e) {
+            return "未知地点";
+        }
+    }
+}

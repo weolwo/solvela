@@ -104,6 +104,8 @@ class MemberAuthServiceTest {
     @Mock
     private LoginChallengeStore challengeStore;
     @Mock
+    private NewDeviceLoginNotifier newDeviceLoginNotifier;
+    @Mock
     private DeviceDispositionService dispositionService;
     @Mock
     private MemberSmsCodeService smsCodeService;
