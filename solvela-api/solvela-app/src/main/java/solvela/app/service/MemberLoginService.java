@@ -87,6 +87,12 @@ public class MemberLoginService {
      */
     private static final String DEVICE_LIMITED_MSG = "当前设备操作过于频繁，请 %d 分钟后重试";
 
+    /**
+     * IP 维度被限。同样<b>不说「你的账号」</b>，而说「当前网络」—— 被限的是这个出口，
+     * 公司、校园网里的真人被误伤时，这句话能让他明白换个网络（比如切到流量）就好，而不是去找回密码。
+     */
+    private static final String IP_LIMITED_MSG = "当前网络登录尝试过于频繁，请 %d 分钟后重试";
+
     /** 不传 deviceType 时的兜底，与 MemberAuthCmd 的约定一致 */
     private static final String DEFAULT_DEVICE_TYPE = "H5";
 
@@ -400,6 +406,8 @@ public class MemberLoginService {
             // 合并文案会让被设备维度限住的用户一直去找回密码，而那解决不了他的问题
             case DEVICE_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED,
                     String.format(DEVICE_LIMITED_MSG, minutes(result.lockedSeconds())));
+            case IP_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED,
+                    String.format(IP_LIMITED_MSG, minutes(result.lockedSeconds())));
             /*
              * 观察档的二次验证。两条分开，因为客户端要据此决定
              * 【把验证码框亮出来】还是【报错并让他重新获取】。

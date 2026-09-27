@@ -223,6 +223,16 @@ solvela:
       #  见 MemberSmsCodeService.checkTransport —— 那是刻意的，
       #  让它在部署时炸，而不是在第一个真实用户点「获取验证码」时炸）。
       phone-code-required: true
+    login:
+      # 登录的 IP 维度闸门（LoginIpGuard）。上线即拦截，不走 dry-run。
+      # 它挡的是设备闸与账号锁都数不到的撞库脚本：不带设备令牌、每个账号只试一次。
+      # 🔴 阈值刻意给得宽：公司出口、校园网背后是成百上千个真人。被误伤时调这里即可，不用发版
+      ip-guard:
+        enabled: true
+        window: 1h
+        max-attempts: 60           # 一个 IP 每小时登录请求总数（含成功）
+        max-failures: 20           # 失败次数（密码错、账号不存在、验证码错）
+        max-unknown-accounts: 10   # 对【不存在的账号】的尝试 —— 最强的信号，以前完全不可见
     device:
       guard:
         # 🔴 只观察不拦截。下面四个阈值全是【拍出来的】，没有任何真实分布支撑。

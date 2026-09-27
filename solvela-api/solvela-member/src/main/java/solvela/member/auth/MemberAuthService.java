@@ -100,6 +100,7 @@ public class MemberAuthService implements MemberAuthApi {
 
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
+    private final LoginIpGuard loginIpGuard;
     private final MemberEmailCodeService emailCodeService;
     private final MemberEmailCodeIssuer emailCodeIssuer;
 
@@ -161,6 +162,14 @@ public class MemberAuthService implements MemberAuthApi {
             return MemberAuthResult.deviceLimited(deviceVerdict.retryAfterSeconds());
         }
 
+        // ---------- IP 闸 ----------
+        // 同样排在查会员之前。它挡的是设备闸与账号锁都数不到的那类脚本：
+        // 不带设备令牌、每个账号只试一次（见 LoginIpGuard 类注释）
+        long ipWait = loginIpGuard.check(cmd.clientIp());
+        if (ipWait > 0) {
+            return MemberAuthResult.ipLimited(ipWait);
+        }
+
         // ---------- 按摘要找人 ----------
         Member member = findMember(loginType, identity);
         if (member == null) {
@@ -176,9 +185,12 @@ public class MemberAuthService implements MemberAuthApi {
                 AuthFailReason codeProblem = toAuthFailReason(
                         emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.credential()));
                 if (codeProblem != null) {
+                    loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
                     return MemberAuthResult.fail(codeProblem);
                 }
             }
+            // 🔴 查无此人以前一行记录都不留（见下面那段注释）—— 现在至少 IP 维度数得到它
+            loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
             // 这里刻意不写登录日志：t_member_login_log.member_id 是 NOT NULL，
             // 没有会员就没有可写的行。「不存在的账号被反复尝试」属于风控范畴，
             // 要防的话得另建一张按 IP/身份聚合的表，不是往会员日志里塞假 member_id。
@@ -192,6 +204,7 @@ public class MemberAuthService implements MemberAuthApi {
          */
         MemberAuthResult statusProblem = checkStatus(member, cmd);
         if (statusProblem != null) {
+            loginIpGuard.recordFailure(cmd.clientIp());
             return statusProblem;
         }
         MemberAuthResult limited = checkOperationLimit(member, cmd);
@@ -200,6 +213,7 @@ public class MemberAuthService implements MemberAuthApi {
         }
         MemberAuthResult credentialProblem = verifyCredential(loginType, identity, member, cmd);
         if (credentialProblem != null) {
+            loginIpGuard.recordFailure(cmd.clientIp());
             return credentialProblem;
         }
 
@@ -208,6 +222,10 @@ public class MemberAuthService implements MemberAuthApi {
         //    给机主发一条短信 —— 而短信是花钱的，那就成了免费的轰炸接口。
         MemberAuthResult deviceChallenge = checkDeviceChallenge(loginType, identity, member, cmd);
         if (deviceChallenge != null) {
+            // 「还差一步」不算失败，「码错了」算
+            if (deviceChallenge.reason() == AuthFailReason.DEVICE_VERIFICATION_FAILED) {
+                loginIpGuard.recordFailure(cmd.clientIp());
+            }
             return deviceChallenge;
         }
 
@@ -395,6 +413,13 @@ public class MemberAuthService implements MemberAuthApi {
      * <p>用 switch 表达式：新增一种登录方式时<b>编译不过</b>，
      * 而不是悄悄落进某个兜底分支去按手机号规范化一个邮箱。
      */
+    /** 身份打码后进日志：邮箱 a***@x.com，手机号 138****0000 */
+    private static String maskIdentity(MemberLoginType loginType, String identity) {
+        return loginType == MemberLoginType.PHONE_PASSWORD
+                ? MemberPhoneUtil.mask(identity)
+                : MemberEmailUtil.mask(identity);
+    }
+
     private static String normalizeIdentity(MemberLoginType loginType, String rawIdentity) {
         return switch (loginType) {
             case PHONE_PASSWORD -> MemberPhoneUtil.normalize(rawIdentity);

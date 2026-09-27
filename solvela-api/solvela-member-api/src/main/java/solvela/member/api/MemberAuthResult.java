@@ -38,4 +38,8 @@ public record MemberAuthResult(MemberIdentity identity, AuthFailReason reason, l
     public static MemberAuthResult deviceLimited(long lockedSeconds) {
         return new MemberAuthResult(null, AuthFailReason.DEVICE_LIMITED, lockedSeconds);
     }
+
+    public static MemberAuthResult ipLimited(long lockedSeconds) {
+        return new MemberAuthResult(null, AuthFailReason.IP_LIMITED, lockedSeconds);
+    }
 }
