@@ -12,12 +12,25 @@ import type { IconName } from './Icon.vue'
  */
 
 /*
- * 「优惠」原来是这里的第二个 tab。活动列表搬进首页顶部的「活动中心」之后它被去掉了 ——
- * 同一份数据留两个入口，迟早会出现「一边改了一边没改」。
- * 老路径 /promo 在 router 里 redirect 到活动中心，收藏过的链接不会失效。
+ * 2026-09-27 从两个 tab（首页 / 我的）改成四个。
+ *
+ * 此前商城、任务、活动是首页顶部的三个小 tab：签到、逛商城这种每天都做的事，
+ * 要先进首页再横着找；而底部只有两个入口，其余一切都塞进了「我的」。
+ * 商城和任务升上来；活动中心不单独占位 —— 它本来就在首页内容流里（轮播 + 活动卡 + 「全部活动」）。
+ *
+ * 首页指向 `feed`（首页自身那条子路由），不是外壳 `home`：外壳是四个页面共用的，
+ * 指向它的话在商城、任务上「首页」也会一起高亮。
+ *
+ * 🔴 高亮用 exact-active-class，不是 active-class：Vue Router 把「指向空路径子路由（feed）」
+ * 的链接当成指向父级外壳，于是在 /mall 上「首页」照样算 active。四个 tab 下面都没有嵌套子页，
+ * 精确匹配正好。（这条是加 TabBar 测试时才发现的，肉眼看截图时两个都亮着也不一定注意得到。）
+ *
+ * 「优惠」更早以前也是这里的一个 tab，老路径 /promo 在 router 里 redirect 到活动中心。
  */
 const TABS: { name: string; label: string; icon: IconName }[] = [
-  { name: 'home', label: '首页', icon: 'home' },
+  { name: 'feed', label: '首页', icon: 'home' },
+  { name: 'mall', label: '商城', icon: 'bag' },
+  { name: 'tasks', label: '任务', icon: 'task' },
   { name: 'mine', label: '我的', icon: 'user' },
 ]
 </script>
@@ -28,7 +41,7 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
       v-for="tab in TABS"
       :key="tab.name"
       class="sv-tabbar__item"
-      active-class="sv-tabbar__item--active"
+      exact-active-class="sv-tabbar__item--active"
       :to="{ name: tab.name }"
     >
       <Icon :name="tab.icon" :size="24" />

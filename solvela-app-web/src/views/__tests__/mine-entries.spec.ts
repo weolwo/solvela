@@ -35,6 +35,23 @@ vi.mock('@/api/notification', () => ({
   fetchUnreadCount: () => unreadSpy(),
 }))
 
+/*
+ * 2026-09-27 重排后这一页要各拉一份列表来数数（券包 / 彩票 / 奖品 / 收藏）和等级名。
+ * 🔴 漏 mock 一个的表现不是断言失败，而是 jsdom 里真发请求、整页卡在加载态。
+ */
+const deliveriesSpy = vi.fn(() =>
+  Promise.resolve([
+    { deliveryId: '1', needAddress: true, status: 0 },
+    { deliveryId: '2', needAddress: false, status: 0 },
+    { deliveryId: '3', needAddress: false, status: 1 },
+  ]),
+)
+vi.mock('@/api/delivery', () => ({ fetchDeliveries: () => deliveriesSpy() }))
+vi.mock('@/api/coupons', () => ({ fetchCoupons: () => Promise.resolve([{}, {}, {}]) }))
+vi.mock('@/api/lottery', () => ({ fetchMyTickets: () => Promise.resolve([{}, {}]) }))
+vi.mock('@/api/mall', () => ({ fetchFavorites: () => Promise.resolve([{}]) }))
+vi.mock('@/api/grade', () => ({ fetchMyGrade: () => Promise.resolve({ gradeName: 'V2 白银' }) }))
+
 /** 这一页上应该存在的入口：路由名 → 给人看的名字 */
 const ENTRIES: [string, string][] = [
   ['messages', '消息'],
@@ -111,23 +128,62 @@ describe('「我的」页的入口', () => {
     ).toBe(true)
   })
 
-  it('🔴 消息入口显示未读数', async () => {
+  it('🔴 消息铃铛显示未读数，读屏能听到「几条未读」', async () => {
     const w = mount(MineView, { global })
     await settle()
 
     expect(unreadSpy).toHaveBeenCalledTimes(1)
     // 服务端把通知和公告两个数加好再下发，端上不自己相加
-    expect(w.text()).toContain('7 条未读')
+    const bell = w.find('.profile__bell')
+    expect(bell.find('.profile__badge').text()).toBe('7')
+    // 红点只是一个数字，对读屏没有意义 —— 名字要把话说全
+    expect(bell.attributes('aria-label')).toBe('消息，7 条未读')
   })
 
-  it('未读数拉不到时入口照样在，只是不显示数字', async () => {
+  it('未读数拉不到时铃铛照样在，只是没有红点', async () => {
     unreadSpy.mockImplementationOnce(() => Promise.reject(new Error('网络炸了')))
 
     const w = mount(MineView, { global })
     await settle()
 
-    // 为一次接口抖动把整行藏起来，是拿次要目标伤害主要目标
-    expect(w.text()).toContain('消息')
-    expect(w.text()).not.toContain('条未读')
+    // 为一次接口抖动把入口藏起来，是拿次要目标伤害主要目标
+    expect(w.find('.profile__bell').exists()).toBe(true)
+    expect(w.find('.profile__badge').exists()).toBe(false)
+  })
+
+  it('资产数字一眼可见：券包 / 彩票 / 奖品 / 收藏', async () => {
+    const w = mount(MineView, { global })
+    await settle()
+
+    const stats = w.findAll('.stats__item').map((s) => s.text())
+    expect(stats).toEqual(['3券包', '2彩票', '3奖品', '1收藏'])
+    // 等级名在名字旁边
+    expect(w.find('.profile__grade').text()).toContain('V2 白银')
+  })
+
+  it('🔴 奖品按要不要我动手分组；「待填地址」用 needAddress，有数时变显眼', async () => {
+    const w = mount(MineView, { global })
+    await settle()
+
+    const groups = w.findAll('.grid--3 .grid__item')
+    expect(groups.map((g) => g.find('.grid__label').text())).toEqual([
+      '待填地址',
+      '待发货',
+      '已发货',
+    ])
+    // needAddress 的那一单不能再被算进「待发货」—— 它此刻卡在用户，不在仓库
+    expect(groups.map((g) => g.find('.grid__count').text())).toEqual(['1', '1', '1'])
+    expect(groups[0]?.classes()).toContain('grid__item--alert')
+  })
+
+  it('数字拉不到时显示「—」而不是 0，入口照样在', async () => {
+    deliveriesSpy.mockImplementationOnce(() => Promise.reject(new Error('网络炸了')))
+
+    const w = mount(MineView, { global })
+    await settle()
+
+    // 0 是一个确定的答案，不知道的时候不能说 0
+    expect(w.findAll('.stats__item')[2]?.text()).toBe('—奖品')
+    expect(w.findAll('.grid--3 .grid__count')).toHaveLength(0)
   })
 })

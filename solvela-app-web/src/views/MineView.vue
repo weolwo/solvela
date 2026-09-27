@@ -1,13 +1,40 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useRouter } from 'vue-router'
 
 import { fetchAssets } from '@/api/assets'
+import { fetchCoupons } from '@/api/coupons'
+import { fetchDeliveries, type DeliveryItem } from '@/api/delivery'
+import { fetchMyGrade } from '@/api/grade'
+import { fetchMyTickets } from '@/api/lottery'
+import { fetchFavorites } from '@/api/mall'
 import { fetchUnreadCount } from '@/api/notification'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import type { IconName } from '@/ui/Icon.vue'
 import { formatWithSeparator, money } from '@/utils/money'
+
+/**
+ * 「我的」。
+ *
+ * <h3>2026-09-27 重排：从一条 12 行的长列表，改成「一眼看到自己有什么」</h3>
+ * 此前券包、彩票、实物奖品、兑换记录、充话费、会员中心、收藏、地址簿……全是同一种样式的行，
+ * 用户只能从头扫到尾，而最常问的「我有几张券、奖品寄到哪了」埋在中间。现在分四块：
+ * <ol>
+ *   <li>页头：等级徽章（→ 会员中心）、铃铛（→ 消息，带未读数）—— 它们是「我是谁」「有人找我」，不是列表项；</li>
+ *   <li>资产：钱包卡 + 一排数字（券包 / 彩票 / 奖品 / 收藏），数字本身就是信息；</li>
+ *   <li>我的奖品：按「要不要我动手」分组，像电商的「我的订单」；</li>
+ *   <li>常用服务宫格（一行四个）+ 设置。</li>
+ * </ol>
+ *
+ * <h3>数字是各拉各的列表再数出来的</h3>
+ * 第一版刻意不加后端汇总接口，先看排版对不对。代价是进这一页多 5 个请求 ——
+ * 定稿后应当换成一个 `/me/summary` 一次给齐。
+ * 任何一个数拉不到都只显示「—」，<b>入口本身永远在</b>：为一次接口抖动把入口藏掉，
+ * 是拿次要目标伤害主要目标（消息入口当初就是这么定的）。
+ */
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -15,28 +42,91 @@ const theme = useThemeStore()
 
 const loggingOut = ref(false)
 
-/*
- * 资产原来在首页。首页改成商城/任务/活动三个 tab 之后它搬到这里 ——
- * 语义上本来就更对：这些是「我的」东西，不是逛的东西。
- */
 const assets = useAsync(fetchAssets)
 
 /**
- * 消息未读数。
- *
- * 🔴 **服务端把通知和公告两个数加好再下发**，端上不要自己拉两个相加 ——
- * 那样迟早漏掉公告那一半，而漏了只表现为「红点偏小」，没人会去对账。
- *
- * 拉不到就当 0：消息入口本身是要显示的，为一次接口抖动把整行藏起来
- * 是拿次要目标伤害主要目标。
+ * 消息未读数。🔴 服务端把通知和公告两个数加好再下发，端上不要自己拉两个相加 ——
+ * 那样迟早漏掉公告那一半。拉不到就当 0，铃铛照样在。
  */
 const unread = useAsync(() => fetchUnreadCount().catch(() => 0))
+const unreadCount = computed(() => unread.data.value ?? 0)
+const unreadBadge = computed(() => (unreadCount.value > 99 ? '99+' : String(unreadCount.value)))
 
-/** 0 条不显示 —— 在入口上写「0 条未读」只是噪声 */
-const unreadLabel = computed(() => {
-  const n = unread.data.value ?? 0
-  return n > 0 ? `${n > 99 ? '99+' : n} 条未读` : undefined
+/** 等级徽章。拉不到时显示「会员中心」—— 入口不能因为名字没拿到就消失 */
+const grade = useAsync(fetchMyGrade)
+const gradeLabel = computed(() => grade.data.value?.gradeName ?? '会员中心')
+
+const coupons = useAsync(() => fetchCoupons('USABLE'))
+const tickets = useAsync(fetchMyTickets)
+const deliveries = useAsync(fetchDeliveries)
+const favorites = useAsync(fetchFavorites)
+
+/** 加载中、出错都显示「—」：0 是一个确定的答案，不知道的时候不能说 0 */
+function countOf(list: readonly unknown[] | null): string {
+  return list === null ? '—' : String(list.length)
+}
+
+interface Stat {
+  label: string
+  value: string
+  to: RouteLocationRaw
+}
+
+const stats = computed<Stat[]>(() => [
+  { label: '券包', value: countOf(coupons.data.value), to: { name: 'coupons' } },
+  { label: '彩票', value: countOf(tickets.data.value), to: { name: 'lottery-tickets' } },
+  { label: '奖品', value: countOf(deliveries.data.value), to: { name: 'deliveries' } },
+  { label: '收藏', value: countOf(favorites.data.value), to: { name: 'favorites' } },
+])
+
+interface DeliveryGroup {
+  label: string
+  icon: IconName
+  /** 数量；不知道时为 null */
+  count: number | null
+  /** 要用户动手的那一组，有数时要显眼 */
+  alert: boolean
+}
+
+/**
+ * 实物奖品按「用户关心的那件事」分三组。
+ *
+ * 「待填地址」用 `needAddress` —— 那是后端给的<b>唯一判据</b>，不自己按 status 推。
+ * 另外两组按 DeliveryItem.status 的文档值（0 待发货 / 1 已发货）只做计数，不决定任何按钮。
+ */
+const deliveryGroups = computed<DeliveryGroup[]>(() => {
+  const list = deliveries.data.value
+  const count = (pred: (d: DeliveryItem) => boolean): number | null =>
+    list === null ? null : list.filter(pred).length
+  return [
+    { label: '待填地址', icon: 'pin', count: count((d) => d.needAddress), alert: true },
+    {
+      label: '待发货',
+      icon: 'box',
+      count: count((d) => !d.needAddress && d.status === 0),
+      alert: false,
+    },
+    { label: '已发货', icon: 'truck', count: count((d) => d.status === 1), alert: false },
+  ]
 })
+
+interface Service {
+  label: string
+  icon: IconName
+  to: RouteLocationRaw
+}
+
+/**
+ * 常用服务，按「多久用一次」排。刻意凑满一行四个：第五个会孤零零掉到第二行。
+ * 会员中心不在这里 —— 页头的等级徽章就是它的入口（截图上看得很清楚，不需要第二个）。
+ * 地址簿用 home 而不是 pin：pin 已经给了上面的「待填地址」，同屏两个一样的图标等于没有图标。
+ */
+const SERVICES: Service[] = [
+  { label: '充话费', icon: 'phone', to: { name: 'recharge' } },
+  { label: '兑换记录', icon: 'clock', to: { name: 'records-exchange' } },
+  { label: '优惠记录', icon: 'gift', to: { name: 'records-promo' } },
+  { label: '地址簿', icon: 'home', to: { name: 'address-list' } },
+]
 
 /**
  * 主资产（列表第一项）单独放大展示。哪一项是主资产由**后端的顺序**决定，
@@ -47,8 +137,7 @@ const otherAssets = computed(() => assets.data.value?.slice(1) ?? [])
 
 /**
  * 金额从后端来是字符串，展示要走 money 工具。
- * 🔴 不要 Number() 之后 toFixed —— 那会在超过 2^53-1 时静默丢精度，
- * 而余额正是最不该丢精度的数。
+ * 🔴 不要 Number() 之后 toFixed —— 那会在超过 2^53-1 时静默丢精度。
  */
 function display(amount: string, currency: boolean): string {
   return currency ? formatWithSeparator(money(amount)) : amount
@@ -58,11 +147,8 @@ function display(amount: string, currency: boolean): string {
 const initial = computed(() => auth.member?.nickname?.trim().charAt(0) ?? '?')
 
 /**
- * 头像 URL。
- *
- * ⚠️ 后端给的是 `avatarFileId`，不是 URL —— 文件访问要走 solvela-base-file 的
- * 下载接口，而网关目前没有暴露它。所以现在恒为 null，一律走首字兜底。
- * 接上之后这里改成拼下载地址即可，模板不用动。
+ * 头像 URL。⚠️ 后端给的是 `avatarFileId`，网关目前没有暴露文件下载接口，
+ * 所以恒为 null，一律走首字兜底。
  */
 const avatarUrl = computed<string | null>(() => null)
 
@@ -72,8 +158,7 @@ async function handleLogout(): Promise<void> {
   }
   loggingOut.value = true
   try {
-    // logout 内部已经吞掉了网络异常：令牌本地清掉才是关键，
-    // 服务端那次注销失败也不该把用户卡在已登录状态
+    // logout 内部已经吞掉了网络异常：服务端那次注销失败也不该把用户卡在已登录状态
     await auth.logout()
     await router.replace({ name: 'login' })
   } finally {
@@ -84,7 +169,6 @@ async function handleLogout(): Promise<void> {
 
 <template>
   <div class="page">
-    <!-- 头像区。用户要的「最上面头像」就是这一块 -->
     <header class="profile">
       <div class="profile__avatar">
         <img v-if="avatarUrl !== null" :src="avatarUrl" alt="" class="profile__img" />
@@ -92,23 +176,37 @@ async function handleLogout(): Promise<void> {
       </div>
       <div class="profile__text">
         <h1 class="profile__name">{{ auth.member?.nickname ?? '未登录' }}</h1>
-        <!--
-          🔴 这里显示的是会员号，不是手机号。
-          后端 MemberPrincipal 刻意不带手机号 —— 那个对象会进 Redis、进日志，
-          放明文手机号会让整套 PII 加密失效。要展示手机号得走单独接口拿脱敏值。
-        -->
-        <p class="profile__id">ID {{ auth.member?.memberId ?? '—' }}</p>
+        <div class="profile__meta">
+          <!--
+            🔴 这里显示的是会员号，不是手机号。MemberPrincipal 刻意不带手机号 ——
+            那个对象会进 Redis、进日志，放明文手机号会让整套 PII 加密失效。
+          -->
+          <span class="profile__id">ID {{ auth.member?.memberId ?? '—' }}</span>
+          <!-- 等级是「我是谁」，放在名字旁边，而不是列表里的一行 -->
+          <RouterLink class="profile__grade" :to="{ name: 'grade' }">
+            <Icon name="crown" :size="14" />
+            {{ gradeLabel }}
+          </RouterLink>
+        </div>
       </div>
+      <!-- 消息：通用的铃铛 + 红点，不再是列表里一行（此前用的还是礼物图标） -->
+      <RouterLink
+        class="profile__bell"
+        :to="{ name: 'messages' }"
+        :aria-label="unreadCount > 0 ? `消息，${unreadCount} 条未读` : '消息'"
+      >
+        <Icon name="bell" :size="24" />
+        <span v-if="unreadCount > 0" class="profile__badge" aria-hidden="true">
+          {{ unreadBadge }}
+        </span>
+      </RouterLink>
     </header>
 
-    <!-- 资产卡：整页最重的一块，用主色实底把它和下面的白卡分开 -->
+    <!-- 资产卡：整页最重的一块，用主色实底把它和下面的卡分开 -->
     <div class="wallet">
       <p class="wallet__label">
         {{ primaryAsset?.label ?? '资产' }}
-        <!--
-          冻结要标出来，而不是把这一项藏起来 —— 藏起来用户会以为资产没了，然后来问客服。
-          既有文字也有底色：只靠颜色区分对色觉障碍用户等于没区分。
-        -->
+        <!-- 冻结要标出来，而不是把这一项藏起来 —— 藏起来用户会以为资产没了 -->
         <span v-if="primaryAsset?.frozen === true" class="wallet__frozen">已冻结</span>
       </p>
       <p v-if="assets.loading.value" class="wallet__amount wallet__amount--loading">—</p>
@@ -129,59 +227,53 @@ async function handleLogout(): Promise<void> {
       </div>
     </div>
 
-    <!--
-      🔴 记录只放入口，不在这一页铺列表。
-      这一页要放钱包、记录、收藏、地址簿、设置 —— 再铺一段列表，
-      它就变成一个什么都有、什么都看不清的页面，而记录本身也只能显示前几条。
+    <!-- 我有什么：数字本身就是信息，不用点进去才知道有没有 -->
+    <nav class="stats" aria-label="我的资产">
+      <RouterLink v-for="s in stats" :key="s.label" class="stats__item" :to="s.to">
+        <span class="stats__value">{{ s.value }}</span>
+        <span class="stats__label">{{ s.label }}</span>
+      </RouterLink>
+    </nav>
 
-      奖励记录不在这里：它是「我在某个活动里中了什么」，属于活动，
-      展示在活动专题页上。
-    -->
-    <!--
-      消息入口。单独一张卡、排在记录之前 —— 它是「平台要告诉你的事」，
-      而下面几组是「你自己要去翻的东西」，两者不是一类。
+    <!-- 我的奖品：像电商的「我的订单」，按要不要我动手分组 -->
+    <section class="block" aria-labelledby="mine-prizes">
+      <div class="block__head">
+        <h2 id="mine-prizes" class="block__title">我的奖品</h2>
+        <RouterLink class="block__more" :to="{ name: 'deliveries' }">
+          全部 <Icon name="chevron" :size="14" />
+        </RouterLink>
+      </div>
+      <div class="grid grid--3">
+        <RouterLink
+          v-for="g in deliveryGroups"
+          :key="g.label"
+          class="grid__item"
+          :class="{ 'grid__item--alert': g.alert && (g.count ?? 0) > 0 }"
+          :to="{ name: 'deliveries' }"
+        >
+          <span class="grid__icon">
+            <Icon :name="g.icon" :size="24" />
+            <span v-if="(g.count ?? 0) > 0" class="grid__count">{{ g.count }}</span>
+          </span>
+          <span class="grid__label">{{ g.label }}</span>
+        </RouterLink>
+      </div>
+    </section>
 
-      ⚠️ 2026-09-15 补：此前消息中心的路由、页面、接口都做好了，却**没有任何
-      地方能点进去** —— 只能手输 URL。做完一个页面记得回头问一句「用户怎么到这」。
-    -->
+    <section class="block" aria-labelledby="mine-services">
+      <div class="block__head">
+        <h2 id="mine-services" class="block__title">常用服务</h2>
+      </div>
+      <div class="grid grid--4">
+        <RouterLink v-for="s in SERVICES" :key="s.label" class="grid__item" :to="s.to">
+          <span class="grid__icon"><Icon :name="s.icon" :size="24" /></span>
+          <span class="grid__label">{{ s.label }}</span>
+        </RouterLink>
+      </div>
+    </section>
+
     <Card>
-      <Cell icon="gift" title="消息" :value="unreadLabel" :to="{ name: 'messages' }" />
-    </Card>
-
-    <Card>
-      <!--
-        🔴 券包必须有入口。2026-09-15 阶段 4：券第一次能被用掉了，
-        而用户找不到自己的券的话，能用也等于没有 —— 消息中心刚踩过这个坑
-        （路由、页面、接口都做好了，却没有任何地方能点进去）。
-      -->
-      <Cell icon="receipt" title="我的券包" :to="{ name: 'coupons' }" />
-      <!--
-        等级放在最前：它是「我是谁」，其余几项是「我有什么」。
-        🔴 保级缓冲期的提示只在这一页里 —— 用户不点进来就永远不知道自己快掉级了。
-        （真要做挽留，下一步是站内信推送，不能只靠他自己想起来点。）
-      -->
-      <Cell icon="star" title="会员中心" :to="{ name: 'grade' }" />
-      <!-- 券的第一个「非商城」出口。⚠️ 今天运营商那一端是假的，页面上写着 -->
-      <Cell icon="phone" title="充话费" :to="{ name: 'recharge' }" />
-      <Cell icon="bag" title="兑换记录" :to="{ name: 'records-exchange' }" />
-      <!--
-        实物奖品单独一个入口，不并进「兑换记录」：那一页是「我花积分买了什么」，
-        而这一页回答的是「我的东西寄到哪了」，还带一个要用户动手的待办（填地址）。
-        混在一起的话，中奖的实物根本不在兑换记录里 —— 它压根不是一笔兑换。
-      -->
-      <Cell icon="home" title="我的实物奖品" :to="{ name: 'deliveries' }" />
-      <Cell icon="star" title="我的彩票" :to="{ name: 'lottery-tickets' }" />
-      <Cell icon="gift" title="优惠记录" :to="{ name: 'records-promo' }" />
-    </Card>
-
-    <Card>
-      <Cell icon="heart" title="我的收藏" :to="{ name: 'favorites' }" />
-      <Cell icon="home" title="地址簿" :to="{ name: 'address-list' }" />
       <Cell icon="settings" title="设置" :to="{ name: 'settings' }" />
-      <!--
-        2026-09-12 放开：深色模式和 iOS 皮肤都落地了，这一行终于有得选。
-        它在此之前是只读的 —— 只有一套皮肤时给箭头等于骗人，点进去没有第二个选项。
-      -->
       <Cell icon="palette" title="主题" :value="theme.label" :to="{ name: 'theme' }" />
     </Card>
 
@@ -205,7 +297,7 @@ async function handleLogout(): Promise<void> {
   display: flex;
   align-items: center;
   gap: var(--sv-space-md);
-  padding: var(--sv-space-xs) var(--sv-space-xs) var(--sv-space-md);
+  padding: var(--sv-space-xs) var(--sv-space-xs) var(--sv-space-sm);
 }
 
 .profile__avatar {
@@ -213,13 +305,13 @@ async function handleLogout(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   overflow: hidden;
   background: var(--sv-color-primary);
   color: var(--sv-text-on-primary);
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
 }
 
@@ -230,6 +322,7 @@ async function handleLogout(): Promise<void> {
 }
 
 .profile__text {
+  flex: 1;
   min-width: 0;
 }
 
@@ -242,10 +335,55 @@ async function handleLogout(): Promise<void> {
   white-space: nowrap;
 }
 
+.profile__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sv-space-sm);
+  margin-top: var(--sv-space-xs);
+}
+
 .profile__id {
-  margin: var(--sv-space-xs) 0 0;
   color: var(--sv-text-placeholder);
   font-size: var(--sv-font-footnote);
+  font-variant-numeric: tabular-nums;
+}
+
+.profile__grade {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px var(--sv-space-sm);
+  border-radius: var(--sv-radius-pill);
+  background: var(--sv-color-primary-soft);
+  color: var(--sv-color-primary);
+  font-size: var(--sv-font-footnote);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.profile__bell {
+  position: relative;
+  flex: none;
+  display: flex;
+  padding: var(--sv-space-sm);
+  color: var(--sv-text-primary);
+}
+
+.profile__badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--sv-radius-pill);
+  background: var(--sv-color-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
@@ -325,63 +463,113 @@ async function handleLogout(): Promise<void> {
   font-variant-numeric: tabular-nums;
 }
 
-.record {
-  display: flex;
-  align-items: center;
-  gap: var(--sv-space-md);
-  padding: var(--sv-space-md);
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: var(--sv-space-md) 0;
+  border-radius: var(--sv-radius-lg);
+  background: var(--sv-bg-surface);
 }
 
-.record__main {
-  flex: 1;
-  min-width: 0;
-}
-
-.record__title {
-  margin: 0;
-  font-size: var(--sv-font-caption);
-  /* 奖品名可能很长，一行截断好过把整行撑成两行高低不齐 */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.record__time {
-  margin: var(--sv-space-xs) 0 0;
-  color: var(--sv-text-placeholder);
-  font-size: var(--sv-font-footnote);
-  font-variant-numeric: tabular-nums;
-}
-
-.record__side {
+.stats__item {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: var(--sv-space-xs);
+  align-items: center;
+  gap: 2px;
+  color: var(--sv-text-primary);
+  text-decoration: none;
 }
 
-.record__amount {
-  color: var(--sv-color-primary);
-  font-size: var(--sv-font-caption);
-  font-weight: 600;
+.stats__value {
+  font-size: var(--sv-font-heading);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-/* 状态既有颜色也有文字：只靠颜色区分对色觉障碍用户等于没区分 */
-.record__status {
+.stats__label {
+  color: var(--sv-text-secondary);
   font-size: var(--sv-font-footnote);
 }
 
-.record__status--done {
-  color: var(--sv-color-success);
+.block {
+  padding: var(--sv-space-md);
+  border-radius: var(--sv-radius-lg);
+  background: var(--sv-bg-surface);
 }
 
-.record__status--pending {
-  color: var(--sv-color-warning);
+.block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sv-space-md);
 }
 
-.record__status--failed {
-  color: var(--sv-color-danger);
+.block__title {
+  margin: 0;
+  font-size: var(--sv-font-body);
+  font-weight: 600;
+}
+
+.block__more {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sv-text-secondary);
+  font-size: var(--sv-font-footnote);
+  text-decoration: none;
+}
+
+.grid {
+  display: grid;
+  row-gap: var(--sv-space-md);
+}
+
+.grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.grid__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sv-space-xs);
+  color: var(--sv-text-primary);
+  text-decoration: none;
+}
+
+.grid__icon {
+  position: relative;
+  display: flex;
+  color: var(--sv-text-secondary);
+}
+
+/* 「待填地址」有数时变主色：它是唯一一个不动手就收不到东西的待办 */
+.grid__item--alert .grid__icon,
+.grid__item--alert .grid__label {
+  color: var(--sv-color-primary);
+}
+
+.grid__count {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--sv-radius-pill);
+  background: var(--sv-color-danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+.grid__label {
+  font-size: var(--sv-font-footnote);
 }
 
 .page__version {
