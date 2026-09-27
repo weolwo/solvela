@@ -17,6 +17,8 @@ import solvela.app.domain.SmsCodeRequest;
 import solvela.member.api.SmsCodeSendCmd;
 import solvela.member.api.SmsScene;
 import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.LoginChallengeCmd;
+import solvela.member.api.LoginChallengeCodeResult;
 import solvela.member.api.StepUpCmd;
 import solvela.member.api.SmsCodeSendResult;
 import solvela.app.domain.MemberLoginRequest;
@@ -196,6 +198,11 @@ public class MemberLoginService {
      * 这一层的措辞才继续成立。
      */
     public void sendSmsCode(SmsCodeRequest request, String ip) {
+        // 🔴 短信 LOGIN 场景只用于观察档二次验证，现在那条路凭票发码（/auth/login/challenge/code）。
+        //    匿名放开它的话，任何人输一个手机号就能让我们给机主发一条要钱的短信
+        if (request.scene() == SmsScene.LOGIN) {
+            throw new ApiException(ApiErrors.INVALID_ARGUMENT, "不支持的验证码用途");
+        }
         SmsCodeSendResult result = memberAuthApi.sendSmsCode(new SmsCodeSendCmd(
                 request.scene(), request.phone(), ip,
                 // BIND 场景要知道「是谁在绑」，其余三个是匿名接口。判据同邮箱那条
@@ -363,6 +370,45 @@ public class MemberLoginService {
     }
 
     /**
+     * 登录二次验证：凭票发码。返回码寄到了哪（打过码的）。
+     *
+     * <p>码发到哪由票决定（登录用的那个邮箱 / 手机号），客户端改不了 ——
+     * 这正是它取代「客户端自己去匿名接口要码」的理由。
+     */
+    public String sendChallengeCode(String ticket, String ip) {
+        LoginChallengeCodeResult result = memberAuthApi.sendChallengeCode(
+                new LoginChallengeCmd(ticket, null, ip, CurrentDevice.deviceIdOrNull()));
+        if (result.success()) {
+            return result.maskedTarget();
+        }
+        throw switch (result.reason()) {
+            case CHALLENGE_EXPIRED -> new ApiException(ApiErrors.CHALLENGE_EXPIRED);
+            case TOO_FREQUENT -> new ApiException(ApiErrors.OPERATION_LIMITED,
+                    String.format("验证码已发送，请 %d 秒后再试", Math.max(1, result.retryAfterSeconds())));
+            case DAILY_LIMIT_REACHED -> new ApiException(ApiErrors.OPERATION_LIMITED, "今日验证码发送次数已用完，请明天再试");
+            case SEND_FAILED -> new ApiException(ApiErrors.INTERNAL, "验证码发送失败，请稍后再试");
+        };
+    }
+
+    /**
+     * 登录二次验证：凭票验码。通过即签发会话 —— 形状与 {@link #login} 完全一致，
+     * 客户端走同一条「登录成功」的路。
+     */
+    public MemberResult verifyChallenge(String ticket, String code, String ip) {
+        MemberAuthResult result = memberAuthApi.verifyChallenge(
+                new LoginChallengeCmd(ticket, code, ip, CurrentDevice.deviceIdOrNull()));
+        if (!result.success()) {
+            throw translate(result);
+        }
+        MemberPrincipal principal = MemberPrincipal.of(result.identity());
+        String deviceType = CurrentDevice.find().map(solvela.auth.device.DeviceIdentity::deviceType)
+                .orElse(DEFAULT_DEVICE_TYPE);
+        MemberAccessToken token = tokenStore.issue(principal.memberId(), sessionContext(deviceType, ip));
+        principalLoader.evict(principal.memberId());
+        return new MemberResult(token.value(), token.expiresIn().toSeconds(), principal);
+    }
+
+    /**
      * 下线除当前之外的所有会话，并撤销其余设备的信任。
      *
      * <p>只踢会话不撤信任的话，被踢下去的那台设备（很可能正是用户怀疑的那台）
@@ -415,7 +461,11 @@ public class MemberLoginService {
              * 🔴 措辞都不提「你的设备被标记了」—— 那句话对真实用户毫无意义
              * （他做不了任何事），只会让人以为账号出了问题去找客服。
              */
-            case DEVICE_VERIFICATION_REQUIRED -> new ApiException(ApiErrors.DEVICE_VERIFICATION_REQUIRED);
+            // 凭票放进 details：客户端之后的发码、验码都凭它。票只在这一个响应里出现一次
+            case DEVICE_VERIFICATION_REQUIRED -> new ApiException(ApiErrors.DEVICE_VERIFICATION_REQUIRED,
+                    ApiErrors.DEVICE_VERIFICATION_REQUIRED.defaultMessage(),
+                    java.util.Map.of("challengeTicket", result.challengeTicket()));
+            case CHALLENGE_EXPIRED -> new ApiException(ApiErrors.CHALLENGE_EXPIRED);
             case DEVICE_VERIFICATION_FAILED ->
                     new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误，请重新获取");
         };

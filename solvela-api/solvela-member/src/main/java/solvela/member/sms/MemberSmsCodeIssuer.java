@@ -62,8 +62,12 @@ public class MemberSmsCodeIssuer {
             // 已经注册过的号码不需要注册码。它照样能收到「该号已注册」——
             // 那句话藏不掉（唯一约束自带），但没必要再花一条短信去说
             case REGISTER -> exists ? SmsDelivery.SUPPRESS : SmsDelivery.DELIVER;
-            // 登录和重置：没有账号就没有可登录/可重置的东西，不发
-            case LOGIN, RESET_PASSWORD -> exists ? SmsDelivery.DELIVER : SmsDelivery.SUPPRESS;
+            // 重置：没有账号就没有可重置的东西，不发
+            case RESET_PASSWORD -> exists ? SmsDelivery.DELIVER : SmsDelivery.SUPPRESS;
+            // 🔴 登录场景的短信只用于观察档二次验证，那条路现在凭票发码（MemberAuthService.sendChallengeCode，
+            //    不经过本类）。走到这里说明有人从匿名的公开发码接口要 LOGIN 码 —— 那正是要关掉的口子：
+            //    任何人输一个手机号就能让我们给机主发一条要钱的短信。网关已拒，这里是第二道：照常计数，但不发
+            case LOGIN -> SmsDelivery.SUPPRESS;
             /*
              * 🔴 绑定看的是「被【别人】占了没有」，不是「有没有人占」。
              *    按 exists 判的话，会员想给【自己的旧号码】发码

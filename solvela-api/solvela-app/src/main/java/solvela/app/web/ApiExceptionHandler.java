@@ -34,7 +34,8 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handle(ApiException e, HttpServletRequest request) {
         log.info("[API] {} {} -> {} {}", request.getMethod(), request.getRequestURI(),
                 e.error().code(), e.getMessage());
-        return build(e.error(), e.getMessage());
+        return ResponseEntity.status(e.error().status())
+                .body(new ApiErrorResponse(e.error().code(), e.getMessage(), traceId(), e.details()));
     }
 
     /**

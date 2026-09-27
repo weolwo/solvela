@@ -1,5 +1,9 @@
 package solvela.app.web;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.Map;
+
 /**
  * 错误响应体。<b>只有失败才有 body 结构，成功直接返回数据本身。</b>
  *
@@ -13,6 +17,13 @@ package solvela.app.web;
  * @param code    稳定的机器码，见 {@link ApiErrors#code()}。<b>客户端按它分支</b>
  * @param message 给人看的一句话，可直接展示
  * @param traceId 本次请求的链路 id。用户截图报障时，凭它一次定位到日志
+ * @param details 个别错误要带给客户端的附加数据（目前只有登录二次验证的凭票）。
+ *                <b>为空时不序列化</b> —— 其余所有错误响应的形状一个字节都不变
  */
-public record ApiErrorResponse(String code, String message, String traceId) {
+public record ApiErrorResponse(String code, String message, String traceId,
+                               @JsonInclude(JsonInclude.Include.NON_NULL) Map<String, Object> details) {
+
+    public ApiErrorResponse(String code, String message, String traceId) {
+        this(code, message, traceId, null);
+    }
 }

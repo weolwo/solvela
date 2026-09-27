@@ -76,7 +76,10 @@
 - 「下线**某一台**设备」只踢会话、**不撤那台的信任**；要彻底清掉请用「下线其他设备」或重置密码。后续可在契约上加 `revokeDevice`。
 - enforce 档下会员服务不可用时，拦截点直接失败（不放行）—— 守资产出口的闸不能默认开门。
 
-### 2.2 观察档改为 challenge_ticket（约 2–3 人日，前后端）
+### 2.2 观察档改为 challenge_ticket —— ✅ 已实施（2026-09-27）
+密码验对 → 签 5 分钟、绑设备的一次性凭票（`LoginChallengeStore`，Redis 只存摘要）→ `/auth/login/challenge/code` 凭票发码（发到票上的登录身份）→ `/auth/login/challenge/verify` 凭票验码即登录。码错可再试，错到作废则票一并作废（`CHALLENGE_EXPIRED`，回到输密码）。匿名短信 LOGIN 场景关闭。顺带修掉：旧前端的二次验证只会要短信码，邮箱+密码用户在观察档设备上永远过不去。
+
+原设计稿：
 - 现在观察档要求客户端把密码留在内存里再发一次。
 - 更要紧：`/sms/code` 的 LOGIN 场景**匿名可调**，号码存在就真发（`solvela-member/.../sms/MemberSmsCodeIssuer.java` 的场景分派）。
   所以 `checkDeviceChallenge` 注释里"验码排在密码之后，防短信轰炸"并不完全成立——轰炸者不必走登录接口。

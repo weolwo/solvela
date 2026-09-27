@@ -12,6 +12,8 @@ import solvela.member.api.DeviceTrust;
 import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.EmailCodeSendResult;
 import solvela.member.api.MemberAuthApi;
+import solvela.member.api.LoginChallengeCodeResult;
+import solvela.member.api.LoginChallengeCmd;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberContactView;
@@ -59,6 +61,16 @@ public class CookieSessionStub {
     @Primary
     public MemberAuthApi cookieStubMemberAuthApi() {
         return new MemberAuthApi() {
+            @Override
+            public LoginChallengeCodeResult sendChallengeCode(LoginChallengeCmd cmd) {
+                throw new UnsupportedOperationException("观察档凭票流程由会员域自己的用例负责");
+            }
+
+            @Override
+            public MemberAuthResult verifyChallenge(LoginChallengeCmd cmd) {
+                throw new UnsupportedOperationException("观察档凭票流程由会员域自己的用例负责");
+            }
+
             @Override
             public MemberAuthResult authenticate(MemberAuthCmd cmd) {
                 return MemberAuthResult.ok(identity());

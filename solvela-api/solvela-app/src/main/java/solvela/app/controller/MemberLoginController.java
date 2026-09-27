@@ -17,6 +17,8 @@ import solvela.app.auth.RequestCredentials;
 import solvela.app.domain.EmailBindRequest;
 import solvela.app.domain.EmailCodeRequest;
 import solvela.app.domain.PhoneBindRequest;
+import solvela.app.domain.LoginChallengeCodeView;
+import solvela.app.domain.LoginChallengeRequest;
 import solvela.app.domain.SessionAdoptRequest;
 import solvela.app.domain.SessionRevokeRequest;
 import solvela.member.api.MemberContactView;
@@ -127,6 +129,32 @@ public class MemberLoginController {
     public MemberResult login(@RequestBody @Valid MemberLoginRequest request,
                               HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         MemberResult result = memberLoginService.login(request, ClientIp.of(servletRequest));
+        return request.cookieDelivery() ? deliverByCookie(result, request.rememberMe(), servletResponse) : result;
+    }
+
+    /**
+     * 登录二次验证：凭票发码。{@code /auth/login} 回 {@code DEVICE_VERIFICATION_REQUIRED} 时，
+     * 响应的 details 里带着 challengeTicket，客户端凭它来这里要码。
+     *
+     * <p>{@link Anonymous}：此时还没有会话。安全不靠登录态，靠「不知道密码就拿不到票」。
+     */
+    @Anonymous
+    @PostMapping("/login/challenge/code")
+    public LoginChallengeCodeView sendChallengeCode(@RequestBody @Valid LoginChallengeRequest request,
+                                                    HttpServletRequest servletRequest) {
+        return new LoginChallengeCodeView(
+                memberLoginService.sendChallengeCode(request.ticket(), ClientIp.of(servletRequest)));
+    }
+
+    /**
+     * 登录二次验证：凭票验码，通过即登录成功。Web 端同样只经 cookie 下发令牌。
+     */
+    @Anonymous
+    @PostMapping("/login/challenge/verify")
+    public MemberResult verifyChallenge(@RequestBody @Valid LoginChallengeRequest request,
+                                        HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        MemberResult result = memberLoginService.verifyChallenge(
+                request.ticket(), request.code(), ClientIp.of(servletRequest));
         return request.cookieDelivery() ? deliverByCookie(result, request.rememberMe(), servletResponse) : result;
     }
 

@@ -109,6 +109,15 @@ class MemberSmsCodeIssuerTest {
     // ============================== 登录 / 重置 ==============================
 
     @Test
+    @DisplayName("🔴 登录场景：号码注册过也不发 —— 这个码只用于观察档二次验证，那条路改成了凭票发码")
+    void 匿名登录码一律不发() {
+        phoneRegistered(true);
+
+        assertEquals(SmsDelivery.SUPPRESS, deliveryOf(SmsScene.LOGIN, null),
+                "匿名入口还能真发的话，任何人输一个手机号就能让我们给机主发一条要钱的短信");
+    }
+
+    @Test
     @DisplayName("🔴 重置密码：没注册过 → 不发。给陌生号码发重置码是纯浪费，也是骚扰")
     void 重置陌生号码() {
         phoneRegistered(false);

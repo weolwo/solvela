@@ -55,6 +55,24 @@ public interface MemberAuthApi {
     MemberAuthResult authenticate(@RequestBody MemberAuthCmd cmd);
 
     /**
+     * 登录二次验证：凭票发码。码发到<b>登录用的那个身份</b>上（邮箱登录发邮件，手机号登录发短信），
+     * 收码地址由票决定，客户端改不了。
+     *
+     * <p>🔴 不知道密码就拿不到票，拿不到票就发不了码 —— 这正是它取代「匿名发码」的理由。
+     */
+    @PostExchange("/challenge/code")
+    LoginChallengeCodeResult sendChallengeCode(@RequestBody LoginChallengeCmd cmd);
+
+    /**
+     * 登录二次验证：凭票验码。通过即完成登录（返回身份），票随即作废。
+     *
+     * <p>码错时返回 {@link AuthFailReason#DEVICE_VERIFICATION_FAILED}，票还能再试；
+     * 码被错到作废、票过期、换了设备，一律 {@link AuthFailReason#CHALLENGE_EXPIRED}，要重新登录。
+     */
+    @PostExchange("/challenge/verify")
+    MemberAuthResult verifyChallenge(@RequestBody LoginChallengeCmd cmd);
+
+    /**
      * 发一封邮箱验证码。
      *
      * <p>挂在<b>认证契约</b>上而不是另建一个 Api，理由同 {@link #register} 的注释：

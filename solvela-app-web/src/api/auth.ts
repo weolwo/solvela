@@ -32,20 +32,6 @@ export interface LoginPayload {
   loginType?: LoginType
   identity: string
   credential: string
-  /**
-   * 二次验证码。**只在服务端回过 DEVICE_VERIFICATION_REQUIRED 之后才需要带**。
-   *
-   * 与 `credential` 不是一回事：credential 是「你知道什么」（密码），
-   * 这一项是「这台设备最近可疑，再证明一次你能收到本人的短信」。
-   *
-   * 客户端不必先问一次「要不要验」—— 先不带地提交，被回绝了再补。
-   * 多一次往返，换的是绝大多数登录不受影响。
-   *
-   * 🔴 类型带上 `| undefined` 不是啰嗦：tsconfig 开了 exactOptionalPropertyTypes，
-   * 在那个开关下「没传这个字段」和「传了 undefined」是两件事，
-   * 而调用方最自然的写法就是 `verificationCode: code || undefined`。
-   */
-  verificationCode?: string | undefined
   deviceType?: DeviceType
 }
 
@@ -173,6 +159,41 @@ export async function login(payload: LoginPayload, remember: boolean): Promise<L
     url: '/auth/login',
     method: 'POST',
     data: { loginType: 'PHONE_PASSWORD', deviceType: 'H5', ...payload, useCookie: true, remember },
+  })
+  return toLoginResult(raw)
+}
+
+/**
+ * 登录二次验证（这台设备处在观察档）：凭票发码。
+ *
+ * 票来自 `/auth/login` 回 `DEVICE_VERIFICATION_REQUIRED` 时的 `details.challengeTicket`。
+ * 码发到哪由票决定（登录用的那个邮箱 / 手机号）—— 所以这里没有邮箱、手机号参数。
+ *
+ * @returns 打过码的收件地址，展示「已发送到 xxx」
+ */
+export async function sendLoginChallengeCode(ticket: string): Promise<string> {
+  const view = await request<{ maskedTarget: string }>({
+    url: '/auth/login/challenge/code',
+    method: 'POST',
+    data: { ticket },
+  })
+  return view.maskedTarget
+}
+
+/**
+ * 登录二次验证：凭票验码，通过即登录成功。形状与 {@link login} 一致，令牌同样只经 cookie 下发。
+ *
+ * 🔴 不用再交一次密码：密码在签票时已经验过了，客户端不必把它一直留在内存里。
+ */
+export async function verifyLoginChallenge(
+  ticket: string,
+  code: string,
+  remember: boolean,
+): Promise<LoginResult> {
+  const raw = await request<RawLoginResult>({
+    url: '/auth/login/challenge/verify',
+    method: 'POST',
+    data: { ticket, code, useCookie: true, remember },
   })
   return toLoginResult(raw)
 }

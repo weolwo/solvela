@@ -11,6 +11,8 @@ import solvela.member.api.MemberPasswordResetResult;
 import solvela.member.api.MemberEmailBindResult;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
+import solvela.member.api.LoginChallengeCodeResult;
+import solvela.member.api.LoginChallengeCmd;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberPhoneBindCmd;
 import solvela.member.api.MemberPhoneBindResult;
@@ -52,6 +54,16 @@ public class MemberAuthInternalController implements MemberAuthApi {
     @Override
     public MemberAuthResult authenticate(MemberAuthCmd cmd) {
         return memberAuthService.authenticate(cmd);
+    }
+
+    @Override
+    public LoginChallengeCodeResult sendChallengeCode(LoginChallengeCmd cmd) {
+        return memberAuthService.sendChallengeCode(cmd);
+    }
+
+    @Override
+    public MemberAuthResult verifyChallenge(LoginChallengeCmd cmd) {
+        return memberAuthService.verifyChallenge(cmd);
     }
 
     @Override

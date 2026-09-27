@@ -19,6 +19,8 @@ import solvela.member.api.AuthFailReason;
 import solvela.member.api.MemberAuthApi;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
+import solvela.member.api.LoginChallengeCmd;
+import solvela.member.api.LoginChallengeCodeResult;
 import solvela.member.api.MemberIdentity;
 import solvela.member.api.MemberLogoutCmd;
 import solvela.member.api.MemberRegisterCmd;
@@ -101,6 +103,7 @@ public class MemberAuthService implements MemberAuthApi {
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
     private final LoginIpGuard loginIpGuard;
+    private final LoginChallengeStore challengeStore;
     private final MemberEmailCodeService emailCodeService;
     private final MemberEmailCodeIssuer emailCodeIssuer;
 
@@ -218,17 +221,23 @@ public class MemberAuthService implements MemberAuthApi {
         }
 
         // ---------- 设备观察档：二次验证 ----------
-        // 🔴 排在密码校验【之后】：排在之前的话，任何人拿一个手机号就能让我们
-        //    给机主发一条短信 —— 而短信是花钱的，那就成了免费的轰炸接口。
+        // 🔴 排在密码校验【之后】：不知道密码就拿不到票，拿不到票就发不了码 ——
+        //    那条码是花钱的（短信），也是轰炸的原料
         MemberAuthResult deviceChallenge = checkDeviceChallenge(loginType, identity, member, cmd);
         if (deviceChallenge != null) {
-            // 「还差一步」不算失败，「码错了」算
-            if (deviceChallenge.reason() == AuthFailReason.DEVICE_VERIFICATION_FAILED) {
-                loginIpGuard.recordFailure(cmd.clientIp());
-            }
             return deviceChallenge;
         }
 
+        return completeLogin(member, cmd);
+    }
+
+    /**
+     * 登录的收尾：清失败计数、判一机多号、写登录日志。
+     *
+     * <p>正常登录与「观察档凭票验码成功」共用这一段 —— 两条路最后必须走同一套收尾，
+     * 否则凭票那条会悄悄漏掉一机多号的记录，而 dry-run 期间要的正是这份数据。
+     */
+    private MemberAuthResult completeLogin(Member member, MemberAuthCmd cmd) {
         operationLimitService.clearFail(member.getMemberId(), MemberOperationTypeEnum.LOGIN);
 
         // 一机多号只能在这里判 —— 在此之前拿不到 memberId。
@@ -244,16 +253,17 @@ public class MemberAuthService implements MemberAuthApi {
     }
 
     /**
-     * 观察档设备的二次验证。正常设备返回 null（什么都不做）。
+     * 观察档设备的二次验证：签一张凭票。正常设备返回 null（什么都不做）。
      *
      * <h3>为什么是「多验一道」而不是「直接拒」</h3>
      * 方案里那句「优先降级，不优先拒绝」落在这里。误伤的代价不对称：
      * 拦错一个正常用户，他不会来报障，只会不再打开；而多要一道验证码，
-     * 正常用户只是多花十秒，刷子却要为<b>每一台设备</b>付出一条短信的成本。
+     * 正常用户只是多花十秒，刷子却要为<b>每一台设备</b>付出一条验证码的成本。
      *
-     * <h3>用哪条通道，跟着登录身份走</h3>
-     * 用 switch 表达式：新增登录方式时<b>编译不过</b>，
-     * 而不是悄悄落进某个兜底分支，让观察档对那条新通道形同虚设。
+     * <h3>为什么是凭票，而不是让客户端带着码再登一次</h3>
+     * 旧做法让客户端把密码留在内存里等用户收码、再整个交一遍，而码由客户端自己去<b>匿名</b>的发码接口要 ——
+     * 于是「验码排在密码之后、防轰炸」并不成立。现在只有验对了密码才签票，发码与验码都只认票，
+     * 码发到哪由票上的身份决定。见 {@link #sendChallengeCode} / {@link #verifyChallenge}。
      */
     private MemberAuthResult checkDeviceChallenge(MemberLoginType loginType, String identity,
                                                   Member member, MemberAuthCmd cmd) {
@@ -268,28 +278,109 @@ public class MemberAuthService implements MemberAuthApi {
         if (loginType == MemberLoginType.EMAIL_CODE) {
             return null;
         }
-        if (SolvelaStringUtil.isBlank(cmd.verificationCode())) {
-            saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：需要二次验证");
-            return MemberAuthResult.fail(AuthFailReason.DEVICE_VERIFICATION_REQUIRED);
+        String ticket = challengeStore.issue(new LoginChallengeStore.Challenge(
+                member.getMemberId(), loginType, cmd.deviceId(), cmd.deviceType(), identity));
+        saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：已签发二次验证凭票");
+        return MemberAuthResult.challenge(ticket);
+    }
+
+    @Override
+    public LoginChallengeCodeResult sendChallengeCode(LoginChallengeCmd cmd) {
+        LoginChallengeStore.Challenge challenge = validChallenge(cmd);
+        if (challenge == null) {
+            return LoginChallengeCodeResult.fail(LoginChallengeCodeResult.Reason.CHALLENGE_EXPIRED);
         }
-        // 用哪条通道跟着登录身份走。switch 表达式：新增登录方式时【编译不过】，
-        // 而不是悄悄落进兜底分支，让观察档对那条新通道形同虚设
-        boolean passed = switch (loginType) {
-            // 手机号+密码：发一条短信到本人号码
-            case PHONE_PASSWORD ->
-                    smsCodeService.verify(SmsScene.LOGIN, identity, cmd.verificationCode())
-                            == SmsCodeVerifyResult.OK;
-            // 邮箱+密码：邮箱一定有（就是用它登的），发到那个邮箱
-            case EMAIL_PASSWORD ->
-                    emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.verificationCode())
-                            == EmailCodeVerifyResult.OK;
-            case EMAIL_CODE -> throw new IllegalStateException("不可能走到：EMAIL_CODE 已在上面返回");
+        // 码发到哪跟着票上的登录身份走。switch 表达式：新增登录方式时【编译不过】
+        return switch (challenge.loginType()) {
+            case PHONE_PASSWORD -> {
+                SmsCodeSendResult sent = smsCodeService.send(SmsScene.LOGIN, challenge.identity(), cmd.clientIp());
+                yield sent.success()
+                        ? LoginChallengeCodeResult.sent(MemberPhoneUtil.mask(challenge.identity()))
+                        : toChallengeFailure(sent.reason().name(), sent.retryAfterSeconds());
+            }
+            case EMAIL_PASSWORD -> {
+                EmailCodeSendResult sent = emailCodeService.send(EmailCodeScene.LOGIN, challenge.identity(), cmd.clientIp());
+                yield sent.success()
+                        ? LoginChallengeCodeResult.sent(MemberEmailUtil.mask(challenge.identity()))
+                        : toChallengeFailure(sent.reason().name(), sent.retryAfterSeconds());
+            }
+            case EMAIL_CODE -> throw new IllegalStateException("不可能走到：邮箱验证码登录不签凭票");
         };
-        if (passed) {
+    }
+
+    /**
+     * 两条通道的发码失败原因同名（TOO_FREQUENT / DAILY_LIMIT_REACHED / SEND_FAILED / 格式错）。
+     * 格式错只可能是库里的数据坏了，当成发不出去。
+     */
+    private static LoginChallengeCodeResult toChallengeFailure(String reason, long retryAfterSeconds) {
+        return switch (reason) {
+            case "TOO_FREQUENT" -> LoginChallengeCodeResult.retryLater(
+                    LoginChallengeCodeResult.Reason.TOO_FREQUENT, retryAfterSeconds);
+            case "DAILY_LIMIT_REACHED" -> LoginChallengeCodeResult.retryLater(
+                    LoginChallengeCodeResult.Reason.DAILY_LIMIT_REACHED, retryAfterSeconds);
+            default -> LoginChallengeCodeResult.fail(LoginChallengeCodeResult.Reason.SEND_FAILED);
+        };
+    }
+
+    @Override
+    public MemberAuthResult verifyChallenge(LoginChallengeCmd cmd) {
+        LoginChallengeStore.Challenge challenge = validChallenge(cmd);
+        if (challenge == null) {
+            return MemberAuthResult.fail(AuthFailReason.CHALLENGE_EXPIRED);
+        }
+        // 登录日志、一机多号记在【签票时】那台设备上 —— 票上记着，不信请求当时带的
+        MemberAuthCmd authCmd = new MemberAuthCmd(challenge.loginType(), challenge.identity(), null, null,
+                challenge.deviceType(), cmd.clientIp(), challenge.deviceId());
+
+        long ipWait = loginIpGuard.check(cmd.clientIp());
+        if (ipWait > 0) {
+            return MemberAuthResult.ipLimited(ipWait);
+        }
+
+        String identity = challenge.identity();
+        String outcome = switch (challenge.loginType()) {
+            case PHONE_PASSWORD -> smsCodeService.verify(SmsScene.LOGIN, identity, cmd.code()).name();
+            case EMAIL_PASSWORD -> emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.code()).name();
+            case EMAIL_CODE -> throw new IllegalStateException("不可能走到：邮箱验证码登录不签凭票");
+        };
+        if ("TOO_MANY_ATTEMPTS".equals(outcome)) {
+            // 码被错到作废：票也作废，让他从输密码重新来 —— 否则同一张票可以无限次「重新发码再猜」
+            challengeStore.discard(cmd.ticket());
+            loginIpGuard.recordFailure(cmd.clientIp());
+            saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：二次验证码错误次数过多");
+            return MemberAuthResult.fail(AuthFailReason.CHALLENGE_EXPIRED);
+        }
+        if (!"OK".equals(outcome)) {
+            loginIpGuard.recordFailure(cmd.clientIp());
+            saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：二次验证码不正确");
+            return MemberAuthResult.fail(AuthFailReason.DEVICE_VERIFICATION_FAILED);
+        }
+
+        challengeStore.discard(cmd.ticket());
+        // 签票到验码之间账号可能被冻结了 —— 状态以此刻为准
+        Member member = memberAuthDao.selectForAuth(challenge.memberId());
+        if (member == null) {
+            return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
+        }
+        MemberAuthResult statusProblem = checkStatus(member, authCmd);
+        if (statusProblem != null) {
+            return statusProblem;
+        }
+        return completeLogin(member, authCmd);
+    }
+
+    /**
+     * 找票，并确认它是在<b>这台设备</b>上签的。无效一律返回 null。
+     *
+     * <p>🔴 设备必须一致：票是在「这台可疑设备上、密码已验对」这个前提下签的，
+     * 拿到别的机器上用，那个前提就不成立了。
+     */
+    private LoginChallengeStore.Challenge validChallenge(LoginChallengeCmd cmd) {
+        LoginChallengeStore.Challenge challenge = challengeStore.find(cmd.ticket());
+        if (challenge == null || !java.util.Objects.equals(challenge.deviceId(), cmd.deviceId())) {
             return null;
         }
-        saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：二次验证码不正确");
-        return MemberAuthResult.fail(AuthFailReason.DEVICE_VERIFICATION_FAILED);
+        return challenge;
     }
 
     /**

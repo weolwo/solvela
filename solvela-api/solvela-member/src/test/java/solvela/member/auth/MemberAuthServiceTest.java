@@ -22,6 +22,9 @@ import solvela.member.MemberOperationLimit;
 import solvela.member.api.AuthFailReason;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
+import solvela.member.api.SmsCodeSendResult;
+import solvela.member.api.LoginChallengeCodeResult;
+import solvela.member.api.LoginChallengeCmd;
 import solvela.member.device.DeviceDispositionService;
 import solvela.member.device.DeviceGuard;
 import solvela.member.sms.MemberSmsCodeService;
@@ -96,6 +99,10 @@ class MemberAuthServiceTest {
     private PiiHasher piiHasher;
     @Mock
     private DeviceGuard deviceGuard;
+    @Mock
+    private LoginIpGuard loginIpGuard;
+    @Mock
+    private LoginChallengeStore challengeStore;
     @Mock
     private DeviceDispositionService dispositionService;
     @Mock
@@ -340,9 +347,10 @@ class MemberAuthServiceTest {
     // ------------------------------------------------------------------ 设备观察档
 
     @Test
-    @DisplayName("🔴 观察档 + 没给码 → DEVICE_VERIFICATION_REQUIRED，而不是登录失败")
+    @DisplayName("🔴 观察档 + 密码对 → DEVICE_VERIFICATION_REQUIRED，并签一张绑在这台设备上的凭票")
     void 观察档要二次验证() {
         deviceUnderObservation();
+        when(challengeStore.issue(any())).thenReturn("lc_ticket");
 
         MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
 
@@ -350,27 +358,104 @@ class MemberAuthServiceTest {
         assertEquals(AuthFailReason.DEVICE_VERIFICATION_REQUIRED, result.reason(),
                 "密码是对的，只是还差一步。回成 BAD_CREDENTIALS 的话，"
                         + "用户会一直以为自己密码记错了，去走找回密码 —— 而那解决不了他的问题");
+        assertEquals("lc_ticket", result.challengeTicket());
+        verify(challengeStore).issue(eq(new LoginChallengeStore.Challenge(
+                MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5", PHONE)));
     }
 
     @Test
-    @DisplayName("观察档 + 码不对 → FAILED，与「没给」分得开")
-    void 观察档码不对() {
+    @DisplayName("🔴 观察档 + 登录请求里自带了码 → 不再直接放行，照样要走凭票")
+    void 自带码不再放行() {
         deviceUnderObservation();
+        when(challengeStore.issue(any())).thenReturn("lc_ticket");
+
+        MemberAuthResult result = service.authenticate(cmdWithCode("123456"));
+
+        assertEquals(AuthFailReason.DEVICE_VERIFICATION_REQUIRED, result.reason(),
+                "旧路径（带着码重新登录）的码来自匿名发码接口 —— 那个口子已经关了，这条路也不能再通");
+        verify(smsCodeService, never()).verify(any(), any(), any());
+    }
+
+    // ------------------------------------------------------------------ 凭票发码 / 验码
+
+    private static final String TICKET = "lc_ticket";
+
+    private void validTicket() {
+        when(challengeStore.find(TICKET)).thenReturn(new LoginChallengeStore.Challenge(
+                MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5", PHONE));
+    }
+
+    private static LoginChallengeCmd ticketCmd(String code, String deviceId) {
+        return new LoginChallengeCmd(TICKET, code, "127.0.0.1", deviceId);
+    }
+
+    @Test
+    @DisplayName("凭票发码：发到票上记着的那个手机号，客户端说了不算")
+    void 凭票发码() {
+        validTicket();
+        when(smsCodeService.send(eq(SmsScene.LOGIN), eq(PHONE), any())).thenReturn(SmsCodeSendResult.ok());
+
+        LoginChallengeCodeResult result = service.sendChallengeCode(ticketCmd(null, DEVICE_ID));
+
+        assertTrue(result.success());
+        verify(smsCodeService).send(eq(SmsScene.LOGIN), eq(PHONE), any());
+    }
+
+    @Test
+    @DisplayName("凭票验码 + 码对 → 登录成功，票作废，照常写成功日志")
+    void 凭票码对() {
+        validTicket();
+        when(smsCodeService.verify(SmsScene.LOGIN, PHONE, "123456")).thenReturn(SmsCodeVerifyResult.OK);
+        when(memberAuthDao.selectForAuth(MEMBER_ID)).thenReturn(member);
+
+        MemberAuthResult result = service.verifyChallenge(ticketCmd("123456", DEVICE_ID));
+
+        assertTrue(result.success());
+        assertEquals(MEMBER_ID, result.identity().memberId());
+        verify(challengeStore).discard(TICKET);
+        verify(deviceGuard).checkMemberFanout(DEVICE_ID, MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("凭票验码 + 码不对 → DEVICE_VERIFICATION_FAILED，票还留着可以再试")
+    void 凭票码不对() {
+        validTicket();
         when(smsCodeService.verify(any(), any(), any())).thenReturn(SmsCodeVerifyResult.MISMATCH);
 
         assertEquals(AuthFailReason.DEVICE_VERIFICATION_FAILED,
-                service.authenticate(cmdWithCode("000000")).reason(),
-                "「还需要一步」和「你给的不对」是两件事：客户端据此决定弹输入框还是报错");
+                service.verifyChallenge(ticketCmd("000000", DEVICE_ID)).reason());
+        verify(challengeStore, never()).discard(any());
+        verify(loginIpGuard).recordFailure("127.0.0.1");
     }
 
     @Test
-    @DisplayName("观察档 + 码对 → 正常放行")
-    void 观察档码对了() {
-        deviceUnderObservation();
-        when(smsCodeService.verify(eq(SmsScene.LOGIN), eq(PHONE), eq("123456")))
-                .thenReturn(SmsCodeVerifyResult.OK);
+    @DisplayName("🔴 码被错到作废 → 票也作废（CHALLENGE_EXPIRED），不能拿同一张票无限次「重发再猜」")
+    void 错太多票作废() {
+        validTicket();
+        when(smsCodeService.verify(any(), any(), any())).thenReturn(SmsCodeVerifyResult.TOO_MANY_ATTEMPTS);
 
-        assertTrue(service.authenticate(cmdWithCode("123456")).success());
+        assertEquals(AuthFailReason.CHALLENGE_EXPIRED,
+                service.verifyChallenge(ticketCmd("000000", DEVICE_ID)).reason());
+        verify(challengeStore).discard(TICKET);
+    }
+
+    @Test
+    @DisplayName("🔴 票拿到别的设备上用 → CHALLENGE_EXPIRED，连码都不验")
+    void 换设备无效() {
+        validTicket();
+
+        assertEquals(AuthFailReason.CHALLENGE_EXPIRED,
+                service.verifyChallenge(ticketCmd("123456", "ffffffffffffffffffffffffffffffff")).reason());
+        assertFalse(service.sendChallengeCode(ticketCmd(null, "ffffffffffffffffffffffffffffffff")).success());
+        verify(smsCodeService, never()).verify(any(), any(), any());
+        verify(smsCodeService, never()).send(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("票不存在 / 过期 → CHALLENGE_EXPIRED")
+    void 票无效() {
+        assertEquals(AuthFailReason.CHALLENGE_EXPIRED,
+                service.verifyChallenge(ticketCmd("123456", DEVICE_ID)).reason());
     }
 
     @Test

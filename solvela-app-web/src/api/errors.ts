@@ -26,6 +26,11 @@ export const API_ERROR_CODES = [
    * 那正是「用户卡死但服务端一切正常」。
    */
   'DEVICE_VERIFICATION_REQUIRED',
+  /**
+   * 登录二次验证的凭票失效了（过期、码错太多次被作废、换了设备）。
+   * 要回到输密码那一步重新登录拿新票 —— 再点多少次「获取验证码」都没用。
+   */
+  'CHALLENGE_EXPIRED',
   'ACCOUNT_DISABLED',
   'FORBIDDEN',
   /**
@@ -54,6 +59,8 @@ export interface ApiErrorResponse {
   code: string
   message: string
   traceId: string
+  /** 个别错误带的附加数据（目前只有登录二次验证的 challengeTicket）。绝大多数错误没有 */
+  details?: Record<string, unknown>
 }
 
 function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
@@ -73,13 +80,22 @@ export class ApiError extends Error {
   readonly code: ErrorCode
   readonly traceId: string | null
   readonly status: number | null
+  /** 见 {@link ApiErrorResponse.details} */
+  readonly details: Record<string, unknown> | null
 
-  constructor(code: ErrorCode, message: string, traceId: string | null, status: number | null) {
+  constructor(
+    code: ErrorCode,
+    message: string,
+    traceId: string | null,
+    status: number | null,
+    details: Record<string, unknown> | null = null,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.traceId = traceId
     this.status = status
+    this.details = details
   }
 
   /** 是否是「没有有效身份、需要重新登录」。注意 BAD_CREDENTIALS 同为 401 但**不属于**此类 */
@@ -111,6 +127,7 @@ export function toApiError(
       body.message,
       typeof body.traceId === 'string' ? body.traceId : null,
       status,
+      typeof body.details === 'object' && body.details !== null ? body.details : null,
     )
   }
   return new ApiError(

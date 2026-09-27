@@ -1,5 +1,7 @@
 package solvela.app.web;
 
+import java.util.Map;
+
 /**
  * 业务异常。抛出去，由 {@link ApiExceptionHandler} 翻成 HTTP 响应。
  *
@@ -18,6 +20,9 @@ public class ApiException extends RuntimeException {
 
     private final ApiErrors error;
 
+    /** 附加数据，见 {@link ApiErrorResponse#details()}。绝大多数错误没有 */
+    private final Map<String, Object> details;
+
     public ApiException(ApiErrors error) {
         this(error, error.defaultMessage());
     }
@@ -26,12 +31,22 @@ public class ApiException extends RuntimeException {
      * 带具体文案。这句话<b>会原样给到用户</b>，所以不要往里放 SQL、类名、堆栈或 id 之类的内部信息。
      */
     public ApiException(ApiErrors error, String message) {
+        this(error, message, null);
+    }
+
+    /** 带附加数据。details 同样会原样给到客户端，规矩同上 */
+    public ApiException(ApiErrors error, String message, Map<String, Object> details) {
         super(message, null, false, false);
         this.error = error;
+        this.details = details;
     }
 
     public ApiErrors error() {
         return error;
+    }
+
+    public Map<String, Object> details() {
+        return details;
     }
 
     /**

@@ -10,6 +10,8 @@ import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.EmailCodeSendResult;
 import solvela.member.api.EmailBindFailReason;
 import solvela.member.api.MemberAuthApi;
+import solvela.member.api.LoginChallengeCodeResult;
+import solvela.member.api.LoginChallengeCmd;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberPhoneBindCmd;
 import solvela.member.api.MemberPhoneBindResult;
@@ -44,6 +46,16 @@ public class ApiContractDownstreamStub {
     @Primary
     public MemberAuthApi stubMemberAuthApi() {
         return new MemberAuthApi() {
+            @Override
+            public LoginChallengeCodeResult sendChallengeCode(LoginChallengeCmd cmd) {
+                throw new UnsupportedOperationException("观察档凭票流程由会员域自己的用例负责");
+            }
+
+            @Override
+            public MemberAuthResult verifyChallenge(LoginChallengeCmd cmd) {
+                throw new UnsupportedOperationException("观察档凭票流程由会员域自己的用例负责");
+            }
+
             @Override
             public MemberAuthResult authenticate(MemberAuthCmd cmd) {
                 // 只区分「像不像手机号」这一件事：契约测试要的是

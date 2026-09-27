@@ -8,19 +8,23 @@ import { ApiError } from '@/api/errors'
 import LoginView from '../LoginView.vue'
 
 /**
- * 观察档设备的二次验证。
+ * 观察档设备的登录二次验证（凭票版）。
  *
- * <h3>这条路径做错的表现是「用户永远登不进去，而服务端一切正常」</h3>
- * 服务端回 `DEVICE_VERIFICATION_REQUIRED` 的意思是**密码已经验过了，只是还差一步**。
- * 把它当成登录失败处理的话，用户被退回登录页从头再来 —— 而他每次都会走到同一个地方，
- * 报障时只会说「我密码没错但就是登不上」。
+ * <h3>流程</h3>
+ * 输密码点登录 → 服务端回 DEVICE_VERIFICATION_REQUIRED，details 里带一张凭票 →
+ * 页面亮出验证码栏并**自动凭票发码** → 用户输码 → **凭票验码**，通过即登录成功。
  *
- * <p>所以这里钉三条：**验证码栏要冒出来**、**手机号和密码要原样留着**、
- * **补上码之后要能真的登进去**。
+ * <h3>钉住的几条</h3>
+ * <ul>
+ *   <li>🔴 第二步不再调 login、不再交密码 —— 密码在签票时已验过；</li>
+ *   <li>🔴 发码凭票，不再去匿名的短信接口要码（那个口子已经关了），邮箱登录也能走通；</li>
+ *   <li>票失效（CHALLENGE_EXPIRED）→ 回到输密码那一步，而不是让人对着「获取验证码」反复点。</li>
+ * </ul>
  */
 
-const sendSmsCode = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const loginApi = vi.hoisted(() => vi.fn())
+const sendLoginChallengeCode = vi.hoisted(() => vi.fn(() => Promise.resolve('138****8000')))
+const verifyLoginChallenge = vi.hoisted(() => vi.fn())
 
 /* mock 工厂里不能写 import() 类型注解（eslint），先在这里起个别名 */
 /* eslint-disable-next-line @typescript-eslint/consistent-type-imports */
@@ -28,8 +32,9 @@ type AuthModule = typeof import('@/api/auth')
 
 vi.mock('@/api/auth', async (importOriginal) => ({
   ...(await importOriginal<AuthModule>()),
-  sendSmsCode,
   login: loginApi,
+  sendLoginChallengeCode,
+  verifyLoginChallenge,
 }))
 
 const router = createRouter({
@@ -38,18 +43,11 @@ const router = createRouter({
     { path: '/', name: 'feed', component: { template: '<div/>' } },
     { path: '/login', name: 'login', component: { template: '<div/>' } },
     { path: '/register', name: 'register', component: { template: '<div/>' } },
-    /*
-     * 登录页上「忘记密码」是一个 RouterLink。
-     * 🔴 少了这条路由，整个 LoginView 会在渲染时抛 "No match for password-reset" ——
-     * 而报错发生在 RouterLink 里，看起来像是路由库坏了。
-     * 路由名是页面之间的契约，测试里的假路由表也得跟着它走。
-     */
     { path: '/password/reset', name: 'password-reset', component: { template: '<div/>' } },
   ],
 })
 
 const OK = {
-  accessToken: 'mb_x',
   expiresIn: 3600,
   member: {
     memberId: '1000000001',
@@ -59,6 +57,8 @@ const OK = {
     gender: 0,
   },
 }
+
+const TICKET = 'lc_ticket_1'
 
 async function mountPage() {
   await router.push('/login')
@@ -80,7 +80,7 @@ function fieldOf(w: Wrapper, placeholder: string) {
   return found!
 }
 
-/** 走一遍「提交 → 被要求二次验证」。 */
+/** 输手机号密码点登录，服务端回「还差一步」并附上凭票 */
 async function reachChallenge(w: Wrapper) {
   loginApi.mockRejectedValueOnce(
     new ApiError(
@@ -88,6 +88,9 @@ async function reachChallenge(w: Wrapper) {
       '为了你的账号安全，请输入验证码后继续',
       'tr-1',
       401,
+      {
+        challengeTicket: TICKET,
+      },
     ),
   )
   await fieldOf(w, '手机号').setValue('13800138000')
@@ -98,99 +101,115 @@ async function reachChallenge(w: Wrapper) {
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  sendSmsCode.mockReset()
-  sendSmsCode.mockResolvedValue(undefined)
   loginApi.mockReset()
   loginApi.mockResolvedValue(OK)
+  sendLoginChallengeCode.mockReset()
+  sendLoginChallengeCode.mockResolvedValue('138****8000')
+  verifyLoginChallenge.mockReset()
+  verifyLoginChallenge.mockResolvedValue(OK)
 })
 
-describe('观察档二次验证', () => {
-  it('正常设备上，验证码那一栏根本不出现', async () => {
+describe('观察档二次验证（凭票）', () => {
+  it('正常设备上，验证码那一栏根本不出现，也不发码', async () => {
     const w = await mountPage()
 
     expect(
-      inputOf(w, '短信验证码'),
+      inputOf(w, '验证码'),
       '默认就摆着的话，绝大多数用户会以为每次登录都要验一道码',
     ).toBeUndefined()
+    expect(sendLoginChallengeCode).not.toHaveBeenCalled()
   })
 
-  it('🔴 被要求二次验证 → 验证码栏冒出来，手机号和密码【原样留着】', async () => {
+  it('🔴 被要求二次验证 → 验证码栏冒出来，并自动凭票发码；手机号密码原样留着', async () => {
     const w = await mountPage()
 
     await reachChallenge(w)
 
-    expect(inputOf(w, '短信验证码'), '不亮出输入框，用户就没有任何办法继续').toBeDefined()
+    expect(inputOf(w, '验证码'), '不亮出输入框，用户就没有任何办法继续').toBeDefined()
+    expect(sendLoginChallengeCode).toHaveBeenCalledWith(TICKET)
+    expect(fieldOf(w, '手机号').element.value).toBe('13800138000')
+    expect(w.text(), '要告诉用户码寄到了哪，否则他不知道该去看短信还是邮箱').toContain(
+      '138****8000',
+    )
+  })
+
+  it('🔴 提交走凭票验码：不再调 login、不再交密码', async () => {
+    const w = await mountPage()
+    await reachChallenge(w)
+    loginApi.mockClear()
+
+    await fieldOf(w, '验证码').setValue('123456')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(verifyLoginChallenge).toHaveBeenCalledWith(TICKET, '123456', true)
     expect(
-      fieldOf(w, '手机号').element.value,
-      '清空重来的话，用户每次都会走到同一个地方，而他不知道为什么',
-    ).toBe('13800138000')
-    expect(fieldOf(w, '密码').element.value).toBe('abcd1234')
+      loginApi,
+      '第二步再调一次 login 就又要把密码交一遍 —— 凭票正是为了免掉这一步',
+    ).not.toHaveBeenCalled()
   })
 
-  it('获取验证码用的是 LOGIN 场景 —— 与注册那条码互不相干', async () => {
+  it('码错（401 BAD_CREDENTIALS）挂在验证码栏上，不当成密码错', async () => {
     const w = await mountPage()
     await reachChallenge(w)
+    verifyLoginChallenge.mockRejectedValueOnce(
+      new ApiError('BAD_CREDENTIALS', '验证码错误，请重新获取', null, 401),
+    )
 
-    const btn = w.findAll('button').find((b) => b.text().includes('获取验证码'))
-    await btn?.trigger('click')
-    await flushPromises()
-
-    expect(sendSmsCode).toHaveBeenCalledWith('LOGIN', '13800138000')
-  })
-
-  it('🔴 补上码之后要真的带上去，而且能登进去', async () => {
-    const w = await mountPage()
-    await reachChallenge(w)
-
-    await fieldOf(w, '短信验证码').setValue('123456')
+    await fieldOf(w, '验证码').setValue('000000')
     await w.find('form').trigger('submit')
     await flushPromises()
 
-    // api 层的 login(payload, remember)：remember 由服务端决定下发持久还是会话 cookie
-    expect(loginApi).toHaveBeenLastCalledWith(
-      expect.objectContaining({ identity: '13800138000', verificationCode: '123456' }),
-      expect.any(Boolean),
-    )
+    expect(inputOf(w, '验证码'), '码错了票还在，栏不能收起来').toBeDefined()
+    expect(w.text()).toContain('验证码错误')
   })
 
-  it('进到这一步之后的 401 说的是【验证码】不对，挂在验证码栏上', async () => {
+  it('🔴 票失效（CHALLENGE_EXPIRED）→ 验证码栏收起，再点登录重新走一遍拿新票', async () => {
     const w = await mountPage()
     await reachChallenge(w)
-    loginApi.mockRejectedValueOnce(
-      new ApiError('BAD_CREDENTIALS', '验证码错误，请重新获取', 'tr-2', 401),
+    verifyLoginChallenge.mockRejectedValueOnce(
+      new ApiError('CHALLENGE_EXPIRED', '验证已过期，请重新登录', null, 401),
     )
 
-    await fieldOf(w, '短信验证码').setValue('000000')
+    await fieldOf(w, '验证码').setValue('123456')
     await w.find('form').trigger('submit')
     await flushPromises()
 
-    const fieldMsgs = w.findAll('.sv-field__msg--error').map((n) => n.text())
-    expect(fieldMsgs).toContain('验证码错误，请重新获取')
+    expect(
+      inputOf(w, '验证码'),
+      '票都没了，还留着验证码栏只会让人反复点「获取验证码」',
+    ).toBeUndefined()
+    expect(w.text()).toContain('验证已过期')
+
+    loginApi.mockClear()
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(loginApi, '再提交应当重新走「密码登录」拿一张新票').toHaveBeenCalledTimes(1)
   })
 
   it('🔴 换了手机号 → 这一整轮作废，验证码栏收起来', async () => {
     const w = await mountPage()
     await reachChallenge(w)
-    expect(inputOf(w, '短信验证码')).toBeDefined()
 
     await fieldOf(w, '手机号').setValue('13900139000')
     await flushPromises()
 
     expect(
-      inputOf(w, '短信验证码'),
-      '那道码是发给上一个号的。留着它，用户会拿 A 号的码去登 B 号，' +
-        '得到一句「验证码错误」而完全不知道自己错在哪',
+      inputOf(w, '验证码'),
+      '拿 A 号的票去登 B 号，得到的只会是一句莫名其妙的错误',
     ).toBeUndefined()
   })
 
-  it('正常登录一次都不受影响：不带 verificationCode', async () => {
+  it('正常登录一次都不受影响：只调 login，不带任何二次验证字段', async () => {
     const w = await mountPage()
+
     await fieldOf(w, '手机号').setValue('13800138000')
     await fieldOf(w, '密码').setValue('abcd1234')
-
     await w.find('form').trigger('submit')
     await flushPromises()
 
-    expect(loginApi.mock.calls[0]?.[0]).toMatchObject({ verificationCode: undefined })
+    expect(loginApi).toHaveBeenCalledTimes(1)
+    expect(loginApi.mock.calls[0]?.[0]).not.toHaveProperty('verificationCode')
+    expect(verifyLoginChallenge).not.toHaveBeenCalled()
   })
 })

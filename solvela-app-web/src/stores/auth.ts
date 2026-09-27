@@ -4,6 +4,7 @@ import { computed, ref, shallowRef } from 'vue'
 import {
   adoptSession,
   fetchMe,
+  verifyLoginChallenge,
   login as loginApi,
   logout as logoutApi,
   register as registerApi,
@@ -60,6 +61,19 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(payload: LoginPayload, remember: boolean): Promise<void> {
     // 这里不吞异常：BAD_CREDENTIALS 必须原样抛给登录页去展示 message
     const result = await loginApi(payload, remember)
+    setSession(result.member)
+  }
+
+  /**
+   * 登录二次验证通过即登录成功（这台设备处在观察档时）。不吞异常：
+   * BAD_CREDENTIALS（码错）要挂在验证码栏上，CHALLENGE_EXPIRED 要让登录页回到输密码那一步。
+   */
+  async function completeLoginChallenge(
+    ticket: string,
+    code: string,
+    remember: boolean,
+  ): Promise<void> {
+    const result = await verifyLoginChallenge(ticket, code, remember)
     setSession(result.member)
   }
 
@@ -155,5 +169,15 @@ export const useAuthStore = defineStore('auth', () => {
     onStepUpRequired: requestStepUp,
   })
 
-  return { member, isLoggedIn, restoring, login, register, logout, restore, clearSession }
+  return {
+    member,
+    isLoggedIn,
+    restoring,
+    login,
+    completeLoginChallenge,
+    register,
+    logout,
+    restore,
+    clearSession,
+  }
 })
