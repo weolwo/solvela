@@ -2,6 +2,7 @@ package solvela.app.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -12,10 +13,16 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import solvela.app.web.Trace;
+
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.util.Locale;
 
 /**
  * 把异常翻成 HTTP 响应。<b>本进程唯一的错误出口。</b>
@@ -83,6 +90,43 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleMethod(HttpRequestMethodNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(new ApiErrorResponse("METHOD_NOT_ALLOWED", "请求方式不正确", traceId()));
+    }
+
+    /**
+     * 调下游（app-biz）时的 I/O 失败。分两种，只有「确定没送到」的才回 503，见 {@link ApiErrors#SERVICE_UNAVAILABLE}。
+     *
+     * <p>不打栈：连接被拒的栈对排查没有任何帮助（原因永远是「对面没在监听」），
+     * 发版重启时却会一次刷出几十屏，把真正的异常埋掉。
+     */
+    @ExceptionHandler(ResourceAccessException.class)
+    public ResponseEntity<ApiErrorResponse> handleDownstreamIo(ResourceAccessException e, HttpServletRequest request) {
+        if (!isNotDelivered(e)) {
+            return handleUnexpected(e, request);
+        }
+        log.warn("[API] {} {} 下游不可达: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return ResponseEntity.status(ApiErrors.SERVICE_UNAVAILABLE.status())
+                .header(HttpHeaders.RETRY_AFTER, "5")
+                .body(new ApiErrorResponse(ApiErrors.SERVICE_UNAVAILABLE.code(),
+                        ApiErrors.SERVICE_UNAVAILABLE.defaultMessage(), traceId()));
+    }
+
+    /**
+     * 请求是否<b>确定</b>没有送到下游：连接被拒、连接超时、域名解析不到。
+     *
+     * <p>🔴 读超时（{@code Read timed out}）刻意排除在外 —— 它和连接超时是同一个异常类，只能靠 message 区分，
+     * 而那时请求可能已经执行完了，见 {@link ApiErrors#SERVICE_UNAVAILABLE}。
+     */
+    static boolean isNotDelivered(Throwable e) {
+        for (Throwable c = e; c != null; c = c.getCause()) {
+            if (c instanceof ConnectException || c instanceof UnknownHostException) {
+                return true;
+            }
+            if (c instanceof SocketTimeoutException && c.getMessage() != null
+                    && c.getMessage().toLowerCase(Locale.ROOT).contains("connect")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

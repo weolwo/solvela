@@ -109,7 +109,20 @@ public enum ApiErrors {
     // ---------------------------------------------------------------- 500
 
     /** 服务端自己的问题。<b>message 永远是这一句</b>，异常细节只进日志。 */
-    INTERNAL(HttpStatus.INTERNAL_SERVER_ERROR, "服务开小差了，请稍后再试");
+    INTERNAL(HttpStatus.INTERNAL_SERVER_ERROR, "服务开小差了，请稍后再试"),
+
+    // ---------------------------------------------------------------- 503
+
+    /**
+     * 业务服务（app-biz）连不上：连接被拒、连接超时、域名解析不到。典型场景是发版重启的那几秒。
+     *
+     * <p>和 {@link #INTERNAL} 分开，是因为两者意味着完全不同的事：500 是「程序出错了」，
+     * 要有人去看；503 是「请求根本没送到」，等几秒重试就好，监控上也不该算成程序错误。
+     *
+     * <p>🔴 <b>只用于「确定没送到」</b>。读超时不算：那时请求可能已经在 app-biz 里执行完了，
+     * 告诉用户「稍后重试」会让他把同一笔操作再提交一次。
+     */
+    SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "服务正在更新，请稍后再试");
 
     private final HttpStatus status;
     private final String defaultMessage;

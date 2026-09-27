@@ -52,6 +52,11 @@ export const API_ERROR_CODES = [
   'NOT_FOUND',
   'CONFLICT',
   'INTERNAL',
+  /**
+   * 503：业务服务暂时连不上（多半是正在发版重启），请求**确定没有执行**，等几秒重试即可。
+   * 与 INTERNAL 区分开，是为了不把「服务在重启」当成「程序出错了」。
+   */
+  'SERVICE_UNAVAILABLE',
 ] as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number]
