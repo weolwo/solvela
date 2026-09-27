@@ -41,6 +41,12 @@ export const API_ERROR_CODES = [
    * 403 而不是 401：401 在这里的语义是「身份没了」，会被当成要重新登录。
    */
   'STEP_UP_REQUIRED',
+  /**
+   * 发验证码、密码登录之前要先过一次滑块。http.ts 会接住它、弹滑块、拿到通行票后自动重试原请求。
+   */
+  'CAPTCHA_REQUIRED',
+  /** 滑块没拖对（或图已过期）。滑块弹窗自己处理：换一张图重来 */
+  'CAPTCHA_FAILED',
   'OPERATION_LIMITED',
   'INVALID_ARGUMENT',
   'NOT_FOUND',
@@ -101,6 +107,11 @@ export class ApiError extends Error {
   /** 是否是「没有有效身份、需要重新登录」。注意 BAD_CREDENTIALS 同为 401 但**不属于**此类 */
   get isLoginRequired(): boolean {
     return this.code === 'LOGIN_REQUIRED'
+  }
+
+  /** 是否是「要先过一次滑块验证码」 */
+  get isCaptchaRequired(): boolean {
+    return this.code === 'CAPTCHA_REQUIRED'
   }
 
   /** 是否是「在这台设备上要先过一次二次验证」。见 API_ERROR_CODES 里的说明 */

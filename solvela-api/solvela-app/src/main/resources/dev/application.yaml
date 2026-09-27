@@ -106,6 +106,15 @@ solvela:
       trusted-origins:
         - http://localhost:5273
         - http://127.0.0.1:5273
+    captcha:
+      # 自建滑块验证码（CaptchaService）。上线即拦截；每个场景单独开关，误伤时只关那一处
+      #   send-code       发邮箱 / 短信验证码之前（这两个接口天生匿名，又是轰炸的原料）
+      #   password-login  密码登录之前（撞库主战场）。邮箱验证码登录不拦：发码那一步已经过过一次
+      # ⚠️ 自建滑块只能抬高批量成本，挡不住专门针对它写的破解。对抗专业黑产要换厂商
+      send-code: true
+      password-login: true
+      tolerance: 5
+      max-create-per-ip-per-minute: 20
     step-up:
       # 🔴 敏感操作二次验证的灰度档：off | observe | enforce（见 StepUpProperties）
       #

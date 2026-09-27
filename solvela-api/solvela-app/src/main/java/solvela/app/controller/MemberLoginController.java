@@ -14,6 +14,9 @@ import solvela.app.auth.Anonymous;
 import solvela.app.auth.CurrentMember;
 import solvela.app.auth.MemberPrincipal;
 import solvela.app.auth.RequestCredentials;
+import solvela.app.captcha.CaptchaProperties;
+import solvela.app.captcha.CaptchaService;
+import solvela.member.api.MemberLoginType;
 import solvela.app.domain.EmailBindRequest;
 import solvela.app.domain.EmailCodeRequest;
 import solvela.app.domain.PhoneBindRequest;
@@ -57,6 +60,10 @@ public class MemberLoginController {
 
     private final MemberSessionProperties sessionProperties;
 
+    private final CaptchaService captchaService;
+
+    private final CaptchaProperties captchaProperties;
+
     /**
      * 注册。两种方式共用这一条路由，由请求体里的 registerType 决定。
      * 成功后<b>直接返回令牌</b>，形状与登录完全一致 ——
@@ -96,6 +103,8 @@ public class MemberLoginController {
     @PostMapping("/email/code")
     public ResponseEntity<Void> sendEmailCode(@RequestBody @Valid EmailCodeRequest request,
                                               HttpServletRequest servletRequest) {
+        // 发码前过滑块：邮件是轰炸的原料，而这个接口天生匿名
+        captchaService.require(servletRequest, captchaProperties.sendCode());
         memberLoginService.sendEmailCode(request, ClientIp.of(servletRequest));
         return ResponseEntity.noContent().build();
     }
@@ -114,6 +123,8 @@ public class MemberLoginController {
     @PostMapping("/sms/code")
     public ResponseEntity<Void> sendSmsCode(@RequestBody @Valid SmsCodeRequest request,
                                             HttpServletRequest servletRequest) {
+        // 短信要花钱，比邮件更该拦
+        captchaService.require(servletRequest, captchaProperties.sendCode());
         memberLoginService.sendSmsCode(request, ClientIp.of(servletRequest));
         return ResponseEntity.noContent().build();
     }
@@ -128,6 +139,10 @@ public class MemberLoginController {
     @PostMapping("/login")
     public MemberResult login(@RequestBody @Valid MemberLoginRequest request,
                               HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        // 密码登录前过滑块 —— 撞库的主战场。邮箱验证码登录不拦：它的码在发码那一步已经过过一次滑块
+        if (request.typeOrDefault() != MemberLoginType.EMAIL_CODE) {
+            captchaService.require(servletRequest, captchaProperties.passwordLogin());
+        }
         MemberResult result = memberLoginService.login(request, ClientIp.of(servletRequest));
         return request.cookieDelivery() ? deliverByCookie(result, request.rememberMe(), servletResponse) : result;
     }

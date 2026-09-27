@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import solvela.apptest.stub.CookieSessionStub;
 
 import java.net.URI;
@@ -22,6 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(CookieSessionStub.class)
+@TestPropertySource(properties = {
+        // 本类测的不是滑块：发码、密码登录的滑块由 CaptchaFlowTest 负责
+        "solvela.app.captcha.send-code=false",
+        "solvela.app.captcha.password-login=false",
+})
 class CspReportTest {
 
     private static final HttpClient HTTP = HttpClient.newHttpClient();

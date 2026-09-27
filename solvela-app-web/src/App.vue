@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 
+import CaptchaDialog from '@/components/CaptchaDialog.vue'
 import ForceAckDialog from '@/components/ForceAckDialog.vue'
 import StepUpDialog from '@/components/StepUpDialog.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -48,6 +49,12 @@ const showTabBar = computed(() => route.meta.tab === true)
     只在登录后挂：二次验证本来就只发生在已登录的请求上。
   -->
   <StepUpDialog v-if="auth.isLoggedIn" />
+
+  <!--
+    滑块验证码。【不】随登录态挂载：它保护的正是登录、发验证码这些未登录时的操作。
+    由 http 拦截器唤起（服务端返回 CAPTCHA_REQUIRED 时），拖对后原请求自动重试。
+  -->
+  <CaptchaDialog />
 </template>
 
 <style scoped>

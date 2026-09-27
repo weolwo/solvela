@@ -15,6 +15,7 @@ import {
 import { ensureDevice } from '@/api/device'
 import { ApiError } from '@/api/errors'
 import { configureHttp } from '@/api/http'
+import { requestCaptcha } from '@/composables/useCaptcha'
 import { finishStepUp, requestStepUp } from '@/composables/useStepUp'
 import { clearSessionHint, hasSessionHint, setSessionHint } from '@/utils/session-hint'
 import { clearToken, readToken } from '@/utils/token-storage'
@@ -167,6 +168,8 @@ export const useAuthStore = defineStore('auth', () => {
     },
     // 新设备上加地址 / 充话费时，服务端要求先验一次邮箱码。弹框由 StepUpDialog 负责
     onStepUpRequired: requestStepUp,
+    // 发码、密码登录之前要过滑块。弹窗由 CaptchaDialog 负责，它不依赖登录态
+    onCaptchaRequired: requestCaptcha,
   })
 
   return {

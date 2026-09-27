@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
+import axios, { AxiosHeaders, type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
 import { toApiError } from './errors'
 
@@ -11,6 +11,8 @@ declare module 'axios' {
      * 不带这个标记的话会再弹一次框、再重试一次，无穷无尽。
      */
     stepUpRetried?: boolean
+    /** 同上：这条请求已经带着滑块通行票重试过一次。再被要求就不再弹，防死循环 */
+    captchaRetried?: boolean
   }
 }
 
@@ -34,12 +36,19 @@ type UnauthorizedHandler = () => void
 type DeviceEnsurer = () => Promise<void>
 /** 弹出二次验证、等用户完成。resolve(true) = 验证通过，调用方重试原请求；false = 用户放弃 */
 type StepUpHandler = () => Promise<boolean>
+/** 弹出滑块、等用户拖完。返回通行票；放弃返回 null */
+type CaptchaHandler = () => Promise<string | null>
 
 let unauthorizedHandler: UnauthorizedHandler = () => {}
 /** 默认不做：注入之前（比如单测里）行为退化成「没有设备身份」，而不是报错 */
 let deviceEnsurer: DeviceEnsurer = () => Promise.resolve()
 /** 默认「不处理」：注入之前（单测里、未登录）STEP_UP_REQUIRED 原样抛给调用方 */
 let stepUpHandler: StepUpHandler = () => Promise.resolve(false)
+/** 默认「不处理」：注入之前（单测里）CAPTCHA_REQUIRED 原样抛给调用方 */
+let captchaHandler: CaptchaHandler = () => Promise.resolve(null)
+
+/** 滑块通行票放在这个头里。对齐网关 CaptchaService.HEADER */
+const CAPTCHA_HEADER = 'X-Captcha-Token'
 
 /**
  * 领设备身份的那条路由。
@@ -65,6 +74,11 @@ export function configureHttp(options: {
    * 见 {@link handleStepUp}：多个请求同时撞上时只弹一次框，验证通过后各自重试。
    */
   onStepUpRequired?: StepUpHandler
+  /**
+   * 可选：服务端要求先过滑块时怎么办（发码、密码登录）。**不传就是「不处理，原样抛给调用方」**。
+   * 与二次验证同一种处理：只弹一次，拿到通行票后各自带着重试。
+   */
+  onCaptchaRequired?: CaptchaHandler
 }): void {
   unauthorizedHandler = options.onLoginRequired
   /*
@@ -75,6 +89,7 @@ export function configureHttp(options: {
   deviceEnsurer = options.ensureDevice ?? (() => Promise.resolve())
   // 同上：无条件赋值，不传就是回到「不处理」
   stepUpHandler = options.onStepUpRequired ?? (() => Promise.resolve(false))
+  captchaHandler = options.onCaptchaRequired ?? (() => Promise.resolve(null))
 }
 
 const http: AxiosInstance = axios.create({
@@ -121,6 +136,22 @@ http.interceptors.response.use(
      * 它 await 到的就是重试之后的结果 —— 页面代码一行都不用为二次验证改。
      */
     const config = error.config
+    /*
+     * 滑块：弹滑块 → 拿到通行票 → 放进 X-Captcha-Token 头原样重试。一张票只放行一次请求，
+     * 所以重试后仍被要求（比如票过期了）就不再弹，原样抛出。
+     */
+    if (apiError.isCaptchaRequired && config !== undefined && config.captchaRetried !== true) {
+      return handleCaptcha().then((token) => {
+        if (token === null) {
+          return Promise.reject(apiError)
+        }
+        // 🔴 new 一份再改：AxiosHeaders.from 遇到已经是 AxiosHeaders 的会原样返回同一个对象，
+        //    改它等于连第一次那个请求的配置也改了
+        const headers = new AxiosHeaders(config.headers)
+        headers.set(CAPTCHA_HEADER, token)
+        return http.request({ ...config, headers, captchaRetried: true })
+      })
+    }
     if (apiError.isStepUpRequired && config !== undefined && config.stepUpRetried !== true) {
       return handleStepUp().then((verified) =>
         verified ? http.request({ ...config, stepUpRetried: true }) : Promise.reject(apiError),
@@ -139,6 +170,28 @@ http.interceptors.response.use(
  * 共用同一个 promise：只弹一次，验证通过后所有等着的请求各自重试。
  */
 let stepUpInflight: Promise<boolean> | null = null
+
+/**
+ * 在途的那一次滑块。与二次验证同理：并发撞上只弹一次。
+ *
+ * ⚠️ 但一张通行票只放行一次请求 —— 并发的两个请求不能共用同一张票。
+ * 所以这里合并的只是「弹窗」；第一个请求拿到票之后，后来者各自再弹一次。
+ * 实际上并发触发滑块的只有「快速连点两次获取验证码」，那种情况第二次本来就该被拦。
+ */
+let captchaInflight: Promise<string | null> | null = null
+
+function handleCaptcha(): Promise<string | null> {
+  if (captchaInflight === null) {
+    captchaInflight = captchaHandler()
+      .catch(() => null)
+      .finally(() => {
+        captchaInflight = null
+      })
+    return captchaInflight
+  }
+  // 后来者：等第一个人拖完，再为自己要一张票。第一个人取消了就一起放弃 —— 不能让他连着取消两次
+  return captchaInflight.then((first) => (first === null ? null : handleCaptcha()))
+}
 
 function handleStepUp(): Promise<boolean> {
   if (stepUpInflight === null) {

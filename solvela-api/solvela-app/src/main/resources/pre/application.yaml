@@ -96,6 +96,15 @@ solvela:
       # 浏览器发起的跨源写请求一律 403（含登录、注册 —— 防登录 CSRF）。App / Postman 不带那两个头，不受影响
       cross-origin-guard: enforce
       # 「自己的源」由 X-Forwarded-Proto + Host 算出（nginx 原样透传），不需要额外配置
+    captcha:
+      # 自建滑块验证码（CaptchaService）。上线即拦截；每个场景单独开关，误伤时只关那一处
+      #   send-code       发邮箱 / 短信验证码之前（这两个接口天生匿名，又是轰炸的原料）
+      #   password-login  密码登录之前（撞库主战场）。邮箱验证码登录不拦：发码那一步已经过过一次
+      # ⚠️ 自建滑块只能抬高批量成本，挡不住专门针对它写的破解。对抗专业黑产要换厂商
+      send-code: true
+      password-login: true
+      tolerance: 5
+      max-create-per-ip-per-minute: 20
     step-up:
       # 🔴 敏感操作二次验证的灰度档：off | observe | enforce（见 StepUpProperties）
       #

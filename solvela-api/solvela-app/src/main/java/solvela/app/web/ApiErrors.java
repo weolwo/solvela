@@ -79,6 +79,14 @@ public enum ApiErrors {
      */
     STEP_UP_REQUIRED(HttpStatus.FORBIDDEN, "为了你的账号安全，请先完成邮箱验证"),
 
+    /**
+     * 这个接口（发验证码、密码登录）要先过一次滑块验证码。见 {@code CaptchaService}。
+     *
+     * <p>与 {@link #STEP_UP_REQUIRED} 同一种处理：客户端弹滑块，拿到通行票后放进
+     * {@code X-Captcha-Token} 头<b>自动重试原请求</b>，页面代码无感。
+     */
+    CAPTCHA_REQUIRED(HttpStatus.FORBIDDEN, "请先完成滑块验证"),
+
     // ---------------------------------------------------------------- 429 太频繁
 
     /** 触发了操作限制（连续登录失败等），要等到期或找客服解冻。 */
@@ -88,6 +96,9 @@ public enum ApiErrors {
 
     /** 入参不合法。校验框架的报错会被翻译成这个。 */
     INVALID_ARGUMENT(HttpStatus.BAD_REQUEST, "请求参数有误"),
+
+    /** 滑块没拖对（或那张图已过期 / 已验过）。客户端换一张图重来 */
+    CAPTCHA_FAILED(HttpStatus.BAD_REQUEST, "验证未通过，请重试"),
 
     /** 资源不存在。 */
     NOT_FOUND(HttpStatus.NOT_FOUND, "请求的内容不存在"),
