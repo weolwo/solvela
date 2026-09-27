@@ -380,7 +380,9 @@ script:
   # 慢脚本日志阈值(ms)
   slow-log-millis: 200
 
-# 彩票中台 —— 部署本环境前必须放开下面的配置
+# 彩票中台 —— 下面的配置【不用放开】：环境变量 LOTTERY_FPE_MASTER_SECRET 会被 Spring 宽松绑定
+# 直接映射成 lottery.fpe.master-secret。docker-compose 已给 admin / app-biz 注入，值在 .env 里填。
+# （2026-09-27 以前这里写的是「部署前必须放开」，而 compose 又没传这个变量 —— 两头都没做，线上领号直接报错）
 #
 # FPE 发号主密钥，派生规则 key = HMAC-SHA256(master-secret, lotteryCode + "|" + issueNo)。
 # 刻意留成注释而不是写 ${LOTTERY_FPE_MASTER_SECRET} 占位：占位符在环境变量缺失时会让应用直接启不来，

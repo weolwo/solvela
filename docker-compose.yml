@@ -249,6 +249,9 @@ services:
     environment:
       <<: *backend-env
       HEALTH_URL: http://127.0.0.1:1024/
+      # 开奖任务要用。刻意不放进 backend-env：网关用不到，就不该拿到。
+      # 缺了照样启动（`:-` 空值），开奖时报「FPE 主密钥未配置」，见 .env.example
+      LOTTERY_FPE_MASTER_SECRET: ${LOTTERY_FPE_MASTER_SECRET:-}
     depends_on:
       mysql:
         condition: service_healthy   # 等库真的建好，不是等端口通
@@ -317,6 +320,8 @@ services:
     environment:
       <<: *backend-env
       HEALTH_URL: http://127.0.0.1:1026/
+      # 领号要用，理由同 admin
+      LOTTERY_FPE_MASTER_SECRET: ${LOTTERY_FPE_MASTER_SECRET:-}
     depends_on:
       mysql:
         condition: service_healthy
