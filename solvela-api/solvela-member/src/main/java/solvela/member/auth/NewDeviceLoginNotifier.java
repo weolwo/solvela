@@ -7,6 +7,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 import solvela.base.mail.MailService;
 import solvela.base.mail.MailTemplateCodeEnum;
+import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaIpUtil;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PiiCipher;
@@ -33,10 +34,20 @@ import java.util.Map;
  * <h3>什么时候发</h3>
  * <ul>
  *   <li>这台设备上该会员<b>从没</b>成功登录过；</li>
- *   <li>并且该会员<b>以前</b>成功登录过（在别的设备上）—— 否则就是注册后的第一次登录，
- *       给每个新用户发一封「异地登录」告警只会教会他们忽略这类信；</li>
+ *   <li>并且这台设备<b>不是注册时用的那台</b>（{@link #rememberRegistrationDevice}）
+ *       —— 在注册的那台上重新登录不是「新设备」，给新用户发「异地登录」告警只会教会他们忽略这类信；</li>
  *   <li>请求有设备号 —— 没有设备身份就判断不了「新不新」，宁可不发也不乱发。</li>
  * </ul>
+ *
+ * <h3>🔴 为什么要单独记住注册设备</h3>
+ * 注册成功直接就是登录态，但刻意不写登录日志（见 MemberRegisterService#createMember）。
+ * 2026-09-27 初版的判据是「该会员以前成功登录过」，结果对<b>绝大多数用户</b>整个失效：
+ * 注册完一直用着注册那次的会话，从没「登录」过 —— 盗号者在别处的那一次登录，
+ * 恰好是这个账号的「第一次登录」，被当成新用户首登跳过了。上线后实测才发现。
+ * 现在注册时把设备号记进 Redis，判据改成「是不是注册那台」。
+ *
+ * <p>记录不存在（这条记录上线前注册的老会员、或 Redis 丢了）时退回初版判据 ——
+ * 分不清的时候不发，和「没有设备号就不发」同一个取向。
  * 判断必须在写本次成功日志<b>之前</b>做（调用方保证）。
  *
  * <h3>发送是异步的</h3>
@@ -65,6 +76,14 @@ public class NewDeviceLoginNotifier {
 
     private final NotificationService notificationService;
 
+    private final RedisService redisService;
+
+    /** 注册设备：会员 → 注册时的设备号 */
+    private static final String KEY_REGISTRATION_DEVICE = "mbr:login:reg-device:";
+
+    /** 与设备 cookie 同寿（400 天）：cookie 还在，就还能认出「这是注册那台」 */
+    private static final long REGISTRATION_DEVICE_TTL_SECONDS = 400L * 24 * 3600;
+
     /** 发信线程池。容器里有多个 AsyncTaskExecutor，按名字精确注入，理由同 MemberEmailCodeService */
     @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
     private AsyncTaskExecutor sendExecutor;
@@ -72,6 +91,20 @@ public class NewDeviceLoginNotifier {
     /** 总开关：误发成灾时的回退，不用发版 */
     @Value("${solvela.member.login.notify-new-device:true}")
     private boolean enabled;
+
+    /**
+     * 注册成功时调用：记住这个会员是在哪台设备上注册的。任何异常都只记日志，绝不影响注册。
+     */
+    public void rememberRegistrationDevice(Long memberId, String deviceId) {
+        if (memberId == null || SolvelaStringUtil.isBlank(deviceId)) {
+            return;
+        }
+        try {
+            redisService.set(registrationDeviceKey(memberId), deviceId, REGISTRATION_DEVICE_TTL_SECONDS);
+        } catch (Exception e) {
+            log.warn("【新设备登录】记录注册设备失败，该会员之后按老判据处理, memberId: {}", memberId, e);
+        }
+    }
 
     /**
      * 登录成功时调用（写本次成功日志之前）。任何异常都只记日志，绝不影响登录。
@@ -82,8 +115,16 @@ public class NewDeviceLoginNotifier {
         }
         try {
             int success = LoginLogResultEnum.LOGIN_SUCCESS.getValue();
-            if (!loginLogDao.existsSuccessfulLogin(memberId, success)
-                    || loginLogDao.existsSuccessfulLoginOnDevice(memberId, deviceId, success)) {
+            String registrationDevice = redisService.get(registrationDeviceKey(memberId));
+            if (registrationDevice == null) {
+                // 不知道注册设备：退回初版判据，从没登录过就当成注册后首登
+                if (!loginLogDao.existsSuccessfulLogin(memberId, success)) {
+                    return;
+                }
+            } else if (registrationDevice.equals(deviceId)) {
+                return;
+            }
+            if (loginLogDao.existsSuccessfulLoginOnDevice(memberId, deviceId, success)) {
                 return;
             }
             String loginTime = LocalDateTime.now().format(TIME);
@@ -116,6 +157,10 @@ public class NewDeviceLoginNotifier {
         } catch (Exception e) {
             log.error("【新设备登录】提醒邮件发送失败, memberId: {}", memberId, e);
         }
+    }
+
+    private String registrationDeviceKey(Long memberId) {
+        return redisService.generateRedisKey(KEY_REGISTRATION_DEVICE, String.valueOf(memberId));
     }
 
     /** IP 归属地；解析不出来时说「未知地点」，不把 IP 原样发给用户（那对他没意义） */

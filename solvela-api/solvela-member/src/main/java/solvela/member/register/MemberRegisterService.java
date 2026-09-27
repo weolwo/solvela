@@ -21,6 +21,7 @@ import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.RegisterFailReason;
 import solvela.member.id.MemberIdAllocator;
+import solvela.member.auth.NewDeviceLoginNotifier;
 import solvela.member.device.DeviceGuard;
 import solvela.member.device.DeviceGuardVerdict;
 import solvela.member.api.EmailCodeScene;
@@ -91,6 +92,7 @@ public class MemberRegisterService {
      * 翻译成任务事件是营销侧防腐层（{@code BizActionEventListener}）的活。
      */
     private final BizEventPublisher bizEventPublisher;
+    private final NewDeviceLoginNotifier newDeviceLoginNotifier;
 
     /**
      * 注册。
@@ -260,6 +262,9 @@ public class MemberRegisterService {
          */
         bizEventPublisher.publish(BizActionEvent.of(
                 BizActionCodes.MEMBER_REGISTER, memberId, String.valueOf(memberId)));
+
+        // 注册即登录、但不写登录日志 —— 新设备提醒要靠这条认出「注册那台」，见 NewDeviceLoginNotifier
+        newDeviceLoginNotifier.rememberRegistrationDevice(memberId, cmd.deviceId());
 
         log.info("【会员注册】成功, memberId: {}, source: {}, ip: {}", memberId, registerSource, cmd.clientIp());
         return MemberRegisterResult.ok(new MemberIdentity(

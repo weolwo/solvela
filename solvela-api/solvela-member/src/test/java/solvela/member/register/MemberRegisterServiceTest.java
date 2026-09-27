@@ -14,6 +14,7 @@ import solvela.base.event.BizEventPublisher;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
+import solvela.member.auth.NewDeviceLoginNotifier;
 import solvela.member.device.DeviceGuard;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.sms.MemberSmsCodeService;
@@ -94,6 +95,8 @@ class MemberRegisterServiceTest {
      */
     @Mock
     private BizEventPublisher bizEventPublisher;
+    @Mock
+    private NewDeviceLoginNotifier newDeviceLoginNotifier;
 
     private MemberRegisterProperties properties;
     private MemberRegisterService service;
@@ -103,7 +106,7 @@ class MemberRegisterServiceTest {
         properties = new MemberRegisterProperties();
         service = new MemberRegisterService(memberRegisterDao, memberIdAllocator, properties,
                 redisService, piiHasher, piiCipher, deviceGuard, emailCodeService, smsCodeService,
-                bizEventPublisher);
+                bizEventPublisher, newDeviceLoginNotifier);
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);
         when(piiCipher.encrypt(PHONE)).thenReturn("加密后的号");
@@ -131,6 +134,8 @@ class MemberRegisterServiceTest {
         assertTrue(result.success());
         assertEquals(MEMBER_ID, result.identity().memberId());
         assertTrue(result.identity().memberName().endsWith(String.valueOf(MEMBER_ID)));
+        // 🔴 注册即登录却不写登录日志：新设备提醒只能靠这一条认出「注册那台」
+        verify(newDeviceLoginNotifier).rememberRegistrationDevice(MEMBER_ID, DEVICE_ID);
     }
 
     @Test
