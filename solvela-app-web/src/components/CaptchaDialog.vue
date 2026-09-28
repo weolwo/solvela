@@ -4,7 +4,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { createCaptcha, type CaptchaChallenge, verifyCaptcha } from '@/api/captcha'
 import { ApiError } from '@/api/errors'
 import { finishCaptcha, useCaptchaState } from '@/composables/useCaptcha'
-import { clampOffset, toImageX } from '@/utils/slider'
+import { clampOffset, endTrack, pushTrackPoint, toImageX, type TrackPoint } from '@/utils/slider'
 
 /**
  * 滑块验证码弹窗：拖动拼图块到缺口处。
@@ -15,6 +15,10 @@ import { clampOffset, toImageX } from '@/utils/slider'
  *
  * <h3>拖错了直接换一张</h3>
  * 服务端一张图只认一次，拖错后那张图已经作废，所以这里立刻换新图，而不是让他在同一张上再拖。
+ *
+ * <h3>顺手记下拖动轨迹</h3>
+ * 每个 pointermove 记一个点（见 {@link TrackPoint}），和 x 一起交给服务端判断是不是人手拖的。
+ * 没有专门的 API，就是把拖动本来就要处理的事件多存一份。
  *
  * <h3>滑块宽度 = 拼图宽度</h3>
  * 这样滑块往右移多少，拼图就往右移多少，用户对齐的是眼睛看到的缺口，不需要任何换算。
@@ -33,6 +37,9 @@ const stageWidth = ref(0)
 
 let dragging = false
 let dragStartX = 0
+let dragStartY = 0
+let dragStartTime = 0
+let track: TrackPoint[] = []
 
 const scale = computed(() =>
   challenge.value === null || stageWidth.value === 0 ? 1 : stageWidth.value / challenge.value.width,
@@ -67,6 +74,9 @@ function onPointerDown(e: PointerEvent): void {
   }
   dragging = true
   dragStartX = e.clientX - offset.value
+  dragStartY = e.clientY
+  dragStartTime = performance.now()
+  track = [trackPoint(e)]
   ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
 }
 
@@ -75,18 +85,30 @@ function onPointerMove(e: PointerEvent): void {
     return
   }
   offset.value = clampOffset(e.clientX - dragStartX, stageWidth.value, handleWidth.value)
+  pushTrackPoint(track, trackPoint(e))
 }
 
-async function onPointerUp(): Promise<void> {
+/** 当前位置记成一个轨迹点：x 用原图坐标，和提交的答案同一坐标系 */
+function trackPoint(e: PointerEvent): TrackPoint {
+  return [
+    Math.round(performance.now() - dragStartTime),
+    Math.round(toImageX(offset.value, stageWidth.value, challenge.value?.width ?? 0)),
+    Math.round(e.clientY - dragStartY),
+  ]
+}
+
+async function onPointerUp(e: PointerEvent): Promise<void> {
   if (!dragging || challenge.value === null) {
     return
   }
   dragging = false
+  endTrack(track, trackPoint(e))
   verifying.value = true
   try {
     const token = await verifyCaptcha(
       challenge.value.captchaId,
       toImageX(offset.value, stageWidth.value, challenge.value.width),
+      track,
     )
     finishCaptcha(token)
   } catch {

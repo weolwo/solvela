@@ -81,10 +81,12 @@ public class CaptchaService {
     }
 
     /**
-     * 判题。拖对了返回一张通行票；拖错、图过期、图已被验过都返回 null。
-     * 不区分这三种：区分等于告诉脚本「这张图还能再试」。
+     * 判题。拖对了返回一张通行票；拖错、轨迹不像人、图过期、图已被验过都返回 null。
+     * 不区分这几种：区分等于告诉脚本「这张图还能再试」或「是轨迹露馅了」。
+     *
+     * @param track 拖动轨迹，见 {@link TrackChecker}
      */
-    public String verify(String captchaId, Integer x) {
+    public String verify(String captchaId, Integer x, int[][] track) {
         if (captchaId == null || x == null) {
             return null;
         }
@@ -94,6 +96,13 @@ public class CaptchaService {
         }
         if (Math.abs(Integer.parseInt(answer) - x) > properties.tolerance()) {
             return null;
+        }
+        if (properties.trackCheck()) {
+            String reason = TrackChecker.reject(track, x, properties.tolerance());
+            if (reason != null) {
+                log.info("滑块轨迹不像人，拒绝: reason={}, points={}", reason, track == null ? 0 : track.length);
+                return null;
+            }
         }
         String pass = randomToken();
         redis.opsForValue().set(KEY_PASS + pass, "1", properties.passTtl());

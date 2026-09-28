@@ -20,3 +20,40 @@ export function toImageX(offsetPx: number, displayWidth: number, imageWidth: num
   }
   return (offsetPx * imageWidth) / displayWidth
 }
+
+/**
+ * 拖动轨迹的一个点：[距按下的毫秒数, 原图 x, 相对按下时的纵向偏移 px]。
+ * 服务端（TrackChecker）拿它判断这一下是不是人手拖的：有没有加减速、y 有没有抖、是不是一步瞬移到位。
+ */
+export type TrackPoint = [number, number, number]
+
+/** 最多收这么多点。服务端上限 400，这里留足余量 */
+export const TRACK_MAX_POINTS = 300
+
+/** 两点间隔不足这么多毫秒就丢掉（抽稀）：高刷屏一秒能来 120 个 pointermove */
+export const TRACK_MIN_GAP_MS = 16
+
+/** 拖动中追加一个点：太密的丢掉，满了不再收 */
+export function pushTrackPoint(track: TrackPoint[], point: TrackPoint): void {
+  const last = track[track.length - 1]
+  if (
+    track.length >= TRACK_MAX_POINTS ||
+    (last !== undefined && point[0] - last[0] < TRACK_MIN_GAP_MS)
+  ) {
+    return
+  }
+  track.push(point)
+}
+
+/**
+ * 松手时补上终点：不受抽稀和上限限制 —— 服务端要核对「轨迹终点 = 提交的 x」，
+ * 终点被抽掉的表现是拖对了也过不去。
+ */
+export function endTrack(track: TrackPoint[], point: TrackPoint): void {
+  const last = track[track.length - 1]
+  if (last !== undefined && last[0] === point[0]) {
+    track[track.length - 1] = point
+  } else {
+    track.push(point)
+  }
+}

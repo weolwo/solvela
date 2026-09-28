@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import solvela.app.captcha.TrackCheckerTest;
 import solvela.apptest.stub.CookieSessionStub;
 import solvela.auth.member.MemberTokenStore;
 
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * <ul>
  *   <li>🔴 发码、密码登录不带通行票 → 403 CAPTCHA_REQUIRED；</li>
  *   <li>🔴 一张图只能验一次；一张通行票只能放行一次请求；</li>
+ *   <li>🔴 位置对但不带轨迹（只交一个 x 的脚本）→ 400；</li>
  *   <li>邮箱验证码登录不拦（它的码在发码那一步已过过一次滑块）；</li>
  *   <li>同一 IP 出图超限 → 429（出图吃 CPU）。</li>
  * </ul>
@@ -85,6 +87,15 @@ class CaptchaFlowTest {
 
         assertCode(post("/captcha/verify", verifyBody(id, answer + 60), Map.of()), 400, "CAPTCHA_FAILED");
         assertCode(post("/captcha/verify", verifyBody(id, answer), Map.of()), 400, "CAPTCHA_FAILED");
+    }
+
+    @Test
+    @DisplayName("🔴 位置对、但没有轨迹 → 400 —— 只交一个 x 的脚本就挡在这")
+    void 没轨迹不认() throws Exception {
+        String id = create(freshIp()).path("captchaId").asText();
+
+        assertCode(post("/captcha/verify", "{\"captchaId\":\"" + id + "\",\"x\":" + answerOf(id) + "}", Map.of()),
+                400, "CAPTCHA_FAILED");
     }
 
     @Test
@@ -147,8 +158,9 @@ class CaptchaFlowTest {
         return Integer.parseInt(redis.opsForValue().get("app:captcha:c:" + captchaId));
     }
 
-    private static String verifyBody(String id, int x) {
-        return "{\"captchaId\":\"" + id + "\",\"x\":" + x + "}";
+    /** 带一条像人的轨迹，终点落在 x */
+    private static String verifyBody(String id, int x) throws Exception {
+        return JSON.writeValueAsString(Map.of("captchaId", id, "x", x, "track", TrackCheckerTest.humanTrack(x)));
     }
 
     private static void assertCode(HttpResponse<String> response, int status, String code) throws Exception {

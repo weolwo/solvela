@@ -39,19 +39,20 @@ public class CaptchaController {
     /**
      * 判题。拖对了返回通行票，拖错返回 400 {@code CAPTCHA_FAILED}（客户端换一张图重来）。
      *
-     * @param body {@code {"captchaId": "...", "x": 123}}，x 是拼图左边缘在<b>原图坐标</b>里的位置
+     * @param body {@code {"captchaId": "...", "x": 123, "track": [[t, x, y], ...]}}，
+     *             x 是拼图左边缘在<b>原图坐标</b>里的位置，track 是拖动轨迹（见 {@link solvela.app.captcha.TrackChecker}）
      */
     @Anonymous
     @PostMapping("/verify")
     public PassView verify(@RequestBody VerifyRequest body) {
-        String pass = captchaService.verify(body.captchaId(), body.x());
+        String pass = captchaService.verify(body.captchaId(), body.x(), body.track());
         if (pass == null) {
             throw new ApiException(ApiErrors.CAPTCHA_FAILED);
         }
         return new PassView(pass);
     }
 
-    public record VerifyRequest(String captchaId, Integer x) {
+    public record VerifyRequest(String captchaId, Integer x, int[][] track) {
     }
 
     /** @param captchaToken 通行票：放进请求头 {@code X-Captcha-Token} 重试原请求，用一次作废 */

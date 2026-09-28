@@ -1,3 +1,5 @@
+import type { TrackPoint } from '@/utils/slider'
+
 import { request } from './http'
 
 /**
@@ -30,12 +32,17 @@ export async function createCaptcha(): Promise<CaptchaChallenge> {
  * 判题。拖对了返回通行票；拖错抛 CAPTCHA_FAILED（这张图也随之作废，要换一张）。
  *
  * @param x 拼图左边缘在【原图坐标】里的位置
+ * @param track 拖动轨迹。不带或不像人手拖的，服务端和拖错一样处理
  */
-export async function verifyCaptcha(captchaId: string, x: number): Promise<string> {
+export async function verifyCaptcha(
+  captchaId: string,
+  x: number,
+  track: TrackPoint[],
+): Promise<string> {
   const view = await request<{ captchaToken: string }>({
     url: '/captcha/verify',
     method: 'POST',
-    data: { captchaId, x: Math.round(x) },
+    data: { captchaId, x: Math.round(x), track },
   })
   return view.captchaToken
 }

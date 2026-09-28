@@ -104,6 +104,8 @@ solvela:
       send-code: true
       password-login: true
       tolerance: 5
+      # 校验拖动轨迹（TrackChecker）：拦直接提交 x、瞬移、匀速直线的脚本。误伤时只关这一项
+      track-check: true
       max-create-per-ip-per-minute: 20
     step-up:
       # 🔴 敏感操作二次验证的灰度档：off | observe | enforce（见 StepUpProperties）
