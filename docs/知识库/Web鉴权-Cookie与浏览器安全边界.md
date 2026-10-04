@@ -199,6 +199,24 @@ CORS 是服务端主动放宽同源策略：用响应头告诉浏览器"允许�
 | 自定义请求头（值随意） | 跨域加不了自定义头（要预检） | **完全依赖 CORS 配置不出错** |
 | CSRF 令牌（double-submit） | 只有同源 JS 读得到的暗号，必须放进请求头 | 部件多；要靠 `__Host-` 防被兄弟子域覆盖 |
 
+#### `SameSite=Lax` 到底放行哪些跨站请求
+
+判断标准只有一条：**是不是「顶层导航」且方法安全（GET）**——也就是地址栏里的页面整个换掉。
+
+| evil.com 上发起的请求 | 带 `Lax` cookie？ |
+|---|---|
+| 点链接 `<a href>`、`location.href = ...`、GET 表单跳过来 | ✅ 带（所以外链点进来仍是登录态） |
+| POST 表单提交（哪怕是顶层跳转） | ❌ |
+| `fetch` / `XMLHttpRequest` | ❌ |
+| `<img>` / `<script>` / `<iframe>` 里的请求 | ❌ |
+
+它是 `Strict`（外链点进来也掉登录）和 `None`（什么都带，必须配 `Secure`）之间的折中。
+代价写在上表：**顶层 GET 会带 cookie，所以 GET 接口绝不能改数据**。
+
+> 为什么要显式写 `Lax`，而不是依赖"浏览器默认就是 Lax"：
+> 各家默认值不一致（§2.3）；Chrome 对**没写** SameSite 的 cookie 还有一个「Lax + POST」例外——
+> cookie 下发后约 2 分钟内，跨站顶层 POST 仍会带上。显式写了 `Lax` 就没有这个窗口。
+
 #### `Sec-Fetch-Site`：目前最推荐的做法
 
 现代浏览器（Chrome 76+、Firefox 90+、Safari 16.4+）在每个请求上自动带：
@@ -210,7 +228,18 @@ CORS 是服务端主动放宽同源策略：用响应头告诉浏览器"允许�
 | `cross-site` | 来自别的网站 |
 | `none` | 用户在地址栏输入、点书签 |
 
-`Sec-` 开头的是**禁止修改的请求头**，任何页面 JS 都改不了。判定规则：
+**谁填的、能不能伪造：**
+
+- **浏览器填**：比较「发起请求的页面」与「请求目标」得出；经过重定向时取整条链上最"外"的那个值。
+  业务代码不用写任何东西，前端零改动。
+- **页面 JS 改不了**：`Sec-` 开头的是规范里的**禁止请求头**（forbidden header），
+  `fetch(url, { headers: { 'Sec-Fetch-Site': 'same-origin' } })` 里的这一项会被浏览器静默丢掉。`Origin` 同理。
+- **curl / 脚本能随便填**——但无所谓：CSRF 的前提是「借受害者浏览器里的 cookie」，
+  自己发请求的人手里只有自己的凭证（见上文「攻击者站在哪」）。挡他们靠鉴权、限流、验证码，不靠这个头。
+- 同一族还有 `Sec-Fetch-Mode`（navigate / cors / no-cors…）、`Sec-Fetch-Dest`（document / image / script…）、
+  `Sec-Fetch-User`（是否用户手势触发）。防 CSRF 只用 `Site` 就够。
+
+判定规则：
 
 ```
 所有写请求（非 GET / HEAD / OPTIONS），包括登录、注册这类匿名接口（见下文「登录 CSRF」）：
