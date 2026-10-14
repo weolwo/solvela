@@ -34,7 +34,7 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-10-14
+-- 生成时间：2026-10-15
 -- 表数量：89 张
 -- =====================================================================================
 
@@ -849,7 +849,7 @@ CREATE TABLE `t_member_risk_event` (
   `decision` tinyint NOT NULL COMMENT '生效结论：1-放行, 2-滑块, 3-OTP, 4-换通道OTP, 5-密码冷却, 6-限流, 7-拒绝',
   `shadow_decision` tinyint NOT NULL COMMENT '陪跑结论：假如所有陪跑规则都生效',
   `verify_channel` tinyint DEFAULT NULL COMMENT '核身通道：1-邮箱, 2-短信。decision 为 OTP 时有值',
-  `outcome` tinyint NOT NULL COMMENT '最终结局：1-成功, 2-凭据错, 3-查无此人, 4-冻结, 5-冷却/锁定中, 6-格式非法, 7-需要滑块, 8-前置限流/拒绝, 9-后置限流/拒绝, 10-已签凭票, 11-二次验证通过, 12-二次验证失败',
+  `outcome` tinyint NOT NULL COMMENT '最终结局：1-成功, 2-凭据错, 3-查无此人, 4-冻结, 5-冷却/锁定中, 6-格式非法, 7-需要滑块, 8-前置限流/拒绝, 9-后置限流/拒绝, 10-已签凭票, 11-二次验证通过, 12-二次验证失败, 13-内部异常（end 没被调用，close 兜底落库）',
   `label` tinyint DEFAULT NULL COMMENT '事后标注：1-确认本人, 2-确认被盗。只这三列允许事后更新',
   `label_source` tinyint DEFAULT NULL COMMENT '标注来源：1-用户「这不是我」, 2-老设备上点「是我」, 3-客服',
   `label_time` datetime DEFAULT NULL COMMENT '标注时间',

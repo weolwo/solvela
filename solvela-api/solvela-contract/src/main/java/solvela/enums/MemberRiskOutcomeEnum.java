@@ -38,6 +38,19 @@ public enum MemberRiskOutcomeEnum implements BaseEnum {
     VERIFY_PASSED(11, "二次验证通过"),
 
     VERIFY_FAILED(12, "二次验证失败"),
+
+    /**
+     * 这次尝试<b>以一个未预料的异常收场</b>（对用户就是 500）。
+     *
+     * <p>🔴 它存在的唯一理由是守住「每一次登录尝试都有一行流水」这个不变量：
+     * {@code RiskSession} 在 {@code close()} 里兜底落库，而那时 outcome 还没被任何人设过。
+     * 没有这一档的话，异常路径就<b>恰好</b>没有流水 —— 而「登录报 500 时风控判了什么、
+     * 命中了哪几条规则」正是最想知道的那一刻。
+     *
+     * <p>风控引擎自己是不会走到这里的（它整体 fail-open，见方案 §3.9）。走到这里说明
+     * 查会员、验密码、写登录日志这些主干环节出了问题。
+     */
+    INTERNAL_ERROR(13, "内部异常"),
     ;
 
     private final Integer value;

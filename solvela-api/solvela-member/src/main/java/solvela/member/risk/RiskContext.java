@@ -51,6 +51,15 @@ public final class RiskContext {
     /** 后置才知道；前置阶段为 null */
     private RiskDeviceTrust deviceTrust;
 
+    /**
+     * IP 熟悉度。由前置矩阵算出来（它是前置唯一用到账号信息的东西，而且<b>只用来放宽</b>），
+     * 后置矩阵直接复用同一个值 —— 一次尝试里不该算出两个不同的熟悉度。
+     */
+    private RiskIpFamiliarity ipFamiliar;
+
+    /** 账号是不是沉睡（最后活跃早于门槛）。null = 还没判 / 判不了（查无此人） */
+    private Boolean dormant;
+
     private final Map<String, Object> features = new HashMap<>();
 
     public RiskContext(MemberRiskEventTypeEnum eventType, MemberLoginType loginType, String identity,
@@ -82,6 +91,14 @@ public final class RiskContext {
     /** 设备可信（老交情 / 验证过 / 注册设备）。没算过信任时一律当不可信 —— 往严的方向偏 */
     public boolean deviceTrusted() {
         return deviceTrust != null && deviceTrust.trusted();
+    }
+
+    public void ipFamiliar(RiskIpFamiliarity familiarity) {
+        this.ipFamiliar = familiarity;
+    }
+
+    public void dormant(boolean value) {
+        this.dormant = value;
     }
 
     /**
