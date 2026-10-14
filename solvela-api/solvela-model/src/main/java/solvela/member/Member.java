@@ -41,6 +41,14 @@ public class Member {
     private LocalDateTime nameUpdateTime;
 
     /**
+     * 最后活跃时间：注册时写入，之后网关按小时节流写。
+     *
+     * <p>登录风控判「沉睡」用它，<b>不用最后登录时间</b>：会话 30 天有效且不续期，
+     * 每天都在用的人 30 天才重新登录一次（方案 §4.4）。
+     */
+    private LocalDateTime lastActiveTime;
+
+    /**
      * 昵称：中文随意，用户可改。?任何地方都不许拿它做关联键
      */
     private String nickname;
