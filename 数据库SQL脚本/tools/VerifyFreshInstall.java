@@ -81,6 +81,8 @@ public class VerifyFreshInstall {
                 // 发出去的券【没有面额/门槛】—— 和上面那条一样，不报错，只是券没用
                 {"t_coupon_template", "1", "券模板：为 0 则发出去的券没有规则，而且不报错"},
                 {"t_member_id_seq", "1", "会员发号种子行：为 0 则第一个注册的用户就撞 -1000"},
+                // 2026-10-14 加：首批 20 条。少于这个数说明种子没导全 —— 缺的那几条会让 app-biz 启动失败
+                {"t_member_risk_rule", "20", "登录风控规则：缺任何一条，app-biz 启动时双向校验失败"},
             };
             boolean allOk = true;
             for (String[] chk : checks) {
@@ -98,7 +100,10 @@ public class VerifyFreshInstall {
                             "t_task_record", "t_prize_log", "t_activity_config", "t_lottery_record",
                             // 2026-09-15 补：通知与公告都是业务数据。
                             // 模板（t_notification_template）是配置，在上面那组里，两者别混。
-                            "t_member_notification", "t_announcement", "t_announcement_ack"};
+                            "t_member_notification", "t_announcement", "t_announcement_ack",
+                            // 2026-10-14 补：风控的流水、命中、名单都是运行期数据。
+                            // 规则（t_member_risk_rule）是配置，在上面那组里。
+                            "t_member_risk_event", "t_member_risk_hit", "t_member_risk_list"};
             for (String t : biz) {
                 try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM `" + t + "`")) {
                     r.next(); long n = r.getLong(1);

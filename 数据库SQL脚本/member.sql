@@ -110,6 +110,12 @@ CREATE TABLE `t_member`
                                    COMMENT '账号：微信号风格，字母开头6~20位[A-Za-z][A-Za-z0-9_-]。全局唯一(大小写不敏感)，用户可改',
     `name_update_time` datetime             DEFAULT NULL COMMENT '上次修改账号的时间：改名限频判据(建议一年一次)。为空表示从未改过',
 
+    -- ---------- 活跃度（登录风控用）----------
+    -- 🔴 不是「最后登录时间」：会话 30 天有效且不续期，每天都在用的人 30 天才重新登录一次，
+    --    按登录算会把每个活跃用户每月判一次「沉睡」。由网关按小时节流写（一小时最多一次），
+    --    与上面「主表不挂高频写字段」的约定不冲突。设计见 docs/业务/会员/登录风控-技术方案.md §4.4
+    `last_active_time` datetime             DEFAULT NULL COMMENT '最后活跃时间：注册时写入，之后网关按小时节流写。登录风控判「沉睡」用它，不用最后登录时间（会话 30 天不续期）',
+
     -- ---------- 展示信息（随便改，不许做键）----------
     `nickname`         varchar(64) NOT NULL COMMENT '昵称：中文随意，用户可改。🔴任何地方都不许拿它做关联键',
     `avatar_file_id`   bigint               DEFAULT NULL COMMENT '头像 file_id（走文件模块，同商城图片）',
