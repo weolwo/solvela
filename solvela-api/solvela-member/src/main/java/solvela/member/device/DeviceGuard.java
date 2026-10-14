@@ -2,11 +2,10 @@ package solvela.member.device;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.enums.DeviceStatusEnum;
+import solvela.member.risk.feature.LoginCounters;
 
 /**
  * 设备维度的闸门：登录频次、失败次数、一机多号、批量注册。
@@ -37,25 +36,14 @@ import solvela.enums.DeviceStatusEnum;
 @RequiredArgsConstructor
 public class DeviceGuard {
 
-    private static final String KEY_LOGIN = "dev:login:";
-
-    private static final String KEY_FAIL = "dev:fail:";
-
-    private static final String KEY_MEMBER = "dev:member:";
-
-    private static final String KEY_REGISTER = "dev:reg:member:";
-
-    private final RedisService redisService;
-
     /**
-     * 一机多号那条规则要的是「几个<b>不同的</b>会员」，而 {@link RedisService} 只提供
-     * 计数与读写，没有集合操作 —— 它被刻意裁剪过（19 个方法删到 6 个）。
+     * 🔴 计数全部走它，本类不再自己拼 Redis 键。
      *
-     * <p>与其往那个所有模块共用的基础类里加方法，不如在这里直接用 {@code StringRedisTemplate}：
-     * 影响面小，而且 {@code MemberRedisTokenStore} 早就是这个做法。
-     * 键名仍然经 {@code generateRedisKey} 生成，保证与其它键同一套项目/环境前缀。
+     * <p>每个计数器都有两侧：写的一侧在这里（失败时 +1），读的一侧在风控规则里（超没超）。
+     * 键名或窗口在两侧各写一遍，漂移的第一天不会有任何报错 —— 表现是「这条限流再也不触发」。
+     * 所以键只在 {@link LoginCounters} 里出现一次。
      */
-    private final StringRedisTemplate redis;
+    private final LoginCounters counters;
 
     private final DeviceGuardProperties properties;
 
@@ -78,14 +66,14 @@ public class DeviceGuard {
         }
         // 🔴 失败计数【只读不加】：它由 recordLoginFailure 在真的失败时才 +1。
         //    在这里 incr 会把「一次正常登录」也算成失败，阈值当场失去意义
-        long fails = readCount(KEY_FAIL, deviceId);
+        long fails = counters.read(LoginCounters.Counter.DEVICE_FAIL, deviceId);
         if (fails > properties.getMaxFailPerHour()) {
-            return verdict(DeviceGuardRule.FAIL_TOO_MANY, deviceId, KEY_FAIL);
+            return verdict(DeviceGuardRule.FAIL_TOO_MANY, deviceId, LoginCounters.Counter.DEVICE_FAIL);
         }
 
-        long logins = redisService.increment(key(KEY_LOGIN, deviceId), properties.dayWindow().toSeconds());
+        long logins = counters.bump(LoginCounters.Counter.DEVICE_LOGIN, deviceId);
         if (logins > properties.getMaxLoginPerDay()) {
-            return verdict(DeviceGuardRule.LOGIN_TOO_MANY, deviceId, KEY_LOGIN);
+            return verdict(DeviceGuardRule.LOGIN_TOO_MANY, deviceId, LoginCounters.Counter.DEVICE_LOGIN);
         }
         return DeviceGuardVerdict.pass();
     }
@@ -99,7 +87,7 @@ public class DeviceGuard {
         if (SolvelaStringUtil.isBlank(deviceId)) {
             return;
         }
-        redisService.increment(key(KEY_FAIL, deviceId), properties.hourWindow().toSeconds());
+        counters.bump(LoginCounters.Counter.DEVICE_FAIL, deviceId);
     }
 
     /**
@@ -113,16 +101,11 @@ public class DeviceGuard {
         if (SolvelaStringUtil.isBlank(deviceId) || memberId == null) {
             return DeviceGuardVerdict.pass();
         }
-        String key = key(KEY_MEMBER, deviceId);
-        redis.opsForSet().add(key, String.valueOf(memberId));
-        // 🔴 每次都续期，而不是只在首次创建时设。集合是逐步长起来的：
-        //    只在首次设 TTL 的话，一台持续活跃的设备会在第一次 add 的 24 小时后
-        //    整个集合消失，计数归零 —— 那正是养号要的效果
-        redis.expire(key, properties.dayWindow());
-
-        Long distinct = redis.opsForSet().size(key);
-        if (distinct != null && distinct > properties.getMaxMembersPerDay()) {
-            return verdict(DeviceGuardRule.MEMBER_FANOUT, deviceId, KEY_MEMBER);
+        // 集合每次 add 都续期（见 LoginCounters.Counter.DEVICE_MEMBER 的注释：
+        // 只在首次设 TTL 的话，一台持续活跃的设备会在 24 小时后计数归零 —— 那正是养号要的效果）
+        long distinct = counters.addToSet(LoginCounters.Counter.DEVICE_MEMBER, deviceId, String.valueOf(memberId));
+        if (distinct > properties.getMaxMembersPerDay()) {
+            return verdict(DeviceGuardRule.MEMBER_FANOUT, deviceId, LoginCounters.Counter.DEVICE_MEMBER);
         }
         return DeviceGuardVerdict.pass();
     }
@@ -140,9 +123,9 @@ public class DeviceGuard {
         if (banned(deviceId)) {
             return DeviceGuardVerdict.hit(DeviceGuardRule.BANNED, 0L, false);
         }
-        long count = redisService.increment(key(KEY_REGISTER, deviceId), properties.dayWindow().toSeconds());
+        long count = counters.bump(LoginCounters.Counter.DEVICE_REGISTER, deviceId);
         if (count > properties.getMaxRegisterPerDay()) {
-            return verdict(DeviceGuardRule.REGISTER_TOO_MANY, deviceId, KEY_REGISTER);
+            return verdict(DeviceGuardRule.REGISTER_TOO_MANY, deviceId, LoginCounters.Counter.DEVICE_REGISTER);
         }
         return DeviceGuardVerdict.pass();
     }
@@ -154,9 +137,9 @@ public class DeviceGuard {
      * 后面校准阈值的全部依据，所以打的是 WARN 而不是 DEBUG：它必须能被捞出来。
      * 上线初期它会很吵，那正是要看的东西。
      */
-    private DeviceGuardVerdict verdict(DeviceGuardRule rule, String deviceId, String keyPrefix) {
+    private DeviceGuardVerdict verdict(DeviceGuardRule rule, String deviceId, LoginCounters.Counter counter) {
         boolean dryRun = properties.isDryRun();
-        long retryAfter = Math.max(1L, redisService.getExpire(key(keyPrefix, deviceId)));
+        long retryAfter = counters.retryAfterSeconds(counter, deviceId);
         log.warn("【设备闸门】{} deviceId: {}, 规则: {}({}), 还需等待 {} 秒",
                 dryRun ? "命中但放行[dry-run]" : "拦截", deviceId, rule.getValue(), rule.getDesc(), retryAfter);
         /*
@@ -183,24 +166,5 @@ public class DeviceGuard {
      */
     private boolean banned(String deviceId) {
         return dispositionService.currentStatus(deviceId) == DeviceStatusEnum.BANNED;
-    }
-
-    private long readCount(String prefix, String deviceId) {
-        String raw = redisService.get(key(prefix, deviceId));
-        if (raw == null) {
-            return 0L;
-        }
-        try {
-            return Long.parseLong(raw);
-        } catch (NumberFormatException e) {
-            // 只可能是有人手改了 Redis，或键撞了别的系统。当成 0 而不是抛：
-            // 一个读不出来的计数器不该让全站登不进来
-            log.warn("【设备闸门】计数键不是数字，已按 0 处理: {}", raw);
-            return 0L;
-        }
-    }
-
-    private String key(String prefix, String deviceId) {
-        return redisService.generateRedisKey(prefix, deviceId);
     }
 }

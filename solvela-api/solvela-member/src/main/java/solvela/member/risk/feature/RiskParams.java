@@ -1,0 +1,129 @@
+package solvela.member.risk.feature;
+
+import solvela.enums.MemberRiskDecisionEnum;
+import tools.jackson.databind.JsonNode;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 读 {@code t_member_risk_rule.params} 的小工具。
+ *
+ * <h3>为什么不用 Spring 的 DurationStyle</h3>
+ * 这些参数是<b>后台可改</b>的，读不出来的后果是一条规则静默关闭。所以解析规则必须是我们自己说得清的、
+ * 有单测钉住的那一份，而不是跟着某个框架内部类的版本走。只认 {@code s/m/h/d} 四个后缀，够用且不会有歧义。
+ *
+ * <h3>解析失败一律抛 {@link IllegalArgumentException}</h3>
+ * 规则的 {@code validate} 与后台保存走同一条路：<b>存不进去</b>好过存进去之后静默失效。
+ *
+ * @Date 2026-10-15
+ */
+public final class RiskParams {
+
+    private RiskParams() {
+    }
+
+    /** 分级阈值的一档：计数<b>超过</b> over 时给出 decision */
+    public record Tier(long over, MemberRiskDecisionEnum decision) {
+    }
+
+    public static Duration duration(JsonNode params, String field, Duration fallback) {
+        JsonNode node = params.path(field);
+        if (node.isMissingNode() || node.isNull()) {
+            return fallback;
+        }
+        return parseDuration(node.asString(), field);
+    }
+
+    /**
+     * {@code "60s"} / {@code "5m"} / {@code "1h"} / {@code "1d"}。
+     *
+     * <p>🔴 不接受裸数字：{@code "60"} 到底是秒还是分钟，看的人一半会猜错，而猜错不会报错。
+     */
+    public static Duration parseDuration(String raw, String field) {
+        String text = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (text.length() < 2) {
+            throw new IllegalArgumentException(field + " 要带单位（s/m/h/d），实际是: " + raw);
+        }
+        char unit = text.charAt(text.length() - 1);
+        long amount;
+        try {
+            amount = Long.parseLong(text.substring(0, text.length() - 1));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(field + " 解析不出数值: " + raw);
+        }
+        if (amount <= 0) {
+            throw new IllegalArgumentException(field + " 必须是正数: " + raw);
+        }
+        return switch (unit) {
+            case 's' -> Duration.ofSeconds(amount);
+            case 'm' -> Duration.ofMinutes(amount);
+            case 'h' -> Duration.ofHours(amount);
+            case 'd' -> Duration.ofDays(amount);
+            default -> throw new IllegalArgumentException(field + " 的单位只认 s/m/h/d，实际是: " + raw);
+        };
+    }
+
+    public static int positiveInt(JsonNode params, String field, int fallback) {
+        JsonNode node = params.path(field);
+        if (node.isMissingNode() || node.isNull()) {
+            return fallback;
+        }
+        if (!node.isIntegralNumber() || node.asInt() <= 0) {
+            throw new IllegalArgumentException(field + " 必须是正整数，实际是: " + node);
+        }
+        return node.asInt();
+    }
+
+    /**
+     * 解析分级阈值 {@code [{"over":5,"do":2},{"over":20,"do":6}]}，按 {@code over} 升序返回。
+     *
+     * <h3>🔴 两条校验，都是为了防「配了却不起作用」</h3>
+     * <ul>
+     *   <li><b>over 必须严格递增</b>：两档配成同一个数，后一档永远轮不到；</li>
+     *   <li><b>处置必须越来越严</b>。配成「超 5 次限流、超 20 次出滑块」的话，
+     *       超 20 次的人<b>反而被放松了</b> —— 而页面上两行看着都很正常。</li>
+     * </ul>
+     */
+    public static List<Tier> tiers(JsonNode params) {
+        JsonNode node = params.path("tiers");
+        if (!node.isArray() || node.isEmpty()) {
+            throw new IllegalArgumentException("tiers 不能为空");
+        }
+        List<Tier> tiers = new ArrayList<>(node.size());
+        for (JsonNode item : node) {
+            long over = item.path("over").asLong(-1);
+            if (over < 0) {
+                throw new IllegalArgumentException("tiers[].over 必须是非负整数，实际是: " + item);
+            }
+            int decision = item.path("do").asInt(-1);
+            tiers.add(new Tier(over, MemberRiskDecisionEnum.ofValue(decision)));
+        }
+        tiers.sort((a, b) -> Long.compare(a.over(), b.over()));
+        for (int i = 1; i < tiers.size(); i++) {
+            Tier prev = tiers.get(i - 1);
+            Tier cur = tiers.get(i);
+            if (cur.over() == prev.over()) {
+                throw new IllegalArgumentException("tiers 里有两档的 over 相同（后一档永远轮不到）: " + cur.over());
+            }
+            if (!cur.decision().atLeast(prev.decision())) {
+                throw new IllegalArgumentException("tiers 的处置必须随 over 越来越严，"
+                        + "否则超得更多的人反而被放松了: over " + prev.over() + " → " + prev.decision()
+                        + "，over " + cur.over() + " → " + cur.decision());
+            }
+        }
+        return List.copyOf(tiers);
+    }
+
+    /** 命中的那一档：取 {@code count > over} 里 over 最大的那个；都没超返回 null */
+    public static Tier hit(List<Tier> tiers, long count) {
+        Tier hit = null;
+        for (Tier tier : tiers) {
+            if (count > tier.over()) {
+                hit = tier;
+            }
+        }
+        return hit;
+    }
+}
