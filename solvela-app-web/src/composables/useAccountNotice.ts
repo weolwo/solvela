@@ -1,6 +1,6 @@
 import { readonly, ref, type Ref } from 'vue'
 
-import type { AssetOutUnlock } from '@/api/errors'
+import type { AssetOutUnlock, ContactNeed } from '@/api/errors'
 
 /**
  * 「账号被保护起来了」这类<b>只需要告知 + 指一条路</b>的全局弹窗状态。
@@ -17,11 +17,15 @@ import type { AssetOutUnlock } from '@/api/errors'
 
 export interface AccountNotice {
   /** 后端的错误码，决定弹窗的标题与按钮 */
-  code: 'ASSET_OUT_FROZEN'
+  code: 'ASSET_OUT_FROZEN' | 'CONTACT_BIND_REQUIRED' | 'CONTACT_COOLING'
   /** 后端给的人话，原样展示 */
   message: string
-  /** 解除方式。null 表示前端不认识服务端给的那种解法，此时只显示「知道了」 */
-  unlock: AssetOutUnlock | null
+  /** ASSET_OUT_FROZEN：解除方式。null 表示前端不认识服务端给的那种解法，此时只显示「知道了」 */
+  unlock?: AssetOutUnlock | null
+  /** CONTACT_BIND_REQUIRED：缺哪一种联系方式 */
+  need?: ContactNeed | null
+  /** CONTACT_COOLING：到什么时候可用（毫秒）。null 时只说「暂时不可用」 */
+  availableAt?: number | null
 }
 
 const current = ref<AccountNotice | null>(null)

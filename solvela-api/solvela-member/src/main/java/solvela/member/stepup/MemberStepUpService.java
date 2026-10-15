@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PiiCipher;
 import solvela.enums.LoginLogResultEnum;
+import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.EmailCodeScene;
@@ -62,6 +63,9 @@ public class MemberStepUpService implements MemberStepUpApi {
     /** 「这不是我」要给那一次登录的决策流水打标（方案 §8.1） */
     private final solvela.member.risk.RiskLabelService riskLabelService;
 
+    /** 新绑的邮箱 7 天内不能用来核身（方案 §6.4），见 {@code ContactCoolingStore} */
+    private final solvela.member.contact.ContactCoolingStore coolingStore;
+
     @Override
     public DeviceTrust check(StepUpCmd cmd) {
         if (SolvelaStringUtil.isBlank(cmd.deviceId())) {
@@ -88,6 +92,16 @@ public class MemberStepUpService implements MemberStepUpApi {
         if (email == null) {
             return StepUpResult.fail(StepUpFailReason.NO_EMAIL);
         }
+        /*
+         * 🔴 在不受信任的设备上新绑的邮箱，7 天内不能用来核身。
+         *    不挡的话这条链是通的：登录 → 加地址要二次验证 → 没有邮箱 → 绑自己的邮箱
+         *    → 用它通过二次验证 → 把东西搬走。而「去绑定」那颗按钮正是我们要给的。
+         */
+        long availableAt = coolingStore.availableAt(cmd.memberId(), MemberVerifyChannelEnum.EMAIL);
+        if (availableAt > 0L) {
+            return StepUpResult.retryLater(StepUpFailReason.CONTACT_COOLING,
+                    availableAt - System.currentTimeMillis() / 1000L);
+        }
         EmailCodeSendResult sent = emailCodeService.send(EmailCodeScene.STEP_UP, email, cmd.clientIp());
         if (sent.success()) {
             return StepUpResult.sent(MemberEmailUtil.mask(email));
@@ -113,6 +127,15 @@ public class MemberStepUpService implements MemberStepUpApi {
         String email = boundEmail(cmd.memberId());
         if (email == null) {
             return StepUpResult.fail(StepUpFailReason.NO_EMAIL);
+        }
+        /*
+         * 验码这一步也要挡。🔴 只挡发码是不够的：码有 5 分钟有效期，
+         * 一个在冷静期开始【之前】发出去的码，冷静期内照样能拿来验过。
+         */
+        long coolingUntil = coolingStore.availableAt(cmd.memberId(), MemberVerifyChannelEnum.EMAIL);
+        if (coolingUntil > 0L) {
+            return StepUpResult.retryLater(StepUpFailReason.CONTACT_COOLING,
+                    coolingUntil - System.currentTimeMillis() / 1000L);
         }
         StepUpFailReason problem = switch (emailCodeService.verify(EmailCodeScene.STEP_UP, email, cmd.code())) {
             case OK -> null;

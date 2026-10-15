@@ -1,26 +1,80 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { dismissAccountNotice, useAccountNoticeState } from '@/composables/useAccountNotice'
 
 /**
- * 账号保护状态的提示弹窗。目前只有一种：点过「这不是我」之后资产出口被冻结。
+ * 账号状态挡住了这次操作时的提示弹窗。三种，共用一个壳：
+ * <ul>
+ *   <li><b>资产出口冻结</b>（点过「这不是我」）→ [去重置密码]；</li>
+ *   <li><b>没绑联系方式</b>（要二次验证却没有邮箱）→ [去绑定]；</li>
+ *   <li><b>新绑的还在冷静期</b> → 只有 [知道了]。</li>
+ * </ul>
  *
  * <h3>为什么要一个弹窗，而不是让页面展示那句错误</h3>
- * 这一档和其它失败不同：**用户必须去做另一件事**才能恢复（重置密码）。
- * 只在兑换页底下显示一行红字「账号处于保护状态」的话，用户会反复点那颗兑换按钮 ——
+ * 这三档都不是「再试一次就好」：**用户必须去做另一件事**（或者只能等）。
+ * 只在兑换页底下显示一行红字的话，用户会反复点那颗按钮 ——
  * 而他永远点不动，也不知道该去哪儿。
  *
- * <h3>🔴 只给「去重置密码」，不给「联系客服」</h3>
- * 这件事用户自己五分钟就能办完，而客服要花半天核身。
- * 把客服摆在同一层，一半的人会选那条更慢的路。
+ * <h3>🔴 冷静期那一档刻意【没有】「重新绑定」</h3>
+ * 再绑一次只会再冷静 7 天。给这颗按钮等于让用户在一个死循环里打转。
+ * 真正的出路是「在你常用的设备上操作」，所以文案要说这一句。
+ *
+ * <h3>🔴 「去绑定」这颗按钮是有代价的</h3>
+ * 首次绑定不要求任何额外验证，所以它本身就是一条账号接管链的入口
+ * （绑自己的邮箱 → 用它通过二次验证 → 把东西搬走）。
+ * 它能存在，前提是服务端那边的 7 天冷静期一起上了 —— 两者缺一不可。
  */
 const { current } = useAccountNoticeState()
 const router = useRouter()
+const route = useRoute()
+
+const TITLES: Record<string, string> = {
+  ASSET_OUT_FROZEN: '账号处于保护状态',
+  CONTACT_BIND_REQUIRED: '需要先绑定邮箱',
+  CONTACT_COOLING: '新绑定的联系方式暂不可用',
+}
+
+const HINTS: Record<string, string> = {
+  ASSET_OUT_FROZEN:
+    '你举报过一次可疑登录，所以兑换、加收货地址、充话费被暂时停用了。重置密码即可恢复。',
+  CONTACT_BIND_REQUIRED: '这个操作需要先验证一次邮箱验证码，所以要先给账号绑定一个邮箱。',
+}
+
+const title = computed(() => (current.value === null ? '' : (TITLES[current.value.code] ?? '')))
+
+const hint = computed(() => {
+  const notice = current.value
+  if (notice === null) {
+    return ''
+  }
+  if (notice.code !== 'CONTACT_COOLING') {
+    return HINTS[notice.code] ?? ''
+  }
+  // 拿不到日期就只说「暂时」，不编一个出来
+  if (notice.availableAt === null || notice.availableAt === undefined) {
+    return '为了账号安全，刚绑定的联系方式要过几天才能用于安全验证。你也可以在常用的设备上操作。'
+  }
+  const d = new Date(notice.availableAt)
+  return `为了账号安全，它要到 ${d.getMonth() + 1} 月 ${d.getDate()} 日之后才能用于安全验证。你也可以在常用的设备上操作。`
+})
 
 async function goPasswordReset(): Promise<void> {
   dismissAccountNotice()
   await router.push({ name: 'password-reset' })
+}
+
+/**
+ * 去绑定。带上 `redirect`：绑完回到用户原来那一页。
+ *
+ * 🔴 回来之后**不自动重试**原请求 —— 中间隔了一次页面跳转，
+ * 让用户自己再点一次，否则他会看到一个自己没点过的操作成功了。
+ */
+async function goBind(): Promise<void> {
+  const target = route.fullPath
+  dismissAccountNotice()
+  await router.push({ name: 'email-bind', query: { redirect: target } })
 }
 </script>
 
@@ -31,18 +85,25 @@ async function goPasswordReset(): Promise<void> {
       class="mask"
       role="alertdialog"
       aria-modal="true"
-      aria-label="账号保护状态"
+      :aria-label="title"
     >
       <div class="dialog">
-        <h2 class="dialog__title">账号处于保护状态</h2>
+        <h2 class="dialog__title">{{ title }}</h2>
         <p class="dialog__message">{{ current.message }}</p>
-        <p class="dialog__hint">
-          你举报过一次可疑登录，所以兑换、加收货地址、充话费被暂时停用了。重置密码即可恢复。
-        </p>
+        <p v-if="hint !== ''" class="dialog__hint">{{ hint }}</p>
 
         <div class="dialog__actions">
-          <Button v-if="current.unlock === 'PASSWORD_RESET'" @click="goPasswordReset">
+          <Button
+            v-if="current.code === 'ASSET_OUT_FROZEN' && current.unlock === 'PASSWORD_RESET'"
+            @click="goPasswordReset"
+          >
             去重置密码
+          </Button>
+          <Button
+            v-else-if="current.code === 'CONTACT_BIND_REQUIRED' && current.need === 'EMAIL'"
+            @click="goBind"
+          >
+            去绑定邮箱
           </Button>
           <Button variant="text" @click="dismissAccountNotice">知道了</Button>
         </div>

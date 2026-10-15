@@ -17,6 +17,20 @@ public enum StepUpFailReason {
      */
     NO_EMAIL,
 
+    /**
+     * 邮箱是<b>在一台不受信任的设备上新绑的</b>，还在 7 天冷静期内，暂时不能用来核身。
+     *
+     * <p>剩余时间见 {@link StepUpResult#retryAfterSeconds()}。
+     *
+     * <h3>🔴 为什么要有这一档</h3>
+     * 首次绑定邮箱不要求任何额外验证，所以一个知道密码的人在新设备上可以
+     * 「绑自己的邮箱 → 用它通过二次验证 → 把东西搬走」。
+     * 而我们偏偏要给「没绑就去绑定」一个显眼的按钮（方案 §6.4）——
+     * 按钮要给，这一档就必须一起上，否则那颗按钮就是把接管链铺成了主路。
+     * 详见 {@code ContactCoolingStore}。
+     */
+    CONTACT_COOLING,
+
     /** 上一封发出去还不到冷却时间。 */
     TOO_FREQUENT,
 

@@ -80,7 +80,23 @@ public class StepUpController {
     private static ApiException translate(StepUpResult result) {
         return switch (result.reason()) {
             case NO_DEVICE -> new ApiException(ApiErrors.DEVICE_REQUIRED);
-            case NO_EMAIL -> new ApiException(ApiErrors.CONFLICT, "请先绑定邮箱，再进行该操作");
+            /*
+             * 🔴 专门一个码，不再用 CONFLICT。那是个大杂烩码，客户端没法据它弹出「去绑定」——
+             * 只能把 message 当普通错误展示，而用户看完并不知道该去哪儿。
+             *
+             * details 里放的是「缺什么」这个事实，不是「跳哪个页面」（方案 §6.4 约定 2）。
+             */
+            case NO_EMAIL -> new ApiException(ApiErrors.CONTACT_BIND_REQUIRED,
+                    ApiErrors.CONTACT_BIND_REQUIRED.defaultMessage(),
+                    java.util.Map.of("need", "EMAIL"));
+            /*
+             * 新绑的联系方式还在冷静期。给可用时间，不给「重新绑定」的出路 ——
+             * 再绑一次只会再冷静 7 天。
+             */
+            case CONTACT_COOLING -> new ApiException(ApiErrors.CONTACT_COOLING,
+                    ApiErrors.CONTACT_COOLING.defaultMessage(),
+                    java.util.Map.of("availableAt",
+                            System.currentTimeMillis() / 1000L + Math.max(0L, result.retryAfterSeconds())));
             case TOO_FREQUENT -> new ApiException(ApiErrors.OPERATION_LIMITED,
                     String.format("验证码已发送，请 %d 秒后再试", Math.max(1, result.retryAfterSeconds())));
             case DAILY_LIMIT_REACHED -> new ApiException(ApiErrors.OPERATION_LIMITED,

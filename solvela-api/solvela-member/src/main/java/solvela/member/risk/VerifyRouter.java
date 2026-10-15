@@ -50,6 +50,9 @@ public class VerifyRouter {
 
     private final MemberSmsCodeService smsCodeService;
 
+    /** 新绑的联系方式在冷静期内一律当「这条通道不可用」（方案 §6.4） */
+    private final solvela.member.contact.ContactCoolingStore coolingStore;
+
     /**
      * 选定的通道。
      *
@@ -74,8 +77,16 @@ public class VerifyRouter {
         if (contacts == null) {
             return null;
         }
-        boolean emailReady = !SolvelaStringUtil.isBlank(contacts.getEmail());
-        boolean smsReady = !SolvelaStringUtil.isBlank(contacts.getPhone()) && smsCodeService.deliverable();
+        /*
+         * 🔴 冷静期内的通道<b>当作没有</b>，而不是单独报一个错。
+         * 这样「还有另一条通道就走另一条、一条都没有才拒绝」这套逻辑一行都不用改 ——
+         * 而那正是对的行为：主人新绑的邮箱还在冷静期，但他的手机号还能收码。
+         */
+        boolean emailReady = !SolvelaStringUtil.isBlank(contacts.getEmail())
+                && !coolingStore.cooling(memberId, MemberVerifyChannelEnum.EMAIL);
+        boolean smsReady = !SolvelaStringUtil.isBlank(contacts.getPhone())
+                && !coolingStore.cooling(memberId, MemberVerifyChannelEnum.SMS)
+                && smsCodeService.deliverable();
 
         MemberVerifyChannelEnum sameAsLogin = loginType == MemberLoginType.PHONE_PASSWORD
                 ? MemberVerifyChannelEnum.SMS

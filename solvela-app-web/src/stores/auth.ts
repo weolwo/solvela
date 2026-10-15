@@ -172,10 +172,27 @@ export const useAuthStore = defineStore('auth', () => {
     // 发码、密码登录之前要过滑块。弹窗由 CaptchaDialog 负责，它不依赖登录态
     onCaptchaRequired: requestCaptcha,
     /*
-     * 点过「这不是我」之后资产出口被冻结。弹窗由 AccountNoticeDialog 负责。
-     * 🔴 它不重试原请求 —— 这一档验证码也过不去，唯一的出口是重置密码。
+     * 账号状态挡住了这次操作：资产出口冻结、没绑联系方式、新绑的还在冷静期。
+     * 弹窗由 AccountNoticeDialog 负责。
+     * 🔴 一律不重试原请求 —— 这三档都不是「还差一步就能继续」。
      */
     onAccountNotice: (error) => {
+      if (error.code === 'CONTACT_BIND_REQUIRED') {
+        showAccountNotice({
+          code: 'CONTACT_BIND_REQUIRED',
+          message: error.message,
+          need: error.contactNeed,
+        })
+        return
+      }
+      if (error.code === 'CONTACT_COOLING') {
+        showAccountNotice({
+          code: 'CONTACT_COOLING',
+          message: error.message,
+          availableAt: error.contactAvailableAt,
+        })
+        return
+      }
       showAccountNotice({
         code: 'ASSET_OUT_FROZEN',
         message: error.message,

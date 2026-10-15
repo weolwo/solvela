@@ -53,6 +53,18 @@ public class MemberPhoneBindService {
 
     private final PiiCipher piiCipher;
 
+    /**
+     * 判断「绑定时那台设备可信吗」。
+     *
+     * <p>🔴 延迟取：{@code MemberStepUpService} 的依赖里有验证码服务，与本类成环的风险同邮箱那边。
+     */
+    private final org.springframework.beans.factory.ObjectProvider<solvela.member.stepup.MemberStepUpService>
+            stepUpServiceProvider;
+
+    private final solvela.member.contact.ContactCoolingStore coolingStore;
+
+    private final solvela.notification.service.NotificationService notificationService;
+
     @Transactional(rollbackFor = Exception.class)
     public MemberPhoneBindResult bind(MemberPhoneBindCmd cmd) {
         String newPhone = MemberPhoneUtil.normalize(cmd.newPhone());
@@ -88,7 +100,7 @@ public class MemberPhoneBindService {
                 return rebindProblem;
             }
         }
-        return doUpdate(cmd.memberId(), newPhone, oldPhone);
+        return doUpdate(cmd.memberId(), newPhone, oldPhone, cmd.deviceId(), cmd.clientIp());
     }
 
     /**
@@ -122,7 +134,8 @@ public class MemberPhoneBindService {
         return MemberPhoneBindResult.fail(PhoneBindFailReason.REBIND_VERIFICATION_FAILED);
     }
 
-    private MemberPhoneBindResult doUpdate(Long memberId, String newPhone, String oldPhone) {
+    private MemberPhoneBindResult doUpdate(Long memberId, String newPhone, String oldPhone,
+                                           String deviceId, String clientIp) {
         String hashHex = piiHasher.hash(newPhone);
         try {
             // 密文与摘要必须来自【同一个】规范化后的字符串，
@@ -134,12 +147,41 @@ public class MemberPhoneBindService {
         }
         log.info("【手机绑定】成功, memberId: {}, 换绑: {}, 新号码: {}",
                 memberId, oldPhone != null, MemberPhoneUtil.mask(newPhone));
+        applyCooling(memberId, deviceId, clientIp);
+        notifyBound(memberId, newPhone);
         /*
          * ⚠️ 还没做「通知旧手机号」。换绑之后旧号码就失去了这个账号的登录能力，
-         *    而它的主人不会收到任何消息 —— 如果换绑是别人干的，他也无从察觉。
+         *    而它的主人收不到短信（站内信他看得到，但那要登进来）。
          *    邮箱那边留着同一条待办。要补的话是一次发送，不影响这里的主流程。
          */
         return MemberPhoneBindResult.ok();
+    }
+
+    /**
+     * 不受信任的设备上绑的 → 进 7 天冷静期；受信任的设备上绑的 → 解除。
+     * 判据与理由与邮箱那边一字不差，见 {@code ContactCoolingStore}。
+     */
+    private void applyCooling(Long memberId, String deviceId, String clientIp) {
+        try {
+            boolean trusted = stepUpServiceProvider.getObject()
+                    .check(solvela.member.api.StepUpCmd.of(memberId, deviceId, clientIp)).trusted();
+            if (trusted) {
+                coolingStore.clear(memberId, solvela.enums.MemberVerifyChannelEnum.SMS);
+            } else {
+                coolingStore.start(memberId, solvela.enums.MemberVerifyChannelEnum.SMS);
+            }
+        } catch (RuntimeException e) {
+            log.error("【手机绑定】判断冷静期失败，本次不设, memberId: {}", memberId, e);
+        }
+    }
+
+    /** 告诉主人一声。号码打过码 —— 这条通知会长期留在消息列表里 */
+    private void notifyBound(Long memberId, String newPhone) {
+        notificationService.send(solvela.notification.domain.NotifyRequest
+                .of(solvela.enums.NotificationTemplateEnum.CONTACT_BOUND, memberId)
+                .param("contactType", "手机号")
+                .param("maskedContact", MemberPhoneUtil.mask(newPhone))
+                .build());
     }
 
     private static PhoneBindFailReason toBindReason(SmsCodeVerifyResult result) {

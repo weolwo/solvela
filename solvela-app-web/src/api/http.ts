@@ -39,7 +39,7 @@ type StepUpHandler = () => Promise<boolean>
 /** 弹出滑块、等用户拖完。返回通行票；放弃返回 null */
 type CaptchaHandler = () => Promise<string | null>
 /**
- * 账号被保护起来了，弹一条告知。
+ * 账号状态挡住了这次操作，弹一条告知（冻结、没绑联系方式、新绑的还在冷静期）。
  *
  * 🔴 **没有返回值，也不重试**：这一档不是「还差一步」，是「这件事现在办不了，去办另一件」。
  * 做成「验完重试」的形状，用户会一直点那个永远点不动的按钮。
@@ -151,7 +151,11 @@ http.interceptors.response.use(
      * 账号被保护起来了。弹窗是旁路：这里**不** return，错误照常往下抛 ——
      * 页面上那颗按钮要停止转圈，而这只有调用方自己做得到。
      */
-    if (apiError.code === 'ASSET_OUT_FROZEN') {
+    if (
+      apiError.code === 'ASSET_OUT_FROZEN' ||
+      apiError.code === 'CONTACT_BIND_REQUIRED' ||
+      apiError.code === 'CONTACT_COOLING'
+    ) {
       accountNoticeHandler(apiError)
     }
 

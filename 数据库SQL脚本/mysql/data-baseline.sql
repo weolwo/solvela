@@ -582,11 +582,12 @@ INSERT INTO `t_task_event` (`id`, `event_code`, `event_name`, `metric_source`, `
 -- [跳过] t_notice_type : Table 'solvela.t_notice_type' doesn't exist
 
 -- -----------------------------------------------------------------------------------
--- t_notification_template  通知模板。缺了发不出任何站内信，而且不报错（9 行）
+-- t_notification_template  通知模板。缺了发不出任何站内信，而且不报错（10 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_notification_template`;
 INSERT INTO `t_notification_template` (`template_code`, `version`, `category`, `title_template`, `content_template`, `param_keys`, `status`, `create_by`, `create_time`, `update_by`, `update_time`) VALUES
 ('ACCOUNT_LIMITED', 1, 'SYSTEM', '账号使用受限提醒', '您的账号因「${limitType}」被限制部分功能，预计 ${unlockTime} 自动恢复。如有疑问请联系客服。', '["limitType", "unlockTime"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
+('CONTACT_BOUND', 1, 'SYSTEM', '账号绑定变更提醒', '你的账号刚刚绑定了${contactType} ${maskedContact}。如果不是你本人操作，请立即修改密码，并在「我的登录设备」中下线其他设备。', '["contactType", "maskedContact"]', 1, 'system', '2026-10-16 10:00:00', NULL, '2026-10-16 10:00:00'),
 ('COUPON_EXPIRING', 1, 'TRADE', '您有优惠券即将过期', '您有 ${count} 张优惠券即将过期，最近一张将于 ${nearestExpireTime} 失效，别忘了使用哦~', '["count", "nearestExpireTime"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),
 ('COUPON_GRANTED', 1, 'MARKETING', '您收到一张优惠券', '您收到一张「${couponName}」。${reason}有效期至 ${validEndTime}，记得在券包里查看。', '["couponName", "reason", "validEndTime"]', 1, 'system', '2026-09-15 18:32:20', NULL, '2026-09-15 18:32:20'),
 ('DELIVERY_SHIPPED', 1, 'TRADE', '您的商品已发货', '您的订单 ${sourceBizId} 已发货。承运：${logisticsCompany}，运单号：${logisticsNo}。请留意物流信息。', '["sourceBizId", "logisticsCompany", "logisticsNo"]', 1, 'system', '2026-09-14 22:42:48', NULL, '2026-09-14 22:42:48'),

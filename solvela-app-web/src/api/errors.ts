@@ -75,6 +75,23 @@ export const API_ERROR_CODES = [
    * 唯一的出口是**重置密码**（`details.unlock === 'PASSWORD_RESET'`）。
    */
   'ASSET_OUT_FROZEN',
+  /**
+   * 要二次验证，但这个账号**没绑**能收码的联系方式（`details.need` 说缺什么）。
+   *
+   * 带 `redirect` 跳绑定页，绑完**不自动重试**原请求 —— 中间隔了一次页面跳转，
+   * 让用户自己再点一次。
+   */
+  'CONTACT_BIND_REQUIRED',
+  /**
+   * 🔴 联系方式是**在一台不受信任的设备上**新绑的，还在 7 天冷静期内，暂时不能用于安全验证。
+   *
+   * 它是「去绑定」那颗按钮的配套：首次绑定不要求任何额外验证，所以一个知道密码的人
+   * 可以「绑自己的邮箱 → 用它通过二次验证 → 把东西搬走」。
+   *
+   * **没有别的出路**：只说「X 月 X 日后可用，也可以在你常用的设备上操作」+ [知道了]。
+   * 给一颗「重新绑定」只会让他再绑一次、再冷静 7 天。
+   */
+  'CONTACT_COOLING',
   'INVALID_ARGUMENT',
   'NOT_FOUND',
   'CONFLICT',
@@ -113,6 +130,9 @@ export interface ChallengeDetails {
 
 /** ASSET_OUT_FROZEN 带的东西。目前只有一种解法 */
 export type AssetOutUnlock = 'PASSWORD_RESET'
+
+/** CONTACT_BIND_REQUIRED 说缺哪一种联系方式 */
+export type ContactNeed = 'EMAIL' | 'PHONE'
 
 /** PASSWORD_COOLDOWN 带的东西 */
 export interface PasswordCooldownDetails {
@@ -242,6 +262,27 @@ export class ApiError extends Error {
     }
     // 只认识一种解法；服务端将来加了别的，这里返回 null，弹窗退化成「只有知道了」
     return this.details?.unlock === 'PASSWORD_RESET' ? 'PASSWORD_RESET' : null
+  }
+
+  /** 缺哪一种联系方式。不是那个码、或者服务端给了个不认识的值时返回 null */
+  get contactNeed(): ContactNeed | null {
+    if (this.code !== 'CONTACT_BIND_REQUIRED') {
+      return null
+    }
+    const need = this.details?.need
+    return need === 'EMAIL' || need === 'PHONE' ? need : null
+  }
+
+  /**
+   * 冷静期到什么时候（毫秒，可直接 `new Date()`）。拿不到就返回 null ——
+   * 此时弹窗只说「暂时不可用」，不编一个日期出来。
+   */
+  get contactAvailableAt(): number | null {
+    if (this.code !== 'CONTACT_COOLING') {
+      return null
+    }
+    const at = this.details?.availableAt
+    return typeof at === 'number' && Number.isFinite(at) && at > 0 ? at * 1000 : null
   }
 
   /**

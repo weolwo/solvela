@@ -360,6 +360,13 @@ public class MemberLoginService {
             case SMS_CODE_LOCKED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误次数过多，请重新获取");
             // 文案从域里取，不在这里再写一遍规则 —— 两份措辞迟早对不上
             case WEAK_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, MemberPasswordPolicy.HINT);
+            /*
+             * 新绑的联系方式还在冷静期，不能用来找回密码。
+             * 🔴 这里<b>不给 availableAt</b>：找回密码是未登录接口，而这个时间点属于账号内部状态 ——
+             * 任何人输一个邮箱就能问出「这个号最近换过联系方式吗」。文案也只说「暂时不可用」。
+             */
+            case CONTACT_COOLING -> new ApiException(ApiErrors.CONTACT_COOLING,
+                    "该联系方式暂时不能用于找回密码，请在你常用的设备上操作，或联系客服");
             // 走到这一档说明码猜对了但账号不存在。含糊成「验证码错误」即可 ——
             // 对真实用户这条路不可能出现（没账号就收不到码）
             case ACCOUNT_NOT_FOUND -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误");

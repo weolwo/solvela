@@ -11,6 +11,7 @@ import solvela.crypto.PiiHasher;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.enums.MemberStatusEnum;
+import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeVerifyResult;
@@ -68,6 +69,9 @@ public class MemberPasswordResetService {
 
     /** 也要解开「这不是我」造成的资产出口冻结（方案 §8.1） */
     private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
+
+    /** 新绑的联系方式 7 天内不能用来找回密码 —— 三处拦截里后果最重的一处 */
+    private final solvela.member.contact.ContactCoolingStore coolingStore;
 
     /**
      * 重置密码。
@@ -129,6 +133,25 @@ public class MemberPasswordResetService {
             log.info("【重置密码】账号状态不允许自助找回, memberId: {}, status: {}",
                     member.getMemberId(), member.getStatus());
             return MemberPasswordResetResult.fail(PasswordResetFailReason.ACCOUNT_UNAVAILABLE);
+        }
+
+        /*
+         * 🔴 冷静期：这一处漏了的后果是【永久接管】。
+         *
+         * 用新绑的邮箱重置密码之后，原主连验证码登录都进不来了 ——
+         * 二次验证那一档漏了只是丢一次兑换，这一档漏了是丢整个账号。
+         *
+         * 排在验码【之后】：要先知道是哪个会员才查得到他的冷静期，
+         * 而在那之前这个接口对「有号 / 没号」的回答必须保持一致。
+         */
+        MemberVerifyChannelEnum channel = switch (type) {
+            case EMAIL_CODE -> MemberVerifyChannelEnum.EMAIL;
+            case SMS_CODE -> MemberVerifyChannelEnum.SMS;
+        };
+        if (coolingStore.cooling(member.getMemberId(), channel)) {
+            log.warn("【重置密码】联系方式还在冷静期内，拒绝, memberId: {}, 通道: {}",
+                    member.getMemberId(), channel);
+            return MemberPasswordResetResult.fail(PasswordResetFailReason.CONTACT_COOLING);
         }
 
         memberAuthDao.updatePassword(member.getMemberId(), PasswordCipher.encode(cmd.newPassword()));

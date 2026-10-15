@@ -9,6 +9,7 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.api.EmailBindFailReason;
 import solvela.member.api.EmailCodeScene;
@@ -51,6 +52,19 @@ public class MemberEmailBindService {
     private final PiiCipher piiCipher;
 
     /**
+     * 新绑的联系方式要不要进冷静期，看<b>绑定时那台设备可信不可信</b>。
+     *
+     * <p>🔴 用 {@code ObjectProvider} 延迟取：{@code MemberStepUpService} 发二次验证码要用
+     * {@code MemberEmailCodeService}，而本类也要它 —— 直接注入会在某些装配顺序下成环。
+     */
+    private final org.springframework.beans.factory.ObjectProvider<solvela.member.stepup.MemberStepUpService>
+            stepUpServiceProvider;
+
+    private final solvela.member.contact.ContactCoolingStore coolingStore;
+
+    private final solvela.notification.service.NotificationService notificationService;
+
+    /**
      * 绑定或更换邮箱。
      *
      * <p>顺序：新邮箱格式 → 新邮箱验证码 → （换绑时）证明你是原主 → 查重 → 落库。
@@ -91,7 +105,7 @@ public class MemberEmailBindService {
             }
         }
 
-        return doUpdate(cmd.memberId(), newEmail, oldEmail);
+        return doUpdate(cmd.memberId(), newEmail, oldEmail, cmd.deviceId(), cmd.clientIp());
     }
 
     /**
@@ -135,7 +149,8 @@ public class MemberEmailBindService {
      * 真正的防线是 {@code uk_mbr_email_hash}，撞了就是「已被别人绑走」，
      * 对用户是同一件事，别让它变成 500。判据同 {@code MemberRegisterService}。
      */
-    private MemberEmailBindResult doUpdate(Long memberId, String newEmail, String oldEmail) {
+    private MemberEmailBindResult doUpdate(Long memberId, String newEmail, String oldEmail,
+                                           String deviceId, String clientIp) {
         String hashHex = piiHasher.hash(newEmail);
         try {
             // 密文与摘要必须来自【同一个】规范化后的字符串，
@@ -148,10 +163,52 @@ public class MemberEmailBindService {
 
         log.info("【邮箱绑定】成功, memberId: {}, 换绑: {}, 新邮箱: {}",
                 memberId, oldEmail != null, MemberEmailUtil.mask(newEmail));
-        // ⚠️ 还没做「通知旧邮箱」。换绑之后旧邮箱就失去了这个账号的登录能力，
-        //    而它的主人不会收到任何消息 —— 如果换绑是别人干的，他也无从察觉。
-        //    要补的话是再加一个模板 + 一次发信，不影响这里的主流程
+        applyCooling(memberId, deviceId, clientIp);
+        notifyBound(memberId, newEmail);
         return MemberEmailBindResult.ok();
+    }
+
+    /**
+     * 不受信任的设备上绑的 → 进 7 天冷静期；受信任的设备上绑的 → 解除（主人回自己老手机上重绑了）。
+     *
+     * <p>🔴 判据是<b>绑定那一刻那台设备</b>，不是「这个账号可不可信」。
+     * 攻击者手里的设备恰恰是不受信任的那台，而主人在自己的老手机上补绑邮箱最正常 ——
+     * 这个判据正好把两者分开（见 {@code ContactCoolingStore}）。
+     *
+     * <p>整段包在 try 里：冷静期记不上只是「这次没有冷静期」，不该让一次成功的绑定回滚。
+     */
+    private void applyCooling(Long memberId, String deviceId, String clientIp) {
+        try {
+            boolean trusted = stepUpServiceProvider.getObject()
+                    .check(solvela.member.api.StepUpCmd.of(memberId, deviceId, clientIp)).trusted();
+            if (trusted) {
+                coolingStore.clear(memberId, MemberVerifyChannelEnum.EMAIL);
+            } else {
+                coolingStore.start(memberId, MemberVerifyChannelEnum.EMAIL);
+            }
+        } catch (RuntimeException e) {
+            log.error("【邮箱绑定】判断冷静期失败，本次不设, memberId: {}", memberId, e);
+        }
+    }
+
+    /**
+     * 告诉主人一声。
+     *
+     * <h3>🔴 这条通知比冷静期更早起作用</h3>
+     * 冷静期挡住的是「用新邮箱核身」，而主人要先<b>知道</b>有人动了他的账号才会去改密码。
+     * 站内信登进来才看得到，但盗号者改不了它的存在 ——
+     * 他能标已读，而主人下一次进来仍然会在消息列表里看到它。
+     *
+     * <p>⚠️ 还没做「通知旧邮箱」。换绑之后旧邮箱就失去了这个账号的登录能力，
+     * 而它的主人不会收到任何消息 —— 要补的话是再加一个邮件模板，不影响这里。
+     */
+    private void notifyBound(Long memberId, String newEmail) {
+        notificationService.send(solvela.notification.domain.NotifyRequest
+                .of(solvela.enums.NotificationTemplateEnum.CONTACT_BOUND, memberId)
+                .param("contactType", "邮箱")
+                // 🔴 打过码：这条通知会长期留在消息列表里，而列表不该成为一个读明文邮箱的地方
+                .param("maskedContact", MemberEmailUtil.mask(newEmail))
+                .build());
     }
 
     /**

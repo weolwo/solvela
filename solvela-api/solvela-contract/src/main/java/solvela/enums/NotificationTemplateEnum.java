@@ -134,6 +134,25 @@ public enum NotificationTemplateEnum {
             List.of("loginTime", "deviceType", "location")),
 
     /**
+     * 账号新绑定了邮箱 / 手机号。
+     *
+     * <p>发送点是绑定服务（{@code MemberEmailBindService} / {@code MemberPhoneBindService}）。
+     *
+     * <h3>🔴 它比「冷静期」更早起作用</h3>
+     * 冷静期挡住的是「用新绑的联系方式核身」，而主人要先<b>知道</b>有人动了他的账号
+     * 才会去改密码。盗号者能把这条标成已读，但改不了它的存在 ——
+     * 主人下一次进来仍然会在消息列表里看到它。
+     *
+     * <p>归在 {@link NotificationCategoryEnum#SYSTEM}：「有人给你的账号绑了一个邮箱」
+     * 不该能被免打扰关掉。
+     *
+     * <p>⚠️ 参数里的联系方式<b>必须是打过码的</b>：这条通知会长期留在消息列表里，
+     * 而列表不该成为一个读明文邮箱 / 手机号的地方。
+     */
+    CONTACT_BOUND("CONTACT_BOUND", NotificationCategoryEnum.SYSTEM,
+            List.of("contactType", "maskedContact")),
+
+    /**
      * 优惠券即将过期。
      *
      * <p>🔴 <b>必须合并发送</b>：一个人有 8 张券要过期，发<b>一条</b>

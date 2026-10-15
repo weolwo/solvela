@@ -17,6 +17,7 @@
  * 没有就只给「旧邮箱验证码」。
  */
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { bindEmail, fetchContact, sendEmailCode, type MemberContact } from '@/api/auth'
 import { ApiError } from '@/api/errors'
@@ -53,6 +54,32 @@ const errorMessage = ref('')
 const errorTraceId = ref<string | null>(null)
 const submitting = ref(false)
 const succeeded = ref(false)
+
+const route = useRoute()
+const router = useRouter()
+
+/** 成功提示停留多久再跳回去。够看清，又不至于让人等 */
+const REDIRECT_DWELL_MS = 700
+
+/**
+ * 绑完回到把用户送过来的那一页。
+ *
+ * 🔴 **只认 `redirect`，没有它就留在本页**。这颗「去绑定」是
+ * `CONTACT_BIND_REQUIRED` 弹窗送过来的（见 AccountNoticeDialog），
+ * 用户原本在做的是兑换 / 加地址 —— 不送回去，他得自己重新找一遍。
+ *
+ * ⚠️ 回去之后**不自动重试**那个操作：让他自己再点一次。
+ * 替他点的话，他会看到一个自己没点过的操作成功了。
+ */
+async function returnToCaller(): Promise<void> {
+  const redirect = route.query.redirect
+  if (typeof redirect !== 'string' || !redirect.startsWith('/')) {
+    // 🔴 只接受站内的相对路径。接受绝对 URL 等于给了一个开放重定向
+    return
+  }
+  await new Promise((resolve) => setTimeout(resolve, REDIRECT_DWELL_MS))
+  await router.replace(redirect)
+}
 
 /** 已经绑过邮箱 = 这次是换绑，要多给一样东西 */
 const rebinding = computed(
@@ -158,6 +185,7 @@ async function submit(): Promise<void> {
     oldEmailCode.value = ''
     newCodeSender.reset()
     oldCodeSender.reset()
+    await returnToCaller()
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.code === 'CONFLICT') {

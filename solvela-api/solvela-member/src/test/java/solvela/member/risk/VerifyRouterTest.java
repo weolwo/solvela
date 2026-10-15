@@ -41,6 +41,9 @@ class VerifyRouterTest {
 
     private MemberSmsCodeService smsCodeService;
 
+    /** 默认都不在冷静期；专门验冷静期的那条用例自己改 */
+    private solvela.member.contact.ContactCoolingStore coolingStore;
+
     private VerifyRouter router;
 
     private Member contacts;
@@ -49,7 +52,8 @@ class VerifyRouterTest {
     void setUp() {
         memberAuthDao = mock(MemberAuthDao.class);
         smsCodeService = mock(MemberSmsCodeService.class);
-        router = new VerifyRouter(memberAuthDao, smsCodeService);
+        coolingStore = mock(solvela.member.contact.ContactCoolingStore.class);
+        router = new VerifyRouter(memberAuthDao, smsCodeService, coolingStore);
         contacts = new Member();
         contacts.setMemberId(MEMBER_ID);
         contacts.setPhone("enc(13800000000)");
@@ -123,6 +127,29 @@ class VerifyRouterTest {
         when(memberAuthDao.selectContacts(MEMBER_ID)).thenReturn(null);
 
         assertNull(route(MemberLoginType.EMAIL_PASSWORD, MemberRiskDecisionEnum.OTP));
+    }
+
+    @Test
+    @DisplayName("🔴 冷静期内的通道【当作没有】：新绑的邮箱还在冷静期 → 手机号登录的 OTP 退回短信")
+    void 冷静期内的通道当作没有() {
+        when(coolingStore.cooling(MEMBER_ID, MemberVerifyChannelEnum.EMAIL)).thenReturn(true);
+
+        // 要求换通道（本该走邮箱），但邮箱在冷静期 → 退回登录时那条
+        VerifyRouter.Route route = route(MemberLoginType.PHONE_PASSWORD,
+                MemberRiskDecisionEnum.OTP_STRONG);
+
+        assertEquals(MemberVerifyChannelEnum.SMS, route.channel());
+        assertTrue(route.fellBack(),
+                "当作「这条通道不可用」而不是单独报错，于是「还有另一条就走另一条」这套逻辑一行都不用改");
+    }
+
+    @Test
+    @DisplayName("两条都在冷静期 → null（由主干翻成 LOGIN_VERIFY_UNAVAILABLE）")
+    void 两条都在冷静期() {
+        when(coolingStore.cooling(MEMBER_ID, MemberVerifyChannelEnum.EMAIL)).thenReturn(true);
+        when(coolingStore.cooling(MEMBER_ID, MemberVerifyChannelEnum.SMS)).thenReturn(true);
+
+        assertNull(route(MemberLoginType.PHONE_PASSWORD, MemberRiskDecisionEnum.OTP));
     }
 
     @Test
