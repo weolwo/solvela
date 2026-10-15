@@ -5,6 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.api.MemberLoginType;
 import solvela.member.risk.RiskEventRef;
 
@@ -53,9 +54,14 @@ public class LoginChallengeStore {
      * @param eventRef 签这张票的那次登录在风控流水里的位置（id + 时间）。验码那一行靠它填
      *                 {@code ref_event_id} —— 不然「签票」和「验码」在流水里是两条互不相干的记录，
      *                 而误伤分析恰恰要顺着这条线看「要了码的人后来验过没有」。可为 null（流水写失败时）
+     * @param channel  码走哪条通道，由核身路由在签票时选定（{@code VerifyRouter}，方案 §3.7）。
+     *                 <p>🔴 <b>写在票上，不在发码那一步按登录方式再算一次</b>：
+     *                 换通道（手机号登录、码发邮箱）和退回（短信没接、只能走邮箱）都只有路由知道，
+     *                 发码时重算等于把那套判断复制一份 —— 而两份一旦漂移，表现是
+     *                 「告诉用户发到了邮箱，码却发去了短信」。
      */
     public record Challenge(Long memberId, MemberLoginType loginType, String deviceId, String deviceType,
-                            RiskEventRef eventRef, String identity) {
+                            RiskEventRef eventRef, MemberVerifyChannelEnum channel, String identity) {
     }
 
     /** 签一张票，返回原文 */
@@ -70,6 +76,7 @@ public class LoginChallengeStore {
                 nullToEmpty(challenge.deviceId()),
                 nullToEmpty(challenge.deviceType()),
                 refToText(challenge.eventRef()),
+                challenge.channel().name(),
                 challenge.identity());
         redis.opsForValue().set(key(ticket), value, TTL);
         return ticket;
@@ -94,13 +101,14 @@ public class LoginChallengeStore {
         if (value == null) {
             return null;
         }
-        String[] parts = value.split("\\" + SEP, 6);
-        if (parts.length != 6) {
+        String[] parts = value.split("\\" + SEP, 7);
+        if (parts.length != 7) {
             return null;
         }
         try {
             return new Challenge(Long.valueOf(parts[0]), MemberLoginType.valueOf(parts[1]),
-                    emptyToNull(parts[2]), emptyToNull(parts[3]), textToRef(parts[4]), parts[5]);
+                    emptyToNull(parts[2]), emptyToNull(parts[3]), textToRef(parts[4]),
+                    MemberVerifyChannelEnum.valueOf(parts[5]), parts[6]);
         } catch (IllegalArgumentException e) {
             return null;
         }

@@ -126,6 +126,10 @@ class MemberAuthServiceTest {
     private solvela.member.risk.feature.AccountFailTracker failTracker;
     @Mock
     private solvela.member.risk.feature.LoginProfileProvider profileProvider;
+    @Mock
+    private solvela.member.risk.VerifyRouter verifyRouter;
+    @Mock
+    private solvela.crypto.PiiCipher piiCipher;
 
     /** 真会话要往它落库。顺手也成了「这条路径有没有写流水」的探针 */
     @Mock
@@ -146,8 +150,18 @@ class MemberAuthServiceTest {
         member.setNickname("小明");
         member.setStatus(MemberStatusEnum.NORMAL);
         member.setPassword(PasswordCipher.encode(RAW_PASSWORD));
+        // 发码 / 验码按会员号现取联系方式（换通道时票上的 identity 不是那个东西），所以这里要有
+        member.setPhone(PHONE);
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);
+        when(piiCipher.decrypt(PHONE)).thenReturn(PHONE);
+        when(memberAuthDao.selectForAuth(MEMBER_ID)).thenReturn(member);
+        // 发码 / 验码的目标单独查一次（登录那个查询刻意不取手机号、邮箱）
+        when(memberAuthDao.selectContacts(MEMBER_ID)).thenReturn(member);
+        // 核身路由：默认走短信（与这批用例的手机号登录一致）。要验「一条通道都没有」的用例自己改
+        when(verifyRouter.route(any(), any(), any()))
+                .thenReturn(new solvela.member.risk.VerifyRouter.Route(
+                        solvela.enums.MemberVerifyChannelEnum.SMS, false));
         when(memberAuthDao.selectForLogin(PHONE_HASH)).thenReturn(member);
 
         // 假引擎 + 真会话：结论由用例指定，落库照真发生
@@ -209,7 +223,9 @@ class MemberAuthServiceTest {
 
         MemberAuthResult result = service.authenticate(cmd("随便一个错密码"));
 
-        assertEquals(AuthFailReason.OPERATION_LIMITED, result.reason());
+        // 🔴 单独一个原因，不并进 OPERATION_LIMITED：被冷却的人还有验证码登录和找回密码两条路，
+        //    而「操作过于频繁，请稍后再试」除了等什么也没告诉他
+        assertEquals(AuthFailReason.PASSWORD_COOLDOWN, result.reason());
         assertEquals(275L, result.lockedSeconds(),
                 "要告诉用户还得等多久，含糊其辞只会把人逼去打客服电话");
         verify(cooldownStore, never()).onPasswordFailure(any());
@@ -522,6 +538,61 @@ class MemberAuthServiceTest {
         verify(failTracker).clear(MEMBER_ID);
     }
 
+    @Test
+    @DisplayName("🔴 核身通道写进票里：发码、验码都只看它，不按登录方式再算一遍")
+    void 通道写进票里() {
+        post(new RiskDecision(MemberRiskDecisionEnum.OTP_STRONG, 0L, Set.of()));
+        // 手机号登录，但路由要求换通道 → 码走邮箱
+        when(verifyRouter.route(any(), any(), any()))
+                .thenReturn(new solvela.member.risk.VerifyRouter.Route(
+                        solvela.enums.MemberVerifyChannelEnum.EMAIL, false));
+        when(recorder.record(any(), any())).thenReturn(4242L);
+        when(challengeStore.issue(any())).thenReturn("lc_ticket");
+
+        MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
+
+        assertEquals(solvela.enums.MemberVerifyChannelEnum.EMAIL, result.verifyChannel(),
+                "客户端要据它说「验证码已发到你的邮箱」—— 说错了用户会去翻另一个收件箱，然后以为我们没发");
+        ArgumentCaptor<LoginChallengeStore.Challenge> captor =
+                ArgumentCaptor.forClass(LoginChallengeStore.Challenge.class);
+        verify(challengeStore).issue(captor.capture());
+        assertEquals(solvela.enums.MemberVerifyChannelEnum.EMAIL, captor.getValue().channel());
+        assertEquals(solvela.enums.MemberVerifyChannelEnum.EMAIL.getValue(),
+                savedEvent().getVerifyChannel(),
+                "落库了才数得出「有多少次本该换通道却退回了」");
+    }
+
+    @Test
+    @DisplayName("🔴 一条通道都没有 → 当场 LOGIN_VERIFY_UNAVAILABLE，不签票")
+    void 没有核身通道() {
+        post(new RiskDecision(MemberRiskDecisionEnum.OTP, 0L, Set.of()));
+        when(verifyRouter.route(any(), any(), any())).thenReturn(null);
+
+        MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
+
+        assertEquals(AuthFailReason.LOGIN_VERIFY_UNAVAILABLE, result.reason());
+        verify(challengeStore, never()).issue(any());
+        assertEquals(MemberRiskOutcomeEnum.POST_BLOCKED, savedEvent().getOutcome());
+    }
+
+    @Test
+    @DisplayName("🔴 「再错几次会冷却」对【有号】和【没号】必须一模一样，否则它就是个账号枚举接口")
+    void 剩余次数不区分有号没号() {
+        when(cooldownStore.onPasswordFailure(any())).thenReturn(1);
+
+        MemberAuthResult hasAccount = service.authenticate(cmd(PHONE, "错密码"));
+
+        // 没号：selectForLogin 返回 null
+        when(memberAuthDao.selectForLogin(PHONE_HASH)).thenReturn(null);
+        MemberAuthResult noAccount = service.authenticate(cmd(PHONE, "错密码"));
+
+        assertEquals(AuthFailReason.BAD_CREDENTIALS, hasAccount.reason());
+        assertEquals(AuthFailReason.BAD_CREDENTIALS, noAccount.reason());
+        assertEquals(hasAccount.attemptsBeforeCooldown(), noAccount.attemptsBeforeCooldown(),
+                "只在有号时给这个数的话，「错两次看看有没有提示」就是一个精确的账号枚举接口");
+        assertEquals(1, noAccount.attemptsBeforeCooldown());
+    }
+
     // ------------------------------------------------------------------ 凭票发码 / 验码
 
     private static final String TICKET = "lc_ticket";
@@ -529,7 +600,8 @@ class MemberAuthServiceTest {
     private void validTicket() {
         when(challengeStore.find(TICKET)).thenReturn(new LoginChallengeStore.Challenge(
                 MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5",
-                new RiskEventRef(4242L, LocalDateTime.now()), PHONE));
+                new RiskEventRef(4242L, LocalDateTime.now()),
+                solvela.enums.MemberVerifyChannelEnum.SMS, PHONE));
     }
 
     private static LoginChallengeCmd ticketCmd(String code, String deviceId) {

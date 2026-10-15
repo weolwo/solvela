@@ -42,6 +42,7 @@ import solvela.member.api.MemberEmailBindResult;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberAuthResult;
+import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberLogoutCmd;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
@@ -77,7 +78,21 @@ import solvela.member.api.MemberPasswordPolicy;
 @RequiredArgsConstructor
 public class MemberLoginService {
 
+    /**
+     * 凭据错的措辞，<b>按登录方式分</b>。
+     *
+     * <p>🔴 按<b>登录方式</b>分，不按账号分 —— 用户输的是邮箱，却被告知「手机号或密码错误」，
+     * 他会去找一个自己根本没输入过的东西。而这个区分不泄露任何信息：
+     * 说的是「你刚才用什么登录的」，那是他自己选的。
+     */
     private static final String BAD_CREDENTIALS_MSG = "手机号或密码错误";
+
+    private static final String BAD_CREDENTIALS_EMAIL_MSG = "邮箱或密码错误";
+
+    private static final String BAD_CREDENTIALS_EMAIL_CODE_MSG = "邮箱或验证码错误";
+
+    /** 认不出登录方式时（凭票那条路）的兜底：两边都不提，免得指错方向 */
+    private static final String BAD_CREDENTIALS_FALLBACK_MSG = "账号或密码错误";
 
     private static final String LOCKED_MSG = "连续登录失败次数过多，请 %d 分钟后重试；需要提前恢复请联系客服";
 
@@ -143,7 +158,7 @@ public class MemberLoginService {
                 request.verificationCode(), request.deviceType(), ip, CurrentDevice.deviceIdOrNull(),
                 captchaPassed));
         if (!result.success()) {
-            throw translate(result);
+            throw translate(result, request.typeOrDefault());
         }
 
         MemberPrincipal principal = MemberPrincipal.of(result.identity());
@@ -440,12 +455,37 @@ public class MemberLoginService {
      * 而不是悄悄落进某个兜底分支返回「服务开小差了」。
      */
     private ApiException translate(MemberAuthResult result) {
+        return translate(result, null);
+    }
+
+    /**
+     * @param loginType 这一次用的登录方式；凭票那条路上认不出来，传 null。
+     *                  只影响措辞和「还有哪些出路」，不影响码
+     */
+    private ApiException translate(MemberAuthResult result, MemberLoginType loginType) {
         return switch (result.reason()) {
             case BAD_PHONE_FORMAT -> new ApiException(ApiErrors.INVALID_ARGUMENT, "手机号格式不正确");
-            case BAD_CREDENTIALS -> new ApiException(ApiErrors.BAD_CREDENTIALS, BAD_CREDENTIALS_MSG);
+            case BAD_CREDENTIALS -> new ApiException(ApiErrors.BAD_CREDENTIALS,
+                    badCredentialsMessage(loginType), lastChanceDetails(result));
             case ACCOUNT_FROZEN -> new ApiException(ApiErrors.ACCOUNT_DISABLED, "账号已被冻结，请联系客服");
             case NO_PASSWORD -> new ApiException(ApiErrors.BAD_CREDENTIALS, "该账号未设置密码，请使用短信验证码登录");
-            case OPERATION_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED, lockedMessage(result.lockedSeconds()));
+            case OPERATION_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED,
+                    lockedMessage(result.lockedSeconds()), retryAfter(result.lockedSeconds()));
+            /*
+             * 密码冷却：唯一一个【用户此刻就有出路】的限制。
+             * 所以除了倒计时，还要告诉客户端有哪几条出路 —— 它据此决定弹窗上摆哪几颗按钮。
+             *
+             * 🔴 details 里放的是 CODE_LOGIN / PASSWORD_RESET 这种【事实】，不是「弹什么窗」：
+             *    App 和 H5 的页面结构不同，下发 UI 的话一个码就得为每个端写一份（方案 6.4 约定 2）。
+             */
+            case PASSWORD_COOLDOWN -> new ApiException(ApiErrors.PASSWORD_COOLDOWN,
+                    ApiErrors.PASSWORD_COOLDOWN.defaultMessage(),
+                    cooldownDetails(result.lockedSeconds(), loginType));
+            /*
+             * 要核身却没有通道。🔴 文案与 details 都【不提绑定】，理由见 ApiErrors.LOGIN_VERIFY_UNAVAILABLE：
+             * 此刻对面只证明了「知道密码」，引导他去绑联系方式就是把账号接管铺成主路。
+             */
+            case LOGIN_VERIFY_UNAVAILABLE -> new ApiException(ApiErrors.LOGIN_VERIFY_UNAVAILABLE);
             // 邮箱格式：与手机号格式同一个判据，明说不泄露任何信息
             case BAD_EMAIL_FORMAT -> new ApiException(ApiErrors.INVALID_ARGUMENT, "邮箱格式不正确");
             // 验证码三态说得具体。它们说的是【码】不是【账号】，
@@ -456,9 +496,11 @@ public class MemberLoginService {
             // 同为 429，但措辞完全不同：账号被限说「连续登录失败」，设备被限说「当前设备」——
             // 合并文案会让被设备维度限住的用户一直去找回密码，而那解决不了他的问题
             case DEVICE_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED,
-                    String.format(DEVICE_LIMITED_MSG, minutes(result.lockedSeconds())));
+                    String.format(DEVICE_LIMITED_MSG, minutes(result.lockedSeconds())),
+                    retryAfter(result.lockedSeconds()));
             case IP_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED,
-                    String.format(IP_LIMITED_MSG, minutes(result.lockedSeconds())));
+                    String.format(IP_LIMITED_MSG, minutes(result.lockedSeconds())),
+                    retryAfter(result.lockedSeconds()));
             /*
              * 观察档的二次验证。两条分开，因为客户端要据此决定
              * 【把验证码框亮出来】还是【报错并让他重新获取】。
@@ -467,9 +509,11 @@ public class MemberLoginService {
              * （他做不了任何事），只会让人以为账号出了问题去找客服。
              */
             // 凭票放进 details：客户端之后的发码、验码都凭它。票只在这一个响应里出现一次
+            // 还带上 channel：客户端要说「验证码已发到你的邮箱 / 手机」。说错了用户会去翻另一个
+            // 收件箱，然后以为我们没发 —— 而换通道（手机号登录、码发邮箱）恰恰是常态
             case DEVICE_VERIFICATION_REQUIRED -> new ApiException(ApiErrors.DEVICE_VERIFICATION_REQUIRED,
                     ApiErrors.DEVICE_VERIFICATION_REQUIRED.defaultMessage(),
-                    java.util.Map.of("challengeTicket", result.challengeTicket()));
+                    challengeDetails(result));
             /*
              * 风控判出这次登录要先过滑块。映射成客户端<b>早就认得</b>的 CAPTCHA_REQUIRED ——
              * 它那套「收到它 → 拖图 → 带票重试」一行都不用改。
@@ -520,6 +564,65 @@ public class MemberLoginService {
 
     private static String registerLimitedMessage(long retryAfterSeconds) {
         return String.format(REGISTER_LIMITED_MSG, minutes(retryAfterSeconds));
+    }
+
+    private static String badCredentialsMessage(MemberLoginType loginType) {
+        if (loginType == null) {
+            return BAD_CREDENTIALS_FALLBACK_MSG;
+        }
+        return switch (loginType) {
+            case PHONE_PASSWORD -> BAD_CREDENTIALS_MSG;
+            case EMAIL_PASSWORD -> BAD_CREDENTIALS_EMAIL_MSG;
+            case EMAIL_CODE -> BAD_CREDENTIALS_EMAIL_CODE_MSG;
+        };
+    }
+
+    /**
+     * 「再错一次就要等了」。
+     *
+     * <h3>🔴 只在剩最后一次时给</h3>
+     * 一直给等于把阶梯的形状完整地告诉对面，而它对正常用户的价值<b>只在最后那一下</b>：
+     * 「再错 1 次就要等一分钟」能让人停下来想想，「还能错 4 次」只会让他继续猜。
+     *
+     * <p>它不构成账号枚举：阶梯按身份摘要计数，没有账号的身份算出同样的数，
+     * 所以这个字段出现的时机对「有号 / 没号」完全一样（域那边有注释钉着）。
+     */
+    private static java.util.Map<String, Object> lastChanceDetails(MemberAuthResult result) {
+        Integer attempts = result.attemptsBeforeCooldown();
+        return attempts != null && attempts <= 1
+                ? java.util.Map.of("attemptsBeforeCooldown", attempts)
+                : null;
+    }
+
+    private static java.util.Map<String, Object> retryAfter(long seconds) {
+        return java.util.Map.of("retryAfterSeconds", Math.max(1L, seconds));
+    }
+
+    private static java.util.Map<String, Object> challengeDetails(MemberAuthResult result) {
+        return result.verifyChannel() == null
+                ? java.util.Map.of("challengeTicket", result.challengeTicket())
+                : java.util.Map.of("challengeTicket", result.challengeTicket(),
+                        "channel", result.verifyChannel().name());
+    }
+
+    /**
+     * 密码冷却时还有哪些出路。
+     *
+     * <h3>只取决于登录方式，不取决于账号</h3>
+     * 按「这个号绑了什么」给的话，这个字段就成了一个账号画像接口 ——
+     * 而冷却这一档对不存在的账号也会出现（按身份摘要计数）。
+     *
+     * <p>🔴 手机号登录今天拿到的是<b>空数组</b>：验证码登录只有邮箱那条，
+     * 而手机号找回密码同样要短信 —— 短信厂商还没接，两条都走不通。
+     * 硬塞一个 {@code PASSWORD_RESET} 进去，用户点过去会撞上一个发不出码的页面，
+     * 那比没有按钮更糟。接上短信的那天把它加回来。
+     */
+    private static java.util.Map<String, Object> cooldownDetails(long lockedSeconds, MemberLoginType loginType) {
+        java.util.List<String> alternatives = loginType == MemberLoginType.PHONE_PASSWORD || loginType == null
+                ? java.util.List.of()
+                : java.util.List.of("CODE_LOGIN", "PASSWORD_RESET");
+        return java.util.Map.of("retryAfterSeconds", Math.max(1L, lockedSeconds),
+                "alternatives", alternatives);
     }
 
     /**

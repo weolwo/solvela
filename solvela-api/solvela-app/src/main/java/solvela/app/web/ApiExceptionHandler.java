@@ -41,8 +41,30 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handle(ApiException e, HttpServletRequest request) {
         log.info("[API] {} {} -> {} {}", request.getMethod(), request.getRequestURI(),
                 e.error().code(), e.getMessage());
-        return ResponseEntity.status(e.error().status())
-                .body(new ApiErrorResponse(e.error().code(), e.getMessage(), traceId(), e.details()));
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(e.error().status());
+        retryAfter(e).ifPresent(seconds -> response.header(HttpHeaders.RETRY_AFTER, seconds.toString()));
+        return response.body(new ApiErrorResponse(e.error().code(), e.getMessage(), traceId(), e.details()));
+    }
+
+    /**
+     * 429 时顺手带上标准的 {@code Retry-After} 头，值取 {@code details.retryAfterSeconds}。
+     *
+     * <h3>为什么在这里统一加，而不是每个抛异常的地方自己加</h3>
+     * 它要给的是<b>基础设施</b>：网关的重试策略、SDK 的退避、压测工具都认这个头，
+     * 而它们一个也不认 {@code details} 里的自定义字段。让每个调用点自己记得加，
+     * 漏掉的那个不会有任何报错 —— 表现只是客户端立刻又打了一次。
+     *
+     * <p>🔴 只在 429 上加。403 / 409 上的 {@code Retry-After} 语义是「这个资源多久后可用」，
+     * 与「你多久后可以再试」不是一回事，带上去只会让中间层做出错误的缓存决定。
+     */
+    private static java.util.Optional<Long> retryAfter(ApiException e) {
+        if (e.error().status() != HttpStatus.TOO_MANY_REQUESTS || e.details() == null) {
+            return java.util.Optional.empty();
+        }
+        Object seconds = e.details().get("retryAfterSeconds");
+        return seconds instanceof Number number && number.longValue() > 0
+                ? java.util.Optional.of(number.longValue())
+                : java.util.Optional.empty();
     }
 
     /**

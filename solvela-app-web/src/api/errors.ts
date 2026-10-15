@@ -48,6 +48,24 @@ export const API_ERROR_CODES = [
   /** 滑块没拖对（或图已过期）。滑块弹窗自己处理：换一张图重来 */
   'CAPTCHA_FAILED',
   'OPERATION_LIMITED',
+  /**
+   * 🔴 密码连续错太多次，**密码这条通道**进了阶梯冷却（60s / 5m / 10m / 60m / 24h）。
+   *
+   * 与 OPERATION_LIMITED 分开，因为它是唯一一个**用户此刻就有出路**的限制：
+   * 验证码登录和找回密码都没被锁。所以不要只展示 message 了事 ——
+   * 要弹窗 + 倒计时 + 把 `details.alternatives` 里那几条出路摆成按钮。
+   *
+   * `details`: {@link PasswordCooldownDetails}
+   */
+  'PASSWORD_COOLDOWN',
+  /**
+   * 要验证码，但这个账号**一条能收码的通道都没有**（手机号账号 + 短信还没接 + 没绑邮箱）。
+   *
+   * 🔴 **只能给「联系客服」，绝不能给「去绑定」**。此刻还没有登录态，对面这个人只证明了
+   * 「知道密码」—— 让他去绑联系方式，等于让他给别人的账号加一条他自己的找回通道，
+   * 之后用它重置密码就是永久接管。
+   */
+  'LOGIN_VERIFY_UNAVAILABLE',
   'INVALID_ARGUMENT',
   'NOT_FOUND',
   'CONFLICT',
@@ -66,11 +84,47 @@ export const NETWORK_ERROR_CODE = 'NETWORK' as const
 
 export type ErrorCode = ApiErrorCode | typeof NETWORK_ERROR_CODE
 
+/** 核身通道。与后端 MemberVerifyChannelEnum 对应 */
+export type VerifyChannel = 'EMAIL' | 'SMS'
+
+/** 密码冷却时还走得通的路。与后端 MemberLoginService.cooldownDetails 对应 */
+export type LoginAlternative = 'CODE_LOGIN' | 'PASSWORD_RESET'
+
+/** DEVICE_VERIFICATION_REQUIRED 带的东西 */
+export interface ChallengeDetails {
+  /** 之后发码、验码都凭它 */
+  ticket: string
+  /**
+   * 码发到哪。**不等于登录方式** —— 手机号登录也可能把码发到邮箱
+   * （后端的核身路由会换通道，短信没接时也会退回邮箱）。
+   * 所以文案必须按它说，照登录方式猜会让用户去翻错的收件箱。
+   */
+  channel: VerifyChannel | null
+}
+
+/** PASSWORD_COOLDOWN 带的东西 */
+export interface PasswordCooldownDetails {
+  retryAfterSeconds: number
+  /** 可能是空数组：手机号登录在短信接通之前两条路都走不通，那时只显示「知道了」 */
+  alternatives: LoginAlternative[]
+}
+
 export interface ApiErrorResponse {
   code: string
   message: string
   traceId: string
-  /** 个别错误带的附加数据（目前只有登录二次验证的 challengeTicket）。绝大多数错误没有 */
+  /**
+   * 个别错误带的附加数据。绝大多数错误没有。
+   *
+   * 🔴 类型是 `Record<string, unknown>` 而**不是**按码区分的联合类型，这是刻意的：
+   * 它来自网络，而网络上的东西没有类型。写成联合类型只是一句编译期的断言 ——
+   * 后端改了字段名、或者老版本服务端还没带上某个字段时，TypeScript 什么也不会说，
+   * 而页面代码会对着 undefined 读属性。
+   *
+   * 所以这里保持「未知」，由 {@link ApiError} 上那几个取值器**在运行时校验一次**，
+   * 页面拿到的是已经验过的 `ChallengeDetails | null` 这种东西 ——
+   * 既不用自己写 `typeof x === 'string'`，也没有假的类型安全。
+   */
   details?: Record<string, unknown>
 }
 
@@ -122,6 +176,62 @@ export class ApiError extends Error {
   /** 是否是「在这台设备上要先过一次二次验证」。见 API_ERROR_CODES 里的说明 */
   get isStepUpRequired(): boolean {
     return this.code === 'STEP_UP_REQUIRED'
+  }
+
+  /**
+   * 登录二次验证的凭票与通道。不是那个码、或者票不是个字符串时返回 null。
+   *
+   * 票缺失时**不要**退化成「继续走下去」：没有票的话发码、验码都做不了，
+   * 把验证码栏亮出来只会给用户一个点了没反应的按钮。
+   */
+  get challenge(): ChallengeDetails | null {
+    if (this.code !== 'DEVICE_VERIFICATION_REQUIRED') {
+      return null
+    }
+    const ticket = this.details?.challengeTicket
+    if (typeof ticket !== 'string' || ticket === '') {
+      return null
+    }
+    const channel = this.details?.channel
+    return { ticket, channel: channel === 'EMAIL' || channel === 'SMS' ? channel : null }
+  }
+
+  /**
+   * 还要等多少秒。429 这几个码带，其余为 null。
+   *
+   * 拿不到就返回 null，**不要兜一个默认值** —— 倒计时从一个编出来的数字开始走，
+   * 走到 0 用户以为能点了，结果又是一次 429。
+   */
+  get retryAfterSeconds(): number | null {
+    const seconds = this.details?.retryAfterSeconds
+    return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
+      ? Math.ceil(seconds)
+      : null
+  }
+
+  /** 密码冷却时的倒计时与出路。不是那个码时返回 null */
+  get passwordCooldown(): PasswordCooldownDetails | null {
+    if (this.code !== 'PASSWORD_COOLDOWN') {
+      return null
+    }
+    const raw = this.details?.alternatives
+    const alternatives = Array.isArray(raw)
+      ? raw.filter(
+          (item): item is LoginAlternative => item === 'CODE_LOGIN' || item === 'PASSWORD_RESET',
+        )
+      : []
+    return { retryAfterSeconds: this.retryAfterSeconds ?? 0, alternatives }
+  }
+
+  /**
+   * 「再错几次就要等了」。服务端**只在剩最后一次时才给**这个数，
+   * 所以它有值就意味着该把那句提醒说出来。
+   */
+  get attemptsBeforeCooldown(): number | null {
+    const attempts = this.details?.attemptsBeforeCooldown
+    return typeof attempts === 'number' && Number.isFinite(attempts) && attempts >= 0
+      ? attempts
+      : null
   }
 }
 

@@ -84,6 +84,24 @@ public class MemberSmsCodeService {
     }
 
     /**
+     * 这条通道<b>此刻能不能把码送到用户手上</b>。核身路由（{@code VerifyRouter}）靠它决定
+     * 要不要把手机号账号的 OTP 退回邮箱。
+     *
+     * <h3>为什么不直接问 {@link SmsSender#available()}</h3>
+     * 那个只回答「有没有实现类」。而 LOG 通道<b>没有实现类也照样把码送出去了</b>（送进日志），
+     * 本地 docker 里整条链路就是这么跑通的 —— 只看 {@code available()} 的话，
+     * 开发环境会一律判成「短信不可用」，于是手机号登录的二次验证在本地永远测不到。
+     *
+     * <p>反过来也要成立：配了 REAL 却没接厂商时必须是 false。那种情况签了票也发不出码，
+     * 用户卡在一个「获取验证码」永远失败的界面上 —— 而那正是
+     * {@code AuthFailReason.LOGIN_VERIFY_UNAVAILABLE} 要提前拦住的事。
+     */
+    public boolean deliverable() {
+        return properties.getSmsTransport() == VerificationCodeProperties.Transport.LOG
+                || smsSender.available();
+    }
+
+    /**
      * 🔴 生产环境不许用 LOG 通道，<b>启动即失败</b>。理由与邮箱那边一字不差：
      * 日志里躺着每个人的验证码，看得到日志的人就能接管任意账号。
      *

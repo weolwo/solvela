@@ -153,27 +153,39 @@ public class PasswordCooldownStore {
      *
      * <p>参数（免罚次数、阶梯、清零时间）从规则表读 —— 与 {@code PasswordCooldownRule} 看同一份配置，
      * 否则「判的时候按新参数、记的时候按旧参数」。规则关闭或读不出来时什么都不做。
+     *
+     * @return <b>再错几次就会进冷却</b>（含下一次）。算不出来时 null。
+     *         <p>由这里返回而不是让调用方再查一遍：那会是第二次读配置 + 第二次读 Redis，
+     *         而两次读之间计数还可能被并发的另一次失败推上去 —— 于是给用户的「还剩 1 次」
+     *         和实际的阶梯对不上。
+     *         <p>🔴 <b>给不给用户看是接入层的决定</b>（方案 §6.4 的约定：只在剩 1 次时才说）。
+     *         一直说等于把阶梯的形状完整地告诉对面。
      */
-    public void onPasswordFailure(RiskContext ctx) {
+    public Integer onPasswordFailure(RiskContext ctx) {
         if (ctx.getIdentityHashHex() == null) {
-            return;
+            return null;
         }
         RiskRuleConfig config = config();
         if (config == null || config.mode() == MemberRiskModeEnum.OFF) {
-            return;
+            return null;
         }
         try {
+            int free = PasswordCooldownRule.free(config.params());
             Outcome outcome = recordFailure(ctx.getIdentityHashHex(),
                     bucket(ctx.getDeviceId(), ctx.deviceTrusted()),
-                    PasswordCooldownRule.free(config.params()),
+                    free,
                     PasswordCooldownRule.steps(config.params()),
                     PasswordCooldownRule.idleReset(config.params()));
             if (outcome.cooling()) {
                 log.info("【密码冷却】连续错误第 {} 次，冷却 {}", outcome.failures(), outcome.cooldown());
+                return 0;
             }
+            // free = 2、已错 2 次 → 1（再错一次就冷却）；已错 1 次 → 2
+            return (int) Math.max(0L, free - outcome.failures() + 1L);
         } catch (RuntimeException e) {
             // 记不上只是「这次没算进去」，不该让登录接口跟着失败
             log.error("【密码冷却】记一次失败时出错", e);
+            return null;
         }
     }
 

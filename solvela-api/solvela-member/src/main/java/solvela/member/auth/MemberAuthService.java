@@ -54,12 +54,14 @@ import solvela.member.util.MemberPhoneUtil;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
+import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.RiskAction;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskEventRef;
 import solvela.member.risk.RiskSession;
+import solvela.member.risk.VerifyRouter;
 import solvela.member.risk.feature.AccountFailTracker;
 import solvela.member.risk.feature.LoginProfileProvider;
 import solvela.member.risk.feature.PasswordCooldownStore;
@@ -147,6 +149,9 @@ public class MemberAuthService implements MemberAuthApi {
 
     /** 登录成功后要让画像缓存失效，否则用户在新网络上验过一次码，下次来还是「陌生网络」 */
     private final LoginProfileProvider profileProvider;
+
+    /** 核身路由：结论只说强度，码发到哪条通道由它选（方案 3.7） */
+    private final VerifyRouter verifyRouter;
 
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
@@ -247,7 +252,13 @@ public class MemberAuthService implements MemberAuthApi {
                     : risk.end(MemberRiskOutcomeEnum.CAPTCHA_REQUIRED, MemberAuthResult.captchaRequired());
         }
         if (pre.is(MemberRiskDecisionEnum.COOLDOWN)) {
-            return risk.end(MemberRiskOutcomeEnum.COOLDOWN, MemberAuthResult.limited(pre.retryAfterSeconds()));
+            /*
+             * 🔴 单独一个原因，不并进 OPERATION_LIMITED：被冷却的人此刻还有两条路
+             * （验证码登录、找回密码），而「操作过于频繁，请稍后再试」除了等什么也说不了。
+             * 见 AuthFailReason.PASSWORD_COOLDOWN。
+             */
+            return risk.end(MemberRiskOutcomeEnum.COOLDOWN,
+                    MemberAuthResult.passwordCooldown(pre.retryAfterSeconds()));
         }
         if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             // 🔴 限流与拒绝对外是<b>同一句</b>：告诉对方「你被拉黑了」等于给他一个精确的调试反馈
@@ -260,6 +271,7 @@ public class MemberAuthService implements MemberAuthApi {
     private MemberAuthResult afterPreDecision(RiskSession risk, MemberLoginType loginType, String identity,
                                               Member member, MemberAuthCmd cmd) {
         if (member == null) {
+            Integer attemptsBeforeCooldown = null;
             // 🔴 验证码登录时，即使查无此人也要照常验一次码，【而且要返回验码本身的结果】。
             //    发码那一步对没有会员的邮箱也存了码（MailDelivery.SUPPRESS），
             //    这里如果一律回 BAD_CREDENTIALS，两条路径的回答又不一样了 ——
@@ -286,13 +298,19 @@ public class MemberAuthService implements MemberAuthApi {
                  * 同理也要记一次冷却计数：否则「错几次会不会被冷却」又成了一个账号枚举接口。
                  */
                 PasswordCipher.matches(cmd.credential(), DUMMY_PASSWORD_HASH);
-                cooldownStore.onPasswordFailure(risk.context());
+                /*
+                 * 🔴 连「还剩几次」也要照样算出来并返回。
+                 *
+                 * 只在账号存在时给这个数的话，「错两次看看有没有提示」就是一个精确的账号枚举接口 ——
+                 * 而阶梯本来就按身份摘要计数，没有账号的身份算出的数一模一样，返回它不泄露任何东西。
+                 */
+                attemptsBeforeCooldown = cooldownStore.onPasswordFailure(risk.context());
             }
             // 🔴 查无此人以前一行记录都不留（登录日志的 member_id 是 NOT NULL）——
             //    现在 IP 维度数得到它，而且风控流水里有完整的一行（按身份摘要聚合）
             loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
             return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
-                    MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS));
+                    MemberAuthResult.badCredentials(attemptsBeforeCooldown));
         }
 
         /*
@@ -319,7 +337,7 @@ public class MemberAuthService implements MemberAuthApi {
         RiskDecision post = riskEngine.evaluatePost(risk);
         applyActions(post, cmd.deviceId());
         if (post.needsOtp()) {
-            return issueChallenge(risk, loginType, identity, member, cmd);
+            return issueChallenge(risk, loginType, identity, member, cmd, post.decision());
         }
         if (post.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             return risk.end(MemberRiskOutcomeEnum.POST_BLOCKED,
@@ -336,7 +354,8 @@ public class MemberAuthService implements MemberAuthApi {
      * 验码那一行才能指回来 —— 不然「签票」和「验码」在流水里是两条互不相干的记录。
      */
     private MemberAuthResult issueChallenge(RiskSession risk, MemberLoginType loginType, String identity,
-                                            Member member, MemberAuthCmd cmd) {
+                                            Member member, MemberAuthCmd cmd,
+                                            MemberRiskDecisionEnum post) {
         if (loginType == MemberLoginType.EMAIL_CODE) {
             /*
              * 邮箱验证码登录【本身就是一道验证码】，不再要第二道：
@@ -346,11 +365,27 @@ public class MemberAuthService implements MemberAuthApi {
              */
             return risk.end(MemberRiskOutcomeEnum.SUCCESS, completeLogin(member, cmd, risk.context().getIdentityHashHex()));
         }
+        /*
+         * ---------- 选通道，而且要在签票【之前】 ----------
+         * 🔴 签了票却发不出码是最糟的一种失败：用户停在一个「获取验证码」永远失败的界面上，
+         *    服务端日志里只剩一串 SEND_FAILED —— 看不出根因是这个账号压根没有通道。
+         *    所以先问路由，一条都没有就当场给出 LOGIN_VERIFY_UNAVAILABLE。
+         */
+        VerifyRouter.Route route = verifyRouter.route(loginType, member.getMemberId(), post);
+        if (route == null) {
+            saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL,
+                    "风控要求二次验证：无可用核身通道");
+            return risk.end(MemberRiskOutcomeEnum.POST_BLOCKED,
+                    MemberAuthResult.fail(AuthFailReason.LOGIN_VERIFY_UNAVAILABLE));
+        }
+        // 落库：事后要能数出「有多少次本该换通道却退回了」（接上短信那天这个数应该归零）
+        risk.verifyChannel(route.channel().getValue());
         RiskEventRef ref = risk.end(MemberRiskOutcomeEnum.CHALLENGED);
         String ticket = challengeStore.issue(new LoginChallengeStore.Challenge(
-                member.getMemberId(), loginType, cmd.deviceId(), cmd.deviceType(), ref, identity));
+                member.getMemberId(), loginType, cmd.deviceId(), cmd.deviceType(), ref,
+                route.channel(), identity));
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "风控要求二次验证：已签发凭票");
-        return MemberAuthResult.challenge(ticket);
+        return MemberAuthResult.challenge(ticket, route.channel());
     }
 
     /**
@@ -409,21 +444,40 @@ public class MemberAuthService implements MemberAuthApi {
         if (challenge == null) {
             return LoginChallengeCodeResult.fail(LoginChallengeCodeResult.Reason.CHALLENGE_EXPIRED);
         }
-        // 码发到哪跟着票上的登录身份走。switch 表达式：新增登录方式时【编译不过】
-        return switch (challenge.loginType()) {
-            case PHONE_PASSWORD -> {
-                SmsCodeSendResult sent = smsCodeService.send(SmsScene.LOGIN, challenge.identity(), cmd.clientIp());
+        /*
+         * 码发到哪【只看票上的通道】，不再按登录方式算一遍 ——
+         * 换通道（手机号登录、码发邮箱）和退回（短信没接、只能走邮箱）都只有路由知道。
+         * 这里重算一次就是把那套判断复制了一份，而两份漂移的表现是
+         * 「告诉用户发到了邮箱，码却发去了短信」。
+         *
+         * 🔴 发到【哪个】邮箱 / 手机号也不看票上的 identity 了：换通道时那两个根本不是一个东西。
+         *    按会员号取当前绑定的那一个。
+         */
+        Member contacts = memberAuthDao.selectContacts(challenge.memberId());
+        if (contacts == null) {
+            return LoginChallengeCodeResult.fail(LoginChallengeCodeResult.Reason.CHALLENGE_EXPIRED);
+        }
+        return switch (challenge.channel()) {
+            case SMS -> {
+                String phone = piiCipher.decrypt(contacts.getPhone());
+                if (SolvelaStringUtil.isBlank(phone)) {
+                    yield LoginChallengeCodeResult.fail(LoginChallengeCodeResult.Reason.SEND_FAILED);
+                }
+                SmsCodeSendResult sent = smsCodeService.send(SmsScene.LOGIN, phone, cmd.clientIp());
                 yield sent.success()
-                        ? LoginChallengeCodeResult.sent(MemberPhoneUtil.mask(challenge.identity()))
+                        ? LoginChallengeCodeResult.sent(MemberPhoneUtil.mask(phone))
                         : toChallengeFailure(sent.reason().name(), sent.retryAfterSeconds());
             }
-            case EMAIL_PASSWORD -> {
-                EmailCodeSendResult sent = emailCodeService.send(EmailCodeScene.LOGIN, challenge.identity(), cmd.clientIp());
+            case EMAIL -> {
+                String email = piiCipher.decrypt(contacts.getEmail());
+                if (SolvelaStringUtil.isBlank(email)) {
+                    yield LoginChallengeCodeResult.fail(LoginChallengeCodeResult.Reason.SEND_FAILED);
+                }
+                EmailCodeSendResult sent = emailCodeService.send(EmailCodeScene.LOGIN, email, cmd.clientIp());
                 yield sent.success()
-                        ? LoginChallengeCodeResult.sent(MemberEmailUtil.mask(challenge.identity()))
+                        ? LoginChallengeCodeResult.sent(MemberEmailUtil.mask(email))
                         : toChallengeFailure(sent.reason().name(), sent.retryAfterSeconds());
             }
-            case EMAIL_CODE -> throw new IllegalStateException("不可能走到：邮箱验证码登录不签凭票");
         };
     }
 
@@ -471,10 +525,26 @@ public class MemberAuthService implements MemberAuthApi {
                 return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED, MemberAuthResult.ipLimited(ipWait));
             }
 
-            String outcome = switch (challenge.loginType()) {
-                case PHONE_PASSWORD -> smsCodeService.verify(SmsScene.LOGIN, identity, cmd.code()).name();
-                case EMAIL_PASSWORD -> emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.code()).name();
-                case EMAIL_CODE -> throw new IllegalStateException("不可能走到：邮箱验证码登录不签凭票");
+            /*
+             * 🔴 验的是【发码时那条通道、那个目标】，所以同样只看票上的 channel，
+             *    而且目标按会员号现取 —— 与 sendChallengeCode 必须是同一套判断。
+             *
+             * 两边不一致的代价很具体：换通道时码发去了邮箱，这里却拿登录用的手机号去验，
+             * 结果是用户收到了码、输对了码，却永远被告知「验证码不正确」。
+             */
+            Member contacts = member == null ? null : memberAuthDao.selectContacts(challenge.memberId());
+            String verifyTarget = contacts == null ? null
+                    : piiCipher.decrypt(challenge.channel() == MemberVerifyChannelEnum.SMS
+                            ? contacts.getPhone() : contacts.getEmail());
+            if (SolvelaStringUtil.isBlank(verifyTarget)) {
+                // 签票之后联系方式被解绑了。不能当成「码错了」—— 那会让用户一直重发一个永远验不过的码
+                saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "二次验证通道已失效");
+                return risk.end(MemberRiskOutcomeEnum.VERIFY_FAILED,
+                        MemberAuthResult.fail(AuthFailReason.CHALLENGE_EXPIRED));
+            }
+            String outcome = switch (challenge.channel()) {
+                case SMS -> smsCodeService.verify(SmsScene.LOGIN, verifyTarget, cmd.code()).name();
+                case EMAIL -> emailCodeService.verify(EmailCodeScene.LOGIN, verifyTarget, cmd.code()).name();
             };
             if ("TOO_MANY_ATTEMPTS".equals(outcome)) {
                 // 码被错到作废：票也作废，让他从输密码重新来 —— 否则同一张票可以无限次「重新发码再猜」
@@ -732,7 +802,7 @@ public class MemberAuthService implements MemberAuthApi {
          *   2. 可信设备【单独一个桶】—— 否则任何知道你邮箱的人连错几次就能把你锁在门外。
          * 见 PasswordCooldownStore 的类注释。
          */
-        cooldownStore.onPasswordFailure(risk.context());
+        Integer attemptsBeforeCooldown = cooldownStore.onPasswordFailure(risk.context());
         // 设备维度也记一次。两者互不替代：冷却挡的是「这个号被爆破」，
         // 设备计数挡的是「这台机器在挨个试不同的号」—— 后者冷却完全看不见
         deviceGuard.recordLoginFailure(cmd.deviceId());
@@ -745,8 +815,11 @@ public class MemberAuthService implements MemberAuthApi {
          * 改造前会立刻把剩余时间告诉用户（理由是「别让他再点一次才发现」）。而冷却现在按身份摘要计数，
          * 对不存在的账号同样会触发 —— 这一刻把它说出来，就等于回答了「这个号存不存在」。
          * 代价是用户要再点一次才看到倒计时，那一次的回答对有号、没号完全一样。
+         *
+         * 「再错几次会冷却」则照样给：它对有号、没号算出的数一模一样（同一个摘要计数器），
+         * 而它能让一个真在回忆密码的人停下来 —— 给不给用户看是接入层的决定（方案 6.4）。
          */
-        return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
+        return MemberAuthResult.badCredentials(attemptsBeforeCooldown);
     }
 
     /**

@@ -94,6 +94,27 @@ public interface MemberAuthDao {
             """)
     Member selectForEmailBind(@Param("memberId") Long memberId);
 
+    /**
+     * 核身（登录二次验证）要用的两列：当前手机号与邮箱<b>密文</b>。
+     *
+     * <h3>🔴 为什么不把这两列加进 {@link #selectForLogin}</h3>
+     * 那两个查询跑在<b>每一次登录请求</b>上，而它们刻意只取认证需要的列
+     * （类注释：「查不到，就不可能漏」）。为了一条很少走到的分支，
+     * 让所有人的手机号、邮箱每次登录都进一遍结果集和一级缓存，是个很差的交换。
+     *
+     * <p>所以单独一个查询，<b>只在真的要发码时</b>才调：核身路由选通道要它
+     * （判「绑了没有」），发码、验码要它（解出目标）。
+     *
+     * <p>取密文不取 {@code *_hash}：要把号码<b>解出来</b>才能发信 / 发短信，
+     * 而摘要是单向的 —— 同 {@link #selectForEmailBind}。
+     */
+    @Select("""
+            SELECT member_id, phone, email
+            FROM t_member
+            WHERE member_id = #{memberId}
+            """)
+    Member selectContacts(@Param("memberId") Long memberId);
+
     /** 换绑手机号要读的那几列：状态、密码（判有没有）、当前手机号密文。 */
     @Select("""
             SELECT member_id, status, password, phone

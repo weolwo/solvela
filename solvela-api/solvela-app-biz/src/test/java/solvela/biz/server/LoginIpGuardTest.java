@@ -179,8 +179,10 @@ class LoginIpGuardTest {
             assertEquals(AuthFailReason.BAD_CREDENTIALS, login(ip, email, "WrongPass2026").reason(),
                     "🔴 第 3 次失败触发了冷却，但这一次的回答仍然是那句含糊的 BAD_CREDENTIALS —— "
                             + "当场说出剩余时间等于回答了「这个号存不存在」");
-            assertEquals(AuthFailReason.OPERATION_LIMITED, login(ip, email, "WrongPass2026").reason(),
-                    "下一次才看到冷却");
+            assertEquals(AuthFailReason.PASSWORD_COOLDOWN, login(ip, email, "WrongPass2026").reason(),
+                    "下一次才看到冷却。🔴 是 PASSWORD_COOLDOWN 不是 OPERATION_LIMITED —— "
+                            + "被冷却的只有密码这条通道，用户还能走验证码登录和找回密码，"
+                            + "而那两个按钮只有专门的码才带得出来");
         }
     }
 
