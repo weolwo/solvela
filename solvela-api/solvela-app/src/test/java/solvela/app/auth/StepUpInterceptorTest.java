@@ -8,8 +8,10 @@ import org.springframework.web.method.HandlerMethod;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.auth.device.DeviceIdentity;
+import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.SessionReportCmd;
 import solvela.member.api.StepUpCmd;
 import solvela.member.api.StepUpResult;
 
@@ -25,8 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>最要紧的几条：
  * <ul>
  *   <li>没标注的方法<b>不调下游</b> —— 否则每个请求都多一次跨进程调用；</li>
- *   <li>observe 档<b>永不拦截</b>，下游挂了也放行；</li>
- *   <li>🔴 enforce 档下游挂了<b>不放行</b> —— 守资产出口的闸，判断不了不能默认开门。</li>
+ *   <li>observe 档对<b>信任</b>永不拦截，下游挂了也放行；</li>
+ *   <li>🔴 enforce 档下游挂了<b>不放行</b> —— 守资产出口的闸，判断不了不能默认开门；</li>
+ *   <li>🔴 「这不是我」造成的<b>冻结</b>连 off / observe 档也拦，而且压倒设备信任 ——
+ *       那个开关管的是二次验证，而冻结是用户自己要求的保护。</li>
  * </ul>
  *
  * @Date 2026-09-26
@@ -37,30 +41,44 @@ class StepUpInterceptorTest {
 
     private static final MemberPrincipal MEMBER = new MemberPrincipal(1001L, "m1001", "n", null, null);
 
-    /** 可控的下游：返回给定的信任结果，或抛异常；记下被调了几次、收到的入参 */
+/** 可控的下游：返回给定的「冻结 + 信任」，或抛异常；记下被调了几次、收到的入参 */
     private static final class FakeStepUpApi implements MemberStepUpApi {
+
+        private final boolean frozen;
 
         private final DeviceTrust trust;
 
         private final RuntimeException failure;
 
+        /** 拦截器问下游的次数。它只该通过 {@link #assetOut} 问，一次拿到两个答案 */
         int checkCalls;
 
         StepUpCmd lastCmd;
 
         FakeStepUpApi(DeviceTrust trust, RuntimeException failure) {
+            this(false, trust, failure);
+        }
+
+        FakeStepUpApi(boolean frozen, DeviceTrust trust, RuntimeException failure) {
+            this.frozen = frozen;
             this.trust = trust;
             this.failure = failure;
         }
 
         @Override
         public DeviceTrust check(StepUpCmd cmd) {
+            throw new UnsupportedOperationException(
+                    "拦截器要一次拿到「冻结 + 信任」两个答案，所以只能走 assetOut");
+        }
+
+        @Override
+        public AssetOutVerdict assetOut(StepUpCmd cmd) {
             checkCalls++;
             lastCmd = cmd;
             if (failure != null) {
                 throw failure;
             }
-            return trust;
+            return new AssetOutVerdict(frozen, trust);
         }
 
         @Override
@@ -75,6 +93,11 @@ class StepUpInterceptorTest {
 
         @Override
         public boolean revokeOthers(StepUpCmd cmd) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean reportNotMe(SessionReportCmd cmd) {
             throw new UnsupportedOperationException();
         }
     }
@@ -116,11 +139,51 @@ class StepUpInterceptorTest {
     // ============================== off ==============================
 
     @Test
-    @DisplayName("off 档：什么都不做，连下游都不调")
-    void off档不调下游() throws Exception {
+    @DisplayName("off 档：不看信任（新设备照样放行），但仍然问一次下游 —— 冻结要拦")
+    void off档只看冻结() throws Exception {
         FakeStepUpApi api = new FakeStepUpApi(DeviceTrust.NEW_DEVICE, null);
         assertTrue(run(interceptor(StepUpProperties.Mode.OFF, api), "guarded"));
-        assertEquals(0, api.checkCalls);
+        assertEquals(1, api.checkCalls,
+                "🔴 这个开关管的是二次验证，而冻结是用户自己要求的保护 —— "
+                        + "绑在一个开关上，意味着关掉二次验证顺带把「这不是我」作废了");
+    }
+
+    @Test
+    @DisplayName("🔴 off 档下游挂了 → 放行。这一档连二次验证都不要，为一次抖动挡住所有人代价更大")
+    void off档下游失败放行() throws Exception {
+        FakeStepUpApi api = new FakeStepUpApi(null, new IllegalStateException("member service down"));
+        assertTrue(run(interceptor(StepUpProperties.Mode.OFF, api), "guarded"));
+    }
+
+    // ============================== 资产出口冻结（「这不是我」） ==============================
+
+    @Test
+    @DisplayName("🔴 冻结压倒信任：受信任的老设备上也拦 —— 举报的人很可能正拿着它")
+    void 冻结压倒信任() {
+        FakeStepUpApi api = new FakeStepUpApi(true, DeviceTrust.VERIFIED, null);
+        ApiException e = assertThrows(ApiException.class,
+                () -> run(interceptor(StepUpProperties.Mode.ENFORCE, api), "guarded"));
+        assertEquals(ApiErrors.ASSET_OUT_FROZEN, e.error(),
+                "🔴 不能复用 STEP_UP_REQUIRED：那个码会让客户端弹验证码框，而这一档验过也过不去");
+        assertEquals("PASSWORD_RESET", e.details().get("unlock"),
+                "前端要据它决定那颗按钮跳哪儿");
+    }
+
+    @Test
+    @DisplayName("🔴 observe 档也拦冻结 —— 否则用户点了「这不是我」却什么也没发生")
+    void observe档也拦冻结() {
+        FakeStepUpApi api = new FakeStepUpApi(true, DeviceTrust.VERIFIED, null);
+        assertThrows(ApiException.class,
+                () -> run(interceptor(StepUpProperties.Mode.OBSERVE, api), "guarded"));
+    }
+
+    @Test
+    @DisplayName("🔴 off 档也拦冻结")
+    void off档也拦冻结() {
+        FakeStepUpApi api = new FakeStepUpApi(true, DeviceTrust.VERIFIED, null);
+        ApiException e = assertThrows(ApiException.class,
+                () -> run(interceptor(StepUpProperties.Mode.OFF, api), "guarded"));
+        assertEquals(ApiErrors.ASSET_OUT_FROZEN, e.error());
     }
 
     // ============================== 注解 ==============================

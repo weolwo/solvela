@@ -1,6 +1,6 @@
 import axios, { AxiosHeaders, type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
-import { toApiError } from './errors'
+import { toApiError, type ApiError } from './errors'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -38,6 +38,13 @@ type DeviceEnsurer = () => Promise<void>
 type StepUpHandler = () => Promise<boolean>
 /** 弹出滑块、等用户拖完。返回通行票；放弃返回 null */
 type CaptchaHandler = () => Promise<string | null>
+/**
+ * 账号被保护起来了，弹一条告知。
+ *
+ * 🔴 **没有返回值，也不重试**：这一档不是「还差一步」，是「这件事现在办不了，去办另一件」。
+ * 做成「验完重试」的形状，用户会一直点那个永远点不动的按钮。
+ */
+type AccountNoticeHandler = (error: ApiError) => void
 
 let unauthorizedHandler: UnauthorizedHandler = () => {}
 /** 默认不做：注入之前（比如单测里）行为退化成「没有设备身份」，而不是报错 */
@@ -46,6 +53,8 @@ let deviceEnsurer: DeviceEnsurer = () => Promise.resolve()
 let stepUpHandler: StepUpHandler = () => Promise.resolve(false)
 /** 默认「不处理」：注入之前（单测里）CAPTCHA_REQUIRED 原样抛给调用方 */
 let captchaHandler: CaptchaHandler = () => Promise.resolve(null)
+/** 默认什么都不做：注入之前，错误原样抛给调用方，页面自己展示那句 message */
+let accountNoticeHandler: AccountNoticeHandler = () => {}
 
 /** 滑块通行票放在这个头里。对齐网关 CaptchaService.HEADER */
 const CAPTCHA_HEADER = 'X-Captcha-Token'
@@ -79,6 +88,12 @@ export function configureHttp(options: {
    * 与二次验证同一种处理：只弹一次，拿到通行票后各自带着重试。
    */
   onCaptchaRequired?: CaptchaHandler
+  /**
+   * 可选：账号被保护起来了（目前只有 ASSET_OUT_FROZEN）。**不传就是「不处理」**。
+   *
+   * 它只负责弹一条告知 —— 原请求照常失败，调用方该怎么处理还怎么处理。
+   */
+  onAccountNotice?: AccountNoticeHandler
 }): void {
   unauthorizedHandler = options.onLoginRequired
   /*
@@ -90,6 +105,7 @@ export function configureHttp(options: {
   // 同上：无条件赋值，不传就是回到「不处理」
   stepUpHandler = options.onStepUpRequired ?? (() => Promise.resolve(false))
   captchaHandler = options.onCaptchaRequired ?? (() => Promise.resolve(null))
+  accountNoticeHandler = options.onAccountNotice ?? (() => {})
 }
 
 const http: AxiosInstance = axios.create({
@@ -129,6 +145,14 @@ http.interceptors.response.use(
 
     if (apiError.isLoginRequired) {
       unauthorizedHandler()
+    }
+
+    /*
+     * 账号被保护起来了。弹窗是旁路：这里**不** return，错误照常往下抛 ——
+     * 页面上那颗按钮要停止转圈，而这只有调用方自己做得到。
+     */
+    if (apiError.code === 'ASSET_OUT_FROZEN') {
+      accountNoticeHandler(apiError)
     }
 
     /*

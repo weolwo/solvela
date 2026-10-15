@@ -66,6 +66,15 @@ export const API_ERROR_CODES = [
    * 之后用它重置密码就是永久接管。
    */
   'LOGIN_VERIFY_UNAVAILABLE',
+  /**
+   * 🔴 用户点过「这不是我」，**资产出口**（加收货地址、兑换、充话费）冻结中。
+   *
+   * 和 STEP_UP_REQUIRED 不是一回事：那一档验一下验证码就过去了，这一档**验过也过不去** ——
+   * 在任何设备上都过不去，包括那台受信任的老设备。所以不要去弹验证码框。
+   *
+   * 唯一的出口是**重置密码**（`details.unlock === 'PASSWORD_RESET'`）。
+   */
+  'ASSET_OUT_FROZEN',
   'INVALID_ARGUMENT',
   'NOT_FOUND',
   'CONFLICT',
@@ -101,6 +110,9 @@ export interface ChallengeDetails {
    */
   channel: VerifyChannel | null
 }
+
+/** ASSET_OUT_FROZEN 带的东西。目前只有一种解法 */
+export type AssetOutUnlock = 'PASSWORD_RESET'
 
 /** PASSWORD_COOLDOWN 带的东西 */
 export interface PasswordCooldownDetails {
@@ -221,6 +233,15 @@ export class ApiError extends Error {
         )
       : []
     return { retryAfterSeconds: this.retryAfterSeconds ?? 0, alternatives }
+  }
+
+  /** 资产出口冻结中。不是那个码时返回 null */
+  get assetOutUnlock(): AssetOutUnlock | null {
+    if (this.code !== 'ASSET_OUT_FROZEN') {
+      return null
+    }
+    // 只认识一种解法；服务端将来加了别的，这里返回 null，弹窗退化成「只有知道了」
+    return this.details?.unlock === 'PASSWORD_RESET' ? 'PASSWORD_RESET' : null
   }
 
   /**

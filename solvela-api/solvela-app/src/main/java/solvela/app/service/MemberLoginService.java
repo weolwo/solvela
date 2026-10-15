@@ -43,6 +43,7 @@ import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberLoginType;
+import solvela.member.api.SessionReportCmd;
 import solvela.member.api.MemberLogoutCmd;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
@@ -441,6 +442,33 @@ public class MemberLoginService {
         int revoked = tokenStore.revokeOthers(memberId, currentToken);
         stepUpApi.revokeOthers(StepUpCmd.of(memberId, CurrentDevice.deviceIdOrNull(), ip));
         return revoked;
+    }
+
+    /**
+     * 「这不是我」：举报某一个会话。
+     *
+     * <h3>顺序：先踢人，再冻结</h3>
+     * 🔴 两件事都要做，但<b>踢人在前</b> —— 用户点下去的那一刻最在意的是「他现在还在不在」。
+     * 冻结要跨进程，万一下游抖了一下，至少对方已经掉线了。
+     *
+     * <h3>为什么顺手把【其余所有】会话也踢掉</h3>
+     * 举报一个会话说明账号已经漏了。只踢被举报那一个，攻击者另开的第二个会话还在
+     * —— 而用户以为自己已经把人赶出去了（方案 §8.1）。
+     *
+     * <p>⚠️ 当前这一台不踢：用户正拿着它操作，踢了他要重新登录，
+     * 而「我刚举报就被踢出去了」看起来像是我们出了故障。
+     *
+     * @param loginEpochSecond 被举报那次登录的时间（秒），用来给决策流水打标；0 = 未知
+     * @return 当前这台设备是否仍受信任
+     */
+    public boolean reportSession(Long memberId, String currentToken, String sessionId,
+                                 String reportedDeviceId, long loginEpochSecond, String ip) {
+        tokenStore.revokeSession(memberId, sessionId);
+        int revoked = tokenStore.revokeOthers(memberId, currentToken);
+        log.warn("【账号安全】「这不是我」, memberId: {}, 被举报会话: {}, 另外踢掉 {} 个会话",
+                memberId, sessionId, revoked);
+        return stepUpApi.reportNotMe(new SessionReportCmd(memberId, reportedDeviceId,
+                loginEpochSecond, CurrentDevice.deviceIdOrNull(), ip));
     }
 
     public void logout(String tokenValue, Long memberId, String ip) {

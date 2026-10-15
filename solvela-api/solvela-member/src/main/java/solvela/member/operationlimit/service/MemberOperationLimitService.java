@@ -146,6 +146,51 @@ public class MemberOperationLimitService {
     }
 
     /**
+     * 直接冻结，<b>不走失败计数</b>：风控或用户举报当场认定要冻。
+     *
+     * <h3>和 {@link #recordFail} 的分工</h3>
+     * 那个是「又错了一次，到阈值才冻」；这个是「已经有结论了，现在就冻」。
+     * 走 {@code recordFail} 的话要先把计数推到阈值，而这里压根没有「几次」这个概念。
+     *
+     * <h3>🔴 幂等：已经冻着就什么都不做</h3>
+     * 不然用户连点两次「这不是我」，表里会多一行，而客服看到两条生效中的限制
+     * 会不知道该解哪一个（{@code selectActive} 取最晚那条，于是解掉前一条也没用）。
+     *
+     * @param expireTime 到期时间。{@code ASSET_OUT} 这类「靠改密解除」的要给一个很远的日期 ——
+     *                   那一列是 NOT NULL，但到期<b>不是</b>它预期的出口
+     * @return 生效中的那一行（新建的，或已经存在的）
+     */
+    public MemberOperationLimit freeze(Long memberId, MemberOperationTypeEnum operationType,
+                                       String reason, LocalDateTime expireTime) {
+        if (memberId == null || operationType == null || expireTime == null) {
+            return null;
+        }
+        MemberOperationLimit active = this.getActiveLimit(memberId, operationType);
+        if (active != null) {
+            return active;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        MemberOperationLimit limit = new MemberOperationLimit();
+        limit.setMemberId(memberId);
+        limit.setOperationType(operationType);
+        limit.setLockTime(now);
+        limit.setExpireTime(expireTime);
+        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
+        limit.setReason(reason);
+        limit.setCreateTime(now);
+        limit.setUpdateTime(now);
+        memberOperationLimitDao.insert(limit);
+        log.info("会员操作限制（直接冻结） memberId={} operation={} 到期={} 原因={}",
+                memberId, operationType.getDesc(), expireTime, reason);
+        return limit;
+    }
+
+    /** 此刻这个操作被冻着吗。{@link #getActiveLimit} 的布尔版，调用方多半只关心这一点 */
+    public boolean isFrozen(Long memberId, MemberOperationTypeEnum operationType) {
+        return this.getActiveLimit(memberId, operationType) != null;
+    }
+
+    /**
      * 清空失败计数。操作成功时调用
      */
     public void clearFail(Long memberId, MemberOperationTypeEnum operationType) {

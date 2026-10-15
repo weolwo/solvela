@@ -11,6 +11,8 @@ import solvela.member.api.DeviceTrust;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendResult;
 import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.AssetOutVerdict;
+import solvela.member.api.SessionReportCmd;
 import solvela.member.api.StepUpCmd;
 import solvela.member.api.StepUpFailReason;
 import solvela.member.api.StepUpResult;
@@ -53,6 +55,12 @@ public class MemberStepUpService implements MemberStepUpApi {
     private final PiiCipher piiCipher;
 
     private final MemberStepUpProperties properties;
+
+    /** 资产出口的冻结记在这里（{@code t_member_operation_limit} 的 ASSET_OUT 类型） */
+    private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
+
+    /** 「这不是我」要给那一次登录的决策流水打标（方案 §8.1） */
+    private final solvela.member.risk.RiskLabelService riskLabelService;
 
     @Override
     public DeviceTrust check(StepUpCmd cmd) {
@@ -128,6 +136,63 @@ public class MemberStepUpService implements MemberStepUpApi {
         trustStore.revoke(cmd.memberId(), keepCurrent ? cmd.deviceId() : null);
         log.info("【二次验证】会员下线其他设备，撤销其余设备信任, memberId: {}, 当前设备保留信任: {}",
                 cmd.memberId(), keepCurrent);
+        return keepCurrent;
+    }
+
+    /**
+     * 资产出口这一道闸的完整回答。<b>顺序固定：先冻结，再信任</b>，理由见 {@link AssetOutVerdict}。
+     *
+     * <p>两个判断合成一次调用，是因为守这道闸的拦截器两件事都要知道 ——
+     * 分成两个接口的话，每一次「加地址 / 充话费」都要跨进程两趟。
+     */
+    @Override
+    public AssetOutVerdict assetOut(StepUpCmd cmd) {
+        boolean frozen = operationLimitService.isFrozen(cmd.memberId(),
+                solvela.enums.MemberOperationTypeEnum.ASSET_OUT);
+        /*
+         * 🔴 冻着就不必再算信任了，而且<b>刻意不算</b>：
+         * 算一次要查登录日志，而这个答案此刻没有任何用途 —— 冻结压倒一切。
+         * 返回 NO_DEVICE 之类的假值会误导调用方，所以给当前这台设备真实的「新设备」语义里
+         * 最保守的那一档。
+         */
+        if (frozen) {
+            return new AssetOutVerdict(true, DeviceTrust.NEW_DEVICE);
+        }
+        return new AssetOutVerdict(false, check(cmd));
+    }
+
+    /**
+     * 「这不是我」。三件事，顺序即重要性：冻结 → 撤信任 → 打标。
+     *
+     * <h3>🔴 打标放在最后，而且不让它影响前两件</h3>
+     * 标注是给分析用的，而且它可能压根找不到对应的流水（老会话没有设备号、
+     * 流水已过期被 DROP PARTITION）。为了一条分析数据让「这不是我」失败，
+     * 等于在用户最需要我们办成事的那一刻办不成。
+     *
+     * <h3>为什么冻结在最前面</h3>
+     * 它是唯一能<b>立刻止损</b>的动作。撤信任只是让对方下次登录要多验一道，
+     * 而他此刻手里那个会话可能正在加收货地址。
+     */
+    @Override
+    public boolean reportNotMe(SessionReportCmd cmd) {
+        if (cmd.memberId() == null) {
+            return false;
+        }
+        operationLimitService.freeze(cmd.memberId(),
+                solvela.enums.MemberOperationTypeEnum.ASSET_OUT,
+                "用户举报「这不是我」",
+                // 没有「到期」这个概念：正确的出口只有重置密码。那一列是 NOT NULL，所以给一个很远的日期
+                java.time.LocalDateTime.now().plusYears(100));
+
+        boolean keepCurrent = revokeOthers(StepUpCmd.of(
+                cmd.memberId(), cmd.currentDeviceId(), cmd.clientIp()));
+
+        riskLabelService.labelLogin(cmd.memberId(), cmd.reportedDeviceId(), cmd.loginEpochSecond(),
+                solvela.enums.MemberRiskLabelEnum.STOLEN,
+                solvela.enums.MemberRiskLabelSourceEnum.USER_REPORT);
+
+        log.warn("【账号安全】用户举报「这不是我」, memberId: {}, 被举报设备: {}, 当前设备保留信任: {}",
+                cmd.memberId(), cmd.reportedDeviceId(), keepCurrent);
         return keepCurrent;
     }
 

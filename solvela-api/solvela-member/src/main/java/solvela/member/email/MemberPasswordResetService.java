@@ -8,6 +8,8 @@ import solvela.auth.member.MemberTokenStore;
 import solvela.member.stepup.DeviceTrustStore;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberOperationTypeEnum;
+import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.member.Member;
 import solvela.member.api.EmailCodeScene;
@@ -60,6 +62,12 @@ public class MemberPasswordResetService {
     private final DeviceGuard deviceGuard;
 
     private final PiiHasher piiHasher;
+
+    /** 重置密码要清掉密码阶梯冷却 —— 它是被恶意冷却时的唯一自助出口（方案 §4.4） */
+    private final solvela.member.risk.feature.PasswordCooldownStore cooldownStore;
+
+    /** 也要解开「这不是我」造成的资产出口冻结（方案 §8.1） */
+    private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
 
     /**
      * 重置密码。
@@ -131,6 +139,19 @@ public class MemberPasswordResetService {
         // 设备信任一并撤销：会话踢掉了，但攻击者那台设备若已「验证过」或「登录满 7 天」，
         // 他改完密码重新登进来就直接是受信任设备，二次验证对他形同虚设
         deviceTrustStore.revoke(member.getMemberId(), null);
+
+        /*
+         * ---------- 重置密码是两个限制的【自助出口】（方案 §4.4、§8.1） ----------
+         *
+         * 🔴 这两行缺了的话，用户改完密码还是进不去 / 还是兑换不了 ——
+         *    而他已经用完了所有能自己做的事，剩下的只有打客服电话。
+         *    它们也正是密码阶梯敢用 24 小时那一档、资产出口敢「冻到改密为止」的前提。
+         */
+        // 密码阶梯冷却：两个桶都清（可信设备桶与共用桶）
+        cooldownStore.onIdentityVerified(hashHex, cmd.deviceId());
+        // 资产出口冻结：「这不是我」之后唯一的恢复方式就是这一步
+        operationLimitService.unlock(member.getMemberId(), MemberOperationTypeEnum.ASSET_OUT,
+                MemberOperationUnlockTypeEnum.RESET_PASSWORD, null, "重置密码");
 
         log.info("【重置密码】成功, memberId: {}, 通道: {}, 吊销会话 {} 个, 身份: {}",
                 member.getMemberId(), type, revoked, mask(type, identity));

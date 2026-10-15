@@ -23,6 +23,7 @@ import solvela.app.domain.PhoneBindRequest;
 import solvela.app.domain.LoginChallengeCodeView;
 import solvela.app.domain.LoginChallengeRequest;
 import solvela.app.domain.SessionAdoptRequest;
+import solvela.app.domain.SessionReportRequest;
 import solvela.app.domain.SessionRevokeRequest;
 import solvela.member.api.MemberContactView;
 import solvela.app.domain.SmsCodeRequest;
@@ -302,6 +303,26 @@ public class MemberLoginController {
     public ResponseEntity<Void> revokeOtherSessions(HttpServletRequest servletRequest) {
         memberLoginService.revokeOtherSessions(
                 CurrentMember.require().memberId(), currentToken(servletRequest), ClientIp.of(servletRequest));
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 「这不是我」：举报某一次登录。<b>要登录。</b>
+     *
+     * <h3>它和「下线」是两个不同的动作，刻意分开</h3>
+     * 「下线」是「这台我不用了」；「这不是我」是「我的号被人登了」。后者还要：
+     * 冻结资产出口到改密为止、撤销其余设备信任、把那次登录标成确认被盗（方案 §8.1）。
+     * 合成一个按钮的话，每次清理旧设备都会把自己的账号冻住。
+     *
+     * <p>返回 204。客户端收到后应当引导用户去<b>重置密码</b> —— 那是解除冻结的唯一方式。
+     */
+    @PostMapping("/sessions/report")
+    public ResponseEntity<Void> reportSession(@RequestBody @Valid SessionReportRequest request,
+                                              HttpServletRequest servletRequest) {
+        memberLoginService.reportSession(CurrentMember.require().memberId(),
+                currentToken(servletRequest), request.sessionId(), request.deviceId(),
+                request.loginTime() == null ? 0L : request.loginTime() / 1000L,
+                ClientIp.of(servletRequest));
         return ResponseEntity.noContent().build();
     }
 

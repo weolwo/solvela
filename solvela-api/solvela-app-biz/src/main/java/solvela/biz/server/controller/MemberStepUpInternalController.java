@@ -42,4 +42,14 @@ public class MemberStepUpInternalController implements MemberStepUpApi {
     public boolean revokeOthers(StepUpCmd cmd) {
         return stepUpService.revokeOthers(cmd);
     }
+
+    @Override
+    public solvela.member.api.AssetOutVerdict assetOut(StepUpCmd cmd) {
+        return stepUpService.assetOut(cmd);
+    }
+
+    @Override
+    public boolean reportNotMe(solvela.member.api.SessionReportCmd cmd) {
+        return stepUpService.reportNotMe(cmd);
+    }
 }

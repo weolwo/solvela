@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 
+import AccountNoticeDialog from '@/components/AccountNoticeDialog.vue'
 import CaptchaDialog from '@/components/CaptchaDialog.vue'
 import ForceAckDialog from '@/components/ForceAckDialog.vue'
 import StepUpDialog from '@/components/StepUpDialog.vue'
@@ -55,6 +56,13 @@ const showTabBar = computed(() => route.meta.tab === true)
     由 http 拦截器唤起（服务端返回 CAPTCHA_REQUIRED 时），拖对后原请求自动重试。
   -->
   <CaptchaDialog />
+
+  <!--
+    账号保护状态（点过「这不是我」之后资产出口被冻结）。同样挂在外壳上：
+    兑换、加地址、充话费可能发生在任何页面。由 http 拦截器唤起。
+    🔴 它【不】重试原请求 —— 这一档验证码也过不去，唯一的出口是重置密码。
+  -->
+  <AccountNoticeDialog v-if="auth.isLoggedIn" />
 </template>
 
 <style scoped>

@@ -12,21 +12,33 @@
  * 每一条都要读三行信息（设备、位置、时间）再做一个有后果的决定。
  * 独立的卡片把每一条围成一个可以单独判断的单元，行与行之间不会看串。
  *
+ * <h3>🔴 「下线」和「这不是我」是两个不同的动作，刻意分开</h3>
+ * 「下线」是「这台我不用了」—— 清理旧手机、公用电脑，很常见，点一下就执行。
+ * 「这不是我」是「我的号被人登了」—— 它还会**冻结兑换、加地址、充话费**到改密为止，
+ * 并撤销其余设备的信任。合成一个按钮的话，每次清理旧设备都会把自己的账号冻住。
+ *
+ * <p>所以后者要二次确认，而且确认之后要**明确告诉用户接下来会发生什么** ——
+ * 不说清楚的话，他下一次兑换时会以为系统坏了。
+ *
  * <h3>🔴 当前这一台必须一眼认出来</h3>
  * 不标的话，用户很容易把自己这台点下线，然后当场被踢出去 —— 而他会以为是页面出了 bug。
  * 所以当前这一条排最前、图标高亮、带「本机」标签、**没有下线按钮**
  *（要退出当前设备走「我的」页那一项）。
  */
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import {
   fetchSessions,
+  reportSession,
   revokeOtherSessions,
   revokeSession,
   type MemberSession,
 } from '@/api/session'
 import { ApiError } from '@/api/errors'
 import type { IconName } from '@/ui/Icon.vue'
+
+const router = useRouter()
 
 const sessions = ref<MemberSession[]>([])
 const loading = ref(true)
@@ -36,6 +48,11 @@ const revoking = ref<string | null>(null)
 const revokingOthers = ref(false)
 /** 「下线其它设备」的二次确认。这个操作会把用户的其它设备全部踢掉，不该点一下就执行 */
 const confirmingOthers = ref(false)
+/** 正在确认举报的那一条。null = 没有在确认 */
+const reportingTarget = ref<MemberSession | null>(null)
+const reporting = ref(false)
+/** 举报成功后的收尾提示：必须让用户知道「现在该去重置密码了」 */
+const reportedDone = ref(false)
 
 const DEVICE_LABELS: Record<string, string> = {
   APP: '手机 App',
@@ -133,6 +150,36 @@ async function revokeOthers(): Promise<void> {
   }
 }
 
+/**
+ * 举报确认。
+ *
+ * 🔴 成功之后**不是**悄悄刷新列表了事：资产出口已经被冻住，用户必须去重置密码才能恢复。
+ * 不说这一句的话，他下一次兑换时会撞上一个看不懂的「账号处于保护状态」。
+ */
+async function confirmReport(): Promise<void> {
+  const target = reportingTarget.value
+  if (target === null || reporting.value) {
+    return
+  }
+  reporting.value = true
+  errorMessage.value = ''
+  try {
+    await reportSession(target)
+    reportingTarget.value = null
+    reportedDone.value = true
+    await load()
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : '操作失败，请稍后再试'
+  } finally {
+    reporting.value = false
+  }
+}
+
+async function goPasswordReset(): Promise<void> {
+  reportedDone.value = false
+  await router.push({ name: 'password-reset' })
+}
+
 onMounted(load)
 </script>
 
@@ -180,15 +227,23 @@ onMounted(load)
               当前这一台【没有】下线按钮。想退出当前设备走「我的」页那一项 ——
               在这里给一个，用户点下去会当场被踢出这个页面，而他多半只是想踢别人
             -->
-            <Button
-              v-if="!session.current"
-              variant="danger"
-              :block="false"
-              :loading="revoking === session.sessionId"
-              @click="revoke(session)"
-            >
-              下线
-            </Button>
+            <div v-if="!session.current" class="card__ops">
+              <Button
+                variant="danger"
+                :block="false"
+                :loading="revoking === session.sessionId"
+                @click="revoke(session)"
+              >
+                下线
+              </Button>
+              <!--
+                「这不是我」比「下线」后果重得多，所以用文字按钮而不是第二颗醒目的按钮：
+                两颗一样显眼的红按钮会让人随手点错，而点错的那一次会把自己的兑换冻住
+              -->
+              <Button variant="text" :block="false" @click="reportingTarget = session">
+                这不是我
+              </Button>
+            </div>
           </li>
         </ul>
 
@@ -224,10 +279,103 @@ onMounted(load)
         </div>
       </template>
     </div>
+
+    <!--
+      举报的二次确认。🔴 必须把后果说全：下线、冻结、要去改密。
+      只写一句「确定举报吗」的话，用户点完才发现兑换不了了。
+    -->
+    <div
+      v-if="reportingTarget !== null"
+      class="mask"
+      role="alertdialog"
+      aria-modal="true"
+      aria-label="举报这次登录"
+    >
+      <div class="dialog">
+        <h2 class="dialog__title">这不是我的登录？</h2>
+        <p class="dialog__message">我们会立刻让这台设备下线，并把你其它设备也一起登出。</p>
+        <p class="dialog__message">
+          为了保护你的东西，<b>兑换、加收货地址、充话费会被暂时停用</b>，直到你重置密码。
+        </p>
+        <div class="dialog__actions">
+          <Button variant="danger" :loading="reporting" @click="confirmReport">
+            确认，这不是我
+          </Button>
+          <Button variant="text" @click="reportingTarget = null">取消</Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 举报成功后的收尾：把「接下来该做什么」一次说清，并给一条路 -->
+    <div v-if="reportedDone" class="mask" role="alertdialog" aria-modal="true" aria-label="已处理">
+      <div class="dialog">
+        <h2 class="dialog__title">已处理</h2>
+        <p class="dialog__message">
+          那台设备已下线，你的其它设备也已登出。现在请重置密码 ——
+          <b>这也是恢复兑换和充话费的唯一方式</b>。
+        </p>
+        <div class="dialog__actions">
+          <Button @click="goPasswordReset">去重置密码</Button>
+          <Button variant="text" @click="reportedDone = false">稍后再说</Button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* 两颗操作竖排：横排时「这不是我」四个字会把卡片挤变形 */
+.card__ops {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sv-space-xs);
+}
+
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sv-space-page);
+  background: rgb(0 0 0 / 45%);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-sm);
+  width: 100%;
+  max-width: 340px;
+  padding: var(--sv-space-lg);
+  border-radius: var(--sv-radius-lg);
+  background: var(--sv-bg-surface);
+  box-shadow: var(--sv-shadow-overlay);
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: var(--sv-font-heading);
+  line-height: 1.4;
+  color: var(--sv-text-primary);
+}
+
+.dialog__message {
+  margin: 0;
+  font-size: var(--sv-font-body);
+  line-height: 1.7;
+  color: var(--sv-text-secondary);
+}
+
+.dialog__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-sm);
+  margin-top: var(--sv-space-sm);
+}
+
 .page {
   display: flex;
   flex-direction: column;

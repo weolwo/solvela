@@ -46,6 +46,28 @@ export async function revokeSession(sessionId: string): Promise<void> {
   await requestVoid({ url: '/auth/sessions/revoke', method: 'POST', data: { sessionId } })
 }
 
+/**
+ * 「这不是我」：举报某一次登录。返回 204。
+ *
+ * 🔴 **和「下线」是两个不同的动作**。「下线」是「这台我不用了」；这个是「我的号被人登了」，
+ * 服务端还会**冻结资产出口到改密为止**、撤销其余设备信任、把那次登录标成确认被盗。
+ * 所以它必须有二次确认，而且确认之后要引导用户去重置密码 —— 那是解除冻结的唯一方式。
+ *
+ * deviceId / loginTime 原样回传列表里的值：服务端只拿它们去定位「那一次登录」好打标，
+ * 认人只靠令牌，所以填不上也不影响下线和冻结。
+ */
+export async function reportSession(session: MemberSession): Promise<void> {
+  await requestVoid({
+    url: '/auth/sessions/report',
+    method: 'POST',
+    data: {
+      sessionId: session.sessionId,
+      deviceId: session.deviceId,
+      loginTime: session.loginTime,
+    },
+  })
+}
+
 /** 下线除当前之外的所有会话。自己留着，不用重新登 */
 export async function revokeOtherSessions(): Promise<void> {
   await requestVoid({ url: '/auth/sessions/revokeOthers', method: 'POST' })

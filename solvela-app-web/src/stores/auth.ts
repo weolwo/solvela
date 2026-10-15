@@ -15,6 +15,7 @@ import {
 import { ensureDevice } from '@/api/device'
 import { ApiError } from '@/api/errors'
 import { configureHttp } from '@/api/http'
+import { showAccountNotice } from '@/composables/useAccountNotice'
 import { requestCaptcha } from '@/composables/useCaptcha'
 import { finishStepUp, requestStepUp } from '@/composables/useStepUp'
 import { clearSessionHint, hasSessionHint, setSessionHint } from '@/utils/session-hint'
@@ -170,6 +171,17 @@ export const useAuthStore = defineStore('auth', () => {
     onStepUpRequired: requestStepUp,
     // 发码、密码登录之前要过滑块。弹窗由 CaptchaDialog 负责，它不依赖登录态
     onCaptchaRequired: requestCaptcha,
+    /*
+     * 点过「这不是我」之后资产出口被冻结。弹窗由 AccountNoticeDialog 负责。
+     * 🔴 它不重试原请求 —— 这一档验证码也过不去，唯一的出口是重置密码。
+     */
+    onAccountNotice: (error) => {
+      showAccountNotice({
+        code: 'ASSET_OUT_FROZEN',
+        message: error.message,
+        unlock: error.assetOutUnlock,
+      })
+    },
   })
 
   return {

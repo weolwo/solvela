@@ -175,6 +175,17 @@ public class CookieSessionStub {
             public boolean revokeOthers(StepUpCmd cmd) {
                 return true;
             }
+
+            /** 这些用例不碰资产出口冻结，一律当「没冻、受信任」 */
+            @Override
+            public solvela.member.api.AssetOutVerdict assetOut(StepUpCmd cmd) {
+                return new solvela.member.api.AssetOutVerdict(false, DeviceTrust.VERIFIED);
+            }
+
+            @Override
+            public boolean reportNotMe(solvela.member.api.SessionReportCmd cmd) {
+                return true;
+            }
         };
     }
 }

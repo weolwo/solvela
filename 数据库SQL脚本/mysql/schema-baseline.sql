@@ -576,7 +576,7 @@ DROP TABLE IF EXISTS `t_member_operation_limit`;
 CREATE TABLE `t_member_operation_limit` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '自增id',
   `member_id` bigint NOT NULL COMMENT '会员号：关联键',
-  `operation_type` int NOT NULL COMMENT '受限操作：1-登录, 2-修改密码。见 MemberOperationTypeEnum',
+  `operation_type` int NOT NULL COMMENT '受限操作：1-登录, 2-修改密码, 3-资产出口（加地址/兑换/充话费，「这不是我」触发，重置密码恢复）。见 MemberOperationTypeEnum',
   `lock_time` datetime NOT NULL COMMENT '冻结开始时间',
   `expire_time` datetime NOT NULL COMMENT '自动到期时间：到点即视为解除，不依赖回写',
   `unlock_time` datetime DEFAULT NULL COMMENT '实际解冻时间：status=1 时必填',

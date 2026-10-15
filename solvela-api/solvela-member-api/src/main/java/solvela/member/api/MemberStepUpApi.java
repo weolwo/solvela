@@ -61,4 +61,36 @@ public interface MemberStepUpApi {
      */
     @PostExchange("/revoke-others")
     boolean revokeOthers(@RequestBody StepUpCmd cmd);
+
+    /**
+     * 资产出口这一道闸要的全部判断：<b>冻着没有</b> + <b>这台设备可信吗</b>。
+     *
+     * <p>和 {@link #check} 并存而不是取代它：进程内还有调用方只要信任那一个答案
+     * （登录风控的设备信任特征），让它们多查一次冻结没有意义。
+     *
+     * <p>🔴 守资产出口的拦截器必须用<b>这个</b>，不是 {@link #check} ——
+     * 只看信任的话，一台受信任的老设备上的盗号者（会话被偷、设备验证过）照样搬得走东西，
+     * 而那恰恰是用户点「这不是我」时最担心的情形。
+     */
+    @PostExchange("/asset-out")
+    AssetOutVerdict assetOut(@RequestBody StepUpCmd cmd);
+
+    /**
+     * 「这不是我」：用户举报了某一次登录。
+     *
+     * <h3>做三件事，顺序即重要性</h3>
+     * <ol>
+     *   <li><b>冻结资产出口</b>到改密为止 —— 这是唯一能立刻止损的动作；</li>
+     *   <li><b>撤销其余设备的信任</b> —— 不撤的话，被踢下线的那台用密码重新登进来
+     *       仍然是「受信任设备」，加地址、充话费不用再验证；</li>
+     *   <li>给那一次登录的决策流水打上「确认被盗」—— 给分析用，<b>失败不影响前两件</b>。</li>
+     * </ol>
+     *
+     * <p>⚠️ <b>下线会话不在这里</b>：令牌库住在网关（{@code solvela-auth}），
+     * 由入口层在调用本方法前后自己踢。域不认识令牌，见 {@code MemberAuthService} 的类注释。
+     *
+     * @return 当前这台设备是否仍受信任（同 {@link #revokeOthers}）
+     */
+    @PostExchange("/report-not-me")
+    boolean reportNotMe(@RequestBody SessionReportCmd cmd);
 }
