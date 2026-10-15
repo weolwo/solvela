@@ -66,6 +66,15 @@ class MemberOperationLimitServiceTest {
     private RedisService redisService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private solvela.member.auth.MemberAuthDao memberAuthDao;
+    @Mock
+    private solvela.crypto.PiiCipher piiCipher;
+    @Mock
+    private solvela.crypto.PiiHasher piiHasher;
+    /** 解冻 LOGIN 时要清 Redis 里的密码冷却键；这批用例只管表，所以给一个空壳 */
+    @Mock
+    private solvela.member.risk.feature.PasswordCooldownStore cooldownStore;
 
     private MemberOperationLimitProperties properties;
     private MemberOperationLimitService service;
@@ -74,7 +83,7 @@ class MemberOperationLimitServiceTest {
     void setUp() {
         properties = new MemberOperationLimitProperties();
         service = new MemberOperationLimitService(memberOperationLimitDao, properties, redisService,
-                notificationService);
+                notificationService, memberAuthDao, piiCipher, piiHasher, () -> cooldownStore);
         when(redisService.generateRedisKey(anyString(), anyString())).thenReturn("k");
         when(memberOperationLimitDao.selectActive(anyLong(), any(), any())).thenReturn(null);
     }

@@ -91,8 +91,21 @@ public class PasswordCooldownRule implements RiskRule {
         if (remaining <= 0) {
             return null;
         }
-        return RiskHit.decide(MemberRiskDecisionEnum.COOLDOWN, remaining,
+        RiskHit hit = RiskHit.decide(MemberRiskDecisionEnum.COOLDOWN, remaining,
                 "密码连续错误 " + store.failures(ctx.getIdentityHashHex(), bucket) + " 次，冷却中");
+        /*
+         * 长冷却要在后台可见、可人工解除，所以请求 RECORD_LIMIT 落一行 t_member_operation_limit。
+         *
+         * 🔴 只有长的那几档才落：60 秒那一档也落库的话，那张表会被手滑的人刷满，
+         *    而客服要找的恰恰是「被锁了很久」的那几个人。
+         *
+         * ⚠️ 按【剩余时间】判，不是按「这一次罚了多久」—— 规则在前置跑，那时它只知道剩多久。
+         *    代价是一个 24 小时的冷却快结束时不再请求落库，而那一行早就落过了。
+         */
+        if (remaining >= recordFrom(config.params()).toSeconds()) {
+            return hit.withActions(solvela.member.risk.RiskAction.RECORD_LIMIT);
+        }
+        return hit;
     }
 
     /** 认证主干记失败时也要这几个参数，所以解析逻辑放这里公用 */

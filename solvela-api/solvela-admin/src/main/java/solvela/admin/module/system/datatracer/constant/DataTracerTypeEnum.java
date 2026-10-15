@@ -54,6 +54,15 @@ public enum DataTracerTypeEnum implements BaseEnum {
      */
     MEMBER_RISK_RULE(11, "登录风控规则"),
 
+    /**
+     * 登录风控名单（黑 / 灰 / 白）。
+     *
+     * <p>🔴 一条 IP 黑名单可能把一整个公司出口挡在外面，而「上周是谁加的、为什么」
+     * 是那时唯一能回答问题的东西。表里的 {@code operator} / {@code revoke_reason} 也记着，
+     * 这里再留一份是为了和其它变更放在同一条时间线上看。
+     */
+    MEMBER_RISK_LIST(12, "登录风控名单"),
+
     ;
 
     private final Integer value;

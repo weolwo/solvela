@@ -159,6 +159,22 @@ class PasswordCooldownTest {
     }
 
     @Test
+    @DisplayName("🔴 长冷却请求 RECORD_LIMIT（落一行让后台看得见），短的不请求")
+    void longCooldownRecordsLimit() {
+        when(redisService.get(anyString())).thenReturn("5");
+
+        // 默认 recordFrom 是 60 分钟：剩 24 小时 → 落库；剩 60 秒 → 不落
+        when(redisService.getExpire(contains(":cd"))).thenReturn(86400L);
+        assertTrue(rule.evaluate(ctx(MemberLoginType.EMAIL_PASSWORD), config())
+                        .actions().contains(solvela.member.risk.RiskAction.RECORD_LIMIT),
+                "客服要找的恰恰是「被锁了很久」的那几个人");
+
+        when(redisService.getExpire(contains(":cd"))).thenReturn(60L);
+        assertTrue(rule.evaluate(ctx(MemberLoginType.EMAIL_PASSWORD), config()).actions().isEmpty(),
+                "🔴 60 秒那一档也落库的话，那张表会被手滑的人刷满");
+    }
+
+    @Test
     @DisplayName("没有冷却时不命中 —— 判断本身不加计数，计数在密码验错之后")
     void notCoolingPasses() {
         when(redisService.getExpire(anyString())).thenReturn(-2L);

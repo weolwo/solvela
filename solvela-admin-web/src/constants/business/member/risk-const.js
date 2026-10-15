@@ -102,6 +102,50 @@ export const RISK_LOGIN_TYPE_ENUM = {
   3: { desc: '邮箱验证码' },
 };
 
+// ---------------------------------------------------------------- 名单
+
+/**
+ * 名单类型。
+ *
+ * 🔴 **豁免面刻意很窄**，页面上要写出来，否则客服会以为「加了白名单就万事大吉」：
+ * IP 白名单只跳过 IP 维度的计数与限流；会员白名单只跳过矩阵与打分 ——
+ * 全局滑块、密码冷却、设备封禁一个都不豁免。
+ */
+export const RISK_LIST_TYPE_ENUM = {
+  BLACK: { value: 1, desc: '黑名单', color: 'red' },
+  GREY: { value: 2, desc: '灰名单', color: 'orange' },
+  WHITE: { value: 3, desc: '白名单', color: 'green' },
+};
+
+export const RISK_LIST_TYPE_OPTIONS = Object.values(RISK_LIST_TYPE_ENUM).map((item) => ({
+  label: item.desc,
+  value: item.value,
+}));
+
+/** 名单维度。会员维度**只允许白名单**（封号走会员状态，不在这里） */
+export const RISK_LIST_DIMENSION_ENUM = {
+  IP: { value: 1, desc: 'IP', color: 'blue' },
+  IP_RANGE: { value: 2, desc: 'IP段', color: 'cyan' },
+  IDENTITY: { value: 3, desc: '身份摘要', color: 'purple' },
+  MEMBER: { value: 4, desc: '会员', color: 'gold' },
+};
+
+export const RISK_LIST_DIMENSION_OPTIONS = Object.values(RISK_LIST_DIMENSION_ENUM).map((item) => ({
+  label: item.desc,
+  value: item.value,
+}));
+
+/** 名单状态。撤销不删行 —— 「谁加的、谁解的、为什么」都要查得到 */
+export const RISK_LIST_STATUS_ENUM = {
+  REVOKED: { value: 0, desc: '已撤销', color: 'default' },
+  VALID: { value: 1, desc: '有效', color: 'green' },
+};
+
+export const RISK_LIST_STATUS_OPTIONS = Object.values(RISK_LIST_STATUS_ENUM).map((item) => ({
+  label: item.desc,
+  value: item.value,
+}));
+
 /** 按 value 找一项；找不到就用 fallback —— 后端加了新取值而前端还没跟上时，别渲染成空白 */
 export function riskMetaOf(enumObj, value, fallback) {
   if (value === null || value === undefined) {

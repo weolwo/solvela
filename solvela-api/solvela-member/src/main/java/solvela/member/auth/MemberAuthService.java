@@ -51,6 +51,7 @@ import solvela.member.email.MemberEmailCodeIssuer;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
@@ -153,6 +154,9 @@ public class MemberAuthService implements MemberAuthApi {
     /** 核身路由：结论只说强度，码发到哪条通道由它选（方案 3.7） */
     private final VerifyRouter verifyRouter;
 
+    /** 长冷却要落一行，让后台看得见、客服解得开（{@code RiskAction.RECORD_LIMIT}） */
+    private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
+
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
     private final LoginIpGuard loginIpGuard;
@@ -244,7 +248,7 @@ public class MemberAuthService implements MemberAuthApi {
      */
     private MemberAuthResult runPreDecision(RiskSession risk, MemberAuthCmd cmd) {
         RiskDecision pre = riskEngine.evaluatePre(risk);
-        applyActions(pre, cmd.deviceId());
+        applyActions(pre, risk.context());
         if (pre.is(MemberRiskDecisionEnum.CAPTCHA)) {
             // 票由接入层核销，域只看结论。已经过了就继续往下走
             return risk.context().isCaptchaPassed()
@@ -335,7 +339,7 @@ public class MemberAuthService implements MemberAuthApi {
          *    那条码是花钱的（短信），也是轰炸的原料。
          */
         RiskDecision post = riskEngine.evaluatePost(risk);
-        applyActions(post, cmd.deviceId());
+        applyActions(post, risk.context());
         if (post.needsOtp()) {
             return issueChallenge(risk, loginType, identity, member, cmd, post.decision());
         }
@@ -403,13 +407,43 @@ public class MemberAuthService implements MemberAuthApi {
     }
 
     /** 执行生效结论带的动作。陪跑规则请求的动作已经被引擎丢掉了，这里拿到的都该执行 */
-    private void applyActions(RiskDecision decision, String deviceId) {
-        if (decision.has(RiskAction.OBSERVE_DEVICE) && deviceId != null) {
-            dispositionService.observe(deviceId, "风控命中：量级异常");
+    private void applyActions(RiskDecision decision, RiskContext ctx) {
+        if (decision.has(RiskAction.OBSERVE_DEVICE) && ctx.getDeviceId() != null) {
+            dispositionService.observe(ctx.getDeviceId(), "风控命中：量级异常");
         }
-        // RECORD_LIMIT（把长冷却写进 t_member_operation_limit 让后台可见可解除）与
-        // NOTIFY_OWNER（通知主人）都还没接，见方案 §9：它们跟后台页面一起在 P1 做。
-        // 🔴 刻意不在这里「先写一半」：一个解除了却不生效的后台按钮比没有按钮更糟
+        if (decision.has(RiskAction.RECORD_LIMIT)) {
+            recordLimit(decision, ctx);
+        }
+        // NOTIFY_OWNER（给主人发一封「我们拦下了一次可疑登录」）还没接，见方案 §9 ——
+        // 它排在 P2：要先有线上数据才知道「可疑到什么程度才值得打扰主人」，
+        // 否则第一周就会把提醒发成垃圾邮件，而用户学会的是忽略这类信
+    }
+
+    /**
+     * 把长冷却落一行 {@code t_member_operation_limit}：后台看得见，客服解得开。
+     *
+     * <h3>🔴 查无此人时什么都不写</h3>
+     * 那张表的 {@code member_id} 是 NOT NULL，而冷却是按<b>身份摘要</b>算的 ——
+     * 不存在的账号照样会被冷却（那正是不泄露账号存在性的前提）。
+     * 这一行只是给人看的副本，少一行不影响冷却本身。
+     *
+     * <h3>🔴 解除是两件事，这里只落其中一件</h3>
+     * 真正拦人的是 Redis 里那个冷却键。客服在后台「解冻」只改这一行的话，
+     * 用户照样登不进去 —— 所以后台的解冻按钮必须同时清 Redis
+     * （{@code PasswordCooldownStore.clear}）。这一点在 §6.3 的名单 / 冷却页上。
+     */
+    private void recordLimit(RiskDecision decision, RiskContext ctx) {
+        if (ctx.memberId() == null) {
+            return;
+        }
+        try {
+            operationLimitService.freeze(ctx.memberId(), MemberOperationTypeEnum.LOGIN,
+                    "密码连续错误过多，风控冷却",
+                    LocalDateTime.now().plusSeconds(Math.max(1L, decision.retryAfterSeconds())));
+        } catch (RuntimeException e) {
+            // 落不上只是后台少看见一行，绝不能让登录接口跟着失败
+            log.error("【风控】记录操作限制失败, memberId: {}", ctx.memberId(), e);
+        }
     }
 
     /**

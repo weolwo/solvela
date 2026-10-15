@@ -64,14 +64,44 @@ public class MemberOperationLimitService {
      */
     private final NotificationService notificationService;
 
+    /** 解冻 LOGIN 时要按会员号取到他的联系方式，才算得出冷却键用的身份摘要 */
+    private final solvela.member.auth.MemberAuthDao memberAuthDao;
+
+    private final solvela.crypto.PiiCipher piiCipher;
+
+    private final solvela.crypto.PiiHasher piiHasher;
+
+    /**
+     * 密码阶梯冷却。
+     *
+     * <p>🔴 延迟取：冷却那边要读规则表，而规则 bean 的装配会带起一串风控组件，
+     * 其中有的又会用到本服务 —— 构造器直接注入在某些顺序下成环。
+     * 同 {@code PasswordCooldownStore} 自己取 registry 的做法。
+     *
+     * <p>用 {@code ObjectFactory} 而不是 {@code ObjectProvider}：两者 Spring 都注得进来，
+     * 而前者是单方法接口 —— 测试里一个 lambda 就够，后者要手写五个空实现。
+     */
+    private final org.springframework.beans.factory.ObjectFactory<
+            solvela.member.risk.feature.PasswordCooldownStore> cooldownStoreProvider;
+
     public MemberOperationLimitService(MemberOperationLimitDao memberOperationLimitDao,
                                        MemberOperationLimitProperties properties,
                                        RedisService redisService,
-                                       NotificationService notificationService) {
+                                       NotificationService notificationService,
+                                       solvela.member.auth.MemberAuthDao memberAuthDao,
+                                       solvela.crypto.PiiCipher piiCipher,
+                                       solvela.crypto.PiiHasher piiHasher,
+                                       org.springframework.beans.factory.ObjectFactory<
+                                               solvela.member.risk.feature.PasswordCooldownStore>
+                                               cooldownStoreProvider) {
         this.memberOperationLimitDao = memberOperationLimitDao;
         this.properties = properties;
         this.redisService = redisService;
         this.notificationService = notificationService;
+        this.memberAuthDao = memberAuthDao;
+        this.piiCipher = piiCipher;
+        this.piiHasher = piiHasher;
+        this.cooldownStoreProvider = cooldownStoreProvider;
     }
 
     /**
@@ -191,6 +221,43 @@ public class MemberOperationLimitService {
     }
 
     /**
+     * 解冻登录限制时顺手清掉密码阶梯冷却。
+     *
+     * <p>冷却是按<b>身份摘要</b>算的，而后台只知道会员号 —— 所以要按号取回联系方式再算摘要。
+     * 手机号和邮箱<b>两条都清</b>：这个账号可能用任一条登录，而阶梯按「登录时用的那个身份」计数。
+     *
+     * <p>🔴 {@code selectContacts} 是专门为核身加的那个窄查询（只取两列密文），
+     * 不是登录主干那个 —— 后者刻意不取 PII。
+     *
+     * <p>查不到人（已注销）就只清表，不抛：客服要的结果是「这个人不再被限」。
+     */
+    private void clearPasswordCooldown(Long memberId) {
+        try {
+            solvela.member.Member contacts = memberAuthDao.selectContacts(memberId);
+            if (contacts == null) {
+                return;
+            }
+            solvela.member.risk.feature.PasswordCooldownStore store = cooldownStoreProvider.getObject();
+            clearByContact(store, contacts.getEmail());
+            clearByContact(store, contacts.getPhone());
+        } catch (RuntimeException e) {
+            log.error("会员操作限制解冻时清密码冷却失败 memberId={}", memberId, e);
+        }
+    }
+
+    private void clearByContact(solvela.member.risk.feature.PasswordCooldownStore store, String cipher) {
+        if (cipher == null || cipher.isBlank()) {
+            return;
+        }
+        String plain = piiCipher.decrypt(cipher);
+        if (plain != null && !plain.isBlank()) {
+            // deviceId 传 null：clear 本来就把两个桶都清掉（可信设备桶 + 共用桶）。
+            // 只清一个的话，用户换台设备还会一脚踩进另一个桶里攒下的计数
+            store.onIdentityVerified(piiHasher.hash(plain), null);
+        }
+    }
+
+    /**
      * 清空失败计数。操作成功时调用
      */
     public void clearFail(Long memberId, MemberOperationTypeEnum operationType) {
@@ -203,6 +270,13 @@ public class MemberOperationLimitService {
     /**
      * 解冻。幂等：没有生效中的限制时什么都不做，返回 false。
      *
+     * <h3>🔴 {@code LOGIN} 这一档还要清 Redis 里的密码冷却键</h3>
+     * 真正拦住用户的<b>不是这张表</b>，而是 {@code PasswordCooldownStore} 在 Redis 里
+     * 那个带 TTL 的键 —— 这张表只是给后台看的副本（由 {@code RiskAction.RECORD_LIMIT} 落的）。
+     * 只改这一行的话，客服看到「已解冻」，而用户照样登不进去，然后再打一次电话。
+     *
+     * <p>这正是这颗解冻按钮迟迟没接的原因（方案 §9）：一个解除了却不生效的按钮比没有按钮更糟。
+     *
      * @param unlockType     解冻方式；{@link MemberOperationUnlockTypeEnum#MANUAL} 时 operator 与 remark 必填
      * @param unlockOperator 人工解冻的操作人，其余方式传 null
      * @param remark         解冻原因，人工解冻时由客服填写；自动到期 / 重置密码传 null
@@ -214,6 +288,10 @@ public class MemberOperationLimitService {
         }
         int rows = memberOperationLimitDao.unlock(memberId, operationType,
                 LocalDateTime.now(), unlockType, unlockOperator, remark);
+        if (rows > 0 && operationType == MemberOperationTypeEnum.LOGIN) {
+            // 🔴 见方法注释：不清 Redis 的话这颗按钮是假的
+            clearPasswordCooldown(memberId);
+        }
         if (rows > 0) {
             // 解了锁却留着计数，等于「解冻后再错一次立刻又被限」
             this.clearFail(memberId, operationType);

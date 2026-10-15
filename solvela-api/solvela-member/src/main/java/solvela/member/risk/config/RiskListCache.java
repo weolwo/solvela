@@ -77,6 +77,24 @@ public class RiskListCache implements SmartInitializingSingleton {
     }
 
     /** IP 命中（精确 IP 与 IP 段一起看）。ip 不是合法字面量时返回 {@link ListMatch#NONE} */
+    /**
+     * 立刻重载一次。后台改完名单调它。
+     *
+     * <p>⚠️ 只对<b>当前这个实例</b>生效 —— 多实例部署时其余实例按自己的周期刷
+     * （默认 30 秒）。做成广播要引入一条消息通道，而「最多晚 30 秒生效」
+     * 对人工加黑名单这件事完全够用；规则那边是同一个取舍。
+     *
+     * <p>失败只打日志：重载不成功不该让「名单已保存」变成一个报错 ——
+     * 行已经落库了，30 秒后自然会被读到。
+     */
+    public void reload() {
+        try {
+            snapshot.loadNow();
+        } catch (RuntimeException e) {
+            log.warn("【风控】名单重载失败，等周期刷新", e);
+        }
+    }
+
     public ListMatch matchIp(String ip) {
         IpRange single = IpRange.single(ip);
         if (single == null) {

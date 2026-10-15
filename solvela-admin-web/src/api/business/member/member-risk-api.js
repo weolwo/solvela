@@ -47,4 +47,45 @@ export const memberRiskApi = {
   eventDetail: (param) => {
     return postRequest('/memberRiskEvent/detail', param);
   },
+
+  /**
+   * 名单分页。不传状态只看有效的 —— 客服日常要的是「现在谁被封着」。
+   *
+   * ⚠️ 身份维度填 `identity`（手机号/邮箱**明文**），服务端算摘要再查；
+   * 库里存的是摘要，前端拿不到也算不出。
+   */
+  queryListPage: (param) => {
+    return postRequest('/memberRiskList/queryPage', param);
+  },
+
+  /**
+   * 新增一条名单。
+   *
+   * 🔴 校验在服务端（灰名单必须有分、会员白名单必须填到期、IP 格式要解得开）——
+   * 这里只拦必填，拦不住的让后端报出来，前端不复制一份规则。
+   */
+  addList: (param) => {
+    return postRequest('/memberRiskList/add', param);
+  },
+
+  /**
+   * 撤销一条名单。**原因必填** —— 「上次为什么解的」和「为什么加的」一样重要。
+   *
+   * ⚠️ 撤销不删行：列表勾上「含已撤销」还能看到它，连撤销人一起。
+   */
+  revokeList: (param) => {
+    return postRequest('/memberRiskList/revoke', param);
+  },
+
+  /**
+   * 看板：结论分布 / 矩阵各格 / 核身漏斗 / 规则命中，**四组数一次取回**。
+   *
+   * 🔴 它们共用同一个时间窗 —— 拆成四个请求就有机会用四个不同的窗去问，
+   * 然后把对不上的数摆在同一个屏幕上。
+   *
+   * ⚠️ 不传时间兜最近 30 天；一次最多 90 天（更长服务端直接报错，不会悄悄截断）。
+   */
+  stat: (param) => {
+    return postRequest('/memberRiskStat/stat', param);
+  },
 };
