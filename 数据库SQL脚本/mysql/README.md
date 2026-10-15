@@ -13,14 +13,14 @@ mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子�
 
 跑完就能登录并正常使用。之后按需执行造数脚本（都可重复执行，见 `*造数*.sql`）。
 
-## ✅ 2026-10-14：空库执行已实测通过（登录风控四张表加入后复跑）
+## ✅ 2026-10-15：空库执行已实测通过（登录风控四张表 + 分区维护任务加入后复跑）
 
 ```
 tools/VerifyFreshInstall.java  ->  RESULT: PASS
   schema-baseline.sql  ->  ok=178  fail=0
   data-baseline.sql    ->  ok=49   fail=0
   建表      89 张
-  种子数据  23 张表 / 551 行
+  种子数据  23 张表 / 552 行
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
@@ -41,7 +41,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | `t_role_menu` | 74 | 任何角色都看不到菜单 |
 | `t_employee` | 12 | 无法登录 |
 | `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
-| `t_solvela_job` | 18 | 定时任务不会注册 |
+| `t_solvela_job` | 19 | 定时任务不会注册（含【基础】按月分区维护 —— 缺了它分区没人补，见文末）|
 | `t_task_event` | 10 | 任务事件识别不了 |
 | `t_notification_template` | 9 | 发不出任何站内信，**而且不报错** |
 | `t_coupon_template` | 6 | 发出去的券没有面额/门槛，**而且不报错** |
@@ -65,7 +65,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | 文件 | 内容 | 不含 |
 |---|---|---|
 | `schema-baseline.sql` | 89 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 23 张配置表、551 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
+| `data-baseline.sql` | 23 张配置表、552 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
@@ -317,6 +317,34 @@ java -cp <mysql-connector.jar> SyncFromBaseline.java lottery.sql t_lottery_issue
 
 需要翻旧账时用 `git log -- 数据库SQL脚本/mysql/sql-update-log/` —— 文件内容都在 git 历史里，
 关键决策与踩坑记录也已沉淀进 `docs/营销中台-会话交接文档.md`。
+
+---
+
+## 🔴 按月分区的表：分区不是建完就不用管了
+
+三张表按月分区：`t_member_login_log`、`t_member_risk_event`、`t_member_risk_hit`。
+基线里的分区是**写死的**（只到 2027-01），之后要靠定时任务
+**【基础】按月分区维护**（handler `partitionMaintain`）每天补。
+
+它默认提前建 2 个月、保留 6 个月，过期的用 `DROP PARTITION` 整个删掉。
+
+**不跑的后果是静默的**：2027-02 之后的数据全落进兜底分区 `pmax`，而它永不过期 ——
+保留期形同虚设，表只会一直涨；等到想清的时候只能 `DELETE`（长事务、锁、主从延迟、留碎片）。
+在那之前不会有任何症状，直到某天写入开始变慢。
+
+所以：
+
+- **这一行必须是启用状态**（基线里 `enabled_flag = 1`）。停用它等于关掉保留期；
+- **新增按月分区的表时，要加进任务参数 `tables`**（或者改 `PartitionMaintainJob.DEFAULT_TABLES` 的默认值）。
+  漏了不会报错，只是那张表到了预设分区的尽头之后开始悄悄堆进 `pmax`；
+- 想知道现在的分区长什么样：
+
+```sql
+SELECT table_name, partition_name, partition_description
+  FROM information_schema.partitions
+ WHERE table_schema = DATABASE() AND partition_name IS NOT NULL
+ ORDER BY table_name, partition_ordinal_position;
+```
 
 ---
 
