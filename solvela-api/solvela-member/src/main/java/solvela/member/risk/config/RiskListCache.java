@@ -3,8 +3,10 @@ package solvela.member.risk.config;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import solvela.enums.MemberRiskListDimensionEnum;
+import solvela.enums.MemberRiskListStatusEnum;
 import solvela.enums.MemberRiskListTypeEnum;
 import solvela.member.MemberRiskList;
 import solvela.member.risk.MemberRiskProperties;
@@ -42,6 +44,12 @@ public class RiskListCache implements SmartInitializingSingleton {
     /** 测试注入时钟用；生产就是当前时间 */
     private final Supplier<LocalDateTime> now;
 
+    /**
+     * 🔴 必须标 {@code @Autowired}：本类有<b>两个</b>构造器（另一个是给单测注入时钟的），
+     * 不标的话 Spring 两个都不选、去找无参构造器，然后整个上下文起不来
+     * （报的是「No default constructor found」，看不出跟第二个构造器有关）。
+     */
+    @Autowired
     public RiskListCache(MemberRiskListDao listDao, MemberRiskProperties properties) {
         this(listDao, properties, LocalDateTime::now);
     }
@@ -109,7 +117,7 @@ public class RiskListCache implements SmartInitializingSingleton {
 
     private Snapshot load() {
         List<MemberRiskList> rows = listDao.selectList(new LambdaQueryWrapper<MemberRiskList>()
-                .eq(MemberRiskList::getStatus, MemberRiskList.STATUS_VALID));
+                .eq(MemberRiskList::getStatus, MemberRiskListStatusEnum.VALID));
         Map<String, List<Entry>> exact = new HashMap<>();
         List<RangeEntry> ranges = new ArrayList<>();
         for (MemberRiskList row : rows) {

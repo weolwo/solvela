@@ -202,7 +202,7 @@ class EmailRegisterAndLoginTest {
 
         String loginCode = sendAndReadCode(EmailCodeScene.LOGIN, email);
         MemberAuthResult result = memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE, email, loginCode, null,
-                "H5", freshIp(), null));
+                "H5", freshIp(), null, true));
 
         assertTrue(result.success(), "失败原因：" + result.reason());
         assertEquals(memberId, result.identity().memberId());
@@ -215,7 +215,7 @@ class EmailRegisterAndLoginTest {
         assertTrue(register(sendAndReadCode(EmailCodeScene.REGISTER, email), PASSWORD).success());
 
         MemberAuthResult result = memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_PASSWORD, email, PASSWORD, null,
-                "H5", freshIp(), null));
+                "H5", freshIp(), null, true));
 
         assertTrue(result.success(), "失败原因：" + result.reason());
         assertEquals(memberId, result.identity().memberId());
@@ -229,10 +229,10 @@ class EmailRegisterAndLoginTest {
         String code = sendAndReadCode(EmailCodeScene.LOGIN, email);
 
         assertTrue(memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE, email, code, null,
-                "H5", freshIp(), null)).success());
+                "H5", freshIp(), null, true)).success());
 
         MemberAuthResult again = memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE, email, code, null,
-                "H5", freshIp(), null));
+                "H5", freshIp(), null, true));
         assertFalse(again.success(), "码不作废的话，拿到一次就能反复用");
         assertEquals(AuthFailReason.EMAIL_CODE_EXPIRED, again.reason());
     }
@@ -259,13 +259,13 @@ class EmailRegisterAndLoginTest {
         assertTrue(register(sendAndReadCode(EmailCodeScene.REGISTER, email), null).success());
         sendAndReadCode(EmailCodeScene.LOGIN, email);
         AuthFailReason withAccount = memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE, email, "000000", null,
-                "H5", freshIp(), null)).reason();
+                "H5", freshIp(), null, true)).reason();
 
         // 没账号
         String stranger = freshEmail();
         memberAuthService.sendEmailCode(new EmailCodeSendCmd(EmailCodeScene.LOGIN, stranger, freshIp(), null));
         AuthFailReason withoutAccount = memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE, stranger, "000000", null,
-                "H5", freshIp(), null)).reason();
+                "H5", freshIp(), null, true)).reason();
 
         assertEquals(withAccount, withoutAccount,
                 "两个回答不一样的话，攻击者请求一次码、随便输个错码，就能把用户枚举出来");
@@ -275,7 +275,7 @@ class EmailRegisterAndLoginTest {
     @DisplayName("邮箱格式不对 → BAD_EMAIL_FORMAT，不是「查无此人」")
     void 格式不对() {
         MemberAuthResult result = memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE, "not-an-email", "123456", null,
-                "H5", freshIp(), null));
+                "H5", freshIp(), null, true));
 
         assertEquals(AuthFailReason.BAD_EMAIL_FORMAT, result.reason(),
                 "含糊成「查无此人」会让用户对着一个填错了的地址反复重试");
@@ -295,7 +295,7 @@ class EmailRegisterAndLoginTest {
 
         // loginType 传 null：老调用点的形状
         assertTrue(memberAuthService.authenticate(new MemberAuthCmd(
-                null, phone, PASSWORD, null, "APP", freshIp(), null)).success());
+                null, phone, PASSWORD, null, "APP", freshIp(), null, true)).success());
     }
 
     private int countByEmail() {

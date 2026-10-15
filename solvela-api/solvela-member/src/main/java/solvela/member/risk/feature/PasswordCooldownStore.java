@@ -2,10 +2,16 @@ package solvela.member.risk.feature;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.enums.MemberRiskModeEnum;
+import solvela.member.risk.RiskContext;
+import solvela.member.risk.config.RiskRuleRegistry;
+import solvela.member.risk.rule.RiskRuleConfig;
+import solvela.member.risk.rule.impl.PasswordCooldownRule;
 
 import java.time.Duration;
 import java.util.List;
@@ -51,6 +57,9 @@ public class PasswordCooldownStore {
 
     /** 续期要 EXPIRE，而 {@link RedisService} 被刻意裁剪过（没有这个方法）。同 {@code MemberRedisTokenStore} 的做法 */
     private final StringRedisTemplate redis;
+
+    /** 延迟取：规则 bean 的构造会先于本类完成，构造器直接注入 registry 就是循环依赖（同 {@link LoginCounters}） */
+    private final ObjectProvider<RiskRuleRegistry> registry;
 
     /**
      * 这一次密码错误之后的状态。
@@ -137,6 +146,58 @@ public class PasswordCooldownStore {
     /** 这次请求该落在哪个桶：可信设备各算各的，其余一律共用 */
     public String bucket(String deviceId, boolean deviceTrusted) {
         return deviceTrusted && !SolvelaStringUtil.isBlank(deviceId) ? deviceId : SHARED_BUCKET;
+    }
+
+    /**
+     * 认证主干用的那一个入口：密码验错了，记一次。
+     *
+     * <p>参数（免罚次数、阶梯、清零时间）从规则表读 —— 与 {@code PasswordCooldownRule} 看同一份配置，
+     * 否则「判的时候按新参数、记的时候按旧参数」。规则关闭或读不出来时什么都不做。
+     */
+    public void onPasswordFailure(RiskContext ctx) {
+        if (ctx.getIdentityHashHex() == null) {
+            return;
+        }
+        RiskRuleConfig config = config();
+        if (config == null || config.mode() == MemberRiskModeEnum.OFF) {
+            return;
+        }
+        try {
+            Outcome outcome = recordFailure(ctx.getIdentityHashHex(),
+                    bucket(ctx.getDeviceId(), ctx.deviceTrusted()),
+                    PasswordCooldownRule.free(config.params()),
+                    PasswordCooldownRule.steps(config.params()),
+                    PasswordCooldownRule.idleReset(config.params()));
+            if (outcome.cooling()) {
+                log.info("【密码冷却】连续错误第 {} 次，冷却 {}", outcome.failures(), outcome.cooldown());
+            }
+        } catch (RuntimeException e) {
+            // 记不上只是「这次没算进去」，不该让登录接口跟着失败
+            log.error("【密码冷却】记一次失败时出错", e);
+        }
+    }
+
+    /**
+     * 登录成功、重置密码成功时清零。
+     *
+     * <p>🔴 重置密码那条路是<b>被恶意冷却时的唯一自助出口</b>（方案 §4.4）：
+     * 不在那里清零的话，用户改完密码还是进不来，而他已经用完了所有能自己做的事。
+     */
+    public void onIdentityVerified(String identityHashHex, String deviceId) {
+        try {
+            clear(identityHashHex, deviceId);
+        } catch (RuntimeException e) {
+            log.error("【密码冷却】清零失败", e);
+        }
+    }
+
+    private RiskRuleConfig config() {
+        try {
+            return registry.getObject().config("PWD_COOLDOWN");
+        } catch (RuntimeException e) {
+            log.warn("【密码冷却】读规则配置失败，本次不记", e);
+            return null;
+        }
     }
 
     public String sharedBucket() {

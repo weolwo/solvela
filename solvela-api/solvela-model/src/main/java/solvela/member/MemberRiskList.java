@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import solvela.enums.MemberRiskListDimensionEnum;
+import solvela.enums.MemberRiskListStatusEnum;
 import solvela.enums.MemberRiskListTypeEnum;
 
 import java.time.LocalDateTime;
@@ -17,12 +18,6 @@ import java.time.LocalDateTime;
 @Data
 @TableName("t_member_risk_list")
 public class MemberRiskList {
-
-    /** {@link #status} 取值：有效 */
-    public static final int STATUS_VALID = 1;
-
-    /** {@link #status} 取值：已撤销 */
-    public static final int STATUS_REVOKED = 0;
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -42,8 +37,7 @@ public class MemberRiskList {
     /** 1-人工, 2-自动（预留） */
     private Integer source;
 
-    /** 1-有效, 0-已撤销 */
-    private Integer status;
+    private MemberRiskListStatusEnum status;
 
     /** null = 长期 */
     private LocalDateTime expireTime;

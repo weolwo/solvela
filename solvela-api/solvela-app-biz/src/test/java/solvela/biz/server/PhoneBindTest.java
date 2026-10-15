@@ -172,7 +172,7 @@ class PhoneBindTest {
         assertEquals(solvela.member.api.AuthFailReason.NO_PASSWORD,
                 memberAuthService.authenticate(new MemberAuthCmd(
                         MemberLoginType.PHONE_PASSWORD, phone, "whatever", null,
-                        "H5", freshIp(), null)).reason(),
+                        "H5", freshIp(), null, true)).reason(),
                 "回 BAD_CREDENTIALS 说明按这个号根本查不到人 —— 绑定没真的生效");
     }
 
@@ -278,10 +278,10 @@ class PhoneBindTest {
 
         assertTrue(memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.PHONE_PASSWORD, second, PASSWORD, null,
-                "H5", freshIp(), null)).success(), "新号码应当能登录");
+                "H5", freshIp(), null, true)).success(), "新号码应当能登录");
         assertFalse(memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.PHONE_PASSWORD, first, PASSWORD, null,
-                "H5", freshIp(), null)).success(),
+                "H5", freshIp(), null, true)).success(),
                 "旧号码换掉之后就不该再是这个账号的登录身份了");
     }
 }

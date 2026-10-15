@@ -119,10 +119,30 @@ public class CaptchaService {
         if (!enabled) {
             return;
         }
-        String pass = request.getHeader(HEADER);
-        if (pass == null || pass.isBlank() || takeOnce(KEY_PASS + pass.trim()) == null) {
+        if (!consumeIfPresent(request)) {
             throw new ApiException(ApiErrors.CAPTCHA_REQUIRED);
         }
+    }
+
+    /**
+     * 带了有效通行票就核销掉并返回 true；没带或票无效返回 false，<b>不抛异常</b>。
+     *
+     * <h3>给「由域来判要不要滑块」的接口用</h3>
+     * 登录走这一条：网关不再无条件先拦（那样「全局滑块开关」「熟悉网络免滑块」就没有地方落 ——
+     * 它们要看规则表和账号画像，都在域里）。网关只负责把票核销掉，把结论交给域。
+     *
+     * <p>🔴 核销仍然<b>只能发生在这里</b>：它是一次 Redis 的「取出即删」，
+     * 「一张票只放行一次请求」这件事只有一个地方做得到。域拿到的只是一个布尔值。
+     *
+     * <p>⚠️ 票是无条件核销的 —— 哪怕这次登录其实不需要滑块。否则客户端带着同一张票
+     * 可以反复重试，而那正是「一张票只放行一次」要堵的。
+     */
+    public boolean consumeIfPresent(HttpServletRequest request) {
+        String pass = request.getHeader(HEADER);
+        if (pass == null || pass.isBlank()) {
+            return false;
+        }
+        return takeOnce(KEY_PASS + pass.trim()) != null;
     }
 
     /**

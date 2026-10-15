@@ -10,11 +10,9 @@ import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
 import solvela.enums.LoginLogResultEnum;
-import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.member.Member;
 import solvela.member.MemberLoginLog;
-import solvela.member.MemberOperationLimit;
 import solvela.member.api.AuthFailReason;
 import solvela.member.api.MemberAuthApi;
 import solvela.member.api.MemberAuthCmd;
@@ -36,7 +34,6 @@ import solvela.member.api.SmsCodeSendResult;
 import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.register.MemberRegisterService;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.device.DeviceGuard;
 import solvela.member.device.DeviceGuardVerdict;
 import solvela.member.api.EmailCodeScene;
@@ -54,6 +51,17 @@ import solvela.member.email.MemberEmailCodeIssuer;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskContext;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskEventRef;
+import solvela.member.risk.RiskSession;
+import solvela.member.risk.feature.PasswordCooldownStore;
+
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -85,6 +93,18 @@ public class MemberAuthService implements MemberAuthApi {
 
     private static final String DEFAULT_DEVICE_TYPE = "H5";
 
+    /**
+     * 查无此人时拿来「验」一次的假哈希，让两条路径的耗时落在同一个量级。
+     *
+     * <h3>🔴 必须是一个真的 Argon2 串，而且参数与线上一致</h3>
+     * 随便塞一个字符串的话 {@code matches} 会在解析阶段就返回 false，几乎不花时间 ——
+     * 那就白做了。这一串是用 {@code PasswordCipher.encode} 生成的，所以它的 m/t/p
+     * 与线上密码同一档，验一次的耗时也就同一档。
+     *
+     * <p>内容是什么不重要（没人知道原文，也不需要知道）：它只被用来消耗与真实校验相同的时间。
+     */
+    private static final String DUMMY_PASSWORD_HASH = PasswordCipher.encode("risk-timing-equalizer");
+
     private static final int TRACE_ID_MAX_LENGTH = 64;
 
     private static final int REMARK_MAX_LENGTH = 128;
@@ -97,8 +117,13 @@ public class MemberAuthService implements MemberAuthApi {
      */
     private final MemberRegisterService memberRegisterService;
     private final MemberLoginLogDao memberLoginLogDao;
-    private final MemberOperationLimitService operationLimitService;
     private final PiiHasher piiHasher;
+
+    /** 风控引擎。前置、后置两个决策点，以及每次尝试一行流水 */
+    private final MemberRiskEngine riskEngine;
+
+    /** 密码阶梯冷却。取代了改造前的账号锁（{@code MemberOperationLimitService} 的 LOGIN 类型） */
+    private final PasswordCooldownStore cooldownStore;
 
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
@@ -152,30 +177,65 @@ public class MemberAuthService implements MemberAuthApi {
         // 邮箱 "A@Example.com" 与 "A@example.com" 都会算出不同的 hash
         String identity = normalizeIdentity(loginType, cmd.identity());
         if (identity == null) {
-            return MemberAuthResult.fail(loginType == MemberLoginType.PHONE_PASSWORD
-                    ? AuthFailReason.BAD_PHONE_FORMAT
-                    : AuthFailReason.BAD_EMAIL_FORMAT);
+            // 格式都不对，谈不上是对哪个账号的尝试：开一个没有身份摘要的会话，只为留下一行流水
+            try (RiskSession risk = riskEngine.open(riskContext(loginType, null, null, null, cmd))) {
+                return risk.end(MemberRiskOutcomeEnum.BAD_FORMAT,
+                        MemberAuthResult.fail(loginType == MemberLoginType.PHONE_PASSWORD
+                                ? AuthFailReason.BAD_PHONE_FORMAT
+                                : AuthFailReason.BAD_EMAIL_FORMAT));
+            }
         }
 
-        // ---------- 设备闸 ----------
-        // 🔴 排在【查会员之前】：被限的设备不该还能拿登录接口去试探「这个号注册过没有」——
-        //    那正是 BAD_CREDENTIALS 合并三种失败原因要堵的口子。
-        //    deviceId 为 null（老客户端）时 checkLogin 直接放行，见 DeviceGuard 类注释。
-        DeviceGuardVerdict deviceVerdict = deviceGuard.checkLogin(cmd.deviceId());
-        if (!deviceVerdict.allowed()) {
-            return MemberAuthResult.deviceLimited(deviceVerdict.retryAfterSeconds());
-        }
-
-        // ---------- IP 闸 ----------
-        // 同样排在查会员之前。它挡的是设备闸与账号锁都数不到的那类脚本：
-        // 不带设备令牌、每个账号只试一次（见 LoginIpGuard 类注释）
-        long ipWait = loginIpGuard.check(cmd.clientIp());
-        if (ipWait > 0) {
-            return MemberAuthResult.ipLimited(ipWait);
-        }
-
-        // ---------- 按摘要找人 ----------
+        /*
+         * ---------- 按摘要找人 ----------
+         * 🔴 挪到了风控【之前】。改造前它在设备闸、IP 闸之后，理由是「被限的设备不该还能试探
+         *    这个号注册过没有」。那个顾虑现在由另一条更强的约束守着：
+         *    前置决策【可以】看账号，但账号信息【只能把结论往松里调】（方案 §3.1）——
+         *    于是「有号」和「没号」得到的回答一模一样，查不查得到人都不会漏出去。
+         *
+         *    换来的是密码冷却能按「可信设备」分桶：没有 member 就算不出信任，
+         *    而算不出信任就只能让所有人共用一个桶 —— 那等于任何知道你邮箱的人都能把你锁在门外。
+         */
         Member member = findMember(loginType, identity);
+        String identityHashHex = piiHasher.hash(identity);
+
+        try (RiskSession risk = riskEngine.open(riskContext(loginType, identity, identityHashHex, member, cmd))) {
+            MemberAuthResult blocked = runPreDecision(risk, cmd);
+            if (blocked != null) {
+                return blocked;
+            }
+            return afterPreDecision(risk, loginType, identity, member, cmd);
+        }
+    }
+
+    /**
+     * 前置决策：被挡下就返回要给客户端的东西，放行返回 null。
+     *
+     * <p>动作（降设备档这类有副作用的事）在这里执行 —— 只执行<b>生效</b>结论带的那些，
+     * 陪跑规则请求的动作已经被引擎丢掉了。
+     */
+    private MemberAuthResult runPreDecision(RiskSession risk, MemberAuthCmd cmd) {
+        RiskDecision pre = riskEngine.evaluatePre(risk);
+        applyActions(pre, cmd.deviceId());
+        if (pre.is(MemberRiskDecisionEnum.CAPTCHA)) {
+            // 票由接入层核销，域只看结论。已经过了就继续往下走
+            return risk.context().isCaptchaPassed()
+                    ? null
+                    : risk.end(MemberRiskOutcomeEnum.CAPTCHA_REQUIRED, MemberAuthResult.captchaRequired());
+        }
+        if (pre.is(MemberRiskDecisionEnum.COOLDOWN)) {
+            return risk.end(MemberRiskOutcomeEnum.COOLDOWN, MemberAuthResult.limited(pre.retryAfterSeconds()));
+        }
+        if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
+            // 🔴 限流与拒绝对外是<b>同一句</b>：告诉对方「你被拉黑了」等于给他一个精确的调试反馈
+            return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED, MemberAuthResult.ipLimited(pre.retryAfterSeconds()));
+        }
+        return null;
+    }
+
+    /** 前置放行之后的主干：找人、状态、验凭据、后置决策、收尾 */
+    private MemberAuthResult afterPreDecision(RiskSession risk, MemberLoginType loginType, String identity,
+                                              Member member, MemberAuthCmd cmd) {
         if (member == null) {
             // 🔴 验证码登录时，即使查无此人也要照常验一次码，【而且要返回验码本身的结果】。
             //    发码那一步对没有会员的邮箱也存了码（MailDelivery.SUPPRESS），
@@ -190,15 +250,26 @@ public class MemberAuthService implements MemberAuthApi {
                         emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.credential()));
                 if (codeProblem != null) {
                     loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
-                    return MemberAuthResult.fail(codeProblem);
+                    return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT, MemberAuthResult.fail(codeProblem));
                 }
+            } else {
+                /*
+                 * 🔴 查无此人也要跑一次密码哈希，而且要算一次【真的】Argon2。
+                 *
+                 * 不跑的话这个分支几十毫秒就返回，而账号存在时要验一次 Argon2 —— 响应时间本身
+                 * 就在回答「这个号存不存在」，前面所有「把三种失败合并成一句话」的努力全都白做。
+                 * 这个缝在改造前一直开着（2026-10-15 对着代码核对时发现）。
+                 *
+                 * 同理也要记一次冷却计数：否则「错几次会不会被冷却」又成了一个账号枚举接口。
+                 */
+                PasswordCipher.matches(cmd.credential(), DUMMY_PASSWORD_HASH);
+                cooldownStore.onPasswordFailure(risk.context());
             }
-            // 🔴 查无此人以前一行记录都不留（见下面那段注释）—— 现在至少 IP 维度数得到它
+            // 🔴 查无此人以前一行记录都不留（登录日志的 member_id 是 NOT NULL）——
+            //    现在 IP 维度数得到它，而且风控流水里有完整的一行（按身份摘要聚合）
             loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
-            // 这里刻意不写登录日志：t_member_login_log.member_id 是 NOT NULL，
-            // 没有会员就没有可写的行。「不存在的账号被反复尝试」属于风控范畴，
-            // 要防的话得另建一张按 IP/身份聚合的表，不是往会员日志里塞假 member_id。
-            return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
+            return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+                    MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS));
         }
 
         /*
@@ -209,27 +280,78 @@ public class MemberAuthService implements MemberAuthApi {
         MemberAuthResult statusProblem = checkStatus(member, cmd);
         if (statusProblem != null) {
             loginIpGuard.recordFailure(cmd.clientIp());
-            return statusProblem;
+            return risk.end(MemberRiskOutcomeEnum.FROZEN, statusProblem);
         }
-        MemberAuthResult limited = checkOperationLimit(member, cmd);
-        if (limited != null) {
-            return limited;
-        }
-        MemberAuthResult credentialProblem = verifyCredential(loginType, identity, member, cmd);
+        MemberAuthResult credentialProblem = verifyCredential(risk, loginType, identity, member, cmd);
         if (credentialProblem != null) {
             loginIpGuard.recordFailure(cmd.clientIp());
-            return credentialProblem;
+            return risk.end(MemberRiskOutcomeEnum.BAD_CREDENTIALS, credentialProblem);
         }
 
-        // ---------- 设备观察档：二次验证 ----------
-        // 🔴 排在密码校验【之后】：不知道密码就拿不到票，拿不到票就发不了码 ——
-        //    那条码是花钱的（短信），也是轰炸的原料
-        MemberAuthResult deviceChallenge = checkDeviceChallenge(loginType, identity, member, cmd);
-        if (deviceChallenge != null) {
-            return deviceChallenge;
+        /*
+         * ---------- 后置决策 ----------
+         * 🔴 排在密码校验【之后】：不知道密码就拿不到票，拿不到票就发不了码 ——
+         *    那条码是花钱的（短信），也是轰炸的原料。
+         */
+        RiskDecision post = riskEngine.evaluatePost(risk);
+        applyActions(post, cmd.deviceId());
+        if (post.needsOtp()) {
+            return issueChallenge(risk, loginType, identity, member, cmd);
+        }
+        if (post.atLeast(MemberRiskDecisionEnum.LIMIT)) {
+            return risk.end(MemberRiskOutcomeEnum.POST_BLOCKED,
+                    MemberAuthResult.deviceLimited(post.retryAfterSeconds()));
         }
 
-        return completeLogin(member, cmd);
+        return risk.end(MemberRiskOutcomeEnum.SUCCESS, completeLogin(member, cmd, risk.context().getIdentityHashHex()));
+    }
+
+    /**
+     * 签一张二次验证凭票。
+     *
+     * <p>🔴 <b>先落流水再签票</b>：票里要带这一行流水的引用（id + 时间），
+     * 验码那一行才能指回来 —— 不然「签票」和「验码」在流水里是两条互不相干的记录。
+     */
+    private MemberAuthResult issueChallenge(RiskSession risk, MemberLoginType loginType, String identity,
+                                            Member member, MemberAuthCmd cmd) {
+        if (loginType == MemberLoginType.EMAIL_CODE) {
+            /*
+             * 邮箱验证码登录【本身就是一道验证码】，不再要第二道：
+             * 再要一道的话，用户会在同一个邮箱里收到两封信，而第二封证明不了第一封证明不了的任何事情。
+             * 规则那边也拦了一道（DeviceObserveRule），这里是兜底 —— 将来新增一条后置规则时，
+             * 它不必自己记得这个例外。
+             */
+            return risk.end(MemberRiskOutcomeEnum.SUCCESS, completeLogin(member, cmd, risk.context().getIdentityHashHex()));
+        }
+        RiskEventRef ref = risk.end(MemberRiskOutcomeEnum.CHALLENGED);
+        String ticket = challengeStore.issue(new LoginChallengeStore.Challenge(
+                member.getMemberId(), loginType, cmd.deviceId(), cmd.deviceType(), ref, identity));
+        saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "风控要求二次验证：已签发凭票");
+        return MemberAuthResult.challenge(ticket);
+    }
+
+    /**
+     * 组装规则看得到的东西。
+     *
+     * <p>只放请求自带、零 IO 就有的 —— 画像、设备信任这类要查库的由规则按需去取，
+     * 而且同一次尝试里只算一次（见 {@code RiskContext#feature}）。
+     */
+    private RiskContext riskContext(MemberLoginType loginType, String identity, String identityHashHex,
+                                    Member member, MemberAuthCmd cmd) {
+        return new RiskContext(MemberRiskEventTypeEnum.LOGIN, loginType, identity, identityHashHex, member,
+                cmd.deviceId(), cmd.deviceType(), cmd.clientIp(),
+                // null（老调用方没传）当作「没过滑块」—— 往严的方向偏
+                Boolean.TRUE.equals(cmd.captchaPassed()));
+    }
+
+    /** 执行生效结论带的动作。陪跑规则请求的动作已经被引擎丢掉了，这里拿到的都该执行 */
+    private void applyActions(RiskDecision decision, String deviceId) {
+        if (decision.has(RiskAction.OBSERVE_DEVICE) && deviceId != null) {
+            dispositionService.observe(deviceId, "风控命中：量级异常");
+        }
+        // RECORD_LIMIT（把长冷却写进 t_member_operation_limit 让后台可见可解除）与
+        // NOTIFY_OWNER（通知主人）都还没接，见方案 §9：它们跟后台页面一起在 P1 做。
+        // 🔴 刻意不在这里「先写一半」：一个解除了却不生效的后台按钮比没有按钮更糟
     }
 
     /**
@@ -238,54 +360,16 @@ public class MemberAuthService implements MemberAuthApi {
      * <p>正常登录与「观察档凭票验码成功」共用这一段 —— 两条路最后必须走同一套收尾，
      * 否则凭票那条会悄悄漏掉一机多号的记录，而 dry-run 期间要的正是这份数据。
      */
-    private MemberAuthResult completeLogin(Member member, MemberAuthCmd cmd) {
-        operationLimitService.clearFail(member.getMemberId(), MemberOperationTypeEnum.LOGIN);
-
-        // 一机多号只能在这里判 —— 在此之前拿不到 memberId。
-        // 关联关系无论放不放行都要记下：dry-run 期间要的正是这份数据
-        DeviceGuardVerdict fanout = deviceGuard.checkMemberFanout(cmd.deviceId(), member.getMemberId());
-        if (!fanout.allowed()) {
-            saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "同一设备关联账号过多");
-            return MemberAuthResult.deviceLimited(fanout.retryAfterSeconds());
-        }
+    private MemberAuthResult completeLogin(Member member, MemberAuthCmd cmd, String identityHashHex) {
+        // 清掉密码冷却的计数：登录成功证明了身份，之前攒的连续失败不该再算（两个桶都清，
+        // 否则换台新手机就会一脚踩进攻击者在共用桶里攒的计数）
+        cooldownStore.onIdentityVerified(identityHashHex, cmd.deviceId());
 
         // 🔴 必须在写本次成功日志【之前】判断：写了之后「这台设备登过没有」永远是「登过」
         newDeviceLoginNotifier.onLoginSucceeded(member.getMemberId(), cmd.deviceId(), cmd.deviceType(), cmd.clientIp());
 
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_SUCCESS, null);
         return MemberAuthResult.ok(toIdentity(member));
-    }
-
-    /**
-     * 观察档设备的二次验证：签一张凭票。正常设备返回 null（什么都不做）。
-     *
-     * <h3>为什么是「多验一道」而不是「直接拒」</h3>
-     * 方案里那句「优先降级，不优先拒绝」落在这里。误伤的代价不对称：
-     * 拦错一个正常用户，他不会来报障，只会不再打开；而多要一道验证码，
-     * 正常用户只是多花十秒，刷子却要为<b>每一台设备</b>付出一条验证码的成本。
-     *
-     * <h3>为什么是凭票，而不是让客户端带着码再登一次</h3>
-     * 旧做法让客户端把密码留在内存里等用户收码、再整个交一遍，而码由客户端自己去<b>匿名</b>的发码接口要 ——
-     * 于是「验码排在密码之后、防轰炸」并不成立。现在只有验对了密码才签票，发码与验码都只认票，
-     * 码发到哪由票上的身份决定。见 {@link #sendChallengeCode} / {@link #verifyChallenge}。
-     */
-    private MemberAuthResult checkDeviceChallenge(MemberLoginType loginType, String identity,
-                                                  Member member, MemberAuthCmd cmd) {
-        if (dispositionService.currentStatus(cmd.deviceId()) != DeviceStatusEnum.OBSERVE) {
-            return null;
-        }
-        /*
-         * 🔴 邮箱验证码登录【本来就是一道验证码】，不再要第二道。
-         * 再要一道的话，用户会在同一个邮箱里收到两封信，
-         * 而第二封证明不了第一封证明不了的任何事情。
-         */
-        if (loginType == MemberLoginType.EMAIL_CODE) {
-            return null;
-        }
-        String ticket = challengeStore.issue(new LoginChallengeStore.Challenge(
-                member.getMemberId(), loginType, cmd.deviceId(), cmd.deviceType(), identity));
-        saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：已签发二次验证凭票");
-        return MemberAuthResult.challenge(ticket);
     }
 
     @Override
@@ -334,43 +418,60 @@ public class MemberAuthService implements MemberAuthApi {
         }
         // 登录日志、一机多号记在【签票时】那台设备上 —— 票上记着，不信请求当时带的
         MemberAuthCmd authCmd = new MemberAuthCmd(challenge.loginType(), challenge.identity(), null, null,
-                challenge.deviceType(), cmd.clientIp(), challenge.deviceId());
-
-        long ipWait = loginIpGuard.check(cmd.clientIp());
-        if (ipWait > 0) {
-            return MemberAuthResult.ipLimited(ipWait);
-        }
-
+                challenge.deviceType(), cmd.clientIp(), challenge.deviceId(), false);
         String identity = challenge.identity();
-        String outcome = switch (challenge.loginType()) {
-            case PHONE_PASSWORD -> smsCodeService.verify(SmsScene.LOGIN, identity, cmd.code()).name();
-            case EMAIL_PASSWORD -> emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.code()).name();
-            case EMAIL_CODE -> throw new IllegalStateException("不可能走到：邮箱验证码登录不签凭票");
-        };
-        if ("TOO_MANY_ATTEMPTS".equals(outcome)) {
-            // 码被错到作废：票也作废，让他从输密码重新来 —— 否则同一张票可以无限次「重新发码再猜」
-            challengeStore.discard(cmd.ticket());
-            loginIpGuard.recordFailure(cmd.clientIp());
-            saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：二次验证码错误次数过多");
-            return MemberAuthResult.fail(AuthFailReason.CHALLENGE_EXPIRED);
-        }
-        if (!"OK".equals(outcome)) {
-            loginIpGuard.recordFailure(cmd.clientIp());
-            saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "设备观察档：二次验证码不正确");
-            return MemberAuthResult.fail(AuthFailReason.DEVICE_VERIFICATION_FAILED);
-        }
-
-        challengeStore.discard(cmd.ticket());
+        String identityHashHex = piiHasher.hash(identity);
         // 签票到验码之间账号可能被冻结了 —— 状态以此刻为准
         Member member = memberAuthDao.selectForAuth(challenge.memberId());
-        if (member == null) {
-            return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
+
+        /*
+         * 验码也是一次尝试，也要有一行流水 —— 而且它靠 ref_event_id 指回签票那一行，
+         * 「要了码的人后来验过没有」才查得出来（方案 §8.2 的打扰率就是这么算的）。
+         * 这里<b>不</b>再跑一遍规则：风控在签票那一步已经判过了，这一步只回答「码对不对」。
+         */
+        try (RiskSession risk = riskEngine.open(
+                new RiskContext(MemberRiskEventTypeEnum.LOGIN_VERIFY, challenge.loginType(), identity,
+                        identityHashHex, member, challenge.deviceId(), challenge.deviceType(),
+                        cmd.clientIp(), false),
+                challenge.eventRef())) {
+
+            long ipWait = loginIpGuard.check(cmd.clientIp());
+            if (ipWait > 0) {
+                return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED, MemberAuthResult.ipLimited(ipWait));
+            }
+
+            String outcome = switch (challenge.loginType()) {
+                case PHONE_PASSWORD -> smsCodeService.verify(SmsScene.LOGIN, identity, cmd.code()).name();
+                case EMAIL_PASSWORD -> emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.code()).name();
+                case EMAIL_CODE -> throw new IllegalStateException("不可能走到：邮箱验证码登录不签凭票");
+            };
+            if ("TOO_MANY_ATTEMPTS".equals(outcome)) {
+                // 码被错到作废：票也作废，让他从输密码重新来 —— 否则同一张票可以无限次「重新发码再猜」
+                challengeStore.discard(cmd.ticket());
+                loginIpGuard.recordFailure(cmd.clientIp());
+                saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "二次验证码错误次数过多");
+                return risk.end(MemberRiskOutcomeEnum.VERIFY_FAILED,
+                        MemberAuthResult.fail(AuthFailReason.CHALLENGE_EXPIRED));
+            }
+            if (!"OK".equals(outcome)) {
+                loginIpGuard.recordFailure(cmd.clientIp());
+                saveLoginLog(challenge.memberId(), authCmd, LoginLogResultEnum.LOGIN_FAIL, "二次验证码不正确");
+                return risk.end(MemberRiskOutcomeEnum.VERIFY_FAILED,
+                        MemberAuthResult.fail(AuthFailReason.DEVICE_VERIFICATION_FAILED));
+            }
+
+            challengeStore.discard(cmd.ticket());
+            if (member == null) {
+                return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+                        MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS));
+            }
+            MemberAuthResult statusProblem = checkStatus(member, authCmd);
+            if (statusProblem != null) {
+                return risk.end(MemberRiskOutcomeEnum.FROZEN, statusProblem);
+            }
+            return risk.end(MemberRiskOutcomeEnum.VERIFY_PASSED,
+                    completeLogin(member, authCmd, identityHashHex));
         }
-        MemberAuthResult statusProblem = checkStatus(member, authCmd);
-        if (statusProblem != null) {
-            return statusProblem;
-        }
-        return completeLogin(member, authCmd);
     }
 
     /**
@@ -405,24 +506,6 @@ public class MemberAuthService implements MemberAuthApi {
             return MemberAuthResult.fail(AuthFailReason.ACCOUNT_FROZEN);
         }
         return null;
-    }
-
-    /**
-     * 连续失败限制。<b>同样必须排在验密码之前</b> —— 放到后面的话，被限期间每一次尝试
-     * 仍然会走一遍密码比对，限制就只剩一句提示语，拦不住任何东西。
-     *
-     * <p>会员端自成一套（{@code t_member_operation_limit} + Redis 计数），不走员工端的
-     * 三级等保：那套锁的是账号，而会员的手机号是可猜、可泄露的 ——
-     * 等于给了别人一个把你挡在门外的开关。
-     */
-    private MemberAuthResult checkOperationLimit(Member member, MemberAuthCmd cmd) {
-        MemberOperationLimit activeLimit =
-                operationLimitService.getActiveLimit(member.getMemberId(), MemberOperationTypeEnum.LOGIN);
-        if (activeLimit == null) {
-            return null;
-        }
-        saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "登录已被限制");
-        return MemberAuthResult.limited(remainingSeconds(activeLimit));
     }
 
     /**
@@ -539,10 +622,10 @@ public class MemberAuthService implements MemberAuthApi {
     /**
      * 验凭据：密码或邮箱验证码。返回 null 表示通过。
      */
-    private MemberAuthResult verifyCredential(MemberLoginType loginType, String identity,
+    private MemberAuthResult verifyCredential(RiskSession risk, MemberLoginType loginType, String identity,
                                               Member member, MemberAuthCmd cmd) {
         return switch (loginType) {
-            case PHONE_PASSWORD, EMAIL_PASSWORD -> verifyPassword(member, cmd);
+            case PHONE_PASSWORD, EMAIL_PASSWORD -> verifyPassword(risk, member, cmd);
             case EMAIL_CODE -> verifyEmailCode(identity, member, cmd);
         };
     }
@@ -568,9 +651,13 @@ public class MemberAuthService implements MemberAuthApi {
         if (result == EmailCodeVerifyResult.OK) {
             return null;
         }
-        // 验证码错也算一次登录失败：账号锁挡「这个号被爆破」，设备计数挡
-        // 「这台机器在挨个试不同的号」，两者都该看到这一次
-        operationLimitService.recordFail(member.getMemberId(), MemberOperationTypeEnum.LOGIN, "邮箱验证码错误");
+        /*
+         * 🔴 邮箱验证码错<b>不进密码冷却的阶梯</b>：验证码自己已经有「错 5 次作废、必须重发」，
+         * 不需要第二道。更要紧的是 —— 验证码登录正是被恶意冷却时剩下的那条出口，
+         * 把它也算进阶梯，那条出口就跟着被堵上了。
+         *
+         * 设备计数照记：它挡的是「这台机器在挨个试不同的号」，与账号维度无关。
+         */
         deviceGuard.recordLoginFailure(cmd.deviceId());
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "邮箱验证码" + result.name());
 
@@ -599,7 +686,7 @@ public class MemberAuthService implements MemberAuthApi {
      * <p>「没设过密码」单独一个原因，不混进「密码错误」—— 混了的话用户会一直重试
      * 一个他从来没设过的密码。
      */
-    private MemberAuthResult verifyPassword(Member member, MemberAuthCmd cmd) {
+    private MemberAuthResult verifyPassword(RiskSession risk, Member member, MemberAuthCmd cmd) {
         if (SolvelaStringUtil.isEmpty(member.getPassword())) {
             saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "未设置登录密码");
             return MemberAuthResult.fail(AuthFailReason.NO_PASSWORD);
@@ -607,17 +694,25 @@ public class MemberAuthService implements MemberAuthApi {
         if (PasswordCipher.matches(cmd.credential(), member.getPassword())) {
             return null;
         }
-        MemberOperationLimit triggered = operationLimitService.recordFail(
-                member.getMemberId(), MemberOperationTypeEnum.LOGIN, "连续登录失败");
-        // 设备维度也记一次。两者互不替代：账号锁挡的是「这个号被爆破」，
-        // 设备计数挡的是「这台机器在挨个试不同的号」—— 后者账号锁完全看不见
+        /*
+         * 阶梯冷却记一次。它取代了改造前的账号锁（30 分钟错 5 次、锁 30 分钟），两处关键的不同：
+         *   1. 按【身份摘要】计数，所以不存在的账号也照样冷却 —— 否则「会不会被冷却」就是账号枚举接口；
+         *   2. 可信设备【单独一个桶】—— 否则任何知道你邮箱的人连错几次就能把你锁在门外。
+         * 见 PasswordCooldownStore 的类注释。
+         */
+        cooldownStore.onPasswordFailure(risk.context());
+        // 设备维度也记一次。两者互不替代：冷却挡的是「这个号被爆破」，
+        // 设备计数挡的是「这台机器在挨个试不同的号」—— 后者冷却完全看不见
         deviceGuard.recordLoginFailure(cmd.deviceId());
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "手机号或密码错误");
-        // triggered 非空表示这一次失败刚好把人限制住了，直接返回「还要等多久」，
-        // 而不是让他再点一次才发现被限 —— 后者是投诉的主要来源
-        return triggered != null
-                ? MemberAuthResult.limited(remainingSeconds(triggered))
-                : MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
+        /*
+         * 🔴 这里<b>不</b>返回「还要等多久」，哪怕这一次失败刚好触发了冷却。
+         *
+         * 改造前会立刻把剩余时间告诉用户（理由是「别让他再点一次才发现」）。而冷却现在按身份摘要计数，
+         * 对不存在的账号同样会触发 —— 这一刻把它说出来，就等于回答了「这个号存不存在」。
+         * 代价是用户要再点一次才看到倒计时，那一次的回答对有号、没号完全一样。
+         */
+        return MemberAuthResult.fail(AuthFailReason.BAD_CREDENTIALS);
     }
 
     /**
@@ -657,11 +752,6 @@ public class MemberAuthService implements MemberAuthApi {
                 member.getNickname(),
                 member.getAvatarFileId(),
                 member.getGender());
-    }
-
-    /** 限制剩余秒数。已过期时按 0 算，不返回负数 —— 负数会被调用方格式化成「请 -1 分钟后重试」。 */
-    private static long remainingSeconds(MemberOperationLimit limit) {
-        return Math.max(0L, Duration.between(LocalDateTime.now(), limit.getExpireTime()).toSeconds());
     }
 
     private void saveLoginLog(Long memberId, MemberAuthCmd cmd, LoginLogResultEnum status, String remark) {

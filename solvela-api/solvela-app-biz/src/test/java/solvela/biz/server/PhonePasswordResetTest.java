@@ -125,7 +125,7 @@ class PhonePasswordResetTest {
     private boolean canLogin(String password) {
         return memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.PHONE_PASSWORD, phone, password, null,
-                "H5", freshIp(), null)).success();
+                "H5", freshIp(), null, true)).success();
     }
 
     @Test

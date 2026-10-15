@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * 滑块验证码端到端：真端口、真 Redis。下游用 {@link CookieSessionStub}（登录一律成功）。
+ * 滑块验证码端到端：真端口、真 Redis。下游用 {@link CookieSessionStub}。
  *
  * <h3>钉住的几条</h3>
  * <ul>
@@ -35,6 +35,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  *   <li>邮箱验证码登录不拦（它的码在发码那一步已过过一次滑块）；</li>
  *   <li>同一 IP 出图超限 → 429（出图吃 CPU）。</li>
  * </ul>
+ *
+ * <h3>⚠️ 2026-10-15：登录那条路上「谁拦」变了，对外的表现没变</h3>
+ * 以前网关自己拦（密码登录一律先要票）。现在网关<b>只核销票</b>，把结论交给域 ——
+ * 因为「全局滑块开关」「熟悉网络免滑块」要看规则表和账号画像，网关看不到。
+ * 所以本类里登录那几条用例实际验的是<b>两段</b>：网关有没有把票正确核销掉（一次性），
+ * 以及域判出「要票而没过」时对外是不是同一个 403 CAPTCHA_REQUIRED（客户端一行都不用改）。
+ * 域那一侧的判断由 {@code MemberAuthServiceTest} 覆盖，这里由桩照域的规矩回答。
+ *
+ * <p>发码（{@code /auth/email/code}、{@code /auth/sms/code}）仍然由网关直接拦：
+ * 发码要花钱，永远全量要票，没有「免滑块」这回事。
  *
  * @Date 2026-09-27
  */

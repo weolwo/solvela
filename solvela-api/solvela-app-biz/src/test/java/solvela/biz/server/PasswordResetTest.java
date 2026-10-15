@@ -134,7 +134,7 @@ class PasswordResetTest {
 
     private boolean canLogin(String password) {
         return memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_PASSWORD, email, password, null,
-                "H5", freshIp(), null)).success();
+                "H5", freshIp(), null, true)).success();
     }
 
     // ============================== 主路径 ==============================

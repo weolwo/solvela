@@ -95,7 +95,12 @@ public final class RiskSession implements AutoCloseable {
 
     private Long eventId;
 
-    RiskSession(RiskContext context, MemberRiskProperties properties, RiskEventRecorder recorder, RiskEventRef ref) {
+    /**
+     * 正常由 {@link MemberRiskEngine#open} 创建。公开是为了让认证主干的测试能用<b>真的</b>会话
+     * 跑一遍落库与结论累积 —— 那比 mock 掉一个账本有意义得多。
+     */
+    public RiskSession(RiskContext context, MemberRiskProperties properties, RiskEventRecorder recorder,
+                       RiskEventRef ref) {
         this.context = context;
         this.properties = properties;
         this.recorder = recorder;

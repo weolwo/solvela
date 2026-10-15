@@ -49,4 +49,12 @@ public record MemberAuthResult(MemberIdentity identity, AuthFailReason reason, l
     public static MemberAuthResult challenge(String ticket) {
         return new MemberAuthResult(null, AuthFailReason.DEVICE_VERIFICATION_REQUIRED, 0L, ticket);
     }
+
+    /**
+     * 要先过一次滑块。<b>不是失败</b>，见 {@link AuthFailReason#CAPTCHA_REQUIRED} ——
+     * 密码还没验，客户端拖完图原样重试即可。
+     */
+    public static MemberAuthResult captchaRequired() {
+        return new MemberAuthResult(null, AuthFailReason.CAPTCHA_REQUIRED, 0L, null);
+    }
 }

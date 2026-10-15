@@ -56,12 +56,33 @@ public record MemberAuthCmd(
         String verificationCode,
         String deviceType,
         String clientIp,
-        String deviceId) {
+        String deviceId,
+
+        /**
+         * 本次请求<b>已经核销过</b>一张有效的滑块通行票。
+         *
+         * <h3>🔴 为什么是「已核销」而不是「票在这里」</h3>
+         * 票的核销是一次 Redis 的「取出即删」，只能发生一次 —— 那一步归接入层（它才认得请求头）。
+         * 域要的只是结论。把票原文传下来的话，域就得去碰 Redis 里属于接入层的键，
+         * 而「一张票只放行一次请求」这件事也会变成两处都能做、谁都不确定谁做过。
+         *
+         * <h3>为什么要由域来判「要不要滑块」</h3>
+         * 改造前这件事写在网关：密码登录一律先拦。于是「熟悉网络免滑块」「全局滑块开关」
+         * 这类判断没有地方落 —— 它们要看账号画像和规则表，那都在域里。
+         *
+         * <h3>🔴 是 Boolean 而不是 boolean</h3>
+         * 本命令会<b>经 JSON 跨进程</b>（网关 → app-biz 的内部接口）。用原始类型的话，
+         * 任何不带这个字段的请求体都会被 Jackson 挡在反序列化阶段，报的是
+         * 「Cannot map null into type boolean」—— 一个 400，而且和业务一点关系都没有。
+         * 老版本网关、内部工具、手写的联调请求都会撞上它。null 一律当作 false（没过滑块），
+         * 往严的方向偏。
+         */
+        Boolean captchaPassed) {
 
     /** 兼容既有调用点的手机号密码登录。 */
     public static MemberAuthCmd byPhonePassword(String phone, String password,
                                                 String deviceType, String clientIp, String deviceId) {
         return new MemberAuthCmd(MemberLoginType.PHONE_PASSWORD, phone, password, null,
-                deviceType, clientIp, deviceId);
+                deviceType, clientIp, deviceId, false);
     }
 }

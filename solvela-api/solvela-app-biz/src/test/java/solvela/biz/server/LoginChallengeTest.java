@@ -157,7 +157,7 @@ class LoginChallengeTest {
     @DisplayName("密码错时不签票 —— 不知道密码就拿不到票，拿不到票就发不了码")
     void 密码错不签票() {
         MemberAuthResult result = memberAuthService.authenticate(new MemberAuthCmd(
-                MemberLoginType.EMAIL_PASSWORD, email, "WrongPass2026", null, "H5", freshIp(), deviceId));
+                MemberLoginType.EMAIL_PASSWORD, email, "WrongPass2026", null, "H5", freshIp(), deviceId, true));
 
         assertEquals(AuthFailReason.BAD_CREDENTIALS, result.reason());
         assertFalse(result.challengeTicket() != null);
@@ -167,7 +167,7 @@ class LoginChallengeTest {
 
     private MemberAuthResult login() {
         return memberAuthService.authenticate(new MemberAuthCmd(
-                MemberLoginType.EMAIL_PASSWORD, email, PASSWORD, null, "H5", freshIp(), deviceId));
+                MemberLoginType.EMAIL_PASSWORD, email, PASSWORD, null, "H5", freshIp(), deviceId, true));
     }
 
     private String readCode(EmailCodeScene scene) {

@@ -14,31 +14,38 @@ import org.mockito.quality.Strictness;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiHasher;
 import solvela.enums.LoginLogResultEnum;
-import solvela.enums.MemberOperationTypeEnum;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.member.Member;
 import solvela.member.MemberLoginLog;
-import solvela.member.MemberOperationLimit;
+import solvela.member.MemberRiskEvent;
 import solvela.member.api.AuthFailReason;
+import solvela.member.api.LoginChallengeCmd;
+import solvela.member.api.LoginChallengeCodeResult;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
+import solvela.member.api.MemberLoginType;
 import solvela.member.api.SmsCodeSendResult;
-import solvela.member.api.LoginChallengeCodeResult;
-import solvela.member.api.LoginChallengeCmd;
-import solvela.member.device.DeviceDispositionService;
-import solvela.member.device.DeviceGuard;
-import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.api.SmsCodeVerifyResult;
 import solvela.member.api.SmsScene;
-import solvela.member.api.MemberLoginType;
-import solvela.enums.DeviceStatusEnum;
-import solvela.member.device.DeviceGuardRule;
-import solvela.member.device.DeviceGuardVerdict;
+import solvela.member.device.DeviceDispositionService;
+import solvela.member.device.DeviceGuard;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.register.MemberRegisterService;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.MemberRiskProperties;
+import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskEventRecorder;
+import solvela.member.risk.RiskEventRef;
+import solvela.member.risk.RiskSession;
+import solvela.member.risk.feature.PasswordCooldownStore;
+import solvela.member.sms.MemberSmsCodeService;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,7 +53,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -58,21 +64,24 @@ import static org.mockito.Mockito.when;
 /**
  * 会员认证：<b>分支顺序本身就是安全设计</b>。
  *
- * <h3>这里钉的四件事</h3>
+ * <h3>这里钉的几件事</h3>
  * <ul>
  *   <li><b>状态在验密码之前</b>。反过来的话，被冻结的账号还能拿来试探密码对不对 ——
  *       一个已经被判定为高风险的账号，不该再提供任何「密码猜对了没有」的信号；</li>
- *   <li><b>限制在验密码之前</b>。放到后面，被限期间每次尝试仍然会走一遍密码比对，
- *       限制就只剩一句提示语，拦不住任何东西；</li>
+ *   <li><b>前置风控在验密码之前</b>。放到后面，被冷却期间每次尝试仍然会走一遍密码比对，
+ *       冷却就只剩一句提示语，拦不住任何东西；</li>
+ *   <li><b>查无此人要和「有这个号」长得一样</b> —— 包括<b>耗时</b>：不跑一次 Argon2 的话，
+ *       响应时间本身就在回答「这个号存不存在」；</li>
  *   <li><b>失败要记数、成功要清数</b>。少了清零那一步，用户今天错两次、下周再错三次
- *       就被锁 —— 而他两次都成功登录过。这类问题的报障描述是「莫名其妙被锁」，
- *       从日志里根本看不出来；</li>
- *   <li><b>写登录日志失败绝不能影响登录</b>。「登不上去是因为日志表满了」排查极其费劲。</li>
+ *       就被冷却 —— 而他两次都成功登录过；</li>
+ *   <li><b>每一次尝试都有一行风控流水</b>，连格式错和异常路径也有；</li>
+ *   <li><b>写登录日志失败绝不能影响登录</b>。</li>
  * </ul>
  *
- * <h3>手机号必须先规范化再算摘要</h3>
- * {@code "138 0000 0000"} 和 {@code "13800000000"} 的 hash 不一样。顺序错了的表现是
- * 「同一个号有时能登有时不能」，取决于用户这次有没有手滑打空格。
+ * <h3>风控用真会话、假引擎</h3>
+ * 引擎自己的行为（规则怎么跑、结论怎么算）由 {@code MemberRiskEngineTest} 覆盖；
+ * 这里只管「主干拿到某个结论之后做对了什么」，所以结论直接给，而 {@link RiskSession} 用<b>真的</b>——
+ * 落库、结局记录都要真的发生，才能钉住「哪条路径漏了流水」。
  *
  * @Author alaric
  * @Date 2026-09-06
@@ -94,8 +103,6 @@ class MemberAuthServiceTest {
     @Mock
     private MemberLoginLogDao memberLoginLogDao;
     @Mock
-    private MemberOperationLimitService operationLimitService;
-    @Mock
     private PiiHasher piiHasher;
     @Mock
     private DeviceGuard deviceGuard;
@@ -109,6 +116,18 @@ class MemberAuthServiceTest {
     private DeviceDispositionService dispositionService;
     @Mock
     private MemberSmsCodeService smsCodeService;
+    @Mock
+    private solvela.member.email.MemberEmailCodeService emailCodeService;
+    @Mock
+    private MemberRiskEngine riskEngine;
+    @Mock
+    private PasswordCooldownStore cooldownStore;
+
+    /** 真会话要往它落库。顺手也成了「这条路径有没有写流水」的探针 */
+    @Mock
+    private RiskEventRecorder recorder;
+
+    private final MemberRiskProperties riskProperties = new MemberRiskProperties();
 
     @InjectMocks
     private MemberAuthService service;
@@ -126,27 +145,30 @@ class MemberAuthServiceTest {
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);
         when(memberAuthDao.selectForLogin(PHONE_HASH)).thenReturn(member);
-        when(operationLimitService.getActiveLimit(anyLong(), any())).thenReturn(null);
-        // 默认设备闸放行：绝大多数用例关心的是它【之后】的分支顺序
-        when(deviceGuard.checkLogin(any())).thenReturn(DeviceGuardVerdict.pass());
-        when(deviceGuard.checkMemberFanout(any(), any())).thenReturn(DeviceGuardVerdict.pass());
-        // 默认设备是正常档：观察档那条支线由 checkDeviceChallenge 自己的用例覆盖
-        when(dispositionService.currentStatus(any())).thenReturn(DeviceStatusEnum.NORMAL);
+
+        // 假引擎 + 真会话：结论由用例指定，落库照真发生
+        when(riskEngine.open(any())).thenAnswer(i ->
+                new RiskSession(i.getArgument(0), riskProperties, recorder, null));
+        when(riskEngine.open(any(), any())).thenAnswer(i ->
+                new RiskSession(i.getArgument(0), riskProperties, recorder, i.getArgument(1)));
+        pre(RiskDecision.PASS);
+        post(RiskDecision.PASS);
     }
 
     // ------------------------------------------------------------------ 正常路径
 
     @Test
-    @DisplayName("认证通过：返回身份、清空失败计数、记一条成功日志")
+    @DisplayName("认证通过：返回身份、清掉冷却计数、记一条成功日志和一行流水")
     void 认证通过() {
         MemberAuthResult result = service.authenticate(cmd(RAW_PASSWORD));
 
         assertTrue(result.success());
         assertEquals(MEMBER_ID, result.identity().memberId());
         assertEquals("小明", result.identity().nickname());
-        // 少了这一步，用户今天错两次、下周再错三次就被锁，而他两次都登录成功过
-        verify(operationLimitService).clearFail(MEMBER_ID, MemberOperationTypeEnum.LOGIN);
+        // 少了这一步，用户今天错两次、下周再错三次就被冷却，而他两次都登录成功过
+        verify(cooldownStore).onIdentityVerified(PHONE_HASH, DEVICE_ID);
         assertEquals(LoginLogResultEnum.LOGIN_SUCCESS, savedLog().getStatus());
+        assertEquals(MemberRiskOutcomeEnum.SUCCESS, savedEvent().getOutcome());
     }
 
     @Test
@@ -156,7 +178,6 @@ class MemberAuthServiceTest {
         service.authenticate(cmd("+8613800000000", RAW_PASSWORD));
 
         // 顺序错了的表现是「同一个号有时能登有时不能」，取决于用户这次有没有手滑打空格
-        verify(piiHasher, org.mockito.Mockito.times(2)).hash(PHONE);
         verify(piiHasher, never()).hash("138 0000 0000");
         verify(piiHasher, never()).hash("+8613800000000");
     }
@@ -171,50 +192,56 @@ class MemberAuthServiceTest {
         MemberAuthResult result = service.authenticate(cmd("随便一个错密码"));
 
         assertEquals(AuthFailReason.ACCOUNT_FROZEN, result.reason());
-        // 没走到密码分支，所以不该记失败次数
-        verify(operationLimitService, never()).recordFail(anyLong(), any(), anyString());
+        // 没走到密码分支，所以不该记冷却计数
+        verify(cooldownStore, never()).onPasswordFailure(any());
         assertEquals("账号已冻结", savedLog().getRemark());
+        assertEquals(MemberRiskOutcomeEnum.FROZEN, savedEvent().getOutcome());
     }
 
     @Test
-    @DisplayName("🔴 限制生效期间直接挡回：连试的机会都不给，否则限制形同虚设")
-    void 限制期间不验密码() {
-        when(operationLimitService.getActiveLimit(MEMBER_ID, MemberOperationTypeEnum.LOGIN))
-                .thenReturn(limitExpiringIn(120));
+    @DisplayName("🔴 密码冷却期间直接挡回：连试的机会都不给，否则冷却形同虚设")
+    void 冷却期间不验密码() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.COOLDOWN, 275L, Set.of()));
 
         MemberAuthResult result = service.authenticate(cmd("随便一个错密码"));
 
         assertEquals(AuthFailReason.OPERATION_LIMITED, result.reason());
-        assertTrue(result.lockedSeconds() > 0 && result.lockedSeconds() <= 120,
+        assertEquals(275L, result.lockedSeconds(),
                 "要告诉用户还得等多久，含糊其辞只会把人逼去打客服电话");
-        verify(operationLimitService, never()).recordFail(anyLong(), any(), anyString());
+        verify(cooldownStore, never()).onPasswordFailure(any());
+        assertEquals(MemberRiskOutcomeEnum.COOLDOWN, savedEvent().getOutcome());
     }
 
     @Test
-    @DisplayName("检查顺序：状态 → 限制 → 密码，一步都不能提前")
+    @DisplayName("检查顺序：前置风控 → 状态 → 密码，一步都不能提前")
     void 分支顺序() {
         service.authenticate(cmd(RAW_PASSWORD));
 
-        InOrder order = inOrder(memberAuthDao, operationLimitService);
+        InOrder order = inOrder(riskEngine, memberAuthDao, cooldownStore);
+        // 查会员挪到了风控之前（前置允许看账号，但只能把结论往松里调）
         order.verify(memberAuthDao).selectForLogin(anyString());
-        order.verify(operationLimitService).getActiveLimit(MEMBER_ID, MemberOperationTypeEnum.LOGIN);
-        order.verify(operationLimitService).clearFail(MEMBER_ID, MemberOperationTypeEnum.LOGIN);
+        order.verify(riskEngine).evaluatePre(any());
+        order.verify(riskEngine).evaluatePost(any());
+        order.verify(cooldownStore).onIdentityVerified(anyString(), any());
     }
 
     // ------------------------------------------------------------------ 失败
 
     @Test
-    @DisplayName("手机号格式不合法：不查库、不写日志")
+    @DisplayName("手机号格式不合法：不查库、不写登录日志，但<b>要</b>留一行流水")
     void 手机号格式不合法() {
         MemberAuthResult result = service.authenticate(cmd("1380000", RAW_PASSWORD));
 
         assertEquals(AuthFailReason.BAD_PHONE_FORMAT, result.reason());
         verify(memberAuthDao, never()).selectForLogin(anyString());
         verify(memberLoginLogDao, never()).insert(any(MemberLoginLog.class));
+        MemberRiskEvent event = savedEvent();
+        assertEquals(MemberRiskOutcomeEnum.BAD_FORMAT, event.getOutcome());
+        assertNull(event.getIdentityHashHex(), "格式都不对，谈不上是对哪个账号的尝试");
     }
 
     @Test
-    @DisplayName("手机号查无此人：给「凭证错误」，且不写登录日志（member_id 非空，没人可记）")
+    @DisplayName("🔴 查无此人：回答与「有这个号」一模一样，而且<b>照样跑一次密码哈希</b>")
     void 手机号不存在() {
         when(memberAuthDao.selectForLogin(PHONE_HASH)).thenReturn(null);
 
@@ -223,6 +250,12 @@ class MemberAuthServiceTest {
         // 与「密码错」给同一个原因：区分开来等于送出一个手机号枚举接口
         assertEquals(AuthFailReason.BAD_CREDENTIALS, result.reason());
         verify(memberLoginLogDao, never()).insert(any(MemberLoginLog.class));
+        // 🔴 不记冷却计数的话，「错几次会不会被冷却」又成了一个账号枚举接口
+        verify(cooldownStore).onPasswordFailure(any());
+        MemberRiskEvent event = savedEvent();
+        assertEquals(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT, event.getOutcome());
+        assertNull(event.getMemberId());
+        assertEquals(PHONE_HASH, event.getIdentityHashHex(), "查无此人靠身份摘要聚合");
     }
 
     @Test
@@ -242,45 +275,83 @@ class MemberAuthServiceTest {
 
         // 混进「密码错误」的话，用户会一直重试一个他从来没设过的密码
         assertEquals(AuthFailReason.NO_PASSWORD, result.reason());
-        verify(operationLimitService, never()).recordFail(anyLong(), any(), anyString());
+        verify(cooldownStore, never()).onPasswordFailure(any());
     }
 
     @Test
-    @DisplayName("密码错误：记一次失败、写失败日志，未达阈值时返回「凭证错误」")
+    @DisplayName("密码错误：记一次冷却计数、写失败日志，返回「凭证错误」")
     void 密码错误() {
-        when(operationLimitService.recordFail(anyLong(), any(), anyString())).thenReturn(null);
-
         MemberAuthResult result = service.authenticate(cmd("WrongPass1!"));
 
         assertEquals(AuthFailReason.BAD_CREDENTIALS, result.reason());
-        verify(operationLimitService).recordFail(MEMBER_ID, MemberOperationTypeEnum.LOGIN, "连续登录失败");
-        verify(operationLimitService, never()).clearFail(anyLong(), any());
+        verify(cooldownStore).onPasswordFailure(any());
+        verify(cooldownStore, never()).onIdentityVerified(anyString(), any());
         assertEquals(LoginLogResultEnum.LOGIN_FAIL, savedLog().getStatus());
+        assertEquals(MemberRiskOutcomeEnum.BAD_CREDENTIALS, savedEvent().getOutcome());
     }
 
     @Test
-    @DisplayName("🔴 这一次失败刚好触发限制：当场返回「还要等多久」，不让用户再点一次才发现")
-    void 失败触发限制当场告知() {
-        when(operationLimitService.recordFail(anyLong(), any(), anyString()))
-                .thenReturn(limitExpiringIn(1800));
-
+    @DisplayName("🔴 这一次失败刚好触发冷却时，<b>不</b>当场把剩余时间说出来")
+    void 失败触发冷却不当场告知() {
         MemberAuthResult result = service.authenticate(cmd("WrongPass1!"));
 
-        assertEquals(AuthFailReason.OPERATION_LIMITED, result.reason());
-        assertTrue(result.lockedSeconds() > 0, "让用户点第二次才知道被限，是投诉的主要来源");
+        /*
+         * 改造前会立刻返回「还要等多久」（理由是别让用户再点一次才发现）。
+         * 而冷却现在按身份摘要计数、对不存在的账号同样触发 —— 这一刻说出来就等于
+         * 回答了「这个号存不存在」。代价是用户要再点一次才看到倒计时。
+         */
+        assertEquals(AuthFailReason.BAD_CREDENTIALS, result.reason());
+        assertEquals(0L, result.lockedSeconds());
     }
 
     @Test
-    @DisplayName("限制已过期：剩余秒数按 0 算，不返回负数")
-    void 剩余秒数不为负() {
-        when(operationLimitService.getActiveLimit(MEMBER_ID, MemberOperationTypeEnum.LOGIN))
-                .thenReturn(limitExpiringIn(-60));
+    @DisplayName("前置判要滑块而请求没带票 → CAPTCHA_REQUIRED，密码压根不验")
+    void 要滑块() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.CAPTCHA, 0L, Set.of()));
 
-        // 负数会被调用方格式化成「请 -1 分钟后重试」
-        assertEquals(0L, service.authenticate(cmd(RAW_PASSWORD)).lockedSeconds());
+        MemberAuthResult result = service.authenticate(cmd("随便一个错密码"));
+
+        assertEquals(AuthFailReason.CAPTCHA_REQUIRED, result.reason());
+        verify(cooldownStore, never()).onPasswordFailure(any());
+        assertEquals(MemberRiskOutcomeEnum.CAPTCHA_REQUIRED, savedEvent().getOutcome());
     }
 
-    // ------------------------------------------------------------------ 日志
+    @Test
+    @DisplayName("前置判要滑块但票已经核销过 → 照常往下走")
+    void 滑块已过() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.CAPTCHA, 0L, Set.of()));
+
+        MemberAuthResult result = service.authenticate(new MemberAuthCmd(MemberLoginType.PHONE_PASSWORD,
+                PHONE, RAW_PASSWORD, null, "H5", "127.0.0.1", DEVICE_ID, true));
+
+        assertTrue(result.success());
+    }
+
+    @Test
+    @DisplayName("前置限流 / 拒绝：对外同一句，不验密码、不写登录日志")
+    void 前置拦下() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.DENY, 600L, Set.of()));
+
+        MemberAuthResult result = service.authenticate(cmd(RAW_PASSWORD));
+
+        assertEquals(AuthFailReason.IP_LIMITED, result.reason(),
+                "拒绝与限流共用一句文案 —— 告诉对方「你被拉黑了」等于给他调试反馈");
+        assertEquals(600L, result.lockedSeconds());
+        verify(memberLoginLogDao, never()).insert(any(MemberLoginLog.class));
+        assertEquals(MemberRiskOutcomeEnum.PRE_BLOCKED, savedEvent().getOutcome());
+    }
+
+    @Test
+    @DisplayName("生效结论带的动作要执行：命中降档就把设备降进观察档")
+    void 执行降档动作() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.LIMIT, 60L, Set.of(RiskAction.OBSERVE_DEVICE)));
+
+        service.authenticate(cmd(RAW_PASSWORD));
+
+        verify(dispositionService).observe(eq(DEVICE_ID), anyString());
+    }
+
+    // ------------------------------------------------------------------ 日志与流水
 
     @Test
     @DisplayName("🔴 写登录日志炸了，登录照样成功")
@@ -293,6 +364,28 @@ class MemberAuthServiceTest {
         // 「登不上去是因为日志表满了」排查极其费劲，而日志的价值再高也高不过登录本身
         assertTrue(result.success());
         assertNotNull(result.identity());
+    }
+
+    @Test
+    @DisplayName("🔴 风控流水写炸了，登录照样成功")
+    void 流水失败不影响认证() {
+        when(recorder.record(any(), any())).thenThrow(new RuntimeException("库挂了"));
+
+        assertTrue(service.authenticate(cmd(RAW_PASSWORD)).success());
+    }
+
+    @Test
+    @DisplayName("🔴 主干抛异常时也有流水：结局记成「内部异常」")
+    void 异常路径也有流水() {
+        when(memberAuthDao.selectForLogin(PHONE_HASH)).thenReturn(member);
+        doThrow(new RuntimeException("Redis 挂了")).when(newDeviceLoginNotifier)
+                .onLoginSucceeded(any(), any(), any(), any());
+
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> service.authenticate(cmd(RAW_PASSWORD)));
+
+        assertEquals(MemberRiskOutcomeEnum.INTERNAL_ERROR, savedEvent().getOutcome(),
+                "登录报 500 时，风控判了什么、命中了哪几条规则，正是最想知道的");
     }
 
     @Test
@@ -325,33 +418,13 @@ class MemberAuthServiceTest {
         assertNull(service.getAuthIdentity(null));
     }
 
-    // ------------------------------------------------------------------ 辅助
-
-    private MemberAuthCmd cmd(String password) {
-        return cmd(PHONE, password);
-    }
-
-    private MemberAuthCmd cmd(String phone, String password) {
-        return MemberAuthCmd.byPhonePassword(phone, password, "H5", "127.0.0.1", DEVICE_ID);
-    }
-
-    /** 带二次验证码的登录命令。 */
-    private MemberAuthCmd cmdWithCode(String code) {
-        return new MemberAuthCmd(MemberLoginType.PHONE_PASSWORD, PHONE, RAW_PASSWORD, code,
-                "H5", "127.0.0.1", DEVICE_ID);
-    }
-
-    /** 把这台设备置成观察档。 */
-    private void deviceUnderObservation() {
-        when(dispositionService.currentStatus(DEVICE_ID)).thenReturn(DeviceStatusEnum.OBSERVE);
-    }
-
-    // ------------------------------------------------------------------ 设备观察档
+    // ------------------------------------------------------------------ 二次验证
 
     @Test
-    @DisplayName("🔴 观察档 + 密码对 → DEVICE_VERIFICATION_REQUIRED，并签一张绑在这台设备上的凭票")
-    void 观察档要二次验证() {
-        deviceUnderObservation();
+    @DisplayName("🔴 后置判要 OTP + 密码对 → 签一张绑在这台设备上的凭票，票里带着流水引用")
+    void 要二次验证() {
+        post(new RiskDecision(MemberRiskDecisionEnum.OTP, 0L, Set.of()));
+        when(recorder.record(any(), any())).thenReturn(4242L);
         when(challengeStore.issue(any())).thenReturn("lc_ticket");
 
         MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
@@ -361,21 +434,77 @@ class MemberAuthServiceTest {
                 "密码是对的，只是还差一步。回成 BAD_CREDENTIALS 的话，"
                         + "用户会一直以为自己密码记错了，去走找回密码 —— 而那解决不了他的问题");
         assertEquals("lc_ticket", result.challengeTicket());
-        verify(challengeStore).issue(eq(new LoginChallengeStore.Challenge(
-                MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5", PHONE)));
+        ArgumentCaptor<LoginChallengeStore.Challenge> captor =
+                ArgumentCaptor.forClass(LoginChallengeStore.Challenge.class);
+        verify(challengeStore).issue(captor.capture());
+        LoginChallengeStore.Challenge challenge = captor.getValue();
+        assertEquals(MEMBER_ID, challenge.memberId());
+        assertEquals(DEVICE_ID, challenge.deviceId());
+        assertEquals(PHONE, challenge.identity());
+        assertEquals(4242L, challenge.eventRef().eventId(),
+                "🔴 票里要带签票那一行流水，验码那一行才能指回来");
+        assertEquals(MemberRiskOutcomeEnum.CHALLENGED, savedEvent().getOutcome());
     }
 
     @Test
-    @DisplayName("🔴 观察档 + 登录请求里自带了码 → 不再直接放行，照样要走凭票")
-    void 自带码不再放行() {
-        deviceUnderObservation();
-        when(challengeStore.issue(any())).thenReturn("lc_ticket");
+    @DisplayName("🔴 邮箱验证码登录即使被判要 OTP 也直接放行：它本身就是一道码")
+    void 邮箱码登录不再要第二道() {
+        post(new RiskDecision(MemberRiskDecisionEnum.OTP, 0L, Set.of()));
+        when(piiHasher.hash("a@x.com")).thenReturn("EMAILHASH");
+        when(memberAuthDao.selectForLoginByEmail("EMAILHASH")).thenReturn(member);
+        when(emailCodeService.verify(any(), eq("a@x.com"), eq("123456")))
+                .thenReturn(solvela.member.api.EmailCodeVerifyResult.OK);
 
-        MemberAuthResult result = service.authenticate(cmdWithCode("123456"));
+        MemberAuthResult result = service.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE,
+                "a@x.com", "123456", null, "H5", "127.0.0.1", DEVICE_ID, false));
 
-        assertEquals(AuthFailReason.DEVICE_VERIFICATION_REQUIRED, result.reason(),
-                "旧路径（带着码重新登录）的码来自匿名发码接口 —— 那个口子已经关了，这条路也不能再通");
+        assertTrue(result.success(), "码已经验过了，不该再要第二道 —— 第二封信证明不了第一封证明不了的任何事情");
+        verify(challengeStore, never()).issue(any());
+    }
+
+    @Test
+    @DisplayName("🔴 二次验证排在密码校验【之后】—— 否则谁都能拿一个手机号让我们发短信")
+    void 二次验证排在密码之后() {
+        post(new RiskDecision(MemberRiskDecisionEnum.OTP, 0L, Set.of()));
+
+        MemberAuthResult result = service.authenticate(
+                new MemberAuthCmd(MemberLoginType.PHONE_PASSWORD, PHONE, "WrongPassword9", "123456",
+                        "H5", "127.0.0.1", DEVICE_ID, false));
+
+        assertEquals(AuthFailReason.BAD_CREDENTIALS, result.reason(),
+                "密码错就该在密码那一关挡下，不该走到二次验证");
+        verify(challengeStore, never()).issue(any());
         verify(smsCodeService, never()).verify(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("后置放行时完全不多一次往返 —— 绝大多数登录是这一条")
+    void 后置放行不要二次验证() {
+        assertTrue(service.authenticate(cmd(PHONE, RAW_PASSWORD)).success());
+
+        verify(challengeStore, never()).issue(any());
+        verify(smsCodeService, never()).verify(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("后置限流（一机多号这类）→ 密码验过了也不放行")
+    void 后置拦下() {
+        post(new RiskDecision(MemberRiskDecisionEnum.LIMIT, 3600L, Set.of()));
+
+        MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
+
+        assertFalse(result.success());
+        assertEquals(AuthFailReason.DEVICE_LIMITED, result.reason());
+        assertEquals(MemberRiskOutcomeEnum.POST_BLOCKED, savedEvent().getOutcome());
+    }
+
+    @Test
+    @DisplayName("密码错时，冷却与设备失败计数【两边都要记】")
+    void 密码错两边都记() {
+        service.authenticate(cmd(PHONE, "WrongPassword9"));
+
+        verify(cooldownStore).onPasswordFailure(any());
+        verify(deviceGuard).recordLoginFailure(DEVICE_ID);
     }
 
     // ------------------------------------------------------------------ 凭票发码 / 验码
@@ -384,7 +513,8 @@ class MemberAuthServiceTest {
 
     private void validTicket() {
         when(challengeStore.find(TICKET)).thenReturn(new LoginChallengeStore.Challenge(
-                MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5", PHONE));
+                MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5",
+                new RiskEventRef(4242L, LocalDateTime.now()), PHONE));
     }
 
     private static LoginChallengeCmd ticketCmd(String code, String deviceId) {
@@ -404,7 +534,7 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    @DisplayName("凭票验码 + 码对 → 登录成功，票作废，照常写成功日志")
+    @DisplayName("凭票验码 + 码对 → 登录成功，票作废，流水指回签票那一行")
     void 凭票码对() {
         validTicket();
         when(smsCodeService.verify(SmsScene.LOGIN, PHONE, "123456")).thenReturn(SmsCodeVerifyResult.OK);
@@ -415,7 +545,10 @@ class MemberAuthServiceTest {
         assertTrue(result.success());
         assertEquals(MEMBER_ID, result.identity().memberId());
         verify(challengeStore).discard(TICKET);
-        verify(deviceGuard).checkMemberFanout(DEVICE_ID, MEMBER_ID);
+        MemberRiskEvent event = savedEvent();
+        assertEquals(MemberRiskEventTypeEnum.LOGIN_VERIFY, event.getEventType());
+        assertEquals(MemberRiskOutcomeEnum.VERIFY_PASSED, event.getOutcome());
+        assertEquals(4242L, event.getRefEventId(), "「要了码的人后来验过没有」要顺着它查");
     }
 
     @Test
@@ -428,6 +561,7 @@ class MemberAuthServiceTest {
                 service.verifyChallenge(ticketCmd("000000", DEVICE_ID)).reason());
         verify(challengeStore, never()).discard(any());
         verify(loginIpGuard).recordFailure("127.0.0.1");
+        assertEquals(MemberRiskOutcomeEnum.VERIFY_FAILED, savedEvent().getOutcome());
     }
 
     @Test
@@ -460,33 +594,22 @@ class MemberAuthServiceTest {
                 service.verifyChallenge(ticketCmd("123456", DEVICE_ID)).reason());
     }
 
-    @Test
-    @DisplayName("🔴 二次验证排在密码校验【之后】—— 否则谁都能拿一个手机号让我们发短信")
-    void 二次验证排在密码之后() {
-        deviceUnderObservation();
+    // ------------------------------------------------------------------ 辅助
 
-        MemberAuthResult result = service.authenticate(
-                new MemberAuthCmd(MemberLoginType.PHONE_PASSWORD, PHONE, "WrongPassword9", "123456",
-                        "H5", "127.0.0.1", DEVICE_ID));
-
-        assertEquals(AuthFailReason.BAD_CREDENTIALS, result.reason(),
-                "密码错就该在密码那一关挡下，不该走到二次验证");
-        verify(smsCodeService, never()).verify(any(), any(), any());
+    private void pre(RiskDecision decision) {
+        when(riskEngine.evaluatePre(any())).thenReturn(decision);
     }
 
-    @Test
-    @DisplayName("正常档设备完全不受影响 —— 绝大多数登录不该多一次往返")
-    void 正常档不要二次验证() {
-        assertTrue(service.authenticate(cmd(PHONE, RAW_PASSWORD)).success());
-
-        verify(smsCodeService, never()).verify(any(), any(), any());
+    private void post(RiskDecision decision) {
+        when(riskEngine.evaluatePost(any())).thenReturn(decision);
     }
 
-    private MemberOperationLimit limitExpiringIn(long seconds) {
-        MemberOperationLimit limit = new MemberOperationLimit();
-        limit.setMemberId(MEMBER_ID);
-        limit.setExpireTime(LocalDateTime.now().plusSeconds(seconds));
-        return limit;
+    private MemberAuthCmd cmd(String password) {
+        return cmd(PHONE, password);
+    }
+
+    private MemberAuthCmd cmd(String phone, String password) {
+        return MemberAuthCmd.byPhonePassword(phone, password, "H5", "127.0.0.1", DEVICE_ID);
     }
 
     private MemberLoginLog savedLog() {
@@ -495,51 +618,9 @@ class MemberAuthServiceTest {
         return captor.getValue();
     }
 
-    // ------------------------------------------------------------------ 设备闸
-
-    @Test
-    @DisplayName("🔴 设备闸拦下时，压根不去查会员 —— 否则登录接口就成了手机号枚举器")
-    void 设备被限时不查会员() {
-        when(deviceGuard.checkLogin(DEVICE_ID))
-                .thenReturn(DeviceGuardVerdict.hit(DeviceGuardRule.LOGIN_TOO_MANY, 600L, false));
-
-        MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
-
-        assertFalse(result.success());
-        assertEquals(AuthFailReason.DEVICE_LIMITED, result.reason());
-        assertEquals(600L, result.lockedSeconds());
-        verify(memberAuthDao, never()).selectForLogin(any());
-        verify(memberLoginLogDao, never()).insert(any(MemberLoginLog.class));
-    }
-
-    @Test
-    @DisplayName("设备闸命中但 dry-run 放行 → 登录照常成功")
-    void dryRun命中不影响登录() {
-        when(deviceGuard.checkLogin(DEVICE_ID))
-                .thenReturn(DeviceGuardVerdict.hit(DeviceGuardRule.LOGIN_TOO_MANY, 600L, true));
-
-        assertTrue(service.authenticate(cmd(PHONE, RAW_PASSWORD)).success(),
-                "dry-run 期间命中了也必须放行 —— 否则这一档没有存在的意义");
-    }
-
-    @Test
-    @DisplayName("密码错时，账号锁与设备失败计数【两边都要记】")
-    void 密码错两边都记() {
-        service.authenticate(cmd(PHONE, "WrongPassword9"));
-
-        verify(operationLimitService).recordFail(eq(MEMBER_ID), any(), any());
-        verify(deviceGuard).recordLoginFailure(DEVICE_ID);
-    }
-
-    @Test
-    @DisplayName("一机多号被拦 → 密码验过了也不放行，并记一条失败日志")
-    void 一机多号拦在成功之后() {
-        when(deviceGuard.checkMemberFanout(DEVICE_ID, MEMBER_ID))
-                .thenReturn(DeviceGuardVerdict.hit(DeviceGuardRule.MEMBER_FANOUT, 3600L, false));
-
-        MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
-
-        assertFalse(result.success());
-        assertEquals(AuthFailReason.DEVICE_LIMITED, result.reason());
+    private MemberRiskEvent savedEvent() {
+        ArgumentCaptor<MemberRiskEvent> captor = ArgumentCaptor.forClass(MemberRiskEvent.class);
+        verify(recorder).record(captor.capture(), any());
+        return captor.getValue();
     }
 }

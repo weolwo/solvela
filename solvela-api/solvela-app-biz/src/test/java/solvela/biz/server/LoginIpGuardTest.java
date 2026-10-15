@@ -38,9 +38,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <h3>钉住的几条</h3>
  * <ul>
  *   <li>对不存在账号的尝试超限 → 这个 IP 被限 —— 以前这类尝试一行记录都不留；</li>
- *   <li>🔴 不带设备、每个号只试一次的撞库脚本，设备闸与账号锁都数不到，只有这里拦得住；</li>
+ *   <li>🔴 不带设备、每个号只试一次的撞库脚本，设备闸与密码冷却都数不到，只有这里拦得住；</li>
  *   <li>换个 IP 不受影响；IP 为空一律放行。</li>
  * </ul>
+ *
+ * <h3>🔴 2026-10-15：阈值改成从规则表调，不再用配置项</h3>
+ * {@code solvela.member.login.ip-guard.*} 已经随 IP 闸门进风控引擎一起删掉了 ——
+ * 阈值现在在 {@code t_member_risk_rule.params}（后台可改、不发版）。
+ * 配置项留在这里的话，测试会「设了一个没人读的值」，然后拿默认阈值 60/20/10 去跑，
+ * 看起来像是闸门失效了。所以改用 {@link RiskRuleFixture} 改表，并把缓存刷新间隔设成 0。
+ *
+ * <p>同时把<b>密码冷却</b>（免罚 2 次，第 3 次起冷却）在这里关掉：它比 IP 失败阈值先触发，
+ * 会把用例想看的那个 IP_LIMITED 盖成 OPERATION_LIMITED。冷却本身由
+ * {@code PasswordCooldownTest} 覆盖。
  *
  * @Date 2026-09-27
  */
@@ -48,9 +58,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @TestPropertySource(properties = {
         "solvela.member.code.email-transport=REAL",
-        "solvela.member.login.ip-guard.max-attempts=6",
-        "solvela.member.login.ip-guard.max-failures=3",
-        "solvela.member.login.ip-guard.max-unknown-accounts=2",
+        // 改完规则表要立刻生效，不然用例跑完了缓存还没刷
+        "solvela.member.risk.cache-refresh=0s",
 })
 class LoginIpGuardTest {
 
@@ -71,9 +80,37 @@ class LoginIpGuardTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private solvela.member.risk.dao.MemberRiskRuleDao ruleDao;
+
     private final List<String> usedIps = new ArrayList<>();
 
     private Long memberId;
+
+    private RiskRuleFixture rules;
+
+    /**
+     * 阈值调小 + 让开会抢先命中的规则。
+     *
+     * <p>全局滑块也要关：本类直接调域、拿不到滑块通行票，不关的话每次登录都停在 CAPTCHA_REQUIRED，
+     * 压根走不到 IP 闸门。
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void tuneRules() {
+        rules = new RiskRuleFixture(ruleDao)
+                .off("GLOBAL_CAPTCHA", "PWD_COOLDOWN")
+                .params("IP_ATTEMPT_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":6,\"do\":6}]}")
+                .params("IP_FAIL_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":3,\"do\":6}]}")
+                .params("IP_UNKNOWN_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":2,\"do\":6}]}");
+    }
+
+    @AfterEach
+    void restoreRules() {
+        if (rules != null) {
+            rules.close();
+            rules = null;
+        }
+    }
 
     @AfterEach
     void cleanUp() {
@@ -117,15 +154,34 @@ class LoginIpGuardTest {
     }
 
     @Test
-    @DisplayName("密码错超了 → IP 被限；IP 闸门先于账号锁（5 次）触发")
+    @DisplayName("密码错超了 → IP 被限（本用例关掉了密码冷却，否则它会先触发）")
     void 密码错超限() {
         String email = registerWithPassword();
         String ip = freshIp();
-        // 阈值 3：记到第 4 次之后，第 5 次被拦 —— 账号锁要 5 次失败才锁，这里先到
+        // 阈值 3：记到第 4 次之后，第 5 次被拦
         for (int i = 0; i < 4; i++) {
             assertEquals(AuthFailReason.BAD_CREDENTIALS, login(ip, email, "WrongPass2026").reason());
         }
         assertEquals(AuthFailReason.IP_LIMITED, login(ip, email, "WrongPass2026").reason());
+    }
+
+    @Test
+    @DisplayName("🔴 密码冷却开着时它先于 IP 失败阈值触发 —— 两者谁先到，看的是规则表里的数")
+    void 冷却先于IP失败阈值() {
+        try (RiskRuleFixture cooldownOn = new RiskRuleFixture(ruleDao)
+                .mode("PWD_COOLDOWN", solvela.enums.MemberRiskModeEnum.ENFORCE)) {
+            String email = registerWithPassword();
+            String ip = freshIp();
+
+            // 免罚 2 次，第 3 次失败起冷却；而 IP 失败阈值是 3（第 4 次才拦）
+            assertEquals(AuthFailReason.BAD_CREDENTIALS, login(ip, email, "WrongPass2026").reason());
+            assertEquals(AuthFailReason.BAD_CREDENTIALS, login(ip, email, "WrongPass2026").reason());
+            assertEquals(AuthFailReason.BAD_CREDENTIALS, login(ip, email, "WrongPass2026").reason(),
+                    "🔴 第 3 次失败触发了冷却，但这一次的回答仍然是那句含糊的 BAD_CREDENTIALS —— "
+                            + "当场说出剩余时间等于回答了「这个号存不存在」");
+            assertEquals(AuthFailReason.OPERATION_LIMITED, login(ip, email, "WrongPass2026").reason(),
+                    "下一次才看到冷却");
+        }
     }
 
     @Test
@@ -151,7 +207,7 @@ class LoginIpGuardTest {
 
     private solvela.member.api.MemberAuthResult login(String ip, String email, String password) {
         return memberAuthService.authenticate(new MemberAuthCmd(
-                MemberLoginType.EMAIL_PASSWORD, email, password, null, "H5", ip, null));
+                MemberLoginType.EMAIL_PASSWORD, email, password, null, "H5", ip, null, true));
     }
 
     /** 注册一个有密码的会员，返回邮箱 */

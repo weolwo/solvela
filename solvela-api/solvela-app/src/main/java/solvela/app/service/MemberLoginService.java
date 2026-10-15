@@ -133,10 +133,15 @@ public class MemberLoginService {
         return new MemberResult(token.value(), token.expiresIn().toSeconds(), principal);
     }
 
-    public MemberResult login(MemberLoginRequest request, String ip) {
+    /**
+     * @param captchaPassed 本次请求带的滑块通行票已经被核销（见 {@code CaptchaService.consumeIfPresent}）。
+     *                      「要不要滑块」由域里的风控判，网关只负责核销
+     */
+    public MemberResult login(MemberLoginRequest request, String ip, boolean captchaPassed) {
         MemberAuthResult result = memberAuthApi.authenticate(new MemberAuthCmd(
                 request.typeOrDefault(), request.identity(), request.credential(),
-                request.verificationCode(), request.deviceType(), ip, CurrentDevice.deviceIdOrNull()));
+                request.verificationCode(), request.deviceType(), ip, CurrentDevice.deviceIdOrNull(),
+                captchaPassed));
         if (!result.success()) {
             throw translate(result);
         }
@@ -465,6 +470,13 @@ public class MemberLoginService {
             case DEVICE_VERIFICATION_REQUIRED -> new ApiException(ApiErrors.DEVICE_VERIFICATION_REQUIRED,
                     ApiErrors.DEVICE_VERIFICATION_REQUIRED.defaultMessage(),
                     java.util.Map.of("challengeTicket", result.challengeTicket()));
+            /*
+             * 风控判出这次登录要先过滑块。映射成客户端<b>早就认得</b>的 CAPTCHA_REQUIRED ——
+             * 它那套「收到它 → 拖图 → 带票重试」一行都不用改。
+             *
+             * 🔴 不带 details、不说原因：说了「因为你换了网络」等于告诉对方该怎么绕。
+             */
+            case CAPTCHA_REQUIRED -> new ApiException(ApiErrors.CAPTCHA_REQUIRED);
             case CHALLENGE_EXPIRED -> new ApiException(ApiErrors.CHALLENGE_EXPIRED);
             case DEVICE_VERIFICATION_FAILED ->
                     new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误，请重新获取");

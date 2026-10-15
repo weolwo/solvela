@@ -71,8 +71,26 @@ public class CookieSessionStub {
                 throw new UnsupportedOperationException("观察档凭票流程由会员域自己的用例负责");
             }
 
+            /**
+             * 登录一律成功，<b>但滑块那一关照域里的规矩判</b>。
+             *
+             * <h3>🔴 为什么桩要管滑块</h3>
+             * 2026-10-15 起「这次登录要不要滑块」是<b>域</b>的决定，网关只负责核销通行票
+             * （全局滑块开关、熟悉网络免滑块都要看规则表和账号画像，网关看不到）。
+             * 桩替代的就是域，所以它必须照着域的行为回答 —— 一律回 ok 的话，
+             * 网关侧那几条「不带票被拦」「一张票只放行一次」的端到端用例就全部失去意义了，
+             * 而它们恰恰是通行票这套机制唯一的端到端证明。
+             *
+             * <p>这里模拟的是「全局滑块开着」那一档（也是上线时的档位）：密码登录必须带票，
+             * 邮箱验证码登录不用（它的码在发码那一步已经过过一次滑块）。
+             */
             @Override
             public MemberAuthResult authenticate(MemberAuthCmd cmd) {
+                boolean passwordLogin = cmd.loginType() == null
+                        || cmd.loginType() != solvela.member.api.MemberLoginType.EMAIL_CODE;
+                if (passwordLogin && !Boolean.TRUE.equals(cmd.captchaPassed())) {
+                    return MemberAuthResult.captchaRequired();
+                }
                 return MemberAuthResult.ok(identity());
             }
 

@@ -139,11 +139,18 @@ public class MemberLoginController {
     @PostMapping("/login")
     public MemberResult login(@RequestBody @Valid MemberLoginRequest request,
                               HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        // 密码登录前过滑块 —— 撞库的主战场。邮箱验证码登录不拦：它的码在发码那一步已经过过一次滑块
-        if (request.typeOrDefault() != MemberLoginType.EMAIL_CODE) {
-            captchaService.require(servletRequest, captchaProperties.passwordLogin());
-        }
-        MemberResult result = memberLoginService.login(request, ClientIp.of(servletRequest));
+        /*
+         * 🔴 这里<b>只核销票，不拦人</b>。「这次登录要不要滑块」由域里的风控决定 ——
+         * 全局滑块开关、熟悉网络免滑块都要看规则表和账号画像，网关看不到那些。
+         *
+         * 域判出「要滑块而没过」时回 CAPTCHA_REQUIRED，与改造前<b>同一个错误码</b>，
+         * 客户端那套「收到它 → 拖图 → 带票重试」一行都不用改。
+         *
+         * 邮箱验证码登录不需要票：它的码在发码那一步已经过过一次滑块。
+         */
+        boolean captchaPassed = request.typeOrDefault() != MemberLoginType.EMAIL_CODE
+                && captchaService.consumeIfPresent(servletRequest);
+        MemberResult result = memberLoginService.login(request, ClientIp.of(servletRequest), captchaPassed);
         return request.cookieDelivery() ? deliverByCookie(result, request.rememberMe(), servletResponse) : result;
     }
 

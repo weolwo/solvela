@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.member.api.MemberLoginType;
+import solvela.member.risk.RiskEventRef;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -46,9 +47,15 @@ public class LoginChallengeStore {
 
     private final RedisService redisService;
 
-    /** 一张票上的全部内容 */
+    /**
+     * 一张票上的全部内容。
+     *
+     * @param eventRef 签这张票的那次登录在风控流水里的位置（id + 时间）。验码那一行靠它填
+     *                 {@code ref_event_id} —— 不然「签票」和「验码」在流水里是两条互不相干的记录，
+     *                 而误伤分析恰恰要顺着这条线看「要了码的人后来验过没有」。可为 null（流水写失败时）
+     */
     public record Challenge(Long memberId, MemberLoginType loginType, String deviceId, String deviceType,
-                            String identity) {
+                            RiskEventRef eventRef, String identity) {
     }
 
     /** 签一张票，返回原文 */
@@ -62,6 +69,7 @@ public class LoginChallengeStore {
                 challenge.loginType().name(),
                 nullToEmpty(challenge.deviceId()),
                 nullToEmpty(challenge.deviceType()),
+                refToText(challenge.eventRef()),
                 challenge.identity());
         redis.opsForValue().set(key(ticket), value, TTL);
         return ticket;
@@ -86,14 +94,44 @@ public class LoginChallengeStore {
         if (value == null) {
             return null;
         }
-        String[] parts = value.split("\\" + SEP, 5);
-        if (parts.length != 5) {
+        String[] parts = value.split("\\" + SEP, 6);
+        if (parts.length != 6) {
             return null;
         }
         try {
             return new Challenge(Long.valueOf(parts[0]), MemberLoginType.valueOf(parts[1]),
-                    emptyToNull(parts[2]), emptyToNull(parts[3]), parts[4]);
+                    emptyToNull(parts[2]), emptyToNull(parts[3]), textToRef(parts[4]), parts[5]);
         } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** {@code 事件id,秒级时间戳}；没有引用时是空串 */
+    private static String refToText(RiskEventRef ref) {
+        if (ref == null || ref.eventId() == null || ref.createTime() == null) {
+            return "";
+        }
+        return ref.eventId() + "," + ref.createTime().toEpochSecond(java.time.ZoneOffset.UTC);
+    }
+
+    /**
+     * 解不出来就当没有引用。
+     *
+     * <p>🔴 绝不因此让整张票失效：票的作用是「这个人已经验过密码了」，而流水引用只是为了
+     * 事后分析能串起来 —— 为了一个分析字段把人挡在登录外面是本末倒置。
+     */
+    private static RiskEventRef textToRef(String text) {
+        if (text == null || text.isEmpty()) {
+            return null;
+        }
+        String[] parts = text.split(",", 2);
+        if (parts.length != 2) {
+            return null;
+        }
+        try {
+            return new RiskEventRef(Long.valueOf(parts[0]),
+                    java.time.LocalDateTime.ofEpochSecond(Long.parseLong(parts[1]), 0, java.time.ZoneOffset.UTC));
+        } catch (RuntimeException e) {
             return null;
         }
     }

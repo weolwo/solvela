@@ -151,7 +151,7 @@ class NewDeviceLoginNotifyTest {
 
     private boolean login(String deviceId) {
         return memberAuthService.authenticate(new MemberAuthCmd(
-                MemberLoginType.EMAIL_PASSWORD, email, PASSWORD, null, "H5", freshIp(), deviceId)).success();
+                MemberLoginType.EMAIL_PASSWORD, email, PASSWORD, null, "H5", freshIp(), deviceId, true)).success();
     }
 
     private int inboxCount() {

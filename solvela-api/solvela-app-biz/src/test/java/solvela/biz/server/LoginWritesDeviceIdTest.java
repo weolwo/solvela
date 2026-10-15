@@ -45,6 +45,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
+@org.springframework.test.context.TestPropertySource(properties = {
+        // 改完规则表要立刻生效
+        "solvela.member.risk.cache-refresh=0s",
+})
 class LoginWritesDeviceIdTest {
 
     private static final String PASSWORD = "SvDevice2026";
@@ -61,9 +65,31 @@ class LoginWritesDeviceIdTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private solvela.member.risk.dao.MemberRiskRuleDao ruleDao;
+
     private Long memberId;
 
     private String phone;
+
+    private RiskRuleFixture rules;
+
+    /**
+     * 本类直接调域，拿不到滑块通行票，所以要把全局滑块关掉 ——
+     * 不关的话每次登录都停在「要先过滑块」，压根走不到「device_id 有没有落库」这件事。
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void turnOffGlobalCaptcha() {
+        rules = new RiskRuleFixture(ruleDao).off("GLOBAL_CAPTCHA");
+    }
+
+    @AfterEach
+    void restoreRules() {
+        if (rules != null) {
+            rules.close();
+            rules = null;
+        }
+    }
 
     @AfterEach
     void cleanUp() {

@@ -78,7 +78,8 @@ class PasswordCooldownTest {
 
     @BeforeEach
     void setUp() {
-        store = new PasswordCooldownStore(redisService, redis);
+        // 规则表用不到：这里测的是低层的计数与分桶，参数由用例直接传
+        store = new PasswordCooldownStore(redisService, redis, emptyRegistry());
         rule = new PasswordCooldownRule(store, trustProvider);
         when(redisService.generateRedisKey(anyString(), anyString()))
                 .thenAnswer(i -> "solvela:dev:" + i.getArgument(0) + i.getArgument(1));
@@ -235,6 +236,31 @@ class PasswordCooldownTest {
         member.setMemberId(1000000001L);
         return new RiskContext(MemberRiskEventTypeEnum.LOGIN, loginType, "a@x.com", HASH, member,
                 "dev-1", "H5", "1.2.3.4", false);
+    }
+
+    private static org.springframework.beans.factory.ObjectProvider<
+            solvela.member.risk.config.RiskRuleRegistry> emptyRegistry() {
+        return new org.springframework.beans.factory.ObjectProvider<>() {
+            @Override
+            public solvela.member.risk.config.RiskRuleRegistry getObject() {
+                throw new org.springframework.beans.factory.NoSuchBeanDefinitionException("registry");
+            }
+
+            @Override
+            public solvela.member.risk.config.RiskRuleRegistry getObject(Object... args) {
+                return getObject();
+            }
+
+            @Override
+            public solvela.member.risk.config.RiskRuleRegistry getIfAvailable() {
+                return null;
+            }
+
+            @Override
+            public solvela.member.risk.config.RiskRuleRegistry getIfUnique() {
+                return null;
+            }
+        };
     }
 
     private static RiskRuleConfig config() {

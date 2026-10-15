@@ -51,8 +51,11 @@ class MemberAuthEndpointMappingTest {
     @Test
     @DisplayName("认证端点已映射，且请求真的走到了域里")
     void 认证端点已映射且转发到位() throws Exception {
+        // captchaPassed 为 true：全局滑块默认开着，不带它的话会停在「要先过滑块」，
+        // 就证明不了「请求走到了域里的认证逻辑」这件事
         String body = """
-                {"loginType":"PHONE_PASSWORD","identity":"13800000000","credential":"__mapping_test__",                 "deviceType":"H5","clientIp":"127.0.0.1"}
+                {"loginType":"PHONE_PASSWORD","identity":"13800000000","credential":"__mapping_test__",\
+                "deviceType":"H5","clientIp":"127.0.0.1","captchaPassed":true}
                 """;
 
         HttpResponse<String> response = http.send(
@@ -69,6 +72,34 @@ class MemberAuthEndpointMappingTest {
         // 分开说等于免费送出一个「这个号注册过没有」的查询接口
         assertTrue(response.body().contains("BAD_CREDENTIALS"),
                 "期望域里的认证逻辑生效并返回 BAD_CREDENTIALS；实际 body: " + response.body());
+    }
+
+    @Test
+    @DisplayName("🔴 请求体不带 captchaPassed 照样进得来 —— 这个字段在线上可以缺")
+    void 缺字段不该变成400() throws Exception {
+        /*
+         * captchaPassed 是 2026-10-15 新加的。如果把它声明成原始类型 boolean，
+         * Jackson 会在反序列化阶段就把【任何不带这个字段的请求体】挡成 400
+         * （「Cannot map null into type boolean」）—— 一个和业务毫无关系的错误，
+         * 而老版本网关、内部工具、手写的联调请求全都不带它。
+         *
+         * 所以它是 Boolean，null 当作「没过滑块」。这条用例钉住的就是这件事：
+         * 回什么业务结果不重要，重要的是<b>不能是 400</b>。
+         */
+        String body = """
+                {"loginType":"PHONE_PASSWORD","identity":"13800000000","credential":"__mapping_test__",\
+                "deviceType":"H5","clientIp":"127.0.0.1"}
+                """;
+
+        HttpResponse<String> response = http.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/internal/member/auth/verify"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(),
+                "缺一个可选字段不该变成 400。实际 body: " + response.body());
     }
 
     @Test
