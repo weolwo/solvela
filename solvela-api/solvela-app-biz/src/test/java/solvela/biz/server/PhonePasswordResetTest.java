@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.auth.member.MemberAccessToken;
@@ -53,6 +54,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
+@ExtendWith(RelaxedRiskRules.class)
+@TestPropertySource(properties = "solvela.member.risk.cache-refresh=0s")
 class PhonePasswordResetTest {
 
     private static final String OLD_PASSWORD = "SvOldPwd2026";

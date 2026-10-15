@@ -27,6 +27,19 @@ class MemberAuthEndpointMappingTest {
     /** 真实业务不会出现的会员号 —— 本测试不造数，只走「查不到」那条路 */
     private static final long NOT_EXIST_MEMBER = 9_999_999_997L;
 
+    /**
+     * 每次换一个不存在的手机号。
+     *
+     * <h3>🔴 不能写死一个号</h3>
+     * 密码连续错误会按<b>身份摘要</b>攒冷却计数（查无此人也照样攒 —— 那正是不让「会不会被冷却」
+     * 变成账号枚举接口的做法），而那个计数在 Redis 里留 24 小时。
+     * 写死一个号的话，本类跑过几遍之后这个号就进了冷却，用例从「查无此人」变成「操作过于频繁」，
+     * 而它想证明的只是「请求走到了域里」。
+     */
+    private static String freshPhone() {
+        return "139" + (10_000_000 + java.util.concurrent.ThreadLocalRandom.current().nextInt(80_000_000));
+    }
+
     @LocalServerPort
     private int port;
 
@@ -54,9 +67,9 @@ class MemberAuthEndpointMappingTest {
         // captchaPassed 为 true：全局滑块默认开着，不带它的话会停在「要先过滑块」，
         // 就证明不了「请求走到了域里的认证逻辑」这件事
         String body = """
-                {"loginType":"PHONE_PASSWORD","identity":"13800000000","credential":"__mapping_test__",\
+                {"loginType":"PHONE_PASSWORD","identity":"%s","credential":"__mapping_test__",\
                 "deviceType":"H5","clientIp":"127.0.0.1","captchaPassed":true}
-                """;
+                """.formatted(freshPhone());
 
         HttpResponse<String> response = http.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/internal/member/auth/verify"))
@@ -87,9 +100,9 @@ class MemberAuthEndpointMappingTest {
          * 回什么业务结果不重要，重要的是<b>不能是 400</b>。
          */
         String body = """
-                {"loginType":"PHONE_PASSWORD","identity":"13800000000","credential":"__mapping_test__",\
+                {"loginType":"PHONE_PASSWORD","identity":"%s","credential":"__mapping_test__",\
                 "deviceType":"H5","clientIp":"127.0.0.1"}
-                """;
+                """.formatted(freshPhone());
 
         HttpResponse<String> response = http.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/internal/member/auth/verify"))

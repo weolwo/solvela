@@ -11,8 +11,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 import solvela.app.auth.CurrentDevice;
+import solvela.app.auth.CurrentMember;
 import solvela.app.web.Trace;
 import solvela.trace.DeviceContract;
+import solvela.trace.MemberContract;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.MallApi;
 import solvela.marketing.api.RechargeApi;
@@ -313,6 +315,17 @@ public class DownstreamClientConfig {
                     String deviceId = CurrentDevice.deviceIdOrNull();
                     if (deviceId != null) {
                         request.getHeaders().add(DeviceContract.HEADER, deviceId);
+                    }
+                    /*
+                     * 会员号同走请求头，理由同设备号：内部服务的 DTO 绝大多数不带 memberId，
+                     * 为了「刷一笔活跃时间」给每层 DTO 加字段，等于开一串「忘了填就静默失效」的口子。
+                     *
+                     * 🔴 下游【只拿它记活跃，不做任何授权判断】（见 MemberContract 类注释）。
+                     * 真正的身份一律走命令里显式传的 memberId —— 那是网关从会话令牌解出来的。
+                     */
+                    Long memberId = CurrentMember.memberIdOrNull();
+                    if (memberId != null) {
+                        request.getHeaders().add(MemberContract.HEADER, String.valueOf(memberId));
                     }
                     return execution.execute(request, body);
                 })

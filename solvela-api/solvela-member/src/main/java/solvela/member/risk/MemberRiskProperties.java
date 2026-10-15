@@ -67,6 +67,14 @@ public class MemberRiskProperties {
     /** 单条规则执行超过它打一条 WARN：特征查询变慢的第一个信号 */
     private Duration slowRuleWarn = Duration.ofMillis(50);
 
+    /**
+     * 会员活跃时间多久最多写库一次。
+     *
+     * <p>{@code t_member} 是热读表（每次鉴权都读），不能挂一个每请求都写的字段 ——
+     * 与 {@code t_device} 的活跃节流同一个理由、同一个默认值。
+     */
+    private Duration activeThrottle = Duration.ofHours(1);
+
     public enum Mode {
         ENFORCE,
         SHADOW,
@@ -74,6 +82,10 @@ public class MemberRiskProperties {
 
     public Duration cacheRefresh() {
         return cacheRefresh == null || cacheRefresh.isNegative() ? Duration.ofSeconds(30) : cacheRefresh;
+    }
+
+    public Duration activeThrottle() {
+        return activeThrottle == null || activeThrottle.isNegative() ? Duration.ofHours(1) : activeThrottle;
     }
 
     public Duration featureBudget() {

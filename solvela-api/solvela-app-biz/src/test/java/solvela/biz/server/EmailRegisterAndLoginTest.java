@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -57,6 +58,8 @@ import static org.mockito.Mockito.verify;
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
+@ExtendWith(RelaxedRiskRules.class)
+@TestPropertySource(properties = "solvela.member.risk.cache-refresh=0s")
 /*
  * ⚠️ 强制 REAL 通道。test profile 默认是 LOG（省掉配 SMTP 这一步），
  * 但本类里有几条断言是「不该调用 MailService」—— LOG 模式下它本来就不会被调用，

@@ -54,7 +54,11 @@ import static org.mockito.Mockito.verify;
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
-@TestPropertySource(properties = "solvela.member.code.email-transport=REAL")
+@ExtendWith(RelaxedRiskRules.class)
+@TestPropertySource(properties = {
+        "solvela.member.code.email-transport=REAL",
+        "solvela.member.risk.cache-refresh=0s",
+})
 class NewDeviceLoginNotifyTest {
 
     private static final String PASSWORD = "SvNewDevice2026";

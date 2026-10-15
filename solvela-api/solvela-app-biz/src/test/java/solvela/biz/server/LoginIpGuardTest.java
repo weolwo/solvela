@@ -98,7 +98,7 @@ class LoginIpGuardTest {
     @org.junit.jupiter.api.BeforeEach
     void tuneRules() {
         rules = new RiskRuleFixture(ruleDao)
-                .off("GLOBAL_CAPTCHA", "PWD_COOLDOWN")
+                .off("GLOBAL_CAPTCHA", "CAPTCHA_MATRIX", "PWD_COOLDOWN", "LOGIN_MATRIX")
                 .params("IP_ATTEMPT_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":6,\"do\":6}]}")
                 .params("IP_FAIL_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":3,\"do\":6}]}")
                 .params("IP_UNKNOWN_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":2,\"do\":6}]}");

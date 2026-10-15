@@ -80,7 +80,7 @@ class LoginWritesDeviceIdTest {
      */
     @org.junit.jupiter.api.BeforeEach
     void turnOffGlobalCaptcha() {
-        rules = new RiskRuleFixture(ruleDao).off("GLOBAL_CAPTCHA");
+        rules = new RiskRuleFixture(ruleDao).off("GLOBAL_CAPTCHA", "CAPTCHA_MATRIX", "LOGIN_MATRIX");
     }
 
     @AfterEach

@@ -45,6 +45,38 @@ public interface MemberLoginLogDao extends BaseMapper<MemberLoginLog> {
     List<MemberLoginLogDTO> queryList(@Param("queryForm") MemberLoginLogQuery queryForm);
 
     /**
+     * 画像用：该会员近 N 天的成功登录，<b>按时间倒序</b>，只取 IP 与时间。
+     *
+     * <h3>为什么不取 {@code ip_region}</h3>
+     * 那一列是压缩过的展示串（缺失的段被删掉了），第二项是省还是运营商分不出来。
+     * 判断要按位置取字段，所以这里只拿 {@code client_ip} 回去重新解析（见 {@code IpIntel}）。
+     *
+     * <h3>为什么限条数</h3>
+     * 「常用网段」只要最近那几个就够了，而一个被撞库刷过的账号可能有成百上千条记录。
+     * 不限条数的话，这个查询会随着被攻击的程度变慢 —— 而它在登录路径上。
+     *
+     * <p>走 {@code idx_mbr_log_member}。时间比较在 SQL 里做，理由同 {@link #existsTrustedLogin}。
+     *
+     * @param lookbackDays 回看多少天
+     * @param limit        最多取多少条
+     */
+    @Select("""
+            SELECT client_ip, create_time
+              FROM t_member_login_log
+             WHERE member_id = #{memberId}
+               AND status = #{successStatus}
+               AND client_ip IS NOT NULL
+               AND create_time >= NOW() - INTERVAL #{lookbackDays} DAY
+             ORDER BY create_time DESC
+             LIMIT #{limit}
+            """)
+    List<solvela.member.loginlog.domain.dto.LoginTraceDTO> selectRecentSuccess(
+            @Param("memberId") Long memberId,
+            @Param("successStatus") int successStatus,
+            @Param("lookbackDays") int lookbackDays,
+            @Param("limit") int limit);
+
+    /**
      * 该会员有没有过<b>任何</b>一次成功登录。新设备提醒用：一次都没有 = 注册后的第一次登录，不该提醒。
      */
     @Select("""

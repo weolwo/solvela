@@ -42,8 +42,15 @@ import java.io.IOException;
  *
  * @Date 2026-09-10
  */
+/*
+ * 🔴 2026-10-15 从 HIGHEST_PRECEDENCE + 2 挪到 +10：base-web 的 MemberTraceFilter 占了 +2，
+ * 两个过滤器同序时相对顺序是不确定的。这里改成 +10，把过滤器链分成两段看得清楚：
+ *   +0 ~ +9   绑 MDC（traceId → 设备号 → 会员号）
+ *   +10 以后  记活跃（必须排在绑 MDC 之后，否则读到的恒为 null 而且不报错）
+ * 本过滤器只读设备号（+1 就绑好了），所以这次挪动不改变任何行为。
+ */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 2)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @RequiredArgsConstructor
 public class DeviceActivityFilter extends OncePerRequestFilter {
 

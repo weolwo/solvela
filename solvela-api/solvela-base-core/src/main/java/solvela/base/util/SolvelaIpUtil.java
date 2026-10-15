@@ -127,6 +127,56 @@ public class SolvelaIpUtil {
     }
 
     /**
+     * 解析 ip 地址，返回<b>按位置对齐</b>的四个字段，缺失的那一项是 {@code null}。
+     *
+     * <h3>🔴 与 {@link #getRegionList} 的区别，以及为什么要有这个方法</h3>
+     * {@code getRegionList} 会把缺失的段<b>直接删掉</b>（它是给展示和落库用的，要的是一个干净的串）。
+     * 于是 {@code 中国|0|0|0|阿里云} 出来是 {@code [中国, 阿里云]} ——
+     * <b>第 2 项到底是省份还是运营商，从结果里分不出来</b>。
+     *
+     * <p>而「常用城市」「是不是机房 IP」这类判断必须按位置取字段：把运营商当成省份去比，
+     * 得到的是一个永远对不上的结果，而且不会报错。所以这里返回定长数组。
+     *
+     * <p>放在本类而不是调用方自己解析：xdb 数据文件的字段布局在 v2/v3 之间<b>段数不变、位置错位</b>
+     * （见 {@link #XDB_VERSION} 的注释），这套版本判断只该有一份。
+     *
+     * @return 定长 4 的数组 {@code [国家, 省份, 城市, 运营商]}，每一项都可能是 null；
+     *         ip 为空、库没加载、解析失败时四项全为 null
+     */
+    public static String[] getRegionFields(String ipStr) {
+        String[] fields = new String[4];
+        try {
+            if (SolvelaStringUtil.isEmpty(ipStr) || IP_SEARCHER == null) {
+                return fields;
+            }
+            String region = IP_SEARCHER.search(ipStr.trim());
+            if (SolvelaStringUtil.isEmpty(region)) {
+                return fields;
+            }
+            String[] split = region.split("\\|", -1);
+            // 下标与 getRegionList 完全一致，只是这里不压缩空位
+            int[] indexes = XDB_VERSION <= XDB_VERSION_V2
+                    ? new int[]{0, 2, 3, 4}   // v2: 国家 | 区域 | 省份 | 城市 | ISP
+                    : new int[]{0, 1, 2, 3};  // v3: 国家 | 省份 | 城市 | ISP | iso-alpha2
+            for (int i = 0; i < indexes.length; i++) {
+                fields[i] = valueAt(split, indexes[i]);
+            }
+        } catch (Exception e) {
+            log.error("解析ip地址出错", e);
+        }
+        return fields;
+    }
+
+    /** 取下标字段；越界、空串、占位符一律返回 null */
+    private static String valueAt(String[] split, int index) {
+        if (index >= split.length) {
+            return null;
+        }
+        String value = split[index].trim();
+        return SolvelaStringUtil.isEmpty(value) || UNKNOWN_PLACEHOLDER.equals(value) ? null : value;
+    }
+
+    /**
      * 取下标字段，跳过越界、空串与占位符
      */
     private static void addIfPresent(List<String> target, String[] split, int index) {

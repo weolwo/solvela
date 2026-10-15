@@ -60,6 +60,8 @@ import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskEventRef;
 import solvela.member.risk.RiskSession;
+import solvela.member.risk.feature.AccountFailTracker;
+import solvela.member.risk.feature.LoginProfileProvider;
 import solvela.member.risk.feature.PasswordCooldownStore;
 
 
@@ -105,6 +107,16 @@ public class MemberAuthService implements MemberAuthApi {
      */
     private static final String DUMMY_PASSWORD_HASH = PasswordCipher.encode("risk-timing-equalizer");
 
+    /**
+     * 失败来源记多久。
+     *
+     * <p>⚠️ 这里是<b>写</b>的一侧，{@code ACCOUNT_FAIL_BURST} 规则是读的一侧 ——
+     * 两边都从规则的 params 取窗口才真正一致，而写的这一刻拿不到规则配置（它在失败路径上，
+     * 不该再去读一次规则表）。所以写的窗口给得比规则的默认值<b>宽</b>：
+     * 记多了只是多留几条过期数据，记少了会让规则读不到本该看见的失败。
+     */
+    private static final java.time.Duration FAIL_BURST_WINDOW = java.time.Duration.ofHours(6);
+
     private static final int TRACE_ID_MAX_LENGTH = 64;
 
     private static final int REMARK_MAX_LENGTH = 128;
@@ -124,6 +136,17 @@ public class MemberAuthService implements MemberAuthApi {
 
     /** 密码阶梯冷却。取代了改造前的账号锁（{@code MemberOperationLimitService} 的 LOGIN 类型） */
     private final PasswordCooldownStore cooldownStore;
+
+    /**
+     * 这个账号最近的失败来自哪些 IP。
+     *
+     * <p>🔴 单独记一份，不从登录日志数 —— 那里的 {@code LOGIN_FAIL} 混着
+     * 「签了二次验证凭票」和「被冷却挡下」，照它数会把正常登录的人算成失败。
+     */
+    private final AccountFailTracker failTracker;
+
+    /** 登录成功后要让画像缓存失效，否则用户在新网络上验过一次码，下次来还是「陌生网络」 */
+    private final LoginProfileProvider profileProvider;
 
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
@@ -364,6 +387,14 @@ public class MemberAuthService implements MemberAuthApi {
         // 清掉密码冷却的计数：登录成功证明了身份，之前攒的连续失败不该再算（两个桶都清，
         // 否则换台新手机就会一脚踩进攻击者在共用桶里攒的计数）
         cooldownStore.onIdentityVerified(identityHashHex, cmd.deviceId());
+        /*
+         * 画像变了：这一次的网段、国家要立刻算进「常用」。
+         * 🔴 不失效的话，用户在新网络上验过一次码、下一次来还是「陌生网络」——
+         * 于是他每次登录都要验一道，而他已经证明过自己了。
+         */
+        profileProvider.evict(member.getMemberId());
+        // 失败来源清零：登录成功说明这个号没被攻破，之前那几次失败不该再算
+        failTracker.clear(member.getMemberId());
 
         // 🔴 必须在写本次成功日志【之前】判断：写了之后「这台设备登过没有」永远是「登过」
         newDeviceLoginNotifier.onLoginSucceeded(member.getMemberId(), cmd.deviceId(), cmd.deviceType(), cmd.clientIp());
@@ -659,6 +690,7 @@ public class MemberAuthService implements MemberAuthApi {
          * 设备计数照记：它挡的是「这台机器在挨个试不同的号」，与账号维度无关。
          */
         deviceGuard.recordLoginFailure(cmd.deviceId());
+        failTracker.record(member.getMemberId(), cmd.clientIp(), FAIL_BURST_WINDOW);
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "邮箱验证码" + result.name());
 
         return MemberAuthResult.fail(toAuthFailReason(result));
@@ -704,6 +736,8 @@ public class MemberAuthService implements MemberAuthApi {
         // 设备维度也记一次。两者互不替代：冷却挡的是「这个号被爆破」，
         // 设备计数挡的是「这台机器在挨个试不同的号」—— 后者冷却完全看不见
         deviceGuard.recordLoginFailure(cmd.deviceId());
+        // 第三个维度：这一次失败是从哪个 IP 来的。冷却只数次数，数不到「多个来源同时围攻一个号」
+        failTracker.record(member.getMemberId(), cmd.clientIp(), FAIL_BURST_WINDOW);
         saveLoginLog(member.getMemberId(), cmd, LoginLogResultEnum.LOGIN_FAIL, "手机号或密码错误");
         /*
          * 🔴 这里<b>不</b>返回「还要等多久」，哪怕这一次失败刚好触发了冷却。

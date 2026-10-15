@@ -87,15 +87,19 @@ public interface MemberRegisterDao {
      *
      * <p>{@code create_by} 不填 —— DDL 注释：「后台导入时有值，<b>自主注册为空</b>」。
      * 空值本身就是「这是用户自己注册的」这个信息，比填一个 "SYSTEM" 有用。
+     *
+     * <p>🔴 {@code last_active_time} 跟着建号就写上（= 注册时间）：登录风控按它判「沉睡」，
+     * 为空的话一个<b>刚注册完的人第二次打开就被判成沉睡</b>，于是要多验一道码 ——
+     * 而他是这个账号最不可疑的时候。之后由 {@code MemberActivityFilter} 按小时刷新。
      */
     @Insert("""
             INSERT INTO t_member
                 (member_id, member_name, nickname, gender, phone, phone_hash, email, email_hash,
-                 password, status, register_source, register_ip, create_time)
+                 password, status, register_source, register_ip, create_time, last_active_time)
             VALUES
                 (#{memberId}, #{memberName}, #{nickname}, #{gender},
                  #{phoneCipher}, UNHEX(#{phoneHashHex}), #{emailCipher}, UNHEX(#{emailHashHex}),
-                 #{password}, #{status}, #{registerSource}, #{registerIp}, NOW())
+                 #{password}, #{status}, #{registerSource}, #{registerIp}, NOW(), NOW())
             """)
     int insertMember(@Param("memberId") Long memberId,
                      @Param("memberName") String memberName,

@@ -122,6 +122,10 @@ class MemberAuthServiceTest {
     private MemberRiskEngine riskEngine;
     @Mock
     private PasswordCooldownStore cooldownStore;
+    @Mock
+    private solvela.member.risk.feature.AccountFailTracker failTracker;
+    @Mock
+    private solvela.member.risk.feature.LoginProfileProvider profileProvider;
 
     /** 真会话要往它落库。顺手也成了「这条路径有没有写流水」的探针 */
     @Mock
@@ -505,6 +509,17 @@ class MemberAuthServiceTest {
 
         verify(cooldownStore).onPasswordFailure(any());
         verify(deviceGuard).recordLoginFailure(DEVICE_ID);
+        // 🔴 第三个维度：失败是从哪个 IP 来的。冷却只数次数，数不到「多个来源围攻同一个号」
+        verify(failTracker).record(eq(MEMBER_ID), eq("127.0.0.1"), any());
+    }
+
+    @Test
+    @DisplayName("🔴 登录成功要让画像缓存失效：不然在新网络验过一次码，下次来还是「陌生网络」")
+    void 成功后画像失效() {
+        service.authenticate(cmd(RAW_PASSWORD));
+
+        verify(profileProvider).evict(MEMBER_ID);
+        verify(failTracker).clear(MEMBER_ID);
     }
 
     // ------------------------------------------------------------------ 凭票发码 / 验码
