@@ -83,7 +83,12 @@ class LoginIpGuardTest {
     @Autowired
     private solvela.member.risk.dao.MemberRiskRuleDao ruleDao;
 
+    @Autowired
+    private solvela.member.device.DeviceService deviceService;
+
     private final List<String> usedIps = new ArrayList<>();
+
+    private final List<String> usedDevices = new ArrayList<>();
 
     private Long memberId;
 
@@ -121,6 +126,15 @@ class LoginIpGuardTest {
                     redisService.generateRedisKey("login:ip:unknown:", ip));
         }
         usedIps.clear();
+        for (String deviceId : usedDevices) {
+            jdbcTemplate.update("DELETE FROM t_member_login_log WHERE device_id = ?", deviceId);
+            jdbcTemplate.update("DELETE FROM t_device WHERE device_id = ?", deviceId);
+            redisService.delete(
+                    redisService.generateRedisKey("dev:login:", deviceId),
+                    redisService.generateRedisKey("dev:fail:", deviceId),
+                    redisService.generateRedisKey("dev:member:", deviceId));
+        }
+        usedDevices.clear();
         if (memberId != null) {
             jdbcTemplate.update("DELETE FROM t_member_operation_limit WHERE member_id = ?", memberId);
             jdbcTemplate.update("DELETE FROM t_member_login_log WHERE member_id = ?", memberId);
@@ -139,6 +153,73 @@ class LoginIpGuardTest {
                     "被拦之前，对外回答必须仍是那句含糊的 BAD_CREDENTIALS —— 不能泄露账号是否存在");
         }
         assertEquals(AuthFailReason.IP_LIMITED, login(ip, freshEmail(), "whatever1").reason());
+    }
+
+    // ------------------------------------------------------------------ 老设备豁免限流档（§4.1）
+
+    @Test
+    @DisplayName("🔴 老设备：IP 失败超限也不再限流 —— 校园网里一个人试错，不该让整片真人登不上")
+    void 老设备免限流档() {
+        String email = registerWithPassword();
+        String device = oldDeviceWithSuccessfulLogin(email);
+        String ip = freshIp();
+
+        // 阈值 3，本来第 5 次就该 IP_LIMITED（见「密码错超限」那条用例）
+        for (int i = 0; i < 6; i++) {
+            assertEquals(AuthFailReason.BAD_CREDENTIALS,
+                    login(ip, email, "WrongPass2026", device).reason(),
+                    "第 " + (i + 1) + " 次：老设备不该撞上限流档");
+        }
+    }
+
+    @Test
+    @DisplayName("同一个 IP 上，新设备照样被限 —— 豁免跟着设备走，不是把这个 IP 整个放过")
+    void 新设备照样被限() {
+        String email = registerWithPassword();
+        String device = oldDeviceWithSuccessfulLogin(email);
+        String ip = freshIp();
+
+        for (int i = 0; i < 6; i++) {
+            login(ip, email, "WrongPass2026", device);
+        }
+
+        assertEquals(AuthFailReason.IP_LIMITED, login(ip, email, "WrongPass2026", null).reason(),
+                "🔴 计数是照常加的 —— 豁免压的是处置，不是观察");
+    }
+
+    @Test
+    @DisplayName("设备令牌刚领的（不够 7 天）→ 没有豁免，照常被限")
+    void 新领的令牌不算老设备() {
+        String email = registerWithPassword();
+        // 领一个令牌、登成功一次，但【不】把 create_time 往前调
+        String device = deviceService.register(
+                new solvela.member.api.DeviceRegisterCmd("H5", null, null, null, freshIp())).deviceId();
+        usedDevices.add(device);
+        assertTrue(login(freshIp(), email, PASSWORD, device).success());
+        String ip = freshIp();
+
+        for (int i = 0; i < 4; i++) {
+            assertEquals(AuthFailReason.BAD_CREDENTIALS, login(ip, email, "WrongPass2026", device).reason());
+        }
+        assertEquals(AuthFailReason.IP_LIMITED, login(ip, email, "WrongPass2026", device).reason(),
+                "光有年龄或光有成功登录都不算 —— 设备令牌是匿名领的，"
+                        + "只看一个条件就等于给攻击者一张可以提前养好的免检通行证");
+    }
+
+    /**
+     * 造一台「老设备」：领令牌 → 成功登录一次（写下那条成功日志）→ 把签发时间往前调 8 天。
+     *
+     * <p>🔴 顺序不能换：先调时间再登录也行，但先登录更接近真实 ——
+     * 而「有过成功登录」这一半正是判据里不能少的那一半。
+     */
+    private String oldDeviceWithSuccessfulLogin(String email) {
+        String device = deviceService.register(
+                new solvela.member.api.DeviceRegisterCmd("H5", null, null, null, freshIp())).deviceId();
+        usedDevices.add(device);
+        assertTrue(login(freshIp(), email, PASSWORD, device).success(), "造数：这一次登录应当成功");
+        jdbcTemplate.update("UPDATE t_device SET create_time = NOW() - INTERVAL 8 DAY WHERE device_id = ?",
+                device);
+        return device;
     }
 
     @Test
@@ -208,8 +289,13 @@ class LoginIpGuardTest {
     // ============================== 工具 ==============================
 
     private solvela.member.api.MemberAuthResult login(String ip, String email, String password) {
+        return login(ip, email, password, null);
+    }
+
+    private solvela.member.api.MemberAuthResult login(String ip, String email, String password,
+                                                      String deviceId) {
         return memberAuthService.authenticate(new MemberAuthCmd(
-                MemberLoginType.EMAIL_PASSWORD, email, password, null, "H5", ip, null, true));
+                MemberLoginType.EMAIL_PASSWORD, email, password, null, "H5", ip, deviceId, true));
     }
 
     /** 注册一个有密码的会员，返回邮箱 */

@@ -75,6 +75,25 @@ public class MemberRiskProperties {
      */
     private Duration activeThrottle = Duration.ofHours(1);
 
+    /**
+     * 「老设备」的年龄门槛：设备令牌签发早于这么久、且这台设备上有过成功登录的，
+     * 不受 IP 维度规则的<b>限流档</b>约束（滑块档照常）。方案 §4.1。
+     *
+     * <h3>它解决的是一个很具体的误伤</h3>
+     * 校园网、公司出口后面一个人故意试错，整片真人跟着一小时登不上 ——
+     * 而那些人手机里躺着一个用了半年的 App。
+     *
+     * <h3>🔴 判的是【设备】的年龄，不是某个账号与设备的关系</h3>
+     * 后者要先知道是谁，而这条判断发生在前置、可能查无此人 —— 依赖账号就等于
+     * 「有号和没号的回答不一样」，那是账号枚举。
+     *
+     * <p>两个条件缺一不可：设备令牌是匿名领的，光看年龄等于「提前领一批养着」就能免检；
+     * 光看有过成功登录则刚领的令牌登一次就免检。
+     *
+     * <p>配成 {@link Duration#ZERO} 关掉这个豁免。
+     */
+    private Duration oldDeviceAge = Duration.ofDays(7);
+
     public enum Mode {
         ENFORCE,
         SHADOW,
@@ -86,6 +105,11 @@ public class MemberRiskProperties {
 
     public Duration activeThrottle() {
         return activeThrottle == null || activeThrottle.isNegative() ? Duration.ofHours(1) : activeThrottle;
+    }
+
+    /** 豁免开着吗。配成 0（或负数）就是关掉 */
+    public boolean oldDeviceExemptEnabled() {
+        return oldDeviceAge != null && !oldDeviceAge.isZero() && !oldDeviceAge.isNegative();
     }
 
     public Duration featureBudget() {

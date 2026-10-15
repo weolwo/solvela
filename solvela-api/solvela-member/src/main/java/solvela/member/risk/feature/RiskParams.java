@@ -118,9 +118,25 @@ public final class RiskParams {
 
     /** 命中的那一档：取 {@code count > over} 里 over 最大的那个；都没超返回 null */
     public static Tier hit(List<Tier> tiers, long count) {
+        return hit(tiers, count, null);
+    }
+
+    /**
+     * 取命中的那一档，但<b>不超过 {@code ceiling}</b>（不含）。
+     *
+     * <p>给「老设备豁免 IP 限流」用（方案 §4.1）：传 {@code LIMIT} 就表示
+     * 「限流及以上的那几档当作没配」，于是超得再多也只落到滑块那一档。
+     *
+     * <p>🔴 <b>不是「整条规则不判」</b>：计数照常加、滑块档照常出。
+     * 整条跳过的话，一台七天前签发过令牌的设备就成了一张免检通行证 ——
+     * 而设备令牌是匿名领的，攻击者也能提前领一批养着。
+     *
+     * @param ceiling 上限（不含）；null = 不设上限
+     */
+    public static Tier hit(List<Tier> tiers, long count, MemberRiskDecisionEnum ceiling) {
         Tier hit = null;
         for (Tier tier : tiers) {
-            if (count > tier.over()) {
+            if (count > tier.over() && (ceiling == null || !tier.decision().atLeast(ceiling))) {
                 hit = tier;
             }
         }

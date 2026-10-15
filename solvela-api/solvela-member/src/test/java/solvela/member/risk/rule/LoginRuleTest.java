@@ -23,6 +23,7 @@ import solvela.member.risk.RiskContext;
 import solvela.member.risk.config.ListMatch;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.feature.LoginCounters;
+import solvela.member.risk.feature.OldDeviceExemption;
 import solvela.member.risk.rule.impl.DeviceBannedRule;
 import solvela.member.risk.rule.impl.DeviceFailLimitRule;
 import solvela.member.risk.rule.impl.DeviceFanoutRule;
@@ -75,6 +76,10 @@ class LoginRuleTest {
     @Mock
     private DeviceDispositionService dispositionService;
 
+    /** 默认不豁免，所以下面那些阈值用例的断言一字不用改 */
+    @Mock
+    private OldDeviceExemption exemption;
+
     @InjectMocks
     private IpAttemptLimitRule ipAttempt;
 
@@ -83,7 +88,7 @@ class LoginRuleTest {
     @Test
     @DisplayName("🔴 登录请求总数：判断时把这一次算进去")
     void attemptCountsThisRequest() {
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters);
+        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
         when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(61L);
         when(counters.retryAfterSeconds(any(), anyString())).thenReturn(1200L);
 
@@ -97,7 +102,7 @@ class LoginRuleTest {
     @Test
     @DisplayName("🔴 登录失败数：只读不加")
     void failOnlyReads() {
-        IpFailLimitRule rule = new IpFailLimitRule(counters);
+        IpFailLimitRule rule = new IpFailLimitRule(counters, exemption);
         when(counters.read(LoginCounters.Counter.IP_FAIL, "1.2.3.4")).thenReturn(21L);
 
         assertEquals(MemberRiskDecisionEnum.LIMIT, rule.evaluate(ctx(), config(tiers(5, 2, 20, 6))).decision());
@@ -107,7 +112,7 @@ class LoginRuleTest {
     @Test
     @DisplayName("🔴 不存在账号数：只读不加")
     void unknownOnlyReads() {
-        IpUnknownLimitRule rule = new IpUnknownLimitRule(counters);
+        IpUnknownLimitRule rule = new IpUnknownLimitRule(counters, exemption);
         when(counters.read(LoginCounters.Counter.IP_UNKNOWN, "1.2.3.4")).thenReturn(4L);
 
         assertEquals(MemberRiskDecisionEnum.CAPTCHA, rule.evaluate(ctx(), config(tiers(3, 2, 10, 6))).decision());
@@ -130,7 +135,7 @@ class LoginRuleTest {
     @Test
     @DisplayName("等于阈值不算超 —— 与改造前的 count > max 完全一致")
     void equalToThresholdPasses() {
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters);
+        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
         when(counters.bump(any(), anyString())).thenReturn(60L);
 
         assertNull(rule.evaluate(ctx(), config(tiers(60, 6))));
@@ -139,7 +144,7 @@ class LoginRuleTest {
     @Test
     @DisplayName("两档都超时取更严的那一档")
     void higherTierWins() {
-        IpFailLimitRule rule = new IpFailLimitRule(counters);
+        IpFailLimitRule rule = new IpFailLimitRule(counters, exemption);
         when(counters.read(any(), anyString())).thenReturn(100L);
 
         assertEquals(MemberRiskDecisionEnum.LIMIT, rule.evaluate(ctx(), config(tiers(5, 2, 20, 6))).decision());
@@ -162,7 +167,7 @@ class LoginRuleTest {
         RiskContext noIp = new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
                 "a@x.com", "ab".repeat(32), member(), "dev-1", "H5", null, false);
 
-        assertNull(new IpAttemptLimitRule(counters).evaluate(noIp, config(tiers(60, 6))));
+        assertNull(new IpAttemptLimitRule(counters, exemption).evaluate(noIp, config(tiers(60, 6))));
     }
 
     // ------------------------------------------------------------------ 集合类
@@ -170,7 +175,7 @@ class LoginRuleTest {
     @Test
     @DisplayName("一个 IP 尝试的不同账号：存摘要前缀，不论账号存不存在都算")
     void ipAccountFanout() {
-        IpAccountFanoutRule rule = new IpAccountFanoutRule(counters);
+        IpAccountFanoutRule rule = new IpAccountFanoutRule(counters, exemption);
         when(counters.addToSet(eq(LoginCounters.Counter.IP_IDENTITY), eq("1.2.3.4"), anyString())).thenReturn(6L);
 
         RiskHit hit = rule.evaluate(ctx(), config(tiers(5, 2, 30, 6)));
@@ -287,7 +292,7 @@ class LoginRuleTest {
         assertTrue(new IpBlacklistRule(lists).alwaysEnforce());
         assertTrue(new DeviceBannedRule(dispositionService).alwaysEnforce());
         assertTrue(new GlobalCaptchaRule().alwaysEnforce());
-        assertEquals(false, new IpFailLimitRule(counters).alwaysEnforce());
+        assertEquals(false, new IpFailLimitRule(counters, exemption).alwaysEnforce());
         assertEquals(false, new DeviceObserveRule(dispositionService).alwaysEnforce());
     }
 
@@ -308,6 +313,76 @@ class LoginRuleTest {
         Member member = new Member();
         member.setMemberId(1000000001L);
         return member;
+    }
+
+    // ------------------------------------------------------------------ 老设备豁免限流档（§4.1）
+
+    @Test
+    @DisplayName("🔴 老设备：超到限流档也只出滑块 —— 校园网里一个人试错，不该让整片真人登不上")
+    void 老设备免限流档() {
+        when(exemption.exempt(any())).thenReturn(true);
+        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
+        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(300L);
+        when(counters.retryAfterSeconds(any(), anyString())).thenReturn(1200L);
+
+        // 超 60 出滑块、超 200 限流；数到 300，没有豁免的话是限流
+        RiskHit hit = rule.evaluate(ctx(), config(tiers(60, 2, 200, 6)));
+
+        assertNotNull(hit, "🔴 不是整条跳过：滑块档照常出");
+        assertEquals(MemberRiskDecisionEnum.CAPTCHA, hit.decision());
+    }
+
+    @Test
+    @DisplayName("🔴 豁免压的是处置，不是观察：计数照常加")
+    void 豁免也照常计数() {
+        when(exemption.exempt(any())).thenReturn(true);
+        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
+        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(300L);
+
+        rule.evaluate(ctx(), config(tiers(60, 2, 200, 6)));
+
+        verify(counters).bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4");
+    }
+
+    @Test
+    @DisplayName("老设备 + 只配了限流一档 → 不命中（没有更低的档可落）")
+    void 老设备且只有限流档时不命中() {
+        when(exemption.exempt(any())).thenReturn(true);
+        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
+        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(300L);
+
+        assertNull(rule.evaluate(ctx(), config(tiers(200, 6))));
+    }
+
+    @Test
+    @DisplayName("🔴 设备维度的规则【没有】这个豁免：一台用了半年的设备开始挨个试号，更值得警惕")
+    void 设备规则不受豁免() {
+        when(exemption.exempt(any())).thenReturn(true);
+        DeviceFanoutRule rule = new DeviceFanoutRule(counters);
+        when(counters.addToSet(eq(LoginCounters.Counter.DEVICE_MEMBER), eq("dev-1"), anyString()))
+                .thenReturn(10L);
+        when(counters.retryAfterSeconds(any(), anyString())).thenReturn(600L);
+
+        RiskHit hit = rule.evaluate(ctx(), config(tiers(3, 6)));
+
+        assertNotNull(hit);
+        assertEquals(MemberRiskDecisionEnum.LIMIT, hit.decision(),
+                "它挡的正是「这台设备在挨个试号」，设备老恰恰不是免责理由");
+    }
+
+    @Test
+    @DisplayName("IP_ACCOUNT_FANOUT 也受豁免（它没走基类，所以单独钉一条）")
+    void 一IP多账号也受豁免() {
+        when(exemption.exempt(any())).thenReturn(true);
+        IpAccountFanoutRule rule = new IpAccountFanoutRule(counters, exemption);
+        when(counters.addToSet(eq(LoginCounters.Counter.IP_IDENTITY), eq("1.2.3.4"), anyString()))
+                .thenReturn(80L);
+        when(counters.retryAfterSeconds(any(), anyString())).thenReturn(600L);
+
+        RiskHit hit = rule.evaluate(ctx(), config(tiers(10, 2, 50, 6)));
+
+        assertNotNull(hit);
+        assertEquals(MemberRiskDecisionEnum.CAPTCHA, hit.decision());
     }
 
     private static RiskContext ctx() {

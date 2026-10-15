@@ -4,7 +4,8 @@ import org.springframework.stereotype.Component;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.feature.LoginCounters;
-import solvela.member.risk.rule.TieredCountRule;
+import solvela.member.risk.feature.OldDeviceExemption;
+import solvela.member.risk.rule.IpTieredCountRule;
 
 /**
  * 单 IP 在一个窗口里的登录请求总数（含成功）。迁自 {@code LoginIpGuard}。
@@ -15,10 +16,10 @@ import solvela.member.risk.rule.TieredCountRule;
  * @Date 2026-10-15
  */
 @Component
-public class IpAttemptLimitRule extends TieredCountRule {
+public class IpAttemptLimitRule extends IpTieredCountRule {
 
-    public IpAttemptLimitRule(LoginCounters counters) {
-        super(counters);
+    public IpAttemptLimitRule(LoginCounters counters, OldDeviceExemption exemption) {
+        super(counters, exemption);
     }
 
     @Override

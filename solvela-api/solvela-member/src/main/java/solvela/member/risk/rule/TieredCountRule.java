@@ -57,13 +57,25 @@ public abstract class TieredCountRule implements RiskRule {
                 ? counters.bump(counter(), value)
                 : counters.read(counter(), value);
         List<RiskParams.Tier> tiers = RiskParams.tiers(config.params());
-        RiskParams.Tier tier = RiskParams.hit(tiers, count);
+        // 老设备豁免：限流及以上的那几档当作没配，滑块档照常（见 limitCeiling）
+        RiskParams.Tier tier = RiskParams.hit(tiers, count, limitCeiling(ctx));
         if (tier == null) {
             return null;
         }
         long retryAfter = counters.retryAfterSeconds(counter(), value);
         return decorate(RiskHit.decide(tier.decision(), retryAfter,
                 dimensionName() + "本窗口第 " + count + " 次（超过 " + tier.over() + "）"), config);
+    }
+
+    /**
+     * 这一次最多能落到哪一档（不含）。默认不设上限。
+     *
+     * <p>IP 维度的规则用它实现「老设备豁免限流档」（方案 §4.1）——
+     * 做成一个钩子而不是基类自己去问豁免，是因为<b>设备维度的规则不该有这个豁免</b>：
+     * 那几条挡的正是「这台设备在挨个试号」，而「这台设备很老」恰恰不是免责理由。
+     */
+    protected solvela.enums.MemberRiskDecisionEnum limitCeiling(RiskContext ctx) {
+        return null;
     }
 
     /** 留给子类挂动作（比如设备闸命中时请求降档）。默认什么都不加 */

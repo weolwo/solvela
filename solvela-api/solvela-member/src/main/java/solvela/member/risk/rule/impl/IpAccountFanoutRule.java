@@ -3,7 +3,9 @@ package solvela.member.risk.rule.impl;
 import org.springframework.stereotype.Component;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.risk.RiskContext;
+import solvela.enums.MemberRiskDecisionEnum;
 import solvela.member.risk.feature.LoginCounters;
+import solvela.member.risk.feature.OldDeviceExemption;
 import solvela.member.risk.feature.RiskParams;
 import solvela.member.risk.rule.RiskHit;
 import solvela.member.risk.rule.RiskRule;
@@ -31,8 +33,11 @@ public class IpAccountFanoutRule implements RiskRule {
 
     private final LoginCounters counters;
 
-    public IpAccountFanoutRule(LoginCounters counters) {
+    private final OldDeviceExemption exemption;
+
+    public IpAccountFanoutRule(LoginCounters counters, OldDeviceExemption exemption) {
         this.counters = counters;
+        this.exemption = exemption;
     }
 
     @Override
@@ -61,7 +66,12 @@ public class IpAccountFanoutRule implements RiskRule {
         String member = ctx.getIdentityHashHex().substring(0, Math.min(16, ctx.getIdentityHashHex().length()));
         long distinct = counters.addToSet(LoginCounters.Counter.IP_IDENTITY, ctx.getClientIp(), member);
         List<RiskParams.Tier> tiers = RiskParams.tiers(config.params());
-        RiskParams.Tier tier = RiskParams.hit(tiers, distinct);
+        /*
+         * 老设备豁免限流档（方案 §4.1）。这条规则尤其需要它：
+         * 校园网、公司出口背后天然有几十个账号，而那里的真人手机里躺着用了半年的 App。
+         */
+        RiskParams.Tier tier = RiskParams.hit(tiers, distinct,
+                exemption.exempt(ctx) ? MemberRiskDecisionEnum.LIMIT : null);
         if (tier == null) {
             return null;
         }
