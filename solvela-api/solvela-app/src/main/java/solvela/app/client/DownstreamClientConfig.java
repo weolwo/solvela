@@ -255,6 +255,19 @@ public class DownstreamClientConfig {
         return proxy(baseUrl, Duration.ofSeconds(2), MemberStepUpApi.class);
     }
 
+    /**
+     * 异常登录的确认（「刚才是你吗」）。<b>2 秒</b>：列表要先判一次设备信任（同上要查登录日志），
+     * 回答「不是我」还要落一行限制。
+     *
+     * <p>它挂在客户端冷启动与回到前台的那条请求上 —— 超时就是「这次不弹窗」，
+     * 下一次回到前台还会再问，所以不必给更长的预算。
+     */
+    @Bean
+    public solvela.member.api.MemberSecurityApi memberSecurityApi(
+            @Value("${solvela.client.member.base-url}") String baseUrl) {
+        return proxy(baseUrl, Duration.ofSeconds(2), solvela.member.api.MemberSecurityApi.class);
+    }
+
     @Bean
     public MemberSignApi memberSignApi(@Value("${solvela.client.member.base-url}") String baseUrl) {
         return proxy(baseUrl, Duration.ofSeconds(1), MemberSignApi.class);

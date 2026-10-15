@@ -43,6 +43,8 @@ import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberLoginType;
+import solvela.member.api.SecurityPromptAnswerCmd;
+import solvela.member.api.SecurityPromptView;
 import solvela.member.api.SessionReportCmd;
 import solvela.member.api.MemberLogoutCmd;
 import solvela.member.api.MemberRegisterCmd;
@@ -118,6 +120,9 @@ public class MemberLoginService {
     private final MemberPrincipalLoader principalLoader;
     private final MemberTokenStore tokenStore;
     private final MemberStepUpApi stepUpApi;
+
+    /** 「刚才是你吗」。单独一个契约，理由见 {@link solvela.member.api.MemberSecurityApi} */
+    private final solvela.member.api.MemberSecurityApi securityApi;
 
     /**
      * 注册并<b>直接登录</b>。
@@ -469,6 +474,27 @@ public class MemberLoginService {
                 memberId, sessionId, revoked);
         return stepUpApi.reportNotMe(new SessionReportCmd(memberId, reportedDeviceId,
                 loginEpochSecond, CurrentDevice.deviceIdOrNull(), ip));
+    }
+
+    /** 待确认的「刚才是你吗」。设备号从令牌解析，客户端说了不算 */
+    public java.util.List<SecurityPromptView> listSecurityPrompts(Long memberId, String ip) {
+        return securityApi.list(StepUpCmd.of(memberId, CurrentDevice.deviceIdOrNull(), ip));
+    }
+
+    /**
+     * 回答一条。
+     *
+     * <p>🔴 「不是我」的后果与 {@link #reportSession} <b>完全一致</b>（域里走同一个方法），
+     * 但这里还要多做一件网关才能做的事：把其余会话踢掉 —— 令牌库只在网关。
+     */
+    public void answerSecurityPrompt(Long memberId, String promptId, boolean isMe, String ip) {
+        boolean accepted = securityApi.answer(new SecurityPromptAnswerCmd(
+                memberId, promptId, isMe, CurrentDevice.deviceIdOrNull(), ip));
+        if (accepted && !isMe) {
+            // 当前这一台不踢：用户正拿着它回答，踢了他要重新登录
+            int revoked = tokenStore.revokeOthers(memberId, null);
+            log.warn("【账号安全】老设备上答「不是我」, memberId: {}, 踢掉 {} 个会话", memberId, revoked);
+        }
     }
 
     public void logout(String tokenValue, Long memberId, String ip) {

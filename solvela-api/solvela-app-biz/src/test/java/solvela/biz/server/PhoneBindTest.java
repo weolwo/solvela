@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.module.redis.RedisService;
@@ -48,7 +49,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @Date 2026-09-10
  */
 @ExtendWith(SpringExtension.class)
+/*
+ * 🔴 和 EmailBindTest 一样要让开后置矩阵：本类有一条用例断言「换绑后新号码能登录」，
+ *    而它是【直接调域】+ 全新 IP + 没有设备号 —— 正是矩阵要求验一道码的那一格。
+ *
+ *    不让开的话这条用例靠的是运气：规则缓存 30 秒，而<b>别的</b>测试类
+ *    （EmailBindTest 等）用 RelaxedRiskRules 把 LOGIN_MATRIX 临时关掉又还回去。
+ *    本类的缓存快照正好落在那个窗口里就过，落在窗口外就报 DEVICE_VERIFICATION_REQUIRED。
+ *    2026-10-16 实测：单跑过、整类跑挂，而且每次挂的用例还不一样。
+ */
+@ExtendWith(RelaxedRiskRules.class)
 @SpringBootTest
+@TestPropertySource(properties = "solvela.member.risk.cache-refresh=0s")
 class PhoneBindTest {
 
     private static final String PASSWORD = "SvPhone2026";
@@ -86,7 +98,20 @@ class PhoneBindTest {
 
     private static String freshIp() {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        return "192.0.2." + (1 + r.nextInt(250));
+        /*
+         * 🔴 两件事都要满足，而且它们互相拉扯：
+         *
+         *   1. 地址空间要【大】—— 每 IP 每天只能发 5 条短信，而这个计数器
+         *      <b>跨测试运行累积</b>。只随机最后一个八位组（250 个地址）时，
+         *      同一天把整个套件跑几遍就会开始随机失败，而且每次失败的是不同的用例；
+         *   2. 地址必须落在【保留段】里 —— 风控会按 IP 查归属地，而「换了国家」
+         *      是一条加 50 分的规则，够把后置结论推到要验证码。
+         *      一旦随机到真实可路由的地址，这个测试就会在「登录应当成功」上随机失败
+         *      （踩过一次：从 192.0.2.0/24 扩到 192.0.0.0/16，而后者大半是真实空间）。
+         *
+         * 198.18.0.0/15（RFC 2544 基准测试保留）两个条件都满足：整段保留、12.8 万个地址。
+         */
+        return "198.18." + r.nextInt(256) + "." + (1 + r.nextInt(250));
     }
 
     /** 发一条 BIND 场景的短信码并读回来。test profile 走 LOG 通道，不需要厂商 */
@@ -276,9 +301,10 @@ class PhoneBindTest {
         String second = freshPhone();
         assertTrue(bind(second, bindCode(second), PASSWORD, null).success());
 
-        assertTrue(memberAuthService.authenticate(new MemberAuthCmd(
+        solvela.member.api.MemberAuthResult byNew = memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.PHONE_PASSWORD, second, PASSWORD, null,
-                "H5", freshIp(), null, true)).success(), "新号码应当能登录");
+                "H5", freshIp(), null, true));
+        assertTrue(byNew.success(), "新号码应当能登录，实际 " + byNew.reason());
         assertFalse(memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.PHONE_PASSWORD, first, PASSWORD, null,
                 "H5", freshIp(), null, true)).success(),

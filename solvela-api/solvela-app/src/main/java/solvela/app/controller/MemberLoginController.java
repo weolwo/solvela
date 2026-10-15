@@ -23,6 +23,8 @@ import solvela.app.domain.PhoneBindRequest;
 import solvela.app.domain.LoginChallengeCodeView;
 import solvela.app.domain.LoginChallengeRequest;
 import solvela.app.domain.SessionAdoptRequest;
+import solvela.app.domain.SecurityPromptAnswerRequest;
+import solvela.member.api.SecurityPromptView;
 import solvela.app.domain.SessionReportRequest;
 import solvela.app.domain.SessionRevokeRequest;
 import solvela.member.api.MemberContactView;
@@ -323,6 +325,37 @@ public class MemberLoginController {
                 currentToken(servletRequest), request.sessionId(), request.deviceId(),
                 request.loginTime() == null ? 0L : request.loginTime() / 1000L,
                 ClientIp.of(servletRequest));
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 待确认的「你的账号刚在 XX 登录，是你吗？」。<b>要登录。</b>
+     *
+     * <p>客户端冷启动和回到前台时各调一次。
+     *
+     * <h3>🔴 不满足条件时返回空列表，不是报错</h3>
+     * 「当前这台设备不受信任」是最常见的情况（新设备上就不该问），
+     * 回一个 403 会让客户端在每次冷启动时都吃一个错误，而那不是错误。
+     */
+    @PostMapping("/security/prompts")
+    public List<SecurityPromptView> securityPrompts(HttpServletRequest servletRequest) {
+        return memberLoginService.listSecurityPrompts(
+                CurrentMember.require().memberId(), ClientIp.of(servletRequest));
+    }
+
+    /**
+     * 回答一条。<b>要登录。</b>返回 204。
+     *
+     * <h3>为什么「受理了没有」不回给客户端</h3>
+     * 单号不存在、已经答过、不在受信任设备上 —— 三种都返回 204。
+     * 客户端拿到结果能做的事只有一件：把这条从列表里去掉，而那件事三种情况下都该做。
+     * 🔴 区分出来反而给了一个探测口：拿一堆单号试，看哪个「受理了」。
+     */
+    @PostMapping("/security/prompts/answer")
+    public ResponseEntity<Void> answerSecurityPrompt(@RequestBody @Valid SecurityPromptAnswerRequest request,
+                                                     HttpServletRequest servletRequest) {
+        memberLoginService.answerSecurityPrompt(CurrentMember.require().memberId(),
+                request.promptId(), Boolean.TRUE.equals(request.isMe()), ClientIp.of(servletRequest));
         return ResponseEntity.noContent().build();
     }
 

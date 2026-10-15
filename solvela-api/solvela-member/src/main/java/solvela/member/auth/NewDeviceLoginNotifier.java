@@ -50,6 +50,11 @@ import java.util.Map;
  * 分不清的时候不发，和「没有设备号就不发」同一个取向。
  * 判断必须在写本次成功日志<b>之前</b>做（调用方保证）。
  *
+ * <h3>🔴 它还是「刚才是你吗」的唯一创建点</h3>
+ * 那条提问要问的正是「这次新设备登录」，判据与本类完全一样 ——
+ * 另写一份判断的话，两份漂移的第一天不会有任何报错，表现是「发了邮件却没弹窗」
+ * 或者反过来。所以提问在这里一起记（方案 §8.1）。
+ *
  * <h3>发送是异步的</h3>
  * 两个存在性查询在登录线程里做（主键 / 索引点查），发信与站内信丢到发信线程池 ——
  * 它们慢或失败都不该拖住、更不该搞砸一次成功的登录。
@@ -77,6 +82,9 @@ public class NewDeviceLoginNotifier {
     private final NotificationService notificationService;
 
     private final RedisService redisService;
+
+    /** 「刚才是你吗」：同一个判据下顺手记一条待确认 */
+    private final solvela.member.risk.SecurityPromptService securityPromptService;
 
     /** 注册设备：会员 → 注册时的设备号 */
     private static final String KEY_REGISTRATION_DEVICE = "mbr:login:reg-device:";
@@ -127,10 +135,18 @@ public class NewDeviceLoginNotifier {
             if (loginLogDao.existsSuccessfulLoginOnDevice(memberId, deviceId, success)) {
                 return;
             }
-            String loginTime = LocalDateTime.now().format(TIME);
+            LocalDateTime now = LocalDateTime.now();
+            String loginTime = now.format(TIME);
             String location = regionOf(clientIp);
             String device = SolvelaStringUtil.isBlank(deviceType) ? "未知设备" : deviceType;
             log.info("【新设备登录】发送提醒, memberId: {}, deviceId: {}, 地点: {}", memberId, deviceId, location);
+            /*
+             * 待确认同步记（一次 Redis 写），发信异步。
+             * 🔴 不放进异步任务里：那个线程池满了会丢任务，而丢掉提问等于丢掉一条标注 ——
+             * 标注是整套风控唯一的「答案」，比那封邮件更难补。
+             */
+            securityPromptService.onNewDeviceLogin(memberId, deviceId, deviceType, location,
+                    now.atZone(java.time.ZoneId.systemDefault()).toEpochSecond());
             sendExecutor.execute(() -> deliver(memberId, loginTime, device, location, deviceId));
         } catch (Exception e) {
             log.error("【新设备登录】判断失败，本次不提醒, memberId: {}", memberId, e);

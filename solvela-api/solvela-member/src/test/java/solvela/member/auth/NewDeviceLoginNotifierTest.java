@@ -63,6 +63,9 @@ class NewDeviceLoginNotifierTest {
     private RedisService redisService;
     @Mock
     private AsyncTaskExecutor sendExecutor;
+    /** 「刚才是你吗」同一个判据下顺手记一条。这批用例只管提醒，不管它 */
+    @Mock
+    private solvela.member.risk.SecurityPromptService securityPromptService;
 
     @InjectMocks
     private NewDeviceLoginNotifier notifier;

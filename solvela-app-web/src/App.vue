@@ -5,6 +5,7 @@ import { RouterView, useRoute } from 'vue-router'
 import AccountNoticeDialog from '@/components/AccountNoticeDialog.vue'
 import CaptchaDialog from '@/components/CaptchaDialog.vue'
 import ForceAckDialog from '@/components/ForceAckDialog.vue'
+import SecurityPromptDialog from '@/components/SecurityPromptDialog.vue'
 import StepUpDialog from '@/components/StepUpDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -63,6 +64,14 @@ const showTabBar = computed(() => route.meta.tab === true)
     🔴 它【不】重试原请求 —— 这一档验证码也过不去，唯一的出口是重置密码。
   -->
   <AccountNoticeDialog v-if="auth.isLoggedIn" />
+
+  <!--
+    「你的账号刚在 XX 登录，是你吗？」。它自己在挂载和回到前台时各拉一次 ——
+    服务端不推送，而且只在【受信任的老设备】上才返回待确认的，所以绝大多数时候是空数组。
+    🔴 挂在外壳上：盗号发生在用户没看手机的那段时间，他重新打开 App 的那一刻正是最该问他的时候，
+    而那时他可能停在任何页面。
+  -->
+  <SecurityPromptDialog v-if="auth.isLoggedIn" />
 </template>
 
 <style scoped>
