@@ -91,6 +91,33 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
         return snapshot.get().byCode().get(code);
     }
 
+    /**
+     * 用这条规则<b>自己的</b> {@code validate} 校验一份参数；不合法抛 {@link IllegalArgumentException}。
+     *
+     * <h3>🔴 后台保存与加载必须走同一个方法</h3>
+     * 只在加载时校验的话，一个读不出来的参数能被存进去 —— 然后那条规则在下一次缓存刷新时
+     * <b>静默关闭</b>，而页面上看着保存成功、列表里也有那一行。
+     * 「形状对不对」只有规则自己知道（分级要 tiers 递增、矩阵不许配成拒绝、机房关键字不能为空……）。
+     */
+    public void validateParams(String code, String paramsJson) {
+        RiskRule impl = rulesByCode.get(code);
+        if (impl == null) {
+            throw new IllegalArgumentException("代码里没有这条规则，改不了它的参数: " + code);
+        }
+        JsonNode params;
+        try {
+            params = SolvelaStringUtil.isBlank(paramsJson)
+                    ? JsonUtils.getMapper().createObjectNode()
+                    : JsonUtils.getMapper().readTree(paramsJson);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("参数不是合法的 JSON: " + e.getMessage(), e);
+        }
+        if (!params.isObject()) {
+            throw new IllegalArgumentException("参数必须是一个 JSON 对象");
+        }
+        impl.validate(params);
+    }
+
     /** 上一次加载时参数读不出来的规则。只用于启动校验时把它们和「缺种子」区分开 */
     private volatile Set<String> loadedButBroken = Set.of();
 

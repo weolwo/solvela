@@ -1,11 +1,19 @@
 package solvela.member.risk.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import solvela.member.MemberRiskEvent;
+import solvela.member.risk.domain.dto.MemberRiskEventDTO;
+import solvela.member.risk.domain.query.MemberRiskEventQuery;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 风控决策流水（按月分区）。🔴 按 id 定位时一定要同时带 create_time。
@@ -37,4 +45,32 @@ public interface MemberRiskEventDao extends BaseMapper<MemberRiskEvent> {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "e.id", keyColumn = "id")
     int insertEvent(@Param("e") MemberRiskEvent event);
+
+    /**
+     * 后台分页查。
+     *
+     * <h3>🔴 {@code create_time} 的条件一个都不能少</h3>
+     * 表按月分区，而分区裁剪只看 WHERE 里有没有分区列。少了它，每个分区都要各探一次索引 ——
+     * 所以 Service 在没传时间时会兜一个默认区间，而不是把条件去掉。
+     *
+     * <h3>{@code identity_hash} 要 HEX / UNHEX</h3>
+     * 列是 {@code binary(32)}，而 Java 侧一律用 hex（{@code PiiHasher} 的约定）。
+     * 查询条件漏了 {@code UNHEX} 的表现是「按手机号查永远 0 条」，而 SQL 看着很正常。
+     */
+    List<MemberRiskEventDTO> queryPage(Page<?> page, @Param("query") MemberRiskEventQuery query);
+
+    /**
+     * 取一行详情。
+     *
+     * <p>🔴 必须同时带 id 和 create_time：只按 id 查不裁剪分区（见 {@link #queryPage}）。
+     */
+    @Select("""
+            SELECT id, event_type, ref_event_id, member_id, HEX(identity_hash) AS identity_hash_hex,
+                   login_type, device_id, device_trust, ip_familiar, dormant, client_ip, ip_region,
+                   captcha_passed, pre_score, post_score, shadow_score, decision, shadow_decision,
+                   verify_channel, outcome, label, label_source, label_time, cost_ms, trace_id, create_time
+              FROM t_member_risk_event
+             WHERE id = #{id} AND create_time = #{createTime}
+            """)
+    MemberRiskEventDTO selectOneAt(@Param("id") Long id, @Param("createTime") LocalDateTime createTime);
 }

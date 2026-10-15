@@ -4,7 +4,11 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import solvela.member.MemberRiskHit;
+import solvela.member.risk.domain.dto.MemberRiskHitDTO;
+
+import java.time.LocalDateTime;
 
 import java.util.List;
 
@@ -41,4 +45,24 @@ public interface MemberRiskHitDao extends BaseMapper<MemberRiskHit> {
             </script>
             """)
     int insertHits(@Param("hits") List<MemberRiskHit> hits);
+
+    /**
+     * 取一次尝试命中的全部规则，顺带把规则名也带出来。
+     *
+     * <h3>为什么要 join 规则表</h3>
+     * 命中明细只存编码（规则改名、改档位都不该动历史记录），而编码不是给人看的。
+     * {@code LEFT JOIN}：规则被下线删掉之后，历史命中<b>照样要能看</b>，只是没有名字。
+     *
+     * <p>🔴 {@code create_time} 不能省：两张表都按月分区，少了它两边都不裁剪分区。
+     */
+    @Select("""
+            SELECT h.id, h.rule_code, r.rule_name, h.mode, h.decision, h.score, h.detail,
+                   h.error, h.create_time
+              FROM t_member_risk_hit h
+              LEFT JOIN t_member_risk_rule r ON r.rule_code = h.rule_code
+             WHERE h.event_id = #{eventId} AND h.create_time = #{createTime}
+             ORDER BY h.id
+            """)
+    List<MemberRiskHitDTO> selectByEvent(@Param("eventId") Long eventId,
+                                         @Param("createTime") LocalDateTime createTime);
 }

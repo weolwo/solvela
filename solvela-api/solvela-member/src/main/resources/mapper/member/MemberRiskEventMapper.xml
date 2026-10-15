@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="solvela.member.risk.dao.MemberRiskEventDao">
+
+    <!--
+      风控决策流水的后台分页查询。
+
+      🔴 两件事在这个文件里最容易错，而且错了都不报错：
+
+      1. create_time 的两个条件【一个都不能省】。表按月分区，分区裁剪只看 WHERE 里有没有
+         分区列（与索引无关）。少了它，每个分区都要各探一次索引 —— 现在只有几个分区所以
+         慢得不明显，保留期攒满之后就是 6 倍。Service 在调用方没传时间时会兜一个默认区间，
+         所以这两个条件在实际查询里永远存在。
+
+      2. identity_hash 是 binary(32)，出要 HEX、入要 UNHEX。漏掉 UNHEX 的表现是
+         「按手机号查永远 0 条」，而 SQL 看着完全正常。
+    -->
+    <select id="queryPage" resultType="solvela.member.risk.domain.dto.MemberRiskEventDTO">
+        SELECT
+            e.id,
+            e.event_type,
+            e.ref_event_id,
+            e.member_id,
+            HEX(e.identity_hash) AS identity_hash_hex,
+            e.login_type,
+            e.device_id,
+            e.device_trust,
+            e.ip_familiar,
+            e.dormant,
+            e.client_ip,
+            e.ip_region,
+            e.captcha_passed,
+            e.pre_score,
+            e.post_score,
+            e.shadow_score,
+            e.decision,
+            e.shadow_decision,
+            e.verify_channel,
+            e.outcome,
+            e.label,
+            e.label_source,
+            e.label_time,
+            e.cost_ms,
+            e.trace_id,
+            e.create_time
+        FROM t_member_risk_event e
+        <where>
+            <if test="query.startTime != null">
+                AND e.create_time &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND e.create_time &lt;= #{query.endTime}
+            </if>
+            <if test="query.memberId != null">
+                AND e.member_id = #{query.memberId}
+            </if>
+            <if test="query.identityHashHex != null and query.identityHashHex != ''">
+                AND e.identity_hash = UNHEX(#{query.identityHashHex})
+            </if>
+            <if test="query.clientIp != null and query.clientIp != ''">
+                AND e.client_ip = #{query.clientIp}
+            </if>
+            <if test="query.deviceId != null and query.deviceId != ''">
+                AND e.device_id = #{query.deviceId}
+            </if>
+            <if test="query.decision != null">
+                AND e.decision = #{query.decision}
+            </if>
+            <if test="query.outcome != null">
+                AND e.outcome = #{query.outcome}
+            </if>
+            <!--
+              只看「切生效会改变结论」的那些。方案 §8.2 的打扰率就是按它算的 ——
+              少了这个开关，运营只能把两列导出来自己比。
+            -->
+            <if test="query.shadowDiffOnly != null and query.shadowDiffOnly">
+                AND e.decision &lt;&gt; e.shadow_decision
+            </if>
+        </where>
+        <!-- 倒序：看的人要的是「最近发生了什么」。id 一起排是为了同一秒内也稳定 -->
+        ORDER BY e.create_time DESC, e.id DESC
+    </select>
+
+</mapper>
