@@ -248,7 +248,8 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
     private static final Map<MemberRiskEventTypeEnum, Set<MemberRiskDecisionEnum>> ALLOWED_DIRECT = Map.of(
             MemberRiskEventTypeEnum.REGISTER, RiskParams.GATE_ONLY,
             MemberRiskEventTypeEnum.RESET_PASSWORD, RiskParams.GATE_ONLY,
-            MemberRiskEventTypeEnum.ASSET_OUT, RiskParams.WITH_STEP_UP);
+            MemberRiskEventTypeEnum.ASSET_OUT, RiskParams.WITH_STEP_UP,
+            MemberRiskEventTypeEnum.CONTACT_BIND, RiskParams.GATE_ONLY);
 
     private static Map<String, RiskRule> indexByCode(
             List<RiskRule> rules) {

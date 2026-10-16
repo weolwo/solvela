@@ -1,18 +1,13 @@
 package solvela.member.risk.rule.impl;
 
 import org.springframework.stereotype.Component;
+import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
-import solvela.enums.MemberRiskPhaseEnum;
-import solvela.member.risk.RiskContext;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.risk.feature.RiskParams;
-import solvela.member.risk.rule.RiskHit;
-import solvela.member.risk.rule.RiskRule;
-import solvela.member.risk.rule.RiskRuleConfig;
-import tools.jackson.databind.JsonNode;
+import solvela.member.risk.rule.DeviceMemberFanoutRule;
 
-import java.time.Duration;
-import java.util.List;
+import java.util.Set;
 
 /**
  * 一台设备在窗口内给<b>几个不同会员</b>做过资产出口 —— 一机多号的资产侧版本。
@@ -33,19 +28,13 @@ import java.util.List;
  * 所以这条新拍的阈值上线即生效（阈值给得宽），而硬拦那两档留给人工签过字的
  * 黑名单与设备封禁。
  *
- * <h3>关联关系无论放不放行都要记下</h3>
- * 先 add 再判阈值 —— 「超了就不记」会让这台设备的真实量级被抹平，
- * 而那正是攻击时最该看清的数。判据同 {@code DeviceFanoutRule}。
- *
  * @Date 2026-10-16
  */
 @Component
-public class AssetDeviceFanoutRule implements RiskRule {
-
-    private final LoginCounters counters;
+public class AssetDeviceFanoutRule extends DeviceMemberFanoutRule {
 
     public AssetDeviceFanoutRule(LoginCounters counters) {
-        this.counters = counters;
+        super(counters);
     }
 
     @Override
@@ -58,34 +47,24 @@ public class AssetDeviceFanoutRule implements RiskRule {
         return MemberRiskEventTypeEnum.ASSET_OUT;
     }
 
-    /** 资产出口只有一个决策点 —— 这条链路上没有「验完再判一次」的位置 */
     @Override
-    public MemberRiskPhaseEnum phase() {
-        return MemberRiskPhaseEnum.PRE;
+    protected LoginCounters.Counter counter() {
+        return LoginCounters.Counter.ASSET_DEVICE_MEMBER;
+    }
+
+    /** 资产出口是唯一一个能要求核身的非登录场景 —— 二次验证本来就长在这条链路上 */
+    @Override
+    protected Set<MemberRiskDecisionEnum> allowedDecisions() {
+        return RiskParams.WITH_STEP_UP;
     }
 
     @Override
-    public void validate(JsonNode params) {
-        RiskParams.duration(params, "window", Duration.ofDays(1));
-        RiskParams.requireDecisionsIn(params, "资产出口", RiskParams.WITH_STEP_UP,
-                "滑块在这条链路上没有出图与核销的地方，密码冷却只锁密码通道（这里的人已经登录了）");
+    protected String whyLimited() {
+        return "滑块在这条链路上没有出图与核销的地方，密码冷却只锁密码通道（这里的人已经登录了）";
     }
 
     @Override
-    public RiskHit evaluate(RiskContext ctx, RiskRuleConfig config) {
-        if (ctx.getDeviceId() == null || ctx.memberId() == null) {
-            // 没带设备令牌时这一维无从计数。资产出口那边本来就会按 NO_DEVICE 要求补设备身份
-            return null;
-        }
-        long distinct = counters.addToSet(LoginCounters.Counter.ASSET_DEVICE_MEMBER,
-                ctx.getDeviceId(), String.valueOf(ctx.memberId()));
-        List<RiskParams.Tier> tiers = RiskParams.tiers(config.params());
-        RiskParams.Tier tier = RiskParams.hit(tiers, distinct);
-        if (tier == null) {
-            return null;
-        }
-        return RiskHit.decide(tier.decision(),
-                counters.retryAfterSeconds(LoginCounters.Counter.ASSET_DEVICE_MEMBER, ctx.getDeviceId()),
-                "本设备本窗口替 " + distinct + " 个账号做过资产出口（超过 " + tier.over() + "）");
+    protected String operationName() {
+        return "做过资产出口";
     }
 }

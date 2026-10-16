@@ -63,13 +63,44 @@ public class MemberPhoneBindService {
 
     private final solvela.member.contact.ContactCoolingStore coolingStore;
 
+    /**
+     * 换绑那一道闸上的风控（2026-10-16，P3 ②）。
+     *
+     * <p>🔴 与 {@code stepUpServiceProvider} 同一个理由必须<b>延迟取</b>：
+     * 风控引擎在构造时会把所有规则实例化出来做双向校验，而其中一条规则要用
+     * 本域的设备信任 —— 直接注入就是一个环（见 {@code MemberStepUpService} 里那段注释）。
+     */
+    private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine>
+            riskEngineFactory;
+
+
     private final solvela.notification.service.NotificationService notificationService;
 
     @Transactional(rollbackFor = Exception.class)
     public MemberPhoneBindResult bind(MemberPhoneBindCmd cmd) {
         String newPhone = MemberPhoneUtil.normalize(cmd.newPhone());
         if (newPhone == null) {
+            // 格式不对连账本都不开（判据同邮箱那边、同注册）
             return MemberPhoneBindResult.fail(PhoneBindFailReason.BAD_PHONE_FORMAT);
+        }
+        try (solvela.member.risk.RiskSession risk = riskEngineFactory.getObject()
+                .open(riskContext(cmd.memberId(), cmd.deviceId(), cmd.clientIp()))) {
+            return insideRisk(risk, cmd, newPhone);
+        }
+    }
+
+    /** 风控账本里的那一段。结构与邮箱那边一字对应 */
+    private MemberPhoneBindResult insideRisk(solvela.member.risk.RiskSession risk,
+                                             MemberPhoneBindCmd cmd, String newPhone) {
+        solvela.member.risk.RiskDecision pre = riskEngineFactory.getObject().evaluatePre(risk);
+        if (pre.atLeast(solvela.enums.MemberRiskDecisionEnum.LIMIT)) {
+            log.warn("【手机绑定】风控拦下, memberId: {}, 结论: {}", cmd.memberId(), pre.decision());
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.PRE_BLOCKED,
+                    MemberPhoneBindResult.fail(PhoneBindFailReason.TOO_MANY_ATTEMPTS));
+        }
+        if (!pre.is(solvela.enums.MemberRiskDecisionEnum.PASS)) {
+            log.error("【手机绑定】风控给出了本场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
+                    pre.decision());
         }
 
         /*
@@ -80,7 +111,8 @@ public class MemberPhoneBindService {
         SmsCodeVerifyResult codeResult =
                 smsCodeService.verify(SmsScene.BIND, newPhone, cmd.newPhoneCode());
         if (codeResult != SmsCodeVerifyResult.OK) {
-            return MemberPhoneBindResult.fail(toBindReason(codeResult));
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS,
+                    MemberPhoneBindResult.fail(toBindReason(codeResult)));
         }
 
         Member member = memberAuthDao.selectForPhoneBind(cmd.memberId());
@@ -88,7 +120,8 @@ public class MemberPhoneBindService {
             // 令牌解析出的会员号在库里不存在。走不到，除非会员被硬删了 ——
             // 而注销是改 status 不是删行。当成没有原主证明处理，不泄露更多
             log.warn("【手机绑定】令牌里的会员号查不到人, memberId: {}", cmd.memberId());
-            return MemberPhoneBindResult.fail(PhoneBindFailReason.REBIND_VERIFICATION_FAILED);
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+                    MemberPhoneBindResult.fail(PhoneBindFailReason.REBIND_VERIFICATION_FAILED));
         }
 
         String oldPhone = SolvelaStringUtil.isEmpty(member.getPhone())
@@ -97,11 +130,36 @@ public class MemberPhoneBindService {
         if (oldPhone != null) {
             MemberPhoneBindResult rebindProblem = requireOwnership(member, oldPhone, cmd);
             if (rebindProblem != null) {
-                return rebindProblem;
+                // 「还没给证明」与「给了但不对」记成两个结局，理由见邮箱那边
+                boolean needsMore =
+                        rebindProblem.reason() == PhoneBindFailReason.REBIND_VERIFICATION_REQUIRED;
+                return risk.end(needsMore
+                        ? solvela.enums.MemberRiskOutcomeEnum.STEP_UP_REQUIRED
+                        : solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS, rebindProblem);
             }
         }
-        return doUpdate(cmd.memberId(), newPhone, oldPhone, cmd.deviceId(), cmd.clientIp());
+
+        MemberPhoneBindResult result =
+                doUpdate(cmd.memberId(), newPhone, oldPhone, cmd.deviceId(), cmd.clientIp());
+        return risk.end(result.success()
+                ? solvela.enums.MemberRiskOutcomeEnum.SUCCESS
+                : solvela.enums.MemberRiskOutcomeEnum.IDENTITY_TAKEN, result);
     }
+
+    /**
+     * 换绑场景的规则上下文。<b>只有会员号</b>，没有加载整行 Member ——
+     * 这三条规则一条都不读账号字段，而为了填一个 Member 去查一次库是白加一次查询
+     * （见 {@code RiskContext#memberIdOnly}）。
+     *
+     * <p>⚠️ 上下文里<b>不放设备信任</b>：换绑那三条规则的 {@code bypass_by_trust} 都是 0
+     * （可信设备也要判），所以引擎用不到它 —— 而算它要查一次登录日志。
+     * 与邮箱那边一字对应。
+     */
+    private solvela.member.risk.RiskContext riskContext(Long memberId, String deviceId, String clientIp) {
+        return new solvela.member.risk.RiskContext(
+                solvela.enums.MemberRiskEventTypeEnum.CONTACT_BIND, memberId, deviceId, clientIp);
+    }
+
 
     /**
      * 换绑时的原主证明：当前密码，或旧手机号收到的验证码。

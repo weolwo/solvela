@@ -211,11 +211,11 @@ class MemberRiskAdminQueryTest {
     // ------------------------------------------------------------------ 规则
 
     @Test
-    @DisplayName("规则列表是全的（登录 20 + 注册 4 + 重置密码 4 + 资产出口 3），按【场景 → 阶段】分好组")
+    @DisplayName("规则列表是全的（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3），按【场景 → 阶段】分好组")
     void listRules() {
         List<MemberRiskRule> rules = adminService.listRules();
 
-        assertEquals(31, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
+        assertEquals(34, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
 
         // 场景不能交错：注册的规则夹在登录的规则中间，页面上那一列就白加了
         solvela.enums.MemberRiskEventTypeEnum scenario = null;
@@ -240,9 +240,10 @@ class MemberRiskAdminQueryTest {
                 .filter(r -> r.getEventType() != solvela.enums.MemberRiskEventTypeEnum.LOGIN)
                 .allMatch(r -> r.getPhase() == solvela.enums.MemberRiskPhaseEnum.PRE));
 
-        // 资产出口那三条【都不许被可信设备跳过】—— 那正是这个场景存在的理由
+        // 资产出口与换绑那几条【都不许被可信设备跳过】—— 那正是这两个场景存在的理由
         assertTrue(rules.stream()
-                .filter(r -> r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.ASSET_OUT)
+                .filter(r -> r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.ASSET_OUT
+                        || r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.CONTACT_BIND)
                 .allMatch(r -> Integer.valueOf(0).equals(r.getBypassByTrust())),
                 "可信设备跳过的话，「一台验证过的老设备被偷了会话」这件事就永远判不出来");
     }

@@ -20,6 +20,7 @@ export const RISK_EVENT_TYPE_ENUM = {
   REGISTER: { value: 3, desc: '注册', color: 'purple' },
   RESET_PASSWORD: { value: 4, desc: '重置密码', color: 'magenta' },
   ASSET_OUT: { value: 5, desc: '资产出口', color: 'red' },
+  CONTACT_BIND: { value: 6, desc: '换绑', color: 'orange' },
 };
 
 export const RISK_EVENT_TYPE_OPTIONS = Object.values(RISK_EVENT_TYPE_ENUM).map((item) => ({

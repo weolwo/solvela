@@ -790,7 +790,7 @@ CREATE TABLE `t_member_risk_rule` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `rule_code` varchar(32) NOT NULL COMMENT '规则编码，与代码里 MemberRiskRule#code() 一一对应。启动时双向校验',
   `rule_name` varchar(64) NOT NULL COMMENT '给人看的名字',
-  `event_type` tinyint NOT NULL COMMENT '适用事件：1-登录, 3-注册, 4-重置密码, 5-资产出口。见 MemberRiskEventTypeEnum。一条规则只属于一个场景，以代码为准并在启动时核对',
+  `event_type` tinyint NOT NULL COMMENT '适用事件：1-登录, 3-注册, 4-重置密码, 5-资产出口, 6-换绑联系方式。见 MemberRiskEventTypeEnum。一条规则只属于一个场景，以代码为准并在启动时核对',
   `phase` tinyint NOT NULL COMMENT '阶段：1-前置（验凭据之前）, 2-后置（验凭据之后）',
   `rule_type` tinyint NOT NULL COMMENT '类型：1-强规则（固定处置）, 2-强规则（分级 / 矩阵，处置写在 params）, 3-打分规则',
   `direct_decision` tinyint DEFAULT NULL COMMENT '固定处置：1-放行, 2-滑块, 3-OTP, 4-换通道OTP, 5-密码冷却, 6-限流, 7-拒绝。分级与打分规则为 NULL',
@@ -831,7 +831,7 @@ CREATE TABLE `t_member_risk_list` (
 DROP TABLE IF EXISTS `t_member_risk_event`;
 CREATE TABLE `t_member_risk_event` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `event_type` tinyint NOT NULL COMMENT '事件：1-登录, 2-登录二次验证, 3-注册, 4-重置密码, 5-资产出口。见 MemberRiskEventTypeEnum',
+  `event_type` tinyint NOT NULL COMMENT '事件：1-登录, 2-登录二次验证, 3-注册, 4-重置密码, 5-资产出口, 6-换绑联系方式。见 MemberRiskEventTypeEnum',
   `ref_event_id` bigint DEFAULT NULL COMMENT '关联事件：二次验证指向签票的那次登录',
   `member_id` bigint DEFAULT NULL COMMENT '会员号。可空：查无此人时没有',
   `identity_hash` binary(32) DEFAULT NULL COMMENT '登录身份的 PiiHasher 摘要，与 t_member.phone_hash/email_hash 同算法',
@@ -849,7 +849,7 @@ CREATE TABLE `t_member_risk_event` (
   `decision` tinyint NOT NULL COMMENT '生效结论：1-放行, 2-滑块, 3-OTP, 4-换通道OTP, 5-密码冷却, 6-限流, 7-拒绝',
   `shadow_decision` tinyint NOT NULL COMMENT '陪跑结论：假如所有陪跑规则都生效',
   `verify_channel` tinyint DEFAULT NULL COMMENT '核身通道：1-邮箱, 2-短信。decision 为 OTP 时有值',
-  `outcome` tinyint NOT NULL COMMENT '最终结局：1-成功, 2-凭据错, 3-查无此人, 4-冻结, 5-冷却/锁定中, 6-格式非法, 7-需要滑块, 8-前置限流/拒绝, 9-后置限流/拒绝, 10-已签凭票, 11-二次验证通过, 12-二次验证失败, 13-内部异常（end 没被调用，close 兜底落库）, 14-身份已被注册（注册）, 15-要求核身（资产出口）',
+  `outcome` tinyint NOT NULL COMMENT '最终结局：1-成功, 2-凭据错, 3-查无此人, 4-冻结, 5-冷却/锁定中, 6-格式非法, 7-需要滑块, 8-前置限流/拒绝, 9-后置限流/拒绝, 10-已签凭票, 11-二次验证通过, 12-二次验证失败, 13-内部异常（end 没被调用，close 兜底落库）, 14-身份已被注册（注册）, 15-要求核身（资产出口 / 换绑待补原主证明）',
   `label` tinyint DEFAULT NULL COMMENT '事后标注：1-确认本人, 2-确认被盗。只这三列允许事后更新',
   `label_source` tinyint DEFAULT NULL COMMENT '标注来源：1-用户「这不是我」, 2-老设备上点「是我」, 3-客服',
   `label_time` datetime DEFAULT NULL COMMENT '标注时间',

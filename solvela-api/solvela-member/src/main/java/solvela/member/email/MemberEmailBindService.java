@@ -62,6 +62,17 @@ public class MemberEmailBindService {
 
     private final solvela.member.contact.ContactCoolingStore coolingStore;
 
+    /**
+     * 换绑那一道闸上的风控（2026-10-16，P3 ②）。
+     *
+     * <p>🔴 与 {@code stepUpServiceProvider} 同一个理由必须<b>延迟取</b>：
+     * 风控引擎在构造时会把所有规则实例化出来做双向校验，而其中一条规则要用
+     * 本域的设备信任 —— 直接注入就是一个环（见 {@code MemberStepUpService} 里那段注释）。
+     */
+    private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine>
+            riskEngineFactory;
+
+
     private final solvela.notification.service.NotificationService notificationService;
 
     /**
@@ -78,13 +89,43 @@ public class MemberEmailBindService {
     public MemberEmailBindResult bind(MemberEmailBindCmd cmd) {
         String newEmail = MemberEmailUtil.normalize(cmd.newEmail());
         if (newEmail == null) {
+            // 格式不对连账本都不开：那几条规则「这一次请求本身就算一次」，
+            // 让一个手滑打错格式的人消耗配额没有道理（判据同注册）
             return MemberEmailBindResult.fail(EmailBindFailReason.BAD_EMAIL_FORMAT);
+        }
+        try (solvela.member.risk.RiskSession risk = riskEngineFactory.getObject()
+                .open(riskContext(cmd.memberId(), cmd.deviceId(), cmd.clientIp()))) {
+            return insideRisk(risk, cmd, newEmail);
+        }
+    }
+
+    /**
+     * 风控账本里的那一段：前置决策 → 新邮箱验证码 → 原主证明 → 落库。
+     *
+     * <h3>🔴 每一条返回路径都走 {@code risk.end(...)}</h3>
+     * 漏掉一条就漏掉一行流水，而那是 code review 看得见的（见 {@code RiskSession}）。
+     */
+    private MemberEmailBindResult insideRisk(solvela.member.risk.RiskSession risk,
+                                             MemberEmailBindCmd cmd, String newEmail) {
+        // 风控排在验码【之前】：被限的请求不该还能去消耗验证码的可错次数
+        solvela.member.risk.RiskDecision pre = riskEngineFactory.getObject().evaluatePre(risk);
+        if (pre.atLeast(solvela.enums.MemberRiskDecisionEnum.LIMIT)) {
+            log.warn("【邮箱绑定】风控拦下, memberId: {}, 结论: {}", cmd.memberId(), pre.decision());
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.PRE_BLOCKED,
+                    MemberEmailBindResult.fail(EmailBindFailReason.TOO_MANY_ATTEMPTS));
+        }
+        if (!pre.is(solvela.enums.MemberRiskDecisionEnum.PASS)) {
+            // 换绑这条链路要不到核身（首次绑定没有旧联系方式可问）。放行并吵得够响 ——
+            // 把一个配置错误变成「谁都绑不了邮箱」，代价完全不对称
+            log.error("【邮箱绑定】风控给出了本场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
+                    pre.decision());
         }
 
         EmailCodeVerifyResult codeResult =
                 emailCodeService.verify(EmailCodeScene.BIND, newEmail, cmd.newEmailCode());
         if (codeResult != EmailCodeVerifyResult.OK) {
-            return MemberEmailBindResult.fail(toBindReason(codeResult));
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS,
+                    MemberEmailBindResult.fail(toBindReason(codeResult)));
         }
 
         Member member = memberAuthDao.selectForEmailBind(cmd.memberId());
@@ -92,7 +133,8 @@ public class MemberEmailBindService {
             // 令牌解析出的会员号在库里不存在。走不到，除非会员被硬删了 ——
             // 而注销是改 status 不是删行。当成没有原主证明处理，不泄露更多
             log.warn("【邮箱绑定】令牌里的会员号查不到人, memberId: {}", cmd.memberId());
-            return MemberEmailBindResult.fail(EmailBindFailReason.REBIND_VERIFICATION_FAILED);
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+                    MemberEmailBindResult.fail(EmailBindFailReason.REBIND_VERIFICATION_FAILED));
         }
 
         String oldEmail = SolvelaStringUtil.isEmpty(member.getEmail())
@@ -101,12 +143,42 @@ public class MemberEmailBindService {
         if (oldEmail != null) {
             MemberEmailBindResult rebindProblem = requireOwnership(member, oldEmail, cmd);
             if (rebindProblem != null) {
-                return rebindProblem;
+                /*
+                 * 两种情况记成两个结局：
+                 * - 还没给证明（REQUIRED）→ 要求核身。它不是失败，客户端据此弹输入框；
+                 * - 给了但不对（FAILED）→ 凭据错误。
+                 * 合成一个的话，看板上「有多少人卡在原主证明这一步」就看不出来了。
+                 */
+                boolean needsMore =
+                        rebindProblem.reason() == EmailBindFailReason.REBIND_VERIFICATION_REQUIRED;
+                return risk.end(needsMore
+                        ? solvela.enums.MemberRiskOutcomeEnum.STEP_UP_REQUIRED
+                        : solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS, rebindProblem);
             }
         }
 
-        return doUpdate(cmd.memberId(), newEmail, oldEmail, cmd.deviceId(), cmd.clientIp());
+        MemberEmailBindResult result =
+                doUpdate(cmd.memberId(), newEmail, oldEmail, cmd.deviceId(), cmd.clientIp());
+        // doUpdate 只有一种失败：撞唯一约束，也就是「这个邮箱已被别人绑走」
+        return risk.end(result.success()
+                ? solvela.enums.MemberRiskOutcomeEnum.SUCCESS
+                : solvela.enums.MemberRiskOutcomeEnum.IDENTITY_TAKEN, result);
     }
+
+    /**
+     * 换绑场景的规则上下文。<b>只有会员号</b>，没有加载整行 Member ——
+     * 这三条规则一条都不读账号字段，而为了填一个 Member 去查一次库是白加一次查询
+     * （见 {@code RiskContext#memberIdOnly}）。
+     *
+     * <p>⚠️ 上下文里<b>不放设备信任</b>：换绑那三条规则的 {@code bypass_by_trust} 都是 0
+     * （可信设备也要判），所以引擎用不到它 —— 而算它要查一次登录日志。
+     * 邮箱与手机号两边一字对应。
+     */
+    private solvela.member.risk.RiskContext riskContext(Long memberId, String deviceId, String clientIp) {
+        return new solvela.member.risk.RiskContext(
+                solvela.enums.MemberRiskEventTypeEnum.CONTACT_BIND, memberId, deviceId, clientIp);
+    }
+
 
     /**
      * 换绑时证明「你是原主」。通过返回 null。

@@ -83,8 +83,8 @@ public class VerifyFreshInstall {
                 {"t_member_id_seq", "1", "会员发号种子行：为 0 则第一个注册的用户就撞 -1000"},
                 // 2026-10-14 加：登录 20 条；2026-10-16 注册（+4 REG_*）、重置密码（+4 RESET_*）、
                 // 资产出口（+3 ASSET_*）进引擎。少于这个数说明种子没导全 —— 缺的那几条会让 app-biz 启动失败
-                {"t_member_risk_rule", "31",
-                        "风控规则（登录 20 + 注册 4 + 重置密码 4 + 资产出口 3）：缺任何一条，app-biz 启动时双向校验失败"},
+                {"t_member_risk_rule", "34",
+                        "风控规则（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3）：缺任何一条，app-biz 启动时双向校验失败"},
             };
             boolean allOk = true;
             for (String[] chk : checks) {

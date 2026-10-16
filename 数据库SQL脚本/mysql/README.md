@@ -13,14 +13,14 @@ mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子�
 
 跑完就能登录并正常使用。之后按需执行造数脚本（都可重复执行，见 `*造数*.sql`）。
 
-## ✅ 2026-10-16：空库执行已实测通过（注册 / 重置密码 / 资产出口接进风控引擎、规则表 +11 条后复跑）
+## ✅ 2026-10-16：空库执行已实测通过（注册 / 重置密码 / 资产出口 / 换绑接进风控引擎、规则表 +14 条后复跑）
 
 ```
 tools/VerifyFreshInstall.java  ->  RESULT: PASS
   schema-baseline.sql  ->  ok=178  fail=0
   data-baseline.sql    ->  ok=49   fail=0
   建表      89 张
-  种子数据  23 张表 / 586 行
+  种子数据  23 张表 / 589 行
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
@@ -46,7 +46,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | `t_notification_template` | 9 | 发不出任何站内信，**而且不报错** |
 | `t_coupon_template` | 6 | 发出去的券没有面额/门槛，**而且不报错** |
 | `t_member_id_seq` | 1 | **第一个注册的用户就撞 -1000** |
-| `t_member_risk_rule` | 31 | 风控规则（登录 20 + 注册 4 + 重置密码 4 + 资产出口 3）。与上面几张相反：**缺了 app-biz 启动失败**（规则表与代码双向校验） |
+| `t_member_risk_rule` | 34 | 风控规则（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3）。与上面几张相反：**缺了 app-biz 启动失败**（规则表与代码双向校验） |
 
 业务表（会员/活动/任务记录/流水/通知/公告）全部 0 行 —— 基线不带任何测试数据。
 
@@ -65,7 +65,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | 文件 | 内容 | 不含 |
 |---|---|---|
 | `schema-baseline.sql` | 89 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 23 张配置表、586 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
+| `data-baseline.sql` | 23 张配置表、589 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。

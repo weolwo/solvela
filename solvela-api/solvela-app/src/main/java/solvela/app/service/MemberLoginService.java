@@ -290,6 +290,8 @@ public class MemberLoginService {
             case EMAIL_CODE_MISMATCH -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误");
             case EMAIL_CODE_LOCKED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误次数过多，请重新获取");
             case EMAIL_TAKEN -> new ApiException(ApiErrors.CONFLICT, "该邮箱已被其他账号绑定");
+            // 风控拦下（设备碰号数、黑名单、设备封禁合成同一句，不说是哪一维）
+            case TOO_MANY_ATTEMPTS -> new ApiException(ApiErrors.OPERATION_LIMITED);
             case REBIND_VERIFICATION_REQUIRED -> new ApiException(ApiErrors.BAD_CREDENTIALS,
                     "更换邮箱需要验证身份：请输入当前密码，或获取原邮箱的验证码");
             case REBIND_VERIFICATION_FAILED -> new ApiException(ApiErrors.BAD_CREDENTIALS,
@@ -322,6 +324,8 @@ public class MemberLoginService {
             case SMS_CODE_LOCKED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误次数过多，请重新获取");
             // 409 而不是 400：不是「你填错了」，是「服务端已有一个冲突的东西」
             case PHONE_TAKEN -> new ApiException(ApiErrors.CONFLICT, "该手机号已被其他账号绑定");
+            // 措辞与邮箱那条对称
+            case TOO_MANY_ATTEMPTS -> new ApiException(ApiErrors.OPERATION_LIMITED);
             case REBIND_VERIFICATION_REQUIRED -> new ApiException(ApiErrors.BAD_CREDENTIALS,
                     "更换手机号需要验证身份：请输入当前密码，或获取原手机号的验证码");
             case REBIND_VERIFICATION_FAILED -> new ApiException(ApiErrors.BAD_CREDENTIALS,

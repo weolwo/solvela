@@ -125,6 +125,15 @@ public class LoginCounters {
          * 而买号的人完全可以只登录一次、然后在同一台设备上挨个把号搬空。
          */
         ASSET_DEVICE_MEMBER("ASSET_DEVICE_FANOUT", "dev:asset:member:w2:", Duration.ofDays(1)),
+
+        /**
+         * 单设备给<b>几个不同会员</b>换过联系方式（集合）。
+         *
+         * <p>与上面那个刻意<b>各记一本</b>：搬东西和改联系方式是两件事，
+         * 一台设备可能只干其中一件。合成一个计数器的话，两个阈值就只能一起调
+         * —— 而它们的正常量级不一样。
+         */
+        BIND_DEVICE_MEMBER("BIND_DEVICE_FANOUT", "dev:bind:member:w2:", Duration.ofDays(1)),
         ;
 
         private final String ruleCode;
