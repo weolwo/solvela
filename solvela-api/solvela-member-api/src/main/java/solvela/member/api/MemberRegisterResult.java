@@ -35,9 +35,4 @@ public record MemberRegisterResult(
     public static MemberRegisterResult tooManyAttempts(long retryAfterSeconds) {
         return new MemberRegisterResult(null, RegisterFailReason.TOO_MANY_ATTEMPTS, retryAfterSeconds);
     }
-
-    /** 设备维度被限。与 IP 那一维是两回事，见 {@link RegisterFailReason#DEVICE_LIMITED}。 */
-    public static MemberRegisterResult deviceLimited(long retryAfterSeconds) {
-        return new MemberRegisterResult(null, RegisterFailReason.DEVICE_LIMITED, retryAfterSeconds);
-    }
 }

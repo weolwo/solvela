@@ -61,7 +61,7 @@ public class DeviceGuardProperties {
     /**
      * 一台设备一天能碰几个<b>不同的</b>会员号。
      *
-     * <p>这是四条里<b>信号最强</b>的一条：一机多号是养号的必然特征，
+     * <p>这是三条里<b>信号最强</b>的一条：一机多号是养号的必然特征，
      * 而正常用户换号登录是极少数（家人共用一台平板、换了新号）。
      *
      * <p>正因为强，误伤也最刺眼 —— 所以默认给到 3 而不是 1，
@@ -69,8 +69,6 @@ public class DeviceGuardProperties {
      */
     private int maxMembersPerDay = 3;
 
-    /** 一台设备一天能注册几个新账号。压批量建号，这条比 IP 那一维硬得多。 */
-    private int maxRegisterPerDay = 2;
 
     private Duration dayWindow = Duration.ofDays(1);
 

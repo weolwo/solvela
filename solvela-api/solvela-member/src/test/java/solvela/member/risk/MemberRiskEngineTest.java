@@ -74,7 +74,7 @@ class MemberRiskEngineTest {
     void setUp() {
         properties = new MemberRiskProperties();
         engine = new MemberRiskEngine(registry, properties, recorder);
-        when(registry.rules(any())).thenReturn(List.of());
+        when(registry.rules(any(), any())).thenReturn(List.of());
     }
 
     // ------------------------------------------------------------------ 取最严
@@ -247,7 +247,7 @@ class MemberRiskEngineTest {
     @Test
     @DisplayName("规则表快照取不到：整个阶段放行，不往外抛")
     void registryFailureIsFailOpen() {
-        when(registry.rules(MemberRiskPhaseEnum.PRE)).thenThrow(new IllegalStateException("库挂了"));
+        when(registry.rules(solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE)).thenThrow(new IllegalStateException("库挂了"));
 
         assertEquals(MemberRiskDecisionEnum.PASS, engine.evaluatePre(session()).decision());
     }
@@ -386,11 +386,11 @@ class MemberRiskEngineTest {
     }
 
     private void pre(RiskRuleRegistry.Bound... rules) {
-        when(registry.rules(MemberRiskPhaseEnum.PRE)).thenReturn(List.of(rules));
+        when(registry.rules(solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE)).thenReturn(List.of(rules));
     }
 
     private void post(RiskRuleRegistry.Bound... rules) {
-        when(registry.rules(MemberRiskPhaseEnum.POST)).thenReturn(List.of(rules));
+        when(registry.rules(solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.POST)).thenReturn(List.of(rules));
     }
 
     /**
@@ -445,13 +445,13 @@ class MemberRiskEngineTest {
 
     private static RiskRuleRegistry.Bound remode(RiskRuleRegistry.Bound b, MemberRiskModeEnum mode) {
         RiskRuleConfig c = b.config();
-        return new RiskRuleRegistry.Bound(b.rule(), new RiskRuleConfig(c.code(), c.name(), c.phase(), c.ruleType(),
+        return new RiskRuleRegistry.Bound(b.rule(), new RiskRuleConfig(c.code(), c.name(), c.eventType(), c.phase(), c.ruleType(),
                 c.directDecision(), c.score(), c.group(), mode, c.bypassByTrust(), c.params()));
     }
 
     private static RiskRuleRegistry.Bound bypass(RiskRuleRegistry.Bound b) {
         RiskRuleConfig c = b.config();
-        return new RiskRuleRegistry.Bound(b.rule(), new RiskRuleConfig(c.code(), c.name(), c.phase(), c.ruleType(),
+        return new RiskRuleRegistry.Bound(b.rule(), new RiskRuleConfig(c.code(), c.name(), c.eventType(), c.phase(), c.ruleType(),
                 c.directDecision(), c.score(), c.group(), c.mode(), true, c.params()));
     }
 
@@ -507,7 +507,7 @@ class MemberRiskEngineTest {
                 return body.apply(ctx);
             }
         };
-        RiskRuleConfig config = new RiskRuleConfig(code, code, phase, type, direct, points, group, mode,
+        RiskRuleConfig config = new RiskRuleConfig(code, code, solvela.enums.MemberRiskEventTypeEnum.LOGIN, phase, type, direct, points, group, mode,
                 bypassByTrust, JsonUtils.getMapper().createObjectNode());
         return new RiskRuleRegistry.Bound(impl, config);
     }

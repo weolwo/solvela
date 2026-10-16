@@ -9,6 +9,11 @@ import lombok.Getter;
  * <p>与「风控判了什么」（{@link MemberRiskDecisionEnum}）分开记：风控说放行、结果密码错，
  * 和风控说要 OTP、结果用户没回来验码，是两件不同的事，误伤分析要能分开看（方案 §8.2）。
  *
+ * <p>⚠️ 几档是按登录起的名字，注册（2026-10-16 接进同一个引擎）复用它们：
+ * 验证码不对记 {@link #BAD_CREDENTIALS}、被限流记 {@link #PRE_BLOCKED}、
+ * 身份被占用记 {@link #IDENTITY_TAKEN}。
+ * 不另起一套注册专用的结局，是因为那会让看板上每一处统计都要分两种口径去写。
+ *
  * @Date 2026-10-15
  */
 @Getter
@@ -51,6 +56,17 @@ public enum MemberRiskOutcomeEnum implements BaseEnum {
      * 查会员、验密码、写登录日志这些主干环节出了问题。
      */
     INTERNAL_ERROR(13, "内部异常"),
+
+    /**
+     * 注册时身份已被占用（手机号 / 邮箱）。
+     *
+     * <h3>🔴 它不能并进 {@link #BAD_CREDENTIALS}</h3>
+     * 「这个号已经有人了」是注册场景里<b>信号最强</b>的一个结局：真人一辈子撞到一两次，
+     * 而一个拿着泄露号码库挨个试「哪些号已经注册过」的脚本，产出的几乎全是这一档。
+     * 并进「凭据错」的话，这个形状在看板上就看不见了 —— 而注册这边本来就只有
+     * {@code PHONE_TAKEN / EMAIL_TAKEN} 这一个藏不掉的枚举口子（见 {@code RegisterFailReason}）。
+     */
+    IDENTITY_TAKEN(14, "身份已被注册"),
     ;
 
     private final Integer value;

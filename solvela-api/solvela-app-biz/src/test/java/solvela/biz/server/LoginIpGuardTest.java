@@ -22,6 +22,7 @@ import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.MemberRegisterType;
 import solvela.member.auth.MemberAuthService;
+import solvela.member.risk.feature.LoginCounters;
 import solvela.member.util.MemberEmailUtil;
 
 import java.util.ArrayList;
@@ -84,6 +85,9 @@ class LoginIpGuardTest {
     private solvela.member.risk.dao.MemberRiskRuleDao ruleDao;
 
     @Autowired
+    private LoginCounters counters;
+
+    @Autowired
     private solvela.member.device.DeviceService deviceService;
 
     private final List<String> usedIps = new ArrayList<>();
@@ -117,22 +121,29 @@ class LoginIpGuardTest {
         }
     }
 
+    /**
+     * 🔴 清理走 {@code counters.clear(...)}，<b>不自己拼 Redis 键</b>。
+     *
+     * <p>键名只在 {@code LoginCounters} 出现一次是那个类的全部意义；测试里再抄一份，
+     * 它就有了两个源头 —— 2026-10-16 换滑动窗口时键名跟着值的类型一起变了
+     * （带上 {@code w2:}），而抄在这里的那一份不会跟着变：
+     * 表现是「测试之间互相污染」，而且看起来像是产品代码的问题。
+     */
     @AfterEach
     void cleanUp() {
         for (String ip : usedIps) {
-            redisService.delete(
-                    redisService.generateRedisKey("login:ip:attempt:", ip),
-                    redisService.generateRedisKey("login:ip:fail:", ip),
-                    redisService.generateRedisKey("login:ip:unknown:", ip));
+            counters.clear(LoginCounters.Counter.IP_ATTEMPT, ip);
+            counters.clear(LoginCounters.Counter.IP_FAIL, ip);
+            counters.clear(LoginCounters.Counter.IP_UNKNOWN, ip);
+            counters.clear(LoginCounters.Counter.IP_IDENTITY, ip);
         }
         usedIps.clear();
         for (String deviceId : usedDevices) {
             jdbcTemplate.update("DELETE FROM t_member_login_log WHERE device_id = ?", deviceId);
             jdbcTemplate.update("DELETE FROM t_device WHERE device_id = ?", deviceId);
-            redisService.delete(
-                    redisService.generateRedisKey("dev:login:", deviceId),
-                    redisService.generateRedisKey("dev:fail:", deviceId),
-                    redisService.generateRedisKey("dev:member:", deviceId));
+            counters.clear(LoginCounters.Counter.DEVICE_LOGIN, deviceId);
+            counters.clear(LoginCounters.Counter.DEVICE_FAIL, deviceId);
+            counters.clear(LoginCounters.Counter.DEVICE_MEMBER, deviceId);
         }
         usedDevices.clear();
         if (memberId != null) {

@@ -403,12 +403,12 @@ class LoginRuleTest {
     }
 
     private static RiskRuleConfig config(tools.jackson.databind.JsonNode params) {
-        return new RiskRuleConfig("X", "X", MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.TIERED, null, 0, null,
+        return new RiskRuleConfig("X", "X", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.TIERED, null, 0, null,
                 MemberRiskModeEnum.ENFORCE, false, params);
     }
 
     private static RiskRuleConfig config(MemberRiskDecisionEnum direct) {
-        return new RiskRuleConfig("X", "X", MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.DIRECT, direct, 0, null,
+        return new RiskRuleConfig("X", "X", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.DIRECT, direct, 0, null,
                 MemberRiskModeEnum.ENFORCE, false, JsonUtils.getMapper().createObjectNode());
     }
 }

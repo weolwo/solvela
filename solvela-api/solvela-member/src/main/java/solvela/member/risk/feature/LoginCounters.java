@@ -23,8 +23,8 @@ import java.time.Duration;
  * 规则按 2 小时判、计数却还是 1 小时就清零了。所以本类向规则表要窗口；
  * 规则缺失或关闭时退回 {@link Counter} 上的默认值（与改造前的硬编码值一致）。
  *
- * <p>注册那条计数器（{@link Counter#DEVICE_REGISTER}）不归任何规则 —— 注册还没进引擎（P3），
- * 它的窗口仍由 {@code DeviceGuardProperties} 说，所以这里只用默认值。
+ * <p>2026-10-16 注册也进引擎了，于是最后两个「窗口由 properties 说」的计数器也归了规则 ——
+ * 本类里不再有任何一个 {@code ruleCode == null} 的计数器。
  *
  * <h3>滑动窗口（2026-10-16 从固定窗口换过来）</h3>
  * 固定窗口的毛病是<b>边界加倍</b>：窗口快结束时打满一次、跨过边界再打满一次，
@@ -36,6 +36,15 @@ import java.time.Duration;
  *
  * <p>🔴 <b>本类对外的方法一个字没变</b>，所以规则一条都没改 —— 这正是把 Redis 键
  * 收在一处的回报：换窗口语义这件事，影响面停在这个类里面。
+ *
+ * <h3>🔴 键名都带上了 {@code w2:} ——「值的类型变了，键名就得变」</h3>
+ * 旧键是字符串（{@code INCR}）和集合（{@code SADD}），新键是哈希（{@code HINCRBY}）和
+ * ZSET（{@code ZADD}）。沿用同一个键名的话，部署后碰到还没过期的旧值，Redis 直接回
+ * {@code WRONGTYPE} —— 而这不是一次性的：最长的窗口是一天，于是最多一整天里这几个计数器
+ * <b>静默不工作</b>（本类吞掉异常当作「没数到」，正是为了不让风控故障变成登录故障，
+ * 所以它不会报警，只会在看板上表现为「这条规则突然不命中了」）。
+ *
+ * <p>换了名字，旧键就没人读了，到点自己过期。下一次再改值的结构，同样要换名字。
  *
  * <p>一个副作用是 {@link Counter#DEVICE_MEMBER} 原来那个「每次 add 都续期」的特例没了：
  * 续期是为了防「整个集合在首次 add 的 24 小时后消失、计数归零」，而滑动窗口里
@@ -55,22 +64,22 @@ public class LoginCounters {
     public enum Counter {
 
         /** 单 IP 的登录请求总数。在<b>规则里</b> +1（每次登录请求都算一次） */
-        IP_ATTEMPT("IP_ATTEMPT_LIMIT", "login:ip:attempt:", Duration.ofHours(1)),
+        IP_ATTEMPT("IP_ATTEMPT_LIMIT", "login:ip:attempt:w2:", Duration.ofHours(1)),
 
         /** 单 IP 的登录失败数。只在<b>真的失败时</b> +1 */
-        IP_FAIL("IP_FAIL_LIMIT", "login:ip:fail:", Duration.ofHours(1)),
+        IP_FAIL("IP_FAIL_LIMIT", "login:ip:fail:w2:", Duration.ofHours(1)),
 
         /** 单 IP 尝试过的不存在账号数。查无此人时 +1，同时也算一次 {@link #IP_FAIL} */
-        IP_UNKNOWN("IP_UNKNOWN_LIMIT", "login:ip:unknown:", Duration.ofHours(1)),
+        IP_UNKNOWN("IP_UNKNOWN_LIMIT", "login:ip:unknown:w2:", Duration.ofHours(1)),
 
         /** 单 IP 尝试过的<b>不同身份</b>（集合，存身份摘要）。不论账号存不存在都算 */
-        IP_IDENTITY("IP_ACCOUNT_FANOUT", "login:ip:ids:", Duration.ofHours(1)),
+        IP_IDENTITY("IP_ACCOUNT_FANOUT", "login:ip:ids:w2:", Duration.ofHours(1)),
 
         /** 单设备的登录次数（含失败）。在规则里 +1 */
-        DEVICE_LOGIN("DEVICE_LOGIN_LIMIT", "dev:login:", Duration.ofDays(1)),
+        DEVICE_LOGIN("DEVICE_LOGIN_LIMIT", "dev:login:w2:", Duration.ofDays(1)),
 
         /** 单设备的登录失败数。只在真的失败时 +1 */
-        DEVICE_FAIL("DEVICE_FAIL_LIMIT", "dev:fail:", Duration.ofHours(1)),
+        DEVICE_FAIL("DEVICE_FAIL_LIMIT", "dev:fail:w2:", Duration.ofHours(1)),
 
         /**
          * 单设备碰过的<b>不同会员</b>（集合）。
@@ -79,10 +88,22 @@ public class LoginCounters {
          * 既不会「整个集合在首次 add 的 24 小时后消失」（那正是养号要的效果），
          * 也不会「只要设备还活着，半年前碰过的号还算在内」。
          */
-        DEVICE_MEMBER("DEVICE_FANOUT", "dev:member:", Duration.ofDays(1)),
+        DEVICE_MEMBER("DEVICE_FANOUT", "dev:member:w2:", Duration.ofDays(1)),
 
-        /** 单设备注册的账号数。注册还没进引擎，窗口由 DeviceGuardProperties 说 */
-        DEVICE_REGISTER(null, "dev:reg:member:", Duration.ofDays(1)),
+        /**
+         * 单 IP 注册的账号数。<b>在规则里 +1</b>（每次注册请求都算一次）。
+         *
+         * <p>迁自 {@code MemberRegisterService.consumeAttempt} 那把手写的
+         * {@code INCR}（键 {@code member:register:ip}、窗口 1h、阈值 10）。
+         */
+        REGISTER_IP("REG_IP_LIMIT", "member:register:ip:w2:", Duration.ofHours(1)),
+
+        /**
+         * 单设备注册的账号数。在规则里 +1。
+         *
+         * <p>迁自 {@code DeviceGuard.checkRegister}（窗口 1d、阈值 2）。
+         */
+        REGISTER_DEVICE("REG_DEVICE_LIMIT", "dev:reg:w2:", Duration.ofDays(1)),
         ;
 
         private final String ruleCode;

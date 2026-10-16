@@ -182,6 +182,12 @@
       <template #extra>
         <span class="cell-sub">
           陪跑那几行的「会改变结论」就是切过去的代价；参考线 &lt; 2%（矩阵按格看会更高）
+          <!--
+            🔴 这张表与上面几块的口径【不一样】：上面全部只算登录（event_type=1），
+            而这里按规则编码聚合，所以 REG_* 那四条（注册场景）也在里面。
+            不说清的话，看的人会拿注册的命中数去除以上面那个「登录尝试总数」。
+          -->
+          · 本表含注册场景的 <b>REG_*</b> 四条，其余各块只算登录
         </span>
       </template>
       <a-table
@@ -350,7 +356,7 @@
     { title: '规则', dataIndex: 'ruleCode', width: 180 },
     { title: '当时档位', dataIndex: 'mode', width: 90 },
     { title: '命中数', dataIndex: 'hits', width: 90 },
-    { title: '其中登录成功', dataIndex: 'loginSucceeded', width: 110 },
+    { title: '其中最终成功', dataIndex: 'loginSucceeded', width: 110 },
     { title: '会改变结论', dataIndex: 'wouldChange', width: 130 },
     { title: '确认被盗', dataIndex: 'confirmedTakeover', width: 100 },
     { title: '取特征失败', dataIndex: 'errorCount', width: 110 },

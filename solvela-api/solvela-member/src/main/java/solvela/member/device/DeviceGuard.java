@@ -8,10 +8,15 @@ import solvela.enums.DeviceStatusEnum;
 import solvela.member.risk.feature.LoginCounters;
 
 /**
- * 设备维度的闸门：登录频次、失败次数、一机多号、批量注册。
+ * 设备维度的闸门：登录频次、失败次数、一机多号。
+ *
+ * <p>⚠️ 2026-10-16 起<b>注册那道闸不在这里了</b>：它成了风控引擎的
+ * {@code REG_DEVICE_LIMIT} 规则（阈值在 {@code t_member_risk_rule}）。
+ * 本类剩下的三条也都有对应的规则（{@code DEVICE_LOGIN_LIMIT} / {@code DEVICE_FAIL_LIMIT} /
+ * {@code DEVICE_FANOUT}），只是登录主干还同时调着本类 —— 那是批次 1 刻意留的一步。
  *
  * <h3>它拦的是「量」，不是「人」</h3>
- * 这四条规则<b>都不判断谁是坏人</b>，只判断某个量级不正常。所以处置也只该是
+ * 这三条规则<b>都不判断谁是坏人</b>，只判断某个量级不正常。所以处置也只该是
  * 「降级 / 打标」而不是封禁 —— 见 {@link DeviceGuardProperties} 的类注释。
  *
  * <h3>为什么全部在 Redis，不进 MySQL</h3>
@@ -106,26 +111,6 @@ public class DeviceGuard {
         long distinct = counters.addToSet(LoginCounters.Counter.DEVICE_MEMBER, deviceId, String.valueOf(memberId));
         if (distinct > properties.getMaxMembersPerDay()) {
             return verdict(DeviceGuardRule.MEMBER_FANOUT, deviceId, LoginCounters.Counter.DEVICE_MEMBER);
-        }
-        return DeviceGuardVerdict.pass();
-    }
-
-    /**
-     * 注册前的闸：这台设备今天建了几个号。
-     *
-     * <p>与 {@code MemberRegisterProperties} 的 IP 限频是<b>两个维度</b>，都要过：
-     * IP 走代理池就换，设备号得先过一次签发限频才拿得到。
-     */
-    public DeviceGuardVerdict checkRegister(String deviceId) {
-        if (SolvelaStringUtil.isBlank(deviceId)) {
-            return DeviceGuardVerdict.pass();
-        }
-        if (banned(deviceId)) {
-            return DeviceGuardVerdict.hit(DeviceGuardRule.BANNED, 0L, false);
-        }
-        long count = counters.bump(LoginCounters.Counter.DEVICE_REGISTER, deviceId);
-        if (count > properties.getMaxRegisterPerDay()) {
-            return verdict(DeviceGuardRule.REGISTER_TOO_MANY, deviceId, LoginCounters.Counter.DEVICE_REGISTER);
         }
         return DeviceGuardVerdict.pass();
     }

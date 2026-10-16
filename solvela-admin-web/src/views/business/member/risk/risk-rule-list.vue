@@ -1,5 +1,9 @@
 <!--
-  * 登录风控 - 规则
+  * 风控 - 规则
+  *
+  * 【一条规则只属于一个场景】2026-10-16 注册也接进了同一个引擎，于是这张表里混着
+  * 登录与注册两条链路。所以第一列就是「场景」—— 看的人必须先知道自己在调哪条链路的松紧，
+  * 两边的正常量级差着一个数量级（注册的阈值是「一小时 10 次」，登录是「一小时 60 次」）。
   *
   * 【这个页面是整套风控唯一的旋钮】规则的逻辑在代码里（一条规则一个 Java 类），
   * 这里能调的只有「松紧」：档位、分值、参数。编码、阶段、类型都是只读的 ——
@@ -64,6 +68,10 @@
         <template v-if="column.dataIndex === 'ruleCode'">
           <div>{{ record.ruleName }}</div>
           <div class="cell-sub">{{ record.ruleCode }}</div>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'eventType'">
+          <a-tag :color="eventTypeMeta(text).color">{{ eventTypeMeta(text).desc }}</a-tag>
         </template>
 
         <template v-else-if="column.dataIndex === 'phase'">
@@ -165,6 +173,7 @@
   import { memberRiskApi } from '/@/api/business/member/member-risk-api';
   import {
     RISK_DECISION_ENUM,
+    RISK_EVENT_TYPE_ENUM,
     RISK_MODE_ENUM,
     RISK_MODE_OPTIONS,
     RISK_PHASE_ENUM,
@@ -174,6 +183,7 @@
   import { solvelaSentry } from '/@/lib/solvela-sentry';
 
   const columns = ref([
+    { title: '场景', dataIndex: 'eventType', width: 80 },
     { title: '规则', dataIndex: 'ruleCode', width: 220 },
     { title: '阶段 / 类型', dataIndex: 'phase', width: 150 },
     { title: '档位', dataIndex: 'mode', width: 90 },
@@ -191,6 +201,10 @@
 
   function modeMeta(value) {
     return riskMetaOf(RISK_MODE_ENUM, value, { desc: value, color: 'default' });
+  }
+
+  function eventTypeMeta(value) {
+    return riskMetaOf(RISK_EVENT_TYPE_ENUM, value, { desc: value, color: 'default' });
   }
 
   function phaseMeta(value) {

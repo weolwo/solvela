@@ -29,6 +29,17 @@ public interface RiskRule {
     MemberRiskPhaseEnum phase();
 
     /**
+     * 这条规则属于哪个场景。默认登录 —— 二十条老规则一条都不用改。
+     *
+     * <p>🔴 <b>以代码为准，启动时与表核对</b>（同 {@link #phase()}）：
+     * 把一条登录规则在表里改成注册场景，它会在一个压根没有密码、没有设备信任的流程里执行，
+     * 而那不会报错 —— 表现是「这条规则再也不命中」或者「它开始误伤注册」。
+     */
+    default solvela.enums.MemberRiskEventTypeEnum eventType() {
+        return solvela.enums.MemberRiskEventTypeEnum.LOGIN;
+    }
+
+    /**
      * 总开关切到 shadow 时仍然生效。只有全局滑块、黑名单、设备封禁是 true ——
      * 那三条是「已经确定要拦」的东西，保命开关不该把它们也放掉。
      */

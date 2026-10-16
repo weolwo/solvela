@@ -76,7 +76,13 @@ public class MemberRiskStatDTO {
     public record OtpFunnel(long challenged, long verified) {
     }
 
-    /** 一条规则切到生效的代价与收益（方案 §8.2 的三个数 + 两个辅助数） */
+    /**
+     * 一条规则切到生效的代价与收益（方案 §8.2 的三个数 + 两个辅助数）。
+     *
+     * <p>⚠️ 这一组数按规则编码聚合，所以它<b>含注册场景的 REG_* 那四条</b>，
+     * 而看板上其余几个数全部只算登录（{@code event_type = 1}）——
+     * 两个口径不一样，页面上写了这件事。
+     */
     @Data
     public static class RuleVerdict {
 
@@ -87,7 +93,7 @@ public class MemberRiskStatDTO {
 
         private Long hits;
 
-        /** 其中最后登录成功了的 —— 「打扰率」的分母侧参考 */
+        /** 其中最后成功了的（登录成功 / 注册建号成功）—— 「打扰率」的分母侧参考 */
         private Long loginSucceeded;
 
         /** 其中被事后标成「确认被盗」的。有就是赚的；早期标注少，不能单看它 */

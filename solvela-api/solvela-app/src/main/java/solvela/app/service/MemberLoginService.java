@@ -605,10 +605,9 @@ public class MemberLoginService {
             case PHONE_TAKEN -> new ApiException(ApiErrors.CONFLICT, "该手机号已注册，请直接登录");
             // 提示文案从域里取，不在这里再写一遍规则 —— 两份措辞迟早对不上
             case WEAK_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, MemberPasswordPolicy.HINT);
+            // 🔴 IP 与设备两维合成同一句：告诉对方「是设备被限」等于教他换一台
             case TOO_MANY_ATTEMPTS ->
                     new ApiException(ApiErrors.OPERATION_LIMITED, registerLimitedMessage(result.retryAfterSeconds()));
-            case DEVICE_LIMITED -> new ApiException(ApiErrors.OPERATION_LIMITED,
-                    String.format(DEVICE_LIMITED_MSG, minutes(result.retryAfterSeconds())));
             case BAD_EMAIL_FORMAT -> new ApiException(ApiErrors.INVALID_ARGUMENT, "邮箱格式不正确");
             // 与 PHONE_TAKEN 同一个取舍：必须如实说，否则用户不知道该去登录还是换个邮箱。
             // 这条枚举口子在邮箱这边【贵得多】—— 验证码校验排在查重之前

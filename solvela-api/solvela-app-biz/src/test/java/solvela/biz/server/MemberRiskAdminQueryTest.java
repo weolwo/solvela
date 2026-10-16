@@ -211,21 +211,33 @@ class MemberRiskAdminQueryTest {
     // ------------------------------------------------------------------ 规则
 
     @Test
-    @DisplayName("规则列表是全的（20 条），而且前置排在后置前面")
+    @DisplayName("规则列表是全的（登录 20 + 注册 4），按【场景 → 阶段】分好组")
     void listRules() {
         List<MemberRiskRule> rules = adminService.listRules();
 
-        assertEquals(20, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
-        int firstPost = -1;
-        for (int i = 0; i < rules.size(); i++) {
-            if (rules.get(i).getPhase() == solvela.enums.MemberRiskPhaseEnum.POST && firstPost < 0) {
-                firstPost = i;
+        assertEquals(24, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
+
+        // 场景不能交错：注册的规则夹在登录的规则中间，页面上那一列就白加了
+        solvela.enums.MemberRiskEventTypeEnum scenario = null;
+        java.util.Set<solvela.enums.MemberRiskEventTypeEnum> seen = new java.util.HashSet<>();
+        boolean post = false;
+        for (MemberRiskRule rule : rules) {
+            if (rule.getEventType() != scenario) {
+                assertTrue(seen.add(rule.getEventType()), "同一个场景出现了两段: " + rule.getEventType());
+                scenario = rule.getEventType();
+                post = false;
             }
-            if (firstPost >= 0) {
-                assertEquals(solvela.enums.MemberRiskPhaseEnum.POST, rules.get(i).getPhase(),
-                        "前置与后置混在一起的话，页面上就看不出一条规则是在密码前还是密码后判的");
+            if (rule.getPhase() == solvela.enums.MemberRiskPhaseEnum.POST) {
+                post = true;
+            } else {
+                assertFalse(post, "前置与后置混在一起的话，页面上就看不出一条规则是在密码前还是密码后判的");
             }
         }
+
+        // 注册场景只有前置 —— 验证码验过账号就建出来了，没有「验完再判一次」的位置
+        assertTrue(rules.stream()
+                .filter(r -> r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.REGISTER)
+                .allMatch(r -> r.getPhase() == solvela.enums.MemberRiskPhaseEnum.PRE));
     }
 
     @Test

@@ -6,6 +6,8 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.stereotype.Component;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskModeEnum;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.enums.MemberRiskRuleTypeEnum;
@@ -63,7 +65,12 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
     public record Bound(RiskRule rule, RiskRuleConfig config) {
     }
 
-    record Snapshot(Map<MemberRiskPhaseEnum, List<Bound>> byPhase, Map<String, RiskRuleConfig> byCode) {
+    /**
+     * @param byScenario 场景 → 阶段 → 要执行的规则。<b>两层都要</b>：
+     *                   少了场景，注册的规则会跑在登录上；少了阶段，前置规则会在验密码之后执行
+     */
+    record Snapshot(Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> byScenario,
+                    Map<String, RiskRuleConfig> byCode) {
     }
 
     @Override
@@ -77,13 +84,24 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
             throw new IllegalStateException("【风控】规则表缺少这些规则的种子数据，拒绝启动: " + missing
                     + "。见 数据库SQL脚本/mysql/data-baseline.sql 的 t_member_risk_rule");
         }
-        log.info("【风控】规则加载完成：前置 {} 条，后置 {} 条", loaded.byPhase().get(MemberRiskPhaseEnum.PRE).size(),
-                loaded.byPhase().get(MemberRiskPhaseEnum.POST).size());
+        loaded.byScenario().forEach((eventType, byPhase) -> {
+            int pre = byPhase.get(MemberRiskPhaseEnum.PRE).size();
+            int post = byPhase.get(MemberRiskPhaseEnum.POST).size();
+            if (pre + post > 0) {
+                log.info("【风控】规则加载完成：{} —— 前置 {} 条，后置 {} 条", eventType.getDesc(), pre, post);
+            }
+        });
     }
 
-    /** 某个阶段此刻要执行的规则（不含关闭的），按表里的 id 顺序 */
-    public List<Bound> rules(MemberRiskPhaseEnum phase) {
-        return snapshot.get().byPhase().get(phase);
+    /** 某个场景的某个阶段此刻要执行的规则（不含关闭的），按表里的 id 顺序 */
+    public List<Bound> rules(MemberRiskEventTypeEnum eventType, MemberRiskPhaseEnum phase) {
+        Map<MemberRiskPhaseEnum, List<Bound>> byPhase = snapshot.get().byScenario().get(eventType);
+        if (byPhase == null) {
+            // 这个场景没有任何规则（比如二次验证那一步，它刻意不跑规则）
+            return List.of();
+        }
+        List<Bound> rules = byPhase.get(phase);
+        return rules == null ? List.of() : rules;
     }
 
     /** 某条规则此刻的配置；不存在（或已关闭）返回 null */
@@ -122,9 +140,14 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
     private volatile Set<String> loadedButBroken = Set.of();
 
     private Snapshot load() {
-        Map<MemberRiskPhaseEnum, List<Bound>> byPhase = new EnumMap<>(MemberRiskPhaseEnum.class);
-        for (MemberRiskPhaseEnum phase : MemberRiskPhaseEnum.values()) {
-            byPhase.put(phase, new ArrayList<>());
+        Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> byScenario =
+                new EnumMap<>(MemberRiskEventTypeEnum.class);
+        for (MemberRiskEventTypeEnum eventType : MemberRiskEventTypeEnum.values()) {
+            Map<MemberRiskPhaseEnum, List<Bound>> byPhase = new EnumMap<>(MemberRiskPhaseEnum.class);
+            for (MemberRiskPhaseEnum phase : MemberRiskPhaseEnum.values()) {
+                byPhase.put(phase, new ArrayList<>());
+            }
+            byScenario.put(eventType, byPhase);
         }
         Map<String, RiskRuleConfig> byCode = new LinkedHashMap<>();
         Set<String> broken = new TreeSet<>();
@@ -146,21 +169,34 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
             }
             byCode.put(config.code(), config);
             if (config.mode() != MemberRiskModeEnum.OFF) {
-                byPhase.get(config.phase()).add(new Bound(impl, config));
+                byScenario.get(config.eventType()).get(config.phase()).add(new Bound(impl, config));
             }
         }
-        byPhase.replaceAll((phase, list) -> Collections.unmodifiableList(list));
+        byScenario.replaceAll((eventType, byPhase) -> {
+            byPhase.replaceAll((phase, list) -> Collections.unmodifiableList(list));
+            return Collections.unmodifiableMap(byPhase);
+        });
         loadedButBroken = Collections.unmodifiableSet(broken);
-        return new Snapshot(Collections.unmodifiableMap(byPhase), Collections.unmodifiableMap(byCode));
+        return new Snapshot(Collections.unmodifiableMap(byScenario), Collections.unmodifiableMap(byCode));
     }
 
     /**
-     * 行 → 配置。阶段以<b>代码为准</b>并与表核对：一条前置规则被人在表里改成后置，
-     * 它会在验密码之后才执行 —— 前置的「有号没号回答一致」就不成立了。
+     * 行 → 配置。<b>阶段与场景都以代码为准，并与表核对</b>：
+     * <ul>
+     *   <li>一条前置规则被人在表里改成后置，它会在验密码之后才执行 ——
+     *       前置的「有号没号回答一致」就不成立了；</li>
+     *   <li>一条登录规则被改成注册场景，它会在一个压根没有密码、没有设备信任的流程里执行 ——
+     *       而那不会报错，表现是「这条规则再也不命中」或者「它开始误伤注册」。</li>
+     * </ul>
+     * 两种都让这一行配置读不出来（当作关闭并打错误日志），启动校验那一步会把它算成「坏行」。
      */
     static RiskRuleConfig toConfig(MemberRiskRule row, RiskRule impl) {
         if (row.getPhase() != impl.phase()) {
             throw new IllegalArgumentException("阶段与代码不一致：表里是 " + row.getPhase() + "，代码是 " + impl.phase());
+        }
+        if (row.getEventType() != impl.eventType()) {
+            throw new IllegalArgumentException("适用场景与代码不一致：表里是 " + row.getEventType()
+                    + "，代码是 " + impl.eventType());
         }
         if (row.getMode() == null || row.getRuleType() == null) {
             throw new IllegalArgumentException("mode / rule_type 为空");
@@ -168,13 +204,36 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
         if (row.getRuleType() == MemberRiskRuleTypeEnum.DIRECT && row.getDirectDecision() == null) {
             throw new IllegalArgumentException("固定处置的强规则缺 direct_decision");
         }
+        /*
+         * 🔴 注册场景只能配放行 / 限流 / 拒绝。
+         *
+         * 滑块与 OTP 在注册这条链路上【没有落点】（滑块票在发码那一步核销，注册本身已经验过一次码），
+         * 配上去的后果不是报错，而是注册接口返回一个客户端不认识的结果 ——
+         * 而规则页上那一行看着完全正常。
+         *
+         * 分级规则的档位由各规则自己的 validate 拦（见 RegisterTieredCountRule），
+         * 这里拦的是固定处置那一列：它在后台改不了，所以只可能是有人直接动了库。
+         */
+        if (row.getEventType() == MemberRiskEventTypeEnum.REGISTER && row.getDirectDecision() != null
+                && !registerDecisionAllowed(row.getDirectDecision())) {
+            throw new IllegalArgumentException("注册场景的固定处置只能是放行 / 限流 / 拒绝，表里是 "
+                    + row.getDirectDecision());
+        }
         JsonNode params = SolvelaStringUtil.isBlank(row.getParams())
                 ? JsonUtils.getMapper().createObjectNode()
                 : JsonUtils.getMapper().readTree(row.getParams());
         impl.validate(params);
-        return new RiskRuleConfig(row.getRuleCode(), row.getRuleName(), row.getPhase(), row.getRuleType(),
+        return new RiskRuleConfig(row.getRuleCode(), row.getRuleName(), row.getEventType(),
+                row.getPhase(), row.getRuleType(),
                 row.getDirectDecision(), row.getScore() == null ? 0 : row.getScore(), row.getRuleGroup(),
                 row.getMode(), Integer.valueOf(1).equals(row.getBypassByTrust()), params);
+    }
+
+    /** 注册场景允许的固定处置。与 {@code RegisterTieredCountRule.validate} 拦的是同一件事的两种形状 */
+    private static boolean registerDecisionAllowed(MemberRiskDecisionEnum decision) {
+        return decision == MemberRiskDecisionEnum.PASS
+                || decision == MemberRiskDecisionEnum.LIMIT
+                || decision == MemberRiskDecisionEnum.DENY;
     }
 
     private static Map<String, RiskRule> indexByCode(

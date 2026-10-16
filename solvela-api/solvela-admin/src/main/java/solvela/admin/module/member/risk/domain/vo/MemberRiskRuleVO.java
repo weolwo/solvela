@@ -3,6 +3,7 @@ package solvela.admin.module.member.risk.domain.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskModeEnum;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.enums.MemberRiskRuleTypeEnum;
@@ -26,6 +27,9 @@ public class MemberRiskRuleVO {
     private String ruleCode;
 
     private String ruleName;
+
+    @Schema(description = "适用场景：1-登录 3-注册。只读 —— 一条规则只属于一个场景，改它等于让规则在另一条链路上执行")
+    private MemberRiskEventTypeEnum eventType;
 
     @Schema(description = "阶段：1-前置（验凭据之前）2-后置（验凭据之后）。只读")
     private MemberRiskPhaseEnum phase;

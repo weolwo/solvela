@@ -6,7 +6,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.event.BizEventPublisher;
-import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.event.BizActionCodes;
 import solvela.event.BizActionEvent;
@@ -14,16 +13,24 @@ import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
 import solvela.enums.GenderEnum;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.member.api.MemberIdentity;
+import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberPasswordPolicy;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.RegisterFailReason;
 import solvela.member.id.MemberIdAllocator;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskContext;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskSession;
 import solvela.member.auth.NewDeviceLoginNotifier;
-import solvela.member.device.DeviceGuard;
-import solvela.member.device.DeviceGuardVerdict;
+import solvela.member.device.DeviceDispositionService;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.api.MemberRegisterType;
@@ -53,6 +60,16 @@ import solvela.member.util.MemberPhoneUtil;
  * 得把那个开关按成 false —— <b>而那是一个需要有人明确决定的事</b>，
  * 不再是一个谁也没注意到的现状。
  *
+ * <h3>限频在 2026-10-16 整体搬进了风控引擎</h3>
+ * 这里原来有两道手写的闸：{@code deviceGuard.checkRegister}（一台设备一天 2 个号）
+ * 和 {@code consumeAttempt}（一个 IP 一小时 10 次）。现在它们是四条规则
+ * （{@code REG_IP_LIMIT} / {@code REG_DEVICE_LIMIT} / {@code REG_IP_BLACKLIST} /
+ * {@code REG_DEVICE_BANNED}），阈值在 {@code t_member_risk_rule}，<b>每一次注册尝试都有一行流水</b>。
+ *
+ * <p>换来的不只是「阈值能在后台改」：注册这条链路以前<b>完全看不见</b> ——
+ * 批量建号发生过没有、挡下了多少、挡错了多少，一个数都没有，
+ * 唯一的痕迹是 {@code t_member.register_ip} 和一行 WARN 日志。
+ *
  * <h3>账号与昵称自动生成</h3>
  * {@code member_name} 由会员号派生（{@code sv} + 10 位会员号），满足 DDL 的
  * 「字母开头 6~20 位 {@code [A-Za-z][A-Za-z0-9_-]}」且天然唯一 —— 会员号本身唯一。
@@ -73,15 +90,15 @@ public class MemberRegisterService {
 
     private static final String DEFAULT_REGISTER_SOURCE = "UNKNOWN";
 
-    private static final String RATE_LIMIT_KEY_PREFIX = "member:register:ip";
-
     private final MemberRegisterDao memberRegisterDao;
     private final MemberIdAllocator memberIdAllocator;
     private final MemberRegisterProperties properties;
-    private final RedisService redisService;
     private final PiiHasher piiHasher;
     private final PiiCipher piiCipher;
-    private final DeviceGuard deviceGuard;
+    /** 注册的四道闸全在它后面。限频、黑名单、设备封禁都是规则，不再是本类里的 if */
+    private final MemberRiskEngine riskEngine;
+    /** 只为执行 {@link RiskAction#OBSERVE_DEVICE}：一台建号超限的设备，下次登录要多验一道码 */
+    private final DeviceDispositionService dispositionService;
     private final MemberEmailCodeService emailCodeService;
     private final MemberSmsCodeService smsCodeService;
     /**
@@ -97,11 +114,12 @@ public class MemberRegisterService {
     /**
      * 注册。
      *
-     * <p>分支顺序有讲究：<b>限频在查重之前</b>。反过来的话，「这个号注册过没有」
+     * <p>分支顺序有讲究：<b>风控在查重之前</b>。反过来的话，「这个号注册过没有」
      * 这个问题可以无限次免费提问 —— 而那正是 {@code PHONE_TAKEN} 藏不掉的那个枚举口子。
      *
-     * <p>格式与强度校验在限频之前：它们不查库、不泄露任何信息，
-     * 让一个手滑打错格式的用户去消耗限频额度没有道理。
+     * <p>格式与强度校验在风控<b>之前</b>，而且<b>连账本都不开</b>：它们不查库、不泄露任何信息，
+     * 而开了账本就会跑规则 —— 那几条规则「这一次请求本身就算一次」，
+     * 于是一个手滑打错格式的人会白白消耗掉他今天的注册额度。
      */
     @Transactional(rollbackFor = Exception.class)
     public MemberRegisterResult register(MemberRegisterCmd cmd) {
@@ -135,19 +153,39 @@ public class MemberRegisterService {
             }
         }
 
-        // ---------- 设备限频 ----------
-        // 与下面的 IP 限频是【两个维度】，都要过：IP 走代理池就换，
-        // 而设备号得先过一次签发限频才拿得到 —— 后者贵得多。
-        // 排在 IP 之前：设备维度更硬，先用硬的那把筛
-        DeviceGuardVerdict deviceVerdict = deviceGuard.checkRegister(cmd.deviceId());
-        if (!deviceVerdict.allowed()) {
-            return MemberRegisterResult.deviceLimited(deviceVerdict.retryAfterSeconds());
-        }
+        // ---------- 身份摘要 ----------
+        // 🔴 挪到了风控【之前】（原来在查重那一步才算）：流水那一行要按身份摘要归集
+        //    （「同一个号被试了多少次」是注册这边唯一藏不掉的枚举口子）。
+        //    代价是零 —— 它只是一次本地 HMAC，不查库
+        String identityHashHex = piiHasher.hash(identity);
 
-        // ---------- IP 限频 ----------
-        long retryAfter = consumeAttempt(cmd.clientIp());
-        if (retryAfter > 0) {
-            return MemberRegisterResult.tooManyAttempts(retryAfter);
+        try (RiskSession risk = riskEngine.open(riskContext(registerType, identity, identityHashHex, cmd))) {
+            return insideRisk(risk, cmd, byEmail, identity, identityHashHex);
+        }
+    }
+
+    /**
+     * 风控账本里的那一段：前置决策 + 验证码 + 查重 + 建号。
+     *
+     * <h3>🔴 每一条返回路径都走 {@code risk.end(...)}</h3>
+     * 写成这样，漏掉一条返回路径就漏掉一行流水，而那是 code review 看得见的
+     * （见 {@code RiskSession} 的类注释）。
+     *
+     * <p>⚠️ 本方法在 {@code register} 的<b>事务里</b>，所以流水那一行也在同一个事务里 ——
+     * 主干抛未预料异常时（对用户是 500），{@code close()} 兜底写的那行
+     * {@code INTERNAL_ERROR} 会随事务一起回滚。
+     * 接受它：那一刻真正要查的东西（traceId、异常栈）在日志里，
+     * 而为了这一行把风控流水拆到独立事务里，代价是注册主干多一次连接往返。
+     */
+    private MemberRegisterResult insideRisk(RiskSession risk, MemberRegisterCmd cmd, boolean byEmail,
+                                            String identity, String identityHashHex) {
+
+        // ---------- 前置决策 ----------
+        // 四条规则都在这一步跑完：IP 黑名单、设备封禁（都是 DENY），IP 与设备的分级限流。
+        // 注册只有这一个决策点 —— 验证码验过账号就建出来了，没有「验完再判一次」的位置
+        MemberRegisterResult blocked = runPreDecision(risk, cmd);
+        if (blocked != null) {
+            return blocked;
         }
 
         // ---------- 验证码 ----------
@@ -162,41 +200,123 @@ public class MemberRegisterService {
             SmsCodeVerifyResult codeResult =
                     smsCodeService.verify(SmsScene.REGISTER, identity, cmd.smsCode());
             if (codeResult != SmsCodeVerifyResult.OK) {
-                return MemberRegisterResult.fail(switch (codeResult) {
-                    case NOT_FOUND -> RegisterFailReason.SMS_CODE_EXPIRED;
-                    case MISMATCH -> RegisterFailReason.SMS_CODE_MISMATCH;
-                    case TOO_MANY_ATTEMPTS -> RegisterFailReason.SMS_CODE_LOCKED;
-                    case OK -> throw new IllegalStateException("不可能走到：OK 已在上面判掉");
-                });
+                return risk.end(MemberRiskOutcomeEnum.BAD_CREDENTIALS,
+                        MemberRegisterResult.fail(switch (codeResult) {
+                            case NOT_FOUND -> RegisterFailReason.SMS_CODE_EXPIRED;
+                            case MISMATCH -> RegisterFailReason.SMS_CODE_MISMATCH;
+                            case TOO_MANY_ATTEMPTS -> RegisterFailReason.SMS_CODE_LOCKED;
+                            case OK -> throw new IllegalStateException("不可能走到：OK 已在上面判掉");
+                        }));
             }
         }
         if (byEmail) {
             EmailCodeVerifyResult codeResult =
                     emailCodeService.verify(EmailCodeScene.REGISTER, identity, cmd.emailCode());
             if (codeResult != EmailCodeVerifyResult.OK) {
-                return MemberRegisterResult.fail(switch (codeResult) {
-                    case NOT_FOUND -> RegisterFailReason.EMAIL_CODE_EXPIRED;
-                    case MISMATCH -> RegisterFailReason.EMAIL_CODE_MISMATCH;
-                    case TOO_MANY_ATTEMPTS -> RegisterFailReason.EMAIL_CODE_LOCKED;
-                    case OK -> throw new IllegalStateException("不可能走到：OK 已在上面判掉");
-                });
+                return risk.end(MemberRiskOutcomeEnum.BAD_CREDENTIALS,
+                        MemberRegisterResult.fail(switch (codeResult) {
+                            case NOT_FOUND -> RegisterFailReason.EMAIL_CODE_EXPIRED;
+                            case MISMATCH -> RegisterFailReason.EMAIL_CODE_MISMATCH;
+                            case TOO_MANY_ATTEMPTS -> RegisterFailReason.EMAIL_CODE_LOCKED;
+                            case OK -> throw new IllegalStateException("不可能走到：OK 已在上面判掉");
+                        }));
             }
         }
 
         // ---------- 身份查重 ----------
         // 只是提前给一句人话，不是并发防线 —— 真正的防线是下面的唯一约束
-        String identityHashHex = piiHasher.hash(identity);
         int taken = byEmail
                 ? memberRegisterDao.countByEmailHash(identityHashHex)
                 : memberRegisterDao.countByPhoneHash(identityHashHex);
         if (taken > 0) {
-            return MemberRegisterResult.fail(byEmail
+            return risk.end(MemberRiskOutcomeEnum.IDENTITY_TAKEN, MemberRegisterResult.fail(byEmail
                     ? RegisterFailReason.EMAIL_TAKEN
-                    : RegisterFailReason.PHONE_TAKEN);
+                    : RegisterFailReason.PHONE_TAKEN));
         }
 
         // ---------- 建号 ----------
-        return createMember(cmd, byEmail, identity, identityHashHex);
+        // createMember 只有一种失败：撞唯一约束，也就是「已被注册」。
+        // 由结果反推结局，而不是在 createMember 里再写一次 risk.end —— 账本的边界留在本方法里
+        MemberRegisterResult created = createMember(cmd, byEmail, identity, identityHashHex);
+        return risk.end(created.success()
+                ? MemberRiskOutcomeEnum.SUCCESS
+                : MemberRiskOutcomeEnum.IDENTITY_TAKEN, created);
+    }
+
+    /**
+     * 前置决策：被挡下就返回要给调用方的东西，放行返回 null。
+     *
+     * <h3>🔴 限流与拒绝对外是<b>同一句</b></h3>
+     * 告诉对方「你这个 IP 被拉黑了」「你这台设备被封了」等于给他一个精确的调试反馈，
+     * 他换一个就继续 —— 与登录那边同一个判据（方案 §6.4）。
+     *
+     * <p>这也是本次改造<b>唯一一处对外行为的变化</b>：原来设备维度被限回的是
+     * {@code DEVICE_LIMITED}（「当前设备操作过于频繁」），现在两维合成一句
+     * 「操作过于频繁」。差别只在措辞 —— 而那句话原本正好告诉了批量注册的人该换设备还是换代理。
+     */
+    private MemberRegisterResult runPreDecision(RiskSession risk, MemberRegisterCmd cmd) {
+        RiskDecision pre = riskEngine.evaluatePre(risk);
+        applyActions(pre, cmd.deviceId());
+        if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
+            return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
+                    MemberRegisterResult.tooManyAttempts(pre.retryAfterSeconds()));
+        }
+        if (!pre.is(MemberRiskDecisionEnum.PASS)) {
+            /*
+             * 🔴 走到这里说明有人把一条注册规则配成了滑块 / OTP / 冷却 —— 而注册这条链路
+             * 执行不了它们（滑块票在发码那一步核销，注册本身已经验过一次码）。
+             *
+             * 放行并吵得够响：既不能静默（那等于这条规则不存在），也不能当成拦截
+             * （把一个配置错误变成「全站注册不可用」，代价完全不对称）。
+             * 正常情况下进不来 —— 分级档位由规则自己的 validate 拦、固定处置由
+             * RiskRuleRegistry.toConfig 拦，这里是最后一层。
+             */
+            log.error("【会员注册】风控给出了注册场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
+                    pre.decision());
+        }
+        return null;
+    }
+
+    /**
+     * 执行生效结论带的动作。注册这边只可能有一个：把设备降进观察档。
+     *
+     * <p>另外两个动作在注册场景不会出现 —— {@code RECORD_LIMIT} 是密码阶梯冷却专有的，
+     * {@code NOTIFY_OWNER} 要有「主人」而注册时还没有这个人。
+     */
+    private void applyActions(RiskDecision decision, String deviceId) {
+        if (decision.has(RiskAction.OBSERVE_DEVICE) && deviceId != null) {
+            dispositionService.observe(deviceId, "风控命中：本设备建号过多");
+        }
+    }
+
+    /**
+     * 组装注册场景的规则上下文。
+     *
+     * <h3>🔴 member 恒为 null，这不是遗漏</h3>
+     * 注册的全部意义就是这个人还没有账号。所以用到 {@code ctx.getMember()} 的规则
+     * （矩阵、画像、密码冷却）在注册场景<b>一条都没有</b>，而不是「拿 null 当最严值」。
+     *
+     * <p>{@code captchaPassed} 恒为 false：注册接口收不到滑块票 ——
+     * 票由网关在<b>发码</b>那一步核销。
+     */
+    private RiskContext riskContext(MemberRegisterType registerType, String identity,
+                                    String identityHashHex, MemberRegisterCmd cmd) {
+        return new RiskContext(MemberRiskEventTypeEnum.REGISTER, loginTypeOf(registerType),
+                identity, identityHashHex, null,
+                cmd.deviceId(), cmd.deviceType(), cmd.clientIp(), false);
+    }
+
+    /**
+     * 注册方式 → 流水里的 {@code login_type}。
+     *
+     * <p>两套枚举不合并（见 {@link MemberRegisterType} 的类注释），但流水那一列记的是
+     * 「这是手机号还是邮箱」—— 注册与登录在这件事上是同一个问题，所以复用同一列，
+     * 让看板不必为注册再分一套口径。
+     */
+    private static MemberLoginType loginTypeOf(MemberRegisterType registerType) {
+        return registerType == MemberRegisterType.EMAIL_CODE
+                ? MemberLoginType.EMAIL_CODE
+                : MemberLoginType.PHONE_PASSWORD;
     }
 
     /**
@@ -269,27 +389,5 @@ public class MemberRegisterService {
         log.info("【会员注册】成功, memberId: {}, source: {}, ip: {}", memberId, registerSource, cmd.clientIp());
         return MemberRegisterResult.ok(new MemberIdentity(
                 memberId, memberName, nickname, null, GenderEnum.UNKNOWN));
-    }
-
-    /**
-     * 消耗一次 IP 配额。返回 0 表示放行，正数表示还要等多少秒。
-     *
-     * <p>拿不到 IP 时<b>放行并打警告</b>，不是静默放行也不是一律拒绝：
-     * 一律拒绝会让任何一次取 IP 失败变成「全站注册不可用」，而那种故障
-     * 比放过几个注册严重得多。警告日志让这件事至少能被发现。
-     */
-    private long consumeAttempt(String clientIp) {
-        if (SolvelaStringUtil.isEmpty(clientIp)) {
-            log.warn("【会员注册】拿不到客户端 IP，本次注册【未受限频保护】");
-            return 0L;
-        }
-        String key = redisService.generateRedisKey(RATE_LIMIT_KEY_PREFIX, clientIp);
-        long attempts = redisService.increment(key, properties.getWindow().toSeconds());
-        if (attempts <= properties.getMaxAttemptsPerIp()) {
-            return 0L;
-        }
-        // 已经超了，告诉调用方还要等多久 —— 让用户点第二次才知道被限，是投诉的主要来源
-        long ttl = redisService.getExpire(key);
-        return Math.max(1L, ttl);
     }
 }

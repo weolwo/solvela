@@ -78,7 +78,9 @@ public class MemberRiskEngine {
         List<RiskSession.Evaluated> hits = new ArrayList<>();
         long budgetNanos = properties.featureBudget().toNanos();
         long slowNanos = properties.getSlowRuleWarn().toNanos();
-        for (RiskRuleRegistry.Bound bound : registry.rules(phase)) {
+        // 🔴 按【场景 + 阶段】取规则。少了场景，注册的那几条会跑在登录上，
+        //    而它们数的是完全不同的东西（一个 IP 注册了几个号，不是登录了几次）
+        for (RiskRuleRegistry.Bound bound : registry.rules(session.context().getEventType(), phase)) {
             MemberRiskModeEnum mode = effectiveMode(bound);
             if (mode == MemberRiskModeEnum.OFF) {
                 continue;

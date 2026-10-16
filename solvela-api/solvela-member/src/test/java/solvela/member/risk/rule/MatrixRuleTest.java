@@ -262,7 +262,7 @@ class MatrixRuleTest {
     }
 
     private static RiskRuleConfig config(String code, MemberRiskPhaseEnum phase, JsonNode params) {
-        return new RiskRuleConfig(code, code, phase, MemberRiskRuleTypeEnum.TIERED, null, 0, null,
+        return new RiskRuleConfig(code, code, solvela.enums.MemberRiskEventTypeEnum.LOGIN, phase, MemberRiskRuleTypeEnum.TIERED, null, 0, null,
                 MemberRiskModeEnum.ENFORCE, false, params);
     }
 }

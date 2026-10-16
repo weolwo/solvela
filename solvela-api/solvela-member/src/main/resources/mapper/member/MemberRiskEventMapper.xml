@@ -63,6 +63,9 @@
             <if test="query.deviceId != null and query.deviceId != ''">
                 AND e.device_id = #{query.deviceId}
             </if>
+            <if test="query.eventType != null">
+                AND e.event_type = #{query.eventType}
+            </if>
             <if test="query.decision != null">
                 AND e.decision = #{query.decision}
             </if>

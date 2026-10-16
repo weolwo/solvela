@@ -280,7 +280,7 @@ class PasswordCooldownTest {
     }
 
     private static RiskRuleConfig config() {
-        return new RiskRuleConfig("PWD_COOLDOWN", "密码阶梯冷却", MemberRiskPhaseEnum.PRE,
+        return new RiskRuleConfig("PWD_COOLDOWN", "密码阶梯冷却", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE,
                 MemberRiskRuleTypeEnum.TIERED, null, 0, null, MemberRiskModeEnum.ENFORCE, false, PARAMS);
     }
 }

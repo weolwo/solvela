@@ -286,8 +286,19 @@ public class MemberRiskAdminService {
     // ------------------------------------------------------------------ 规则
 
     /** 规则列表，按 id 排（也就是建表时灌进去的顺序：前置在前、后置在后） */
+    /**
+     * 规则列表。<b>按【场景 → 阶段 → id】排</b>，不是只按 id。
+     *
+     * <p>🔴 只按 id 排也能得到今天这个顺序（种子数据恰好是那样排的），
+     * 但下一条规则插在哪个 id 上没人保证 —— 而「注册的规则混在登录的规则中间」
+     * 在页面上只是看着乱，在人脑里是真的会看错：两边的阈值差着一个数量级
+     * （注册是「一小时 10 次」，登录是「一小时 60 次」）。
+     * 排序写出来，就不依赖种子数据的运气了。
+     */
     public List<MemberRiskRule> listRules() {
         return ruleDao.selectList(new LambdaQueryWrapper<MemberRiskRule>()
+                .orderByAsc(MemberRiskRule::getEventType)
+                .orderByAsc(MemberRiskRule::getPhase)
                 .orderByAsc(MemberRiskRule::getId));
     }
 

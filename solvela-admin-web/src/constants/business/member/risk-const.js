@@ -1,11 +1,28 @@
 /**
- * 登录风控的枚举。**与后端的枚举一一对应，取值不能自己改**。
+ * 风控的枚举。**与后端的枚举一一对应，取值不能自己改**。
  *
  * 后端：MemberRiskDecisionEnum / MemberRiskModeEnum / MemberRiskOutcomeEnum /
- *      MemberRiskPhaseEnum / MemberRiskRuleTypeEnum
+ *      MemberRiskPhaseEnum / MemberRiskRuleTypeEnum / MemberRiskEventTypeEnum
  *
  * @Date 2026-10-16
  */
+
+/**
+ * 场景。2026-10-16 注册也接进了同一个引擎，于是规则表与流水表里混着两条链路。
+ *
+ * 🔴 取值**跳过 2**：那一档是「登录二次验证」，它是同一次登录的后半段，
+ * 不是一个独立场景 —— 规则表里永远没有 event_type=2 的行（那一步刻意不跑规则）。
+ */
+export const RISK_EVENT_TYPE_ENUM = {
+  LOGIN: { value: 1, desc: '登录', color: 'blue' },
+  LOGIN_VERIFY: { value: 2, desc: '二次验证', color: 'cyan' },
+  REGISTER: { value: 3, desc: '注册', color: 'purple' },
+};
+
+export const RISK_EVENT_TYPE_OPTIONS = Object.values(RISK_EVENT_TYPE_ENUM).map((item) => ({
+  label: item.desc,
+  value: item.value,
+}));
 
 /**
  * 处置等级。
@@ -42,7 +59,7 @@ export const RISK_MODE_OPTIONS = Object.values(RISK_MODE_ENUM).map((item) => ({
 
 /** 这次尝试最后怎么样了。与「风控判了什么」是两件事，所以分开记、分开看 */
 export const RISK_OUTCOME_ENUM = {
-  SUCCESS: { value: 1, desc: '登录成功', color: 'green' },
+  SUCCESS: { value: 1, desc: '成功', color: 'green' },
   BAD_CREDENTIALS: { value: 2, desc: '凭据错误', color: 'orange' },
   UNKNOWN_ACCOUNT: { value: 3, desc: '查无此人', color: 'volcano' },
   FROZEN: { value: 4, desc: '账号冻结', color: 'red' },
@@ -55,6 +72,7 @@ export const RISK_OUTCOME_ENUM = {
   VERIFY_PASSED: { value: 11, desc: '验证通过', color: 'green' },
   VERIFY_FAILED: { value: 12, desc: '验证失败', color: 'orange' },
   INTERNAL_ERROR: { value: 13, desc: '内部异常', color: 'red' },
+  IDENTITY_TAKEN: { value: 14, desc: '身份已被注册', color: 'volcano' },
 };
 
 export const RISK_OUTCOME_OPTIONS = Object.values(RISK_OUTCOME_ENUM).map((item) => ({
@@ -95,7 +113,11 @@ export const RISK_VERIFY_CHANNEL_ENUM = {
   2: { desc: '短信' },
 };
 
-/** 登录方式。与后端 MemberLoginType 的序号对应（1 开始，不是 ordinal） */
+/**
+ * 登录方式。与后端 MemberLoginType 的序号对应（1 开始，不是 ordinal）。
+ *
+ * 注册事件借这一列记「手机号还是邮箱」—— 同一个问题，不为注册再分一套口径
+ */
 export const RISK_LOGIN_TYPE_ENUM = {
   1: { desc: '手机号+密码' },
   2: { desc: '邮箱+密码' },

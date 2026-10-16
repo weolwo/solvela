@@ -10,27 +10,39 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DuplicateKeyException;
+import org.mockito.ArgumentCaptor;
 import solvela.base.event.BizEventPublisher;
-import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
+import solvela.member.MemberRiskEvent;
 import solvela.member.auth.NewDeviceLoginNotifier;
-import solvela.member.device.DeviceGuard;
+import solvela.member.device.DeviceDispositionService;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.sms.MemberSmsCodeService;
+import solvela.member.api.MemberLoginType;
 import solvela.member.api.SmsCodeVerifyResult;
 import solvela.member.api.SmsScene;
-import solvela.member.device.DeviceGuardRule;
-import solvela.member.device.DeviceGuardVerdict;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.RegisterFailReason;
 import solvela.member.id.MemberIdAllocator;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.MemberRiskProperties;
+import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskEventRecorder;
+import solvela.member.risk.RiskSession;
+
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -50,6 +62,15 @@ import static org.mockito.Mockito.when;
  *
  * <p>而格式与强度校验又排在限频<b>之前</b>：它们不查库、不泄露任何信息，
  * 让一个手滑打错格式的用户去消耗限频额度没有道理。
+ *
+ * <h3>限频 = 风控引擎的前置决策（2026-10-16）</h3>
+ * 原来这里断言的是 {@code redisService.increment} 与 {@code deviceGuard.checkRegister}。
+ * 那两道闸现在是四条规则，所以这些用例改成断言<b>引擎的位置与结论的落点</b>：
+ * 「超了几次就该限流」属于规则自己的单测（{@code RegisterRuleTest}），
+ * 不该在主干单测里再钉一遍 —— 那只会让同一件事有两处要改。
+ *
+ * <p>引擎是假的、{@link RiskSession} 是<b>真的</b>（与 {@code MemberAuthServiceTest} 同一个做法）：
+ * 结论由用例指定，而「这条路径有没有写流水、写的是哪个结局」照真发生。
  *
  * <h3>撞唯一约束是预期结果，不是意外</h3>
  * 查重和插入之间有窗口，两个请求同时注册同一个号必然有一个撞唯一键。
@@ -78,13 +99,16 @@ class MemberRegisterServiceTest {
     @Mock
     private MemberIdAllocator memberIdAllocator;
     @Mock
-    private RedisService redisService;
-    @Mock
     private PiiHasher piiHasher;
     @Mock
     private PiiCipher piiCipher;
     @Mock
-    private DeviceGuard deviceGuard;
+    private MemberRiskEngine riskEngine;
+    @Mock
+    private DeviceDispositionService dispositionService;
+    /** 真会话要往它落库。顺手也成了「这条路径有没有写流水」的探针 */
+    @Mock
+    private RiskEventRecorder recorder;
     @Mock
     private MemberEmailCodeService emailCodeService;
     @Mock
@@ -98,6 +122,8 @@ class MemberRegisterServiceTest {
     @Mock
     private NewDeviceLoginNotifier newDeviceLoginNotifier;
 
+    private final MemberRiskProperties riskProperties = new MemberRiskProperties();
+
     private MemberRegisterProperties properties;
     private MemberRegisterService service;
 
@@ -105,7 +131,7 @@ class MemberRegisterServiceTest {
     void setUp() {
         properties = new MemberRegisterProperties();
         service = new MemberRegisterService(memberRegisterDao, memberIdAllocator, properties,
-                redisService, piiHasher, piiCipher, deviceGuard, emailCodeService, smsCodeService,
+                piiHasher, piiCipher, riskEngine, dispositionService, emailCodeService, smsCodeService,
                 bizEventPublisher, newDeviceLoginNotifier);
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);
@@ -115,11 +141,10 @@ class MemberRegisterServiceTest {
         // 12 个参数：2026-09-09 加了 emailCipher / emailHashHex 两个
         when(memberRegisterDao.insertMember(anyLong(), anyString(), anyString(), anyInt(),
                 any(), any(), any(), any(), any(), anyInt(), anyString(), anyString())).thenReturn(1);
-        when(redisService.generateRedisKey(anyString(), anyString())).thenReturn("k");
-        // 默认设备闸放行：本类关心的是格式 → 强度 → 限频 → 查重这条顺序
-        when(deviceGuard.checkRegister(any())).thenReturn(DeviceGuardVerdict.pass());
-        // 默认放行：第 1 次尝试，上限 10
-        when(redisService.increment(anyString(), anyLong())).thenReturn(1L);
+        // 假引擎 + 真会话：结论由用例指定，落库照真发生
+        when(riskEngine.open(any())).thenAnswer(i ->
+                new RiskSession(i.getArgument(0), riskProperties, recorder, null));
+        pre(RiskDecision.PASS);
         // 默认验证码正确：本类的其余用例关心的是【顺序】，不是验证码本身
         when(smsCodeService.verify(any(), anyString(), any())).thenReturn(SmsCodeVerifyResult.OK);
     }
@@ -177,8 +202,8 @@ class MemberRegisterServiceTest {
         service.register(cmd(PHONE, STRONG_PASSWORD));
 
         // 查重在限频之前的话，「这个号注册过没有」可以无限次免费提问
-        InOrder order = inOrder(redisService, memberRegisterDao);
-        order.verify(redisService).increment(anyString(), anyLong());
+        InOrder order = inOrder(riskEngine, memberRegisterDao);
+        order.verify(riskEngine).evaluatePre(any());
         order.verify(memberRegisterDao).countByPhoneHash(PHONE_HASH);
     }
 
@@ -188,8 +213,9 @@ class MemberRegisterServiceTest {
         MemberRegisterResult result = service.register(cmd("1380000", STRONG_PASSWORD));
 
         assertEquals(RegisterFailReason.BAD_PHONE_FORMAT, result.reason());
-        // 手滑打错格式不该占掉他今天的注册机会
-        verify(redisService, never()).increment(anyString(), anyLong());
+        // 手滑打错格式不该占掉他今天的注册机会 —— 连账本都不开：
+        // 开了就会跑规则，而那几条规则【这一次请求本身就算一次】
+        verify(riskEngine, never()).open(any());
         verify(memberRegisterDao, never()).countByPhoneHash(anyString());
     }
 
@@ -199,55 +225,101 @@ class MemberRegisterServiceTest {
         MemberRegisterResult result = service.register(cmd(PHONE, "123456"));
 
         assertEquals(RegisterFailReason.WEAK_PASSWORD, result.reason());
-        verify(redisService, never()).increment(anyString(), anyLong());
+        verify(riskEngine, never()).open(any());
     }
 
-    // ------------------------------------------------------------------ 限频
+    // ------------------------------------------------------------------ 前置决策
 
     @Test
-    @DisplayName("超过 IP 配额：告诉他还要等多久，且不查重不建号")
-    void 超出IP配额() {
-        when(redisService.increment(anyString(), anyLong()))
-                .thenReturn((long) properties.getMaxAttemptsPerIp() + 1);
-        when(redisService.getExpire(anyString())).thenReturn(600L);
+    @DisplayName("限流 → 告诉他还要等多久，且不验码、不查重、不建号")
+    void 被限流() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.LIMIT, 600L, Set.of()));
 
         MemberRegisterResult result = service.register(cmd(PHONE, STRONG_PASSWORD));
 
         assertEquals(RegisterFailReason.TOO_MANY_ATTEMPTS, result.reason());
         assertEquals(600L, result.retryAfterSeconds(), "让用户点第二次才知道被限，是投诉的主要来源");
+        verify(smsCodeService, never()).verify(any(), anyString(), any());
         verify(memberRegisterDao, never()).countByPhoneHash(anyString());
     }
 
     @Test
-    @DisplayName("恰好用满配额那一次仍然放行（阈值是「超过」不是「达到」）")
-    void 用满配额仍放行() {
-        when(redisService.increment(anyString(), anyLong()))
-                .thenReturn((long) properties.getMaxAttemptsPerIp());
+    @DisplayName("🔴 拒绝（黑名单 / 设备封禁）对外与限流【同一句】")
+    void 拒绝与限流同一句() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.DENY, 3600L, Set.of()));
 
+        MemberRegisterResult result = service.register(cmd(PHONE, STRONG_PASSWORD));
+
+        // 告诉对方「你这个 IP 被拉黑了」等于给他一个精确的调试反馈，他换一个就继续
+        assertEquals(RegisterFailReason.TOO_MANY_ATTEMPTS, result.reason());
+    }
+
+    @Test
+    @DisplayName("🔴 配成了注册执行不了的处置（滑块 / OTP）→ 放行，不是静默拦住")
+    void 执行不了的处置按放行() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.OTP, 0L, Set.of()));
+
+        // 把一个配置错误变成「全站注册不可用」，代价完全不对称。
+        // 真正的防线在保存与加载那一步（RegisterTieredCountRule.validate / RiskRuleRegistry.toConfig）
         assertTrue(service.register(cmd(PHONE, STRONG_PASSWORD)).success());
     }
 
     @Test
-    @DisplayName("限频键没有 TTL 时至少报 1 秒，不返回 0 或负数")
-    void 等待秒数至少一秒() {
-        when(redisService.increment(anyString(), anyLong()))
-                .thenReturn((long) properties.getMaxAttemptsPerIp() + 1);
-        // -1 = 键存在但没有过期时间，-2 = 键不存在
-        when(redisService.getExpire(anyString())).thenReturn(-1L);
+    @DisplayName("生效结论带的观察档动作要真的执行 —— 不然 params.observe 是句空话")
+    void 执行观察档动作() {
+        pre(new RiskDecision(MemberRiskDecisionEnum.LIMIT, 60L, Set.of(RiskAction.OBSERVE_DEVICE)));
 
-        // 返回 0 的话，前端的「x 秒后重试」会显示成「0 秒后重试」然后立刻又被拒
-        assertEquals(1L, service.register(cmd(PHONE, STRONG_PASSWORD)).retryAfterSeconds());
+        service.register(cmd(PHONE, STRONG_PASSWORD));
+
+        verify(dispositionService).observe(eq(DEVICE_ID), anyString());
     }
 
     @Test
-    @DisplayName("🔴 拿不到客户端 IP 时放行，不是一律拒绝")
-    void 没有IP时放行() {
-        MemberRegisterResult result =
-                service.register(MemberRegisterCmd.byPhonePassword(PHONE, STRONG_PASSWORD, SMS_CODE, "H5", null, "APP", DEVICE_ID));
+    @DisplayName("🔴 上下文：场景是注册、member 恒为 null、没有滑块票")
+    void 上下文() {
+        service.register(cmd(PHONE, STRONG_PASSWORD));
 
-        // 一律拒绝会让任何一次取 IP 失败变成「全站注册不可用」，那种故障比放过几个注册严重得多
-        assertTrue(result.success());
-        verify(redisService, never()).increment(anyString(), anyLong());
+        ArgumentCaptor<solvela.member.risk.RiskContext> ctx =
+                ArgumentCaptor.forClass(solvela.member.risk.RiskContext.class);
+        verify(riskEngine).open(ctx.capture());
+
+        assertEquals(MemberRiskEventTypeEnum.REGISTER, ctx.getValue().getEventType());
+        // 注册的全部意义就是这个人还没有账号：用到 member 的规则在这个场景一条都没有
+        assertNull(ctx.getValue().getMember());
+        // 滑块票由网关在【发码】那一步核销，注册接口收不到
+        assertFalse(ctx.getValue().isCaptchaPassed());
+        assertEquals(PHONE_HASH, ctx.getValue().getIdentityHashHex());
+        assertEquals(MemberLoginType.PHONE_PASSWORD, ctx.getValue().getLoginType());
+    }
+
+    // ------------------------------------------------------------------ 流水
+
+    @Test
+    @DisplayName("🔴 每一条返回路径都落一行流水，而且结局各不相同")
+    void 四种结局都落库() {
+        assertOutcome(MemberRiskOutcomeEnum.SUCCESS, () -> service.register(cmd(PHONE, STRONG_PASSWORD)));
+
+        pre(new RiskDecision(MemberRiskDecisionEnum.LIMIT, 60L, Set.of()));
+        assertOutcome(MemberRiskOutcomeEnum.PRE_BLOCKED, () -> service.register(cmd(PHONE, STRONG_PASSWORD)));
+
+        pre(RiskDecision.PASS);
+        when(smsCodeService.verify(any(), anyString(), any())).thenReturn(SmsCodeVerifyResult.MISMATCH);
+        assertOutcome(MemberRiskOutcomeEnum.BAD_CREDENTIALS, () -> service.register(cmd(PHONE, STRONG_PASSWORD)));
+
+        when(smsCodeService.verify(any(), anyString(), any())).thenReturn(SmsCodeVerifyResult.OK);
+        when(memberRegisterDao.countByPhoneHash(PHONE_HASH)).thenReturn(1);
+        // 「这个号已经有人了」是注册这边信号最强的一个结局：
+        // 并进「凭据错」的话，拿着泄露号码库挨个试的那个形状在看板上就看不见了
+        assertOutcome(MemberRiskOutcomeEnum.IDENTITY_TAKEN, () -> service.register(cmd(PHONE, STRONG_PASSWORD)));
+    }
+
+    private void assertOutcome(MemberRiskOutcomeEnum expected, Runnable action) {
+        clearInvocations(recorder);
+        action.run();
+        ArgumentCaptor<MemberRiskEvent> event = ArgumentCaptor.forClass(MemberRiskEvent.class);
+        verify(recorder).record(event.capture(), org.mockito.ArgumentMatchers.anyList());
+        assertEquals(expected, event.getValue().getOutcome());
+        assertEquals(MemberRiskEventTypeEnum.REGISTER, event.getValue().getEventType());
     }
 
     // ------------------------------------------------------------------ 查重与并发
@@ -309,9 +381,9 @@ class MemberRegisterServiceTest {
     void 验证码的位置() {
         service.register(cmd(PHONE, STRONG_PASSWORD));
 
-        InOrder order = inOrder(deviceGuard, smsCodeService, memberRegisterDao);
+        InOrder order = inOrder(riskEngine, smsCodeService, memberRegisterDao);
         // 之后：验码要读 Redis 还要写回失败计数，已经被限频挡下的请求不该做这些
-        order.verify(deviceGuard).checkRegister(any());
+        order.verify(riskEngine).evaluatePre(any());
         order.verify(smsCodeService).verify(eq(SmsScene.REGISTER), eq(PHONE), any());
         // 之前：否则没有验证码的人也能拿注册接口反复问「这个号注册过没有」
         order.verify(memberRegisterDao).countByPhoneHash(PHONE_HASH);
@@ -335,36 +407,11 @@ class MemberRegisterServiceTest {
         verify(smsCodeService, never()).verify(any(), anyString(), any());
     }
 
+    private void pre(RiskDecision decision) {
+        when(riskEngine.evaluatePre(any())).thenReturn(decision);
+    }
+
     private MemberRegisterCmd cmd(String phone, String password) {
         return MemberRegisterCmd.byPhonePassword(phone, password, SMS_CODE, "H5", CLIENT_IP, "APP", DEVICE_ID);
-    }
-
-    // ------------------------------------------------------------------ 设备闸
-
-    @Test
-    @DisplayName("🔴 设备闸拦下时，不消耗 IP 配额、不查重、不建号")
-    void 设备被限时什么都不做() {
-        when(deviceGuard.checkRegister(DEVICE_ID))
-                .thenReturn(DeviceGuardVerdict.hit(DeviceGuardRule.REGISTER_TOO_MANY, 7200L, false));
-
-        MemberRegisterResult result = service.register(cmd(PHONE, STRONG_PASSWORD));
-
-        assertFalse(result.success());
-        assertEquals(RegisterFailReason.DEVICE_LIMITED, result.reason());
-        assertEquals(7200L, result.retryAfterSeconds());
-        verify(redisService, never()).increment(anyString(), anyLong());
-        verify(memberRegisterDao, never()).countByPhoneHash(any());
-    }
-
-    @Test
-    @DisplayName("设备闸排在 IP 限频【之前】—— 更硬的那把先筛")
-    void 设备闸在IP限频之前() {
-        when(deviceGuard.checkRegister(DEVICE_ID))
-                .thenReturn(DeviceGuardVerdict.hit(DeviceGuardRule.REGISTER_TOO_MANY, 7200L, false));
-
-        service.register(cmd(PHONE, STRONG_PASSWORD));
-
-        // IP 计数一次都没走：反过来的话，一台设备能把它所在 IP 的配额顺手烧光
-        verify(redisService, never()).increment(anyString(), anyLong());
     }
 }

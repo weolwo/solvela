@@ -1,5 +1,8 @@
 <!--
-  * 登录风控 - 决策流水
+  * 风控 - 决策流水
+  *
+  * 【2026-10-16 起这张表里混着两条链路】注册也接进了同一个引擎。所以第一个筛选器是「场景」，
+  * 列表第一列也是它 —— 「这个 IP 在干什么」的答案，取决于那是 10 次注册还是 10 次登录。
   *
   * 【它回答客服最常被问的那句话】「我为什么要验证码 / 为什么登不上」——
   * 查到那一次尝试，点开看命中了哪几条规则、依据是什么。
@@ -38,6 +41,15 @@
       <a-form-item label="设备号" class="solvela-query-form-item">
         <a-input style="width: 160px" v-model:value="queryForm.deviceId" placeholder="精确匹配" allow-clear @press-enter="onSearch" />
       </a-form-item>
+      <a-form-item label="场景" class="solvela-query-form-item">
+        <a-select
+          style="width: 120px"
+          v-model:value="queryForm.eventType"
+          :options="RISK_EVENT_TYPE_OPTIONS"
+          placeholder="全部"
+          allow-clear
+        />
+      </a-form-item>
       <a-form-item label="结论" class="solvela-query-form-item">
         <a-select style="width: 130px" v-model:value="queryForm.decision" :options="RISK_DECISION_OPTIONS" placeholder="全部" allow-clear />
       </a-form-item>
@@ -75,7 +87,11 @@
       bordered
     >
       <template #bodyCell="{ column, text, record }">
-        <template v-if="column.dataIndex === 'who'">
+        <template v-if="column.dataIndex === 'eventType'">
+          <a-tag :color="eventTypeMeta(text).color">{{ eventTypeMeta(text).desc }}</a-tag>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'who'">
           <div v-if="record.memberId">{{ record.memberId }}</div>
           <!--
             没有会员号正是这张表存在的理由之一 —— 标出来，而不是显示一个空格
@@ -224,6 +240,8 @@
     RISK_DECISION_ENUM,
     RISK_DECISION_OPTIONS,
     RISK_DEVICE_TRUST_ENUM,
+    RISK_EVENT_TYPE_ENUM,
+    RISK_EVENT_TYPE_OPTIONS,
     RISK_IP_FAMILIAR_ENUM,
     RISK_LOGIN_TYPE_ENUM,
     RISK_MODE_ENUM,
@@ -237,6 +255,7 @@
   import TablePagination from '/@/components/framework/table-pagination/index.vue';
 
   const columns = ref([
+    { title: '场景', dataIndex: 'eventType', width: 90 },
     { title: '会员 / 身份摘要', dataIndex: 'who', width: 160 },
     { title: '结论', dataIndex: 'decision', width: 120 },
     { title: '结局', dataIndex: 'outcome', width: 110 },
@@ -299,6 +318,7 @@
     identity: undefined,
     clientIp: undefined,
     deviceId: undefined,
+    eventType: undefined,
     decision: undefined,
     outcome: undefined,
     shadowDiffOnly: false,
@@ -312,6 +332,10 @@
   const tableLoading = ref(false);
   const tableData = ref([]);
   const total = ref(0);
+
+  function eventTypeMeta(value) {
+    return riskMetaOf(RISK_EVENT_TYPE_ENUM, value, { desc: value, color: 'default' });
+  }
 
   function onChangeTime(dates, dateStrings) {
     queryForm.startTime = dateStrings[0] || undefined;

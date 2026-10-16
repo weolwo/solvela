@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.auth.device.DeviceTokenCodec;
 import solvela.member.device.DeviceGuard;
+import solvela.member.risk.feature.LoginCounters;
 import solvela.member.device.DeviceGuardProperties;
 import solvela.member.device.DeviceGuardRule;
 import solvela.member.device.DeviceGuardVerdict;
@@ -42,6 +43,10 @@ class DeviceGuardTest {
     @Autowired
     private DeviceGuardProperties properties;
 
+    /** 验「一机多号」的那条用例要直接问计数器 —— 🔴 不自己拼 Redis 键，键只在 LoginCounters 出现一次 */
+    @Autowired
+    private LoginCounters counters;
+
     private boolean originalDryRun;
 
     /**
@@ -73,12 +78,11 @@ class DeviceGuardTest {
     // ============================== 老客户端 ==============================
 
     @Test
-    @DisplayName("🔴 deviceId 为空 → 四条规则一律放行，且不命中")
+    @DisplayName("🔴 deviceId 为空 → 三条规则一律放行，且不命中")
     void 没有设备号一律放行() {
         enforce();
         for (String none : new String[]{null, "", "  "}) {
             assertPass(guard.checkLogin(none), "checkLogin");
-            assertPass(guard.checkRegister(none), "checkRegister");
             assertPass(guard.checkMemberFanout(none, 1L), "checkMemberFanout");
             // 不该抛，也不该在 Redis 里留下键
             guard.recordLoginFailure(none);
@@ -202,8 +206,8 @@ class DeviceGuardTest {
     }
 
     @Test
-    @DisplayName("关联集合每次都续期 —— 否则一台持续活跃的设备会在 24h 后计数归零")
-    void 关联集合续期() throws Exception {
+    @DisplayName("🔴 一台持续活跃的设备，计数不会整个归零 —— 那正是养号要的效果")
+    void 持续活跃不归零() throws Exception {
         properties.setDryRun(true);
         String device = freshDevice();
 
@@ -211,39 +215,16 @@ class DeviceGuardTest {
         Thread.sleep(1100);
         guard.checkMemberFanout(device, 2L);
 
-        // 第二次 add 之后 TTL 应当被重新推回接近一整个窗口，而不是只剩「窗口 - 1 秒」
-        long ttl = ttlOfMemberSet(device);
-        assertTrue(ttl > properties.dayWindow().toSeconds() - 1,
-                "集合没有续期。只在首次设 TTL 的话，一台持续活跃的设备会在第一次关联的 24 小时后"
-                        + "整个集合消失、计数归零 —— 那正是养号要的效果。实际 TTL=" + ttl);
-    }
-
-    @Autowired
-    private org.springframework.data.redis.core.StringRedisTemplate redis;
-
-    @Autowired
-    private solvela.base.module.redis.RedisService redisService;
-
-    private long ttlOfMemberSet(String device) {
-        Long ttl = redis.getExpire(redisService.generateRedisKey("dev:member:", device));
-        return ttl == null ? -1L : ttl;
-    }
-
-    // ============================== 注册 ==============================
-
-    @Test
-    @DisplayName("一台设备一天建号超限 → 命中 REGISTER_TOO_MANY")
-    void 注册超限() {
-        enforce();
-        String device = freshDevice();
-
-        for (int i = 0; i < properties.getMaxRegisterPerDay(); i++) {
-            assertTrue(guard.checkRegister(device).allowed());
-        }
-        DeviceGuardVerdict over = guard.checkRegister(device);
-
-        assertEquals(DeviceGuardRule.REGISTER_TOO_MANY, over.rule());
-        assertFalse(over.allowed());
+        /*
+         * 换滑动窗口（2026-10-16）之前这里测的是「集合每次 add 都续期」——
+         * 那是为了防「整个集合在首次 add 的 24 小时后消失」。
+         *
+         * 现在成员是【各自】到点掉出去的，续期与否不再是那个问题的答案，
+         * 所以这条用例直接测它真正要的那件事：两个会员都还算在内。
+         * 「半年前碰过的号还算在内」那一半由 SlidingWindowCounterTest 盯着。
+         */
+        assertEquals(2L, counters.addToSet(LoginCounters.Counter.DEVICE_MEMBER, device, "2"),
+                "第二次关联之后，两个会员都该还在窗口里");
     }
 
     @Test

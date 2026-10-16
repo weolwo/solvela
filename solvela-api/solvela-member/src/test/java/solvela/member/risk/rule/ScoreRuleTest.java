@@ -286,7 +286,7 @@ class ScoreRuleTest {
     }
 
     private static RiskRuleConfig config(JsonNode params) {
-        return new RiskRuleConfig("X", "X", MemberRiskPhaseEnum.POST, MemberRiskRuleTypeEnum.SCORE, null, 30,
+        return new RiskRuleConfig("X", "X", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.POST, MemberRiskRuleTypeEnum.SCORE, null, 30,
                 null, MemberRiskModeEnum.ENFORCE, true, params);
     }
 }

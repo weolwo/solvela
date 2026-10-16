@@ -32,6 +32,9 @@ public class MemberRiskEventQueryForm extends PageParam {
     @Schema(description = "设备号：精确匹配")
     private String deviceId;
 
+    @Schema(description = "场景：1-登录 2-登录二次验证 3-注册。不传看全部")
+    private Integer eventType;
+
     @Schema(description = "生效结论：1-放行 2-滑块 3-OTP 4-换通道OTP 5-密码冷却 6-限流 7-拒绝")
     private Integer decision;
 

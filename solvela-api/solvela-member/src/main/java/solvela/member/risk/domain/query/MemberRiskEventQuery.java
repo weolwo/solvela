@@ -36,6 +36,15 @@ public class MemberRiskEventQuery extends PageParam {
 
     private String deviceId;
 
+    /**
+     * 场景，见 MemberRiskEventTypeEnum。
+     *
+     * <p>🔴 注册（2026-10-16）接进同一个引擎之后，这张表里混着两条链路的行。
+     * 没有这个筛选，「这个 IP 在干什么」要靠人用肉眼从一屏里把注册和登录挑开 ——
+     * 而那两件事的正常量级差着一个数量级。
+     */
+    private Integer eventType;
+
     /** 生效结论，见 MemberRiskDecisionEnum */
     private Integer decision;
 
