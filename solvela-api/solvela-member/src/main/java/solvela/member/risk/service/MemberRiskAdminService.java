@@ -108,7 +108,8 @@ public class MemberRiskAdminService {
         stat.setMatrixCells(statDao.matrixCells(begin, end));
         stat.setOtpFunnel(new MemberRiskStatDTO.OtpFunnel(
                 statDao.countChallenged(begin, end), statDao.countVerified(begin, end)));
-        stat.setRuleHits(statDao.ruleHits(begin, end));
+        stat.setRuleVerdicts(statDao.ruleVerdicts(begin, end));
+        stat.setFamiliarity(statDao.familiarity(begin, end));
         stat.setShadowDiffCount(statDao.countShadowDiff(begin, end));
         return stat;
     }

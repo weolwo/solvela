@@ -246,6 +246,14 @@ solvela:
     login:
       # 新设备登录提醒（NewDeviceLoginNotifier）：邮件 + 站内信。误发成灾时关掉，不用发版
       notify-new-device: true
+      # 可疑登录被拦下的提醒（SuspiciousLoginNotifier，RiskAction.NOTIFY_OWNER）：邮件 + 站内信。
+      # 触发面比上面那条窄得多：只有「换通道 OTP」和「拒绝」这两档会带它。
+      # 🔴 它和上面那条说的不是一件事：那条是「登进去了，是台新设备」，
+      #    这条是「有人想进来、我们没让他直接进去」—— 而能走到那一步说明对方密码是对的。
+      notify-suspicious: true
+      # 同一个会员多久最多一封。🔴 节流不是省钱，是保住这封信的可信度：
+      # 一次撞库会对同一个账号连试几十次，三十封一样的信换来的是用户把发件人拉黑
+      notify-suspicious-throttle: 6h
       # 登录的 IP 维度闸门（LoginIpGuard）。上线即拦截，不走 dry-run。
       # 它挡的是设备闸与账号锁都数不到的撞库脚本：不带设备令牌、每个账号只试一次。
       # 🔴 阈值刻意给得宽：公司出口、校园网背后是成百上千个真人。被误伤时调这里即可，不用发版

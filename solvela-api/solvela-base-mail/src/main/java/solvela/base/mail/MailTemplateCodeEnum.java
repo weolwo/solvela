@@ -58,4 +58,16 @@ public enum MailTemplateCodeEnum {
      */
     MEMBER_NEW_DEVICE_LOGIN,
 
+    /**
+     * 可疑登录被拦下的提醒（{@code RiskAction.NOTIFY_OWNER}）。
+     *
+     * <h3>它和 {@link #MEMBER_NEW_DEVICE_LOGIN} 不是一回事</h3>
+     * 那封说「登进去了，是一台新设备」；这封说「有人想进来，<b>我们没让他直接进去</b>」——
+     * 而能走到这一步说明对方<b>密码是对的</b>（后置决策排在密码校验之后）。
+     * 所以这封信的重点是「你的密码可能已经泄露了，去改密码」。
+     *
+     * <p>🔴 信里<b>同样不放任何链接</b>，理由见上一条。
+     */
+    MEMBER_SUSPICIOUS_LOGIN,
+
 }

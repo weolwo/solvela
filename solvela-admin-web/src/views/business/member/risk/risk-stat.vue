@@ -12,6 +12,10 @@
   * 【🔴 第二个该看的是「取特征失败」】一条规则在列表上写着「生效中」，而它每次都取不到特征，
   * 实际什么也没拦。那种静默失效只有这一列看得见。
   *
+  * 【「切生效会怎样」那张表就是 P2 的操作台】方案 §8.2 原本是一段要手写的 join SQL ——
+  * 而对着一张按月分区的表手写 join，只会在出了问题之后才有人去做，到那时该切的早就该切了。
+  * 所以它做进了这里：一行一条规则，直接给出「会改变多少次结论」「抓到过几次确认被盗」。
+  *
   * 【刻意不画图】这里用的是表格和进度条，不引图表库：
   * 四组数里真正要「看趋势」的只有结论分布，而它一天一行、三十行以内一眼扫得完。
   * 为此引一个几百 KB 的图表库，换来的是一张更好看但信息量相同的图。
@@ -129,12 +133,61 @@
       <!---------- 矩阵各格 end ----------->
     </a-row>
 
-    <!---------- 规则命中 begin ----------->
-    <a-card size="small" :bordered="false" :hoverable="true" title="按规则的命中" style="margin-top: 12px">
+    <!---------- IP 熟悉度分布 begin ----------->
+    <a-card
+      size="small"
+      :bordered="false"
+      :hoverable="true"
+      title="IP 熟悉度分布"
+      style="margin-top: 12px"
+    >
+      <template #extra>
+        <!--
+          🔴 这是「什么时候能关掉全局滑块」的前置条件之一：
+          「常用网段」占比够高，关掉之后才有足够多的人真的免掉滑块。
+          占比很低的话，关掉只是把滑块从「所有人」变成「几乎所有人」。
+        -->
+        <span class="cell-sub">「常用网段」占比 {{ strictFamiliarRate }} —— 关掉全局滑块的前置条件</span>
+      </template>
       <a-table
         size="small"
-        :dataSource="stat.ruleHits ?? []"
-        :columns="ruleColumns"
+        :dataSource="stat.familiarity ?? []"
+        :columns="familiarityColumns"
+        :pagination="false"
+        rowKey="ipFamiliar"
+        bordered
+      >
+        <template #bodyCell="{ column, text, record }">
+          <template v-if="column.dataIndex === 'ipFamiliar'">
+            <a-tag :color="metaOf(RISK_IP_FAMILIAR_ENUM, text).color">
+              {{ metaOf(RISK_IP_FAMILIAR_ENUM, text).desc }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.dataIndex === 'rate'">
+            {{ percent(record.count, familiarTotal) }}
+          </template>
+        </template>
+      </a-table>
+    </a-card>
+    <!---------- IP 熟悉度分布 end ----------->
+
+    <!---------- 切生效会怎样 begin ----------->
+    <a-card
+      size="small"
+      :bordered="false"
+      :hoverable="true"
+      title="每条规则：切到生效会怎样"
+      style="margin-top: 12px"
+    >
+      <template #extra>
+        <span class="cell-sub">
+          陪跑那几行的「会改变结论」就是切过去的代价；参考线 &lt; 2%（矩阵按格看会更高）
+        </span>
+      </template>
+      <a-table
+        size="small"
+        :dataSource="stat.ruleVerdicts ?? []"
+        :columns="verdictColumns"
         :pagination="false"
         :rowKey="(r) => `${r.ruleCode}-${r.mode}`"
         bordered
@@ -145,6 +198,26 @@
               {{ metaOf(RISK_MODE_ENUM, text).desc }}
             </a-tag>
           </template>
+
+          <template v-else-if="column.dataIndex === 'wouldChange'">
+            <div>{{ record.wouldChange ?? 0 }}</div>
+            <!--
+              🔴 这个数只对【陪跑】那几行有决策意义：已经生效的规则，
+              「会改变结论」说的是它正在改变结论，那是它本来就该做的事
+            -->
+            <div v-if="record.mode === RISK_MODE_ENUM.SHADOW.value" class="cell-sub">
+              占命中 {{ percent(record.wouldChange, record.hits) }}
+            </div>
+          </template>
+
+          <template v-else-if="column.dataIndex === 'confirmedTakeover'">
+            <!-- 有就是赚的。早期标注少，所以 0 不说明规则没用 -->
+            <span v-if="record.confirmedTakeover > 0" class="cell-good">
+              {{ record.confirmedTakeover }}
+            </span>
+            <span v-else class="cell-sub">0</span>
+          </template>
+
           <template v-else-if="column.dataIndex === 'errorCount'">
             <!-- 不为 0 要显眼：那条规则其实没在工作，而它在规则页上写着「生效中」 -->
             <span v-if="record.errorCount > 0" class="cell-error">{{ record.errorCount }}</span>
@@ -153,7 +226,7 @@
         </template>
       </a-table>
     </a-card>
-    <!---------- 规则命中 end ----------->
+    <!---------- 切生效会怎样 end ----------->
   </a-spin>
 </template>
 
@@ -223,8 +296,18 @@
   );
 
   const errorHitCount = computed(() =>
-    (stat.value.ruleHits ?? []).reduce((sum, r) => sum + (r.errorCount ?? 0), 0),
+    (stat.value.ruleVerdicts ?? []).reduce((sum, r) => sum + (r.errorCount ?? 0), 0),
   );
+
+  const familiarTotal = computed(() =>
+    (stat.value.familiarity ?? []).reduce((sum, b) => sum + (b.count ?? 0), 0),
+  );
+
+  /** 「常用网段」（严格熟悉）的占比。关掉全局滑块的前置条件之一 */
+  const strictFamiliarRate = computed(() => {
+    const strict = (stat.value.familiarity ?? []).find((b) => b.ipFamiliar === 2);
+    return percent(strict?.count, familiarTotal.value);
+  });
 
   // ---------------------------- 每日结论分布 ----------------------------
 
@@ -257,11 +340,20 @@
     { title: '尝试数', dataIndex: 'count', width: 90 },
   ]);
 
-  const ruleColumns = ref([
-    { title: '规则', dataIndex: 'ruleCode', width: 200 },
-    { title: '当时档位', dataIndex: 'mode', width: 100 },
-    { title: '命中数', dataIndex: 'count', width: 100 },
-    { title: '其中取特征失败', dataIndex: 'errorCount', width: 140 },
+  const familiarityColumns = ref([
+    { title: 'IP 熟悉度', dataIndex: 'ipFamiliar', width: 160 },
+    { title: '尝试数', dataIndex: 'count', width: 100 },
+    { title: '占比', dataIndex: 'rate', width: 100 },
+  ]);
+
+  const verdictColumns = ref([
+    { title: '规则', dataIndex: 'ruleCode', width: 180 },
+    { title: '当时档位', dataIndex: 'mode', width: 90 },
+    { title: '命中数', dataIndex: 'hits', width: 90 },
+    { title: '其中登录成功', dataIndex: 'loginSucceeded', width: 110 },
+    { title: '会改变结论', dataIndex: 'wouldChange', width: 130 },
+    { title: '确认被盗', dataIndex: 'confirmedTakeover', width: 100 },
+    { title: '取特征失败', dataIndex: 'errorCount', width: 110 },
   ]);
 </script>
 
@@ -273,6 +365,12 @@
 
   .cell-error {
     color: #cf1322;
+    font-weight: 600;
+  }
+
+  /* 「确认被盗」是好事：这条规则真抓到了东西 */
+  .cell-good {
+    color: #389e0d;
     font-weight: 600;
   }
 </style>

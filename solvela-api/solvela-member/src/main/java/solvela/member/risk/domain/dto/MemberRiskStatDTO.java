@@ -28,14 +28,28 @@ public class MemberRiskStatDTO {
     /** 核身打扰与通过 */
     private OtpFunnel otpFunnel;
 
-    /** 按规则的命中数。生效 / 陪跑分开，取特征失败的也单独数 */
-    private List<RuleHit> ruleHits;
-
     /** 生效结论与陪跑结论不一致的尝试数 —— 「切生效会多打扰多少人」就是这个数 */
     private Long shadowDiffCount;
 
     /** 窗口内的总尝试数，给上面几个数当分母 */
     private Long totalCount;
+
+    /**
+     * 每条规则「切到生效会怎样」的那三个数（方案 §8.2）。
+     *
+     * <h3>🔴 它是 P2 那一步唯一的依据</h3>
+     * 「把某条陪跑规则切生效」不是一个可以凭感觉拍的决定。没有这几个数，
+     * 要么不敢切（规则白写了），要么硬切（上线第一天打扰一片真人）。
+     * 以前这三个数要对着分区表手写一段 join —— 那种事只会在出了问题之后才有人去做。
+     */
+    private List<RuleVerdict> ruleVerdicts;
+
+    /**
+     * IP 熟悉度分布。<b>关掉全局滑块的前置条件之一</b>（§9）：
+     * 「严格熟悉网段」的占比够高，关掉之后才有足够多的人真的免掉滑块；
+     * 占比很低的话，关掉只是把滑块从「所有人」变成「几乎所有人」。
+     */
+    private List<FamiliarityBucket> familiarity;
 
     @Data
     public static class DecisionDaily {
@@ -62,13 +76,39 @@ public class MemberRiskStatDTO {
     public record OtpFunnel(long challenged, long verified) {
     }
 
+    /** 一条规则切到生效的代价与收益（方案 §8.2 的三个数 + 两个辅助数） */
     @Data
-    public static class RuleHit {
+    public static class RuleVerdict {
+
         private String ruleCode;
-        /** 命中时规则所处的档位：1-陪跑, 2-生效 */
+
+        /** 命中时规则所处的档位：1-陪跑, 2-生效。规则档位会变，命中明细里存的是当时的 */
         private Integer mode;
-        private Long count;
-        /** 其中「特征取不到、按未命中处理」的次数。不为 0 说明这条规则其实没在工作 */
+
+        private Long hits;
+
+        /** 其中最后登录成功了的 —— 「打扰率」的分母侧参考 */
+        private Long loginSucceeded;
+
+        /** 其中被事后标成「确认被盗」的。有就是赚的；早期标注少，不能单看它 */
+        private Long confirmedTakeover;
+
+        /**
+         * 其中<b>会改变结论</b>的（生效结论 ≠ 陪跑结论）。
+         *
+         * <p>🔴 这个数就是「切过去会多打扰多少人」—— P2 那一步看的就是它。
+         */
+        private Long wouldChange;
+
+        /** 其中「特征取不到、按未命中处理」的。≈ 0 才说明这条规则真的在工作 */
         private Long errorCount;
     }
+
+    @Data
+    public static class FamiliarityBucket {
+        /** 见 RiskIpFamiliarity：0-陌生, 1-同城同运营商, 2-常用网段 */
+        private Integer ipFamiliar;
+        private Long count;
+    }
+
 }

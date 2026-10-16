@@ -153,6 +153,19 @@ public enum NotificationTemplateEnum {
             List.of("contactType", "maskedContact")),
 
     /**
+     * 可疑登录被拦下（{@code RiskAction.NOTIFY_OWNER}）。
+     *
+     * <p>发送点是 {@code SuspiciousLoginNotifier}，<b>按会员节流</b>（默认 6 小时一封）——
+     * 一次撞库会对同一个账号连试几十次，不节流的话主人收到三十封一样的信，
+     * 而他第一反应是把发件人拉黑。
+     *
+     * <p>归在 {@link NotificationCategoryEnum#SYSTEM}：「有人在试你的密码」
+     * 不该是可以被免打扰关掉的东西。
+     */
+    SUSPICIOUS_LOGIN("SUSPICIOUS_LOGIN", NotificationCategoryEnum.SYSTEM,
+            List.of("loginTime", "deviceType", "location")),
+
+    /**
      * 优惠券即将过期。
      *
      * <p>🔴 <b>必须合并发送</b>：一个人有 8 张券要过期，发<b>一条</b>

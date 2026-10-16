@@ -90,21 +90,51 @@ public interface MemberRiskStatDao {
     long countVerified(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     /**
-     * 按规则 × 档位的命中数，顺带数出「取特征失败」的那几条。
+     * 每条规则「切到生效会怎样」的那三个数（方案 §8.2 那段手写 SQL 的落地）。
      *
-     * <p>{@code error = 1} 不为 0 说明这条规则其实<b>没在工作</b>（特征取不到、超了时间预算），
-     * 而它在列表上看着是「生效中」—— 这是看板上最该先看的一个数。
+     * <h3>🔴 为什么要做进接口，而不是让人手写 SQL</h3>
+     * 它是 P2「逐条切生效」唯一的依据。而对着一张按月分区的表手写 join，
+     * 只会在出了问题之后才有人去做 —— 到那时该切的早就该切了。
+     *
+     * <p>⚠️ {@code wouldChange} 是<b>按尝试</b>算的，不是按规则算的：
+     * 一次尝试里可能有好几条规则命中，它们的 {@code decision <> shadow_decision} 是同一个值。
+     * 所以把几条规则的这个数加起来<b>没有意义</b>（会重复计），只能一条一条看。
      */
     @Select("""
-            SELECT rule_code AS ruleCode, mode, COUNT(*) AS count,
-                   SUM(CASE WHEN error = 1 THEN 1 ELSE 0 END) AS errorCount
-              FROM t_member_risk_hit
-             WHERE create_time >= #{from} AND create_time < #{to}
+            SELECT h.rule_code                               AS ruleCode,
+                   h.mode                                    AS mode,
+                   COUNT(*)                                  AS hits,
+                   SUM(e.outcome = 1)                        AS loginSucceeded,
+                   SUM(e.label = 2)                          AS confirmedTakeover,
+                   SUM(e.decision <> e.shadow_decision)      AS wouldChange,
+                   SUM(h.error = 1)                          AS errorCount
+              FROM t_member_risk_hit h
+              JOIN t_member_risk_event e
+                ON e.id = h.event_id AND e.create_time = h.create_time
+             WHERE h.create_time >= #{from} AND h.create_time < #{to}
              GROUP BY ruleCode, mode
-             ORDER BY count DESC
+             ORDER BY hits DESC
             """)
-    List<MemberRiskStatDTO.RuleHit> ruleHits(@Param("from") LocalDateTime from,
-                                             @Param("to") LocalDateTime to);
+    List<MemberRiskStatDTO.RuleVerdict> ruleVerdicts(@Param("from") LocalDateTime from,
+                                                     @Param("to") LocalDateTime to);
+
+    /**
+     * IP 熟悉度分布。<b>关掉全局滑块的前置条件之一</b>（§9）。
+     *
+     * <p>🔴 要求非空：查无此人时算不出熟悉度，混进来会把「陌生」那一档撑大 ——
+     * 而撞库恰恰大量落在查无此人上，于是这个数会系统性地低估真实用户的熟悉度，
+     * 让人以为「关掉全局滑块没几个人受益」。
+     */
+    @Select("""
+            SELECT ip_familiar AS ipFamiliar, COUNT(*) AS count
+              FROM t_member_risk_event
+             WHERE event_type = 1 AND ip_familiar IS NOT NULL
+               AND create_time >= #{from} AND create_time < #{to}
+             GROUP BY ipFamiliar
+             ORDER BY ipFamiliar
+            """)
+    List<MemberRiskStatDTO.FamiliarityBucket> familiarity(@Param("from") LocalDateTime from,
+                                                          @Param("to") LocalDateTime to);
 
     /**
      * 生效结论与陪跑结论不一致的尝试数。<b>「切生效会多打扰多少人」就是这个数。</b>

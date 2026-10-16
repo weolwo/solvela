@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,10 +48,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DeviceRegisterTest {
 
     /** 每条用例用一个独立 IP，避免彼此烧对方的配额 —— 限流键是按 IP 分的。 */
+    /**
+     * 造数用的 IP。
+     *
+     * <h3>🔴 地址空间要足够大，而且必须落在保留段里</h3>
+     * 「同一 IP 一天最多签发几个设备」那个计数器在 Redis 里<b>按天累积、跨测试运行不清</b>，
+     * 而本类有三个用例会把某个 IP 一路刷到上限。于是地址空间小的时候，
+     * 后面某一次运行随机到一个<b>被前几次运行刷过</b>的 IP，
+     * 「两次签发都该成功」这条就会莫名其妙地挂掉 —— 而单跑它又是绿的。
+     * 2026-10-16 实测挂过一次：抽到的那个 IP 之前已经被刷到 9 次。
+     *
+     * <p>原来是 {@code 203.0.X.Y}（6.25 万个，而且只有 203.0.113.0/24 是保留段）。
+     * 换成 {@code 100.64.0.0/10}（RFC 6598 运营商级 NAT，整段保留、约 400 万个地址）：
+     * 空间大到碰撞可以忽略，而且不会被解析出真实归属地。
+     */
     private static String freshIp() {
-        int a = 1 + (int) (Math.random() * 250);
-        int b = 1 + (int) (Math.random() * 250);
-        return "203.0." + a + "." + b;
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        return "100." + (64 + r.nextInt(64)) + "." + r.nextInt(256) + "." + (1 + r.nextInt(250));
     }
 
     private final List<String> createdDeviceIds = new ArrayList<>();

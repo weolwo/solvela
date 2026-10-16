@@ -157,6 +157,9 @@ public class MemberAuthService implements MemberAuthApi {
     /** 长冷却要落一行，让后台看得见、客服解得开（{@code RiskAction.RECORD_LIMIT}） */
     private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
 
+    /** 「我们拦下了一次可疑登录」（{@code RiskAction.NOTIFY_OWNER}） */
+    private final solvela.member.risk.SuspiciousLoginNotifier suspiciousLoginNotifier;
+
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
     private final LoginIpGuard loginIpGuard;
@@ -382,6 +385,16 @@ public class MemberAuthService implements MemberAuthApi {
             return risk.end(MemberRiskOutcomeEnum.POST_BLOCKED,
                     MemberAuthResult.fail(AuthFailReason.LOGIN_VERIFY_UNAVAILABLE));
         }
+        /*
+         * 本该换通道却退回了（§3.7）：那意味着我们没能避开「可能已失守的那个因子」——
+         * 往同一个邮箱发码，证明不了它没被一起泄露。所以这一次也要通知主人。
+         *
+         * 🔴 通知放在这里而不是让路由自己发：路由是个纯函数式的「选通道」，
+         * 让它顺手发信，「查一下走哪条通道」就带上了副作用。
+         */
+        if (route.fellBack()) {
+            suspiciousLoginNotifier.notifyOwner(member.getMemberId(), cmd.clientIp(), cmd.deviceType());
+        }
         // 落库：事后要能数出「有多少次本该换通道却退回了」（接上短信那天这个数应该归零）
         risk.verifyChannel(route.channel().getValue());
         RiskEventRef ref = risk.end(MemberRiskOutcomeEnum.CHALLENGED);
@@ -414,9 +427,13 @@ public class MemberAuthService implements MemberAuthApi {
         if (decision.has(RiskAction.RECORD_LIMIT)) {
             recordLimit(decision, ctx);
         }
-        // NOTIFY_OWNER（给主人发一封「我们拦下了一次可疑登录」）还没接，见方案 §9 ——
-        // 它排在 P2：要先有线上数据才知道「可疑到什么程度才值得打扰主人」，
-        // 否则第一周就会把提醒发成垃圾邮件，而用户学会的是忽略这类信
+        if (decision.has(RiskAction.NOTIFY_OWNER)) {
+            /*
+             * 「我们拦下了一次可疑登录」。触发面刻意很窄（只有 OTP_STRONG / DENY，
+             * 见 RiskSession），而且按会员节流 —— 一次撞库会对同一个账号连试几十次。
+             */
+            suspiciousLoginNotifier.notifyOwner(ctx.memberId(), ctx.getClientIp(), ctx.getDeviceType());
+        }
     }
 
     /**

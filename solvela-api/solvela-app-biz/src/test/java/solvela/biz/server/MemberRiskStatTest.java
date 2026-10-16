@@ -74,9 +74,14 @@ class MemberRiskStatTest {
                         .anyMatch(c -> c.getDeviceTrust() == 2 && c.getIpFamiliar() == 2 && c.getDormant() == 0),
                 "矩阵那一格要数得出来");
         assertTrue(stat.getShadowDiffCount() >= 1, "🔴 这个数就是「切生效会多打扰多少人」");
-        assertTrue(stat.getRuleHits().stream()
+        assertTrue(stat.getRuleVerdicts().stream()
                         .anyMatch(r -> "NEW_COUNTRY".equals(r.getRuleCode()) && r.getErrorCount() >= 1),
                 "取特征失败要单独数出来 —— 那条规则写着「生效」却其实没在工作");
+        assertTrue(stat.getRuleVerdicts().stream()
+                        .anyMatch(r -> "LOGIN_MATRIX".equals(r.getRuleCode()) && r.getHits() >= 1),
+                "每条规则「切生效会怎样」的那几个数是 P2 唯一的依据（§8.2）");
+        assertTrue(stat.getFamiliarity().stream().allMatch(b -> b.getIpFamiliar() != null),
+                "🔴 查无此人算不出熟悉度，混进来会把「陌生」那一档撑大");
     }
 
     @Test
