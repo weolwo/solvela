@@ -108,6 +108,14 @@ public class MemberLoginService {
     private static final String DEVICE_LIMITED_MSG = "当前设备操作过于频繁，请 %d 分钟后重试";
 
     /**
+     * 已泄露密码的提示。
+     *
+     * <p>🔴 <b>不说它在哪个库里排第几</b> —— 那是在教攻击者排序。
+     * 也不说「太简单」：{@code Password1} 完全满足强度规则，用户会以为是长度问题。
+     */
+    private static final String LEAKED_PASSWORD_MSG = "这个密码已在公开泄露的密码库中，请换一个";
+
+    /**
      * IP 维度被限。同样<b>不说「你的账号」</b>，而说「当前网络」—— 被限的是这个出口，
      * 公司、校园网里的真人被误伤时，这句话能让他明白换个网络（比如切到流量）就好，而不是去找回密码。
      */
@@ -364,6 +372,7 @@ public class MemberLoginService {
             case SMS_CODE_LOCKED -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误次数过多，请重新获取");
             // 文案从域里取，不在这里再写一遍规则 —— 两份措辞迟早对不上
             case WEAK_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, MemberPasswordPolicy.HINT);
+            case LEAKED_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, LEAKED_PASSWORD_MSG);
             /*
              * 新绑的联系方式还在冷静期，不能用来找回密码。
              * 🔴 这里<b>不给 availableAt</b>：找回密码是未登录接口，而这个时间点属于账号内部状态 ——
@@ -613,6 +622,8 @@ public class MemberLoginService {
             case PHONE_TAKEN -> new ApiException(ApiErrors.CONFLICT, "该手机号已注册，请直接登录");
             // 提示文案从域里取，不在这里再写一遍规则 —— 两份措辞迟早对不上
             case WEAK_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, MemberPasswordPolicy.HINT);
+            // 🔴 与「强度不够」分开说：两者的补救办法完全不同（见 RegisterFailReason.LEAKED_PASSWORD）
+            case LEAKED_PASSWORD -> new ApiException(ApiErrors.INVALID_ARGUMENT, LEAKED_PASSWORD_MSG);
             // 🔴 IP 与设备两维合成同一句：告诉对方「是设备被限」等于教他换一台
             case TOO_MANY_ATTEMPTS ->
                     new ApiException(ApiErrors.OPERATION_LIMITED, registerLimitedMessage(result.retryAfterSeconds()));

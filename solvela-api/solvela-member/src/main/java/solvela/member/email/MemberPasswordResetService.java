@@ -93,6 +93,9 @@ public class MemberPasswordResetService {
     /** 四条 RESET_* 规则在它后面。重置密码这条链路以前一次也没被计数过 */
     private final MemberRiskEngine riskEngine;
 
+    /** 已泄露密码表（P3 ③）。刻意不做成风控规则，见 {@code WeakPasswordChecker} */
+    private final solvela.member.password.WeakPasswordChecker weakPasswordChecker;
+
     /**
      * 重置密码。
      *
@@ -175,6 +178,16 @@ public class MemberPasswordResetService {
         if (!MemberPasswordPolicy.isValid(cmd.newPassword())) {
             return risk.end(MemberRiskOutcomeEnum.BAD_FORMAT,
                     MemberPasswordResetResult.fail(PasswordResetFailReason.WEAK_PASSWORD));
+        }
+        /*
+         * 🔴 这一处比注册那一处更要紧：走到这里的人<b>正在把密码换成新的那一个</b>，
+         *    而「忘记密码」最常见的起因之一就是号被人动过 ——
+         *    让他把新密码设成 Password1，等于刚赶走一个人又把门留开。
+         */
+        if (weakPasswordChecker.leaked(cmd.newPassword())) {
+            log.info("【重置密码】新密码命中已泄露密码表，拒绝");
+            return risk.end(MemberRiskOutcomeEnum.BAD_FORMAT,
+                    MemberPasswordResetResult.fail(PasswordResetFailReason.LEAKED_PASSWORD));
         }
 
         String hashHex = piiHasher.hash(identity);

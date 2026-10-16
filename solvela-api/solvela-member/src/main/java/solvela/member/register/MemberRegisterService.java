@@ -97,6 +97,13 @@ public class MemberRegisterService {
     private final PiiCipher piiCipher;
     /** 注册的四道闸全在它后面。限频、黑名单、设备封禁都是规则，不再是本类里的 if */
     private final MemberRiskEngine riskEngine;
+    /**
+     * 已泄露密码表（P3 ③）。
+     *
+     * <p>🔴 刻意<b>不</b>做成风控规则：这件事没有「误伤」可言（换个密码十秒钟），
+     * 而规则意味着页面上有一个能把它关掉的下拉框。见 {@code WeakPasswordChecker}。
+     */
+    private final solvela.member.password.WeakPasswordChecker weakPasswordChecker;
     /** 只为执行 {@link RiskAction#OBSERVE_DEVICE}：一台建号超限的设备，下次登录要多验一道码 */
     private final DeviceDispositionService dispositionService;
     private final MemberEmailCodeService emailCodeService;
@@ -150,6 +157,18 @@ public class MemberRegisterService {
         if (!byEmail || hasPassword) {
             if (!MemberPasswordPolicy.isValid(cmd.password())) {
                 return MemberRegisterResult.fail(RegisterFailReason.WEAK_PASSWORD);
+            }
+            /*
+             * 🔴 强度之外还要过一次「已泄露」。两者不能互相替代：
+             *    Password1 完全满足 8 位 + 字母 + 数字，而它在每一份泄露库的前几十名里 ——
+             *    撞库脚本的第一发就是它。
+             *
+             * 排在这里（限频之前、账本之前）是因为它是一次纯本地的集合查找：
+             * 不查库、不碰 Redis、不泄露任何信息，与强度校验同一类。
+             */
+            if (weakPasswordChecker.leaked(cmd.password())) {
+                log.info("【会员注册】密码命中已泄露密码表，拒绝, source: {}", cmd.registerSource());
+                return MemberRegisterResult.fail(RegisterFailReason.LEAKED_PASSWORD);
             }
         }
 

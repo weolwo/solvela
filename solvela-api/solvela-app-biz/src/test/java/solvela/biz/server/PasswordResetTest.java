@@ -223,6 +223,19 @@ class PasswordResetTest {
     // ============================== 拒绝路径 ==============================
 
     @Test
+    @DisplayName("🔴 新密码在已泄露表里 → 拒绝。刚赶走一个人，不能把门又留开")
+    void 新密码已泄露() {
+        registerWithEmail();
+        String code = sendAndReadCode(EmailCodeScene.RESET_PASSWORD, email);
+
+        // Password1 完全满足强度规则，所以这一档必须单独存在
+        MemberPasswordResetResult result = reset(code, "Password1");
+
+        assertEquals(PasswordResetFailReason.LEAKED_PASSWORD, result.reason());
+        assertTrue(canLogin(OLD_PASSWORD), "被拒的那次不该改掉密码");
+    }
+
+    @Test
     @DisplayName("验证码错 → 拒绝，密码不变")
     void 码错() {
         registerWithEmail();

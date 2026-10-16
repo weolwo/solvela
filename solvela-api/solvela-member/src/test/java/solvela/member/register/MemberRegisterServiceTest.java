@@ -29,6 +29,7 @@ import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.RegisterFailReason;
 import solvela.member.id.MemberIdAllocator;
+import solvela.member.password.WeakPasswordChecker;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.RiskAction;
@@ -88,7 +89,13 @@ class MemberRegisterServiceTest {
 
     private static final String PHONE = "13800000000";
     private static final String PHONE_HASH = "ABCDEF";
-    private static final String STRONG_PASSWORD = "Passw0rd!";
+    /**
+     * 🔴 不能再用 {@code Passw0rd!} 了 —— 它在已泄露密码表里（2026-10-16，P3 ③）。
+     *
+     * <p>这不是测试的妥协，而是这个功能的第一个产出：
+     * 连我们自己的测试常量都是泄露库里的那一批，用户会写出什么可想而知。
+     */
+    private static final String STRONG_PASSWORD = "SvRegister2026";
     private static final String CLIENT_IP = "10.0.0.7";
     private static final long MEMBER_ID = 900001L;
     private static final String DEVICE_ID = "0123456789abcdef0123456789abcdef";
@@ -131,8 +138,8 @@ class MemberRegisterServiceTest {
     void setUp() {
         properties = new MemberRegisterProperties();
         service = new MemberRegisterService(memberRegisterDao, memberIdAllocator, properties,
-                piiHasher, piiCipher, riskEngine, dispositionService, emailCodeService, smsCodeService,
-                bizEventPublisher, newDeviceLoginNotifier);
+                piiHasher, piiCipher, riskEngine, new WeakPasswordChecker(), dispositionService,
+                emailCodeService, smsCodeService, bizEventPublisher, newDeviceLoginNotifier);
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);
         when(piiCipher.encrypt(PHONE)).thenReturn("加密后的号");
@@ -217,6 +224,26 @@ class MemberRegisterServiceTest {
         // 开了就会跑规则，而那几条规则【这一次请求本身就算一次】
         verify(riskEngine, never()).open(any());
         verify(memberRegisterDao, never()).countByPhoneHash(anyString());
+    }
+
+    @Test
+    @DisplayName("🔴 密码强度够、但在已泄露表里 → 单独一档，而不是「强度不够」")
+    void 已泄露密码() {
+        // Password1 完全满足 8 位 + 字母 + 数字 —— 而它在每一份泄露库的前几十名里
+        MemberRegisterResult result = service.register(cmd(PHONE, "Password1"));
+
+        assertEquals(RegisterFailReason.LEAKED_PASSWORD, result.reason(),
+                "并进 WEAK_PASSWORD 的话，用户会对着它反复加长度，而每次都被拒 —— 他不会明白为什么");
+        // 与强度校验同一类：不查库、不开账本、不消耗任何配额
+        verify(riskEngine, never()).open(any());
+        verify(memberRegisterDao, never()).countByPhoneHash(anyString());
+    }
+
+    @Test
+    @DisplayName("大小写变体照样挡 —— 漏掉 PASSWORD1 的泄露密码表是摆设")
+    void 已泄露密码大小写() {
+        assertEquals(RegisterFailReason.LEAKED_PASSWORD, service.register(cmd(PHONE, "PASSWORD1")).reason());
+        assertEquals(RegisterFailReason.LEAKED_PASSWORD, service.register(cmd(PHONE, "pAsSwOrD1")).reason());
     }
 
     @Test
