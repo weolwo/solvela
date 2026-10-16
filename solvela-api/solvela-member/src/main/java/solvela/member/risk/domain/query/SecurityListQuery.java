@@ -2,9 +2,9 @@ package solvela.member.risk.domain.query;
 
 import lombok.Data;
 import solvela.base.domain.PageParam;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListStatusEnum;
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 /**
  * 名单查询条件。
@@ -17,15 +17,15 @@ import solvela.enums.MemberRiskListTypeEnum;
  * @Date 2026-10-16
  */
 @Data
-public class MemberRiskListQuery extends PageParam {
+public class SecurityListQuery extends PageParam {
 
-    private MemberRiskListTypeEnum listType;
+    private SecurityListTypeEnum listType;
 
-    private MemberRiskListDimensionEnum dimension;
+    private SecurityListDimensionEnum dimension;
 
     /** IP / CIDR 原文、身份摘要（hex）、或会员号。精确匹配 */
     private String listValue;
 
     /** 不传 = 只看有效的。查历史（含已撤销）要显式传 */
-    private MemberRiskListStatusEnum status;
+    private SecurityListStatusEnum status;
 }

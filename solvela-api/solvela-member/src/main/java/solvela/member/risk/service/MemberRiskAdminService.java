@@ -7,26 +7,26 @@ import lombok.extern.slf4j.Slf4j;
 import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListStatusEnum;
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
 import solvela.enums.MemberRiskModeEnum;
-import solvela.member.MemberRiskList;
+import solvela.member.SecurityList;
 import solvela.member.MemberRiskRule;
 import solvela.member.risk.config.IpRange;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.dao.MemberRiskEventDao;
 import solvela.member.risk.dao.MemberRiskHitDao;
-import solvela.member.risk.dao.MemberRiskListDao;
+import solvela.member.risk.dao.SecurityListDao;
 import solvela.member.risk.dao.MemberRiskRuleDao;
 import solvela.member.risk.domain.dto.MemberRiskEventDTO;
 import solvela.member.risk.domain.dto.MemberRiskEventDetailDTO;
 import solvela.member.risk.domain.dto.MemberRiskHitDTO;
 import solvela.member.risk.domain.dto.MemberRiskStatDTO;
-import solvela.member.risk.domain.MemberRiskListAddCmd;
+import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.domain.query.MemberRiskEventQuery;
-import solvela.member.risk.domain.query.MemberRiskListQuery;
+import solvela.member.risk.domain.query.SecurityListQuery;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -66,7 +66,7 @@ public class MemberRiskAdminService {
 
     private final RiskRuleRegistry registry;
 
-    private final MemberRiskListDao listDao;
+    private final SecurityListDao listDao;
 
     private final solvela.member.risk.dao.MemberRiskStatDao statDao;
 
@@ -126,16 +126,16 @@ public class MemberRiskAdminService {
      * 名单分页。不传状态时<b>只看有效的</b> —— 客服日常要的是「现在谁被封着」，
      * 而历史（含已撤销）是另一个问题，得显式问。
      */
-    public PageResult<MemberRiskList> queryListPage(MemberRiskListQuery query) {
-        Page<MemberRiskList> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<MemberRiskList> wrapper = new LambdaQueryWrapper<MemberRiskList>()
-                .eq(query.getListType() != null, MemberRiskList::getListType, query.getListType())
-                .eq(query.getDimension() != null, MemberRiskList::getDimension, query.getDimension())
+    public PageResult<SecurityList> queryListPage(SecurityListQuery query) {
+        Page<SecurityList> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SecurityList> wrapper = new LambdaQueryWrapper<SecurityList>()
+                .eq(query.getListType() != null, SecurityList::getListType, query.getListType())
+                .eq(query.getDimension() != null, SecurityList::getDimension, query.getDimension())
                 .eq(SolvelaStringUtil.isNotBlank(query.getListValue()),
-                        MemberRiskList::getListValue, query.getListValue())
-                .eq(MemberRiskList::getStatus,
-                        query.getStatus() == null ? MemberRiskListStatusEnum.VALID : query.getStatus())
-                .orderByDesc(MemberRiskList::getId);
+                        SecurityList::getListValue, query.getListValue())
+                .eq(SecurityList::getStatus,
+                        query.getStatus() == null ? SecurityListStatusEnum.VALID : query.getStatus())
+                .orderByDesc(SecurityList::getId);
         // 单表查询走 BaseMapper.selectPage，所以这里自己造 Page（SolvelaPageUtil 那个返回 Page<?>，
         // 泛型对不上 selectPage 的签名），再用同一个工具把结果裹成 PageResult
         listDao.selectPage(page, wrapper);
@@ -157,7 +157,7 @@ public class MemberRiskAdminService {
      *
      * @return 新增后的那一行
      */
-    public MemberRiskList addList(MemberRiskListAddCmd cmd) {
+    public SecurityList addList(SecurityListAddCmd cmd) {
         if (cmd.getListType() == null || cmd.getDimension() == null) {
             throw new IllegalArgumentException("名单类型与维度必填");
         }
@@ -168,8 +168,8 @@ public class MemberRiskAdminService {
         validateScore(cmd.getListType(), cmd.getScore());
         LocalDateTime expireTime = resolveExpireTime(cmd);
 
-        if (cmd.getDimension() == MemberRiskListDimensionEnum.MEMBER
-                && cmd.getListType() != MemberRiskListTypeEnum.WHITE) {
+        if (cmd.getDimension() == SecurityListDimensionEnum.MEMBER
+                && cmd.getListType() != SecurityListTypeEnum.WHITE) {
             /*
              * 🔴 会员只允许白名单。黑名单那一份由 t_member.status（冻结）管 ——
              * 名单里再放一份就有了两个答案，而「这个人到底能不能用」只该有一个。
@@ -177,19 +177,19 @@ public class MemberRiskAdminService {
             throw new IllegalArgumentException("会员维度只允许白名单：封号请用会员状态（冻结）");
         }
 
-        MemberRiskList row = new MemberRiskList();
+        SecurityList row = new SecurityList();
         row.setListType(cmd.getListType());
         row.setDimension(cmd.getDimension());
         row.setListValue(value);
         row.setScore(cmd.getScore());
         row.setReason(cmd.getReason());
         row.setSource(1);
-        row.setStatus(MemberRiskListStatusEnum.VALID);
+        row.setStatus(SecurityListStatusEnum.VALID);
         row.setExpireTime(expireTime);
         row.setOperator(cmd.getOperator());
         listDao.insert(row);
         listCache.reload();
-        log.info("【风控名单】新增, 类型: {}, 维度: {}, 值: {}, 到期: {}, 操作人: {}",
+        log.info("【安全名单】新增, 类型: {}, 维度: {}, 值: {}, 到期: {}, 操作人: {}",
                 cmd.getListType(), cmd.getDimension(), value, expireTime, cmd.getOperator());
         return row;
     }
@@ -203,24 +203,24 @@ public class MemberRiskAdminService {
         if (id == null || SolvelaStringUtil.isBlank(reason)) {
             throw new IllegalArgumentException("撤销必须写原因 —— 「上次为什么解的」和「为什么加的」一样重要");
         }
-        MemberRiskList row = listDao.selectById(id);
-        if (row == null || row.getStatus() == MemberRiskListStatusEnum.REVOKED) {
+        SecurityList row = listDao.selectById(id);
+        if (row == null || row.getStatus() == SecurityListStatusEnum.REVOKED) {
             return false;
         }
-        MemberRiskList update = new MemberRiskList();
+        SecurityList update = new SecurityList();
         update.setId(id);
-        update.setStatus(MemberRiskListStatusEnum.REVOKED);
+        update.setStatus(SecurityListStatusEnum.REVOKED);
         update.setRevokeOperator(operator);
         update.setRevokeReason(reason);
         update.setRevokeTime(LocalDateTime.now());
         listDao.updateById(update);
         listCache.reload();
-        log.info("【风控名单】撤销, id: {}, 操作人: {}, 原因: {}", id, operator, reason);
+        log.info("【安全名单】撤销, id: {}, 操作人: {}, 原因: {}", id, operator, reason);
         return true;
     }
 
     /** 各维度的值形状。解不出来当场拒绝，而不是留一行「永远不命中」的名单 */
-    private static String normalizeListValue(MemberRiskListDimensionEnum dimension, String raw) {
+    private static String normalizeListValue(SecurityListDimensionEnum dimension, String raw) {
         String value = raw == null ? "" : raw.trim();
         if (value.isEmpty()) {
             throw new IllegalArgumentException("名单值必填");
@@ -251,8 +251,8 @@ public class MemberRiskAdminService {
         return value;
     }
 
-    private static void validateScore(MemberRiskListTypeEnum listType, Integer score) {
-        if (listType == MemberRiskListTypeEnum.GREY) {
+    private static void validateScore(SecurityListTypeEnum listType, Integer score) {
+        if (listType == SecurityListTypeEnum.GREY) {
             if (score == null || score <= 0) {
                 throw new IllegalArgumentException("灰名单必须给分 —— 不给分的灰名单命中了也什么都不会发生");
             }
@@ -270,14 +270,14 @@ public class MemberRiskAdminService {
      * 它的典型用途是应用市场审核账号、压测账号 —— 都是「这一阵子」的事。
      * 长期白名单会在没人记得的时候继续生效，而白名单上的账号恰恰是最值得猜的。
      */
-    private static LocalDateTime resolveExpireTime(MemberRiskListAddCmd cmd) {
+    private static LocalDateTime resolveExpireTime(SecurityListAddCmd cmd) {
         if (cmd.getExpireTime() != null) {
             if (cmd.getExpireTime().isBefore(LocalDateTime.now())) {
                 throw new IllegalArgumentException("到期时间不能是过去 —— 那条名单加完立刻就失效了");
             }
             return cmd.getExpireTime();
         }
-        if (cmd.getDimension() == MemberRiskListDimensionEnum.MEMBER) {
+        if (cmd.getDimension() == SecurityListDimensionEnum.MEMBER) {
             throw new IllegalArgumentException("会员白名单必须填到期时间，不允许长期");
         }
         return LocalDateTime.now().plus(DEFAULT_LIST_TTL);

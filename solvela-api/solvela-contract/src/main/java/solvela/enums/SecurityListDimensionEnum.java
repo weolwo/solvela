@@ -4,13 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 风控名单的维度。取值与 {@code t_member_risk_list.dimension} 一致。
+ * 安全名单的维度。取值与 {@code t_security_list.dimension} 一致。
  *
  * @Date 2026-10-15
  */
 @Getter
 @AllArgsConstructor
-public enum MemberRiskListDimensionEnum implements BaseEnum {
+public enum SecurityListDimensionEnum implements BaseEnum {
 
     IP(1, "IP"),
 

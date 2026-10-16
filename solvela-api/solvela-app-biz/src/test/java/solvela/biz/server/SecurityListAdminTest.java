@@ -10,13 +10,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.domain.PageResult;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListStatusEnum;
-import solvela.enums.MemberRiskListTypeEnum;
-import solvela.member.MemberRiskList;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
+import solvela.member.SecurityList;
 import solvela.member.risk.config.RiskListCache;
-import solvela.member.risk.domain.MemberRiskListAddCmd;
-import solvela.member.risk.domain.query.MemberRiskListQuery;
+import solvela.member.risk.domain.SecurityListAddCmd;
+import solvela.member.risk.domain.query.SecurityListQuery;
 import solvela.member.risk.service.MemberRiskAdminService;
 
 import java.time.LocalDateTime;
@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 @TestPropertySource(properties = "solvela.member.risk.cache-refresh=0s")
-class MemberRiskListAdminTest {
+class SecurityListAdminTest {
 
     @Autowired
     private MemberRiskAdminService riskAdminService;
@@ -61,8 +61,8 @@ class MemberRiskListAdminTest {
 
     @AfterEach
     void cleanUp() {
-        jdbcTemplate.update("DELETE FROM t_member_risk_list WHERE list_value LIKE ?", IP_PREFIX + "%");
-        jdbcTemplate.update("DELETE FROM t_member_risk_list WHERE reason LIKE '用例：%'");
+        jdbcTemplate.update("DELETE FROM t_security_list WHERE list_value LIKE ?", IP_PREFIX + "%");
+        jdbcTemplate.update("DELETE FROM t_security_list WHERE reason LIKE '用例：%'");
         listCache.reload();
     }
 
@@ -72,8 +72,8 @@ class MemberRiskListAdminTest {
         String ip = freshIp();
         assertFalse(listCache.matchIp(ip).black(), "造数：一开始不该命中");
 
-        riskAdminService.addList(add(MemberRiskListTypeEnum.BLACK,
-                MemberRiskListDimensionEnum.IP, ip, null, null));
+        riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+                SecurityListDimensionEnum.IP, ip, null, null));
 
         assertTrue(listCache.matchIp(ip).black());
     }
@@ -81,8 +81,8 @@ class MemberRiskListAdminTest {
     @Test
     @DisplayName("IP 段（CIDR）命中段内任意地址")
     void 网段命中() {
-        riskAdminService.addList(add(MemberRiskListTypeEnum.BLACK,
-                MemberRiskListDimensionEnum.IP_RANGE, IP_PREFIX + "0.0/16", null, null));
+        riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+                SecurityListDimensionEnum.IP_RANGE, IP_PREFIX + "0.0/16", null, null));
 
         assertTrue(listCache.matchIp(IP_PREFIX + "7.7").black());
     }
@@ -91,12 +91,12 @@ class MemberRiskListAdminTest {
     @DisplayName("🔴 格式解不开直接拒绝 —— 否则列表里会躺着一条永远不命中的名单")
     void 格式不对就拒绝() {
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                add(MemberRiskListTypeEnum.BLACK, MemberRiskListDimensionEnum.IP, "不是IP", null, null)));
+                add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, "不是IP", null, null)));
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                add(MemberRiskListTypeEnum.BLACK, MemberRiskListDimensionEnum.IP_RANGE,
+                add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP_RANGE,
                         "203.0.113.0/99", null, null)));
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                add(MemberRiskListTypeEnum.BLACK, MemberRiskListDimensionEnum.IDENTITY,
+                add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IDENTITY,
                         "短了点", null, null)));
     }
 
@@ -104,10 +104,10 @@ class MemberRiskListAdminTest {
     @DisplayName("灰名单必须给分；黑白名单不许给分")
     void 分数的规矩() {
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                        add(MemberRiskListTypeEnum.GREY, MemberRiskListDimensionEnum.IP, freshIp(), null, null)),
+                        add(SecurityListTypeEnum.GREY, SecurityListDimensionEnum.IP, freshIp(), null, null)),
                 "不给分的灰名单命中了也什么都不会发生");
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                        add(MemberRiskListTypeEnum.BLACK, MemberRiskListDimensionEnum.IP, freshIp(), 30, null)),
+                        add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, freshIp(), 30, null)),
                 "黑名单直接拒绝，分数在这一档上没有意义");
     }
 
@@ -115,22 +115,22 @@ class MemberRiskListAdminTest {
     @DisplayName("🔴 会员维度只许白名单，而且必须填到期 —— 长期白名单会在没人记得时继续生效")
     void 会员维度的规矩() {
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                        add(MemberRiskListTypeEnum.BLACK, MemberRiskListDimensionEnum.MEMBER, "900001", null,
+                        add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.MEMBER, "900001", null,
                                 LocalDateTime.now().plusDays(3))),
                 "封号请用会员状态 —— 名单里再放一份就有了两个答案");
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                        add(MemberRiskListTypeEnum.WHITE, MemberRiskListDimensionEnum.MEMBER, "900001", null, null)),
+                        add(SecurityListTypeEnum.WHITE, SecurityListDimensionEnum.MEMBER, "900001", null, null)),
                 "会员白名单必须填到期");
         assertNotNull(riskAdminService.addList(
-                add(MemberRiskListTypeEnum.WHITE, MemberRiskListDimensionEnum.MEMBER, "900001", null,
+                add(SecurityListTypeEnum.WHITE, SecurityListDimensionEnum.MEMBER, "900001", null,
                         LocalDateTime.now().plusDays(3))));
     }
 
     @Test
     @DisplayName("原因必填 —— 那句话是给下一个看到它的人的")
     void 原因必填() {
-        MemberRiskListAddCmd cmd = add(MemberRiskListTypeEnum.BLACK,
-                MemberRiskListDimensionEnum.IP, freshIp(), null, null);
+        SecurityListAddCmd cmd = add(SecurityListTypeEnum.BLACK,
+                SecurityListDimensionEnum.IP, freshIp(), null, null);
         cmd.setReason("  ");
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(cmd));
     }
@@ -139,7 +139,7 @@ class MemberRiskListAdminTest {
     @DisplayName("到期时间不能是过去 —— 那条名单加完立刻就失效了")
     void 到期不能是过去() {
         assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
-                add(MemberRiskListTypeEnum.BLACK, MemberRiskListDimensionEnum.IP, freshIp(), null,
+                add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, freshIp(), null,
                         LocalDateTime.now().minusDays(1))));
     }
 
@@ -147,18 +147,18 @@ class MemberRiskListAdminTest {
     @DisplayName("🔴 撤销不删行：状态改成已撤销，并记下谁解的、为什么；缓存立刻不再命中")
     void 撤销留痕() {
         String ip = freshIp();
-        MemberRiskList row = riskAdminService.addList(add(MemberRiskListTypeEnum.BLACK,
-                MemberRiskListDimensionEnum.IP, ip, null, null));
+        SecurityList row = riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+                SecurityListDimensionEnum.IP, ip, null, null));
 
         assertTrue(riskAdminService.revokeList(row.getId(), "客服小王", "误封，公司出口"));
 
         assertFalse(listCache.matchIp(ip).black());
-        MemberRiskListQuery query = new MemberRiskListQuery();
+        SecurityListQuery query = new SecurityListQuery();
         query.setPageNum(1L);
         query.setPageSize(10L);
         query.setListValue(ip);
-        query.setStatus(MemberRiskListStatusEnum.REVOKED);
-        PageResult<MemberRiskList> page = riskAdminService.queryListPage(query);
+        query.setStatus(SecurityListStatusEnum.REVOKED);
+        PageResult<SecurityList> page = riskAdminService.queryListPage(query);
         assertEquals(1, page.list().size(), "🔴 删行的话，下一个人看到的是「这个 IP 从来没被封过」");
         assertEquals("客服小王", page.list().getFirst().getRevokeOperator());
         assertEquals("误封，公司出口", page.list().getFirst().getRevokeReason());
@@ -167,14 +167,14 @@ class MemberRiskListAdminTest {
     @Test
     @DisplayName("连点两次撤销：第二次返回 false，不覆盖第一次记的人")
     void 撤销幂等() {
-        MemberRiskList row = riskAdminService.addList(add(MemberRiskListTypeEnum.BLACK,
-                MemberRiskListDimensionEnum.IP, freshIp(), null, null));
+        SecurityList row = riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+                SecurityListDimensionEnum.IP, freshIp(), null, null));
 
         assertTrue(riskAdminService.revokeList(row.getId(), "客服小王", "误封"));
         assertFalse(riskAdminService.revokeList(row.getId(), "客服小李", "又点了一次"));
 
         String operator = jdbcTemplate.queryForObject(
-                "SELECT revoke_operator FROM t_member_risk_list WHERE id = ?", String.class, row.getId());
+                "SELECT revoke_operator FROM t_security_list WHERE id = ?", String.class, row.getId());
         assertEquals("客服小王", operator);
     }
 
@@ -188,11 +188,11 @@ class MemberRiskListAdminTest {
     @DisplayName("列表默认只看有效的：客服日常要的是「现在谁被封着」")
     void 默认只看有效() {
         String ip = freshIp();
-        MemberRiskList row = riskAdminService.addList(add(MemberRiskListTypeEnum.BLACK,
-                MemberRiskListDimensionEnum.IP, ip, null, null));
+        SecurityList row = riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+                SecurityListDimensionEnum.IP, ip, null, null));
         riskAdminService.revokeList(row.getId(), "客服", "误封");
 
-        MemberRiskListQuery query = new MemberRiskListQuery();
+        SecurityListQuery query = new SecurityListQuery();
         query.setPageNum(1L);
         query.setPageSize(10L);
         query.setListValue(ip);
@@ -201,10 +201,10 @@ class MemberRiskListAdminTest {
 
     // ============================== 工具 ==============================
 
-    private static MemberRiskListAddCmd add(MemberRiskListTypeEnum type,
-                                            MemberRiskListDimensionEnum dimension,
+    private static SecurityListAddCmd add(SecurityListTypeEnum type,
+                                            SecurityListDimensionEnum dimension,
                                             String value, Integer score, LocalDateTime expireTime) {
-        MemberRiskListAddCmd cmd = new MemberRiskListAddCmd();
+        SecurityListAddCmd cmd = new SecurityListAddCmd();
         cmd.setListType(type);
         cmd.setDimension(dimension);
         cmd.setListValue(value);

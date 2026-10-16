@@ -5,12 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListStatusEnum;
-import solvela.enums.MemberRiskListTypeEnum;
-import solvela.member.MemberRiskList;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
+import solvela.member.SecurityList;
 import solvela.member.risk.MemberRiskProperties;
-import solvela.member.risk.dao.MemberRiskListDao;
+import solvela.member.risk.dao.SecurityListDao;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * 风控名单的本地缓存。启动时加载一次，之后每 {@code cache-refresh}（默认 30 秒）重载一次 ——
+ * 安全名单的本地缓存。启动时加载一次，之后每 {@code cache-refresh}（默认 30 秒）重载一次 ——
  * 后台新增、撤销最多这么久在每个实例上生效，<b>不用重启</b>。
  *
  * <h3>到期在读的时候判</h3>
@@ -37,7 +37,7 @@ import java.util.function.Supplier;
 @Component
 public class RiskListCache implements SmartInitializingSingleton {
 
-    private final MemberRiskListDao listDao;
+    private final SecurityListDao listDao;
 
     private final PeriodicSnapshot<Snapshot> snapshot;
 
@@ -50,18 +50,18 @@ public class RiskListCache implements SmartInitializingSingleton {
      * （报的是「No default constructor found」，看不出跟第二个构造器有关）。
      */
     @Autowired
-    public RiskListCache(MemberRiskListDao listDao, MemberRiskProperties properties) {
+    public RiskListCache(SecurityListDao listDao, MemberRiskProperties properties) {
         this(listDao, properties, LocalDateTime::now);
     }
 
-    RiskListCache(MemberRiskListDao listDao, MemberRiskProperties properties, Supplier<LocalDateTime> now) {
+    RiskListCache(SecurityListDao listDao, MemberRiskProperties properties, Supplier<LocalDateTime> now) {
         this.listDao = listDao;
         this.now = now;
         this.snapshot = new PeriodicSnapshot<>("名单", this::load, properties.cacheRefresh());
     }
 
     /** 一条名单在缓存里的样子 */
-    record Entry(long id, MemberRiskListTypeEnum type, int score, LocalDateTime expireTime) {
+    record Entry(long id, SecurityListTypeEnum type, int score, LocalDateTime expireTime) {
     }
 
     record RangeEntry(IpRange range, Entry entry) {
@@ -103,7 +103,7 @@ public class RiskListCache implements SmartInitializingSingleton {
         Snapshot s = snapshot.get();
         LocalDateTime at = now.get();
         ListMatch.Builder b = new ListMatch.Builder();
-        b.addAll(s.exact().get(key(MemberRiskListDimensionEnum.IP, canonicalIp(single))), at);
+        b.addAll(s.exact().get(key(SecurityListDimensionEnum.IP, canonicalIp(single))), at);
         for (RangeEntry r : s.ranges()) {
             if (r.range().contains(single)) {
                 b.add(r.entry(), at);
@@ -116,7 +116,7 @@ public class RiskListCache implements SmartInitializingSingleton {
         if (memberId == null) {
             return ListMatch.NONE;
         }
-        return exact(MemberRiskListDimensionEnum.MEMBER, String.valueOf(memberId));
+        return exact(SecurityListDimensionEnum.MEMBER, String.valueOf(memberId));
     }
 
     /** @param identityHashHex {@code PiiHasher} 输出，大小写不敏感 */
@@ -124,21 +124,21 @@ public class RiskListCache implements SmartInitializingSingleton {
         if (identityHashHex == null || identityHashHex.isBlank()) {
             return ListMatch.NONE;
         }
-        return exact(MemberRiskListDimensionEnum.IDENTITY, identityHashHex.trim().toLowerCase(Locale.ROOT));
+        return exact(SecurityListDimensionEnum.IDENTITY, identityHashHex.trim().toLowerCase(Locale.ROOT));
     }
 
-    private ListMatch exact(MemberRiskListDimensionEnum dimension, String value) {
+    private ListMatch exact(SecurityListDimensionEnum dimension, String value) {
         ListMatch.Builder b = new ListMatch.Builder();
         b.addAll(snapshot.get().exact().get(key(dimension, value)), now.get());
         return b.build();
     }
 
     private Snapshot load() {
-        List<MemberRiskList> rows = listDao.selectList(new LambdaQueryWrapper<MemberRiskList>()
-                .eq(MemberRiskList::getStatus, MemberRiskListStatusEnum.VALID));
+        List<SecurityList> rows = listDao.selectList(new LambdaQueryWrapper<SecurityList>()
+                .eq(SecurityList::getStatus, SecurityListStatusEnum.VALID));
         Map<String, List<Entry>> exact = new HashMap<>();
         List<RangeEntry> ranges = new ArrayList<>();
-        for (MemberRiskList row : rows) {
+        for (SecurityList row : rows) {
             if (row.getListType() == null || row.getDimension() == null || row.getListValue() == null) {
                 continue;
             }
@@ -147,12 +147,12 @@ public class RiskListCache implements SmartInitializingSingleton {
             try {
                 switch (row.getDimension()) {
                     case IP -> exact.computeIfAbsent(
-                            key(MemberRiskListDimensionEnum.IP, canonicalIp(IpRange.parse(row.getListValue()))),
+                            key(SecurityListDimensionEnum.IP, canonicalIp(IpRange.parse(row.getListValue()))),
                             k -> new ArrayList<>()).add(entry);
                     case IP_RANGE -> ranges.add(new RangeEntry(IpRange.parse(row.getListValue()), entry));
-                    case IDENTITY -> exact.computeIfAbsent(key(MemberRiskListDimensionEnum.IDENTITY,
+                    case IDENTITY -> exact.computeIfAbsent(key(SecurityListDimensionEnum.IDENTITY,
                             row.getListValue().trim().toLowerCase(Locale.ROOT)), k -> new ArrayList<>()).add(entry);
-                    case MEMBER -> exact.computeIfAbsent(key(MemberRiskListDimensionEnum.MEMBER,
+                    case MEMBER -> exact.computeIfAbsent(key(SecurityListDimensionEnum.MEMBER,
                             String.valueOf(Long.parseLong(row.getListValue().trim()))), k -> new ArrayList<>()).add(entry);
                 }
             } catch (RuntimeException e) {
@@ -163,7 +163,7 @@ public class RiskListCache implements SmartInitializingSingleton {
         return new Snapshot(exact, List.copyOf(ranges));
     }
 
-    private static String key(MemberRiskListDimensionEnum dimension, String value) {
+    private static String key(SecurityListDimensionEnum dimension, String value) {
         return dimension.getValue() + ":" + value;
     }
 

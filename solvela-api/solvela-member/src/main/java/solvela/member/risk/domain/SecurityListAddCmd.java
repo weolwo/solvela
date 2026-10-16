@@ -1,8 +1,8 @@
 package solvela.member.risk.domain;
 
 import lombok.Data;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -20,11 +20,11 @@ import java.time.LocalDateTime;
  * @param score      灰名单命中加多少分。黑、白名单必须为 null
  */
 @Data
-public class MemberRiskListAddCmd {
+public class SecurityListAddCmd {
 
-    private MemberRiskListTypeEnum listType;
+    private SecurityListTypeEnum listType;
 
-    private MemberRiskListDimensionEnum dimension;
+    private SecurityListDimensionEnum dimension;
 
     private String listValue;
 

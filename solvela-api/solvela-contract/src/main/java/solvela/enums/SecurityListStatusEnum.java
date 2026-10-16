@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 风控名单条目的状态。取值与 {@code t_member_risk_list.status} 一致。
+ * 安全名单条目的状态。取值与 {@code t_security_list.status} 一致。
  *
  * <h3>撤销不删行</h3>
  * 解除一条黑名单时把状态改成 {@link #REVOKED} 并记下撤销人、原因、时间 ——
@@ -19,7 +19,7 @@ import lombok.Getter;
  */
 @Getter
 @AllArgsConstructor
-public enum MemberRiskListStatusEnum implements BaseEnum {
+public enum SecurityListStatusEnum implements BaseEnum {
 
     /** 已撤销。到期失效<b>不</b>改这一列（见 {@code RiskListCache}：到期在读的时候判） */
     REVOKED(0, "已撤销"),

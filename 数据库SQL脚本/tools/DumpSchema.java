@@ -70,7 +70,7 @@ public class DumpSchema {
             "t_grade_entitlement","t_grade_entitlement_grant",
             // 2026-10-14 登录风控。归会员域而不是 solvela-risk：那个模块是营销发奖前的风控链，
             // 这四张管的是账号安全（docs/业务/会员/登录风控-技术方案.md §5）
-            "t_member_risk_rule","t_member_risk_list","t_member_risk_event","t_member_risk_hit"));
+            "t_member_risk_rule","t_security_list","t_member_risk_event","t_member_risk_hit"));
         GROUPS.put("账务 / 履约", List.of(
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config",

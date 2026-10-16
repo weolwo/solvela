@@ -5,8 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -19,16 +19,16 @@ import java.time.LocalDateTime;
  * 就能写出一条读出来会炸、或者永远不命中的名单。
  */
 @Data
-@Schema(description = "新增风控名单")
-public class MemberRiskListAddForm {
+@Schema(description = "新增安全名单")
+public class SecurityListAddForm {
 
     @Schema(description = "名单类型：1-黑, 2-灰, 3-白", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "请选择名单类型")
-    private MemberRiskListTypeEnum listType;
+    private SecurityListTypeEnum listType;
 
     @Schema(description = "维度：1-IP, 2-IP段, 3-身份摘要, 4-会员", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "请选择维度")
-    private MemberRiskListDimensionEnum dimension;
+    private SecurityListDimensionEnum dimension;
 
     @Schema(description = "IP / CIDR 原文，或会员号。身份维度请改填 identity")
     private String listValue;

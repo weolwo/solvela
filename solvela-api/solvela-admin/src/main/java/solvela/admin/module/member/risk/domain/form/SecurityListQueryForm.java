@@ -4,9 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListStatusEnum;
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 /**
  * 名单查询。
@@ -17,14 +17,14 @@ import solvela.enums.MemberRiskListTypeEnum;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@Schema(description = "风控名单查询")
-public class MemberRiskListQueryForm extends PageParam {
+@Schema(description = "安全名单查询")
+public class SecurityListQueryForm extends PageParam {
 
     @Schema(description = "名单类型：1-黑, 2-灰, 3-白")
-    private MemberRiskListTypeEnum listType;
+    private SecurityListTypeEnum listType;
 
     @Schema(description = "维度：1-IP, 2-IP段, 3-身份摘要, 4-会员")
-    private MemberRiskListDimensionEnum dimension;
+    private SecurityListDimensionEnum dimension;
 
     @Schema(description = "IP / CIDR 原文，或会员号。精确匹配")
     private String listValue;
@@ -33,5 +33,5 @@ public class MemberRiskListQueryForm extends PageParam {
     private String identity;
 
     @Schema(description = "状态：1-有效, 0-已撤销。不传只看有效的")
-    private MemberRiskListStatusEnum status;
+    private SecurityListStatusEnum status;
 }

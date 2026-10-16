@@ -4,27 +4,27 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.enums.MemberRiskListStatusEnum;
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 import java.time.LocalDateTime;
 
 /**
- * 会员风控名单。撤销不删行（{@code status = 0} + 撤销人、原因、时间），谁加的、谁解的都查得到。
+ * 安全名单：网关与登录风控共用，表结构以 docs/架构/网关阶梯限流-技术方案.md §6.3 为准。撤销不删行（{@code status = 0} + 撤销人、原因、时间），谁加的、谁解的都查得到。
  *
  * @Date 2026-10-15
  */
 @Data
-@TableName("t_member_risk_list")
-public class MemberRiskList {
+@TableName("t_security_list")
+public class SecurityList {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private MemberRiskListTypeEnum listType;
+    private SecurityListTypeEnum listType;
 
-    private MemberRiskListDimensionEnum dimension;
+    private SecurityListDimensionEnum dimension;
 
     /** IP / CIDR 原文；身份摘要存十六进制；会员存会员号 */
     private String listValue;
@@ -37,7 +37,7 @@ public class MemberRiskList {
     /** 1-人工, 2-自动（预留） */
     private Integer source;
 
-    private MemberRiskListStatusEnum status;
+    private SecurityListStatusEnum status;
 
     /** null = 长期 */
     private LocalDateTime expireTime;

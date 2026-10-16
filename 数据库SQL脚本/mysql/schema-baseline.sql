@@ -806,8 +806,8 @@ CREATE TABLE `t_member_risk_rule` (
   UNIQUE KEY `uk_mbr_risk_rule_code` (`rule_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员风控规则（逻辑在代码，参数与档位在表）';
 
-DROP TABLE IF EXISTS `t_member_risk_list`;
-CREATE TABLE `t_member_risk_list` (
+DROP TABLE IF EXISTS `t_security_list`;
+CREATE TABLE `t_security_list` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `list_type` tinyint NOT NULL COMMENT '名单类型：1-黑, 2-灰, 3-白',
   `dimension` tinyint NOT NULL COMMENT '维度：1-IP, 2-IP段（CIDR）, 3-身份摘要, 4-会员',
@@ -824,9 +824,9 @@ CREATE TABLE `t_member_risk_list` (
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_mbr_risk_list` (`dimension`,`list_value`,`list_type`),
-  KEY `idx_mbr_risk_list_active` (`status`,`expire_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员风控名单';
+  UNIQUE KEY `uk_sec_list` (`dimension`,`list_value`,`list_type`),
+  KEY `idx_sec_list_active` (`status`,`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全名单（网关与登录风控共用）';
 
 DROP TABLE IF EXISTS `t_member_risk_event`;
 CREATE TABLE `t_member_risk_event` (

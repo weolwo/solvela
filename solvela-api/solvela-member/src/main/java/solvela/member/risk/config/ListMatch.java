@@ -1,6 +1,6 @@
 package solvela.member.risk.config;
 
-import solvela.enums.MemberRiskListTypeEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,11 +43,11 @@ public record ListMatch(Long blackEntryId, boolean white, int greyScore) {
             if (e.expireTime() != null && !e.expireTime().isAfter(now)) {
                 return;
             }
-            if (e.type() == MemberRiskListTypeEnum.BLACK) {
+            if (e.type() == SecurityListTypeEnum.BLACK) {
                 blackEntryId = blackEntryId == null ? e.id() : Math.min(blackEntryId, e.id());
-            } else if (e.type() == MemberRiskListTypeEnum.WHITE) {
+            } else if (e.type() == SecurityListTypeEnum.WHITE) {
                 white = true;
-            } else if (e.type() == MemberRiskListTypeEnum.GREY) {
+            } else if (e.type() == SecurityListTypeEnum.GREY) {
                 greyScore = Math.max(greyScore, e.score());
             }
         }

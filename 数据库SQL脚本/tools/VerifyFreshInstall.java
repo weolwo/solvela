@@ -105,7 +105,7 @@ public class VerifyFreshInstall {
                             "t_member_notification", "t_announcement", "t_announcement_ack",
                             // 2026-10-14 补：风控的流水、命中、名单都是运行期数据。
                             // 规则（t_member_risk_rule）是配置，在上面那组里。
-                            "t_member_risk_event", "t_member_risk_hit", "t_member_risk_list"};
+                            "t_member_risk_event", "t_member_risk_hit", "t_security_list"};
             for (String t : biz) {
                 try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM `" + t + "`")) {
                     r.next(); long n = r.getLong(1);

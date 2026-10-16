@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.admin.module.member.risk.domain.form.MemberRiskListAddForm;
-import solvela.admin.module.member.risk.domain.form.MemberRiskListQueryForm;
-import solvela.admin.module.member.risk.domain.vo.MemberRiskListVO;
+import solvela.admin.module.member.risk.domain.form.SecurityListAddForm;
+import solvela.admin.module.member.risk.domain.form.SecurityListQueryForm;
+import solvela.admin.module.member.risk.domain.vo.SecurityListVO;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 import solvela.admin.module.system.datatracer.service.DataTracerService;
 import solvela.admin.auth.CurrentEmployee;
@@ -21,10 +21,10 @@ import solvela.base.domain.PageResult;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PiiHasher;
-import solvela.enums.MemberRiskListDimensionEnum;
-import solvela.member.MemberRiskList;
-import solvela.member.risk.domain.MemberRiskListAddCmd;
-import solvela.member.risk.domain.query.MemberRiskListQuery;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.member.SecurityList;
+import solvela.member.risk.domain.SecurityListAddCmd;
+import solvela.member.risk.domain.query.SecurityListQuery;
 import solvela.member.risk.service.MemberRiskAdminService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
@@ -52,7 +52,7 @@ import solvela.web.RequiresPermission;
 @RestController
 @Tag(name = "登录风控 - 名单")
 @RequestMapping("/memberRiskList")
-public class MemberRiskListController {
+public class SecurityListController {
 
     private final MemberRiskAdminService riskAdminService;
 
@@ -63,13 +63,13 @@ public class MemberRiskListController {
     @Operation(summary = "分页查询。不传状态只看有效的")
     @PostMapping("/queryPage")
     @RequiresPermission("memberRisk:query")
-    public PageResult<MemberRiskListVO> queryPage(@RequestBody @Valid MemberRiskListQueryForm form) {
-        MemberRiskListQuery query = SolvelaBeanUtil.copy(form, MemberRiskListQuery.class);
+    public PageResult<SecurityListVO> queryPage(@RequestBody @Valid SecurityListQueryForm form) {
+        SecurityListQuery query = SolvelaBeanUtil.copy(form, SecurityListQuery.class);
         if (SolvelaStringUtil.isNotBlank(form.getIdentity())) {
             query.setListValue(hashIdentity(form.getIdentity()));
         }
-        PageResult<MemberRiskList> page = riskAdminService.queryListPage(query);
-        return SolvelaPageUtil.convert2PageResult(page, MemberRiskListVO.class);
+        PageResult<SecurityList> page = riskAdminService.queryListPage(query);
+        return SolvelaPageUtil.convert2PageResult(page, SecurityListVO.class);
     }
 
     /**
@@ -81,19 +81,19 @@ public class MemberRiskListController {
     @Operation(summary = "新增一条名单 @author 风控")
     @PostMapping("/add")
     @RequiresPermission("memberRisk:list")
-    public String add(@RequestBody @Valid MemberRiskListAddForm form) {
-        MemberRiskListAddCmd cmd = SolvelaBeanUtil.copy(form, MemberRiskListAddCmd.class);
+    public String add(@RequestBody @Valid SecurityListAddForm form) {
+        SecurityListAddCmd cmd = SolvelaBeanUtil.copy(form, SecurityListAddCmd.class);
         /*
          * 身份维度：页面上输的是明文，库里存的是摘要。
          * 规范化再算 hash —— 不规范化的话「138 0000 0000」和「13800000000」是两行，
          * 而登录那一侧只认后者算出来的那一个（同决策流水页）。
          */
-        if (form.getDimension() == MemberRiskListDimensionEnum.IDENTITY) {
+        if (form.getDimension() == SecurityListDimensionEnum.IDENTITY) {
             cmd.setListValue(hashIdentity(form.getIdentity()));
         }
         cmd.setOperator(CurrentEmployee.nameOrNull());
-        MemberRiskList row = riskAdminService.addList(cmd);
-        dataTracerService.addTrace(row.getId(), DataTracerTypeEnum.MEMBER_RISK_LIST,
+        SecurityList row = riskAdminService.addList(cmd);
+        dataTracerService.addTrace(row.getId(), DataTracerTypeEnum.SECURITY_LIST,
                 "新增 %s（%s）：%s，到期 %s，原因：%s".formatted(
                         row.getListType().getDesc(), row.getDimension().getDesc(),
                         row.getListValue(), row.getExpireTime(), row.getReason()));
@@ -113,7 +113,7 @@ public class MemberRiskListController {
         if (!revoked) {
             return "该名单已不在有效状态";
         }
-        dataTracerService.addTrace(form.id(), DataTracerTypeEnum.MEMBER_RISK_LIST,
+        dataTracerService.addTrace(form.id(), DataTracerTypeEnum.SECURITY_LIST,
                 "撤销，原因：" + form.reason());
         return "已撤销";
     }

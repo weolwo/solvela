@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 风控名单类型。取值与 {@code t_member_risk_list.list_type} 一致。
+ * 安全名单类型。取值与 {@code t_security_list.list_type} 一致。
  *
  * <p>同一个值同时在黑、白名单里时<b>黑名单优先</b>。
  *
@@ -12,7 +12,7 @@ import lombok.Getter;
  */
 @Getter
 @AllArgsConstructor
-public enum MemberRiskListTypeEnum implements BaseEnum {
+public enum SecurityListTypeEnum implements BaseEnum {
 
     BLACK(1, "黑名单"),
 
