@@ -36,8 +36,22 @@ public final class RiskContext {
     /** {@code PiiHasher} 摘要，64 位 hex。不管号存不存在都有 */
     private final String identityHashHex;
 
-    /** 查无此人时为 null */
+    /** 查无此人时为 null；只拿到会员号、没有加载整行时也为 null（见 {@link #memberIdOnly}） */
     private final Member member;
+
+    /**
+     * 只有会员号、没有加载整行的场景用它（资产出口、换绑 —— 它们本来就是登录态）。
+     *
+     * <h3>🔴 为什么不顺手查一行 Member 填进去</h3>
+     * 那是在<b>每一次加地址 / 充话费</b>上加一次查询，而这些场景的规则一条都不读账号字段
+     * （数的是「这台设备替几个人搬过东西」）。
+     *
+     * <p>也<b>刻意不</b>造一个只填了 memberId 的空 {@code Member} 塞进上面那个字段：
+     * 那个对象看起来是「加载过的」，于是将来某条规则读 {@code getStatus()} 时拿到 null
+     * —— 而那不会报错，只会静默判错。{@link #getMember()} 为 null 的语义是
+     * 「账号字段此刻不可用」，两种情况都该如实说 null。
+     */
+    private final Long memberIdOnly;
 
     private final String deviceId;
 
@@ -65,11 +79,25 @@ public final class RiskContext {
     public RiskContext(MemberRiskEventTypeEnum eventType, MemberLoginType loginType, String identity,
                        String identityHashHex, Member member, String deviceId, String deviceType,
                        String clientIp, boolean captchaPassed) {
+        this(eventType, loginType, identity, identityHashHex, member, null,
+                deviceId, deviceType, clientIp, captchaPassed);
+    }
+
+    /** 只有会员号、没有加载整行的场景（见 {@link #memberIdOnly}） */
+    public RiskContext(MemberRiskEventTypeEnum eventType, Long memberId, String deviceId,
+                       String clientIp) {
+        this(eventType, null, null, null, null, memberId, deviceId, null, clientIp, false);
+    }
+
+    private RiskContext(MemberRiskEventTypeEnum eventType, MemberLoginType loginType, String identity,
+                        String identityHashHex, Member member, Long memberIdOnly, String deviceId,
+                        String deviceType, String clientIp, boolean captchaPassed) {
         this.eventType = eventType;
         this.loginType = loginType;
         this.identity = identity;
         this.identityHashHex = identityHashHex;
         this.member = member;
+        this.memberIdOnly = memberIdOnly;
         this.deviceId = deviceId;
         this.deviceType = deviceType;
         this.clientIp = clientIp;
@@ -77,11 +105,17 @@ public final class RiskContext {
     }
 
     public Long memberId() {
-        return member == null ? null : member.getMemberId();
+        return member == null ? memberIdOnly : member.getMemberId();
     }
 
+    /**
+     * 知不知道这是谁。
+     *
+     * <p>⚠️ 它<b>不是</b>「账号字段可不可用」—— 那个问题由 {@link #getMember()} 是否为 null 回答。
+     * 登录那条链路上两者等价（查得到人才有会员号）；资产出口只有会员号。
+     */
     public boolean memberExists() {
-        return member != null;
+        return memberId() != null;
     }
 
     public void deviceTrust(RiskDeviceTrust trust) {

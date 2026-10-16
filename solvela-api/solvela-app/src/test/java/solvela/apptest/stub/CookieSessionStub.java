@@ -179,7 +179,7 @@ public class CookieSessionStub {
             /** 这些用例不碰资产出口冻结，一律当「没冻、受信任」 */
             @Override
             public solvela.member.api.AssetOutVerdict assetOut(StepUpCmd cmd) {
-                return new solvela.member.api.AssetOutVerdict(false, DeviceTrust.VERIFIED);
+                return solvela.member.api.AssetOutVerdict.pass(DeviceTrust.VERIFIED);
             }
 
             @Override

@@ -94,7 +94,7 @@ INSERT INTO `t_member_id_seq` (`id`, `next_seq`, `step`) VALUES (1, 0, 1000);
         // 2026-10-14 补：登录风控规则。逻辑在代码、参数与档位在表（docs/业务/会员/登录风控-技术方案.md §5.1）。
         // 🔴 与上面那几张「缺了不报错」的相反：代码里有、表里没有的规则会让 app-biz【启动失败】——
         //    一条没有档位的规则，默认开或关都是错的。
-        SEED.put("t_member_risk_rule",      "风控规则：登录 20 + 注册 4 + 重置密码 4。缺了 app-biz 启动失败（规则表与代码双向校验）");
+        SEED.put("t_member_risk_rule",      "风控规则：登录 20 + 注册 4 + 重置密码 4 + 资产出口 3。缺了 app-biz 启动失败（规则表与代码双向校验）");
         SEED.put("t_code_generator_config", "代码生成器配置（开发工具，可选）");
         SEED.put("t_table_column",          "列配置（开发工具，可选）");
     }

@@ -12,6 +12,7 @@ import solvela.member.api.DeviceTrust;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendResult;
 import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.AssetOutRisk;
 import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.SessionReportCmd;
 import solvela.member.api.StepUpCmd;
@@ -65,6 +66,28 @@ public class MemberStepUpService implements MemberStepUpApi {
 
     /** 新绑的邮箱 7 天内不能用来核身（方案 §6.4），见 {@code ContactCoolingStore} */
     private final solvela.member.contact.ContactCoolingStore coolingStore;
+
+    /**
+     * 资产出口那一道闸上的风控（2026-10-16，P3 ②）。
+     *
+     * <p>🔴 它回答的是 {@link #check} 回答不了的那个问题：
+     * check 说「这台设备可信吗」，风控说「这一次操作像不像出事了」。
+     * 一台「验证过」的老设备被偷了会话之后照样可信 —— 所以风控能要求可信设备也验一道。
+     *
+     * <h3>🔴 必须延迟取，不能直接注入</h3>
+     * 直接注入是一个<b>真的循环依赖</b>，而且这条环说出了一件真事：
+     * <pre>
+     * 本服务 → 风控引擎 → 规则表（构造时把所有规则实例化出来做双向校验）
+     *        → LoginMatrixRule → DeviceTrustProvider → 本服务
+     * </pre>
+     * 也就是说：<b>登录风控要用本服务算设备信任，而本服务要用风控判资产出口</b> ——
+     * 两个方向都是对的，只是不能在构造器里同时成立。
+     * 判据与 {@code LoginCounters} 里那个 {@code ObjectProvider} 一字不差。
+     *
+     * <p>用 {@code ObjectFactory} 而不是 {@code ObjectProvider}：前者是函数式接口，
+     * 单测里一个 lambda 就能给（后者不是，试过，编译不过）。
+     */
+    private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine> riskEngine;
 
     @Override
     public DeviceTrust check(StepUpCmd cmd) {
@@ -173,15 +196,84 @@ public class MemberStepUpService implements MemberStepUpApi {
         boolean frozen = operationLimitService.isFrozen(cmd.memberId(),
                 solvela.enums.MemberOperationTypeEnum.ASSET_OUT);
         /*
-         * 🔴 冻着就不必再算信任了，而且<b>刻意不算</b>：
-         * 算一次要查登录日志，而这个答案此刻没有任何用途 —— 冻结压倒一切。
-         * 返回 NO_DEVICE 之类的假值会误导调用方，所以给当前这台设备真实的「新设备」语义里
-         * 最保守的那一档。
+         * 🔴 冻着就不必再算信任、也不必跑风控了，而且<b>刻意都不做</b>：
+         * 两者都要查库，而它们的答案此刻没有任何用途 —— 冻结压倒一切。
+         * 代价是被冻结账号上的那些尝试没有风控流水；它们记在
+         * t_member_operation_limit 那一行上（谁冻的、什么时候、为什么）。
          */
         if (frozen) {
-            return new AssetOutVerdict(true, DeviceTrust.NEW_DEVICE);
+            return AssetOutVerdict.ofFrozen();
         }
-        return new AssetOutVerdict(false, check(cmd));
+        DeviceTrust trust = check(cmd);
+        return assetOutRisk(cmd, trust);
+    }
+
+    /**
+     * 跑一遍资产出口的风控，并把结论折成网关能执行的三种之一。
+     *
+     * <h3>🔴 风控出错 = 放行，但留痕</h3>
+     * 与引擎其余部分一致（方案 §3.9）：风控挂了不能等于「所有人都取不出东西」。
+     * 这一层额外兜一道 try，是因为这里<b>多了一次落库</b>（流水），
+     * 而资产出口这条路上任何一次异常都会变成用户点不动那颗按钮。
+     */
+    private AssetOutVerdict assetOutRisk(StepUpCmd cmd, DeviceTrust trust) {
+        solvela.member.risk.MemberRiskEngine engine = riskEngine.getObject();
+        try (solvela.member.risk.RiskSession risk = engine.open(assetContext(cmd, trust))) {
+            solvela.member.risk.RiskDecision decision = engine.evaluatePre(risk);
+            if (decision.atLeast(solvela.enums.MemberRiskDecisionEnum.LIMIT)) {
+                log.warn("【资产出口】风控硬拦, memberId: {}, deviceId: {}, 结论: {}",
+                        cmd.memberId(), cmd.deviceId(), decision.decision());
+                return risk.end(solvela.enums.MemberRiskOutcomeEnum.PRE_BLOCKED,
+                        AssetOutVerdict.of(trust, AssetOutRisk.BLOCKED, decision.retryAfterSeconds()));
+            }
+            if (decision.needsOtp()) {
+                /*
+                 * 🔴 这一档会让【可信设备】也去验一道码 —— 整个改造的落点就在这里。
+                 *
+                 * 对客户端是 STEP_UP_REQUIRED，与「新设备要验码」同一个码、同一个弹窗，
+                 * 所以前端一行都不用改；误判的代价也停在「多收一封信」。
+                 */
+                log.info("【资产出口】风控要求核身, memberId: {}, deviceId: {}, 设备信任: {}",
+                        cmd.memberId(), cmd.deviceId(), trust);
+                return risk.end(solvela.enums.MemberRiskOutcomeEnum.STEP_UP_REQUIRED,
+                        AssetOutVerdict.of(trust, AssetOutRisk.STEP_UP, 0L));
+            }
+            return risk.end(solvela.enums.MemberRiskOutcomeEnum.SUCCESS, AssetOutVerdict.pass(trust));
+        } catch (RuntimeException e) {
+            log.error("【资产出口】风控执行失败，按放行处理, memberId: {}", cmd.memberId(), e);
+            return AssetOutVerdict.pass(trust);
+        }
+    }
+
+    /**
+     * 资产出口的规则上下文。
+     *
+     * <h3>🔴 只有会员号，没有加载整行 Member</h3>
+     * 这个场景的规则一条都不读账号字段（数的是「这台设备替几个人搬过东西」），
+     * 而为了填一个 {@code Member} 去查一次库，是在<b>每一次加地址 / 充话费</b>上加一次查询。
+     * 见 {@code RiskContext#memberIdOnly}。
+     *
+     * <h3>设备信任要放进上下文</h3>
+     * 不放的话，引擎那条「可信设备跳过」的通路对本场景永远不生效 ——
+     * 而本场景恰恰有一条规则刻意配成「可信也不跳过」（{@code ASSET_DEVICE_FANOUT}）。
+     * 两件事要都能表达，前提是上下文里有这个值。
+     */
+    private solvela.member.risk.RiskContext assetContext(StepUpCmd cmd, DeviceTrust trust) {
+        solvela.member.risk.RiskContext ctx = new solvela.member.risk.RiskContext(
+                solvela.enums.MemberRiskEventTypeEnum.ASSET_OUT,
+                cmd.memberId(), cmd.deviceId(), cmd.clientIp());
+        ctx.deviceTrust(toRiskTrust(trust));
+        return ctx;
+    }
+
+    /** 二次验证那套信任档 → 风控那套。两边刻意是同一个定义（方案 §3.2），这里只是换个载体 */
+    private static solvela.member.risk.RiskDeviceTrust toRiskTrust(DeviceTrust trust) {
+        return switch (trust) {
+            case NO_DEVICE -> solvela.member.risk.RiskDeviceTrust.NO_DEVICE;
+            case NEW_DEVICE -> solvela.member.risk.RiskDeviceTrust.NEW;
+            case HISTORY -> solvela.member.risk.RiskDeviceTrust.HISTORY;
+            case VERIFIED -> solvela.member.risk.RiskDeviceTrust.VERIFIED;
+        };
     }
 
     /**

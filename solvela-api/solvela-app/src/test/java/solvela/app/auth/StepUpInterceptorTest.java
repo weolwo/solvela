@@ -8,6 +8,7 @@ import org.springframework.web.method.HandlerMethod;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.auth.device.DeviceIdentity;
+import solvela.member.api.AssetOutRisk;
 import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.MemberStepUpApi;
@@ -65,6 +66,9 @@ class StepUpInterceptorTest {
             this.failure = failure;
         }
 
+        /** 风控结论。默认没有意见 —— 既有用例一个都不用改 */
+        AssetOutRisk risk = AssetOutRisk.PASS;
+
         @Override
         public DeviceTrust check(StepUpCmd cmd) {
             throw new UnsupportedOperationException(
@@ -78,7 +82,9 @@ class StepUpInterceptorTest {
             if (failure != null) {
                 throw failure;
             }
-            return new AssetOutVerdict(frozen, trust);
+            return frozen
+                    ? AssetOutVerdict.ofFrozen()
+                    : AssetOutVerdict.of(trust, risk, risk == AssetOutRisk.BLOCKED ? 600L : 0L);
         }
 
         @Override
@@ -259,6 +265,62 @@ class StepUpInterceptorTest {
     void observe下游失败放行() throws Exception {
         FakeStepUpApi api = new FakeStepUpApi(null, new IllegalStateException("member service down"));
         assertTrue(run(interceptor(StepUpProperties.Mode.OBSERVE, api), "guarded"));
+    }
+
+    // ============================== 风控（2026-10-16） ==============================
+
+    @Test
+    @DisplayName("🔴 风控要求核身时，【受信任的老设备】也要验 —— 整个改造的落点就在这里")
+    void 风控压倒信任() throws Exception {
+        FakeStepUpApi api = new FakeStepUpApi(false, DeviceTrust.VERIFIED, null);
+        api.risk = AssetOutRisk.STEP_UP;
+
+        ApiException e = assertThrows(ApiException.class,
+                () -> run(interceptor(StepUpProperties.Mode.ENFORCE, api), "guarded"));
+
+        // 复用 STEP_UP_REQUIRED：对客户端与「新设备要验码」完全一样，前端一行都不用改
+        assertEquals(ApiErrors.STEP_UP_REQUIRED, e.error(),
+                "check() 回答的是「这台设备可信吗」，它不回答「这一次操作像不像出事了」—— "
+                        + "一台验证过的老设备被偷了会话之后照样可信");
+    }
+
+    @Test
+    @DisplayName("风控没意见时，受信任的设备照常放行（没有顺手变严）")
+    void 风控没意见不改变现状() throws Exception {
+        FakeStepUpApi api = new FakeStepUpApi(false, DeviceTrust.VERIFIED, null);
+        assertTrue(run(interceptor(StepUpProperties.Mode.ENFORCE, api), "guarded"));
+    }
+
+    @Test
+    @DisplayName("🔴 风控硬拦 → 429，而且【不】用 ASSET_OUT_FROZEN（改密码也不会恢复）")
+    void 风控硬拦() throws Exception {
+        FakeStepUpApi api = new FakeStepUpApi(false, DeviceTrust.VERIFIED, null);
+        api.risk = AssetOutRisk.BLOCKED;
+
+        ApiException e = assertThrows(ApiException.class,
+                () -> run(interceptor(StepUpProperties.Mode.ENFORCE, api), "guarded"));
+
+        assertEquals(ApiErrors.OPERATION_LIMITED, e.error(),
+                "带「重置密码后恢复」提示的那个码会把用户支到一条走不通的路上");
+    }
+
+    @Test
+    @DisplayName("🔴 硬拦不是二次验证：off / observe 档照拦；要求核身则不（observe 只记日志）")
+    void 两档开关下的风控() throws Exception {
+        for (StepUpProperties.Mode mode : new StepUpProperties.Mode[]{
+                StepUpProperties.Mode.OFF, StepUpProperties.Mode.OBSERVE}) {
+            FakeStepUpApi blocked = new FakeStepUpApi(false, DeviceTrust.NEW_DEVICE, null);
+            blocked.risk = AssetOutRisk.BLOCKED;
+            ApiException e = assertThrows(ApiException.class,
+                    () -> run(interceptor(mode, blocked), "guarded"), mode + " 档该拦住硬拦");
+            assertEquals(ApiErrors.OPERATION_LIMITED, e.error());
+
+            // 「要求核身」就是二次验证本身，所以这两档不该要求它 ——
+            // 否则 observe 那句「不影响任何请求」就是假的
+            FakeStepUpApi stepUp = new FakeStepUpApi(false, DeviceTrust.NEW_DEVICE, null);
+            stepUp.risk = AssetOutRisk.STEP_UP;
+            assertTrue(run(interceptor(mode, stepUp), "guarded"), mode + " 档不该要求核身");
+        }
     }
 
     // ============================== 标注清单 ==============================

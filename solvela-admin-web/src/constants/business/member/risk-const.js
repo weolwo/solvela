@@ -8,7 +8,8 @@
  */
 
 /**
- * 场景。2026-10-16 注册与重置密码也接进了同一个引擎，于是规则表与流水表里混着几条链路。
+ * 场景。2026-10-16 注册、重置密码、资产出口都接进了同一个引擎，
+ * 于是规则表与流水表里混着几条链路。
  *
  * 🔴 取值**跳过 2**：那一档是「登录二次验证」，它是同一次登录的后半段，
  * 不是一个独立场景 —— 规则表里永远没有 event_type=2 的行（那一步刻意不跑规则）。
@@ -18,6 +19,7 @@ export const RISK_EVENT_TYPE_ENUM = {
   LOGIN_VERIFY: { value: 2, desc: '二次验证', color: 'cyan' },
   REGISTER: { value: 3, desc: '注册', color: 'purple' },
   RESET_PASSWORD: { value: 4, desc: '重置密码', color: 'magenta' },
+  ASSET_OUT: { value: 5, desc: '资产出口', color: 'red' },
 };
 
 export const RISK_EVENT_TYPE_OPTIONS = Object.values(RISK_EVENT_TYPE_ENUM).map((item) => ({
@@ -74,6 +76,7 @@ export const RISK_OUTCOME_ENUM = {
   VERIFY_FAILED: { value: 12, desc: '验证失败', color: 'orange' },
   INTERNAL_ERROR: { value: 13, desc: '内部异常', color: 'red' },
   IDENTITY_TAKEN: { value: 14, desc: '身份已被注册', color: 'volcano' },
+  STEP_UP_REQUIRED: { value: 15, desc: '要求核身', color: 'gold' },
 };
 
 export const RISK_OUTCOME_OPTIONS = Object.values(RISK_OUTCOME_ENUM).map((item) => ({

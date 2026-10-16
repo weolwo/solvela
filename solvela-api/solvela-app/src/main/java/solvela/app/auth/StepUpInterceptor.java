@@ -10,6 +10,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.app.web.ClientIp;
+import solvela.member.api.AssetOutRisk;
 import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.MemberStepUpApi;
@@ -29,6 +30,21 @@ import solvela.member.api.StepUpCmd;
  * <h3>🔴 它还守着「这不是我」造成的资产出口冻结</h3>
  * 冻结判断与信任判断<b>合成同一次下游调用</b>（{@link MemberStepUpApi#assetOut}）——
  * 分成两次的话，每一个加地址 / 充话费请求都要跨进程两趟。
+ *
+ * <h3>🔴 顺序：冻结 → 风控 → 信任（2026-10-16 中间那一档是新加的）</h3>
+ * 风控<b>压倒信任</b>：{@link MemberStepUpApi#check} 回答「这台设备可信吗」，
+ * 它不回答「这一次操作像不像出事了」—— 一台「验证过」的老设备被偷了会话之后照样可信。
+ * 所以风控说要核身时，<b>可信设备也要验</b>（{@link AssetOutRisk#STEP_UP}）。
+ *
+ * <p>这一档刻意复用 {@code STEP_UP_REQUIRED}：对客户端与「新设备要验码」完全一样，
+ * 前端一行都不用改，而误判的代价也停在「多收一封信、多输六位数」。
+ *
+ * <p>⚠️ 风控的<b>硬拦</b>（黑名单、设备封禁）与<b>要求核身</b>在三个档位下不一样：
+ * <ul>
+ *   <li><b>硬拦</b>：和冻结同一类 —— 它不是「二次验证」，所以 off / observe 档也照拦；</li>
+ *   <li><b>要求核身</b>：它<b>就是</b>二次验证，所以 off 档不要求、observe 档只记日志。
+ *       否则 observe 那句「不影响任何请求」就是假的。</li>
+ * </ul>
  *
  * <p>冻结<b>压倒信任</b>，而且<b>连观察档也拦</b>：
  * <ul>
@@ -76,7 +92,7 @@ public class StepUpInterceptor implements HandlerInterceptor {
         StepUpCmd cmd = StepUpCmd.of(memberId, deviceId, ClientIp.of(request));
 
         if (properties.mode() == StepUpProperties.Mode.OFF) {
-            return !frozen(cmd, request);
+            return !hardGates(cmd, request);
         }
         if (properties.mode() == StepUpProperties.Mode.OBSERVE) {
             return !observe(cmd, request);
@@ -86,9 +102,17 @@ public class StepUpInterceptor implements HandlerInterceptor {
         if (verdict.frozen()) {
             throw assetOutFrozen(memberId, request);
         }
+        if (verdict.risk() == AssetOutRisk.BLOCKED) {
+            throw riskBlocked(cmd, request, verdict.retryAfterSeconds());
+        }
         DeviceTrust trust = verdict.trust();
-        if (trust.trusted()) {
+        // 🔴 风控要核身时【不看信任】—— 这就是整个改造的落点
+        if (trust.trusted() && verdict.risk() != AssetOutRisk.STEP_UP) {
             return true;
+        }
+        if (verdict.risk() == AssetOutRisk.STEP_UP && trust.trusted()) {
+            log.info("【二次验证】风控要求可信设备也核身, memberId: {}, deviceId: {}, 信任: {}, 接口: {} {}",
+                    memberId, deviceId, trust, request.getMethod(), request.getRequestURI());
         }
         log.info("【二次验证】拦截, memberId: {}, deviceId: {}, 信任: {}, 接口: {} {}",
                 memberId, deviceId, trust, request.getMethod(), request.getRequestURI());
@@ -110,6 +134,15 @@ public class StepUpInterceptor implements HandlerInterceptor {
             if (verdict.frozen()) {
                 throw assetOutFrozen(cmd.memberId(), request);
             }
+            // 硬拦不是「二次验证」，所以观察档也照拦（与冻结同一类）
+            if (verdict.risk() == AssetOutRisk.BLOCKED) {
+                throw riskBlocked(cmd, request, verdict.retryAfterSeconds());
+            }
+            if (verdict.risk() == AssetOutRisk.STEP_UP) {
+                log.warn("【二次验证】风控要求核身但放行[observe], memberId: {}, deviceId: {}, 信任: {}, 接口: {} {}",
+                        cmd.memberId(), cmd.deviceId(), verdict.trust(),
+                        request.getMethod(), request.getRequestURI());
+            }
             if (!verdict.trust().trusted()) {
                 log.warn("【二次验证】命中但放行[observe], memberId: {}, deviceId: {}, 信任: {}, 接口: {} {}",
                         cmd.memberId(), cmd.deviceId(), verdict.trust(),
@@ -127,7 +160,11 @@ public class StepUpInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * 二次验证整体关掉时，只判冻结。
+     * 二次验证整体关掉时，只判<b>两道硬闸</b>：冻结、风控硬拦。
+     *
+     * <p>🔴 这两道都不是「二次验证」，所以那个开关管不着它们 ——
+     * 冻结是用户<b>自己要求</b>的保护，风控硬拦来自人工签过字的黑名单与设备封禁。
+     * 把它们也关掉，意味着关掉二次验证顺带把那两件事一起作废。
      *
      * <p>🔴 判断失败时<b>放行</b>：这一档下连二次验证都不要，为了一次下游抖动
      * 把所有人的加地址、充话费挡住，代价远大于让一个被冻结的账号漏过一次。
@@ -135,18 +172,37 @@ public class StepUpInterceptor implements HandlerInterceptor {
      *
      * @return 是否要拦下这个请求
      */
-    private boolean frozen(StepUpCmd cmd, HttpServletRequest request) {
+    private boolean hardGates(StepUpCmd cmd, HttpServletRequest request) {
         try {
-            if (stepUpApi.assetOut(cmd).frozen()) {
+            AssetOutVerdict verdict = stepUpApi.assetOut(cmd);
+            if (verdict.frozen()) {
                 throw assetOutFrozen(cmd.memberId(), request);
+            }
+            if (verdict.risk() == AssetOutRisk.BLOCKED) {
+                throw riskBlocked(cmd, request, verdict.retryAfterSeconds());
             }
         } catch (ApiException e) {
             throw e;
         } catch (RuntimeException e) {
-            log.error("【资产出口】判冻结失败，已放行[off], memberId: {}, 接口: {} {}",
+            log.error("【资产出口】判冻结 / 风控失败，已放行[off], memberId: {}, 接口: {} {}",
                     cmd.memberId(), request.getMethod(), request.getRequestURI(), e);
         }
         return false;
+    }
+
+    /**
+     * 风控硬拦。
+     *
+     * <p>🔴 对外与限流<b>同一句话</b>，不说是不是被拉黑了 ——
+     * 告诉对方具体原因等于给他一个精确的调试反馈，他换个 IP 就继续。
+     * 也<b>不复用</b> {@code ASSET_OUT_FROZEN}：那个码带着「重置密码后恢复」的提示，
+     * 而这一档改密码也不会恢复 —— 把用户支到一条走不通的路上，比不解释更糟。
+     */
+    private static ApiException riskBlocked(StepUpCmd cmd, HttpServletRequest request, long retryAfterSeconds) {
+        log.warn("【资产出口】风控硬拦, memberId: {}, deviceId: {}, 还需等待 {} 秒, 接口: {} {}",
+                cmd.memberId(), cmd.deviceId(), retryAfterSeconds,
+                request.getMethod(), request.getRequestURI());
+        return new ApiException(ApiErrors.OPERATION_LIMITED);
     }
 
     /**

@@ -67,6 +67,17 @@ public enum MemberRiskOutcomeEnum implements BaseEnum {
      * {@code PHONE_TAKEN / EMAIL_TAKEN} 这一个藏不掉的枚举口子（见 {@code RegisterFailReason}）。
      */
     IDENTITY_TAKEN(14, "身份已被注册"),
+
+    /**
+     * 要求先过二次验证（资产出口）。
+     *
+     * <h3>🔴 不并进 {@link #CHALLENGED}</h3>
+     * 那一档的意思是「签了一张凭票」—— 登录那条链路上，票是「密码已经验对了」的凭证。
+     * 资产出口没有票：用户本来就是登录态，拦下他只是让他去走一遍发码 / 验码。
+     * 两件事记成一档的话，看板上的 OTP 漏斗（签票数 → 验过数）会被资产出口的量冲掉，
+     * 而那个漏斗是「打扰了多少人」唯一的分母。
+     */
+    STEP_UP_REQUIRED(15, "要求核身"),
     ;
 
     private final Integer value;

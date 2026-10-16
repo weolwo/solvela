@@ -14,6 +14,7 @@ import solvela.enums.MemberRiskRuleTypeEnum;
 import solvela.member.MemberRiskRule;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.dao.MemberRiskRuleDao;
+import solvela.member.risk.feature.RiskParams;
 import solvela.member.risk.rule.RiskRule;
 import solvela.member.risk.rule.RiskRuleConfig;
 import tools.jackson.databind.JsonNode;
@@ -214,10 +215,10 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
          * 分级规则的档位由各规则自己的 validate 拦（走 RiskParams.requireGateOnly），
          * 这里拦的是固定处置那一列：它在后台改不了，所以只可能是有人直接动了库。
          */
-        if (GATE_ONLY_SCENARIOS.contains(row.getEventType()) && row.getDirectDecision() != null
-                && !gateDecisionAllowed(row.getDirectDecision())) {
+        Set<MemberRiskDecisionEnum> allowed = ALLOWED_DIRECT.get(row.getEventType());
+        if (allowed != null && row.getDirectDecision() != null && !allowed.contains(row.getDirectDecision())) {
             throw new IllegalArgumentException(row.getEventType().getDesc()
-                    + "场景的固定处置只能是放行 / 限流 / 拒绝，表里是 " + row.getDirectDecision());
+                    + "场景的固定处置只能是 " + allowed + "，表里是 " + row.getDirectDecision());
         }
         JsonNode params = SolvelaStringUtil.isBlank(row.getParams())
                 ? JsonUtils.getMapper().createObjectNode()
@@ -230,21 +231,24 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
     }
 
     /**
-     * 处置只能是放行 / 限流 / 拒绝的场景。
+     * 每个场景<b>允许的固定处置</b>。没列进来的场景（登录、二次验证）不限制。
      *
-     * <p>共同点是<b>这条链路上没有核身的落点</b>：滑块票在发码那一步就核销了，
-     * 而接口本身已经验过一次验证码 —— 再要一道 OTP 等于让同一个邮箱收两封信。
-     * 登录不在其中（它的处置矩阵正是建立在「还能再要一道」之上）。
+     * <h3>🔴 为什么要按场景限制</h3>
+     * 一个此刻执行不了的处置，配上去的后果不是报错，而是接口返回一个客户端不认识的结果
+     * —— 而规则页上那一行看着完全正常。
+     * <ul>
+     *   <li><b>注册、重置密码</b>：那两条链路上没有核身的落点（票在发码那一步核销，
+     *       接口本身已经验过一次码），所以只能放行 / 限流 / 拒绝；</li>
+     *   <li><b>资产出口</b>：二次验证本来就长在那条链路上，所以它<b>可以</b>要求 OTP ——
+     *       但配不了滑块（没有出图与核销的地方）和密码冷却（这里的人已经登录了）。</li>
+     * </ul>
+     * 与各规则 {@code validate} 里的分级档位校验（{@code RiskParams.requireDecisionsIn}）
+     * 拦的是同一件事的两种形状：一个在 {@code direct_decision} 那一列，一个在 {@code params.tiers} 里。
      */
-    private static final Set<MemberRiskEventTypeEnum> GATE_ONLY_SCENARIOS =
-            java.util.EnumSet.of(MemberRiskEventTypeEnum.REGISTER, MemberRiskEventTypeEnum.RESET_PASSWORD);
-
-    /** 与 {@code RiskParams.requireGateOnly} 拦的是同一件事的两种形状 */
-    private static boolean gateDecisionAllowed(MemberRiskDecisionEnum decision) {
-        return decision == MemberRiskDecisionEnum.PASS
-                || decision == MemberRiskDecisionEnum.LIMIT
-                || decision == MemberRiskDecisionEnum.DENY;
-    }
+    private static final Map<MemberRiskEventTypeEnum, Set<MemberRiskDecisionEnum>> ALLOWED_DIRECT = Map.of(
+            MemberRiskEventTypeEnum.REGISTER, RiskParams.GATE_ONLY,
+            MemberRiskEventTypeEnum.RESET_PASSWORD, RiskParams.GATE_ONLY,
+            MemberRiskEventTypeEnum.ASSET_OUT, RiskParams.WITH_STEP_UP);
 
     private static Map<String, RiskRule> indexByCode(
             List<RiskRule> rules) {

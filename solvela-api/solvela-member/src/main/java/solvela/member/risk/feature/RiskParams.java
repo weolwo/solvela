@@ -43,13 +43,36 @@ public final class RiskParams {
      * @param scenario 场景名，只进报错文案（「注册」/「重置密码」）
      */
     public static void requireGateOnly(JsonNode params, String scenario) {
+        requireDecisionsIn(params, scenario, GATE_ONLY,
+                "滑块与 OTP 在这里没有落点（票在发码那一步核销，接口本身已经验过一次码）");
+    }
+
+    /** 放行 / 限流 / 拒绝。注册与重置密码只能配这三档 */
+    public static final java.util.Set<MemberRiskDecisionEnum> GATE_ONLY = java.util.Set.of(
+            MemberRiskDecisionEnum.PASS, MemberRiskDecisionEnum.LIMIT, MemberRiskDecisionEnum.DENY);
+
+    /**
+     * 放行 / OTP / 换通道 OTP / 限流 / 拒绝。<b>资产出口</b>能配这几档 ——
+     * 二次验证本来就长在那条链路上，所以它是唯一一个能让风控要求核身的非登录场景。
+     *
+     * <p>不含滑块（那条链路上没有出图与核销的地方）与密码冷却（它只锁密码通道，
+     * 而这里的人已经登录了）。
+     */
+    public static final java.util.Set<MemberRiskDecisionEnum> WITH_STEP_UP = java.util.Set.of(
+            MemberRiskDecisionEnum.PASS, MemberRiskDecisionEnum.OTP, MemberRiskDecisionEnum.OTP_STRONG,
+            MemberRiskDecisionEnum.LIMIT, MemberRiskDecisionEnum.DENY);
+
+    /**
+     * 分级档位只能落在 {@code allowed} 里，否则<b>存不进去</b>。
+     *
+     * @param why 说清为什么不许 —— 报错文案要让看到它的人不必再去翻代码
+     */
+    public static void requireDecisionsIn(JsonNode params, String scenario,
+                                          java.util.Set<MemberRiskDecisionEnum> allowed, String why) {
         for (Tier tier : tiers(params)) {
-            if (tier.decision() != MemberRiskDecisionEnum.PASS
-                    && tier.decision() != MemberRiskDecisionEnum.LIMIT
-                    && tier.decision() != MemberRiskDecisionEnum.DENY) {
-                throw new IllegalArgumentException(scenario + "场景只能配放行 / 限流 / 拒绝，"
-                        + "滑块与 OTP 在这里没有落点（票在发码那一步核销，接口本身已经验过一次码）："
-                        + "over " + tier.over() + " → " + tier.decision());
+            if (!allowed.contains(tier.decision())) {
+                throw new IllegalArgumentException(scenario + "场景不能配这一档：" + why
+                        + "：over " + tier.over() + " → " + tier.decision());
             }
         }
     }

@@ -116,6 +116,15 @@ public class LoginCounters {
 
         /** 单设备的重置密码尝试数。在规则里 +1。同样是新加的一维 */
         RESET_DEVICE("RESET_DEVICE_LIMIT", "dev:reset:w2:", Duration.ofDays(1)),
+
+        /**
+         * 单设备给<b>几个不同会员</b>做过资产出口（集合）。
+         *
+         * <p>🔴 它数的是「这台设备在替多少个人把东西搬出去」—— 一机多号的资产侧版本，
+         * 而这件事以前<b>一个计数器都数不到</b>：{@link #DEVICE_MEMBER} 只在<b>登录</b>时 add，
+         * 而买号的人完全可以只登录一次、然后在同一台设备上挨个把号搬空。
+         */
+        ASSET_DEVICE_MEMBER("ASSET_DEVICE_FANOUT", "dev:asset:member:w2:", Duration.ofDays(1)),
         ;
 
         private final String ruleCode;
