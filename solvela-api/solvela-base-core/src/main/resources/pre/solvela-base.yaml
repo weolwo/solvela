@@ -226,6 +226,10 @@ solvela:
     login:
       # 新设备登录提醒（NewDeviceLoginNotifier）：邮件 + 站内信。误发成灾时关掉，不用发版
       notify-new-device: true
+      # 当前密码在已泄露密码库里（LeakedPasswordNotifier）：只发站内信，默认 30 天一条。
+      # 🔴 不发邮件也不拦登录：没有人在攻击他，只是他正在用的那个密码躺在撞库字典里 ——
+      #    而「你的密码不安全」正是钓鱼邮件最爱的模板。他此刻正在登录，站内信离「去改」最近。
+      notify-leaked-password: true
       # 可疑登录被拦下的提醒（SuspiciousLoginNotifier，RiskAction.NOTIFY_OWNER）：邮件 + 站内信。
       # 触发面比上面那条窄得多：只有「换通道 OTP」和「拒绝」这两档会带它。
       # 🔴 它和上面那条说的不是一件事：那条是「登进去了，是台新设备」，

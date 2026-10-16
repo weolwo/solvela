@@ -112,6 +112,14 @@ class MemberAuthServiceTest {
     private LoginChallengeStore challengeStore;
     @Mock
     private NewDeviceLoginNotifier newDeviceLoginNotifier;
+    /**
+     * 「你正在用的密码已泄露」那条提醒（P3 ③ 的后半截）。
+     *
+     * <p>本类不断言它 —— 发不发由 {@code LeakedPasswordNotifierTest} 钉。
+     * 这里只是让它别是 null：它挂在验密码那一行之后，而<b>登录不该因为它而炸</b>。
+     */
+    @Mock
+    private solvela.member.password.LeakedPasswordNotifier leakedPasswordNotifier;
     @Mock
     private DeviceDispositionService dispositionService;
     @Mock

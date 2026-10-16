@@ -165,6 +165,14 @@ public class MemberAuthService implements MemberAuthApi {
     private final LoginIpGuard loginIpGuard;
     private final LoginChallengeStore challengeStore;
     private final NewDeviceLoginNotifier newDeviceLoginNotifier;
+
+    /**
+     * 存量账号的密码卫生提醒（P3 ③ 的后半截）。
+     *
+     * <p>注册与重置密码那两处是<b>入口</b>上的拦截；它管的是<b>已经在用</b>的那些密码 ——
+     * 一个 2024 年注册时设了 {@code Password1} 的人，不会因为我们后来加了那张表就自动安全。
+     */
+    private final solvela.member.password.LeakedPasswordNotifier leakedPasswordNotifier;
     private final MemberEmailCodeService emailCodeService;
     private final MemberEmailCodeIssuer emailCodeIssuer;
 
@@ -845,6 +853,16 @@ public class MemberAuthService implements MemberAuthApi {
             return MemberAuthResult.fail(AuthFailReason.NO_PASSWORD);
         }
         if (PasswordCipher.matches(cmd.credential(), member.getPassword())) {
+            /*
+             * 🔴 这是唯一能判断「这个账号正在用的密码是不是已泄露」的时刻 ——
+             *    库里只有 Argon2 哈希，而哈希不能拿去跟一张明文表比。
+             *    注册与重置密码那两处挡的是【新设的】密码；这里管的是存量账号。
+             *
+             * 放在验过密码的这一行之后、后置决策之前：后置可能把这次登录判成要验码甚至拒绝，
+             * 而「你的密码在泄露库里」不论那次登录成不成功都是真的 ——
+             * 尤其是被拒的那种（有人正拿着这个密码在试）。
+             */
+            leakedPasswordNotifier.onPasswordVerified(member.getMemberId(), cmd.credential());
             return null;
         }
         /*

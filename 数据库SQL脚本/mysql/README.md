@@ -20,7 +20,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
   schema-baseline.sql  ->  ok=178  fail=0
   data-baseline.sql    ->  ok=49   fail=0
   建表      89 张
-  种子数据  23 张表 / 589 行
+  种子数据  23 张表 / 590 行
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
@@ -43,7 +43,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
 | `t_solvela_job` | 19 | 定时任务不会注册（含【基础】按月分区维护 —— 缺了它分区没人补，见文末）|
 | `t_task_event` | 10 | 任务事件识别不了 |
-| `t_notification_template` | 9 | 发不出任何站内信，**而且不报错** |
+| `t_notification_template` | 12 | 发不出任何站内信，**而且不报错** |
 | `t_coupon_template` | 6 | 发出去的券没有面额/门槛，**而且不报错** |
 | `t_member_id_seq` | 1 | **第一个注册的用户就撞 -1000** |
 | `t_member_risk_rule` | 34 | 风控规则（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3）。与上面几张相反：**缺了 app-biz 启动失败**（规则表与代码双向校验） |
@@ -65,7 +65,7 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 | 文件 | 内容 | 不含 |
 |---|---|---|
 | `schema-baseline.sql` | 89 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 23 张配置表、589 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
+| `data-baseline.sql` | 23 张配置表、590 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
