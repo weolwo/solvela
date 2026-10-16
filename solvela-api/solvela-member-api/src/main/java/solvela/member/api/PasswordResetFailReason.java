@@ -56,6 +56,18 @@ public enum PasswordResetFailReason {
     ACCOUNT_NOT_FOUND,
 
     /**
+     * 被重置密码的限频挡下了。剩余秒数见 {@link MemberPasswordResetResult#retryAfterSeconds()}。
+     *
+     * <h3>🔴 它不说是哪一维被限，也不说是不是黑名单</h3>
+     * 背后是四条规则（IP / 设备限频、IP 黑名单、设备封禁）。对外一律回
+     * 「操作过于频繁」—— 告诉对方「你这个 IP 被拉黑了」等于给他一个精确的调试反馈。
+     *
+     * <p>⚠️ 这一档<b>必须给出等待秒数</b>：走到这里的人已经登不进账号了，
+     * 而「请稍后再试」对他的意思是「不知道还有没有希望」。
+     */
+    TOO_MANY_ATTEMPTS,
+
+    /**
      * 账号被冻结或已注销。
      *
      * <p>🔴 <b>冻结的账号不许自助找回</b>。允许的话，风控封掉一个刷子账号之后，

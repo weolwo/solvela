@@ -104,6 +104,18 @@ public class LoginCounters {
          * <p>迁自 {@code DeviceGuard.checkRegister}（窗口 1d、阈值 2）。
          */
         REGISTER_DEVICE("REG_DEVICE_LIMIT", "dev:reg:w2:", Duration.ofDays(1)),
+
+        /**
+         * 单 IP 的重置密码尝试数。在规则里 +1。
+         *
+         * <p>🔴 这一维以前<b>完全不存在</b>：重置密码只受「单个邮箱 / 手机号每天能发几条码」
+         * 约束，而那是按<b>目标</b>算的 —— 一台机器拿着泄露的身份库挨个试重置码，
+         * 每个目标只试一次，一条限额都碰不到。
+         */
+        RESET_IP("RESET_IP_LIMIT", "member:reset:ip:w2:", Duration.ofHours(1)),
+
+        /** 单设备的重置密码尝试数。在规则里 +1。同样是新加的一维 */
+        RESET_DEVICE("RESET_DEVICE_LIMIT", "dev:reset:w2:", Duration.ofDays(1)),
         ;
 
         private final String ruleCode;

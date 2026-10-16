@@ -370,6 +370,10 @@ public class MemberLoginService {
             // 走到这一档说明码猜对了但账号不存在。含糊成「验证码错误」即可 ——
             // 对真实用户这条路不可能出现（没账号就收不到码）
             case ACCOUNT_NOT_FOUND -> new ApiException(ApiErrors.BAD_CREDENTIALS, "验证码错误");
+            // 🔴 四条规则（IP / 设备限频、黑名单、设备封禁）合成同一句，并带上秒数：
+            //    走到这一步的人已经登不进去了，「请稍后再试」对他等于「不知道还有没有希望」
+            case TOO_MANY_ATTEMPTS -> new ApiException(ApiErrors.OPERATION_LIMITED,
+                    String.format("操作过于频繁，请 %d 分钟后重试", minutes(result.retryAfterSeconds())));
             case ACCOUNT_UNAVAILABLE -> new ApiException(ApiErrors.ACCOUNT_DISABLED,
                     "账号状态异常，无法自助重置密码，请联系客服");
         };

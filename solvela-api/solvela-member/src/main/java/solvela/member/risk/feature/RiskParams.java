@@ -28,6 +28,32 @@ public final class RiskParams {
     public record Tier(long over, MemberRiskDecisionEnum decision) {
     }
 
+    /**
+     * 这个场景只许配放行 / 限流 / 拒绝 —— 滑块、OTP、冷却在它那条链路上<b>没有落点</b>。
+     *
+     * <h3>🔴 为什么是「存不进去」而不是「执行时忽略」</h3>
+     * 配成滑块之后，那条规则会给出一个<b>没人能满足的处置</b>：
+     * 表现是接口返回一个客户端不认识的结果，而规则页上那一行看着完全正常。
+     * 判据与 {@code LoginMatrixRule} 拒绝配成「冷却」同一个：
+     * <b>一个此刻执行不了的处置，不如在保存那一刻就拦住。</b>
+     *
+     * <p>注册与重置密码共用它 —— 两边的理由一字不差（票在发码那一步核销、
+     * 接口本身已经验过一次码），所以校验也只该有一份。
+     *
+     * @param scenario 场景名，只进报错文案（「注册」/「重置密码」）
+     */
+    public static void requireGateOnly(JsonNode params, String scenario) {
+        for (Tier tier : tiers(params)) {
+            if (tier.decision() != MemberRiskDecisionEnum.PASS
+                    && tier.decision() != MemberRiskDecisionEnum.LIMIT
+                    && tier.decision() != MemberRiskDecisionEnum.DENY) {
+                throw new IllegalArgumentException(scenario + "场景只能配放行 / 限流 / 拒绝，"
+                        + "滑块与 OTP 在这里没有落点（票在发码那一步核销，接口本身已经验过一次码）："
+                        + "over " + tier.over() + " → " + tier.decision());
+            }
+        }
+    }
+
     public static Duration duration(JsonNode params, String field, Duration fallback) {
         JsonNode node = params.path(field);
         if (node.isMissingNode() || node.isNull()) {

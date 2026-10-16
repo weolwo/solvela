@@ -1,6 +1,5 @@
 package solvela.member.risk.rule;
 
-import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.risk.feature.LoginCounters;
@@ -46,15 +45,7 @@ public abstract class RegisterTieredCountRule extends TieredCountRule {
     @Override
     public void validate(JsonNode params) {
         super.validate(params);
-        for (RiskParams.Tier tier : RiskParams.tiers(params)) {
-            if (tier.decision() == MemberRiskDecisionEnum.CAPTCHA
-                    || tier.decision() == MemberRiskDecisionEnum.OTP
-                    || tier.decision() == MemberRiskDecisionEnum.OTP_STRONG
-                    || tier.decision() == MemberRiskDecisionEnum.COOLDOWN) {
-                throw new IllegalArgumentException("注册场景只能配放行 / 限流 / 拒绝，"
-                        + "滑块与 OTP 在这里没有落点（滑块票在发码那一步核销，注册本身已经验过一次码）："
-                        + "over " + tier.over() + " → " + tier.decision());
-            }
-        }
+        // 与重置密码共用同一份校验：两边的理由一字不差（见 RiskParams.requireGateOnly）
+        RiskParams.requireGateOnly(params, "注册");
     }
 }

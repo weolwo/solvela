@@ -211,11 +211,11 @@ class MemberRiskAdminQueryTest {
     // ------------------------------------------------------------------ 规则
 
     @Test
-    @DisplayName("规则列表是全的（登录 20 + 注册 4），按【场景 → 阶段】分好组")
+    @DisplayName("规则列表是全的（登录 20 + 注册 4 + 重置密码 4），按【场景 → 阶段】分好组")
     void listRules() {
         List<MemberRiskRule> rules = adminService.listRules();
 
-        assertEquals(24, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
+        assertEquals(28, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
 
         // 场景不能交错：注册的规则夹在登录的规则中间，页面上那一列就白加了
         solvela.enums.MemberRiskEventTypeEnum scenario = null;
@@ -234,9 +234,10 @@ class MemberRiskAdminQueryTest {
             }
         }
 
-        // 注册场景只有前置 —— 验证码验过账号就建出来了，没有「验完再判一次」的位置
+        // 注册与重置密码只有前置 —— 验证码验过事情就发生了，没有「验完再判一次」的位置
         assertTrue(rules.stream()
-                .filter(r -> r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.REGISTER)
+                .filter(r -> r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.REGISTER
+                        || r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.RESET_PASSWORD)
                 .allMatch(r -> r.getPhase() == solvela.enums.MemberRiskPhaseEnum.PRE));
     }
 

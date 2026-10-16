@@ -94,9 +94,21 @@ class PhonePasswordResetTest {
         return "13" + (100_000_000 + ThreadLocalRandom.current().nextInt(800_000_000));
     }
 
+    /**
+     * 造数用的随机 IP。
+     *
+     * <p>🔴 <b>198.18.0.0/15</b>（RFC 2544 基准测试段，整段保留、约 13 万个地址）。
+     * 两个硬要求，两个都踩过坑（方案 §12.4）：
+     * <ul>
+     *   <li><b>落在保留段里</b>：真实可路由空间会被解析出真实归属地，
+     *       于是「换了国家」那条 +50 分的规则把结论推到要验证码；</li>
+     *   <li><b>空间大到跨测试运行不碰撞</b>：重置密码现在有按 IP 的计数器
+     *       （{@code RESET_IP_LIMIT}，窗口 1 小时），而计数不随测试结束清零。</li>
+     * </ul>
+     */
     private static String freshIp() {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        return "198.51." + (1 + r.nextInt(250)) + "." + (1 + r.nextInt(250));
+        return "198." + (18 + r.nextInt(2)) + "." + r.nextInt(256) + "." + (1 + r.nextInt(254));
     }
 
     /** 发一条重置码并读回来。test profile 走 LOG 通道，不需要厂商 */

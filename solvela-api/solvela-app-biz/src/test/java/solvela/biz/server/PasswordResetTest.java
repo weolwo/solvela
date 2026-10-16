@@ -16,6 +16,8 @@ import solvela.auth.member.MemberTokenStore;
 import solvela.base.mail.MailService;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendCmd;
@@ -106,9 +108,21 @@ class PasswordResetTest {
         return "reset" + ThreadLocalRandom.current().nextLong(1_000_000_000L) + "@example.com";
     }
 
+    /**
+     * 造数用的随机 IP。
+     *
+     * <p>🔴 <b>198.18.0.0/15</b>（RFC 2544 基准测试段，整段保留、约 13 万个地址）。
+     * 两个硬要求，两个都踩过坑（方案 §12.4）：
+     * <ul>
+     *   <li><b>落在保留段里</b>：真实可路由空间会被解析出真实归属地，
+     *       于是「换了国家」那条 +50 分的规则把结论推到要验证码；</li>
+     *   <li><b>空间大到跨测试运行不碰撞</b>：重置密码现在有按 IP 的计数器
+     *       （{@code RESET_IP_LIMIT}，窗口 1 小时），而计数不随测试结束清零。</li>
+     * </ul>
+     */
     private static String freshIp() {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        return "203.0." + (1 + r.nextInt(250)) + "." + (1 + r.nextInt(250));
+        return "198." + (18 + r.nextInt(2)) + "." + r.nextInt(256) + "." + (1 + r.nextInt(254));
     }
 
     private String sendAndReadCode(EmailCodeScene scene, String target) {
@@ -138,6 +152,38 @@ class PasswordResetTest {
     private boolean canLogin(String password) {
         return memberAuthService.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_PASSWORD, email, password, null,
                 "H5", freshIp(), null, true)).success();
+    }
+
+    // ============================== 风控流水 ==============================
+
+    @Test
+    @DisplayName("🔴 每一次重置都落一行流水（场景 = 重置密码），结局各不相同")
+    void 落流水() {
+        registerWithEmail();
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusMinutes(5).withNano(0);
+
+        // 码错那一次：记「凭据错误」。这条链路以前【一次也没被记过】——
+        // 发码那边按目标限额，而挨个试重置码的人每个目标只试一次
+        assertFalse(reset("000000", NEW_PASSWORD).success());
+        assertEquals(1, riskRows(since, MemberRiskOutcomeEnum.BAD_CREDENTIALS));
+
+        assertTrue(reset(sendAndReadCode(EmailCodeScene.RESET_PASSWORD, email), NEW_PASSWORD).success());
+        assertEquals(1, riskRows(since, MemberRiskOutcomeEnum.SUCCESS));
+    }
+
+    /**
+     * 这个身份在窗口内、这个结局的流水行数。
+     *
+     * <p>🔴 {@code create_time} 的条件不能省：表按月分区，而分区裁剪只看 WHERE 里有没有分区列。
+     */
+    private int riskRows(java.time.LocalDateTime since, MemberRiskOutcomeEnum outcome) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_member_risk_event"
+                        + " WHERE event_type = ? AND outcome = ? AND identity_hash = UNHEX(?)"
+                        + " AND create_time >= ?",
+                Integer.class, MemberRiskEventTypeEnum.RESET_PASSWORD.getValue(), outcome.getValue(),
+                piiHasher.hash(MemberEmailUtil.normalize(email)), since);
+        return n == null ? 0 : n;
     }
 
     // ============================== 主路径 ==============================

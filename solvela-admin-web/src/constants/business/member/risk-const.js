@@ -8,7 +8,7 @@
  */
 
 /**
- * 场景。2026-10-16 注册也接进了同一个引擎，于是规则表与流水表里混着两条链路。
+ * 场景。2026-10-16 注册与重置密码也接进了同一个引擎，于是规则表与流水表里混着几条链路。
  *
  * 🔴 取值**跳过 2**：那一档是「登录二次验证」，它是同一次登录的后半段，
  * 不是一个独立场景 —— 规则表里永远没有 event_type=2 的行（那一步刻意不跑规则）。
@@ -17,6 +17,7 @@ export const RISK_EVENT_TYPE_ENUM = {
   LOGIN: { value: 1, desc: '登录', color: 'blue' },
   LOGIN_VERIFY: { value: 2, desc: '二次验证', color: 'cyan' },
   REGISTER: { value: 3, desc: '注册', color: 'purple' },
+  RESET_PASSWORD: { value: 4, desc: '重置密码', color: 'magenta' },
 };
 
 export const RISK_EVENT_TYPE_OPTIONS = Object.values(RISK_EVENT_TYPE_ENUM).map((item) => ({

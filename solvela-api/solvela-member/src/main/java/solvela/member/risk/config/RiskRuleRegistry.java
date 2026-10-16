@@ -205,19 +205,19 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
             throw new IllegalArgumentException("固定处置的强规则缺 direct_decision");
         }
         /*
-         * 🔴 注册场景只能配放行 / 限流 / 拒绝。
+         * 🔴 注册与重置密码只能配放行 / 限流 / 拒绝。
          *
-         * 滑块与 OTP 在注册这条链路上【没有落点】（滑块票在发码那一步核销，注册本身已经验过一次码），
-         * 配上去的后果不是报错，而是注册接口返回一个客户端不认识的结果 ——
+         * 滑块与 OTP 在那两条链路上【没有落点】（票在发码那一步核销，接口本身已经验过一次码），
+         * 配上去的后果不是报错，而是接口返回一个客户端不认识的结果 ——
          * 而规则页上那一行看着完全正常。
          *
-         * 分级规则的档位由各规则自己的 validate 拦（见 RegisterTieredCountRule），
+         * 分级规则的档位由各规则自己的 validate 拦（走 RiskParams.requireGateOnly），
          * 这里拦的是固定处置那一列：它在后台改不了，所以只可能是有人直接动了库。
          */
-        if (row.getEventType() == MemberRiskEventTypeEnum.REGISTER && row.getDirectDecision() != null
-                && !registerDecisionAllowed(row.getDirectDecision())) {
-            throw new IllegalArgumentException("注册场景的固定处置只能是放行 / 限流 / 拒绝，表里是 "
-                    + row.getDirectDecision());
+        if (GATE_ONLY_SCENARIOS.contains(row.getEventType()) && row.getDirectDecision() != null
+                && !gateDecisionAllowed(row.getDirectDecision())) {
+            throw new IllegalArgumentException(row.getEventType().getDesc()
+                    + "场景的固定处置只能是放行 / 限流 / 拒绝，表里是 " + row.getDirectDecision());
         }
         JsonNode params = SolvelaStringUtil.isBlank(row.getParams())
                 ? JsonUtils.getMapper().createObjectNode()
@@ -229,8 +229,18 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
                 row.getMode(), Integer.valueOf(1).equals(row.getBypassByTrust()), params);
     }
 
-    /** 注册场景允许的固定处置。与 {@code RegisterTieredCountRule.validate} 拦的是同一件事的两种形状 */
-    private static boolean registerDecisionAllowed(MemberRiskDecisionEnum decision) {
+    /**
+     * 处置只能是放行 / 限流 / 拒绝的场景。
+     *
+     * <p>共同点是<b>这条链路上没有核身的落点</b>：滑块票在发码那一步就核销了，
+     * 而接口本身已经验过一次验证码 —— 再要一道 OTP 等于让同一个邮箱收两封信。
+     * 登录不在其中（它的处置矩阵正是建立在「还能再要一道」之上）。
+     */
+    private static final Set<MemberRiskEventTypeEnum> GATE_ONLY_SCENARIOS =
+            java.util.EnumSet.of(MemberRiskEventTypeEnum.REGISTER, MemberRiskEventTypeEnum.RESET_PASSWORD);
+
+    /** 与 {@code RiskParams.requireGateOnly} 拦的是同一件事的两种形状 */
+    private static boolean gateDecisionAllowed(MemberRiskDecisionEnum decision) {
         return decision == MemberRiskDecisionEnum.PASS
                 || decision == MemberRiskDecisionEnum.LIMIT
                 || decision == MemberRiskDecisionEnum.DENY;
