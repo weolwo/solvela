@@ -11,6 +11,11 @@ import { ApiError } from '@/api/errors'
  * 典型表现是某个页面忘了处理错误，请求失败时永远停在骨架屏上，
  * 而这种 bug 只在后端挂掉时才出现。
  *
+ * <h3>🔴 只认最后一次 reload</h3>
+ * 切 tab、换分类、改搜索词都会马上 reload。两次请求可能乱序回来 ——
+ * 晚到的那份是旧条件的，认了它，「已使用」那一栏里就会出现可用的券。
+ * 所以每次 reload 记一个序号，回来时已经不是最新的那次就丢掉。
+ *
  * <p>不做缓存、不做重试、不做并发去重。需要那些的时候再上库
  * （TanStack Query 之类），现在上是为还没有的问题付钱。
  */
@@ -27,17 +32,27 @@ export function useAsync<T>(loader: () => Promise<T>): AsyncState<T> {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  let latest = 0
+
   async function reload(): Promise<void> {
+    const mine = ++latest
     loading.value = true
     error.value = null
     try {
-      data.value = await loader()
+      const loaded = await loader()
+      if (mine === latest) {
+        data.value = loaded
+      }
     } catch (e) {
-      // 后端给的 message 是给用户看的人话，优先用它；
-      // 网络层的原始错误（Network Error 之类）对用户没有意义，换成一句人话
-      error.value = e instanceof ApiError ? e.message : '加载失败，请下拉重试'
+      if (mine === latest) {
+        // 后端给的 message 是给用户看的人话，优先用它；
+        // 网络层的原始错误（Network Error 之类）对用户没有意义，换成一句人话
+        error.value = e instanceof ApiError ? e.message : '加载失败，请下拉重试'
+      }
     } finally {
-      loading.value = false
+      if (mine === latest) {
+        loading.value = false
+      }
     }
   }
 
