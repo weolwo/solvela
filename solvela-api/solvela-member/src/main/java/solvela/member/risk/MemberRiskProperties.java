@@ -32,7 +32,7 @@ import java.time.Duration;
 public class MemberRiskProperties {
 
     /**
-     * 总开关。{@code shadow} 让<b>除全局滑块、黑名单、设备封禁以外</b>的规则全部只记录 ——
+     * 总开关。{@code shadow} 让<b>除全局滑块以外</b>的规则全部只记录 ——
      * 上线后某条规则大面积误伤、又来不及定位是哪条时的保命开关。
      *
      * <p>刻意<b>没有 off</b>：旧的硬编码路径已经删掉，没有可以「退回」的地方；
@@ -59,8 +59,8 @@ public class MemberRiskProperties {
      * 只接异常是不够的：Redis 或画像查询变慢时不会抛，只会让每次登录都多等一会儿 ——
      * 而那正是最该快的接口。超了预算就不再取特征，宁可少判几条规则。
      *
-     * <p>{@code alwaysEnforce} 的那几条（全局滑块、黑名单、设备封禁）<b>不受预算约束</b>：
-     * 它们读的是本地缓存，本来就不花时间，而因为超预算放过一台被封的设备是不能接受的。
+     * <p>{@code alwaysEnforce} 的规则（今天只有全局滑块）<b>不受预算约束</b>：
+     * 它不取特征、本来就不花时间，而因为超预算放过一道「确定要拦」的门是不能接受的。
      */
     private Duration featureBudget = Duration.ofMillis(150);
 

@@ -24,13 +24,11 @@ import solvela.member.risk.config.ListMatch;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.risk.feature.OldDeviceExemption;
-import solvela.member.risk.rule.impl.DeviceBannedRule;
 import solvela.member.risk.rule.impl.DeviceFailLimitRule;
 import solvela.member.risk.rule.impl.DeviceFanoutRule;
 import solvela.member.risk.rule.impl.DeviceObserveRule;
 import solvela.member.risk.rule.impl.GlobalCaptchaRule;
 import solvela.member.risk.rule.impl.IpAccountFanoutRule;
-import solvela.member.risk.rule.impl.IpBlacklistRule;
 import solvela.member.risk.rule.impl.IpFailLimitRule;
 import solvela.member.risk.rule.impl.IpGreylistRule;
 import solvela.member.risk.rule.impl.IpUnknownLimitRule;
@@ -191,18 +189,6 @@ class LoginRuleTest {
     // ------------------------------------------------------------------ 名单与状态
 
     @Test
-    @DisplayName("IP 黑名单命中即拒绝，命中依据带条目 id 好让客服顺着查")
-    void blacklist() {
-        IpBlacklistRule rule = new IpBlacklistRule(lists);
-        when(lists.matchIp("1.2.3.4")).thenReturn(new ListMatch(77L, false, 0));
-
-        RiskHit hit = rule.evaluate(ctx(), config(MemberRiskDecisionEnum.DENY));
-
-        assertEquals(MemberRiskDecisionEnum.DENY, hit.decision());
-        assertTrue(hit.detail().contains("#77"));
-    }
-
-    @Test
     @DisplayName("灰名单加的分跟着条目走，不跟着规则走")
     void greylistScoreFromEntry() {
         IpGreylistRule rule = new IpGreylistRule(lists);
@@ -219,18 +205,12 @@ class LoginRuleTest {
     void listMissReturnsNull() {
         when(lists.matchIp(anyString())).thenReturn(ListMatch.NONE);
 
-        assertNull(new IpBlacklistRule(lists).evaluate(ctx(), config(MemberRiskDecisionEnum.DENY)));
         assertNull(new IpGreylistRule(lists).evaluate(ctx(), config(tiers())));
     }
 
     @Test
-    @DisplayName("设备封禁 → 拒绝；观察档 → OTP")
+    @DisplayName("观察档 → OTP（设备封禁 2026-10-17 移交网关安全闸）")
     void deviceStatusRules() {
-        when(dispositionService.currentStatus("dev-1")).thenReturn(DeviceStatusEnum.BANNED);
-        assertEquals(MemberRiskDecisionEnum.DENY,
-                new DeviceBannedRule(dispositionService).evaluate(ctx(), config(MemberRiskDecisionEnum.DENY))
-                        .decision());
-
         when(dispositionService.currentStatus("dev-1")).thenReturn(DeviceStatusEnum.OBSERVE);
         assertEquals(MemberRiskDecisionEnum.OTP,
                 new DeviceObserveRule(dispositionService).evaluate(ctx(), config(MemberRiskDecisionEnum.OTP))
@@ -248,11 +228,10 @@ class LoginRuleTest {
     }
 
     @Test
-    @DisplayName("设备正常时这两条都不命中")
+    @DisplayName("设备正常时观察档规则不命中")
     void normalDevicePasses() {
         when(dispositionService.currentStatus("dev-1")).thenReturn(DeviceStatusEnum.NORMAL);
 
-        assertNull(new DeviceBannedRule(dispositionService).evaluate(ctx(), config(MemberRiskDecisionEnum.DENY)));
         assertNull(new DeviceObserveRule(dispositionService).evaluate(ctx(), config(MemberRiskDecisionEnum.OTP)));
     }
 
@@ -267,10 +246,8 @@ class LoginRuleTest {
     }
 
     @Test
-    @DisplayName("黑名单、封禁、全局滑块都是 alwaysEnforce；普通限流不是")
+    @DisplayName("全局滑块是 alwaysEnforce；普通限流不是")
     void alwaysEnforceSet() {
-        assertTrue(new IpBlacklistRule(lists).alwaysEnforce());
-        assertTrue(new DeviceBannedRule(dispositionService).alwaysEnforce());
         assertTrue(new GlobalCaptchaRule().alwaysEnforce());
         assertEquals(false, new IpFailLimitRule(counters, exemption).alwaysEnforce());
         assertEquals(false, new DeviceObserveRule(dispositionService).alwaysEnforce());

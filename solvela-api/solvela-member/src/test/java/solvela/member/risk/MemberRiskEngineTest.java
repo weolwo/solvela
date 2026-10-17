@@ -164,12 +164,12 @@ class MemberRiskEngineTest {
     }
 
     @Test
-    @DisplayName("总开关切到 shadow：生效规则降成陪跑，但黑名单那几条不降")
+    @DisplayName("总开关切到 shadow：生效规则降成陪跑，但 alwaysEnforce 的不降")
     void globalShadowSparesAlwaysEnforce() {
         properties.setMode(MemberRiskProperties.Mode.SHADOW);
         pre(direct("IP_FAIL_LIMIT", MemberRiskDecisionEnum.LIMIT,
                         ctx -> RiskHit.decide(MemberRiskDecisionEnum.LIMIT, 60, "普通规则")),
-                alwaysEnforce(direct("DEVICE_BANNED", MemberRiskDecisionEnum.DENY,
+                alwaysEnforce(direct("STRONG_DENY", MemberRiskDecisionEnum.DENY,
                         ctx -> RiskHit.decide(MemberRiskDecisionEnum.DENY, "设备封禁"))));
 
         RiskSession session = session();
@@ -179,7 +179,7 @@ class MemberRiskEngineTest {
                 "保命开关不该顺手把「已经确定要拦」的门也打开");
         List<MemberRiskHit> hits = writtenHits(session);
         assertEquals(MemberRiskModeEnum.SHADOW, byCode(hits, "IP_FAIL_LIMIT").getMode());
-        assertEquals(MemberRiskModeEnum.ENFORCE, byCode(hits, "DEVICE_BANNED").getMode());
+        assertEquals(MemberRiskModeEnum.ENFORCE, byCode(hits, "STRONG_DENY").getMode());
     }
 
     @Test
@@ -253,13 +253,13 @@ class MemberRiskEngineTest {
     }
 
     @Test
-    @DisplayName("时间预算用完：剩下的规则记 error 跳过，但黑名单那几条照跑")
+    @DisplayName("时间预算用完：剩下的规则记 error 跳过，但 alwaysEnforce 的照跑")
     void budgetExhausted() {
         properties.setFeatureBudget(java.time.Duration.ofNanos(1));
         pre(direct("SLOW", MemberRiskDecisionEnum.CAPTCHA, ctx -> RiskHit.decide(MemberRiskDecisionEnum.CAPTCHA, "慢")),
                 direct("SKIPPED", MemberRiskDecisionEnum.LIMIT,
                         ctx -> RiskHit.decide(MemberRiskDecisionEnum.LIMIT, "不该跑到")),
-                alwaysEnforce(direct("DEVICE_BANNED", MemberRiskDecisionEnum.DENY,
+                alwaysEnforce(direct("STRONG_DENY", MemberRiskDecisionEnum.DENY,
                         ctx -> RiskHit.decide(MemberRiskDecisionEnum.DENY, "封禁"))));
 
         RiskSession session = session();

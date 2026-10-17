@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.auth.device.DeviceTokenCodec;
@@ -14,6 +15,7 @@ import solvela.enums.DeviceStatusEnum;
 import solvela.member.api.DeviceRegisterCmd;
 import solvela.member.device.DeviceDispositionService;
 import solvela.member.device.DeviceService;
+import solvela.security.SecurityKeys;
 
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -59,6 +61,9 @@ class DeviceDispositionTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private StringRedisTemplate redis;
+
     private String deviceId;
 
     @AfterEach
@@ -67,6 +72,7 @@ class DeviceDispositionTest {
             jdbcTemplate.update("DELETE FROM t_device WHERE device_id = ?", deviceId);
             redisService.delete(redisService.generateRedisKey("dev:observe:", deviceId));
             redisService.delete(redisService.generateRedisKey("dev:active:", deviceId));
+            redis.opsForSet().remove(SecurityKeys.BANNED_DEVICES, deviceId);
             deviceId = null;
         }
     }
@@ -177,6 +183,41 @@ class DeviceDispositionTest {
         assertEquals(DeviceStatusEnum.NORMAL, dispositionService.currentStatus(deviceId),
                 "「后台说的和实际不一样」是这类功能最常见的失效方式");
         assertNull(redisService.get(redisService.generateRedisKey("dev:observe:", deviceId)));
+    }
+
+    // ============================== 封禁镜像（网关安全闸读它） ==============================
+
+    @Test
+    @DisplayName("🔴 封禁 → 进镜像；解封 → 出镜像。网关不连库，镜像里没有就等于没封")
+    void 封禁同步镜像() {
+        registerDevice();
+
+        dispositionService.disposeManually(deviceId, DeviceStatusEnum.BANNED, "批量注册", "admin-7");
+        assertTrue(inMirror(deviceId), "被封的设备不在镜像里，它在网关那边照常能抽奖、签到");
+
+        dispositionService.disposeManually(deviceId, DeviceStatusEnum.NORMAL, "误判，已核实", "admin-7");
+        assertFalse(inMirror(deviceId), "解封了还在镜像里，用户会被一直挡在网关外面");
+    }
+
+    @Test
+    @DisplayName("🔴 镜像丢了 / 多了 → 按库全量重建：库是真相源")
+    void 按库重建镜像() {
+        registerDevice();
+        dispositionService.disposeManually(deviceId, DeviceStatusEnum.BANNED, "批量注册", "admin-7");
+        String stray = DeviceTokenCodec.newDeviceId();
+        // 模拟：同步那一下没写进去，另有一条库里早已解封的残留
+        redis.opsForSet().remove(SecurityKeys.BANNED_DEVICES, deviceId);
+        redis.opsForSet().add(SecurityKeys.BANNED_DEVICES, stray);
+
+        int size = dispositionService.rebuildBannedMirror();
+
+        assertTrue(inMirror(deviceId), "库里封着的设备要补回来");
+        assertFalse(inMirror(stray), "库里没封的要清掉");
+        assertEquals(size, redis.opsForSet().size(SecurityKeys.BANNED_DEVICES).intValue());
+    }
+
+    private boolean inMirror(String id) {
+        return Boolean.TRUE.equals(redis.opsForSet().isMember(SecurityKeys.BANNED_DEVICES, id));
     }
 
     private static void assertNull(Object o) {

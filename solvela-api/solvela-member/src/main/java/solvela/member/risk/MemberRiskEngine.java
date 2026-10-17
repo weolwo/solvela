@@ -120,9 +120,9 @@ public class MemberRiskEngine {
      * 这条规则此刻真正的档位。
      *
      * <p>总开关切到 {@code shadow} 时，{@code ENFORCE} 的规则一律降成陪跑 ——
-     * 但 {@code alwaysEnforce()} 的那几条（全局滑块、黑名单、设备封禁）不降：
+     * 但 {@code alwaysEnforce()} 的规则（今天只有全局滑块）不降：
      * 保命开关是给「某条规则大面积误伤、又来不及定位是哪条」用的，
-     * 它不该顺手把三条「已经确定要拦」的门也打开。
+     * 它不该顺手把「已经确定要拦」的门也打开。（黑名单、设备封禁 2026-10-17 移交网关安全闸，不再经过这里）
      */
     private MemberRiskModeEnum effectiveMode(RiskRuleRegistry.Bound bound) {
         MemberRiskModeEnum mode = bound.config().mode();

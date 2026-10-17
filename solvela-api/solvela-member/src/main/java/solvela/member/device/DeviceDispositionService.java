@@ -11,7 +11,11 @@ import solvela.enums.DeviceStatusEnum;
 import solvela.member.Device;
 import solvela.member.device.dao.DeviceDao;
 
+import solvela.security.SecurityKeys;
+
 import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * 设备的<b>处置闭环</b>：活跃刷新、自动降档、自动回档、人工封禁。
@@ -33,10 +37,14 @@ import java.time.Duration;
  * 这个偏差只影响展示，不影响拦截 —— 拦不拦看 Redis。要彻底消掉得加一个定时任务
  * 扫 {@code idx_dev_status}，那是「后台开始按这一列做统计」之后才值得做的事。
  *
- * <h3>封禁只能人工，而且不进 Redis</h3>
+ * <h3>封禁只能人工，库是真相源，Redis 里只有一份镜像</h3>
  * {@link DeviceStatusEnum#BANNED} 由库里那一行说了算，没有 TTL、不会自动解除。
  * 自动封禁一旦误判就是「这台机器再也用不了」，而受害者说不清自己遇到了什么 ——
  * 那种代价必须有人签字。
+ *
+ * <p>执行在网关：安全闸查 {@link SecurityKeys#BANNED_DEVICES} 这个集合，被封的设备访问<b>任何</b>接口都在网关结束
+ * （网关不连库）。本类在人工处置时同步这份镜像，{@link #rebuildBannedMirror} 按库全量重建 —— 镜像丢了、
+ * 同步失败了，由定时任务补回来（{@code DeviceBanMirrorRebuildJob}）。
  *
  * @Date 2026-09-10
  */
@@ -230,13 +238,71 @@ public class DeviceDispositionService {
             case NORMAL -> redisService.delete(observeKey);
             // 人工推进观察档也要有计时器，否则它永远不会自动回档
             case OBSERVE -> redis.opsForValue().set(observeKey, "manual", properties.observeWindow());
-            // 封禁不进 Redis：它由库里那一行说了算，不该自动解除
+            // 封禁没有计时器：它由库里那一行说了算，不该自动解除
             case BANNED -> redisService.delete(observeKey);
+        }
+        if (changed > 0) {
+            syncBannedMirror(deviceId, target == DeviceStatusEnum.BANNED);
         }
 
         log.warn("【设备处置】人工处置, deviceId: {}, 目标: {}, 操作人: {}, 原因: {}, 影响行数: {}",
                 deviceId, target.getDesc(), operator, reason, changed);
         return changed > 0;
+    }
+
+    // ------------------------------------------------------------------ 封禁镜像
+
+    /** 重建时一次 SADD 的设备数 */
+    private static final int MIRROR_BATCH = 500;
+
+    /**
+     * 人工处置后同步一台设备的镜像。
+     *
+     * <p>失败只打日志：库已经改了，处置就算成功；镜像最多晚一个重建周期对上。
+     * 反过来让「Redis 写不进去」把一次封禁变成报错，客服只会再点一次，而库里那行早就改好了。
+     */
+    private void syncBannedMirror(String deviceId, boolean banned) {
+        try {
+            if (banned) {
+                redis.opsForSet().add(SecurityKeys.BANNED_DEVICES, deviceId);
+            } else {
+                redis.opsForSet().remove(SecurityKeys.BANNED_DEVICES, deviceId);
+            }
+        } catch (Exception e) {
+            log.error("【设备处置】封禁镜像同步失败，等定时任务重建, deviceId: {}, 封禁: {}", deviceId, banned, e);
+        }
+    }
+
+    /**
+     * 按库全量重建封禁镜像：先写进一个临时键，再 {@code RENAME} 过去 —— 网关任何时刻读到的都是一份完整的集合，
+     * 不会读到「清空了、还没写完」的半成品。库里一台被封的都没有时直接删掉镜像。
+     *
+     * <p>⚠️ 已知窗口：读库之后、改名之前恰好有人封了一台设备，它的那条 SADD 会被这次改名盖掉，
+     * 要等下一个周期才回来。封禁本来就是人工动作、频率很低，这个窗口可以接受。
+     *
+     * @return 镜像里的设备数
+     */
+    public int rebuildBannedMirror() {
+        List<String> banned = deviceDao.selectObjs(Wrappers.<Device>lambdaQuery()
+                        .select(Device::getDeviceId)
+                        .eq(Device::getStatus, DeviceStatusEnum.BANNED.getValue()))
+                .stream().map(String::valueOf).toList();
+        if (banned.isEmpty()) {
+            redis.delete(SecurityKeys.BANNED_DEVICES);
+            return 0;
+        }
+        String temp = SecurityKeys.BANNED_DEVICES + ":rebuild:" + UUID.randomUUID();
+        try {
+            for (int i = 0; i < banned.size(); i += MIRROR_BATCH) {
+                redis.opsForSet().add(temp, banned.subList(i, Math.min(i + MIRROR_BATCH, banned.size()))
+                        .toArray(String[]::new));
+            }
+            redis.rename(temp, SecurityKeys.BANNED_DEVICES);
+        } finally {
+            // 改名成功后临时键已经不在了；中途失败时别把它留在 Redis 里
+            redis.delete(temp);
+        }
+        return banned.size();
     }
 
     /** 截断而不是让一句过长的原因把整次处置变成 500。 */

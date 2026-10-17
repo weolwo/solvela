@@ -16,7 +16,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -57,8 +56,6 @@ public class RateLimiter {
     private static final int[] ORDER = {DEVICE, ACCOUNT, IP, IP_SEGMENT, GLOBAL};
 
     private static final int MODE_SHADOW = 1, MODE_ENFORCE = 2;
-
-    private static final int LIST_GREY = 2, LIST_WHITE = 3;
 
     private final StringRedisTemplate redis;
 
@@ -107,8 +104,9 @@ public class RateLimiter {
         boolean oldDevice = request.deviceIssuedAt() != null
                 && now - request.deviceIssuedAt().getEpochSecond() >= d.globals.oldDeviceSeconds();
         IpRange ip = IpRange.single(request.clientIp());
-        boolean white = ip != null && d.matches(d.white, ip, now);
-        boolean grey = ip != null && d.matches(d.grey, ip, now);
+        long nowMillis = System.currentTimeMillis();
+        boolean white = d.lists.white(ip, nowMillis);
+        boolean grey = d.lists.grey(ip, nowMillis);
         boolean anonymousTarget = request.memberId() == null && request.scene().anonymous();
 
         for (int dim : ORDER) {
@@ -221,7 +219,8 @@ public class RateLimiter {
         }
     }
 
-    private static ApiException blocked(long retryAfter) {
+    /** 对外的 429。安全闸挡下的请求也用它 —— 两边说的是同一句话，不告诉对方是哪一道闸 */
+    static ApiException blocked(long retryAfter) {
         long seconds = Math.max(1, retryAfter);
         String wait = seconds < 120 ? seconds + " 秒" : seconds < 7200 ? ((seconds + 59) / 60) + " 分钟" : ((seconds + 3599) / 3600) + " 小时";
         return new ApiException(ApiErrors.OPERATION_LIMITED, "操作过于频繁，请 " + wait + "后再试",
@@ -270,14 +269,9 @@ public class RateLimiter {
 
         final Map<String, Map<Integer, GatewayRuleSnapshot.Rule>> endpointRules = new HashMap<>();
 
-        final List<Entry> white = new ArrayList<>();
-
-        final List<Entry> grey = new ArrayList<>();
+        final IpLists lists;
 
         final RateLimitGlobals globals;
-
-        record Entry(IpRange range, Long expireAtMillis) {
-        }
 
         Derived(GatewayRuleSnapshot snapshot) {
             this.snapshot = snapshot;
@@ -286,30 +280,9 @@ public class RateLimiter {
                         rule.targetType() == 2 ? endpointRules : sceneRules;
                 target.computeIfAbsent(rule.target(), k -> new HashMap<>()).put(rule.dimension(), rule);
             }
-            if (snapshot.ipLists() != null) {
-                for (GatewayRuleSnapshot.IpEntry e : snapshot.ipLists()) {
-                    List<Entry> bucket = e.listType() == LIST_WHITE ? white : e.listType() == LIST_GREY ? grey : null;
-                    if (bucket == null) {
-                        continue;
-                    }
-                    try {
-                        bucket.add(new Entry(IpRange.parse(e.value()), e.expireAt()));
-                    } catch (IllegalArgumentException ex) {
-                        log.warn("【网关限流】名单里有解不开的 IP，忽略: {}", e.value());
-                    }
-                }
-            }
+            this.lists = new IpLists(snapshot);
             this.globals = RateLimitGlobals.parse(snapshot.configs() == null ? null
                     : snapshot.configs().get("gateway_rate_limit"));
-        }
-
-        boolean matches(List<Entry> entries, IpRange ip, long nowSeconds) {
-            for (Entry e : entries) {
-                if ((e.expireAtMillis() == null || e.expireAtMillis() / 1000 > nowSeconds) && e.range().contains(ip)) {
-                    return true;
-                }
-            }
-            return false;
         }
     }
 }

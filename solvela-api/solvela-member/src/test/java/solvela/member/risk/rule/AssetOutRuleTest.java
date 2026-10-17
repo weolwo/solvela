@@ -8,21 +8,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import solvela.base.json.JsonUtils;
-import solvela.enums.DeviceStatusEnum;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskModeEnum;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.enums.MemberRiskRuleTypeEnum;
-import solvela.member.device.DeviceDispositionService;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDeviceTrust;
-import solvela.member.risk.config.ListMatch;
-import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.feature.LoginCounters;
-import solvela.member.risk.rule.impl.AssetDeviceBannedRule;
 import solvela.member.risk.rule.impl.AssetDeviceFanoutRule;
-import solvela.member.risk.rule.impl.AssetIpBlacklistRule;
 import tools.jackson.databind.JsonNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,19 +49,11 @@ class AssetOutRuleTest {
     @Mock
     private LoginCounters counters;
 
-    @Mock
-    private RiskListCache lists;
-
-    @Mock
-    private DeviceDispositionService dispositionService;
-
     @Test
-    @DisplayName("🔴 三条都写死在【资产出口 + 前置】")
+    @DisplayName("🔴 写死在【资产出口 + 前置】")
     void 场景与阶段() {
-        for (RiskRule rule : new RiskRule[]{
-                new AssetDeviceFanoutRule(counters),
-                new AssetIpBlacklistRule(lists),
-                new AssetDeviceBannedRule(dispositionService)}) {
+        // 黑名单与设备封禁 2026-10-17 移交网关安全闸（挡所有接口，不只这条链路），这里只剩一机多号
+        for (RiskRule rule : new RiskRule[]{new AssetDeviceFanoutRule(counters)}) {
             assertEquals(MemberRiskEventTypeEnum.ASSET_OUT, rule.eventType(), rule.code());
             assertEquals(MemberRiskPhaseEnum.PRE, rule.phase(), rule.code());
         }
@@ -129,23 +115,6 @@ class AssetOutRuleTest {
         }
     }
 
-    @Test
-    @DisplayName("黑名单与设备封禁：硬拦，且不受陪跑影响")
-    void 名单与封禁() {
-        when(lists.matchIp("1.2.3.4")).thenReturn(new ListMatch(77L, false, 0));
-        when(dispositionService.currentStatus("dev-1")).thenReturn(DeviceStatusEnum.BANNED);
-
-        AssetIpBlacklistRule black = new AssetIpBlacklistRule(lists);
-        AssetDeviceBannedRule banned = new AssetDeviceBannedRule(dispositionService);
-
-        assertEquals(MemberRiskDecisionEnum.DENY,
-                black.evaluate(ctx(), direct(MemberRiskDecisionEnum.DENY)).decision());
-        assertEquals(MemberRiskDecisionEnum.DENY,
-                banned.evaluate(ctx(), direct(MemberRiskDecisionEnum.DENY)).decision());
-        assertTrue(black.alwaysEnforce());
-        assertTrue(banned.alwaysEnforce());
-    }
-
     // ------------------------------------------------------------------ 脚手架
 
     /**
@@ -178,11 +147,5 @@ class AssetOutRuleTest {
     private static RiskRuleConfig config(JsonNode params) {
         return new RiskRuleConfig("X", "X", MemberRiskEventTypeEnum.ASSET_OUT, MemberRiskPhaseEnum.PRE,
                 MemberRiskRuleTypeEnum.TIERED, null, 0, null, MemberRiskModeEnum.ENFORCE, false, params);
-    }
-
-    private static RiskRuleConfig direct(MemberRiskDecisionEnum decision) {
-        return new RiskRuleConfig("X", "X", MemberRiskEventTypeEnum.ASSET_OUT, MemberRiskPhaseEnum.PRE,
-                MemberRiskRuleTypeEnum.DIRECT, decision, 0, null, MemberRiskModeEnum.ENFORCE, false,
-                JsonUtils.getMapper().createObjectNode());
     }
 }

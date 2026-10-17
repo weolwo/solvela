@@ -40,8 +40,9 @@ public interface RiskRule {
     }
 
     /**
-     * 总开关切到 shadow 时仍然生效。只有全局滑块、黑名单、设备封禁是 true ——
-     * 那三条是「已经确定要拦」的东西，保命开关不该把它们也放掉。
+     * 总开关切到 shadow 时仍然生效。今天只有全局滑块是 true ——
+     * 它是「已经确定要拦」的东西，保命开关不该把它也放掉。
+     * （黑名单、设备封禁原来也是，2026-10-17 移交网关安全闸）
      */
     default boolean alwaysEnforce() {
         return false;

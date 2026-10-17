@@ -37,7 +37,10 @@ public final class SecurityKeys {
 
     // ------------------------------------------------------------------ 安全闸（网关与会员域都会写，网关执行）
 
-    /** 全局处罚（蜜罐、关键字、蜜罐账号）：作用于所有场景。值是到期时间，TTL 与之相同 */
+    /**
+     * 全局处罚（蜜罐、关键字、蜜罐账号）：作用于所有场景，由网关的安全闸执行。
+     * 🔴 值是到期时间（<b>epoch 秒</b>），TTL 与之相同；IP 先过 {@link IpKeys#ip}（IPv6 取 /64），写的一方与读的一方必须一致。
+     */
     public static String securityPenaltyIp(String ip) {
         return "sec:pen:ip:" + ip;
     }

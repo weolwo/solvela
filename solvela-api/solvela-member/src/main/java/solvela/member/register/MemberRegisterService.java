@@ -60,11 +60,11 @@ import solvela.member.util.MemberPhoneUtil;
  * 得把那个开关按成 false —— <b>而那是一个需要有人明确决定的事</b>，
  * 不再是一个谁也没注意到的现状。
  *
- * <h3>限频在 2026-10-16 整体搬进了风控引擎</h3>
+ * <h3>限频在 2026-10-16 整体搬进了风控引擎，2026-10-17 再交给网关</h3>
  * 这里原来有两道手写的闸：{@code deviceGuard.checkRegister}（一台设备一天 2 个号）
- * 和 {@code consumeAttempt}（一个 IP 一小时 10 次）。现在它们是四条规则
- * （{@code REG_IP_LIMIT} / {@code REG_DEVICE_LIMIT} / {@code REG_IP_BLACKLIST} /
- * {@code REG_DEVICE_BANNED}），阈值在 {@code t_member_risk_rule}，<b>每一次注册尝试都有一行流水</b>。
+ * 和 {@code consumeAttempt}（一个 IP 一小时 10 次）。先是变成了风控里的四条规则，
+ * 之后各归其位：IP / 设备的次数归网关限流（{@code REGISTER} 场景），黑名单与设备封禁归网关安全闸
+ * （挡所有接口，不只注册）。注册仍然走风控引擎，<b>每一次注册尝试都有一行流水</b>。
  *
  * <p>换来的不只是「阈值能在后台改」：注册这条链路以前<b>完全看不见</b> ——
  * 批量建号发生过没有、挡下了多少、挡错了多少，一个数都没有，
