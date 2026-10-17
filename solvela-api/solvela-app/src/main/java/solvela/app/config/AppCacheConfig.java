@@ -76,7 +76,21 @@ public class AppCacheConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(valueSerializer()));
 
-        return new TtlInNameCacheManager(RedisCacheWriter.nonLockingRedisCacheWriter(factory), defaults);
+        return new TtlInNameCacheManager(immediateWriter(factory), defaults);
+    }
+
+    /**
+     * 不加锁、<b>同步写</b>的缓存写入器。
+     *
+     * <h3>🔴 必须显式要 immediateWrites</h3>
+     * Spring Data Redis 4 起，连接工厂支持响应式（Lettuce、Redisson 都是）时，{@code put} / {@code evict}
+     * 默认<b>异步</b>执行：方法返回时那条 SET / DEL 可能还没到 Redis。后果是顺序不再有保证 ——
+     * 先读回源写一份旧身份、紧接着改资料调 {@code evict}，异步的那条 SET 可能落在 DEL 之后，
+     * 旧资料就再挂 30 分钟，而且没有任何报错。
+     * 2026-10-17 由 {@code MemberPrincipalLoaderTest} 的偶发失败查出（写完立刻读，约一成读不到）。
+     */
+    static RedisCacheWriter immediateWriter(RedisConnectionFactory factory) {
+        return RedisCacheWriter.create(factory, writer -> writer.immediateWrites());
     }
 
     /**

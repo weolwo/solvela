@@ -122,8 +122,10 @@ public class RedisConfig {
     @Bean
     @ConditionalOnProperty(prefix = "spring.cache", name = {"type"}, havingValue = REDIS_CACHE)
     public CustomRedisCacheManager cacheManager() {
-        // 使用非阻塞模式的缓存写入器，适用于大多数高并发场景
-        RedisCacheWriter redisCacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(factory);
+        // 不加锁的缓存写入器。🔴 必须显式要 immediateWrites：Spring Data Redis 4 起，连接工厂支持响应式时
+        // （Redisson 就是）put / evict 默认异步执行，「先清缓存、再读」的顺序不再有保证 —— 刚清掉的字典
+        // 可能被一条晚到的 SET 写回旧值。网关那份（AppCacheConfig）因此出过偶发问题，见那里的注释
+        RedisCacheWriter redisCacheWriter = RedisCacheWriter.create(factory, writer -> writer.immediateWrites());
 
         // 构建默认缓存配置
         RedisCacheConfiguration defaultCacheConfig = RedisCacheConfiguration.defaultCacheConfig()

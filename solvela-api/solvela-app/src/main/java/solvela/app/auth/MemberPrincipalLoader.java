@@ -52,12 +52,13 @@ public class MemberPrincipalLoader {
     /**
      * 取可用的会员身份；会员不存在或状态不正常返回 null。
      *
-     * <p>⚠️ 返回 null 时<b>不写缓存</b>（AppCacheConfig 开了 disableCachingNullValues）。
+     * <p>⚠️ 返回 null 时<b>不写缓存</b>（{@code unless}；AppCacheConfig 也开了 disableCachingNullValues ——
+     * 只靠后者的话，每次都会先试着写、被拒、再打一条「写入失败」的 WARN）。
      * 也就是说不存在的 memberId 每次都回源 —— 这是刻意的：正常令牌指向的会员一定存在，
      * 会走到这里只可能是会员被物理删了（业务不允许，注销是改 status），或者有人在试探。
      * 后者恰恰不该给它缓存。
      */
-    @Cacheable(value = CACHE, key = "#memberId")
+    @Cacheable(value = CACHE, key = "#memberId", unless = "#result == null")
     public MemberPrincipal load(Long memberId) {
         MemberIdentity identity = memberAuthApi.getAuthIdentity(memberId);
         return identity == null ? null : MemberPrincipal.of(identity);

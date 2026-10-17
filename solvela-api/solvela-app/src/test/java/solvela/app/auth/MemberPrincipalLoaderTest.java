@@ -92,6 +92,18 @@ class MemberPrincipalLoaderTest {
                 "写回的值没带类型信息，下次读它必然抛 InvalidTypeIdException。实际存的是：" + written);
     }
 
+    @Test
+    @DisplayName("🔴 写完立刻读得到 —— 缓存写入是同步的（Spring Data Redis 4 默认异步，要显式 immediateWrites）")
+    void 写回是同步的() {
+        // 异步写的时候这里约一成读不到：方法返回了，那条 SET 还在路上（2026-10-17 查出，见 AppCacheConfig.immediateWriter）。
+        // 连读 50 次，异步的话几乎必然撞上一次
+        for (int i = 0; i < 50; i++) {
+            redis.delete(CACHE_KEY);
+            principalLoader.load(MEMBER_ID);
+            assertNotNull(redis.opsForValue().get(CACHE_KEY), "第 " + (i + 1) + " 次：方法返回了，缓存却还没写进去");
+        }
+    }
+
     /*
      * 🔴 这里【刻意没有】「坏缓存被读过一次之后下次不再回源」那条用例。
      *
@@ -99,6 +111,8 @@ class MemberPrincipalLoaderTest {
      * 吞掉降级为回源 —— 也就是说「读失败之后一定会把好值写回去」并不是这个类保证的性质。
      * 断言它，就是断言一个设计上没有承诺的东西，表现是这条用例时红时绿：
      * 2026-09 它在全量构建里红过四次，而每次单跑都是绿的。
+     * （2026-10-17 补：当时时红时绿的直接原因多半是缓存写入是异步的 —— 「写回」那条也因此偶发失败过，
+     * 改成同步写之后才稳定。自愈本身仍然不是承诺过的行为，所以这条依旧不加。）
      *
      * 真正要守的两条性质分别由上下两条用例守着：
      *   · 坏缓存不影响回源      —— 读不出来不能变成用户面的 500
