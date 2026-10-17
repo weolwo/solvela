@@ -45,16 +45,30 @@ public class SecurityIncidentAdminService {
     }
 
     public PageResult<Row> queryPage(Query q) {
-        LocalDateTime to = q.to() == null ? LocalDateTime.now() : q.to();
-        LocalDateTime from = q.from() == null ? to.minus(DEFAULT_WINDOW) : q.from();
-        if (from.isAfter(to)) {
-            throw new IllegalArgumentException("开始时间不能晚于结束时间");
+        StringBuilder where = new StringBuilder(" WHERE 1 = 1");
+        List<Object> args = new ArrayList<>();
+        /*
+         * 🔴 没给的那一端交给 SQL 的 NOW()，不在 Java 里取「现在」：create_time 是秒精度，写入时毫秒被四舍五入，
+         * 刚落库的那一行可能比 Java 此刻的时钟还「晚」半秒 —— 拿 Java 的 now 当上界，它就查不到。
+         * 没给结束时间就不设上界。
+         */
+        if (q.from() == null && q.to() == null) {
+            where.append(" AND create_time >= NOW() - INTERVAL ").append(DEFAULT_WINDOW.toDays()).append(" DAY");
+        } else {
+            LocalDateTime from = q.from() != null ? q.from() : q.to().minus(DEFAULT_WINDOW);
+            if (q.to() != null && from.isAfter(q.to())) {
+                throw new IllegalArgumentException("开始时间不能晚于结束时间");
+            }
+            if (Duration.between(from, q.to() != null ? q.to() : LocalDateTime.now()).compareTo(MAX_WINDOW) > 0) {
+                throw new IllegalArgumentException("一次最多查 " + MAX_WINDOW.toDays() + " 天 —— 这张表按月分区，更长的区间请分几次查");
+            }
+            where.append(" AND create_time >= ?");
+            args.add(from);
+            if (q.to() != null) {
+                where.append(" AND create_time < ?");
+                args.add(q.to());
+            }
         }
-        if (Duration.between(from, to).compareTo(MAX_WINDOW) > 0) {
-            throw new IllegalArgumentException("一次最多查 " + MAX_WINDOW.toDays() + " 天 —— 这张表按月分区，更长的区间请分几次查");
-        }
-        StringBuilder where = new StringBuilder(" WHERE create_time >= ? AND create_time < ?");
-        List<Object> args = new ArrayList<>(List.of(from, to));
         if (SolvelaStringUtil.isNotBlank(q.clientIp())) {
             where.append(" AND client_ip = ?");
             args.add(q.clientIp().trim());

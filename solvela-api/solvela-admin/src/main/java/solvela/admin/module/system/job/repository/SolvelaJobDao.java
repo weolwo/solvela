@@ -56,6 +56,9 @@ public interface SolvelaJobDao extends BaseMapper<SolvelaJobEntity> {
      * <p>预读窗口把「马上就要到点」的一并捞出来，避免边界抖动导致一秒漂移。
      * 走 {@code idx_next_trigger(app_env, enabled_flag, deleted_flag, next_trigger_time)}。
      */
+    /** 给 next_trigger_time 为空、又没终止的 cron 任务排上期（立刻可被扫到）。返回排上的条数。SQL 与理由见 mapper */
+    int armUnscheduled(@Param("appEnv") String appEnv);
+
     List<SolvelaJobEntity> selectDueJobList(@Param("appEnv") String appEnv,
                                             @Param("dueTime") LocalDateTime dueTime,
                                             @Param("limit") int limit);

@@ -46,6 +46,16 @@ public class SolvelaJobBootstrapInitializer implements SmartInitializingSingleto
                     "0 */5 * * * *", SolvelaJobPresetEnum.LIGHT, "自动创建：每 5 分钟回收「执行中」僵尸记录");
             this.ensure("_jobHealthCheck", "【系统】调度健康自检与告警",
                     "0 */5 * * * *", SolvelaJobPresetEnum.LIGHT, "自动创建：每 5 分钟检查调度器是否仍在正常工作");
+            /*
+             * 🔴 种子数据里的任务 next_trigger_time 是空的（它们是直接写进库的，没走过「新增任务」那条会算下次触发的路），
+             *    扫描器只挑「有下次触发时间」的行，于是它们<b>一次都不会跑</b>，而且没有任何报错。
+             *    2026-10-17 端到端验收时发现：分区维护、网关快照重发、安全事件落库、名单维护，空库装完全都没跑过。
+             *    这里给它们排上「现在」，之后按 cron 排 —— 与上面三个内置任务同一个做法。
+             */
+            int armed = jobDao.armUnscheduled(jobConfig.getEnv());
+            if (armed > 0) {
+                log.info("==== SolvelaJob ==== 给 {} 个从没排过期的任务排上了下次触发", armed);
+            }
         } catch (Exception e) {
             // 自举失败不能拖垮启动 —— 表还没建、库还没连上都可能走到这里
             log.error("==== SolvelaJob ==== 内置任务自举失败（不影响启动，但系统任务不会运行）", e);

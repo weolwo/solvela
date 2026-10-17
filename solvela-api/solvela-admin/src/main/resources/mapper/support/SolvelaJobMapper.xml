@@ -96,6 +96,22 @@
           AND deleted_flag = 0
     </update>
 
+    <!--
+      🔴 给「从没排过期」的任务排上：next_trigger_time 为 NULL 又没终止的 cron 任务，扫描器永远挑不中它。
+         这种行只会来自绕过后台直接写库的地方 —— 种子数据（空库安装）、迁移脚本、本地手工 INSERT。
+         用库的 NOW()：调度只认数据库时钟（铁律 9/10）
+    -->
+    <update id="armUnscheduled">
+        UPDATE t_solvela_job
+        SET next_trigger_time = NOW()
+        WHERE app_env = #{appEnv}
+          AND enabled_flag = 1
+          AND deleted_flag = 0
+          AND terminal_flag = 0
+          AND trigger_type = 'cron'
+          AND next_trigger_time IS NULL
+    </update>
+
     <update id="markTerminal">
         UPDATE t_solvela_job
         SET terminal_flag     = 1,
