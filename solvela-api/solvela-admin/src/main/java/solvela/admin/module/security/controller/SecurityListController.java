@@ -25,7 +25,7 @@ import solvela.enums.SecurityListDimensionEnum;
 import solvela.member.SecurityList;
 import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.domain.query.SecurityListQuery;
-import solvela.member.risk.service.MemberRiskAdminService;
+import solvela.member.risk.security.SecurityListAdminService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
 import solvela.web.RequiresPermission;
@@ -54,7 +54,7 @@ import solvela.web.RequiresPermission;
 @RequestMapping("/securityList")
 public class SecurityListController {
 
-    private final MemberRiskAdminService riskAdminService;
+    private final SecurityListAdminService listAdminService;
 
     private final DataTracerService dataTracerService;
 
@@ -68,7 +68,7 @@ public class SecurityListController {
         if (SolvelaStringUtil.isNotBlank(form.getIdentity())) {
             query.setListValue(hashIdentity(form.getIdentity()));
         }
-        PageResult<SecurityList> page = riskAdminService.queryListPage(query);
+        PageResult<SecurityList> page = listAdminService.queryListPage(query);
         return SolvelaPageUtil.convert2PageResult(page, SecurityListVO.class);
     }
 
@@ -92,7 +92,7 @@ public class SecurityListController {
             cmd.setListValue(hashIdentity(form.getIdentity()));
         }
         cmd.setOperator(CurrentEmployee.nameOrNull());
-        SecurityList row = riskAdminService.addList(cmd);
+        SecurityList row = listAdminService.addList(cmd);
         dataTracerService.addTrace(row.getId(), DataTracerTypeEnum.SECURITY_LIST,
                 "新增 %s（%s）：%s，到期 %s，原因：%s".formatted(
                         row.getListType().getDesc(), row.getDimension().getDesc(),
@@ -108,7 +108,7 @@ public class SecurityListController {
     @PostMapping("/revoke")
     @RequiresPermission("security:list")
     public String revoke(@RequestBody @Valid RevokeForm form) {
-        boolean revoked = riskAdminService.revokeList(
+        boolean revoked = listAdminService.revokeList(
                 form.id(), CurrentEmployee.nameOrNull(), form.reason());
         if (!revoked) {
             return "该名单已不在有效状态";

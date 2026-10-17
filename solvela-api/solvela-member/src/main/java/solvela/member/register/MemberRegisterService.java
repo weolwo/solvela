@@ -26,11 +26,11 @@ import solvela.member.api.RegisterFailReason;
 import solvela.member.id.MemberIdAllocator;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskActionExecutor;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskSession;
 import solvela.member.auth.NewDeviceLoginNotifier;
-import solvela.member.device.DeviceDispositionService;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.api.MemberRegisterType;
@@ -104,8 +104,8 @@ public class MemberRegisterService {
      * 而规则意味着页面上有一个能把它关掉的下拉框。见 {@code WeakPasswordChecker}。
      */
     private final solvela.member.password.WeakPasswordChecker weakPasswordChecker;
-    /** 只为执行 {@link RiskAction#OBSERVE_DEVICE}：一台建号超限的设备，下次登录要多验一道码 */
-    private final DeviceDispositionService dispositionService;
+    /** 执行风控结论带的动作。注册这边只会有 {@link RiskAction#OBSERVE_DEVICE}：一台建号超限的设备，下次登录要多验一道码 */
+    private final RiskActionExecutor riskActions;
     private final MemberEmailCodeService emailCodeService;
     private final MemberSmsCodeService smsCodeService;
     /**
@@ -275,7 +275,7 @@ public class MemberRegisterService {
      */
     private MemberRegisterResult runPreDecision(RiskSession risk, MemberRegisterCmd cmd) {
         RiskDecision pre = riskEngine.evaluatePre(risk);
-        applyActions(pre, cmd.deviceId());
+        riskActions.execute(pre, risk.context());
         if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
                     MemberRegisterResult.tooManyAttempts(pre.retryAfterSeconds()));
@@ -294,18 +294,6 @@ public class MemberRegisterService {
                     pre.decision());
         }
         return null;
-    }
-
-    /**
-     * 执行生效结论带的动作。注册这边只可能有一个：把设备降进观察档。
-     *
-     * <p>另外两个动作在注册场景不会出现 —— {@code RECORD_LIMIT} 是密码阶梯冷却专有的，
-     * {@code NOTIFY_OWNER} 要有「主人」而注册时还没有这个人。
-     */
-    private void applyActions(RiskDecision decision, String deviceId) {
-        if (decision.has(RiskAction.OBSERVE_DEVICE) && deviceId != null) {
-            dispositionService.observe(deviceId, "风控命中：本设备建号过多");
-        }
     }
 
     /**

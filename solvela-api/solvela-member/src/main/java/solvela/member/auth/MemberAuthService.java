@@ -50,17 +50,17 @@ import solvela.member.email.MemberEmailCodeIssuer;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
-import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.risk.MemberRiskEngine;
-import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskActionExecutor;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskEventRef;
 import solvela.member.risk.RiskSession;
+import solvela.member.risk.SuspiciousLoginNotifier;
 import solvela.member.risk.VerifyRouter;
 import solvela.member.risk.feature.AccountFailTracker;
 import solvela.member.risk.feature.LoginProfileProvider;
@@ -153,14 +153,11 @@ public class MemberAuthService implements MemberAuthApi {
     /** 核身路由：结论只说强度，码发到哪条通道由它选（方案 3.7） */
     private final VerifyRouter verifyRouter;
 
-    /** 长冷却要落一行，让后台看得见、客服解得开（{@code RiskAction.RECORD_LIMIT}） */
-    private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
+    /** 执行风控结论带的动作：降设备档、落冷却、蜜罐账号、通知主人 */
+    private final RiskActionExecutor riskActions;
 
-    /** 「我们拦下了一次可疑登录」（{@code RiskAction.NOTIFY_OWNER}） */
-    private final solvela.member.risk.SuspiciousLoginNotifier suspiciousLoginNotifier;
-
-    /** 蜜罐账号命中后的处罚与告警 */
-    private final solvela.member.risk.security.CanaryTrap canaryTrap;
+    /** 本该换通道却退回了：通知主人（与 {@code RiskAction.NOTIFY_OWNER} 同一封信） */
+    private final SuspiciousLoginNotifier suspiciousLoginNotifier;
 
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
@@ -182,7 +179,6 @@ public class MemberAuthService implements MemberAuthApi {
 
     private final solvela.member.sms.MemberSmsCodeIssuer smsCodeIssuer;
 
-    private final solvela.member.device.DeviceDispositionService dispositionService;
     private final MemberEmailBindService emailBindService;
 
     private final solvela.member.sms.MemberPhoneBindService phoneBindService;
@@ -261,7 +257,7 @@ public class MemberAuthService implements MemberAuthApi {
      */
     private MemberAuthResult runPreDecision(RiskSession risk, MemberAuthCmd cmd) {
         RiskDecision pre = riskEngine.evaluatePre(risk);
-        applyActions(pre, risk.context());
+        riskActions.execute(pre, risk.context());
         if (pre.is(MemberRiskDecisionEnum.CAPTCHA)) {
             // 票由接入层核销，域只看结论。已经过了就继续往下走
             return risk.context().isCaptchaPassed()
@@ -288,48 +284,8 @@ public class MemberAuthService implements MemberAuthApi {
     private MemberAuthResult afterPreDecision(RiskSession risk, MemberLoginType loginType, String identity,
                                               Member member, MemberAuthCmd cmd) {
         if (member == null) {
-            Integer attemptsBeforeCooldown = null;
-            // 🔴 验证码登录时，即使查无此人也要照常验一次码，【而且要返回验码本身的结果】。
-            //    发码那一步对没有会员的邮箱也存了码（MailDelivery.SUPPRESS），
-            //    这里如果一律回 BAD_CREDENTIALS，两条路径的回答又不一样了 ——
-            //    随便输个错码，有账号回「验证码错误」、没账号回「邮箱或密码错误」，
-            //    发码那一步藏住的东西在这里漏光。这条有用例钉着（输错码的回答一致）。
-            //
-            //    码【对】了才落到下面的 BAD_CREDENTIALS。那需要猜中一个六位数
-            //    （百万分之一，且只有 5 次机会），不构成可用的枚举手段。
-            if (loginType == MemberLoginType.EMAIL_CODE) {
-                AuthFailReason codeProblem = toAuthFailReason(
-                        emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.credential()));
-                if (codeProblem != null) {
-                    loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
-                    return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT, MemberAuthResult.fail(codeProblem));
-                }
-            } else {
-                /*
-                 * 🔴 查无此人也要跑一次密码哈希，而且要算一次【真的】Argon2。
-                 *
-                 * 不跑的话这个分支几十毫秒就返回，而账号存在时要验一次 Argon2 —— 响应时间本身
-                 * 就在回答「这个号存不存在」，前面所有「把三种失败合并成一句话」的努力全都白做。
-                 * 这个缝在改造前一直开着（2026-10-15 对着代码核对时发现）。
-                 *
-                 * 同理也要记一次冷却计数：否则「错几次会不会被冷却」又成了一个账号枚举接口。
-                 */
-                PasswordCipher.matches(cmd.credential(), DUMMY_PASSWORD_HASH);
-                /*
-                 * 🔴 连「还剩几次」也要照样算出来并返回。
-                 *
-                 * 只在账号存在时给这个数的话，「错两次看看有没有提示」就是一个精确的账号枚举接口 ——
-                 * 而阶梯本来就按身份摘要计数，没有账号的身份算出的数一模一样，返回它不泄露任何东西。
-                 */
-                attemptsBeforeCooldown = cooldownStore.onPasswordFailure(risk.context());
-            }
-            // 🔴 查无此人以前一行记录都不留（登录日志的 member_id 是 NOT NULL）——
-            //    现在 IP 维度数得到它，而且风控流水里有完整的一行（按身份摘要聚合）
-            loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
-            return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
-                    MemberAuthResult.badCredentials(attemptsBeforeCooldown));
+            return unknownAccount(risk, loginType, identity, cmd);
         }
-
         /*
          * 三道闸，顺序即安全，返回非 null 即被挡下：
          *   状态 -> 限制 -> 密码
@@ -346,13 +302,67 @@ public class MemberAuthService implements MemberAuthApi {
             return risk.end(MemberRiskOutcomeEnum.BAD_CREDENTIALS, credentialProblem);
         }
 
-        /*
-         * ---------- 后置决策 ----------
-         * 🔴 排在密码校验【之后】：不知道密码就拿不到票，拿不到票就发不了码 ——
-         *    那条码是花钱的（短信），也是轰炸的原料。
-         */
+        return runPostDecision(risk, loginType, identity, member, cmd);
+    }
+
+    /**
+     * 查无此人。🔴 这条路径的回答、耗时、计数都要与「有号但凭据错了」一模一样，
+     * 否则登录接口就是一个账号枚举接口。
+     */
+    private MemberAuthResult unknownAccount(RiskSession risk, MemberLoginType loginType, String identity,
+                                            MemberAuthCmd cmd) {
+        Integer attemptsBeforeCooldown = null;
+        // 🔴 验证码登录时，即使查无此人也要照常验一次码，【而且要返回验码本身的结果】。
+        //    发码那一步对没有会员的邮箱也存了码（MailDelivery.SUPPRESS），
+        //    这里如果一律回 BAD_CREDENTIALS，两条路径的回答又不一样了 ——
+        //    随便输个错码，有账号回「验证码错误」、没账号回「邮箱或密码错误」，
+        //    发码那一步藏住的东西在这里漏光。这条有用例钉着（输错码的回答一致）。
+        //
+        //    码【对】了才落到下面的 BAD_CREDENTIALS。那需要猜中一个六位数
+        //    （百万分之一，且只有 5 次机会），不构成可用的枚举手段。
+        if (loginType == MemberLoginType.EMAIL_CODE) {
+            AuthFailReason codeProblem = toAuthFailReason(
+                    emailCodeService.verify(EmailCodeScene.LOGIN, identity, cmd.credential()));
+            if (codeProblem != null) {
+                loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
+                return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT, MemberAuthResult.fail(codeProblem));
+            }
+        } else {
+            /*
+             * 🔴 查无此人也要跑一次密码哈希，而且要算一次【真的】Argon2。
+             *
+             * 不跑的话这个分支几十毫秒就返回，而账号存在时要验一次 Argon2 —— 响应时间本身
+             * 就在回答「这个号存不存在」，前面所有「把三种失败合并成一句话」的努力全都白做。
+             * 这个缝在改造前一直开着（2026-10-15 对着代码核对时发现）。
+             *
+             * 同理也要记一次冷却计数：否则「错几次会不会被冷却」又成了一个账号枚举接口。
+             */
+            PasswordCipher.matches(cmd.credential(), DUMMY_PASSWORD_HASH);
+            /*
+             * 🔴 连「还剩几次」也要照样算出来并返回。
+             *
+             * 只在账号存在时给这个数的话，「错两次看看有没有提示」就是一个精确的账号枚举接口 ——
+             * 而阶梯本来就按身份摘要计数，没有账号的身份算出的数一模一样，返回它不泄露任何东西。
+             */
+            attemptsBeforeCooldown = cooldownStore.onPasswordFailure(risk.context());
+        }
+        // 🔴 查无此人以前一行记录都不留（登录日志的 member_id 是 NOT NULL）——
+        //    现在 IP 维度数得到它，而且风控流水里有完整的一行（按身份摘要聚合）
+        loginIpGuard.recordUnknownAccount(cmd.clientIp(), maskIdentity(loginType, identity));
+        return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+                MemberAuthResult.badCredentials(attemptsBeforeCooldown));
+    }
+
+    /**
+     * 后置决策：要二次验证就签票，被挡就回限流，否则登录成功。
+     *
+     * <p>🔴 排在密码校验【之后】：不知道密码就拿不到票，拿不到票就发不了码 ——
+     * 那条码是花钱的（短信），也是轰炸的原料。
+     */
+    private MemberAuthResult runPostDecision(RiskSession risk, MemberLoginType loginType, String identity,
+                                             Member member, MemberAuthCmd cmd) {
         RiskDecision post = riskEngine.evaluatePost(risk);
-        applyActions(post, risk.context());
+        riskActions.execute(post, risk.context());
         if (post.needsOtp()) {
             return issueChallenge(risk, loginType, identity, member, cmd, post.decision());
         }
@@ -427,54 +437,6 @@ public class MemberAuthService implements MemberAuthApi {
                 cmd.deviceId(), cmd.deviceType(), cmd.clientIp(),
                 // null（老调用方没传）当作「没过滑块」—— 往严的方向偏
                 Boolean.TRUE.equals(cmd.captchaPassed()));
-    }
-
-    /** 执行生效结论带的动作。陪跑规则请求的动作已经被引擎丢掉了，这里拿到的都该执行 */
-    private void applyActions(RiskDecision decision, RiskContext ctx) {
-        if (decision.has(RiskAction.OBSERVE_DEVICE) && ctx.getDeviceId() != null) {
-            dispositionService.observe(ctx.getDeviceId(), "风控命中：量级异常");
-        }
-        if (decision.has(RiskAction.RECORD_LIMIT)) {
-            recordLimit(decision, ctx);
-        }
-        if (decision.has(RiskAction.CANARY_TRAP)) {
-            // 只有副作用：登录照常往下走，在密码比对那一步失败 —— 回答与真实账号输错密码逐字节相同
-            canaryTrap.spring(ctx);
-        }
-        if (decision.has(RiskAction.NOTIFY_OWNER)) {
-            /*
-             * 「我们拦下了一次可疑登录」。触发面刻意很窄（只有 OTP_STRONG / DENY，
-             * 见 RiskSession），而且按会员节流 —— 一次撞库会对同一个账号连试几十次。
-             */
-            suspiciousLoginNotifier.notifyOwner(ctx.memberId(), ctx.getClientIp(), ctx.getDeviceType());
-        }
-    }
-
-    /**
-     * 把长冷却落一行 {@code t_member_operation_limit}：后台看得见，客服解得开。
-     *
-     * <h3>🔴 查无此人时什么都不写</h3>
-     * 那张表的 {@code member_id} 是 NOT NULL，而冷却是按<b>身份摘要</b>算的 ——
-     * 不存在的账号照样会被冷却（那正是不泄露账号存在性的前提）。
-     * 这一行只是给人看的副本，少一行不影响冷却本身。
-     *
-     * <h3>🔴 解除是两件事，这里只落其中一件</h3>
-     * 真正拦人的是 Redis 里那个冷却键。客服在后台「解冻」只改这一行的话，
-     * 用户照样登不进去 —— 所以后台的解冻按钮必须同时清 Redis
-     * （{@code PasswordCooldownStore.clear}）。这一点在 §6.3 的名单 / 冷却页上。
-     */
-    private void recordLimit(RiskDecision decision, RiskContext ctx) {
-        if (ctx.memberId() == null) {
-            return;
-        }
-        try {
-            operationLimitService.freeze(ctx.memberId(), MemberOperationTypeEnum.LOGIN,
-                    "密码连续错误过多，风控冷却",
-                    LocalDateTime.now().plusSeconds(Math.max(1L, decision.retryAfterSeconds())));
-        } catch (RuntimeException e) {
-            // 落不上只是后台少看见一行，绝不能让登录接口跟着失败
-            log.error("【风控】记录操作限制失败, memberId: {}", ctx.memberId(), e);
-        }
     }
 
     /**

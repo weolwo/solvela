@@ -20,6 +20,10 @@ import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.member.MemberRiskEvent;
 import solvela.member.auth.NewDeviceLoginNotifier;
 import solvela.member.device.DeviceDispositionService;
+import solvela.member.operationlimit.service.MemberOperationLimitService;
+import solvela.member.risk.RiskActionExecutor;
+import solvela.member.risk.SuspiciousLoginNotifier;
+import solvela.member.risk.security.CanaryTrap;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.api.MemberLoginType;
@@ -50,6 +54,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -138,7 +143,10 @@ class MemberRegisterServiceTest {
     void setUp() {
         properties = new MemberRegisterProperties();
         service = new MemberRegisterService(memberRegisterDao, memberIdAllocator, properties,
-                piiHasher, piiCipher, riskEngine, new WeakPasswordChecker(), dispositionService,
+                piiHasher, piiCipher, riskEngine, new WeakPasswordChecker(),
+                // 真的执行器、假的下游：断言「设备被降进观察档」落在 dispositionService 上
+                new RiskActionExecutor(dispositionService, mock(MemberOperationLimitService.class),
+                        mock(CanaryTrap.class), mock(SuspiciousLoginNotifier.class)),
                 emailCodeService, smsCodeService, bizEventPublisher, newDeviceLoginNotifier);
 
         when(piiHasher.hash(PHONE)).thenReturn(PHONE_HASH);

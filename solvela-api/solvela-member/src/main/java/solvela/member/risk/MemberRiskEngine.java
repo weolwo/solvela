@@ -11,8 +11,9 @@ import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.rule.RiskHit;
 import solvela.member.risk.rule.RiskRuleConfig;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 登录风控引擎：按阶段跑规则，把命中交给 {@link RiskSession} 算结论。
@@ -75,45 +76,50 @@ public class MemberRiskEngine {
     }
 
     private List<RiskSession.Evaluated> runRules(RiskSession session, MemberRiskPhaseEnum phase) {
-        List<RiskSession.Evaluated> hits = new ArrayList<>();
-        long budgetNanos = properties.featureBudget().toNanos();
-        long slowNanos = properties.getSlowRuleWarn().toNanos();
         // 🔴 按【场景 + 阶段】取规则。少了场景，注册的那几条会跑在登录上，
         //    而它们数的是完全不同的东西（一个 IP 注册了几个号，不是登录了几次）
-        for (RiskRuleRegistry.Bound bound : registry.rules(session.context().getEventType(), phase)) {
-            MemberRiskModeEnum mode = effectiveMode(bound);
-            if (mode == MemberRiskModeEnum.OFF) {
-                continue;
-            }
-            // 可信设备跳过：信任的定义与资产出口的二次验证共用一个答案（方案 §3.2）。
-            // 不被跳过的是强规则和「不可能旅行」—— 可信不能洗白一个人工判过的东西，
-            // 而一台 20 分钟内从深圳跳到纽约的「老设备」正是令牌被复制的样子
-            if (bound.config().bypassByTrust() && session.context().deviceTrusted()) {
-                continue;
-            }
-            if (session.engineNanos() >= budgetNanos && !bound.rule().alwaysEnforce()) {
-                hits.add(errorHit(bound, mode, "超出风控时间预算，按未命中处理"));
-                continue;
-            }
-            long started = System.nanoTime();
-            try {
-                RiskHit hit = bound.rule().evaluate(session.context(), bound.config());
-                if (hit != null) {
-                    hits.add(toEvaluated(bound, mode, hit));
-                }
-            } catch (Exception e) {
-                log.error("【风控】规则 {} 执行失败，按未命中处理", bound.config().code(), e);
-                hits.add(errorHit(bound, mode, "规则执行异常: " + e.getClass().getSimpleName()));
-            } finally {
-                long cost = System.nanoTime() - started;
-                session.addEngineNanos(cost);
-                if (cost >= slowNanos) {
-                    log.warn("【风控】规则 {} 执行了 {} ms —— 特征查询变慢的第一个信号",
-                            bound.config().code(), cost / 1_000_000L);
-                }
-            }
+        return registry.rules(session.context().getEventType(), phase).stream()
+                .map(bound -> runOne(session, bound))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    /** 跑一条规则。没命中、或这次不该跑，返回 null */
+    private RiskSession.Evaluated runOne(RiskSession session, RiskRuleRegistry.Bound bound) {
+        MemberRiskModeEnum mode = effectiveMode(bound);
+        if (mode == MemberRiskModeEnum.OFF || bypassedByTrust(session, bound)) {
+            return null;
         }
-        return hits;
+        if (session.engineNanos() >= properties.featureBudget().toNanos() && !bound.rule().alwaysEnforce()) {
+            return errorHit(bound, mode, "超出风控时间预算，按未命中处理");
+        }
+        long started = System.nanoTime();
+        try {
+            RiskHit hit = bound.rule().evaluate(session.context(), bound.config());
+            return hit == null ? null : toEvaluated(bound, mode, hit);
+        } catch (Exception e) {
+            log.error("【风控】规则 {} 执行失败，按未命中处理", bound.config().code(), e);
+            return errorHit(bound, mode, "规则执行异常: " + e.getClass().getSimpleName());
+        } finally {
+            recordCost(session, bound, System.nanoTime() - started);
+        }
+    }
+
+    /**
+     * 可信设备跳过：信任的定义与资产出口的二次验证共用一个答案（方案 §3.2）。
+     * 不被跳过的是强规则和「不可能旅行」—— 可信不能洗白一个人工判过的东西，
+     * 而一台 20 分钟内从深圳跳到纽约的「老设备」正是令牌被复制的样子。
+     */
+    private static boolean bypassedByTrust(RiskSession session, RiskRuleRegistry.Bound bound) {
+        return bound.config().bypassByTrust() && session.context().deviceTrusted();
+    }
+
+    /** 记进时间预算；慢到阈值打一条 WARN —— 特征查询变慢的第一个信号 */
+    private void recordCost(RiskSession session, RiskRuleRegistry.Bound bound, long nanos) {
+        session.addEngineNanos(nanos);
+        if (nanos >= properties.getSlowRuleWarn().toNanos()) {
+            log.warn("【风控】规则 {} 执行了 {} ms —— 特征查询变慢的第一个信号", bound.config().code(), nanos / 1_000_000L);
+        }
     }
 
     /**
@@ -149,27 +155,31 @@ public class MemberRiskEngine {
                                                      RiskHit hit) {
         RiskRuleConfig config = bound.config();
         boolean scoring = config.ruleType() == MemberRiskRuleTypeEnum.SCORE;
-        MemberRiskDecisionEnum decision = null;
-        int score = 0;
-        if (scoring) {
-            if (hit.decision() != null) {
-                log.warn("【风控】打分规则 {} 返回了处置 {}，已忽略", config.code(), hit.decision());
-            }
-            score = hit.score() != null ? hit.score() : config.score();
-        } else {
-            // 分级 / 矩阵规则自己决定是哪一档；固定处置的强规则用表里那一档
-            decision = hit.decision() != null ? hit.decision() : config.directDecision();
-            if (hit.score() != null) {
-                log.warn("【风控】强规则 {} 返回了分值 {}，已忽略", config.code(), hit.score());
-            }
-        }
+        warnIfIgnored(config, hit, scoring);
+        // 打分规则只出分；分级 / 矩阵规则自己决定是哪一档，固定处置的强规则用表里那一档
+        int score = scoring ? orElse(hit.score(), config.score()) : 0;
+        MemberRiskDecisionEnum decision = scoring ? null : orElse(hit.decision(), config.directDecision());
         return new RiskSession.Evaluated(config.code(), mode, decision, score, config.group(),
                 hit.retryAfterSeconds(), hit.detail(), false, hit.actions());
+    }
+
+    private static <T> T orElse(T value, T fallback) {
+        return value != null ? value : fallback;
+    }
+
+    /** 规则返回了它这一类不该给的东西：忽略，但要让人看见 —— 那是规则写错了 */
+    private static void warnIfIgnored(RiskRuleConfig config, RiskHit hit, boolean scoring) {
+        if (scoring && hit.decision() != null) {
+            log.warn("【风控】打分规则 {} 返回了处置 {}，已忽略", config.code(), hit.decision());
+        }
+        if (!scoring && hit.score() != null) {
+            log.warn("【风控】强规则 {} 返回了分值 {}，已忽略", config.code(), hit.score());
+        }
     }
 
     private static RiskSession.Evaluated errorHit(RiskRuleRegistry.Bound bound, MemberRiskModeEnum mode,
                                                   String detail) {
         return new RiskSession.Evaluated(bound.config().code(), mode, null, 0, bound.config().group(),
-                0L, detail, true, java.util.Set.of());
+                0L, detail, true, Set.of());
     }
 }

@@ -17,7 +17,7 @@ import solvela.member.SecurityList;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.domain.query.SecurityListQuery;
-import solvela.member.risk.service.MemberRiskAdminService;
+import solvela.member.risk.security.SecurityListAdminService;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SecurityListAdminTest {
 
     @Autowired
-    private MemberRiskAdminService riskAdminService;
+    private SecurityListAdminService listAdminService;
 
     @Autowired
     private RiskListCache listCache;
@@ -72,7 +72,7 @@ class SecurityListAdminTest {
         String ip = freshIp();
         assertFalse(listCache.matchIp(ip).black(), "造数：一开始不该命中");
 
-        riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+        listAdminService.addList(add(SecurityListTypeEnum.BLACK,
                 SecurityListDimensionEnum.IP, ip, null, null));
 
         assertTrue(listCache.matchIp(ip).black());
@@ -81,7 +81,7 @@ class SecurityListAdminTest {
     @Test
     @DisplayName("IP 段（CIDR）命中段内任意地址")
     void 网段命中() {
-        riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+        listAdminService.addList(add(SecurityListTypeEnum.BLACK,
                 SecurityListDimensionEnum.IP_RANGE, IP_PREFIX + "0.0/16", null, null));
 
         assertTrue(listCache.matchIp(IP_PREFIX + "7.7").black());
@@ -90,12 +90,12 @@ class SecurityListAdminTest {
     @Test
     @DisplayName("🔴 格式解不开直接拒绝 —— 否则列表里会躺着一条永远不命中的名单")
     void 格式不对就拒绝() {
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                 add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, "不是IP", null, null)));
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                 add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP_RANGE,
                         "203.0.113.0/99", null, null)));
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                 add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IDENTITY,
                         "短了点", null, null)));
     }
@@ -103,10 +103,10 @@ class SecurityListAdminTest {
     @Test
     @DisplayName("灰名单必须给分；黑白名单不许给分")
     void 分数的规矩() {
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                         add(SecurityListTypeEnum.GREY, SecurityListDimensionEnum.IP, freshIp(), null, null)),
                 "不给分的灰名单命中了也什么都不会发生");
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                         add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, freshIp(), 30, null)),
                 "黑名单直接拒绝，分数在这一档上没有意义");
     }
@@ -114,14 +114,14 @@ class SecurityListAdminTest {
     @Test
     @DisplayName("🔴 会员维度只许白名单，而且必须填到期 —— 长期白名单会在没人记得时继续生效")
     void 会员维度的规矩() {
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                         add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.MEMBER, "900001", null,
                                 LocalDateTime.now().plusDays(3))),
                 "封号请用会员状态 —— 名单里再放一份就有了两个答案");
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                         add(SecurityListTypeEnum.WHITE, SecurityListDimensionEnum.MEMBER, "900001", null, null)),
                 "会员白名单必须填到期");
-        assertNotNull(riskAdminService.addList(
+        assertNotNull(listAdminService.addList(
                 add(SecurityListTypeEnum.WHITE, SecurityListDimensionEnum.MEMBER, "900001", null,
                         LocalDateTime.now().plusDays(3))));
     }
@@ -132,13 +132,13 @@ class SecurityListAdminTest {
         SecurityListAddCmd cmd = add(SecurityListTypeEnum.BLACK,
                 SecurityListDimensionEnum.IP, freshIp(), null, null);
         cmd.setReason("  ");
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(cmd));
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(cmd));
     }
 
     @Test
     @DisplayName("到期时间不能是过去 —— 那条名单加完立刻就失效了")
     void 到期不能是过去() {
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.addList(
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.addList(
                 add(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, freshIp(), null,
                         LocalDateTime.now().minusDays(1))));
     }
@@ -147,10 +147,10 @@ class SecurityListAdminTest {
     @DisplayName("🔴 撤销不删行：状态改成已撤销，并记下谁解的、为什么；缓存立刻不再命中")
     void 撤销留痕() {
         String ip = freshIp();
-        SecurityList row = riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+        SecurityList row = listAdminService.addList(add(SecurityListTypeEnum.BLACK,
                 SecurityListDimensionEnum.IP, ip, null, null));
 
-        assertTrue(riskAdminService.revokeList(row.getId(), "客服小王", "误封，公司出口"));
+        assertTrue(listAdminService.revokeList(row.getId(), "客服小王", "误封，公司出口"));
 
         assertFalse(listCache.matchIp(ip).black());
         SecurityListQuery query = new SecurityListQuery();
@@ -158,7 +158,7 @@ class SecurityListAdminTest {
         query.setPageSize(10L);
         query.setListValue(ip);
         query.setStatus(SecurityListStatusEnum.REVOKED);
-        PageResult<SecurityList> page = riskAdminService.queryListPage(query);
+        PageResult<SecurityList> page = listAdminService.queryListPage(query);
         assertEquals(1, page.list().size(), "🔴 删行的话，下一个人看到的是「这个 IP 从来没被封过」");
         assertEquals("客服小王", page.list().getFirst().getRevokeOperator());
         assertEquals("误封，公司出口", page.list().getFirst().getRevokeReason());
@@ -167,11 +167,11 @@ class SecurityListAdminTest {
     @Test
     @DisplayName("连点两次撤销：第二次返回 false，不覆盖第一次记的人")
     void 撤销幂等() {
-        SecurityList row = riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+        SecurityList row = listAdminService.addList(add(SecurityListTypeEnum.BLACK,
                 SecurityListDimensionEnum.IP, freshIp(), null, null));
 
-        assertTrue(riskAdminService.revokeList(row.getId(), "客服小王", "误封"));
-        assertFalse(riskAdminService.revokeList(row.getId(), "客服小李", "又点了一次"));
+        assertTrue(listAdminService.revokeList(row.getId(), "客服小王", "误封"));
+        assertFalse(listAdminService.revokeList(row.getId(), "客服小李", "又点了一次"));
 
         String operator = jdbcTemplate.queryForObject(
                 "SELECT revoke_operator FROM t_security_list WHERE id = ?", String.class, row.getId());
@@ -181,22 +181,22 @@ class SecurityListAdminTest {
     @Test
     @DisplayName("撤销必须写原因")
     void 撤销要写原因() {
-        assertThrows(IllegalArgumentException.class, () -> riskAdminService.revokeList(1L, "客服", " "));
+        assertThrows(IllegalArgumentException.class, () -> listAdminService.revokeList(1L, "客服", " "));
     }
 
     @Test
     @DisplayName("列表默认只看有效的：客服日常要的是「现在谁被封着」")
     void 默认只看有效() {
         String ip = freshIp();
-        SecurityList row = riskAdminService.addList(add(SecurityListTypeEnum.BLACK,
+        SecurityList row = listAdminService.addList(add(SecurityListTypeEnum.BLACK,
                 SecurityListDimensionEnum.IP, ip, null, null));
-        riskAdminService.revokeList(row.getId(), "客服", "误封");
+        listAdminService.revokeList(row.getId(), "客服", "误封");
 
         SecurityListQuery query = new SecurityListQuery();
         query.setPageNum(1L);
         query.setPageSize(10L);
         query.setListValue(ip);
-        assertEquals(0, riskAdminService.queryListPage(query).list().size());
+        assertEquals(0, listAdminService.queryListPage(query).list().size());
     }
 
     // ============================== 工具 ==============================

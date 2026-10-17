@@ -20,7 +20,6 @@ import solvela.member.device.DeviceDispositionService;
 import solvela.member.device.DeviceService;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
-import solvela.member.risk.service.MemberRiskAdminService;
 import solvela.security.IpKeys;
 import solvela.security.SecurityIncidentEvent;
 import solvela.security.SecurityKeys;
@@ -69,7 +68,7 @@ class SecurityIncidentPipelineTest {
     private ConfigService configService;
 
     @Autowired
-    private MemberRiskAdminService adminService;
+    private SecurityListAdminService listAdminService;
 
     @Autowired
     private DeviceService deviceService;
@@ -272,7 +271,7 @@ class SecurityIncidentPipelineTest {
         redis.opsForValue().set(penalty, String.valueOf(now() + 86400));
         long id = ((Number) listRow(ip, 1).get("id")).longValue();
 
-        assertTrue(adminService.revokeList(id, "admin", "用例：误判"));
+        assertTrue(listAdminService.revokeList(id, "admin", "用例：误判"));
 
         assertNull(redis.opsForValue().get(penalty));
     }

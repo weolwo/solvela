@@ -21,6 +21,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,6 +54,9 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
     private final Map<String, RiskRule> rulesByCode;
 
     private final PeriodicSnapshot<Snapshot> snapshot;
+
+    /** 上一次加载时参数读不出来的规则。只用于启动校验时把它们和「缺种子」区分开 */
+    private volatile Set<String> loadedButBroken = Set.of();
 
     public RiskRuleRegistry(MemberRiskRuleDao ruleDao,
                             ObjectProvider<RiskRule> rules,
@@ -123,24 +127,48 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
         if (impl == null) {
             throw new IllegalArgumentException("代码里没有这条规则，改不了它的参数: " + code);
         }
-        JsonNode params;
-        try {
-            params = SolvelaStringUtil.isBlank(paramsJson)
-                    ? JsonUtils.getMapper().createObjectNode()
-                    : JsonUtils.getMapper().readTree(paramsJson);
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("参数不是合法的 JSON: " + e.getMessage(), e);
-        }
-        if (!params.isObject()) {
-            throw new IllegalArgumentException("参数必须是一个 JSON 对象");
-        }
-        impl.validate(params);
+        impl.validate(parseParams(paramsJson));
     }
 
-    /** 上一次加载时参数读不出来的规则。只用于启动校验时把它们和「缺种子」区分开 */
-    private volatile Set<String> loadedButBroken = Set.of();
-
     private Snapshot load() {
+        Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> byScenario = emptyIndex();
+        Map<String, RiskRuleConfig> byCode = new LinkedHashMap<>();
+        Set<String> broken = new TreeSet<>();
+        List<MemberRiskRule> rows = ruleDao.selectList(null);
+        rows.sort(Comparator.comparing(MemberRiskRule::getId));
+        for (MemberRiskRule row : rows) {
+            Bound bound = bind(row, broken);
+            if (bound == null) {
+                continue;
+            }
+            RiskRuleConfig config = bound.config();
+            byCode.put(config.code(), config);
+            if (config.mode() != MemberRiskModeEnum.OFF) {
+                byScenario.get(config.eventType()).get(config.phase()).add(bound);
+            }
+        }
+        loadedButBroken = Collections.unmodifiableSet(broken);
+        return new Snapshot(freeze(byScenario), Collections.unmodifiableMap(byCode));
+    }
+
+    /** 一行配上它的实现；代码里没有这条规则、或配置读不出来（记进 {@code broken}）返回 null —— 都当作关闭 */
+    private Bound bind(MemberRiskRule row, Set<String> broken) {
+        RiskRule impl = rulesByCode.get(row.getRuleCode());
+        if (impl == null) {
+            log.warn("【风控】规则表里有 {}，但代码里没有这条规则，当作关闭", row.getRuleCode());
+            return null;
+        }
+        try {
+            return new Bound(impl, toConfig(row, impl));
+        } catch (RuntimeException e) {
+            broken.add(row.getRuleCode());
+            log.error("【风控】规则 {} 的配置读不出来，当作关闭：{}", row.getRuleCode(), e.getMessage());
+            return null;
+        }
+    }
+
+    /** 每个场景 × 每个阶段都先放一个空列表：查的时候不用判空 */
+    private static Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> emptyIndex() {
         Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> byScenario =
                 new EnumMap<>(MemberRiskEventTypeEnum.class);
         for (MemberRiskEventTypeEnum eventType : MemberRiskEventTypeEnum.values()) {
@@ -150,35 +178,17 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
             }
             byScenario.put(eventType, byPhase);
         }
-        Map<String, RiskRuleConfig> byCode = new LinkedHashMap<>();
-        Set<String> broken = new TreeSet<>();
-        List<MemberRiskRule> rows = ruleDao.selectList(null);
-        rows.sort((a, b) -> Long.compare(a.getId(), b.getId()));
-        for (MemberRiskRule row : rows) {
-            RiskRule impl = rulesByCode.get(row.getRuleCode());
-            if (impl == null) {
-                log.warn("【风控】规则表里有 {}，但代码里没有这条规则，当作关闭", row.getRuleCode());
-                continue;
-            }
-            RiskRuleConfig config;
-            try {
-                config = toConfig(row, impl);
-            } catch (RuntimeException e) {
-                broken.add(row.getRuleCode());
-                log.error("【风控】规则 {} 的配置读不出来，当作关闭：{}", row.getRuleCode(), e.getMessage());
-                continue;
-            }
-            byCode.put(config.code(), config);
-            if (config.mode() != MemberRiskModeEnum.OFF) {
-                byScenario.get(config.eventType()).get(config.phase()).add(new Bound(impl, config));
-            }
-        }
+        return byScenario;
+    }
+
+    /** 快照发布出去之后谁也不许改它：请求线程正拿着它在跑 */
+    private static Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> freeze(
+            Map<MemberRiskEventTypeEnum, Map<MemberRiskPhaseEnum, List<Bound>>> byScenario) {
         byScenario.replaceAll((eventType, byPhase) -> {
             byPhase.replaceAll((phase, list) -> Collections.unmodifiableList(list));
             return Collections.unmodifiableMap(byPhase);
         });
-        loadedButBroken = Collections.unmodifiableSet(broken);
-        return new Snapshot(Collections.unmodifiableMap(byScenario), Collections.unmodifiableMap(byCode));
+        return Collections.unmodifiableMap(byScenario);
     }
 
     /**
@@ -220,9 +230,7 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
             throw new IllegalArgumentException(row.getEventType().getDesc()
                     + "场景的固定处置只能是 " + allowed + "，表里是 " + row.getDirectDecision());
         }
-        JsonNode params = SolvelaStringUtil.isBlank(row.getParams())
-                ? JsonUtils.getMapper().createObjectNode()
-                : JsonUtils.getMapper().readTree(row.getParams());
+        JsonNode params = parseParams(row.getParams());
         impl.validate(params);
         return new RiskRuleConfig(row.getRuleCode(), row.getRuleName(), row.getEventType(),
                 row.getPhase(), row.getRuleType(),
@@ -251,8 +259,23 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
             MemberRiskEventTypeEnum.ASSET_OUT, RiskParams.WITH_STEP_UP,
             MemberRiskEventTypeEnum.CONTACT_BIND, RiskParams.GATE_ONLY);
 
-    private static Map<String, RiskRule> indexByCode(
-            List<RiskRule> rules) {
+    /** 参数原文 → JSON 对象；空的当作 {@code {}}。加载与后台保存共用，两边对「什么算合法」只有一个答案 */
+    private static JsonNode parseParams(String json) {
+        JsonNode params;
+        try {
+            params = SolvelaStringUtil.isBlank(json)
+                    ? JsonUtils.getMapper().createObjectNode()
+                    : JsonUtils.getMapper().readTree(json);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("参数不是合法的 JSON: " + e.getMessage(), e);
+        }
+        if (!params.isObject()) {
+            throw new IllegalArgumentException("参数必须是一个 JSON 对象");
+        }
+        return params;
+    }
+
+    private static Map<String, RiskRule> indexByCode(List<RiskRule> rules) {
         Map<String, RiskRule> byCode = new LinkedHashMap<>();
         for (RiskRule rule : rules) {
             if (byCode.put(rule.code(), rule) != null) {

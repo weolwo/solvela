@@ -23,7 +23,7 @@ import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.feature.DeviceTrustProvider;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
 import solvela.member.risk.security.SecurityIncidentStore;
-import solvela.member.risk.service.MemberRiskAdminService;
+import solvela.member.risk.security.SecurityListAdminService;
 import solvela.member.stepup.DeviceTrustStore;
 import solvela.member.stepup.MemberStepUpService;
 import solvela.security.GatewayRuleSnapshot;
@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MemberGreyListTest {
 
     @Autowired
-    private MemberRiskAdminService adminService;
+    private SecurityListAdminService listAdminService;
 
     @Autowired
     private RiskListCache listCache;
@@ -97,10 +97,10 @@ class MemberGreyListTest {
     @Test
     @DisplayName("🔴 后台：会员维度可以加灰（必须有到期），仍然不能加黑 —— 会员的「黑」就是冻结")
     void adminCanGreyButNotBlack() {
-        assertNotNull(adminService.addList(cmd(SecurityListTypeEnum.GREY)));
+        assertNotNull(listAdminService.addList(cmd(SecurityListTypeEnum.GREY)));
 
         IllegalArgumentException black = assertThrows(IllegalArgumentException.class,
-                () -> adminService.addList(cmd(SecurityListTypeEnum.BLACK)));
+                () -> listAdminService.addList(cmd(SecurityListTypeEnum.BLACK)));
         assertTrue(black.getMessage().contains("冻结"), black.getMessage());
     }
 
@@ -154,7 +154,7 @@ class MemberGreyListTest {
     // ------------------------------------------------------------------ 造数
 
     private void grey() {
-        adminService.addList(cmd(SecurityListTypeEnum.GREY));
+        listAdminService.addList(cmd(SecurityListTypeEnum.GREY));
     }
 
     private SecurityListAddCmd cmd(SecurityListTypeEnum type) {

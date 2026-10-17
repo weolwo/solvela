@@ -30,13 +30,13 @@ import solvela.member.api.MemberLoginType;
 import solvela.member.api.SmsCodeSendResult;
 import solvela.member.api.SmsCodeVerifyResult;
 import solvela.member.api.SmsScene;
-import solvela.member.device.DeviceDispositionService;
 import solvela.member.device.DeviceGuard;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
 import solvela.member.register.MemberRegisterService;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskActionExecutor;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskEventRecorder;
 import solvela.member.risk.RiskEventRef;
@@ -120,8 +120,9 @@ class MemberAuthServiceTest {
      */
     @Mock
     private solvela.member.password.LeakedPasswordNotifier leakedPasswordNotifier;
+    /** 动作怎么执行由 {@code RiskActionExecutorTest} 钉；这里只钉「生效结论的动作交给了它」 */
     @Mock
-    private DeviceDispositionService dispositionService;
+    private RiskActionExecutor riskActions;
     @Mock
     private MemberSmsCodeService smsCodeService;
     @Mock
@@ -370,13 +371,14 @@ class MemberAuthServiceTest {
     }
 
     @Test
-    @DisplayName("生效结论带的动作要执行：命中降档就把设备降进观察档")
+    @DisplayName("生效结论带的动作要执行：前置结论原样交给动作执行器")
     void 执行降档动作() {
-        pre(new RiskDecision(MemberRiskDecisionEnum.LIMIT, 60L, Set.of(RiskAction.OBSERVE_DEVICE)));
+        RiskDecision decision = new RiskDecision(MemberRiskDecisionEnum.LIMIT, 60L, Set.of(RiskAction.OBSERVE_DEVICE));
+        pre(decision);
 
         service.authenticate(cmd(RAW_PASSWORD));
 
-        verify(dispositionService).observe(eq(DEVICE_ID), anyString());
+        verify(riskActions).execute(eq(decision), any());
     }
 
     // ------------------------------------------------------------------ 日志与流水

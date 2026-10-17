@@ -65,7 +65,7 @@ public class SecurityListWriter {
     }
 
     /** {@code t_security_list.source}：1-人工, 2-自动 */
-    private static final int SOURCE_MANUAL = 1;
+    public static final int SOURCE_MANUAL = 1;
 
     /** 按编码找维度（库里读出来的那一列）；不认识的返回 null */
     public static SecurityListDimensionEnum dimension(int code) {

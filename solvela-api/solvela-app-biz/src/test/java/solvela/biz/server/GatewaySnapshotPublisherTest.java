@@ -15,7 +15,7 @@ import solvela.exception.BusinessException;
 import solvela.enums.SecurityListTypeEnum;
 import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
-import solvela.member.risk.service.MemberRiskAdminService;
+import solvela.member.risk.security.SecurityListAdminService;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.SecurityKeys;
 
@@ -46,7 +46,7 @@ class GatewaySnapshotPublisherTest {
     private GatewaySnapshotPublisher publisher;
 
     @Autowired
-    private MemberRiskAdminService riskAdminService;
+    private SecurityListAdminService listAdminService;
 
     @Autowired
     private ConfigService configService;
@@ -122,11 +122,11 @@ class GatewaySnapshotPublisherTest {
         cmd.setListValue(ip);
         cmd.setReason("用例：快照发布");
         cmd.setOperator("用例");
-        Long id = riskAdminService.addList(cmd).getId();
+        Long id = listAdminService.addList(cmd).getId();
 
         assertTrue(snapshotIps().contains(ip), "加完名单没有立即发布，网关要等 5 分钟才知道");
 
-        riskAdminService.revokeList(id, "用例", "用例：撤销");
+        listAdminService.revokeList(id, "用例", "用例：撤销");
         assertFalse(snapshotIps().contains(ip), "撤销之后快照里还有它");
     }
 
