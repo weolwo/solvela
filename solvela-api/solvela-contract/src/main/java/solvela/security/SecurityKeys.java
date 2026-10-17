@@ -51,6 +51,12 @@ public final class SecurityKeys {
     }
 
     /**
+     * 蜜罐熔断：最近一个窗口里命中过蜜罐的<b>不同 IP</b>（ZSET，成员是 IP、分数是毫秒时间）。
+     * 太多不同 IP 同时命中，更可能是我们自己的前端出了 bug 或蜜罐路径被公开链接了 —— 那时停止处罚（网关方案 §5.3）
+     */
+    public static final String HONEYPOT_BREAKER = "sec:hp:breaker";
+
+    /**
      * 被封禁的设备号集合。<b>真相源是 {@code t_device.status}</b>，这里只是镜像：
      * 会员域在封禁 / 解封时同步，并有定时任务按库全量重建。
      */
