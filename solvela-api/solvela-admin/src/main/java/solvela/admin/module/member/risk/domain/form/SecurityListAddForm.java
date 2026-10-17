@@ -44,6 +44,6 @@ public class SecurityListAddForm {
     @Size(max = 128, message = "原因最多 128 字")
     private String reason;
 
-    @Schema(description = "到期时间。不填默认 30 天；会员白名单必填")
+    @Schema(description = "到期时间。不填默认 30 天；会员名单（白、灰）必填")
     private LocalDateTime expireTime;
 }

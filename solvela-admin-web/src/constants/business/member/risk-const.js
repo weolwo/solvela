@@ -149,7 +149,7 @@ export const RISK_LIST_TYPE_OPTIONS = Object.values(RISK_LIST_TYPE_ENUM).map((it
   value: item.value,
 }));
 
-/** 名单维度。会员维度**只允许白名单**（封号走会员状态，不在这里） */
+/** 名单维度。会员维度**没有黑名单**（封号走会员状态，不在这里），只有白、灰 */
 export const RISK_LIST_DIMENSION_ENUM = {
   IP: { value: 1, desc: 'IP', color: 'blue' },
   IP_RANGE: { value: 2, desc: 'IP段', color: 'cyan' },

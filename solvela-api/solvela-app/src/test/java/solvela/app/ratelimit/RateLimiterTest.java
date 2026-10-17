@@ -251,6 +251,67 @@ class RateLimiterTest {
         assertEquals(SecurityIncidentEvent.ACTION_RECORD, events.get(3).action(), "设备不进名单，它有自己的状态位");
     }
 
+    @Test
+    @DisplayName("🔴 会员灰名单上的会员：账号维度阈值减半；别的会员不受影响")
+    void memberGreyHalvesAccount() {
+        long grey = 9_910_000_000L + ThreadLocalRandom.current().nextLong(1_000_000L);
+        long normal = grey + 1;
+        track(grey);
+        track(normal);
+        RateLimiter limiter = limiter(List.of(rule("REDEEM", RateLimiter.ACCOUNT, 4, 100, 100, 100)), Map.of(), List.of(),
+                List.of(new GatewayRuleSnapshot.MemberEntry(grey, Instant.now().plusSeconds(3600).toEpochMilli())));
+
+        limiter.check(redeem(grey));
+        limiter.check(redeem(grey));
+        assertThrows(ApiException.class, () -> limiter.check(redeem(grey)), "突发 4 减半成 2");
+        for (int i = 0; i < 4; i++) {
+            limiter.check(redeem(normal));
+        }
+    }
+
+    @Test
+    @DisplayName("🔴 登录后场景的账号维度罚到第 4 档 → 事件要求拉灰这个会员；匿名场景怎么打都不会")
+    void accountEscalationGreysMemberOnlyAfterLogin() {
+        long member = 9_920_000_000L + ThreadLocalRandom.current().nextLong(1_000_000L);
+        track(member);
+        RateLimiter limiter = limiter(List.of(rule("REDEEM", RateLimiter.ACCOUNT, 100, 1, 100, 100),
+                rule("CODE_SEND", RateLimiter.ACCOUNT, 100, 1, 100, 100)), Map.of());
+        limiter.check(redeem(member));
+        for (int level = 1; level <= 4; level++) {
+            assertThrows(ApiException.class, () -> limiter.check(redeem(member)));
+            expirePenalty("REDEEM", RateLimiter.ACCOUNT, "m:" + member);
+        }
+        // 匿名场景里哪怕带着登录态（换绑时发码），账号维度也不能拉灰
+        touched.add(SecurityKeys.rateLimitCounter("CODE_SEND", RateLimiter.ACCOUNT, "m:" + member));
+        touched.add(SecurityKeys.rateLimitPenalty("CODE_SEND", RateLimiter.ACCOUNT, "m:" + member));
+        limiter.check(codeSend(member));
+        for (int level = 1; level <= 4; level++) {
+            assertThrows(ApiException.class, () -> limiter.check(codeSend(member)));
+            expirePenalty("CODE_SEND", RateLimiter.ACCOUNT, "m:" + member);
+        }
+
+        List<SecurityIncidentEvent> events = events();
+        assertNull(events.get(2).memberListUntilEpochSec(), "第 3 档还不拉灰");
+        assertNotNull(events.get(3).memberListUntilEpochSec());
+        assertEquals(member, events.get(3).memberId());
+        assertTrue(events.subList(4, 8).stream().allMatch(e -> e.memberListUntilEpochSec() == null),
+                "匿名场景的「账号」是别人填的目标 —— 拉灰它就成了拿别人的号去拉灰的办法");
+    }
+
+    private RateLimiter.Request redeem(long memberId) {
+        return new RateLimiter.Request(RateLimitScene.REDEEM, "POST /entitlement/{grantId}/claim", ip(), null, null,
+                memberId, null);
+    }
+
+    private RateLimiter.Request codeSend(long memberId) {
+        return new RateLimiter.Request(RateLimitScene.CODE_SEND, "POST /auth/email/code", ip(), null, null, memberId, null);
+    }
+
+    private void track(long memberId) {
+        touched.add(SecurityKeys.rateLimitCounter("REDEEM", RateLimiter.ACCOUNT, "m:" + memberId));
+        touched.add(SecurityKeys.rateLimitPenalty("REDEEM", RateLimiter.ACCOUNT, "m:" + memberId));
+    }
+
     private List<SecurityIncidentEvent> events() {
         List<String> raw = redis.opsForList().range(incidentQueue, 0, -1);
         List<SecurityIncidentEvent> events = new ArrayList<>();
@@ -268,7 +329,13 @@ class RateLimiterTest {
 
     private RateLimiter limiter(List<GatewayRuleSnapshot.Rule> rules, Map<String, String> configs,
                                 List<GatewayRuleSnapshot.IpEntry> lists) {
-        GatewayRuleSnapshot snapshot = new GatewayRuleSnapshot("t-" + UUID.randomUUID(), 1L, rules, configs, lists);
+        return limiter(rules, configs, lists, null);
+    }
+
+    private RateLimiter limiter(List<GatewayRuleSnapshot.Rule> rules, Map<String, String> configs,
+                                List<GatewayRuleSnapshot.IpEntry> lists, List<GatewayRuleSnapshot.MemberEntry> memberGrey) {
+        GatewayRuleSnapshot snapshot = new GatewayRuleSnapshot("t-" + UUID.randomUUID(), 1L, rules, configs, lists,
+                memberGrey);
         redis.opsForHash().putAll(snapshotKey, Map.of(
                 SecurityKeys.SNAPSHOT_FIELD_VERSION, snapshot.version(),
                 SecurityKeys.SNAPSHOT_FIELD_BUILT_AT, "1",

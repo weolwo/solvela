@@ -174,12 +174,16 @@ public class MemberRiskAdminService {
         LocalDateTime expireTime = resolveExpireTime(cmd);
 
         if (cmd.getDimension() == SecurityListDimensionEnum.MEMBER
-                && cmd.getListType() != SecurityListTypeEnum.WHITE) {
+                && cmd.getListType() == SecurityListTypeEnum.BLACK) {
             /*
-             * 🔴 会员只允许白名单。黑名单那一份由 t_member.status（冻结）管 ——
+             * 🔴 会员没有黑名单。那一份由 t_member.status（冻结）管 ——
              * 名单里再放一份就有了两个答案，而「这个人到底能不能用」只该有一个。
+             *
+             * 灰名单 2026-10-17 放开（网关方案 §5.5）：可信设备按新设备算、资产出口每次都要二次验证、
+             * 网关账号维度阈值减半。它的分不参与打分（登录风控只按 IP 灰名单加分），但照样必填 ——
+             * 名单缓存按「有分」认灰名单，与 IP 那一份同一个判据。
              */
-            throw new IllegalArgumentException("会员维度只允许白名单：封号请用会员状态（冻结）");
+            throw new IllegalArgumentException("会员维度没有黑名单：封号请用会员状态（冻结）");
         }
 
         SecurityList row = new SecurityList();
@@ -284,9 +288,10 @@ public class MemberRiskAdminService {
     /**
      * 到期时间。
      *
-     * <h3>🔴 会员白名单必须有到期</h3>
-     * 它的典型用途是应用市场审核账号、压测账号 —— 都是「这一阵子」的事。
+     * <h3>🔴 会员名单（白、灰）必须有到期</h3>
+     * 白名单的典型用途是应用市场审核账号、压测账号 —— 都是「这一阵子」的事。
      * 长期白名单会在没人记得的时候继续生效，而白名单上的账号恰恰是最值得猜的。
+     * 灰名单同理：一个人不该因为某个月的一次异常，永远比别人多验几道码。
      */
     private static LocalDateTime resolveExpireTime(SecurityListAddCmd cmd) {
         if (cmd.getExpireTime() != null) {
@@ -296,7 +301,7 @@ public class MemberRiskAdminService {
             return cmd.getExpireTime();
         }
         if (cmd.getDimension() == SecurityListDimensionEnum.MEMBER) {
-            throw new IllegalArgumentException("会员白名单必须填到期时间，不允许长期");
+            throw new IllegalArgumentException("会员名单必须填到期时间，不允许长期");
         }
         return LocalDateTime.now().plus(DEFAULT_LIST_TTL);
     }

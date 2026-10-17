@@ -89,6 +89,9 @@ public class MemberStepUpService implements MemberStepUpApi {
      */
     private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine> riskEngine;
 
+    /** 会员灰名单：资产出口每次都要二次验证（网关方案 §5.5） */
+    private final solvela.member.risk.config.RiskListCache listCache;
+
     @Override
     public DeviceTrust check(StepUpCmd cmd) {
         if (SolvelaStringUtil.isBlank(cmd.deviceId())) {
@@ -170,6 +173,8 @@ public class MemberStepUpService implements MemberStepUpApi {
             return StepUpResult.fail(problem);
         }
         trustStore.markVerified(cmd.memberId(), cmd.deviceId());
+        // 会员灰名单上的人：这次验证只管接下来那一次资产操作（见 assetOut）
+        trustStore.markFresh(cmd.memberId(), cmd.deviceId());
         log.info("【二次验证】通过，设备记为受信任, memberId: {}, deviceId: {}", cmd.memberId(), cmd.deviceId());
         return StepUpResult.verified();
     }
@@ -205,7 +210,25 @@ public class MemberStepUpService implements MemberStepUpApi {
             return AssetOutVerdict.ofFrozen();
         }
         DeviceTrust trust = check(cmd);
+        if (trust.trusted() && listCache.matchMember(cmd.memberId()).grey()) {
+            trust = greyListTrust(cmd);
+        }
         return assetOutRisk(cmd, trust);
+    }
+
+    /**
+     * 🔴 会员灰名单上的人，资产出口<b>每次</b>都要二次验证，不看设备是否可信（网关方案 §5.5）。
+     *
+     * <p>「每次」靠一张一次性凭证实现：验证通过时发一张（{@link DeviceTrustStore#markFresh}），这里消耗一张。
+     * 有凭证 = 刚验过、这一次放行；没有 = 当成新设备，要验。
+     * 不这样的话，「可信设备一律按新设备算」会让验完码之后的重试<b>又一次</b>被要求验码 —— 永远走不出去。
+     */
+    private DeviceTrust greyListTrust(StepUpCmd cmd) {
+        if (trustStore.consumeFresh(cmd.memberId(), cmd.deviceId())) {
+            return DeviceTrust.VERIFIED;
+        }
+        log.info("【资产出口】会员在灰名单上，可信设备也要二次验证, memberId: {}, deviceId: {}", cmd.memberId(), cmd.deviceId());
+        return DeviceTrust.NEW_DEVICE;
     }
 
     /**

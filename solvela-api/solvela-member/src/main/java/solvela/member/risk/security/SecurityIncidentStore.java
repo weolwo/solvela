@@ -43,6 +43,9 @@ public class SecurityIncidentStore {
         if (e.action() != SecurityIncidentEvent.ACTION_RECORD && e.listUntilEpochSec() != null) {
             changed = updateList(e, incidentId);
         }
+        if (e.memberListUntilEpochSec() != null && e.memberId() != null) {
+            changed |= greyMember(e, incidentId);
+        }
         if (e.observeDevice() && e.deviceId() != null) {
             dispositionService.observe(e.deviceId(), SecurityIncidentEvent.truncate(
                     "网关限流 " + e.ruleCode() + " 设备维度罚到第 " + e.penaltyLevel() + " 档", 128));
@@ -65,6 +68,19 @@ public class SecurityIncidentStore {
                 e.listUntilEpochSec(), incidentId));
         log.info("【安全名单】自动{}: {}, 来源: {} {}, 结果: {}", black ? "拉黑" : "拉灰", value,
                 sourceRule(e.incidentType()), e.ruleCode(), outcome);
+        return outcome != SecurityListWriter.Outcome.KEPT_MANUAL && outcome != SecurityListWriter.Outcome.KEPT_EXISTING;
+    }
+
+    /**
+     * 会员灰名单（网关方案 §5.5）：登录后场景的账号维度罚到高档。对会员本人不可见、不提示 ——
+     * 他只会感觉「这几天验证码多了一点」。人工的会员白名单不受影响（那是另一行）。
+     */
+    private boolean greyMember(SecurityIncidentEvent e, long incidentId) {
+        SecurityListWriter.Outcome outcome = listWriter.upsert(new SecurityListWriter.Entry(2, 4,
+                String.valueOf(e.memberId()), sourceRule(e.incidentType()), reason(e), e.memberListUntilEpochSec(),
+                incidentId));
+        log.info("【安全名单】自动拉灰会员: {}, 来源: {} {}, 结果: {}", e.memberId(), sourceRule(e.incidentType()),
+                e.ruleCode(), outcome);
         return outcome != SecurityListWriter.Outcome.KEPT_MANUAL && outcome != SecurityListWriter.Outcome.KEPT_EXISTING;
     }
 

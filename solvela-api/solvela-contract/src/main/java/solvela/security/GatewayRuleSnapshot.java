@@ -24,6 +24,7 @@ import java.util.Map;
  * @param rules     {@code t_rate_limit_rule} 的全部行（含关闭的，网关按 mode 自己判）
  * @param configs   全局参数：{@code t_config.config_key} → 原样的 {@code config_value}
  * @param ipLists   名单里当前有效的 IP / IP 段条目（黑、灰、白）
+ * @param memberGreyList 会员灰名单（网关方案 §5.5）：这些会员在所有场景的账号维度阈值减半。可能为 null（旧格式）
  * @Date 2026-10-17
  */
 public record GatewayRuleSnapshot(
@@ -31,7 +32,22 @@ public record GatewayRuleSnapshot(
         long builtAt,
         List<Rule> rules,
         Map<String, String> configs,
-        List<IpEntry> ipLists) {
+        List<IpEntry> ipLists,
+        List<MemberEntry> memberGreyList) {
+
+    /** 没有会员灰名单的快照（内置默认值、测试） */
+    public GatewayRuleSnapshot(String version, long builtAt, List<Rule> rules, Map<String, String> configs,
+                               List<IpEntry> ipLists) {
+        this(version, builtAt, rules, configs, ipLists, null);
+    }
+
+    /**
+     * 一条会员灰名单。
+     *
+     * @param expireAt 到期时间（epoch 毫秒）。🔴 会员名单必有到期；网关按自己的时钟过滤，不等下一次快照
+     */
+    public record MemberEntry(long memberId, Long expireAt) {
+    }
 
     /**
      * 一行限流规则，字段与 {@code t_rate_limit_rule} 一一对应。

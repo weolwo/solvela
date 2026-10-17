@@ -159,8 +159,20 @@ public class GatewaySnapshotPublisher {
                 SecurityListStatusEnum.VALID.getValue(),
                 SecurityListDimensionEnum.IP.getValue(), SecurityListDimensionEnum.IP_RANGE.getValue());
 
-        String version = digest(rules, configs, ipLists);
-        return new GatewayRuleSnapshot(version, builtAt, rules, configs, ipLists);
+        // 会员灰名单（网关方案 §5.5）：网关把这些会员的账号维度阈值减半。会员名单必有到期，值是会员号
+        List<GatewayRuleSnapshot.MemberEntry> memberGrey = jdbcTemplate.query("""
+                        SELECT list_value, CAST(UNIX_TIMESTAMP(expire_time) * 1000 AS SIGNED) AS expire_at
+                        FROM t_security_list
+                        WHERE status = ? AND dimension = ? AND list_type = ?
+                          AND (expire_time IS NULL OR expire_time > NOW())
+                        ORDER BY id""",
+                (rs, i) -> new GatewayRuleSnapshot.MemberEntry(Long.parseLong(rs.getString("list_value").trim()),
+                        (Long) rs.getObject("expire_at", Long.class)),
+                SecurityListStatusEnum.VALID.getValue(), SecurityListDimensionEnum.MEMBER.getValue(),
+                solvela.enums.SecurityListTypeEnum.GREY.getValue());
+
+        String version = digest(rules, configs, ipLists, memberGrey);
+        return new GatewayRuleSnapshot(version, builtAt, rules, configs, ipLists, memberGrey);
     }
 
     /**
@@ -168,9 +180,9 @@ public class GatewaySnapshotPublisher {
      * 取 SHA-256 前 12 位十六进制 —— 只用来判断「变没变」，不做任何安全用途。
      */
     static String digest(List<GatewayRuleSnapshot.Rule> rules, Map<String, String> configs,
-                         List<GatewayRuleSnapshot.IpEntry> ipLists) {
+                         List<GatewayRuleSnapshot.IpEntry> ipLists, List<GatewayRuleSnapshot.MemberEntry> memberGrey) {
         try {
-            String content = JsonUtils.toJson(List.of(rules, configs, ipLists));
+            String content = JsonUtils.toJson(List.of(rules, configs, ipLists, memberGrey));
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash).substring(0, 12);
         } catch (Exception e) {

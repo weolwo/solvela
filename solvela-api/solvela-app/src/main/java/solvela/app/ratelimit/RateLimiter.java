@@ -132,7 +132,9 @@ public class RateLimiter {
             }
             long cap = dim == IP_SEGMENT ? d.globals.ipSegmentCapSec()
                     : dim == ACCOUNT && anonymousTarget ? d.globals.anonAccountCapSec() : 0;
-            double factor = ipDim && grey ? d.globals.greyFactor() : 1.0;
+            // 灰名单减半：IP 灰名单作用在 IP 维度，会员灰名单作用在（登录后的）账号维度
+            boolean greyHere = ipDim ? grey : dim == ACCOUNT && d.memberGrey(request.memberId(), nowMillis);
+            double factor = greyHere ? d.globals.greyFactor() : 1.0;
             Outcome outcome = run(rule, dim, value, now, cap, factor, d.globals);
             if (outcome == null) {
                 continue;
@@ -197,7 +199,7 @@ public class RateLimiter {
     /**
      * 一次判罚 / 升档的事件（只在状态变化时投：处罚期间被挡的请求不投）。罚到 {@code greyLevel} 档起：
      * IP 维度 → 这个 IP 拉灰 {@code greyDays} 天；匿名场景的设备维度 → 这台设备进观察档（§5.5）。
-     * 账号维度只记录：登录后场景的会员拉灰在会员灰名单那一步（T12），匿名场景的「账号」是别人填的目标，永远不拉灰。
+     * 登录后场景的账号维度 → 这个会员拉灰 {@code greyDays} 天；匿名场景的「账号」是别人填的目标，永远不拉灰。
      */
     private static SecurityIncidentEvent incident(Request request, int dim, Outcome outcome, RateLimitGlobals globals) {
         long now = Instant.now().getEpochSecond();
@@ -211,6 +213,10 @@ public class RateLimiter {
                 .observeDevice(high && dim == DEVICE && request.scene().anonymous());
         if (high && dim == IP) {
             event.action(SecurityIncidentEvent.ACTION_GREY, now + globals.greyDays() * 86400L);
+        }
+        // 🔴 只有登录后场景：匿名场景的「账号」是请求体里别人填的目标，拉灰它等于给了一个拿别人的号去拉灰的办法（§2.4）
+        if (high && dim == ACCOUNT && request.memberId() != null && !request.scene().anonymous()) {
+            event.greyMember(now + globals.greyDays() * 86400L);
         }
         return event.build();
     }
@@ -321,6 +327,9 @@ public class RateLimiter {
 
         final IpLists lists;
 
+        /** 会员灰名单：会员号 → 到期（epoch 毫秒，null = 长期） */
+        final Map<Long, Long> memberGrey = new HashMap<>();
+
         final RateLimitGlobals globals;
 
         Derived(GatewayRuleSnapshot snapshot) {
@@ -331,8 +340,21 @@ public class RateLimiter {
                 target.computeIfAbsent(rule.target(), k -> new HashMap<>()).put(rule.dimension(), rule);
             }
             this.lists = new IpLists(snapshot);
+            if (snapshot.memberGreyList() != null) {
+                for (GatewayRuleSnapshot.MemberEntry e : snapshot.memberGreyList()) {
+                    memberGrey.put(e.memberId(), e.expireAt());
+                }
+            }
             this.globals = RateLimitGlobals.parse(snapshot.configs() == null ? null
                     : snapshot.configs().get("gateway_rate_limit"));
+        }
+
+        boolean memberGrey(Long memberId, long nowMillis) {
+            if (memberId == null || !memberGrey.containsKey(memberId)) {
+                return false;
+            }
+            Long expireAt = memberGrey.get(memberId);
+            return expireAt == null || expireAt > nowMillis;
         }
     }
 }

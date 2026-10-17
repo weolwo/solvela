@@ -29,6 +29,8 @@ package solvela.security;
  * @param penaltyUntilEpochSec 处罚到期时间（epoch 秒），没有处罚为 null
  * @param listUntilEpochSec    名单条目的到期（epoch 秒）；{@code action} 为「仅记录」时为 null
  * @param observeDevice        要不要把这台设备推进观察档（限流的设备维度罚到高档时）
+ * @param memberListUntilEpochSec 把 {@code memberId} 拉进会员灰名单到这一刻（epoch 秒）；不拉为 null。
+ *                             只会来自<b>登录后</b>场景的账号维度 —— 匿名场景的「账号」是别人填的目标，永远不拉灰
  * @param occurredAtEpochMilli 发生时间（epoch 毫秒）
  * @Date 2026-10-17
  */
@@ -51,6 +53,7 @@ public record SecurityIncidentEvent(
         Long penaltyUntilEpochSec,
         Long listUntilEpochSec,
         boolean observeDevice,
+        Long memberListUntilEpochSec,
         String traceId,
         long occurredAtEpochMilli) {
 
@@ -87,6 +90,7 @@ public record SecurityIncidentEvent(
         private Long penaltyUntilEpochSec;
         private Long listUntilEpochSec;
         private boolean observeDevice;
+        private Long memberListUntilEpochSec;
         private String traceId;
 
         private Builder(int incidentType, String ruleCode) {
@@ -143,11 +147,16 @@ public record SecurityIncidentEvent(
             return this;
         }
 
+        public Builder greyMember(Long untilEpochSec) {
+            this.memberListUntilEpochSec = untilEpochSec;
+            return this;
+        }
+
         public SecurityIncidentEvent build() {
             return new SecurityIncidentEvent(incidentType, ruleCode, action, suppressReason, penaltyLevel, clientIp,
                     deviceId, memberId, identityHashHex, httpMethod, requestPath, matchedField, matchedParam,
-                    matchedSample, userAgent, penaltyUntilEpochSec, listUntilEpochSec, observeDevice, traceId,
-                    System.currentTimeMillis());
+                    matchedSample, userAgent, penaltyUntilEpochSec, listUntilEpochSec, observeDevice,
+                    memberListUntilEpochSec, traceId, System.currentTimeMillis());
         }
     }
 

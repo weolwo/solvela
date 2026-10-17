@@ -42,6 +42,12 @@ public class DeviceTrustStore {
 
     private static final String KEY_SINCE = "mbr:trust:since:";
 
+    /** 「刚刚验过」的一次性凭证：会员灰名单上的人做资产操作，每一次都要消耗一张 */
+    private static final String KEY_FRESH = "mbr:trust:fresh:";
+
+    /** 验完之后多久内回去做那一次操作。足够客户端重试原请求，又不至于验一次管一下午 */
+    static final Duration FRESH_TTL = Duration.ofMinutes(5);
+
     /** 起算点的保留期。理由见类注释 */
     private static final Duration SINCE_TTL = Duration.ofDays(365);
 
@@ -69,6 +75,27 @@ public class DeviceTrustStore {
     /**
      * 信任起算点，Unix 秒。从没撤销过返回 0（等于不限制）。
      */
+    /** 记下「这台设备刚刚验过」，供 {@link #consumeFresh} 消耗一次 */
+    public void markFresh(Long memberId, String deviceId) {
+        if (memberId == null || SolvelaStringUtil.isBlank(deviceId)) {
+            return;
+        }
+        redis.opsForValue().set(freshKey(memberId, deviceId), "1", FRESH_TTL);
+    }
+
+    /**
+     * 消耗一次「刚刚验过」。🔴 用 DEL 的返回值判断，不是先 GET 再 DEL：并发的两次操作只能有一次拿到它
+     * （本地开发的 Redis 太老，没有 GETDEL）。
+     *
+     * @return 有、并且已经被这一次用掉了
+     */
+    public boolean consumeFresh(Long memberId, String deviceId) {
+        if (memberId == null || SolvelaStringUtil.isBlank(deviceId)) {
+            return false;
+        }
+        return Boolean.TRUE.equals(redis.delete(freshKey(memberId, deviceId)));
+    }
+
     public long trustSince(Long memberId) {
         String raw = redis.opsForValue().get(sinceKey(memberId));
         if (raw == null) {
@@ -99,6 +126,10 @@ public class DeviceTrustStore {
 
     private String verifiedKey(Long memberId) {
         return redisService.generateRedisKey(KEY_VERIFIED, String.valueOf(memberId));
+    }
+
+    private String freshKey(Long memberId, String deviceId) {
+        return redisService.generateRedisKey(KEY_FRESH, memberId + ":" + deviceId);
     }
 
     private String sinceKey(Long memberId) {

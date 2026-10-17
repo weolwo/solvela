@@ -24,6 +24,11 @@ import solvela.member.stepup.MemberStepUpService;
  * 不认注册设备的话，一个用户在注册的那台机器上第二次登录就要验一道码 —— 而那台机器恰恰是最可信的。
  * 判据与新设备登录提醒共用（同一个 Redis 键）。
  *
+ * <h3>🔴 会员灰名单上的人：可信设备一律按新设备算</h3>
+ * 网关方案 §5.5（2026-10-17）。于是不熟悉的网络上要 OTP —— 他只会感觉「这几天验证码多了一点」，对他本人不提示。
+ * 资产出口那一侧的「每次都要二次验证」在 {@code MemberStepUpService#assetOut}，不在这里：
+ * 这里只影响登录矩阵，那边还要让「刚验过的这一次」放行。
+ *
  * <h3>一次尝试只算一次</h3>
  * 走 {@link RiskContext#feature}：前置的密码冷却要用它分桶，后置的矩阵也要用它，
  * 而它背后是一次 Redis 查询加一次可能的登录日志点查。
@@ -44,6 +49,8 @@ public class DeviceTrustProvider {
 
     private final RedisService redisService;
 
+    private final solvela.member.risk.config.RiskListCache listCache;
+
     /**
      * 算出信任档位并记进上下文。查无此人、没带设备令牌时分别是 {@link RiskDeviceTrust#NEW}
      * 与 {@link RiskDeviceTrust#NO_DEVICE} —— 都不可信。
@@ -55,6 +62,14 @@ public class DeviceTrustProvider {
     }
 
     private RiskDeviceTrust compute(RiskContext ctx) {
+        RiskDeviceTrust trust = computeIgnoringGreyList(ctx);
+        if (trust.trusted() && listCache.matchMember(ctx.memberId()).grey()) {
+            return RiskDeviceTrust.NEW;
+        }
+        return trust;
+    }
+
+    private RiskDeviceTrust computeIgnoringGreyList(RiskContext ctx) {
         if (SolvelaStringUtil.isBlank(ctx.getDeviceId())) {
             return RiskDeviceTrust.NO_DEVICE;
         }
