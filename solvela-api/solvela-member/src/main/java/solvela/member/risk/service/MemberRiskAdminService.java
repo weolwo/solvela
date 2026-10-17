@@ -72,6 +72,9 @@ public class MemberRiskAdminService {
 
     private final RiskListCache listCache;
 
+    /** 名单里的 IP / IP 段条目网关也要用：改完立即重发快照（网关方案 §6） */
+    private final solvela.member.risk.gateway.GatewaySnapshotPublisher snapshotPublisher;
+
 
 
     // ------------------------------------------------------------------ 看板
@@ -189,6 +192,7 @@ public class MemberRiskAdminService {
         row.setOperator(cmd.getOperator());
         listDao.insert(row);
         listCache.reload();
+        snapshotPublisher.publishQuietly("新增名单");
         log.info("【安全名单】新增, 类型: {}, 维度: {}, 值: {}, 到期: {}, 操作人: {}",
                 cmd.getListType(), cmd.getDimension(), value, expireTime, cmd.getOperator());
         return row;
@@ -215,6 +219,7 @@ public class MemberRiskAdminService {
         update.setRevokeTime(LocalDateTime.now());
         listDao.updateById(update);
         listCache.reload();
+        snapshotPublisher.publishQuietly("撤销名单");
         log.info("【安全名单】撤销, id: {}, 操作人: {}, 原因: {}", id, operator, reason);
         return true;
     }

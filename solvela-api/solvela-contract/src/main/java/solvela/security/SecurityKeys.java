@@ -64,8 +64,21 @@ public final class SecurityKeys {
 
     // ------------------------------------------------------------------ 规则下发（后台写，网关读；网关回报，后台读）
 
-    /** 规则快照：后台把限流规则、全局参数、名单拼成一份 JSON 写在这里，网关比对 version 后整份拉 */
+    /**
+     * 规则快照，一个<b>哈希</b>：{@link #SNAPSHOT_FIELD_VERSION}、{@link #SNAPSHOT_FIELD_BUILT_AT}、{@link #SNAPSHOT_FIELD_BODY}。
+     * 网关每 15 秒只读 version，变了才拉 body —— 一份几 KB 的 JSON 不必每次都搬。
+     * 三个字段由发布方用一段脚本原子地一起写（见 {@code GatewaySnapshotPublisher}）。
+     */
     public static final String RULE_SNAPSHOT = "gw:rl:snapshot";
+
+    /** 快照哈希里的内容摘要 */
+    public static final String SNAPSHOT_FIELD_VERSION = "version";
+
+    /** 快照哈希里的发布方读库时刻（数据库时钟，epoch 毫秒） */
+    public static final String SNAPSHOT_FIELD_BUILT_AT = "builtAt";
+
+    /** 快照哈希里的 {@link GatewayRuleSnapshot} JSON */
+    public static final String SNAPSHOT_FIELD_BODY = "body";
 
     /** 网关上报的路由清单：后台接口覆盖的下拉框与 target 校验靠它 */
     public static final String ROUTES = "gw:routes";
