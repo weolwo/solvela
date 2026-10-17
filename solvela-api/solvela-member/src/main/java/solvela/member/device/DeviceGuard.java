@@ -1,57 +1,41 @@
 package solvela.member.device;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.enums.DeviceStatusEnum;
 import solvela.member.risk.feature.LoginCounters;
 
 /**
- * 设备维度的闸门：登录频次、失败次数、一机多号。
+ * 设备维度的<b>失败计数</b>：认证主干在「这次登录确实失败了」时记一笔。
  *
- * <p>⚠️ 登录次数、注册数两道纯计次的闸 2026-10-17 移交网关限流（LOGIN / REGISTER 场景的设备维度）；
- * 失败次数与一机多号要看结果、看会员，归风控引擎的 {@code DEVICE_FAIL_LIMIT} / {@code DEVICE_FANOUT}。
- * 本类今天在生产路径上只剩 {@link #recordLoginFailure} 一个调用方。
+ * <h3>它现在只剩这一件事</h3>
+ * 这个类原来是一整道「设备闸门」：登录频次、注册数、失败次数、一机多号四条规则，外加一个 dry-run 开关。
+ * 那几条判断后来各有了归属，本类里对应的代码与配置（{@code solvela.member.device.guard.*}）已全部删除：
+ * <ul>
+ *   <li>登录频次、注册数 —— 只数「来了多少次」，归网关限流（LOGIN / REGISTER 场景的设备维度，2026-10-17）；</li>
+ *   <li>失败次数「超没超」—— 风控引擎的 {@code DEVICE_FAIL_LIMIT}；</li>
+ *   <li>一机多号 —— 风控引擎的 {@code DEVICE_FANOUT}；</li>
+ *   <li>陪跑 / 生效 —— 每条规则在规则表里各有档位，不再是一个总开关。</li>
+ * </ul>
+ * 剩下的是计数的<b>写</b>那一侧：只有认证主干知道「这次是不是真的失败了」，所以由它调用本类；
+ * 读那一侧在 {@code DEVICE_FAIL_LIMIT} 规则里。键只在 {@link LoginCounters} 出现一次，两侧不会对不上。
  *
- * <h3>它拦的是「量」，不是「人」</h3>
- * 这三条规则<b>都不判断谁是坏人</b>，只判断某个量级不正常。所以处置也只该是
- * 「降级 / 打标」而不是封禁 —— 见 {@link DeviceGuardProperties} 的类注释。
- *
- * <h3>为什么全部在 Redis，不进 MySQL</h3>
- * 这些计数高频、可自然过期、丢了也不要紧。{@code t_member_operation_limit} 那张表
- * 管的是<b>会员</b>的功能级冻结（带人工解冻、要审计），语义和成本都不一样：
- * 把设备计数写进去只会让它变成一张热点表。
- *
- * <h3>🔴 deviceId 为空时一律放行，而且判的是 isBlank 不是 isEmpty</h3>
+ * <h3>🔴 deviceId 为空时什么都不做，而且判的是 isBlank 不是 isEmpty</h3>
  * 判成 {@code isEmpty} 的话，一个全是空白的设备号会被当成真设备去计数 ——
  * 于是<b>所有这样的请求共用同一个计数器</b>，很快集体撞上限，
  * 而日志里那个 deviceId 看起来只是「空的」。
  * 生产上走不到（{@code DeviceContract.sanitize} 只放 32 位 hex 过），
  * 但这类「兜底判空判得不够」的写法值得一次就写对。
  *
- * <p>而「为空」本身是<b>常态</b>：灰度期间老客户端还没带设备令牌。把它当成可疑，
- * 等于在 enforce 之前就把老版本用户全挡在外面 —— 那正是三档灰度要避免的事故。
+ * <p>而「为空」本身是<b>常态</b>：老客户端还没带设备令牌。
  *
  * @Date 2026-09-09
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DeviceGuard {
 
-    /**
-     * 🔴 计数全部走它，本类不再自己拼 Redis 键。
-     *
-     * <p>每个计数器都有两侧：写的一侧在这里（失败时 +1），读的一侧在风控规则里（超没超）。
-     * 键名或窗口在两侧各写一遍，漂移的第一天不会有任何报错 —— 表现是「这条限流再也不触发」。
-     * 所以键只在 {@link LoginCounters} 里出现一次。
-     */
     private final LoginCounters counters;
-
-    private final DeviceGuardProperties properties;
-
-    private final DeviceDispositionService dispositionService;
 
     /**
      * 记一次登录失败。密码错、账号冻结这类<b>能定位到人</b>的失败才算。
@@ -63,63 +47,5 @@ public class DeviceGuard {
             return;
         }
         counters.bump(LoginCounters.Counter.DEVICE_FAIL, deviceId);
-    }
-
-    /**
-     * 登录成功之后：把这台设备与这个会员关联起来，并判断一机多号。
-     *
-     * <p>🔴 只能放在<b>认证通过之后</b>——在那之前拿不到 memberId。
-     * 代价是「密码验过了才告诉你设备被限」，看起来别扭，但这个场景里
-     * 账号本来就是攻击者自己的，不构成泄露。
-     */
-    public DeviceGuardVerdict checkMemberFanout(String deviceId, Long memberId) {
-        if (SolvelaStringUtil.isBlank(deviceId) || memberId == null) {
-            return DeviceGuardVerdict.pass();
-        }
-        // 集合每次 add 都续期（见 LoginCounters.Counter.DEVICE_MEMBER 的注释：
-        // 只在首次设 TTL 的话，一台持续活跃的设备会在 24 小时后计数归零 —— 那正是养号要的效果）
-        long distinct = counters.addToSet(LoginCounters.Counter.DEVICE_MEMBER, deviceId, String.valueOf(memberId));
-        if (distinct > properties.getMaxMembersPerDay()) {
-            return verdict(DeviceGuardRule.MEMBER_FANOUT, deviceId, LoginCounters.Counter.DEVICE_MEMBER);
-        }
-        return DeviceGuardVerdict.pass();
-    }
-
-    /**
-     * 组装判定并打日志。
-     *
-     * <p>dry-run 期间<b>照常放行</b>，只把「本来会被拦」记下来 —— 这条日志就是
-     * 后面校准阈值的全部依据，所以打的是 WARN 而不是 DEBUG：它必须能被捞出来。
-     * 上线初期它会很吵，那正是要看的东西。
-     */
-    private DeviceGuardVerdict verdict(DeviceGuardRule rule, String deviceId, LoginCounters.Counter counter) {
-        boolean dryRun = properties.isDryRun();
-        long retryAfter = counters.retryAfterSeconds(counter, deviceId);
-        log.warn("【设备闸门】{} deviceId: {}, 规则: {}({}), 还需等待 {} 秒",
-                dryRun ? "命中但放行[dry-run]" : "拦截", deviceId, rule.getValue(), rule.getDesc(), retryAfter);
-        /*
-         * 🔴 降档也归 dryRun 管。
-         *
-         * 「进观察档」不是一条日志，它对用户是有感的（下次登录要多验一道短信码）——
-         * 所以它和拦截是同一类动作，dry-run 期间两者都不该发生。
-         * 只把拦截关掉、留着降档，等于「说好了不拦人，实际在拦」。
-         *
-         * 代价是 dry-run 期间整个处置闭环也是静止的。那正是方案本来的顺序：
-         * 四个阈值全是拍出来的，先拿真实流量校准，再收口。
-         */
-        if (!dryRun) {
-            dispositionService.observe(deviceId, rule.getDesc());
-        }
-        return DeviceGuardVerdict.hit(rule, retryAfter, dryRun);
-    }
-
-    /**
-     * 是否已被人工封禁。
-     *
-     * <p>🔴 <b>不受 dryRun 影响</b>。dry-run 说的是「那四个拍出来的阈值先别拦人」，
-     * 而封禁是<b>有人看过之后签字做的决定</b> —— 把它也关掉，后台那个按钮就是假的。
-     */
-    private boolean banned(String deviceId) {
-        return dispositionService.currentStatus(deviceId) == DeviceStatusEnum.BANNED;
     }
 }

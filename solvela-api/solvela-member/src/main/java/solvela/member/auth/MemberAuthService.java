@@ -35,7 +35,6 @@ import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.register.MemberRegisterService;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
 import solvela.member.device.DeviceGuard;
-import solvela.member.device.DeviceGuardVerdict;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.api.MemberLoginType;

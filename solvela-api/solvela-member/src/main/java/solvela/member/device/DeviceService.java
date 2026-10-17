@@ -116,7 +116,7 @@ public class DeviceService implements DeviceApi {
         device.setKeyVersion(deviceTokenCodec.currentKeyVersion());
         // 0-仅自报：还没有任何验证码或厂商证明。这一档是本期的全部现实
         device.setAttestLevel(0);
-        // 0-正常。降档由后面的 DeviceGuard 做，封禁只能人工
+        // 0-正常。降进观察档由风控引擎的设备规则请求（RiskAction.OBSERVE_DEVICE），封禁只能人工
         device.setStatus(0);
         // create_time / last_active_time / update_time 交给列上的 CURRENT_TIMESTAMP 默认值：
         // MyBatis-Plus 默认跳过 null 字段，让库里的时间来自同一个时钟源

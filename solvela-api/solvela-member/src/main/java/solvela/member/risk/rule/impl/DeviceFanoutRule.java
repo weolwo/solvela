@@ -15,7 +15,7 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * 一台设备碰过多少个<b>不同会员</b>。迁自 {@code DeviceGuard.checkMemberFanout}（改造前是 dry-run）。
+ * 一台设备碰过多少个<b>不同会员</b>。迁自 {@code DeviceGuard} 原来的 {@code checkMemberFanout}（改造前是 dry-run；那个方法 2026-10-17 已删）。
  *
  * <h3>设备维度里信号最强的一条</h3>
  * 一机多号是养号、买号的必然特征，而正常用户换号登录是极少数（家人共用一台平板、换了新号）。

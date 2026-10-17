@@ -18,7 +18,7 @@ import solvela.member.risk.feature.LoginCounters;
  * 而它恰恰是最强的信号：真人偶尔记错注册邮箱，一个 IP 一小时试十个不存在的账号只可能是脚本。
  *
  * <h3>上线即拦截</h3>
- * 不走 dry-run（与 {@code DeviceGuard} 不同）。代价是误伤共用出口的真人，所以阈值给得宽，见
+ * 不走 dry-run。代价是误伤共用出口的真人，所以阈值给得宽，见
  * {@link LoginIpGuardProperties}。计数全在 Redis，窗口自然过期。
  *
  * <p>IP 为空时一律放行：只可能是调用方没传（内部工具、测试），不该因此把人挡在外面。

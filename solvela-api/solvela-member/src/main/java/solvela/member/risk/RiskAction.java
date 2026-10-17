@@ -22,8 +22,8 @@ public enum RiskAction {
     /**
      * 把这台设备降进观察档（24 小时内登录要多验一道码）。
      *
-     * <p>对应现状 {@code DeviceGuard.hit} 里的 {@code dispositionService.observe}。
-     * 由设备闸那几条规则在 {@code params.observe = true} 时请求。
+     * <p>由设备维度的规则（{@code DEVICE_FAIL_LIMIT}、{@code DEVICE_FANOUT} 等）在 {@code params.observe = true} 时请求。
+     * 改造前它写在 {@code DeviceGuard} 的判定里，随那一整道闸门一起删了。
      */
     OBSERVE_DEVICE,
 
