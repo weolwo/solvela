@@ -9,6 +9,7 @@ import solvela.scriptengine.core.QLExpressEvaluator;
 import solvela.scriptengine.core.ScriptEngineProperties;
 import solvela.scriptengine.domain.EngineFunctionMeta;
 import solvela.scriptengine.domain.ExecutableScript;
+import solvela.scriptengine.handler.ToolCollectionHandler;
 import solvela.scriptengine.handler.ToolDateTimeHandler;
 import solvela.scriptengine.handler.ToolJsonHandler;
 import solvela.scriptengine.handler.ToolStringHandler;
@@ -57,7 +58,7 @@ public class ToolFunctionTest {
         bind(new ToolStringHandler());
         bind(new ToolJsonHandler());
         // tool_size 等集合函数也在 tool_ 域里，断言时会用到
-        bind(new solvela.scriptengine.handler.ToolCollectionHandler());
+        bind(new ToolCollectionHandler());
     }
 
     private Object run(String script) {

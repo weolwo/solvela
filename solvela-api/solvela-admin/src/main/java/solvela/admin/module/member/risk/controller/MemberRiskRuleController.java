@@ -13,13 +13,14 @@ import solvela.admin.module.member.risk.domain.vo.MemberRiskRuleVO;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 import solvela.admin.module.system.datatracer.service.DataTracerService;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.enums.MemberRiskModeEnum;
 import solvela.base.util.SolvelaEnumUtil;
+import solvela.enums.MemberRiskModeEnum;
 import solvela.member.MemberRiskRule;
 import solvela.member.risk.service.MemberRiskAdminService;
 import solvela.web.RequiresPermission;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 登录风控 - 规则。
@@ -85,10 +86,10 @@ public class MemberRiskRuleController {
             sb.append("档位 ").append(before.getMode().getDesc())
                     .append(" → ").append(after.getMode().getDesc()).append("；");
         }
-        if (!java.util.Objects.equals(before.getScore(), after.getScore())) {
+        if (!Objects.equals(before.getScore(), after.getScore())) {
             sb.append("分值 ").append(before.getScore()).append(" → ").append(after.getScore()).append("；");
         }
-        if (!java.util.Objects.equals(before.getParams(), after.getParams())) {
+        if (!Objects.equals(before.getParams(), after.getParams())) {
             sb.append("参数已修改；");
         }
         if (sb.length() == after.getRuleCode().length() + 1) {

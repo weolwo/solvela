@@ -1,14 +1,14 @@
 package solvela.task.prizemapping.dao;
 
-        import java.util.List;
-
-        import solvela.task.TaskPrizeMapping;
-        import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
-        import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
-        import solvela.base.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.base.dao.CustomizedBaseMapper;
+import solvela.task.TaskPrizeMapping;
+import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
+import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
+
+import java.util.List;
 
 /**
  * 任务阶段与奖励映射表 Dao

@@ -1,5 +1,6 @@
 package solvela.admin.mapper;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.mapping.ResultMap;
 import org.apache.ibatis.mapping.ResultMapping;
 import org.apache.ibatis.reflection.MetaClass;
@@ -12,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.risk.proposal.dao.ProposalRecordDao;
-import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 
 import java.util.ArrayList;
@@ -89,7 +89,7 @@ class ResultMapPropertyTest {
         // 上面那个测试是静态对账，这里补一次真实链路：真查库、真做结果映射。
         // 库里没数据时这个测试不会失败也不会误报，它的价值在有数据的环境（本地/测试环境）。
         assertDoesNotThrow(() -> proposalRecordDao.queryPage(
-                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10),
+                new Page<>(1, 10),
                 new ProposalRecordQuery()));
     }
 }

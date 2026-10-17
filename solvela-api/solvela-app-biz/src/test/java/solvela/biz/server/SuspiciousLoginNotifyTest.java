@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -145,7 +146,7 @@ class SuspiciousLoginNotifyTest {
     void 没有会员号() {
         notifier.notifyOwner(null, "1.2.3.4", "APP");
 
-        verify(mailService, org.mockito.Mockito.never()).sendMail(any(), any(), any());
+        verify(mailService, Mockito.never()).sendMail(any(), any(), any());
     }
 
     // ============================== 工具 ==============================

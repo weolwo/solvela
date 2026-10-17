@@ -1,24 +1,31 @@
 package solvela.biz.server;
 
-import org.junit.jupiter.api.DisplayName;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.jdbc.core.JdbcTemplate;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.enums.NotificationTemplateEnum;
-import solvela.notification.NotificationTemplate;
 import solvela.notification.Announcement;
+import solvela.notification.MemberNotification;
+import solvela.notification.NotificationTemplate;
+import solvela.notification.dao.AnnouncementAckDao;
 import solvela.notification.dao.AnnouncementDao;
+import solvela.notification.dao.MemberAnnouncementCursorDao;
+import solvela.notification.dao.MemberNotificationDao;
 import solvela.notification.dao.NotificationTemplateDao;
 import solvela.notification.domain.NotifyRequest;
+import solvela.notification.domain.command.ManualNotifyCommand;
+import solvela.notification.domain.command.ManualNotifyResult;
 import solvela.notification.domain.dto.MemberNotificationDTO;
 import solvela.notification.domain.dto.MemberNotificationDetailDTO;
 import solvela.notification.domain.query.MemberNotificationQuery;
-import solvela.notification.domain.command.ManualNotifyCommand;
-import solvela.notification.domain.command.ManualNotifyResult;
 import solvela.notification.service.AnnouncementService;
 import solvela.notification.service.NotificationAdminService;
 import solvela.notification.service.NotificationInboxService;
@@ -27,6 +34,8 @@ import solvela.notification.service.NotificationService;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.LongStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -66,7 +75,7 @@ class NotificationLiveTest {
     @Autowired
     private NotificationTemplateDao notificationTemplateDao;
     @Autowired
-    private solvela.notification.dao.MemberNotificationDao memberNotificationDao;
+    private MemberNotificationDao memberNotificationDao;
     @Autowired
     private NotificationPreferenceService notificationPreferenceService;
     @Autowired
@@ -76,15 +85,15 @@ class NotificationLiveTest {
     @Autowired
     private AnnouncementDao announcementDao;
     @Autowired
-    private solvela.notification.dao.AnnouncementAckDao announcementAckDao;
+    private AnnouncementAckDao announcementAckDao;
     @Autowired
-    private solvela.notification.dao.MemberAnnouncementCursorDao memberAnnouncementCursorDao;
+    private MemberAnnouncementCursorDao memberAnnouncementCursorDao;
 
     @Autowired
-    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private JdbcTemplate jdbcTemplate;
 
     /** @AfterAll 是静态的，拿不到注入的实例字段，这里存一份 */
-    private static org.springframework.jdbc.core.JdbcTemplate cleanerJdbc;
+    private static JdbcTemplate cleanerJdbc;
 
     @BeforeEach
     void 记下清理入口() {
@@ -151,7 +160,7 @@ class NotificationLiveTest {
 
         // 🔴 越权：换一个会员号去读同一条，必须什么都拿不到
         assertNotNull(detail, "前置断言");
-        org.junit.jupiter.api.Assertions.assertNull(
+        Assertions.assertNull(
                 notificationInboxService.detail(latest.getId(), MEMBER_ID + 1),
                 "拿别人的会员号读到了内容 —— 这是越权");
     }
@@ -314,10 +323,10 @@ class NotificationLiveTest {
 
     // ------------------------------------------------------------------ 人工发送
 
-    private ManualNotifyCommand manualCmd(java.util.List<Long> memberIds) {
+    private ManualNotifyCommand manualCmd(List<Long> memberIds) {
         ManualNotifyCommand cmd = new ManualNotifyCommand();
         cmd.setMemberIds(memberIds);
-        cmd.setParams(java.util.Map.of("title", "工单答复", "content", "您反馈的问题已处理，补偿 100 积分"));
+        cmd.setParams(Map.of("title", "工单答复", "content", "您反馈的问题已处理，补偿 100 积分"));
         cmd.setBizRefId("TICKET-9527");
         return cmd;
     }
@@ -345,16 +354,16 @@ class NotificationLiveTest {
             assertEquals("工单答复", detail.getTitle());
             assertFalse(detail.getContent().contains("${"), "正文里还有没替换掉的占位符: " + detail.getContent());
         } finally {
-            memberNotificationDao.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                    solvela.notification.MemberNotification>()
-                    .eq(solvela.notification.MemberNotification::getMemberId, MEMBER_ID));
+            memberNotificationDao.delete(new LambdaQueryWrapper<
+                    MemberNotification>()
+                    .eq(MemberNotification::getMemberId, MEMBER_ID));
         }
     }
 
     @Test
     @DisplayName("🔴 收件人超上限直接拒绝，不是截断 —— 这个入口不能变成广播后门")
     void 人工发送有硬上限() {
-        List<Long> tooMany = java.util.stream.LongStream
+        List<Long> tooMany = LongStream
                 .range(0, NotificationAdminService.MANUAL_MAX_RECIPIENTS + 1)
                 .boxed()
                 .toList();
@@ -364,7 +373,7 @@ class NotificationLiveTest {
          *    所以是拒绝，并在错误信息里指向公告 —— 一次要发给几万人，
          *    那是「一条内容一行」该干的事，不是「一人一条」。
          */
-        IllegalArgumentException e = org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalArgumentException e = Assertions.assertThrows(
                 IllegalArgumentException.class,
                 () -> notificationAdminService.sendManual(manualCmd(tooMany), "客服小王"));
         assertTrue(e.getMessage().contains("公告"), "错误信息应当指向公告这条出路，实际: " + e.getMessage());
@@ -373,10 +382,10 @@ class NotificationLiveTest {
     @Test
     @DisplayName("🔴 人工发送不填操作人直接拒绝 —— 不留痕就回答不了「这是谁发的」")
     void 人工发送必须留痕() {
-        org.junit.jupiter.api.Assertions.assertThrows(
+        Assertions.assertThrows(
                 IllegalArgumentException.class,
                 () -> notificationAdminService.sendManual(manualCmd(List.of(MEMBER_ID)), null));
-        org.junit.jupiter.api.Assertions.assertThrows(
+        Assertions.assertThrows(
                 IllegalArgumentException.class,
                 () -> notificationAdminService.sendManual(manualCmd(List.of(MEMBER_ID)), "  "));
     }

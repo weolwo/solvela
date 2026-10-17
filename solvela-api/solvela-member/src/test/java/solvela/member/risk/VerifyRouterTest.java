@@ -8,6 +8,7 @@ import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.api.MemberLoginType;
 import solvela.member.auth.MemberAuthDao;
+import solvela.member.contact.ContactCoolingStore;
 import solvela.member.sms.MemberSmsCodeService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,7 +43,7 @@ class VerifyRouterTest {
     private MemberSmsCodeService smsCodeService;
 
     /** 默认都不在冷静期；专门验冷静期的那条用例自己改 */
-    private solvela.member.contact.ContactCoolingStore coolingStore;
+    private ContactCoolingStore coolingStore;
 
     private VerifyRouter router;
 
@@ -52,7 +53,7 @@ class VerifyRouterTest {
     void setUp() {
         memberAuthDao = mock(MemberAuthDao.class);
         smsCodeService = mock(MemberSmsCodeService.class);
-        coolingStore = mock(solvela.member.contact.ContactCoolingStore.class);
+        coolingStore = mock(ContactCoolingStore.class);
         router = new VerifyRouter(memberAuthDao, smsCodeService, coolingStore);
         contacts = new Member();
         contacts.setMemberId(MEMBER_ID);

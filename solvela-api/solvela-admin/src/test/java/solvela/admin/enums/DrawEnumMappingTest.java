@@ -1,16 +1,19 @@
 package solvela.admin.enums;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import solvela.draw.DrawPrizeLog;
+import org.springframework.transaction.annotation.Transactional;
 import solvela.draw.DrawConfig;
+import solvela.draw.DrawPrizeLog;
 import solvela.draw.PrizePoolConfig;
+import solvela.draw.drawconfig.manager.DrawConfigManager;
 import solvela.draw.drawlog.dao.DrawPrizeLogDao;
 import solvela.draw.poolconfig.dao.PrizePoolConfigDao;
 import solvela.enums.DrawModeEnum;
@@ -38,13 +41,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DrawEnumMappingTest {
 
     @Autowired
-    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private PrizePoolConfigDao prizePoolConfigDao;
 
     @Autowired
-    private solvela.draw.drawconfig.manager.DrawConfigManager drawConfigManager;
+    private DrawConfigManager drawConfigManager;
 
     @Autowired
     private DrawPrizeLogDao drawPrizeLogDao;
@@ -101,7 +104,7 @@ class DrawEnumMappingTest {
         int sum = 0;
         for (PrizePoolStatusEnum status : PrizePoolStatusEnum.values()) {
             List<PrizePoolConfig> hit = prizePoolConfigDao.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PrizePoolConfig>()
+                    new LambdaQueryWrapper<PrizePoolConfig>()
                             .eq(PrizePoolConfig::getStatus, status));
             for (PrizePoolConfig e : hit) {
                 assertTrue(status == e.getStatus(), "按 " + status + " 查询却查出了 " + e.getStatus());

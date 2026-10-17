@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -113,7 +114,7 @@ public final class ScriptFileParser {
         }
     }
 
-    private static java.util.Optional<String> tag(String headerText, String tagName) {
+    private static Optional<String> tag(String headerText, String tagName) {
         Matcher matcher = TAG.matcher(headerText);
         while (matcher.find()) {
             if (tagName.equals(matcher.group(1))) {
@@ -124,10 +125,10 @@ public final class ScriptFileParser {
                         .filter(line -> !line.isEmpty())
                         .reduce((a, b) -> a + " " + b)
                         .orElse("");
-                return value.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(value);
+                return value.isBlank() ? Optional.empty() : Optional.of(value);
             }
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     private static IllegalStateException fail(String filePath, String reason) {

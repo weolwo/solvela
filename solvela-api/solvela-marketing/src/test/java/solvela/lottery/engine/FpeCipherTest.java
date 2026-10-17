@@ -3,6 +3,7 @@ package solvela.lottery.engine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -170,7 +171,7 @@ class FpeCipherTest {
         }
         // 自由度 9、显著性 0.001 的临界值是 27.877；超过它才认为分布显著不均
         assertTrue(chiSquare < 27.877,
-                "首位数字分布显著偏斜，卡方值=" + chiSquare + "，各桶=" + java.util.Arrays.toString(buckets));
+                "首位数字分布显著偏斜，卡方值=" + chiSquare + "，各桶=" + Arrays.toString(buckets));
     }
 
     @Test

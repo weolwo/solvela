@@ -1,5 +1,6 @@
 package solvela.member.risk.rule;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,16 +25,17 @@ import solvela.member.risk.config.ListMatch;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.risk.feature.OldDeviceExemption;
+import solvela.member.risk.rule.impl.CanaryAccountRule;
 import solvela.member.risk.rule.impl.DeviceFailLimitRule;
 import solvela.member.risk.rule.impl.DeviceFanoutRule;
 import solvela.member.risk.rule.impl.DeviceObserveRule;
-import solvela.member.risk.security.CanaryAccountService;
-import solvela.member.risk.rule.impl.CanaryAccountRule;
 import solvela.member.risk.rule.impl.GlobalCaptchaRule;
 import solvela.member.risk.rule.impl.IpAccountFanoutRule;
 import solvela.member.risk.rule.impl.IpFailLimitRule;
 import solvela.member.risk.rule.impl.IpGreylistRule;
 import solvela.member.risk.rule.impl.IpUnknownLimitRule;
+import solvela.member.risk.security.CanaryAccountService;
+import tools.jackson.databind.JsonNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -283,7 +285,7 @@ class LoginRuleTest {
     @DisplayName("分级规则自己校验参数：tiers 缺了直接抛，不等到运行时才发现")
     void tieredRulesValidate() {
         assertEquals(MemberRiskPhaseEnum.PRE, ipFail.phase());
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+        Assertions.assertThrows(IllegalArgumentException.class,
                 () -> ipFail.validate(JsonUtils.getMapper().readTree("{}")));
         ipFail.validate(JsonUtils.getMapper().readTree("{\"window\":\"1h\",\"tiers\":[{\"over\":20,\"do\":6}]}"));
     }
@@ -373,7 +375,7 @@ class LoginRuleTest {
     }
 
     /** {@code tiers(5, 2, 20, 6)} = 超 5 出滑块、超 20 限流 */
-    private static tools.jackson.databind.JsonNode tiers(int... overAndDo) {
+    private static JsonNode tiers(int... overAndDo) {
         StringBuilder sb = new StringBuilder("{\"window\":\"1h\",\"tiers\":[");
         for (int i = 0; i < overAndDo.length; i += 2) {
             if (i > 0) {
@@ -384,13 +386,13 @@ class LoginRuleTest {
         return JsonUtils.getMapper().readTree(sb.append("]}").toString());
     }
 
-    private static RiskRuleConfig config(tools.jackson.databind.JsonNode params) {
-        return new RiskRuleConfig("X", "X", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.TIERED, null, 0, null,
+    private static RiskRuleConfig config(JsonNode params) {
+        return new RiskRuleConfig("X", "X", MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.TIERED, null, 0, null,
                 MemberRiskModeEnum.ENFORCE, false, params);
     }
 
     private static RiskRuleConfig config(MemberRiskDecisionEnum direct) {
-        return new RiskRuleConfig("X", "X", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.DIRECT, direct, 0, null,
+        return new RiskRuleConfig("X", "X", MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE, MemberRiskRuleTypeEnum.DIRECT, direct, 0, null,
                 MemberRiskModeEnum.ENFORCE, false, JsonUtils.getMapper().createObjectNode());
     }
 }

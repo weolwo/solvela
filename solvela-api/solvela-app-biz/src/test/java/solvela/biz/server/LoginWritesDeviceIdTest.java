@@ -16,6 +16,7 @@ import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.auth.MemberAuthService;
+import solvela.member.risk.dao.MemberRiskRuleDao;
 
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,7 @@ class LoginWritesDeviceIdTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private solvela.member.risk.dao.MemberRiskRuleDao ruleDao;
+    private MemberRiskRuleDao ruleDao;
 
     private Long memberId;
 

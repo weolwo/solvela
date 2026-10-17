@@ -1,16 +1,16 @@
 package solvela.lottery.record.dao;
 
-        import java.util.List;
-
-        import solvela.lottery.LotteryRecord;
-        import solvela.lottery.record.domain.query.LotteryRecordQuery;
-        import solvela.lottery.record.domain.dto.LotteryRecordDTO;
-        import solvela.lottery.record.domain.dto.MemberTicketDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.lottery.LotteryRecord;
+import solvela.lottery.record.domain.dto.LotteryRecordDTO;
+import solvela.lottery.record.domain.dto.MemberTicketDTO;
+import solvela.lottery.record.domain.query.LotteryRecordQuery;
+
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户号码记录 Dao
@@ -46,19 +46,19 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
      * 出现「分项加起来不等于总数」这种自相矛盾。
      * 刻意不吃 winStatus / prizeLevel 条件 —— 那两个正是漏斗要拆解的维度。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") LotteryRecordQuery queryForm);
+    Map<String, Object> selectFunnel(@Param("queryForm") LotteryRecordQuery queryForm);
 
     /**
      * 奖级分布，按奖级升序。只统计 win_status=2 的行 ——
      * 未中奖行的 prize_level 是 99 占位，不是奖级。
      */
-    List<java.util.Map<String, Object>> selectPrizeLevelStat(@Param("queryForm") LotteryRecordQuery queryForm);
+    List<Map<String, Object>> selectPrizeLevelStat(@Param("queryForm") LotteryRecordQuery queryForm);
 
     /**
      * 按玩法汇总参与人数与中奖注数，供彩票玩法一览一次性取全部玩法的实况。
      * 不做成「逐个玩法查一次」——玩法多起来就是 N+1。
      */
-    List<java.util.Map<String, Object>> selectStatByLottery();
+    List<Map<String, Object>> selectStatByLottery();
 
     /**
      * 某期已发出的最大游标，供 Redis 冷启动回源用。
@@ -150,7 +150,7 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
     /**
      * 核销进度统计，供接口返回与验收核对
      */
-    java.util.Map<String, Object> settleSummary(@Param("lotteryCode") String lotteryCode,
+    Map<String, Object> settleSummary(@Param("lotteryCode") String lotteryCode,
                                                 @Param("issueNo") String issueNo);
 
 

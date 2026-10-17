@@ -16,6 +16,7 @@ import solvela.scriptengine.spi.ScriptEvaluator;
 import solvela.scriptengine.spi.ScriptFunctionHandler;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -72,8 +73,8 @@ public class ScriptCollectionTest {
         assertEquals(Map.of("a", 1), run("m = {:}; m.a = 1; return m;"));
         assertEquals(1, run("return [1, 2, 3][0];"));
         assertEquals(3, run("return [1, 2, 3].length;"));
-        assertEquals(0, new java.math.BigDecimal("6").compareTo(
-                (java.math.BigDecimal) run("r = 0; for (x : [1,2,3]) { r = r + x; } return r;")));
+        assertEquals(0, new BigDecimal("6").compareTo(
+                (BigDecimal) run("r = 0; for (x : [1,2,3]) { r = r + x; } return r;")));
     }
 
     // =====================================================================

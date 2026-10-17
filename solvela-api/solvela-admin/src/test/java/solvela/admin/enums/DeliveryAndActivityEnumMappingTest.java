@@ -7,8 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.transaction.annotation.Transactional;
 import solvela.activity.ActivityConfig;
 import solvela.activity.dao.ActivityConfigDao;
 import solvela.enums.ActivityStatusEnum;
@@ -46,7 +47,7 @@ class DeliveryAndActivityEnumMappingTest {
 
     /** 直接读列，用来和 TypeHandler 装配出来的枚举对账 */
     @Autowired
-    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private JdbcTemplate jdbcTemplate;
 
     /**
      * 🔴 用例自带数据，不再靠「开发库里碰巧有什么」。

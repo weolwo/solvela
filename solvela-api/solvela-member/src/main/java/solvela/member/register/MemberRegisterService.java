@@ -7,8 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.event.BizEventPublisher;
 import solvela.base.util.SolvelaStringUtil;
-import solvela.event.BizActionCodes;
-import solvela.event.BizActionEvent;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
@@ -17,27 +15,30 @@ import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberStatusEnum;
+import solvela.event.BizActionCodes;
+import solvela.event.BizActionEvent;
+import solvela.member.api.EmailCodeScene;
+import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.api.MemberIdentity;
 import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberPasswordPolicy;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
+import solvela.member.api.MemberRegisterType;
 import solvela.member.api.RegisterFailReason;
+import solvela.member.api.SmsCodeVerifyResult;
+import solvela.member.api.SmsScene;
+import solvela.member.auth.NewDeviceLoginNotifier;
+import solvela.member.email.MemberEmailCodeService;
 import solvela.member.id.MemberIdAllocator;
+import solvela.member.password.WeakPasswordChecker;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.RiskAction;
 import solvela.member.risk.RiskActionExecutor;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskSession;
-import solvela.member.auth.NewDeviceLoginNotifier;
-import solvela.member.api.EmailCodeScene;
-import solvela.member.api.EmailCodeVerifyResult;
-import solvela.member.api.MemberRegisterType;
-import solvela.member.email.MemberEmailCodeService;
-import solvela.member.api.SmsCodeVerifyResult;
 import solvela.member.sms.MemberSmsCodeService;
-import solvela.member.api.SmsScene;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
 
@@ -103,7 +104,7 @@ public class MemberRegisterService {
      * <p>🔴 刻意<b>不</b>做成风控规则：这件事没有「误伤」可言（换个密码十秒钟），
      * 而规则意味着页面上有一个能把它关掉的下拉框。见 {@code WeakPasswordChecker}。
      */
-    private final solvela.member.password.WeakPasswordChecker weakPasswordChecker;
+    private final WeakPasswordChecker weakPasswordChecker;
     /** 执行风控结论带的动作。注册这边只会有 {@link RiskAction#OBSERVE_DEVICE}：一台建号超限的设备，下次登录要多验一道码 */
     private final RiskActionExecutor riskActions;
     private final MemberEmailCodeService emailCodeService;
@@ -274,24 +275,11 @@ public class MemberRegisterService {
      * 「操作过于频繁」。差别只在措辞 —— 而那句话原本正好告诉了批量注册的人该换设备还是换代理。
      */
     private MemberRegisterResult runPreDecision(RiskSession risk, MemberRegisterCmd cmd) {
-        RiskDecision pre = riskEngine.evaluatePre(risk);
+        RiskDecision pre = riskEngine.evaluateGatePre(risk);
         riskActions.execute(pre, risk.context());
         if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
                     MemberRegisterResult.tooManyAttempts(pre.retryAfterSeconds()));
-        }
-        if (!pre.is(MemberRiskDecisionEnum.PASS)) {
-            /*
-             * 🔴 走到这里说明有人把一条注册规则配成了滑块 / OTP / 冷却 —— 而注册这条链路
-             * 执行不了它们（滑块票在发码那一步核销，注册本身已经验过一次码）。
-             *
-             * 放行并吵得够响：既不能静默（那等于这条规则不存在），也不能当成拦截
-             * （把一个配置错误变成「全站注册不可用」，代价完全不对称）。
-             * 正常情况下进不来 —— 分级档位由规则自己的 validate 拦、固定处置由
-             * RiskRuleRegistry.toConfig 拦，这里是最后一层。
-             */
-            log.error("【会员注册】风控给出了注册场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
-                    pre.decision());
         }
         return null;
     }

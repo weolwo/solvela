@@ -2,8 +2,10 @@ package solvela.biz.server.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.SessionReportCmd;
 import solvela.member.api.StepUpCmd;
 import solvela.member.api.StepUpResult;
 import solvela.member.stepup.MemberStepUpService;
@@ -44,12 +46,12 @@ public class MemberStepUpInternalController implements MemberStepUpApi {
     }
 
     @Override
-    public solvela.member.api.AssetOutVerdict assetOut(StepUpCmd cmd) {
+    public AssetOutVerdict assetOut(StepUpCmd cmd) {
         return stepUpService.assetOut(cmd);
     }
 
     @Override
-    public boolean reportNotMe(solvela.member.api.SessionReportCmd cmd) {
+    public boolean reportNotMe(SessionReportCmd cmd) {
         return stepUpService.reportNotMe(cmd);
     }
 }

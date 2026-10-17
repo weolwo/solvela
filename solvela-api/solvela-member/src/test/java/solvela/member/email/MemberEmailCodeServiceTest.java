@@ -1,19 +1,23 @@
 package solvela.member.email;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.support.TaskExecutorAdapter;
+import solvela.base.domain.SystemEnvironment;
+import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.base.mail.MailService;
 import solvela.base.mail.MailTemplateCodeEnum;
-import solvela.base.domain.SystemEnvironment;
 import solvela.base.module.redis.RedisService;
-import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.crypto.PiiHasher;
 import solvela.exception.BusinessException;
 import solvela.member.api.EmailCodeFailReason;
@@ -23,9 +27,11 @@ import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.code.VerificationCodeProperties;
 import solvela.member.code.VerificationCodeStore;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -98,11 +104,11 @@ class MemberEmailCodeServiceTest {
 
     /** 记录 set 进去的值，供断言与「模拟下一次读」。 */
     private void captureSets() {
-        org.mockito.Mockito.doAnswer(i -> {
+        Mockito.doAnswer(i -> {
             store.put(i.getArgument(0), i.getArgument(1));
             return null;
         }).when(redisService).set(anyString(), anyString(), anyLong());
-        org.mockito.Mockito.doAnswer(i -> {
+        Mockito.doAnswer(i -> {
             // delete 是可变参数，Mockito 会把它摊平成若干个 String 参数
             for (Object k : i.getArguments()) {
                 if (k instanceof String key) {
@@ -216,11 +222,11 @@ class MemberEmailCodeServiceTest {
     void 队列满时同步失败并删码() {
         captureSets();
         // 换一个「一提交就拒绝」的执行器，模拟队列打满
-        org.springframework.core.task.AsyncTaskExecutor rejecting = task -> {
-            throw new java.util.concurrent.RejectedExecutionException("queue full");
+        AsyncTaskExecutor rejecting = task -> {
+            throw new RejectedExecutionException("queue full");
         };
         try {
-            java.lang.reflect.Field f =
+            Field f =
                     MemberEmailCodeService.class.getDeclaredField("emailSendExecutor");
             f.setAccessible(true);
             f.set(service, rejecting);
@@ -300,7 +306,7 @@ class MemberEmailCodeServiceTest {
         service.verify(EmailCodeScene.LOGIN, EMAIL, "000000");
 
         ArgumentCaptor<Long> written = ArgumentCaptor.forClass(Long.class);
-        verify(redisService, org.mockito.Mockito.atLeast(2))
+        verify(redisService, Mockito.atLeast(2))
                 .set(anyString(), anyString(), written.capture());
         assertEquals(42L, written.getValue(),
                 "写回时给完整 TTL 的话，攻击者只要一直猜，这个码就永远不过期");
@@ -392,7 +398,7 @@ class MemberEmailCodeServiceTest {
     @Test
     @DisplayName("🔴 生产环境 + LOG 通道 → 启动即失败，不是静默降级")
     void 生产不许用log通道() {
-        IllegalStateException e = org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalStateException e = Assertions.assertThrows(
                 IllegalStateException.class,
                 () -> serviceWith(VerificationCodeProperties.Transport.LOG, true));
 
@@ -404,7 +410,7 @@ class MemberEmailCodeServiceTest {
     @Test
     @DisplayName("生产环境 + MAIL 通道 → 正常")
     void 生产用real通道() {
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        Assertions.assertDoesNotThrow(
                 () -> serviceWith(VerificationCodeProperties.Transport.REAL, true));
     }
 
@@ -421,10 +427,10 @@ class MemberEmailCodeServiceTest {
      * 而被验证的逻辑（提交/拒绝/删码）与生产完全一致。
      */
     private static void injectSyncExecutor(MemberEmailCodeService target) {
-        org.springframework.core.task.AsyncTaskExecutor sync =
-                new org.springframework.core.task.support.TaskExecutorAdapter(Runnable::run);
+        AsyncTaskExecutor sync =
+                new TaskExecutorAdapter(Runnable::run);
         try {
-            java.lang.reflect.Field f =
+            Field f =
                     MemberEmailCodeService.class.getDeclaredField("emailSendExecutor");
             f.setAccessible(true);
             f.set(target, sync);

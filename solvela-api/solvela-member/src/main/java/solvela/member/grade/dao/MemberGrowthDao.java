@@ -46,7 +46,7 @@ public interface MemberGrowthDao extends BaseMapper<MemberGrowth> {
 
     /** 数据库时钟。周期边界判定不能用应用时钟 —— 两边有偏差时跨周期的那一刻会算错 */
     @Select("SELECT NOW()")
-    java.time.LocalDateTime selectDbNow();
+    LocalDateTime selectDbNow();
 
     /**
      * 条件更新等级：<b>只有当前等级仍然是 {@code oldGrade} 时才改</b>。

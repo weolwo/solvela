@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -15,17 +16,17 @@ import solvela.enums.EnableStatusEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
-import solvela.mall.commodity.GradeDiscount;
-import solvela.mall.commodity.MallGradeDiscountResolver;
-import solvela.mall.commodity.MallGradeGate;
-import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCommodity;
 import solvela.mall.MallOrder;
 import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
+import solvela.mall.commodity.GradeDiscount;
+import solvela.mall.commodity.MallGradeDiscountResolver;
+import solvela.mall.commodity.MallGradeGate;
 import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.exchangelimit.dao.MallExchangeLimitDao;
+import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.order.event.MallOrderPendingEvent;
 import solvela.mall.order.manager.MallOrderManager;
 import solvela.mall.sku.dao.MallSkuDao;
@@ -34,6 +35,9 @@ import solvela.marketing.api.MallRedeemCmd;
 import solvela.marketing.api.MallRedeemReason;
 import solvela.marketing.api.MallRedeemResult;
 import solvela.member.api.AssetDebitApi;
+import solvela.member.api.AssetDebitCmd;
+import solvela.member.api.AssetDebitReason;
+import solvela.member.api.AssetDebitResult;
 import solvela.member.api.CouponLockCmd;
 import solvela.member.api.CouponQueryApi;
 import solvela.member.api.CouponTrialQuery;
@@ -41,14 +45,12 @@ import solvela.member.api.CouponTrialView;
 import solvela.member.api.CouponWriteOffApi;
 import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
-import solvela.member.api.AssetDebitCmd;
-import solvela.member.api.AssetDebitReason;
-import solvela.member.api.AssetDebitResult;
 import solvela.member.service.MemberService;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -516,13 +518,13 @@ class MallRedeemServiceTest {
     /** 白金 9 折，没有覆盖价 */
     private void givenNinetyPercent() {
         when(mallGradeDiscountResolver.forMember(any(), any()))
-                .thenReturn(new GradeDiscount(3, 90, java.util.Map.of()));
+                .thenReturn(new GradeDiscount(3, 90, Map.of()));
     }
 
     /** 白金 9 折 + 这件商品的单品覆盖价 */
     private void givenOverride(int price) {
         when(mallGradeDiscountResolver.forMember(any(), any())).thenReturn(new GradeDiscount(3, 90,
-                java.util.Map.of(GradeDiscount.Key.ofCommodity(COMMODITY_ID), price)));
+                Map.of(GradeDiscount.Key.ofCommodity(COMMODITY_ID), price)));
     }
 
     @Test
@@ -836,7 +838,7 @@ class MallRedeemServiceTest {
 
     /** 同一条用例里跑第二遍时清掉调用记录，避免 verify 撞上一轮的调用 */
     private void reset() {
-        org.mockito.Mockito.clearInvocations(service, mallSkuDao, mallExchangeLimitDao,
+        Mockito.clearInvocations(service, mallSkuDao, mallExchangeLimitDao,
                 assetDebitApi, couponQueryApi, couponWriteOffApi, mallOrderManager, eventPublisher);
     }
 }

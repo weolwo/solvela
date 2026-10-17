@@ -1,8 +1,10 @@
 package solvela.prize.prizelog.dao;
 
-import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
+import solvela.enums.PrizeDispatchStatusEnum;
+
 import java.util.List;
+import java.util.Map;
 
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.domain.query.PrizeLogQuery;
@@ -86,7 +88,7 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      * <p>刻意不吃 {@code status} / {@code approveStatus} 两个筛选项 ——
      * 那两个正是漏斗要拆解的维度，跟着筛会让「已发出率」恒为 100%。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") PrizeLogQuery queryForm);
+    Map<String, Object> selectFunnel(@Param("queryForm") PrizeLogQuery queryForm);
 
     /**
      * 奖励类型维度：条数与价值双口径。
@@ -94,12 +96,12 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      * <p>价值必须按类型分组 —— 积分、现金、券面额、实物价值不是同一个量纲，
      * 合成一个「总价值」的那个数字没有任何含义。
      */
-    List<java.util.Map<String, Object>> selectPrizeTypeStat(@Param("queryForm") PrizeLogQuery queryForm);
+    List<Map<String, Object>> selectPrizeTypeStat(@Param("queryForm") PrizeLogQuery queryForm);
 
     /**
      * 奖品维度分布（发奖量 TOP 20）：哪个奖发得多、哪个奖最容易发不出去。
      */
-    List<java.util.Map<String, Object>> selectPrizeStat(@Param("queryForm") PrizeLogQuery queryForm);
+    List<Map<String, Object>> selectPrizeStat(@Param("queryForm") PrizeLogQuery queryForm);
 
     /**
      * 失败原因分布（TOP 10），按 {@code fail_reason} 文案原文聚类。
@@ -107,7 +109,7 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      * <p>⚠️ 这张表没有 {@code fail_code} 那样的封闭编码列（对比 t_proposal_record.risk_code），
      * 所以文案一旦带上具体数值，同一种原因就会裂成多条。已知代价，如实展示原文。
      */
-    List<java.util.Map<String, Object>> selectFailReasonStat(@Param("queryForm") PrizeLogQuery queryForm);
+    List<Map<String, Object>> selectFailReasonStat(@Param("queryForm") PrizeLogQuery queryForm);
 
     /*
      * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。

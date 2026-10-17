@@ -5,9 +5,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import solvela.base.json.JsonUtils;
 import solvela.base.module.redis.RedisService;
@@ -18,8 +21,10 @@ import solvela.enums.MemberRiskPhaseEnum;
 import solvela.enums.MemberRiskRuleTypeEnum;
 import solvela.member.Member;
 import solvela.member.api.MemberLoginType;
+import solvela.member.risk.RiskAction;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDeviceTrust;
+import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.rule.RiskHit;
 import solvela.member.risk.rule.RiskRuleConfig;
 import solvela.member.risk.rule.impl.PasswordCooldownRule;
@@ -166,7 +171,7 @@ class PasswordCooldownTest {
         // 默认 recordFrom 是 60 分钟：剩 24 小时 → 落库；剩 60 秒 → 不落
         when(redisService.getExpire(contains(":cd"))).thenReturn(86400L);
         assertTrue(rule.evaluate(ctx(MemberLoginType.EMAIL_PASSWORD), config())
-                        .actions().contains(solvela.member.risk.RiskAction.RECORD_LIMIT),
+                        .actions().contains(RiskAction.RECORD_LIMIT),
                 "客服要找的恰恰是「被锁了很久」的那几个人");
 
         when(redisService.getExpire(contains(":cd"))).thenReturn(60L);
@@ -180,7 +185,7 @@ class PasswordCooldownTest {
         when(redisService.getExpire(anyString())).thenReturn(-2L);
 
         assertNull(rule.evaluate(ctx(MemberLoginType.EMAIL_PASSWORD), config()));
-        verify(redisService, org.mockito.Mockito.never()).increment(anyString(), anyLong());
+        verify(redisService, Mockito.never()).increment(anyString(), anyLong());
     }
 
     @Test
@@ -254,33 +259,33 @@ class PasswordCooldownTest {
                 "dev-1", "H5", "1.2.3.4", false);
     }
 
-    private static org.springframework.beans.factory.ObjectProvider<
-            solvela.member.risk.config.RiskRuleRegistry> emptyRegistry() {
-        return new org.springframework.beans.factory.ObjectProvider<>() {
+    private static ObjectProvider<
+            RiskRuleRegistry> emptyRegistry() {
+        return new ObjectProvider<>() {
             @Override
-            public solvela.member.risk.config.RiskRuleRegistry getObject() {
-                throw new org.springframework.beans.factory.NoSuchBeanDefinitionException("registry");
+            public RiskRuleRegistry getObject() {
+                throw new NoSuchBeanDefinitionException("registry");
             }
 
             @Override
-            public solvela.member.risk.config.RiskRuleRegistry getObject(Object... args) {
+            public RiskRuleRegistry getObject(Object... args) {
                 return getObject();
             }
 
             @Override
-            public solvela.member.risk.config.RiskRuleRegistry getIfAvailable() {
+            public RiskRuleRegistry getIfAvailable() {
                 return null;
             }
 
             @Override
-            public solvela.member.risk.config.RiskRuleRegistry getIfUnique() {
+            public RiskRuleRegistry getIfUnique() {
                 return null;
             }
         };
     }
 
     private static RiskRuleConfig config() {
-        return new RiskRuleConfig("PWD_COOLDOWN", "密码阶梯冷却", solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE,
+        return new RiskRuleConfig("PWD_COOLDOWN", "密码阶梯冷却", MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE,
                 MemberRiskRuleTypeEnum.TIERED, null, 0, null, MemberRiskModeEnum.ENFORCE, false, PARAMS);
     }
 }

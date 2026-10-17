@@ -7,8 +7,10 @@ import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.rule.RiskRuleConfig;
+import solvela.security.SlidingWindowScripts;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * 登录相关的所有计数器。<b>Redis 键只在这里出现一次。</b>
@@ -196,7 +198,7 @@ public class LoginCounters {
             return Window.EMPTY;
         }
         try {
-            java.util.List<Long> result = redisService.slidingWindowCount(
+            List<Long> result = redisService.slidingWindowCount(
                     key(counter, value), windowSeconds(counter), BUCKETS, nowSeconds(), delta);
             return new Window(result.get(0) == null ? 0L : result.get(0),
                     result.size() < 2 || result.get(1) == null ? -1L : result.get(1));
@@ -240,7 +242,7 @@ public class LoginCounters {
         if (current.oldestBucket() < 0) {
             return Math.max(1L, window);
         }
-        return solvela.security.SlidingWindowScripts.retryAfterSeconds(
+        return SlidingWindowScripts.retryAfterSeconds(
                 window, BUCKETS, nowSeconds(), current.oldestBucket());
     }
 

@@ -4,13 +4,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DuplicateKeyException;
-import org.mockito.ArgumentCaptor;
 import solvela.base.event.BizEventPublisher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
@@ -18,28 +19,29 @@ import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.member.MemberRiskEvent;
-import solvela.member.auth.NewDeviceLoginNotifier;
-import solvela.member.device.DeviceDispositionService;
-import solvela.member.operationlimit.service.MemberOperationLimitService;
-import solvela.member.risk.RiskActionExecutor;
-import solvela.member.risk.SuspiciousLoginNotifier;
-import solvela.member.risk.security.CanaryTrap;
-import solvela.member.email.MemberEmailCodeService;
-import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.api.MemberLoginType;
-import solvela.member.api.SmsCodeVerifyResult;
-import solvela.member.api.SmsScene;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.RegisterFailReason;
+import solvela.member.api.SmsCodeVerifyResult;
+import solvela.member.api.SmsScene;
+import solvela.member.auth.NewDeviceLoginNotifier;
+import solvela.member.device.DeviceDispositionService;
+import solvela.member.email.MemberEmailCodeService;
 import solvela.member.id.MemberIdAllocator;
+import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.password.WeakPasswordChecker;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.RiskAction;
+import solvela.member.risk.RiskActionExecutor;
+import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskEventRecorder;
 import solvela.member.risk.RiskSession;
+import solvela.member.risk.SuspiciousLoginNotifier;
+import solvela.member.risk.security.CanaryTrap;
+import solvela.member.sms.MemberSmsCodeService;
 
 import java.util.Set;
 
@@ -196,7 +198,7 @@ class MemberRegisterServiceTest {
 
         verify(memberRegisterDao).insertMember(anyLong(), anyString(), anyString(), anyInt(),
                 any(), any(), any(), any(), any(), anyInt(),
-                org.mockito.ArgumentMatchers.argThat(s -> s != null && !s.isBlank()), anyString());
+                ArgumentMatchers.argThat(s -> s != null && !s.isBlank()), anyString());
     }
 
     @Test
@@ -218,7 +220,7 @@ class MemberRegisterServiceTest {
 
         // 查重在限频之前的话，「这个号注册过没有」可以无限次免费提问
         InOrder order = inOrder(riskEngine, memberRegisterDao);
-        order.verify(riskEngine).evaluatePre(any());
+        order.verify(riskEngine).evaluateGatePre(any());
         order.verify(memberRegisterDao).countByPhoneHash(PHONE_HASH);
     }
 
@@ -314,8 +316,8 @@ class MemberRegisterServiceTest {
     void 上下文() {
         service.register(cmd(PHONE, STRONG_PASSWORD));
 
-        ArgumentCaptor<solvela.member.risk.RiskContext> ctx =
-                ArgumentCaptor.forClass(solvela.member.risk.RiskContext.class);
+        ArgumentCaptor<RiskContext> ctx =
+                ArgumentCaptor.forClass(RiskContext.class);
         verify(riskEngine).open(ctx.capture());
 
         assertEquals(MemberRiskEventTypeEnum.REGISTER, ctx.getValue().getEventType());
@@ -352,7 +354,7 @@ class MemberRegisterServiceTest {
         clearInvocations(recorder);
         action.run();
         ArgumentCaptor<MemberRiskEvent> event = ArgumentCaptor.forClass(MemberRiskEvent.class);
-        verify(recorder).record(event.capture(), org.mockito.ArgumentMatchers.anyList());
+        verify(recorder).record(event.capture(), ArgumentMatchers.anyList());
         assertEquals(expected, event.getValue().getOutcome());
         assertEquals(MemberRiskEventTypeEnum.REGISTER, event.getValue().getEventType());
     }
@@ -418,7 +420,7 @@ class MemberRegisterServiceTest {
 
         InOrder order = inOrder(riskEngine, smsCodeService, memberRegisterDao);
         // 之后：验码要读 Redis 还要写回失败计数，已经被限频挡下的请求不该做这些
-        order.verify(riskEngine).evaluatePre(any());
+        order.verify(riskEngine).evaluateGatePre(any());
         order.verify(smsCodeService).verify(eq(SmsScene.REGISTER), eq(PHONE), any());
         // 之前：否则没有验证码的人也能拿注册接口反复问「这个号注册过没有」
         order.verify(memberRegisterDao).countByPhoneHash(PHONE_HASH);
@@ -443,7 +445,7 @@ class MemberRegisterServiceTest {
     }
 
     private void pre(RiskDecision decision) {
-        when(riskEngine.evaluatePre(any())).thenReturn(decision);
+        when(riskEngine.evaluateGatePre(any())).thenReturn(decision);
     }
 
     private MemberRegisterCmd cmd(String phone, String password) {

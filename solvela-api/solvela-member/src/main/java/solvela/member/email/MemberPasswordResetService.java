@@ -5,33 +5,37 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.auth.member.MemberTokenStore;
-import solvela.member.stepup.DeviceTrustStore;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiHasher;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberOperationUnlockTypeEnum;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeVerifyResult;
+import solvela.member.api.MemberLoginType;
+import solvela.member.api.MemberPasswordPolicy;
 import solvela.member.api.MemberPasswordResetCmd;
 import solvela.member.api.MemberPasswordResetResult;
-import solvela.member.api.MemberPasswordPolicy;
 import solvela.member.api.PasswordResetFailReason;
-import solvela.member.auth.MemberAuthDao;
-import solvela.member.device.DeviceGuard;
 import solvela.member.api.PasswordResetType;
-import solvela.enums.MemberRiskDecisionEnum;
-import solvela.enums.MemberRiskEventTypeEnum;
-import solvela.enums.MemberRiskOutcomeEnum;
-import solvela.member.api.MemberLoginType;
+import solvela.member.api.SmsScene;
+import solvela.member.auth.MemberAuthDao;
+import solvela.member.contact.ContactCoolingStore;
+import solvela.member.device.DeviceGuard;
+import solvela.member.operationlimit.service.MemberOperationLimitService;
+import solvela.member.password.WeakPasswordChecker;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskSession;
-import solvela.member.api.SmsScene;
+import solvela.member.risk.feature.PasswordCooldownStore;
 import solvela.member.sms.MemberSmsCodeService;
+import solvela.member.stepup.DeviceTrustStore;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
 
@@ -82,19 +86,19 @@ public class MemberPasswordResetService {
     private final PiiHasher piiHasher;
 
     /** 重置密码要清掉密码阶梯冷却 —— 它是被恶意冷却时的唯一自助出口（方案 §4.4） */
-    private final solvela.member.risk.feature.PasswordCooldownStore cooldownStore;
+    private final PasswordCooldownStore cooldownStore;
 
     /** 也要解开「这不是我」造成的资产出口冻结（方案 §8.1） */
-    private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
+    private final MemberOperationLimitService operationLimitService;
 
     /** 新绑的联系方式 7 天内不能用来找回密码 —— 三处拦截里后果最重的一处 */
-    private final solvela.member.contact.ContactCoolingStore coolingStore;
+    private final ContactCoolingStore coolingStore;
 
     /** 四条 RESET_* 规则在它后面。重置密码这条链路以前一次也没被计数过 */
     private final MemberRiskEngine riskEngine;
 
     /** 已泄露密码表（P3 ③）。刻意不做成风控规则，见 {@code WeakPasswordChecker} */
-    private final solvela.member.password.WeakPasswordChecker weakPasswordChecker;
+    private final WeakPasswordChecker weakPasswordChecker;
 
     /**
      * 重置密码。
@@ -150,17 +154,11 @@ public class MemberPasswordResetService {
      */
     private MemberPasswordResetResult insideRisk(RiskSession risk, MemberPasswordResetCmd cmd,
                                                  PasswordResetType type, String identity) {
-        RiskDecision pre = riskEngine.evaluatePre(risk);
+        RiskDecision pre = riskEngine.evaluateGatePre(risk);
         if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             // 限流与拒绝对外同一句，并带上秒数 —— 走到这一步的人已经登不进去了
             return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
                     MemberPasswordResetResult.limited(pre.retryAfterSeconds()));
-        }
-        if (!pre.is(MemberRiskDecisionEnum.PASS)) {
-            // 有人把一条重置规则配成了滑块 / OTP —— 这条链路执行不了它们。放行并吵得够响，
-            // 理由同注册那边：把一个配置错误变成「找回密码全站不可用」，代价完全不对称
-            log.error("【重置密码】风控给出了本场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
-                    pre.decision());
         }
 
         PasswordResetFailReason codeProblem = verifyCode(type, identity, cmd.code());

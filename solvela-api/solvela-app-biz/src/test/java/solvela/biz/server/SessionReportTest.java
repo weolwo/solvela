@@ -14,6 +14,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.mail.MailService;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiHasher;
+import solvela.enums.LoginLogResultEnum;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberRiskLabelEnum;
 import solvela.enums.MemberRiskLabelSourceEnum;
@@ -155,7 +156,7 @@ class SessionReportTest {
         jdbcTemplate.update("""
                 INSERT INTO t_member_login_log (member_id, device_id, status, create_time)
                 VALUES (?, ?, ?, NOW() - INTERVAL 30 DAY)
-                """, memberId, CURRENT_DEVICE, solvela.enums.LoginLogResultEnum.LOGIN_SUCCESS.getValue());
+                """, memberId, CURRENT_DEVICE, LoginLogResultEnum.LOGIN_SUCCESS.getValue());
         assertTrue(stepUpService.assetOut(cmd(CURRENT_DEVICE)).trust().trusted(), "造数：该是受信任的");
 
         stepUpService.reportNotMe(report(0L, null));

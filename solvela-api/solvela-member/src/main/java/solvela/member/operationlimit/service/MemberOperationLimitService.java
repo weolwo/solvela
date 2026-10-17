@@ -1,15 +1,21 @@
 package solvela.member.operationlimit.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.stereotype.Service;
 import solvela.base.module.redis.RedisService;
-import solvela.member.operationlimit.MemberOperationLimitProperties;
+import solvela.crypto.PiiCipher;
+import solvela.crypto.PiiHasher;
 import solvela.enums.MemberOperationLimitStatusEnum;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.enums.NotificationTemplateEnum;
-import solvela.member.operationlimit.dao.MemberOperationLimitDao;
+import solvela.member.Member;
 import solvela.member.MemberOperationLimit;
+import solvela.member.auth.MemberAuthDao;
+import solvela.member.operationlimit.MemberOperationLimitProperties;
+import solvela.member.operationlimit.dao.MemberOperationLimitDao;
+import solvela.member.risk.feature.PasswordCooldownStore;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
 
@@ -65,11 +71,11 @@ public class MemberOperationLimitService {
     private final NotificationService notificationService;
 
     /** 解冻 LOGIN 时要按会员号取到他的联系方式，才算得出冷却键用的身份摘要 */
-    private final solvela.member.auth.MemberAuthDao memberAuthDao;
+    private final MemberAuthDao memberAuthDao;
 
-    private final solvela.crypto.PiiCipher piiCipher;
+    private final PiiCipher piiCipher;
 
-    private final solvela.crypto.PiiHasher piiHasher;
+    private final PiiHasher piiHasher;
 
     /**
      * 密码阶梯冷却。
@@ -81,18 +87,18 @@ public class MemberOperationLimitService {
      * <p>用 {@code ObjectFactory} 而不是 {@code ObjectProvider}：两者 Spring 都注得进来，
      * 而前者是单方法接口 —— 测试里一个 lambda 就够，后者要手写五个空实现。
      */
-    private final org.springframework.beans.factory.ObjectFactory<
-            solvela.member.risk.feature.PasswordCooldownStore> cooldownStoreProvider;
+    private final ObjectFactory<
+            PasswordCooldownStore> cooldownStoreProvider;
 
     public MemberOperationLimitService(MemberOperationLimitDao memberOperationLimitDao,
                                        MemberOperationLimitProperties properties,
                                        RedisService redisService,
                                        NotificationService notificationService,
-                                       solvela.member.auth.MemberAuthDao memberAuthDao,
-                                       solvela.crypto.PiiCipher piiCipher,
-                                       solvela.crypto.PiiHasher piiHasher,
-                                       org.springframework.beans.factory.ObjectFactory<
-                                               solvela.member.risk.feature.PasswordCooldownStore>
+                                       MemberAuthDao memberAuthDao,
+                                       PiiCipher piiCipher,
+                                       PiiHasher piiHasher,
+                                       ObjectFactory<
+                                               PasswordCooldownStore>
                                                cooldownStoreProvider) {
         this.memberOperationLimitDao = memberOperationLimitDao;
         this.properties = properties;
@@ -233,11 +239,11 @@ public class MemberOperationLimitService {
      */
     private void clearPasswordCooldown(Long memberId) {
         try {
-            solvela.member.Member contacts = memberAuthDao.selectContacts(memberId);
+            Member contacts = memberAuthDao.selectContacts(memberId);
             if (contacts == null) {
                 return;
             }
-            solvela.member.risk.feature.PasswordCooldownStore store = cooldownStoreProvider.getObject();
+            PasswordCooldownStore store = cooldownStoreProvider.getObject();
             clearByContact(store, contacts.getEmail());
             clearByContact(store, contacts.getPhone());
         } catch (RuntimeException e) {
@@ -245,7 +251,7 @@ public class MemberOperationLimitService {
         }
     }
 
-    private void clearByContact(solvela.member.risk.feature.PasswordCooldownStore store, String cipher) {
+    private void clearByContact(PasswordCooldownStore store, String cipher) {
         if (cipher == null || cipher.isBlank()) {
             return;
         }

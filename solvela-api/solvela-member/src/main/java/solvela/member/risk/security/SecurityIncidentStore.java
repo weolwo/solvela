@@ -6,14 +6,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
-import solvela.member.device.DeviceDispositionService;
-import solvela.member.risk.config.RiskListCache;
 import solvela.enums.SecurityListDimensionEnum;
 import solvela.enums.SecurityListTypeEnum;
+import solvela.member.device.DeviceDispositionService;
+import solvela.member.risk.config.RiskListCache;
 import solvela.security.IpKeys;
 import solvela.security.SecurityIncidentEvent;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 
@@ -147,7 +148,7 @@ public class SecurityIncidentStore {
         return SecurityIncidentEvent.truncate(s, max);
     }
 
-    private static void setInt(PreparedStatement ps, int i, Integer v) throws java.sql.SQLException {
+    private static void setInt(PreparedStatement ps, int i, Integer v) throws SQLException {
         if (v == null) {
             ps.setNull(i, Types.INTEGER);
         } else {
@@ -155,7 +156,7 @@ public class SecurityIncidentStore {
         }
     }
 
-    private static void setLong(PreparedStatement ps, int i, Long v) throws java.sql.SQLException {
+    private static void setLong(PreparedStatement ps, int i, Long v) throws SQLException {
         if (v == null) {
             ps.setNull(i, Types.BIGINT);
         } else {

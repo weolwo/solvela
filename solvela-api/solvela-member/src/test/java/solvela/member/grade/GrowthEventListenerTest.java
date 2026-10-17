@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -147,7 +148,7 @@ class GrowthEventListenerTest {
     @Test
     @DisplayName("🔴 下游抛异常不能往上冒 —— 此刻积分已经到账了")
     void 异常不上抛() {
-        org.mockito.Mockito.doThrow(new RuntimeException("库挂了"))
+        Mockito.doThrow(new RuntimeException("库挂了"))
                 .when(memberGrowthService).accrue(anyLong(), anyLong(),
                         anyString(), any(), anyString(), anyString());
 

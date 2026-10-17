@@ -9,51 +9,49 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
-import solvela.enums.LoginLogResultEnum;
-import solvela.enums.MemberStatusEnum;
-import solvela.member.Member;
-import solvela.member.MemberLoginLog;
-import solvela.member.api.AuthFailReason;
-import solvela.member.api.MemberAuthApi;
-import solvela.member.api.MemberAuthCmd;
-import solvela.member.api.MemberAuthResult;
-import solvela.member.api.LoginChallengeCmd;
-import solvela.member.api.LoginChallengeCodeResult;
-import solvela.member.api.MemberIdentity;
-import solvela.member.api.MemberLogoutCmd;
-import solvela.member.api.MemberRegisterCmd;
-import solvela.member.api.MemberContactView;
-import solvela.member.api.MemberPhoneBindCmd;
-import solvela.member.api.MemberPhoneBindResult;
-import solvela.member.api.MemberRegisterResult;
 import solvela.enums.DeviceStatusEnum;
-import solvela.member.api.SmsCodeVerifyResult;
-import solvela.member.api.SmsScene;
-import solvela.member.api.SmsCodeSendCmd;
-import solvela.member.api.SmsCodeSendResult;
-import solvela.member.sms.MemberSmsCodeService;
-import solvela.member.register.MemberRegisterService;
-import solvela.member.loginlog.dao.MemberLoginLogDao;
-import solvela.member.device.DeviceGuard;
-import solvela.member.api.EmailCodeScene;
-import solvela.member.api.EmailCodeVerifyResult;
-import solvela.member.api.MemberLoginType;
-import solvela.member.api.EmailCodeSendCmd;
-import solvela.member.api.EmailCodeSendResult;
-import solvela.member.api.MemberEmailBindCmd;
-import solvela.member.api.MemberEmailBindResult;
-import solvela.member.api.MemberPasswordResetCmd;
-import solvela.member.api.MemberPasswordResetResult;
-import solvela.member.email.MemberEmailBindService;
-import solvela.member.email.MemberPasswordResetService;
-import solvela.member.email.MemberEmailCodeIssuer;
-import solvela.member.email.MemberEmailCodeService;
-import solvela.member.util.MemberEmailUtil;
-import solvela.member.util.MemberPhoneUtil;
+import solvela.enums.LoginLogResultEnum;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
+import solvela.enums.MemberStatusEnum;
 import solvela.enums.MemberVerifyChannelEnum;
+import solvela.member.Member;
+import solvela.member.MemberLoginLog;
+import solvela.member.api.AuthFailReason;
+import solvela.member.api.EmailCodeScene;
+import solvela.member.api.EmailCodeSendCmd;
+import solvela.member.api.EmailCodeSendResult;
+import solvela.member.api.EmailCodeVerifyResult;
+import solvela.member.api.LoginChallengeCmd;
+import solvela.member.api.LoginChallengeCodeResult;
+import solvela.member.api.MemberAuthApi;
+import solvela.member.api.MemberAuthCmd;
+import solvela.member.api.MemberAuthResult;
+import solvela.member.api.MemberContactView;
+import solvela.member.api.MemberEmailBindCmd;
+import solvela.member.api.MemberEmailBindResult;
+import solvela.member.api.MemberIdentity;
+import solvela.member.api.MemberLoginType;
+import solvela.member.api.MemberLogoutCmd;
+import solvela.member.api.MemberPasswordResetCmd;
+import solvela.member.api.MemberPasswordResetResult;
+import solvela.member.api.MemberPhoneBindCmd;
+import solvela.member.api.MemberPhoneBindResult;
+import solvela.member.api.MemberRegisterCmd;
+import solvela.member.api.MemberRegisterResult;
+import solvela.member.api.SmsCodeSendCmd;
+import solvela.member.api.SmsCodeSendResult;
+import solvela.member.api.SmsCodeVerifyResult;
+import solvela.member.api.SmsScene;
+import solvela.member.device.DeviceGuard;
+import solvela.member.email.MemberEmailBindService;
+import solvela.member.email.MemberEmailCodeIssuer;
+import solvela.member.email.MemberEmailCodeService;
+import solvela.member.email.MemberPasswordResetService;
+import solvela.member.loginlog.dao.MemberLoginLogDao;
+import solvela.member.password.LeakedPasswordNotifier;
+import solvela.member.register.MemberRegisterService;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.RiskActionExecutor;
 import solvela.member.risk.RiskContext;
@@ -65,10 +63,16 @@ import solvela.member.risk.VerifyRouter;
 import solvela.member.risk.feature.AccountFailTracker;
 import solvela.member.risk.feature.LoginProfileProvider;
 import solvela.member.risk.feature.PasswordCooldownStore;
-
+import solvela.member.sms.MemberPhoneBindService;
+import solvela.member.sms.MemberSmsCodeIssuer;
+import solvela.member.sms.MemberSmsCodeService;
+import solvela.member.util.MemberEmailUtil;
+import solvela.member.util.MemberPhoneUtil;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 /**
  * 会员认证：验明身份，仅此而已。{@link MemberAuthApi} 的实现。
@@ -117,7 +121,7 @@ public class MemberAuthService implements MemberAuthApi {
      * 不该再去读一次规则表）。所以写的窗口给得比规则的默认值<b>宽</b>：
      * 记多了只是多留几条过期数据，记少了会让规则读不到本该看见的失败。
      */
-    private static final java.time.Duration FAIL_BURST_WINDOW = java.time.Duration.ofHours(6);
+    private static final Duration FAIL_BURST_WINDOW = Duration.ofHours(6);
 
     private static final int TRACE_ID_MAX_LENGTH = 64;
 
@@ -171,17 +175,17 @@ public class MemberAuthService implements MemberAuthApi {
      * <p>注册与重置密码那两处是<b>入口</b>上的拦截；它管的是<b>已经在用</b>的那些密码 ——
      * 一个 2024 年注册时设了 {@code Password1} 的人，不会因为我们后来加了那张表就自动安全。
      */
-    private final solvela.member.password.LeakedPasswordNotifier leakedPasswordNotifier;
+    private final LeakedPasswordNotifier leakedPasswordNotifier;
     private final MemberEmailCodeService emailCodeService;
     private final MemberEmailCodeIssuer emailCodeIssuer;
 
     private final MemberSmsCodeService smsCodeService;
 
-    private final solvela.member.sms.MemberSmsCodeIssuer smsCodeIssuer;
+    private final MemberSmsCodeIssuer smsCodeIssuer;
 
     private final MemberEmailBindService emailBindService;
 
-    private final solvela.member.sms.MemberPhoneBindService phoneBindService;
+    private final MemberPhoneBindService phoneBindService;
     private final MemberPasswordResetService passwordResetService;
 
     /**
@@ -610,7 +614,7 @@ public class MemberAuthService implements MemberAuthApi {
      */
     private LoginChallengeStore.Challenge validChallenge(LoginChallengeCmd cmd) {
         LoginChallengeStore.Challenge challenge = challengeStore.find(cmd.ticket());
-        if (challenge == null || !java.util.Objects.equals(challenge.deviceId(), cmd.deviceId())) {
+        if (challenge == null || !Objects.equals(challenge.deviceId(), cmd.deviceId())) {
             return null;
         }
         return challenge;
@@ -677,7 +681,7 @@ public class MemberAuthService implements MemberAuthApi {
     }
 
     /** 密文 → 明文 → 打码。解不出来时返回 null，不抛：一个展示接口不该因此 500。 */
-    private String maskCipher(String cipher, java.util.function.UnaryOperator<String> mask) {
+    private String maskCipher(String cipher, UnaryOperator<String> mask) {
         if (SolvelaStringUtil.isEmpty(cipher)) {
             return null;
         }

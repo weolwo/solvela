@@ -5,6 +5,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
+import solvela.app.controller.AddressController;
+import solvela.app.controller.RechargeController;
+import solvela.app.domain.AddressRequest;
+import solvela.app.domain.RechargeRequest;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.auth.device.DeviceIdentity;
@@ -328,14 +332,14 @@ class StepUpInterceptorTest {
     @Test
     @DisplayName("🔴 资产出口三个接口都标了 @StepUpRequired —— 漏标一个，这道闸就有一个后门")
     void 出口接口都已标注() throws Exception {
-        assertTrue(solvela.app.controller.AddressController.class
-                .getMethod("create", solvela.app.domain.AddressRequest.class)
+        assertTrue(AddressController.class
+                .getMethod("create", AddressRequest.class)
                 .isAnnotationPresent(StepUpRequired.class), "POST /address");
-        assertTrue(solvela.app.controller.AddressController.class
-                .getMethod("update", Long.class, solvela.app.domain.AddressRequest.class)
+        assertTrue(AddressController.class
+                .getMethod("update", Long.class, AddressRequest.class)
                 .isAnnotationPresent(StepUpRequired.class), "PUT /address/{id}");
-        assertTrue(solvela.app.controller.RechargeController.class
-                .getMethod("create", solvela.app.domain.RechargeRequest.class)
+        assertTrue(RechargeController.class
+                .getMethod("create", RechargeRequest.class)
                 .isAnnotationPresent(StepUpRequired.class), "POST /recharge/order");
     }
 }

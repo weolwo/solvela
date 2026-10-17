@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.Announcement;
 import solvela.notification.NotificationTemplate;
 import solvela.notification.dao.AnnouncementAckDao;
@@ -12,11 +13,15 @@ import solvela.notification.dao.NotificationTemplateDao;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.domain.command.ManualNotifyCommand;
 import solvela.notification.domain.command.ManualNotifyResult;
-import solvela.enums.NotificationTemplateEnum;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * 管理端用：模板与公告的维护。
@@ -132,7 +137,7 @@ public class NotificationAdminService {
      */
     public ManualNotifyResult sendManual(ManualNotifyCommand cmd, String operator) {
         List<Long> memberIds = cmd.getMemberIds() == null ? List.of() : cmd.getMemberIds().stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
@@ -154,7 +159,7 @@ public class NotificationAdminService {
         Map<String, Object> params = cmd.getParams() == null ? Map.of() : cmd.getParams();
 
         int sent = 0;
-        List<Long> failed = new java.util.ArrayList<>();
+        List<Long> failed = new ArrayList<>();
         for (Long memberId : memberIds) {
             NotifyRequest.Builder builder = NotifyRequest.of(template, memberId)
                     .bizRefId(cmd.getBizRefId())
@@ -264,8 +269,8 @@ public class NotificationAdminService {
         return announcementAckDao.countByAnnouncement(announcementId);
     }
 
-    private static java.util.function.Predicate<NotificationTemplate> distinctByCode() {
-        java.util.Set<String> seen = new java.util.HashSet<>();
+    private static Predicate<NotificationTemplate> distinctByCode() {
+        Set<String> seen = new HashSet<>();
         return template -> seen.add(template.getTemplateCode());
     }
 

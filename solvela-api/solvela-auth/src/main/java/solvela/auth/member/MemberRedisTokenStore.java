@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 
@@ -346,7 +347,7 @@ public class MemberRedisTokenStore implements MemberTokenStore {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
                     .digest(tokenValue.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(hash);
+            return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             // SHA-256 是 JDK 必须实现的算法，走到这里说明 JRE 被裁剪过
             throw new IllegalStateException("当前 JRE 不支持 SHA-256", e);

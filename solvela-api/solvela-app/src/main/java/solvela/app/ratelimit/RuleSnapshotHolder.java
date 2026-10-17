@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.SecurityKeys;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -215,7 +216,7 @@ public class RuleSnapshotHolder {
                 throw new IllegalStateException("classpath 上没有 " + DEFAULT_RESOURCE + " —— solvela-contract 没打进来？");
             }
             return MAPPER.readValue(in, GatewayRuleSnapshot.class);
-        } catch (IOException | tools.jackson.core.JacksonException e) {
+        } catch (IOException | JacksonException e) {
             throw new IllegalStateException("内置默认快照读不出来：" + DEFAULT_RESOURCE, e);
         }
     }

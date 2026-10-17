@@ -1,5 +1,6 @@
 package solvela.member.risk.rule;
 
+import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.risk.RiskContext;
 import tools.jackson.databind.JsonNode;
@@ -35,8 +36,8 @@ public interface RiskRule {
      * 把一条登录规则在表里改成注册场景，它会在一个压根没有密码、没有设备信任的流程里执行，
      * 而那不会报错 —— 表现是「这条规则再也不命中」或者「它开始误伤注册」。
      */
-    default solvela.enums.MemberRiskEventTypeEnum eventType() {
-        return solvela.enums.MemberRiskEventTypeEnum.LOGIN;
+    default MemberRiskEventTypeEnum eventType() {
+        return MemberRiskEventTypeEnum.LOGIN;
     }
 
     /**

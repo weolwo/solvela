@@ -25,6 +25,7 @@ import solvela.scriptengine.dao.ScriptRefDao;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -157,7 +158,7 @@ class CBucketTailEnumMappingTest {
                 "t_script_ref 分状态计数之和与总量对不上");
     }
 
-    private <E> long sum(E[] values, java.util.function.Function<E, Long> counter) {
+    private <E> long sum(E[] values, Function<E, Long> counter) {
         long total = 0;
         for (E v : values) {
             Long n = counter.apply(v);

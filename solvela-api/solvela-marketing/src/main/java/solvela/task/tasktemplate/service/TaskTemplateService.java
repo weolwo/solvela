@@ -1,30 +1,31 @@
 package solvela.task.tasktemplate.service;
 
-import solvela.enums.EnableStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.util.SolvelaCollectionUtil;
-import solvela.base.dao.SolvelaPageUtil;
+import solvela.enums.EnableStatusEnum;
+import solvela.exception.BusinessException;
+import solvela.task.TaskTemplate;
 import solvela.task.constant.TaskTypeEnum;
 import solvela.task.tasktemplate.dao.TaskTemplateDao;
-import solvela.task.TaskTemplate;
 import solvela.task.tasktemplate.domain.command.TaskTemplateAddCommand;
-import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
 import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
 import solvela.task.tasktemplate.domain.command.TaskTemplateUpdateCommand;
-import solvela.task.tasktemplate.domain.dto.TaskTemplateOptionDTO;
 import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
+import solvela.task.tasktemplate.domain.dto.TaskTemplateOptionDTO;
+import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
 import solvela.task.tasktemplate.manager.TaskTemplateManager;
-import solvela.exception.BusinessException;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -195,7 +196,7 @@ public class TaskTemplateService {
         TaskTypeEnum taskType = TaskTypeEnum.resolve(taskTypeValue);
         if (taskType == null) {
             return "任务类型非法：" + taskTypeValue + "，可选值 "
-                    + java.util.Arrays.stream(TaskTypeEnum.values()).map(TaskTypeEnum::getValue).toList();
+                    + Arrays.stream(TaskTypeEnum.values()).map(TaskTypeEnum::getValue).toList();
         }
         List<String> requiredKeys = taskType.targetParamKeys();
         if (requiredKeys.isEmpty()) {

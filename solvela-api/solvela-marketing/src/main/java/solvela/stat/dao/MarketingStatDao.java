@@ -1,5 +1,7 @@
 package solvela.stat.dao;
 
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import solvela.stat.domain.dto.EventHealthDTO;
 import solvela.stat.domain.dto.GameplayDTO;
 import solvela.stat.domain.dto.OverviewDTO;
@@ -8,11 +10,10 @@ import solvela.stat.domain.dto.ParticipationTrendDTO;
 import solvela.stat.domain.dto.PrizeHealthDTO;
 import solvela.stat.domain.dto.TaskFunnelDTO;
 import solvela.stat.domain.dto.TopMemberDTO;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 营销统计 Dao
@@ -90,7 +91,7 @@ public interface MarketingStatDao {
     // ───────── 板块四：事件健康度 ─────────
 
     /** 按 flow_type 统计条数：1-有效推进 2-丢弃 */
-    List<java.util.Map<String, Object>> eventFlowTypeCount(@Param("fromTime") LocalDateTime fromTime);
+    List<Map<String, Object>> eventFlowTypeCount(@Param("fromTime") LocalDateTime fromTime);
 
     /** 丢弃原因聚类（按 discard_code，不是自由文本的 discard_reason） */
     List<EventHealthDTO.DiscardItem> discardStat(@Param("fromTime") LocalDateTime fromTime);

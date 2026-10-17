@@ -39,7 +39,8 @@ public class LotteryIssueService {
 
     /**
      * 期号状态：0-待开奖（可售卖、可编辑、可删除）
-     */
+     */
+
 
     /**
      * 分页查询
@@ -124,7 +125,7 @@ public class LotteryIssueService {
     /**
      * 售卖窗口合法性，返回 null 表示通过
      */
-    private String checkSaleWindow(java.time.LocalDateTime start, java.time.LocalDateTime end) {
+    private String checkSaleWindow(LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null) {
             return "售卖起止时间不能为空";
         }

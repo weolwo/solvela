@@ -10,6 +10,7 @@ import solvela.event.BizActionEvent;
 import solvela.member.grade.GrowthProperties;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Objects;
 
 /**
@@ -122,7 +123,7 @@ public class GrowthEventListener {
             return 0L;
         }
         return amount.multiply(BigDecimal.valueOf(growthProperties.getScoreRatio()))
-                .setScale(0, java.math.RoundingMode.DOWN)
+                .setScale(0, RoundingMode.DOWN)
                 .longValue();
     }
 

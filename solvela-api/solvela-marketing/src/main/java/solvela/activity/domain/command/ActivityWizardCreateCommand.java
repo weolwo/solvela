@@ -1,11 +1,12 @@
 package solvela.activity.domain.command;
 
-import solvela.enums.ApproveModeEnum;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.validation.enumeration.CheckEnum;
 import solvela.enums.ActivityTypeEnum;
+import solvela.enums.ApproveModeEnum;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -76,7 +77,7 @@ public class ActivityWizardCreateCommand {
         private Long promotionConfigId;
 
         /** 奖励价值 */
-        private java.math.BigDecimal prizeValue;
+        private BigDecimal prizeValue;
 
         /** 审批模式：0-自动免审, 1-人工审批 */
         private ApproveModeEnum approveMode;

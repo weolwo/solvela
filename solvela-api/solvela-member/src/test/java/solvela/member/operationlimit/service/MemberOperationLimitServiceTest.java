@@ -5,18 +5,23 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import solvela.base.module.redis.RedisService;
+import solvela.crypto.PiiCipher;
+import solvela.crypto.PiiHasher;
 import solvela.enums.MemberOperationLimitStatusEnum;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberOperationUnlockTypeEnum;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.member.MemberOperationLimit;
+import solvela.member.auth.MemberAuthDao;
 import solvela.member.operationlimit.MemberOperationLimitProperties;
 import solvela.member.operationlimit.dao.MemberOperationLimitDao;
-import solvela.enums.NotificationTemplateEnum;
+import solvela.member.risk.feature.PasswordCooldownStore;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
 
@@ -67,14 +72,14 @@ class MemberOperationLimitServiceTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private solvela.member.auth.MemberAuthDao memberAuthDao;
+    private MemberAuthDao memberAuthDao;
     @Mock
-    private solvela.crypto.PiiCipher piiCipher;
+    private PiiCipher piiCipher;
     @Mock
-    private solvela.crypto.PiiHasher piiHasher;
+    private PiiHasher piiHasher;
     /** 解冻 LOGIN 时要清 Redis 里的密码冷却键；这批用例只管表，所以给一个空壳 */
     @Mock
-    private solvela.member.risk.feature.PasswordCooldownStore cooldownStore;
+    private PasswordCooldownStore cooldownStore;
 
     private MemberOperationLimitProperties properties;
     private MemberOperationLimitService service;
@@ -174,7 +179,7 @@ class MemberOperationLimitServiceTest {
 
         // 粒度太粗的话，改密码失败会把登录失败的计数一起清掉，两种限制互相抵消
         verify(redisService).generateRedisKey(anyString(),
-                org.mockito.ArgumentMatchers.eq(LOGIN.getValue() + ":" + MEMBER_ID));
+                ArgumentMatchers.eq(LOGIN.getValue() + ":" + MEMBER_ID));
         verify(redisService).delete(anyString());
     }
 
@@ -209,7 +214,7 @@ class MemberOperationLimitServiceTest {
     }
 
     private Long eqMemberId() {
-        return org.mockito.ArgumentMatchers.eq(MEMBER_ID);
+        return ArgumentMatchers.eq(MEMBER_ID);
     }
 
     private MemberOperationLimit limitExpiringIn(long seconds) {

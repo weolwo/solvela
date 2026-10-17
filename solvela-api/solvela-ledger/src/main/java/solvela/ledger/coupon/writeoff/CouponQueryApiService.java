@@ -124,7 +124,7 @@ public class CouponQueryApiService implements CouponQueryApi {
                 result.unusable().stream().map(CouponQueryApiService::toItem).toList());
     }
 
-    private static boolean isBlank(java.math.BigDecimal amount) {
+    private static boolean isBlank(BigDecimal amount) {
         return amount == null || amount.signum() <= 0;
     }
 

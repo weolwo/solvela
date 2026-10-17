@@ -1,16 +1,16 @@
 package solvela.lottery.issue.dao;
 
-        import java.util.List;
-
-        import solvela.lottery.LotteryIssue;
-        import solvela.lottery.issue.domain.query.LotteryIssueQuery;
-        import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
-        import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
-import solvela.enums.IssueStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.enums.IssueStatusEnum;
+import solvela.lottery.LotteryIssue;
+import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
+import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
+import solvela.lottery.issue.domain.query.LotteryIssueQuery;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -57,7 +57,7 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      * 全系统只认数据库一个时钟。多实例部署时各节点 JVM 时钟未必一致，
      * 用 JVM 时间会出现「A 节点认为还能买、B 节点认为已截止」。
      */
-    java.time.LocalDateTime selectDbNow();
+    LocalDateTime selectDbNow();
 
     /**
      * 已发数 +1，条件更新做防超发兜底。

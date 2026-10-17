@@ -6,5 +6,5 @@ import solvela.member.MemberGrowthLog;
 
 /** MemberGrowthLog Dao */
 @Mapper
-public interface MemberGrowthLogDao extends BaseMapper<solvela.member.MemberGrowthLog> {
+public interface MemberGrowthLogDao extends BaseMapper<MemberGrowthLog> {
 }

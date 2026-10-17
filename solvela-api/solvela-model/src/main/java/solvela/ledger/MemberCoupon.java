@@ -1,14 +1,17 @@
 package solvela.ledger;
 
-import solvela.enums.CouponStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-
-import java.time.LocalDateTime;
-
 import lombok.Data;
+import solvela.enums.CouponDeductTargetEnum;
+import solvela.enums.CouponDiscountTypeEnum;
+import solvela.enums.CouponScopeTypeEnum;
+import solvela.enums.CouponStatusEnum;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 会员优惠券 实体类
@@ -106,22 +109,22 @@ public class MemberCoupon {
     private Integer templateVersion;
 
     /** 规则快照：FIXED-固定金额 / PERCENT-百分比 */
-    private solvela.enums.CouponDiscountTypeEnum discountType;
+    private CouponDiscountTypeEnum discountType;
 
     /** 规则快照：FIXED 时是抵扣额；PERCENT 时是折扣率（20 表示减 20%） */
-    private java.math.BigDecimal discountValue;
+    private BigDecimal discountValue;
 
     /** 规则快照：最低消费门槛，0 表示无门槛 */
-    private java.math.BigDecimal minAmount;
+    private BigDecimal minAmount;
 
     /** 规则快照：最高抵扣。PERCENT 时必填，不设上限就是资损口子 */
-    private java.math.BigDecimal maxDiscount;
+    private BigDecimal maxDiscount;
 
     /** 规则快照：CASH-抵现金 / SCORE-抵积分。🔴 两者不可比，试算时别跨类选最优 */
-    private solvela.enums.CouponDeductTargetEnum deductTarget;
+    private CouponDeductTargetEnum deductTarget;
 
     /** 规则快照：适用范围 */
-    private solvela.enums.CouponScopeTypeEnum scopeType;
+    private CouponScopeTypeEnum scopeType;
 
     /** 规则快照：范围明细，json 数组 */
     private String scopeRefs;
@@ -135,7 +138,7 @@ public class MemberCoupon {
     private String lockedBizId;
 
     /** 锁定时间。兜底 job 按它判超时 */
-    private java.time.LocalDateTime lockedTime;
+    private LocalDateTime lockedTime;
 
     /**
      * 本次实际抵扣额。核销时写、释放时清空。
@@ -145,7 +148,7 @@ public class MemberCoupon {
      * 和 {@code t_member_notification.summary} 是同一个理由。
      * 两者不一致时以流水为准。
      */
-    private java.math.BigDecimal discountAmount;
+    private BigDecimal discountAmount;
 
     /**
      * 创建人

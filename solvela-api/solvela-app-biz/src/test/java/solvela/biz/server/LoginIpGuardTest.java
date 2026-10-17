@@ -13,15 +13,20 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.mail.MailService;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberRiskModeEnum;
 import solvela.member.api.AuthFailReason;
+import solvela.member.api.DeviceRegisterCmd;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.MemberAuthCmd;
+import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.MemberRegisterType;
 import solvela.member.auth.MemberAuthService;
+import solvela.member.device.DeviceService;
+import solvela.member.risk.dao.MemberRiskRuleDao;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.util.MemberEmailUtil;
 
@@ -82,13 +87,13 @@ class LoginIpGuardTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private solvela.member.risk.dao.MemberRiskRuleDao ruleDao;
+    private MemberRiskRuleDao ruleDao;
 
     @Autowired
     private LoginCounters counters;
 
     @Autowired
-    private solvela.member.device.DeviceService deviceService;
+    private DeviceService deviceService;
 
     private final List<String> usedIps = new ArrayList<>();
 
@@ -201,7 +206,7 @@ class LoginIpGuardTest {
         String email = registerWithPassword();
         // 领一个令牌、登成功一次，但【不】把 create_time 往前调
         String device = deviceService.register(
-                new solvela.member.api.DeviceRegisterCmd("H5", null, null, null, freshIp())).deviceId();
+                new DeviceRegisterCmd("H5", null, null, null, freshIp())).deviceId();
         usedDevices.add(device);
         assertTrue(login(freshIp(), email, PASSWORD, device).success());
         String ip = freshIp();
@@ -222,7 +227,7 @@ class LoginIpGuardTest {
      */
     private String oldDeviceWithSuccessfulLogin(String email) {
         String device = deviceService.register(
-                new solvela.member.api.DeviceRegisterCmd("H5", null, null, null, freshIp())).deviceId();
+                new DeviceRegisterCmd("H5", null, null, null, freshIp())).deviceId();
         usedDevices.add(device);
         assertTrue(login(freshIp(), email, PASSWORD, device).success(), "造数：这一次登录应当成功");
         jdbcTemplate.update("UPDATE t_device SET create_time = NOW() - INTERVAL 8 DAY WHERE device_id = ?",
@@ -258,7 +263,7 @@ class LoginIpGuardTest {
     @DisplayName("🔴 密码冷却开着时它先于 IP 失败阈值触发 —— 两者谁先到，看的是规则表里的数")
     void 冷却先于IP失败阈值() {
         try (RiskRuleFixture cooldownOn = new RiskRuleFixture(ruleDao)
-                .mode("PWD_COOLDOWN", solvela.enums.MemberRiskModeEnum.ENFORCE)) {
+                .mode("PWD_COOLDOWN", MemberRiskModeEnum.ENFORCE)) {
             String email = registerWithPassword();
             String ip = freshIp();
 
@@ -297,11 +302,11 @@ class LoginIpGuardTest {
 
     // ============================== 工具 ==============================
 
-    private solvela.member.api.MemberAuthResult login(String ip, String email, String password) {
+    private MemberAuthResult login(String ip, String email, String password) {
         return login(ip, email, password, null);
     }
 
-    private solvela.member.api.MemberAuthResult login(String ip, String email, String password,
+    private MemberAuthResult login(String ip, String email, String password,
                                                       String deviceId) {
         return memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.EMAIL_PASSWORD, email, password, null, "H5", ip, deviceId, true));

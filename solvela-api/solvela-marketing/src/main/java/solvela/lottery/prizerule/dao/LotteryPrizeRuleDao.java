@@ -1,14 +1,13 @@
 package solvela.lottery.prizerule.dao;
 
-        import java.util.List;
-
-        import solvela.lottery.LotteryPrizeRule;
-        import solvela.lottery.prizerule.domain.query.LotteryPrizeRuleQuery;
-        import solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.lottery.LotteryPrizeRule;
+import solvela.lottery.prizerule.domain.dto.LotteryPrizeRuleDTO;
+import solvela.lottery.prizerule.domain.query.LotteryPrizeRuleQuery;
+
 import java.util.List;
 
 /**

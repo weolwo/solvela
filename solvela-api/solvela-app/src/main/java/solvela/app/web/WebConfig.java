@@ -8,6 +8,7 @@ import solvela.app.auth.AuthorizationInterceptor;
 import solvela.app.auth.CrossOriginGuardInterceptor;
 import solvela.app.auth.DeviceRequirementInterceptor;
 import solvela.app.auth.StepUpInterceptor;
+import solvela.app.ratelimit.RateLimitInterceptor;
 
 /**
  * C 端的 MVC 装配。
@@ -32,7 +33,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final DeviceRequirementInterceptor deviceRequirementInterceptor;
 
-    private final solvela.app.ratelimit.RateLimitInterceptor rateLimitInterceptor;
+    private final RateLimitInterceptor rateLimitInterceptor;
 
     private final AuthorizationInterceptor authorizationInterceptor;
 

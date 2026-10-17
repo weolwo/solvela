@@ -1,24 +1,25 @@
 package solvela.member.service;
 
-import solvela.enums.MemberStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import solvela.base.domain.PageResult;
-import solvela.exception.BusinessException;
+import solvela.auth.member.MemberTokenStore;
 import solvela.base.dao.SolvelaPageUtil;
+import solvela.base.domain.PageResult;
+import solvela.enums.MemberStatusEnum;
+import solvela.exception.BusinessException;
+import solvela.member.Member;
 import solvela.member.constant.MemberConst;
 import solvela.member.dao.MemberDao;
-import solvela.member.Member;
-import solvela.member.manager.MemberManager;
-import solvela.auth.member.MemberTokenStore;
-import solvela.member.stepup.DeviceTrustStore;
-import solvela.member.domain.query.MemberQuery;
 import solvela.member.domain.dto.MemberDTO;
+import solvela.member.domain.query.MemberQuery;
+import solvela.member.manager.MemberManager;
+import solvela.member.stepup.DeviceTrustStore;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -163,7 +164,7 @@ public class MemberService {
      * 返回 null 时调用方<b>只放行 ALL 人群</b> —— 宁可少发一条定向公告，
      * 也不要把一条本该定向的公告发给全体。
      */
-    public java.time.LocalDateTime getCreateTime(Long memberId) {
+    public LocalDateTime getCreateTime(Long memberId) {
         return memberId == null ? null : memberDao.selectCreateTimeById(memberId);
     }
 
@@ -191,13 +192,13 @@ public class MemberService {
      * @return {@code null} 表示查不到该会员，调用方应当如实往下传
      */
     public Boolean isNewMember(Long memberId) {
-        java.time.LocalDateTime createTime = getCreateTime(memberId);
+        LocalDateTime createTime = getCreateTime(memberId);
         if (createTime == null) {
             log.warn("【会员人群】查不到会员的注册时间，无法判定新老, memberId: {}", memberId);
             return null;
         }
         return createTime.isAfter(
-                java.time.LocalDateTime.now().minus(audienceProperties.getNewMemberWithin()));
+                LocalDateTime.now().minus(audienceProperties.getNewMemberWithin()));
     }
 
     /**

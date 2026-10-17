@@ -21,6 +21,7 @@ import solvela.member.entitlement.service.GradeEntitlementGrantService;
 import solvela.member.entitlement.service.GradeEntitlementGrantService.GenerateResult;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -202,7 +203,7 @@ class GradeEntitlementGrantServiceTest {
          *    根本不会有第二次调用 —— 那样这条用例验的就不是游标，而是提前收工。
          *    批大小是服务内部的常量，这里按它构造 500 条。
          */
-        List<EntitlementCandidate> fullBatch = new java.util.ArrayList<>();
+        List<EntitlementCandidate> fullBatch = new ArrayList<>();
         for (int i = 1; i <= 500; i++) {
             fullBatch.add(candidate(i, 0));
         }

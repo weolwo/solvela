@@ -9,8 +9,8 @@ import solvela.enums.TaskConfigStatusEnum;
 import solvela.marketing.api.TaskCenterItem;
 import solvela.marketing.api.TaskStageView;
 import solvela.member.grade.service.MemberGrowthService;
-import solvela.prize.prizeconfig.service.PrizeCatalog;
 import solvela.prize.PrizeConfig;
+import solvela.prize.prizeconfig.service.PrizeCatalog;
 import solvela.task.TaskConfig;
 import solvela.task.TaskPrizeMapping;
 import solvela.task.TaskRecord;
@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -335,7 +336,7 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
     private static BigDecimal resolveTarget(TaskConfig task, List<TaskStageView> stages) {
         return stages.stream()
                 .map(TaskStageView::target)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .max(BigDecimal::compareTo)
                 .orElseGet(() -> TaskRuleConfig.parse(task.getRuleConfig()).target());
     }

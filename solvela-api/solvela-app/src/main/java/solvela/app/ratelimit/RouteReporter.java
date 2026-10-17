@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -74,7 +75,7 @@ public class RouteReporter {
 
     /** 接口键 → 场景名。没标 {@code @RateLimit} 的接口不在里面（单测保证没有这种接口） */
     Map<String, String> routeScenes() {
-        Map<String, String> scenes = new java.util.TreeMap<>();
+        Map<String, String> scenes = new TreeMap<>();
         handlerMapping.getHandlerMethods().forEach((info, method) -> {
             RateLimit rateLimit = method.getMethodAnnotation(RateLimit.class);
             if (rateLimit == null) {

@@ -2,7 +2,14 @@ package solvela.member.password;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import solvela.member.api.MemberPasswordPolicy;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -61,10 +68,10 @@ class WeakPasswordCheckerTest {
     @Test
     @DisplayName("🔴 表里不该有【过不了强度校验】的条目 —— 那种条目永远轮不到本类来挡")
     void 没有死条目() throws Exception {
-        java.util.List<String> dead = new java.util.ArrayList<>();
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(
-                new org.springframework.core.io.ClassPathResource("member/weak-passwords.txt").getInputStream(),
-                java.nio.charset.StandardCharsets.UTF_8))) {
+        List<String> dead = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new ClassPathResource("member/weak-passwords.txt").getInputStream(),
+                StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String value = line.trim();

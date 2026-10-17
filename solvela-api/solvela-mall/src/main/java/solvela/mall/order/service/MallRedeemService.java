@@ -5,18 +5,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
-import solvela.mall.commodity.GradeDiscount;
-import solvela.mall.commodity.MallGradeDiscountResolver;
-import solvela.mall.commodity.MallGradeGate;
-import solvela.mall.commodity.MallPricing;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCommodity;
 import solvela.mall.MallOrder;
 import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
+import solvela.mall.commodity.GradeDiscount;
+import solvela.mall.commodity.MallGradeDiscountResolver;
+import solvela.mall.commodity.MallGradeGate;
+import solvela.mall.commodity.MallPricing;
 import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.exchangelimit.dao.MallExchangeLimitDao;
 import solvela.mall.order.event.MallOrderActionPublisher;
@@ -29,6 +30,7 @@ import solvela.marketing.api.MallRedeemReason;
 import solvela.marketing.api.MallRedeemResult;
 import solvela.member.api.AssetDebitApi;
 import solvela.member.api.AssetDebitCmd;
+import solvela.member.api.AssetDebitResult;
 import solvela.member.api.CouponLockCmd;
 import solvela.member.api.CouponQueryApi;
 import solvela.member.api.CouponTrialQuery;
@@ -36,13 +38,13 @@ import solvela.member.api.CouponTrialView;
 import solvela.member.api.CouponWriteOffApi;
 import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
-import solvela.member.api.AssetDebitResult;
 import solvela.member.service.MemberService;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * 兑换下单。<b>整条链路只有这一个入口。</b>
@@ -199,7 +201,7 @@ public class MallRedeemService {
          *    但写法要和列表页保持一致，见 MallGradeDiscountResolver 的注释。
          */
         GradeDiscount discount = mallGradeDiscountResolver.forMember(
-                cmd.memberId(), java.util.List.of(commodity.getId()));
+                cmd.memberId(), List.of(commodity.getId()));
         int listPoints = MallPricing.listPoints(sku, commodity);
         int gradedPoints = MallPricing.points(sku, commodity, discount);
         int originalPoints = gradedPoints * quantity;
@@ -536,7 +538,7 @@ public class MallRedeemService {
      * 表现是「积分不足」这类用户文案全变成 500。
      */
     protected void markRollbackOnly() {
-        org.springframework.transaction.interceptor.TransactionAspectSupport
+        TransactionAspectSupport
                 .currentTransactionStatus().setRollbackOnly();
     }
 

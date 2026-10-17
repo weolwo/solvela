@@ -5,10 +5,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import solvela.member.loginlog.domain.query.MemberLoginLogQuery;
 import solvela.member.MemberLoginLog;
-import solvela.member.loginlog.domain.dto.MemberLoginLogStatDTO;
+import solvela.member.loginlog.domain.dto.LoginTraceDTO;
 import solvela.member.loginlog.domain.dto.MemberLoginLogDTO;
+import solvela.member.loginlog.domain.dto.MemberLoginLogStatDTO;
+import solvela.member.loginlog.domain.query.MemberLoginLogQuery;
 
 import java.util.List;
 
@@ -70,7 +71,7 @@ public interface MemberLoginLogDao extends BaseMapper<MemberLoginLog> {
              ORDER BY create_time DESC
              LIMIT #{limit}
             """)
-    List<solvela.member.loginlog.domain.dto.LoginTraceDTO> selectRecentSuccess(
+    List<LoginTraceDTO> selectRecentSuccess(
             @Param("memberId") Long memberId,
             @Param("successStatus") int successStatus,
             @Param("lookbackDays") int lookbackDays,

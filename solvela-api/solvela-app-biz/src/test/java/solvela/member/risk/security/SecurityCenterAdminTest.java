@@ -19,6 +19,7 @@ import solvela.security.SecurityKeys;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -191,7 +192,7 @@ class SecurityCenterAdminTest {
         assertEquals(1, page.total());
         assertEquals("<img src=x onerror=alert(1)>", page.list().get(0).userAgent(), "原样返回，转义是前端的事（只按纯文本渲染）");
         assertThrows(IllegalArgumentException.class, () -> incidentService.queryPage(new SecurityIncidentAdminService.Query(
-                null, null, null, null, java.time.LocalDateTime.now().minusDays(40), null, 1, 20)));
+                null, null, null, null, LocalDateTime.now().minusDays(40), null, 1, 20)));
     }
 
     private static RateLimitRuleAdminService.RuleValues values(int burst, int l3, int l5, int l10) {

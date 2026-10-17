@@ -1,10 +1,12 @@
 package solvela.member.risk.rule;
 
+import solvela.enums.MemberRiskDecisionEnum;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.risk.feature.RiskParams;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -43,7 +45,7 @@ public abstract class TieredCountRule implements RiskRule {
     @Override
     public void validate(JsonNode params) {
         RiskParams.tiers(params);
-        RiskParams.duration(params, "window", java.time.Duration.ofHours(1));
+        RiskParams.duration(params, "window", Duration.ofHours(1));
     }
 
     @Override
@@ -74,7 +76,7 @@ public abstract class TieredCountRule implements RiskRule {
      * 做成一个钩子而不是基类自己去问豁免，是因为<b>设备维度的规则不该有这个豁免</b>：
      * 那几条挡的正是「这台设备在挨个试号」，而「这台设备很老」恰恰不是免责理由。
      */
-    protected solvela.enums.MemberRiskDecisionEnum limitCeiling(RiskContext ctx) {
+    protected MemberRiskDecisionEnum limitCeiling(RiskContext ctx) {
         return null;
     }
 

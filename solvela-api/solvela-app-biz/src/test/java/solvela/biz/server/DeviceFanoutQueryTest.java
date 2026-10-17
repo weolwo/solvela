@@ -17,6 +17,7 @@ import solvela.member.device.DeviceService;
 import solvela.member.device.domain.dto.DeviceMemberDTO;
 import solvela.member.device.domain.query.DeviceQuery;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -55,7 +56,7 @@ class DeviceFanoutQueryTest {
 
     private String deviceId;
 
-    private final List<Long> memberIds = new java.util.ArrayList<>();
+    private final List<Long> memberIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {

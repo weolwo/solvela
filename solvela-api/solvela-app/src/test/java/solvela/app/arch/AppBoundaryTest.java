@@ -2,10 +2,13 @@ package solvela.app.arch;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import solvela.code.ErrorCode;
 
 import java.util.Map;
 
@@ -88,7 +91,7 @@ class AppBoundaryTest {
         // 框架自带的 advice（springdoc 的 OpenApiResourceAdvice）不算 —— 它不碰业务异常。
         // 要防的是<b>本项目自己的</b>第二个错误出口。
         var ours = context.getBeansWithAnnotation(RestControllerAdvice.class).entrySet().stream()
-                .filter(e -> org.springframework.aop.support.AopUtils.getTargetClass(e.getValue())
+                .filter(e -> AopUtils.getTargetClass(e.getValue())
                         .getName().startsWith("solvela."))
                 .map(Map.Entry::getKey)
                 .toList();
@@ -98,7 +101,7 @@ class AppBoundaryTest {
 
                         最可能的原因是组件扫描把 solvela.web 包了进来 —— 那里的
                         GlobalExceptionHandler 是<b>管理端</b>的错误出口。两边现在都返回
-                        真实 HTTP 状态码，但错误码表不同：管理端用 solvela.code.ErrorCode
+                        真实 HTTP 状态码，但错误码表不同：管理端用 ErrorCode
                         （NO_PERMISSION / LOGIN_ACTIVE_TIMEOUT…），C 端用 ApiErrors
                         （LOGIN_REQUIRED / BAD_CREDENTIALS…）。
                         两个 advice 同时在场时，返回哪套 code 取决于哪个先匹配上，
@@ -111,9 +114,9 @@ class AppBoundaryTest {
     @DisplayName("共享模块的 controller 一个都没被装配")
     void 没有外来的接口() {
         Map<String, Object> controllers =
-                context.getBeansWithAnnotation(org.springframework.stereotype.Controller.class);
+                context.getBeansWithAnnotation(Controller.class);
         var foreign = controllers.values().stream()
-                .map(bean -> org.springframework.aop.support.AopUtils.getTargetClass(bean).getName())
+                .map(bean -> AopUtils.getTargetClass(bean).getName())
                 // 只看 solvela 自己的类：Spring Boot 的 BasicErrorController、
                 // springdoc 的文档端点都是框架该有的，不在讨论范围内
                 .filter(name -> name.startsWith("solvela.") && !name.startsWith("solvela.app."))

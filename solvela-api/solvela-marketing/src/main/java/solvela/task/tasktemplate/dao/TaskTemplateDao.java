@@ -1,14 +1,13 @@
 package solvela.task.tasktemplate.dao;
 
-        import java.util.List;
-
-        import solvela.task.TaskTemplate;
-        import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
-        import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.task.TaskTemplate;
+import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
+import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
+
 import java.util.List;
 
 /**

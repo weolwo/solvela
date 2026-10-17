@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -14,9 +15,9 @@ import solvela.member.MemberGrowth;
 import solvela.member.MemberGrowthLog;
 import solvela.member.grade.dao.MemberGrowthDao;
 import solvela.member.grade.dao.MemberGrowthLogDao;
-import solvela.member.grade.service.MemberGrowthService;
 import solvela.member.grade.service.MemberGradeChangeService;
 import solvela.member.grade.service.MemberGradeResolver;
+import solvela.member.grade.service.MemberGrowthService;
 
 import java.time.LocalDateTime;
 
@@ -164,7 +165,7 @@ class MemberGrowthServiceUpgradeTest {
     }
 
     private void doThrowOnInsert() {
-        org.mockito.Mockito.doThrow(new DuplicateKeyException("uk_t_mbr_gr_log_src"))
+        Mockito.doThrow(new DuplicateKeyException("uk_t_mbr_gr_log_src"))
                 .when(memberGrowthLogDao).insert(any(MemberGrowthLog.class));
     }
 }

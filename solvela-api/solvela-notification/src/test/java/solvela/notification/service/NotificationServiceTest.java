@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -155,7 +156,7 @@ class NotificationServiceTest {
     void 渠道异常不外抛() {
         when(notificationTemplateService.getLatestEnabled(anyString()))
                 .thenReturn(template("标题", "正文"));
-        org.mockito.Mockito.doThrow(new RuntimeException("库挂了")).when(sender).send(any());
+        Mockito.doThrow(new RuntimeException("库挂了")).when(sender).send(any());
 
         assertFalse(assertDoesNotThrow(() -> service.send(request())));
     }

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -13,11 +14,11 @@ import solvela.mall.MallAddress;
 import solvela.mall.MallOrder;
 import solvela.mall.address.service.MallAddressService;
 import solvela.mall.order.dao.MallOrderDao;
-import solvela.notification.service.NotificationService;
 import solvela.member.api.AssetGrantApi;
 import solvela.member.api.AssetGrantCmd;
 import solvela.member.api.AssetGrantReason;
 import solvela.member.api.AssetGrantResult;
+import solvela.notification.service.NotificationService;
 
 import java.math.BigDecimal;
 
@@ -200,7 +201,7 @@ class MallFulfillServiceTest {
             service.fulfill(ORDER_NO);
         }
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(mallOrderDao, org.mockito.Mockito.atLeastOnce()).markFailed(anyString(), captor.capture());
+        verify(mallOrderDao, Mockito.atLeastOnce()).markFailed(anyString(), captor.capture());
         // 超长在 MySQL 严格模式下不是截断，是整条 UPDATE 被拒 —— 单子会卡在「履约中」
         captor.getAllValues().forEach(text ->
                 assertTrue(text.length() <= 255, "失败原因超长: " + text));

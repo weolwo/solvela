@@ -16,6 +16,8 @@ import solvela.member.api.DeviceTrust;
 import solvela.member.api.MemberStepUpApi;
 import solvela.member.api.StepUpCmd;
 
+import java.util.Map;
+
 /**
  * 不受信任的设备调用 {@link StepUpRequired} 接口时，要求先过二次验证。
  *
@@ -214,6 +216,6 @@ public class StepUpInterceptor implements HandlerInterceptor {
                 memberId, request.getMethod(), request.getRequestURI());
         return new ApiException(ApiErrors.ASSET_OUT_FROZEN, ApiErrors.ASSET_OUT_FROZEN.defaultMessage(),
                 // 事实，不是 UI：前端据它决定那颗按钮跳哪儿（方案 §6.4 约定 2）
-                java.util.Map.of("unlock", "PASSWORD_RESET"));
+                Map.of("unlock", "PASSWORD_RESET"));
     }
 }

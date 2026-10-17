@@ -9,6 +9,7 @@ import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.api.MemberLoginType;
 import solvela.member.auth.MemberAuthDao;
+import solvela.member.contact.ContactCoolingStore;
 import solvela.member.sms.MemberSmsCodeService;
 
 /**
@@ -51,7 +52,7 @@ public class VerifyRouter {
     private final MemberSmsCodeService smsCodeService;
 
     /** 新绑的联系方式在冷静期内一律当「这条通道不可用」（方案 §6.4） */
-    private final solvela.member.contact.ContactCoolingStore coolingStore;
+    private final ContactCoolingStore coolingStore;
 
     /**
      * 选定的通道。

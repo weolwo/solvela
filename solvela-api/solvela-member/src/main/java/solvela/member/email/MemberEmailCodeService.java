@@ -2,6 +2,7 @@ package solvela.member.email;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.mail.MailService;
@@ -68,7 +69,7 @@ public class MemberEmailCodeService {
      * <p>{@code @RequiredArgsConstructor} 不便带 {@code @Qualifier}，故走字段注入。
      */
     @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
-    private org.springframework.core.task.AsyncTaskExecutor emailSendExecutor;
+    private AsyncTaskExecutor emailSendExecutor;
 
     /**
      * 🔴 生产环境不许用 LOG 通道，<b>启动即失败</b>。

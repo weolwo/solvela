@@ -1,7 +1,5 @@
 package solvela.app.controller;
 
-import solvela.app.ratelimit.RateLimit;
-import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -15,6 +13,8 @@ import solvela.app.auth.CurrentDevice;
 import solvela.app.auth.CurrentMember;
 import solvela.app.domain.StepUpCodeView;
 import solvela.app.domain.StepUpVerifyRequest;
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.app.web.ClientIp;
@@ -22,6 +22,8 @@ import solvela.member.api.MemberStepUpApi;
 import solvela.member.api.StepUpCmd;
 import solvela.member.api.StepUpFailReason;
 import solvela.member.api.StepUpResult;
+
+import java.util.Map;
 
 /**
  * 敏感操作二次验证。客户端收到 {@code STEP_UP_REQUIRED} 后走这两步，然后<b>重试原请求</b>。
@@ -92,14 +94,14 @@ public class StepUpController {
              */
             case NO_EMAIL -> new ApiException(ApiErrors.CONTACT_BIND_REQUIRED,
                     ApiErrors.CONTACT_BIND_REQUIRED.defaultMessage(),
-                    java.util.Map.of("need", "EMAIL"));
+                    Map.of("need", "EMAIL"));
             /*
              * 新绑的联系方式还在冷静期。给可用时间，不给「重新绑定」的出路 ——
              * 再绑一次只会再冷静 7 天。
              */
             case CONTACT_COOLING -> new ApiException(ApiErrors.CONTACT_COOLING,
                     ApiErrors.CONTACT_COOLING.defaultMessage(),
-                    java.util.Map.of("availableAt",
+                    Map.of("availableAt",
                             System.currentTimeMillis() / 1000L + Math.max(0L, result.retryAfterSeconds())));
             case TOO_FREQUENT -> new ApiException(ApiErrors.OPERATION_LIMITED,
                     String.format("验证码已发送，请 %d 秒后再试", Math.max(1, result.retryAfterSeconds())));

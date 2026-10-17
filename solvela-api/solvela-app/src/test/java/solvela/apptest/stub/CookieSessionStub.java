@@ -5,21 +5,23 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import solvela.auth.device.DeviceTokenCodec;
 import solvela.enums.GenderEnum;
+import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceApi;
 import solvela.member.api.DeviceRegisterCmd;
 import solvela.member.api.DeviceRegisterResult;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.EmailCodeSendResult;
-import solvela.member.api.MemberAuthApi;
-import solvela.member.api.LoginChallengeCodeResult;
 import solvela.member.api.LoginChallengeCmd;
+import solvela.member.api.LoginChallengeCodeResult;
+import solvela.member.api.MemberAuthApi;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberEmailBindCmd;
 import solvela.member.api.MemberEmailBindResult;
 import solvela.member.api.MemberIdentity;
+import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberLogoutCmd;
 import solvela.member.api.MemberPasswordResetCmd;
 import solvela.member.api.MemberPasswordResetResult;
@@ -28,6 +30,7 @@ import solvela.member.api.MemberPhoneBindResult;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.MemberStepUpApi;
+import solvela.member.api.SessionReportCmd;
 import solvela.member.api.SmsCodeSendCmd;
 import solvela.member.api.SmsCodeSendResult;
 import solvela.member.api.StepUpCmd;
@@ -87,7 +90,7 @@ public class CookieSessionStub {
             @Override
             public MemberAuthResult authenticate(MemberAuthCmd cmd) {
                 boolean passwordLogin = cmd.loginType() == null
-                        || cmd.loginType() != solvela.member.api.MemberLoginType.EMAIL_CODE;
+                        || cmd.loginType() != MemberLoginType.EMAIL_CODE;
                 if (passwordLogin && !Boolean.TRUE.equals(cmd.captchaPassed())) {
                     return MemberAuthResult.captchaRequired();
                 }
@@ -178,12 +181,12 @@ public class CookieSessionStub {
 
             /** 这些用例不碰资产出口冻结，一律当「没冻、受信任」 */
             @Override
-            public solvela.member.api.AssetOutVerdict assetOut(StepUpCmd cmd) {
-                return solvela.member.api.AssetOutVerdict.pass(DeviceTrust.VERIFIED);
+            public AssetOutVerdict assetOut(StepUpCmd cmd) {
+                return AssetOutVerdict.pass(DeviceTrust.VERIFIED);
             }
 
             @Override
-            public boolean reportNotMe(solvela.member.api.SessionReportCmd cmd) {
+            public boolean reportNotMe(SessionReportCmd cmd) {
                 return true;
             }
         };

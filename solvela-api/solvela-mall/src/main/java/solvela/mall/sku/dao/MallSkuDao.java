@@ -1,15 +1,15 @@
 package solvela.mall.sku.dao;
 
-        import java.util.List;
-
-        import solvela.mall.MallSku;
-        import solvela.mall.sku.domain.query.MallSkuQuery;
-        import solvela.mall.sku.domain.dto.MallSkuDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
+import solvela.mall.MallSku;
+import solvela.mall.sku.domain.dto.MallSkuDTO;
+import solvela.mall.sku.domain.query.MallSkuQuery;
+
+import java.util.List;
 
 /**
  * 商城-SKU与库存 Dao

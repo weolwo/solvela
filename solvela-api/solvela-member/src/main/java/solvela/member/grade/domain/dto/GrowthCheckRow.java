@@ -2,6 +2,8 @@ package solvela.member.grade.domain.dto;
 
 import lombok.Data;
 
+import java.util.Objects;
+
 /**
  * 对账扫描出来的一行：主表记的值 vs 流水求和。
  *
@@ -27,7 +29,7 @@ public class GrowthCheckRow {
     private Long logSum;
 
     public boolean drifted() {
-        return !java.util.Objects.equals(recorded, logSum);
+        return !Objects.equals(recorded, logSum);
     }
 
     /** 主表比流水多了多少（负数表示少了） */

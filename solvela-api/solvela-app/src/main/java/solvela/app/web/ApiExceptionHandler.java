@@ -26,6 +26,7 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * 把异常翻成 HTTP 响应。<b>本进程唯一的错误出口。</b>
@@ -72,14 +73,14 @@ public class ApiExceptionHandler {
      * <p>🔴 只在 429 上加。403 / 409 上的 {@code Retry-After} 语义是「这个资源多久后可用」，
      * 与「你多久后可以再试」不是一回事，带上去只会让中间层做出错误的缓存决定。
      */
-    private static java.util.Optional<Long> retryAfter(ApiException e) {
+    private static Optional<Long> retryAfter(ApiException e) {
         if (e.error().status() != HttpStatus.TOO_MANY_REQUESTS || e.details() == null) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
         Object seconds = e.details().get("retryAfterSeconds");
         return seconds instanceof Number number && number.longValue() > 0
-                ? java.util.Optional.of(number.longValue())
-                : java.util.Optional.empty();
+                ? Optional.of(number.longValue())
+                : Optional.empty();
     }
 
     /**

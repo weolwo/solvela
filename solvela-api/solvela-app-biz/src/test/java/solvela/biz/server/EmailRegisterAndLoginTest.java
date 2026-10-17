@@ -4,10 +4,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.mail.MailService;
@@ -187,7 +188,7 @@ class EmailRegisterAndLoginTest {
     void 已注册的邮箱不寄注册码() {
         email = freshEmail();
         assertTrue(register(sendAndReadCode(EmailCodeScene.REGISTER, email), null).success());
-        org.mockito.Mockito.clearInvocations(mailService);
+        Mockito.clearInvocations(mailService);
 
         assertTrue(memberAuthService.sendEmailCode(
                         new EmailCodeSendCmd(EmailCodeScene.REGISTER, email, freshIp(), null)).success(),
@@ -244,7 +245,7 @@ class EmailRegisterAndLoginTest {
     @DisplayName("🔴 没有账号的邮箱：照样存码、照样成功，只是不寄信")
     void 没有账号也存码() {
         String stranger = freshEmail();
-        org.mockito.Mockito.clearInvocations(mailService);
+        Mockito.clearInvocations(mailService);
 
         assertTrue(memberAuthService.sendEmailCode(
                         new EmailCodeSendCmd(EmailCodeScene.LOGIN, stranger, freshIp(), null)).success(),

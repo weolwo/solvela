@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -84,11 +85,11 @@ class MemberSmsCodeServiceTest {
         // 计数键默认没超
         when(redisService.increment(anyString(), anyLong())).thenReturn(1L);
         when(smsSender.available()).thenReturn(true);
-        org.mockito.Mockito.doAnswer(i -> {
+        Mockito.doAnswer(i -> {
             store.put(i.getArgument(0), i.getArgument(1));
             return null;
         }).when(redisService).set(anyString(), anyString(), anyLong());
-        org.mockito.Mockito.doAnswer(i -> {
+        Mockito.doAnswer(i -> {
             store.remove(i.<String>getArgument(0));
             return null;
         }).when(redisService).delete(anyString());

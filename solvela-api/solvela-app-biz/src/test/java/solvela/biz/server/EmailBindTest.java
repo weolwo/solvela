@@ -1,13 +1,14 @@
 package solvela.biz.server;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.mail.MailService;
@@ -159,7 +160,7 @@ class EmailBindTest {
     }
 
     private static void assertNull(Object o) {
-        org.junit.jupiter.api.Assertions.assertNull(o);
+        Assertions.assertNull(o);
     }
 
     @Test

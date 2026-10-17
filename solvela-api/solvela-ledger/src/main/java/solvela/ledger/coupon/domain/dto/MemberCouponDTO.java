@@ -1,9 +1,13 @@
 package solvela.ledger.coupon.domain.dto;
 
-import solvela.enums.CouponStatusEnum;
-import java.time.LocalDateTime;
-
 import lombok.Data;
+import solvela.enums.CouponDeductTargetEnum;
+import solvela.enums.CouponDiscountTypeEnum;
+import solvela.enums.CouponScopeTypeEnum;
+import solvela.enums.CouponStatusEnum;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 会员券列表的<b>读模型</b>：mapper 的 resultMap 映射到这里，service 也返回它。
@@ -90,22 +94,22 @@ public class MemberCouponDTO {
     private Integer templateVersion;
 
     /** 规则快照：FIXED-固定金额 / PERCENT-百分比。null = 没有规则 */
-    private solvela.enums.CouponDiscountTypeEnum discountType;
+    private CouponDiscountTypeEnum discountType;
 
     /** 规则快照：FIXED 时是抵扣额，PERCENT 时是折扣率 */
-    private java.math.BigDecimal discountValue;
+    private BigDecimal discountValue;
 
     /** 规则快照：最低消费门槛。0 = 无门槛，null = 没有规则 */
-    private java.math.BigDecimal minAmount;
+    private BigDecimal minAmount;
 
     /** 规则快照：最高抵扣。PERCENT 时必填 */
-    private java.math.BigDecimal maxDiscount;
+    private BigDecimal maxDiscount;
 
     /** 规则快照：CASH-抵现金 / SCORE-抵积分 */
-    private solvela.enums.CouponDeductTargetEnum deductTarget;
+    private CouponDeductTargetEnum deductTarget;
 
     /** 规则快照：适用范围 */
-    private solvela.enums.CouponScopeTypeEnum scopeType;
+    private CouponScopeTypeEnum scopeType;
 
     /**
      * 锁定它的单据号。
@@ -123,7 +127,7 @@ public class MemberCouponDTO {
      *
      * <p>⚠️ 冗余列，<b>权威在 {@code t_coupon_write_off}</b>。两者不一致时以流水为准。
      */
-    private java.math.BigDecimal discountAmount;
+    private BigDecimal discountAmount;
 
     /**
      * 创建人

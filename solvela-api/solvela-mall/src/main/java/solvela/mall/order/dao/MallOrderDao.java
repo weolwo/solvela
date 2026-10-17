@@ -1,18 +1,18 @@
 package solvela.mall.order.dao;
 
-        import java.util.List;
-
-        import solvela.mall.MallOrder;
-        import solvela.mall.order.domain.query.MallOrderQuery;
-        import solvela.mall.order.domain.dto.MallOrderRankDTO;
-        import solvela.mall.order.domain.dto.MallOrderStatDTO;
-        import solvela.mall.order.domain.dto.MallOrderDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import solvela.mall.MallOrder;
+import solvela.mall.order.domain.dto.MallOrderDTO;
+import solvela.mall.order.domain.dto.MallOrderRankDTO;
+import solvela.mall.order.domain.dto.MallOrderStatDTO;
+import solvela.mall.order.domain.query.MallOrderQuery;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -149,7 +149,7 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
              ORDER BY expire_time
              LIMIT #{limit}
             """)
-    List<MallOrder> selectExpiredUnpaid(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+    List<MallOrder> selectExpiredUnpaid(@Param("now") LocalDateTime now, @Param("limit") int limit);
 
     /** 按订单号取单。order_no 上有唯一键，一定是 0 或 1 行 */
     @Select("SELECT * FROM t_mall_order WHERE order_no = #{orderNo}")
@@ -180,7 +180,7 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
              ORDER BY pay_time
              LIMIT #{limit}
             """)
-    List<MallOrder> selectSettledBetween(@Param("from") java.time.LocalDateTime from,
-                                         @Param("to") java.time.LocalDateTime to,
+    List<MallOrder> selectSettledBetween(@Param("from") LocalDateTime from,
+                                         @Param("to") LocalDateTime to,
                                          @Param("limit") int limit);
 }

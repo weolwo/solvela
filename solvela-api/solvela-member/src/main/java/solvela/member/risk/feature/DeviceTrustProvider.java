@@ -9,6 +9,7 @@ import solvela.member.api.DeviceTrust;
 import solvela.member.api.StepUpCmd;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDeviceTrust;
+import solvela.member.risk.config.RiskListCache;
 import solvela.member.stepup.MemberStepUpService;
 
 /**
@@ -49,7 +50,7 @@ public class DeviceTrustProvider {
 
     private final RedisService redisService;
 
-    private final solvela.member.risk.config.RiskListCache listCache;
+    private final RiskListCache listCache;
 
     /**
      * 算出信任档位并记进上下文。查无此人、没带设备令牌时分别是 {@link RiskDeviceTrust#NEW}

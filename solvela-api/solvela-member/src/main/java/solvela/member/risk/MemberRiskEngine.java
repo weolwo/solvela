@@ -61,6 +61,23 @@ public class MemberRiskEngine {
         return evaluate(session, MemberRiskPhaseEnum.PRE);
     }
 
+    /**
+     * 只能放行 / 限流 / 拒绝的场景（注册、重置密码、换绑联系方式）的前置决策。调用方只需要判 {@code atLeast(LIMIT)}。
+     *
+     * <p>🔴 规则给出了这些链路执行不了的处置（滑块 / OTP / 冷却）时：<b>放行并吵得够响</b>。
+     * 那几条链路上没有核身的落点（滑块票在发码那一步核销，接口本身已经验过一次码），
+     * 既不能静默（那等于这条规则不存在），也不能当成拦截（把一个配置错误变成「这个功能全站不可用」，代价完全不对称）。
+     * 正常情况下进不来 —— 分级档位由规则自己的 validate 拦、固定处置由 {@code RiskRuleRegistry.toConfig} 拦，这里是最后一层。
+     */
+    public RiskDecision evaluateGatePre(RiskSession session) {
+        RiskDecision pre = evaluatePre(session);
+        if (!pre.is(MemberRiskDecisionEnum.PASS) && !pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
+            log.error("【风控】{}场景给出了执行不了的处置: {}，本次放行 —— 请检查规则配置",
+                    session.context().getEventType().getDesc(), pre.decision());
+        }
+        return pre;
+    }
+
     public RiskDecision evaluatePost(RiskSession session) {
         return evaluate(session, MemberRiskPhaseEnum.POST);
     }

@@ -1,59 +1,63 @@
 package solvela.mall.clientapi;
 
-import java.math.BigDecimal;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import solvela.member.api.DeliveryReceiverCmd;
-import solvela.member.api.DeliveryFillResult;
-import solvela.member.api.DeliveryApi;
-import solvela.marketing.api.MallDeliveryFillResult;
-import solvela.enums.EnableStatusEnum;
 import solvela.base.module.file.service.FileAssetService;
+import solvela.enums.EnableStatusEnum;
 import solvela.enums.MallCommodityStatusEnum;
-import solvela.member.MemberGrade;
-import solvela.member.grade.service.MemberGradeResolver;
-import solvela.mall.commodity.MallGradeGate;
-import solvela.mall.commodity.GradeDiscount;
-import solvela.mall.commodity.MallGradeDiscountResolver;
-import solvela.mall.commodity.MallPricing;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCategory;
 import solvela.mall.MallCommodity;
-import solvela.mall.MallOrder;
+import solvela.mall.MallExchangeLimit;
 import solvela.mall.MallFavorite;
+import solvela.mall.MallOrder;
 import solvela.mall.MallSku;
 import solvela.mall.address.service.MallAddressService;
-import solvela.mall.order.service.MallRedeemService;
-import solvela.mall.pay.MallPayService;
-import solvela.marketing.api.MallPayResult;
+import solvela.mall.category.manager.MallCategoryManager;
+import solvela.mall.commodity.GradeDiscount;
+import solvela.mall.commodity.MallGradeDiscountResolver;
+import solvela.mall.commodity.MallGradeGate;
+import solvela.mall.commodity.MallPricing;
+import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.constant.MallConst;
 import solvela.mall.constant.MallSkuAttrs;
-import solvela.mall.category.manager.MallCategoryManager;
-import solvela.mall.commodity.manager.MallCommodityManager;
 import solvela.mall.exchangelimit.manager.MallExchangeLimitManager;
 import solvela.mall.favorite.manager.MallFavoriteManager;
 import solvela.mall.order.manager.MallOrderManager;
+import solvela.mall.order.service.MallRedeemService;
+import solvela.mall.pay.MallPayService;
 import solvela.mall.sku.manager.MallSkuManager;
 import solvela.marketing.api.MallAddressCmd;
-import solvela.marketing.api.MallApi;
 import solvela.marketing.api.MallAddressView;
+import solvela.marketing.api.MallApi;
 import solvela.marketing.api.MallCategoryView;
 import solvela.marketing.api.MallCommodityBriefView;
 import solvela.marketing.api.MallCommodityDetailView;
 import solvela.marketing.api.MallCommodityPageCmd;
 import solvela.marketing.api.MallCommodityPageView;
 import solvela.marketing.api.MallCommoditySkuView;
+import solvela.marketing.api.MallDeliveryFillResult;
 import solvela.marketing.api.MallOrderView;
+import solvela.marketing.api.MallPayResult;
 import solvela.marketing.api.MallRedeemCmd;
 import solvela.marketing.api.MallRedeemResult;
+import solvela.member.MemberGrade;
+import solvela.member.api.DeliveryApi;
+import solvela.member.api.DeliveryFillResult;
+import solvela.member.api.DeliveryReceiverCmd;
+import solvela.member.grade.service.MemberGradeResolver;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -244,7 +248,7 @@ public class MallClientFacade implements MallApi {
      * 而 null 会让专享标整个不出现 —— 商品仍然兑不了（服务端照拦），
      * 只是不再宣传一个已经不存在的等级。
      */
-    private GradeLens gradeLens(Long memberId, java.util.Collection<Long> commodityIds) {
+    private GradeLens gradeLens(Long memberId, Collection<Long> commodityIds) {
         return gradeLensOf(mallGradeGate.gradeOf(memberId), commodityIds);
     }
 
@@ -255,7 +259,7 @@ public class MallClientFacade implements MallApi {
      *（含保级缓冲期那套判断），这个是<b>已经知道等级</b>。
      * 管理端的 C 端预览走这条 —— 它没有会员，只有运营选的一个「假装是几级」。
      */
-    private GradeLens gradeLensOf(int grade, java.util.Collection<Long> commodityIds) {
+    private GradeLens gradeLensOf(int grade, Collection<Long> commodityIds) {
         List<MemberGrade> grades = memberGradeResolver.enabledGrades();
         Map<Integer, String> names = grades.stream()
                 .filter(g -> g.getGradeCode() != null && g.getGradeName() != null)
@@ -350,7 +354,7 @@ public class MallClientFacade implements MallApi {
                  * 也不要在图集里留一个永远转不出来的位置。
                  */
                 bannerIds.stream().map(id -> urlFor(images, id))
-                        .filter(java.util.Objects::nonNull).toList(),
+                        .filter(Objects::nonNull).toList(),
                 commodity.getDetailContent(), commodity.getExchangeNotice(),
                 commodity.getLimitPeriod(), commodity.getLimitCount(),
                 remaining,
@@ -366,7 +370,7 @@ public class MallClientFacade implements MallApi {
      * 而它们本来可以是一次。这个页面是 C 端点击最密集的地方之一。
      */
     private Map<Long, String> loadAllImages(MallCommodity commodity, List<MallSku> skus, List<Long> bannerIds) {
-        List<Long> imageIds = new java.util.ArrayList<>(bannerIds);
+        List<Long> imageIds = new ArrayList<>(bannerIds);
         imageIds.add(commodity.getCoverFileId());
         skus.forEach(sku -> imageIds.add(sku.getSkuCoverFileId()));
         return urlsOf(imageIds);
@@ -388,11 +392,11 @@ public class MallClientFacade implements MallApi {
             return null;
         }
         Integer used = mallExchangeLimitManager.lambdaQuery()
-                .eq(solvela.mall.MallExchangeLimit::getMemberId, memberId)
-                .eq(solvela.mall.MallExchangeLimit::getCommodityId, commodity.getId())
+                .eq(MallExchangeLimit::getMemberId, memberId)
+                .eq(MallExchangeLimit::getCommodityId, commodity.getId())
                 .list().stream()
-                .map(solvela.mall.MallExchangeLimit::getUsedCount)
-                .filter(java.util.Objects::nonNull)
+                .map(MallExchangeLimit::getUsedCount)
+                .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(0);
         return Math.max(0, commodity.getLimitCount() - used);
@@ -425,7 +429,7 @@ public class MallClientFacade implements MallApi {
                 .collect(Collectors.toMap(MallCommodity::getId, Function.identity()));
         Map<Long, String> covers = urlsOf(list.stream().map(MallCommodity::getCoverFileId).toList());
         GradeLens lens = gradeLens(memberId, ids);
-        return ids.stream().map(byId::get).filter(java.util.Objects::nonNull)
+        return ids.stream().map(byId::get).filter(Objects::nonNull)
                 .map(c -> toBrief(c, lens, skus, favorites, covers))
                 .toList();
     }
@@ -563,11 +567,11 @@ public class MallClientFacade implements MallApi {
      * <b>连同 MallFulfillService 一起改</b> —— 只改一边就是制造漂移。
      */
     private static String fullAddress(MallAddress address) {
-        String joined = org.apache.commons.lang3.StringUtils.defaultString(address.getProvince())
-                + org.apache.commons.lang3.StringUtils.defaultString(address.getCity())
-                + org.apache.commons.lang3.StringUtils.defaultString(address.getDistrict())
-                + org.apache.commons.lang3.StringUtils.defaultString(address.getDetailAddress());
-        return org.apache.commons.lang3.StringUtils.trimToNull(joined);
+        String joined = StringUtils.defaultString(address.getProvince())
+                + StringUtils.defaultString(address.getCity())
+                + StringUtils.defaultString(address.getDistrict())
+                + StringUtils.defaultString(address.getDetailAddress());
+        return StringUtils.trimToNull(joined);
     }
 
     @Override
@@ -642,7 +646,7 @@ public class MallClientFacade implements MallApi {
      * 文件被删了就该没有图，而不是一个 404 的图裂。
      */
     private Map<Long, String> urlsOf(Collection<Long> fileIds) {
-        Set<Long> ids = fileIds.stream().filter(java.util.Objects::nonNull)
+        Set<Long> ids = fileIds.stream().filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         return ids.isEmpty() ? Map.of() : fileAssetService.batchUrl(ids);
     }

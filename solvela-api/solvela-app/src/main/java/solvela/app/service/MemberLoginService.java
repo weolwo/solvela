@@ -4,52 +4,57 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import solvela.app.auth.CurrentDevice;
+import solvela.app.auth.CurrentMember;
 import solvela.app.auth.MemberPrincipal;
 import solvela.app.auth.MemberPrincipalLoader;
-import solvela.auth.member.MemberAccessToken;
-import solvela.auth.member.MemberSession;
-import solvela.auth.member.MemberSessionContext;
-import solvela.auth.member.MemberTokenStore;
-import solvela.app.auth.CurrentMember;
 import solvela.app.domain.EmailBindRequest;
 import solvela.app.domain.EmailCodeRequest;
-import solvela.app.domain.SmsCodeRequest;
-import solvela.member.api.SmsCodeSendCmd;
-import solvela.member.api.SmsScene;
-import solvela.member.api.MemberStepUpApi;
-import solvela.member.api.LoginChallengeCmd;
-import solvela.member.api.LoginChallengeCodeResult;
-import solvela.member.api.StepUpCmd;
-import solvela.member.api.SmsCodeSendResult;
 import solvela.app.domain.MemberLoginRequest;
 import solvela.app.domain.MemberRegisterRequest;
 import solvela.app.domain.MemberResult;
 import solvela.app.domain.PasswordResetRequest;
-import solvela.app.domain.PhoneBindRequest;
-import solvela.member.api.MemberPhoneBindCmd;
-import solvela.member.api.MemberPhoneBindResult;
 import solvela.app.domain.PasswordResetView;
+import solvela.app.domain.PhoneBindRequest;
+import solvela.app.domain.SmsCodeRequest;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
+import solvela.auth.device.DeviceIdentity;
+import solvela.auth.member.MemberAccessToken;
+import solvela.auth.member.MemberSession;
+import solvela.auth.member.MemberSessionContext;
+import solvela.auth.member.MemberTokenStore;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.EmailCodeSendResult;
+import solvela.member.api.LoginChallengeCmd;
+import solvela.member.api.LoginChallengeCodeResult;
 import solvela.member.api.MemberAuthApi;
+import solvela.member.api.MemberAuthCmd;
+import solvela.member.api.MemberAuthResult;
+import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberEmailBindCmd;
+import solvela.member.api.MemberEmailBindResult;
+import solvela.member.api.MemberLoginType;
+import solvela.member.api.MemberLogoutCmd;
+import solvela.member.api.MemberPasswordPolicy;
 import solvela.member.api.MemberPasswordResetCmd;
 import solvela.member.api.MemberPasswordResetResult;
-import solvela.member.api.MemberEmailBindResult;
-import solvela.member.api.MemberAuthCmd;
-import solvela.member.api.MemberContactView;
-import solvela.member.api.MemberAuthResult;
-import solvela.member.api.MemberLoginType;
+import solvela.member.api.MemberPhoneBindCmd;
+import solvela.member.api.MemberPhoneBindResult;
+import solvela.member.api.MemberRegisterCmd;
+import solvela.member.api.MemberRegisterResult;
+import solvela.member.api.MemberSecurityApi;
+import solvela.member.api.MemberStepUpApi;
 import solvela.member.api.SecurityPromptAnswerCmd;
 import solvela.member.api.SecurityPromptView;
 import solvela.member.api.SessionReportCmd;
-import solvela.member.api.MemberLogoutCmd;
-import solvela.member.api.MemberRegisterCmd;
-import solvela.member.api.MemberRegisterResult;
-import solvela.member.api.MemberPasswordPolicy;
+import solvela.member.api.SmsCodeSendCmd;
+import solvela.member.api.SmsCodeSendResult;
+import solvela.member.api.SmsScene;
+import solvela.member.api.StepUpCmd;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * 会员登录与退出的<b>接入层</b>：会话 + 措辞，没有别的。
@@ -130,7 +135,7 @@ public class MemberLoginService {
     private final MemberStepUpApi stepUpApi;
 
     /** 「刚才是你吗」。单独一个契约，理由见 {@link solvela.member.api.MemberSecurityApi} */
-    private final solvela.member.api.MemberSecurityApi securityApi;
+    private final MemberSecurityApi securityApi;
 
     /**
      * 注册并<b>直接登录</b>。
@@ -405,7 +410,7 @@ public class MemberLoginService {
     }
 
     /** 这个会员当前活着的登录会话。 */
-    public java.util.List<MemberSession> listSessions(Long memberId, String currentToken) {
+    public List<MemberSession> listSessions(Long memberId, String currentToken) {
         return tokenStore.listSessions(memberId, currentToken);
     }
 
@@ -451,7 +456,7 @@ public class MemberLoginService {
             throw translate(result);
         }
         MemberPrincipal principal = MemberPrincipal.of(result.identity());
-        String deviceType = CurrentDevice.find().map(solvela.auth.device.DeviceIdentity::deviceType)
+        String deviceType = CurrentDevice.find().map(DeviceIdentity::deviceType)
                 .orElse(DEFAULT_DEVICE_TYPE);
         MemberAccessToken token = tokenStore.issue(principal.memberId(), sessionContext(deviceType, ip));
         principalLoader.evict(principal.memberId());
@@ -501,7 +506,7 @@ public class MemberLoginService {
     }
 
     /** 待确认的「刚才是你吗」。设备号从令牌解析，客户端说了不算 */
-    public java.util.List<SecurityPromptView> listSecurityPrompts(Long memberId, String ip) {
+    public List<SecurityPromptView> listSecurityPrompts(Long memberId, String ip) {
         return securityApi.list(StepUpCmd.of(memberId, CurrentDevice.deviceIdOrNull(), ip));
     }
 
@@ -666,21 +671,21 @@ public class MemberLoginService {
      * <p>它不构成账号枚举：阶梯按身份摘要计数，没有账号的身份算出同样的数，
      * 所以这个字段出现的时机对「有号 / 没号」完全一样（域那边有注释钉着）。
      */
-    private static java.util.Map<String, Object> lastChanceDetails(MemberAuthResult result) {
+    private static Map<String, Object> lastChanceDetails(MemberAuthResult result) {
         Integer attempts = result.attemptsBeforeCooldown();
         return attempts != null && attempts <= 1
-                ? java.util.Map.of("attemptsBeforeCooldown", attempts)
+                ? Map.of("attemptsBeforeCooldown", attempts)
                 : null;
     }
 
-    private static java.util.Map<String, Object> retryAfter(long seconds) {
-        return java.util.Map.of("retryAfterSeconds", Math.max(1L, seconds));
+    private static Map<String, Object> retryAfter(long seconds) {
+        return Map.of("retryAfterSeconds", Math.max(1L, seconds));
     }
 
-    private static java.util.Map<String, Object> challengeDetails(MemberAuthResult result) {
+    private static Map<String, Object> challengeDetails(MemberAuthResult result) {
         return result.verifyChannel() == null
-                ? java.util.Map.of("challengeTicket", result.challengeTicket())
-                : java.util.Map.of("challengeTicket", result.challengeTicket(),
+                ? Map.of("challengeTicket", result.challengeTicket())
+                : Map.of("challengeTicket", result.challengeTicket(),
                         "channel", result.verifyChannel().name());
     }
 
@@ -696,11 +701,11 @@ public class MemberLoginService {
      * 硬塞一个 {@code PASSWORD_RESET} 进去，用户点过去会撞上一个发不出码的页面，
      * 那比没有按钮更糟。接上短信的那天把它加回来。
      */
-    private static java.util.Map<String, Object> cooldownDetails(long lockedSeconds, MemberLoginType loginType) {
-        java.util.List<String> alternatives = loginType == MemberLoginType.PHONE_PASSWORD || loginType == null
-                ? java.util.List.of()
-                : java.util.List.of("CODE_LOGIN", "PASSWORD_RESET");
-        return java.util.Map.of("retryAfterSeconds", Math.max(1L, lockedSeconds),
+    private static Map<String, Object> cooldownDetails(long lockedSeconds, MemberLoginType loginType) {
+        List<String> alternatives = loginType == MemberLoginType.PHONE_PASSWORD || loginType == null
+                ? List.of()
+                : List.of("CODE_LOGIN", "PASSWORD_RESET");
+        return Map.of("retryAfterSeconds", Math.max(1L, lockedSeconds),
                 "alternatives", alternatives);
     }
 

@@ -23,6 +23,7 @@ import solvela.enums.EnableStatusEnum;
 import solvela.exception.BusinessException;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -287,7 +288,7 @@ class DrawWorkbenchAcceptanceTest {
         cmd.setActivityCode(ACTIVITY_CODE);
         cmd.setPrizeItemList(List.of(item(PRIZE_1), item(PRIZE_2)));
         // 用可变 list：好几条用例要往里加池子
-        cmd.setPoolList(new java.util.ArrayList<>(List.of(pool(POOL_A, "验收池一"))));
+        cmd.setPoolList(new ArrayList<>(List.of(pool(POOL_A, "验收池一"))));
         return cmd;
     }
 
@@ -303,7 +304,7 @@ class DrawWorkbenchAcceptanceTest {
         DrawWorkbenchPoolCommand pool = new DrawWorkbenchPoolCommand();
         pool.setPoolCode(poolCode);
         pool.setPoolName(poolName);
-        pool.setPrizeMappingList(new java.util.ArrayList<>(List.of(
+        pool.setPrizeMappingList(new ArrayList<>(List.of(
                 mapping(PRIZE_1, "30", false),
                 mapping(PRIZE_2, "70", true))));
         return pool;

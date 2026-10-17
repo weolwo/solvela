@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.enums.MemberRiskLabelEnum;
 import solvela.enums.MemberRiskLabelSourceEnum;
+import solvela.member.api.MemberSecurityApi;
 import solvela.member.api.SecurityPromptAnswerCmd;
 import solvela.member.api.SecurityPromptView;
 import solvela.member.api.SessionReportCmd;
@@ -41,7 +42,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SecurityPromptService implements solvela.member.api.MemberSecurityApi {
+public class SecurityPromptService implements MemberSecurityApi {
 
     private final SecurityPromptStore store;
 

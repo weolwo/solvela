@@ -9,9 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.event.BizEventPublisher;
 import solvela.enums.ExternalOrderStatusEnum;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.event.BizActionCodes;
 import solvela.event.BizActionEvent;
-import solvela.enums.NotificationTemplateEnum;
 import solvela.external.ExternalOrder;
 import solvela.external.ExternalSceneProperties;
 import solvela.external.dao.ExternalOrderDao;
@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 /**
  * 充话费：券的<b>第一个非商城出口</b>。
@@ -289,7 +290,7 @@ public class ExternalRechargeService {
         bizEventPublisher.publish(new BizActionEvent(
                 BizActionCodes.RECHARGE_PAID, order.getMemberId(), orderNo,
                 null, LocalDateTime.now(),
-                java.util.Map.of(
+                Map.of(
                         "orderNo", orderNo,
                         "sceneCode", order.getSceneCode(),
                         // 实付（抵扣之后）。「累计充值满 100 元」这类任务按它计量，

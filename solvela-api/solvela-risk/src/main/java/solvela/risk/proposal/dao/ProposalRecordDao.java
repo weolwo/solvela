@@ -1,15 +1,17 @@
 package solvela.risk.proposal.dao;
 
-import solvela.enums.ProposalStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import solvela.risk.ProposalRecord;
-import solvela.risk.proposal.domain.query.ProposalRecordQuery;
-import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.enums.ProposalStatusEnum;
+import solvela.risk.ProposalRecord;
+import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
+import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 提案表 Dao
@@ -78,7 +80,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * 出现「分项加起来不等于总数」这种自相矛盾。
      * 刻意不吃 status 条件 —— 它正是漏斗要拆解的维度。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") ProposalRecordQuery queryForm);
+    Map<String, Object> selectFunnel(@Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 按资产类型汇总条数与金额。
@@ -86,12 +88,12 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * <p>⚠️ 金额<b>必须</b>按 asset_type 分组：积分、现金、券张数、实物件数不是同一个量纲，
      * 合成一个「总金额」的那个数字没有任何含义。
      */
-    List<java.util.Map<String, Object>> selectAssetStat(@Param("queryForm") ProposalRecordQuery queryForm);
+    List<Map<String, Object>> selectAssetStat(@Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 按来源汇总提案数与到账数：哪种玩法在花钱、哪种玩法的奖最容易发不出去。
      */
-    List<java.util.Map<String, Object>> selectSourceStat(@Param("queryForm") ProposalRecordQuery queryForm);
+    List<Map<String, Object>> selectSourceStat(@Param("queryForm") ProposalRecordQuery queryForm);
 
     /**
      * 风控拦截原因分布（TOP 10）。
@@ -99,7 +101,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * <p>只能按 remark 这个自由文本聚类 —— {@code RiskResult.code} 没有落库。
      * 文案一改统计就会裂开，这是已知的脆弱点（对照 t_task_record_flow.discard_code 的做法）。
      */
-    List<java.util.Map<String, Object>> selectBlockReasonStat(@Param("queryForm") ProposalRecordQuery queryForm);
+    List<Map<String, Object>> selectBlockReasonStat(@Param("queryForm") ProposalRecordQuery queryForm);
 
     // ==================== 卡单扫描（proposalStuckScan 定时任务） ====================
 
@@ -111,7 +113,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      *
      * @param now 数据库时钟，由任务上下文传入（铁律 9）
      */
-    long countStuckDispatch(@Param("now") java.time.LocalDateTime now, @Param("minutes") int minutes);
+    long countStuckDispatch(@Param("now") LocalDateTime now, @Param("minutes") int minutes);
 
     /**
      * 卡单样本（最多 {@code limit} 条），给日志用：让人能直接拿单号去查。
@@ -119,7 +121,7 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      * <p>不返回全量 —— 真卡了几千条，前十条和后十条是同一个原因，
      * 把几千个单号刷进日志只会把真正有用的那行冲掉。
      */
-    List<java.util.Map<String, Object>> selectStuckDispatchSample(@Param("now") java.time.LocalDateTime now,
+    List<Map<String, Object>> selectStuckDispatchSample(@Param("now") LocalDateTime now,
                                                                   @Param("minutes") int minutes,
                                                                   @Param("limit") int limit);
 

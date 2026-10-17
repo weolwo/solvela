@@ -57,7 +57,7 @@ class DrawScriptRejectTest {
     private DrawPrizeLogDao drawPrizeLogDao;
 
     @Mock
-    private solvela.draw.runtime.ActivityDrawFacade activityDrawFacade;
+    private ActivityDrawFacade activityDrawFacade;
 
     @InjectMocks
     private DrawScriptFunctions functions;

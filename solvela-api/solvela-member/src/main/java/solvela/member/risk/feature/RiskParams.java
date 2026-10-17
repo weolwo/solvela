@@ -6,6 +6,8 @@ import tools.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * 读 {@code t_member_risk_rule.params} 的小工具。
@@ -48,7 +50,7 @@ public final class RiskParams {
     }
 
     /** 放行 / 限流 / 拒绝。注册与重置密码只能配这三档 */
-    public static final java.util.Set<MemberRiskDecisionEnum> GATE_ONLY = java.util.Set.of(
+    public static final Set<MemberRiskDecisionEnum> GATE_ONLY = Set.of(
             MemberRiskDecisionEnum.PASS, MemberRiskDecisionEnum.LIMIT, MemberRiskDecisionEnum.DENY);
 
     /**
@@ -58,7 +60,7 @@ public final class RiskParams {
      * <p>不含滑块（那条链路上没有出图与核销的地方）与密码冷却（它只锁密码通道，
      * 而这里的人已经登录了）。
      */
-    public static final java.util.Set<MemberRiskDecisionEnum> WITH_STEP_UP = java.util.Set.of(
+    public static final Set<MemberRiskDecisionEnum> WITH_STEP_UP = Set.of(
             MemberRiskDecisionEnum.PASS, MemberRiskDecisionEnum.OTP, MemberRiskDecisionEnum.OTP_STRONG,
             MemberRiskDecisionEnum.LIMIT, MemberRiskDecisionEnum.DENY);
 
@@ -68,7 +70,7 @@ public final class RiskParams {
      * @param why 说清为什么不许 —— 报错文案要让看到它的人不必再去翻代码
      */
     public static void requireDecisionsIn(JsonNode params, String scenario,
-                                          java.util.Set<MemberRiskDecisionEnum> allowed, String why) {
+                                          Set<MemberRiskDecisionEnum> allowed, String why) {
         for (Tier tier : tiers(params)) {
             if (!allowed.contains(tier.decision())) {
                 throw new IllegalArgumentException(scenario + "场景不能配这一档：" + why
@@ -91,7 +93,7 @@ public final class RiskParams {
      * <p>🔴 不接受裸数字：{@code "60"} 到底是秒还是分钟，看的人一半会猜错，而猜错不会报错。
      */
     public static Duration parseDuration(String raw, String field) {
-        String text = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        String text = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         if (text.length() < 2) {
             throw new IllegalArgumentException(field + " 要带单位（s/m/h/d），实际是: " + raw);
         }

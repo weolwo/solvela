@@ -6,8 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.auth.member.MemberAccessToken;
@@ -24,16 +24,17 @@ import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.MemberAuthCmd;
 import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberPasswordResetCmd;
-import solvela.member.api.PasswordResetType;
 import solvela.member.api.MemberPasswordResetResult;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
 import solvela.member.api.MemberRegisterType;
 import solvela.member.api.PasswordResetFailReason;
+import solvela.member.api.PasswordResetType;
 import solvela.member.auth.MemberAuthService;
 import solvela.member.service.MemberService;
 import solvela.member.util.MemberEmailUtil;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -160,7 +161,7 @@ class PasswordResetTest {
     @DisplayName("🔴 每一次重置都落一行流水（场景 = 重置密码），结局各不相同")
     void 落流水() {
         registerWithEmail();
-        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusMinutes(5).withNano(0);
+        LocalDateTime since = LocalDateTime.now().minusMinutes(5).withNano(0);
 
         // 码错那一次：记「凭据错误」。这条链路以前【一次也没被记过】——
         // 发码那边按目标限额，而挨个试重置码的人每个目标只试一次
@@ -176,7 +177,7 @@ class PasswordResetTest {
      *
      * <p>🔴 {@code create_time} 的条件不能省：表按月分区，而分区裁剪只看 WHERE 里有没有分区列。
      */
-    private int riskRows(java.time.LocalDateTime since, MemberRiskOutcomeEnum outcome) {
+    private int riskRows(LocalDateTime since, MemberRiskOutcomeEnum outcome) {
         Integer n = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_member_risk_event"
                         + " WHERE event_type = ? AND outcome = ? AND identity_hash = UNHEX(?)"

@@ -6,5 +6,5 @@ import solvela.member.MemberGrade;
 
 /** MemberGrade Dao */
 @Mapper
-public interface MemberGradeDao extends BaseMapper<solvela.member.MemberGrade> {
+public interface MemberGradeDao extends BaseMapper<MemberGrade> {
 }

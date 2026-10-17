@@ -2,6 +2,8 @@ package solvela.member.email;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,15 +11,28 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberVerifyChannelEnum;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.member.Member;
 import solvela.member.api.EmailBindFailReason;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.api.MemberEmailBindCmd;
 import solvela.member.api.MemberEmailBindResult;
+import solvela.member.api.StepUpCmd;
 import solvela.member.auth.MemberAuthDao;
+import solvela.member.contact.ContactCoolingStore;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.RiskContext;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskSession;
+import solvela.member.stepup.MemberStepUpService;
 import solvela.member.util.MemberEmailUtil;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
 
 /**
  * 绑定 / 更换邮箱。
@@ -57,10 +72,9 @@ public class MemberEmailBindService {
      * <p>🔴 用 {@code ObjectProvider} 延迟取：{@code MemberStepUpService} 发二次验证码要用
      * {@code MemberEmailCodeService}，而本类也要它 —— 直接注入会在某些装配顺序下成环。
      */
-    private final org.springframework.beans.factory.ObjectProvider<solvela.member.stepup.MemberStepUpService>
-            stepUpServiceProvider;
+    private final ObjectProvider<MemberStepUpService> stepUpServiceProvider;
 
-    private final solvela.member.contact.ContactCoolingStore coolingStore;
+    private final ContactCoolingStore coolingStore;
 
     /**
      * 换绑那一道闸上的风控（2026-10-16，P3 ②）。
@@ -69,11 +83,10 @@ public class MemberEmailBindService {
      * 风控引擎在构造时会把所有规则实例化出来做双向校验，而其中一条规则要用
      * 本域的设备信任 —— 直接注入就是一个环（见 {@code MemberStepUpService} 里那段注释）。
      */
-    private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine>
-            riskEngineFactory;
+    private final ObjectFactory<MemberRiskEngine> riskEngineFactory;
 
 
-    private final solvela.notification.service.NotificationService notificationService;
+    private final NotificationService notificationService;
 
     /**
      * 绑定或更换邮箱。
@@ -93,7 +106,7 @@ public class MemberEmailBindService {
             // 让一个手滑打错格式的人消耗配额没有道理（判据同注册）
             return MemberEmailBindResult.fail(EmailBindFailReason.BAD_EMAIL_FORMAT);
         }
-        try (solvela.member.risk.RiskSession risk = riskEngineFactory.getObject()
+        try (RiskSession risk = riskEngineFactory.getObject()
                 .open(riskContext(cmd.memberId(), cmd.deviceId(), cmd.clientIp()))) {
             return insideRisk(risk, cmd, newEmail);
         }
@@ -105,26 +118,20 @@ public class MemberEmailBindService {
      * <h3>🔴 每一条返回路径都走 {@code risk.end(...)}</h3>
      * 漏掉一条就漏掉一行流水，而那是 code review 看得见的（见 {@code RiskSession}）。
      */
-    private MemberEmailBindResult insideRisk(solvela.member.risk.RiskSession risk,
+    private MemberEmailBindResult insideRisk(RiskSession risk,
                                              MemberEmailBindCmd cmd, String newEmail) {
         // 风控排在验码【之前】：被限的请求不该还能去消耗验证码的可错次数
-        solvela.member.risk.RiskDecision pre = riskEngineFactory.getObject().evaluatePre(risk);
-        if (pre.atLeast(solvela.enums.MemberRiskDecisionEnum.LIMIT)) {
+        RiskDecision pre = riskEngineFactory.getObject().evaluateGatePre(risk);
+        if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             log.warn("【邮箱绑定】风控拦下, memberId: {}, 结论: {}", cmd.memberId(), pre.decision());
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.PRE_BLOCKED,
+            return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
                     MemberEmailBindResult.fail(EmailBindFailReason.TOO_MANY_ATTEMPTS));
-        }
-        if (!pre.is(solvela.enums.MemberRiskDecisionEnum.PASS)) {
-            // 换绑这条链路要不到核身（首次绑定没有旧联系方式可问）。放行并吵得够响 ——
-            // 把一个配置错误变成「谁都绑不了邮箱」，代价完全不对称
-            log.error("【邮箱绑定】风控给出了本场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
-                    pre.decision());
         }
 
         EmailCodeVerifyResult codeResult =
                 emailCodeService.verify(EmailCodeScene.BIND, newEmail, cmd.newEmailCode());
         if (codeResult != EmailCodeVerifyResult.OK) {
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS,
+            return risk.end(MemberRiskOutcomeEnum.BAD_CREDENTIALS,
                     MemberEmailBindResult.fail(toBindReason(codeResult)));
         }
 
@@ -133,7 +140,7 @@ public class MemberEmailBindService {
             // 令牌解析出的会员号在库里不存在。走不到，除非会员被硬删了 ——
             // 而注销是改 status 不是删行。当成没有原主证明处理，不泄露更多
             log.warn("【邮箱绑定】令牌里的会员号查不到人, memberId: {}", cmd.memberId());
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+            return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
                     MemberEmailBindResult.fail(EmailBindFailReason.REBIND_VERIFICATION_FAILED));
         }
 
@@ -152,8 +159,8 @@ public class MemberEmailBindService {
                 boolean needsMore =
                         rebindProblem.reason() == EmailBindFailReason.REBIND_VERIFICATION_REQUIRED;
                 return risk.end(needsMore
-                        ? solvela.enums.MemberRiskOutcomeEnum.STEP_UP_REQUIRED
-                        : solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS, rebindProblem);
+                        ? MemberRiskOutcomeEnum.STEP_UP_REQUIRED
+                        : MemberRiskOutcomeEnum.BAD_CREDENTIALS, rebindProblem);
             }
         }
 
@@ -161,8 +168,8 @@ public class MemberEmailBindService {
                 doUpdate(cmd.memberId(), newEmail, oldEmail, cmd.deviceId(), cmd.clientIp());
         // doUpdate 只有一种失败：撞唯一约束，也就是「这个邮箱已被别人绑走」
         return risk.end(result.success()
-                ? solvela.enums.MemberRiskOutcomeEnum.SUCCESS
-                : solvela.enums.MemberRiskOutcomeEnum.IDENTITY_TAKEN, result);
+                ? MemberRiskOutcomeEnum.SUCCESS
+                : MemberRiskOutcomeEnum.IDENTITY_TAKEN, result);
     }
 
     /**
@@ -174,9 +181,9 @@ public class MemberEmailBindService {
      * （可信设备也要判），所以引擎用不到它 —— 而算它要查一次登录日志。
      * 邮箱与手机号两边一字对应。
      */
-    private solvela.member.risk.RiskContext riskContext(Long memberId, String deviceId, String clientIp) {
-        return new solvela.member.risk.RiskContext(
-                solvela.enums.MemberRiskEventTypeEnum.CONTACT_BIND, memberId, deviceId, clientIp);
+    private RiskContext riskContext(Long memberId, String deviceId, String clientIp) {
+        return new RiskContext(
+                MemberRiskEventTypeEnum.CONTACT_BIND, memberId, deviceId, clientIp);
     }
 
 
@@ -252,7 +259,7 @@ public class MemberEmailBindService {
     private void applyCooling(Long memberId, String deviceId, String clientIp) {
         try {
             boolean trusted = stepUpServiceProvider.getObject()
-                    .check(solvela.member.api.StepUpCmd.of(memberId, deviceId, clientIp)).trusted();
+                    .check(StepUpCmd.of(memberId, deviceId, clientIp)).trusted();
             if (trusted) {
                 coolingStore.clear(memberId, MemberVerifyChannelEnum.EMAIL);
             } else {
@@ -275,8 +282,8 @@ public class MemberEmailBindService {
      * 而它的主人不会收到任何消息 —— 要补的话是再加一个邮件模板，不影响这里。
      */
     private void notifyBound(Long memberId, String newEmail) {
-        notificationService.send(solvela.notification.domain.NotifyRequest
-                .of(solvela.enums.NotificationTemplateEnum.CONTACT_BOUND, memberId)
+        notificationService.send(NotifyRequest
+                .of(NotificationTemplateEnum.CONTACT_BOUND, memberId)
                 .param("contactType", "邮箱")
                 // 🔴 打过码：这条通知会长期留在消息列表里，而列表不该成为一个读明文邮箱的地方
                 .param("maskedContact", MemberEmailUtil.mask(newEmail))

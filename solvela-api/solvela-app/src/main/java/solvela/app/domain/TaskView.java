@@ -1,5 +1,7 @@
 package solvela.app.domain;
 
+import java.util.List;
+
 /**
  * C 端任务中心里的一条。
  *
@@ -29,7 +31,7 @@ public record TaskView(
         String statusText,
         boolean finished,
         String rewardText,
-        java.util.List<TaskStageItem> stages,
+        List<TaskStageItem> stages,
         String ruleText,
         String periodText,
         /** 截止提示，如「9月30日 23:59 截止」。不限时为 null，前端就不画那一行 */

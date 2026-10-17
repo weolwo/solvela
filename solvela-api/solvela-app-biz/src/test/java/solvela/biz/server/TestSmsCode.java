@@ -7,6 +7,8 @@ import solvela.member.api.SmsScene;
 import solvela.member.auth.MemberAuthService;
 import solvela.member.util.MemberPhoneUtil;
 
+import java.util.regex.Pattern;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -40,6 +42,6 @@ final class TestSmsCode {
         String key = redisService.generateRedisKey("mbr:code:",
                 "sms:" + SmsScene.REGISTER.name() + ":" + piiHasher.hash(MemberPhoneUtil.normalize(phone)));
         String stored = redisService.get(key);
-        return stored == null ? null : stored.split(java.util.regex.Pattern.quote("|"))[0];
+        return stored == null ? null : stored.split(Pattern.quote("|"))[0];
     }
 }

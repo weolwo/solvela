@@ -2,6 +2,7 @@ package solvela.app.service;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import solvela.app.domain.ActivityPrizeItem;
 import solvela.app.domain.ActivityView;
 import solvela.enums.ActivityStatusEnum;
@@ -106,8 +107,8 @@ class ActivityPrizeViewTest {
     }
 
     private static ActivityView translate(List<ActivityPrizeView> prizes) {
-        ActivityApi api = org.mockito.Mockito.mock(ActivityApi.class);
-        org.mockito.Mockito.when(api.getActivityRule("A8P0Y3ANGI")).thenReturn(new ActivityRuleView(
+        ActivityApi api = Mockito.mock(ActivityApi.class);
+        Mockito.when(api.getActivityRule("A8P0Y3ANGI")).thenReturn(new ActivityRuleView(
                 "A8P0Y3ANGI", "中秋", "DRAW", ActivityStatusEnum.ONLINE,
                 LocalDateTime.now().minusDays(1), null, LocalDateTime.now().plusDays(20),
                 "中秋佳节", null, 126L, 126L, null, "中秋佳节", "花好月圆",

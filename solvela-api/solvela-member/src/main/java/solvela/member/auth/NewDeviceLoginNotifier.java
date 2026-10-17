@@ -16,10 +16,12 @@ import solvela.enums.NotificationTemplateEnum;
 import solvela.member.Member;
 import solvela.member.email.EmailSendExecutorConfig;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
+import solvela.member.risk.SecurityPromptService;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -84,7 +86,7 @@ public class NewDeviceLoginNotifier {
     private final RedisService redisService;
 
     /** 「刚才是你吗」：同一个判据下顺手记一条待确认 */
-    private final solvela.member.risk.SecurityPromptService securityPromptService;
+    private final SecurityPromptService securityPromptService;
 
     /** 注册设备：会员 → 注册时的设备号 */
     private static final String KEY_REGISTRATION_DEVICE = "mbr:login:reg-device:";
@@ -146,7 +148,7 @@ public class NewDeviceLoginNotifier {
              * 标注是整套风控唯一的「答案」，比那封邮件更难补。
              */
             securityPromptService.onNewDeviceLogin(memberId, deviceId, deviceType, location,
-                    now.atZone(java.time.ZoneId.systemDefault()).toEpochSecond());
+                    now.atZone(ZoneId.systemDefault()).toEpochSecond());
             sendExecutor.execute(() -> deliver(memberId, loginTime, device, location, deviceId));
         } catch (Exception e) {
             log.error("【新设备登录】判断失败，本次不提醒, memberId: {}", memberId, e);

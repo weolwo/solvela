@@ -1,15 +1,17 @@
 package solvela.task.record.dao;
 
-        import java.util.List;
-
-        import solvela.task.TaskRecord;
-        import solvela.task.record.domain.query.TaskRecordQuery;
-        import solvela.task.record.domain.dto.TaskRecordDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.task.TaskRecord;
+import solvela.task.record.domain.dto.TaskRecordDTO;
+import solvela.task.record.domain.query.TaskRecordQuery;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 任务记录表 Dao
@@ -47,12 +49,12 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * 出现「分项加起来不等于总数」这种自相矛盾。
      * 刻意不吃 status / completeTime 条件 —— 那两个正是漏斗要拆解的维度。
      */
-    java.util.Map<String, Object> selectFunnel(@Param("queryForm") TaskRecordQuery queryForm);
+    Map<String, Object> selectFunnel(@Param("queryForm") TaskRecordQuery queryForm);
 
     /**
      * 任务维度分布（接取量 TOP 20），一次查全 —— 逐个任务查一次在任务多起来之后就是 N+1。
      */
-    List<java.util.Map<String, Object>> selectTaskStat(@Param("queryForm") TaskRecordQuery queryForm);
+    List<Map<String, Object>> selectTaskStat(@Param("queryForm") TaskRecordQuery queryForm);
 
     /**
      * 事件丢弃分类分布，查的是 {@code t_task_record_flow}（走 idx_t_tsk_flw_stat）。
@@ -60,7 +62,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * <p>「用户做了事进度却不涨」的答案在这里，而不在记录表里：被丢弃的事件<b>压根没建记录</b>，
      * 记录表怎么翻都看不到它们。
      */
-    List<java.util.Map<String, Object>> selectDiscardStat(@Param("queryForm") TaskRecordQuery queryForm);
+    List<Map<String, Object>> selectDiscardStat(@Param("queryForm") TaskRecordQuery queryForm);
 
             // ----- 物理删除 -----
                 /**
@@ -106,7 +108,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      *
      * @return 影响行数，0 表示记录已不可推进
      */
-    int advanceMetric(@Param("id") Long id, @Param("delta") java.math.BigDecimal delta);
+    int advanceMetric(@Param("id") Long id, @Param("delta") BigDecimal delta);
 
     /**
      * 乐观锁覆写进度与进度详情：STREAK 专用。
@@ -118,7 +120,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      * 主动降级成需要重试的问题。
      */
     int overwriteMetric(@Param("id") Long id,
-                        @Param("metric") java.math.BigDecimal metric,
+                        @Param("metric") BigDecimal metric,
                         @Param("progressData") String progressData,
                         @Param("version") Integer version);
 
@@ -152,7 +154,7 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      *
      * @param now 数据库时钟，由任务上下文传入（铁律 9：不要在这里用 JVM 时间）
      */
-    long countExpirableRecord(@Param("now") java.time.LocalDateTime now);
+    long countExpirableRecord(@Param("now") LocalDateTime now);
 
     /**
      * 把过了有效期的进行中记录置为 3-已过期，一次最多 {@code limit} 行。
@@ -164,10 +166,10 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
      *
      * @return 实际更新行数
      */
-    int expireRecordBatch(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+    int expireRecordBatch(@Param("now") LocalDateTime now, @Param("limit") int limit);
 
     /**
      * 取数据库时钟（铁律 9：时间只认数据库一个时钟，不用 JVM 的 LocalDateTime.now()）
      */
-    java.time.LocalDateTime selectDbNow();
+    LocalDateTime selectDbNow();
 }

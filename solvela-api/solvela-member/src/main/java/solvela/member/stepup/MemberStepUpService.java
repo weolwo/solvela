@@ -2,26 +2,44 @@ package solvela.member.stepup;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.stereotype.Service;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PiiCipher;
 import solvela.enums.LoginLogResultEnum;
+import solvela.enums.MemberOperationTypeEnum;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskLabelEnum;
+import solvela.enums.MemberRiskLabelSourceEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
+import solvela.member.api.AssetOutRisk;
+import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendResult;
 import solvela.member.api.MemberStepUpApi;
-import solvela.member.api.AssetOutRisk;
-import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.SessionReportCmd;
 import solvela.member.api.StepUpCmd;
 import solvela.member.api.StepUpFailReason;
 import solvela.member.api.StepUpResult;
 import solvela.member.auth.MemberAuthDao;
+import solvela.member.contact.ContactCoolingStore;
 import solvela.member.email.MemberEmailCodeService;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
+import solvela.member.operationlimit.service.MemberOperationLimitService;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.RiskContext;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskDeviceTrust;
+import solvela.member.risk.RiskLabelService;
+import solvela.member.risk.RiskSession;
+import solvela.member.risk.config.RiskListCache;
 import solvela.member.util.MemberEmailUtil;
+
+import java.time.LocalDateTime;
 
 /**
  * 敏感操作二次验证。契约与取舍见 {@link MemberStepUpApi}。
@@ -59,13 +77,13 @@ public class MemberStepUpService implements MemberStepUpApi {
     private final MemberStepUpProperties properties;
 
     /** 资产出口的冻结记在这里（{@code t_member_operation_limit} 的 ASSET_OUT 类型） */
-    private final solvela.member.operationlimit.service.MemberOperationLimitService operationLimitService;
+    private final MemberOperationLimitService operationLimitService;
 
     /** 「这不是我」要给那一次登录的决策流水打标（方案 §8.1） */
-    private final solvela.member.risk.RiskLabelService riskLabelService;
+    private final RiskLabelService riskLabelService;
 
     /** 新绑的邮箱 7 天内不能用来核身（方案 §6.4），见 {@code ContactCoolingStore} */
-    private final solvela.member.contact.ContactCoolingStore coolingStore;
+    private final ContactCoolingStore coolingStore;
 
     /**
      * 资产出口那一道闸上的风控（2026-10-16，P3 ②）。
@@ -87,10 +105,10 @@ public class MemberStepUpService implements MemberStepUpApi {
      * <p>用 {@code ObjectFactory} 而不是 {@code ObjectProvider}：前者是函数式接口，
      * 单测里一个 lambda 就能给（后者不是，试过，编译不过）。
      */
-    private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine> riskEngine;
+    private final ObjectFactory<MemberRiskEngine> riskEngine;
 
     /** 会员灰名单：资产出口每次都要二次验证（网关方案 §5.5） */
-    private final solvela.member.risk.config.RiskListCache listCache;
+    private final RiskListCache listCache;
 
     @Override
     public DeviceTrust check(StepUpCmd cmd) {
@@ -199,7 +217,7 @@ public class MemberStepUpService implements MemberStepUpApi {
     @Override
     public AssetOutVerdict assetOut(StepUpCmd cmd) {
         boolean frozen = operationLimitService.isFrozen(cmd.memberId(),
-                solvela.enums.MemberOperationTypeEnum.ASSET_OUT);
+                MemberOperationTypeEnum.ASSET_OUT);
         /*
          * 🔴 冻着就不必再算信任、也不必跑风控了，而且<b>刻意都不做</b>：
          * 两者都要查库，而它们的答案此刻没有任何用途 —— 冻结压倒一切。
@@ -240,13 +258,13 @@ public class MemberStepUpService implements MemberStepUpApi {
      * 而资产出口这条路上任何一次异常都会变成用户点不动那颗按钮。
      */
     private AssetOutVerdict assetOutRisk(StepUpCmd cmd, DeviceTrust trust) {
-        solvela.member.risk.MemberRiskEngine engine = riskEngine.getObject();
-        try (solvela.member.risk.RiskSession risk = engine.open(assetContext(cmd, trust))) {
-            solvela.member.risk.RiskDecision decision = engine.evaluatePre(risk);
-            if (decision.atLeast(solvela.enums.MemberRiskDecisionEnum.LIMIT)) {
+        MemberRiskEngine engine = riskEngine.getObject();
+        try (RiskSession risk = engine.open(assetContext(cmd, trust))) {
+            RiskDecision decision = engine.evaluatePre(risk);
+            if (decision.atLeast(MemberRiskDecisionEnum.LIMIT)) {
                 log.warn("【资产出口】风控硬拦, memberId: {}, deviceId: {}, 结论: {}",
                         cmd.memberId(), cmd.deviceId(), decision.decision());
-                return risk.end(solvela.enums.MemberRiskOutcomeEnum.PRE_BLOCKED,
+                return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
                         AssetOutVerdict.of(trust, AssetOutRisk.BLOCKED, decision.retryAfterSeconds()));
             }
             if (decision.needsOtp()) {
@@ -258,10 +276,10 @@ public class MemberStepUpService implements MemberStepUpApi {
                  */
                 log.info("【资产出口】风控要求核身, memberId: {}, deviceId: {}, 设备信任: {}",
                         cmd.memberId(), cmd.deviceId(), trust);
-                return risk.end(solvela.enums.MemberRiskOutcomeEnum.STEP_UP_REQUIRED,
+                return risk.end(MemberRiskOutcomeEnum.STEP_UP_REQUIRED,
                         AssetOutVerdict.of(trust, AssetOutRisk.STEP_UP, 0L));
             }
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.SUCCESS, AssetOutVerdict.pass(trust));
+            return risk.end(MemberRiskOutcomeEnum.SUCCESS, AssetOutVerdict.pass(trust));
         } catch (RuntimeException e) {
             log.error("【资产出口】风控执行失败，按放行处理, memberId: {}", cmd.memberId(), e);
             return AssetOutVerdict.pass(trust);
@@ -281,21 +299,21 @@ public class MemberStepUpService implements MemberStepUpApi {
      * 而本场景恰恰有一条规则刻意配成「可信也不跳过」（{@code ASSET_DEVICE_FANOUT}）。
      * 两件事要都能表达，前提是上下文里有这个值。
      */
-    private solvela.member.risk.RiskContext assetContext(StepUpCmd cmd, DeviceTrust trust) {
-        solvela.member.risk.RiskContext ctx = new solvela.member.risk.RiskContext(
-                solvela.enums.MemberRiskEventTypeEnum.ASSET_OUT,
+    private RiskContext assetContext(StepUpCmd cmd, DeviceTrust trust) {
+        RiskContext ctx = new RiskContext(
+                MemberRiskEventTypeEnum.ASSET_OUT,
                 cmd.memberId(), cmd.deviceId(), cmd.clientIp());
         ctx.deviceTrust(toRiskTrust(trust));
         return ctx;
     }
 
     /** 二次验证那套信任档 → 风控那套。两边刻意是同一个定义（方案 §3.2），这里只是换个载体 */
-    private static solvela.member.risk.RiskDeviceTrust toRiskTrust(DeviceTrust trust) {
+    private static RiskDeviceTrust toRiskTrust(DeviceTrust trust) {
         return switch (trust) {
-            case NO_DEVICE -> solvela.member.risk.RiskDeviceTrust.NO_DEVICE;
-            case NEW_DEVICE -> solvela.member.risk.RiskDeviceTrust.NEW;
-            case HISTORY -> solvela.member.risk.RiskDeviceTrust.HISTORY;
-            case VERIFIED -> solvela.member.risk.RiskDeviceTrust.VERIFIED;
+            case NO_DEVICE -> RiskDeviceTrust.NO_DEVICE;
+            case NEW_DEVICE -> RiskDeviceTrust.NEW;
+            case HISTORY -> RiskDeviceTrust.HISTORY;
+            case VERIFIED -> RiskDeviceTrust.VERIFIED;
         };
     }
 
@@ -317,17 +335,17 @@ public class MemberStepUpService implements MemberStepUpApi {
             return false;
         }
         operationLimitService.freeze(cmd.memberId(),
-                solvela.enums.MemberOperationTypeEnum.ASSET_OUT,
+                MemberOperationTypeEnum.ASSET_OUT,
                 "用户举报「这不是我」",
                 // 没有「到期」这个概念：正确的出口只有重置密码。那一列是 NOT NULL，所以给一个很远的日期
-                java.time.LocalDateTime.now().plusYears(100));
+                LocalDateTime.now().plusYears(100));
 
         boolean keepCurrent = revokeOthers(StepUpCmd.of(
                 cmd.memberId(), cmd.currentDeviceId(), cmd.clientIp()));
 
         riskLabelService.labelLogin(cmd.memberId(), cmd.reportedDeviceId(), cmd.loginEpochSecond(),
-                solvela.enums.MemberRiskLabelEnum.STOLEN,
-                solvela.enums.MemberRiskLabelSourceEnum.USER_REPORT);
+                MemberRiskLabelEnum.STOLEN,
+                MemberRiskLabelSourceEnum.USER_REPORT);
 
         log.warn("【账号安全】用户举报「这不是我」, memberId: {}, 被举报设备: {}, 当前设备保留信任: {}",
                 cmd.memberId(), cmd.reportedDeviceId(), keepCurrent);

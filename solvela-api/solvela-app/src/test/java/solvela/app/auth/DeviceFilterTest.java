@@ -1,15 +1,16 @@
 package solvela.app.auth;
 
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
+import solvela.app.web.ApiErrors;
+import solvela.app.web.ApiException;
 import solvela.auth.device.DeviceIdentity;
 import solvela.auth.device.DeviceTokenCodec;
 import solvela.auth.device.DeviceTokenProperties;
-import solvela.app.web.ApiErrors;
-import solvela.app.web.ApiException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -74,7 +75,7 @@ class DeviceFilterTest {
     void cookie也认() throws Exception {
         DeviceTokenCodec codec = codec();
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setCookies(new jakarta.servlet.http.Cookie("__Host-sv_dv", codec.issue(DEVICE_ID, "H5")));
+        request.setCookies(new Cookie("__Host-sv_dv", codec.issue(DEVICE_ID, "H5")));
 
         DeviceIdentity identity = runFilter(
                 newFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);
@@ -90,7 +91,7 @@ class DeviceFilterTest {
         String other = "fedcba9876543210fedcba9876543210";
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(DeviceAuthProperties.DEFAULT_HEADER, codec.issue(DEVICE_ID, "APP"));
-        request.setCookies(new jakarta.servlet.http.Cookie("__Host-sv_dv", codec.issue(other, "H5")));
+        request.setCookies(new Cookie("__Host-sv_dv", codec.issue(other, "H5")));
 
         DeviceIdentity identity = runFilter(
                 newFilter(codec, new DeviceAuthProperties(null, DeviceAuthProperties.Mode.OFF)), request);

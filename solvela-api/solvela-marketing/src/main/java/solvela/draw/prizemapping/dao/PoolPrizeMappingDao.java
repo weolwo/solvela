@@ -1,14 +1,13 @@
 package solvela.draw.prizemapping.dao;
 
-        import java.util.List;
-
-        import solvela.draw.PoolPrizeMapping;
-        import solvela.draw.prizemapping.domain.query.PoolPrizeMappingQuery;
-        import solvela.draw.prizemapping.domain.dto.PoolPrizeMappingDTO;
-        import solvela.base.dao.CustomizedBaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.base.dao.CustomizedBaseMapper;
+import solvela.draw.PoolPrizeMapping;
+import solvela.draw.prizemapping.domain.dto.PoolPrizeMappingDTO;
+import solvela.draw.prizemapping.domain.query.PoolPrizeMappingQuery;
+
 import java.util.List;
 
 /**

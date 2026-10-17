@@ -1,8 +1,10 @@
 package solvela.draw.runtime;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
+import java.time.temporal.TemporalAdjusters;
 
 /**
  * 奖池重置周期解析：把 {@code t_prize_pool_config.reset_period} 翻译成
@@ -123,7 +125,7 @@ public final class DrawPeriodResolver {
             case PERIOD_DAY -> now.toLocalDate().atStartOfDay();
             // 与 resolve 的周桶同一套 ISO 语义：周一 00:00 起算
             case PERIOD_WEEK -> now.toLocalDate()
-                    .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                    .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                     .atStartOfDay();
             case PERIOD_MONTH -> now.toLocalDate().withDayOfMonth(1).atStartOfDay();
             case PERIOD_ACTIVITY -> null;

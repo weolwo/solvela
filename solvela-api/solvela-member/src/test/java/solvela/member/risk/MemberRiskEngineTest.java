@@ -25,6 +25,8 @@ import solvela.member.risk.rule.RiskHit;
 import solvela.member.risk.rule.RiskRule;
 import solvela.member.risk.rule.RiskRuleConfig;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.Function;
 
@@ -247,7 +249,7 @@ class MemberRiskEngineTest {
     @Test
     @DisplayName("规则表快照取不到：整个阶段放行，不往外抛")
     void registryFailureIsFailOpen() {
-        when(registry.rules(solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE)).thenThrow(new IllegalStateException("库挂了"));
+        when(registry.rules(MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE)).thenThrow(new IllegalStateException("库挂了"));
 
         assertEquals(MemberRiskDecisionEnum.PASS, engine.evaluatePre(session()).decision());
     }
@@ -255,7 +257,7 @@ class MemberRiskEngineTest {
     @Test
     @DisplayName("时间预算用完：剩下的规则记 error 跳过，但 alwaysEnforce 的照跑")
     void budgetExhausted() {
-        properties.setFeatureBudget(java.time.Duration.ofNanos(1));
+        properties.setFeatureBudget(Duration.ofNanos(1));
         pre(direct("SLOW", MemberRiskDecisionEnum.CAPTCHA, ctx -> RiskHit.decide(MemberRiskDecisionEnum.CAPTCHA, "慢")),
                 direct("SKIPPED", MemberRiskDecisionEnum.LIMIT,
                         ctx -> RiskHit.decide(MemberRiskDecisionEnum.LIMIT, "不该跑到")),
@@ -347,7 +349,7 @@ class MemberRiskEngineTest {
     @Test
     @DisplayName("二次验证那一行指回签票的那次登录")
     void verifyEventPointsBack() {
-        RiskSession session = engine.open(context(), new RiskEventRef(4242L, java.time.LocalDateTime.now()));
+        RiskSession session = engine.open(context(), new RiskEventRef(4242L, LocalDateTime.now()));
         session.end(MemberRiskOutcomeEnum.VERIFY_PASSED, null);
 
         assertEquals(4242L, written(session).getRefEventId());
@@ -386,11 +388,11 @@ class MemberRiskEngineTest {
     }
 
     private void pre(RiskRuleRegistry.Bound... rules) {
-        when(registry.rules(solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE)).thenReturn(List.of(rules));
+        when(registry.rules(MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.PRE)).thenReturn(List.of(rules));
     }
 
     private void post(RiskRuleRegistry.Bound... rules) {
-        when(registry.rules(solvela.enums.MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.POST)).thenReturn(List.of(rules));
+        when(registry.rules(MemberRiskEventTypeEnum.LOGIN, MemberRiskPhaseEnum.POST)).thenReturn(List.of(rules));
     }
 
     /**
@@ -507,7 +509,7 @@ class MemberRiskEngineTest {
                 return body.apply(ctx);
             }
         };
-        RiskRuleConfig config = new RiskRuleConfig(code, code, solvela.enums.MemberRiskEventTypeEnum.LOGIN, phase, type, direct, points, group, mode,
+        RiskRuleConfig config = new RiskRuleConfig(code, code, MemberRiskEventTypeEnum.LOGIN, phase, type, direct, points, group, mode,
                 bypassByTrust, JsonUtils.getMapper().createObjectNode());
         return new RiskRuleRegistry.Bound(impl, config);
     }

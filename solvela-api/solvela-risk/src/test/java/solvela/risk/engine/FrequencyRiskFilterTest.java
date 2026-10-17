@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -68,7 +69,7 @@ class FrequencyRiskFilterTest {
     }
 
     private static String any() {
-        return org.mockito.ArgumentMatchers.anyString();
+        return ArgumentMatchers.anyString();
     }
 
     private RiskResult run(String deviceId) {

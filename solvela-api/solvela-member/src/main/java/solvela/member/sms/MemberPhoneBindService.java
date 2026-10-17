@@ -2,6 +2,8 @@ package solvela.member.sms;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,14 +11,28 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.crypto.PasswordCipher;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
+import solvela.enums.MemberRiskDecisionEnum;
+import solvela.enums.MemberRiskEventTypeEnum;
+import solvela.enums.MemberRiskOutcomeEnum;
+import solvela.enums.MemberVerifyChannelEnum;
+import solvela.enums.NotificationTemplateEnum;
 import solvela.member.Member;
 import solvela.member.api.MemberPhoneBindCmd;
 import solvela.member.api.MemberPhoneBindResult;
 import solvela.member.api.PhoneBindFailReason;
 import solvela.member.api.SmsCodeVerifyResult;
 import solvela.member.api.SmsScene;
+import solvela.member.api.StepUpCmd;
 import solvela.member.auth.MemberAuthDao;
+import solvela.member.contact.ContactCoolingStore;
+import solvela.member.risk.MemberRiskEngine;
+import solvela.member.risk.RiskContext;
+import solvela.member.risk.RiskDecision;
+import solvela.member.risk.RiskSession;
+import solvela.member.stepup.MemberStepUpService;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.notification.domain.NotifyRequest;
+import solvela.notification.service.NotificationService;
 
 /**
  * 绑定 / 更换手机号。
@@ -58,10 +74,9 @@ public class MemberPhoneBindService {
      *
      * <p>🔴 延迟取：{@code MemberStepUpService} 的依赖里有验证码服务，与本类成环的风险同邮箱那边。
      */
-    private final org.springframework.beans.factory.ObjectProvider<solvela.member.stepup.MemberStepUpService>
-            stepUpServiceProvider;
+    private final ObjectProvider<MemberStepUpService> stepUpServiceProvider;
 
-    private final solvela.member.contact.ContactCoolingStore coolingStore;
+    private final ContactCoolingStore coolingStore;
 
     /**
      * 换绑那一道闸上的风控（2026-10-16，P3 ②）。
@@ -70,11 +85,10 @@ public class MemberPhoneBindService {
      * 风控引擎在构造时会把所有规则实例化出来做双向校验，而其中一条规则要用
      * 本域的设备信任 —— 直接注入就是一个环（见 {@code MemberStepUpService} 里那段注释）。
      */
-    private final org.springframework.beans.factory.ObjectFactory<solvela.member.risk.MemberRiskEngine>
-            riskEngineFactory;
+    private final ObjectFactory<MemberRiskEngine> riskEngineFactory;
 
 
-    private final solvela.notification.service.NotificationService notificationService;
+    private final NotificationService notificationService;
 
     @Transactional(rollbackFor = Exception.class)
     public MemberPhoneBindResult bind(MemberPhoneBindCmd cmd) {
@@ -83,24 +97,20 @@ public class MemberPhoneBindService {
             // 格式不对连账本都不开（判据同邮箱那边、同注册）
             return MemberPhoneBindResult.fail(PhoneBindFailReason.BAD_PHONE_FORMAT);
         }
-        try (solvela.member.risk.RiskSession risk = riskEngineFactory.getObject()
+        try (RiskSession risk = riskEngineFactory.getObject()
                 .open(riskContext(cmd.memberId(), cmd.deviceId(), cmd.clientIp()))) {
             return insideRisk(risk, cmd, newPhone);
         }
     }
 
     /** 风控账本里的那一段。结构与邮箱那边一字对应 */
-    private MemberPhoneBindResult insideRisk(solvela.member.risk.RiskSession risk,
+    private MemberPhoneBindResult insideRisk(RiskSession risk,
                                              MemberPhoneBindCmd cmd, String newPhone) {
-        solvela.member.risk.RiskDecision pre = riskEngineFactory.getObject().evaluatePre(risk);
-        if (pre.atLeast(solvela.enums.MemberRiskDecisionEnum.LIMIT)) {
+        RiskDecision pre = riskEngineFactory.getObject().evaluateGatePre(risk);
+        if (pre.atLeast(MemberRiskDecisionEnum.LIMIT)) {
             log.warn("【手机绑定】风控拦下, memberId: {}, 结论: {}", cmd.memberId(), pre.decision());
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.PRE_BLOCKED,
+            return risk.end(MemberRiskOutcomeEnum.PRE_BLOCKED,
                     MemberPhoneBindResult.fail(PhoneBindFailReason.TOO_MANY_ATTEMPTS));
-        }
-        if (!pre.is(solvela.enums.MemberRiskDecisionEnum.PASS)) {
-            log.error("【手机绑定】风控给出了本场景执行不了的处置: {}，本次放行 —— 请检查规则配置",
-                    pre.decision());
         }
 
         /*
@@ -111,7 +121,7 @@ public class MemberPhoneBindService {
         SmsCodeVerifyResult codeResult =
                 smsCodeService.verify(SmsScene.BIND, newPhone, cmd.newPhoneCode());
         if (codeResult != SmsCodeVerifyResult.OK) {
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS,
+            return risk.end(MemberRiskOutcomeEnum.BAD_CREDENTIALS,
                     MemberPhoneBindResult.fail(toBindReason(codeResult)));
         }
 
@@ -120,7 +130,7 @@ public class MemberPhoneBindService {
             // 令牌解析出的会员号在库里不存在。走不到，除非会员被硬删了 ——
             // 而注销是改 status 不是删行。当成没有原主证明处理，不泄露更多
             log.warn("【手机绑定】令牌里的会员号查不到人, memberId: {}", cmd.memberId());
-            return risk.end(solvela.enums.MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
+            return risk.end(MemberRiskOutcomeEnum.UNKNOWN_ACCOUNT,
                     MemberPhoneBindResult.fail(PhoneBindFailReason.REBIND_VERIFICATION_FAILED));
         }
 
@@ -134,16 +144,16 @@ public class MemberPhoneBindService {
                 boolean needsMore =
                         rebindProblem.reason() == PhoneBindFailReason.REBIND_VERIFICATION_REQUIRED;
                 return risk.end(needsMore
-                        ? solvela.enums.MemberRiskOutcomeEnum.STEP_UP_REQUIRED
-                        : solvela.enums.MemberRiskOutcomeEnum.BAD_CREDENTIALS, rebindProblem);
+                        ? MemberRiskOutcomeEnum.STEP_UP_REQUIRED
+                        : MemberRiskOutcomeEnum.BAD_CREDENTIALS, rebindProblem);
             }
         }
 
         MemberPhoneBindResult result =
                 doUpdate(cmd.memberId(), newPhone, oldPhone, cmd.deviceId(), cmd.clientIp());
         return risk.end(result.success()
-                ? solvela.enums.MemberRiskOutcomeEnum.SUCCESS
-                : solvela.enums.MemberRiskOutcomeEnum.IDENTITY_TAKEN, result);
+                ? MemberRiskOutcomeEnum.SUCCESS
+                : MemberRiskOutcomeEnum.IDENTITY_TAKEN, result);
     }
 
     /**
@@ -155,9 +165,9 @@ public class MemberPhoneBindService {
      * （可信设备也要判），所以引擎用不到它 —— 而算它要查一次登录日志。
      * 与邮箱那边一字对应。
      */
-    private solvela.member.risk.RiskContext riskContext(Long memberId, String deviceId, String clientIp) {
-        return new solvela.member.risk.RiskContext(
-                solvela.enums.MemberRiskEventTypeEnum.CONTACT_BIND, memberId, deviceId, clientIp);
+    private RiskContext riskContext(Long memberId, String deviceId, String clientIp) {
+        return new RiskContext(
+                MemberRiskEventTypeEnum.CONTACT_BIND, memberId, deviceId, clientIp);
     }
 
 
@@ -222,11 +232,11 @@ public class MemberPhoneBindService {
     private void applyCooling(Long memberId, String deviceId, String clientIp) {
         try {
             boolean trusted = stepUpServiceProvider.getObject()
-                    .check(solvela.member.api.StepUpCmd.of(memberId, deviceId, clientIp)).trusted();
+                    .check(StepUpCmd.of(memberId, deviceId, clientIp)).trusted();
             if (trusted) {
-                coolingStore.clear(memberId, solvela.enums.MemberVerifyChannelEnum.SMS);
+                coolingStore.clear(memberId, MemberVerifyChannelEnum.SMS);
             } else {
-                coolingStore.start(memberId, solvela.enums.MemberVerifyChannelEnum.SMS);
+                coolingStore.start(memberId, MemberVerifyChannelEnum.SMS);
             }
         } catch (RuntimeException e) {
             log.error("【手机绑定】判断冷静期失败，本次不设, memberId: {}", memberId, e);
@@ -235,8 +245,8 @@ public class MemberPhoneBindService {
 
     /** 告诉主人一声。号码打过码 —— 这条通知会长期留在消息列表里 */
     private void notifyBound(Long memberId, String newPhone) {
-        notificationService.send(solvela.notification.domain.NotifyRequest
-                .of(solvela.enums.NotificationTemplateEnum.CONTACT_BOUND, memberId)
+        notificationService.send(NotifyRequest
+                .of(NotificationTemplateEnum.CONTACT_BOUND, memberId)
                 .param("contactType", "手机号")
                 .param("maskedContact", MemberPhoneUtil.mask(newPhone))
                 .build());

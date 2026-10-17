@@ -1,35 +1,36 @@
 package solvela.app.client;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
-import tools.jackson.databind.json.JsonMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 import solvela.app.auth.CurrentDevice;
 import solvela.app.auth.CurrentMember;
 import solvela.app.web.Trace;
-import solvela.trace.DeviceContract;
-import solvela.trace.MemberContract;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.MallApi;
-import solvela.marketing.api.RechargeApi;
 import solvela.marketing.api.PrizeRecordApi;
+import solvela.marketing.api.RechargeApi;
 import solvela.member.api.AssetApi;
 import solvela.member.api.CouponQueryApi;
 import solvela.member.api.DeliveryApi;
 import solvela.member.api.DeviceApi;
-import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.MemberAuthApi;
 import solvela.member.api.MemberEntitlementApi;
 import solvela.member.api.MemberGradeApi;
+import solvela.member.api.MemberSecurityApi;
 import solvela.member.api.MemberSignApi;
 import solvela.member.api.MemberStepUpApi;
 import solvela.member.api.NotificationApi;
+import solvela.member.api.ProposalRecordApi;
+import solvela.trace.DeviceContract;
+import solvela.trace.MemberContract;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 
@@ -263,9 +264,9 @@ public class DownstreamClientConfig {
      * 下一次回到前台还会再问，所以不必给更长的预算。
      */
     @Bean
-    public solvela.member.api.MemberSecurityApi memberSecurityApi(
+    public MemberSecurityApi memberSecurityApi(
             @Value("${solvela.client.member.base-url}") String baseUrl) {
-        return proxy(baseUrl, Duration.ofSeconds(2), solvela.member.api.MemberSecurityApi.class);
+        return proxy(baseUrl, Duration.ofSeconds(2), MemberSecurityApi.class);
     }
 
     @Bean

@@ -1,23 +1,24 @@
 package solvela.admin.activity;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import solvela.draw.runtime.DrawCacheKey;
+import solvela.exception.BusinessException;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityDrawCmd;
 import solvela.marketing.api.ActivityRuleView;
 import solvela.marketing.api.DrawLimits;
 import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.DrawResultView;
-import solvela.exception.BusinessException;
-import org.redisson.api.RedissonClient;
-import solvela.draw.runtime.DrawCacheKey;
 import solvela.scriptengine.Script;
 import solvela.scriptengine.domain.ScriptSaveCommand;
 import solvela.scriptengine.manager.ScriptManager;
@@ -148,7 +149,7 @@ class ActivityPlayAcceptanceTest {
          */
         redissonClient.getRateLimiter(DrawCacheKey.rateLimit(ACTIVITY_CODE, MEMBER_ID)).delete();
 
-        scriptManager.remove(com.baomidou.mybatisplus.core.toolkit.Wrappers.<Script>lambdaQuery()
+        scriptManager.remove(Wrappers.<Script>lambdaQuery()
                 .in(Script::getScriptCode, COUNT_SCRIPT, MULTI_SCRIPT, OVER_LIMIT_SCRIPT));
         jdbcTemplate.update("DELETE FROM t_draw_prize_log WHERE activity_code = ?", ACTIVITY_CODE);
         jdbcTemplate.update("DELETE FROM t_draw_config WHERE activity_code = ?", ACTIVITY_CODE);

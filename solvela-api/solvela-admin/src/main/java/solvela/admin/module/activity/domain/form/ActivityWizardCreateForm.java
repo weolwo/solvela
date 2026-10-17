@@ -1,6 +1,5 @@
 package solvela.admin.module.activity.domain.form;
 
-import solvela.enums.ApproveModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,7 +9,9 @@ import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.validation.enumeration.CheckEnum;
 import solvela.enums.ActivityTypeEnum;
+import solvela.enums.ApproveModeEnum;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -97,7 +98,7 @@ public class ActivityWizardCreateForm {
 
         @Schema(description = "奖励价值", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "奖励价值 不能为空")
-        private java.math.BigDecimal prizeValue;
+        private BigDecimal prizeValue;
 
         @Schema(description = "审批模式：0-自动免审, 1-人工审批", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "审批模式 不能为空")

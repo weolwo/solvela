@@ -2,14 +2,15 @@ package solvela.ledger.wallet.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import solvela.ledger.MemberWallet;
 import solvela.ledger.wallet.domain.dto.MemberWalletDTO;
 import solvela.ledger.wallet.domain.query.MemberWalletQuery;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 会员钱包表 Dao
@@ -29,12 +30,12 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
      *
      * <p>本页的「本期变动」走交易明细表，不在这里另写一份。
      */
-    java.util.Map<String, Object> selectStat();
+    Map<String, Object> selectStat();
 
     /**
      * 按资产类型的余额存量。余额必须按类型分开 —— 积分和现金不是同一个量纲。
      */
-    List<java.util.Map<String, Object>> selectAssetBalanceStat();
+    List<Map<String, Object>> selectAssetBalanceStat();
 
 
     /**

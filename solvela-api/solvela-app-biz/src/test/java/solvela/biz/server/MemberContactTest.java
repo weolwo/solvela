@@ -11,10 +11,12 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiHasher;
 import solvela.member.api.EmailCodeScene;
+import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.MemberContactView;
 import solvela.member.api.MemberEmailBindCmd;
 import solvela.member.api.MemberRegisterCmd;
 import solvela.member.api.MemberRegisterResult;
+import solvela.member.api.MemberRegisterType;
 import solvela.member.auth.MemberAuthService;
 import solvela.member.util.MemberEmailUtil;
 
@@ -87,7 +89,7 @@ class MemberContactTest {
 
     private String sendAndReadCode(EmailCodeScene scene, String email) {
         assertTrue(memberAuthService.sendEmailCode(
-                new solvela.member.api.EmailCodeSendCmd(scene, email, freshIp(), memberId)).success());
+                new EmailCodeSendCmd(scene, email, freshIp(), memberId)).success());
         String key = redisService.generateRedisKey("mbr:code:",
                 "email:" + scene.name() + ":" + piiHasher.hash(MemberEmailUtil.normalize(email)));
         String stored = redisService.get(key);
@@ -156,7 +158,7 @@ class MemberContactTest {
         String email = freshEmail();
         String code = sendAndReadCode(EmailCodeScene.REGISTER, email);
         MemberRegisterResult r = memberAuthService.register(new MemberRegisterCmd(
-                solvela.member.api.MemberRegisterType.EMAIL_CODE, email, code, null, null,
+                MemberRegisterType.EMAIL_CODE, email, code, null, null,
                 "H5", freshIp(), "H5", null));
         assertTrue(r.success(), "前提不成立：" + r.reason());
         memberId = r.identity().memberId();

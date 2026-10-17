@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.module.redis.RedisService;
+import solvela.security.SlidingWindowScripts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -151,7 +152,7 @@ class SlidingWindowCounterTest {
         bump(key, later);
 
         long oldest = redisService.slidingWindowCount(key, WINDOW, BUCKETS, later, 0L).get(1);
-        long retryAfter = solvela.security.SlidingWindowScripts.retryAfterSeconds(WINDOW, BUCKETS, later, oldest);
+        long retryAfter = SlidingWindowScripts.retryAfterSeconds(WINDOW, BUCKETS, later, oldest);
 
         assertTrue(retryAfter > 0 && retryAfter <= WINDOW / 2 + BUCKET_SECONDS,
                 "最旧那一批应当在约半个窗口后掉出去，实际 " + retryAfter);

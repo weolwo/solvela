@@ -1,6 +1,7 @@
 package solvela.admin.task;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.List;
 
@@ -72,7 +73,7 @@ final class TestMemberCleaner {
 
     private static boolean allIdle(Object... pools) {
         for (Object pool : pools) {
-            if (pool instanceof org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor p) {
+            if (pool instanceof ThreadPoolTaskExecutor p) {
                 if (p.getActiveCount() > 0 || !p.getThreadPoolExecutor().getQueue().isEmpty()) {
                     return false;
                 }

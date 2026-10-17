@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -149,7 +150,7 @@ class MemberGrowthProtectBoostTest {
         assertEquals(100_000L, capturedLog().getDelta());
         verify(memberGrowthDao).addValue(MEMBER_ID, 100_000L);
         // 套利不是靠封顶堵的，是靠「期满一并清零、带不进新周期」堵的 —— 累加器这一层不该碰周期
-        verify(memberGrowthDao, org.mockito.Mockito.never())
+        verify(memberGrowthDao, Mockito.never())
                 .closePeriod(anyLong(), any(), any(), any());
     }
 }

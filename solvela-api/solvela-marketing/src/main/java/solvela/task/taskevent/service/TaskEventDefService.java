@@ -1,26 +1,27 @@
 package solvela.task.taskevent.service;
 
-import solvela.enums.EnableStatusEnum;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import tools.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import solvela.base.dao.SolvelaPageUtil;
 import solvela.base.domain.PageResult;
 import solvela.base.json.JsonUtils;
 import solvela.base.util.SolvelaBeanUtil;
-import solvela.base.dao.SolvelaPageUtil;
-import solvela.task.taskconfig.dao.TaskConfigDao;
-import solvela.task.TaskConfig;
-import solvela.task.taskevent.dao.TaskEventDao;
-import solvela.task.TaskEvent;
-import solvela.task.taskevent.domain.command.TaskEventAddCommand;
-import solvela.task.taskevent.domain.query.TaskEventQuery;
-import solvela.task.taskevent.domain.command.TaskEventUpdateCommand;
-import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
-import solvela.task.taskevent.domain.dto.TaskEventDTO;
+import solvela.enums.EnableStatusEnum;
 import solvela.exception.BusinessException;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.stereotype.Service;
+import solvela.task.TaskConfig;
+import solvela.task.TaskEvent;
+import solvela.task.taskconfig.dao.TaskConfigDao;
+import solvela.task.taskevent.dao.TaskEventDao;
+import solvela.task.taskevent.domain.command.TaskEventAddCommand;
+import solvela.task.taskevent.domain.command.TaskEventUpdateCommand;
+import solvela.task.taskevent.domain.dto.TaskEventDTO;
+import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
+import solvela.task.taskevent.domain.query.TaskEventQuery;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.List;
 
@@ -122,7 +123,7 @@ public class TaskEventDefService {
             return;
         }
         Long refCount = taskConfigDao.selectCount(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskConfig>()
+                new LambdaQueryWrapper<TaskConfig>()
                         .eq(TaskConfig::getTriggerEvent, exists.getEventCode()));
         if (refCount != null && refCount > 0) {
             throw new BusinessException("该事件已被 " + refCount

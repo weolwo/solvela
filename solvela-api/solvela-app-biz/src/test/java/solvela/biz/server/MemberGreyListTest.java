@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import solvela.auth.device.DeviceTokenCodec;
 import solvela.base.json.JsonUtils;
@@ -69,7 +70,7 @@ class MemberGreyListTest {
     private GatewaySnapshotPublisher snapshotPublisher;
 
     @Autowired
-    private org.springframework.data.redis.core.StringRedisTemplate redis;
+    private StringRedisTemplate redis;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;

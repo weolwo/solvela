@@ -1,9 +1,11 @@
 package solvela.mall.category.service;
 
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,8 +83,8 @@ class MallCategoryIconRelationTest {
     /** 名称查重那条走 manager 的 lambdaQuery，这里让它返回空集合就够了 */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void stubNameCheckPasses() {
-        var query = mock(com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper.class,
-                org.mockito.Answers.RETURNS_DEEP_STUBS);
+        var query = mock(LambdaQueryChainWrapper.class,
+                Answers.RETURNS_DEEP_STUBS);
         when(mallCategoryManager.lambdaQuery()).thenReturn(query);
         when(query.eq(any(), any())).thenReturn(query);
         when(query.list()).thenReturn(List.of());

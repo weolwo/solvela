@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,7 +38,7 @@ class MemberAuthEndpointMappingTest {
      * 而它想证明的只是「请求走到了域里」。
      */
     private static String freshPhone() {
-        return "139" + (10_000_000 + java.util.concurrent.ThreadLocalRandom.current().nextInt(80_000_000));
+        return "139" + (10_000_000 + ThreadLocalRandom.current().nextInt(80_000_000));
     }
 
     @LocalServerPort

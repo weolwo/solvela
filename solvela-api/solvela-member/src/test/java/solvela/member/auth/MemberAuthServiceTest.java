@@ -1,5 +1,6 @@
 package solvela.member.auth;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,16 +13,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import solvela.crypto.PasswordCipher;
+import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
 import solvela.enums.LoginLogResultEnum;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
 import solvela.enums.MemberStatusEnum;
+import solvela.enums.MemberVerifyChannelEnum;
 import solvela.member.Member;
 import solvela.member.MemberLoginLog;
 import solvela.member.MemberRiskEvent;
 import solvela.member.api.AuthFailReason;
+import solvela.member.api.EmailCodeVerifyResult;
 import solvela.member.api.LoginChallengeCmd;
 import solvela.member.api.LoginChallengeCodeResult;
 import solvela.member.api.MemberAuthCmd;
@@ -31,7 +35,9 @@ import solvela.member.api.SmsCodeSendResult;
 import solvela.member.api.SmsCodeVerifyResult;
 import solvela.member.api.SmsScene;
 import solvela.member.device.DeviceGuard;
+import solvela.member.email.MemberEmailCodeService;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
+import solvela.member.password.LeakedPasswordNotifier;
 import solvela.member.register.MemberRegisterService;
 import solvela.member.risk.MemberRiskEngine;
 import solvela.member.risk.MemberRiskProperties;
@@ -41,6 +47,9 @@ import solvela.member.risk.RiskDecision;
 import solvela.member.risk.RiskEventRecorder;
 import solvela.member.risk.RiskEventRef;
 import solvela.member.risk.RiskSession;
+import solvela.member.risk.VerifyRouter;
+import solvela.member.risk.feature.AccountFailTracker;
+import solvela.member.risk.feature.LoginProfileProvider;
 import solvela.member.risk.feature.PasswordCooldownStore;
 import solvela.member.sms.MemberSmsCodeService;
 
@@ -119,26 +128,26 @@ class MemberAuthServiceTest {
      * 这里只是让它别是 null：它挂在验密码那一行之后，而<b>登录不该因为它而炸</b>。
      */
     @Mock
-    private solvela.member.password.LeakedPasswordNotifier leakedPasswordNotifier;
+    private LeakedPasswordNotifier leakedPasswordNotifier;
     /** 动作怎么执行由 {@code RiskActionExecutorTest} 钉；这里只钉「生效结论的动作交给了它」 */
     @Mock
     private RiskActionExecutor riskActions;
     @Mock
     private MemberSmsCodeService smsCodeService;
     @Mock
-    private solvela.member.email.MemberEmailCodeService emailCodeService;
+    private MemberEmailCodeService emailCodeService;
     @Mock
     private MemberRiskEngine riskEngine;
     @Mock
     private PasswordCooldownStore cooldownStore;
     @Mock
-    private solvela.member.risk.feature.AccountFailTracker failTracker;
+    private AccountFailTracker failTracker;
     @Mock
-    private solvela.member.risk.feature.LoginProfileProvider profileProvider;
+    private LoginProfileProvider profileProvider;
     @Mock
-    private solvela.member.risk.VerifyRouter verifyRouter;
+    private VerifyRouter verifyRouter;
     @Mock
-    private solvela.crypto.PiiCipher piiCipher;
+    private PiiCipher piiCipher;
 
     /** 真会话要往它落库。顺手也成了「这条路径有没有写流水」的探针 */
     @Mock
@@ -169,8 +178,8 @@ class MemberAuthServiceTest {
         when(memberAuthDao.selectContacts(MEMBER_ID)).thenReturn(member);
         // 核身路由：默认走短信（与这批用例的手机号登录一致）。要验「一条通道都没有」的用例自己改
         when(verifyRouter.route(any(), any(), any()))
-                .thenReturn(new solvela.member.risk.VerifyRouter.Route(
-                        solvela.enums.MemberVerifyChannelEnum.SMS, false));
+                .thenReturn(new VerifyRouter.Route(
+                        MemberVerifyChannelEnum.SMS, false));
         when(memberAuthDao.selectForLogin(PHONE_HASH)).thenReturn(member);
 
         // 假引擎 + 真会话：结论由用例指定，落库照真发生
@@ -411,7 +420,7 @@ class MemberAuthServiceTest {
         doThrow(new RuntimeException("Redis 挂了")).when(newDeviceLoginNotifier)
                 .onLoginSucceeded(any(), any(), any(), any());
 
-        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+        Assertions.assertThrows(RuntimeException.class,
                 () -> service.authenticate(cmd(RAW_PASSWORD)));
 
         assertEquals(MemberRiskOutcomeEnum.INTERNAL_ERROR, savedEvent().getOutcome(),
@@ -483,7 +492,7 @@ class MemberAuthServiceTest {
         when(piiHasher.hash("a@x.com")).thenReturn("EMAILHASH");
         when(memberAuthDao.selectForLoginByEmail("EMAILHASH")).thenReturn(member);
         when(emailCodeService.verify(any(), eq("a@x.com"), eq("123456")))
-                .thenReturn(solvela.member.api.EmailCodeVerifyResult.OK);
+                .thenReturn(EmailCodeVerifyResult.OK);
 
         MemberAuthResult result = service.authenticate(new MemberAuthCmd(MemberLoginType.EMAIL_CODE,
                 "a@x.com", "123456", null, "H5", "127.0.0.1", DEVICE_ID, false));
@@ -554,20 +563,20 @@ class MemberAuthServiceTest {
         post(new RiskDecision(MemberRiskDecisionEnum.OTP_STRONG, 0L, Set.of()));
         // 手机号登录，但路由要求换通道 → 码走邮箱
         when(verifyRouter.route(any(), any(), any()))
-                .thenReturn(new solvela.member.risk.VerifyRouter.Route(
-                        solvela.enums.MemberVerifyChannelEnum.EMAIL, false));
+                .thenReturn(new VerifyRouter.Route(
+                        MemberVerifyChannelEnum.EMAIL, false));
         when(recorder.record(any(), any())).thenReturn(4242L);
         when(challengeStore.issue(any())).thenReturn("lc_ticket");
 
         MemberAuthResult result = service.authenticate(cmd(PHONE, RAW_PASSWORD));
 
-        assertEquals(solvela.enums.MemberVerifyChannelEnum.EMAIL, result.verifyChannel(),
+        assertEquals(MemberVerifyChannelEnum.EMAIL, result.verifyChannel(),
                 "客户端要据它说「验证码已发到你的邮箱」—— 说错了用户会去翻另一个收件箱，然后以为我们没发");
         ArgumentCaptor<LoginChallengeStore.Challenge> captor =
                 ArgumentCaptor.forClass(LoginChallengeStore.Challenge.class);
         verify(challengeStore).issue(captor.capture());
-        assertEquals(solvela.enums.MemberVerifyChannelEnum.EMAIL, captor.getValue().channel());
-        assertEquals(solvela.enums.MemberVerifyChannelEnum.EMAIL.getValue(),
+        assertEquals(MemberVerifyChannelEnum.EMAIL, captor.getValue().channel());
+        assertEquals(MemberVerifyChannelEnum.EMAIL.getValue(),
                 savedEvent().getVerifyChannel(),
                 "落库了才数得出「有多少次本该换通道却退回了」");
     }
@@ -611,7 +620,7 @@ class MemberAuthServiceTest {
         when(challengeStore.find(TICKET)).thenReturn(new LoginChallengeStore.Challenge(
                 MEMBER_ID, MemberLoginType.PHONE_PASSWORD, DEVICE_ID, "H5",
                 new RiskEventRef(4242L, LocalDateTime.now()),
-                solvela.enums.MemberVerifyChannelEnum.SMS, PHONE));
+                MemberVerifyChannelEnum.SMS, PHONE));
     }
 
     private static LoginChallengeCmd ticketCmd(String code, String deviceId) {

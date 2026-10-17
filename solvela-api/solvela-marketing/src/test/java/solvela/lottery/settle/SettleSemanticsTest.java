@@ -1,13 +1,14 @@
 package solvela.lottery.settle;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import solvela.lottery.engine.MatchRuleEnum;
 import solvela.lottery.engine.PrizeRuleSnapshot;
 import solvela.lottery.engine.TicketMatcher;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -126,7 +127,7 @@ class SettleSemanticsTest {
     void higherLevelClaimsFirst() {
         String winning = "89102";
         List<Ticket> tickets = List.of(new Ticket("89102"), new Ticket("55102"), new Ticket("55552"), new Ticket("55555"))
-                .stream().collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                .stream().collect(Collectors.toCollection(ArrayList::new));
 
         settleLikeSql(tickets, standardRules(), winning);
 

@@ -1,31 +1,6 @@
 package solvela.admin.task;
 
-import solvela.enums.TaskConfigStatusEnum;
-import solvela.enums.TaskFlowTypeEnum;
-import solvela.enums.TaskRecordStatusEnum;
-import solvela.enums.PrizeDispatchStatusEnum;
-import solvela.base.util.SolvelaEnumUtil;
-import solvela.exception.BusinessException;
-import solvela.prize.PrizeLog;
-import solvela.task.constant.TaskConst;
-import solvela.task.constant.TaskDiscardCode;
-import solvela.task.record.dao.TaskRecordDao;
-import solvela.task.TaskRecord;
-import solvela.task.recordflow.dao.TaskRecordFlowDao;
-import solvela.task.TaskRecordFlow;
-import solvela.task.constant.TaskTypeEnum;
-import solvela.task.runtime.TaskEventService;
-import solvela.task.runtime.TaskPeriodResolver;
-import solvela.task.runtime.domain.TaskAdvanceResult;
-import solvela.task.runtime.domain.TaskEventContext;
-import solvela.task.runtime.domain.TaskEventReportCommand;
-import solvela.task.TaskEvent;
-import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
-import solvela.task.taskevent.service.TaskEventDefService;
-import solvela.task.taskconfig.dao.TaskConfigDao;
-import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
-import solvela.task.tasktemplate.service.TaskTemplateService;
-import solvela.task.TaskConfig;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,13 +8,43 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import solvela.base.config.AsyncConfig;
+import solvela.base.util.SolvelaEnumUtil;
+import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.enums.TaskConfigStatusEnum;
+import solvela.enums.TaskFlowTypeEnum;
+import solvela.enums.TaskRecordStatusEnum;
+import solvela.exception.BusinessException;
+import solvela.prize.PrizeLog;
+import solvela.task.TaskConfig;
+import solvela.task.TaskEvent;
+import solvela.task.TaskRecord;
+import solvela.task.TaskRecordFlow;
+import solvela.task.constant.TaskConst;
+import solvela.task.constant.TaskDiscardCode;
+import solvela.task.constant.TaskTypeEnum;
+import solvela.task.record.dao.TaskRecordDao;
+import solvela.task.recordflow.dao.TaskRecordFlowDao;
+import solvela.task.runtime.TaskEventExecutorConfig;
+import solvela.task.runtime.TaskEventService;
+import solvela.task.runtime.TaskPeriodResolver;
+import solvela.task.runtime.domain.TaskAdvanceResult;
+import solvela.task.runtime.domain.TaskEventContext;
+import solvela.task.runtime.domain.TaskEventReportCommand;
+import solvela.task.taskconfig.dao.TaskConfigDao;
+import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
+import solvela.task.taskevent.service.TaskEventDefService;
+import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
+import solvela.task.tasktemplate.service.TaskTemplateService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -121,13 +126,13 @@ class TaskRuntimeP0AcceptanceTest {
     private String member;
 
     @Autowired
-    private org.springframework.context.ApplicationContext applicationContext;
+    private ApplicationContext applicationContext;
 
     /** 本轮造出来的全部会员号，@AfterAll 统一清 */
-    private static final java.util.List<Long> createdMembers = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static final List<Long> createdMembers = new CopyOnWriteArrayList<>();
 
     /** @AfterAll 是静态的，拿不到注入的实例字段，这里存一份 */
-    private static org.springframework.jdbc.core.JdbcTemplate cleanerJdbc;
+    private static JdbcTemplate cleanerJdbc;
 
     /** 两个异步池：base 的通用池 + 任务模块自己的事件池。收尾时要等它们都空 */
     private static Object asyncExecutor;
@@ -145,9 +150,9 @@ class TaskRuntimeP0AcceptanceTest {
                 memberId, member, member);
         createdMembers.add(memberId);
         cleanerJdbc = jdbcTemplate;
-        asyncExecutor = applicationContext.getBean(solvela.base.config.AsyncConfig.ASYNC_EXECUTOR_THREAD_NAME);
+        asyncExecutor = applicationContext.getBean(AsyncConfig.ASYNC_EXECUTOR_THREAD_NAME);
         taskEventExecutor = applicationContext.getBean(
-                solvela.task.runtime.TaskEventExecutorConfig.TASK_EVENT_EXECUTOR);
+                TaskEventExecutorConfig.TASK_EVENT_EXECUTOR);
     }
 
     /**
@@ -194,7 +199,7 @@ class TaskRuntimeP0AcceptanceTest {
 
     private TaskConfig configOf(String taskName) {
         List<TaskConfig> list = taskConfigDao.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskConfig>()
+                new LambdaQueryWrapper<TaskConfig>()
                         .eq(TaskConfig::getTaskName, taskName));
         assertEquals(1, list.size(), "造数前提不成立：没有唯一的任务配置 " + taskName
                 + "，请先执行 数据库SQL脚本/mysql/任务模块-运行态联调造数.sql");
@@ -209,7 +214,7 @@ class TaskRuntimeP0AcceptanceTest {
     /** 该任务下本会员的全部记录（多轮时会有多条） */
     private List<TaskRecord> recordsOf(Long taskConfigId) {
         return taskRecordDao.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecord>()
+                new LambdaQueryWrapper<TaskRecord>()
                         .eq(TaskRecord::getMemberId, memberId)
                         .eq(TaskRecord::getTaskConfigId, taskConfigId)
                         .orderByAsc(TaskRecord::getId));
@@ -217,7 +222,7 @@ class TaskRuntimeP0AcceptanceTest {
 
     private TaskRecord recordOf(Long taskConfigId) {
         List<TaskRecord> list = taskRecordDao.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecord>()
+                new LambdaQueryWrapper<TaskRecord>()
                         .eq(TaskRecord::getMemberId, memberId)
                         .eq(TaskRecord::getTaskConfigId, taskConfigId));
         return list.isEmpty() ? null : list.get(0);
@@ -225,7 +230,7 @@ class TaskRuntimeP0AcceptanceTest {
 
     private List<TaskRecordFlow> flowsOf(Long taskConfigId) {
         return taskRecordFlowDao.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TaskRecordFlow>()
+                new LambdaQueryWrapper<TaskRecordFlow>()
                         .eq(TaskRecordFlow::getMemberId, memberId)
                         .eq(TaskRecordFlow::getTaskConfigId, taskConfigId)
                         .orderByAsc(TaskRecordFlow::getId));

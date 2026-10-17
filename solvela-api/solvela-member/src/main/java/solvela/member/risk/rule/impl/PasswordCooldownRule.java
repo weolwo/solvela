@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.api.MemberLoginType;
+import solvela.member.risk.RiskAction;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.feature.DeviceTrustProvider;
 import solvela.member.risk.feature.PasswordCooldownStore;
@@ -14,6 +15,7 @@ import solvela.member.risk.rule.RiskRuleConfig;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -103,7 +105,7 @@ public class PasswordCooldownRule implements RiskRule {
          *    代价是一个 24 小时的冷却快结束时不再请求落库，而那一行早就落过了。
          */
         if (remaining >= recordFrom(config.params()).toSeconds()) {
-            return hit.withActions(solvela.member.risk.RiskAction.RECORD_LIMIT);
+            return hit.withActions(RiskAction.RECORD_LIMIT);
         }
         return hit;
     }
@@ -114,7 +116,7 @@ public class PasswordCooldownRule implements RiskRule {
         if (!node.isArray()) {
             return List.of();
         }
-        List<Duration> steps = new java.util.ArrayList<>(node.size());
+        List<Duration> steps = new ArrayList<>(node.size());
         for (JsonNode item : node) {
             steps.add(RiskParams.parseDuration(item.asString(), "steps[]"));
         }

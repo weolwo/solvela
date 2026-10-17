@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -103,7 +104,7 @@ class LeakedPasswordNotifierTest {
     @Test
     @DisplayName("🔴 发站内信本身炸了也不能冒到登录上")
     void 发送失败不影响登录() {
-        org.mockito.Mockito.doThrow(new IllegalStateException("notify down"))
+        Mockito.doThrow(new IllegalStateException("notify down"))
                 .when(notificationService).send(any());
 
         assertDoesNotThrow(() -> notifier.onPasswordVerified(MEMBER_ID, "Password1"));

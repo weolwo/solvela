@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * 内置工具：字符串与标量取值。注册后脚本里以 {@code tool_xxx} 调用。
@@ -149,7 +150,7 @@ public class ToolStringHandler implements ScriptFunctionHandler {
         }
         // -1：保留末尾的空串，"a,b," 切出来是 3 段而不是 2 段。
         // 少一段的话，按位置取值的脚本会静默取错
-        result.addAll(Arrays.asList(text.split(java.util.regex.Pattern.quote(separator), -1)));
+        result.addAll(Arrays.asList(text.split(Pattern.quote(separator), -1)));
         return result;
     }
 

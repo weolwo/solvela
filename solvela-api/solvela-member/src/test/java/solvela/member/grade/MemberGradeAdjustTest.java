@@ -6,20 +6,24 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import solvela.enums.EnableStatusEnum;
 import solvela.exception.BusinessException;
-import solvela.member.MemberGrowth;
 import solvela.member.MemberGrade;
-import solvela.member.grade.dao.MemberGrowthDao;
-import solvela.member.grade.dao.MemberGrowthLogDao;
+import solvela.member.MemberGradeLog;
+import solvela.member.MemberGrowth;
+import solvela.member.MemberGrowthLog;
 import solvela.member.grade.dao.MemberGradeDao;
 import solvela.member.grade.dao.MemberGradeLogDao;
-import solvela.member.grade.service.MemberGrowthService;
+import solvela.member.grade.dao.MemberGrowthDao;
+import solvela.member.grade.dao.MemberGrowthLogDao;
+import solvela.member.grade.domain.query.MemberGrowthLogQuery;
 import solvela.member.grade.service.MemberGradeAdminService;
 import solvela.member.grade.service.MemberGradeChangeService;
+import solvela.member.grade.service.MemberGrowthService;
 import solvela.member.service.MemberService;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -107,7 +111,7 @@ class MemberGradeAdjustTest {
     @Test
     @DisplayName("🔴 会员不存在要在入口就拦住，不能等到写库时才发现")
     void 会员必须存在() {
-        org.mockito.Mockito.doThrow(new BusinessException("会员不存在"))
+        Mockito.doThrow(new BusinessException("会员不存在"))
                 .when(memberService).requireExists(MEMBER_ID);
 
         assertThrows(BusinessException.class,
@@ -186,8 +190,8 @@ class MemberGradeAdjustTest {
     @Test
     @DisplayName("成长值流水必须指定会员 —— 全表翻这张表没有业务场景")
     void 流水必须带会员() {
-        solvela.member.grade.domain.query.MemberGrowthLogQuery query =
-                new solvela.member.grade.domain.query.MemberGrowthLogQuery();
+        MemberGrowthLogQuery query =
+                new MemberGrowthLogQuery();
 
         assertThrows(BusinessException.class, () -> service.queryGrowthLogPage(query));
         verify(memberGrowthLogDao, never()).selectPage(any(), any());
@@ -200,8 +204,8 @@ class MemberGradeAdjustTest {
 
         // 期末结算照样要按他真实的成长值重判 —— 所以人工升级默认只在本周期有效
         verify(memberGrowthDao, never()).addValue(anyLong(), anyLong());
-        verify(memberGrowthLogDao, never()).insert(any(solvela.member.MemberGrowthLog.class));
-        verify(memberGradeLogDao, never()).insert(any(solvela.member.MemberGradeLog.class));
+        verify(memberGrowthLogDao, never()).insert(any(MemberGrowthLog.class));
+        verify(memberGradeLogDao, never()).insert(any(MemberGradeLog.class));
         // 留痕由 MemberGradeChangeService 统一写，不在这里各写一遍
         verify(memberGradeChangeService).change(anyLong(), anyInt(), anyInt(),
                 anyString(), anyLong(), anyString(), anyString());

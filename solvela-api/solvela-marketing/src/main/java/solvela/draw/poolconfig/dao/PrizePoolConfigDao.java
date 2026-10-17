@@ -1,15 +1,14 @@
 package solvela.draw.poolconfig.dao;
 
-        import java.util.List;
-
-        import solvela.draw.PrizePoolConfig;
-        import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
-        import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
-import solvela.enums.PrizePoolStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.draw.PrizePoolConfig;
+import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
+import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
+import solvela.enums.PrizePoolStatusEnum;
+
 import java.util.List;
 
 /**

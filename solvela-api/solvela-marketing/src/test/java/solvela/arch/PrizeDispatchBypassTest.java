@@ -2,6 +2,7 @@ package solvela.arch;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import solvela.dispatch.outbox.PrizeEventPublisher;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -78,7 +79,7 @@ class PrizeDispatchBypassTest {
                         这些玩法侧的类直接引用了 %s：
                           %s
 
-                        发奖的唯一出口是 solvela.dispatch.outbox.PrizeEventPublisher.publish(UserPrizeEvent)，
+                        发奖的唯一出口是 PrizeEventPublisher.publish(UserPrizeEvent)，
                         必须【在业务事务内】调用。接住它的 GlobalEventDispatcher.dispatch 挂在
                         @TransactionalEventListener(AFTER_COMMIT) 上，事务提交之后才派发。
 

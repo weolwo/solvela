@@ -16,6 +16,7 @@ import solvela.task.record.dao.TaskRecordDao;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -260,7 +261,7 @@ class BusinessJobTest {
         List<Map<String, Object>> samples = proposalRecordDao.selectStuckDispatchSample(now, minutes, 10);
         assertEquals(Math.min(10L, expected), samples.size(), "样本条数不对");
         if (!samples.isEmpty()) {
-            assertEquals(java.util.Set.of("tradeNo", "status", "memberId", "memberName", "stuckMinutes"),
+            assertEquals(Set.of("tradeNo", "status", "memberId", "memberName", "stuckMinutes"),
                     samples.get(0).keySet(),
                     "SQL 别名与 Job 读取的 key 对不上：日志里会打出一串 null");
             long previous = Long.MAX_VALUE;

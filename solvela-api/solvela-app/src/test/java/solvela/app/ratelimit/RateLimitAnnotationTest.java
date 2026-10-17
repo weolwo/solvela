@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -87,7 +88,7 @@ class RateLimitAnnotationTest {
                 return;
             }
             boolean hasBody = Arrays.stream(method.getMethodParameters())
-                    .anyMatch(p -> p.hasParameterAnnotation(org.springframework.web.bind.annotation.RequestBody.class));
+                    .anyMatch(p -> p.hasParameterAnnotation(RequestBody.class));
             boolean exposes = Arrays.stream(method.getMethodParameters())
                     .anyMatch(p -> RateLimitAccount.class.isAssignableFrom(p.getParameterType()));
             // 凭票的二次验证（只有一张票，没有账号）是唯一刻意不交账号的：票本身已经绑在验对了密码的那次登录上

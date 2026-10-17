@@ -567,7 +567,7 @@ public class MallCommodityService {
         // 已有行的锁定/已售只能从库里拿：表单刻意不带这两个字段（见 toSkuEntity）
         Map<Long, MallSku> existingById = draft.getId() == null ? Map.of()
                 : listDbSku(draft.getId()).stream()
-                        .collect(Collectors.toMap(MallSku::getId, java.util.function.Function.identity(),
+                        .collect(Collectors.toMap(MallSku::getId, Function.identity(),
                                 (a, b) -> a));
 
         List<MallSku> draftSkus = new ArrayList<>();

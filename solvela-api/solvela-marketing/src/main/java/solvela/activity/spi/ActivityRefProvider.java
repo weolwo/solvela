@@ -4,6 +4,7 @@ import solvela.activity.domain.dto.ActivityRefItem;
 import solvela.enums.ActivityTypeEnum;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 活动下游引用的查询契约，由各玩法模块实现。
@@ -89,5 +90,5 @@ public interface ActivityRefProvider {
      *                           玩法侧凡是引用 prize_code 的地方都要按它重映射，
      *                           否则新活动的奖池会指向老活动的奖品
      */
-    void copyTo(String sourceActivityCode, String targetActivityCode, java.util.Map<String, String> prizeCodeMap);
+    void copyTo(String sourceActivityCode, String targetActivityCode, Map<String, String> prizeCodeMap);
 }

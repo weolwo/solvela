@@ -29,6 +29,7 @@ import solvela.mall.order.dao.MallOrderDao;
 import solvela.mall.sku.dao.MallSkuDao;
 
 import java.util.List;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -208,7 +209,7 @@ class MallEnumMappingTest {
         }
     }
 
-    private <E> long sumByStatus(E[] values, java.util.function.Function<E, Long> counter) {
+    private <E> long sumByStatus(E[] values, Function<E, Long> counter) {
         long sum = 0;
         for (E v : values) {
             Long n = counter.apply(v);

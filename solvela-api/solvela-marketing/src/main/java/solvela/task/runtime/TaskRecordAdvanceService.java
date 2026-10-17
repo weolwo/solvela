@@ -1,34 +1,38 @@
 package solvela.task.runtime;
 
-import solvela.enums.TaskRecordStatusEnum;
-import solvela.enums.TaskFlowTypeEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import solvela.base.json.JsonUtils;
+import solvela.enums.TaskFlowTypeEnum;
+import solvela.enums.TaskRecordStatusEnum;
+import solvela.task.TaskConfig;
+import solvela.task.TaskEvent;
+import solvela.task.TaskPrizeMapping;
+import solvela.task.TaskRecord;
+import solvela.task.TaskRecordFlow;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
 import solvela.task.constant.TaskTypeEnum;
-import solvela.task.TaskPrizeMapping;
 import solvela.task.prizemapping.manager.TaskPrizeMappingManager;
 import solvela.task.record.dao.TaskRecordDao;
-import solvela.task.TaskRecord;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;
-import solvela.task.TaskRecordFlow;
 import solvela.task.runtime.domain.MetricPlan;
 import solvela.task.runtime.domain.TaskAdvanceResult;
 import solvela.task.runtime.domain.TaskEventContext;
 import solvela.task.runtime.domain.TaskRuleConfig;
 import solvela.task.runtime.strategy.TaskProgressStrategy;
 import solvela.task.runtime.strategy.TaskProgressStrategyFactory;
-import solvela.task.TaskConfig;
-import solvela.task.TaskEvent;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * 单个任务配置的进度推进 —— <b>运行态的核心，也是唯一写库的地方</b>。
@@ -308,7 +312,7 @@ public class TaskRecordAdvanceService {
             return true;
         }
         int maxStage = mappings.stream().map(TaskPrizeMapping::getStageLevel)
-                .filter(java.util.Objects::nonNull).mapToInt(Integer::intValue).max().orElse(0);
+                .filter(Objects::nonNull).mapToInt(Integer::intValue).max().orElse(0);
         return highestReached >= maxStage;
     }
 
@@ -506,7 +510,7 @@ public class TaskRecordAdvanceService {
         record.setCurrentMetric(BigDecimal.ZERO);
         record.setVersion(0);
         record.setStatus(TaskRecordStatusEnum.RUNNING);
-        record.setProgressData(JsonUtils.toJson(java.util.Map.of()));
+        record.setProgressData(JsonUtils.toJson(Map.of()));
         record.setRuleSnapshot(config.getRuleConfig() == null ? "{}" : config.getRuleConfig());
         record.setPrizeSnapshot(buildPrizeSnapshot(config.getId()));
         // create_time / update_time 由 DDL 的 DEFAULT CURRENT_TIMESTAMP 产生，代码里不要填（铁律 9）
@@ -516,11 +520,11 @@ public class TaskRecordAdvanceService {
     private String buildPrizeSnapshot(Long taskConfigId) {
         List<TaskPrizeMapping> mappings = taskPrizeMappingManager.lambdaQuery()
                 .eq(TaskPrizeMapping::getTaskConfigId, taskConfigId).list();
-        List<java.util.Map<String, Object>> snapshot = mappings.stream()
-                .sorted(java.util.Comparator.comparing(TaskPrizeMapping::getStageLevel,
-                        java.util.Comparator.nullsFirst(Integer::compareTo)))
+        List<Map<String, Object>> snapshot = mappings.stream()
+                .sorted(Comparator.comparing(TaskPrizeMapping::getStageLevel,
+                        Comparator.nullsFirst(Integer::compareTo)))
                 .map(m -> {
-                    java.util.Map<String, Object> item = new java.util.LinkedHashMap<String, Object>();
+                    Map<String, Object> item = new LinkedHashMap<String, Object>();
                     item.put("stageLevel", m.getStageLevel());
                     item.put("prizeCode", m.getPrizeCode());
                     item.put("prizeMode", m.getPrizeMode());

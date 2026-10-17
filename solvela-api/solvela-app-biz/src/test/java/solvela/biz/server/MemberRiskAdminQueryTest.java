@@ -13,6 +13,7 @@ import solvela.enums.MemberRiskDecisionEnum;
 import solvela.enums.MemberRiskEventTypeEnum;
 import solvela.enums.MemberRiskModeEnum;
 import solvela.enums.MemberRiskOutcomeEnum;
+import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.MemberRiskEvent;
 import solvela.member.MemberRiskHit;
 import solvela.member.MemberRiskRule;
@@ -24,7 +25,9 @@ import solvela.member.risk.domain.query.MemberRiskEventQuery;
 import solvela.member.risk.service.MemberRiskAdminService;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -218,8 +221,8 @@ class MemberRiskAdminQueryTest {
         assertEquals(19, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败（2026-10-17 起纯计次的 6 条移交网关限流、黑名单与设备封禁的 10 条移交网关安全闸，新增蜜罐账号 1 条）");
 
         // 场景不能交错：注册的规则夹在登录的规则中间，页面上那一列就白加了
-        solvela.enums.MemberRiskEventTypeEnum scenario = null;
-        java.util.Set<solvela.enums.MemberRiskEventTypeEnum> seen = new java.util.HashSet<>();
+        MemberRiskEventTypeEnum scenario = null;
+        Set<MemberRiskEventTypeEnum> seen = new HashSet<>();
         boolean post = false;
         for (MemberRiskRule rule : rules) {
             if (rule.getEventType() != scenario) {
@@ -227,7 +230,7 @@ class MemberRiskAdminQueryTest {
                 scenario = rule.getEventType();
                 post = false;
             }
-            if (rule.getPhase() == solvela.enums.MemberRiskPhaseEnum.POST) {
+            if (rule.getPhase() == MemberRiskPhaseEnum.POST) {
                 post = true;
             } else {
                 assertFalse(post, "前置与后置混在一起的话，页面上就看不出一条规则是在密码前还是密码后判的");
@@ -237,13 +240,13 @@ class MemberRiskAdminQueryTest {
         // 🔴 只有登录分前后两段（「密码对不对」把信号分成了两半）。
         //    其余三个场景都只有前置：验证码验过 / 操作提交之后就没有「再判一次」的位置了
         assertTrue(rules.stream()
-                .filter(r -> r.getEventType() != solvela.enums.MemberRiskEventTypeEnum.LOGIN)
-                .allMatch(r -> r.getPhase() == solvela.enums.MemberRiskPhaseEnum.PRE));
+                .filter(r -> r.getEventType() != MemberRiskEventTypeEnum.LOGIN)
+                .allMatch(r -> r.getPhase() == MemberRiskPhaseEnum.PRE));
 
         // 资产出口与换绑那几条【都不许被可信设备跳过】—— 那正是这两个场景存在的理由
         assertTrue(rules.stream()
-                .filter(r -> r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.ASSET_OUT
-                        || r.getEventType() == solvela.enums.MemberRiskEventTypeEnum.CONTACT_BIND)
+                .filter(r -> r.getEventType() == MemberRiskEventTypeEnum.ASSET_OUT
+                        || r.getEventType() == MemberRiskEventTypeEnum.CONTACT_BIND)
                 .allMatch(r -> Integer.valueOf(0).equals(r.getBypassByTrust())),
                 "可信设备跳过的话，「一台验证过的老设备被偷了会话」这件事就永远判不出来");
     }

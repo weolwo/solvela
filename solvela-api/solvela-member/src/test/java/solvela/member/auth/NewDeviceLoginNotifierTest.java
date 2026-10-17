@@ -15,6 +15,7 @@ import solvela.base.mail.MailService;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiCipher;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
+import solvela.member.risk.SecurityPromptService;
 import solvela.notification.service.NotificationService;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -65,7 +66,7 @@ class NewDeviceLoginNotifierTest {
     private AsyncTaskExecutor sendExecutor;
     /** 「刚才是你吗」同一个判据下顺手记一条。这批用例只管提醒，不管它 */
     @Mock
-    private solvela.member.risk.SecurityPromptService securityPromptService;
+    private SecurityPromptService securityPromptService;
 
     @InjectMocks
     private NewDeviceLoginNotifier notifier;

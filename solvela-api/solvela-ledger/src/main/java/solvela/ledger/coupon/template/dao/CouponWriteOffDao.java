@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import solvela.coupon.CouponWriteOff;
+import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -53,7 +54,7 @@ public interface CouponWriteOffDao extends BaseMapper<CouponWriteOff> {
      *
      * @return 没有任何核销时返回 null，调用方按 0 处理
      */
-    BigDecimal sumConfirmedAmount(@Param("form") solvela.ledger.stat.domain.query.LedgerStatQuery form);
+    BigDecimal sumConfirmedAmount(@Param("form") LedgerStatQuery form);
 
     /**
      * 这一笔对这张券的<b>锁定</b>那一行。

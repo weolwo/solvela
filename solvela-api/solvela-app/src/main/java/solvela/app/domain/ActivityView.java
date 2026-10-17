@@ -3,6 +3,7 @@ package solvela.app.domain;
 import solvela.enums.ActivityStatusEnum;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * C 端看到的活动。
@@ -55,7 +56,7 @@ public record ActivityView(
         String shareDesc,
         String extraConfig,
         String ruleContent,
-        java.util.List<ActivityPrizeItem> prizes,
+        List<ActivityPrizeItem> prizes,
         boolean joinable,
         boolean claimable) {
 }

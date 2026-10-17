@@ -6,14 +6,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiHasher;
+import solvela.member.api.AuthFailReason;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendCmd;
 import solvela.member.api.MemberAuthCmd;
+import solvela.member.api.MemberAuthResult;
 import solvela.member.api.MemberLoginType;
 import solvela.member.api.MemberPhoneBindCmd;
 import solvela.member.api.MemberPhoneBindResult;
@@ -194,7 +196,7 @@ class PhoneBindTest {
 
         // 这个会员没有密码，所以验「查得到人」而不是「登得进去」：
         // 查不到人时返回的是 BAD_CREDENTIALS，查到了但没密码返回 NO_PASSWORD
-        assertEquals(solvela.member.api.AuthFailReason.NO_PASSWORD,
+        assertEquals(AuthFailReason.NO_PASSWORD,
                 memberAuthService.authenticate(new MemberAuthCmd(
                         MemberLoginType.PHONE_PASSWORD, phone, "whatever", null,
                         "H5", freshIp(), null, true)).reason(),
@@ -301,7 +303,7 @@ class PhoneBindTest {
         String second = freshPhone();
         assertTrue(bind(second, bindCode(second), PASSWORD, null).success());
 
-        solvela.member.api.MemberAuthResult byNew = memberAuthService.authenticate(new MemberAuthCmd(
+        MemberAuthResult byNew = memberAuthService.authenticate(new MemberAuthCmd(
                 MemberLoginType.PHONE_PASSWORD, second, PASSWORD, null,
                 "H5", freshIp(), null, true));
         assertTrue(byNew.success(), "新号码应当能登录，实际 " + byNew.reason());

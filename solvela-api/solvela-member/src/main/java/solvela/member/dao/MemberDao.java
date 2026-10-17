@@ -2,14 +2,15 @@ package solvela.member.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.MapKey;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import solvela.member.Member;
-import solvela.member.domain.query.MemberQuery;
 import solvela.member.domain.dto.MemberDTO;
+import solvela.member.domain.query.MemberQuery;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +70,7 @@ public interface MemberDao extends BaseMapper<Member> {
      * 整行捞回来等于每次列表都白白解密一遍。
      */
     @Select("SELECT create_time FROM t_member WHERE member_id = #{memberId}")
-    java.time.LocalDateTime selectCreateTimeById(@Param("memberId") Long memberId);
+    LocalDateTime selectCreateTimeById(@Param("memberId") Long memberId);
 
     @Select("SELECT member_id FROM t_member WHERE member_name = #{memberName}")
     Long selectMemberIdByName(@Param("memberName") String memberName);

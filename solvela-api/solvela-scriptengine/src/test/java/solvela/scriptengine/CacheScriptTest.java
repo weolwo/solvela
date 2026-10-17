@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import solvela.base.module.redis.RedisService;
 import solvela.scriptengine.annotation.ScriptFunction;
 import solvela.scriptengine.core.DefaultScriptEngine;
@@ -90,7 +91,7 @@ public class CacheScriptTest {
         scriptEngine.evaluate(ExecutableScript.untrusted("online-test", "return cache_incr('join', 60);"),
                 EngineContext.create());
 
-        verify(redisService, org.mockito.Mockito.times(2)).increment(keys.capture(), anyLong());
+        verify(redisService, Mockito.times(2)).increment(keys.capture(), anyLong());
         assertNotEquals(keys.getAllValues().get(0), keys.getAllValues().get(1),
                 "试跑要是和线上共用一个键，运营点几下试跑就能把真实用户的次数用光");
     }

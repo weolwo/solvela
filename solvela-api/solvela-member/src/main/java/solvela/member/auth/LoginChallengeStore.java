@@ -14,6 +14,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
 
@@ -119,7 +121,7 @@ public class LoginChallengeStore {
         if (ref == null || ref.eventId() == null || ref.createTime() == null) {
             return "";
         }
-        return ref.eventId() + "," + ref.createTime().toEpochSecond(java.time.ZoneOffset.UTC);
+        return ref.eventId() + "," + ref.createTime().toEpochSecond(ZoneOffset.UTC);
     }
 
     /**
@@ -138,7 +140,7 @@ public class LoginChallengeStore {
         }
         try {
             return new RiskEventRef(Long.valueOf(parts[0]),
-                    java.time.LocalDateTime.ofEpochSecond(Long.parseLong(parts[1]), 0, java.time.ZoneOffset.UTC));
+                    LocalDateTime.ofEpochSecond(Long.parseLong(parts[1]), 0, ZoneOffset.UTC));
         } catch (RuntimeException e) {
             return null;
         }

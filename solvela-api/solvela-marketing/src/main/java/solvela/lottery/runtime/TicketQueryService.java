@@ -1,15 +1,16 @@
 package solvela.lottery.runtime;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import solvela.exception.BusinessException;
 import solvela.lottery.LotteryConfig;
+import solvela.lottery.LotteryRecord;
 import solvela.lottery.config.service.LotteryConfigService;
 import solvela.lottery.engine.FpeCipher;
 import solvela.lottery.engine.FpeCipherFactory;
 import solvela.lottery.record.dao.LotteryRecordDao;
-import solvela.lottery.LotteryRecord;
-import solvela.exception.BusinessException;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 
@@ -70,7 +71,7 @@ public class TicketQueryService {
         }
 
         List<LotteryRecord> list = lotteryRecordDao.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<LotteryRecord>()
+                new LambdaQueryWrapper<LotteryRecord>()
                         .eq(LotteryRecord::getLotteryCode, lotteryCode)
                         .eq(LotteryRecord::getIssueNo, issueNo)
                         .eq(LotteryRecord::getTicketNumber, ticketNumber));

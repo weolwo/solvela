@@ -1,6 +1,9 @@
 package solvela.ledger.coupon.dao;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.domain.dto.MemberCouponDTO;
@@ -46,7 +49,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
     /**
      * 本期发放（时间窗落在 {@code create_time}）：张数、会员数、这批券里已用掉的张数。
      */
-    java.util.Map<String, Object> selectIssuedStat(@Param("form") LedgerStatQuery form);
+    Map<String, Object> selectIssuedStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 本期核销（时间窗落在 {@code used_time}）。
@@ -55,23 +58,23 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      * 用同一个窗口算「今日核销 / 今日发放」会得到一个必然接近 0 的比率，
      * 而它错得很像一条正常的业务结论。
      */
-    java.util.Map<String, Object> selectUsedStat(@Param("form") LedgerStatQuery form);
+    Map<String, Object> selectUsedStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 券库存与一致性体检。<b>刻意不带时间窗，统计的是全量</b>：
      * 「手上还压着多少张没用的券」是存量问题，限制在今天只会把它藏起来。
      */
-    java.util.Map<String, Object> selectStockStat();
+    Map<String, Object> selectStockStat();
 
     /**
      * 券模维度分布（本期发放量 TOP 10）
      */
-    List<java.util.Map<String, Object>> selectCouponStat(@Param("form") LedgerStatQuery form);
+    List<Map<String, Object>> selectCouponStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 来源维度分布（本期发放）
      */
-    List<java.util.Map<String, Object>> selectSourceStat(@Param("form") LedgerStatQuery form);
+    List<Map<String, Object>> selectSourceStat(@Param("form") LedgerStatQuery form);
 
     // ==================== 过期收口（couponExpire 定时任务） ====================
 
@@ -80,7 +83,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      *
      * @param now 数据库时钟，由任务上下文传入（铁律 9：不要在这里用 JVM 时间）
      */
-    long countExpirableCoupon(@Param("now") java.time.LocalDateTime now);
+    long countExpirableCoupon(@Param("now") LocalDateTime now);
 
     /**
      * 把过了有效期的未使用券置为 2-已过期，一次最多 {@code limit} 行。
@@ -90,7 +93,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      *
      * @return 实际更新行数
      */
-    int expireCouponBatch(@Param("now") java.time.LocalDateTime now, @Param("limit") int limit);
+    int expireCouponBatch(@Param("now") LocalDateTime now, @Param("limit") int limit);
 
     /**
      * 即将过期的券，<b>按会员聚合</b>：一个会员一行，带张数与最近一张的失效时间。
@@ -103,8 +106,8 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      * @param from 窗口起点（通常是 now，排除已经过期的）
      * @param to   窗口终点（now + N 天）
      */
-    List<MemberCouponExpiringDTO> selectExpiringGroupByMember(@Param("from") java.time.LocalDateTime from,
-                                                              @Param("to") java.time.LocalDateTime to,
+    List<MemberCouponExpiringDTO> selectExpiringGroupByMember(@Param("from") LocalDateTime from,
+                                                              @Param("to") LocalDateTime to,
                                                               @Param("limit") int limit,
                                                               @Param("offset") int offset);
 
@@ -122,7 +125,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      * @param now 数据库时钟。有效期判断只认一个钟（铁律 9）
      */
     List<MemberCoupon> selectUsableCandidates(@Param("memberId") Long memberId,
-                                              @Param("now") java.time.LocalDateTime now);
+                                              @Param("now") LocalDateTime now);
 
     /**
      * 锁定：0-未使用 → 4-锁定中。
@@ -140,8 +143,8 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
     int lockCoupon(@Param("couponId") Long couponId,
                    @Param("memberId") Long memberId,
                    @Param("bizRefId") String bizRefId,
-                   @Param("discountAmount") java.math.BigDecimal discountAmount,
-                   @Param("now") java.time.LocalDateTime now);
+                   @Param("discountAmount") BigDecimal discountAmount,
+                   @Param("now") LocalDateTime now);
 
     /**
      * 确认：4-锁定中 → 1-已使用。
@@ -153,7 +156,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      */
     int confirmCoupon(@Param("couponId") Long couponId,
                       @Param("bizRefId") String bizRefId,
-                      @Param("now") java.time.LocalDateTime now);
+                      @Param("now") LocalDateTime now);
 
     /**
      * 释放：4-锁定中 → 0-未使用，并清掉锁定痕迹与冗余的抵扣额。
@@ -179,7 +182,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
     List<MemberCoupon> selectWallet(@Param("memberId") Long memberId,
                                     @Param("statuses") List<Integer> statuses,
                                     @Param("excludeExpired") boolean excludeExpired,
-                                    @Param("now") java.time.LocalDateTime now);
+                                    @Param("now") LocalDateTime now);
 
     /**
      * 可用券张数。口径与 {@link #selectWallet} 的「可用」tab 相同：未使用、且还没过有效期
@@ -187,7 +190,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      */
     long countUsable(@Param("memberId") Long memberId,
                      @Param("usableStatus") int usableStatus,
-                     @Param("now") java.time.LocalDateTime now);
+                     @Param("now") LocalDateTime now);
 
     /**
      * 卡在「锁定中」超过 {@code before} 的券。给兜底释放任务用。
@@ -196,7 +199,7 @@ public interface MemberCouponDao extends BaseMapper<MemberCoupon> {
      *（有架构守卫测试盯着）。所以只能按时间兜底，阈值要比订单自己的支付超时
      * 宽得多，详见 {@code CouponStuckLockReleaseJob}。
      */
-    List<MemberCoupon> selectStuckLocked(@Param("before") java.time.LocalDateTime before,
+    List<MemberCoupon> selectStuckLocked(@Param("before") LocalDateTime before,
                                          @Param("limit") int limit);
 
     /*

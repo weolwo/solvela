@@ -5,6 +5,7 @@ import lombok.Getter;
 import solvela.enums.BaseEnum;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * 任务进度累积类型，对齐 t_task_template.task_type（varchar，故 value 是 String）。
@@ -81,15 +82,15 @@ public enum TaskTypeEnum implements BaseEnum {
      *
      * @return 空列表表示不作要求
      */
-    public java.util.List<String> targetParamKeys() {
+    public List<String> targetParamKeys() {
         return switch (this) {
-            case AMOUNT -> java.util.List.of(TaskConst.RULE_KEY_TARGET_AMOUNT);
+            case AMOUNT -> List.of(TaskConst.RULE_KEY_TARGET_AMOUNT);
             // 主形态 targetCount，兼容存量的 targetDays（名单只出不进，见 TaskConst 的说明）
-            case COUNT, STREAK -> java.util.List.of(
+            case COUNT, STREAK -> List.of(
                     TaskConst.RULE_KEY_TARGET_COUNT, TaskConst.RULE_KEY_TARGET_DAYS_LEGACY);
             // SIMPLE 的目标恒为 1（SimpleTaskStrategy 在没配时兜底），不强制声明 ——
             // 强制反而会逼运营为「完善资料」这种一次性任务填一个永远是 1 的参数
-            case SIMPLE -> java.util.List.of();
+            case SIMPLE -> List.of();
         };
     }
 

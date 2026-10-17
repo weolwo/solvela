@@ -2,14 +2,15 @@ package solvela.ledger.logistic.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 发货物流表 Dao
@@ -43,7 +44,7 @@ public interface PhysicalDeliveryDao extends BaseMapper<PhysicalDelivery> {
     /**
      * 本期新增的履约单（时间窗落在 {@code create_time}）
      */
-    java.util.Map<String, Object> selectNewStat(@Param("form") LedgerStatQuery form);
+    Map<String, Object> selectNewStat(@Param("form") LedgerStatQuery form);
 
     /**
      * 履约状态与积压体检。<b>刻意不带时间窗，统计的是全量</b>：
@@ -53,12 +54,12 @@ public interface PhysicalDeliveryDao extends BaseMapper<PhysicalDelivery> {
      * <p>待发货拆成「收件信息没补全（想发也发不了）」和「地址齐了等发货」两类 ——
      * 光看一个总数分不出这两种，运营只能一单一单点开看。
      */
-    java.util.Map<String, Object> selectStatusStat();
+    Map<String, Object> selectStatusStat();
 
     /**
      * 来源维度分布（全量）
      */
-    List<java.util.Map<String, Object>> selectSourceStat();
+    List<Map<String, Object>> selectSourceStat();
 
     // ----- 物理删除 -----
 

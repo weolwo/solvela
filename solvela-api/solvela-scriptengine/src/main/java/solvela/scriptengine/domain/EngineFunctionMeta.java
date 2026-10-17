@@ -2,6 +2,7 @@ package solvela.scriptengine.domain;
 
 import lombok.Builder;
 import lombok.Getter;
+import solvela.scriptengine.spi.ScriptContextProjection;
 import solvela.scriptengine.spi.ScriptDomain;
 import solvela.scriptengine.spi.ScriptFunctionHandler;
 
@@ -62,7 +63,7 @@ public class EngineFunctionMeta {
      *
      * <p>见 {@link solvela.scriptengine.spi.ScriptContextProjection}。
      */
-    private final solvela.scriptengine.spi.ScriptContextProjection<?> contextProjection;
+    private final ScriptContextProjection<?> contextProjection;
 
     // --- 前端展示与文档所需资源 ---
 

@@ -15,6 +15,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import solvela.app.auth.DeviceAuthProperties;
+import solvela.app.auth.DeviceFilter;
 import solvela.auth.device.DeviceIdentity;
 import solvela.auth.device.DeviceTokenCodec;
 import solvela.security.GatewayRuleSnapshot;
@@ -24,6 +25,7 @@ import solvela.security.SecurityIncidentEvent;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -288,7 +290,7 @@ class SecurityGateFilterTest {
     void honeypotLooksLikeNotFound() throws Exception {
         SecurityGateFilter gate = honeypotGate(50);
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
-                .addFilters(context.getBean(solvela.app.auth.DeviceFilter.class), gate).build();
+                .addFilters(context.getBean(DeviceFilter.class), gate).build();
         String ip = trackedIp();
 
         MvcResult honeypot = mvc.perform(get("/.env").header("X-Forwarded-For", ip)).andReturn();
@@ -470,7 +472,7 @@ class SecurityGateFilterTest {
     void keywordLooksLikeBadRequest() throws Exception {
         SecurityGateFilter gate = keywordGate(50);
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
-                .addFilters(context.getBean(solvela.app.auth.DeviceFilter.class), gate).build();
+                .addFilters(context.getBean(DeviceFilter.class), gate).build();
         String ip = trackedIp();
 
         MvcResult probe = mvc.perform(post("/auth/login").header("X-Forwarded-For", ip)
@@ -612,7 +614,7 @@ class SecurityGateFilterTest {
     }
 
     private static byte[] bytes(String s) {
-        return s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return s.getBytes(StandardCharsets.UTF_8);
     }
 
     private static String withoutTrace(String body) {
@@ -621,7 +623,7 @@ class SecurityGateFilterTest {
 
     private MockMvc mvc() {
         return MockMvcBuilders.webAppContextSetup(context).addFilters(
-                context.getBean(solvela.app.auth.DeviceFilter.class),
+                context.getBean(DeviceFilter.class),
                 context.getBean(SecurityGateFilter.class)).build();
     }
 

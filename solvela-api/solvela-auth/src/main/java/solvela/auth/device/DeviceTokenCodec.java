@@ -3,8 +3,6 @@ package solvela.auth.device;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -12,7 +10,10 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * 设备令牌的签发与验签。<b>自包含，不查任何存储。</b>
@@ -107,7 +108,7 @@ public class DeviceTokenCodec {
                             + "请在配置中心/环境变量里注入，且【不要】复用 solvela.crypto.pii.hmac-key"
                             + "——那把不能改，这把必须能换。");
         }
-        java.util.Map<Integer, SecretKeySpec> parsed = new java.util.LinkedHashMap<>();
+        Map<Integer, SecretKeySpec> parsed = new LinkedHashMap<>();
         raw.forEach((version, key) -> {
             if (version == null || version <= 0) {
                 throw new IllegalStateException("solvela.auth.device.keys 的版本号必须是正整数，实际：" + version);

@@ -1,14 +1,14 @@
 package solvela.draw.poolitem.dao;
 
-        import java.util.List;
-
-        import solvela.draw.PrizePoolItem;
-        import solvela.draw.poolitem.domain.query.PrizePoolItemQuery;
-        import solvela.draw.poolitem.domain.dto.PrizePoolItemDTO;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.draw.PrizePoolItem;
+import solvela.draw.poolitem.domain.dto.PrizePoolItemDTO;
+import solvela.draw.poolitem.domain.query.PrizePoolItemQuery;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -34,7 +34,7 @@ public interface PrizePoolItemDao extends BaseMapper<PrizePoolItem> {
      * 多实例部署时各节点 JVM 时钟未必一致，跨零点那一刻会出现
      * 「A 节点认为还是昨天、B 节点认为已是今天」，同一个用户在两个桶里各拿一次额度。
      */
-    java.time.LocalDateTime selectDbNow();
+    LocalDateTime selectDbNow();
 
     /**
      * 分页查询

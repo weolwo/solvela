@@ -12,6 +12,7 @@ import solvela.auth.member.MemberTokenStore;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -131,7 +132,7 @@ class TokenStoreTest {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
                     .digest(tokenValue.getBytes(StandardCharsets.UTF_8));
-            return "app:auth:t:" + java.util.HexFormat.of().formatHex(hash);
+            return "app:auth:t:" + HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }

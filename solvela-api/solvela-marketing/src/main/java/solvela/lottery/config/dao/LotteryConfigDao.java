@@ -1,15 +1,14 @@
 package solvela.lottery.config.dao;
 
-        import java.util.List;
-
-        import solvela.lottery.LotteryConfig;
-        import solvela.lottery.config.domain.query.LotteryConfigQuery;
-        import solvela.lottery.config.domain.dto.LotteryConfigDTO;
-import solvela.enums.LotteryConfigStatusEnum;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import solvela.enums.LotteryConfigStatusEnum;
+import solvela.lottery.LotteryConfig;
+import solvela.lottery.config.domain.dto.LotteryConfigDTO;
+import solvela.lottery.config.domain.query.LotteryConfigQuery;
+
 import java.util.List;
 
 /**
