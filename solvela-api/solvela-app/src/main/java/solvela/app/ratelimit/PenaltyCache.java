@@ -22,8 +22,15 @@ final class PenaltyCache {
 
     static final int MAX_ENTRIES = 10_000;
 
-    /** @param untilEpochSeconds 处罚到期（epoch 秒）；0 = 没有到期时间（设备封禁、长期黑名单） */
-    record Blocked(long untilEpochSeconds) {
+    /**
+     * @param untilEpochSeconds 处罚到期（epoch 秒）；0 = 没有到期时间（设备封禁、长期黑名单）
+     * @param listValue         挡下它的那个 IP 名单值（{@code IpKeys.listValue} 的写法），被挡次数记在它头上；设备那一份为 null
+     */
+    record Blocked(long untilEpochSeconds, String listValue) {
+
+        Blocked(long untilEpochSeconds) {
+            this(untilEpochSeconds, null);
+        }
     }
 
     private record Cached(Blocked blocked, long cachedUntilMillis) {

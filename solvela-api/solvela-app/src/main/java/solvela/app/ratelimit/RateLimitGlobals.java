@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
  * @param ipSegmentCapSec   IP 段维度封顶
  * @param oldDeviceSeconds  设备令牌签发多久之后算「老设备」
  * @param greyFactor        IP 灰名单上的 IP：阈值乘以它（向上取整，至少 1）
+ * @param greyLevel         限流罚到第几档起，IP 维度的那个 IP 进灰名单、匿名场景设备维度的那台设备进观察档（§5.5）
+ * @param greyDays          上一条拉灰拉多少天
  * @Date 2026-10-17
  */
 @Slf4j
@@ -32,10 +34,12 @@ public record RateLimitGlobals(
         long anonAccountCapSec,
         long ipSegmentCapSec,
         long oldDeviceSeconds,
-        double greyFactor) {
+        double greyFactor,
+        int greyLevel,
+        int greyDays) {
 
     static final RateLimitGlobals DEFAULTS = new RateLimitGlobals(
-            List.of(60L, 300L, 1800L, 3600L, 7200L, 28800L), 86400L, 1800L, 1800L, 7L * 86400, 0.5);
+            List.of(60L, 300L, 1800L, 3600L, 7200L, 28800L), 86400L, 1800L, 1800L, 7L * 86400, 0.5, 4, 7);
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -64,7 +68,14 @@ public record RateLimitGlobals(
                         ? root.get("oldDeviceDays").asLong() * 86400 : DEFAULTS.oldDeviceSeconds,
                 root.has("greyFactor") && root.get("greyFactor").isNumber()
                         && root.get("greyFactor").asDouble() > 0 && root.get("greyFactor").asDouble() <= 1
-                        ? root.get("greyFactor").asDouble() : DEFAULTS.greyFactor);
+                        ? root.get("greyFactor").asDouble() : DEFAULTS.greyFactor,
+                positiveInt(root, "rateLimitGreyLevel", DEFAULTS.greyLevel),
+                positiveInt(root, "rateLimitGreyDays", DEFAULTS.greyDays));
+    }
+
+    private static int positiveInt(JsonNode root, String field, int fallback) {
+        JsonNode node = root.get(field);
+        return node != null && node.canConvertToInt() && node.asInt() > 0 ? node.asInt() : fallback;
     }
 
     /** {@code "60s" / "5m" / "1h" / "1d"} → 秒；解不开返回 -1 */

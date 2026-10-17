@@ -10,6 +10,7 @@ import solvela.member.util.MemberPhoneUtil;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
 import solvela.security.IpRange;
+import solvela.security.SecurityIncidentEvent;
 import solvela.security.SecurityKeys;
 
 import javax.crypto.Mac;
@@ -65,13 +66,17 @@ public class RateLimiter {
 
     private final SecretKeySpec accountKey;
 
+    private final IncidentPublisher incidents;
+
     /** 由快照算出来的东西，换快照时才重算 */
     private volatile Derived derived;
 
-    public RateLimiter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder, RateLimitProperties properties) {
+    public RateLimiter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder, RateLimitProperties properties,
+                       IncidentPublisher incidents) {
         this.redis = redis;
         this.snapshotHolder = snapshotHolder;
         this.properties = properties;
+        this.incidents = incidents;
         this.accountKey = properties.accountKey() == null ? null
                 : new SecretKeySpec(properties.accountKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
@@ -132,7 +137,7 @@ public class RateLimiter {
             if (outcome == null) {
                 continue;
             }
-            report(request, rule, dim, outcome);
+            report(request, rule, dim, outcome, d.globals);
             if (outcome.blocked()) {
                 throw blocked(outcome.retryAfter());
             }
@@ -172,10 +177,14 @@ public class RateLimiter {
         }
     }
 
-    private static void report(Request request, GatewayRuleSnapshot.Rule rule, int dim, Outcome outcome) {
+    private void report(Request request, GatewayRuleSnapshot.Rule rule, int dim, Outcome outcome,
+                        RateLimitGlobals globals) {
         switch (outcome.kind()) {
-            case 1 -> log.warn("【网关限流】判罚, 规则: {}, 维度: {}, 第 {} 档, {} 秒, 接口: {}, IP: {}",
-                    rule.target(), dim, outcome.level(), outcome.retryAfter(), request.endpointKey(), request.clientIp());
+            case 1 -> {
+                log.warn("【网关限流】判罚, 规则: {}, 维度: {}, 第 {} 档, {} 秒, 接口: {}, IP: {}",
+                        rule.target(), dim, outcome.level(), outcome.retryAfter(), request.endpointKey(), request.clientIp());
+                incidents.publish(incident(request, dim, outcome, globals));
+            }
             case 2 -> log.warn("【网关限流】陪跑命中（本来会判罚）, 规则: {}, 维度: {}, 接口: {}, IP: {}",
                     rule.target(), dim, request.endpointKey(), request.clientIp());
             case 3 -> log.info("【网关限流】陪跑命中（本来会因突发拒绝）, 规则: {}, 维度: {}, 接口: {}",
@@ -183,6 +192,47 @@ public class RateLimiter {
             default -> {
             }
         }
+    }
+
+    /**
+     * 一次判罚 / 升档的事件（只在状态变化时投：处罚期间被挡的请求不投）。罚到 {@code greyLevel} 档起：
+     * IP 维度 → 这个 IP 拉灰 {@code greyDays} 天；匿名场景的设备维度 → 这台设备进观察档（§5.5）。
+     * 账号维度只记录：登录后场景的会员拉灰在会员灰名单那一步（T12），匿名场景的「账号」是别人填的目标，永远不拉灰。
+     */
+    private static SecurityIncidentEvent incident(Request request, int dim, Outcome outcome, RateLimitGlobals globals) {
+        long now = Instant.now().getEpochSecond();
+        boolean high = outcome.level() >= globals.greyLevel();
+        SecurityIncidentEvent.Builder event = SecurityIncidentEvent
+                .builder(SecurityIncidentEvent.RATE_LIMIT, request.scene().name())
+                .penalty(outcome.level(), now + outcome.retryAfter())
+                .who(request.clientIp(), request.deviceId(), request.memberId())
+                .request(method(request.endpointKey()), path(request.endpointKey()), null, solvela.app.web.Trace.id())
+                .matched(null, dimensionName(dim), null)
+                .observeDevice(high && dim == DEVICE && request.scene().anonymous());
+        if (high && dim == IP) {
+            event.action(SecurityIncidentEvent.ACTION_GREY, now + globals.greyDays() * 86400L);
+        }
+        return event.build();
+    }
+
+    private static String dimensionName(int dim) {
+        return switch (dim) {
+            case IP -> "IP";
+            case ACCOUNT -> "ACCOUNT";
+            case DEVICE -> "DEVICE";
+            case IP_SEGMENT -> "IP_SEGMENT";
+            default -> "GLOBAL";
+        };
+    }
+
+    private static String method(String endpointKey) {
+        int space = endpointKey == null ? -1 : endpointKey.indexOf(' ');
+        return space < 0 ? null : endpointKey.substring(0, space);
+    }
+
+    private static String path(String endpointKey) {
+        int space = endpointKey == null ? -1 : endpointKey.indexOf(' ');
+        return space < 0 ? endpointKey : endpointKey.substring(space + 1);
     }
 
     /** 该维度的计数值；没有可数的东西返回 null（跳过这个维度） */

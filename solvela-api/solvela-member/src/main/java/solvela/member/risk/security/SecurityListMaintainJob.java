@@ -1,0 +1,263 @@
+package solvela.member.risk.security;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+import solvela.base.json.JsonUtils;
+import solvela.base.module.config.ConfigKeyEnum;
+import solvela.base.module.config.ConfigService;
+import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
+import solvela.base.module.jobspi.core.SolvelaJob;
+import solvela.base.module.jobspi.core.SolvelaJobContext;
+import solvela.base.module.jobspi.core.SolvelaJobHandler;
+import solvela.member.risk.config.RiskListCache;
+import solvela.member.risk.gateway.GatewaySnapshotPublisher;
+import solvela.security.IpKeys;
+import solvela.security.SecurityKeys;
+import tools.jackson.databind.JsonNode;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * 每 5 分钟维护一次安全名单（网关方案 §5.5「什么事件进什么名单」、§6.3）：
+ * <ol>
+ *   <li><b>黑到期转灰</b>：到期的自动黑名单 → 同一个值进灰名单 {@code escalateGreyDays} 天（{@code ESCALATE}），黑的那一行撤销。
+ *       封禁结束后它还背着前科 —— 「以后只要是记录里的 IP 就提高风控」；</li>
+ *   <li><b>同段连坐</b>：{@code segmentGrey.within} 内同一个 /24（IPv6 /48）里有 {@code minIps} 个以上 IP 被自动拉黑 →
+ *       整段拉灰 {@code days} 天（{@code SEGMENT}）。🔴 <b>只拉灰，永远不自动拉黑整段</b>；</li>
+ *   <li><b>被挡次数</b>：网关攒在 Redis 里的计数（{@code sec:blocked:*}）加到对应黑名单的 {@code blocked_count}。</li>
+ * </ol>
+ * 名单变了就重发网关快照。参数取 {@code t_config.gateway_security_gate}，解不开的用默认值。
+ *
+ * @Date 2026-10-17
+ */
+@Slf4j
+@Component
+@SolvelaJobHandler(
+        name = "securityListMaintain",
+        title = "【安全】安全名单维护",
+        group = "SYSTEM",
+        lane = SolvelaJobLaneEnum.FAST,
+        idempotent = true,
+        defaultTimeoutSeconds = 30
+)
+public class SecurityListMaintainJob implements SolvelaJob {
+
+    /** 一轮最多转这么多条：积压很多时分几轮做完，不让一轮超时 */
+    static final int ESCALATE_BATCH = 1000;
+
+    private static final Pattern DURATION = Pattern.compile("(\\d+)\\s*([smhd])");
+
+    private final JdbcTemplate jdbcTemplate;
+
+    private final StringRedisTemplate redis;
+
+    private final SecurityListWriter listWriter;
+
+    private final ConfigService configService;
+
+    private final RiskListCache listCache;
+
+    private final GatewaySnapshotPublisher snapshotPublisher;
+
+    /** 被挡计数的键前缀：生产就是 {@link SecurityKeys#BLOCKED_COUNTER_PREFIX}，测试换一个 */
+    private final String blockedPrefix;
+
+    @Autowired
+    public SecurityListMaintainJob(JdbcTemplate jdbcTemplate, StringRedisTemplate redis, SecurityListWriter listWriter,
+                                   ConfigService configService, RiskListCache listCache,
+                                   GatewaySnapshotPublisher snapshotPublisher) {
+        this(jdbcTemplate, redis, listWriter, configService, listCache, snapshotPublisher,
+                SecurityKeys.BLOCKED_COUNTER_PREFIX);
+    }
+
+    SecurityListMaintainJob(JdbcTemplate jdbcTemplate, StringRedisTemplate redis, SecurityListWriter listWriter,
+                            ConfigService configService, RiskListCache listCache,
+                            GatewaySnapshotPublisher snapshotPublisher, String blockedPrefix) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.redis = redis;
+        this.listWriter = listWriter;
+        this.configService = configService;
+        this.listCache = listCache;
+        this.snapshotPublisher = snapshotPublisher;
+        this.blockedPrefix = blockedPrefix;
+    }
+
+    /** 参数 */
+    record Settings(int escalateGreyDays, int segmentMinIps, long segmentWithinSeconds, int segmentDays) {
+
+        static final Settings DEFAULTS = new Settings(30, 3, 86400, 7);
+    }
+
+    /** 一轮的结果 */
+    public record Result(int escalated, int segments, long blocked) {
+
+        @Override
+        public String toString() {
+            return String.format("黑到期转灰 %d 条，同段连坐拉灰 %d 段，同步被挡次数 %d", escalated, segments, blocked);
+        }
+    }
+
+    @Override
+    public String execute(SolvelaJobContext ctx) {
+        return run().toString();
+    }
+
+    public Result run() {
+        Settings settings = settings();
+        int escalated = escalate(settings);
+        int segments = segmentGrey(settings);
+        long blocked = syncBlocked();
+        if (escalated + segments > 0) {
+            listCache.reload();
+            snapshotPublisher.publishQuietly("安全名单维护");
+        }
+        return new Result(escalated, segments, blocked);
+    }
+
+    // ------------------------------------------------------------------ 黑到期转灰
+
+    private int escalate(Settings s) {
+        List<Map<String, Object>> expired = jdbcTemplate.queryForList("""
+                SELECT id, dimension, list_value FROM t_security_list
+                 WHERE list_type = 1 AND source = 2 AND status = 1 AND dimension IN (1, 2)
+                   AND expire_time IS NOT NULL AND expire_time <= NOW()
+                 ORDER BY id LIMIT ?
+                """, ESCALATE_BATCH);
+        long until = System.currentTimeMillis() / 1000 + s.escalateGreyDays() * 86400L;
+        for (Map<String, Object> row : expired) {
+            String value = (String) row.get("list_value");
+            listWriter.upsert(new SecurityListWriter.Entry(2, ((Number) row.get("dimension")).intValue(), value,
+                    "ESCALATE", "自动黑名单到期，转灰 " + s.escalateGreyDays() + " 天（自动）", until, null));
+            jdbcTemplate.update("""
+                    UPDATE t_security_list
+                       SET status = 0, revoke_operator = ?, revoke_reason = '到期，已转灰（ESCALATE）', revoke_time = NOW()
+                     WHERE id = ? AND status = 1
+                    """, SecurityListWriter.SYSTEM, row.get("id"));
+        }
+        if (!expired.isEmpty()) {
+            log.info("【安全名单】黑到期转灰 {} 条", expired.size());
+        }
+        return expired.size();
+    }
+
+    // ------------------------------------------------------------------ 同段连坐
+
+    private int segmentGrey(Settings s) {
+        // 「被自动拉黑过」：还有效的，或已被系统转灰的（被人撤销的不算 —— 那多半是误判）
+        List<String> values = jdbcTemplate.queryForList("""
+                SELECT list_value FROM t_security_list
+                 WHERE list_type = 1 AND source = 2 AND dimension IN (1, 2)
+                   AND source_rule IN ('HONEYPOT', 'KEYWORD', 'CANARY')
+                   AND (status = 1 OR revoke_operator = ?)
+                   AND last_hit_time >= NOW() - INTERVAL ? SECOND
+                """, String.class, SecurityListWriter.SYSTEM, s.segmentWithinSeconds());
+        Map<String, Set<String>> bySegment = new HashMap<>();
+        for (String value : values) {
+            String address = value.contains("/") ? value.substring(0, value.indexOf('/')) : value;
+            String segment = IpKeys.segmentListValue(address);
+            if (segment != null) {
+                bySegment.computeIfAbsent(segment, k -> new HashSet<>()).add(value);
+            }
+        }
+        long until = System.currentTimeMillis() / 1000 + s.segmentDays() * 86400L;
+        int created = 0;
+        for (Map.Entry<String, Set<String>> e : bySegment.entrySet()) {
+            if (e.getValue().size() < s.segmentMinIps()) {
+                continue;
+            }
+            SecurityListWriter.Outcome outcome = listWriter.upsert(new SecurityListWriter.Entry(2, 2, e.getKey(),
+                    "SEGMENT", "同段 " + e.getValue().size() + " 个 IP 被自动拉黑，整段拉灰 " + s.segmentDays() + " 天（自动）",
+                    until, null), true);
+            if (outcome != SecurityListWriter.Outcome.KEPT_EXISTING && outcome != SecurityListWriter.Outcome.KEPT_MANUAL) {
+                created++;
+                log.warn("【安全名单】同段连坐：{} 里 {} 个 IP 被自动拉黑，整段拉灰 {} 天", e.getKey(), e.getValue().size(),
+                        s.segmentDays());
+            }
+        }
+        return created;
+    }
+
+    // ------------------------------------------------------------------ 被挡次数
+
+    /** 读一个计数就把它清零（{@code GETSET}），再加到库里。中间崩了丢的是这一个键的数，可以接受 */
+    private long syncBlocked() {
+        long total = 0;
+        try (Cursor<String> cursor = redis.scan(ScanOptions.scanOptions().match(blockedPrefix + "*").count(500).build())) {
+            while (cursor.hasNext()) {
+                String key = cursor.next();
+                String rest = key.substring(blockedPrefix.length());
+                int colon = rest.indexOf(':');
+                if (colon <= 0) {
+                    continue;
+                }
+                String previous = redis.opsForValue().getAndSet(key, "0");
+                long n = previous == null ? 0 : Long.parseLong(previous);
+                if (n <= 0) {
+                    continue;
+                }
+                jdbcTemplate.update("""
+                        UPDATE t_security_list SET blocked_count = blocked_count + ?
+                         WHERE dimension = ? AND list_value = ? AND list_type = 1
+                        """, n, Integer.parseInt(rest.substring(0, colon)), rest.substring(colon + 1));
+                total += n;
+            }
+        } catch (RuntimeException e) {
+            log.warn("【安全名单】同步被挡次数中途失败，已同步 {}，剩下的下一轮再来", total, e);
+        }
+        return total;
+    }
+
+    // ------------------------------------------------------------------ 参数
+
+    Settings settings() {
+        String json = configService.getConfigValue(ConfigKeyEnum.GATEWAY_SECURITY_GATE);
+        Settings d = Settings.DEFAULTS;
+        if (json == null || json.isBlank()) {
+            return d;
+        }
+        try {
+            JsonNode root = JsonUtils.getMapper().readTree(json);
+            JsonNode seg = root.path("segmentGrey");
+            return new Settings(
+                    positive(root.path("escalateGreyDays"), d.escalateGreyDays()),
+                    positive(seg.path("minIps"), d.segmentMinIps()),
+                    seconds(seg.path("within").asString(null), d.segmentWithinSeconds()),
+                    positive(seg.path("days"), d.segmentDays()));
+        } catch (Exception e) {
+            log.warn("【安全名单】gateway_security_gate 解不开，名单维护用默认参数", e);
+            return d;
+        }
+    }
+
+    private static int positive(JsonNode node, int fallback) {
+        return node.canConvertToInt() && node.asInt() > 0 ? node.asInt() : fallback;
+    }
+
+    private static long seconds(String text, long fallback) {
+        if (text == null) {
+            return fallback;
+        }
+        Matcher m = DURATION.matcher(text.trim());
+        if (!m.matches()) {
+            return fallback;
+        }
+        long n = Long.parseLong(m.group(1));
+        return switch (m.group(2)) {
+            case "s" -> n;
+            case "m" -> n * 60;
+            case "h" -> n * 3600;
+            default -> n * 86400;
+        };
+    }
+}

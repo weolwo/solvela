@@ -23,11 +23,11 @@ final class IpLists {
     /** 名单条目来源：1-人工, 2-自动 */
     static final int SOURCE_MANUAL = 1;
 
-    /** 一条黑名单命中 */
-    record BlackHit(boolean manual, Long expireAtMillis) {
+    /** 一条黑名单命中。{@code value} 是名单里那一行的原文（被挡次数记在它头上） */
+    record BlackHit(boolean manual, Long expireAtMillis, String value) {
     }
 
-    private record Entry(IpRange range, int source, Long expireAtMillis) {
+    private record Entry(IpRange range, String value, int source, Long expireAtMillis) {
 
         boolean live(long nowMillis) {
             return expireAtMillis == null || expireAtMillis > nowMillis;
@@ -58,7 +58,7 @@ final class IpLists {
                 continue;
             }
             try {
-                bucket.add(new Entry(IpRange.parse(e.value()), e.source(), e.expireAt()));
+                bucket.add(new Entry(IpRange.parse(e.value()), e.value(), e.source(), e.expireAt()));
             } catch (IllegalArgumentException ex) {
                 log.warn("【安全名单】快照里有解不开的 IP，忽略: {}", e.value());
             }
@@ -87,7 +87,7 @@ final class IpLists {
             if (!e.live(nowMillis) || !e.range().contains(ip)) {
                 continue;
             }
-            BlackHit hit = new BlackHit(e.source() == SOURCE_MANUAL, e.expireAtMillis());
+            BlackHit hit = new BlackHit(e.source() == SOURCE_MANUAL, e.expireAtMillis(), e.value());
             if (best == null || better(hit, best)) {
                 best = hit;
             }

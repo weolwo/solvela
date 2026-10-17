@@ -75,6 +75,8 @@ public class MemberRiskAdminService {
     /** 名单里的 IP / IP 段条目网关也要用：改完立即重发快照（网关方案 §6） */
     private final solvela.member.risk.gateway.GatewaySnapshotPublisher snapshotPublisher;
 
+    /** 撤销 IP 黑名单时一并删掉网关的处罚键（网关方案 §6.4：后台解封 = 撤销条目 + 删除处罚键） */
+    private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
 
     // ------------------------------------------------------------------ 看板
@@ -201,6 +203,10 @@ public class MemberRiskAdminService {
     /**
      * 撤销。<b>不删行</b>，记下撤销人、原因、时间。
      *
+     * <p>🔴 撤销的是 IP 黑名单时，同一个操作里把网关的 IP 处罚键也删掉：自动黑名单背后都有一个 24 小时的处罚键，
+     * 只撤条目的话，后台显示「已解封」，人还要被挡到处罚到期 —— 「后台说的和实际不一样」。
+     * 网关各实例的进程内缓存最多再挡几秒。
+     *
      * @return false 表示这一行不存在或本来就已撤销（幂等，连点两次不会覆盖第一次记的人）
      */
     public boolean revokeList(Long id, String operator, String reason) {
@@ -218,6 +224,13 @@ public class MemberRiskAdminService {
         update.setRevokeReason(reason);
         update.setRevokeTime(LocalDateTime.now());
         listDao.updateById(update);
+        if (row.getListType() == SecurityListTypeEnum.BLACK
+                && (row.getDimension() == SecurityListDimensionEnum.IP || row.getDimension() == SecurityListDimensionEnum.IP_RANGE)) {
+            String ipKey = solvela.security.IpKeys.ipOfListValue(row.getListValue());
+            if (ipKey != null) {
+                redis.delete(solvela.security.SecurityKeys.securityPenaltyIp(ipKey));
+            }
+        }
         listCache.reload();
         snapshotPublisher.publishQuietly("撤销名单");
         log.info("【安全名单】撤销, id: {}, 操作人: {}, 原因: {}", id, operator, reason);

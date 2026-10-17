@@ -67,19 +67,32 @@ public final class SecurityKeys {
      */
     public static final String BANNED_DEVICES = "sec:dev:banned";
 
-    /** 封禁期间被安全闸挡掉的请求数：{@code sec:blocked:{名单维度}:{值}}，定时同步到 {@code t_security_list.blocked_count} */
-    public static String blockedCounter(int listDimension, String value) {
-        return "sec:blocked:" + listDimension + ":" + value;
+    /**
+     * 封禁期间被安全闸挡掉的请求数：{@code sec:blocked:{名单维度}:{名单值}}，定时同步到 {@code t_security_list.blocked_count}。
+     * 名单值是 {@link IpKeys#listValue} 的写法（与名单表里那一行逐字相同）。
+     */
+    public static String blockedCounter(int listDimension, String listValue) {
+        return BLOCKED_COUNTER_PREFIX + listDimension + ":" + listValue;
     }
 
-    /**
-     * 安全事件的 Redis Stream。网关（与会员域）投递，app-biz 消费写 {@code t_security_incident}。
-     * 每条消息一个字段 {@link #INCIDENT_FIELD}，值是 {@link SecurityIncidentEvent} 的 JSON。
-     */
-    public static final String INCIDENT_STREAM = "sec:incident";
+    /** 同步任务扫描时用的前缀 */
+    public static final String BLOCKED_COUNTER_PREFIX = "sec:blocked:";
 
-    /** Stream 消息里装事件 JSON 的那个字段名 */
-    public static final String INCIDENT_FIELD = "event";
+    /**
+     * 安全事件队列（Redis <b>List</b>）：网关与会员域 {@code LPUSH}，后台的落库任务从另一头取。
+     * 每个元素是一条 {@link SecurityIncidentEvent} 的 JSON。
+     *
+     * <h3>为什么不是 Stream</h3>
+     * 本地开发用的 Redis 是 3.0（没有 Stream，Stream 要 5.0），生产是 8。List 两边都能用，
+     * 而这里要的只是「排队、有上限、取走之后处理完再删」—— {@code RPOPLPUSH} 到 {@link #INCIDENT_PROCESSING} 就是这件事。
+     */
+    public static final String INCIDENT_QUEUE = "sec:incident";
+
+    /** 取出来、还没落完库的事件：落库任务崩在半路，下一次先把这里的处理掉 */
+    public static final String INCIDENT_PROCESSING = "sec:incident:processing";
+
+    /** 队列上限：消费方停了也只占这么多内存，超出丢的是最老的（处罚本身已经在 Redis 里，不受影响） */
+    public static final int INCIDENT_QUEUE_MAX = 100_000;
 
     // ------------------------------------------------------------------ 规则下发（后台写，网关读；网关回报，后台读）
 

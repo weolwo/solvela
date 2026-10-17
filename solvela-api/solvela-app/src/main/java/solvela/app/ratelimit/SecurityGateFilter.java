@@ -30,6 +30,7 @@ import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
 import solvela.security.IpRange;
 import solvela.security.KeywordRules;
+import solvela.security.SecurityIncidentEvent;
 import solvela.security.SecurityKeys;
 import solvela.security.SlidingWindowScripts;
 
@@ -137,6 +138,11 @@ public class SecurityGateFilter extends OncePerRequestFilter {
     /** 熔断键的前缀：生产为空串；测试换一个，免得碰到本机网关真在用的熔断计数 */
     private final String breakerNamespace;
 
+    private final IncidentPublisher incidents;
+
+    /** 被挡次数；为 null 时不计（只在测试里） */
+    private final BlockedCounter blockedCounter;
+
     private final PenaltyCache cache = new PenaltyCache();
 
     /** 每个熔断键上一次告警的时刻 */
@@ -151,18 +157,30 @@ public class SecurityGateFilter extends OncePerRequestFilter {
     @Autowired
     public SecurityGateFilter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder,
                               @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
-                              @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping) {
-        this(redis, snapshotHolder, exceptionResolver, handlerMapping, "");
+                              @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping,
+                              IncidentPublisher incidents, BlockedCounter blockedCounter) {
+        this(redis, snapshotHolder, exceptionResolver, handlerMapping, "", incidents, blockedCounter);
     }
 
     SecurityGateFilter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder,
                        HandlerExceptionResolver exceptionResolver, RequestMappingHandlerMapping handlerMapping,
-                       String breakerNamespace) {
+                       String breakerNamespace, IncidentPublisher incidents, BlockedCounter blockedCounter) {
         this.redis = redis;
         this.snapshotHolder = snapshotHolder;
         this.exceptionResolver = exceptionResolver;
         this.handlerMapping = handlerMapping;
         this.breakerNamespace = breakerNamespace;
+        this.incidents = incidents;
+        this.blockedCounter = blockedCounter;
+    }
+
+    /** 一个请求里安全闸要用到的东西。蜜罐与关键字的判定、事件都从这里取 */
+    record Probe(String method, String path, String clientIp, DeviceIdentity device, String secFetchSite,
+                 String origin, String userAgent, String traceId) {
+
+        String deviceId() {
+            return device == null ? null : device.deviceId();
+        }
     }
 
     /** 快照换了才重算 */
@@ -180,12 +198,16 @@ public class SecurityGateFilter extends OncePerRequestFilter {
         DeviceIdentity device = CurrentDevice.find().orElse(null);
         PenaltyCache.Blocked blocked = check(ip, device);
         if (blocked != null) {
+            if (blockedCounter != null) {
+                blockedCounter.record(blocked.listValue());
+            }
             exceptionResolver.resolveException(request, response, null, limited(blocked));
             return;
         }
-        String secFetchSite = request.getHeader("Sec-Fetch-Site");
-        String origin = request.getHeader("Origin");
-        if (trap(request.getRequestURI(), ip, device, secFetchSite, origin) != Trap.MISS) {
+        Probe probe = new Probe(request.getMethod(), request.getRequestURI(), ip, device,
+                request.getHeader("Sec-Fetch-Site"), request.getHeader("Origin"), request.getHeader("User-Agent"),
+                solvela.app.web.Trace.id());
+        if (trap(probe) != Trap.MISS) {
             // 蜜罐照常往下走：落到「找不到」，与任何不存在的路径同一个响应。关键字不用再扫了
             chain.doFilter(request, response);
             return;
@@ -194,8 +216,8 @@ public class SecurityGateFilter extends OncePerRequestFilter {
         byte[] body = smallJsonBody(request);
         HttpServletRequest forward = body == null ? request : new CachedBodyRequest(request, body);
         KeywordRules.Hit hit = scan(derived().gate().keywords(), request.getRequestURI(), request.getQueryString(),
-                body, request.getHeader("User-Agent"));
-        if (hit != null && keyword(hit, ip, device, secFetchSite, origin) != Trap.BREAKER_OPEN) {
+                body, probe.userAgent());
+        if (hit != null && keyword(hit, probe) != Trap.BREAKER_OPEN) {
             // 与参数校验失败逐字相同，不告诉对方「你被拦了」；之后的请求才开始收到 429
             exceptionResolver.resolveException(request, response, null, new ApiException(ApiErrors.INVALID_ARGUMENT));
             return;
@@ -216,7 +238,8 @@ public class SecurityGateFilter extends OncePerRequestFilter {
         // 黑名单：纯内存
         IpLists.BlackHit black = d.lists().black(ip, nowMillis);
         if (black != null && (black.manual() || !oldDevice)) {
-            return new PenaltyCache.Blocked(black.expireAtMillis() == null ? 0 : black.expireAtMillis() / 1000);
+            return new PenaltyCache.Blocked(black.expireAtMillis() == null ? 0 : black.expireAtMillis() / 1000,
+                    black.value());
         }
 
         // 进程内缓存
@@ -261,7 +284,8 @@ public class SecurityGateFilter extends OncePerRequestFilter {
             return remember(deviceCacheKey, new PenaltyCache.Blocked(deviceUntil), nowMillis, "设备处罚中", deviceId);
         }
         if (ipUntil > now) {
-            return remember(ipCacheKey, new PenaltyCache.Blocked(ipUntil), nowMillis, "IP 处罚中", ipKey);
+            return remember(ipCacheKey, new PenaltyCache.Blocked(ipUntil, IpKeys.listValue(clientIp)), nowMillis,
+                    "IP 处罚中", ipKey);
         }
         return null;
     }
@@ -284,18 +308,25 @@ public class SecurityGateFilter extends OncePerRequestFilter {
      * @param origin       {@code Origin}；没有为 null
      */
     Trap trap(String requestPath, String clientIp, DeviceIdentity device, String secFetchSite, String origin) {
+        return trap(new Probe("GET", requestPath, clientIp, device, secFetchSite, origin, null, null));
+    }
+
+    Trap trap(Probe probe) {
         Derived d = derived();
-        SecurityGateConfig.Honeypot honeypot = d.gate().honeypot(requestPath);
+        SecurityGateConfig.Honeypot honeypot = d.gate().honeypot(probe.path());
         if (honeypot == null) {
             return Trap.MISS;
         }
-        if (!sameOriginOrNonBrowser(secFetchSite, origin)) {
+        SecurityIncidentEvent.Builder event = SecurityIncidentEvent.builder(SecurityIncidentEvent.HONEYPOT, honeypot.code())
+                .matched(SecurityIncidentEvent.FIELD_PATH, null, probe.path());
+        if (!sameOriginOrNonBrowser(probe.secFetchSite(), probe.origin())) {
             log.warn("【蜜罐】跨站发起的命中，只记录不处罚, 蜜罐: {}, 路径: {}, IP: {}, Sec-Fetch-Site: {}, Origin: {}",
-                    honeypot.code(), requestPath, clientIp, secFetchSite, origin);
+                    honeypot.code(), probe.path(), probe.clientIp(), probe.secFetchSite(), probe.origin());
+            publish(event.suppressed(SecurityIncidentEvent.SUPPRESS_CROSS_SITE), probe);
             return Trap.CROSS_SITE;
         }
-        return penalise("蜜罐", honeypot.code(), "路径 " + requestPath, breakerNamespace + SecurityKeys.HONEYPOT_BREAKER,
-                clientIp, device, d);
+        return penalise("蜜罐", honeypot.code(), "路径 " + probe.path(), breakerNamespace + SecurityKeys.HONEYPOT_BREAKER,
+                probe, event, d);
     }
 
     // ================================================================== ③ 关键字
@@ -378,33 +409,72 @@ public class SecurityGateFilter extends OncePerRequestFilter {
      * 那时挡下的是真人。
      */
     Trap keyword(KeywordRules.Hit hit, String clientIp, DeviceIdentity device, String secFetchSite, String origin) {
+        return keyword(hit, new Probe("GET", "/", clientIp, device, secFetchSite, origin, null, null));
+    }
+
+    Trap keyword(KeywordRules.Hit hit, Probe probe) {
         boolean urlBorne = hit.location().equals("path") || hit.location().startsWith("query.");
-        if (urlBorne && !sameOriginOrNonBrowser(secFetchSite, origin)) {
+        SecurityIncidentEvent.Builder event = SecurityIncidentEvent.builder(SecurityIncidentEvent.KEYWORD, hit.code())
+                .matched(matchedField(hit.location()), matchedParam(hit.location()), hit.sample());
+        if (urlBorne && !sameOriginOrNonBrowser(probe.secFetchSite(), probe.origin())) {
             log.warn("【关键字】跨站发起的命中，拒绝但不处罚, 规则: {}, 位置: {}, 片段: {}, IP: {}",
-                    hit.code(), hit.location(), hit.sample(), clientIp);
+                    hit.code(), hit.location(), hit.sample(), probe.clientIp());
+            publish(event.suppressed(SecurityIncidentEvent.SUPPRESS_CROSS_SITE), probe);
             return Trap.CROSS_SITE;
         }
         return penalise("关键字", hit.code(), hit.location() + " 「" + hit.sample() + "」",
-                breakerNamespace + SecurityKeys.keywordBreaker(hit.code()), clientIp, device, derived());
+                breakerNamespace + SecurityKeys.keywordBreaker(hit.code()), probe, event, derived());
+    }
+
+    /** 命中位置 → 表里的 matched_field */
+    private static int matchedField(String location) {
+        if (location.equals("ua")) {
+            return SecurityIncidentEvent.FIELD_UA;
+        }
+        if (location.equals("path")) {
+            return SecurityIncidentEvent.FIELD_PATH;
+        }
+        return location.startsWith("query.") ? SecurityIncidentEvent.FIELD_QUERY : SecurityIncidentEvent.FIELD_BODY;
+    }
+
+    /** 命中位置 → 参数 / 字段名（{@code query.id} → {@code id}，{@code body.items[1].name} → {@code items[1].name}） */
+    private static String matchedParam(String location) {
+        int dot = location.indexOf('.');
+        return dot < 0 ? null : location.substring(dot + 1);
     }
 
     // ================================================================== 蜜罐与关键字共用的处罚
 
     /**
-     * IP 与设备各罚 {@code ban}（作用于所有接口），写进本实例缓存（下一个请求就挡，不用去 Redis）。
-     * 先过熔断：窗口内太多不同 IP 命中同一个来源 → 不罚、告警。
+     * IP 与设备各罚 {@code ban}（作用于所有接口），写进本实例缓存（下一个请求就挡，不用去 Redis），并投一条事件
+     * （IP 被罚的，落库任务把它拉黑到同一时刻）。
+     * <ul>
+     *   <li>先过熔断：窗口内太多不同 IP 命中同一个来源 → 不罚、告警；</li>
+     *   <li>🔴 命中的是<b>老设备</b>：只罚设备，IP 那一份压下（§5.2）—— 共用出口后面的真人不该因为别人而被封一天。
+     *       设备那一份照罚：设备维度是它自己的账。</li>
+     * </ul>
      */
-    private Trap penalise(String source, String code, String detail, String breakerKey, String clientIp,
-                          DeviceIdentity device, Derived d) {
-        String deviceId = device == null ? null : device.deviceId();
+    private Trap penalise(String source, String code, String detail, String breakerKey, Probe probe,
+                          SecurityIncidentEvent.Builder event, Derived d) {
+        String clientIp = probe.clientIp();
+        String deviceId = probe.deviceId();
         String ipKey = IpRange.single(clientIp) == null ? null : IpKeys.ip(clientIp);
         long nowMillis = System.currentTimeMillis();
         if (ipKey != null && breakerOpen(breakerKey, ipKey, nowMillis, d.gate(), source + " " + code)) {
             log.warn("【{}】熔断中，只记录不处罚, 规则: {}, {}, IP: {}", source, code, detail, clientIp);
+            publish(event.suppressed(SecurityIncidentEvent.SUPPRESS_BREAKER), probe);
             return Trap.BREAKER_OPEN;
         }
         long ban = d.gate().banSeconds();
         long until = nowMillis / 1000 + ban;
+        if (ipKey != null && isOld(probe.device(), nowMillis / 1000, d)) {
+            ipKey = null;
+            event.suppressed(SecurityIncidentEvent.SUPPRESS_OLD_DEVICE);
+        }
+        event.penalty(null, until);
+        if (ipKey != null) {
+            event.action(SecurityIncidentEvent.ACTION_BLACK, until);
+        }
         try {
             if (ipKey != null) {
                 redis.opsForValue().set(SecurityKeys.securityPenaltyIp(ipKey), String.valueOf(until), Duration.ofSeconds(ban));
@@ -415,14 +485,16 @@ public class SecurityGateFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             log.error("【{}】处罚写不进 Redis，这次只记录, 规则: {}, IP: {}", source, code, clientIp, e);
+            publish(event, probe);
             return Trap.PENALISED;
         }
         if (ipKey != null) {
-            cache.put(ipCacheKey(ipKey), new PenaltyCache.Blocked(until), nowMillis);
+            cache.put(ipCacheKey(ipKey), new PenaltyCache.Blocked(until, IpKeys.listValue(clientIp)), nowMillis);
         }
         if (deviceId != null) {
             cache.put(deviceCacheKey(deviceId), new PenaltyCache.Blocked(until), nowMillis);
         }
+        publish(event, probe);
         if (d.lists().white(IpRange.single(clientIp), nowMillis)) {
             log.error("【告警】【{}】白名单 IP 命中（照样处罚，白名单只豁免限流）, 规则: {}, {}, IP: {}, 设备: {}",
                     source, code, detail, clientIp, deviceId);
@@ -442,6 +514,15 @@ public class SecurityGateFilter extends OncePerRequestFilter {
             return "same-origin".equalsIgnoreCase(secFetchSite) || "none".equalsIgnoreCase(secFetchSite);
         }
         return origin == null || origin.isBlank();
+    }
+
+    private void publish(SecurityIncidentEvent.Builder event, Probe probe) {
+        if (incidents == null) {
+            return;
+        }
+        incidents.publish(event.who(probe.clientIp(), probe.deviceId(), null)
+                .request(probe.method(), probe.path(), probe.userAgent(), probe.traceId())
+                .build());
     }
 
     /** 第 2 道保险：把这个 IP 记进熔断窗口，返回「是否已经熔断」 */
