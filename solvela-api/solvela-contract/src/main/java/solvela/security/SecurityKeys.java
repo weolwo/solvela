@@ -1,0 +1,80 @@
+package solvela.security;
+
+/**
+ * 网关、app-biz、后台<b>共同读写</b>的 Redis 键 —— 名字只在这里出现一次。
+ *
+ * <h3>🔴 这些键不带「项目:环境:」前缀</h3>
+ * app-biz 里 {@code RedisService.generateRedisKey} 会给键加 {@code 项目名:环境:} 前缀，网关不会。
+ * 两边各自拼的话，同一个处罚键在两个进程里是两个名字：会员域写下的蜜罐账号处罚，网关永远读不到，
+ * 而且没有任何报错。所以这里的键是<b>原样使用</b>的完整键名，两边都不许再包一层 —— 与会话键
+ * {@code app:auth:*}（{@code MemberRedisTokenStore}）同一个约定。
+ *
+ * <p>⚠️ 改这里等于改线上协议：网关、app-biz、后台必须同时发版。
+ *
+ * @Date 2026-10-17
+ */
+public final class SecurityKeys {
+
+    private SecurityKeys() {
+    }
+
+    // ------------------------------------------------------------------ 限流（网关写，后台查与解除）
+
+    /** 限流计数：{@code rl:c:{规则目标}:{维度}:{值}}。规则目标是场景编码或接口键 */
+    public static String rateLimitCounter(String target, int dimension, String value) {
+        return "rl:c:" + target + ":" + dimension + ":" + value;
+    }
+
+    /** 限流处罚（档位 + 到期）：{@code rl:p:{规则目标}:{维度}:{值}} */
+    public static String rateLimitPenalty(String target, int dimension, String value) {
+        return "rl:p:" + target + ":" + dimension + ":" + value;
+    }
+
+    // ------------------------------------------------------------------ 安全闸（网关与会员域都会写，网关执行）
+
+    /** 全局处罚（蜜罐、关键字、蜜罐账号）：作用于所有场景。值是到期时间，TTL 与之相同 */
+    public static String securityPenaltyIp(String ip) {
+        return "sec:pen:ip:" + ip;
+    }
+
+    /** 同上，设备维度 */
+    public static String securityPenaltyDevice(String deviceId) {
+        return "sec:pen:dev:" + deviceId;
+    }
+
+    /**
+     * 被封禁的设备号集合。<b>真相源是 {@code t_device.status}</b>，这里只是镜像：
+     * 会员域在封禁 / 解封时同步，并有定时任务按库全量重建。
+     */
+    public static final String BANNED_DEVICES = "sec:dev:banned";
+
+    /** 封禁期间被安全闸挡掉的请求数：{@code sec:blocked:{名单维度}:{值}}，定时同步到 {@code t_security_list.blocked_count} */
+    public static String blockedCounter(int listDimension, String value) {
+        return "sec:blocked:" + listDimension + ":" + value;
+    }
+
+    /**
+     * 安全事件的 Redis Stream。网关（与会员域）投递，app-biz 消费写 {@code t_security_incident}。
+     * 每条消息一个字段 {@link #INCIDENT_FIELD}，值是 {@link SecurityIncidentEvent} 的 JSON。
+     */
+    public static final String INCIDENT_STREAM = "sec:incident";
+
+    /** Stream 消息里装事件 JSON 的那个字段名 */
+    public static final String INCIDENT_FIELD = "event";
+
+    // ------------------------------------------------------------------ 规则下发（后台写，网关读；网关回报，后台读）
+
+    /** 规则快照：后台把限流规则、全局参数、名单拼成一份 JSON 写在这里，网关比对 version 后整份拉 */
+    public static final String RULE_SNAPSHOT = "gw:rl:snapshot";
+
+    /** 网关上报的路由清单：后台接口覆盖的下拉框与 target 校验靠它 */
+    public static final String ROUTES = "gw:routes";
+
+    /** 某个网关实例已加载的规则版本：{@code gw:rl:loaded:{实例}}，短 TTL，实例停了自然消失 */
+    public static String loadedVersion(String instance) {
+        return "gw:rl:loaded:" + instance;
+    }
+
+    /** 扫描全部实例的已加载版本时用的前缀 */
+    public static final String LOADED_VERSION_PREFIX = "gw:rl:loaded:";
+}

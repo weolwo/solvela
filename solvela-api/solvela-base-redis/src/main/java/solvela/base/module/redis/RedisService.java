@@ -4,6 +4,7 @@ import jakarta.annotation.Resource;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.enumeration.SystemEnvironmentEnum;
 import solvela.base.constant.StringConst;
+import solvela.security.SlidingWindowScripts;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
@@ -108,7 +109,7 @@ public class RedisService {
      * @param nowSeconds 调用方传「现在」，不在脚本里取 —— 同一次请求里的记一次与读一次
      *                   必须落在同一个「现在」上，否则两者会算出不同的窗口
      * @return 下标 0 = 窗口内累计值；下标 1 = 窗口内<b>最旧那个桶</b>的序号（没有数据时为 -1），
-     *         调用方用它算「还要多久这个计数才会降下来」（见 {@link #slidingWindowRetryAfterSeconds}）
+     *         调用方用它算「还要多久这个计数才会降下来」（见 {@link SlidingWindowScripts#retryAfterSeconds}）
      */
     public List<Long> slidingWindowCount(String key, long windowSeconds, int buckets,
                                          long nowSeconds, long delta) {
@@ -118,67 +119,8 @@ public class RedisService {
         return result == null ? List.of(0L, -1L) : result;
     }
 
-    /**
-     * 「还要多久这个滑动计数才会降下来」= 最旧那个桶滑出窗口还要多久。
-     *
-     * <p>🔴 不能用键的 TTL 回答这件事：TTL 是从<b>最后一次写入</b>算的，
-     * 而滑动窗口里先掉出去的是<b>最早</b>那一批。用 TTL 的话，一个还在被攻击的 IP
-     * 会被告知「等一小时」，而其实它再过一分钟就降到阈值以下了。
-     *
-     * @param oldestBucket {@link #slidingWindowCount} 返回的下标 1
-     * @return 至少 1 秒 —— 回「请 0 秒后重试」等于没说
-     */
-    public static long slidingWindowRetryAfterSeconds(long windowSeconds, int buckets,
-                                                      long nowSeconds, long oldestBucket) {
-        if (oldestBucket < 0) {
-            return 1L;
-        }
-        long bucketSeconds = Math.max(1L, windowSeconds / Math.max(1, buckets));
-        // 最旧那个桶的起点 + 窗口 = 它滑出窗口的时刻
-        long expiresAt = (oldestBucket + buckets) * bucketSeconds;
-        return Math.max(1L, expiresAt - nowSeconds);
-    }
-
-    /**
-     * 滑动窗口计数，一次往返、原子完成。
-     *
-     * <p>桶号 = {@code floor(now / bucketSeconds)}，窗口内的桶是
-     * {@code [cur - buckets + 1, cur]}。字段就是桶号，值是那个桶里的次数。
-     *
-     * <p>🔴 {@code EXPIRE} 只在写入时设：只读也续期的话，一个一直在被查询
-     * （而没人再写入）的键永远不过期。
-     */
-    private static final RedisScript<List> SLIDING_WINDOW = RedisScript.of("""
-            local window = tonumber(ARGV[1])
-            local buckets = tonumber(ARGV[2])
-            local now = tonumber(ARGV[3])
-            local delta = tonumber(ARGV[4])
-            local bucketSeconds = math.floor(window / buckets)
-            if bucketSeconds < 1 then bucketSeconds = 1 end
-            local cur = math.floor(now / bucketSeconds)
-            local cutoff = cur - buckets + 1
-            if delta > 0 then
-                redis.call('HINCRBY', KEYS[1], tostring(cur), delta)
-                redis.call('EXPIRE', KEYS[1], window + bucketSeconds)
-            end
-            local total = 0
-            local oldest = -1
-            local stale = {}
-            local flat = redis.call('HGETALL', KEYS[1])
-            for i = 1, #flat, 2 do
-                local bucket = tonumber(flat[i])
-                if bucket == nil or bucket < cutoff then
-                    table.insert(stale, flat[i])
-                else
-                    total = total + tonumber(flat[i + 1])
-                    if oldest < 0 or bucket < oldest then oldest = bucket end
-                end
-            end
-            if #stale > 0 then
-                redis.call('HDEL', KEYS[1], unpack(stale))
-            end
-            return {total, oldest}
-            """, List.class);
+    /** 脚本源码在 {@link SlidingWindowScripts#COUNT}：网关限流与这里共用同一份，窗口语义不会两边各一套 */
+    private static final RedisScript<List> SLIDING_WINDOW = RedisScript.of(SlidingWindowScripts.COUNT, List.class);
 
     /**
      * <b>滑动窗口去重计数</b>：把一个成员记进集合（或只读），返回最近 {@code windowMillis} 内的<b>去重数量</b>。
@@ -205,27 +147,8 @@ public class RedisService {
         return count == null ? 0L : count;
     }
 
-    /**
-     * 滑动窗口去重计数，一次往返、原子完成。
-     *
-     * <p>🔴 修剪（按分数、按数量）在 ZCARD <b>之前</b>做：顺序反过来的话，
-     * 返回的数量里会含着已经过期的成员 —— 而那正是固定窗口的毛病。
-     */
-    private static final RedisScript<Long> SLIDING_SET = RedisScript.of("""
-            local member = ARGV[1]
-            local window = tonumber(ARGV[2])
-            local now = tonumber(ARGV[3])
-            local maxEntries = tonumber(ARGV[4])
-            if member ~= '' then
-                redis.call('ZADD', KEYS[1], now, member)
-                redis.call('PEXPIRE', KEYS[1], window)
-            end
-            redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, now - window)
-            if maxEntries > 0 then
-                redis.call('ZREMRANGEBYRANK', KEYS[1], 0, -(maxEntries + 1))
-            end
-            return redis.call('ZCARD', KEYS[1])
-            """, Long.class);
+    /** 脚本源码在 {@link SlidingWindowScripts#DISTINCT}，与网关共用 */
+    private static final RedisScript<Long> SLIDING_SET = RedisScript.of(SlidingWindowScripts.DISTINCT, Long.class);
 
     /**
      * INCR + 首次设置 TTL，一次往返、原子完成。

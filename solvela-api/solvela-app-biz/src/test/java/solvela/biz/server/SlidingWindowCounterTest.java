@@ -151,7 +151,7 @@ class SlidingWindowCounterTest {
         bump(key, later);
 
         long oldest = redisService.slidingWindowCount(key, WINDOW, BUCKETS, later, 0L).get(1);
-        long retryAfter = RedisService.slidingWindowRetryAfterSeconds(WINDOW, BUCKETS, later, oldest);
+        long retryAfter = solvela.security.SlidingWindowScripts.retryAfterSeconds(WINDOW, BUCKETS, later, oldest);
 
         assertTrue(retryAfter > 0 && retryAfter <= WINDOW / 2 + BUCKET_SECONDS,
                 "最旧那一批应当在约半个窗口后掉出去，实际 " + retryAfter);

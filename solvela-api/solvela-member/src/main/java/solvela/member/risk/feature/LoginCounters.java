@@ -266,7 +266,7 @@ public class LoginCounters {
         if (current.oldestBucket() < 0) {
             return Math.max(1L, window);
         }
-        return solvela.base.module.redis.RedisService.slidingWindowRetryAfterSeconds(
+        return solvela.security.SlidingWindowScripts.retryAfterSeconds(
                 window, BUCKETS, nowSeconds(), current.oldestBucket());
     }
 
