@@ -3,6 +3,7 @@ package solvela.app.domain;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 /**
  * 回答一条「你的账号刚在 XX 登录，是你吗？」。
@@ -18,7 +19,8 @@ import jakarta.validation.constraints.NotNull;
 public record SecurityPromptAnswerRequest(
 
         @Schema(description = "确认单号，来自待确认列表", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请指定要回答的确认") String promptId,
+        @NotBlank(message = "请指定要回答的确认")
+        @Size(max = InputLimits.TOKEN_LENGTH, message = "确认已失效") String promptId,
 
         @Schema(description = "是不是你本人：true-是我，false-不是我",
                 requiredMode = Schema.RequiredMode.REQUIRED)

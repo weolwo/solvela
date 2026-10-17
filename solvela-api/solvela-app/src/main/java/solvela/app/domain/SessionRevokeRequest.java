@@ -2,6 +2,7 @@ package solvela.app.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 让某一个登录会话下线。
@@ -14,5 +15,6 @@ import jakarta.validation.constraints.NotBlank;
 public record SessionRevokeRequest(
 
         @Schema(description = "会话ID，来自登录设备列表", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请指定要下线的会话") String sessionId) {
+        @NotBlank(message = "请指定要下线的会话")
+        @Size(max = InputLimits.TOKEN_LENGTH, message = "会话不存在") String sessionId) {
 }

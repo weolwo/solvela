@@ -2,6 +2,7 @@ package solvela.app.domain;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -20,7 +21,8 @@ import java.math.BigDecimal;
  * @Date 2026-09-15
  */
 public record RechargeRequest(
-        @NotBlank(message = "请填写手机号") String targetAccount,
+        @NotBlank(message = "请填写手机号")
+        @Size(max = 32, message = "手机号格式不对") String targetAccount,
         @NotNull(message = "请选择充值面额") BigDecimal amount,
         Long couponId) {
 }

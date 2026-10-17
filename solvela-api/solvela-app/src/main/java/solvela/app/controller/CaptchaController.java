@@ -3,6 +3,8 @@ package solvela.app.controller;
 import solvela.app.ratelimit.RateLimit;
 import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.app.auth.Anonymous;
 import solvela.app.captcha.CaptchaService;
+import solvela.app.captcha.TrackChecker;
+import solvela.app.domain.InputLimits;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 
@@ -46,7 +50,7 @@ public class CaptchaController {
     @Anonymous
     @RateLimit(RateLimitScene.CAPTCHA)
     @PostMapping("/verify")
-    public PassView verify(@RequestBody VerifyRequest body) {
+    public PassView verify(@RequestBody @Valid VerifyRequest body) {
         String pass = captchaService.verify(body.captchaId(), body.x(), body.track());
         if (pass == null) {
             throw new ApiException(ApiErrors.CAPTCHA_FAILED);
@@ -54,7 +58,11 @@ public class CaptchaController {
         return new PassView(pass);
     }
 
-    public record VerifyRequest(String captchaId, Integer x, int[][] track) {
+    public record VerifyRequest(
+            @Size(max = InputLimits.TOKEN_LENGTH, message = "验证已过期，请换一张") String captchaId,
+            Integer x,
+            // 轨迹点数的业务判定在 TrackChecker（超了算「不像人」）；这里是天花板，与它同一个数
+            @Size(max = TrackChecker.MAX_POINTS, message = "验证已过期，请换一张") int[][] track) {
     }
 
     /** @param captchaToken 通行票：放进请求头 {@code X-Captcha-Token} 重试原请求，用一次作废 */

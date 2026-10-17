@@ -3,6 +3,7 @@ package solvela.app.domain;
 import solvela.app.ratelimit.RateLimitAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import solvela.member.api.PasswordResetType;
 
 /**
@@ -23,13 +24,16 @@ public record PasswordResetRequest(
         PasswordResetType resetType,
 
         @Schema(description = "账号邮箱或手机号", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入邮箱或手机号") String identity,
+        @NotBlank(message = "请输入邮箱或手机号")
+        @Size(max = InputLimits.IDENTITY_LENGTH, message = "邮箱或手机号过长") String identity,
 
         @Schema(description = "邮箱收到的验证码", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入验证码") String code,
+        @NotBlank(message = "请输入验证码")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对") String code,
 
         @Schema(description = "新密码", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入新密码") String newPassword) implements RateLimitAccount {
+        @NotBlank(message = "请输入新密码")
+        @Size(max = InputLimits.PASSWORD_LENGTH, message = "密码过长") String newPassword) implements RateLimitAccount {
 
     /** 网关限流的账号维度数它（规范化后算 HMAC，不落明文），格式校验仍在会员域 */
     @Override

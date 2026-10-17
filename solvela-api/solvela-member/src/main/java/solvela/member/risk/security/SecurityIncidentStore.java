@@ -123,6 +123,7 @@ public class SecurityIncidentStore {
             case SecurityIncidentEvent.HONEYPOT -> "HONEYPOT";
             case SecurityIncidentEvent.CANARY -> "CANARY";
             case SecurityIncidentEvent.KEYWORD -> "KEYWORD";
+            case SecurityIncidentEvent.UNKNOWN_FIELD -> "UNKNOWN_FIELD";
             default -> "RATE_LIMIT";
         };
     }
@@ -133,6 +134,7 @@ public class SecurityIncidentStore {
             case SecurityIncidentEvent.HONEYPOT -> "碰了蜜罐路径 " + e.ruleCode();
             case SecurityIncidentEvent.CANARY -> "用蜜罐账号登录（用户名单可能已泄露）";
             case SecurityIncidentEvent.KEYWORD -> "请求里带探测特征 " + e.ruleCode();
+            case SecurityIncidentEvent.UNKNOWN_FIELD -> "请求体里有不认识的字段 " + e.matchedParam();
             default -> "限流 " + e.ruleCode() + " 罚到第 " + e.penaltyLevel() + " 档";
         };
         return SecurityIncidentEvent.truncate(text + "（自动）", 128);

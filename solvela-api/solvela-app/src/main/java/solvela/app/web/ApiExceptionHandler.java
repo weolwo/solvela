@@ -2,6 +2,7 @@ package solvela.app.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,9 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import solvela.app.web.Trace;
+import solvela.app.ratelimit.UnknownFieldReporter;
+import solvela.security.SecurityIncidentEvent;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
@@ -35,6 +38,18 @@ import java.util.Locale;
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    /** 严格模式撞上未知字段时记一条事件。测试里直接 new 本类时为 null */
+    private final UnknownFieldReporter unknownFields;
+
+    public ApiExceptionHandler() {
+        this(null);
+    }
+
+    @Autowired
+    public ApiExceptionHandler(UnknownFieldReporter unknownFields) {
+        this.unknownFields = unknownFields;
+    }
 
     /** 业务异常：预期内的失败，不打栈，日志降到 info。 */
     @ExceptionHandler(ApiException.class)
@@ -89,10 +104,35 @@ public class ApiExceptionHandler {
         return build(ApiErrors.INVALID_ARGUMENT, ApiErrors.INVALID_ARGUMENT.defaultMessage());
     }
 
-    /** 请求体不是合法 JSON、字段类型对不上、少了必填参数 —— 都是客户端的问题，400。 */
+    /**
+     * 请求体不是合法 JSON、字段类型对不上、超了解析上限、少了必填参数 —— 都是客户端的问题，400。
+     *
+     * <p>其中「未知字段」单独说清是哪个字段（请求体按严格模式解析，见 {@code InboundJsonConfig}）：
+     * 前端拼错一个字段名时，「未知字段 phoneNum」能让人当场改对，一句「请求参数有误」只会换来一次排查。
+     * 字段名是请求方自己发来的，回显给它不泄露任何东西；截短是为了不原样回显一大段。
+     */
     @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class})
-    public ResponseEntity<ApiErrorResponse> handleMalformed(Exception e) {
+    public ResponseEntity<ApiErrorResponse> handleMalformed(Exception e, HttpServletRequest request) {
+        UnrecognizedPropertyException unknown = unknownField(e);
+        if (unknown != null && unknown.getPropertyName() != null) {
+            String field = unknown.getPropertyName();
+            log.info("[API] {} {} -> 未知字段 {}", request.getMethod(), request.getRequestURI(),
+                    SecurityIncidentEvent.truncate(field, 64));
+            if (unknownFields != null) {
+                unknownFields.report(request, field);
+            }
+            return build(ApiErrors.INVALID_ARGUMENT, "未知字段 " + SecurityIncidentEvent.truncate(field, 32));
+        }
         return build(ApiErrors.INVALID_ARGUMENT, ApiErrors.INVALID_ARGUMENT.defaultMessage());
+    }
+
+    private static UnrecognizedPropertyException unknownField(Throwable e) {
+        for (Throwable c = e; c != null; c = c.getCause()) {
+            if (c instanceof UnrecognizedPropertyException unknown) {
+                return unknown;
+            }
+        }
+        return null;
     }
 
     /**

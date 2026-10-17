@@ -63,6 +63,8 @@ export const SECURITY_INCIDENT_TYPE_ENUM = {
   CANARY: { value: 2, desc: '蜜罐账号', color: 'red' },
   KEYWORD: { value: 3, desc: '关键字', color: 'magenta' },
   RATE_LIMIT: { value: 4, desc: '限流判罚 / 升档', color: 'orange' },
+  // 低置信、只记录：请求体里有请求对象没有的字段。前后端版本错开时真人也会撞到
+  UNKNOWN_FIELD: { value: 5, desc: '未知字段', color: 'default' },
 };
 
 export const SECURITY_INCIDENT_TYPE_OPTIONS = optionsOf(SECURITY_INCIDENT_TYPE_ENUM);

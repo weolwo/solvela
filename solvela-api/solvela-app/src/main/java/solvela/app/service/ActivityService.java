@@ -14,6 +14,7 @@ import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityDrawCmd;
 import solvela.marketing.api.ActivityPrizeView;
 import solvela.marketing.api.ActivityRuleView;
+import solvela.marketing.api.DrawParams;
 import solvela.marketing.api.DrawRejectReason;
 import solvela.marketing.api.DrawResultView;
 
@@ -131,6 +132,11 @@ public class ActivityService {
      * 不是把请求里那个数回显给前端。
      */
     public DrawView draw(String activityCode, Long memberId, DrawRequest request) {
+        // 全网关唯一一个「什么都能装」的入参，键与形状按契约收口，见 DrawParams
+        String paramsViolation = DrawParams.violation(request.params());
+        if (paramsViolation != null) {
+            throw new ApiException(ApiErrors.INVALID_ARGUMENT, paramsViolation);
+        }
         DrawResultView result = activityApi.draw(new ActivityDrawCmd(
                 activityCode, memberId, request.requestId(), request.timesOrOne(), request.params()));
 

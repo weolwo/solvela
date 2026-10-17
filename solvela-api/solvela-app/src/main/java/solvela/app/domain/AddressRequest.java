@@ -25,6 +25,7 @@ public record AddressRequest(
         String receiverName,
 
         @Pattern(regexp = "^$|^1\\d{10}$", message = "手机号格式不对")
+        @Size(max = 11, message = "手机号格式不对")
         String receiverPhone,
 
         @NotBlank(message = "请选择省")

@@ -20,7 +20,7 @@ package solvela.security;
  *
  * <p>⚠️ 加字段向后兼容（消费方忽略不认识的字段）；删字段、改含义要两边同时发版。
  *
- * @param incidentType         {@link #HONEYPOT} / {@link #CANARY} / {@link #KEYWORD} / {@link #RATE_LIMIT}
+ * @param incidentType         {@link #HONEYPOT} / {@link #CANARY} / {@link #KEYWORD} / {@link #RATE_LIMIT} / {@link #UNKNOWN_FIELD}
  * @param action               {@link #ACTION_RECORD} / {@link #ACTION_GREY} / {@link #ACTION_BLACK}：对客户端 IP 的名单处置
  * @param suppressReason       {@link #SUPPRESS_NONE} / {@link #SUPPRESS_CROSS_SITE} / {@link #SUPPRESS_BREAKER} / {@link #SUPPRESS_OLD_DEVICE}
  * @param penaltyLevel         限流判罚的档位（1–6），其它类型为 null
@@ -58,6 +58,9 @@ public record SecurityIncidentEvent(
         long occurredAtEpochMilli) {
 
     public static final int HONEYPOT = 1, CANARY = 2, KEYWORD = 3, RATE_LIMIT = 4;
+
+    /** 请求体里有请求对象没有的字段。<b>低置信、只记录</b>：前后端版本错开时真人也会撞到 */
+    public static final int UNKNOWN_FIELD = 5;
 
     public static final int ACTION_RECORD = 0, ACTION_GREY = 1, ACTION_BLACK = 2;
 

@@ -110,7 +110,7 @@ public enum ScriptScene {
                     ScriptParam.required("memberId", Long.class, "会员号（关联键）"),
                     ScriptParam.required("activityCode", String.class, "活动编码"),
                     ScriptParam.required("activityType", String.class, "玩法类型 BASIC/DRAW/TASK/LOTTERY"),
-                    ScriptParam.required("params", Map.class, "前端传入的自定义参数，各玩法自定义；没有时是空 Map 而不是 null")
+                    ScriptParam.required("params", Map.class, "前端传入的自定义参数。能带哪些键先在 DrawParams 里声明，没声明的在网关就被拒；没有时是空 Map 而不是 null")
             )),
     ;
 

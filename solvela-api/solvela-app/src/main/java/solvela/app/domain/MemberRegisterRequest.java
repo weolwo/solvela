@@ -3,6 +3,7 @@ package solvela.app.domain;
 import solvela.app.ratelimit.RateLimitAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import solvela.member.api.MemberRegisterType;
 
 /**
@@ -48,18 +49,23 @@ public record MemberRegisterRequest(
         MemberRegisterType registerType,
 
         @Schema(description = "手机号或邮箱", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入手机号或邮箱") String identity,
+        @NotBlank(message = "请输入手机号或邮箱")
+        @Size(max = InputLimits.IDENTITY_LENGTH, message = "手机号或邮箱过长") String identity,
 
         @Schema(description = "邮箱验证码，邮箱注册时必填")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对")
         String emailCode,
 
         @Schema(description = "短信验证码，手机号注册时必填")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对")
         String smsCode,
 
         @Schema(description = "密码。手机号注册必填；邮箱注册可不填，之后走验证码登录")
+        @Size(max = InputLimits.PASSWORD_LENGTH, message = "密码过长")
         String password,
 
         @Schema(description = "设备端：APP/H5/WECHAT/PC")
+        @Size(max = InputLimits.DEVICE_TYPE_LENGTH, message = "设备端不对")
         String deviceType,
         @Schema(description = "Web 端传 true：凭证只经 HttpOnly cookie 下发，响应体里不带。"
                 + "App / 自动化测试不传，凭证照旧在响应体里")

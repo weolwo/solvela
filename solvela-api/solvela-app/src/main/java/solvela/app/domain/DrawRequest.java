@@ -3,6 +3,7 @@ package solvela.app.domain;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import solvela.marketing.api.DrawLimits;
 
 import java.util.Map;
@@ -28,10 +29,12 @@ import java.util.Map;
  *                  十万行流水 insert、十万个派发事件。上限见 {@link DrawLimits#MAX_TIMES}。
  *                  <p>它只是<b>意愿</b> —— 用户点的是「单抽」还是「十连抽」。
  *                  真正抽几次由编排脚本结合剩余次数裁决，与 poolCode 是同一套分工
- * @param params    玩法自定义参数，可为空。必填项由脚本场景契约声明并在服务端校验
+ * @param params    玩法自定义参数，可为空。全网关唯一一个「什么都能装」的入参：能带哪些键、每个多大
+ *                  由 {@link solvela.marketing.api.DrawParams} 声明，网关在入口校验（今天一个键都没声明）
  */
 public record DrawRequest(
-        @NotBlank(message = "缺少请求标识") String requestId,
+        @NotBlank(message = "缺少请求标识")
+        @Size(max = InputLimits.REQUEST_ID_LENGTH, message = "请求标识过长") String requestId,
         @Min(value = 1, message = "抽奖次数至少为 1")
         @Max(value = DrawLimits.MAX_TIMES, message = "一次最多抽 " + DrawLimits.MAX_TIMES + " 次")
         Integer times,

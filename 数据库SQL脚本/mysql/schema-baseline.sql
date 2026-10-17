@@ -906,7 +906,7 @@ CREATE TABLE `t_security_list` (
 DROP TABLE IF EXISTS `t_security_incident`;
 CREATE TABLE `t_security_incident` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `incident_type` tinyint NOT NULL COMMENT '1-蜜罐接口, 2-蜜罐账号, 3-关键字, 4-限流判罚 / 升档',
+  `incident_type` tinyint NOT NULL COMMENT '1-蜜罐接口, 2-蜜罐账号, 3-关键字, 4-限流判罚 / 升档, 5-未知字段（低置信，只记录）',
   `rule_code` varchar(32) DEFAULT NULL COMMENT '命中的蜜罐路径 / 关键字规则 / 限流场景编码',
   `action` tinyint NOT NULL COMMENT '实际处置：0-仅记录, 1-拉灰, 2-拉黑',
   `suppress_reason` tinyint NOT NULL DEFAULT '0' COMMENT '处罚被压下的原因：0-无, 1-跨站发起, 2-熔断中, 3-老设备豁免（仅 IP 部分）',

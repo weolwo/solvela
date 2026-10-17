@@ -1,6 +1,7 @@
 package solvela.app.domain;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 登录二次验证（观察档设备）：凭票发码 / 验码。
@@ -12,8 +13,12 @@ import jakarta.validation.constraints.NotBlank;
  * @param useCookie 同登录：Web 端传 true，令牌只经 HttpOnly cookie 下发
  * @param remember  同登录的「记住我」
  */
-public record LoginChallengeRequest(@NotBlank(message = "验证已过期，请重新登录") String ticket,
-                                    String code, Boolean useCookie, Boolean remember) {
+public record LoginChallengeRequest(
+        @NotBlank(message = "验证已过期，请重新登录")
+        @Size(max = InputLimits.TOKEN_LENGTH, message = "验证已过期，请重新登录") String ticket,
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对") String code,
+        Boolean useCookie,
+        Boolean remember) {
 
     public boolean cookieDelivery() {
         return Boolean.TRUE.equals(useCookie);

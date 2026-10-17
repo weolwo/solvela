@@ -2,6 +2,7 @@ package solvela.app.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 「这不是我」：举报某一次登录。
@@ -21,9 +22,11 @@ import jakarta.validation.constraints.NotBlank;
 public record SessionReportRequest(
 
         @Schema(description = "会话ID，来自登录设备列表", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请指定要举报的会话") String sessionId,
+        @NotBlank(message = "请指定要举报的会话")
+        @Size(max = InputLimits.TOKEN_LENGTH, message = "会话不存在") String sessionId,
 
         @Schema(description = "那次登录的设备号，来自登录设备列表。老会话可能没有")
+        @Size(max = InputLimits.TOKEN_LENGTH, message = "设备号不对")
         String deviceId,
 
         @Schema(description = "那次登录的时间（毫秒），来自登录设备列表。0 或不传表示未知")

@@ -3,6 +3,7 @@ package solvela.app.domain;
 import solvela.app.ratelimit.RateLimitAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import solvela.member.api.MemberLoginType;
 
 /**
@@ -35,15 +36,19 @@ public record MemberLoginRequest(
         MemberLoginType loginType,
 
         @Schema(description = "手机号或邮箱", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入手机号或邮箱") String identity,
+        @NotBlank(message = "请输入手机号或邮箱")
+        @Size(max = InputLimits.IDENTITY_LENGTH, message = "手机号或邮箱过长") String identity,
 
         @Schema(description = "密码或邮箱验证码", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入密码或验证码") String credential,
+        @NotBlank(message = "请输入密码或验证码")
+        @Size(max = InputLimits.PASSWORD_LENGTH, message = "密码过长") String credential,
 
         @Schema(description = "二次验证码。仅当服务端回 DEVICE_VERIFICATION_REQUIRED 时才需要带")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对")
         String verificationCode,
 
         @Schema(description = "设备端：APP/H5/WECHAT/PC")
+        @Size(max = InputLimits.DEVICE_TYPE_LENGTH, message = "设备端不对")
         String deviceType,
         @Schema(description = "Web 端传 true：凭证只经 HttpOnly cookie 下发，响应体里不带。"
                 + "App / 自动化测试不传，凭证照旧在响应体里")

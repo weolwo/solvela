@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 /**
  * 兑换请求。
@@ -23,7 +24,8 @@ import jakarta.validation.constraints.NotNull;
  *                  减多少由服务端重新试算。让客户端报数就是一个直接刷钱的口子。
  */
 public record RedeemRequest(
-        @NotBlank(message = "缺少请求标识") String requestId,
+        @NotBlank(message = "缺少请求标识")
+        @Size(max = InputLimits.REQUEST_ID_LENGTH, message = "请求标识过长") String requestId,
         @NotNull(message = "请选择规格") Long skuId,
         @Min(value = 1, message = "兑换件数至少为 1")
         @Max(value = 20, message = "一次最多兑 20 件")

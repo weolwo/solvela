@@ -2,6 +2,7 @@ package solvela.app.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 绑定 / 更换邮箱的入参。
@@ -18,14 +19,18 @@ import jakarta.validation.constraints.NotBlank;
 public record EmailBindRequest(
 
         @Schema(description = "新邮箱", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入邮箱") String email,
+        @NotBlank(message = "请输入邮箱")
+        @Size(max = InputLimits.IDENTITY_LENGTH, message = "邮箱过长") String email,
 
         @Schema(description = "新邮箱收到的验证码", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入验证码") String code,
+        @NotBlank(message = "请输入验证码")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对") String code,
 
         @Schema(description = "当前密码。更换邮箱时与旧邮箱验证码二选一")
+        @Size(max = InputLimits.PASSWORD_LENGTH, message = "密码过长")
         String currentPassword,
 
         @Schema(description = "旧邮箱收到的验证码。更换邮箱时与当前密码二选一")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对")
         String oldEmailCode) {
 }

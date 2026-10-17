@@ -2,6 +2,7 @@ package solvela.app.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 绑定 / 更换手机号。
@@ -13,14 +14,18 @@ import jakarta.validation.constraints.NotBlank;
 public record PhoneBindRequest(
 
         @Schema(description = "新手机号", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入手机号") String phone,
+        @NotBlank(message = "请输入手机号")
+        @Size(max = InputLimits.IDENTITY_LENGTH, message = "手机号格式不对") String phone,
 
         @Schema(description = "新手机号收到的验证码", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入验证码") String code,
+        @NotBlank(message = "请输入验证码")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对") String code,
 
         @Schema(description = "当前密码。更换手机号时与旧手机号验证码二选一")
+        @Size(max = InputLimits.PASSWORD_LENGTH, message = "密码过长")
         String currentPassword,
 
         @Schema(description = "旧手机号收到的验证码。更换时与当前密码二选一")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对")
         String oldPhoneCode) {
 }

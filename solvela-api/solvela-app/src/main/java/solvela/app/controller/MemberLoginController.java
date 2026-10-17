@@ -203,7 +203,7 @@ public class MemberLoginController {
      */
     @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/session/adopt")
-    public ResponseEntity<Void> adoptSession(@RequestBody(required = false) SessionAdoptRequest request,
+    public ResponseEntity<Void> adoptSession(@RequestBody(required = false) @Valid SessionAdoptRequest request,
                                              HttpServletRequest servletRequest,
                                              HttpServletResponse servletResponse) {
         CurrentMember.require();

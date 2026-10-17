@@ -1,6 +1,7 @@
 package solvela.app.domain;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 二次验证：提交验证码。
@@ -10,5 +11,7 @@ import jakarta.validation.constraints.NotBlank;
  *
  * @param code 发到已绑定邮箱的验证码
  */
-public record StepUpVerifyRequest(@NotBlank(message = "请输入验证码") String code) {
+public record StepUpVerifyRequest(
+        @NotBlank(message = "请输入验证码")
+        @Size(max = InputLimits.CODE_LENGTH, message = "验证码不对") String code) {
 }
