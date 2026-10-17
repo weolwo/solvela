@@ -41,4 +41,12 @@ public enum RiskAction {
      * 那张表会被手滑的人刷满，而客服要找的恰恰是「被锁了很久」的那几个人。
      */
     RECORD_LIMIT,
+
+    /**
+     * 登录的是蜜罐账号：罚 IP 与设备、投安全事件、告警（{@code CanaryTrap}）。
+     *
+     * <p>由 {@code CANARY_ACCOUNT} 请求。🔴 它<b>不改变登录的回答</b> —— 登录照常在密码比对那一步失败，
+     * 对方分不出是哪一下暴露了。
+     */
+    CANARY_TRAP,
 }

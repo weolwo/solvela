@@ -33,15 +33,16 @@ public interface MemberAuthDao {
      * 症状就是登录静默失败，而两边代码单看都很正常。
      */
     /*
-     * 🔴 后三列是给登录风控的，别顺手删掉：
+     * 🔴 后四列是给登录风控的，别顺手删掉：
      *   register_ip        注册那台机器的网络也算「常用网段」，否则刚注册的人第二次打开就是陌生网络
+     *   register_source    CANARY 是蜜罐账号（CANARY_ACCOUNT 规则靠它认出来；少了它，蜜罐静默失效）
      *   create_time        last_active_time 为空（这一列上线前建的号）时的退路
      *   last_active_time   判「沉睡」用它，不能用最后登录时间（会话 30 天不续期，见 MemberActivityService）
      * 少取一列不会报错，只会让矩阵悄悄按一个错的格子判人。
      */
     @Select("""
             SELECT member_id, member_name, nickname, avatar_file_id, gender, status, password,
-                   register_ip, create_time, last_active_time
+                   register_ip, register_source, create_time, last_active_time
             FROM t_member
             WHERE phone_hash = UNHEX(#{phoneHashHex})
             """)
@@ -60,7 +61,7 @@ public interface MemberAuthDao {
      */
     @Select("""
             SELECT member_id, member_name, nickname, avatar_file_id, gender, status, password,
-                   register_ip, create_time, last_active_time
+                   register_ip, register_source, create_time, last_active_time
             FROM t_member
             WHERE email_hash = UNHEX(#{emailHashHex})
             """)

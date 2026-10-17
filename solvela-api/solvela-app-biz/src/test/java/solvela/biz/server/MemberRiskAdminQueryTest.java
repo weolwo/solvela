@@ -215,7 +215,7 @@ class MemberRiskAdminQueryTest {
     void listRules() {
         List<MemberRiskRule> rules = adminService.listRules();
 
-        assertEquals(18, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败（2026-10-17 起纯计次的 6 条移交网关限流、黑名单与设备封禁的 10 条移交网关安全闸）");
+        assertEquals(19, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败（2026-10-17 起纯计次的 6 条移交网关限流、黑名单与设备封禁的 10 条移交网关安全闸，新增蜜罐账号 1 条）");
 
         // 场景不能交错：注册的规则夹在登录的规则中间，页面上那一列就白加了
         solvela.enums.MemberRiskEventTypeEnum scenario = null;

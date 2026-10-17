@@ -27,6 +27,8 @@ import solvela.member.risk.feature.OldDeviceExemption;
 import solvela.member.risk.rule.impl.DeviceFailLimitRule;
 import solvela.member.risk.rule.impl.DeviceFanoutRule;
 import solvela.member.risk.rule.impl.DeviceObserveRule;
+import solvela.member.risk.security.CanaryAccountService;
+import solvela.member.risk.rule.impl.CanaryAccountRule;
 import solvela.member.risk.rule.impl.GlobalCaptchaRule;
 import solvela.member.risk.rule.impl.IpAccountFanoutRule;
 import solvela.member.risk.rule.impl.IpFailLimitRule;
@@ -233,6 +235,28 @@ class LoginRuleTest {
         when(dispositionService.currentStatus("dev-1")).thenReturn(DeviceStatusEnum.NORMAL);
 
         assertNull(new DeviceObserveRule(dispositionService).evaluate(ctx(), config(MemberRiskDecisionEnum.OTP)));
+    }
+
+    @Test
+    @DisplayName("🔴 蜜罐账号：请求 CANARY_TRAP，处置用表里那一档（放行）—— 它不改变登录的回答；普通账号、查无此人都不命中")
+    void canaryAccount() {
+        CanaryAccountRule rule = new CanaryAccountRule();
+        Member canary = member();
+        canary.setRegisterSource(CanaryAccountService.REGISTER_SOURCE);
+        RiskContext canaryLogin = new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
+                "a@x.com", "ab".repeat(32), canary, "dev-1", "H5", "1.2.3.4", false);
+
+        RiskHit hit = rule.evaluate(canaryLogin, config(MemberRiskDecisionEnum.PASS));
+
+        assertEquals(MemberRiskDecisionEnum.PASS, hit.decision());
+        assertTrue(hit.actions().contains(RiskAction.CANARY_TRAP));
+        assertTrue(rule.alwaysEnforce(), "保命开关不该把它也关掉：它从不误伤真人");
+        Member normal = member();
+        normal.setRegisterSource("H5");
+        assertNull(rule.evaluate(new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
+                "a@x.com", "ab".repeat(32), normal, "dev-1", "H5", "1.2.3.4", false), config(MemberRiskDecisionEnum.PASS)));
+        assertNull(rule.evaluate(new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
+                "a@x.com", "ab".repeat(32), null, "dev-1", "H5", "1.2.3.4", false), config(MemberRiskDecisionEnum.PASS)));
     }
 
     @Test

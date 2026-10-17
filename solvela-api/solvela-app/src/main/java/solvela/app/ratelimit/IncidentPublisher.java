@@ -27,12 +27,7 @@ import java.util.List;
 @Component
 public class IncidentPublisher {
 
-    /** 一次往返：推进去，再把超出上限的最老那一截剪掉 */
-    private static final RedisScript<Long> PUSH = RedisScript.of("""
-            redis.call('LPUSH', KEYS[1], ARGV[1])
-            redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]) - 1)
-            return 1
-            """, Long.class);
+    private static final RedisScript<Long> PUSH = RedisScript.of(SecurityKeys.INCIDENT_PUSH_SCRIPT, Long.class);
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 

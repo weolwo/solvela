@@ -7,7 +7,6 @@ import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
-import solvela.base.json.JsonUtils;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
 import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
@@ -18,15 +17,12 @@ import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
 import solvela.security.IpKeys;
 import solvela.security.SecurityKeys;
-import tools.jackson.databind.JsonNode;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 每 5 分钟维护一次安全名单（网关方案 §5.5「什么事件进什么名单」、§6.3）：
@@ -55,8 +51,6 @@ public class SecurityListMaintainJob implements SolvelaJob {
 
     /** 一轮最多转这么多条：积压很多时分几轮做完，不让一轮超时 */
     static final int ESCALATE_BATCH = 1000;
-
-    private static final Pattern DURATION = Pattern.compile("(\\d+)\\s*([smhd])");
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -93,12 +87,6 @@ public class SecurityListMaintainJob implements SolvelaJob {
         this.blockedPrefix = blockedPrefix;
     }
 
-    /** 参数 */
-    record Settings(int escalateGreyDays, int segmentMinIps, long segmentWithinSeconds, int segmentDays) {
-
-        static final Settings DEFAULTS = new Settings(30, 3, 86400, 7);
-    }
-
     /** 一轮的结果 */
     public record Result(int escalated, int segments, long blocked) {
 
@@ -114,7 +102,7 @@ public class SecurityListMaintainJob implements SolvelaJob {
     }
 
     public Result run() {
-        Settings settings = settings();
+        GateSettings settings = GateSettings.parse(configService.getConfigValue(ConfigKeyEnum.GATEWAY_SECURITY_GATE));
         int escalated = escalate(settings);
         int segments = segmentGrey(settings);
         long blocked = syncBlocked();
@@ -127,7 +115,7 @@ public class SecurityListMaintainJob implements SolvelaJob {
 
     // ------------------------------------------------------------------ 黑到期转灰
 
-    private int escalate(Settings s) {
+    private int escalate(GateSettings s) {
         List<Map<String, Object>> expired = jdbcTemplate.queryForList("""
                 SELECT id, dimension, list_value FROM t_security_list
                  WHERE list_type = 1 AND source = 2 AND status = 1 AND dimension IN (1, 2)
@@ -153,7 +141,7 @@ public class SecurityListMaintainJob implements SolvelaJob {
 
     // ------------------------------------------------------------------ 同段连坐
 
-    private int segmentGrey(Settings s) {
+    private int segmentGrey(GateSettings s) {
         // 「被自动拉黑过」：还有效的，或已被系统转灰的（被人撤销的不算 —— 那多半是误判）
         List<String> values = jdbcTemplate.queryForList("""
                 SELECT list_value FROM t_security_list
@@ -216,48 +204,5 @@ public class SecurityListMaintainJob implements SolvelaJob {
             log.warn("【安全名单】同步被挡次数中途失败，已同步 {}，剩下的下一轮再来", total, e);
         }
         return total;
-    }
-
-    // ------------------------------------------------------------------ 参数
-
-    Settings settings() {
-        String json = configService.getConfigValue(ConfigKeyEnum.GATEWAY_SECURITY_GATE);
-        Settings d = Settings.DEFAULTS;
-        if (json == null || json.isBlank()) {
-            return d;
-        }
-        try {
-            JsonNode root = JsonUtils.getMapper().readTree(json);
-            JsonNode seg = root.path("segmentGrey");
-            return new Settings(
-                    positive(root.path("escalateGreyDays"), d.escalateGreyDays()),
-                    positive(seg.path("minIps"), d.segmentMinIps()),
-                    seconds(seg.path("within").asString(null), d.segmentWithinSeconds()),
-                    positive(seg.path("days"), d.segmentDays()));
-        } catch (Exception e) {
-            log.warn("【安全名单】gateway_security_gate 解不开，名单维护用默认参数", e);
-            return d;
-        }
-    }
-
-    private static int positive(JsonNode node, int fallback) {
-        return node.canConvertToInt() && node.asInt() > 0 ? node.asInt() : fallback;
-    }
-
-    private static long seconds(String text, long fallback) {
-        if (text == null) {
-            return fallback;
-        }
-        Matcher m = DURATION.matcher(text.trim());
-        if (!m.matches()) {
-            return fallback;
-        }
-        long n = Long.parseLong(m.group(1));
-        return switch (m.group(2)) {
-            case "s" -> n;
-            case "m" -> n * 60;
-            case "h" -> n * 3600;
-            default -> n * 86400;
-        };
     }
 }

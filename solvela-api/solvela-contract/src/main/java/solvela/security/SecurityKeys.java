@@ -94,6 +94,16 @@ public final class SecurityKeys {
     /** 队列上限：消费方停了也只占这么多内存，超出丢的是最老的（处罚本身已经在 Redis 里，不受影响） */
     public static final int INCIDENT_QUEUE_MAX = 100_000;
 
+    /**
+     * 投递一条事件的脚本（KEYS[1] = 队列，ARGV[1] = 事件 JSON，ARGV[2] = 上限）：推进去，再把超出上限的最老那一截剪掉，一次往返。
+     * 网关与会员域（蜜罐账号）各自包成 {@code RedisScript} 用，与 {@link SlidingWindowScripts} 同一个做法。
+     */
+    public static final String INCIDENT_PUSH_SCRIPT = """
+            redis.call('LPUSH', KEYS[1], ARGV[1])
+            redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]) - 1)
+            return 1
+            """;
+
     // ------------------------------------------------------------------ 规则下发（后台写，网关读；网关回报，后台读）
 
     /**

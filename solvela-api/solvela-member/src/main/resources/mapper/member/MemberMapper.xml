@@ -76,6 +76,14 @@
             <if test="queryForm.registerSource != null and queryForm.registerSource != ''">
                 AND register_source = #{queryForm.registerSource}
             </if>
+            <!--
+              🔴 蜜罐账号（register_source = CANARY）默认不出现在任何列表里：它们从不对外使用，
+              进了列表就可能被拿去发券、导出、联系 —— 而它的邮箱一旦从我们这边流出去，这个蜜罐就废了。
+              要看它们得显式按来源筛 CANARY。见 CanaryAccountService
+            -->
+            <if test="queryForm.registerSource == null or queryForm.registerSource == ''">
+                AND register_source &lt;&gt; 'CANARY'
+            </if>
             <if test="queryForm.inviteId != null">
                 AND invite_id = #{queryForm.inviteId}
             </if>

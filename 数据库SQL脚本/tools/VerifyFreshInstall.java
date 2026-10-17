@@ -83,9 +83,9 @@ public class VerifyFreshInstall {
                 {"t_member_id_seq", "1", "会员发号种子行：为 0 则第一个注册的用户就撞 -1000"},
                 // 2026-10-14 加：登录 20 条；2026-10-16 注册（+4 REG_*）、重置密码（+4 RESET_*）、
                 // 资产出口（+3 ASSET_*）进引擎。少于这个数说明种子没导全 —— 缺的那几条会让 app-biz 启动失败
-                // 2026-10-17：纯计次的 6 条移交网关限流，五条 *IP_BLACKLIST 与五条 *DEVICE_BANNED 移交网关安全闸
-                {"t_member_risk_rule", "18",
-                        "风控规则（登录 16 + 资产出口 1 + 换绑 1）：缺任何一条，app-biz 启动时双向校验失败"},
+                // 2026-10-17：纯计次的 6 条移交网关限流，五条 *IP_BLACKLIST 与五条 *DEVICE_BANNED 移交网关安全闸；新增 CANARY_ACCOUNT
+                {"t_member_risk_rule", "19",
+                        "风控规则（登录 17 + 资产出口 1 + 换绑 1）：缺任何一条，app-biz 启动时双向校验失败"},
                 {"t_rate_limit_rule", "28",
                         "网关限流规则（9 个场景 × 维度的默认值）：缺了网关退回内置默认值，后台调不动阈值"},
             };

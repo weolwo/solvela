@@ -159,6 +159,9 @@ public class MemberAuthService implements MemberAuthApi {
     /** 「我们拦下了一次可疑登录」（{@code RiskAction.NOTIFY_OWNER}） */
     private final solvela.member.risk.SuspiciousLoginNotifier suspiciousLoginNotifier;
 
+    /** 蜜罐账号命中后的处罚与告警 */
+    private final solvela.member.risk.security.CanaryTrap canaryTrap;
+
     private final PiiCipher piiCipher;
     private final DeviceGuard deviceGuard;
     private final LoginIpGuard loginIpGuard;
@@ -433,6 +436,10 @@ public class MemberAuthService implements MemberAuthApi {
         }
         if (decision.has(RiskAction.RECORD_LIMIT)) {
             recordLimit(decision, ctx);
+        }
+        if (decision.has(RiskAction.CANARY_TRAP)) {
+            // 只有副作用：登录照常往下走，在密码比对那一步失败 —— 回答与真实账号输错密码逐字节相同
+            canaryTrap.spring(ctx);
         }
         if (decision.has(RiskAction.NOTIFY_OWNER)) {
             /*
