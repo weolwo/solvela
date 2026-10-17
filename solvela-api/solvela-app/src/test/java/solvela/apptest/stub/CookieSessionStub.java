@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Web 端 cookie 会话测试（{@code CookieSessionTest}）专用的下游桩。
  *
- * <p>与 {@link ApiContractDownstreamStub} 分开：那个桩的 {@code getAuthIdentity} 恒返回 null
+ * <p>与 {@link ApiContractDownstreamStub} 分开：那个桩的 {@code getAuthIdentity} 只认它注册出来的那一个会员
  * （它只验错误翻译表），而这里要「注册之后凭 cookie 真的认得出人」。
  * 放在 {@code solvela.apptest} 下的理由见 {@link StubMemberAuthApiConfig} 类注释。
  *

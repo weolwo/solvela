@@ -325,6 +325,31 @@ class ApiContractTest {
                 "合法的 traceId 应当沿用 —— 客户端埋点要靠它和服务端日志串起来");
     }
 
+    @Test
+    @DisplayName("🔴 绑定手机号的路由存在：未登录 401、成功 204、号被占 409（2026-10-17 之前前端调它一直是 404）")
+    void 绑定手机号() {
+        String body = "{\"phone\":\"13800008000\",\"code\":\"123456\"}";
+        assertEquals(401, post("/auth/phone/bind", body, null).statusCode(),
+                "绑定手机号要登录 —— 匿名能调的话，它就是一个「把任意号挂到任意账号上」的接口");
+
+        String token = registerAndGetToken();
+        HttpResponse<String> ok = post("/auth/phone/bind", body, token);
+        assertEquals(204, ok.statusCode(), "实际响应：" + ok.body());
+
+        HttpResponse<String> taken = post("/auth/phone/bind", "{\"phone\":\"13911110000\",\"code\":\"123456\"}", token);
+        assertEquals(409, taken.statusCode(), "实际响应：" + taken.body());
+        assertEquals("CONFLICT", parse(taken).path("code").asText());
+        assertEquals("该手机号已被其他账号绑定", parse(taken).path("message").asText());
+    }
+
+    /** 走一次注册拿令牌：桩对 138 开头、不以 1/2 结尾的手机号一律注册成功 */
+    private String registerAndGetToken() {
+        HttpResponse<String> response =
+                post("/auth/register", "{\"identity\":\"13800000000\",\"password\":\"abcd1234\"}", null);
+        assertEquals(200, response.statusCode(), "实际响应：" + response.body());
+        return parse(response).path("accessToken").asText();
+    }
+
     // ------------------------------------------------------------------ 工具
 
     private String base() {

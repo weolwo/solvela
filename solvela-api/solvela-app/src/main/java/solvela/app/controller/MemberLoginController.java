@@ -120,7 +120,7 @@ public class MemberLoginController {
      * 索取短信验证码。
      *
      * <p>与邮箱那条分成两条路由，而不是一条带 channel 参数：两条通道的场景集合不一样
-     * （短信没有 BIND）、限频不一样、失败措辞不一样。合成一条会得到一个
+     * （短信没有 STEP_UP）、限频不一样、失败措辞不一样。合成一条会得到一个
      * 「大部分字段在大部分情况下没用」的入参。
      *
      * <p>⚠️ 短信是<b>要花钱</b>的接口。它匿名、无成本地暴露在公网上，
@@ -230,6 +230,23 @@ public class MemberLoginController {
     public ResponseEntity<Void> bindEmail(@RequestBody @Valid EmailBindRequest request,
                                           HttpServletRequest servletRequest) {
         memberLoginService.bindEmail(request, ClientIp.of(servletRequest));
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 绑定 / 更换手机号。<b>要登录</b>。与 {@link #bindEmail} 逐段对称。
+     *
+     * <p>手机号比邮箱重一档：它是注册的默认身份，换绑意味着「原来那个号从此登不了这个账号」。
+     * 所以换绑时域里同样要求「当前密码」或「旧手机号验证码」，拦「会话被盗 → 换绑 → 短信登录 → 永久接管」。
+     * 验证码走 {@code /auth/sms/code} 的 BIND 场景。
+     *
+     * <p>返回 204：没有要给客户端的数据。
+     */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
+    @PostMapping("/phone/bind")
+    public ResponseEntity<Void> bindPhone(@RequestBody @Valid PhoneBindRequest request,
+                                          HttpServletRequest servletRequest) {
+        memberLoginService.bindPhone(request, ClientIp.of(servletRequest));
         return ResponseEntity.noContent().build();
     }
 

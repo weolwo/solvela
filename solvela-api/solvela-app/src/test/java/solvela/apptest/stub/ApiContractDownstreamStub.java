@@ -159,7 +159,10 @@ public class ApiContractDownstreamStub {
 
             @Override
             public MemberIdentity getAuthIdentity(Long memberId) {
-                return null;
+                // 只认注册桩发出去的那一个会员：要登录的接口（绑定手机号）也要验它的翻译表
+                return memberId != null && memberId == 1000000001L
+                        ? new MemberIdentity(1000000001L, "sv1000000001", "会员1000000001", null, GenderEnum.UNKNOWN)
+                        : null;
             }
 
             @Override
