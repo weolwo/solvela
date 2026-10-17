@@ -18,6 +18,7 @@ import { formatDateTime } from '@/utils/datetime'
 
 import Backdrop from './Backdrop.vue'
 import Wheel from './Wheel.vue'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 
 /**
  * 中秋抽奖专题页。
@@ -35,6 +36,9 @@ import Wheel from './Wheel.vue'
  */
 
 const route = useRoute()
+
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -136,6 +140,7 @@ async function onDraw(times: number): Promise<void> {
     await spinWheelTo(landingIndex(outcome, data.wheel.prizes))
     result.value = outcome
   } catch (error) {
+    wait.catchLimited(error)
     hintText.value = error instanceof ApiError ? error.message : '抽奖失败，请稍后再试'
   } finally {
     pendingTimes.value = null
@@ -230,21 +235,21 @@ function goBack(): void {
         <div v-if="detail.data.value.wheel !== null" class="actions">
           <div class="actions__slot">
             <Button
-              :disabled="pendingTimes !== null || !detail.data.value.joinable"
+              :disabled="pendingTimes !== null || !detail.data.value.joinable || wait.active.value"
               :loading="pendingTimes === 1"
               @click="onDraw(1)"
             >
-              抽一次
+              {{ wait.label('抽一次') }}
             </Button>
           </div>
           <div class="actions__slot">
             <Button
               class="actions__ten"
-              :disabled="pendingTimes !== null || !detail.data.value.joinable"
+              :disabled="pendingTimes !== null || !detail.data.value.joinable || wait.active.value"
               :loading="pendingTimes === MAX_DRAW_TIMES"
               @click="onDraw(MAX_DRAW_TIMES)"
             >
-              抽 {{ MAX_DRAW_TIMES }} 次
+              {{ wait.label(`抽 ${MAX_DRAW_TIMES} 次`) }}
             </Button>
           </div>
         </div>

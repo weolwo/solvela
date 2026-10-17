@@ -7,6 +7,7 @@ import { claimEntitlement, fetchMyEntitlements, type MemberEntitlement } from '@
 import { ApiError } from '@/api/errors'
 import { fetchGrowthLog, fetchMyGrade } from '@/api/grade'
 import { useAsync } from '@/composables/useAsync'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 
 /**
  * 会员中心。
@@ -47,6 +48,9 @@ const entitlements = useAsync(fetchMyEntitlements)
 const claiming = ref<number | null>(null)
 const claimHint = ref('')
 
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
+
 /**
  * 领取一份。
  *
@@ -65,6 +69,7 @@ async function onClaim(item: MemberEntitlement): Promise<void> {
     claimHint.value = `已领取：${got.assetName}`
     await entitlements.reload()
   } catch (error) {
+    wait.catchLimited(error)
     // 文案一律用服务端给的：「已经领过了」「已过期」都是它算出来的
     claimHint.value = error instanceof ApiError ? error.message : '领取失败，请稍后再试'
   } finally {
@@ -258,10 +263,10 @@ const progress = computed(() => {
               v-if="item.status === 0"
               :block="false"
               :loading="claiming === item.grantId"
-              :disabled="claiming !== null && claiming !== item.grantId"
+              :disabled="(claiming !== null && claiming !== item.grantId) || wait.active.value"
               @click="onClaim(item)"
             >
-              领取
+              {{ wait.label('领取') }}
             </Button>
           </div>
         </Card>

@@ -1,6 +1,7 @@
-import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
 
 import { ApiError } from '@/api/errors'
+import { useCountdown } from '@/composables/useCountdown'
 
 /**
  * 「获取验证码」那颗按钮的全部状态：倒计时、发送中、失败提示。
@@ -15,9 +16,14 @@ import { ApiError } from '@/api/errors'
  * 点下去就开始倒计时的写法很常见，也很坑：请求失败时用户看着 60 秒读秒，
  * 而他手上一条短信都没有 —— 那一分钟他什么都做不了，只能反复退出重进。
  *
- * <h3>🔴 被限频（429）时【也要】倒计时</h3>
+ * <h3>🔴 被限频（429）时【也要】倒计时，而且按服务端给的秒数</h3>
  * 那是服务端在说「你现在发不出去」。不倒计时的话按钮立刻又可点，
- * 用户会一直点一直被拒，而每一次都是一趟真实的请求。
+ * 用户会一直点一直被拒，而每一次都是一趟真实的请求（还会把网关的阶梯处罚往高一档推）。
+ * 秒数取 {@code retryAfterSeconds}：网关的阶梯处罚能到 8 小时，按固定 60 秒读秒的话，
+ * 走到 0 用户以为能点了，结果又是一次 429。服务端没给秒数时才退回发码冷却的那 60 秒。
+ *
+ * <p>倒计时用 {@link useCountdown}（按到期时刻算）：手机息屏时 setInterval 会被压制，
+ * 每秒减一的写法回到前台时会停在「还剩 23 秒」不动。
  */
 
 /** 与后端 resend-cooldown 对齐。两边不一致时，宁可这边长一点 */
@@ -62,32 +68,11 @@ export function useCodeSender(
 ): CodeSender {
   const cooldownSeconds = options.cooldownSeconds ?? DEFAULT_COOLDOWN_SECONDS
   const sending = ref(false)
-  const secondsLeft = ref(0)
   const error = ref<string | undefined>(undefined)
   const sent = ref(false)
-
-  let timer: ReturnType<typeof setInterval> | null = null
-
-  function stopTimer(): void {
-    if (timer !== null) {
-      clearInterval(timer)
-      timer = null
-    }
-  }
-
-  function startCooldown(): void {
-    secondsLeft.value = cooldownSeconds
-    stopTimer()
-    timer = setInterval(() => {
-      secondsLeft.value -= 1
-      if (secondsLeft.value <= 0) {
-        stopTimer()
-      }
-    }, 1000)
-  }
-
-  // 页面被销毁时定时器必须停：留着它会在已经不存在的组件上改 ref
-  onScopeDispose(stopTimer)
+  // 页面被销毁时它自己停（onScopeDispose 在 useCountdown 里）
+  const countdown = useCountdown()
+  const secondsLeft = countdown.secondsLeft
 
   const canSend = computed(() => !sending.value && secondsLeft.value <= 0)
 
@@ -113,7 +98,7 @@ export function useCodeSender(
     try {
       await request()
       sent.value = true
-      startCooldown()
+      countdown.start(cooldownSeconds)
     } catch (e) {
       if (e instanceof ApiError) {
         error.value = e.message
@@ -125,7 +110,7 @@ export function useCodeSender(
          * 罚他等 60 秒没有道理。
          */
         if (e.code === 'OPERATION_LIMITED') {
-          startCooldown()
+          countdown.start(e.retryAfterSeconds ?? cooldownSeconds)
         }
       } else {
         error.value = '验证码发送失败，请稍后再试'
@@ -136,8 +121,7 @@ export function useCodeSender(
   }
 
   function reset(): void {
-    stopTimer()
-    secondsLeft.value = 0
+    countdown.stop()
     sending.value = false
     sent.value = false
     error.value = undefined

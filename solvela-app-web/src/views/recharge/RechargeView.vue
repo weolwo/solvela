@@ -12,6 +12,7 @@ import {
 } from '@/api/recharge'
 import { useAsync } from '@/composables/useAsync'
 import type { Id } from '@/types/contract'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 
 /**
  * 充话费。
@@ -83,6 +84,9 @@ const payAmount = computed(() => {
 
 /* ---- 提交 ---- */
 const submitting = ref(false)
+
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
 const hintText = ref('')
 
 const blockedReason = computed<string | null>(() => {
@@ -120,6 +124,7 @@ async function onSubmit(): Promise<void> {
     amount.value = null
     await orders.reload()
   } catch (error) {
+    wait.catchLimited(error)
     hintText.value = error instanceof ApiError ? error.message : '充值失败，请稍后再试'
   } finally {
     submitting.value = false
@@ -223,8 +228,8 @@ function pickCoupon(couponId: Id | null): void {
           <p v-if="hintText !== ''" class="hint" role="alert">{{ hintText }}</p>
           <p v-else-if="blockedReason !== null" class="hint hint--muted">{{ blockedReason }}</p>
 
-          <Button :disabled="blockedReason !== null" :loading="submitting" @click="onSubmit">
-            立即充值
+          <Button :disabled="blockedReason !== null || wait.active.value" :loading="submitting" @click="onSubmit">
+            {{ wait.label('立即充值') }}
           </Button>
         </div>
       </Section>

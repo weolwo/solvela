@@ -7,6 +7,7 @@ import { ApiError } from '@/api/errors'
 import { fetchLotteryBoard, obtainTicket } from '@/api/lottery'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 
 /**
  * 彩票活动页。
@@ -44,6 +45,9 @@ const board = useAsync(() => fetchLotteryBoard(activityCode))
 /* ---- 领号 ---- */
 
 const obtaining = ref(false)
+
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
 /** 刚领到的那个号码，用来做一次「亮出来」的展示。null = 没有 */
 const justGot = ref<string | null>(null)
 const hint = ref('')
@@ -86,6 +90,7 @@ async function onObtain(): Promise<void> {
       await board.reload()
     }
   } catch (error) {
+    wait.catchLimited(error)
     hint.value = error instanceof ApiError ? error.message : '领取失败，请稍后再试'
   } finally {
     obtaining.value = false
@@ -167,7 +172,9 @@ const placeholders = computed(() => {
 
               <p v-if="hint !== ''" class="issue__hint" role="alert">{{ hint }}</p>
 
-              <Button v-if="sellable" :loading="obtaining" @click="onObtain">领取号码</Button>
+              <Button v-if="sellable" :loading="obtaining" :disabled="wait.active.value" @click="onObtain">
+                {{ wait.label('领取号码') }}
+              </Button>
 
               <p v-if="board.data.value.issue !== null" class="issue__mine">
                 我这期已有 {{ board.data.value.issue.myTicketCount }} 张

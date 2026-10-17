@@ -77,6 +77,27 @@ describe('倒计时', () => {
     stop()
   })
 
+  it('🔴 被限频（429）带了秒数时按服务端给的秒数倒计时 —— 网关的阶梯处罚能到 8 小时，按 60 秒读秒到 0 又是一次 429', async () => {
+    const { value: sender, stop } = inScope(() =>
+      useCodeSender(
+        () =>
+          Promise.reject(
+            new ApiError('OPERATION_LIMITED', '操作过于频繁，请 2 小时后再试', null, 429, {
+              retryAfterSeconds: 7200,
+            }),
+          ),
+        { cooldownSeconds: 60 },
+      ),
+    )
+
+    await sender.send()
+    await vi.advanceTimersByTimeAsync(61_000)
+
+    expect(sender.canSend.value).toBe(false)
+    expect(sender.label.value).toBe('7139s')
+    stop()
+  })
+
   it('格式错（400）不进冷却 —— 那是用户能立刻改好的，罚他等 60 秒没道理', async () => {
     const { value: sender, stop } = inScope(() =>
       useCodeSender(

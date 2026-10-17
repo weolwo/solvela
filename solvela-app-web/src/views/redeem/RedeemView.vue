@@ -8,6 +8,7 @@ import { type CouponTrialGroup, type CouponTrialItem, trialCoupons } from '@/api
 import { ApiError } from '@/api/errors'
 import { fetchCommodityDetail, OrderStatus, redeem, type RedeemResult } from '@/api/mall'
 import { useAsync } from '@/composables/useAsync'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 import { type Id, toId, type Money } from '@/types/contract'
 import { formatCash, formatPoints } from '@/utils/cost'
 import {
@@ -287,6 +288,9 @@ const shortfall = computed<Money | null>(() => {
 
 /* ---- 提交 ---- */
 const submitting = ref(false)
+
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
 const hintText = ref('')
 const result = ref<RedeemResult | null>(null)
 
@@ -352,6 +356,7 @@ async function onConfirm(): Promise<void> {
     // 积分被扣了，余额得重新拉 —— 本地自己减一遍只是猜服务端扣了多少
     void assets.reload()
   } catch (error) {
+    wait.catchLimited(error)
     // 商品下架 / 无货 / 超限兑 / 积分不足 / 地址失效都会走到这里，都是预期内的
     hintText.value = error instanceof ApiError ? error.message : '兑换失败，请稍后再试'
   } finally {
@@ -562,8 +567,8 @@ function goRecords(): void {
             {{ hintText }}
           </p>
           <p v-else-if="blockedReason !== null" class="bar__hint">{{ blockedReason }}</p>
-          <Button :disabled="blockedReason !== null" :loading="submitting" @click="onConfirm">
-            确认兑换
+          <Button :disabled="blockedReason !== null || wait.active.value" :loading="submitting" @click="onConfirm">
+            {{ wait.label('确认兑换') }}
           </Button>
         </div>
       </template>

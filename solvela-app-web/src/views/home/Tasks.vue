@@ -2,8 +2,10 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
+import { ApiError } from '@/api/errors'
 import { fetchSignedToday, fetchTasks, sign, type TaskItem, type TaskStage } from '@/api/task'
 import { useAsync } from '@/composables/useAsync'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 import { compare, format, money } from '@/utils/money'
 
 /**
@@ -44,6 +46,9 @@ const signing = ref(false)
 /** 刚签完要说的那句话。null = 不显示。它只活到下一次进页面 */
 const signHint = ref<string | null>(null)
 
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
+
 /**
  * 签到。
  *
@@ -71,8 +76,11 @@ async function doSign(): Promise<void> {
       // 只有真签上了才值得再拉一次列表 —— 重复点什么都没变
       await tasks.reload()
     }
-  } catch {
-    signHint.value = '签到失败，请稍后再试'
+  } catch (error) {
+    // 被限流时说服务端的原话（「请 X 分钟后再试」），并让按钮按倒计时置灰
+    signHint.value = wait.catchLimited(error) && error instanceof ApiError
+      ? error.message
+      : '签到失败，请稍后再试'
   } finally {
     signing.value = false
   }
@@ -218,10 +226,10 @@ const grouped = computed(() => {
         <Button
           :block="false"
           :loading="signing"
-          :disabled="signedToday.data.value === true"
+          :disabled="signedToday.data.value === true || wait.active.value"
           @click="doSign"
         >
-          {{ signedToday.data.value === true ? '已签到' : '签到' }}
+          {{ signedToday.data.value === true ? '已签到' : wait.label('签到') }}
         </Button>
       </div>
     </Card>

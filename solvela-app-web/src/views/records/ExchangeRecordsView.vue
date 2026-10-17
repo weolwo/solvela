@@ -5,6 +5,7 @@ import { ApiError } from '@/api/errors'
 import { payOrder } from '@/api/mall'
 import { fetchExchangeRecords } from '@/api/records'
 import { useAsync } from '@/composables/useAsync'
+import { useRetryAfter } from '@/composables/useRetryAfter'
 
 /**
  * 兑换记录：我花积分换了什么。
@@ -43,6 +44,9 @@ const orders = useAsync(fetchExchangeRecords)
  * 只会让用户看到一个和服务端不一致的页面，而他会按那个去做下一步。
  */
 const paying = ref<string | null>(null)
+
+/** 被限流（429）后按服务端给的秒数把按钮置灰，到 0 自己恢复（不弹窗：这一档唯一的出路就是等） */
+const wait = useRetryAfter()
 const payError = ref('')
 
 async function onPay(orderNo: string): Promise<void> {
@@ -55,6 +59,7 @@ async function onPay(orderNo: string): Promise<void> {
     await payOrder(orderNo)
     await orders.reload()
   } catch (error) {
+    wait.catchLimited(error)
     // 「这单已经不能支付了」是预期内的（超时取消 / 已付过），按人话提示
     payError.value = error instanceof ApiError ? error.message : '支付失败，请稍后再试'
   } finally {
@@ -129,10 +134,10 @@ async function onPay(orderNo: string): Promise<void> {
             <Button
               size="small"
               :loading="paying === order.orderNo"
-              :disabled="paying !== null"
+              :disabled="paying !== null || wait.active.value"
               @click="onPay(order.orderNo)"
             >
-              去支付
+              {{ wait.label('去支付') }}
             </Button>
           </div>
         </Card>
