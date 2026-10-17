@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +55,7 @@ public class CspReportController {
      */
     @Anonymous
     @DeviceExempt
+    @RateLimit(value = RateLimitScene.EXEMPT, reason = "浏览器自动发的 CSP 违规报告，限了只会丢报告")
     @PostMapping("/csp-report")
     public ResponseEntity<Void> report(@RequestBody(required = false) String body) {
         if (admit()) {

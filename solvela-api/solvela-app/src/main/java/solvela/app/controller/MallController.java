@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +56,7 @@ public class MallController {
     private final OrderService orderService;
 
     @Anonymous
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/category")
     public List<MallCategoryView> listCategories() {
         return mallApi.listCategories();
@@ -68,6 +71,7 @@ public class MallController {
      * @param sortBy SORT(默认，运营权重) / SOLD(热销) / POINTS_ASC(积分从低到高)
      */
     @Anonymous
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/commodity")
     public MallCommodityPageView pageCommodity(@RequestParam(required = false) Long categoryId,
                                                @RequestParam(required = false) String keyword,
@@ -85,6 +89,7 @@ public class MallController {
      * 「这个商品下架了」对用户没有可操作性，而区分开来等于告诉爬虫哪些 id 是有效的。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/commodity/{commodityId}")
     public MallCommodityDetailView getCommodity(@PathVariable Long commodityId) {
         MallCommodityDetailView view = mallApi.getCommodity(
@@ -106,6 +111,7 @@ public class MallController {
      * <p>🔴 会员号从登录态取。订单号由服务端生成，客户端给不了 ——
      * 请求体里那个 requestId 只挡「连点两次提交」。
      */
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/redeem")
     public RedeemResultView redeem(@RequestBody @Valid RedeemRequest request) {
         return redeemService.redeem(CurrentMember.require().memberId(), request);
@@ -126,11 +132,13 @@ public class MallController {
      * <p>🔴 会员号从登录态取，<b>不接受客户端传</b>：少了这一条就是
      * 「可以支付别人的订单」。
      */
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/order/{orderNo}/pay")
     public RedeemResultView pay(@PathVariable String orderNo) {
         return redeemService.pay(CurrentMember.require().memberId(), orderNo);
     }
 
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/order")
     public List<OrderView> listMyOrders() {
         return orderService.listMyOrders(CurrentMember.require().memberId());
@@ -139,18 +147,21 @@ public class MallController {
     /* ---------------- 收藏。要登录 ---------------- */
 
     /** 我收藏的商品。<b>已下架的不出现</b> —— 收藏行还在，但不展示一个点不进去的卡片 */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/favorite")
     public List<MallCommodityBriefView> listFavorites() {
         return mallApi.listFavorites(CurrentMember.require().memberId());
     }
 
     /** 收藏。重复收藏不报错 —— 前端连点两次是常态 */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PutMapping("/favorite/{commodityId}")
     public void addFavorite(@PathVariable Long commodityId) {
         mallApi.addFavorite(commodityId, CurrentMember.require().memberId());
     }
 
     /** 取消收藏。已经不在了也不报错，重复点是常态 */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @DeleteMapping("/favorite/{commodityId}")
     public void removeFavorite(@PathVariable Long commodityId) {
         mallApi.removeFavorite(commodityId, CurrentMember.require().memberId());

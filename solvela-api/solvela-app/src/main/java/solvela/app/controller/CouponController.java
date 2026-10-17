@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,7 @@ public class CouponController {
      *
      * <p>一张券都没有时返回<b>空数组</b> —— 新用户就是这个状态，不是 404。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<MemberCouponView> listCoupons(@RequestParam(defaultValue = "USABLE") String status) {
         return couponService.listCoupons(CurrentMember.require().memberId(), status);
@@ -64,6 +67,7 @@ public class CouponController {
      * 端上用掉。真正定下来的是下单时服务端重新试算并锁定的那一次 ——
      * 所以下单接口<b>不接受</b>客户端传的抵扣额。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @PostMapping("/trial")
     public CouponTrialView trial(@RequestBody @Valid CouponTrialRequest request) {
         return couponService.trial(CurrentMember.require().memberId(), request);

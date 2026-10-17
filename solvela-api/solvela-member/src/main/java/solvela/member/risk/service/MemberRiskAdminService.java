@@ -13,7 +13,7 @@ import solvela.enums.SecurityListTypeEnum;
 import solvela.enums.MemberRiskModeEnum;
 import solvela.member.SecurityList;
 import solvela.member.MemberRiskRule;
-import solvela.member.risk.config.IpRange;
+import solvela.security.IpRange;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.dao.MemberRiskEventDao;

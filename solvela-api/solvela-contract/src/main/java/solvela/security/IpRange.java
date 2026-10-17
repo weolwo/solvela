@@ -1,4 +1,4 @@
-package solvela.member.risk.config;
+package solvela.security;
 
 import java.math.BigInteger;
 import java.net.InetAddress;

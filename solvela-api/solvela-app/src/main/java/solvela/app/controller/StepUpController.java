@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -44,6 +46,7 @@ public class StepUpController {
     private final MemberStepUpApi stepUpApi;
 
     /** 发一封验证码到当前会员已绑定的邮箱。 */
+    @RateLimit(RateLimitScene.CODE_SEND)
     @PostMapping("/code")
     public StepUpCodeView sendCode(HttpServletRequest servletRequest) {
         StepUpResult result = stepUpApi.sendCode(cmd(servletRequest, null));
@@ -56,6 +59,7 @@ public class StepUpController {
     /**
      * 校验验证码。通过即把当前设备记为受信任，返回 204。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/verify")
     public ResponseEntity<Void> verify(@RequestBody @Valid StepUpVerifyRequest request,
                                        HttpServletRequest servletRequest) {

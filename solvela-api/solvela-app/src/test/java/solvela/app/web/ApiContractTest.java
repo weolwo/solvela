@@ -46,6 +46,8 @@ import static org.junit.jupiter.api.Assertions.*;
         // 本类测的不是滑块：发码、密码登录的滑块由 CaptchaFlowTest 负责
         "solvela.app.captcha.send-code=false",
         "solvela.app.captcha.password-login=false",
+        // 本类测的也不是限流：同一个 127.0.0.1 连续注册、登录几十次必然被挡。限流在 solvela.app.ratelimit 包里单独测
+        "solvela.app.rate-limit.enabled=false",
 })
 class ApiContractTest {
 

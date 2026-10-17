@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -65,6 +67,7 @@ public class DeviceController {
      */
     @Anonymous
     @DeviceExempt
+    @RateLimit(value = RateLimitScene.EXEMPT, reason = "领设备令牌：日配额在业务域（同 IP 一天 10 块）；限住它会让设备维度失效、所有维度退化成只剩 IP")
     @PostMapping("/register")
     public DeviceRegisterView register(@RequestBody @Valid DeviceRegisterRequest request,
                                        HttpServletRequest servletRequest, HttpServletResponse servletResponse) {

@@ -32,6 +32,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final DeviceRequirementInterceptor deviceRequirementInterceptor;
 
+    private final solvela.app.ratelimit.RateLimitInterceptor rateLimitInterceptor;
+
     private final AuthorizationInterceptor authorizationInterceptor;
 
     private final StepUpInterceptor stepUpInterceptor;
@@ -47,6 +49,12 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(deviceRequirementInterceptor)
                 .addPathPatterns("/**")
                 // 同下：/error 必须放行，否则 404 会变成 401
+                .excludePathPatterns("/error");
+
+        // 限流排在「要不要登录」之前：没带登录态去打要登录的接口，照样按 IP、设备数。
+        // 认证过滤器已经跑过，所以已登录的请求在这里就能按会员号数（docs/架构/网关阶梯限流-技术方案.md）
+        registry.addInterceptor(rateLimitInterceptor)
+                .addPathPatterns("/**")
                 .excludePathPatterns("/error");
 
         registry.addInterceptor(authorizationInterceptor)

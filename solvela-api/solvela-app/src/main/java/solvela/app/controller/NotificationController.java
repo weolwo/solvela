@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +62,7 @@ public class NotificationController {
      *
      * @param category 分类筛选：SYSTEM / TRADE / MARKETING，不传 = 全部
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public NotificationPageView list(@RequestParam(required = false) String category,
                                      @RequestParam(required = false) Boolean unreadOnly,
@@ -75,6 +78,7 @@ public class NotificationController {
      * <p>「不存在」与「不是你的」给同一个 404：通知 id 是自增的、可枚举，
      * 区分开来等于确认某个 id 存在，而这条信息对攻击者有用、对用户无用。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/{id}")
     public NotificationDetailView detail(@PathVariable Long id) {
         Long memberId = CurrentMember.require().memberId();
@@ -89,6 +93,7 @@ public class NotificationController {
     }
 
     /** 通知全部已读。一次 UPDATE，返回本次标记条数 */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/read-all")
     public int markAllRead() {
         return notificationApi.markAllRead(CurrentMember.require().memberId());
@@ -102,6 +107,7 @@ public class NotificationController {
      * @param lastId 上一页最后一条的 id，首页不传。用游标翻页而不是页码 ——
      *               公告会持续新增，页码分页在第 2 页会重复看到被挤下来的那一条
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/announcement")
     public List<AnnouncementView> announcements(@RequestParam(required = false) Long lastId,
                                                 @RequestParam(required = false) Integer limit) {
@@ -115,12 +121,14 @@ public class NotificationController {
      * 前端把公告和通知分成两个 tab 正是这条语义成立的前提 ——
      * 两种已读行为各待在自己的列表里，用户不会在同一个列表里看到两种规则。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/announcement/{id}/read")
     public void readAnnouncement(@PathVariable Long id) {
         notificationApi.readAnnouncement(id, CurrentMember.require().memberId());
     }
 
     /** 公告全部已读 */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/announcement/read-all")
     public void readAllAnnouncements() {
         notificationApi.readAllAnnouncements(CurrentMember.require().memberId());
@@ -132,6 +140,7 @@ public class NotificationController {
      * <p>返回非空就弹窗，用户点了「我已阅读」再调 {@link #ackAnnouncement}。
      * <b>没确认就一直返回</b> —— 这个机制自带催办。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/announcement/pending-ack")
     public List<AnnouncementView> pendingAck() {
         return notificationApi.pendingAck(CurrentMember.require().memberId());
@@ -143,6 +152,7 @@ public class NotificationController {
      * <p>IP 由<b>服务端从请求里取</b>，不收客户端传的 —— 合规留痕的字段
      * 让被记录方自己填，那条记录就一文不值了。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/announcement/{id}/ack")
     public void ackAnnouncement(@PathVariable Long id, HttpServletRequest request) {
         notificationApi.ackAnnouncement(id, CurrentMember.require().memberId(), ClientIp.of(request));
@@ -151,17 +161,20 @@ public class NotificationController {
     // ------------------------------------------------------------------ 红点与设置
 
     /** 入口总红点 = 通知未读 + 公告未读，在服务端加好。口径见 {@link UnreadCounter} */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/unread-count")
     public long unreadCount() {
         return unreadCounter.count(CurrentMember.require().memberId());
     }
 
     /** 免打扰设置。注意<b>没有</b>系统通知开关 —— 那一类关不掉 */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/preference")
     public NotificationPreferenceView preference() {
         return notificationApi.preference(CurrentMember.require().memberId());
     }
 
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/preference")
     public void savePreference(@RequestParam boolean tradeEnabled,
                                @RequestParam boolean marketingEnabled) {

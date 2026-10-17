@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,7 @@ public class DeliveryController {
      * <p>没有就返回空数组，不是 404。
      */
     @Operation(summary = "我的实物奖品（含中奖与商城兑换）")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<MemberDeliveryView> listMine() {
         return deliveryApi.listMine(CurrentMember.require().memberId(), DEFAULT_LIMIT);
@@ -77,6 +80,7 @@ public class DeliveryController {
      * 用户要寄到新地址，先去地址簿加一条。
      */
     @Operation(summary = "用地址簿里的地址补填收货信息")
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/{deliveryId}/address")
     public MallDeliveryFillResult fillAddress(@PathVariable Long deliveryId,
                                               @RequestParam Long addressId) {

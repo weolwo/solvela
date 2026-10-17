@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,7 @@ public class GradeController {
      * 「你还没开始」和「查不到」对用户是两件事，而这个页面正是要对新人说前一句。
      */
     @Operation(summary = "我的等级：当前档位、成长值、距下一档、保级状态与完整阶梯")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public MemberGradeView myGrade() {
         return memberGradeApi.myGrade(CurrentMember.require().memberId());
@@ -58,6 +61,7 @@ public class GradeController {
      * 用户第一反应是系统算错了。把「100 × 2」摆出来，那条加速规则才真的被感知到。
      */
     @Operation(summary = "我的成长值明细，新的在前")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/growthLog")
     public List<GradeGrowthLogView> myGrowthLog(
             @RequestParam(required = false, defaultValue = "" + DEFAULT_LOG_LIMIT) int limit) {

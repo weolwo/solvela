@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ public class CaptchaController {
 
     /** 取一张图。答案不下发 */
     @Anonymous
+    @RateLimit(RateLimitScene.CAPTCHA)
     @PostMapping
     public CaptchaService.Challenge create(HttpServletRequest request) {
         return captchaService.create(ClientIp.of(request));
@@ -43,6 +46,7 @@ public class CaptchaController {
      *             x 是拼图左边缘在<b>原图坐标</b>里的位置，track 是拖动轨迹（见 {@link solvela.app.captcha.TrackChecker}）
      */
     @Anonymous
+    @RateLimit(RateLimitScene.CAPTCHA)
     @PostMapping("/verify")
     public PassView verify(@RequestBody VerifyRequest body) {
         String pass = captchaService.verify(body.captchaId(), body.x(), body.track());

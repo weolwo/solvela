@@ -25,6 +25,11 @@ public final class SecurityKeys {
         return "rl:c:" + target + ":" + dimension + ":" + value;
     }
 
+    /** 限流长窗口（1h / 1d）计数：{@code rl:l:{规则目标}:{维度}:{值}}。与 10 分钟内的计数分开存，桶的粒度不同 */
+    public static String rateLimitLongCounter(String target, int dimension, String value) {
+        return "rl:l:" + target + ":" + dimension + ":" + value;
+    }
+
     /** 限流处罚（档位 + 到期）：{@code rl:p:{规则目标}:{维度}:{值}} */
     public static String rateLimitPenalty(String target, int dimension, String value) {
         return "rl:p:" + target + ":" + dimension + ":" + value;

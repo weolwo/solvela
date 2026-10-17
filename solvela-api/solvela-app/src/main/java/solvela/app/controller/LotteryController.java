@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +66,7 @@ public class LotteryController {
      */
     @Anonymous
     @Operation(summary = "彩票当前期号（匿名可看）")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/{lotteryCode}/issue")
     public LotteryIssueView getIssue(@PathVariable String lotteryCode) {
         return activityApi.getLotteryIssue(lotteryCode, CurrentMember.memberIdOrNull());
@@ -80,6 +83,7 @@ public class LotteryController {
      */
     @Anonymous
     @Operation(summary = "彩票活动页数据（匿名可看）")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/board/{activityCode}")
     public LotteryBoardView getBoard(@PathVariable String activityCode) {
         return activityApi.getLotteryBoard(activityCode, CurrentMember.memberIdOrNull());
@@ -98,6 +102,7 @@ public class LotteryController {
      * 网关这一侧一次请求一个新值，防的是<b>网络重试</b>，那正是它该防的。
      */
     @Operation(summary = "参与彩票活动，领一个号码")
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/{activityCode}/obtain")
     public LotteryObtainResult obtain(@PathVariable String activityCode) {
         return activityApi.obtainLotteryTicket(new ActivityDrawCmd(
@@ -112,6 +117,7 @@ public class LotteryController {
      * 用户点进来最想知道的是「我中了没有」。这个口径由服务端的 SQL 保证。
      */
     @Operation(summary = "我的彩票号码（中奖的排在最前）")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/ticket/mine")
     public List<LotteryTicketView> listMyTickets() {
         return activityApi.getMyLotteryTickets(CurrentMember.require().memberId(), MY_TICKET_LIMIT);

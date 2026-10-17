@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -84,6 +86,7 @@ public class MemberLoginController {
      * 它只是提供了另一条已验证的入口。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.REGISTER)
     @PostMapping("/register")
     public MemberResult register(@RequestBody @Valid MemberRegisterRequest request,
                                  HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
@@ -103,6 +106,7 @@ public class MemberLoginController {
      * 「已发送」「该邮箱未注册」这类区分会把它变成账号枚举接口。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.CODE_SEND)
     @PostMapping("/email/code")
     public ResponseEntity<Void> sendEmailCode(@RequestBody @Valid EmailCodeRequest request,
                                               HttpServletRequest servletRequest) {
@@ -123,6 +127,7 @@ public class MemberLoginController {
      * 唯一的保护是域里的 IP 与目标日限（比邮箱紧得多）。改动那两个配置前先想清楚。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.CODE_SEND)
     @PostMapping("/sms/code")
     public ResponseEntity<Void> sendSmsCode(@RequestBody @Valid SmsCodeRequest request,
                                             HttpServletRequest servletRequest) {
@@ -139,6 +144,7 @@ public class MemberLoginController {
      * 就意味着它只能被 HTTP 调用，短信验证码登录、第三方登录、内部工具都没法复用同一段逻辑。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.LOGIN)
     @PostMapping("/login")
     public MemberResult login(@RequestBody @Valid MemberLoginRequest request,
                               HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
@@ -164,6 +170,7 @@ public class MemberLoginController {
      * <p>{@link Anonymous}：此时还没有会话。安全不靠登录态，靠「不知道密码就拿不到票」。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.LOGIN)
     @PostMapping("/login/challenge/code")
     public LoginChallengeCodeView sendChallengeCode(@RequestBody @Valid LoginChallengeRequest request,
                                                     HttpServletRequest servletRequest) {
@@ -175,6 +182,7 @@ public class MemberLoginController {
      * 登录二次验证：凭票验码，通过即登录成功。Web 端同样只经 cookie 下发令牌。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.LOGIN)
     @PostMapping("/login/challenge/verify")
     public MemberResult verifyChallenge(@RequestBody @Valid LoginChallengeRequest request,
                                         HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
@@ -193,6 +201,7 @@ public class MemberLoginController {
      * <p>搬的是<b>同一个</b>令牌，不重新签发：用户不会因为升级而掉线，
      * 「我的登录设备」里也不会凭空多出一条会话。等最后一批旧令牌过期（30 天），本接口可以删掉。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/session/adopt")
     public ResponseEntity<Void> adoptSession(@RequestBody(required = false) SessionAdoptRequest request,
                                              HttpServletRequest servletRequest,
@@ -216,6 +225,7 @@ public class MemberLoginController {
      *
      * <p>返回 204：没有要给客户端的数据。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/email/bind")
     public ResponseEntity<Void> bindEmail(@RequestBody @Valid EmailBindRequest request,
                                           HttpServletRequest servletRequest) {
@@ -229,6 +239,7 @@ public class MemberLoginController {
      * <p>单独一条路由而不是塞进 {@code /auth/me}：那个结果会进网关缓存和日志，
      * 而手机号邮箱是 PII。代价是多一次往返，换的是明文一次都不出域。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @PostMapping("/contact")
     public MemberContactView contact() {
         return memberLoginService.contact(CurrentMember.require().memberId());
@@ -242,6 +253,7 @@ public class MemberLoginController {
      * 而「已在 3 台设备上退出登录」正是他要的那个答案。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.PASSWORD_RESET)
     @PostMapping("/password/reset")
     public PasswordResetView resetPassword(@RequestBody @Valid PasswordResetRequest request,
                                            HttpServletRequest servletRequest) {
@@ -254,6 +266,7 @@ public class MemberLoginController {
      * <p>返回 204：这个操作没有任何要给客户端的数据，
      * 硬造一个 {@code {"msg":"操作成功"}} 只是让客户端多写一次解析。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         MemberPrincipal member = CurrentMember.require();
@@ -274,6 +287,7 @@ public class MemberLoginController {
      * <p>列表里 {@code current=true} 那一条是用户此刻正在用的。必须标出来：
      * 不标的话他很容易把自己这台点下线，然后当场被踢出去。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @PostMapping("/sessions")
     public List<MemberSession> sessions(HttpServletRequest servletRequest) {
         return memberLoginService.listSessions(
@@ -287,6 +301,7 @@ public class MemberLoginController {
      * 用户要的结果是「那台设备下线」，而它本来就不在线时，这个结果已经成立。
      * 为此回一个 404 只会让客户端多写一段没用的分支。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/sessions/revoke")
     public ResponseEntity<Void> revokeSession(@RequestBody @Valid SessionRevokeRequest request,
                                               HttpServletRequest servletRequest) {
@@ -301,6 +316,7 @@ public class MemberLoginController {
      * 而自己不用重新登。做成「全部下线（含自己）」的话，用户会犹豫要不要点 ——
      * 而犹豫的那几分钟里，别人还登着。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/sessions/revokeOthers")
     public ResponseEntity<Void> revokeOtherSessions(HttpServletRequest servletRequest) {
         memberLoginService.revokeOtherSessions(
@@ -318,6 +334,7 @@ public class MemberLoginController {
      *
      * <p>返回 204。客户端收到后应当引导用户去<b>重置密码</b> —— 那是解除冻结的唯一方式。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/sessions/report")
     public ResponseEntity<Void> reportSession(@RequestBody @Valid SessionReportRequest request,
                                               HttpServletRequest servletRequest) {
@@ -337,6 +354,7 @@ public class MemberLoginController {
      * 「当前这台设备不受信任」是最常见的情况（新设备上就不该问），
      * 回一个 403 会让客户端在每次冷启动时都吃一个错误，而那不是错误。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @PostMapping("/security/prompts")
     public List<SecurityPromptView> securityPrompts(HttpServletRequest servletRequest) {
         return memberLoginService.listSecurityPrompts(
@@ -351,6 +369,7 @@ public class MemberLoginController {
      * 客户端拿到结果能做的事只有一件：把这条从列表里去掉，而那件事三种情况下都该做。
      * 🔴 区分出来反而给了一个探测口：拿一堆单号试，看哪个「受理了」。
      */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping("/security/prompts/answer")
     public ResponseEntity<Void> answerSecurityPrompt(@RequestBody @Valid SecurityPromptAnswerRequest request,
                                                      HttpServletRequest servletRequest) {
@@ -362,6 +381,7 @@ public class MemberLoginController {
     /**
      * 取当前登录会员。客户端冷启动时用它确认本地令牌还有效。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @PostMapping("/me")
     public MemberPrincipal me() {
         return CurrentMember.require();

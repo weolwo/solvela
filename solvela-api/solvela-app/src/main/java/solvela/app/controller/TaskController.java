@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,6 +53,7 @@ public class TaskController {
      * 用户不关心「这个任务属于哪场活动」。真需要活动内的任务页时，
      * 契约里那个 {@code getTaskCenter(activityCode, memberId)} 已经在了。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<TaskView> listMyTasks() {
         return taskService.listMyTasks(CurrentMember.require().memberId());
@@ -69,6 +72,7 @@ public class TaskController {
      * 硬要同步返回就得让签到接口去等任务引擎 —— 那等于把那道异步隔离拆了，
      * 任务系统抖一下签到按钮就转圈。端上要看进度，刷新一次任务列表即可。
      */
+    @RateLimit(RateLimitScene.SIGN)
     @PostMapping("/sign")
     public MemberSignResult sign() {
         return memberSignApi.sign(CurrentMember.require().memberId());
@@ -77,6 +81,7 @@ public class TaskController {
     /**
      * 今天签过没有。给按钮状态用 —— 页面进来时问一次，决定按钮是「签到」还是「已签到」。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/sign/today")
     public boolean signedToday() {
         return memberSignApi.signedToday(CurrentMember.require().memberId());

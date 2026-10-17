@@ -1,5 +1,6 @@
 package solvela.app.domain;
 
+import solvela.app.ratelimit.RateLimitAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import solvela.member.api.MemberRegisterType;
@@ -62,7 +63,14 @@ public record MemberRegisterRequest(
         String deviceType,
         @Schema(description = "Web 端传 true：凭证只经 HttpOnly cookie 下发，响应体里不带。"
                 + "App / 自动化测试不传，凭证照旧在响应体里")
-        Boolean useCookie) {
+        Boolean useCookie) implements RateLimitAccount {
+
+    /** 网关限流的账号维度数它（规范化后算 HMAC，不落明文），格式校验仍在会员域 */
+    @Override
+    public String rateLimitAccount() {
+        return identity;
+    }
+
 
     /** 不传时按最早的那条通道兜底 —— 域里也有同样的兜底，两处一致。 */
     public boolean cookieDelivery() {

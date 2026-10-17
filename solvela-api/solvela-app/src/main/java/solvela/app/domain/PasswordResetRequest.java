@@ -1,5 +1,6 @@
 package solvela.app.domain;
 
+import solvela.app.ratelimit.RateLimitAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import solvela.member.api.PasswordResetType;
@@ -28,7 +29,14 @@ public record PasswordResetRequest(
         @NotBlank(message = "请输入验证码") String code,
 
         @Schema(description = "新密码", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入新密码") String newPassword) {
+        @NotBlank(message = "请输入新密码") String newPassword) implements RateLimitAccount {
+
+    /** 网关限流的账号维度数它（规范化后算 HMAC，不落明文），格式校验仍在会员域 */
+    @Override
+    public String rateLimitAccount() {
+        return identity;
+    }
+
 
     /** 不传时按最早的那条通道兜底 —— 域里也有同样的兜底，两处一致。 */
     public PasswordResetType typeOrDefault() {

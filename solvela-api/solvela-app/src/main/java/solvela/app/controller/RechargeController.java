@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +62,7 @@ public class RechargeController {
      * <p>🔴 场景关着时 {@code enabled = false}，端上要<b>如实显示「暂未开放」</b>，
      * 不要把入口藏起来 —— 藏起来用户会以为是自己的问题。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/options")
     public RechargeOptionsView options() {
         return rechargeApi.options();
@@ -70,6 +73,7 @@ public class RechargeController {
      *
      * <p>🔴 返回里<b>包含用不了的券和原因</b>，端上要把它们也显示出来（置灰 + 一句原因）。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @PostMapping("/trial")
     public RechargeTrialView trial(@RequestParam BigDecimal amount) {
         return rechargeApi.trial(CurrentMember.require().memberId(), amount);
@@ -77,6 +81,7 @@ public class RechargeController {
 
     /** 下单。抵扣额由服务端重新试算，请求里<b>没有</b>「减多少」这个字段 */
     @StepUpRequired
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/order")
     public RechargeOrderResult create(@RequestBody @Valid RechargeRequest request) {
         RechargeOrderResult result = rechargeApi.create(new RechargeOrderCmd(
@@ -89,6 +94,7 @@ public class RechargeController {
     }
 
     /** 支付并执行。⚠️ 今天两者都是假的，所以是一个动作 */
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/order/{orderNo}/pay")
     public RechargeOrderResult pay(@PathVariable String orderNo) {
         RechargeOrderResult result = rechargeApi.pay(orderNo, CurrentMember.require().memberId());
@@ -99,6 +105,7 @@ public class RechargeController {
     }
 
     /** 我的充值记录，新的在前 */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/order")
     public List<RechargeOrderView> listMyOrders() {
         return rechargeApi.listMyOrders(CurrentMember.require().memberId(), 20);

@@ -61,6 +61,15 @@ spring:
 # ---------------------------------------------------------------------------
 solvela:
   app:
+    rate-limit:
+      # 网关限流（docs/架构/网关阶梯限流-技术方案.md）。阈值、阶梯不在这里 —— 它们在库里、经 Redis 快照下发、后台可改。
+      # 总开关：关掉等于网关不限流，只用于误伤排障时的临时回退
+      enabled: true
+      # 🔴 账号维度计数键的 HMAC 密钥：匿名接口的「账号」是邮箱 / 手机号，不能明文当 Redis 键，
+      #    裸 SHA-256 也不行（手机号能被穷举还原）。不配或短于 32 位启动即失败。
+      #    可以随时换：换了只是账号维度的计数从零开始。同一环境的多个网关实例必须一致。
+      #    生产从环境变量注入：${SOLVELA_APP_RATE_LIMIT_ACCOUNT_KEY}
+      account-key: ${SOLVELA_APP_RATE_LIMIT_ACCOUNT_KEY}
     auth:
       # 只剩「令牌怎么携带」这两件属于端的事。
       header: Authorization

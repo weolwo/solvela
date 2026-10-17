@@ -68,6 +68,8 @@ x-backend-env: &backend-env
   SOLVELA_CRYPTO_PII_HMAC_KEY:   ${SOLVELA_CRYPTO_PII_HMAC_KEY}
   SOLVELA_MEMBER_ID_SECRET_KEY:  ${SOLVELA_MEMBER_ID_SECRET_KEY}
   SOLVELA_AUTH_DEVICE_KEY_V1:    ${SOLVELA_AUTH_DEVICE_KEY_V1}
+  # 网关限流账号维度的计数键 HMAC 密钥（只有网关用；可以随时换，换了只是计数清零）
+  SOLVELA_APP_RATE_LIMIT_ACCOUNT_KEY: ${SOLVELA_APP_RATE_LIMIT_ACCOUNT_KEY}
 
   # ---- 发信 ----
   # ⚠️ Cloudflare Email Routing 只能【收】信，发信要单独的 SMTP 服务商。

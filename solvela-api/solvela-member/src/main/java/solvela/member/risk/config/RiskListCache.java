@@ -1,5 +1,6 @@
 package solvela.member.risk.config;
 
+import solvela.security.IpRange;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;

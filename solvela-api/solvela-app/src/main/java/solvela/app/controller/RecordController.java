@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +37,7 @@ public class RecordController {
      * @param activityCode 只看这一个活动的，<b>不传表示全部</b>。
      *                     活动专题页传它，「我的」页不传
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/prize")
     public List<RecordView> listPrizeRecords(@RequestParam(required = false) String activityCode) {
         return recordService.listPrizeRecords(CurrentMember.require().memberId(), activityCode);
@@ -46,6 +49,7 @@ public class RecordController {
      * <p>底层是提案记录。<b>「提案」是运营视角的词，不出现在 C 端任何地方</b> ——
      * 用户不需要知道他的奖励要过两道审批。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/promo")
     public List<RecordView> listPromoRecords() {
         return recordService.listPromoRecords(CurrentMember.require().memberId());

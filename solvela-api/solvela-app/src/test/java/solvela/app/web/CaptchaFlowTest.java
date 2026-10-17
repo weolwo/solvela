@@ -50,6 +50,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(CookieSessionStub.class)
+// 本类测的是滑块流程，不是网关限流：连续出图、判题会撞上 CAPTCHA 场景的阈值。限流在 solvela.app.ratelimit 包里单独测
+@org.springframework.test.context.TestPropertySource(properties = "solvela.app.rate-limit.enabled=false")
 class CaptchaFlowTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();

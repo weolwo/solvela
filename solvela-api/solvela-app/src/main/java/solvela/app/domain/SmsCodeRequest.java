@@ -1,5 +1,6 @@
 package solvela.app.domain;
 
+import solvela.app.ratelimit.RateLimitAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,5 +24,12 @@ public record SmsCodeRequest(
         @NotNull(message = "请指定验证码用途") SmsScene scene,
 
         @Schema(description = "手机号", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入手机号") String phone) {
+        @NotBlank(message = "请输入手机号") String phone) implements RateLimitAccount {
+
+    /** 网关限流的账号维度数它（规范化后算 HMAC，不落明文），格式校验仍在会员域 */
+    @Override
+    public String rateLimitAccount() {
+        return phone;
+    }
+
 }

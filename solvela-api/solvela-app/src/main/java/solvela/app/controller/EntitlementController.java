@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,7 @@ public class EntitlementController {
      * 看不见了，会以为「刚才那个东西没了」。
      */
     @Operation(summary = "我的权益：待领取在前，已领取与已过期也一并返回")
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<MemberEntitlementView> mine() {
         return memberEntitlementApi.mine(CurrentMember.require().memberId(), DEFAULT_LIMIT);
@@ -60,6 +63,7 @@ public class EntitlementController {
      * 而不是返回一个「失败」的成功响应 —— 后者会让端上以为自己要自己判。
      */
     @Operation(summary = "领取一份待领取的权益，返回领到的东西叫什么")
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/{grantId}/claim")
     public EntitlementClaimResult claim(@PathVariable Long grantId) {
         return memberEntitlementApi.claim(CurrentMember.require().memberId(), grantId);

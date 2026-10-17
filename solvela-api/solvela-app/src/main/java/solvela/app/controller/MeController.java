@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +67,7 @@ public class MeController {
                                 Long favorites, DeliverySummaryView deliveries) {
     }
 
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/summary")
     public MeSummaryView summary() {
         Long memberId = CurrentMember.require().memberId();

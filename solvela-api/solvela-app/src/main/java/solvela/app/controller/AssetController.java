@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +36,7 @@ public class AssetController {
      * 我的全部资产。没有任何钱包记录时返回<b>空数组</b> ——
      * 新注册、还没拿过奖励的用户就是这个状态，它是正常的，不是 404。
      */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<AssetView> listAssets() {
         return assetService.listAssets(CurrentMember.require().memberId());

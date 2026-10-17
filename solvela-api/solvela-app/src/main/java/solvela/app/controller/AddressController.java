@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,11 +47,13 @@ public class AddressController {
     private final MallApi mallApi;
 
     /** 我的地址，<b>默认那条排最前</b>。手机号是脱敏值（138****8000） */
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<MallAddressView> list() {
         return mallApi.listAddresses(CurrentMember.require().memberId());
     }
 
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/{addressId}")
     public MallAddressView get(@PathVariable Long addressId) {
         MallAddressView view = mallApi.getAddress(addressId, CurrentMember.require().memberId());
@@ -61,6 +65,7 @@ public class AddressController {
 
     /** 新增。<b>第一条自动成为默认</b> */
     @StepUpRequired
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PostMapping
     public MallAddressView create(@RequestBody @Valid AddressRequest request) {
         return mallApi.createAddress(toCmd(request));
@@ -73,6 +78,7 @@ public class AddressController {
      * 端上不该把 {@code 138****8000} 回填给用户改，一提交就把星号存进库了。
      */
     @StepUpRequired
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PutMapping("/{addressId}")
     public MallAddressView update(@PathVariable Long addressId,
                                   @RequestBody @Valid AddressRequest request) {
@@ -80,12 +86,14 @@ public class AddressController {
     }
 
     /** 删除。删掉默认那条时服务端会把剩下的第一条置默认 */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @DeleteMapping("/{addressId}")
     public void delete(@PathVariable Long addressId) {
         mallApi.deleteAddress(addressId, CurrentMember.require().memberId());
     }
 
     /** 设为默认。服务端一个事务做完「旧的取消 + 新的置上」 */
+    @RateLimit(RateLimitScene.DEFAULT_WRITE)
     @PutMapping("/{addressId}/default")
     public void setDefault(@PathVariable Long addressId) {
         mallApi.setDefaultAddress(addressId, CurrentMember.require().memberId());

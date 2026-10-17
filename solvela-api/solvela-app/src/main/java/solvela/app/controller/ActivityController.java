@@ -1,5 +1,7 @@
 package solvela.app.controller;
 
+import solvela.app.ratelimit.RateLimit;
+import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -53,12 +55,14 @@ public class ActivityController {
      * 参与那一步（抽奖）再要求登录。
      */
     @Anonymous
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping
     public List<PromoView> listOpen() {
         return activityService.listOpen();
     }
 
     @Anonymous
+    @RateLimit(RateLimitScene.DEFAULT_READ)
     @GetMapping("/{activityCode}")
     public ActivityView getActivity(@PathVariable String activityCode) {
         return activityService.getActivity(activityCode);
@@ -73,6 +77,7 @@ public class ActivityController {
      * <p>幂等键由客户端生成（一次点击一个）。它不是可选的：
      * 网络超时不代表没抽，没有它就只能在「可能重复发奖」和「可能白扣一次机会」之间选一个。
      */
+    @RateLimit(RateLimitScene.REDEEM)
     @PostMapping("/{activityCode}/draw")
     public DrawView draw(@PathVariable String activityCode, @RequestBody @Valid DrawRequest request) {
         return activityService.draw(activityCode, CurrentMember.require().memberId(), request);
