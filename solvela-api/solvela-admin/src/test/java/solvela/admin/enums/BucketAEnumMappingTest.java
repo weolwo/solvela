@@ -19,9 +19,14 @@ import solvela.admin.module.system.loginlog.domain.LoginLogVO;
 import solvela.enums.LoginLogResultEnum;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -77,7 +82,7 @@ class BucketAEnumMappingTest {
             assertNotNull(vo.getStatus(), "VO.status 是 null —— resultType 没走到枚举 TypeHandler");
         }
 
-        int sum = 0;
+        List<Long> bucketed = new ArrayList<>();
         for (SolvelaJobExecuteStatusEnum status : SolvelaJobExecuteStatusEnum.values()) {
             SolvelaJobLogQueryForm form = new SolvelaJobLogQueryForm();
             form.setStatus(status);
@@ -85,11 +90,11 @@ class BucketAEnumMappingTest {
             for (SolvelaJobLogVO vo : hit) {
                 assertTrue(status == vo.getStatus(),
                         "按 " + status + " 查询却查出了 " + vo.getStatus() + "，条件没有正确下推");
+                bucketed.add(vo.getLogId());
             }
-            sum += hit.size();
         }
-        assertEquals(all.size(), sum,
-                "按各状态分别查询的总数与不带条件的总数对不上，说明有行的 status 落在枚举之外");
+        assertPartitioned(all.stream().map(SolvelaJobLogVO::getLogId).toList(), bucketed,
+                id -> jobLogDao.selectById(id) != null, "t_solvela_job_log", "status");
     }
 
     @Test
@@ -119,7 +124,7 @@ class BucketAEnumMappingTest {
             assertNotNull(vo.getUserType(), "VO.userType 是 null");
         }
 
-        int sum = 0;
+        List<Long> bucketed = new ArrayList<>();
         for (UserTypeEnum userType : UserTypeEnum.values()) {
             LoginLogQueryForm form = new LoginLogQueryForm();
             form.setUserType(userType);
@@ -127,10 +132,11 @@ class BucketAEnumMappingTest {
             for (LoginLogVO vo : hit) {
                 assertTrue(userType == vo.getUserType(),
                         "按 " + userType + " 查询却查出了 " + vo.getUserType());
+                bucketed.add(vo.getLoginLogId());
             }
-            sum += hit.size();
         }
-        assertEquals(all.size(), sum, "分类型查询的总数与总量对不上");
+        assertPartitioned(all.stream().map(LoginLogVO::getLoginLogId).toList(), bucketed,
+                id -> loginLogDao.selectById(id) != null, "t_login_log", "user_type");
     }
 
     @Test
@@ -149,6 +155,39 @@ class BucketAEnumMappingTest {
         long fail = all.stream().filter(v -> v.getLoginResult() == LoginLogResultEnum.LOGIN_FAIL).count();
         assertTrue(success > fail,
                 "登录成功(" + success + ") 居然不比失败(" + fail + ") 多 —— 0/1 口径多半被改反了");
+    }
+
+    // ------------------------------------------------------------ 按 id 对齐
+
+    /**
+     * 「不带条件查出的每一行，都恰好落进某一个取值的桶里」。
+     *
+     * <h3>🔴 为什么按 id 对齐，不比总数</h3>
+     * 这几次查询不在同一个时刻：两张都是日志表，定时任务和并行跑的其它模块的测试随时在写
+     * （全量 {@code mvn -T 1C test} 时尤其如此）。先查全量、再逐个取值查，中间插进来的新行会进桶却不在全量里，
+     * 于是总数比较报 {@code expected: <4930> but was: <4932>}，而报的原因「有行落在枚举之外」根本不存在。
+     *
+     * <p>按 id 对齐之后：中间<b>新插进来</b>的行不在全量里，直接忽略；中间<b>被删掉</b>的行（日志清理任务）
+     * 再查一次确认确实没了，也不算数。剩下的「全量里有、哪个桶都没有」才真的是取值落在枚举之外。
+     */
+    private static void assertPartitioned(List<Long> allIds, List<Long> bucketedIds,
+                                          Predicate<Long> stillExists, String table, String column) {
+        Set<Long> all = new HashSet<>(allIds);
+        Map<Long, Integer> seen = new HashMap<>();
+        for (Long id : bucketedIds) {
+            if (all.contains(id)) {
+                seen.merge(id, 1, Integer::sum);
+            }
+        }
+        List<Long> duplicated = seen.entrySet().stream().filter(e -> e.getValue() > 1).map(Map.Entry::getKey).toList();
+        assertTrue(duplicated.isEmpty(), table + " 有行同时落进了多个 " + column + " 桶：" + firstFew(duplicated));
+
+        List<Long> missing = all.stream().filter(id -> !seen.containsKey(id)).filter(stillExists).toList();
+        assertTrue(missing.isEmpty(), table + " 有行的 " + column + " 落在枚举之外（哪个取值都查不到它）：" + firstFew(missing));
+    }
+
+    private static String firstFew(List<Long> ids) {
+        return ids.size() <= 10 ? ids.toString() : ids.subList(0, 10) + " 等 " + ids.size() + " 行";
     }
 
     // ------------------------------------------------------------ 分页大小
@@ -173,7 +212,7 @@ class BucketAEnumMappingTest {
      * 报的是 {@code expected: <1000> but was: <1001>} —— 1000 正是那个页大小。
      *
      * <p>所以页大小必须<b>跟着表走</b>。多给 100 是留给「取行数与真正查询之间又插进来几行」
-     * 的余量：这两张都是日志表，定时任务随时在写。
+     * 的余量：这两张都是日志表，定时任务随时在写。插进来的行本身不影响结论，见 {@link #assertPartitioned}。
      */
     private static int pageCovering(Long total, String table) {
         assertNotNull(total, table + " 的行数查不出来");
