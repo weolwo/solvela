@@ -5,6 +5,7 @@ import org.springframework.http.server.PathContainer;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PatternParseException;
 import org.springframework.web.util.pattern.PathPatternParser;
+import solvela.security.KeywordRules;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -20,7 +21,8 @@ import java.util.regex.Pattern;
  * {"ban":"24h", "breaker":{"window":"10m","distinctIps":50},
  *  "honeypotPaths":[{"code":"ENV","path":"/.env","enabled":true}, ...], ...}
  * }</pre>
- * 其余字段（黑到期转灰、同段连坐、关键字）由各自的任务解释，这里不认识的一律忽略。
+ * 关键字规则：{@code "keywords":[{"code":"SQL_SLEEP","scope":"PARAM","pattern":"...","enabled":true}]}。
+ * 其余字段（黑到期转灰、同段连坐）由各自的任务解释，这里不认识的一律忽略。
  *
  * <h3>解不开就退回默认值，不是「不设防」</h3>
  * 单条蜜罐路径写坏了只丢那一条并 WARN；整段 JSON 坏了用默认参数、<b>没有蜜罐</b> ——
@@ -33,9 +35,9 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breakerDistinctIps,
-                          List<Honeypot> honeypots) {
+                          List<Honeypot> honeypots, List<KeywordRules.Rule> keywords) {
 
-    static final SecurityGateConfig DEFAULTS = new SecurityGateConfig(86400, 600, 50, List.of());
+    static final SecurityGateConfig DEFAULTS = new SecurityGateConfig(86400, 600, 50, List.of(), List.of());
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -67,7 +69,8 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
         JsonNode distinct = breaker.get("distinctIps");
         int distinctIps = distinct != null && distinct.canConvertToInt() && distinct.asInt() > 0
                 ? distinct.asInt() : DEFAULTS.breakerDistinctIps;
-        return new SecurityGateConfig(ban, window, distinctIps, parseHoneypots(root.get("honeypotPaths")));
+        return new SecurityGateConfig(ban, window, distinctIps, parseHoneypots(root.get("honeypotPaths")),
+                parseKeywords(root.get("keywords")));
     }
 
     /** 请求路径命中的蜜罐；没命中为 null */
@@ -116,7 +119,7 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
     /** 去掉某几条之后的配置（运行中加载到与路由重叠的蜜罐时用） */
     SecurityGateConfig without(Collection<Honeypot> removed) {
         List<Honeypot> kept = honeypots.stream().filter(h -> !removed.contains(h)).toList();
-        return new SecurityGateConfig(banSeconds, breakerWindowSeconds, breakerDistinctIps, kept);
+        return new SecurityGateConfig(banSeconds, breakerWindowSeconds, breakerDistinctIps, kept, keywords);
     }
 
     /** 模板 → 一个能被它匹配的具体路径：变量与通配符各换成一段 {@code x} */
@@ -143,6 +146,29 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
                 result.add(new Honeypot(code, path, PathPatternParser.defaultInstance.parse(path)));
             } catch (PatternParseException e) {
                 log.warn("【安全闸】蜜罐路径解不开，忽略: {}", item);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * 关键字规则。🔴 编译时过反例集（{@link KeywordRules#compile}），过不了的丢掉并告警 ——
+     * 后台保存时已经校验过；走到这里还过不了，说明有人绕过后台直接改了库。
+     */
+    private static List<KeywordRules.Rule> parseKeywords(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
+        List<KeywordRules.Rule> result = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (!item.path("enabled").asBoolean(true)) {
+                continue;
+            }
+            try {
+                result.add(KeywordRules.compile(item.path("code").asString(null), item.path("scope").asString(null),
+                        item.path("pattern").asString(null)));
+            } catch (IllegalArgumentException e) {
+                log.error("【告警】【安全闸】关键字规则不启用: {}", e.getMessage());
             }
         }
         return List.copyOf(result);

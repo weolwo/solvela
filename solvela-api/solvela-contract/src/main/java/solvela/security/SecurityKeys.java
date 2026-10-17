@@ -56,6 +56,11 @@ public final class SecurityKeys {
      */
     public static final String HONEYPOT_BREAKER = "sec:hp:breaker";
 
+    /** 关键字熔断：同上，每条规则各一个 —— 一条写宽了的规则熔断，不该连累别的规则 */
+    public static String keywordBreaker(String ruleCode) {
+        return "sec:kw:breaker:" + ruleCode;
+    }
+
     /**
      * 被封禁的设备号集合。<b>真相源是 {@code t_device.status}</b>，这里只是镜像：
      * 会员域在封禁 / 解封时同步，并有定时任务按库全量重建。

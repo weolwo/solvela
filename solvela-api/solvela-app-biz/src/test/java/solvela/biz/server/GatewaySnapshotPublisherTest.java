@@ -11,6 +11,7 @@ import solvela.base.json.JsonUtils;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
 import solvela.enums.SecurityListDimensionEnum;
+import solvela.exception.BusinessException;
 import solvela.enums.SecurityListTypeEnum;
 import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
@@ -144,6 +145,23 @@ class GatewaySnapshotPublisherTest {
         } finally {
             configService.updateValueByKey(ConfigKeyEnum.GATEWAY_SECURITY_GATE, original);
         }
+    }
+
+    @Test
+    @DisplayName("🔴 关键字规则命中反例集 → 后台存不进去（停用的也不行），库里与快照里都还是原样")
+    void wideKeywordRuleRejected() {
+        String original = configService.getConfigValue(ConfigKeyEnum.GATEWAY_SECURITY_GATE);
+        String wide = original.replace("\"keywords\":[",
+                "\"keywords\":[{\"code\":\"OR_PAREN\",\"scope\":\"PARAM\",\"pattern\":\"\\\\bor\\\\s*\\\\(\",\"enabled\":false},");
+        assertNotEquals(original, wide, "造数：种子里应有 keywords 数组");
+
+        BusinessException e = assertThrows(BusinessException.class,
+                () -> configService.updateValueByKey(ConfigKeyEnum.GATEWAY_SECURITY_GATE, wide));
+
+        assertTrue(e.getMessage().contains("Tea or (coffee)"), "消息要说清楚命中了哪条正常输入：" + e.getMessage());
+        assertEquals(original, configService.getConfigValue(ConfigKeyEnum.GATEWAY_SECURITY_GATE));
+        assertEquals(original, jdbcTemplate.queryForObject(
+                "SELECT config_value FROM t_config WHERE config_key = 'gateway_security_gate'", String.class));
     }
 
     private List<String> snapshotIps() {

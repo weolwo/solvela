@@ -19,6 +19,7 @@ import solvela.auth.device.DeviceIdentity;
 import solvela.auth.device.DeviceTokenCodec;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
+import solvela.security.KeywordRules;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -75,6 +76,9 @@ class SecurityGateFilterTest {
     @AfterEach
     void tearDown() {
         touched.add(snapshotKey);
+        if (breakerKey != null) {
+            touched.addAll(redis.keys(breakerKey + "*"));
+        }
         redis.delete(touched);
         if (!bannedDevices.isEmpty()) {
             redis.opsForSet().remove(SecurityKeys.BANNED_DEVICES, bannedDevices.toArray());
@@ -224,8 +228,8 @@ class SecurityGateFilterTest {
         SecurityGateFilter gate = honeypotGate(50);
 
         assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.git/config", trackedIp(), null, "none", null));
-        assertEquals(SecurityGateFilter.Trap.NOT_A_HONEYPOT, gate.trap("/disabled", trackedIp(), null, null, null));
-        assertEquals(SecurityGateFilter.Trap.NOT_A_HONEYPOT, gate.trap("/auth/login", trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.MISS, gate.trap("/disabled", trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.MISS, gate.trap("/auth/login", trackedIp(), null, null, null));
     }
 
     @Test
@@ -274,7 +278,7 @@ class SecurityGateFilterTest {
                 {"code":"LOGIN","path":"/auth/login","enabled":true}""");
         SecurityGateFilter withRoutes = new SecurityGateFilter(redis, holder(List.of(), json), null, mapping, breakerKey());
         assertThrows(IllegalStateException.class, withRoutes::verifyHoneypotsAtStartup);
-        assertEquals(SecurityGateFilter.Trap.NOT_A_HONEYPOT, withRoutes.trap("/auth/login", trackedIp(), null, null, null),
+        assertEquals(SecurityGateFilter.Trap.MISS, withRoutes.trap("/auth/login", trackedIp(), null, null, null),
                 "真实登录接口被当成蜜罐的话，所有人一登录就被封 24 小时");
     }
 
@@ -294,6 +298,116 @@ class SecurityGateFilterTest {
         assertEquals(withoutTrace(missing.getResponse().getContentAsString()),
                 withoutTrace(honeypot.getResponse().getContentAsString()));
         assertEquals(429, mvc.perform(get("/.env").header("X-Forwarded-For", ip)).andReturn().getResponse().getStatus());
+    }
+
+    // ------------------------------------------------------------------ 关键字
+
+    @Test
+    @DisplayName("🔴 种子里的关键字规则全部过得了反例集，一条都没被丢掉")
+    void seededKeywordsAllLoad() {
+        String seeded = new RuleSnapshotHolder(redis, "test:none:" + UUID.randomUUID(), "x").current()
+                .configs().get("gateway_security_gate");
+        assertEquals(13, SecurityGateConfig.parse(seeded).keywords().size());
+    }
+
+    @Test
+    @DisplayName("扫路径、查询串（解码一次）、JSON 请求体的值、UA；🔴 密码与验证码字段里写什么都不触发")
+    void scanLocations() {
+        List<KeywordRules.Rule> rules = SecurityGateConfig.parse(new RuleSnapshotHolder(redis,
+                "test:none:" + UUID.randomUUID(), "x").current().configs().get("gateway_security_gate")).keywords();
+
+        assertEquals("query.id", SecurityGateFilter.scan(rules, "/goods", "id=1%20union%20select%20null,2", null, null).location());
+        assertEquals("path", SecurityGateFilter.scan(rules, "/file/..%2F..%2Fetc%2Fpasswd", null, null, null).location());
+        assertEquals("body.nickname", SecurityGateFilter.scan(rules, "/member", null,
+                bytes("{\"nickname\":\"x' or 1=1\"}"), null).location());
+        assertEquals("body.items[1].name", SecurityGateFilter.scan(rules, "/order", null,
+                bytes("{\"items\":[{\"name\":\"ok\"},{\"name\":\"<script>alert(1)</script>\"}]}"), null).location());
+        assertEquals("ua", SecurityGateFilter.scan(rules, "/", null, null, "sqlmap/1.8#stable").location());
+
+        assertNull(SecurityGateFilter.scan(rules, "/auth/login", "code=1%27%20or%201%3D1", bytes(
+                "{\"identity\":\"a@b.com\",\"credential\":\"x' or 1=1\",\"newPassword\":\"sleep(5)\",\"code\":\"' or 1=1\"}"),
+                "curl/8.5.0"), "密码与验证码字段不扫；curl 不是扫描器");
+        assertNull(SecurityGateFilter.scan(rules, "/goods/search", "q=Floor(%E8%90%BD%E5%9C%B0%E7%81%AF)",
+                bytes("{\"nickname\":\"Doctor(医生)\",\"address\":\"解放路100号(东门)\"}"), null));
+    }
+
+    @Test
+    @DisplayName("🔴 写宽了的规则存不进去：裸的 or( 会命中「Tea or (coffee)」；会指数回溯的正则在乱按键盘的输入上超时")
+    void counterexamplesRejectWideRules() {
+        IllegalArgumentException wide = assertThrows(IllegalArgumentException.class,
+                () -> KeywordRules.compile("OR_PAREN", "PARAM", "\\bor\\s*\\("));
+        assertTrue(wide.getMessage().contains("Tea or (coffee)"), wide.getMessage());
+        // 本 JDK 对 (a+)+$ 这类经典写法已有优化，换一个仍会指数回溯的
+        IllegalArgumentException slow = assertThrows(IllegalArgumentException.class,
+                () -> KeywordRules.compile("SLOW", "PARAM", "(.*a){25}x"));
+        assertTrue(slow.getMessage().contains("太慢"), slow.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> KeywordRules.compile("CURL", "UA", "curl"),
+                "curl 不是扫描器");
+        assertThrows(IllegalArgumentException.class, () -> KeywordRules.compile("bad code", "PARAM", "x"));
+    }
+
+    @Test
+    @DisplayName("关键字命中 → IP 与设备罚 24 小时；路径与查询串上的跨站命中拒绝但不罚；请求体上的不看跨站")
+    void keywordPenalties() {
+        SecurityGateFilter gate = keywordGate(50);
+        String ip = trackedIp();
+        String device = newDeviceId();
+        track(SecurityKeys.securityPenaltyDevice(device));
+        KeywordRules.Hit inQuery = new KeywordRules.Hit("SQL_TAUTOLOGY", "query.id", "' or 1=1");
+        KeywordRules.Hit inBody = new KeywordRules.Hit("SQL_TAUTOLOGY", "body.nickname", "' or 1=1");
+
+        String crossSite = trackedIp();
+        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, gate.keyword(inQuery, crossSite, null, "cross-site", null));
+        assertNull(gate.check(crossSite, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(inBody, trackedIp(), null, "cross-site", null),
+                "JSON 请求体从别的网站发不过来，Sec-Fetch-Site 说什么都不算数");
+
+        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(inQuery, ip, newDevice(device), null, null));
+        assertNotNull(gate.check(ip, null));
+        assertNotNull(gate(List.of()).check(trackedIp(), oldDevice(device)));
+    }
+
+    @Test
+    @DisplayName("🔴 每条规则各自熔断，熔断时放行（那时挡下的多半是真人）；别的规则不受连累")
+    void keywordBreakerPerRule() {
+        SecurityGateFilter gate = keywordGate(2);
+        KeywordRules.Hit hit = new KeywordRules.Hit("SQL_TAUTOLOGY", "body.nickname", "' or 1=1");
+
+        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(hit, trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(hit, trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.BREAKER_OPEN, gate.keyword(hit, trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED,
+                gate.keyword(new KeywordRules.Hit("XSS_SCRIPT", "body.nickname", "<script"), trackedIp(), null, null, null));
+    }
+
+    @Test
+    @DisplayName("🔴 关键字命中的回答与参数校验失败逐字相同（除了链路 id）；之后的请求 429；干净的请求体 Controller 照样读得到")
+    void keywordLooksLikeBadRequest() throws Exception {
+        SecurityGateFilter gate = keywordGate(50);
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
+                .addFilters(context.getBean(solvela.app.auth.DeviceFilter.class), gate).build();
+        String ip = trackedIp();
+
+        MvcResult probe = mvc.perform(post("/auth/login").header("X-Forwarded-For", ip)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"loginType\":\"EMAIL_PASSWORD\",\"identity\":\"a@b.com' or 1=1 -- \",\"credential\":\"x\"}"))
+                .andReturn();
+        MvcResult malformed = mvc.perform(post("/auth/login").header("X-Forwarded-For", trackedIp())
+                .contentType(MediaType.APPLICATION_JSON).content("{")).andReturn();
+
+        assertEquals(400, probe.getResponse().getStatus());
+        assertEquals(withoutTrace(malformed.getResponse().getContentAsString()),
+                withoutTrace(probe.getResponse().getContentAsString()));
+        assertEquals(429, mvc.perform(post("/auth/login").header("X-Forwarded-For", ip)
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andReturn().getResponse().getStatus());
+
+        MvcResult clean = mvc.perform(post("/auth/login").header("X-Forwarded-For", trackedIp())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"loginType\":\"EMAIL_PASSWORD\",\"identity\":\"floor@example.com\",\"credential\":\"Color(2024)!\"}"))
+                .andReturn();
+        // 本用例没有桩下游，绑定成功的请求会走到「调 app-biz」那一步（503）；请求体丢了的话是参数校验的 400
+        assertNotEquals(400, clean.getResponse().getStatus(),
+                "请求体被安全闸读过之后要原样交给 Controller：" + clean.getResponse().getContentAsString());
     }
 
     // ------------------------------------------------------------------ 真的 HTTP 路径
@@ -344,8 +458,21 @@ class SecurityGateFilterTest {
     }
 
     private static String gateJson(int breakerDistinctIps, String honeypots) {
+        return gateJson(breakerDistinctIps, honeypots, "");
+    }
+
+    private static String gateJson(int breakerDistinctIps, String honeypots, String keywords) {
         return "{\"ban\":\"24h\",\"breaker\":{\"window\":\"10m\",\"distinctIps\":" + breakerDistinctIps
-                + "},\"honeypotPaths\":[" + honeypots + "]}";
+                + "},\"honeypotPaths\":[" + honeypots + "],\"keywords\":[" + keywords + "]}";
+    }
+
+    /** 带关键字规则的配置：取内置默认值里的那一份（与种子相同），熔断阈值换成用例给的 */
+    private SecurityGateFilter keywordGate(int breakerDistinctIps) {
+        String seeded = new RuleSnapshotHolder(redis, "test:none:" + UUID.randomUUID(), "x").current()
+                .configs().get("gateway_security_gate");
+        String json = seeded.replace("\"distinctIps\":50", "\"distinctIps\":" + breakerDistinctIps);
+        return new SecurityGateFilter(redis, holder(List.of(), json),
+                context.getBean("handlerExceptionResolver", HandlerExceptionResolver.class), null, breakerKey());
     }
 
     private RuleSnapshotHolder holder(List<GatewayRuleSnapshot.IpEntry> lists, String gateConfig) {
@@ -364,10 +491,10 @@ class SecurityGateFilterTest {
         return holder;
     }
 
-    /** 每个用例一个熔断键：不碰本机网关真在用的那一个，用例之间也不互相凑数 */
+    /** 熔断键的前缀：每个用例一个，用例结束时把这个前缀下的键一起删掉 */
     private String breakerKey() {
         if (breakerKey == null) {
-            breakerKey = track("test:sec:hp:breaker:" + UUID.randomUUID());
+            breakerKey = "test:" + UUID.randomUUID() + ":";
         }
         return breakerKey;
     }
@@ -382,6 +509,10 @@ class SecurityGateFilterTest {
         String ip = ip();
         track(SecurityKeys.securityPenaltyIp(IpKeys.ip(ip)));
         return ip;
+    }
+
+    private static byte[] bytes(String s) {
+        return s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private static String withoutTrace(String body) {

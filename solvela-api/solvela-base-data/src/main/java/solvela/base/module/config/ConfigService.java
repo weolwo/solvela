@@ -14,6 +14,7 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.base.module.config.domain.*;
 import solvela.base.module.config.domain.*;
 import solvela.base.json.JsonUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -44,6 +45,9 @@ public class ConfigService {
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
+
+    @Resource
+    private ObjectProvider<ConfigValueValidator> validators;
 
     /*
      * 这里原先有一个 @SolvelaReload(ReloadConst.CONFIG_RELOAD) 的 configReload()，
@@ -82,6 +86,16 @@ public class ConfigService {
         this.CONFIG_CACHE.put(configEntity.getConfigKey().toLowerCase(), configEntity);
         // 三条写入路径都经过这里，所以事件只在这一处发：不会有哪条路径漏发（见 ConfigChangedEvent）
         eventPublisher.publishEvent(new ConfigChangedEvent(configEntity.getConfigKey()));
+    }
+
+    /** 三条写入路径都先过这里：有登记了校验的配置，不合格就拒绝保存（见 ConfigValueValidator） */
+    private void validate(String configKey, String configValue) {
+        if (configKey == null) {
+            return;
+        }
+        validators.orderedStream()
+                .filter(v -> v.configKey().equalsIgnoreCase(configKey))
+                .forEach(v -> v.validate(configValue));
     }
 
     /**
@@ -141,6 +155,7 @@ public class ConfigService {
         if (null != entity) {
             throw new BusinessException(UserErrorCode.ALREADY_EXIST);
         }
+        validate(configAddForm.getConfigKey(), configAddForm.getConfigValue());
         entity = SolvelaBeanUtil.copy(configAddForm, ConfigEntity.class);
         configDao.insert(entity);
 
@@ -163,6 +178,7 @@ public class ConfigService {
             throw new BusinessException(UserErrorCode.ALREADY_EXIST, "config key 已存在");
         }
 
+        validate(updateDTO.getConfigKey(), updateDTO.getConfigValue());
         // 更新数据
         entity = SolvelaBeanUtil.copy(updateDTO, ConfigEntity.class);
         configDao.updateById(entity);
@@ -181,6 +197,7 @@ public class ConfigService {
             throw new BusinessException(UserErrorCode.DATA_NOT_EXIST);
         }
 
+        validate(key.getValue(), value);
         // 更新数据
         Long configId = config.getConfigId();
         ConfigEntity entity = new ConfigEntity();
