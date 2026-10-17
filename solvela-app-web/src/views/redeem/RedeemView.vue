@@ -4,10 +4,16 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { type Address, fetchAddresses, formatAddressLine } from '@/api/address'
 import { fetchAssets } from '@/api/assets'
-import { type CouponTrialGroup, type CouponTrialItem, trialCoupons } from '@/api/coupons'
+import {
+  type CouponTrialGroup,
+  type CouponTrialItem,
+  type CouponTrialResult,
+  trialCoupons,
+} from '@/api/coupons'
 import { ApiError } from '@/api/errors'
 import { fetchCommodityDetail, OrderStatus, redeem, type RedeemResult } from '@/api/mall'
 import { useAsync } from '@/composables/useAsync'
+import { useCouponPicker } from '@/composables/useCouponPicker'
 import { useRetryAfter } from '@/composables/useRetryAfter'
 import { type Id, toId, type Money } from '@/types/contract'
 import { formatCash, formatPoints } from '@/utils/cost'
@@ -151,74 +157,39 @@ function goPickAddress(): void {
  *    真正作数的是下单时服务端重新试算并锁定的那一次，
  *    所以下单请求里只有「用哪张」，没有「减多少」。
  */
-/*
- * 这里<b>没有</b>用 useAsync：那个composable 一构造就发请求，
- * 而 sku 要等商品详情回来才知道 —— 立刻发一次等于带着空 skuId 去问一遍。
- * 触发时机由下面那个 watch 管。
- */
+const NO_TRIAL: CouponTrialResult = { groups: [], unusable: [] }
+
 /*
  * 🔴 按抵扣对象分组存，不拍平成一个列表。
  *    混合支付单上两种券都能用，而「减 10 积分」和「减 5 元」谁更划算
  *    系统答不了 —— 拍平之后按 discountAmount 排序，等于拿积分和人民币比大小。
  */
-const couponGroups = ref<CouponTrialGroup[]>([])
-const unusableCoupons = ref<CouponTrialItem[]>([])
-const trialLoading = ref(false)
-
-/** 全部可用券拍平。只用来数数和按 couponId 找回用户选的那张，**不用来排序** */
-const usableCoupons = computed<CouponTrialItem[]>(() =>
-  couponGroups.value.flatMap((group) => group.items),
-)
-
-/** 用户选中的券。null = 不使用优惠券，这是默认 */
-const chosenCouponId = ref<Id | null>(null)
-const couponPickerOpen = ref(false)
-
-async function reloadTrial(skuId: Id): Promise<void> {
-  trialLoading.value = true
-  try {
-    const outcome = await trialCoupons({ commodityId, skuId, quantity: quantity.value })
-    couponGroups.value = outcome.groups
-    unusableCoupons.value = outcome.unusable
-  } catch {
-    /*
-     * 选券挂了不该挡住兑换本身 —— 用户还是可以不用券把单下了。
-     * 静默降级成「没有可用券」，而不是把整页变成错误态。
-     */
-    couponGroups.value = []
-    unusableCoupons.value = []
-  } finally {
-    trialLoading.value = false
-  }
-}
-
-const chosenCoupon = computed<CouponTrialItem | null>(
-  () => usableCoupons.value.find((item) => item.couponId === chosenCouponId.value) ?? null,
-)
+const {
+  result: trial,
+  loading: trialLoading,
+  usable: usableCoupons,
+  chosenId: chosenCouponId,
+  chosen: chosenCoupon,
+  pickerOpen: couponPickerOpen,
+  reload: reloadTrial,
+  pick: pickCoupon,
+} = useCouponPicker({
+  // 只在选好了规格时才会被调到（见下面的 watch），所以 sku 一定在
+  load: () =>
+    trialCoupons({ commodityId, skuId: sku.value?.skuId as Id, quantity: quantity.value }),
+  usableOf: (outcome) => outcome.groups.flatMap((group) => group.items),
+  empty: NO_TRIAL,
+})
+const couponGroups = computed<CouponTrialGroup[]>(() => trial.value.groups)
+const unusableCoupons = computed<CouponTrialItem[]>(() => trial.value.unusable)
 
 /**
- * 规格或件数一变就重新试算 —— 门槛是按<b>整单</b>判的。
- *
- * 🔴 顺带把已选的券清掉：换了规格之后，原来那张可能已经不满足门槛了。
- * 不清的话，用户会带着一张用不了的券去下单，然后被后端拒掉，
- * 而页面上那张券还好端端地显示着「可减 1000」。
+ * 规格或件数一变就重新试算 —— 门槛是按<b>整单</b>判的（已选的券由 useCouponPicker 清掉）。
+ * 不用 useAsync：那个一构造就发请求，而 sku 要等商品详情回来才知道。
  */
-watch(
-  [() => sku.value?.skuId, quantity],
-  ([skuId]) => {
-    chosenCouponId.value = null
-    couponPickerOpen.value = false
-    if (skuId !== undefined) {
-      void reloadTrial(skuId)
-    }
-  },
-  { immediate: true },
-)
-
-function pickCoupon(couponId: Id | null): void {
-  chosenCouponId.value = couponId
-  couponPickerOpen.value = false
-}
+watch([() => sku.value?.skuId, quantity], ([skuId]) => void reloadTrial(skuId !== undefined), {
+  immediate: true,
+})
 
 /* ---- 账单 ---- */
 /**
@@ -567,7 +538,11 @@ function goRecords(): void {
             {{ hintText }}
           </p>
           <p v-else-if="blockedReason !== null" class="bar__hint">{{ blockedReason }}</p>
-          <Button :disabled="blockedReason !== null || wait.active.value" :loading="submitting" @click="onConfirm">
+          <Button
+            :disabled="blockedReason !== null || wait.active.value"
+            :loading="submitting"
+            @click="onConfirm"
+          >
             {{ wait.label('确认兑换') }}
           </Button>
         </div>

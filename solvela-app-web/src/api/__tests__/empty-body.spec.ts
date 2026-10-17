@@ -1,4 +1,4 @@
-import type { AxiosRequestConfig } from 'axios'
+import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it } from 'vitest'
 
 import http, { request } from '../http'
@@ -30,10 +30,15 @@ import http, { request } from '../http'
 /** 把 adapter 换掉：请求不出网，由我们决定服务端「返回」了什么 */
 function replyWith(data: unknown, headers: Record<string, string> = {}): () => void {
   const original = http.defaults.adapter
-  http.defaults.adapter = (config: AxiosRequestConfig) =>
+  const fake: AxiosAdapter = (config: InternalAxiosRequestConfig) =>
     Promise.resolve({ data, status: 200, statusText: 'OK', headers, config })
+  http.defaults.adapter = fake
   return () => {
-    http.defaults.adapter = original
+    if (original === undefined) {
+      delete http.defaults.adapter
+    } else {
+      http.defaults.adapter = original
+    }
   }
 }
 

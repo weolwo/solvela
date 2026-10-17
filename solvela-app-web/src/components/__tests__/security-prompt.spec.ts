@@ -62,9 +62,7 @@ function dialogText(): string {
 }
 
 function buttonByText(text: string): HTMLButtonElement | undefined {
-  return [...document.body.querySelectorAll('button')].find(
-    (b) => b.textContent?.trim() === text,
-  ) as HTMLButtonElement | undefined
+  return [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)
 }
 
 async function click(text: string): Promise<void> {

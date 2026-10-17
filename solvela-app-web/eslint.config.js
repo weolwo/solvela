@@ -6,7 +6,15 @@ import tseslint from 'typescript-eslint'
 import vueParser from 'vue-eslint-parser'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**', 'src/components.d.ts'] },
+  {
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'src/components.d.ts',
+      // public/ 原样拷贝、不经打包，只能写 ES5（见 theme-init.js 的注释）—— 它不在 TS 工程里，类型感知的规则解析不了它
+      'public/**',
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

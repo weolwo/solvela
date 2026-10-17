@@ -9,10 +9,13 @@ import {
   payRechargeOrder,
   trialRechargeCoupons,
   type RechargeCouponItem,
+  type RechargeTrialResult,
 } from '@/api/recharge'
 import { useAsync } from '@/composables/useAsync'
-import type { Id } from '@/types/contract'
+import { useCouponPicker } from '@/composables/useCouponPicker'
 import { useRetryAfter } from '@/composables/useRetryAfter'
+import type { Money } from '@/types/contract'
+import { isNegative, money, sub, ZERO } from '@/utils/money'
 
 /**
  * 充话费。
@@ -40,46 +43,35 @@ const phone = ref('')
 const amount = ref<string | null>(null)
 
 /* ---- 选券 ---- */
-const usableCoupons = ref<RechargeCouponItem[]>([])
-const unusableCoupons = ref<RechargeCouponItem[]>([])
-const chosenCouponId = ref<Id | null>(null)
-const pickerOpen = ref(false)
+const NO_TRIAL: RechargeTrialResult = { usable: [], unusable: [] }
 
-const chosenCoupon = computed(
-  () => usableCoupons.value.find((c) => c.couponId === chosenCouponId.value) ?? null,
-)
-
-/**
- * 面额一变就重新试算，并把已选的券清掉。
- *
- * 🔴 不清的话，用户从 100 改成 10 之后，原来那张「满 100 减 10」还显示着，
- * 他会带着一张用不了的券去下单，然后被后端拒掉 —— 而页面上那张券好端端的。
- */
-watch(amount, async (value) => {
-  chosenCouponId.value = null
-  pickerOpen.value = false
-  usableCoupons.value = []
-  unusableCoupons.value = []
-  if (value === null) {
-    return
-  }
-  try {
-    const result = await trialRechargeCoupons(value)
-    usableCoupons.value = result.usable
-    unusableCoupons.value = result.unusable
-  } catch {
-    // 选券挂了不该挡住充值本身 —— 用户还是可以不用券把单下了
-    usableCoupons.value = []
-    unusableCoupons.value = []
-  }
+const {
+  result: trial,
+  usable: usableCoupons,
+  chosenId: chosenCouponId,
+  chosen: chosenCoupon,
+  pickerOpen,
+  reload: reloadTrial,
+  pick: pickCoupon,
+} = useCouponPicker({
+  // 只在挑了面额时才会被调到（见下面的 watch）
+  load: () => trialRechargeCoupons(amount.value ?? ''),
+  usableOf: (result) => result.usable,
+  empty: NO_TRIAL,
 })
+const unusableCoupons = computed<RechargeCouponItem[]>(() => trial.value.unusable)
 
-const payAmount = computed(() => {
+/** 面额一变就重新试算（已选的券由 useCouponPicker 清掉：从 100 改成 10 之后，「满 100 减 10」就用不了了） */
+watch(amount, (value) => void reloadTrial(value !== null))
+
+/** 实付 = 面额 - 券抵扣，不减成负数。🔴 金额走 Decimal，不用 JS 原生减法 */
+const payAmount = computed<Money>(() => {
   if (amount.value === null) {
-    return '0'
+    return ZERO
   }
-  const discount = chosenCoupon.value === null ? 0 : Number(chosenCoupon.value.discountAmount)
-  return String(Math.max(0, Number(amount.value) - discount))
+  const discount = chosenCoupon.value === null ? ZERO : money(chosenCoupon.value.discountAmount)
+  const left = sub(money(amount.value), discount)
+  return isNegative(left) ? ZERO : left
 })
 
 /* ---- 提交 ---- */
@@ -129,11 +121,6 @@ async function onSubmit(): Promise<void> {
   } finally {
     submitting.value = false
   }
-}
-
-function pickCoupon(couponId: Id | null): void {
-  chosenCouponId.value = couponId
-  pickerOpen.value = false
 }
 </script>
 
@@ -228,7 +215,11 @@ function pickCoupon(couponId: Id | null): void {
           <p v-if="hintText !== ''" class="hint" role="alert">{{ hintText }}</p>
           <p v-else-if="blockedReason !== null" class="hint hint--muted">{{ blockedReason }}</p>
 
-          <Button :disabled="blockedReason !== null || wait.active.value" :loading="submitting" @click="onSubmit">
+          <Button
+            :disabled="blockedReason !== null || wait.active.value"
+            :loading="submitting"
+            @click="onSubmit"
+          >
             {{ wait.label('立即充值') }}
           </Button>
         </div>

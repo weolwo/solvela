@@ -103,12 +103,17 @@ const cost = computed(() => {
    * ⚠️ findSku 没选全或找不到时返回的是 null，【不是 undefined】——
    *    判 `=== undefined` 的话「起」永远不会出现（第一版就是这么写的，
    *    接口回 priceVaries=true 而页面上一个「起」字都没有）。
-   *    这里判 `== null` 同时覆盖两种空。
+   *    这里两种空都要判。
    */
   const sku = chosenSku.value
   const points = sku?.pointsPrice ?? data.pointsPrice
   const cash = sku?.cashPrice ?? data.cashPrice
-  return formatCost(data.payType, points, cash, sku == null && data.priceVaries)
+  return formatCost(
+    data.payType,
+    points,
+    cash,
+    (sku === null || sku === undefined) && data.priceVaries,
+  )
 })
 
 const worth = computed(() =>
