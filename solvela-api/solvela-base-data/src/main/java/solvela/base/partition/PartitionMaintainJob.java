@@ -18,8 +18,8 @@ import java.util.List;
  * 按月分区表的分区维护：提前补下几个月，删掉过期的。
  *
  * <h3>它补的是一个一直存在的缺口</h3>
- * 三张按月分区的表（{@code t_member_login_log}、{@code t_member_risk_event}、
- * {@code t_member_risk_hit}）的分区都是建表时一次性写死的，只建到 2027-01。
+ * 四张按月分区的表（{@code t_member_login_log}、{@code t_member_risk_event}、
+ * {@code t_member_risk_hit}、{@code t_security_incident}）的分区都是建表时一次性写死的，只建到 2027-01。
  * <b>在本任务之前没有任何东西会去补</b> —— 到那之后所有数据落进 {@code pmax}，
  * 而它永不过期：保留期形同虚设，表只会一直涨，想清的时候已经清不动了（只能 DELETE）。
  * 这件事没有任何症状，直到某天写入开始变慢。
@@ -63,12 +63,13 @@ import java.util.List;
 public class PartitionMaintainJob implements SolvelaJob {
 
     /**
-     * 默认维护这三张。
+     * 默认维护这四张。
      *
      * <p>🔴 新增按月分区的表时<b>要把它加进来</b>（或者在后台的任务参数里加）。
      * 漏了不会报错 —— 只是那张表到了预设分区的尽头之后，数据开始悄悄堆进 {@code pmax}。
      */
-    static final String DEFAULT_TABLES = "t_member_login_log,t_member_risk_event,t_member_risk_hit";
+    public static final String DEFAULT_TABLES =
+            "t_member_login_log,t_member_risk_event,t_member_risk_hit,t_security_incident";
 
     /** 🔴 保留期不接受 0：那意味着连当月的分区都算过期 */
     private static final int MIN_RETAIN_MONTHS = 1;
@@ -102,7 +103,7 @@ public class PartitionMaintainJob implements SolvelaJob {
                 /*
                  * 🔴 一张表失败不影响其它表。分区操作是 DDL，失败的原因通常是这一张表的状态
                  * （锁等待、磁盘、被人手工改过），而不是任务本身 —— 让它把剩下两张做完，
-                 * 比整个任务红掉、三张表都不维护要好。
+                 * 比整个任务红掉、所有表都不维护要好。
                  */
                 log.error("【分区维护】{} 维护失败，继续处理其余表", table, e);
                 report.add(table + ": 失败(" + e.getClass().getSimpleName() + ")");

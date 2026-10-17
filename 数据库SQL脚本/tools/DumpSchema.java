@@ -69,8 +69,11 @@ public class DumpSchema {
             // 钱包里。配置与凭证在这儿，资产在那儿，边界就是 AssetGrantApi。
             "t_grade_entitlement","t_grade_entitlement_grant",
             // 2026-10-14 登录风控。归会员域而不是 solvela-risk：那个模块是营销发奖前的风控链，
-            // 这四张管的是账号安全（docs/业务/会员/登录风控-技术方案.md §5）
-            "t_member_risk_rule","t_security_list","t_member_risk_event","t_member_risk_hit"));
+            // 这三张管的是账号安全（名单表 2026-10-17 挪到「平台安全」组）（docs/业务/会员/登录风控-技术方案.md §5）
+            "t_member_risk_rule","t_member_risk_event","t_member_risk_hit"));
+        // 2026-10-17 网关阶梯限流与安全闸（docs/架构/网关阶梯限流-技术方案.md §6）。
+        // 单开一组：名单表从会员域挪过来 —— 它已经是网关与登录风控共用的平台级表（原 t_member_risk_list）
+        GROUPS.put("平台安全", List.of("t_security_list","t_security_incident","t_rate_limit_rule"));
         GROUPS.put("账务 / 履约", List.of(
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config",

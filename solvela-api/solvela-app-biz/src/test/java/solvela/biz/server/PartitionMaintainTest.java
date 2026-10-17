@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.base.partition.MonthlyPartition;
+import solvela.base.partition.PartitionMaintainJob;
 import solvela.base.partition.PartitionMaintainService;
 
 import java.time.LocalDate;
@@ -182,7 +183,8 @@ class PartitionMaintainTest {
     @Test
     @DisplayName("业务表现在的分区形状是本任务认得的 —— 否则它会一直静默跳过")
     void realTablesAreRecognised() {
-        for (String table : List.of("t_member_login_log", "t_member_risk_event", "t_member_risk_hit")) {
+        // 直接读任务的默认清单：测试自己再抄一份的话，新加一张分区表时两份迟早只改了一份
+        for (String table : PartitionMaintainJob.DEFAULT_TABLES.split(",")) {
             PartitionMaintainService.Outcome outcome = service.maintain(table, 2, 6, 0, TODAY, true);
             assertFalse(outcome.skipped(),
                     table + " 被跳过了：" + outcome.skippedReason() + " —— 它的分区就不会有人维护");

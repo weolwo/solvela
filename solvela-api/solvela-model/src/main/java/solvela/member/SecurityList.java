@@ -34,8 +34,23 @@ public class SecurityList {
 
     private String reason;
 
-    /** 1-人工, 2-自动（预留） */
+    /** 1-人工, 2-自动 */
     private Integer source;
+
+    /** 自动入名单的来源：HONEYPOT / CANARY / KEYWORD / RATE_LIMIT / ESCALATE / SEGMENT。人工条目为 null */
+    private String sourceRule;
+
+    /** 有效期内命中次数。新增时留 null，取库里的默认值 1 */
+    private Integer hitCount;
+
+    /** 最近一次命中。人工条目为 null */
+    private LocalDateTime lastHitTime;
+
+    /** 最近一次证据，指向 t_security_incident */
+    private Long lastIncidentId;
+
+    /** 封禁期间被安全闸直接挡掉的请求数，定时从 Redis 计数器同步。新增时留 null，取库里的默认值 0 */
+    private Long blockedCount;
 
     private SecurityListStatusEnum status;
 

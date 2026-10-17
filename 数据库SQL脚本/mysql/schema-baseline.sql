@@ -34,8 +34,8 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-10-15
--- 表数量：89 张
+-- 生成时间：2026-10-17
+-- 表数量：91 张
 -- =====================================================================================
 
 -- 刻意排除（手工备份表，不属于系统结构）：
@@ -481,7 +481,7 @@ CREATE TABLE `t_file_relation` (
 
 
 -- =====================================================================================
--- 会员域（18 张）
+-- 会员域（17 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_member`;
@@ -576,7 +576,7 @@ DROP TABLE IF EXISTS `t_member_operation_limit`;
 CREATE TABLE `t_member_operation_limit` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '自增id',
   `member_id` bigint NOT NULL COMMENT '会员号：关联键',
-  `operation_type` int NOT NULL COMMENT '受限操作：1-登录, 2-修改密码, 3-资产出口（加地址/兑换/充话费，「这不是我」触发，重置密码恢复）。见 MemberOperationTypeEnum',
+  `operation_type` int NOT NULL COMMENT '受限操作：1-登录, 2-修改密码。见 MemberOperationTypeEnum',
   `lock_time` datetime NOT NULL COMMENT '冻结开始时间',
   `expire_time` datetime NOT NULL COMMENT '自动到期时间：到点即视为解除，不依赖回写',
   `unlock_time` datetime DEFAULT NULL COMMENT '实际解冻时间：status=1 时必填',
@@ -790,7 +790,7 @@ CREATE TABLE `t_member_risk_rule` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
   `rule_code` varchar(32) NOT NULL COMMENT '规则编码，与代码里 MemberRiskRule#code() 一一对应。启动时双向校验',
   `rule_name` varchar(64) NOT NULL COMMENT '给人看的名字',
-  `event_type` tinyint NOT NULL COMMENT '适用事件：1-登录, 3-注册, 4-重置密码, 5-资产出口, 6-换绑联系方式。见 MemberRiskEventTypeEnum。一条规则只属于一个场景，以代码为准并在启动时核对',
+  `event_type` tinyint NOT NULL COMMENT '适用事件：1-登录。见 MemberRiskEventTypeEnum',
   `phase` tinyint NOT NULL COMMENT '阶段：1-前置（验凭据之前）, 2-后置（验凭据之后）',
   `rule_type` tinyint NOT NULL COMMENT '类型：1-强规则（固定处置）, 2-强规则（分级 / 矩阵，处置写在 params）, 3-打分规则',
   `direct_decision` tinyint DEFAULT NULL COMMENT '固定处置：1-放行, 2-滑块, 3-OTP, 4-换通道OTP, 5-密码冷却, 6-限流, 7-拒绝。分级与打分规则为 NULL',
@@ -806,38 +806,16 @@ CREATE TABLE `t_member_risk_rule` (
   UNIQUE KEY `uk_mbr_risk_rule_code` (`rule_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员风控规则（逻辑在代码，参数与档位在表）';
 
-DROP TABLE IF EXISTS `t_security_list`;
-CREATE TABLE `t_security_list` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `list_type` tinyint NOT NULL COMMENT '名单类型：1-黑, 2-灰, 3-白',
-  `dimension` tinyint NOT NULL COMMENT '维度：1-IP, 2-IP段（CIDR）, 3-身份摘要, 4-会员',
-  `list_value` varchar(64) NOT NULL COMMENT 'IP / CIDR 原文；身份摘要存 HEX(PiiHasher 输出)，不存明文；会员存会员号',
-  `score` smallint DEFAULT NULL COMMENT '灰名单命中加的分。黑、白名单为 NULL',
-  `reason` varchar(128) NOT NULL COMMENT '为什么进名单：给下一个看到它的人的人话',
-  `source` tinyint NOT NULL DEFAULT '1' COMMENT '来源：1-人工, 2-自动（预留）',
-  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：1-有效, 0-已撤销。撤销不删行，留痕',
-  `expire_time` datetime DEFAULT NULL COMMENT '到期时间。NULL 表示长期；后台新增时默认 30 天',
-  `operator` varchar(64) NOT NULL COMMENT '新增人',
-  `revoke_operator` varchar(64) DEFAULT NULL COMMENT '撤销人：status=0 时必填',
-  `revoke_reason` varchar(128) DEFAULT NULL COMMENT '撤销原因：status=0 时必填',
-  `revoke_time` datetime DEFAULT NULL COMMENT '撤销时间',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_sec_list` (`dimension`,`list_value`,`list_type`),
-  KEY `idx_sec_list_active` (`status`,`expire_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全名单（网关与登录风控共用）';
-
 DROP TABLE IF EXISTS `t_member_risk_event`;
 CREATE TABLE `t_member_risk_event` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `event_type` tinyint NOT NULL COMMENT '事件：1-登录, 2-登录二次验证, 3-注册, 4-重置密码, 5-资产出口, 6-换绑联系方式。见 MemberRiskEventTypeEnum',
+  `event_type` tinyint NOT NULL COMMENT '事件：1-登录, 2-登录二次验证。见 MemberRiskEventTypeEnum',
   `ref_event_id` bigint DEFAULT NULL COMMENT '关联事件：二次验证指向签票的那次登录',
   `member_id` bigint DEFAULT NULL COMMENT '会员号。可空：查无此人时没有',
   `identity_hash` binary(32) DEFAULT NULL COMMENT '登录身份的 PiiHasher 摘要，与 t_member.phone_hash/email_hash 同算法',
-  `login_type` tinyint DEFAULT NULL COMMENT '登录方式：见 MemberLoginType。注册事件借它记「手机号还是邮箱」',
+  `login_type` tinyint DEFAULT NULL COMMENT '登录方式：见 MemberLoginType',
   `device_id` char(32) DEFAULT NULL COMMENT '设备号，可空（没带设备令牌）',
-  `device_trust` tinyint DEFAULT NULL COMMENT '设备信任：0-无设备, 1-新设备, 2-老交情, 3-验证过, 4-注册设备。查无此人、注册时为 NULL',
+  `device_trust` tinyint DEFAULT NULL COMMENT '设备信任：0-无设备, 1-新设备, 2-老交情, 3-验证过, 4-注册设备。查无此人时为 NULL',
   `ip_familiar` tinyint DEFAULT NULL COMMENT 'IP 熟悉度：0-陌生, 1-宽松熟悉, 2-严格熟悉。查无此人时为 NULL',
   `dormant` tinyint DEFAULT NULL COMMENT '是否沉睡：0-活跃, 1-沉睡。查无此人时为 NULL',
   `client_ip` varchar(39) DEFAULT NULL COMMENT '客户端IP',
@@ -849,7 +827,7 @@ CREATE TABLE `t_member_risk_event` (
   `decision` tinyint NOT NULL COMMENT '生效结论：1-放行, 2-滑块, 3-OTP, 4-换通道OTP, 5-密码冷却, 6-限流, 7-拒绝',
   `shadow_decision` tinyint NOT NULL COMMENT '陪跑结论：假如所有陪跑规则都生效',
   `verify_channel` tinyint DEFAULT NULL COMMENT '核身通道：1-邮箱, 2-短信。decision 为 OTP 时有值',
-  `outcome` tinyint NOT NULL COMMENT '最终结局：1-成功, 2-凭据错, 3-查无此人, 4-冻结, 5-冷却/锁定中, 6-格式非法, 7-需要滑块, 8-前置限流/拒绝, 9-后置限流/拒绝, 10-已签凭票, 11-二次验证通过, 12-二次验证失败, 13-内部异常（end 没被调用，close 兜底落库）, 14-身份已被注册（注册）, 15-要求核身（资产出口 / 换绑待补原主证明）',
+  `outcome` tinyint NOT NULL COMMENT '最终结局：1-成功, 2-凭据错, 3-查无此人, 4-冻结, 5-冷却/锁定中, 6-格式非法, 7-需要滑块, 8-前置限流/拒绝, 9-后置限流/拒绝, 10-已签凭票, 11-二次验证通过, 12-二次验证失败, 13-内部异常（end 没被调用，close 兜底落库）',
   `label` tinyint DEFAULT NULL COMMENT '事后标注：1-确认本人, 2-确认被盗。只这三列允许事后更新',
   `label_source` tinyint DEFAULT NULL COMMENT '标注来源：1-用户「这不是我」, 2-老设备上点「是我」, 3-客服',
   `label_time` datetime DEFAULT NULL COMMENT '标注时间',
@@ -891,6 +869,93 @@ CREATE TABLE `t_member_risk_hit` (
  PARTITION p202612 VALUES LESS THAN ('2027-01-01') ENGINE = InnoDB,
  PARTITION p202701 VALUES LESS THAN ('2027-02-01') ENGINE = InnoDB,
  PARTITION pmax VALUES LESS THAN (MAXVALUE) ENGINE = InnoDB) */;
+
+
+-- =====================================================================================
+-- 平台安全（3 张）
+-- =====================================================================================
+
+DROP TABLE IF EXISTS `t_security_list`;
+CREATE TABLE `t_security_list` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `list_type` tinyint NOT NULL COMMENT '名单类型：1-黑, 2-灰, 3-白',
+  `dimension` tinyint NOT NULL COMMENT '维度：1-IP, 2-IP段（CIDR）, 3-身份摘要, 4-会员',
+  `list_value` varchar(64) NOT NULL COMMENT 'IP / CIDR 原文；身份摘要存 HEX(PiiHasher 输出)，不存明文；会员存会员号',
+  `score` smallint DEFAULT NULL COMMENT '灰名单命中加的分。黑、白名单为 NULL',
+  `reason` varchar(128) NOT NULL COMMENT '为什么进名单：给下一个看到它的人的人话',
+  `source` tinyint NOT NULL DEFAULT '1' COMMENT '来源：1-人工, 2-自动',
+  `source_rule` varchar(32) DEFAULT NULL COMMENT '自动入名单的来源：HONEYPOT / CANARY / KEYWORD / RATE_LIMIT / ESCALATE（黑到期转灰） / SEGMENT（同段连坐）。人工条目为 NULL',
+  `hit_count` int NOT NULL DEFAULT '1' COMMENT '有效期内命中次数：自动条目重复命中时累加',
+  `last_hit_time` datetime DEFAULT NULL COMMENT '最近一次命中（人工条目为 NULL）',
+  `last_incident_id` bigint DEFAULT NULL COMMENT '最近一次证据，指向 t_security_incident',
+  `blocked_count` bigint NOT NULL DEFAULT '0' COMMENT '封禁期间被安全闸直接挡掉的请求数，定时从 Redis 计数器同步',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：1-有效, 0-已撤销。撤销不删行，留痕',
+  `expire_time` datetime DEFAULT NULL COMMENT '到期时间。NULL 表示长期；后台新增默认 30 天；自动条目必填',
+  `operator` varchar(64) NOT NULL COMMENT '新增人；自动条目为 system',
+  `revoke_operator` varchar(64) DEFAULT NULL COMMENT '撤销人：status=0 时必填',
+  `revoke_reason` varchar(128) DEFAULT NULL COMMENT '撤销原因：status=0 时必填',
+  `revoke_time` datetime DEFAULT NULL COMMENT '撤销时间',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_sec_list` (`dimension`,`list_value`,`list_type`),
+  KEY `idx_sec_list_active` (`status`,`expire_time`),
+  KEY `idx_sec_list_rule` (`source_rule`,`last_hit_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全名单（网关与登录风控共用）';
+
+DROP TABLE IF EXISTS `t_security_incident`;
+CREATE TABLE `t_security_incident` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `incident_type` tinyint NOT NULL COMMENT '1-蜜罐接口, 2-蜜罐账号, 3-关键字, 4-限流判罚 / 升档',
+  `rule_code` varchar(32) DEFAULT NULL COMMENT '命中的蜜罐路径 / 关键字规则 / 限流场景编码',
+  `action` tinyint NOT NULL COMMENT '实际处置：0-仅记录, 1-拉灰, 2-拉黑',
+  `suppress_reason` tinyint NOT NULL DEFAULT '0' COMMENT '处罚被压下的原因：0-无, 1-跨站发起, 2-熔断中, 3-老设备豁免（仅 IP 部分）',
+  `penalty_level` tinyint DEFAULT NULL COMMENT '限流判罚的档位（1-6），其它类型为 NULL',
+  `client_ip` varchar(39) DEFAULT NULL COMMENT '客户端IP',
+  `device_id` char(32) DEFAULT NULL COMMENT '设备号',
+  `member_id` bigint DEFAULT NULL COMMENT '会员号（已登录时）',
+  `identity_hash` binary(32) DEFAULT NULL COMMENT '蜜罐账号命中时的登录身份摘要',
+  `http_method` varchar(8) DEFAULT NULL COMMENT '请求方法',
+  `request_path` varchar(256) DEFAULT NULL COMMENT '请求路径，不含查询串',
+  `matched_field` tinyint DEFAULT NULL COMMENT '命中位置：1-UA, 2-路径, 3-查询参数, 4-请求体字段',
+  `matched_param` varchar(32) DEFAULT NULL COMMENT '命中的参数 / 字段名',
+  `matched_sample` varchar(128) DEFAULT NULL COMMENT '命中片段，截断。攻击者可控：后台只能按纯文本展示',
+  `user_agent` varchar(256) DEFAULT NULL COMMENT 'UA，截断。攻击者可控：后台只能按纯文本展示',
+  `penalty_until` datetime DEFAULT NULL COMMENT '处罚到期时间',
+  `trace_id` varchar(64) DEFAULT NULL COMMENT '全链路追踪ID',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`,`create_time`),
+  KEY `idx_sec_inc_ip` (`client_ip`,`create_time`),
+  KEY `idx_sec_inc_device` (`device_id`,`create_time`),
+  KEY `idx_sec_inc_member` (`member_id`,`create_time`),
+  KEY `idx_sec_inc_type` (`incident_type`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全事件流水（append-only，按月分区，保留 6 个月；只在状态变化时写）'
+/*!50500 PARTITION BY RANGE  COLUMNS(create_time)
+(PARTITION p202610 VALUES LESS THAN ('2026-11-01') ENGINE = InnoDB,
+ PARTITION p202611 VALUES LESS THAN ('2026-12-01') ENGINE = InnoDB,
+ PARTITION p202612 VALUES LESS THAN ('2027-01-01') ENGINE = InnoDB,
+ PARTITION p202701 VALUES LESS THAN ('2027-02-01') ENGINE = InnoDB,
+ PARTITION pmax VALUES LESS THAN (MAXVALUE) ENGINE = InnoDB) */;
+
+DROP TABLE IF EXISTS `t_rate_limit_rule`;
+CREATE TABLE `t_rate_limit_rule` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `target_type` tinyint NOT NULL COMMENT '1-场景（默认值）, 2-接口（覆盖）',
+  `target` varchar(128) NOT NULL COMMENT '场景编码（与 RateLimitScene 枚举一一对应）；或接口键，如 "POST /activity/{activityCode}/draw"，必须与网关上报的路由清单逐字一致',
+  `dimension` tinyint NOT NULL COMMENT '0-全局（不分人，保护下游）, 1-IP, 2-账号, 3-设备, 4-IP段（只允许四个匿名场景）',
+  `burst` int NOT NULL COMMENT '突发：10 秒令牌桶容量',
+  `limit_3m` int NOT NULL COMMENT '3 分钟阈值',
+  `limit_5m` int NOT NULL COMMENT '5 分钟阈值',
+  `limit_10m` int NOT NULL COMMENT '10 分钟阈值',
+  `long_window` varchar(8) DEFAULT NULL COMMENT '可选长窗口：1h / 1d。NULL = 不启用（从登录风控迁过来的几条用它）',
+  `limit_long` int DEFAULT NULL COMMENT '长窗口阈值。long_window 为 NULL 时为 NULL',
+  `mode` tinyint NOT NULL DEFAULT '2' COMMENT '档位：0-关闭, 1-陪跑（只记日志）, 2-生效',
+  `description` varchar(256) DEFAULT NULL COMMENT '为什么是这个数；接口行写清为什么要和场景不一样',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rl_rule` (`target_type`,`target`,`dimension`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='网关限流规则：场景给默认值，接口按需覆盖；后台维护，经 Redis 快照下发到网关';
 
 
 -- =====================================================================================

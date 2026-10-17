@@ -85,6 +85,8 @@ public class VerifyFreshInstall {
                 // 资产出口（+3 ASSET_*）进引擎。少于这个数说明种子没导全 —— 缺的那几条会让 app-biz 启动失败
                 {"t_member_risk_rule", "34",
                         "风控规则（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3）：缺任何一条，app-biz 启动时双向校验失败"},
+                {"t_rate_limit_rule", "28",
+                        "网关限流规则（9 个场景 × 维度的默认值）：缺了网关退回内置默认值，后台调不动阈值"},
             };
             boolean allOk = true;
             for (String[] chk : checks) {
@@ -105,7 +107,7 @@ public class VerifyFreshInstall {
                             "t_member_notification", "t_announcement", "t_announcement_ack",
                             // 2026-10-14 补：风控的流水、命中、名单都是运行期数据。
                             // 规则（t_member_risk_rule）是配置，在上面那组里。
-                            "t_member_risk_event", "t_member_risk_hit", "t_security_list"};
+                            "t_member_risk_event", "t_member_risk_hit", "t_security_list", "t_security_incident"};
             for (String t : biz) {
                 try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM `" + t + "`")) {
                     r.next(); long n = r.getLong(1);

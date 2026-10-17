@@ -50,7 +50,7 @@ public class PartitionMaintainService {
     /** 表名的形状。库里查得到才算真存在，这里只是先挡掉明显不是表名的东西 */
     private static final Pattern TABLE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,63}");
 
-    /** 分区列只认它 —— 三张表都是按它分的，而「按哪一列分」决定了边界怎么算 */
+    /** 分区列只认它 —— 维护的几张表都是按它分的，而「按哪一列分」决定了边界怎么算 */
     private static final String PARTITION_COLUMN = "create_time";
 
     private final JdbcTemplate jdbcTemplate;
