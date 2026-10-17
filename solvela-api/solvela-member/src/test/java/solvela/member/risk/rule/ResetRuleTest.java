@@ -21,9 +21,7 @@ import solvela.member.risk.config.ListMatch;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.risk.rule.impl.ResetDeviceBannedRule;
-import solvela.member.risk.rule.impl.ResetDeviceLimitRule;
 import solvela.member.risk.rule.impl.ResetIpBlacklistRule;
-import solvela.member.risk.rule.impl.ResetIpLimitRule;
 import tools.jackson.databind.JsonNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,72 +63,16 @@ class ResetRuleTest {
     private DeviceDispositionService dispositionService;
 
     @Test
-    @DisplayName("🔴 四条都写死在【重置密码 + 前置】")
+    @DisplayName("🔴 两条都写死在【重置密码 + 前置】")
     void 场景与阶段() {
+        // 重置密码的 IP / 设备次数限频 2026-10-17 移交网关限流（PASSWORD_RESET 场景），这里只剩名单与封禁
         for (RiskRule rule : new RiskRule[]{
-                new ResetIpLimitRule(counters),
-                new ResetDeviceLimitRule(counters),
                 new ResetIpBlacklistRule(lists),
                 new ResetDeviceBannedRule(dispositionService)}) {
             assertEquals(MemberRiskEventTypeEnum.RESET_PASSWORD, rule.eventType(), rule.code());
             // 验证码验过就改密码了，没有「验完再判一次」的位置
             assertEquals(MemberRiskPhaseEnum.PRE, rule.phase(), rule.code());
         }
-    }
-
-    @Test
-    @DisplayName("🔴 配成滑块 / OTP / 冷却 → 保存那一刻就拒绝（与注册共用那份校验）")
-    void 拒绝执行不了的档位() {
-        ResetIpLimitRule rule = new ResetIpLimitRule(counters);
-        for (int decision : new int[]{2, 3, 4, 5}) {
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                    () -> rule.validate(tiers(20, decision)));
-            assertTrue(e.getMessage().contains("重置密码"), e.getMessage());
-        }
-        rule.validate(tiers(20, 6));
-        rule.validate(tiers(20, 7));
-    }
-
-    @Test
-    @DisplayName("🔴 两维都把这一次提交算进去")
-    void 都算这一次() {
-        when(counters.bump(LoginCounters.Counter.RESET_IP, "1.2.3.4")).thenReturn(21L);
-        when(counters.bump(LoginCounters.Counter.RESET_DEVICE, "dev-1")).thenReturn(6L);
-        when(counters.retryAfterSeconds(any(), anyString())).thenReturn(900L);
-
-        RiskHit ip = new ResetIpLimitRule(counters).evaluate(ctx(), config(tiers(20, 6)));
-        RiskHit device = new ResetDeviceLimitRule(counters).evaluate(ctx(), config(tiers(5, 6)));
-
-        assertEquals(MemberRiskDecisionEnum.LIMIT, ip.decision());
-        assertEquals(MemberRiskDecisionEnum.LIMIT, device.decision());
-        // 走到这一步的人已经登不进去了，「请稍后再试」对他等于「不知道还有没有希望」
-        assertEquals(900L, ip.retryAfterSeconds());
-        verify(counters, never()).read(any(), anyString());
-    }
-
-    @Test
-    @DisplayName("🔴 设备维度【不】请求观察档 —— 帮人找回账号的那台设备不该连登录一起被罚")
-    void 不降设备档() {
-        when(counters.bump(LoginCounters.Counter.RESET_DEVICE, "dev-1")).thenReturn(6L);
-
-        // 即使有人在 params 里配了 observe，这条规则也不认它（它根本不读那个字段）
-        JsonNode withObserve = JsonUtils.getMapper()
-                .readTree("{\"window\":\"1d\",\"observe\":true,\"tiers\":[{\"over\":5,\"do\":6}]}");
-        assertTrue(new ResetDeviceLimitRule(counters).evaluate(ctx(), config(withObserve))
-                .actions().isEmpty());
-    }
-
-    @Test
-    @DisplayName("等于阈值不算超；维度取不到时不判")
-    void 边界与维度缺失() {
-        when(counters.bump(LoginCounters.Counter.RESET_IP, "1.2.3.4")).thenReturn(20L);
-        assertNull(new ResetIpLimitRule(counters).evaluate(ctx(), config(tiers(20, 6))));
-
-        RiskContext noIp = new RiskContext(MemberRiskEventTypeEnum.RESET_PASSWORD,
-                MemberLoginType.EMAIL_CODE, "a@x.com", "ab".repeat(32), null, null, null, null, false);
-        // 拿不到 IP 不该变成「全站找不回密码」
-        assertNull(new ResetIpLimitRule(counters).evaluate(noIp, config(tiers(20, 6))));
-        assertNull(new ResetDeviceLimitRule(counters).evaluate(noIp, config(tiers(5, 6))));
     }
 
     @Test

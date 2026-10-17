@@ -10,10 +10,9 @@ import solvela.member.risk.feature.LoginCounters;
 /**
  * 设备维度的闸门：登录频次、失败次数、一机多号。
  *
- * <p>⚠️ 2026-10-16 起<b>注册那道闸不在这里了</b>：它成了风控引擎的
- * {@code REG_DEVICE_LIMIT} 规则（阈值在 {@code t_member_risk_rule}）。
- * 本类剩下的三条也都有对应的规则（{@code DEVICE_LOGIN_LIMIT} / {@code DEVICE_FAIL_LIMIT} /
- * {@code DEVICE_FANOUT}），只是登录主干还同时调着本类 —— 那是批次 1 刻意留的一步。
+ * <p>⚠️ 登录次数、注册数两道纯计次的闸 2026-10-17 移交网关限流（LOGIN / REGISTER 场景的设备维度）；
+ * 失败次数与一机多号要看结果、看会员，归风控引擎的 {@code DEVICE_FAIL_LIMIT} / {@code DEVICE_FANOUT}。
+ * 本类今天在生产路径上只剩 {@link #recordLoginFailure} 一个调用方。
  *
  * <h3>它拦的是「量」，不是「人」</h3>
  * 这三条规则<b>都不判断谁是坏人</b>，只判断某个量级不正常。所以处置也只该是
@@ -53,35 +52,6 @@ public class DeviceGuard {
     private final DeviceGuardProperties properties;
 
     private final DeviceDispositionService dispositionService;
-
-    /**
-     * 登录前的闸：这台设备今天登得太多了吗、最近失败得太多了吗。
-     *
-     * <p>放在<b>查会员之前</b>调用：被限的设备不该还能拿登录接口去试探
-     * 「这个手机号注册过没有」——那正是 {@code BAD_CREDENTIALS} 刻意合并三种原因要堵的口子。
-     */
-    public DeviceGuardVerdict checkLogin(String deviceId) {
-        if (SolvelaStringUtil.isBlank(deviceId)) {
-            return DeviceGuardVerdict.pass();
-        }
-        // 封禁排在所有计数之前：一台已被人工封掉的设备不该再消耗任何计数配额，
-        // 也不该因为「今天还没登够 30 次」而被放行
-        if (banned(deviceId)) {
-            return DeviceGuardVerdict.hit(DeviceGuardRule.BANNED, 0L, false);
-        }
-        // 🔴 失败计数【只读不加】：它由 recordLoginFailure 在真的失败时才 +1。
-        //    在这里 incr 会把「一次正常登录」也算成失败，阈值当场失去意义
-        long fails = counters.read(LoginCounters.Counter.DEVICE_FAIL, deviceId);
-        if (fails > properties.getMaxFailPerHour()) {
-            return verdict(DeviceGuardRule.FAIL_TOO_MANY, deviceId, LoginCounters.Counter.DEVICE_FAIL);
-        }
-
-        long logins = counters.bump(LoginCounters.Counter.DEVICE_LOGIN, deviceId);
-        if (logins > properties.getMaxLoginPerDay()) {
-            return verdict(DeviceGuardRule.LOGIN_TOO_MANY, deviceId, LoginCounters.Counter.DEVICE_LOGIN);
-        }
-        return DeviceGuardVerdict.pass();
-    }
 
     /**
      * 记一次登录失败。密码错、账号冻结这类<b>能定位到人</b>的失败才算。

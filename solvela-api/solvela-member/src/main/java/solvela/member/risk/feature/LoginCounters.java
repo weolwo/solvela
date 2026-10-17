@@ -63,9 +63,6 @@ public class LoginCounters {
      */
     public enum Counter {
 
-        /** 单 IP 的登录请求总数。在<b>规则里</b> +1（每次登录请求都算一次） */
-        IP_ATTEMPT("IP_ATTEMPT_LIMIT", "login:ip:attempt:w2:", Duration.ofHours(1)),
-
         /** 单 IP 的登录失败数。只在<b>真的失败时</b> +1 */
         IP_FAIL("IP_FAIL_LIMIT", "login:ip:fail:w2:", Duration.ofHours(1)),
 
@@ -74,9 +71,6 @@ public class LoginCounters {
 
         /** 单 IP 尝试过的<b>不同身份</b>（集合，存身份摘要）。不论账号存不存在都算 */
         IP_IDENTITY("IP_ACCOUNT_FANOUT", "login:ip:ids:w2:", Duration.ofHours(1)),
-
-        /** 单设备的登录次数（含失败）。在规则里 +1 */
-        DEVICE_LOGIN("DEVICE_LOGIN_LIMIT", "dev:login:w2:", Duration.ofDays(1)),
 
         /** 单设备的登录失败数。只在真的失败时 +1 */
         DEVICE_FAIL("DEVICE_FAIL_LIMIT", "dev:fail:w2:", Duration.ofHours(1)),
@@ -90,32 +84,12 @@ public class LoginCounters {
          */
         DEVICE_MEMBER("DEVICE_FANOUT", "dev:member:w2:", Duration.ofDays(1)),
 
-        /**
-         * 单 IP 注册的账号数。<b>在规则里 +1</b>（每次注册请求都算一次）。
-         *
-         * <p>迁自 {@code MemberRegisterService.consumeAttempt} 那把手写的
-         * {@code INCR}（键 {@code member:register:ip}、窗口 1h、阈值 10）。
+        /*
+         * 2026-10-17：单 IP / 单设备的登录请求数、注册数、重置密码尝试数这 6 个计数器连同它们的规则
+         * （IP_ATTEMPT_LIMIT、DEVICE_LOGIN_LIMIT、REG_IP_LIMIT、REG_DEVICE_LIMIT、RESET_IP_LIMIT、RESET_DEVICE_LIMIT）
+         * 移交网关限流：它们只数「来了多少次」，不看结果、不认身份，那正是网关的事
+         * （docs/架构/网关阶梯限流-技术方案.md §1.1）。留在这里的都要看结果或身份。
          */
-        REGISTER_IP("REG_IP_LIMIT", "member:register:ip:w2:", Duration.ofHours(1)),
-
-        /**
-         * 单设备注册的账号数。在规则里 +1。
-         *
-         * <p>迁自 {@code DeviceGuard.checkRegister}（窗口 1d、阈值 2）。
-         */
-        REGISTER_DEVICE("REG_DEVICE_LIMIT", "dev:reg:w2:", Duration.ofDays(1)),
-
-        /**
-         * 单 IP 的重置密码尝试数。在规则里 +1。
-         *
-         * <p>🔴 这一维以前<b>完全不存在</b>：重置密码只受「单个邮箱 / 手机号每天能发几条码」
-         * 约束，而那是按<b>目标</b>算的 —— 一台机器拿着泄露的身份库挨个试重置码，
-         * 每个目标只试一次，一条限额都碰不到。
-         */
-        RESET_IP("RESET_IP_LIMIT", "member:reset:ip:w2:", Duration.ofHours(1)),
-
-        /** 单设备的重置密码尝试数。在规则里 +1。同样是新加的一维 */
-        RESET_DEVICE("RESET_DEVICE_LIMIT", "dev:reset:w2:", Duration.ofDays(1)),
 
         /**
          * 单设备给<b>几个不同会员</b>做过资产出口（集合）。

@@ -287,7 +287,7 @@ class MemberRegisterServiceTest {
         pre(new RiskDecision(MemberRiskDecisionEnum.OTP, 0L, Set.of()));
 
         // 把一个配置错误变成「全站注册不可用」，代价完全不对称。
-        // 真正的防线在保存与加载那一步（RegisterTieredCountRule.validate / RiskRuleRegistry.toConfig）
+        // 真正的防线在保存与加载那一步（各规则的 validate / RiskRuleRegistry.toConfig）
         assertTrue(service.register(cmd(PHONE, STRONG_PASSWORD)).success());
     }
 

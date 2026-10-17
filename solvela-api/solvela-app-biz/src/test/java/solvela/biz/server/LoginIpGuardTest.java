@@ -108,7 +108,6 @@ class LoginIpGuardTest {
     void tuneRules() {
         rules = new RiskRuleFixture(ruleDao)
                 .off("GLOBAL_CAPTCHA", "CAPTCHA_MATRIX", "PWD_COOLDOWN", "LOGIN_MATRIX")
-                .params("IP_ATTEMPT_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":6,\"do\":6}]}")
                 .params("IP_FAIL_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":3,\"do\":6}]}")
                 .params("IP_UNKNOWN_LIMIT", "{\"window\":\"1h\",\"tiers\":[{\"over\":2,\"do\":6}]}");
     }
@@ -132,7 +131,6 @@ class LoginIpGuardTest {
     @AfterEach
     void cleanUp() {
         for (String ip : usedIps) {
-            counters.clear(LoginCounters.Counter.IP_ATTEMPT, ip);
             counters.clear(LoginCounters.Counter.IP_FAIL, ip);
             counters.clear(LoginCounters.Counter.IP_UNKNOWN, ip);
             counters.clear(LoginCounters.Counter.IP_IDENTITY, ip);
@@ -141,7 +139,6 @@ class LoginIpGuardTest {
         for (String deviceId : usedDevices) {
             jdbcTemplate.update("DELETE FROM t_member_login_log WHERE device_id = ?", deviceId);
             jdbcTemplate.update("DELETE FROM t_device WHERE device_id = ?", deviceId);
-            counters.clear(LoginCounters.Counter.DEVICE_LOGIN, deviceId);
             counters.clear(LoginCounters.Counter.DEVICE_FAIL, deviceId);
             counters.clear(LoginCounters.Counter.DEVICE_MEMBER, deviceId);
         }
@@ -279,14 +276,15 @@ class LoginIpGuardTest {
     }
 
     @Test
-    @DisplayName("总次数超限 → 被限（含成功的登录）")
-    void 总次数超限() {
+    @DisplayName("🔴 单纯的请求次数不归域管：同一个 IP 连续成功登录，域里不再按次数限它（那是网关 LOGIN 场景的事）")
+    void 请求次数归网关() {
         String email = registerWithPassword();
         String ip = freshIp();
-        for (int i = 0; i < 6; i++) {
+        // 2026-10-17 之前这里有一条「同 IP 每小时登录请求 > N 就限」的 IP_ATTEMPT_LIMIT；它只数次数、不看结果，
+        // 移交给了网关限流。域里两边都数的话，同一件事有两个阈值、两套文案、两处要查
+        for (int i = 0; i < 10; i++) {
             assertTrue(login(ip, email, PASSWORD).success(), "第 " + (i + 1) + " 次应当成功");
         }
-        assertEquals(AuthFailReason.IP_LIMITED, login(ip, email, PASSWORD).reason());
     }
 
     @Test

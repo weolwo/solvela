@@ -54,6 +54,24 @@ class RateLimitHttpTest {
     }
 
     @Test
+    @DisplayName("同一 IP 连续出图 → 429（出图吃 CPU，不限就是免费的压测口；原来在 CaptchaService 里，2026-10-17 移交 CAPTCHA 场景）")
+    void captchaCreationLimited() throws Exception {
+        String ip = freshIp();
+        int limitedAt = -1;
+        // CAPTCHA 场景 IP 维度突发 10（内置默认值 / 种子），连续出图到第 11 张起被挡
+        for (int i = 0; i < 15 && limitedAt < 0; i++) {
+            int status = mvc.perform(post("/captcha").header("X-Forwarded-For", ip)
+                    .contentType(MediaType.APPLICATION_JSON).content("{}")).andReturn().getResponse().getStatus();
+            if (status == 429) {
+                limitedAt = i + 1;
+            } else {
+                assertEquals(200, status, "第 " + (i + 1) + " 张图");
+            }
+        }
+        assertTrue(limitedAt > 1, "连续出图应当在若干张之后被网关限流挡下，实际第 " + limitedAt + " 张");
+    }
+
+    @Test
     @DisplayName("不限流的接口（领设备令牌）怎么打都不会 429")
     void exemptEndpointNeverLimited() throws Exception {
         String ip = freshIp();

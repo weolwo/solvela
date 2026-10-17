@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 设备闸门的四条规则，连真实 Redis。
+ * 设备闸门的失败计数与一机多号，连真实 Redis。
  *
  * <h3>这套用例真正要钉住的是 dry-run 这一档</h3>
  * 「命中」和「拦截」是<b>两件事</b>：dry-run 期间命中了照样放行。
@@ -78,11 +78,10 @@ class DeviceGuardTest {
     // ============================== 老客户端 ==============================
 
     @Test
-    @DisplayName("🔴 deviceId 为空 → 三条规则一律放行，且不命中")
+    @DisplayName("🔴 deviceId 为空 → 一律放行，且不命中、不计数")
     void 没有设备号一律放行() {
         enforce();
         for (String none : new String[]{null, "", "  "}) {
-            assertPass(guard.checkLogin(none), "checkLogin");
             assertPass(guard.checkMemberFanout(none, 1L), "checkMemberFanout");
             // 不该抛，也不该在 Redis 里留下键
             guard.recordLoginFailure(none);
@@ -95,83 +94,24 @@ class DeviceGuardTest {
         assertNull(v.rule());
     }
 
-    // ============================== 登录频次 ==============================
-
-    @Test
-    @DisplayName("dry-run：登录超限【命中但放行】—— 这一档的全部意义")
-    void 登录超限时dryRun照常放行() {
-        properties.setDryRun(true);
-        String device = freshDevice();
-
-        for (int i = 0; i < properties.getMaxLoginPerDay(); i++) {
-            assertFalse(guard.checkLogin(device).hit(), "配额内不该命中");
-        }
-        DeviceGuardVerdict over = guard.checkLogin(device);
-
-        assertTrue(over.hit(), "第 N+1 次必须命中");
-        assertEquals(DeviceGuardRule.LOGIN_TOO_MANY, over.rule());
-        assertTrue(over.allowed(), "🔴 dry-run 期间必须照常放行 —— 否则这一档没有存在的意义");
-        assertTrue(over.retryAfterSeconds() > 0, "要告诉调用方还得等多久");
-    }
-
-    @Test
-    @DisplayName("关掉 dry-run：同样的量级就真的拦了")
-    void 关掉dryRun就拦() {
-        enforce();
-        String device = freshDevice();
-
-        for (int i = 0; i < properties.getMaxLoginPerDay(); i++) {
-            guard.checkLogin(device);
-        }
-        DeviceGuardVerdict over = guard.checkLogin(device);
-
-        assertTrue(over.hit());
-        assertFalse(over.allowed(), "关掉 dry-run 之后必须真的拦下来");
-    }
-
-    @Test
-    @DisplayName("计数按设备隔离 —— 一台被限不影响另一台")
-    void 按设备隔离() {
-        enforce();
-        String busy = freshDevice();
-        for (int i = 0; i <= properties.getMaxLoginPerDay(); i++) {
-            guard.checkLogin(busy);
-        }
-        assertFalse(guard.checkLogin(busy).allowed());
-
-        assertTrue(guard.checkLogin(freshDevice()).allowed(),
-                "限流键没按设备分开的话，一个人能把全站登录打瘫");
-    }
-
     // ============================== 失败次数 ==============================
 
-    @Test
-    @DisplayName("🔴 失败计数只由 recordLoginFailure 累加，checkLogin 不能把正常登录算成失败")
-    void 失败计数不被正常登录污染() {
-        enforce();
-        String device = freshDevice();
-
-        // 只登录、不失败：登录次数远没到上限，失败规则也不该命中
-        for (int i = 0; i < properties.getMaxFailPerHour() + 5; i++) {
-            DeviceGuardVerdict v = guard.checkLogin(device);
-            assertTrue(v.rule() != DeviceGuardRule.FAIL_TOO_MANY,
-                    "checkLogin 里如果 incr 了失败计数，正常登录就会把自己顶成「连续失败」");
-        }
-    }
+    /*
+     * 2026-10-17：「登录频次」那道闸（checkLogin）移交网关限流（LOGIN 场景的设备维度），
+     * 原来测它的四条用例随之删除。失败次数的「超没超」由风控的 DEVICE_FAIL_LIMIT 判，
+     * 本类在生产路径上只剩 recordLoginFailure 这一个调用方 —— 下面这条钉的就是它。
+     */
 
     @Test
-    @DisplayName("连续失败超限 → 下一次登录被 FAIL_TOO_MANY 挡下")
-    void 失败超限() {
-        enforce();
+    @DisplayName("连续失败 → 计数准确累加（风控的 DEVICE_FAIL_LIMIT 读的就是这个数）")
+    void 失败计数累加() {
         String device = freshDevice();
 
         for (int i = 0; i <= properties.getMaxFailPerHour(); i++) {
             guard.recordLoginFailure(device);
         }
-        DeviceGuardVerdict v = guard.checkLogin(device);
 
-        assertEquals(DeviceGuardRule.FAIL_TOO_MANY, v.rule());
-        assertFalse(v.allowed());
+        assertEquals(properties.getMaxFailPerHour() + 1L, counters.read(LoginCounters.Counter.DEVICE_FAIL, device));
     }
 
     // ============================== 一机多号 ==============================

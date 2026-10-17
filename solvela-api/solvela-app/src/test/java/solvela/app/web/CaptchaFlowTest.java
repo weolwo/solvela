@@ -139,16 +139,7 @@ class CaptchaFlowTest {
         tokenStore.revokeAll(CookieSessionStub.MEMBER_ID);
     }
 
-    @Test
-    @DisplayName("同一 IP 一分钟出图超过 20 张 → 429（出图吃 CPU，不限就是免费的压测口）")
-    void 出图限频() throws Exception {
-        String ip = freshIp();
-        for (int i = 0; i < 20; i++) {
-            assertEquals(200, post("/captcha", "{}", Map.of("X-Forwarded-For", ip)).statusCode());
-        }
-        assertEquals(429, post("/captcha", "{}", Map.of("X-Forwarded-For", ip)).statusCode());
-        redis.delete("app:captcha:ip:" + ip);
-    }
+    // 「同一 IP 出图超限 → 429」2026-10-17 移交网关限流的 CAPTCHA 场景，用例在 RateLimitHttpTest
 
     // ============================== 工具 ==============================
 

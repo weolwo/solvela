@@ -10,7 +10,6 @@ import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 
@@ -43,8 +42,6 @@ public class CaptchaService {
 
     private static final String KEY_PASS = "app:captcha:p:";
 
-    private static final String KEY_CREATE = "app:captcha:ip:";
-
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private static final DefaultRedisScript<String> TAKE_ONCE = new DefaultRedisScript<>(
@@ -61,18 +58,13 @@ public class CaptchaService {
                             int pieceSize) {
     }
 
-    /** 出一张图。同一 IP 每分钟超限返回 429 */
-    public Challenge create(String ip) {
-        if (ip != null) {
-            String key = KEY_CREATE + ip;
-            Long count = redis.opsForValue().increment(key);
-            if (count != null && count == 1L) {
-                redis.expire(key, Duration.ofMinutes(1));
-            }
-            if (count != null && count > properties.maxCreatePerIpPerMinute()) {
-                throw new ApiException(ApiErrors.OPERATION_LIMITED, "操作过于频繁，请稍后再试");
-            }
-        }
+    /**
+     * 出一张图。
+     *
+     * <p>出图要吃 CPU，频率由网关限流的 {@code CAPTCHA} 场景管（同 IP、同设备，阶梯处罚）——
+     * 这里原来那把「同 IP 每分钟 20 张」2026-10-17 移交了过去：同一件事只在一个地方数。
+     */
+    public Challenge create() {
         SliderCaptchaGenerator.Puzzle puzzle = generator.generate();
         String id = randomToken();
         redis.opsForValue().set(KEY_CHALLENGE + id, String.valueOf(puzzle.answerX()), properties.challengeTtl());

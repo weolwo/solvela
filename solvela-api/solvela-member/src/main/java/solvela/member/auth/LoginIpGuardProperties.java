@@ -16,8 +16,7 @@ import java.time.Duration;
  *       ip-guard:
  *         enabled: true
  *         window: 1h
- *         max-attempts: 60
- *         max-failures: 20
+ * *         max-failures: 20
  *         max-unknown-accounts: 10
  * </pre>
  *
@@ -39,8 +38,6 @@ public class LoginIpGuardProperties {
     /** 计数窗口 */
     private Duration window = Duration.ofHours(1);
 
-    /** 一个 IP 一个窗口内的登录请求总数（含成功） */
-    private int maxAttempts = 60;
 
     /** 一个 IP 一个窗口内的登录失败次数（密码错、账号不存在、验证码错） */
     private int maxFailures = 20;

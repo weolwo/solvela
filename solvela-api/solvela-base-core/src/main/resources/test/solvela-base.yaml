@@ -240,7 +240,6 @@ solvela:
       ip-guard:
         enabled: true
         window: 1h
-        max-attempts: 60           # 一个 IP 每小时登录请求总数（含成功）
         max-failures: 20           # 失败次数（密码错、账号不存在、验证码错）
         max-unknown-accounts: 10   # 对【不存在的账号】的尝试 —— 最强的信号，以前完全不可见
     device:

@@ -3,7 +3,6 @@ package solvela.app.controller;
 import solvela.app.ratelimit.RateLimit;
 import solvela.app.ratelimit.RateLimitScene;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,7 +12,6 @@ import solvela.app.auth.Anonymous;
 import solvela.app.captcha.CaptchaService;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
-import solvela.app.web.ClientIp;
 
 /**
  * 滑块验证码。客户端在受保护接口回 {@code CAPTCHA_REQUIRED} 时来这里：取一张图 → 拖 → 拿通行票 → 带着票重试原请求。
@@ -35,8 +33,8 @@ public class CaptchaController {
     @Anonymous
     @RateLimit(RateLimitScene.CAPTCHA)
     @PostMapping
-    public CaptchaService.Challenge create(HttpServletRequest request) {
-        return captchaService.create(ClientIp.of(request));
+    public CaptchaService.Challenge create() {
+        return captchaService.create();
     }
 
     /**

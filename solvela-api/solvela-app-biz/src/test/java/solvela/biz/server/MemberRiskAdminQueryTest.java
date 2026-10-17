@@ -211,11 +211,11 @@ class MemberRiskAdminQueryTest {
     // ------------------------------------------------------------------ 规则
 
     @Test
-    @DisplayName("规则列表是全的（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3），按【场景 → 阶段】分好组")
+    @DisplayName("规则列表是全的（登录 18 + 注册 2 + 重置 2 + 资产出口 3 + 换绑 3），按【场景 → 阶段】分好组")
     void listRules() {
         List<MemberRiskRule> rules = adminService.listRules();
 
-        assertEquals(34, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败");
+        assertEquals(28, rules.size(), "少一条就说明种子数据没灌全 —— 那会让 app-biz 启动失败（2026-10-17 起纯计次的 6 条移交网关限流）");
 
         // 场景不能交错：注册的规则夹在登录的规则中间，页面上那一列就白加了
         solvela.enums.MemberRiskEventTypeEnum scenario = null;

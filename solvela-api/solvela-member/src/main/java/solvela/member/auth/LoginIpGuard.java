@@ -7,7 +7,7 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.member.risk.feature.LoginCounters;
 
 /**
- * 登录的 IP 维度闸门：总次数、失败次数、对不存在账号的尝试次数。
+ * 登录的 IP 维度闸门：失败次数、对不存在账号的尝试次数（单纯的请求总数 2026-10-17 移交网关限流）。
  *
  * <h3>为什么设备与账号两个维度还不够</h3>
  * 一个撞库脚本<b>不带设备令牌</b>（设备闸门对「没有设备」一律放行）、<b>每个账号只试一次</b>
@@ -45,8 +45,8 @@ public class LoginIpGuard {
      * 登录前的闸。放行返回 0，拦截返回还需等待的秒数（≥1）。
      *
      * <p>🔴 排在<b>查会员之前</b>：被限的 IP 不该还能拿登录接口去试探「这个号注册过没有」。
-     * 失败与未知账号的计数<b>只读不加</b>（由 {@link #recordFailure} / {@link #recordUnknownAccount} 在真的发生时加），
-     * 总次数在这里加 —— 在这里加失败计数会把每一次正常登录也算成失败。
+     * 失败与未知账号的计数<b>只读不加</b>（由 {@link #recordFailure} / {@link #recordUnknownAccount} 在真的发生时加）——
+     * 在这里加的话，每一次正常登录都会被算成失败。
      */
     public long check(String ip) {
         if (!properties.isEnabled() || SolvelaStringUtil.isBlank(ip)) {
@@ -58,10 +58,7 @@ public class LoginIpGuard {
         if (counters.read(LoginCounters.Counter.IP_FAIL, ip) > properties.getMaxFailures()) {
             return hit(LoginCounters.Counter.IP_FAIL, ip, "登录失败过多");
         }
-        long attempts = counters.bump(LoginCounters.Counter.IP_ATTEMPT, ip);
-        if (attempts > properties.getMaxAttempts()) {
-            return hit(LoginCounters.Counter.IP_ATTEMPT, ip, "登录请求过多");
-        }
+        // 「单 IP 登录请求总数」2026-10-17 移交网关限流（LOGIN 场景的 IP 维度）：它只数次数、不看结果
         return 0L;
     }
 

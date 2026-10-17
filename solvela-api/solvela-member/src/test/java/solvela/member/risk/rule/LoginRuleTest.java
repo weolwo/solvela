@@ -27,11 +27,9 @@ import solvela.member.risk.feature.OldDeviceExemption;
 import solvela.member.risk.rule.impl.DeviceBannedRule;
 import solvela.member.risk.rule.impl.DeviceFailLimitRule;
 import solvela.member.risk.rule.impl.DeviceFanoutRule;
-import solvela.member.risk.rule.impl.DeviceLoginLimitRule;
 import solvela.member.risk.rule.impl.DeviceObserveRule;
 import solvela.member.risk.rule.impl.GlobalCaptchaRule;
 import solvela.member.risk.rule.impl.IpAccountFanoutRule;
-import solvela.member.risk.rule.impl.IpAttemptLimitRule;
 import solvela.member.risk.rule.impl.IpBlacklistRule;
 import solvela.member.risk.rule.impl.IpFailLimitRule;
 import solvela.member.risk.rule.impl.IpGreylistRule;
@@ -81,23 +79,9 @@ class LoginRuleTest {
     private OldDeviceExemption exemption;
 
     @InjectMocks
-    private IpAttemptLimitRule ipAttempt;
+    private IpFailLimitRule ipFail;
 
     // ------------------------------------------------------------------ 计数口径
-
-    @Test
-    @DisplayName("🔴 登录请求总数：判断时把这一次算进去")
-    void attemptCountsThisRequest() {
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
-        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(61L);
-        when(counters.retryAfterSeconds(any(), anyString())).thenReturn(1200L);
-
-        RiskHit hit = rule.evaluate(ctx(), config(tiers(60, 6)));
-
-        assertEquals(MemberRiskDecisionEnum.LIMIT, hit.decision());
-        assertEquals(1200L, hit.retryAfterSeconds());
-        verify(counters, never()).read(eq(LoginCounters.Counter.IP_ATTEMPT), anyString());
-    }
 
     @Test
     @DisplayName("🔴 登录失败数：只读不加")
@@ -120,14 +104,11 @@ class LoginRuleTest {
     }
 
     @Test
-    @DisplayName("设备失败数只读不加，设备登录数算这一次")
+    @DisplayName("设备失败数只读不加")
     void deviceCounters() {
         when(counters.read(LoginCounters.Counter.DEVICE_FAIL, "dev-1")).thenReturn(11L);
         assertNotNull(new DeviceFailLimitRule(counters).evaluate(ctx(), config(tiers(10, 6))));
         verify(counters, never()).bump(any(), anyString());
-
-        when(counters.bump(LoginCounters.Counter.DEVICE_LOGIN, "dev-1")).thenReturn(31L);
-        assertNotNull(new DeviceLoginLimitRule(counters).evaluate(ctx(), config(tiers(30, 6))));
     }
 
     // ------------------------------------------------------------------ 边界
@@ -135,10 +116,10 @@ class LoginRuleTest {
     @Test
     @DisplayName("等于阈值不算超 —— 与改造前的 count > max 完全一致")
     void equalToThresholdPasses() {
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
-        when(counters.bump(any(), anyString())).thenReturn(60L);
+        IpFailLimitRule rule = new IpFailLimitRule(counters, exemption);
+        when(counters.read(any(), anyString())).thenReturn(20L);
 
-        assertNull(rule.evaluate(ctx(), config(tiers(60, 6))));
+        assertNull(rule.evaluate(ctx(), config(tiers(20, 6))));
     }
 
     @Test
@@ -156,7 +137,6 @@ class LoginRuleTest {
         RiskContext noDevice = new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
                 "a@x.com", "ab".repeat(32), member(), null, "H5", "1.2.3.4", false);
 
-        assertNull(new DeviceLoginLimitRule(counters).evaluate(noDevice, config(tiers(30, 6))));
         assertNull(new DeviceFailLimitRule(counters).evaluate(noDevice, config(tiers(10, 6))));
         verify(counters, never()).bump(any(), anyString());
     }
@@ -167,7 +147,7 @@ class LoginRuleTest {
         RiskContext noIp = new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
                 "a@x.com", "ab".repeat(32), member(), "dev-1", "H5", null, false);
 
-        assertNull(new IpAttemptLimitRule(counters, exemption).evaluate(noIp, config(tiers(60, 6))));
+        assertNull(new IpFailLimitRule(counters, exemption).evaluate(noIp, config(tiers(20, 6))));
     }
 
     // ------------------------------------------------------------------ 集合类
@@ -197,14 +177,14 @@ class LoginRuleTest {
     @Test
     @DisplayName("设备闸命中时请求降档，params.observe 为 false 就不请求")
     void observeActionFollowsParams() {
-        when(counters.bump(any(), anyString())).thenReturn(31L);
+        when(counters.read(any(), anyString())).thenReturn(11L);
 
-        RiskHit withObserve = new DeviceLoginLimitRule(counters).evaluate(ctx(),
+        RiskHit withObserve = new DeviceFailLimitRule(counters).evaluate(ctx(),
                 config(JsonUtils.getMapper().readTree(
-                        "{\"tiers\":[{\"over\":30,\"do\":6}],\"observe\":true}")));
+                        "{\"tiers\":[{\"over\":10,\"do\":6}],\"observe\":true}")));
         assertTrue(withObserve.actions().contains(RiskAction.OBSERVE_DEVICE));
 
-        RiskHit without = new DeviceLoginLimitRule(counters).evaluate(ctx(), config(tiers(30, 6)));
+        RiskHit without = new DeviceFailLimitRule(counters).evaluate(ctx(), config(tiers(10, 6)));
         assertTrue(without.actions().isEmpty());
     }
 
@@ -301,10 +281,10 @@ class LoginRuleTest {
     @Test
     @DisplayName("分级规则自己校验参数：tiers 缺了直接抛，不等到运行时才发现")
     void tieredRulesValidate() {
-        assertEquals(MemberRiskPhaseEnum.PRE, ipAttempt.phase());
+        assertEquals(MemberRiskPhaseEnum.PRE, ipFail.phase());
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> ipAttempt.validate(JsonUtils.getMapper().readTree("{}")));
-        ipAttempt.validate(JsonUtils.getMapper().readTree("{\"window\":\"1h\",\"tiers\":[{\"over\":60,\"do\":6}]}"));
+                () -> ipFail.validate(JsonUtils.getMapper().readTree("{}")));
+        ipFail.validate(JsonUtils.getMapper().readTree("{\"window\":\"1h\",\"tiers\":[{\"over\":20,\"do\":6}]}"));
     }
 
     // ------------------------------------------------------------------ 脚手架
@@ -321,8 +301,8 @@ class LoginRuleTest {
     @DisplayName("🔴 老设备：超到限流档也只出滑块 —— 校园网里一个人试错，不该让整片真人登不上")
     void 老设备免限流档() {
         when(exemption.exempt(any())).thenReturn(true);
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
-        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(300L);
+        IpFailLimitRule rule = new IpFailLimitRule(counters, exemption);
+        when(counters.read(LoginCounters.Counter.IP_FAIL, "1.2.3.4")).thenReturn(300L);
         when(counters.retryAfterSeconds(any(), anyString())).thenReturn(1200L);
 
         // 超 60 出滑块、超 200 限流；数到 300，没有豁免的话是限流
@@ -336,20 +316,21 @@ class LoginRuleTest {
     @DisplayName("🔴 豁免压的是处置，不是观察：计数照常加")
     void 豁免也照常计数() {
         when(exemption.exempt(any())).thenReturn(true);
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
-        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(300L);
+        // 用「一个 IP 碰过几个不同账号」：留在风控里、而且自己计数的那条 IP 规则
+        IpAccountFanoutRule rule = new IpAccountFanoutRule(counters, exemption);
+        when(counters.addToSet(eq(LoginCounters.Counter.IP_IDENTITY), eq("1.2.3.4"), anyString())).thenReturn(300L);
 
-        rule.evaluate(ctx(), config(tiers(60, 2, 200, 6)));
+        rule.evaluate(ctx(), config(tiers(5, 2, 30, 6)));
 
-        verify(counters).bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4");
+        verify(counters).addToSet(eq(LoginCounters.Counter.IP_IDENTITY), eq("1.2.3.4"), anyString());
     }
 
     @Test
     @DisplayName("老设备 + 只配了限流一档 → 不命中（没有更低的档可落）")
     void 老设备且只有限流档时不命中() {
         when(exemption.exempt(any())).thenReturn(true);
-        IpAttemptLimitRule rule = new IpAttemptLimitRule(counters, exemption);
-        when(counters.bump(LoginCounters.Counter.IP_ATTEMPT, "1.2.3.4")).thenReturn(300L);
+        IpFailLimitRule rule = new IpFailLimitRule(counters, exemption);
+        when(counters.read(LoginCounters.Counter.IP_FAIL, "1.2.3.4")).thenReturn(300L);
 
         assertNull(rule.evaluate(ctx(), config(tiers(200, 6))));
     }

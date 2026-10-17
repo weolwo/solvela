@@ -22,9 +22,7 @@ import solvela.member.risk.config.ListMatch;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.feature.LoginCounters;
 import solvela.member.risk.rule.impl.RegisterDeviceBannedRule;
-import solvela.member.risk.rule.impl.RegisterDeviceLimitRule;
 import solvela.member.risk.rule.impl.RegisterIpBlacklistRule;
-import solvela.member.risk.rule.impl.RegisterIpLimitRule;
 import tools.jackson.databind.JsonNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -69,11 +67,10 @@ class RegisterRuleTest {
     // ------------------------------------------------------------------ 场景与阶段
 
     @Test
-    @DisplayName("🔴 四条都写死在【注册 + 前置】—— 表里改不动它们")
+    @DisplayName("🔴 两条都写死在【注册 + 前置】—— 表里改不动它们")
     void 场景与阶段() {
+        // 注册的 IP / 设备次数限频 2026-10-17 移交网关限流（REGISTER 场景），这里只剩名单与封禁
         for (RiskRule rule : new RiskRule[]{
-                new RegisterIpLimitRule(counters),
-                new RegisterDeviceLimitRule(counters),
                 new RegisterIpBlacklistRule(lists),
                 new RegisterDeviceBannedRule(dispositionService)}) {
             assertEquals(MemberRiskEventTypeEnum.REGISTER, rule.eventType(), rule.code());
@@ -87,78 +84,6 @@ class RegisterRuleTest {
     void 强规则一律生效() {
         assertTrue(new RegisterIpBlacklistRule(lists).alwaysEnforce());
         assertTrue(new RegisterDeviceBannedRule(dispositionService).alwaysEnforce());
-    }
-
-    // ------------------------------------------------------------------ 档位
-
-    @Test
-    @DisplayName("🔴 配成滑块 / OTP / 冷却 → 保存那一刻就拒绝")
-    void 拒绝执行不了的档位() {
-        RegisterIpLimitRule rule = new RegisterIpLimitRule(counters);
-        for (int decision : new int[]{2, 3, 4, 5}) {
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                    () -> rule.validate(tiers(10, decision)));
-            assertTrue(e.getMessage().contains("注册场景"), e.getMessage());
-        }
-    }
-
-    @Test
-    @DisplayName("放行 / 限流 / 拒绝都能配")
-    void 允许的档位() {
-        RegisterDeviceLimitRule rule = new RegisterDeviceLimitRule(counters);
-        rule.validate(tiers(2, 1));
-        rule.validate(tiers(2, 6));
-        rule.validate(tiers(2, 7));
-    }
-
-    // ------------------------------------------------------------------ 计数口径
-
-    @Test
-    @DisplayName("🔴 两维都【把这一次算进去】：注册请求本身就是一次建号尝试")
-    void 都算这一次() {
-        when(counters.bump(LoginCounters.Counter.REGISTER_IP, "1.2.3.4")).thenReturn(11L);
-        when(counters.bump(LoginCounters.Counter.REGISTER_DEVICE, "dev-1")).thenReturn(3L);
-        when(counters.retryAfterSeconds(any(), anyString())).thenReturn(600L);
-
-        RiskHit ip = new RegisterIpLimitRule(counters).evaluate(ctx(), config(tiers(10, 6)));
-        RiskHit device = new RegisterDeviceLimitRule(counters).evaluate(ctx(), config(tiers(2, 6)));
-
-        assertEquals(MemberRiskDecisionEnum.LIMIT, ip.decision());
-        assertEquals(MemberRiskDecisionEnum.LIMIT, device.decision());
-        assertEquals(600L, ip.retryAfterSeconds(), "不告诉他要等多久，他只会立刻再点一次");
-        verify(counters, never()).read(any(), anyString());
-    }
-
-    @Test
-    @DisplayName("等于阈值不算超（与改造前的 count > max 一致）")
-    void 边界() {
-        when(counters.bump(LoginCounters.Counter.REGISTER_DEVICE, "dev-1")).thenReturn(2L);
-
-        assertNull(new RegisterDeviceLimitRule(counters).evaluate(ctx(), config(tiers(2, 6))));
-    }
-
-    @Test
-    @DisplayName("🔴 维度取不到时不判：拿不到 IP 不该变成「全站注册不可用」")
-    void 维度取不到不判() {
-        RiskContext noIp = new RiskContext(MemberRiskEventTypeEnum.REGISTER, MemberLoginType.PHONE_PASSWORD,
-                "13800000000", "ab".repeat(32), null, null, "H5", null, false);
-
-        // 一律拒绝的话，任何一次取 IP 失败都会让所有人注册不了 —— 那种故障比放过几个注册严重得多
-        assertNull(new RegisterIpLimitRule(counters).evaluate(noIp, config(tiers(10, 6))));
-        // 没带设备令牌是常态（老客户端），不是可疑
-        assertNull(new RegisterDeviceLimitRule(counters).evaluate(noIp, config(tiers(2, 6))));
-    }
-
-    @Test
-    @DisplayName("设备维度命中生效时请求观察档 —— params.observe 关掉就不请求")
-    void 观察档动作() {
-        when(counters.bump(LoginCounters.Counter.REGISTER_DEVICE, "dev-1")).thenReturn(3L);
-        RegisterDeviceLimitRule rule = new RegisterDeviceLimitRule(counters);
-
-        JsonNode observe = JsonUtils.getMapper()
-                .readTree("{\"window\":\"1d\",\"observe\":true,\"tiers\":[{\"over\":2,\"do\":6}]}");
-        assertTrue(rule.evaluate(ctx(), config(observe)).actions().contains(RiskAction.OBSERVE_DEVICE));
-        assertTrue(rule.evaluate(ctx(), config(tiers(2, 6))).actions().isEmpty());
     }
 
     // ------------------------------------------------------------------ 名单与封禁
