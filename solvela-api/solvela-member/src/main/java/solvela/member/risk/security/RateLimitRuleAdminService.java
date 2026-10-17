@@ -1,6 +1,7 @@
 package solvela.member.risk.security;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -9,13 +10,13 @@ import solvela.base.json.JsonUtils;
 import solvela.member.RateLimitRule;
 import solvela.member.risk.dao.RateLimitRuleDao;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
+import solvela.security.RateLimitDimension;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -52,9 +53,40 @@ public class RateLimitRuleAdminService {
 
     private final StringRedisTemplate redis;
 
-    /** 一行要改成的样子 */
+    /** 一行要改成的样子。保存前先 {@link #validate()} */
     public record RuleValues(int burst, int limit3m, int limit5m, int limit10m, String longWindow, Integer limitLong,
                              int mode) {
+
+        /** 填了长窗口（空串算没填） */
+        boolean hasLongWindow() {
+            return longWindow != null && !longWindow.isBlank();
+        }
+
+        /** 见类注释「保存时的几条校验」。不合格抛 {@link IllegalArgumentException}，后台原样提示 */
+        public void validate() {
+            if (mode < 0 || mode > 2) {
+                throw new IllegalArgumentException("档位只能是 0-关闭, 1-陪跑, 2-生效");
+            }
+            if (burst < 1 || limit3m < 1 || limit5m < 1 || limit10m < 1) {
+                throw new IllegalArgumentException("阈值至少是 1");
+            }
+            if (!(burst <= limit3m && limit3m <= limit5m && limit5m <= limit10m)) {
+                throw new IllegalArgumentException("要满足 突发 ≤ 3 分钟 ≤ 5 分钟 ≤ 10 分钟：短窗口比长窗口还宽，长窗口就永远先触发");
+            }
+            // 亚线性：每分钟的允许量随窗口变长而变小。5 分钟的量 ≥ 3 分钟的 5/3 倍，5 分钟窗口就永远不会先触发
+            if (limit5m * 3L >= limit3m * 5L || limit10m >= limit5m * 2L) {
+                throw new IllegalArgumentException("三个窗口要亚线性：5 分钟要小于 3 分钟的 5/3 倍、10 分钟要小于 5 分钟的 2 倍"
+                        + " —— 否则长窗口永远不会先触发，配了等于没配");
+            }
+            if (hasLongWindow() != (limitLong != null)) {
+                throw new IllegalArgumentException("长窗口与长窗口阈值要么都填、要么都不填");
+            }
+            // 长窗口的阈值可以比 10 分钟的还小：它抓的是「每 10 分钟都卡在阈值下、慢慢滴」的脚本，
+            // 迁过来的几条本来就是这样（注册：10 分钟 5 次，但一天只许 2 次）
+            if (hasLongWindow() && (!LONG_WINDOWS.contains(longWindow) || limitLong < 1)) {
+                throw new IllegalArgumentException("长窗口只能是 1h 或 1d，阈值至少是 1");
+            }
+        }
     }
 
     /** 网关上报的一个接口 */
@@ -80,10 +112,10 @@ public class RateLimitRuleAdminService {
         if (row == null) {
             throw new IllegalArgumentException("没有这条限流规则: " + id);
         }
-        validate(v);
+        v.validate();
         apply(row, v);
         // 🔴 不用 updateById：它跳过 null 字段，「清掉长窗口」就存不进去 —— 页面上显示已清，库里还在
-        ruleDao.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<RateLimitRule>()
+        ruleDao.update(null, new LambdaUpdateWrapper<RateLimitRule>()
                 .eq(RateLimitRule::getId, id)
                 .set(RateLimitRule::getBurst, row.getBurst())
                 .set(RateLimitRule::getLimit3m, row.getLimit3m())
@@ -99,14 +131,14 @@ public class RateLimitRuleAdminService {
 
     /** 加一条按接口的覆盖行。接口必须在网关上报的路由清单里 */
     public RateLimitRule addEndpoint(String endpointKey, int dimension, RuleValues v, String operator) {
-        if (dimension < 0 || dimension > 4) {
+        if (RateLimitDimension.of(dimension) == null) {
             throw new IllegalArgumentException("维度只能是 0-全局, 1-IP, 2-账号, 3-设备, 4-IP段");
         }
         if (routes().stream().noneMatch(r -> r.endpointKey().equals(endpointKey))) {
             throw new IllegalArgumentException("网关上报的路由清单里没有这个接口: " + endpointKey
                     + " —— 只能从下拉框里选，手填的接口键对不上就永远不生效");
         }
-        validate(v);
+        v.validate();
         boolean exists = ruleDao.selectCount(new LambdaQueryWrapper<RateLimitRule>()
                 .eq(RateLimitRule::getTargetType, TARGET_ENDPOINT).eq(RateLimitRule::getTarget, endpointKey)
                 .eq(RateLimitRule::getDimension, dimension)) > 0;
@@ -163,51 +195,29 @@ public class RateLimitRuleAdminService {
     /** 已发布的版本，与各网关实例已加载的版本（实例停了，它的那一条一分钟内自然消失） */
     public Versions versions() {
         Object published = redis.opsForHash().get(SecurityKeys.RULE_SNAPSHOT, SecurityKeys.SNAPSHOT_FIELD_VERSION);
-        Map<String, LoadedVersion> instances = new LinkedHashMap<>();
         Set<String> keys = redis.keys(SecurityKeys.LOADED_VERSION_PREFIX + "*");
-        if (keys != null) {
-            for (String key : keys) {
-                String raw = redis.opsForValue().get(key);
-                if (raw == null) {
-                    continue;
-                }
-                String instance = key.substring(SecurityKeys.LOADED_VERSION_PREFIX.length());
-                try {
-                    JsonNode n = JsonUtils.getMapper().readTree(raw);
-                    instances.put(instance, new LoadedVersion(instance, n.path("version").asString(null),
-                            n.path("source").asString(null),
-                            n.path("reportedAt").canConvertToLong() ? n.path("reportedAt").asLong() : null));
-                } catch (Exception e) {
-                    instances.put(instance, new LoadedVersion(instance, null, null, null));
-                }
-            }
-        }
-        return new Versions(published == null ? null : published.toString(), List.copyOf(instances.values()));
+        List<LoadedVersion> instances = keys == null ? List.of() : keys.stream()
+                .sorted()
+                .map(this::loadedVersion)
+                .filter(Objects::nonNull)
+                .toList();
+        return new Versions(published == null ? null : published.toString(), instances);
     }
 
-    static void validate(RuleValues v) {
-        if (v.mode() < 0 || v.mode() > 2) {
-            throw new IllegalArgumentException("档位只能是 0-关闭, 1-陪跑, 2-生效");
+    /** 一个实例的回报（{@code RuleSnapshotHolder.reportLoaded} 写的）；键刚过期读不到为 null，解不开的只留实例名 */
+    private LoadedVersion loadedVersion(String key) {
+        String raw = redis.opsForValue().get(key);
+        if (raw == null) {
+            return null;
         }
-        if (v.burst() < 1 || v.limit3m() < 1 || v.limit5m() < 1 || v.limit10m() < 1) {
-            throw new IllegalArgumentException("阈值至少是 1");
-        }
-        if (!(v.burst() <= v.limit3m() && v.limit3m() <= v.limit5m() && v.limit5m() <= v.limit10m())) {
-            throw new IllegalArgumentException("要满足 突发 ≤ 3 分钟 ≤ 5 分钟 ≤ 10 分钟：短窗口比长窗口还宽，长窗口就永远先触发");
-        }
-        // 亚线性：每分钟的允许量随窗口变长而变小。5 分钟的量 ≥ 3 分钟的 5/3 倍，5 分钟窗口就永远不会先触发
-        if (v.limit5m() * 3L >= v.limit3m() * 5L || v.limit10m() >= v.limit5m() * 2L) {
-            throw new IllegalArgumentException("三个窗口要亚线性：5 分钟要小于 3 分钟的 5/3 倍、10 分钟要小于 5 分钟的 2 倍"
-                    + " —— 否则长窗口永远不会先触发，配了等于没配");
-        }
-        boolean hasLong = v.longWindow() != null && !v.longWindow().isBlank();
-        if (hasLong != (v.limitLong() != null)) {
-            throw new IllegalArgumentException("长窗口与长窗口阈值要么都填、要么都不填");
-        }
-        // 长窗口的阈值可以比 10 分钟的还小：它抓的是「每 10 分钟都卡在阈值下、慢慢滴」的脚本，
-        // 迁过来的几条本来就是这样（注册：10 分钟 5 次，但一天只许 2 次）
-        if (hasLong && (!LONG_WINDOWS.contains(v.longWindow()) || v.limitLong() < 1)) {
-            throw new IllegalArgumentException("长窗口只能是 1h 或 1d，阈值至少是 1");
+        String instance = key.substring(SecurityKeys.LOADED_VERSION_PREFIX.length());
+        try {
+            JsonNode n = JsonUtils.getMapper().readTree(raw);
+            Long reportedAt = n.path("reportedAt").canConvertToLong() ? n.path("reportedAt").asLong() : null;
+            return new LoadedVersion(instance, n.path("version").asString(null), n.path("source").asString(null),
+                    reportedAt);
+        } catch (Exception e) {
+            return new LoadedVersion(instance, null, null, null);
         }
     }
 
@@ -216,9 +226,8 @@ public class RateLimitRuleAdminService {
         row.setLimit3m(v.limit3m());
         row.setLimit5m(v.limit5m());
         row.setLimit10m(v.limit10m());
-        boolean hasLong = v.longWindow() != null && !v.longWindow().isBlank();
-        row.setLongWindow(hasLong ? v.longWindow() : null);
-        row.setLimitLong(hasLong ? v.limitLong() : null);
+        row.setLongWindow(v.hasLongWindow() ? v.longWindow() : null);
+        row.setLimitLong(v.hasLongWindow() ? v.limitLong() : null);
         row.setMode(v.mode());
     }
 }

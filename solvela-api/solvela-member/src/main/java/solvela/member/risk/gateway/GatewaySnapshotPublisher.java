@@ -12,6 +12,7 @@ import solvela.base.module.config.ConfigChangedEvent;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.enums.SecurityListDimensionEnum;
 import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
 import solvela.member.RateLimitRule;
 import solvela.member.risk.dao.RateLimitRuleDao;
 import solvela.security.GatewayRuleSnapshot;
@@ -122,8 +123,17 @@ public class GatewaySnapshotPublisher {
     /** 拼一份快照。不写 Redis —— 单独暴露出来，测试拿它与网关的内置默认值比对 */
     public GatewayRuleSnapshot build() {
         long builtAt = dbNowMillis();
+        List<GatewayRuleSnapshot.Rule> rules = loadRules();
+        Map<String, String> configs = loadConfigs();
+        List<GatewayRuleSnapshot.IpEntry> ipLists = loadIpLists();
+        List<GatewayRuleSnapshot.MemberEntry> memberGrey = loadMemberGreyList();
+        String version = digest(rules, configs, ipLists, memberGrey);
+        return new GatewayRuleSnapshot(version, builtAt, rules, configs, ipLists, memberGrey);
+    }
 
-        List<GatewayRuleSnapshot.Rule> rules = ruleDao.selectList(null).stream()
+    /** 全部限流规则，排好序：顺序也进摘要，库里行序变了不该算「内容变了」 */
+    private List<GatewayRuleSnapshot.Rule> loadRules() {
+        return ruleDao.selectList(null).stream()
                 .sorted(Comparator.comparing(RateLimitRule::getTargetType)
                         .thenComparing(RateLimitRule::getTarget)
                         .thenComparing(RateLimitRule::getDimension))
@@ -131,7 +141,10 @@ public class GatewaySnapshotPublisher {
                         r.getBurst(), r.getLimit3m(), r.getLimit5m(), r.getLimit10m(),
                         r.getLongWindow(), r.getLimitLong(), r.getMode()))
                 .toList();
+    }
 
+    /** 那两条全局配置的原文（网关自己解析）；库里没有的不放 */
+    private Map<String, String> loadConfigs() {
         Map<String, String> configs = new LinkedHashMap<>();
         for (ConfigKeyEnum key : CONFIG_KEYS) {
             List<String> values = jdbcTemplate.queryForList(
@@ -140,12 +153,17 @@ public class GatewaySnapshotPublisher {
                 configs.put(key.getValue(), values.get(0));
             }
         }
+        return configs;
+    }
 
-        /*
-         * 🔴 到期过滤与「到期时间 → epoch」都在 SQL 里做：Java 这一侧不做任何时区换算（交接文档铁律 10）。
-         * expire_time 是按会话时区写进库的，UNIX_TIMESTAMP 在同一个会话时区里还原 —— 两边落在同一个钟上。
-         */
-        List<GatewayRuleSnapshot.IpEntry> ipLists = jdbcTemplate.query("""
+    /**
+     * 有效的 IP / IP 段名单（黑、灰、白）。
+     *
+     * <p>🔴 到期过滤与「到期时间 → epoch」都在 SQL 里做：Java 这一侧不做任何时区换算（交接文档铁律 10）。
+     * expire_time 是按会话时区写进库的，UNIX_TIMESTAMP 在同一个会话时区里还原 —— 两边落在同一个钟上。
+     */
+    private List<GatewayRuleSnapshot.IpEntry> loadIpLists() {
+        return jdbcTemplate.query("""
                         SELECT list_type, dimension, list_value, score, source,
                                CAST(UNIX_TIMESTAMP(expire_time) * 1000 AS SIGNED) AS expire_at
                         FROM t_security_list
@@ -158,9 +176,11 @@ public class GatewaySnapshotPublisher {
                         (Long) rs.getObject("expire_at", Long.class)),
                 SecurityListStatusEnum.VALID.getValue(),
                 SecurityListDimensionEnum.IP.getValue(), SecurityListDimensionEnum.IP_RANGE.getValue());
+    }
 
-        // 会员灰名单（网关方案 §5.5）：网关把这些会员的账号维度阈值减半。会员名单必有到期，值是会员号
-        List<GatewayRuleSnapshot.MemberEntry> memberGrey = jdbcTemplate.query("""
+    /** 会员灰名单（网关方案 §5.5）：网关把这些会员的账号维度阈值减半。会员名单必有到期，值是会员号 */
+    private List<GatewayRuleSnapshot.MemberEntry> loadMemberGreyList() {
+        return jdbcTemplate.query("""
                         SELECT list_value, CAST(UNIX_TIMESTAMP(expire_time) * 1000 AS SIGNED) AS expire_at
                         FROM t_security_list
                         WHERE status = ? AND dimension = ? AND list_type = ?
@@ -169,10 +189,7 @@ public class GatewaySnapshotPublisher {
                 (rs, i) -> new GatewayRuleSnapshot.MemberEntry(Long.parseLong(rs.getString("list_value").trim()),
                         (Long) rs.getObject("expire_at", Long.class)),
                 SecurityListStatusEnum.VALID.getValue(), SecurityListDimensionEnum.MEMBER.getValue(),
-                solvela.enums.SecurityListTypeEnum.GREY.getValue());
-
-        String version = digest(rules, configs, ipLists, memberGrey);
-        return new GatewayRuleSnapshot(version, builtAt, rules, configs, ipLists, memberGrey);
+                SecurityListTypeEnum.GREY.getValue());
     }
 
     /**

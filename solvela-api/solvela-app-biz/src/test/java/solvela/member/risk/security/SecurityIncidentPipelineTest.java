@@ -13,6 +13,8 @@ import solvela.base.module.config.ConfigService;
 import solvela.base.module.redis.RedisService;
 import solvela.biz.server.BizApplication;
 import solvela.enums.DeviceStatusEnum;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListTypeEnum;
 import solvela.member.api.DeviceRegisterCmd;
 import solvela.member.device.DeviceDispositionService;
 import solvela.member.device.DeviceService;
@@ -225,7 +227,7 @@ class SecurityIncidentPipelineTest {
                     last_hit_time, expire_time, operator)
                 VALUES (1, 1, ?, '用例：到期', 2, 'HONEYPOT', 1, NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 1 MINUTE, 'system')""", expired);
         for (int i = 0; i < 3; i++) {
-            listWriter.upsert(new SecurityListWriter.Entry(1, 1, ip(), "HONEYPOT", "用例：连坐", now() + 86400, null));
+            listWriter.upsert(new SecurityListWriter.Entry(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, ip(), "HONEYPOT", "用例：连坐", now() + 86400, null));
         }
         SecurityListMaintainJob job = maintainJob();
 
@@ -251,7 +253,7 @@ class SecurityIncidentPipelineTest {
     @DisplayName("网关攒在 Redis 的被挡次数 → 加到那条黑名单的 blocked_count，计数清零")
     void syncsBlockedCount() {
         String ip = ip();
-        listWriter.upsert(new SecurityListWriter.Entry(1, 1, ip, "HONEYPOT", "用例：被挡", now() + 86400, null));
+        listWriter.upsert(new SecurityListWriter.Entry(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, ip, "HONEYPOT", "用例：被挡", now() + 86400, null));
         String key = ns + "blocked:1:" + ip;
         redis.opsForValue().set(key, "42");
 
@@ -265,7 +267,7 @@ class SecurityIncidentPipelineTest {
     @DisplayName("🔴 后台撤销一条 IP 黑名单 → 网关的处罚键一起删掉（否则后台显示已解封，人还要被挡到处罚到期）")
     void revokeClearsPenalty() {
         String ip = ip();
-        listWriter.upsert(new SecurityListWriter.Entry(1, 1, ip, "HONEYPOT", "用例：撤销", now() + 86400, null));
+        listWriter.upsert(new SecurityListWriter.Entry(SecurityListTypeEnum.BLACK, SecurityListDimensionEnum.IP, ip, "HONEYPOT", "用例：撤销", now() + 86400, null));
         String penalty = SecurityKeys.securityPenaltyIp(IpKeys.ip(ip));
         redis.opsForValue().set(penalty, String.valueOf(now() + 86400));
         long id = ((Number) listRow(ip, 1).get("id")).longValue();

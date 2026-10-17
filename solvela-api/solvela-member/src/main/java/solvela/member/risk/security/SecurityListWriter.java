@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListStatusEnum;
+import solvela.enums.SecurityListTypeEnum;
 
 import java.util.List;
 import java.util.Map;
@@ -41,18 +44,38 @@ public class SecurityListWriter {
     /**
      * 一条自动条目要写成什么样。
      *
-     * @param listType     1-黑, 2-灰
-     * @param dimension    1-IP, 2-IP段
+     * @param listType     黑 / 灰（自动条目不会是白）
+     * @param dimension    IP / IP 段 / 会员
      * @param sourceRule   HONEYPOT / CANARY / KEYWORD / RATE_LIMIT / ESCALATE / SEGMENT
      * @param untilEpochSec 到期（epoch 秒），🔴 自动条目必填
      * @param incidentId   证据；没有（由任务推导出来的条目）为 null
      */
-    public record Entry(int listType, int dimension, String value, String sourceRule, String reason,
-                        long untilEpochSec, Long incidentId) {
+    public record Entry(SecurityListTypeEnum listType, SecurityListDimensionEnum dimension, String value,
+                        String sourceRule, String reason, long untilEpochSec, Long incidentId) {
     }
 
     /** 写的结果 */
-    public enum Outcome { INSERTED, EXTENDED, REUSED, KEPT_MANUAL, KEPT_EXISTING }
+    public enum Outcome {
+        INSERTED, EXTENDED, REUSED, KEPT_MANUAL, KEPT_EXISTING;
+
+        /** 名单有没有变 —— 变了的话调用方要重载名单缓存、重发网关快照 */
+        public boolean changed() {
+            return this != KEPT_MANUAL && this != KEPT_EXISTING;
+        }
+    }
+
+    /** {@code t_security_list.source}：1-人工, 2-自动 */
+    private static final int SOURCE_MANUAL = 1;
+
+    /** 按编码找维度（库里读出来的那一列）；不认识的返回 null */
+    public static SecurityListDimensionEnum dimension(int code) {
+        for (SecurityListDimensionEnum d : SecurityListDimensionEnum.values()) {
+            if (d.equalsValue(code)) {
+                return d;
+            }
+        }
+        return null;
+    }
 
     /** 按上面的规则写一条 */
     public Outcome upsert(Entry e) {
@@ -72,47 +95,76 @@ public class SecurityListWriter {
     }
 
     private Outcome doUpsert(Entry e, boolean onlyIfAbsent) {
+        Existing existing = find(e);
+        if (existing == null) {
+            insert(e);
+            return Outcome.INSERTED;
+        }
+        if (existing.valid() && existing.manual()) {
+            return Outcome.KEPT_MANUAL;
+        }
+        if (existing.valid() && onlyIfAbsent) {
+            return Outcome.KEPT_EXISTING;
+        }
+        if (existing.valid()) {
+            extend(existing.id(), e);
+            return Outcome.EXTENDED;
+        }
+        reuse(existing.id(), e);
+        return Outcome.REUSED;
+    }
+
+    /** 唯一键上已有的那一行。{@code valid} = 有效且没过期 */
+    private record Existing(long id, boolean valid, boolean manual) {
+    }
+
+    private Existing find(Entry e) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT id, source, status, (expire_time IS NOT NULL AND expire_time <= NOW()) AS expired
                   FROM t_security_list
                  WHERE dimension = ? AND list_value = ? AND list_type = ?
-                """, e.dimension(), e.value(), e.listType());
-        Integer score = e.listType() == 2 ? AUTO_GREY_SCORE : null;
+                """, e.dimension().getValue(), e.value(), e.listType().getValue());
         if (rows.isEmpty()) {
-            jdbcTemplate.update("""
-                    INSERT INTO t_security_list (list_type, dimension, list_value, score, reason, source, source_rule,
-                                                 hit_count, last_hit_time, last_incident_id, status, expire_time, operator)
-                    VALUES (?, ?, ?, ?, ?, 2, ?, 1, NOW(), ?, 1, FROM_UNIXTIME(?), ?)
-                    """, e.listType(), e.dimension(), e.value(), score, e.reason(), e.sourceRule(), e.incidentId(),
-                    e.untilEpochSec(), SYSTEM);
-            return Outcome.INSERTED;
+            return null;
         }
         Map<String, Object> row = rows.get(0);
-        long id = ((Number) row.get("id")).longValue();
-        boolean valid = ((Number) row.get("status")).intValue() == 1 && ((Number) row.get("expired")).intValue() == 0;
-        boolean manual = ((Number) row.get("source")).intValue() == 1;
-        if (valid && manual) {
-            return Outcome.KEPT_MANUAL;
-        }
-        if (valid && onlyIfAbsent) {
-            return Outcome.KEPT_EXISTING;
-        }
-        if (valid) {
-            jdbcTemplate.update("""
-                    UPDATE t_security_list
-                       SET hit_count = hit_count + 1, last_hit_time = NOW(), last_incident_id = COALESCE(?, last_incident_id),
-                           source_rule = ?, expire_time = GREATEST(expire_time, FROM_UNIXTIME(?))
-                     WHERE id = ?
-                    """, e.incidentId(), e.sourceRule(), e.untilEpochSec(), id);
-            return Outcome.EXTENDED;
-        }
+        boolean valid = SecurityListStatusEnum.VALID.equalsValue(((Number) row.get("status")).intValue())
+                && ((Number) row.get("expired")).intValue() == 0;
+        return new Existing(((Number) row.get("id")).longValue(), valid,
+                ((Number) row.get("source")).intValue() == SOURCE_MANUAL);
+    }
+
+    private void insert(Entry e) {
+        jdbcTemplate.update("""
+                INSERT INTO t_security_list (list_type, dimension, list_value, score, reason, source, source_rule,
+                                             hit_count, last_hit_time, last_incident_id, status, expire_time, operator)
+                VALUES (?, ?, ?, ?, ?, 2, ?, 1, NOW(), ?, 1, FROM_UNIXTIME(?), ?)
+                """, e.listType().getValue(), e.dimension().getValue(), e.value(), score(e), e.reason(), e.sourceRule(),
+                e.incidentId(), e.untilEpochSec(), SYSTEM);
+    }
+
+    /** 有效的自动条目：命中次数 +1、刷新证据，到期取两者中更晚的 */
+    private void extend(long id, Entry e) {
+        jdbcTemplate.update("""
+                UPDATE t_security_list
+                   SET hit_count = hit_count + 1, last_hit_time = NOW(), last_incident_id = COALESCE(?, last_incident_id),
+                       source_rule = ?, expire_time = GREATEST(expire_time, FROM_UNIXTIME(?))
+                 WHERE id = ?
+                """, e.incidentId(), e.sourceRule(), e.untilEpochSec(), id);
+    }
+
+    /** 已撤销或已过期的：复用这一行，重新置为有效、归为自动 */
+    private void reuse(long id, Entry e) {
         jdbcTemplate.update("""
                 UPDATE t_security_list
                    SET status = 1, source = 2, source_rule = ?, reason = ?, score = ?, hit_count = 1, last_hit_time = NOW(),
                        last_incident_id = ?, expire_time = FROM_UNIXTIME(?), operator = ?,
                        revoke_operator = NULL, revoke_reason = NULL, revoke_time = NULL
                  WHERE id = ?
-                """, e.sourceRule(), e.reason(), score, e.incidentId(), e.untilEpochSec(), SYSTEM, id);
-        return Outcome.REUSED;
+                """, e.sourceRule(), e.reason(), score(e), e.incidentId(), e.untilEpochSec(), SYSTEM, id);
+    }
+
+    private static Integer score(Entry e) {
+        return e.listType() == SecurityListTypeEnum.GREY ? AUTO_GREY_SCORE : null;
     }
 }

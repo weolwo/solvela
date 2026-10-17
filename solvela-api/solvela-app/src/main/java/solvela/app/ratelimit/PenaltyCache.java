@@ -39,7 +39,25 @@ final class PenaltyCache {
     private final ConcurrentHashMap<String, Cached> entries = new ConcurrentHashMap<>();
 
     /** 缓存里还有效的处罚；没有为 null */
-    Blocked get(String key, long nowMillis) {
+    /** @param ipKey {@code IpKeys.ip} 的写法；null 返回 null */
+    Blocked ip(String ipKey, long nowMillis) {
+        return ipKey == null ? null : get("ip:" + ipKey, nowMillis);
+    }
+
+    /** @param deviceId 设备号；null 返回 null */
+    Blocked device(String deviceId, long nowMillis) {
+        return deviceId == null ? null : get("dev:" + deviceId, nowMillis);
+    }
+
+    void putIp(String ipKey, Blocked blocked, long nowMillis) {
+        put("ip:" + ipKey, blocked, nowMillis);
+    }
+
+    void putDevice(String deviceId, Blocked blocked, long nowMillis) {
+        put("dev:" + deviceId, blocked, nowMillis);
+    }
+
+    private Blocked get(String key, long nowMillis) {
         Cached c = entries.get(key);
         if (c == null) {
             return null;
@@ -51,7 +69,7 @@ final class PenaltyCache {
         return c.blocked();
     }
 
-    void put(String key, Blocked blocked, long nowMillis) {
+    private void put(String key, Blocked blocked, long nowMillis) {
         if (entries.size() >= MAX_ENTRIES) {
             entries.clear();
         }
@@ -61,9 +79,5 @@ final class PenaltyCache {
             until = Math.min(until, blocked.untilEpochSeconds() * 1000);
         }
         entries.put(key, new Cached(blocked, until));
-    }
-
-    int size() {
-        return entries.size();
     }
 }

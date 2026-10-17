@@ -11,6 +11,7 @@ import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
+import solvela.security.RateLimitDimension;
 import solvela.security.SecurityIncidentEvent;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.json.JsonMapper;
@@ -63,7 +64,7 @@ class RateLimiterTest {
     @Test
     @DisplayName("突发：第一次超只拒不罚；10 分钟内第二次超才判罚（第 1 档 60 秒）")
     void burstFirstRejectsThenPenalises() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.DEVICE, 2, 100, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.DEVICE.code(), 2, 100, 100, 100)), Map.of());
         String device = device();
 
         limiter.check(login(null, device, null));
@@ -79,14 +80,14 @@ class RateLimiterTest {
     @Test
     @DisplayName("窗口超了 → 判罚；处罚期间不计数、不延长")
     void windowViolationPenalisesAndDoesNotExtend() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.DEVICE, 100, 3, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.DEVICE.code(), 100, 3, 100, 100)), Map.of());
         String device = device();
         for (int i = 0; i < 3; i++) {
             limiter.check(login(null, device, null));
         }
         assertEquals(60, retryAfter(assertThrows(ApiException.class, () -> limiter.check(login(null, device, null)))));
 
-        String penaltyKey = SecurityKeys.rateLimitPenalty("LOGIN", RateLimiter.DEVICE, device);
+        String penaltyKey = SecurityKeys.rateLimitPenalty("LOGIN", RateLimitDimension.DEVICE.code(), device);
         String until = (String) redis.opsForHash().get(penaltyKey, "until");
         for (int i = 0; i < 5; i++) {
             assertThrows(ApiException.class, () -> limiter.check(login(null, device, null)));
@@ -98,12 +99,12 @@ class RateLimiterTest {
     @Test
     @DisplayName("阶梯：处罚到期后再犯升一档（60 秒 → 5 分钟）")
     void ladderEscalates() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.DEVICE, 100, 1, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.DEVICE.code(), 100, 1, 100, 100)), Map.of());
         String device = device();
         limiter.check(login(null, device, null));
         assertEquals(60, retryAfter(assertThrows(ApiException.class, () -> limiter.check(login(null, device, null)))));
 
-        expirePenalty("LOGIN", RateLimiter.DEVICE, device);
+        expirePenalty("LOGIN", RateLimitDimension.DEVICE.code(), device);
         assertEquals(300, retryAfter(assertThrows(ApiException.class, () -> limiter.check(login(null, device, null)))),
                 "到期之后马上再犯，应是第 2 档");
     }
@@ -112,7 +113,7 @@ class RateLimiterTest {
     @DisplayName("🔴 匿名场景的账号维度封顶 30 分钟：拿别人的邮箱打，最多让他等半小时")
     void anonymousAccountCapped() {
         String ladder = "{\"ladder\":[\"2h\"],\"anonAccountCap\":\"30m\"}";
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.ACCOUNT, 100, 1, 100, 100)),
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.ACCOUNT.code(), 100, 1, 100, 100)),
                 Map.of("gateway_rate_limit", ladder));
         String email = "cap-" + UUID.randomUUID() + "@example.com";
         limiter.check(login(email, null, null));
@@ -122,7 +123,7 @@ class RateLimiterTest {
     @Test
     @DisplayName("账号按会员域的规则规范化：域名大小写不同、前后空格，都是同一个账号")
     void accountNormalised() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.ACCOUNT, 100, 1, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.ACCOUNT.code(), 100, 1, 100, 100)), Map.of());
         String local = "norm-" + UUID.randomUUID();
         limiter.check(login(local + "@Example.COM", null, null));
         assertThrows(ApiException.class, () -> limiter.check(login("  " + local + "@example.com ", null, null)));
@@ -131,7 +132,7 @@ class RateLimiterTest {
     @Test
     @DisplayName("🔴 老设备豁免 IP 维度：共用出口后面的真人不被同出口的别人连累")
     void oldDeviceExemptFromIp() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.IP, 100, 1, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.IP.code(), 100, 1, 100, 100)), Map.of());
         String ip = ip();
         Instant old = Instant.now().minus(Duration.ofDays(8));
         for (int i = 0; i < 5; i++) {
@@ -150,7 +151,7 @@ class RateLimiterTest {
         List<GatewayRuleSnapshot.IpEntry> lists = List.of(
                 new GatewayRuleSnapshot.IpEntry(3, 1, white, null, 1, null),
                 new GatewayRuleSnapshot.IpEntry(2, 1, grey, 30, 2, null));
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.IP, 100, 4, 100, 100)), Map.of(), lists);
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.IP.code(), 100, 4, 100, 100)), Map.of(), lists);
         for (int i = 0; i < 10; i++) {
             limiter.check(login(null, null, white));
         }
@@ -162,7 +163,7 @@ class RateLimiterTest {
     @Test
     @DisplayName("陪跑：照常计数，但从不挡")
     void shadowNeverBlocks() {
-        GatewayRuleSnapshot.Rule shadow = new GatewayRuleSnapshot.Rule(1, "LOGIN", RateLimiter.DEVICE,
+        GatewayRuleSnapshot.Rule shadow = new GatewayRuleSnapshot.Rule(1, "LOGIN", RateLimitDimension.DEVICE.code(),
                 1, 1, 1, 1, null, null, 1);
         RateLimiter limiter = limiter(List.of(shadow), Map.of());
         String device = device();
@@ -175,16 +176,16 @@ class RateLimiterTest {
     @DisplayName("接口覆盖：同一维度上接口行覆盖场景行，而且单独计数")
     void endpointOverride() {
         String endpoint = "POST /auth/login";
-        GatewayRuleSnapshot.Rule override = new GatewayRuleSnapshot.Rule(2, endpoint, RateLimiter.DEVICE,
+        GatewayRuleSnapshot.Rule override = new GatewayRuleSnapshot.Rule(2, endpoint, RateLimitDimension.DEVICE.code(),
                 100, 1, 100, 100, null, null, 2);
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.DEVICE, 100, 50, 100, 100), override), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.DEVICE.code(), 100, 50, 100, 100), override), Map.of());
         String device = device();
         RateLimiter.Request req = new RateLimiter.Request(RateLimitScene.LOGIN, endpoint, ip(), device, null, null, null);
         limiter.check(req);
         assertThrows(ApiException.class, () -> limiter.check(req), "接口行的阈值是 1，覆盖了场景行的 50");
-        touched.add(SecurityKeys.rateLimitCounter(endpoint, RateLimiter.DEVICE, device));
-        touched.add(SecurityKeys.rateLimitPenalty(endpoint, RateLimiter.DEVICE, device));
-        assertNotNull(redis.opsForHash().get(SecurityKeys.rateLimitPenalty(endpoint, RateLimiter.DEVICE, device), "until"),
+        touched.add(SecurityKeys.rateLimitCounter(endpoint, RateLimitDimension.DEVICE.code(), device));
+        touched.add(SecurityKeys.rateLimitPenalty(endpoint, RateLimitDimension.DEVICE.code(), device));
+        assertNotNull(redis.opsForHash().get(SecurityKeys.rateLimitPenalty(endpoint, RateLimitDimension.DEVICE.code(), device), "until"),
                 "处罚落在接口行自己的键上");
     }
 
@@ -193,15 +194,15 @@ class RateLimiterTest {
     void ipSegmentOnlyForAnonymousScenes() {
         String ip = ip();
         RateLimiter limiter = limiter(List.of(
-                rule("REDEEM", RateLimiter.IP_SEGMENT, 100, 1, 100, 100),
-                rule("LOGIN", RateLimiter.IP_SEGMENT, 100, 1, 100, 100)), Map.of());
+                rule("REDEEM", RateLimitDimension.IP_SEGMENT.code(), 100, 1, 100, 100),
+                rule("LOGIN", RateLimitDimension.IP_SEGMENT.code(), 100, 1, 100, 100)), Map.of());
         for (int i = 0; i < 3; i++) {
             limiter.check(new RateLimiter.Request(RateLimitScene.REDEEM, null, ip, null, null, 1L, null));
         }
         limiter.check(login(null, null, ip));
         assertThrows(ApiException.class, () -> limiter.check(login(null, null, ip)));
-        touched.add(SecurityKeys.rateLimitCounter("LOGIN", RateLimiter.IP_SEGMENT, IpKeys.segment(ip)));
-        touched.add(SecurityKeys.rateLimitPenalty("LOGIN", RateLimiter.IP_SEGMENT, IpKeys.segment(ip)));
+        touched.add(SecurityKeys.rateLimitCounter("LOGIN", RateLimitDimension.IP_SEGMENT.code(), IpKeys.segment(ip)));
+        touched.add(SecurityKeys.rateLimitPenalty("LOGIN", RateLimitDimension.IP_SEGMENT.code(), IpKeys.segment(ip)));
     }
 
     // ------------------------------------------------------------------ 安全事件
@@ -209,14 +210,14 @@ class RateLimiterTest {
     @Test
     @DisplayName("🔴 判罚、升档各投一条事件；IP 维度罚到第 4 档 → 拉灰 7 天；处罚期间被挡的请求不投")
     void penaltiesPublishIncidents() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.IP, 100, 1, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.IP.code(), 100, 1, 100, 100)), Map.of());
         String ip = ip();
         limiter.check(login(null, null, ip));
         for (int level = 1; level <= 4; level++) {
             // 窗口里还数着前面的请求：处罚一到期，下一次就是新的违规（见 ladderEscalates）
             assertThrows(ApiException.class, () -> limiter.check(login(null, null, ip)));
             assertThrows(ApiException.class, () -> limiter.check(login(null, null, ip)), "处罚期间再点");
-            expirePenalty("LOGIN", RateLimiter.IP, IpKeys.ip(ip));
+            expirePenalty("LOGIN", RateLimitDimension.IP.code(), IpKeys.ip(ip));
         }
 
         List<SecurityIncidentEvent> events = events();
@@ -237,12 +238,12 @@ class RateLimiterTest {
     @Test
     @DisplayName("匿名场景的设备维度罚到第 4 档 → 事件要求把设备推进观察档；账号维度永远只记录")
     void deviceEscalationObserves() {
-        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimiter.DEVICE, 100, 1, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.DEVICE.code(), 100, 1, 100, 100)), Map.of());
         String device = device();
         limiter.check(login(null, device, null));
         for (int level = 1; level <= 4; level++) {
             assertThrows(ApiException.class, () -> limiter.check(login(null, device, null)));
-            expirePenalty("LOGIN", RateLimiter.DEVICE, device);
+            expirePenalty("LOGIN", RateLimitDimension.DEVICE.code(), device);
         }
 
         List<SecurityIncidentEvent> events = events();
@@ -258,7 +259,7 @@ class RateLimiterTest {
         long normal = grey + 1;
         track(grey);
         track(normal);
-        RateLimiter limiter = limiter(List.of(rule("REDEEM", RateLimiter.ACCOUNT, 4, 100, 100, 100)), Map.of(), List.of(),
+        RateLimiter limiter = limiter(List.of(rule("REDEEM", RateLimitDimension.ACCOUNT.code(), 4, 100, 100, 100)), Map.of(), List.of(),
                 List.of(new GatewayRuleSnapshot.MemberEntry(grey, Instant.now().plusSeconds(3600).toEpochMilli())));
 
         limiter.check(redeem(grey));
@@ -274,20 +275,20 @@ class RateLimiterTest {
     void accountEscalationGreysMemberOnlyAfterLogin() {
         long member = 9_920_000_000L + ThreadLocalRandom.current().nextLong(1_000_000L);
         track(member);
-        RateLimiter limiter = limiter(List.of(rule("REDEEM", RateLimiter.ACCOUNT, 100, 1, 100, 100),
-                rule("CODE_SEND", RateLimiter.ACCOUNT, 100, 1, 100, 100)), Map.of());
+        RateLimiter limiter = limiter(List.of(rule("REDEEM", RateLimitDimension.ACCOUNT.code(), 100, 1, 100, 100),
+                rule("CODE_SEND", RateLimitDimension.ACCOUNT.code(), 100, 1, 100, 100)), Map.of());
         limiter.check(redeem(member));
         for (int level = 1; level <= 4; level++) {
             assertThrows(ApiException.class, () -> limiter.check(redeem(member)));
-            expirePenalty("REDEEM", RateLimiter.ACCOUNT, "m:" + member);
+            expirePenalty("REDEEM", RateLimitDimension.ACCOUNT.code(), "m:" + member);
         }
         // 匿名场景里哪怕带着登录态（换绑时发码），账号维度也不能拉灰
-        touched.add(SecurityKeys.rateLimitCounter("CODE_SEND", RateLimiter.ACCOUNT, "m:" + member));
-        touched.add(SecurityKeys.rateLimitPenalty("CODE_SEND", RateLimiter.ACCOUNT, "m:" + member));
+        touched.add(SecurityKeys.rateLimitCounter("CODE_SEND", RateLimitDimension.ACCOUNT.code(), "m:" + member));
+        touched.add(SecurityKeys.rateLimitPenalty("CODE_SEND", RateLimitDimension.ACCOUNT.code(), "m:" + member));
         limiter.check(codeSend(member));
         for (int level = 1; level <= 4; level++) {
             assertThrows(ApiException.class, () -> limiter.check(codeSend(member)));
-            expirePenalty("CODE_SEND", RateLimiter.ACCOUNT, "m:" + member);
+            expirePenalty("CODE_SEND", RateLimitDimension.ACCOUNT.code(), "m:" + member);
         }
 
         List<SecurityIncidentEvent> events = events();
@@ -308,8 +309,8 @@ class RateLimiterTest {
     }
 
     private void track(long memberId) {
-        touched.add(SecurityKeys.rateLimitCounter("REDEEM", RateLimiter.ACCOUNT, "m:" + memberId));
-        touched.add(SecurityKeys.rateLimitPenalty("REDEEM", RateLimiter.ACCOUNT, "m:" + memberId));
+        touched.add(SecurityKeys.rateLimitCounter("REDEEM", RateLimitDimension.ACCOUNT.code(), "m:" + memberId));
+        touched.add(SecurityKeys.rateLimitPenalty("REDEEM", RateLimitDimension.ACCOUNT.code(), "m:" + memberId));
     }
 
     private List<SecurityIncidentEvent> events() {
@@ -368,8 +369,8 @@ class RateLimiterTest {
     private String device() {
         String d = "test" + UUID.randomUUID().toString().replace("-", "").substring(0, 28);
         for (String target : List.of("LOGIN")) {
-            touched.add(SecurityKeys.rateLimitCounter(target, RateLimiter.DEVICE, d));
-            touched.add(SecurityKeys.rateLimitPenalty(target, RateLimiter.DEVICE, d));
+            touched.add(SecurityKeys.rateLimitCounter(target, RateLimitDimension.DEVICE.code(), d));
+            touched.add(SecurityKeys.rateLimitPenalty(target, RateLimitDimension.DEVICE.code(), d));
         }
         return d;
     }
@@ -379,8 +380,8 @@ class RateLimiterTest {
         ThreadLocalRandom r = ThreadLocalRandom.current();
         String ip = "198.18." + r.nextInt(256) + "." + (1 + r.nextInt(254));
         for (String target : List.of("LOGIN", "REDEEM")) {
-            touched.add(SecurityKeys.rateLimitCounter(target, RateLimiter.IP, IpKeys.ip(ip)));
-            touched.add(SecurityKeys.rateLimitPenalty(target, RateLimiter.IP, IpKeys.ip(ip)));
+            touched.add(SecurityKeys.rateLimitCounter(target, RateLimitDimension.IP.code(), IpKeys.ip(ip)));
+            touched.add(SecurityKeys.rateLimitPenalty(target, RateLimitDimension.IP.code(), IpKeys.ip(ip)));
         }
         return ip;
     }

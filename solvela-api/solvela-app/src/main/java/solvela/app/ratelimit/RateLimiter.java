@@ -5,22 +5,16 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.app.web.ApiErrors;
 import solvela.app.web.ApiException;
-import solvela.member.util.MemberEmailUtil;
-import solvela.member.util.MemberPhoneUtil;
+import solvela.app.web.Trace;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
 import solvela.security.IpRange;
+import solvela.security.RateLimitDimension;
 import solvela.security.SecurityIncidentEvent;
 import solvela.security.SecurityKeys;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -33,14 +27,7 @@ import java.util.stream.Collectors;
  *   <li>按「设备 → 账号 → IP → IP 段 → 全局」逐个维度调一次脚本（越准的维度越先判）；</li>
  *   <li>任何一个维度说「挡」就停：后面的维度不再计数 —— 被挡的请求不该再去推高别的计数器。</li>
  * </ol>
- *
- * <h3>哪些维度会被跳过</h3>
- * <ul>
- *   <li><b>老设备</b>（令牌签发早于 {@code oldDeviceDays}）：跳过 IP、IP 段，以及匿名场景里的账号维度。
- *       共用出口后面的真人都带着自己的老设备，而他们自己的设备维度照常在数（§2.3、§2.4）；</li>
- *   <li><b>IP 白名单</b>：跳过 IP、IP 段；</li>
- *   <li>IP 段只用在匿名场景，非匿名场景的 IP 段行忽略。</li>
- * </ul>
+ * 哪些维度跳过、封顶多久、阈值打几折，都由这个请求的 {@link Facts} 决定。
  *
  * <h3>🔴 Redis 出错就放行</h3>
  * 限流挂了不能等于整站挂了。每个维度各自容错：一个维度的脚本失败只跳过那一个维度。
@@ -51,11 +38,11 @@ import java.util.stream.Collectors;
 @Component
 public class RateLimiter {
 
-    /** 维度编码，与 {@code t_rate_limit_rule.dimension} 一致 */
-    static final int GLOBAL = 0, IP = 1, ACCOUNT = 2, DEVICE = 3, IP_SEGMENT = 4;
+    /** 判的顺序：越准的维度越先判，一个维度说「挡」后面的就不再计数 */
+    private static final List<RateLimitDimension> CHECK_ORDER = List.of(RateLimitDimension.DEVICE,
+            RateLimitDimension.ACCOUNT, RateLimitDimension.IP, RateLimitDimension.IP_SEGMENT, RateLimitDimension.GLOBAL);
 
-    private static final int[] ORDER = {DEVICE, ACCOUNT, IP, IP_SEGMENT, GLOBAL};
-
+    /** {@code t_rate_limit_rule.mode}：1 = 陪跑（照常计数、只记录「本来会怎样」），2 = 生效；其余 = 停用 */
     private static final int MODE_SHADOW = 1, MODE_ENFORCE = 2;
 
     private final StringRedisTemplate redis;
@@ -64,12 +51,9 @@ public class RateLimiter {
 
     private final RateLimitProperties properties;
 
-    private final SecretKeySpec accountKey;
+    private final AccountKey accountKey;
 
     private final IncidentPublisher incidents;
-
-    /** 由快照算出来的东西，换快照时才重算 */
-    private volatile Derived derived;
 
     public RateLimiter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder, RateLimitProperties properties,
                        IncidentPublisher incidents) {
@@ -77,8 +61,7 @@ public class RateLimiter {
         this.snapshotHolder = snapshotHolder;
         this.properties = properties;
         this.incidents = incidents;
-        this.accountKey = properties.accountKey() == null ? null
-                : new SecretKeySpec(properties.accountKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        this.accountKey = new AccountKey(properties.accountKey());
     }
 
     /**
@@ -91,6 +74,11 @@ public class RateLimiter {
      */
     public record Request(RateLimitScene scene, String endpointKey, String clientIp, String deviceId,
                           Instant deviceIssuedAt, Long memberId, String rawAccount) {
+
+        /** 匿名场景里的「账号」是请求体里别人填的目标，不是请求者自己 */
+        boolean anonymousTarget() {
+            return memberId == null && scene.anonymous();
+        }
     }
 
     /**
@@ -100,261 +88,239 @@ public class RateLimiter {
         if (!properties.enabled() || request.scene() == RateLimitScene.EXEMPT) {
             return;
         }
-        Derived d = derived();
-        Map<Integer, GatewayRuleSnapshot.Rule> rules = effectiveRules(d, request);
+        CompiledSnapshot snapshot = snapshotHolder.compiled();
+        Map<RateLimitDimension, GatewayRuleSnapshot.Rule> rules = snapshot.rulesFor(request.scene(), request.endpointKey());
         if (rules.isEmpty()) {
             return;
         }
-        long now = Instant.now().getEpochSecond();
-        boolean oldDevice = request.deviceIssuedAt() != null
-                && now - request.deviceIssuedAt().getEpochSecond() >= d.globals.oldDeviceSeconds();
-        IpRange ip = IpRange.single(request.clientIp());
-        long nowMillis = System.currentTimeMillis();
-        boolean white = d.lists.white(ip, nowMillis);
-        boolean grey = d.lists.grey(ip, nowMillis);
-        boolean anonymousTarget = request.memberId() == null && request.scene().anonymous();
-
-        for (int dim : ORDER) {
-            GatewayRuleSnapshot.Rule rule = rules.get(dim);
-            if (rule == null || (rule.mode() != MODE_SHADOW && rule.mode() != MODE_ENFORCE)) {
-                continue;
-            }
-            boolean ipDim = dim == IP || dim == IP_SEGMENT;
-            if ((ipDim && (oldDevice || white)) || (dim == ACCOUNT && anonymousTarget && oldDevice)) {
-                continue;
-            }
-            if (dim == IP_SEGMENT && !request.scene().anonymous()) {
-                continue;
-            }
-            String value = value(dim, request);
-            if (value == null) {
-                continue;
-            }
-            long cap = dim == IP_SEGMENT ? d.globals.ipSegmentCapSec()
-                    : dim == ACCOUNT && anonymousTarget ? d.globals.anonAccountCapSec() : 0;
-            // 灰名单减半：IP 灰名单作用在 IP 维度，会员灰名单作用在（登录后的）账号维度
-            boolean greyHere = ipDim ? grey : dim == ACCOUNT && d.memberGrey(request.memberId(), nowMillis);
-            double factor = greyHere ? d.globals.greyFactor() : 1.0;
-            Outcome outcome = run(rule, dim, value, now, cap, factor, d.globals);
+        Facts facts = Facts.of(request, snapshot);
+        for (RateLimitDimension dimension : CHECK_ORDER) {
+            GatewayRuleSnapshot.Rule rule = rules.get(dimension);
+            String value = active(rule) && !facts.skips(dimension) ? countedValue(dimension, request) : null;
+            Outcome outcome = value == null ? null : run(rule, dimension, value, facts);
             if (outcome == null) {
                 continue;
             }
-            report(request, rule, dim, outcome, d.globals);
+            report(request, rule, dimension, outcome, facts.globals());
             if (outcome.blocked()) {
                 throw blocked(outcome.retryAfter());
             }
         }
     }
 
-    /** 一个维度的结果 */
-    record Outcome(boolean blocked, long retryAfter, int level, int kind) {
+    /** 对外的 429。安全闸挡下的请求也用它 —— 两边说的是同一句话，不告诉对方是哪一道闸 */
+    static ApiException blocked(long retryAfter) {
+        long seconds = Math.max(1, retryAfter);
+        return new ApiException(ApiErrors.OPERATION_LIMITED, "操作过于频繁，请 " + humanize(seconds) + "后再试",
+                Map.of("retryAfterSeconds", seconds));
     }
 
-    private Outcome run(GatewayRuleSnapshot.Rule rule, int dim, String value, long now, long cap,
-                        double factor, RateLimitGlobals globals) {
-        long longWindow = rule.longWindow() == null ? 0 : Math.max(0, RateLimitGlobals.seconds(rule.longWindow()));
+    // ================================================================== 一个请求的事实
+
+    /**
+     * 一个请求在判之前就定下来的事实：哪些维度跳过、封顶多久、阈值打几折。
+     *
+     * @param oldDevice       设备令牌签发满 {@code oldDeviceDays}
+     * @param anonymousTarget 见 {@link Request#anonymousTarget()}
+     */
+    record Facts(RateLimitScene scene, long nowSeconds, boolean oldDevice, boolean whiteIp, boolean greyIp,
+                 boolean greyMember, boolean anonymousTarget, RateLimitGlobals globals) {
+
+        static Facts of(Request request, CompiledSnapshot snapshot) {
+            long nowMillis = System.currentTimeMillis();
+            long nowSeconds = nowMillis / 1000;
+            IpRange ip = IpRange.single(request.clientIp());
+            return new Facts(request.scene(), nowSeconds,
+                    snapshot.oldDevice(request.deviceIssuedAt(), nowSeconds),
+                    snapshot.ipLists().white(ip, nowMillis),
+                    snapshot.ipLists().grey(ip, nowMillis),
+                    snapshot.memberGrey(request.memberId(), nowMillis),
+                    request.anonymousTarget(),
+                    snapshot.globals());
+        }
+
+        /**
+         * <ul>
+         *   <li><b>老设备</b>、<b>IP 白名单</b>：跳过 IP 与 IP 段 —— 共用出口后面的真人都带着自己的老设备，
+         *       而他们自己的设备维度照常在数（§2.3、§2.4）；</li>
+         *   <li>老设备在匿名场景里也跳过账号维度（那里的「账号」是别人填的目标）；</li>
+         *   <li>IP 段只用在匿名场景。</li>
+         * </ul>
+         */
+        boolean skips(RateLimitDimension dimension) {
+            if (dimension.ipBased() && (oldDevice || whiteIp)) {
+                return true;
+            }
+            if (dimension == RateLimitDimension.ACCOUNT && anonymousTarget && oldDevice) {
+                return true;
+            }
+            return dimension == RateLimitDimension.IP_SEGMENT && !scene.anonymous();
+        }
+
+        /** 处罚封顶秒数，0 = 不封顶。IP 段与匿名账号罚的可能是别人，封顶 30 分钟级 */
+        long capSeconds(RateLimitDimension dimension) {
+            if (dimension == RateLimitDimension.IP_SEGMENT) {
+                return globals.ipSegmentCapSec();
+            }
+            return dimension == RateLimitDimension.ACCOUNT && anonymousTarget ? globals.anonAccountCapSec() : 0;
+        }
+
+        /** 灰名单打折：IP 灰名单作用在 IP 两个维度，会员灰名单作用在（登录后的）账号维度 */
+        double factor(RateLimitDimension dimension) {
+            boolean grey = dimension.ipBased() ? greyIp : dimension == RateLimitDimension.ACCOUNT && greyMember;
+            return grey ? globals.greyFactor() : 1.0;
+        }
+    }
+
+    // ================================================================== 一个维度
+
+    /** 脚本返回的 kind（见 {@link RateLimitScript}），按编码顺序排列 */
+    enum Verdict {
+        /** 正常，或已在处罚中 */
+        NONE,
+        /** 本次刚判罚 / 升档 */
+        PENALISED,
+        /** 陪跑：本来会判罚 */
+        SHADOW_PENALTY,
+        /** 陪跑：本来会因突发拒绝 */
+        SHADOW_BURST,
+        /** 突发拒绝（第一次只拒不罚） */
+        BURST_REJECTED;
+
+        static Verdict of(long kind) {
+            return kind >= 0 && kind < values().length ? values()[(int) kind] : NONE;
+        }
+    }
+
+    /** 一个维度的结果 */
+    record Outcome(boolean blocked, long retryAfter, int level, Verdict verdict) {
+    }
+
+    private static boolean active(GatewayRuleSnapshot.Rule rule) {
+        return rule != null && (rule.mode() == MODE_SHADOW || rule.mode() == MODE_ENFORCE);
+    }
+
+    /** 该维度的计数值；没有可数的东西返回 null（跳过这个维度） */
+    private String countedValue(RateLimitDimension dimension, Request request) {
+        return switch (dimension) {
+            case GLOBAL -> "*";
+            case IP -> IpKeys.ip(request.clientIp());
+            case IP_SEGMENT -> IpKeys.segment(request.clientIp());
+            case DEVICE -> request.deviceId();
+            case ACCOUNT -> request.memberId() != null ? "m:" + request.memberId()
+                    : request.scene().anonymous() ? accountKey.of(request.rawAccount()) : null;
+        };
+    }
+
+    private Outcome run(GatewayRuleSnapshot.Rule rule, RateLimitDimension dimension, String value, Facts facts) {
         try {
             List<?> r = redis.execute(RateLimitScript.SCRIPT,
-                    List.of(SecurityKeys.rateLimitCounter(rule.target(), dim, value),
-                            SecurityKeys.rateLimitPenalty(rule.target(), dim, value),
-                            SecurityKeys.rateLimitLongCounter(rule.target(), dim, value)),
-                    String.valueOf(now),
-                    rule.mode() == MODE_ENFORCE ? "1" : "0",
-                    String.valueOf(scaled(rule.burst(), factor)),
-                    String.valueOf(scaled(rule.limit3m(), factor)),
-                    String.valueOf(scaled(rule.limit5m(), factor)),
-                    String.valueOf(scaled(rule.limit10m(), factor)),
-                    String.valueOf(longWindow),
-                    String.valueOf(rule.limitLong() == null ? Integer.MAX_VALUE : scaled(rule.limitLong(), factor)),
-                    globals.ladderSeconds().stream().map(String::valueOf).collect(Collectors.joining(",")),
-                    String.valueOf(globals.levelResetSeconds()),
-                    String.valueOf(cap));
+                    List.of(SecurityKeys.rateLimitCounter(rule.target(), dimension.code(), value),
+                            SecurityKeys.rateLimitPenalty(rule.target(), dimension.code(), value),
+                            SecurityKeys.rateLimitLongCounter(rule.target(), dimension.code(), value)),
+                    scriptArgs(rule, facts.nowSeconds(), facts.capSeconds(dimension), facts.factor(dimension),
+                            facts.globals()));
             if (r == null || r.size() < 4) {
                 return null;
             }
-            return new Outcome(toLong(r.get(0)) == 1, toLong(r.get(1)), (int) toLong(r.get(2)), (int) toLong(r.get(3)));
+            return new Outcome(RateLimitScript.asLong(r.get(0)) == 1, RateLimitScript.asLong(r.get(1)),
+                    (int) RateLimitScript.asLong(r.get(2)), Verdict.of(RateLimitScript.asLong(r.get(3))));
         } catch (Exception e) {
-            log.error("【网关限流】脚本执行失败，放行这个维度, 规则: {}, 维度: {}", rule.target(), dim, e);
+            log.error("【网关限流】脚本执行失败，放行这个维度, 规则: {}, 维度: {}", rule.target(), dimension, e);
             return null;
         }
     }
 
-    private void report(Request request, GatewayRuleSnapshot.Rule rule, int dim, Outcome outcome,
+    /** 参数顺序见 {@link RateLimitScript} 的「参数」一节 */
+    private static Object[] scriptArgs(GatewayRuleSnapshot.Rule rule, long now, long cap, double factor,
+                                       RateLimitGlobals globals) {
+        long longWindow = rule.longWindow() == null ? 0 : Math.max(0, RateLimitGlobals.seconds(rule.longWindow()));
+        int longLimit = rule.limitLong() == null ? Integer.MAX_VALUE : scaled(rule.limitLong(), factor);
+        return new Object[]{
+                String.valueOf(now),
+                rule.mode() == MODE_ENFORCE ? "1" : "0",
+                String.valueOf(scaled(rule.burst(), factor)),
+                String.valueOf(scaled(rule.limit3m(), factor)),
+                String.valueOf(scaled(rule.limit5m(), factor)),
+                String.valueOf(scaled(rule.limit10m(), factor)),
+                String.valueOf(longWindow),
+                String.valueOf(longLimit),
+                globals.ladderSeconds().stream().map(String::valueOf).collect(Collectors.joining(",")),
+                String.valueOf(globals.levelResetSeconds()),
+                String.valueOf(cap)};
+    }
+
+    private void report(Request request, GatewayRuleSnapshot.Rule rule, RateLimitDimension dimension, Outcome outcome,
                         RateLimitGlobals globals) {
-        switch (outcome.kind()) {
-            case 1 -> {
-                log.warn("【网关限流】判罚, 规则: {}, 维度: {}, 第 {} 档, {} 秒, 接口: {}, IP: {}",
-                        rule.target(), dim, outcome.level(), outcome.retryAfter(), request.endpointKey(), request.clientIp());
-                incidents.publish(incident(request, dim, outcome, globals));
+        switch (outcome.verdict()) {
+            case PENALISED -> {
+                log.warn("【网关限流】判罚, 规则: {}, 维度: {}, 第 {} 档, {} 秒, 接口: {}, IP: {}", rule.target(), dimension,
+                        outcome.level(), outcome.retryAfter(), request.endpointKey(), request.clientIp());
+                incidents.publish(incident(request, dimension, outcome, globals));
             }
-            case 2 -> log.warn("【网关限流】陪跑命中（本来会判罚）, 规则: {}, 维度: {}, 接口: {}, IP: {}",
-                    rule.target(), dim, request.endpointKey(), request.clientIp());
-            case 3 -> log.info("【网关限流】陪跑命中（本来会因突发拒绝）, 规则: {}, 维度: {}, 接口: {}",
-                    rule.target(), dim, request.endpointKey());
-            default -> {
+            case SHADOW_PENALTY -> log.warn("【网关限流】陪跑命中（本来会判罚）, 规则: {}, 维度: {}, 接口: {}, IP: {}",
+                    rule.target(), dimension, request.endpointKey(), request.clientIp());
+            case SHADOW_BURST -> log.info("【网关限流】陪跑命中（本来会因突发拒绝）, 规则: {}, 维度: {}, 接口: {}",
+                    rule.target(), dimension, request.endpointKey());
+            case NONE, BURST_REJECTED -> {
             }
         }
     }
 
     /**
      * 一次判罚 / 升档的事件（只在状态变化时投：处罚期间被挡的请求不投）。罚到 {@code greyLevel} 档起：
-     * IP 维度 → 这个 IP 拉灰 {@code greyDays} 天；匿名场景的设备维度 → 这台设备进观察档（§5.5）。
-     * 登录后场景的账号维度 → 这个会员拉灰 {@code greyDays} 天；匿名场景的「账号」是别人填的目标，永远不拉灰。
+     * <ul>
+     *   <li>IP 维度 → 这个 IP 拉灰 {@code greyDays} 天；</li>
+     *   <li>匿名场景的设备维度 → 这台设备进观察档（§5.5）；</li>
+     *   <li>登录后场景的账号维度 → 这个会员拉灰 {@code greyDays} 天。
+     *       🔴 匿名场景的「账号」是请求体里别人填的目标，永远不拉灰 —— 否则就是一个拿别人的号去拉灰的办法（§2.4）。</li>
+     * </ul>
      */
-    private static SecurityIncidentEvent incident(Request request, int dim, Outcome outcome, RateLimitGlobals globals) {
+    private static SecurityIncidentEvent incident(Request request, RateLimitDimension dimension, Outcome outcome,
+                                                  RateLimitGlobals globals) {
         long now = Instant.now().getEpochSecond();
+        long greyUntil = now + globals.greyDays() * 86400L;
         boolean high = outcome.level() >= globals.greyLevel();
         SecurityIncidentEvent.Builder event = SecurityIncidentEvent
                 .builder(SecurityIncidentEvent.RATE_LIMIT, request.scene().name())
                 .penalty(outcome.level(), now + outcome.retryAfter())
                 .who(request.clientIp(), request.deviceId(), request.memberId())
-                .request(method(request.endpointKey()), path(request.endpointKey()), null, solvela.app.web.Trace.id())
-                .matched(null, dimensionName(dim), null)
-                .observeDevice(high && dim == DEVICE && request.scene().anonymous());
-        if (high && dim == IP) {
-            event.action(SecurityIncidentEvent.ACTION_GREY, now + globals.greyDays() * 86400L);
+                .request(method(request.endpointKey()), path(request.endpointKey()), null, Trace.id())
+                .matched(null, dimension.name(), null)
+                .observeDevice(high && dimension == RateLimitDimension.DEVICE && request.scene().anonymous());
+        if (high && dimension == RateLimitDimension.IP) {
+            event.action(SecurityIncidentEvent.ACTION_GREY, greyUntil);
         }
-        // 🔴 只有登录后场景：匿名场景的「账号」是请求体里别人填的目标，拉灰它等于给了一个拿别人的号去拉灰的办法（§2.4）
-        if (high && dim == ACCOUNT && request.memberId() != null && !request.scene().anonymous()) {
-            event.greyMember(now + globals.greyDays() * 86400L);
+        if (high && dimension == RateLimitDimension.ACCOUNT && request.memberId() != null && !request.scene().anonymous()) {
+            event.greyMember(greyUntil);
         }
         return event.build();
     }
 
-    private static String dimensionName(int dim) {
-        return switch (dim) {
-            case IP -> "IP";
-            case ACCOUNT -> "ACCOUNT";
-            case DEVICE -> "DEVICE";
-            case IP_SEGMENT -> "IP_SEGMENT";
-            default -> "GLOBAL";
-        };
-    }
+    // ================================================================== 工具
 
+    /** {@code METHOD 模板路径} 的前半段 */
     private static String method(String endpointKey) {
         int space = endpointKey == null ? -1 : endpointKey.indexOf(' ');
         return space < 0 ? null : endpointKey.substring(0, space);
     }
 
+    /** {@code METHOD 模板路径} 的后半段 */
     private static String path(String endpointKey) {
         int space = endpointKey == null ? -1 : endpointKey.indexOf(' ');
         return space < 0 ? endpointKey : endpointKey.substring(space + 1);
     }
 
-    /** 该维度的计数值；没有可数的东西返回 null（跳过这个维度） */
-    private String value(int dim, Request request) {
-        return switch (dim) {
-            case GLOBAL -> "*";
-            case IP -> IpKeys.ip(request.clientIp());
-            case IP_SEGMENT -> IpKeys.segment(request.clientIp());
-            case DEVICE -> request.deviceId();
-            case ACCOUNT -> request.memberId() != null ? "m:" + request.memberId() : anonymousAccount(request);
-            default -> null;
-        };
-    }
-
-    /** 匿名场景的目标：先按会员域的规则规范化（大小写不同的邮箱必须是同一个账号），再算 HMAC */
-    private String anonymousAccount(Request request) {
-        if (!request.scene().anonymous() || request.rawAccount() == null || request.rawAccount().isBlank()
-                || accountKey == null) {
-            return null;
-        }
-        String raw = request.rawAccount();
-        String normalized = raw.contains("@") ? MemberEmailUtil.normalize(raw) : MemberPhoneUtil.normalize(raw);
-        if (normalized == null) {
-            // 格式不对的输入会被会员域拒绝；这里照样数，免得「故意填错格式」成了绕开账号维度的办法
-            normalized = raw.strip().toLowerCase(Locale.ROOT);
-        }
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(accountKey);
-            return "a:" + HexFormat.of().formatHex(mac.doFinal(normalized.getBytes(StandardCharsets.UTF_8)), 0, 16);
-        } catch (Exception e) {
-            log.error("【网关限流】账号键计算失败，跳过账号维度", e);
-            return null;
-        }
-    }
-
-    /** 对外的 429。安全闸挡下的请求也用它 —— 两边说的是同一句话，不告诉对方是哪一道闸 */
-    static ApiException blocked(long retryAfter) {
-        long seconds = Math.max(1, retryAfter);
-        String wait = seconds < 120 ? seconds + " 秒" : seconds < 7200 ? ((seconds + 59) / 60) + " 分钟" : ((seconds + 3599) / 3600) + " 小时";
-        return new ApiException(ApiErrors.OPERATION_LIMITED, "操作过于频繁，请 " + wait + "后再试",
-                Map.of("retryAfterSeconds", seconds));
-    }
-
-    /** 场景行打底，接口行覆盖同一维度 */
-    private static Map<Integer, GatewayRuleSnapshot.Rule> effectiveRules(Derived d, Request request) {
-        Map<Integer, GatewayRuleSnapshot.Rule> result = new HashMap<>();
-        Map<Integer, GatewayRuleSnapshot.Rule> scene = d.sceneRules.get(request.scene().name());
-        if (scene != null) {
-            result.putAll(scene);
-        }
-        Map<Integer, GatewayRuleSnapshot.Rule> endpoint =
-                request.endpointKey() == null ? null : d.endpointRules.get(request.endpointKey());
-        if (endpoint != null) {
-            result.putAll(endpoint);
-        }
-        return result;
-    }
-
+    /** 灰名单打折后的阈值，至少 1 */
     private static int scaled(int limit, double factor) {
         return factor >= 1.0 ? limit : Math.max(1, (int) Math.ceil(limit * factor));
     }
 
-    private static long toLong(Object o) {
-        return o instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(o));
-    }
-
-    private Derived derived() {
-        GatewayRuleSnapshot snapshot = snapshotHolder.current();
-        Derived d = derived;
-        if (d == null || d.snapshot != snapshot) {
-            d = new Derived(snapshot);
-            derived = d;
+    /** 两分钟内按秒、两小时内按分钟、再长按小时（都向上取整） */
+    private static String humanize(long seconds) {
+        if (seconds < 120) {
+            return seconds + " 秒";
         }
-        return d;
-    }
-
-    /** 从一份快照算出来的查找表。只在快照换了的时候重算一次 */
-    static final class Derived {
-
-        final GatewayRuleSnapshot snapshot;
-
-        final Map<String, Map<Integer, GatewayRuleSnapshot.Rule>> sceneRules = new HashMap<>();
-
-        final Map<String, Map<Integer, GatewayRuleSnapshot.Rule>> endpointRules = new HashMap<>();
-
-        final IpLists lists;
-
-        /** 会员灰名单：会员号 → 到期（epoch 毫秒，null = 长期） */
-        final Map<Long, Long> memberGrey = new HashMap<>();
-
-        final RateLimitGlobals globals;
-
-        Derived(GatewayRuleSnapshot snapshot) {
-            this.snapshot = snapshot;
-            for (GatewayRuleSnapshot.Rule rule : snapshot.rules()) {
-                Map<String, Map<Integer, GatewayRuleSnapshot.Rule>> target =
-                        rule.targetType() == 2 ? endpointRules : sceneRules;
-                target.computeIfAbsent(rule.target(), k -> new HashMap<>()).put(rule.dimension(), rule);
-            }
-            this.lists = new IpLists(snapshot);
-            if (snapshot.memberGreyList() != null) {
-                for (GatewayRuleSnapshot.MemberEntry e : snapshot.memberGreyList()) {
-                    memberGrey.put(e.memberId(), e.expireAt());
-                }
-            }
-            this.globals = RateLimitGlobals.parse(snapshot.configs() == null ? null
-                    : snapshot.configs().get("gateway_rate_limit"));
-        }
-
-        boolean memberGrey(Long memberId, long nowMillis) {
-            if (memberId == null || !memberGrey.containsKey(memberId)) {
-                return false;
-            }
-            Long expireAt = memberGrey.get(memberId);
-            return expireAt == null || expireAt > nowMillis;
-        }
+        return seconds < 7200 ? (seconds + 59) / 60 + " 分钟" : (seconds + 3599) / 3600 + " 小时";
     }
 }

@@ -96,18 +96,17 @@ class SecurityCenterAdminTest {
     @Test
     @DisplayName("🔴 保存前校验：突发 ≤ 3 ≤ 5 ≤ 10 分钟、三个窗口亚线性、长窗口要么都填要么都不填；现有种子全都过得了")
     void rateLimitValidation() {
-        assertThrows(IllegalArgumentException.class, () -> RateLimitRuleAdminService.validate(values(20, 10, 15, 25)),
+        assertThrows(IllegalArgumentException.class, () -> values(20, 10, 15, 25).validate(),
                 "突发比 3 分钟还宽");
-        assertThrows(IllegalArgumentException.class, () -> RateLimitRuleAdminService.validate(values(5, 10, 20, 25)),
+        assertThrows(IllegalArgumentException.class, () -> values(5, 10, 20, 25).validate(),
                 "5 分钟 ≥ 3 分钟的 5/3 倍：5 分钟窗口永远不会先触发");
-        assertThrows(IllegalArgumentException.class, () -> RateLimitRuleAdminService.validate(
-                new RateLimitRuleAdminService.RuleValues(5, 10, 15, 25, "1d", null, 2)));
-        RateLimitRuleAdminService.validate(new RateLimitRuleAdminService.RuleValues(2, 3, 4, 5, "1d", 2, 2));
+        assertThrows(IllegalArgumentException.class, () -> new RateLimitRuleAdminService.RuleValues(5, 10, 15, 25, "1d", null, 2).validate());
+        new RateLimitRuleAdminService.RuleValues(2, 3, 4, 5, "1d", 2, 2).validate();
 
         for (RateLimitRule r : rateLimitService.list()) {
-            assertDoesNotThrow(() -> RateLimitRuleAdminService.validate(new RateLimitRuleAdminService.RuleValues(
+            assertDoesNotThrow(() -> new RateLimitRuleAdminService.RuleValues(
                     r.getBurst(), r.getLimit3m(), r.getLimit5m(), r.getLimit10m(), r.getLongWindow(), r.getLimitLong(),
-                    r.getMode())), "种子里的 " + r.getTarget() + " / " + r.getDimension() + " 自己都存不回去");
+                    r.getMode()).validate(), "种子里的 " + r.getTarget() + " / " + r.getDimension() + " 自己都存不回去");
         }
     }
 

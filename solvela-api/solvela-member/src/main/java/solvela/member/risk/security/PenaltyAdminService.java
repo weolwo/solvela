@@ -9,9 +9,11 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.member.RateLimitRule;
 import solvela.member.risk.dao.RateLimitRuleDao;
 import solvela.security.IpKeys;
+import solvela.security.RateLimitDimension;
 import solvela.security.SecurityKeys;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +38,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class PenaltyAdminService {
 
-    /** 维度编码，与 {@code t_rate_limit_rule.dimension} 一致 */
-    private static final int IP = 1, ACCOUNT = 2, DEVICE = 3, IP_SEGMENT = 4;
-
     private final StringRedisTemplate redis;
 
     private final RateLimitRuleDao ruleDao;
@@ -57,39 +56,45 @@ public class PenaltyAdminService {
     }
 
     public List<Penalty> query(String ip, String deviceId, Long memberId) {
-        List<Penalty> result = new ArrayList<>();
-        long now = System.currentTimeMillis() / 1000;
         String ipKey = SolvelaStringUtil.isBlank(ip) ? null : IpKeys.ip(ip.trim());
-        String segment = SolvelaStringUtil.isBlank(ip) ? null : IpKeys.segment(ip.trim());
-        String device = SolvelaStringUtil.isBlank(deviceId) ? null : deviceId.trim();
         if (SolvelaStringUtil.isNotBlank(ip) && ipKey == null) {
             throw new IllegalArgumentException("不是合法的 IP: " + ip);
         }
-
+        String device = SolvelaStringUtil.isBlank(deviceId) ? null : deviceId.trim();
+        long now = System.currentTimeMillis() / 1000;
+        List<Penalty> result = new ArrayList<>();
         if (ipKey != null) {
             global(result, SecurityKeys.securityPenaltyIp(ipKey), "IP", ipKey, now);
         }
         if (device != null) {
             global(result, SecurityKeys.securityPenaltyDevice(device), "DEVICE", device, now);
-            if (Boolean.TRUE.equals(redis.opsForSet().isMember(SecurityKeys.BANNED_DEVICES, device))) {
-                result.add(new Penalty(SecurityKeys.BANNED_DEVICES, "BANNED", null, "DEVICE", device, null, null));
-            }
+            banned(result, device);
         }
+        Map<RateLimitDimension, String> counted = countedValues(ipKey, ipKey == null ? null : IpKeys.segment(ip.trim()),
+                device, memberId);
         for (String target : targets()) {
-            if (ipKey != null) {
-                rateLimit(result, target, IP, "IP", ipKey, now);
-            }
-            if (segment != null) {
-                rateLimit(result, target, IP_SEGMENT, "IP_SEGMENT", segment, now);
-            }
-            if (device != null) {
-                rateLimit(result, target, DEVICE, "DEVICE", device, now);
-            }
-            if (memberId != null) {
-                rateLimit(result, target, ACCOUNT, "ACCOUNT", "m:" + memberId, now);
-            }
+            counted.forEach((dimension, value) -> rateLimit(result, target, dimension, value, now));
         }
         return result;
+    }
+
+    /** 每个维度在限流计数键里的值（与网关 {@code RateLimiter} 的写法一致）；没给的维度不查 */
+    private static Map<RateLimitDimension, String> countedValues(String ipKey, String segment, String device,
+                                                                 Long memberId) {
+        Map<RateLimitDimension, String> values = new EnumMap<>(RateLimitDimension.class);
+        if (ipKey != null) {
+            values.put(RateLimitDimension.IP, ipKey);
+        }
+        if (segment != null) {
+            values.put(RateLimitDimension.IP_SEGMENT, segment);
+        }
+        if (device != null) {
+            values.put(RateLimitDimension.DEVICE, device);
+        }
+        if (memberId != null) {
+            values.put(RateLimitDimension.ACCOUNT, "m:" + memberId);
+        }
+        return values;
     }
 
     /**
@@ -118,8 +123,15 @@ public class PenaltyAdminService {
         }
     }
 
-    private void rateLimit(List<Penalty> result, String target, int dim, String dimension, String value, long now) {
-        String key = SecurityKeys.rateLimitPenalty(target, dim, value);
+    /** 设备封禁不是处罚键，这里只展示，解封要去设备管理 */
+    private void banned(List<Penalty> result, String device) {
+        if (Boolean.TRUE.equals(redis.opsForSet().isMember(SecurityKeys.BANNED_DEVICES, device))) {
+            result.add(new Penalty(SecurityKeys.BANNED_DEVICES, "BANNED", null, "DEVICE", device, null, null));
+        }
+    }
+
+    private void rateLimit(List<Penalty> result, String target, RateLimitDimension dimension, String value, long now) {
+        String key = SecurityKeys.rateLimitPenalty(target, dimension.code(), value);
         Map<Object, Object> h = redis.opsForHash().entries(key);
         if (h.isEmpty()) {
             return;
@@ -127,7 +139,7 @@ public class PenaltyAdminService {
         long until = h.get("until") == null ? 0 : parse(h.get("until").toString());
         if (until > now) {
             Integer level = h.get("level") == null ? null : (int) parse(h.get("level").toString());
-            result.add(new Penalty(key, "RATE_LIMIT", target, dimension, value, until, level));
+            result.add(new Penalty(key, "RATE_LIMIT", target, dimension.name(), value, until, level));
         }
     }
 

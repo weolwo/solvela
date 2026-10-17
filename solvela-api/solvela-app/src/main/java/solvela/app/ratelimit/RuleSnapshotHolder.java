@@ -81,7 +81,8 @@ public class RuleSnapshotHolder {
 
     private final String instance;
 
-    private volatile GatewayRuleSnapshot current;
+    /** 当前生效的快照，连同编译好的查找表一起换：两者永远是同一份 */
+    private volatile CompiledSnapshot compiled;
 
     private volatile Source source;
 
@@ -99,13 +100,18 @@ public class RuleSnapshotHolder {
         this.redis = redis;
         this.snapshotKey = snapshotKey;
         this.instance = instance;
-        this.current = loadBuiltin();
+        this.compiled = new CompiledSnapshot(loadBuiltin());
         this.source = Source.BUILTIN;
     }
 
     /** 当前生效的快照。永不为 null */
     public GatewayRuleSnapshot current() {
-        return current;
+        return compiled.snapshot();
+    }
+
+    /** 当前快照编译成的查找表。永不为 null */
+    CompiledSnapshot compiled() {
+        return compiled;
     }
 
     Source source() {
@@ -149,12 +155,12 @@ public class RuleSnapshotHolder {
                 reportMissing();
             } else {
                 missingReported = false;
-                if (source != Source.REDIS || !Objects.equals(version, current.version())) {
+                if (source != Source.REDIS || !Objects.equals(version, current().version())) {
                     load(version);
                 }
             }
         } catch (Exception e) {
-            log.error("【网关快照】读取失败，继续用手里这份（来源 {}，版本 {}）", source, current.version(), e);
+            log.error("【网关快照】读取失败，继续用手里这份（来源 {}，版本 {}）", source, current().version(), e);
         }
         reportLoaded();
     }
@@ -171,8 +177,8 @@ public class RuleSnapshotHolder {
             log.error("【网关快照】版本 {} 里没有任何规则，拒绝加载，继续用手里这份", version);
             return;
         }
-        String previous = current.version();
-        current = loaded;
+        String previous = current().version();
+        compiled = new CompiledSnapshot(loaded);
         source = Source.REDIS;
         log.info("【网关快照】已加载, 版本 {} → {}, 规则 {} 条, IP 名单 {} 条",
                 previous, loaded.version(), loaded.rules().size(),
@@ -187,14 +193,14 @@ public class RuleSnapshotHolder {
         if (source == Source.BUILTIN) {
             log.error("【网关快照】Redis 里没有快照，正在用内置默认值。后台的定时任务 gatewaySnapshotPublish 应该在 5 分钟内补上");
         } else {
-            log.warn("【网关快照】Redis 里的快照不见了，继续用上一次加载的版本 {}", current.version());
+            log.warn("【网关快照】Redis 里的快照不见了，继续用上一次加载的版本 {}", current().version());
         }
     }
 
     private void reportLoaded() {
         try {
             Map<String, Object> loaded = new LinkedHashMap<>();
-            loaded.put("version", current.version());
+            loaded.put("version", current().version());
             loaded.put("source", source.name());
             loaded.put("reportedAt", System.currentTimeMillis());
             redis.opsForValue().set(SecurityKeys.loadedVersion(instance), MAPPER.writeValueAsString(loaded), LOADED_TTL);

@@ -8,6 +8,8 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
 import solvela.member.device.DeviceDispositionService;
 import solvela.member.risk.config.RiskListCache;
+import solvela.enums.SecurityListDimensionEnum;
+import solvela.enums.SecurityListTypeEnum;
 import solvela.security.IpKeys;
 import solvela.security.SecurityIncidentEvent;
 
@@ -64,11 +66,12 @@ public class SecurityIncidentStore {
                     sourceRule(e.incidentType()), e.ruleCode(), e.clientIp(), incidentId);
         }
         SecurityListWriter.Outcome outcome = listWriter.upsert(new SecurityListWriter.Entry(
-                black ? 1 : 2, IpKeys.listDimension(value), value, sourceRule(e.incidentType()), reason(e),
+                black ? SecurityListTypeEnum.BLACK : SecurityListTypeEnum.GREY,
+                SecurityListWriter.dimension(IpKeys.listDimension(value)), value, sourceRule(e.incidentType()), reason(e),
                 e.listUntilEpochSec(), incidentId));
         log.info("【安全名单】自动{}: {}, 来源: {} {}, 结果: {}", black ? "拉黑" : "拉灰", value,
                 sourceRule(e.incidentType()), e.ruleCode(), outcome);
-        return outcome != SecurityListWriter.Outcome.KEPT_MANUAL && outcome != SecurityListWriter.Outcome.KEPT_EXISTING;
+        return outcome.changed();
     }
 
     /**
@@ -76,12 +79,12 @@ public class SecurityIncidentStore {
      * 他只会感觉「这几天验证码多了一点」。人工的会员白名单不受影响（那是另一行）。
      */
     private boolean greyMember(SecurityIncidentEvent e, long incidentId) {
-        SecurityListWriter.Outcome outcome = listWriter.upsert(new SecurityListWriter.Entry(2, 4,
-                String.valueOf(e.memberId()), sourceRule(e.incidentType()), reason(e), e.memberListUntilEpochSec(),
+        SecurityListWriter.Outcome outcome = listWriter.upsert(new SecurityListWriter.Entry(
+                SecurityListTypeEnum.GREY, SecurityListDimensionEnum.MEMBER, String.valueOf(e.memberId()), sourceRule(e.incidentType()), reason(e), e.memberListUntilEpochSec(),
                 incidentId));
         log.info("【安全名单】自动拉灰会员: {}, 来源: {} {}, 结果: {}", e.memberId(), sourceRule(e.incidentType()),
                 e.ruleCode(), outcome);
-        return outcome != SecurityListWriter.Outcome.KEPT_MANUAL && outcome != SecurityListWriter.Outcome.KEPT_EXISTING;
+        return outcome.changed();
     }
 
     private long insert(SecurityIncidentEvent e) {

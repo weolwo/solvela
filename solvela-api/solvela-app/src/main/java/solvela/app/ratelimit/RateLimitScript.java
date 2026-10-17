@@ -39,6 +39,11 @@ final class RateLimitScript {
     private RateLimitScript() {
     }
 
+    /** Lua 返回的数字：Redis 给的是 Long，个别客户端给字符串 */
+    static long asLong(Object value) {
+        return value instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(value));
+    }
+
     @SuppressWarnings("rawtypes")
     static final RedisScript<List> SCRIPT = RedisScript.of("""
             local now = tonumber(ARGV[1])

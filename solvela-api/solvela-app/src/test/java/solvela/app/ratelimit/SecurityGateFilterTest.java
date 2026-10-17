@@ -212,7 +212,7 @@ class SecurityGateFilterTest {
         String device = newDeviceId();
         SecurityGateFilter gate = honeypotGate(50);
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.env", ip, newDevice(device), null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.env", ip, newDevice(device), null, null));
 
         String ipKey = track(SecurityKeys.securityPenaltyIp(IpKeys.ip(ip)));
         String deviceKey = track(SecurityKeys.securityPenaltyDevice(device));
@@ -228,9 +228,9 @@ class SecurityGateFilterTest {
     void honeypotMatching() {
         SecurityGateFilter gate = honeypotGate(50);
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.git/config", trackedIp(), null, "none", null));
-        assertEquals(SecurityGateFilter.Trap.MISS, gate.trap("/disabled", trackedIp(), null, null, null));
-        assertEquals(SecurityGateFilter.Trap.MISS, gate.trap("/auth/login", trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.git/config", trackedIp(), null, "none", null));
+        assertEquals(SecurityGateFilter.Trap.MISS, trap(gate, "/disabled", trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.MISS, trap(gate, "/auth/login", trackedIp(), null, null, null));
     }
 
     @Test
@@ -239,15 +239,15 @@ class SecurityGateFilterTest {
         SecurityGateFilter gate = honeypotGate(50);
         String a = trackedIp(), b = trackedIp(), c = trackedIp();
 
-        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, gate.trap("/.env", a, null, "cross-site", "https://evil.example"));
-        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, gate.trap("/.env", b, null, "same-site", null));
-        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, gate.trap("/.env", c, null, null, "https://evil.example"),
+        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, trap(gate, "/.env", a, null, "cross-site", "https://evil.example"));
+        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, trap(gate, "/.env", b, null, "same-site", null));
+        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, trap(gate, "/.env", c, null, null, "https://evil.example"),
                 "老浏览器不带 Sec-Fetch-Site，但带着外站 Origin");
         assertNull(redis.opsForValue().get(SecurityKeys.securityPenaltyIp(IpKeys.ip(a))));
         assertNull(gate.check(a, null));
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.env", trackedIp(), null, "same-origin", null));
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.env", trackedIp(), null, "none", null),
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.env", trackedIp(), null, "same-origin", null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.env", trackedIp(), null, "none", null),
                 "用户自己在地址栏敲的");
     }
 
@@ -256,10 +256,10 @@ class SecurityGateFilterTest {
     void breakerStopsPenalties() {
         SecurityGateFilter gate = honeypotGate(2);
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.env", trackedIp(), null, null, null));
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.env", trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.env", trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.env", trackedIp(), null, null, null));
         String third = trackedIp();
-        assertEquals(SecurityGateFilter.Trap.BREAKER_OPEN, gate.trap("/.env", third, null, null, null));
+        assertEquals(SecurityGateFilter.Trap.BREAKER_OPEN, trap(gate, "/.env", third, null, null, null));
         assertNull(redis.opsForValue().get(SecurityKeys.securityPenaltyIp(IpKeys.ip(third))));
     }
 
@@ -279,7 +279,7 @@ class SecurityGateFilterTest {
                 {"code":"LOGIN","path":"/auth/login","enabled":true}""");
         SecurityGateFilter withRoutes = new SecurityGateFilter(redis, holder(List.of(), json), null, mapping, breakerKey(), incidents(), null);
         assertThrows(IllegalStateException.class, withRoutes::verifyHoneypotsAtStartup);
-        assertEquals(SecurityGateFilter.Trap.MISS, withRoutes.trap("/auth/login", trackedIp(), null, null, null),
+        assertEquals(SecurityGateFilter.Trap.MISS, trap(withRoutes, "/auth/login", trackedIp(), null, null, null),
                 "真实登录接口被当成蜜罐的话，所有人一登录就被封 24 小时");
     }
 
@@ -312,8 +312,8 @@ class SecurityGateFilterTest {
         track(SecurityKeys.securityPenaltyDevice(device));
 
         gate.trap(new SecurityGateFilter.Probe("GET", "/.env", ip, newDevice(device), null, null, "curl/8.5.0", "t-1"));
-        gate.trap("/.env", trackedIp(), null, "cross-site", null);
-        gate.trap("/.env", trackedIp(), null, null, null);
+        trap(gate, "/.env", trackedIp(), null, "cross-site", null);
+        trap(gate, "/.env", trackedIp(), null, null, null);
 
         List<SecurityIncidentEvent> events = incidentsPublished();
         assertEquals(3, events.size());
@@ -339,7 +339,7 @@ class SecurityGateFilterTest {
         String device = newDeviceId();
         String deviceKey = track(SecurityKeys.securityPenaltyDevice(device));
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.trap("/.env", ip, oldDevice(device), null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, trap(gate, "/.env", ip, oldDevice(device), null, null));
 
         assertNull(redis.opsForValue().get(SecurityKeys.securityPenaltyIp(IpKeys.ip(ip))));
         assertNotNull(redis.opsForValue().get(deviceKey));
@@ -354,7 +354,7 @@ class SecurityGateFilterTest {
     void keywordIncidentFields() {
         SecurityGateFilter gate = keywordGate(50);
 
-        gate.keyword(new KeywordRules.Hit("SQL_TAUTOLOGY", "query.id", "' or 1=1"), trackedIp(), null, null, null);
+        keyword(gate, new KeywordRules.Hit("SQL_TAUTOLOGY", "query.id", "' or 1=1"), trackedIp(), null, null, null);
 
         SecurityIncidentEvent event = incidentsPublished().get(0);
         assertEquals(SecurityIncidentEvent.KEYWORD, event.incidentType());
@@ -401,18 +401,18 @@ class SecurityGateFilterTest {
         List<KeywordRules.Rule> rules = SecurityGateConfig.parse(new RuleSnapshotHolder(redis,
                 "test:none:" + UUID.randomUUID(), "x").current().configs().get("gateway_security_gate")).keywords();
 
-        assertEquals("query.id", SecurityGateFilter.scan(rules, "/goods", "id=1%20union%20select%20null,2", null, null).location());
-        assertEquals("path", SecurityGateFilter.scan(rules, "/file/..%2F..%2Fetc%2Fpasswd", null, null, null).location());
-        assertEquals("body.nickname", SecurityGateFilter.scan(rules, "/member", null,
+        assertEquals("query.id", KeywordScanner.scan(rules, "/goods", "id=1%20union%20select%20null,2", null, null).location());
+        assertEquals("path", KeywordScanner.scan(rules, "/file/..%2F..%2Fetc%2Fpasswd", null, null, null).location());
+        assertEquals("body.nickname", KeywordScanner.scan(rules, "/member", null,
                 bytes("{\"nickname\":\"x' or 1=1\"}"), null).location());
-        assertEquals("body.items[1].name", SecurityGateFilter.scan(rules, "/order", null,
+        assertEquals("body.items[1].name", KeywordScanner.scan(rules, "/order", null,
                 bytes("{\"items\":[{\"name\":\"ok\"},{\"name\":\"<script>alert(1)</script>\"}]}"), null).location());
-        assertEquals("ua", SecurityGateFilter.scan(rules, "/", null, null, "sqlmap/1.8#stable").location());
+        assertEquals("ua", KeywordScanner.scan(rules, "/", null, null, "sqlmap/1.8#stable").location());
 
-        assertNull(SecurityGateFilter.scan(rules, "/auth/login", "code=1%27%20or%201%3D1", bytes(
+        assertNull(KeywordScanner.scan(rules, "/auth/login", "code=1%27%20or%201%3D1", bytes(
                 "{\"identity\":\"a@b.com\",\"credential\":\"x' or 1=1\",\"newPassword\":\"sleep(5)\",\"code\":\"' or 1=1\"}"),
                 "curl/8.5.0"), "密码与验证码字段不扫；curl 不是扫描器");
-        assertNull(SecurityGateFilter.scan(rules, "/goods/search", "q=Floor(%E8%90%BD%E5%9C%B0%E7%81%AF)",
+        assertNull(KeywordScanner.scan(rules, "/goods/search", "q=Floor(%E8%90%BD%E5%9C%B0%E7%81%AF)",
                 bytes("{\"nickname\":\"Doctor(医生)\",\"address\":\"解放路100号(东门)\"}"), null));
     }
 
@@ -442,12 +442,12 @@ class SecurityGateFilterTest {
         KeywordRules.Hit inBody = new KeywordRules.Hit("SQL_TAUTOLOGY", "body.nickname", "' or 1=1");
 
         String crossSite = trackedIp();
-        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, gate.keyword(inQuery, crossSite, null, "cross-site", null));
+        assertEquals(SecurityGateFilter.Trap.CROSS_SITE, keyword(gate, inQuery, crossSite, null, "cross-site", null));
         assertNull(gate.check(crossSite, null));
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(inBody, trackedIp(), null, "cross-site", null),
+        assertEquals(SecurityGateFilter.Trap.PENALISED, keyword(gate, inBody, trackedIp(), null, "cross-site", null),
                 "JSON 请求体从别的网站发不过来，Sec-Fetch-Site 说什么都不算数");
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(inQuery, ip, newDevice(device), null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, keyword(gate, inQuery, ip, newDevice(device), null, null));
         assertNotNull(gate.check(ip, null));
         assertNotNull(gate(List.of()).check(trackedIp(), oldDevice(device)));
     }
@@ -458,11 +458,11 @@ class SecurityGateFilterTest {
         SecurityGateFilter gate = keywordGate(2);
         KeywordRules.Hit hit = new KeywordRules.Hit("SQL_TAUTOLOGY", "body.nickname", "' or 1=1");
 
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(hit, trackedIp(), null, null, null));
-        assertEquals(SecurityGateFilter.Trap.PENALISED, gate.keyword(hit, trackedIp(), null, null, null));
-        assertEquals(SecurityGateFilter.Trap.BREAKER_OPEN, gate.keyword(hit, trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, keyword(gate, hit, trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.PENALISED, keyword(gate, hit, trackedIp(), null, null, null));
+        assertEquals(SecurityGateFilter.Trap.BREAKER_OPEN, keyword(gate, hit, trackedIp(), null, null, null));
         assertEquals(SecurityGateFilter.Trap.PENALISED,
-                gate.keyword(new KeywordRules.Hit("XSS_SCRIPT", "body.nickname", "<script"), trackedIp(), null, null, null));
+                keyword(gate, new KeywordRules.Hit("XSS_SCRIPT", "body.nickname", "<script"), trackedIp(), null, null, null));
     }
 
     @Test
@@ -664,5 +664,17 @@ class SecurityGateFilterTest {
     private static String ip() {
         ThreadLocalRandom r = ThreadLocalRandom.current();
         return "198.18." + r.nextInt(256) + "." + (1 + r.nextInt(254));
+    }
+
+    /** 只关心路径与来源头的蜜罐检查 */
+    private static SecurityGateFilter.Trap trap(SecurityGateFilter gate, String path, String ip, DeviceIdentity device,
+                                                String secFetchSite, String origin) {
+        return gate.trap(new SecurityGateFilter.Probe("GET", path, ip, device, secFetchSite, origin, null, null));
+    }
+
+    /** 只关心命中与来源头的关键字判定 */
+    private static SecurityGateFilter.Trap keyword(SecurityGateFilter gate, KeywordRules.Hit hit, String ip,
+                                                   DeviceIdentity device, String secFetchSite, String origin) {
+        return gate.keyword(hit, new SecurityGateFilter.Probe("GET", "/", ip, device, secFetchSite, origin, null, null));
     }
 }

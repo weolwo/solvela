@@ -34,8 +34,6 @@ final class IpLists {
         }
     }
 
-    final GatewayRuleSnapshot snapshot;
-
     private final List<Entry> black = new ArrayList<>();
 
     private final List<Entry> grey = new ArrayList<>();
@@ -43,7 +41,6 @@ final class IpLists {
     private final List<Entry> white = new ArrayList<>();
 
     IpLists(GatewayRuleSnapshot snapshot) {
-        this.snapshot = snapshot;
         if (snapshot.ipLists() == null) {
             return;
         }

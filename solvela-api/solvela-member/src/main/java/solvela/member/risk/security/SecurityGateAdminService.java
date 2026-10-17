@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import solvela.base.json.JsonUtils;
 import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
+import solvela.exception.BusinessException;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -34,7 +35,16 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class SecurityGateAdminService {
 
-    public enum Kind { HONEYPOT, KEYWORD }
+    /** 两类条目，各存在配置 JSON 的一个数组里 */
+    public enum Kind {
+        HONEYPOT("honeypotPaths"), KEYWORD("keywords");
+
+        private final String field;
+
+        Kind(String field) {
+            this.field = field;
+        }
+    }
 
     private final ConfigService configService;
 
@@ -53,9 +63,8 @@ public class SecurityGateAdminService {
     public Gate get() {
         ObjectNode root = load();
         GateSettings settings = GateSettings.parse(root.toString());
-        JsonNode breaker = root.path("breaker");
-        long window = GateSettings.seconds(breaker.path("window").asString(null), 600);
-        int threshold = breaker.path("distinctIps").canConvertToInt() ? breaker.path("distinctIps").asInt() : 50;
+        long window = settings.breakerWindowSeconds();
+        int threshold = settings.breakerDistinctIps();
         long nowMillis = System.currentTimeMillis();
 
         long honeypotIps = distinct(SecurityKeys.HONEYPOT_BREAKER, window, nowMillis);
@@ -139,19 +148,14 @@ public class SecurityGateAdminService {
     private void save(ObjectNode root) {
         try {
             configService.updateValueByKey(ConfigKeyEnum.GATEWAY_SECURITY_GATE, JsonUtils.getMapper().writeValueAsString(root));
-        } catch (solvela.exception.BusinessException e) {
+        } catch (BusinessException e) {
             // 保存前的校验（反例集）没过：消息原样给页面
             throw new IllegalArgumentException(e.getMessage());
         }
     }
 
     private static ArrayNode array(ObjectNode root, Kind kind) {
-        String field = kind == Kind.HONEYPOT ? "honeypotPaths" : "keywords";
-        JsonNode node = root.get(field);
-        if (node instanceof ArrayNode array) {
-            return array;
-        }
-        return root.putArray(field);
+        return root.get(kind.field) instanceof ArrayNode array ? array : root.putArray(kind.field);
     }
 
     private static ObjectNode find(ObjectNode root, Kind kind, String code) {

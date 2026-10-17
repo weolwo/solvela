@@ -97,50 +97,58 @@ public class SecurityIncidentDrainJob implements SolvelaJob {
 
     public Result drain() {
         long deadline = System.currentTimeMillis() + BUDGET_MILLIS;
-        int stored = 0, recovered = 0, dropped = 0;
-        boolean changed = false;
-        boolean dbError = false;
-
+        Tally tally = new Tally();
         // 先把上一次没做完的处理掉
         List<String> leftovers = redis.opsForList().range(processingKey, 0, -1);
-        if (leftovers != null) {
-            for (String raw : leftovers) {
-                Handled h = handle(raw);
-                if (h == Handled.DB_ERROR) {
-                    dbError = true;
-                    break;
-                }
-                if (h == Handled.DROPPED) {
-                    dropped++;
-                } else {
-                    stored++;
-                    recovered++;
-                    changed |= h == Handled.LIST_CHANGED;
-                }
+        for (String raw : leftovers == null ? List.<String>of() : leftovers) {
+            if (!tally.add(handle(raw), true)) {
+                break;
             }
         }
-
-        while (!dbError && stored + dropped < MAX_PER_RUN && System.currentTimeMillis() < deadline) {
+        while (!tally.dbError && tally.handled() < MAX_PER_RUN && System.currentTimeMillis() < deadline) {
             String raw = redis.opsForList().rightPopAndLeftPush(queueKey, processingKey);
             if (raw == null) {
                 break;
             }
-            Handled h = handle(raw);
-            if (h == Handled.DB_ERROR) {
-                dbError = true;
-            } else if (h == Handled.DROPPED) {
-                dropped++;
-            } else {
-                stored++;
-                changed |= h == Handled.LIST_CHANGED;
-            }
+            tally.add(handle(raw), false);
         }
-
-        if (changed) {
+        if (tally.listChanged) {
             listCache.reload();
             snapshotPublisher.publishQuietly("安全事件更新了名单");
         }
-        return new Result(stored, recovered, dropped, changed, dbError);
+        return new Result(tally.stored, tally.recovered, tally.dropped, tally.listChanged, tally.dbError);
+    }
+
+    /** 一轮的计数 */
+    private static final class Tally {
+
+        int stored;
+
+        int recovered;
+
+        int dropped;
+
+        boolean listChanged;
+
+        boolean dbError;
+
+        /** 记一条；数据库出错时返回 false —— 本轮到此为止，剩下的留在队列里等下一轮 */
+        boolean add(Handled handled, boolean leftover) {
+            switch (handled) {
+                case DB_ERROR -> dbError = true;
+                case DROPPED -> dropped++;
+                case STORED, LIST_CHANGED -> {
+                    stored++;
+                    recovered += leftover ? 1 : 0;
+                    listChanged |= handled == Handled.LIST_CHANGED;
+                }
+            }
+            return !dbError;
+        }
+
+        int handled() {
+            return stored + dropped;
+        }
     }
 
     private enum Handled { STORED, LIST_CHANGED, DROPPED, DB_ERROR }
