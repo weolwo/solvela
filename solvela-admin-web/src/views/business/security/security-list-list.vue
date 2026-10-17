@@ -1,5 +1,5 @@
 <!--
-  * 登录风控 - 名单（黑 / 灰 / 白）
+  * 安全中心 - 名单（黑 / 灰 / 白）。网关与登录风控共用一份
   *
   * 【🔴 豁免面刻意很窄】白名单上的东西恰恰是攻击者最想拿到的。所以页面顶上那条说明
   * 不是客套：IP 白名单只跳过 IP 维度的计数与限流，会员白名单只跳过矩阵与打分 ——
@@ -31,10 +31,10 @@
   <a-form class="solvela-query-form">
     <a-row class="solvela-query-form-row">
       <a-form-item label="类型" class="solvela-query-form-item">
-        <a-select style="width: 120px" v-model:value="queryForm.listType" :options="RISK_LIST_TYPE_OPTIONS" placeholder="全部" allow-clear />
+        <a-select style="width: 120px" v-model:value="queryForm.listType" :options="SECURITY_LIST_TYPE_OPTIONS" placeholder="全部" allow-clear />
       </a-form-item>
       <a-form-item label="维度" class="solvela-query-form-item">
-        <a-select style="width: 120px" v-model:value="queryForm.dimension" :options="RISK_LIST_DIMENSION_OPTIONS" placeholder="全部" allow-clear />
+        <a-select style="width: 120px" v-model:value="queryForm.dimension" :options="SECURITY_LIST_DIMENSION_OPTIONS" placeholder="全部" allow-clear />
       </a-form-item>
       <a-form-item label="值" class="solvela-query-form-item">
         <a-input style="width: 180px" v-model:value="queryForm.listValue" placeholder="IP / 网段 / 会员号" allow-clear @press-enter="onSearch" />
@@ -53,7 +53,7 @@
 
   <a-card size="small" :bordered="false" :hoverable="true" style="margin-top: 12px">
     <template #title>
-      <a-button v-privilege="'memberRisk:list'" type="primary" @click="openAdd">新增名单</a-button>
+      <a-button v-privilege="'security:list'" type="primary" @click="openAdd">新增名单</a-button>
     </template>
 
     <a-table
@@ -67,11 +67,11 @@
     >
       <template #bodyCell="{ column, text, record }">
         <template v-if="column.dataIndex === 'listType'">
-          <a-tag :color="metaOf(RISK_LIST_TYPE_ENUM, text).color">
-            {{ metaOf(RISK_LIST_TYPE_ENUM, text).desc }}
+          <a-tag :color="metaOf(SECURITY_LIST_TYPE_ENUM, text).color">
+            {{ metaOf(SECURITY_LIST_TYPE_ENUM, text).desc }}
           </a-tag>
-          <a-tag :color="metaOf(RISK_LIST_DIMENSION_ENUM, record.dimension).color">
-            {{ metaOf(RISK_LIST_DIMENSION_ENUM, record.dimension).desc }}
+          <a-tag :color="metaOf(SECURITY_LIST_DIMENSION_ENUM, record.dimension).color">
+            {{ metaOf(SECURITY_LIST_DIMENSION_ENUM, record.dimension).desc }}
           </a-tag>
         </template>
 
@@ -90,9 +90,22 @@
           <span v-else class="cell-sub">长期</span>
         </template>
 
+        <template v-else-if="column.dataIndex === 'sourceRule'">
+          <a-tag v-if="text" :color="metaOf(SECURITY_LIST_SOURCE_RULE_ENUM, text).color">
+            {{ metaOf(SECURITY_LIST_SOURCE_RULE_ENUM, text).desc }}
+          </a-tag>
+          <span v-else class="cell-sub">人工</span>
+        </template>
+
+        <template v-else-if="column.dataIndex === 'hitCount'">
+          <!-- 命中次数：自动条目重复命中时累加；被挡：封禁期间被网关安全闸直接挡掉的请求数（这笔成本账） -->
+          <div>命中 {{ record.hitCount ?? 0 }} 次</div>
+          <div class="cell-sub">被挡 {{ record.blockedCount ?? 0 }} 次</div>
+        </template>
+
         <template v-else-if="column.dataIndex === 'status'">
-          <a-tag :color="metaOf(RISK_LIST_STATUS_ENUM, text).color">
-            {{ metaOf(RISK_LIST_STATUS_ENUM, text).desc }}
+          <a-tag :color="metaOf(SECURITY_LIST_STATUS_ENUM, text).color">
+            {{ metaOf(SECURITY_LIST_STATUS_ENUM, text).desc }}
           </a-tag>
           <!-- 撤销信息跟状态挤在一列：它只在已撤销时才有意义 -->
           <div v-if="record.revokeOperator" class="cell-sub">
@@ -102,8 +115,8 @@
 
         <template v-else-if="column.dataIndex === 'action'">
           <a
-            v-if="record.status === RISK_LIST_STATUS_ENUM.VALID.value"
-            v-privilege="'memberRisk:list'"
+            v-if="record.status === SECURITY_LIST_STATUS_ENUM.VALID.value"
+            v-privilege="'security:list'"
             @click="openRevoke(record)"
           >
             撤销
@@ -120,11 +133,11 @@
   <a-modal v-model:open="addOpen" title="新增名单" :confirmLoading="saving" @ok="doAdd" width="640">
     <a-form :labelCol="{ span: 6 }">
       <a-form-item label="类型">
-        <a-radio-group v-model:value="addForm.listType" :options="RISK_LIST_TYPE_OPTIONS" />
+        <a-radio-group v-model:value="addForm.listType" :options="SECURITY_LIST_TYPE_OPTIONS" />
       </a-form-item>
 
       <a-form-item label="维度">
-        <a-radio-group v-model:value="addForm.dimension" :options="RISK_LIST_DIMENSION_OPTIONS" />
+        <a-radio-group v-model:value="addForm.dimension" :options="SECURITY_LIST_DIMENSION_OPTIONS" />
         <div v-if="memberDimension" class="cell-sub">
           会员维度只有白、灰两种（没有黑名单），而且<b>必须填到期时间</b>：白名单的用途是审核账号、压测账号，
           灰名单是「这阵子多盯着点」—— 都是「这一阵子」的事。
@@ -138,9 +151,9 @@
       <a-form-item v-else label="值">
         <a-input
           v-model:value="addForm.listValue"
-          :placeholder="addForm.dimension === RISK_LIST_DIMENSION_ENUM.IP_RANGE.value
+          :placeholder="addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.IP_RANGE.value
             ? '网段，如 203.0.113.0/24'
-            : addForm.dimension === RISK_LIST_DIMENSION_ENUM.MEMBER.value
+            : addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.MEMBER.value
               ? '会员号'
               : 'IP'"
         />
@@ -189,17 +202,18 @@
 <script setup>
   import { computed, onMounted, reactive, ref } from 'vue';
   import { message } from 'ant-design-vue';
-  import { memberRiskApi } from '/@/api/business/member/member-risk-api';
+  import { securityApi } from '/@/api/business/security/security-api';
   import QueryActions from '/@/components/framework/query-actions/index.vue';
   import TablePagination from '/@/components/framework/table-pagination/index.vue';
   import {
-    RISK_LIST_DIMENSION_ENUM,
-    RISK_LIST_DIMENSION_OPTIONS,
-    RISK_LIST_STATUS_ENUM,
-    RISK_LIST_TYPE_ENUM,
-    RISK_LIST_TYPE_OPTIONS,
-    riskMetaOf,
-  } from '/@/constants/business/member/risk-const';
+    SECURITY_LIST_DIMENSION_ENUM,
+    SECURITY_LIST_DIMENSION_OPTIONS,
+    SECURITY_LIST_SOURCE_RULE_ENUM,
+    SECURITY_LIST_STATUS_ENUM,
+    SECURITY_LIST_TYPE_ENUM,
+    SECURITY_LIST_TYPE_OPTIONS,
+  } from '/@/constants/business/security/security-const';
+  import { riskMetaOf } from '/@/constants/business/member/risk-const';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
 
   const columns = ref([
@@ -208,6 +222,8 @@
     { title: '分', dataIndex: 'score', width: 80 },
     { title: '原因', dataIndex: 'reason', width: 200, ellipsis: true },
     { title: '到期', dataIndex: 'expireTime', width: 160 },
+    { title: '来源', dataIndex: 'sourceRule', width: 130 },
+    { title: '命中 / 被挡', dataIndex: 'hitCount', width: 120 },
     { title: '新增人', dataIndex: 'operator', width: 100 },
     { title: '状态', dataIndex: 'status', width: 180 },
     { title: '操作', dataIndex: 'action', width: 80, fixed: 'right' },
@@ -238,9 +254,9 @@
     try {
       // 不传 status = 只看有效；要看历史就显式不限（传 undefined 会被后端兜成「只看有效」，
       // 所以这里靠「含已撤销」开关切换：开了就查已撤销那一档，关了查有效那一档）
-      const res = await memberRiskApi.queryListPage({
+      const res = await securityApi.queryListPage({
         ...queryForm,
-        status: includeRevoked.value ? RISK_LIST_STATUS_ENUM.REVOKED.value : undefined,
+        status: includeRevoked.value ? SECURITY_LIST_STATUS_ENUM.REVOKED.value : undefined,
       });
       tableData.value = res.list;
       total.value = res.total;
@@ -269,8 +285,8 @@
   const addOpen = ref(false);
   const saving = ref(false);
   const addForm = reactive({
-    listType: RISK_LIST_TYPE_ENUM.BLACK.value,
-    dimension: RISK_LIST_DIMENSION_ENUM.IP.value,
+    listType: SECURITY_LIST_TYPE_ENUM.BLACK.value,
+    dimension: SECURITY_LIST_DIMENSION_ENUM.IP.value,
     listValue: '',
     identity: '',
     score: undefined,
@@ -278,18 +294,18 @@
     expireTime: undefined,
   });
 
-  const greyType = computed(() => addForm.listType === RISK_LIST_TYPE_ENUM.GREY.value);
+  const greyType = computed(() => addForm.listType === SECURITY_LIST_TYPE_ENUM.GREY.value);
   const memberDimension = computed(
-    () => addForm.dimension === RISK_LIST_DIMENSION_ENUM.MEMBER.value,
+    () => addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.MEMBER.value,
   );
   const identityDimension = computed(
-    () => addForm.dimension === RISK_LIST_DIMENSION_ENUM.IDENTITY.value,
+    () => addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.IDENTITY.value,
   );
 
   function openAdd() {
     Object.assign(addForm, {
-      listType: RISK_LIST_TYPE_ENUM.BLACK.value,
-      dimension: RISK_LIST_DIMENSION_ENUM.IP.value,
+      listType: SECURITY_LIST_TYPE_ENUM.BLACK.value,
+      dimension: SECURITY_LIST_DIMENSION_ENUM.IP.value,
       listValue: '',
       identity: '',
       score: undefined,
@@ -306,7 +322,7 @@
        * 🔴 只把「这一档用得上」的字段送出去：灰名单才带 score，身份维度才带 identity。
        * 都带的话，后端那几条语义校验（「黑白名单不许有分」）会把一个前端默认值当成用户填的。
        */
-      await memberRiskApi.addList({
+      await securityApi.addList({
         listType: addForm.listType,
         dimension: addForm.dimension,
         listValue: identityDimension.value ? undefined : addForm.listValue,
@@ -340,7 +356,7 @@
   async function doRevoke() {
     saving.value = true;
     try {
-      const res = await memberRiskApi.revokeList({
+      const res = await securityApi.revokeList({
         id: revokeTarget.value.id,
         reason: revokeReason.value,
       });

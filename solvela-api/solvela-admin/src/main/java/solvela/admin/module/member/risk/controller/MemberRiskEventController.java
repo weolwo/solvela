@@ -52,7 +52,7 @@ public class MemberRiskEventController {
 
     @Operation(summary = "分页查询。不传时间默认最近 7 天")
     @PostMapping("/queryPage")
-    @RequiresPermission("memberRisk:query")
+    @RequiresPermission("security:query")
     public PageResult<MemberRiskEventVO> queryPage(@RequestBody @Valid MemberRiskEventQueryForm form) {
         MemberRiskEventQuery query = SolvelaBeanUtil.copy(form, MemberRiskEventQuery.class);
         query.setIdentityHashHex(hashIdentity(form.getIdentity()));
@@ -68,7 +68,7 @@ public class MemberRiskEventController {
      */
     @Operation(summary = "流水详情：结论 + 每条命中的规则")
     @PostMapping("/detail")
-    @RequiresPermission("memberRisk:query")
+    @RequiresPermission("security:query")
     public MemberRiskEventDetailVO detail(@RequestBody @Valid MemberRiskEventDetailForm form) {
         MemberRiskEventDetailDTO dto = riskAdminService.getEventDetail(form.id(), form.createTime());
         if (dto == null) {

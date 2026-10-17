@@ -46,7 +46,7 @@
         最多 30 秒在所有实例上生效。
       </a-col>
       <a-col flex="none">
-        <a-button v-privilege="'memberRisk:update'" size="small" type="primary" @click="openEdit(globalCaptcha)">
+        <a-button v-privilege="'security:rule'" size="small" type="primary" @click="openEdit(globalCaptcha)">
           切换
         </a-button>
       </a-col>
@@ -107,7 +107,7 @@
         </template>
 
         <template v-else-if="column.dataIndex === 'action'">
-          <a v-privilege="'memberRisk:update'" @click="openEdit(record)">调整</a>
+          <a v-privilege="'security:rule'" @click="openEdit(record)">调整</a>
         </template>
       </template>
     </a-table>

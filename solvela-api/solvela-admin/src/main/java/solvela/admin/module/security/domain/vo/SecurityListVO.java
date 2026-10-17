@@ -1,4 +1,4 @@
-package solvela.admin.module.member.risk.domain.vo;
+package solvela.admin.module.security.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -38,6 +38,18 @@ public class SecurityListVO {
 
     @Schema(description = "来源：1-人工, 2-自动")
     private Integer source;
+
+    @Schema(description = "自动入名单的来源：HONEYPOT / CANARY / KEYWORD / RATE_LIMIT / ESCALATE / SEGMENT；人工为空")
+    private String sourceRule;
+
+    @Schema(description = "有效期内命中次数（自动条目重复命中时累加）")
+    private Integer hitCount;
+
+    @Schema(description = "最近一次命中")
+    private LocalDateTime lastHitTime;
+
+    @Schema(description = "封禁期间被网关安全闸直接挡掉的请求数")
+    private Long blockedCount;
 
     @Schema(description = "状态：1-有效, 0-已撤销")
     private SecurityListStatusEnum status;

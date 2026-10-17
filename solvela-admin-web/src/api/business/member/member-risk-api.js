@@ -1,7 +1,7 @@
 /**
  * 登录风控 api 封装。
  *
- * 两个页面：规则（能改档位）、决策流水（只读）。
+ * 三个页面：规则（能改档位）、决策流水（只读）、看板。都在「安全中心」菜单下。
  *
  * 🔴 **规则没有新增、没有删除**：一条规则对应一个 Java 类，代码里有而表里没有会让服务
  * 启动失败。所以后台能做的只有调「松紧」—— 档位、分值、参数。
@@ -48,34 +48,7 @@ export const memberRiskApi = {
     return postRequest('/memberRiskEvent/detail', param);
   },
 
-  /**
-   * 名单分页。不传状态只看有效的 —— 客服日常要的是「现在谁被封着」。
-   *
-   * ⚠️ 身份维度填 `identity`（手机号/邮箱**明文**），服务端算摘要再查；
-   * 库里存的是摘要，前端拿不到也算不出。
-   */
-  queryListPage: (param) => {
-    return postRequest('/memberRiskList/queryPage', param);
-  },
-
-  /**
-   * 新增一条名单。
-   *
-   * 🔴 校验在服务端（灰名单必须有分、会员白名单必须填到期、IP 格式要解得开）——
-   * 这里只拦必填，拦不住的让后端报出来，前端不复制一份规则。
-   */
-  addList: (param) => {
-    return postRequest('/memberRiskList/add', param);
-  },
-
-  /**
-   * 撤销一条名单。**原因必填** —— 「上次为什么解的」和「为什么加的」一样重要。
-   *
-   * ⚠️ 撤销不删行：列表勾上「含已撤销」还能看到它，连撤销人一起。
-   */
-  revokeList: (param) => {
-    return postRequest('/memberRiskList/revoke', param);
-  },
+  // 名单的接口 2026-10-17 搬到了 security/security-api.js（名单归安全中心）
 
   /**
    * 看板：结论分布 / 矩阵各格 / 核身漏斗 / 规则命中，**四组数一次取回**。

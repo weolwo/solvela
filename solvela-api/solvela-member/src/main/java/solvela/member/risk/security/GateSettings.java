@@ -50,7 +50,8 @@ record GateSettings(long banSeconds, int escalateGreyDays, int segmentMinIps, lo
         return node.canConvertToInt() && node.asInt() > 0 ? node.asInt() : fallback;
     }
 
-    private static long seconds(String text, long fallback) {
+    /** {@code "24h" / "10m"} → 秒；解不开或不是正数用 {@code fallback} */
+    static long seconds(String text, long fallback) {
         if (text == null) {
             return fallback;
         }

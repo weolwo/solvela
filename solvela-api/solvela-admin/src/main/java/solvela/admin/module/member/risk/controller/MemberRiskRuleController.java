@@ -47,7 +47,7 @@ public class MemberRiskRuleController {
 
     @Operation(summary = "规则列表（前置在前、后置在后）")
     @PostMapping("/list")
-    @RequiresPermission("memberRisk:query")
+    @RequiresPermission("security:query")
     public List<MemberRiskRuleVO> list() {
         return SolvelaBeanUtil.copyList(riskAdminService.listRules(), MemberRiskRuleVO.class);
     }
@@ -60,7 +60,7 @@ public class MemberRiskRuleController {
      */
     @Operation(summary = "改规则的档位 / 分值 / 参数")
     @PostMapping("/update")
-    @RequiresPermission("memberRisk:update")
+    @RequiresPermission("security:rule")
     public MemberRiskRuleVO update(@RequestBody @Valid MemberRiskRuleUpdateForm form) {
         MemberRiskRule before = riskAdminService.getRule(form.getId());
         if (before == null) {

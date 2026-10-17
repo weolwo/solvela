@@ -1,4 +1,4 @@
-package solvela.admin.module.member.risk.controller;
+package solvela.admin.module.security.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import solvela.admin.module.member.risk.domain.form.SecurityListAddForm;
-import solvela.admin.module.member.risk.domain.form.SecurityListQueryForm;
-import solvela.admin.module.member.risk.domain.vo.SecurityListVO;
+import solvela.admin.module.security.domain.form.SecurityListAddForm;
+import solvela.admin.module.security.domain.form.SecurityListQueryForm;
+import solvela.admin.module.security.domain.vo.SecurityListVO;
 import solvela.admin.module.system.datatracer.constant.DataTracerTypeEnum;
 import solvela.admin.module.system.datatracer.service.DataTracerService;
 import solvela.admin.auth.CurrentEmployee;
@@ -43,15 +43,15 @@ import solvela.web.RequiresPermission;
  * 「这个 IP 从来没被封过」—— 而他正要判断「上次是不是误封」。
  *
  * <h3>权限分成两个</h3>
- * {@code memberRisk:query} 客服日常要看；{@code memberRisk:list} 才能增删 ——
+ * {@code security:query} 客服日常要看；{@code security:list} 才能增删 ——
  * 加一条 IP 黑名单可能把一整个公司出口挡在外面，这不是查流水那一级的权力。
  *
  * @Date 2026-10-16
  */
 @RequiredArgsConstructor
 @RestController
-@Tag(name = "登录风控 - 名单")
-@RequestMapping("/memberRiskList")
+@Tag(name = "安全中心 - 名单")
+@RequestMapping("/securityList")
 public class SecurityListController {
 
     private final MemberRiskAdminService riskAdminService;
@@ -62,7 +62,7 @@ public class SecurityListController {
 
     @Operation(summary = "分页查询。不传状态只看有效的")
     @PostMapping("/queryPage")
-    @RequiresPermission("memberRisk:query")
+    @RequiresPermission("security:query")
     public PageResult<SecurityListVO> queryPage(@RequestBody @Valid SecurityListQueryForm form) {
         SecurityListQuery query = SolvelaBeanUtil.copy(form, SecurityListQuery.class);
         if (SolvelaStringUtil.isNotBlank(form.getIdentity())) {
@@ -80,7 +80,7 @@ public class SecurityListController {
      */
     @Operation(summary = "新增一条名单 @author 风控")
     @PostMapping("/add")
-    @RequiresPermission("memberRisk:list")
+    @RequiresPermission("security:list")
     public String add(@RequestBody @Valid SecurityListAddForm form) {
         SecurityListAddCmd cmd = SolvelaBeanUtil.copy(form, SecurityListAddCmd.class);
         /*
@@ -106,7 +106,7 @@ public class SecurityListController {
      */
     @Operation(summary = "撤销一条名单 @author 风控")
     @PostMapping("/revoke")
-    @RequiresPermission("memberRisk:list")
+    @RequiresPermission("security:list")
     public String revoke(@RequestBody @Valid RevokeForm form) {
         boolean revoked = riskAdminService.revokeList(
                 form.id(), CurrentEmployee.nameOrNull(), form.reason());

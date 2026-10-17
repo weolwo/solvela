@@ -37,7 +37,7 @@ public class MemberRiskStatController {
 
     @Operation(summary = "看板：结论分布 / 矩阵各格 / 核身漏斗 / 规则命中。不传时间默认最近 30 天")
     @PostMapping("/stat")
-    @RequiresPermission("memberRisk:query")
+    @RequiresPermission("security:query")
     public MemberRiskStatDTO stat(@RequestBody @Valid StatForm form) {
         return riskAdminService.stat(form.startTime(), form.endTime());
     }

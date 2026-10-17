@@ -1,4 +1,4 @@
-package solvela.admin.module.member.risk.controller;
+package solvela.admin.module.security.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,8 +26,8 @@ import solvela.web.RequiresPermission;
  */
 @RequiredArgsConstructor
 @RestController
-@Tag(name = "登录风控 - 蜜罐账号")
-@RequestMapping("/memberRisk/canary")
+@Tag(name = "安全中心 - 蜜罐账号")
+@RequestMapping("/security/canary")
 public class CanaryAccountController {
 
     private final CanaryAccountService canaryAccountService;
@@ -36,7 +36,7 @@ public class CanaryAccountController {
 
     @Operation(summary = "用一个从没被用过的邮箱建蜜罐账号 @author 风控")
     @PostMapping("/create")
-    @RequiresPermission("memberRisk:list")
+    @RequiresPermission("security:list")
     public String create(@RequestBody @Valid CreateForm form) {
         long memberId = canaryAccountService.create(form.email(), CurrentEmployee.nameOrNull());
         dataTracerService.addTrace(memberId, DataTracerTypeEnum.SECURITY_LIST,

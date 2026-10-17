@@ -62,12 +62,34 @@ public class RouteReporter {
             payload.put("instance", snapshotHolder.instance());
             payload.put("reportedAt", System.currentTimeMillis());
             payload.put("routes", routes);
+            // 每个接口归哪个场景：后台的接口覆盖下拉框里，每个接口旁边要显示它（§6.5）
+            payload.put("scenes", routeScenes());
             redis.opsForValue().set(SecurityKeys.ROUTES, MAPPER.writeValueAsString(payload));
             log.info("【网关路由】已上报 {} 个接口", routes.size());
         } catch (Exception e) {
             // 上报失败只影响后台的下拉框与失效标红，不影响限流本身
             log.error("【网关路由】上报失败，后台接口覆盖暂时选不到接口", e);
         }
+    }
+
+    /** 接口键 → 场景名。没标 {@code @RateLimit} 的接口不在里面（单测保证没有这种接口） */
+    Map<String, String> routeScenes() {
+        Map<String, String> scenes = new java.util.TreeMap<>();
+        handlerMapping.getHandlerMethods().forEach((info, method) -> {
+            RateLimit rateLimit = method.getMethodAnnotation(RateLimit.class);
+            if (rateLimit == null) {
+                return;
+            }
+            Set<RequestMethod> methods = info.getMethodsCondition().getMethods();
+            for (String pattern : info.getPatternValues()) {
+                if (methods.isEmpty()) {
+                    scenes.put("ANY " + pattern, rateLimit.value().name());
+                } else {
+                    methods.forEach(m -> scenes.put(m.name() + " " + pattern, rateLimit.value().name()));
+                }
+            }
+        });
+        return scenes;
     }
 
     /** 全部接口键，排好序。一个映射声明了多个方法或多个路径时展开成多条 */
