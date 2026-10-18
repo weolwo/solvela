@@ -1,0 +1,10 @@
+# 数据源 provisioning。editable: false —— 面板和数据源都从文件来，
+# 在界面上改了也会被下一次重启覆盖，不如一开始就不让改。
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

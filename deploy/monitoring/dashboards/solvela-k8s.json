@@ -1,0 +1,116 @@
+{
+  "title": "Solvela 集群层（仅 k8s）",
+  "uid": "solvela-k8s",
+  "tags": [
+    "solvela"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "description": "这几块只有 k8s 有数据：Pod 状态来自 kube-state-metrics，内存/CPU/网络来自 kubelet 自带的 cAdvisor。docker compose 那套没有对应数据源 —— 独立的 cAdvisor 容器在 Docker Desktop on Windows 上连不上 docker daemon，实测 container_memory_working_set_bytes 一条带容器名的序列都没有，所以刻意不做，而不是留空面板。",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Pod 就绪",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(kube_pod_status_ready{namespace=\"solvela\",condition=\"true\"})",
+          "legendFormat": "就绪 Pod 数"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "容器重启总次数",
+      "description": "一直在涨就说明有东西在 CrashLoopBackOff，先看它",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"solvela\"})",
+          "legendFormat": "重启次数"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "各 Pod 内存（working set）",
+      "description": "对着 20-backend.yaml 里的 limits 看：admin/app-biz 1Gi、网关 768Mi",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"solvela\",pod!=\"\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "各 Pod CPU（核）",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"solvela\",pod!=\"\"}[5m]))",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "节点网络收发（按网卡）",
+      "description": "🔴 这里【不是】按 Pod 分的。Docker Desktop 用的是 cri-dockerd，cAdvisor 在这套运行时下不吐 per-pod 网络数据 —— container_network_* 全部只有 id=\"/\" 和 interface 两个标签，共 7 条节点级序列。cni0 是 Pod 网络的桥，所以它那条约等于集群内所有 Pod 的流量总和。",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(container_network_receive_bytes_total{interface=~\"cni0|eth0\"}[5m])",
+          "legendFormat": "{{interface}} 收"
+        },
+        {
+          "expr": "rate(container_network_transmit_bytes_total{interface=~\"cni0|eth0\"}[5m])",
+          "legendFormat": "{{interface}} 发"
+        }
+      ]
+    }
+  ]
+}

@@ -127,3 +127,55 @@ docker compose up -d
 ```
 
 隧道不用动 —— cloudflared 是独立容器，后端重建时它一直连着。
+
+---
+
+## 六、监控
+
+```
+Grafana      http://127.0.0.1:3000      admin / .env 里的 GRAFANA_ADMIN_PASSWORD
+Prometheus   http://127.0.0.1:9090
+```
+
+`docker compose up -d` 会一起起来,不需要额外步骤。面板是 provisioning 出来的,开浏览器就有,不用手点导入。
+
+### 🔴 这两个端口只绑回环,而且刻意不接隧道
+
+`deploy/cloudflared/config.yml` 里没有它们的路由(兜底是 `http_status:404`),所以公网碰不到。
+
+**不要把它们接进隧道。** Grafana 有登录态,但 **Prometheus 没有任何鉴权** —— 它的 `/api/v1/query` 能把全部指标读出去:接口路径、会员量、各进程的主机名与端口。等于把内部拓扑公开。
+
+### 抓的是独立的 management 端口,不是业务端口
+
+三个后端的 actuator 挂在 **业务端口 + 1000** 上:admin `2024`、app-gateway `2025`、app-biz `2026`。这三个端口**没有** `ports` 映射 —— Prometheus 和它们在同一个 compose 网络里,用服务名直连。
+
+必须独立端口的原因有两条,少任何一条都会出事:
+
+1. **`/actuator/**` 是网关安全闸的蜜罐路径之一**(`t_config.gateway_security_gate` 的 `honeypotPaths`)。从业务端口抓,每抓一次就被当成扫描器罚 IP 与设备 24 小时 —— 而响应和 404 一模一样,两边都不报错,只是过一会儿发现自己被封了。
+2. 独立端口是 Boot 的 **management 子上下文**,父上下文里那些 `@Component` 的 Filter(安检门、限流、设备令牌)都不会注册进去,所以抓取既过不了安检门、也不计入限流。
+
+实测边界:`admin:1024/actuator/health` → **404**,`admin:2024/actuator/health` → **200**,宿主机 `localhost:2024` → **连不上**。
+
+### 面板能看到什么
+
+`Solvela 应用与中间件`,**9 个面板**:JVM 堆(已用/上限)、GC 暂停、HTTP QPS、HTTP P99、HikariCP 连接池、MySQL 连接数与 QPS 与慢查询、Redis 内存与命中率与连接数。
+
+**没有容器层面板**(Pod/容器的 CPU 与内存)。k8s 那套靠 kubelet 自带的 cAdvisor,compose 下没有对应物;独立的 cAdvisor 容器在 **Docker Desktop on Windows 上连不上 docker daemon**(实测日志 `Registration of the docker container factory failed`,带容器名的内存序列一条都没有),所以刻意不做 —— 而不是留几个空面板。要看容器内存就 `docker stats`。
+
+### 文件在哪
+
+```
+deploy/monitoring/prometheus.yml                     抓取配置
+deploy/monitoring/grafana/provisioning/              数据源与面板的 provisioning
+deploy/monitoring/dashboards/solvela-app.json        面板定义（与 k8s 那套【共用同一份】）
+deploy/monitoring/dashboards/solvela-k8s.json        Pod/节点层，只有 k8s 有数据源
+```
+
+改了 `prometheus.yml` 不用重启容器:`curl -X POST http://127.0.0.1:9090/-/reload`。
+改了面板 json,Grafana 30 秒内自己重载(provisioning 的 `updateIntervalSeconds`)。
+
+### 验证面板不是空的
+
+**只看 Prometheus 的 target 是不是 `up` 不够** —— "抓得到、但算不出"是最常见的坑(缺 `_bucket` 算不出 P99、标签对不上筛不出序列),这两种情况 target 都一直显示 `up`,面板却一片空白且不报错。
+
+把 Grafana 里**线上那一份**面板的每条查询真打一遍,办法见 `deploy/k8s/README.md` 的「怎么确认面板不是空的」一节(把那段里的 `30090` 换成 `9090`、`30300` 换成 `3000`)。

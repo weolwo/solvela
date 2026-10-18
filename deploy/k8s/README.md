@@ -39,11 +39,30 @@ bash deploy/k8s/teardown.sh   # 拆
 | `20-backend.yaml` | admin:1024 / app-gateway:1025 / app-biz:1026 |
 | `30-web.yaml` | nginx 静态站 + NodePort |
 | `monitoring/40-prometheus.yaml` | Prometheus + RBAC + kube-state-metrics + mysqld/redis exporter |
-| `monitoring/41-grafana.yaml` | Grafana + 数据源与面板的 provisioning |
+| `monitoring/41-grafana.yaml` | Grafana + 数据源 provisioning(**面板定义不在这里**,见下) |
 | `setup.sh` / `teardown.sh` | 装 / 拆 |
 
 **机密不在这些文件里。** `setup.sh` 从 `.env` 现读,建成 `solvela-secret`;
-`nginx.conf` 和两个基线同理 —— 从仓库里那份现读现建 ConfigMap,所以仓库里不会出现第二份副本。
+`nginx.conf`、两个基线、以及面板定义同理 —— 从仓库里那份现读现建 ConfigMap,所以仓库里不会出现第二份副本。
+
+### 面板定义和 docker compose 那套共用
+
+```
+deploy/monitoring/dashboards/solvela-app.json    应用与中间件层,9 个面板 —— 两边【共用同一份】
+deploy/monitoring/dashboards/solvela-k8s.json    Pod/节点层,5 个面板 —— 只有这里有数据源
+```
+
+共用那一份之所以能共用,是因为面板靠的是 **Prometheus 抓取配置里写死的 `app` 标签**,
+而 `deploy/monitoring/prometheus.yml`(compose)和 `monitoring/40-prometheus.yaml`(k8s)
+里那三行 `labels: { app: ... }` 逐字一致 —— 不依赖任何应用侧的 micrometer tag。
+
+compose 那套只挂 `solvela-app.json`:它没有 kube-state-metrics 和 cAdvisor,
+挂 `solvela-k8s.json` 进去就是 5 个空面板。compose 侧的说明见 `deploy/README.md` 第六节。
+
+> ⚠️ **2026-10-18 之后这套没有再 live 验证过。** 当天把面板从 `41-grafana.yaml` 里
+> 内嵌改成由 `setup.sh --from-file` 现建之后,体验集群就 `teardown` 掉了,所以
+> 「从文件建 ConfigMap」这条路径只做过静态校验(两个 json 合法、`setup.sh` 的
+> 引用路径存在)。重新 `bash deploy/k8s/setup.sh` 跑一遍就能验证到。
 
 ---
 

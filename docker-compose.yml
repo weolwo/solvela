@@ -35,6 +35,11 @@
 #       要本地调试就用 127.0.0.1 前缀绑定（见 minio 那两行的写法）。
 #
 #    真要连库调试：ssh -L 3306:127.0.0.1:3306 user@server
+#
+#    ⚠️ 例外只有三个，而且都【只绑回环】：minio 的 9000/9001、
+#       prometheus 的 9090、grafana 的 3000。它们都不在
+#       deploy/cloudflared/config.yml 的路由里，所以公网仍然碰不到。
+#       尤其 Prometheus 没有任何鉴权，接到公网等于把内部拓扑和业务量公开。
 
 # ---------------------------------------------------------------------------
 # 三个后端进程共享的环境变量。
@@ -393,6 +398,100 @@ services:
       # 🔴 这个文件【不要提交】—— .gitignore 里已经挡了。
       - ./deploy/cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
 
+  # =========================================================================
+  # 监控：Prometheus + Grafana + 两个 exporter
+  # =========================================================================
+  # 🔴 只绑回环，并且【不接隧道】。deploy/cloudflared/config.yml 里没有它们的
+  #    路由，所以公网碰不到；绑回环只为你在本机开浏览器看。
+  #
+  #    ⚠️ 千万不要把它们接进隧道。Grafana 有登录态，但 **Prometheus 没有任何
+  #       鉴权** —— 它的 /api/v1/query 能把全部指标读出去：接口路径、会员量、
+  #       各进程的主机名与端口。等于把内部拓扑对外开放。
+  #
+  # 抓的是三个后端独立的 management 端口（2024/2025/2026），那几个端口
+  # 刻意【没有】ports 映射 —— 同一个 compose 网络里用服务名直连就够了。
+  # 为什么必须独立端口见 deploy/monitoring/prometheus.yml 开头。
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      # 改了 prometheus.yml 之后不用重启容器：
+      #   curl -X POST http://127.0.0.1:9090/-/reload
+      - --web.enable-lifecycle
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      admin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?请在 .env 里设置}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      # 🔴 只挂【共用】那一份面板。solvela-k8s.json 刻意不挂 —— compose 这边
+      #    没有 kube-state-metrics 与 cAdvisor，挂进来就是 5 个空面板。
+      - ./deploy/monitoring/dashboards/solvela-app.json:/etc/grafana/dashboards/solvela-app.json:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ⚠️ 用 root 连库，图省事。真要长期跑该建个只有
+  #    PROCESS / REPLICATION CLIENT / SELECT 权限的 exporter 账号。
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    restart: unless-stopped
+    # 0.15 起不再读 DATA_SOURCE_NAME：账号走参数，密码走这个固定名字的环境变量
+    command:
+      - --mysqld.address=mysql:3306
+      - --mysqld.username=root
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TZ: Asia/Shanghai
+    depends_on:
+      redis:
+        condition: service_healthy
+
+
 volumes:
   mysql-data:
   redis-data:
@@ -403,3 +502,8 @@ volumes:
   gateway-logs:
   biz-logs:
   admin-upload:
+
+  # 监控数据。掉了不心疼：面板和数据源都是从 deploy/monitoring/ 下的文件
+  # provisioning 出来的，重建一次就回来；Prometheus 只保留 15 天。
+  prometheus-data:
+  grafana-data:

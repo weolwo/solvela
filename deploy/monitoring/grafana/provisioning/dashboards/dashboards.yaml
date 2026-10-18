@@ -1,0 +1,16 @@
+# 面板 provisioning。
+#
+# ⚠️ path 刻意用 /etc/grafana/dashboards 而【不是】/var/lib/grafana/dashboards：
+#    后者在 Grafana 的数据卷里面，面板文件挂进去就成了"卷里套一个文件挂载"，
+#    能不能生效取决于容器运行时的挂载顺序（父挂载后挂会把子挂载整个盖掉）。
+#    放到数据卷外面就没有这个问题 —— 不依赖挂载顺序这种隐式知识。
+apiVersion: 1
+providers:
+  - name: solvela
+    orgId: 1
+    folder: Solvela
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

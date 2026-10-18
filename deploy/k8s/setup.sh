@@ -219,6 +219,15 @@ kubectl apply -f deploy/k8s/30-web.yaml
 kubectl -n "$NS" patch deploy/web --type=merge \
   -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"solvela.local/nginx-conf-hash\":\"$CONF_HASH\"}}}}}"
 
+say "把面板定义做成 ConfigMap"
+# 面板定义在 deploy/monitoring/dashboards/ 下，和 docker compose 那套【共用】
+# （solvela-app.json 两边都成立；solvela-k8s.json 只有这里有数据源）。
+# 和 nginx.conf、两个基线同一个路子：仓库里只留一份定义，apply 时现建。
+kubectl -n "$NS" create configmap grafana-dashboards \
+  --from-file=solvela-app.json=deploy/monitoring/dashboards/solvela-app.json \
+  --from-file=solvela-k8s.json=deploy/monitoring/dashboards/solvela-k8s.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 say "apply 监控部分"
 kubectl apply -f deploy/k8s/monitoring/
 

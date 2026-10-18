@@ -1,0 +1,50 @@
+# =============================================================================
+# docker compose 那套的抓取配置
+# =============================================================================
+# 🔴 抓的是三个后端【独立的 management 端口】（业务端口 + 1000），
+#    不是业务端口，更不是经 nginx / 网关的 /api。两个原因：
+#    ① /actuator/** 是网关安全闸的蜜罐路径之一（t_config.gateway_security_gate
+#       的 honeypotPaths）。从业务端口抓，每抓一次就被当成扫描器罚 IP 与设备
+#       24 小时 —— 而响应和 404 一模一样，两边都不报错。
+#    ② 独立端口是 Boot 的 management 子上下文，父上下文里那些 @Component 的
+#       Filter（安检门、限流、设备令牌）都不注册进去，抓取既不过安检门也不计限流。
+#
+# ⚠️ 这里【没有】k8s 那套的 cadvisor / kubelet / kube-state-metrics 三个 job：
+#    它们是 kubelet 与 k8s API 提供的，compose 下没有对应物。独立的 cAdvisor
+#    容器在 Docker Desktop on Windows 上连不上 docker daemon（实测
+#    "Registration of the docker container factory failed"，带容器名的内存序列
+#    一条都没有），所以容器层面板只在 k8s 那套里有，见
+#    deploy/monitoring/dashboards/solvela-k8s.json。
+#
+# ⚠️ 也没有 minio 的 job：MinIO 的 /minio/v2/metrics/cluster 默认要 Bearer token，
+#    要免 token 得给 minio 容器加 MINIO_PROMETHEUS_AUTH_TYPE=public。那是改生产
+#    服务的配置，而眼下没有任何面板用得到 MinIO 指标 —— 真要看再加。
+# -----------------------------------------------------------------------------
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # app 标签在这里写死，和 deploy/k8s/monitoring/40-prometheus.yaml 里逐字一致 ——
+  # 面板（solvela-app.json）靠它区分进程，所以两边能共用同一份面板定义。
+  - job_name: solvela-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['admin:2024']
+        labels: { app: admin }
+      - targets: ['app-gateway:2025']
+        labels: { app: app-gateway }
+      - targets: ['app-biz:2026']
+        labels: { app: app-biz }
+
+  - job_name: mysql
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+
+  - job_name: redis
+    static_configs:
+      - targets: ['redis-exporter:9121']
