@@ -1,0 +1,62 @@
+# =============================================================================
+# 静态站 + 反向代理。8080 = C 端，8081 = 管理端
+# =============================================================================
+# 🔴 这套【不跑 cloudflared】。两个客户端连同一条隧道会互相抢路由，
+#    而隧道凭据只有一份 —— 体验集群把生产的隧道搅乱是最不值得的事故。
+#    所以外面的入口换成 NodePort：Docker Desktop 会把 NodePort 映到 localhost。
+#
+# ⚠️ 代价要说清楚：compose 那套【一个端口都不发布】，这是 nginx 那份真实 IP
+#    归一化（deploy/nginx/snippets/proxy-upstream.conf）能成立的前提 ——
+#    只有 cloudflared 够得着 web，才能保证 CF-Connecting-IP 是 Cloudflare 写的。
+#    这里开了 NodePort，本机任何进程都能自己发一个 CF-Connecting-IP 进来，
+#    把 IP 伪造成任意值。**所以这套只能在本机玩，不要往公网接。**
+#
+# nginx.conf 不在这个文件里，也不在仓库里存第二份 —— setup.sh 从
+# deploy/nginx/nginx.conf 现读，只把 `resolver 127.0.0.11`（Docker 内置 DNS）
+# 换成集群 CoreDNS 的地址，然后建成 ConfigMap。snippets/ 仍用镜像里烤好的那份。
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: solvela
+spec:
+  type: NodePort
+  selector: { app: web }
+  ports:
+    - { name: app,   port: 8080, targetPort: 8080, nodePort: 30080 }
+    - { name: admin, port: 8081, targetPort: 8081, nodePort: 30081 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web, namespace: solvela }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: solvela-web:3.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8080 }
+            - { containerPort: 8081 }
+          volumeMounts:
+            # subPath：只盖掉 nginx.conf 这一个文件，不动镜像里的 snippets/ 和 /srv
+            - { name: nginx-conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true }
+            # 🔴 管理端 Basic Auth 的口令文件。文件缺失时 nginx 对 :8081 的请求会 500，
+            #    这是刻意的 fail closed：宁可管理端打不开，也不要没密码就敞开。
+            - { name: htpasswd, mountPath: /etc/nginx/admin.htpasswd, subPath: admin.htpasswd, readOnly: true }
+          readinessProbe:
+            # nginx 的 / 返回 200，所以这里可以用 httpGet（后端那三个不行，它们是 404）
+            httpGet: { path: /, port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 32Mi, cpu: 50m }
+            limits:   { memory: 128Mi }
+      volumes:
+        - { name: nginx-conf, configMap: { name: web-nginx-conf } }
+        - { name: htpasswd,   secret:    { secretName: web-htpasswd } }

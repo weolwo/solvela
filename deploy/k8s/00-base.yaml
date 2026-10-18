@@ -1,0 +1,52 @@
+# =============================================================================
+# 命名空间 + 非机密环境变量
+# =============================================================================
+# 🔴 这一整套【不碰】docker compose 那一套：
+#    · 独立 namespace，独立 PVC（不复用 solvela_* 那些 docker 卷）
+#    · 不跑 cloudflared —— 两个客户端连同一条隧道会互相抢路由
+#    · 对外只开 NodePort，而 compose 那套一个端口都不发布，所以不会撞
+#
+# ⚠️ Service 的名字【刻意】和 compose 的服务名逐字一致（mysql / redis / minio /
+#    admin / app-biz / app-gateway）。这样 SPRING_DATASOURCE_URL、
+#    MEMBER_SERVICE_URL 和 nginx 里那些 proxy_pass 一个字都不用改 ——
+#    换了名字就要在两个地方各维护一份主机名，那是漂移的开始。
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: solvela
+  labels:
+    app.kubernetes.io/part-of: solvela
+---
+# 非机密的那一半环境变量。机密那一半由 setup.sh 从 .env 现读、建成 Secret，
+# 不落在仓库里的任何文件（见 setup.sh 的注释）。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solvela-env
+  namespace: solvela
+data:
+  TZ: Asia/Shanghai
+
+  # 主机名就是 Service 名，和 compose 里一致
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/solvela?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&allowMultiQueries=true"
+  SPRING_DATASOURCE_USERNAME: root
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: "6379"
+
+  # 两个键都指向 app-biz，和 compose 一样 —— 将来资产域真拆出去时只改这里
+  MEMBER_SERVICE_URL: http://app-biz:1026
+  MARKETING_SERVICE_URL: http://app-biz:1026
+
+  # 对象存储。桶保持私有，C 端公开图走 admin 的 /support/file/public/
+  FILE_STORAGE_MODE: local
+  FILE_STORAGE_CLOUD_ENDPOINT: http://minio:9000
+  FILE_STORAGE_CLOUD_BUCKET_NAME: solvela
+  FILE_STORAGE_CLOUD_REGION: us-east-1
+  FILE_STORAGE_CLOUD_PATH_STYLE_ACCESS: "true"
+
+  # ⚠️ 本地 k8s 没有域名，C 端图片前缀留空 —— 留空时图片退回要登录态的下载接口，
+  #    管理端能看、C 端看不到图。体验集群不接隧道，这是刻意的取舍。
+  FILE_STORAGE_PUBLIC_URL_PREFIX: ""
+
+  SMTP_PORT: "465"

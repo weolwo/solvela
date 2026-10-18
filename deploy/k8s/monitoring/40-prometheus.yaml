@@ -1,0 +1,288 @@
+# =============================================================================
+# Prometheus + 三个 exporter + kube-state-metrics
+# =============================================================================
+# 🔴 先说这套抓不到什么：**应用级指标一个都没有**。
+#
+#    solvela-api/pom.xml:288 把 spring-boot-actuator 从 redisson 的传递依赖里
+#    显式排掉了，三个 Java 进程都没有 /actuator/**，所以 JVM 堆、GC、HTTP QPS、
+#    连接池这些全部抓不到。要抓就得把 actuator + micrometer-registry-prometheus
+#    加回去，那是改代码，不在"把 compose 搬成 k8s"这件事里。
+#
+#    （顺带：/actuator/** 正好是网关安全闸的蜜罐路径之一 —— 真要加回来，
+#      得让 Prometheus 绕过网关直连容器端口，不能从 /api 那条路进。）
+#
+# 所以这套抓的是容器层和中间件层：
+#    · cAdvisor（kubelet 自带）—— 每个 Pod 的 CPU / 内存 / 网络 / 重启
+#    · kube-state-metrics     —— Deployment 副本数、Pod 状态、PVC 容量
+#    · mysqld-exporter        —— 连接数、QPS、慢查询、InnoDB 缓冲池
+#    · redis-exporter         —— 内存、命中率、连接数、key 数
+#    · MinIO 自带的 /minio/v2/metrics/cluster
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: prometheus, namespace: solvela }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: solvela-prometheus }
+rules:
+  - apiGroups: [""]
+    resources: [nodes, nodes/metrics, nodes/proxy, services, endpoints, pods]
+    verbs: [get, list, watch]
+  - nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: solvela-prometheus }
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: solvela-prometheus
+subjects:
+  - { kind: ServiceAccount, name: prometheus, namespace: solvela }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: prometheus-config, namespace: solvela }
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      scrape_timeout: 10s
+
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # cAdvisor 不是独立进程，它在 kubelet 里。直连 kubelet 的 10250 需要节点证书，
+      # 所以走 apiserver 的 /proxy 转发 —— 用 ServiceAccount 的 token 就够了。
+      - job_name: kubernetes-cadvisor
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+
+      # kubelet 自己的指标（节点级：pod 数、volume、运行时）
+      - job_name: kubernetes-kubelet
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/$1/proxy/metrics
+
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: ['kube-state-metrics:8080']
+
+      - job_name: mysql
+        static_configs:
+          - targets: ['mysqld-exporter:9104']
+
+      - job_name: redis
+        static_configs:
+          - targets: ['redis-exporter:9121']
+
+      # MinIO 自带，不需要 exporter。靠 MINIO_PROMETHEUS_AUTH_TYPE=public 免 token，
+      # 那一行在 10-data.yaml 里（compose 那套没有）。
+      - job_name: minio
+        metrics_path: /minio/v2/metrics/cluster
+        static_configs:
+          - targets: ['minio:9000']
+---
+apiVersion: v1
+kind: Service
+metadata: { name: prometheus, namespace: solvela }
+spec:
+  type: NodePort
+  selector: { app: prometheus }
+  ports: [{ name: http, port: 9090, targetPort: 9090, nodePort: 30090 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: prometheus, namespace: solvela }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: prometheus } }
+  template:
+    metadata:
+      labels: { app: prometheus }
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        # 官方镜像以 nobody(65534) 跑，emptyDir 挂进来默认是 root 所有 ——
+        # 不给 fsGroup 的话 Prometheus 写不进 /prometheus，启动就退出。
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.54.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=7d
+            - --web.enable-lifecycle
+          ports: [{ containerPort: 9090 }]
+          volumeMounts:
+            - { name: config, mountPath: /etc/prometheus }
+            - { name: data,   mountPath: /prometheus }
+          readinessProbe:
+            httpGet: { path: /-/ready, port: 9090 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits:   { memory: 1Gi }
+      volumes:
+        - { name: config, configMap: { name: prometheus-config } }
+        # emptyDir 而不是 PVC：体验用，7 天保留，掉了也不心疼 ——
+        # 面板和数据源都是 provisioning 出来的，重建一次就回来。
+        - { name: data, emptyDir: {} }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: kube-state-metrics, namespace: solvela }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: solvela-kube-state-metrics }
+rules:
+  - apiGroups: [""]
+    resources: [nodes, pods, services, resourcequotas, replicationcontrollers, limitranges, persistentvolumeclaims, persistentvolumes, namespaces, endpoints]
+    verbs: [list, watch]
+  - apiGroups: [apps]
+    resources: [statefulsets, daemonsets, deployments, replicasets]
+    verbs: [list, watch]
+  - apiGroups: [batch]
+    resources: [cronjobs, jobs]
+    verbs: [list, watch]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [list, watch]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, volumeattachments]
+    verbs: [list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: solvela-kube-state-metrics }
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: solvela-kube-state-metrics
+subjects:
+  - { kind: ServiceAccount, name: kube-state-metrics, namespace: solvela }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: kube-state-metrics, namespace: solvela }
+spec:
+  selector: { app: kube-state-metrics }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: kube-state-metrics, namespace: solvela }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: kube-state-metrics } }
+  template:
+    metadata:
+      labels: { app: kube-state-metrics }
+    spec:
+      serviceAccountName: kube-state-metrics
+      containers:
+        - name: kube-state-metrics
+          image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
+          ports: [{ containerPort: 8080 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 64Mi, cpu: 50m }
+            limits:   { memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mysqld-exporter, namespace: solvela }
+spec:
+  selector: { app: mysqld-exporter }
+  ports: [{ name: http, port: 9104, targetPort: 9104 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mysqld-exporter, namespace: solvela }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mysqld-exporter } }
+  template:
+    metadata:
+      labels: { app: mysqld-exporter }
+    spec:
+      containers:
+        - name: mysqld-exporter
+          image: prom/mysqld-exporter:v0.15.1
+          # ⚠️ 0.15 起不再读 DATA_SOURCE_NAME，账号走参数、密码走这个固定名字的环境变量。
+          #    这里直接用 root —— 体验集群图省事；真要长期跑应该建个只有
+          #    PROCESS/REPLICATION CLIENT/SELECT 权限的 exporter 账号。
+          args:
+            - --mysqld.address=mysql:3306
+            - --mysqld.username=root
+          env:
+            - name: MYSQLD_EXPORTER_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MYSQL_ROOT_PASSWORD } }
+          ports: [{ containerPort: 9104 }]
+          resources:
+            requests: { memory: 32Mi, cpu: 50m }
+            limits:   { memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-exporter, namespace: solvela }
+spec:
+  selector: { app: redis-exporter }
+  ports: [{ name: http, port: 9121, targetPort: 9121 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis-exporter, namespace: solvela }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: redis-exporter } }
+  template:
+    metadata:
+      labels: { app: redis-exporter }
+    spec:
+      containers:
+        - name: redis-exporter
+          image: oliver006/redis_exporter:v1.62.0
+          env:
+            - { name: REDIS_ADDR, value: "redis://redis:6379" }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: REDIS_PASSWORD } }
+          ports: [{ containerPort: 9121 }]
+          resources:
+            requests: { memory: 32Mi, cpu: 50m }
+            limits:   { memory: 128Mi }

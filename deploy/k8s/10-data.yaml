@@ -1,0 +1,233 @@
+# =============================================================================
+# 有状态的三件：MySQL / Redis / MinIO
+# =============================================================================
+# 这三个在 compose 里都【没有 ports】，k8s 里同样只给 ClusterIP —— 外面碰不到。
+# 要连库调试用 kubectl port-forward，不要给它们加 NodePort。
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: mysql-data, namespace: solvela }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 8Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: redis-data, namespace: solvela }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 2Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: minio-data, namespace: solvela }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 8Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: admin-upload, namespace: solvela }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 4Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mysql, namespace: solvela }
+spec:
+  selector: { app: mysql }
+  ports: [{ name: mysql, port: 3306, targetPort: 3306 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mysql, namespace: solvela }
+spec:
+  replicas: 1
+  # 🔴 Recreate 而不是默认的 RollingUpdate：PVC 是 ReadWriteOnce，
+  #    滚动更新时新旧两个 Pod 会同时要挂同一块盘，新 Pod 永远 Pending。
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: mysql } }
+  template:
+    metadata: { labels: { app: mysql } }
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_general_ci
+            # 基线里有老导出留下的废弃语法，和 compose 保持一致放宽
+            - --sql-mode=NO_ENGINE_SUBSTITUTION
+          env:
+            # 给 initdb 一个默认库上下文：两个基线自己不带 USE 语句
+            - { name: MYSQL_DATABASE, value: solvela }
+            - { name: TZ, value: Asia/Shanghai }
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MYSQL_ROOT_PASSWORD } }
+          ports: [{ containerPort: 3306 }]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/mysql }
+            # ⚠️ 和 compose 一样：initdb 只在数据目录为空时执行一次。
+            #    这里的 PVC 是新的空盘，所以两个基线会跑 —— k8s 这套库是
+            #    【当前基线的干净库】，不是生产库的拷贝。
+            - { name: initdb, mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+          # 判据和 compose 一致：用 root 密码真连一次，不是只看端口通。
+          # initdb 期间端口早就通了，那时连上去会一头撞进空库。
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 10
+            failureThreshold: 60     # 10 分钟：首次要灌 527KB 的两个基线
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits:   { memory: 1536Mi }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: mysql-data } }
+        # setup.sh 用 kubectl create configmap --from-file 从
+        # 数据库SQL脚本/mysql/ 现建，所以仓库里不会多出第二份基线
+        - { name: initdb, configMap: { name: mysql-initdb } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis, namespace: solvela }
+spec:
+  selector: { app: redis }
+  ports: [{ name: redis, port: 6379, targetPort: 6379 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis, namespace: solvela }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata: { labels: { app: redis } }
+    spec:
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          # 密码从 Secret 来，所以不能写在 args 里（args 不读 Secret），
+          # 用 sh -c 把它展开。exec 是为了让 redis-server 成为 1 号进程，
+          # 否则 SIGTERM 到不了它，每次重启都要白等 30 秒宽限期。
+          command:
+            - sh
+            - -c
+            - >-
+              exec redis-server
+              --requirepass "$REDIS_PASSWORD"
+              --appendonly yes
+              --maxmemory 256mb
+              --maxmemory-policy noeviction
+          # ⚠️ noeviction 而不是 allkeys-lru：Redis 里放的是 Sa-Token 会话和分布式锁，
+          #    内存满了宁可写失败报错，也不能让锁被悄悄淘汰。
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: REDIS_PASSWORD } }
+            - { name: TZ, value: Asia/Shanghai }
+          ports: [{ containerPort: 6379 }]
+          volumeMounts: [{ name: data, mountPath: /data }]
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli -a "$REDIS_PASSWORD" ping | grep -q PONG
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests: { memory: 128Mi, cpu: 50m }
+            limits:   { memory: 512Mi }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: redis-data } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: minio, namespace: solvela }
+spec:
+  selector: { app: minio }
+  ports:
+    - { name: api,     port: 9000, targetPort: 9000 }
+    - { name: console, port: 9001, targetPort: 9001 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: minio, namespace: solvela }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: minio } }
+  template:
+    metadata:
+      labels: { app: minio }
+    spec:
+      containers:
+        - name: minio
+          # 从 quay.io 拉，不是 Docker Hub —— 理由见 docker-compose.yml 里 minio 那段
+          image: quay.io/minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MINIO_ROOT_USER } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MINIO_ROOT_PASSWORD } }
+            - { name: TZ, value: Asia/Shanghai }
+            # 🔴 compose 那套【没有】这一行。MinIO 的 /minio/v2/metrics/cluster
+            #    默认要 Bearer token，设成 public 才能让 Prometheus 直接抓。
+            #    只在这套体验集群里放开：9000 只有集群内碰得到，不对外。
+            - { name: MINIO_PROMETHEUS_AUTH_TYPE, value: public }
+          ports:
+            - { containerPort: 9000 }
+            - { containerPort: 9001 }
+          volumeMounts: [{ name: data, mountPath: /data }]
+          readinessProbe:
+            httpGet: { path: /minio/health/live, port: 9000 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits:   { memory: 1Gi }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: minio-data } }
+---
+# 一次性建桶。桶【保持私有】，不设 anonymous download ——
+# 文件公开与否是按 public_flag 一条一条定的，整桶公共读等于私有附件一起裸奔。
+apiVersion: batch/v1
+kind: Job
+metadata: { name: minio-init, namespace: solvela }
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: quay.io/minio/mc:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "[minio-init] 等 MinIO 起来…"
+                sleep 3
+              done
+              mc mb --ignore-existing local/"$MINIO_BUCKET"
+              echo "[minio-init] 桶已就绪：$MINIO_BUCKET（保持私有，不开匿名读）"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MINIO_ROOT_USER } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MINIO_ROOT_PASSWORD } }
+            - { name: MINIO_BUCKET, value: solvela }

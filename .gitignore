@@ -38,3 +38,6 @@ deploy/cloudflared/credentials.json
 
 # 管理端 Basic Auth 口令文件（bcrypt）。挂载进容器，不进镜像/仓库
 deploy/nginx/admin.htpasswd
+
+# Grafana 体验环境的 admin 口令（deploy/k8s/setup.sh 生成，只在本机用）
+deploy/k8s/.grafana-admin-password

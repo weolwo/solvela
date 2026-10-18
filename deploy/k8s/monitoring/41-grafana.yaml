@@ -1,0 +1,210 @@
+# =============================================================================
+# Grafana。数据源和面板都 provisioning 进去，开浏览器就能看，不用手点
+# =============================================================================
+# 面板里刻意【没有】JVM / HTTP 那一排 —— 应用没有 actuator，抓不到。
+# 理由与补法见 40-prometheus.yaml 开头。
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: grafana-provisioning, namespace: solvela }
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: solvela
+        orgId: 1
+        folder: Solvela
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: grafana-dashboards, namespace: solvela }
+data:
+  solvela.json: |-
+    {
+      "title": "Solvela 容器与中间件",
+      "uid": "solvela-overview",
+      "tags": ["solvela"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Pod 就绪",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_status_ready{namespace=\"solvela\",condition=\"true\"})",
+              "legendFormat": "就绪 Pod 数"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "容器重启总次数",
+          "description": "一直在涨就说明有东西在 CrashLoopBackOff，先看它",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"solvela\"})",
+              "legendFormat": "重启次数"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "MySQL 连接数",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "targets": [
+            { "expr": "mysql_global_status_threads_connected", "legendFormat": "连接" }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Redis 已用内存",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            { "expr": "redis_memory_used_bytes", "legendFormat": "已用" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "各 Pod 内存（working set）",
+          "description": "对着 20-backend.yaml 里的 limits 看：admin/app-biz 1Gi、网关 768Mi",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"solvela\",container!=\"\",container!=\"POD\"})",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "各 Pod CPU（核）",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"solvela\",container!=\"\",container!=\"POD\"}[5m]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "MySQL QPS 与慢查询",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
+          "targets": [
+            { "expr": "rate(mysql_global_status_queries[5m])", "legendFormat": "QPS" },
+            { "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "慢查询/秒" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Redis 命中率与连接数",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
+          "targets": [
+            {
+              "expr": "rate(redis_keyspace_hits_total[5m]) / clamp_min(rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]), 0.001)",
+              "legendFormat": "命中率"
+            },
+            { "expr": "redis_connected_clients", "legendFormat": "连接数" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Pod 网络收发",
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 22 },
+          "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"solvela\"}[5m]))",
+              "legendFormat": "{{pod}} 收"
+            },
+            {
+              "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"solvela\"}[5m]))",
+              "legendFormat": "{{pod}} 发"
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: grafana, namespace: solvela }
+spec:
+  type: NodePort
+  selector: { app: grafana }
+  ports: [{ name: http, port: 3000, targetPort: 3000, nodePort: 30300 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: grafana, namespace: solvela }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: grafana } }
+  template:
+    metadata:
+      labels: { app: grafana }
+    spec:
+      securityContext:
+        # 官方镜像以 472 跑；emptyDir 默认 root 所有，不给 fsGroup 就写不进 sqlite
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.2.0
+          env:
+            - { name: GF_SECURITY_ADMIN_USER, value: admin }
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: GRAFANA_ADMIN_PASSWORD } }
+            - { name: GF_USERS_ALLOW_SIGN_UP, value: "false" }
+            # 装插件要出网，体验集群不指望它
+            - { name: GF_INSTALL_PLUGINS, value: "" }
+          ports: [{ containerPort: 3000 }]
+          volumeMounts:
+            - { name: provisioning-ds, mountPath: /etc/grafana/provisioning/datasources }
+            - { name: provisioning-db, mountPath: /etc/grafana/provisioning/dashboards }
+            # 🔴 顺序要紧：/var/lib/grafana 必须排在 /var/lib/grafana/dashboards
+            #    【前面】。容器运行时按声明顺序挂载，父目录后挂会把子挂载整个盖掉 ——
+            #    表现是 Grafana 起得来、数据源有、面板一个都没有，而且不报错。
+            - { name: data,            mountPath: /var/lib/grafana }
+            - { name: dashboards,      mountPath: /var/lib/grafana/dashboards }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits:   { memory: 512Mi }
+      volumes:
+        # 同一个 ConfigMap 挂两次，各取一个文件 —— provisioning 的两个目录
+        # Grafana 是分开读的，混在一个目录里它会把 datasources.yaml 当面板解析
+        - name: provisioning-ds
+          configMap:
+            name: grafana-provisioning
+            items: [{ key: datasources.yaml, path: datasources.yaml }]
+        - name: provisioning-db
+          configMap:
+            name: grafana-provisioning
+            items: [{ key: dashboards.yaml, path: dashboards.yaml }]
+        - { name: dashboards, configMap: { name: grafana-dashboards } }
+        - { name: data, emptyDir: {} }

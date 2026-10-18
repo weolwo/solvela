@@ -1,0 +1,238 @@
+# =============================================================================
+# 三个后端进程：admin :1024 / app-gateway :1025 / app-biz :1026
+# =============================================================================
+# 镜像复用 docker compose build 出来的那四个本地镜像，不从任何 registry 拉：
+#   solvela-admin:3.0.0-distroless / solvela-app:3.0.0-distroless /
+#   solvela-app-biz:3.0.0-distroless / solvela-web:3.0.0
+# Docker Desktop 的内置 k8s 和 dockerd 共用一个镜像库，所以本地构建的直接可见。
+# imagePullPolicy 必须显式写 IfNotPresent —— 不写时 k8s 对非 :latest 标签默认就是
+# IfNotPresent，但 :latest 会变成 Always，那会去 Docker Hub 找一个不存在的镜像。
+#
+# 🔴 k8s 没有 compose 的 depends_on: service_healthy。这里用 initContainer 代替，
+#    而且判据和 compose 一样是【真连一次】而不是【端口通】：
+#    MySQL 在 initdb 期间端口早就通了，那时连上去会一头撞进空库。
+#
+# ⚠️ 探针直接复用镜像里自带的那个 /opt/probe/HealthCheck（distroless 没有 shell、
+#    没有 curl，这是镜像自己的解法）。它的判据是「状态码 < 500」：404 和 401 都
+#    算活着，只有连不上和 5xx 算死。改成 httpGet 的话会挂 —— app-biz 的 GET /
+#    返回 404，而 k8s 的 httpGet 只认 2xx/3xx。
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata: { name: admin, namespace: solvela }
+spec:
+  selector: { app: admin }
+  ports: [{ name: http, port: 1024, targetPort: 1024 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: admin, namespace: solvela }
+spec:
+  replicas: 1
+  # 🔴 不要加副本。定时任务是 admin 独占的，多一个进程跑 @Scheduled
+  #    就是发奖和结算重复执行，而多发的那份没人会来报。
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: admin } }
+  template:
+    metadata:
+      labels: { app: admin }
+    spec:
+      initContainers:
+        - name: wait-mysql
+          image: mysql:8.4
+          command:
+            - sh
+            - -c
+            - |
+              until mysqladmin ping -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do
+                echo "等 MySQL 真的建好（不是等端口通）…"
+                sleep 3
+              done
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MYSQL_ROOT_PASSWORD } }
+        - name: wait-redis
+          image: redis:8-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h redis -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q PONG; do
+                echo "等 Redis…"
+                sleep 3
+              done
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: REDIS_PASSWORD } }
+      containers:
+        - name: admin
+          image: solvela-admin:3.0.0-distroless
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: { name: solvela-env }
+            - secretRef:    { name: solvela-secret }
+          env:
+            - { name: HEALTH_URL, value: "http://127.0.0.1:1024/" }
+          ports: [{ containerPort: 1024 }]
+          volumeMounts:
+            - { name: logs, mountPath: /home/logs }
+            # FILE_STORAGE_MODE=local 时文件落在这里，所以给它一块真盘而不是
+            # emptyDir —— emptyDir 跟着 Pod 销毁，重建一次图就全没了。
+            - { name: upload, mountPath: /home/solvela/upload }
+          startupProbe:
+            exec: { command: ["/opt/jre/bin/java","-XX:TieredStopAtLevel=1","-cp","/opt/probe","HealthCheck"] }
+            periodSeconds: 10
+            failureThreshold: 30     # 5 分钟
+          readinessProbe:
+            exec: { command: ["/opt/jre/bin/java","-XX:TieredStopAtLevel=1","-cp","/opt/probe","HealthCheck"] }
+            periodSeconds: 30
+            timeoutSeconds: 10
+          resources:
+            # 和 compose 的 ADMIN_MEMORY 一致。实测限 1GB 能正常启动、稳态 529MB。
+            # ⚠️ 探针会再 fork 一个小 JVM，算进同一个 limit 里 —— 别把 limit 压到
+            #    稳态占用附近，否则探针那一下就把容器 OOM 掉。
+            requests: { memory: 640Mi, cpu: 200m }
+            limits:   { memory: 1Gi }
+      volumes:
+        - { name: logs, emptyDir: {} }
+        - { name: upload, persistentVolumeClaim: { claimName: admin-upload } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: app-biz, namespace: solvela }
+spec:
+  selector: { app: app-biz }
+  ports: [{ name: http, port: 1026, targetPort: 1026 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: app-biz, namespace: solvela }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: app-biz } }
+  template:
+    metadata:
+      labels: { app: app-biz }
+    spec:
+      initContainers:
+        - name: wait-mysql
+          image: mysql:8.4
+          command:
+            - sh
+            - -c
+            - |
+              until mysqladmin ping -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do
+                echo "等 MySQL 真的建好…"
+                sleep 3
+              done
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: MYSQL_ROOT_PASSWORD } }
+        - name: wait-redis
+          image: redis:8-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h redis -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q PONG; do
+                echo "等 Redis…"
+                sleep 3
+              done
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: REDIS_PASSWORD } }
+      containers:
+        - name: app-biz
+          image: solvela-app-biz:3.0.0-distroless
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: { name: solvela-env }
+            - secretRef:    { name: solvela-secret }
+          env:
+            - { name: HEALTH_URL, value: "http://127.0.0.1:1026/" }
+          ports: [{ containerPort: 1026 }]
+          volumeMounts:
+            - { name: logs, mountPath: /home/logs }
+          startupProbe:
+            exec: { command: ["/opt/jre/bin/java","-XX:TieredStopAtLevel=1","-cp","/opt/probe","HealthCheck"] }
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            exec: { command: ["/opt/jre/bin/java","-XX:TieredStopAtLevel=1","-cp","/opt/probe","HealthCheck"] }
+            periodSeconds: 30
+            timeoutSeconds: 10
+          resources:
+            requests: { memory: 640Mi, cpu: 200m }
+            limits:   { memory: 1Gi }
+      volumes:
+        - { name: logs, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: app-gateway, namespace: solvela }
+spec:
+  selector: { app: app-gateway }
+  ports: [{ name: http, port: 1025, targetPort: 1025 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: app-gateway, namespace: solvela }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: app-gateway } }
+  template:
+    metadata:
+      labels: { app: app-gateway }
+    spec:
+      initContainers:
+        # 网关没有数据库驱动（2026-09-01 摘掉了全部 base 模块），只等 Redis 和 app-biz
+        - name: wait-redis
+          image: redis:8-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h redis -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q PONG; do
+                echo "等 Redis…"
+                sleep 3
+              done
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: solvela-secret, key: REDIS_PASSWORD } }
+        - name: wait-app-biz
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z app-biz 1026; do
+                echo "等 app-biz…"
+                sleep 3
+              done
+      containers:
+        - name: app-gateway
+          image: solvela-app:3.0.0-distroless
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: { name: solvela-env }
+            - secretRef:    { name: solvela-secret }
+          env:
+            - { name: HEALTH_URL, value: "http://127.0.0.1:1025/" }
+          ports: [{ containerPort: 1025 }]
+          volumeMounts:
+            - { name: logs, mountPath: /home/logs }
+          startupProbe:
+            exec: { command: ["/opt/jre/bin/java","-XX:TieredStopAtLevel=1","-cp","/opt/probe","HealthCheck"] }
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            exec: { command: ["/opt/jre/bin/java","-XX:TieredStopAtLevel=1","-cp","/opt/probe","HealthCheck"] }
+            periodSeconds: 30
+            timeoutSeconds: 10
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits:   { memory: 768Mi }
+      volumes:
+        - { name: logs, emptyDir: {} }
