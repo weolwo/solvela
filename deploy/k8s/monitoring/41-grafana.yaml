@@ -92,7 +92,7 @@ data:
           "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
           "targets": [
             {
-              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"solvela\",container!=\"\",container!=\"POD\"})",
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"solvela\",pod!=\"\"})",
               "legendFormat": "{{pod}}"
             }
           ]
@@ -103,7 +103,7 @@ data:
           "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
           "targets": [
             {
-              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"solvela\",container!=\"\",container!=\"POD\"}[5m]))",
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"solvela\",pod!=\"\"}[5m]))",
               "legendFormat": "{{pod}}"
             }
           ]
@@ -131,17 +131,125 @@ data:
         },
         {
           "type": "timeseries",
-          "title": "Pod 网络收发",
+          "title": "节点网络收发（按网卡）",
+          "description": "🔴 这里【不是】按 Pod 分的。Docker Desktop 用的是 cri-dockerd，cAdvisor 在这套运行时下不吐 per-pod 网络数据 —— container_network_* 全部只有 id=\"/\" 和 interface 两个标签，共 7 条节点级序列。cni0 是 Pod 网络的桥，所以它那条约等于集群内所有 Pod 的流量总和。",
           "gridPos": { "h": 9, "w": 24, "x": 0, "y": 22 },
           "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
           "targets": [
             {
-              "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"solvela\"}[5m]))",
-              "legendFormat": "{{pod}} 收"
+              "expr": "rate(container_network_receive_bytes_total{interface=~\"cni0|eth0\"}[5m])",
+              "legendFormat": "{{interface}} 收"
             },
             {
-              "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"solvela\"}[5m]))",
-              "legendFormat": "{{pod}} 发"
+              "expr": "rate(container_network_transmit_bytes_total{interface=~\"cni0|eth0\"}[5m])",
+              "legendFormat": "{{interface}} 发"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "JVM 堆（已用 / 上限）",
+          "description": "app 这个标签来自 Prometheus 抓取配置里写的 labels，不依赖应用侧的 micrometer tag —— 少一层会变的东西。",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 31
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum by (app) (jvm_memory_used_bytes{area=\"heap\"})",
+              "legendFormat": "{{app}} 已用"
+            },
+            {
+              "expr": "sum by (app) (jvm_memory_max_bytes{area=\"heap\"})",
+              "legendFormat": "{{app}} 上限"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "GC 暂停（每秒累计暂停时长）",
+          "description": "不是单次暂停时长，是每秒花在 GC 暂停上的时间。接近 1 就说明这个进程基本在 GC 里过日子了。",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 31
+          },
+          "targets": [
+            {
+              "expr": "sum by (app) (rate(jvm_gc_pause_seconds_sum[5m]))",
+              "legendFormat": "{{app}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "HTTP QPS（按进程）",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 40
+          },
+          "targets": [
+            {
+              "expr": "sum by (app) (rate(http_server_requests_seconds_count[5m]))",
+              "legendFormat": "{{app}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "HTTP P99 延迟",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 40
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (app, le) (rate(http_server_requests_seconds_bucket[5m])))",
+              "legendFormat": "{{app}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "HikariCP 连接池",
+          "description": "只有 admin 与 app-biz 有：网关 2026-09-01 摘掉了全部 base 模块，连 MySQL 驱动都没有，所以它不会出现在这块里。pending 持续大于 0 就是在等连接。",
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 49
+          },
+          "targets": [
+            {
+              "expr": "sum by (app) (hikaricp_connections_active)",
+              "legendFormat": "{{app}} 活跃"
+            },
+            {
+              "expr": "sum by (app) (hikaricp_connections_idle)",
+              "legendFormat": "{{app}} 空闲"
+            },
+            {
+              "expr": "sum by (app) (hikaricp_connections_pending)",
+              "legendFormat": "{{app}} 等待中"
             }
           ]
         }

@@ -17,6 +17,53 @@ server:
     context-path: /
 
 # -------------------------------------------------------------------------
+# actuator 的独立端口（业务端口 + 1000）
+#
+# 🔴 必须独立端口，不能挂在业务端口上。两个原因：
+#    ① /actuator/** 是网关安全闸的【蜜罐路径】之一（见 t_config 的
+#       gateway_security_gate.honeypotPaths）。挂在业务端口上时，Prometheus
+#       每抓一次就被当成扫描器，罚 IP 与设备 24 小时 —— 而响应和 404 一模一样，
+#       两边都不报错，只是过一会儿发现自己被封了。
+#    ② 独立端口让 Boot 建一个【独立的 management 子上下文和 servlet 容器】，
+#       父上下文里那些 @Component 的 Filter（安检门、限流、设备令牌）都不会
+#       注册进去，所以抓取既过不了安检门、也不计入限流。
+#
+# ⚠️ 这个端口【不对外发布】：docker-compose.yml 没有它的 ports，
+#    deploy/k8s 里也没有 NodePort，nginx 没有任何到它的 proxy_pass。
+#    只给同机 / 同集群的 Prometheus 用。
+# -------------------------------------------------------------------------
+management:
+  server:
+    port: 2025
+  endpoints:
+    web:
+      exposure:
+        # 只开这两个。env / heapdump / loggers / threaddump 一律不开 ——
+        # 它们能读出配置里的密钥、能导出整个堆。
+        include: health,prometheus
+  metrics:
+    distribution:
+      # 🔴 不开这一行就没有 http_server_requests_seconds_bucket ——
+      #    micrometer 默认只发 count / sum / max 三个，histogram_quantile 算不出
+      #    P99，面板是空的，而 Prometheus 那边 target 一直显示 up。
+      #    这种"抓得到、但算不出"的缺口最难发现，所以显式写上。
+      #
+      # ⚠️ 代价是时间线数量：每个 uri × status 会多出一排桶。Spring 对 uri 标签
+      #    做了模板化（/activity/{activityCode}/draw 而不是具体值），所以不会被
+      #    路径参数炸开；真要再省就加 management.metrics.distribution.slo 只留几档。
+      percentiles-histogram:
+        http.server.requests: true
+  # ⚠️ 这里刻意【不设】 management.metrics.tags.application。
+  #    父 pom 对 src/main/resources/${profiles.active}/*.yaml 开了 filtering=true，
+  #    而本项目没有继承 spring-boot-starter-parent（只 import 了 BOM），所以 Maven
+  #    的默认分隔符 ${...} 也生效 —— 写 ${project.name} 会在【构建期】被替换成
+  #    【这个文件所在模块】的名字，而不是运行它的进程名。实测 admin 与 app-biz
+  #    都会被标成 application="solvela-base-core"，而且不报任何错。
+  #    （${project.log-directory} 能活到运行期，只是因为 Maven 里没有这个属性。）
+  #    要区分进程用 Prometheus 抓取配置里写死的 app 标签，见
+  #    deploy/k8s/monitoring/40-prometheus.yaml 的 solvela-backend job。
+
+# -------------------------------------------------------------------------
 # 这里原先有一段 solvela.job（role: NONE），用来阻止本进程执行定时任务。
 # 2026-08-25 job 模块整体移交 solvela-admin 之后已经删除 —— 本服务的 classpath 上
 # 根本没有调度器、执行池和任何 SolvelaJob 实现类，不存在"会不会跑"的问题了。

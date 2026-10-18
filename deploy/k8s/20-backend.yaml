@@ -22,7 +22,11 @@ kind: Service
 metadata: { name: admin, namespace: solvela }
 spec:
   selector: { app: admin }
-  ports: [{ name: http, port: 1024, targetPort: 1024 }]
+  ports:
+    - { name: http,    port: 1024, targetPort: 1024 }
+    # metrics 端口刻意【只在 Service 上开，不给 NodePort】——
+    # 只有集群内的 Prometheus 碰得到。理由见各模块 application.yaml 的 management 段。
+    - { name: metrics, port: 2024, targetPort: 2024 }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -73,7 +77,9 @@ spec:
             - secretRef:    { name: solvela-secret }
           env:
             - { name: HEALTH_URL, value: "http://127.0.0.1:1024/" }
-          ports: [{ containerPort: 1024 }]
+          ports:
+            - { containerPort: 1024, name: http }
+            - { containerPort: 2024, name: metrics }
           volumeMounts:
             - { name: logs, mountPath: /home/logs }
             # FILE_STORAGE_MODE=local 时文件落在这里，所以给它一块真盘而不是
@@ -102,7 +108,11 @@ kind: Service
 metadata: { name: app-biz, namespace: solvela }
 spec:
   selector: { app: app-biz }
-  ports: [{ name: http, port: 1026, targetPort: 1026 }]
+  ports:
+    - { name: http,    port: 1026, targetPort: 1026 }
+    # metrics 端口刻意【只在 Service 上开，不给 NodePort】——
+    # 只有集群内的 Prometheus 碰得到。理由见各模块 application.yaml 的 management 段。
+    - { name: metrics, port: 2026, targetPort: 2026 }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -151,7 +161,9 @@ spec:
             - secretRef:    { name: solvela-secret }
           env:
             - { name: HEALTH_URL, value: "http://127.0.0.1:1026/" }
-          ports: [{ containerPort: 1026 }]
+          ports:
+            - { containerPort: 1026, name: http }
+            - { containerPort: 2026, name: metrics }
           volumeMounts:
             - { name: logs, mountPath: /home/logs }
           startupProbe:
@@ -173,7 +185,11 @@ kind: Service
 metadata: { name: app-gateway, namespace: solvela }
 spec:
   selector: { app: app-gateway }
-  ports: [{ name: http, port: 1025, targetPort: 1025 }]
+  ports:
+    - { name: http,    port: 1025, targetPort: 1025 }
+    # metrics 端口刻意【只在 Service 上开，不给 NodePort】——
+    # 只有集群内的 Prometheus 碰得到。理由见各模块 application.yaml 的 management 段。
+    - { name: metrics, port: 2025, targetPort: 2025 }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -220,7 +236,9 @@ spec:
             - secretRef:    { name: solvela-secret }
           env:
             - { name: HEALTH_URL, value: "http://127.0.0.1:1025/" }
-          ports: [{ containerPort: 1025 }]
+          ports:
+            - { containerPort: 1025, name: http }
+            - { containerPort: 2025, name: metrics }
           volumeMounts:
             - { name: logs, mountPath: /home/logs }
           startupProbe:

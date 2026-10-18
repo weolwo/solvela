@@ -109,16 +109,30 @@ Docker 内置 DNS 能解析裸容器名,CoreDNS 不能 —— 所以 compose 那
 
 ---
 
-## Grafana 能看到什么、看不到什么
+## Grafana 能看到什么
 
-**看不到:JVM 堆 / GC / HTTP QPS / 连接池 —— 应用级指标一个都没有。**
+`Solvela 容器与中间件`,**14 个面板,每一条查询都实测有数据**(办法见本节末尾)。
 
-`solvela-api/pom.xml:288` 把 `spring-boot-actuator` 从 redisson 的传递依赖里显式排掉了,三个 Java 进程都没有 `/actuator/**`。
-要补就得把 actuator + `micrometer-registry-prometheus` 加回去 —— 那是改代码,不在"搬 compose"这件事里。
+### 应用级指标:走独立的 management 端口
 
-(补的时候还有一个坑:`/actuator/**` 正好是网关安全闸的**蜜罐路径**之一。Prometheus 必须绕过网关直连容器端口,从 `/api` 那条路进去会被当扫描器罚 24 小时。)
+三个 Java 进程的 JVM 堆、GC 暂停、HTTP QPS、HTTP P99、HikariCP 连接池。
 
-**看得到**(`Solvela 容器与中间件`,9 个面板,每一条查询都实测有数据):
+🔴 **抓的是独立的 management 端口(业务端口 + 1000:2024 / 2025 / 2026),不是业务端口,更不是经网关的 `/api`。** 两个原因:
+
+1. `/actuator/**` 正好是网关安全闸的**蜜罐路径**之一(`t_config.gateway_security_gate.honeypotPaths`)。从业务端口抓,每抓一次就被当成扫描器罚 IP 与设备 24 小时 —— 而响应和 404 一模一样,两边都不报错,只是过一会儿发现自己被封了。
+2. 独立端口让 Boot 建一个**独立的 management 子上下文和 servlet 容器**,父上下文里那些 `@Component` 的 Filter(安检门、限流、设备令牌)都不会注册进去,所以抓取既过不了安检门、也不计入限流。
+
+这个端口**不对外发布**:`docker-compose.yml` 没有它的 `ports`,这里也没有 NodePort(只在 Service 上开),nginx 没有任何到它的 `proxy_pass`。实测:
+`admin:1024/actuator/health` → **404**,`admin:2024/actuator/health` → **200**,宿主机 `localhost:2024` → 连不上。
+
+> ⚠️ 2026-10-18 之前这些指标**一个都没有**:`solvela-api/pom.xml` 把 `spring-boot-actuator` 从 redisson 的传递依赖里排掉了(那条排除是 2019 年从上游 smart-admin 继承来的)。现在 actuator 与 micrometer 由三个模块各自**显式声明**,而那条排除**保留不动** —— 指标不该因为哪天换掉 redisson 就一起消失。
+
+两个容易踩的配置缺口,都已经写进配置里了:
+
+- **不开 `management.metrics.distribution.percentiles-histogram.http.server.requests` 就没有 `_bucket`**,micrometer 默认只发 `count / sum / max`,`histogram_quantile` 算不出 P99 —— 面板是空的,而 target 一直显示 `up`。
+- **不要用 `${project.name}` 做 micrometer 的标签。** 父 pom 对 `src/main/resources/${profiles.active}/*.yaml` 开了 `filtering=true`,而本项目没有继承 `spring-boot-starter-parent`(只 import 了 BOM),所以 Maven 默认分隔符生效 —— `${project.name}` 在**构建期**就被换成了**文件所在模块**的名字。实测 admin 与 app-biz 都会被标成 `application="solvela-base-core"`,而且不报错。区分进程用 Prometheus 抓取配置里写死的 `app` 标签。
+
+### 容器与中间件层
 
 - 每个 Pod 的内存 / CPU —— cAdvisor,对着 `limits` 看
 - 容器重启次数 —— kube-state-metrics,一直涨就是有东西在 CrashLoopBackOff
@@ -133,6 +147,27 @@ Docker 内置 DNS 能解析裸容器名,CoreDNS 不能 —— 所以 compose 那
 
 1. **没有 `container` 标签。** 这套运行时(cri-dockerd)下 cAdvisor 只吐 **Pod 级**序列。所以查询写的是 `{namespace="solvela",pod!=""}` —— 照抄社区面板里常见的 `container!="",container!="POD"` 会把**全部序列筛掉**,面板一片空白而 target 显示 `up`,很难看出是查询的问题。
 2. **没有 per-pod 网络。** `container_network_*` 全都只有 `id="/"` 和 `interface` 两个标签,共 7 条节点级序列。所以网络面板是按网卡画的;`cni0` 是 Pod 网络的桥,它那条约等于集群内所有 Pod 的流量总和。
+
+### 怎么确认面板不是空的
+
+**只看 Prometheus 的 target 是不是 `up` 不够。** 上面这两处、以及缺 `_bucket` 那处,都是"抓得到、但算不出"——target 一直 `up`,面板却一片空白,而且没有任何报错。
+
+把线上那份面板里的每一条查询真打一遍:
+
+```bash
+PW=$(cat deploy/k8s/.grafana-admin-password)
+curl -s "http://admin:$PW@localhost:30300/api/dashboards/uid/solvela-overview" \
+  | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",async()=>{
+      const j=JSON.parse(s);
+      for(const p of j.dashboard.panels) for(const t of (p.targets||[])){
+        const r=await fetch("http://localhost:30090/api/v1/query?query="+encodeURIComponent(t.expr)).then(x=>x.json());
+        const n=r?.data?.result?.length??0;
+        console.log(`${n>0?"OK ":"空 "} ${String(n).padStart(3)} 条  ${p.title}`);
+      }})'
+```
+
+要点是读 **Grafana 里那一份**(`/api/dashboards/uid/...`),不是读仓库里的 yaml —— 这样顺带验证了 ConfigMap 真的同步进去了。
+注意 `rate(...[5m])` 需要至少两轮抓取,所以刚重启完要先打点流量、等一分钟再跑。
 
 ---
 

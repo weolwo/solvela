@@ -122,6 +122,23 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- actuator + micrometer：只为 /actuator/health 与 /actuator/prometheus 两个端点。
+             端点挂在独立的 management 端口上（业务端口 + 1000），理由见本模块
+             resources/*/application.yaml 里 management 那段注释。
+
+             ⚠️ 父 pom 里 redisson 仍然排除着 spring-boot-actuator（那条排除是 2019 年
+                从上游 smart-admin 继承下来的）。刻意不动它：actuator 应当是【我们自己
+                显式声明】的依赖，而不是 redisson 带进来的副作用 —— 哪天换掉 redisson，
+                指标不该跟着一起消失。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>

@@ -99,10 +99,34 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # 只开这两个。env / heapdump / loggers / threaddump 一律不开 ——
+        # 它们能读出配置里的密钥、能导出整个堆。
+        # 端点挂在独立的 management 端口上，见各进程自己的 application.yaml。
+        include: health,prometheus
   health:
     mail:
       enabled: false
+  metrics:
+    distribution:
+      # 🔴 不开这一行就没有 http_server_requests_seconds_bucket ——
+      #    micrometer 默认只发 count / sum / max 三个，histogram_quantile 算不出
+      #    P99，面板是空的，而 Prometheus 那边 target 一直显示 up。
+      #    这种"抓得到、但算不出"的缺口最难发现，所以显式写上。
+      #
+      # ⚠️ 代价是时间线数量：每个 uri × status 会多出一排桶。Spring 对 uri 标签
+      #    做了模板化（/activity/{activityCode}/draw 而不是具体值），所以不会被
+      #    路径参数炸开；真要再省就加 management.metrics.distribution.slo 只留几档。
+      percentiles-histogram:
+        http.server.requests: true
+  # ⚠️ 这里刻意【不设】 management.metrics.tags.application。
+  #    父 pom 对 src/main/resources/${profiles.active}/*.yaml 开了 filtering=true，
+  #    而本项目没有继承 spring-boot-starter-parent（只 import 了 BOM），所以 Maven
+  #    的默认分隔符 ${...} 也生效 —— 写 ${project.name} 会在【构建期】被替换成
+  #    【这个文件所在模块】的名字，而不是运行它的进程名。实测 admin 与 app-biz
+  #    都会被标成 application="solvela-base-core"，而且不报任何错。
+  #    （${project.log-directory} 能活到运行期，只是因为 Maven 里没有这个属性。）
+  #    要区分进程用 Prometheus 抓取配置里写死的 app 标签，见
+  #    deploy/k8s/monitoring/40-prometheus.yaml 的 solvela-backend job。
 
 # tomcat 配置，主要用于 配置 访问日志（便于将来排查错误）
 server:

@@ -1,17 +1,16 @@
 # =============================================================================
 # Prometheus + 三个 exporter + kube-state-metrics
 # =============================================================================
-# 🔴 先说这套抓不到什么：**应用级指标一个都没有**。
+# 抓四层：
+#    · solvela-backend        —— 三个 Java 进程的 JVM 堆、GC、HTTP、Hikari 连接池，
+#      走各自独立的 management 端口 2024/2025/2026，不经业务端口、更不经网关
 #
-#    solvela-api/pom.xml:288 把 spring-boot-actuator 从 redisson 的传递依赖里
-#    显式排掉了，三个 Java 进程都没有 /actuator/**，所以 JVM 堆、GC、HTTP QPS、
-#    连接池这些全部抓不到。要抓就得把 actuator + micrometer-registry-prometheus
-#    加回去，那是改代码，不在"把 compose 搬成 k8s"这件事里。
+# ⚠️ 2026-10-18 之前这里【没有】上面那一层：solvela-api/pom.xml 把
+#    spring-boot-actuator 从 redisson 的传递依赖里排掉了（那条排除是 2019 年
+#    从上游 smart-admin 继承来的），三个进程都没有 /actuator/**。现在 actuator
+#    与 micrometer 由三个模块各自【显式声明】，而那条排除保留不动 ——
+#    指标不该因为哪天换掉 redisson 就一起消失。
 #
-#    （顺带：/actuator/** 正好是网关安全闸的蜜罐路径之一 —— 真要加回来，
-#      得让 Prometheus 绕过网关直连容器端口，不能从 /api 那条路进。）
-#
-# 所以这套抓的是容器层和中间件层：
 #    · cAdvisor（kubelet 自带）—— 每个 Pod 的 CPU / 内存 / 网络 / 重启
 #    · kube-state-metrics     —— Deployment 副本数、Pod 状态、PVC 容量
 #    · mysqld-exporter        —— 连接数、QPS、慢查询、InnoDB 缓冲池
@@ -94,6 +93,28 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/$1/proxy/metrics
+
+      # 三个 Java 进程的应用级指标：JVM 堆、GC、HTTP、Hikari 连接池。
+      #
+      # 🔴 抓的是【独立的 management 端口】（业务端口 + 1000），不是业务端口，
+      #    更不是经网关的 /api。两个原因：
+      #    ① /actuator/** 是网关安全闸的蜜罐路径之一 —— 从业务端口抓，每抓一次
+      #       就被当成扫描器罚 24 小时，而响应和 404 一模一样，两边都不报错。
+      #    ② 独立端口是 Boot 的 management 子上下文，父上下文里那些 Filter
+      #       （安检门、限流、设备令牌）都不注册进去，抓取不过安检门也不计限流。
+      #
+      # ⚠️ 用 Service 名做静态目标，因为三个进程都刻意只有 1 个副本
+      #    （admin 加副本 = 定时任务重复执行）。哪天真要多副本，这里得换成
+      #    role: endpoints 的服务发现，否则只能抓到被负载均衡挑中的那一个。
+      - job_name: solvela-backend
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['admin:2024']
+            labels: { app: admin }
+          - targets: ['app-gateway:2025']
+            labels: { app: app-gateway }
+          - targets: ['app-biz:2026']
+            labels: { app: app-biz }
 
       - job_name: kube-state-metrics
         static_configs:
