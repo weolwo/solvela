@@ -75,9 +75,30 @@ compose 里的每个机制都有 k8s 的对应物,下面是对照 —— 以及*
 | 命名日志卷 ×3 | `emptyDir` | 日志在 k8s 里看 `kubectl logs`。要留档再换 PVC |
 | `admin-upload` 卷 | PVC | `FILE_STORAGE_MODE=local` 时图片落在这儿,emptyDir 会跟着 Pod 一起没 |
 | `deploy.resources.limits.memory` | `resources.limits` 同值 | admin/app-biz 1Gi、网关 768Mi,和 `.env` 的默认一致 |
-| `resolver 127.0.0.11`(Docker 内置 DNS) | **sed 成 CoreDNS 的 ClusterIP** | 整套搬迁唯一一处非改不可的。不改的话全站 502,而 nginx 日志只报解析失败 |
+| `resolver 127.0.0.11`(Docker 内置 DNS) | **sed 成 CoreDNS 的 ClusterIP** | 不改的话 `/api` 全是 502 |
+| `set $upstream_gateway app-gateway:1025;` | **sed 成 `app-gateway.solvela.svc.cluster.local:1025`** | 🔴 比上一条隐蔽得多,见下 |
 | cloudflared | **没有**,换 NodePort | 见上面隔离表 |
 | 不发布任何端口 | NodePort | ⚠️ 代价见下 |
+
+### 🔴 nginx 的 resolver 不吃 search 域
+
+这条值得单独记,因为它的症状会骗人:**静态站 200、管理端 401 都正常,只有 `/api` 全是 502**。
+
+`nginx -t` 不报错,配置也确实加载了。原因是 **nginx 自己的 `resolver` 完全绕开 libc,不会用 `/etc/resolv.conf` 里的 `search` 域**。Pod 里明明有:
+
+```
+nameserver 10.96.0.10
+search solvela.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5
+```
+
+但 nginx 拿裸名 `app-gateway` 直接去问 CoreDNS,CoreDNS 对裸名回 SERVFAIL:
+
+```
+[error] app-gateway could not be resolved (2: Server failure)
+```
+
+Docker 内置 DNS 能解析裸容器名,CoreDNS 不能 —— 所以 compose 那份配置照搬过来,**换了 resolver 地址还是 502**,上游主机名也必须补成 FQDN。`setup.sh` 两处一起 sed,并且带校验:残留任何裸名上游就直接报错退出,不会装出一个"看着起来了、一调接口就 502"的环境。
 
 ### ⚠️ 真实 IP 归一化在这套里**不成立**
 
@@ -97,13 +118,21 @@ compose 里的每个机制都有 k8s 的对应物,下面是对照 —— 以及*
 
 (补的时候还有一个坑:`/actuator/**` 正好是网关安全闸的**蜜罐路径**之一。Prometheus 必须绕过网关直连容器端口,从 `/api` 那条路进去会被当扫描器罚 24 小时。)
 
-**看得到**(`Solvela 容器与中间件` 这个面板):
+**看得到**(`Solvela 容器与中间件`,9 个面板,每一条查询都实测有数据):
 
-- 每个 Pod 的内存 / CPU / 网络 —— cAdvisor,对着 `limits` 看
+- 每个 Pod 的内存 / CPU —— cAdvisor,对着 `limits` 看
 - 容器重启次数 —— kube-state-metrics,一直涨就是有东西在 CrashLoopBackOff
 - MySQL:连接数、QPS、慢查询
 - Redis:已用内存、命中率、连接数
 - MinIO 自带的 cluster 指标(靠 `MINIO_PROMETHEUS_AUTH_TYPE=public`,**compose 那套没有这一行**)
+- 网络:**节点级,按网卡**,不是按 Pod
+
+### ⚠️ cAdvisor 在 Docker Desktop 上给的东西比标准集群少
+
+两处要注意,都已经反映在面板的查询里了:
+
+1. **没有 `container` 标签。** 这套运行时(cri-dockerd)下 cAdvisor 只吐 **Pod 级**序列。所以查询写的是 `{namespace="solvela",pod!=""}` —— 照抄社区面板里常见的 `container!="",container!="POD"` 会把**全部序列筛掉**,面板一片空白而 target 显示 `up`,很难看出是查询的问题。
+2. **没有 per-pod 网络。** `container_network_*` 全都只有 `id="/"` 和 `interface` 两个标签,共 7 条节点级序列。所以网络面板是按网卡画的;`cni0` 是 Pod 网络的桥,它那条约等于集群内所有 Pod 的流量总和。
 
 ---
 
@@ -115,10 +144,25 @@ compose 里的每个机制都有 k8s 的对应物,下面是对照 —— 以及*
 - **C 端图片看不到。** `FILE_STORAGE_PUBLIC_URL_PREFIX` 留空(本地没有域名),图片会退回要登录态的下载接口 —— 管理端能看,C 端是叉。
 - **Prometheus 和 Grafana 都用 emptyDir**,重建就清零。面板和数据源是 provisioning 出来的,清零也会自己回来。
 - **镜像 tag 写死在 manifests 里**(`3.0.0`)。重新 `docker compose build` 之后 tag 不变,所以要让 k8s 用上新代码得 `kubectl -n solvela rollout restart deploy/admin deploy/app-biz deploy/app-gateway deploy/web`。
+- **改了 `deploy/nginx/nginx.conf` 要重跑 `setup.sh`,不能只改 ConfigMap。** nginx.conf 是用 `subPath` 挂的,而 **subPath 挂进去的 ConfigMap 更新不会传播到容器里**(普通目录挂载会在几十秒内自己同步,subPath 是一次性拷贝,永远停在 Pod 创建那一刻)。`setup.sh` 把配置内容的哈希打在 pod template 的注解上:内容没变不会白重启,变了才滚动一次。
+- **`:latest` 的镜像必须显式写 `imagePullPolicy: IfNotPresent`。** k8s 对 `:latest` 默认是 `Always`,于是哪怕本机已经有(生产正在用同一个),kubelet 还是会去拉 —— 而 `quay.io/minio/minio:latest` 对此回 `401 UNAUTHORIZED`,直接 ImagePullBackOff。
+
+### 两个基线塞进 ConfigMap 的两道上限
+
+两个基线现在约 514KB,装在一个 ConfigMap 里。这里有**两道**上限,而卡人的是更紧的那一道:
+
+- ConfigMap 整个对象 **1MiB** —— 还有余量,`setup.sh` 会先量一下、超了直接报错
+- 注解总大小 **256KiB** ←← 真正的瓶颈
+
+所以这一个 ConfigMap **不能用 `kubectl apply`**:apply 会把整个对象再塞进 `kubectl.kubernetes.io/last-applied-configuration` 注解里,514KB 的 data 存两遍,直接撞 256KiB:
+
+```
+The ConfigMap "mysql-initdb" is invalid: metadata.annotations: Too long: may not be more than 262144 bytes
+```
+
+`setup.sh` 改成先 `delete` 再 `create`(create 不写那个注解),一样可重复执行。
 
 ### 基线哪天超过 1MiB
-
-两个基线现在约 527KB,塞在一个 ConfigMap 里(上限 1MiB),`setup.sh` 会先量一下、超了直接报错。
 真超了就把 `10-data.yaml` 里 `initdb` 那个 volume 换成 hostPath:
 
 ```yaml

@@ -130,16 +130,23 @@ SCHEMA="$REPO/数据库SQL脚本/mysql/schema-baseline.sql"
 DATA="$REPO/数据库SQL脚本/mysql/data-baseline.sql"
 [ -f "$SCHEMA" ] && [ -f "$DATA" ] || die "找不到两个基线文件"
 
-# ⚠️ ConfigMap 整个对象上限 1MiB。现在两份加起来约 527KB，还有一倍余量，
-#    但基线是会长的 —— 超了就得改成 hostPath 挂目录（见 README 末尾）。
+# ⚠️ 这里有【两道】上限，而且卡人的是更紧的那一道：
+#    · ConfigMap 整个对象 1MiB —— 两份基线现在约 514KB，还有余量
+#    · 注解总大小 256KiB  ←← 真正的瓶颈
+#
+# 🔴 所以这一个 ConfigMap 不能用 kubectl apply。apply 会把【整个对象】塞进
+#    kubectl.kubernetes.io/last-applied-configuration 注解里，于是 514KB 的
+#    data 在注解里再存一遍，直接撞 256KiB 那道墙：
+#      The ConfigMap "mysql-initdb" is invalid: metadata.annotations: Too long
+#    create 不写那个注解，所以改成先删后建 —— 一样是可重复执行的。
 BYTES=$(( $(wc -c < "$SCHEMA") + $(wc -c < "$DATA") ))
-echo "  两份基线共 $((BYTES / 1024)) KB（ConfigMap 上限 1024 KB）"
+echo "  两份基线共 $((BYTES / 1024)) KB（ConfigMap 对象上限 1024 KB）"
 [ "$BYTES" -lt 1000000 ] || die "基线已超过 ConfigMap 上限，改用 hostPath，见 deploy/k8s/README.md"
 
+kubectl -n "$NS" delete configmap mysql-initdb --ignore-not-found
 kubectl -n "$NS" create configmap mysql-initdb \
   --from-file=01-schema.sql="$SCHEMA" \
-  --from-file=02-data.sql="$DATA" \
-  --dry-run=client -o yaml | kubectl apply -f -
+  --from-file=02-data.sql="$DATA"
 
 # -----------------------------------------------------------------------------
 # ⑤ nginx.conf → ConfigMap（只改 resolver 那一行）
@@ -157,22 +164,60 @@ COREDNS_IP=$(kubectl -n kube-system get svc kube-dns -o jsonpath='{.spec.cluster
 echo "  CoreDNS: $COREDNS_IP"
 
 TMP_CONF=$(mktemp)
-sed "s#resolver 127\.0\.0\.11 valid=30s ipv6=off;#resolver ${COREDNS_IP} valid=30s ipv6=off;  # k8s: CoreDNS（由 deploy/k8s/setup.sh 替换）#" \
+# 要改【两处】，少任何一处都是 502：
+#
+# ① resolver 的地址：127.0.0.11（Docker 内置 DNS）→ CoreDNS 的 ClusterIP
+#
+# ② 上游主机名补成 FQDN。这一处比第一处隐蔽得多：
+#    🔴 nginx 自己的 resolver【不用】/etc/resolv.conf 里的 search 域。
+#    Pod 里明明有 `search solvela.svc.cluster.local`，但 nginx 是拿裸名
+#    `app-gateway` 直接去问 CoreDNS 的，而 CoreDNS 对裸名回 SERVFAIL：
+#      [error] app-gateway could not be resolved (2: Server failure)
+#    Docker 内置 DNS 能解析裸容器名，CoreDNS 不能 —— 所以 compose 那份配置
+#    照搬过来，静态站是 200、管理端 401 都正常，只有 /api 全是 502。
+#
+# ⚠️ 分隔符用 | 而不是 # —— 替换内容里自己带一个 #（那句 nginx 注释），
+#    用 # 当分隔符会把 s 命令提前截断，报 "unknown option to `s'"。
+sed -E \
+  -e "s|resolver 127\.0\.0\.11 valid=30s ipv6=off;|resolver ${COREDNS_IP} valid=30s ipv6=off;  # k8s: CoreDNS（由 deploy/k8s/setup.sh 替换）|" \
+  -e 's#(set \$upstream_[a-z_]+ +)(app-gateway|admin|app-biz)(:[0-9]+ *;)#\1\2.'"$NS"'.svc.cluster.local\3#g' \
   "$REPO/deploy/nginx/nginx.conf" > "$TMP_CONF"
-grep -q "resolver ${COREDNS_IP}" "$TMP_CONF" || die "resolver 那一行没替换成功 —— nginx.conf 是不是改过了？去 setup.sh 里更新那条 sed。"
+
+grep -q "resolver ${COREDNS_IP}" "$TMP_CONF" \
+  || die "resolver 那一行没替换成功 —— nginx.conf 是不是改过了？去 setup.sh 里更新那条 sed。"
+
+# 不能有残留的裸名上游，否则那条路径上线就是 502
+if grep -nE 'set \$upstream_[a-z_]+ +(app-gateway|admin|app-biz):' "$TMP_CONF"; then
+  die "上面这些上游还是裸名，没补成 FQDN —— nginx.conf 的写法变了，去 setup.sh 里更新那条 sed。"
+fi
+echo "  上游已补成 FQDN：$(grep -cE 'svc\.cluster\.local:[0-9]+ *;' "$TMP_CONF") 处"
 
 kubectl -n "$NS" create configmap web-nginx-conf \
   --from-file=nginx.conf="$TMP_CONF" \
   --dry-run=client -o yaml | kubectl apply -f -
+
+# 🔴 30-web.yaml 里 nginx.conf 是用 subPath 挂的，而【subPath 挂进去的
+#    ConfigMap 更新不会传播到容器里】—— 普通目录挂载会在几十秒内自己同步，
+#    subPath 是一次性拷贝，永远停在 Pod 创建那一刻。
+#    所以改了配置必须让 web 重建。把内容哈希打在 pod template 上：
+#    内容没变哈希就没变，不会白重启；变了才滚动一次。
+CONF_HASH=$(sha256sum "$TMP_CONF" | cut -c1-12)
 rm -f "$TMP_CONF"
 
 # -----------------------------------------------------------------------------
 # ⑥ apply
 # -----------------------------------------------------------------------------
 say "apply 应用部分"
+# ⚠️ Job 的 spec.template 是不可变字段：apply 一个改过的 Job 会报
+#    "field is immutable"，整个 10-data.yaml 就卡在这儿。
+#    minio-init 只是一次性建桶（mc mb --ignore-existing），删掉重跑没有副作用。
+kubectl -n "$NS" delete job minio-init --ignore-not-found
 kubectl apply -f deploy/k8s/10-data.yaml
 kubectl apply -f deploy/k8s/20-backend.yaml
 kubectl apply -f deploy/k8s/30-web.yaml
+# 放在 apply 之后：apply 不会删掉它不认识的注解，所以这个 patch 留得住
+kubectl -n "$NS" patch deploy/web --type=merge \
+  -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"solvela.local/nginx-conf-hash\":\"$CONF_HASH\"}}}}}"
 
 say "apply 监控部分"
 kubectl apply -f deploy/k8s/monitoring/
@@ -182,6 +227,12 @@ kubectl apply -f deploy/k8s/monitoring/
 # -----------------------------------------------------------------------------
 say "等 MySQL 灌完两个基线（首次约 1-2 分钟）"
 kubectl -n "$NS" rollout status deploy/mysql --timeout=15m
+
+say "等 MinIO 与建桶"
+# ⚠️ 这两条原本漏了，于是 MinIO 整个 ImagePullBackOff，脚本还一路退 0 ——
+#    "装完了" 的结论必须覆盖每一个真会坏的东西，漏一个就等于没验。
+kubectl -n "$NS" rollout status deploy/minio --timeout=5m
+kubectl -n "$NS" wait --for=condition=complete job/minio-init --timeout=5m
 
 say "等三个后端"
 kubectl -n "$NS" rollout status deploy/app-biz     --timeout=10m
