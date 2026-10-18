@@ -26,6 +26,7 @@ import privilegePlugin from '/@/plugins/privilege-plugin';
 import dictPlugin from '/@/plugins/dict-plugin';
 import solvelaEnumPlugin from '/@/plugins/solvela-enums-plugin';
 import { buildRoutes, router } from '/@/router';
+import { installChunkReload } from '/@/lib/chunk-reload';
 import { store } from '/@/store';
 import { useUserStore } from '/@/store/modules/system/user';
 import 'ant-design-vue/dist/reset.css';
@@ -101,6 +102,10 @@ async function initVue() {
   //挂载
   app.mount('#app');
 }
+// 重新部署后，开着的老页面会去取已经不存在的 chunk（文件名带 hash）——
+// 装上自愈，让它自己刷一次，而不是停在进度条上。必须在任何一次路由跳转【之前】装。
+installChunkReload(router);
+
 //不需要获取用户信息、用户菜单、用户菜单动态路由，直接初始化vue即可
 let token = localRead(LocalStorageKeyConst.USER_TOKEN);
 if (!token) {

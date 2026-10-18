@@ -10,6 +10,8 @@
 // 顶部加载条：原来用 nprogress，因它停更十年且 1.x 挪了 CSS 路径（升级时把 dev server 打挂过），
 // 换成项目内的 20 行实现。只用到 start/done 两个 API，样式由 JS 注入、不引 CSS 文件
 import progressBar from '/@/lib/progress-bar';
+import { isChunkLoadError } from '/@/lib/chunk-reload';
+import { solvelaSentry } from '/@/lib/solvela-sentry';
 import { nextTick } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { routerArray } from './routers';
@@ -62,12 +64,26 @@ router.beforeEach(async (to, from) => {
   let toRouterInfo = routerMap.get(to.name);
   if (toRouterInfo && _.isFunction(toRouterInfo.component) && toRouterInfo.meta.renameComponentFlag === false) {
     // 因为组件component 为 lazy load是个方法，所以可以直接执行 component()方法
-    toRouterInfo.component().then((val) => {
-      // 修改组件的name
-      val.default.name = to.meta.componentName;
-      // 记录已经修改过 组件的name
-      toRouterInfo.meta.renameComponentFlag = true;
-    });
+    toRouterInfo
+      .component()
+      .then((val) => {
+        // 修改组件的name
+        val.default.name = to.meta.componentName;
+        // 记录已经修改过 组件的name
+        toRouterInfo.meta.renameComponentFlag = true;
+      })
+      .catch((e) => {
+        // 🔴 这个 catch 不能省：这是一个【裸着的】Promise（下面直接 return true 走了，没人 await 它）。
+        //    chunk 取不到时它只会在控制台留一条 Uncaught (in promise)，看不出是哪个页面、更没人处理。
+        //
+        // 换版导致的取不到 chunk 不在这里救：路由紧接着自己 await 组件也会失败，
+        // 由 chunk-reload 装的 router.onError / vite:preloadError 统一决定是否重载 ——
+        // 两处都触发也没关系，那边有冷却窗口，只会刷一次。
+        if (isChunkLoadError(e)) {
+          return;
+        }
+        solvelaSentry.captureError(e);
+      });
   }
 
   // 设置tagNav
