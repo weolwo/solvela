@@ -11,7 +11,7 @@
     "from": "now-1h",
     "to": "now"
   },
-  "description": "docker compose 与 k8s 共用同一份定义（deploy/monitoring/dashboards/solvela-app.json）。app 标签来自 Prometheus 抓取配置里写死的 labels，两边写法一致，所以同一份面板在两边都成立。",
+  "description": "顶部「进程」下拉框可以切到单个进程（admin / app-gateway / app-biz）。MySQL 与 Redis 那几块不受它影响 —— 那是共享的中间件，不属于任何单个进程。 docker compose 与 k8s 共用同一份定义：deploy/monitoring/dashboards/solvela-app.json。",
   "panels": [
     {
       "type": "stat",
@@ -109,11 +109,11 @@
       },
       "targets": [
         {
-          "expr": "sum by (app) (jvm_memory_used_bytes{area=\"heap\"})",
+          "expr": "sum by (app) (jvm_memory_used_bytes{app=~\"$app\", area=\"heap\"})",
           "legendFormat": "{{app}} 已用"
         },
         {
-          "expr": "sum by (app) (jvm_memory_max_bytes{area=\"heap\"})",
+          "expr": "sum by (app) (jvm_memory_max_bytes{app=~\"$app\", area=\"heap\"})",
           "legendFormat": "{{app}} 上限"
         }
       ]
@@ -130,7 +130,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (app) (rate(jvm_gc_pause_seconds_sum[5m]))",
+          "expr": "sum by (app) (rate(jvm_gc_pause_seconds_sum{app=~\"$app\"}[5m]))",
           "legendFormat": "{{app}}"
         }
       ]
@@ -146,7 +146,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (app) (rate(http_server_requests_seconds_count[5m]))",
+          "expr": "sum by (app) (rate(http_server_requests_seconds_count{app=~\"$app\"}[5m]))",
           "legendFormat": "{{app}}"
         }
       ]
@@ -168,7 +168,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (app, le) (rate(http_server_requests_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (app, le) (rate(http_server_requests_seconds_bucket{app=~\"$app\"}[5m])))",
           "legendFormat": "{{app}}"
         }
       ]
@@ -185,18 +185,46 @@
       },
       "targets": [
         {
-          "expr": "sum by (app) (hikaricp_connections_active)",
+          "expr": "sum by (app) (hikaricp_connections_active{app=~\"$app\"})",
           "legendFormat": "{{app}} 活跃"
         },
         {
-          "expr": "sum by (app) (hikaricp_connections_idle)",
+          "expr": "sum by (app) (hikaricp_connections_idle{app=~\"$app\"})",
           "legendFormat": "{{app}} 空闲"
         },
         {
-          "expr": "sum by (app) (hikaricp_connections_pending)",
+          "expr": "sum by (app) (hikaricp_connections_pending{app=~\"$app\"})",
           "legendFormat": "{{app}} 等待中"
         }
       ]
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "app",
+        "label": "进程",
+        "description": "选 admin / app-gateway / app-biz 看单个进程，或 All 看全部。这个 app 标签来自 Prometheus 抓取配置里写死的 labels，compose 与 k8s 两边逐字一致。",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus"
+        },
+        "query": "label_values(jvm_memory_used_bytes, app)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  }
 }
