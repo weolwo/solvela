@@ -154,3 +154,68 @@ export const SECURITY_KEYWORD_SCOPE_OPTIONS = [
   { label: '请求参数（路径、查询串、JSON 请求体）', value: 'PARAM' },
   { label: 'User-Agent', value: 'UA' },
 ];
+
+/**
+ * 关键字规则的反例集，照抄后端 KeywordRules.NORMAL_INPUTS / NORMAL_USER_AGENTS。
+ *
+ * 🔴 **这份只用来在弹窗里做本地预检**：规则保存前服务端会用它自己那份（同一套，连超时判定一起）再跑一遍，
+ * 那份才是说了算的。放一份到前端，是因为「写宽了的正则会把真人封 24 小时」这件事
+ * 值得在人还在改正则的时候就说出来，而不是等点了保存才弹一条红字。
+ *
+ * 两边不同步的代价是单向的：前端漏了一条 → 预检放过、服务端照样拒绝（只是晚一步）；
+ * 所以这里宁可少、不可多，也不要在这里加后端没有的反例。
+ */
+export const KEYWORD_NORMAL_INPUTS = [
+  'Floor(落地灯)',
+  'Doctor(医生)',
+  'Color(2024)!',
+  'XX路(东门)',
+  '解放路100号(东门)3楼',
+  'iPhone 15 Pro (256GB)',
+  'Sleep(睡眠)眼罩',
+  'sleep (8h) 好梦套装',
+  'Tea or (coffee)',
+  'Rock and Roll (Live)',
+  '喜欢(猫)和(狗)',
+  'error(404) 页面',
+  'for(int i = 0; i < n; i++)',
+  "O'Neil",
+  "I'm here or there",
+  '1+1=2',
+  'a=b',
+  'x = 1 or 2',
+  'price<100',
+  '<b>加粗</b>',
+  '../readme.md',
+  'C:\\Users\\me',
+  'JavaScript: The Good Parts',
+  'Union Square 联合广场',
+  'select 精选好物',
+  'Benchmark (2020)',
+  'Wait for delay 等待',
+  'P@ssw0rd!',
+  'a\'b"c',
+  '#hashtag',
+  '50% off!',
+  'user@example.com',
+  'https://example.com/path?q=1&b=2',
+  '「双十一」限时 5 折',
+  'Mr. Information',
+  'or',
+  'and',
+  'union',
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!',
+  '1111111111111111111111111111111111111111x',
+];
+
+/** 正常的 User-Agent。🔴 curl / Postman 不是扫描器，不该被封 */
+export const KEYWORD_NORMAL_USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0',
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36',
+  'okhttp/4.12.0',
+  'curl/8.5.0',
+  'PostmanRuntime/7.42.0',
+  'Dart/3.5 (dart:io)',
+  'Java-http-client/21',
+];

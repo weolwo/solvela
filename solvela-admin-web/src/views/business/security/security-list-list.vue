@@ -13,7 +13,12 @@
   * 看着不友好，但「列表页能读出所有被封用户的手机号」是更糟的事。
   * 要确认是谁，用查询框输明文反查（服务端算摘要再匹配）。
   *
-  * @Date 2026-10-16
+  * 【🔴 新增弹窗里不合法的组合是选不出来的，不是选了之后被拒绝】
+  * 「会员维度没有黑名单」「灰名单必须有分」「会员名单必须填到期」这几条是 SecurityListAdminService
+  * 的语义校验。页面把它们做成联动（会员维度时黑名单灰掉、灰名单才出现分、会员维度时「长期」灰掉），
+  * 人就不会先填完一屏、再被一条红字打回来。服务端那份仍然是说了算的。
+  *
+  * @Date 2026-10-18
 -->
 <template>
   <a-alert type="warning" show-icon style="margin-bottom: 12px" message="白名单不是万能钥匙">
@@ -130,77 +135,136 @@
   </a-card>
 
   <!---------- 新增 begin ----------->
-  <a-modal v-model:open="addOpen" title="新增名单" :confirmLoading="saving" @ok="doAdd" width="640">
-    <a-form :labelCol="{ span: 6 }">
-      <a-form-item label="类型">
-        <a-radio-group v-model:value="addForm.listType" :options="SECURITY_LIST_TYPE_OPTIONS" />
-      </a-form-item>
+  <a-modal v-model:open="addOpen" title="新增名单" :width="680" :maskClosable="false" :destroyOnClose="true">
+    <!-- 这一条随着选择变，人点保存之前能先读一遍「我到底在加什么」 -->
+    <div class="modal-target">
+      <a-tag :color="metaOf(SECURITY_LIST_TYPE_ENUM, addForm.listType).color">
+        {{ metaOf(SECURITY_LIST_TYPE_ENUM, addForm.listType).desc }}
+      </a-tag>
+      <a-tag :color="metaOf(SECURITY_LIST_DIMENSION_ENUM, addForm.dimension).color">
+        {{ metaOf(SECURITY_LIST_DIMENSION_ENUM, addForm.dimension).desc }}
+      </a-tag>
+      <span class="modal-target-note">{{ EFFECT_HINT[addForm.listType] }}</span>
+    </div>
 
-      <a-form-item label="维度">
-        <a-radio-group v-model:value="addForm.dimension" :options="SECURITY_LIST_DIMENSION_OPTIONS" />
-        <div v-if="memberDimension" class="cell-sub">
-          会员维度只有白、灰两种（没有黑名单），而且<b>必须填到期时间</b>：白名单的用途是审核账号、压测账号，
-          灰名单是「这阵子多盯着点」—— 都是「这一阵子」的事。
+    <a-form ref="addFormRef" :model="addForm" :rules="addRules" :label-col="{ span: 5 }" :wrapper-col="{ span: 18 }">
+      <a-form-item label="维度" name="dimension">
+        <a-radio-group v-model:value="addForm.dimension" button-style="solid" @change="onDimensionChange">
+          <a-radio-button v-for="item in SECURITY_LIST_DIMENSION_OPTIONS" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </a-radio-button>
+        </a-radio-group>
+        <div v-if="memberDimension" class="form-hint">
+          会员维度只有白、灰两种（没有黑名单 —— 封号请用会员状态），而且<b>必须填到期时间</b>：
+          白名单的用途是审核账号、压测账号，灰名单是「这阵子多盯着点」—— 都是「这一阵子」的事。
         </div>
       </a-form-item>
 
-      <a-form-item v-if="identityDimension" label="手机号 / 邮箱">
+      <a-form-item label="类型" name="listType">
+        <a-radio-group v-model:value="addForm.listType" button-style="solid" @change="onListTypeChange">
+          <a-radio-button
+            v-for="item in SECURITY_LIST_TYPE_OPTIONS"
+            :key="item.value"
+            :value="item.value"
+            :disabled="memberDimension && item.value === SECURITY_LIST_TYPE_ENUM.BLACK.value"
+          >
+            {{ item.label }}
+          </a-radio-button>
+        </a-radio-group>
+      </a-form-item>
+
+      <a-form-item v-if="identityDimension" label="手机号 / 邮箱" name="identity">
         <a-input v-model:value="addForm.identity" placeholder="明文，服务端算摘要再存" />
-        <div class="cell-sub">🔴 服务端会先规范化再算摘要 —— 和登录那一侧算出来的必须是同一个</div>
+        <div class="form-hint">🔴 服务端会先规范化再算摘要 —— 和登录那一侧算出来的必须是同一个</div>
       </a-form-item>
-      <a-form-item v-else label="值">
-        <a-input
-          v-model:value="addForm.listValue"
-          :placeholder="addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.IP_RANGE.value
-            ? '网段，如 203.0.113.0/24'
-            : addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.MEMBER.value
-              ? '会员号'
-              : 'IP'"
-        />
-        <div class="cell-sub">格式解不开会直接报错 —— 不会留一条「永远不命中」的名单在列表里</div>
+      <a-form-item v-else label="值" name="listValue">
+        <a-input v-model:value="addForm.listValue" :placeholder="VALUE_PLACEHOLDER[addForm.dimension]" />
+        <div class="form-hint">格式解不开会直接报错 —— 不会留一条「永远不命中」的名单在列表里</div>
       </a-form-item>
 
-      <a-form-item v-if="greyType" label="命中加分">
-        <a-input-number v-model:value="addForm.score" :min="1" :max="1000" style="width: 140px" />
-        <div class="cell-sub">只有灰名单有分：黑名单直接拒绝、白名单直接放宽，分数在那两档上没有意义</div>
-      </a-form-item>
-
-      <a-form-item label="到期时间">
-        <a-date-picker
-          v-model:value="addForm.expireTime"
-          show-time
-          valueFormat="YYYY-MM-DD HH:mm:ss"
-          style="width: 220px"
-        />
-        <div class="cell-sub">
-          不填默认 30 天。🔴 IP 会被回收、重新分配 —— 永久黑名单迟早误伤一个无辜的新住户
+      <a-form-item v-if="greyType" label="命中加分" name="score">
+        <a-input-number v-model:value="addForm.score" :min="1" :max="1000" :precision="0" style="width: 140px" />
+        <div class="form-hint">
+          只有灰名单有分：黑名单直接拒绝、白名单直接放宽，分数在那两档上没有意义。
+          分档线：前置 ≥ 30 出滑块，后置 ≥ 40 要 OTP、≥ 80 换通道。
         </div>
       </a-form-item>
 
-      <a-form-item label="原因">
-        <a-textarea v-model:value="addForm.reason" :rows="3" placeholder="给下一个看到它的人的人话" />
+      <a-form-item label="到期" name="expireTime">
+        <!-- 🔴 常用时长做成按钮：一条名单该挂多久是个「几天」的判断，不该每次都去日历上点一个时刻 -->
+        <a-radio-group v-model:value="expirePreset" button-style="solid" size="small" @change="onExpirePresetChange">
+          <a-radio-button v-for="item in EXPIRE_PRESETS" :key="item.key" :value="item.key">{{ item.label }}</a-radio-button>
+          <a-radio-button value="CUSTOM">自定义</a-radio-button>
+          <a-radio-button value="NEVER" :disabled="memberDimension">长期</a-radio-button>
+        </a-radio-group>
+        <div v-if="expirePreset === 'CUSTOM'" style="margin-top: 8px">
+          <a-date-picker
+            v-model:value="addForm.expireTime"
+            show-time
+            valueFormat="YYYY-MM-DD HH:mm:ss"
+            style="width: 240px"
+            placeholder="到期时刻"
+          />
+        </div>
+        <div class="form-hint">
+          <template v-if="addForm.expireTime">到期：{{ addForm.expireTime }}</template>
+          <template v-else>长期有效。🔴 IP 会被回收、重新分配 —— 永久黑名单迟早误伤一个无辜的新住户</template>
+        </div>
+      </a-form-item>
+
+      <a-form-item label="原因" name="reason">
+        <a-textarea
+          v-model:value="addForm.reason"
+          :rows="3"
+          :maxlength="128"
+          show-count
+          placeholder="给下一个看到它的人的人话：为什么封、从哪看出来的"
+        />
       </a-form-item>
     </a-form>
+
+    <template #footer>
+      <a-space>
+        <a-button @click="addOpen = false">取消</a-button>
+        <a-button type="primary" :loading="saving" @click="doAdd">新增</a-button>
+      </a-space>
+    </template>
   </a-modal>
   <!---------- 新增 end ----------->
 
   <!---------- 撤销 begin ----------->
-  <a-modal v-model:open="revokeOpen" title="撤销名单" :confirmLoading="saving" @ok="doRevoke">
-    <a-form :labelCol="{ span: 5 }">
-      <a-form-item label="名单">
-        <span>{{ revokeTarget?.listValue }}</span>
+  <a-modal v-model:open="revokeOpen" title="撤销名单" :width="560" :maskClosable="false" :destroyOnClose="true">
+    <div class="modal-target">
+      <a-tag :color="metaOf(SECURITY_LIST_TYPE_ENUM, revokeTarget?.listType).color">
+        {{ metaOf(SECURITY_LIST_TYPE_ENUM, revokeTarget?.listType).desc }}
+      </a-tag>
+      <span class="modal-target-name">{{ revokeTarget?.listValue }}</span>
+      <span class="modal-target-note">撤销不删行：这一条连同撤销人、原因一起留在列表里（勾「看已撤销的」能查到）</span>
+    </div>
+
+    <a-form ref="revokeFormRef" :model="revokeForm" :rules="revokeRules" :label-col="{ span: 5 }" :wrapper-col="{ span: 18 }">
+      <a-form-item label="当初为什么加">
+        <span class="cell-sub">{{ revokeTarget?.reason || '—' }}</span>
       </a-form-item>
-      <a-form-item label="撤销原因">
-        <a-textarea v-model:value="revokeReason" :rows="3" placeholder="必填" />
-        <div class="cell-sub">「上次为什么解的」和「为什么加的」一样重要 —— 这一行不会被删掉</div>
+      <a-form-item label="撤销原因" name="reason">
+        <a-textarea v-model:value="revokeForm.reason" :rows="3" :maxlength="128" show-count placeholder="必填" />
+        <div class="form-hint">「上次为什么解的」和「为什么加的」一样重要 —— 这一行不会被删掉</div>
       </a-form-item>
     </a-form>
+
+    <template #footer>
+      <a-space>
+        <a-button @click="revokeOpen = false">取消</a-button>
+        <a-button type="primary" danger :loading="saving" @click="doRevoke">撤销</a-button>
+      </a-space>
+    </template>
   </a-modal>
   <!---------- 撤销 end ----------->
 </template>
 
 <script setup>
   import { computed, onMounted, reactive, ref } from 'vue';
+  import dayjs from 'dayjs';
   import { message } from 'ant-design-vue';
   import { securityApi } from '/@/api/business/security/security-api';
   import QueryActions from '/@/components/framework/query-actions/index.vue';
@@ -228,6 +292,27 @@
     { title: '状态', dataIndex: 'status', width: 180 },
     { title: '操作', dataIndex: 'action', width: 80, fixed: 'right' },
   ]);
+
+  /** 选中这一档会发生什么。「黑 / 灰 / 白」三个字本身不说明它命中之后干了什么 */
+  const EFFECT_HINT = {
+    [SECURITY_LIST_TYPE_ENUM.BLACK.value]: '命中即拒绝：网关安全闸直接挡掉，登录风控也当场判死。',
+    [SECURITY_LIST_TYPE_ENUM.GREY.value]: '命中加分：更容易触发滑块 / OTP；会员灰名单另外还要每次二次验证、限流阈值减半。',
+    [SECURITY_LIST_TYPE_ENUM.WHITE.value]: '只放宽这一个维度的计数与打分，其余处置（全局滑块、密码冷却、设备封禁）照常。',
+  };
+
+  const VALUE_PLACEHOLDER = {
+    [SECURITY_LIST_DIMENSION_ENUM.IP.value]: 'IP，如 203.0.113.5',
+    [SECURITY_LIST_DIMENSION_ENUM.IP_RANGE.value]: '网段，如 203.0.113.0/24',
+    [SECURITY_LIST_DIMENSION_ENUM.MEMBER.value]: '会员号',
+  };
+
+  /** 常用时长。天数对齐服务端不填时的默认（30 天） */
+  const EXPIRE_PRESETS = [
+    { key: 'D1', label: '1 天', days: 1 },
+    { key: 'D7', label: '7 天', days: 7 },
+    { key: 'D30', label: '30 天', days: 30 },
+    { key: 'D90', label: '90 天', days: 90 },
+  ];
 
   const queryFormDefault = () => ({
     listType: undefined,
@@ -284,6 +369,9 @@
 
   const addOpen = ref(false);
   const saving = ref(false);
+  const addFormRef = ref();
+  /** 到期的快捷档：EXPIRE_PRESETS 的 key、CUSTOM（自己挑时刻）或 NEVER（长期） */
+  const expirePreset = ref('D30');
   const addForm = reactive({
     listType: SECURITY_LIST_TYPE_ENUM.BLACK.value,
     dimension: SECURITY_LIST_DIMENSION_ENUM.IP.value,
@@ -295,12 +383,92 @@
   });
 
   const greyType = computed(() => addForm.listType === SECURITY_LIST_TYPE_ENUM.GREY.value);
-  const memberDimension = computed(
-    () => addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.MEMBER.value,
-  );
-  const identityDimension = computed(
-    () => addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.IDENTITY.value,
-  );
+  const memberDimension = computed(() => addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.MEMBER.value);
+  const identityDimension = computed(() => addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.IDENTITY.value);
+
+  /**
+   * 值的形状。与后端 IpRange.literalBytes 同一条判据（只认十六进制数字、`.`、`:`，可带 /前缀），
+   * 故意宽松 —— 比服务端严的前端校验会把一个合法的 IPv6 挡在门外，那比晚一步报错更糟。
+   */
+  function validateListValue() {
+    const value = (addForm.listValue || '').trim();
+    if (!value) {
+      return Promise.reject('这一项必填');
+    }
+    if (addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.MEMBER.value) {
+      return /^\d+$/.test(value) ? Promise.resolve() : Promise.reject('会员维度的值是会员号（纯数字）');
+    }
+    const [addr, prefix, ...rest] = value.split('/');
+    if (rest.length > 0 || !/^[0-9a-fA-F.:]+$/.test(addr)) {
+      return Promise.reject('不是 IP 字面量 —— 这里不接受域名，解不开的值会变成一条永远不命中的名单');
+    }
+    if (addForm.dimension === SECURITY_LIST_DIMENSION_ENUM.IP_RANGE.value && !/^\d{1,3}$/.test(prefix || '')) {
+      return Promise.reject('网段要带前缀长度，如 203.0.113.0/24');
+    }
+    if (prefix !== undefined && !/^\d{1,3}$/.test(prefix)) {
+      return Promise.reject('前缀长度不合法');
+    }
+    return Promise.resolve();
+  }
+
+  const addRules = {
+    dimension: [{ required: true, message: '选一个维度' }],
+    listType: [{ required: true, message: '选一个类型' }],
+    listValue: [{ validator: validateListValue }],
+    identity: [{ required: true, message: '输手机号或邮箱的明文，服务端算摘要再存' }],
+    score: [{ required: true, message: '灰名单必须给分 —— 不给分的灰名单命中了也什么都不会发生' }],
+    reason: [{ required: true, message: '写明为什么进名单 —— 这句话是给下一个看到它的人的' }],
+    expireTime: [
+      {
+        validator: () => {
+          if (!addForm.expireTime) {
+            return memberDimension.value
+              ? Promise.reject('会员名单必须填到期时间，不允许长期')
+              : Promise.resolve();
+          }
+          return dayjs(addForm.expireTime).isAfter(dayjs())
+            ? Promise.resolve()
+            : Promise.reject('到期时间不能是过去 —— 那条名单加完立刻就失效了');
+        },
+      },
+    ],
+  };
+
+  function applyExpirePreset() {
+    const preset = EXPIRE_PRESETS.find((item) => item.key === expirePreset.value);
+    if (preset) {
+      addForm.expireTime = dayjs().add(preset.days, 'day').format('YYYY-MM-DD HH:mm:ss');
+    } else if (expirePreset.value === 'NEVER') {
+      addForm.expireTime = undefined;
+    }
+    // CUSTOM 保留人自己挑的那个时刻，不覆盖
+  }
+
+  function onExpirePresetChange() {
+    applyExpirePreset();
+  }
+
+  /** 换维度：会员维度没有黑名单，也不许长期 —— 这两条在这里当场纠正，而不是等保存被拒 */
+  function onDimensionChange() {
+    if (memberDimension.value) {
+      if (addForm.listType === SECURITY_LIST_TYPE_ENUM.BLACK.value) {
+        addForm.listType = SECURITY_LIST_TYPE_ENUM.GREY.value;
+      }
+      if (expirePreset.value === 'NEVER') {
+        expirePreset.value = 'D30';
+        applyExpirePreset();
+      }
+    }
+    addForm.listValue = '';
+    addForm.identity = '';
+    addFormRef.value?.clearValidate(['listValue', 'identity', 'listType', 'expireTime']);
+  }
+
+  /** 换类型：分只在灰名单上有意义，切走就清掉（带着一个前端默认值提交会被后端当成「人填的」） */
+  function onListTypeChange() {
+    addForm.score = greyType.value ? addForm.score ?? 30 : undefined;
+    addFormRef.value?.clearValidate(['score']);
+  }
 
   function openAdd() {
     Object.assign(addForm, {
@@ -312,10 +480,18 @@
       reason: '',
       expireTime: undefined,
     });
+    expirePreset.value = 'D30';
+    applyExpirePreset();
     addOpen.value = true;
   }
 
   async function doAdd() {
+    try {
+      await addFormRef.value.validate();
+    } catch {
+      // 校验没过：错误已经标在对应的字段上
+      return;
+    }
     saving.value = true;
     try {
       /*
@@ -344,21 +520,31 @@
   // ---------------------------- 撤销 ----------------------------
 
   const revokeOpen = ref(false);
+  const revokeFormRef = ref();
   const revokeTarget = ref(null);
-  const revokeReason = ref('');
+  const revokeForm = reactive({ reason: '' });
+
+  const revokeRules = {
+    reason: [{ required: true, message: '撤销必须写原因' }],
+  };
 
   function openRevoke(record) {
     revokeTarget.value = record;
-    revokeReason.value = '';
+    revokeForm.reason = '';
     revokeOpen.value = true;
   }
 
   async function doRevoke() {
+    try {
+      await revokeFormRef.value.validate();
+    } catch {
+      return;
+    }
     saving.value = true;
     try {
       const res = await securityApi.revokeList({
         id: revokeTarget.value.id,
-        reason: revokeReason.value,
+        reason: revokeForm.reason,
       });
       message.success(res ?? '已撤销');
       revokeOpen.value = false;
@@ -381,5 +567,36 @@
   .cell-value {
     font-family: var(--font-family-monospace, monospace);
     font-size: 12px;
+  }
+
+  /* 弹窗顶上那条「在加 / 在撤什么」 */
+  .modal-target {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #fafafa;
+    border-radius: 6px;
+  }
+
+  .modal-target-name {
+    font-family: var(--font-family-monospace, monospace);
+    font-weight: 600;
+    word-break: break-all;
+  }
+
+  .modal-target-note {
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
+  .form-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(0, 0, 0, 0.45);
   }
 </style>
