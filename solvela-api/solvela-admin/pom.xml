@@ -170,17 +170,6 @@
             <artifactId>reflections</artifactId>
         </dependency>
 
-        <!-- 代码生成器渲染 .vm 模板用。随 codegenerator 模块从 solvela-base 移交过来 ——
-             全项目只有这一个地方用 velocity，放在 solvela-base 等于让每个依赖它的服务
-             都背着这两个 jar，而 C 端进程永远不会生成代码。 -->
-        <dependency>
-            <groupId>org.apache.velocity</groupId>
-            <artifactId>velocity-engine-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.velocity.tools</groupId>
-            <artifactId>velocity-tools-generic</artifactId>
-        </dependency>
         <!-- AdminApplicationTest 需要；此前是靠 solvela-base 的 compile 作用域传递白嫖来的 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

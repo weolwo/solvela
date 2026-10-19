@@ -32,9 +32,6 @@ public class SwaggerTagConst {
 
         public static final String DICT = "业务支撑-数据字典";
 
-        public static final String CODE_GENERATOR = "业务支撑-代码生成";
-
-
         public static final String SCRIPT_DOC = "业务支撑-脚本方法文档";
 
 

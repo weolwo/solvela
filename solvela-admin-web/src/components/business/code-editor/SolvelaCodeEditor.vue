@@ -7,7 +7,7 @@
   ⚠️ 取值大小写敏感，传错不会报错、只是静默没有高亮 —— 本项目真出过这个 bug。
   编辑器只做着色，不做语法检查；QL 的语法校验走后端 check(script) 接口。
 
-  只读回显请优先用 highlight.js（见 code-generator-preview-modal.vue），比本组件更轻。
+  只读回显也用本组件，传 readOnly。原先推荐的 highlight.js 已随代码生成模块一起删掉。
 -->
 <template>
   <div ref="containerRef" class="solvela-code-editor" :style="{ height: normalizedHeight }"></div>

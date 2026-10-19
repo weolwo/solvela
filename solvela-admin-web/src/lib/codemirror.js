@@ -2,7 +2,10 @@
  * CodeMirror 6 装配层
  *
  * 本项目只需要「浏览器里看代码 + 偶尔改一改」，CodeMirror 6 按需装语言约 250KB 即可满足。
- * 只读回显的场景不要用这里，用 highlight.js（见 code-generator-preview-modal.vue 的用法），更轻。
+ * 只读回显也走这里：readOnly 那个 Compartment 会同时去掉 contenteditable 与光标。2026-10-19 随代码生成模块
+ * 摘掉了对 highlight.js 的【直接依赖】——本项目自己的代码里，代码生成器的预览弹窗是它唯一的
+ * 使用点。它仍作为 diff2html 的传递依赖留在依赖树里（SolvelaCodeDiff.vue 用 diff2html），
+ * 但不要再直接 import 它。
  *
  * ⚠️ 新增语言时在 LANGUAGE_LOADERS 里补一条。key **大小写敏感**，
  *    历史上写成大写 'JSON' 导致高亮静默失效（不报错），改动务必与调用方对齐。

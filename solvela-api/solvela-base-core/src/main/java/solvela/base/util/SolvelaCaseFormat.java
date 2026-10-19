@@ -7,7 +7,7 @@ import java.util.List;
  * 命名风格转换：驼峰 / 下划线 / 中划线 互转。
  *
  * <p>用来替代 Guava 的 {@code com.google.common.base.CaseFormat} —— 全项目只用到 5 种格式、
- * 7 种组合（代码生成器 + 数据变更追踪 + 枚举名推导），为此扛一个 2.9MB 的依赖不划算。
+ * 7 种组合（数据变更追踪 + 枚举名推导），为此扛一个 2.9MB 的依赖不划算。
  *
  * <p><b>语义与 Guava 对齐</b>：先按「源格式」把串拆成单词，再按「目标格式」拼回去。
  * 已用真实语料逐条比对过 Guava 的输出（见 {@code SolvelaCaseFormatTest}），包括
