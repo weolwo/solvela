@@ -145,6 +145,8 @@ C 端可以被「添加到主屏幕」，从桌面图标全屏打开。不上应
 - 只在生产构建里注册。本地试：`npm run build-only && npm run preview`（localhost 不要求 HTTPS）。
   **手机上试必须走 HTTPS**（Cloudflare 隧道那个域名可以），局域网 IP + http 注册不了 SW、也装不了。
 - nginx 给 `sw.js` 和 `manifest.webmanifest` 发 `no-cache`，后者还要显式指定类型（自带的 mime.types 里没有）。
+  ⚠️ **`sw.js` 那条在 Cloudflare 后面不生效**：边缘按扩展名缓存 `.js`，并用区域的 Browser Cache TTL
+  盖掉源站的头（实测回的是 `max-age=14400`）。要守住得在 Cloudflare 侧改，见 `deploy/nginx/nginx.conf` 里那段注释。
 - 入口在「设置 → 添加到桌面」：Chrome / Edge 直接弹系统安装框；iOS 给「分享 → 添加到主屏幕」的说明；
   微信等 App 内置浏览器装不了，提示先在浏览器中打开。
 - 没做推送：iOS 装到主屏幕后能收 Web Push，但 Android 的 Web Push 走 FCM，国内收不到。
