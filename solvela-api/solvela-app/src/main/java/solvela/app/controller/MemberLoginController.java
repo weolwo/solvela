@@ -24,7 +24,6 @@ import solvela.app.domain.EmailCodeRequest;
 import solvela.app.domain.PhoneBindRequest;
 import solvela.app.domain.LoginChallengeCodeView;
 import solvela.app.domain.LoginChallengeRequest;
-import solvela.app.domain.SessionAdoptRequest;
 import solvela.app.domain.SecurityPromptAnswerRequest;
 import solvela.member.api.SecurityPromptView;
 import solvela.app.domain.SessionReportRequest;
@@ -32,7 +31,6 @@ import solvela.app.domain.SessionRevokeRequest;
 import solvela.member.api.MemberContactView;
 import solvela.app.domain.SmsCodeRequest;
 import solvela.auth.member.MemberSession;
-import solvela.auth.member.MemberSessionProperties;
 
 import java.time.Duration;
 
@@ -62,8 +60,6 @@ public class MemberLoginController {
     private final MemberLoginService memberLoginService;
 
     private final RequestCredentials credentials;
-
-    private final MemberSessionProperties sessionProperties;
 
     private final CaptchaService captchaService;
 
@@ -189,31 +185,6 @@ public class MemberLoginController {
         MemberResult result = memberLoginService.verifyChallenge(
                 request.ticket(), request.code(), ClientIp.of(servletRequest));
         return request.cookieDelivery() ? deliverByCookie(result, request.rememberMe(), servletResponse) : result;
-    }
-
-    /**
-     * 把 localStorage 里的旧令牌搬进 HttpOnly cookie。Web 端升级到 cookie 版本后<b>只调一次</b>。
-     *
-     * <p>🔴 <b>只有「请求头 → cookie」这一个方向。</b>任何「cookie → 响应体」的接口都不能存在：
-     * 那等于给混进页面的脚本一个把 HttpOnly 令牌取出来的出口，整套改造白做。
-     * 所以这里<b>只认请求头里的令牌</b>，返回 204、没有响应体。
-     *
-     * <p>搬的是<b>同一个</b>令牌，不重新签发：用户不会因为升级而掉线，
-     * 「我的登录设备」里也不会凭空多出一条会话。等最后一批旧令牌过期（30 天），本接口可以删掉。
-     */
-    @RateLimit(RateLimitScene.DEFAULT_WRITE)
-    @PostMapping("/session/adopt")
-    public ResponseEntity<Void> adoptSession(@RequestBody(required = false) @Valid SessionAdoptRequest request,
-                                             HttpServletRequest servletRequest,
-                                             HttpServletResponse servletResponse) {
-        CurrentMember.require();
-        RequestCredentials.Credential credential = credentials.session(servletRequest);
-        if (credential != null && !credential.fromCookie()) {
-            boolean remember = request != null && request.rememberMe();
-            credentials.writeSession(servletResponse, credential.value(),
-                    remember ? sessionProperties.tokenTtl() : null);
-        }
-        return ResponseEntity.noContent().build();
     }
 
     /**

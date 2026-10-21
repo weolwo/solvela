@@ -1,5 +1,3 @@
-import { clearDevice, readDevice } from '@/utils/device-storage'
-
 import { type DeviceType } from './auth'
 import { DEVICE_REGISTER_URL, request } from './http'
 
@@ -42,30 +40,14 @@ interface RawDeviceRegisterView {
 }
 
 /**
- * 旧版本存在 localStorage 里的设备令牌走这个头交给服务端，服务端把**同一个**令牌写进 cookie。
- * 对齐网关的 `solvela.app.device.header`。
- */
-const LEGACY_DEVICE_HEADER = 'X-Device-Token'
-
-/**
  * 领（或续期）设备身份，返回设备号。
- *
- * <h3>迁移：旧令牌只交出去一次</h3>
- * localStorage 里还躺着旧版本领的令牌时，放进请求头交给服务端 —— 服务端认出它、
- * 把同一个令牌写进 cookie，**设备号不断档**（「这台设备碰过哪些号」的历史还在）。
- * 交出去成功之后删掉本地那份：留着它就留着一份脚本读得到的凭证。
  */
 export async function registerDevice(payload: DeviceRegisterPayload): Promise<string> {
-  const legacy = readDevice()
   const raw = await request<RawDeviceRegisterView>({
     url: DEVICE_REGISTER_URL,
     method: 'POST',
     data: { ...payload, useCookie: true },
-    ...(legacy === null ? {} : { headers: { [LEGACY_DEVICE_HEADER]: legacy.token } }),
   })
-  if (legacy !== null) {
-    clearDevice()
-  }
   return raw.deviceId
 }
 

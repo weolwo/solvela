@@ -2,7 +2,6 @@ import type { AxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ensureDevice, registerDevice, resetDeviceForTest } from '../device'
-import { clearDevice, readDevice } from '@/utils/device-storage'
 
 /**
  * 设备身份（HttpOnly cookie 版）。它坏掉的时候**不会有任何报错**。
@@ -11,7 +10,7 @@ import { clearDevice, readDevice } from '@/utils/device-storage'
  * 它退化的方式全是静默的：页面照常打开，只是 `t_device` 里凭空多出几行、
  * 或者令牌又回到了脚本读得到的地方。
  *
- * <p>这里钉住：**令牌不落本地**、**一次页面生命周期只领一次**、**旧令牌迁移后清掉**。
+ * <p>这里钉住：**令牌不落本地**、**一次页面生命周期只领一次**。
  */
 
 const request = vi.hoisted(() => vi.fn())
@@ -25,28 +24,21 @@ vi.mock('../http', () => ({
 /** cookie 模式下服务端不回令牌原文 */
 const REPLY = { deviceToken: null, deviceId: '0123456789abcdef0123456789abcdef' }
 
-const LEGACY_TOKEN = 'dv_1.eyJ4IjoxfQ.c2ln'
-
 function sentConfig(i = 0): AxiosRequestConfig {
   const config = request.mock.calls[i]?.[0] as AxiosRequestConfig | undefined
   expect(config, '压根没发出请求').toBeDefined()
   return config as AxiosRequestConfig
 }
 
-function writeLegacy(): void {
-  localStorage.setItem('solvela.app.device.token', LEGACY_TOKEN)
-  localStorage.setItem('solvela.app.device.id', REPLY.deviceId)
-}
-
 beforeEach(() => {
-  clearDevice()
+  localStorage.clear()
   resetDeviceForTest()
   request.mockReset()
   request.mockResolvedValue(REPLY)
 })
 
 afterEach(() => {
-  clearDevice()
+  localStorage.clear()
 })
 
 describe('领设备身份', () => {
@@ -54,7 +46,7 @@ describe('领设备身份', () => {
     await registerDevice({ deviceType: 'H5' })
 
     expect((sentConfig().data as Record<string, unknown>).useCookie).toBe(true)
-    expect(readDevice()).toBeNull()
+    expect(localStorage.length).toBe(0)
   })
 
   it('🔴 H5 不上报 model —— 浏览器里那串 UA 不是型号', async () => {
@@ -65,30 +57,10 @@ describe('领设备身份', () => {
     expect(body.model).toBeUndefined()
   })
 
-  it('本地没有旧令牌时，不带设备头', async () => {
+  it('不带设备头 —— 凭证只走 cookie', async () => {
     await registerDevice({ deviceType: 'H5' })
 
     expect(sentConfig().headers).toBeUndefined()
-  })
-})
-
-describe('迁移', () => {
-  it('🔴 旧令牌放进请求头交给服务端（设备号不断档），成功后清掉本地那份', async () => {
-    writeLegacy()
-
-    await registerDevice({ deviceType: 'H5' })
-
-    expect((sentConfig().headers as Record<string, string>)['X-Device-Token']).toBe(LEGACY_TOKEN)
-    expect(readDevice(), '交出去之后还留着，就是留着一份脚本读得到的凭证').toBeNull()
-  })
-
-  it('交接失败时保留旧令牌，下次再试 —— 丢了它设备号就断档了', async () => {
-    writeLegacy()
-    request.mockRejectedValueOnce(new Error('network'))
-
-    await expect(registerDevice({ deviceType: 'H5' })).rejects.toThrow()
-
-    expect(readDevice()).not.toBeNull()
   })
 })
 

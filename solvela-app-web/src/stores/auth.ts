@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 
 import {
-  adoptSession,
   fetchMe,
   verifyLoginChallenge,
   login as loginApi,
@@ -13,13 +12,11 @@ import {
   type RegisterPayload,
 } from '@/api/auth'
 import { ensureDevice } from '@/api/device'
-import { ApiError } from '@/api/errors'
 import { configureHttp } from '@/api/http'
 import { showAccountNotice } from '@/composables/useAccountNotice'
 import { requestCaptcha } from '@/composables/useCaptcha'
 import { finishStepUp, requestStepUp } from '@/composables/useStepUp'
 import { clearSessionHint, hasSessionHint, setSessionHint } from '@/utils/session-hint'
-import { clearToken, readToken } from '@/utils/token-storage'
 
 /**
  * 登录态。
@@ -101,33 +98,9 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /**
-   * 迁移：旧版本存在 localStorage / sessionStorage 里的令牌，交给服务端写进 HttpOnly cookie。
-   *
-   * <p>搬的是同一个令牌（用户不掉线），成功或服务端明确拒绝后都清掉本地那份 ——
-   * 留着它就是留着一份脚本读得到的凭证。只有网络失败时保留，下次启动再试。
-   */
-  async function migrateLegacySession(): Promise<void> {
-    const legacy = readToken()
-    if (legacy === null) {
-      return
-    }
-    try {
-      await adoptSession(legacy.token, legacy.persisted)
-      setSessionHint()
-      clearToken()
-    } catch (error) {
-      if (error instanceof ApiError && error.status !== null) {
-        // 服务端答复了（多半是令牌早已失效）：这份旧令牌没用了
-        clearToken()
-      }
-    }
-  }
-
   let restoreTask: Promise<void> | null = null
 
   async function doRestore(): Promise<void> {
-    await migrateLegacySession()
     if (!hasSessionHint()) {
       return
     }

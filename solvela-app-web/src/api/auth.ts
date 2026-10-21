@@ -199,25 +199,6 @@ export async function verifyLoginChallenge(
 }
 
 /**
- * 迁移：把旧版本存在 localStorage 里的会话令牌交给服务端，由它写进 HttpOnly cookie。
- *
- * 🔴 **只有这一个方向。** 服务端没有、也不能有「cookie → 响应体」的接口 ——
- * 那等于给混进页面的脚本一个把 HttpOnly 令牌取出来的出口。本接口返回 204、没有响应体。
- *
- * 搬的是**同一个**令牌：用户不会因为升级而掉线。
- *
- * @param remember 旧令牌原来在 localStorage（记住我）还是 sessionStorage
- */
-export async function adoptSession(legacyToken: string, remember: boolean): Promise<void> {
-  await requestVoid({
-    url: '/auth/session/adopt',
-    method: 'POST',
-    data: { remember },
-    headers: { Authorization: `Bearer ${legacyToken}` },
-  })
-}
-
-/**
  * 短信验证码的用途。对齐后端 SmsScene。
  *
  * 比邮箱**少一个 BIND** —— 绑定手机号还没做。

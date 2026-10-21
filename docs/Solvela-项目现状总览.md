@@ -153,7 +153,6 @@ Cloudflare 隧道 ─┤                                          只连 Redis  
 9. **万能密码后门**：`t_config.super_password`（`1024ok`）仍能绕过管理端登录锁定与邮箱二次验证。删除它的提交在 `claude/remove-super-password` 分支上，**还没合进 `upgrade/springboot4`**。
 10. **蜜罐账号**：上线前由运营在「安全中心 → 蜜罐与关键字」建，数量与投放位置由运营定（邮箱不进代码与种子）。
 11. 已知小缝：下线单台设备不撤该设备信任；无滑动续期（30 天必须重登）；管理端无 CSP；邮箱登录失败提示仍是「手机号或密码错误」。
-12. 迁移代码（`/auth/session/adopt`、`token-storage.ts`、`device-storage.ts`）**2026-10-26 之后删除**。
 
 ### 5.5 技术债（不阻塞上线）
 

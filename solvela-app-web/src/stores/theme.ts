@@ -43,7 +43,7 @@ const SKIN_KEY = 'solvela.app.skin'
 
 /**
  * 隐私模式 / 禁用站点数据时，访问 storage 会直接抛（不是返回 null）。
- * 与 token-storage 同一个处理：不能让它掀翻整个应用。
+ * 不能让它掀翻整个应用。
  */
 function safeRead(key: string): string | null {
   try {

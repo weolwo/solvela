@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * 放内存里丢了就只能重新注册一台设备，那既会多出一行记录，也会消耗一次 IP 配额。
  *
  * <p>存的位置要选能跨重装的：iOS 用 Keychain，Android 存私有目录，
- * H5 只有 localStorage（清缓存就没了 —— 这是 H5 设备可信度天然低的根本原因，
+ * H5 由服务端写进 HttpOnly cookie、不经客户端之手（清站点数据就没了 —— 这是 H5 设备可信度天然低的根本原因，
  * 不是实现没做好）。
  *
  * @param deviceToken 设备令牌原文，之后每个请求都带在 {@code X-Device-Token} 头上

@@ -35,7 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <h3>钉住的几条</h3>
  * <ul>
  *   <li>🔴 cookie 模式下<b>响应体里没有令牌</b> —— 有的话 HttpOnly 白做；</li>
- *   <li>🔴 {@code /auth/session/adopt} <b>只能单向</b>（请求头 → cookie），不存在 cookie → 响应体的出口；</li>
  *   <li>🔴 凭 cookie 调「下线其他设备」<b>不会把自己踢掉</b>（改造前「当前令牌」只从请求头取）；</li>
  *   <li>🔴 浏览器发起的跨源写请求被拒，包括登录（登录 CSRF）；App / Postman 不受影响；</li>
  *   <li>设备注册在已有身份时复用，不新建。</li>
@@ -168,37 +167,6 @@ class CookieSessionTest {
         assertTrue(sessions.isArray() && !sessions.isEmpty(), sessions.toString());
         assertTrue(sessions.get(0).path("current").asBoolean(),
                 "标不出本机的话，用户不敢点任何一个下线按钮 —— 怕把自己踢掉。实际：" + sessions);
-    }
-
-    // ============================== 迁移 ==============================
-
-    @Test
-    @DisplayName("adopt：请求头里的旧令牌原样搬进 cookie，响应体为空")
-    void adopt请求头到cookie() throws Exception {
-        String token = JSON.readTree(post("/auth/register", String.format(REGISTER_BODY, ""), Map.of()).body())
-                .path("accessToken").asText();
-
-        HttpResponse<String> response = post("/auth/session/adopt", "{\"remember\":true}",
-                Map.of("Authorization", "Bearer " + token));
-
-        assertEquals(204, response.statusCode(), response.body());
-        assertTrue(response.body().isEmpty());
-        String setCookie = setCookie(response, cookieProperties.sessionCookieName()).orElseThrow();
-        assertTrue(setCookie.startsWith(cookieProperties.sessionCookieName() + "=" + token + ";"),
-                "搬的必须是【同一个】令牌：重新签发的话「我的登录设备」会凭空多一条。实际：" + setCookie);
-    }
-
-    @Test
-    @DisplayName("🔴 adopt 不存在反方向：凭 cookie 调它拿不到任何令牌")
-    void adopt不能反向() throws Exception {
-        String cookie = registerByCookie();
-
-        HttpResponse<String> response = post("/auth/session/adopt", "{}", Map.of("Cookie", cookie));
-
-        assertEquals(204, response.statusCode());
-        assertTrue(response.body().isEmpty(),
-                "任何「cookie → 响应体」的出口都会让 XSS 把 HttpOnly 令牌取出来。实际：" + response.body());
-        assertTrue(setCookie(response, cookieProperties.sessionCookieName()).isEmpty());
     }
 
     // ============================== 跨站防护 ==============================

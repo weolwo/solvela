@@ -55,7 +55,7 @@ src/
     http.ts     axios 实例 + 拦截器
     errors.ts   错误码契约 + ApiError
   types/      契约类型（branded type）与边界转换函数
-  utils/      money / datetime / token-storage —— 都是有业务语义的封装，不是杂物间
+  utils/      money / datetime / session-hint —— 都是有业务语义的封装，不是杂物间
   stores/     pinia
   router/     路由与守卫
   views/      页面
