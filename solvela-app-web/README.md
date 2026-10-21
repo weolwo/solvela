@@ -60,6 +60,10 @@ src/
   router/     路由与守卫
   views/      页面
   styles/     主题变量与基础样式
+public/
+  sw.js                service worker（不经打包）
+  manifest.webmanifest 添加到桌面用的名称、图标
+  icons/               192 / 512 / iOS 180 三张图标
 ```
 
 ---
@@ -131,6 +135,19 @@ src/
 而且 dev 填的那个值指向 `:1024`，那是 **solvela-admin**，公开文件接口在管理端。
 上线前要决定：走 CDN / OSS（推荐），还是让 nginx 把该路径转到 admin。
 后者意味着管理端要对公网可见，与 `docker-compose.yml` 里「别让应用端口直接对公网」的约定冲突。
+
+### 添加到桌面（PWA）
+
+C 端可以被「添加到主屏幕」，从桌面图标全屏打开。不上应用商店、不用开发者账号、不用签名。
+
+- **service worker 只是一层加速，删掉它行为不变**：页面导航网络优先（联网时永远是服务端最新的
+  index.html，发版即生效），`/assets/` 缓存优先，`/api` 与图片一律不碰。理由见 `public/sw.js` 文件头。
+- 只在生产构建里注册。本地试：`npm run build-only && npm run preview`（localhost 不要求 HTTPS）。
+  **手机上试必须走 HTTPS**（Cloudflare 隧道那个域名可以），局域网 IP + http 注册不了 SW、也装不了。
+- nginx 给 `sw.js` 和 `manifest.webmanifest` 发 `no-cache`，后者还要显式指定类型（自带的 mime.types 里没有）。
+- 入口在「设置 → 添加到桌面」：Chrome / Edge 直接弹系统安装框；iOS 给「分享 → 添加到主屏幕」的说明；
+  微信等 App 内置浏览器装不了，提示先在浏览器中打开。
+- 没做推送：iOS 装到主屏幕后能收 Web Push，但 Android 的 Web Push 走 FCM，国内收不到。
 
 ---
 

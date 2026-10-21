@@ -167,7 +167,7 @@ Cloudflare 隧道 ─┤                                          只连 Redis  
 
 ### 5.6 下一阶段（产品层面）
 
-- **App 端。** 推荐 Capacitor（Android / iOS）+ ArkWeb 薄壳（鸿蒙）复用 H5；必须补推送、设备绑定（Keychain / Keystore）、生物识别等原生能力，否则过不了 App Store 4.2。后端登录接口已支持非 cookie 模式。
+- **App 端。** 先走 PWA（2026-10-21 已做：添加到桌面、离线外壳、安装引导，见 `solvela-app-web/README.md`「添加到桌面」）—— 零认证、零费用，拿不到的是应用商店入口和 Android 国内推送。要上商店再走下面这条：推荐 Capacitor（Android / iOS）+ ArkWeb 薄壳（鸿蒙）复用 H5；必须补推送、设备绑定（Keychain / Keystore）、生物识别等原生能力，否则过不了 App Store 4.2。后端登录接口已支持非 cookie 模式。
 - **旧号不可用时的换绑通道**：多弱证据叠加 + 冷静期，方案见本会话讨论（尚未成文）。
 
 ---

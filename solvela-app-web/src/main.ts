@@ -2,8 +2,10 @@ import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 
 import App from './App.vue'
+import { listenInstallEvents } from './composables/useInstallApp'
 import router from './router'
 import './styles/index.css'
+import { registerServiceWorker } from './utils/service-worker'
 
 // 2026-09-26 之前的版本把会话令牌、设备令牌存在这几个键里，现在它们都在服务端下发的 HttpOnly cookie 里。
 // 迁移接口已经删了，残留的旧令牌不会再交给服务端；但留在本地就是一份脚本读得到的凭证，启动时直接扔掉。
@@ -30,3 +32,6 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.mount('#app')
+
+listenInstallEvents()
+registerServiceWorker()

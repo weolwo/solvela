@@ -11,6 +11,16 @@
     <meta name="theme-color" content="#14181d" media="(prefers-color-scheme: dark)" />
     <title>Solvela</title>
     <!--
+      添加到主屏幕（PWA）。manifest 管 Android / 桌面 Chrome 的名称、图标与全屏打开；
+      iOS 认 manifest 的 display，但图标只认 apple-touch-icon，标题认 apple-mobile-web-app-title。
+      图标是不透明的满底方块：iOS 自己切圆角、Android 自己套遮罩，透明边会被填成黑色或白色。
+      service worker 的注册在 src/utils/service-worker.ts。
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Solvela" />
+    <!--
       🔴 在 JS 加载【之前】就把主题打到 <html> 上，否则深色模式用户每次打开都会先白屏一下。
       必须【同步】加载（不能 defer / async / type=module），放在 <head> 里 —— 见文件内注释。
       是外部文件而不是内联脚本：nginx 下发的 CSP 不允许内联脚本（那正是它挡 XSS 的方式）。
