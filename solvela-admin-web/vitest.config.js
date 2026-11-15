@@ -40,5 +40,17 @@ export default defineConfig({
     include: ['src/**/__tests__/**/*.spec.js'],
     // 依赖 ant-design-vue 的组件树很深，默认 5s 在冷启动那几条上会误报超时
     testTimeout: 15000,
+    /*
+     * 🔴 关掉 Node 自带的 localStorage，让 jsdom 的那份生效。
+     *
+     * Node 25 起默认带一个全局 localStorage，没给 --localstorage-file 时它的值是 undefined。
+     * vitest 的 jsdom 环境看到全局上已经有这个名字，就不再拿 jsdom 的覆盖它 ——
+     * 于是 localStorage.getItem() 报「读取 undefined 的属性」，而报错位置在被测代码里，
+     * 看上去像业务代码坏了。Node 24 及以下没有这个全局，所以只在升 Node 之后才冒出来。
+     *
+     * 用带 experimental 的旧名字是刻意的：Node 22 也认它，短名 --no-webstorage 只有 25+ 认。
+     * C 端的 vitest.config.ts 有同一条，改一个记得看另一个。
+     */
+    execArgv: ['--no-experimental-webstorage'],
   },
 });
