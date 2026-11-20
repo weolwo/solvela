@@ -64,7 +64,8 @@ vi.mock('@/api/mall', async (importOriginal) => {
       }).map((c) => ({ ...c, favorite: favorites.has(c.commodityId) }))
       return Promise.resolve({ list, total: list.length })
     },
-    fetchCommodityDetail: (id: Id) => Promise.resolve({ ...fixtures.detailOf(id), ...detailOverride }),
+    fetchCommodityDetail: (id: Id) =>
+      Promise.resolve({ ...fixtures.detailOf(id), ...detailOverride }),
     fetchFavorites: () =>
       Promise.resolve(
         fixtures.COMMODITIES.filter((c) => favorites.has(c.commodityId)).map((c) => ({
@@ -123,7 +124,6 @@ describe('ProductView', () => {
   afterEach(() => {
     detailOverride = {}
   })
-
 
   it('渲染标题、价格、库存与评分', async () => {
     const w = await mountDetail()

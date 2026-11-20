@@ -50,7 +50,9 @@ describe('签到被限流', () => {
 
   it('🔴 429 → 按钮置灰并倒计时，提示说服务端的原话；到 0 恢复可点', async () => {
     signApi.mockRejectedValueOnce(
-      new ApiError('OPERATION_LIMITED', '操作过于频繁，请 60 秒后再试', null, 429, { retryAfterSeconds: 60 }),
+      new ApiError('OPERATION_LIMITED', '操作过于频繁，请 60 秒后再试', null, 429, {
+        retryAfterSeconds: 60,
+      }),
     )
     const w = await mountTasks()
 

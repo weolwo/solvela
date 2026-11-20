@@ -31,7 +31,14 @@ import type { GradeLadderItem, MyGrade } from '@/api/grade'
  */
 
 const LADDER: GradeLadderItem[] = [
-  { gradeCode: 0, gradeName: '普通会员', threshold: 0, reached: true, current: false, privileges: [] },
+  {
+    gradeCode: 0,
+    gradeName: '普通会员',
+    threshold: 0,
+    reached: true,
+    current: false,
+    privileges: [],
+  },
   {
     gradeCode: 1,
     gradeName: '银卡会员',

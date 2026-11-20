@@ -172,7 +172,12 @@ const placeholders = computed(() => {
 
               <p v-if="hint !== ''" class="issue__hint" role="alert">{{ hint }}</p>
 
-              <Button v-if="sellable" :loading="obtaining" :disabled="wait.active.value" @click="onObtain">
+              <Button
+                v-if="sellable"
+                :loading="obtaining"
+                :disabled="wait.active.value"
+                @click="onObtain"
+              >
                 {{ wait.label('领取号码') }}
               </Button>
 

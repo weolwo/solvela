@@ -78,9 +78,8 @@ async function doSign(): Promise<void> {
     }
   } catch (error) {
     // 被限流时说服务端的原话（「请 X 分钟后再试」），并让按钮按倒计时置灰
-    signHint.value = wait.catchLimited(error) && error instanceof ApiError
-      ? error.message
-      : '签到失败，请稍后再试'
+    signHint.value =
+      wait.catchLimited(error) && error instanceof ApiError ? error.message : '签到失败，请稍后再试'
   } finally {
     signing.value = false
   }

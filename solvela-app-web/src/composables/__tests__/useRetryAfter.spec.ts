@@ -65,8 +65,14 @@ describe('useRetryAfter', () => {
   it('400（关键字拦截也是它）、其它错误、非 ApiError 都不倒计时', () => {
     const { wait, stop } = inScope()
 
-    expect(wait.catchLimited(new ApiError('INVALID_ARGUMENT', '请求参数有误', null, 400))).toBe(false)
-    expect(wait.catchLimited(new ApiError('CONFLICT', '已经领过了', null, 409, { retryAfterSeconds: 60 }))).toBe(false)
+    expect(wait.catchLimited(new ApiError('INVALID_ARGUMENT', '请求参数有误', null, 400))).toBe(
+      false,
+    )
+    expect(
+      wait.catchLimited(
+        new ApiError('CONFLICT', '已经领过了', null, 409, { retryAfterSeconds: 60 }),
+      ),
+    ).toBe(false)
     expect(wait.catchLimited(new Error('boom'))).toBe(false)
     expect(wait.active.value).toBe(false)
     stop()

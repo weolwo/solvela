@@ -51,7 +51,8 @@ export function formatCash(cash: Money): string {
  * 而他没有任何办法从卡片上看出来这是最低价。
  */
 export function formatCost(payType: 1 | 2, points: number, cash: Money, varies = false): string {
-  const cost = payType === 2 ? `${formatPoints(points)} + ${formatCash(cash)}` : formatPoints(points)
+  const cost =
+    payType === 2 ? `${formatPoints(points)} + ${formatCash(cash)}` : formatPoints(points)
   return varies ? `${cost} 起` : cost
 }
 
