@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -166,14 +167,14 @@ public class SolvelaJobService {
                     vo.setBizDateOffset(meta.bizDateOffset());
                     vo.setDefaultTimeoutSeconds(meta.defaultTimeoutSeconds());
                     vo.setHandlerClassName(meta.handlerClassName());
-                    vo.setParamSchemaList(java.util.Arrays.stream(meta.params()).map(pa -> {
+                    vo.setParamSchemaList(Arrays.stream(meta.params()).map(pa -> {
                         SolvelaJobHandlerVO.ParamSchema schema = new SolvelaJobHandlerVO.ParamSchema();
                         schema.setKey(pa.key());
                         schema.setDesc(pa.desc());
                         schema.setType(pa.type().name());
                         schema.setRequired(pa.required());
                         schema.setDefaultValue(pa.defaultValue());
-                        schema.setOptions(java.util.Arrays.asList(pa.options()));
+                        schema.setOptions(Arrays.asList(pa.options()));
                         return schema;
                     }).toList());
                     return vo;

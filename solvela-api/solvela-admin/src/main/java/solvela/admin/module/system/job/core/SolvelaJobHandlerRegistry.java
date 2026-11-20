@@ -11,6 +11,7 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.util.*;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -133,7 +134,7 @@ public class SolvelaJobHandlerRegistry implements SmartInitializingSingleton {
         Set<String> dbNames = dbJobList.stream()
                 .filter(e -> !Boolean.TRUE.equals(e.getDeletedFlag()))
                 .map(SolvelaJobEntity::getHandlerName)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
         boolean anyMissing = reportMissingHandlers(dbJobList);

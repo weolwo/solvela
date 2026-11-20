@@ -8,6 +8,7 @@ import solvela.base.module.file.domain.form.FileQueryForm;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -78,10 +79,10 @@ public interface FileDao extends BaseMapper<FileEntity> {
      *
      * @param deadline 保护期边界，<b>用库时钟算</b>（{@code ctx.dbNow()}）
      */
-    List<Long> selectOrphanIds(@Param("deadline") java.time.LocalDateTime deadline,
+    List<Long> selectOrphanIds(@Param("deadline") LocalDateTime deadline,
                                @Param("limit") int limit);
 
     /** 与 {@link #selectOrphanIds} 同一套条件的计数，给试运行用 */
-    long countOrphans(@Param("deadline") java.time.LocalDateTime deadline);
+    long countOrphans(@Param("deadline") LocalDateTime deadline);
 
 }

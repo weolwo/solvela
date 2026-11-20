@@ -48,7 +48,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 素材库服务：文件的记账与生命周期。
@@ -287,7 +289,7 @@ public class FileAssetService {
         }
         List<FileVO> list = fileDao.selectByFileKeyList(new LinkedHashSet<>(storageKeys));
         Map<String, FileVO> byKey = list.stream()
-                .collect(java.util.stream.Collectors.toMap(FileVO::getStorageKey, v -> v, (a, b) -> a));
+                .collect(Collectors.toMap(FileVO::getStorageKey, v -> v, (a, b) -> a));
         for (FileVO vo : list) {
             vo.setFileUrl(urlOfVo(vo));
         }
@@ -315,7 +317,7 @@ public class FileAssetService {
                 .toList();
         return listByStorageKeys(keys).stream()
                 .map(FileVO::getFileUrl)
-                .collect(java.util.stream.Collectors.joining(StringConst.SEPARATOR));
+                .collect(Collectors.joining(StringConst.SEPARATOR));
     }
 
     /**
@@ -504,7 +506,7 @@ public class FileAssetService {
      */
     static String normalizeTags(List<String> tags) {
         List<String> cleaned = tags.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(String::trim)
                 .filter(t -> !t.isEmpty() && t.indexOf(',') < 0 && t.indexOf('，') < 0)
                 .distinct()
@@ -797,7 +799,7 @@ public class FileAssetService {
     public List<Long> findUnreferenced(Collection<Long> fileIds) {
         Set<Long> referenced = fileRelationDao.listByFileIds(fileIds).stream()
                 .map(FileRelationEntity::getFileId)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         return fileIds.stream().filter(id -> !referenced.contains(id)).toList();
     }
 

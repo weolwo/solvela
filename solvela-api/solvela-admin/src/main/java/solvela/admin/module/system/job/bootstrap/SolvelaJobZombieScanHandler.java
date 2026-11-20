@@ -13,6 +13,7 @@ import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobLogEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -109,7 +110,7 @@ public class SolvelaJobZombieScanHandler implements SolvelaJob {
         int timeout = null == job.getTimeoutSeconds() || job.getTimeoutSeconds() <= 0
                 ? handler.map(SolvelaJobHandlerMeta::defaultTimeoutSeconds).orElse(300)
                 : job.getTimeoutSeconds();
-        long ageSeconds = java.time.Duration.between(log.getExecuteStartTime(), dbNow).getSeconds();
+        long ageSeconds = Duration.between(log.getExecuteStartTime(), dbNow).getSeconds();
         return ageSeconds > Math.max(MIN_ZOMBIE_AGE_SECONDS, timeout * 2L);
     }
 

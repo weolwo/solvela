@@ -312,7 +312,7 @@ public class DataTracerChangeContentService {
             Method get = pd.getReadMethod();
             return get.invoke(object);
         } catch (Exception e) {
-            log.error("bean operate log: reflect field value error " + field.getName());
+            log.error("[数据变更日志] 读取字段失败，该字段记为 null: {}#{}", object.getClass().getName(), field.getName(), e);
             return null;
         }
     }

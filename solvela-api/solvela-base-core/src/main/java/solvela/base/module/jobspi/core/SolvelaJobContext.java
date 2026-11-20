@@ -1,7 +1,10 @@
 package solvela.base.module.jobspi.core;
 
+import solvela.base.json.JsonUtils;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -92,17 +95,17 @@ public record SolvelaJobContext(String jobCode,
      * 为此加缓存字段会让这个 record 不再是纯数据载体，不划算
      */
     @SuppressWarnings("unchecked")
-    private java.util.Map<String, Object> paramMap() {
+    private Map<String, Object> paramMap() {
         if (null == param || param.isBlank()) {
-            return java.util.Map.of();
+            return Map.of();
         }
         try {
-            java.util.Map<String, Object> map = solvela.base.json.JsonUtils
-                    .parseObject(param, java.util.Map.class);
-            return null == map ? java.util.Map.of() : map;
+            Map<String, Object> map = JsonUtils
+                    .parseObject(param, Map.class);
+            return null == map ? Map.of() : map;
         } catch (Exception e) {
             // 不是 JSON（老任务的裸字符串参数）—— 不是错误，按空处理
-            return java.util.Map.of();
+            return Map.of();
         }
     }
 

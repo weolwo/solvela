@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -121,7 +122,7 @@ public final class SonicSheetReader<T> {
             Stream<T> result = StreamSupport
                     .stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
                     .map(row -> mapRow(mapper, row))
-                    .filter(java.util.Objects::nonNull);
+                    .filter(Objects::nonNull);
             return closeWith(result, rows, workbook);
         } catch (IOException e) {
             closeQuietly(rows, workbook);

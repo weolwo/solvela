@@ -166,7 +166,8 @@ public abstract class OperateLogAspect {
             }
             this.submitLog(joinPoint, e);
         } catch (Exception exp) {
-            log.error("保存操作日志异常:{}", exp.getMessage());
+            // 操作日志是旁路，写不成不能让业务请求跟着失败；但要带上堆栈，只有 message 时连哪一步出错都看不出
+            log.error("保存操作日志异常, 方法: {}", joinPoint.getSignature().toShortString(), exp);
         }
     }
 

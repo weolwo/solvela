@@ -9,6 +9,7 @@ import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.dao.DuplicateKeyException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -103,7 +104,7 @@ public class SolvelaJobBootstrapInitializer implements SmartInitializingSingleto
         entity.setTriggerType(SolvelaJobTriggerTypeEnum.CRON.getValue());
         entity.setTriggerValue(cron);
         // 🔴 立刻可被扫到，但下一次触发按 cron 排 —— 不预置的话它要等到第一次 cron 命中才动
-        entity.setNextTriggerTime(java.time.LocalDateTime.now());
+        entity.setNextTriggerTime(LocalDateTime.now());
         entity.setTriggerVersion(0L);
 
         entity.setPresetCode(preset.getValue());

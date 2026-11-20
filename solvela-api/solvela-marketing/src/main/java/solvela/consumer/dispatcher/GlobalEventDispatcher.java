@@ -68,7 +68,8 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
                     routeTable.put(classRoute.value(), new RouteTarget(bean, handleMethod));
                     log.info("【事件路由】加载 [类级别] 分类: {} -> {}", classRoute.value(), targetClass.getSimpleName());
                 } catch (NoSuchMethodException e) {
-                    log.error("路由加载失败", e);
+                    // 启动期就失败：只打日志的话进程照常起来，这个分类的事件此后全部「无人处理」，没有任何报错
+                    throw new IllegalStateException("类级别路由 [" + targetClass.getName() + "] 找不到 handle(BaseBizEvent)", e);
                 }
                 continue; // 如果是类级别，就不再扫描它的方法了
             }

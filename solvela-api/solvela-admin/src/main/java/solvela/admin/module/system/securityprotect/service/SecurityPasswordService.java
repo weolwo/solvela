@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 三级等保 密码 相关
@@ -88,19 +87,24 @@ public class SecurityPasswordService {
     }
 
     /**
-     * 随机生成密码
+     * 随机生成密码（新建员工、重置密码时发给本人的初始密码）。
+     *
+     * <p>🔴 凭证类随机数只用 {@link RandomStringUtils#secure()}，每一位都是。
+     * 旧写法用的是已弃用的静态方法（3.16 起内部才改走 SecureRandom，换个版本就可能不是），
+     * 外加一位 {@code ThreadLocalRandom} —— 可预测的随机源不该出现在密码里，哪怕只有一位。
      */
     public String randomPassword() {
+        RandomStringUtils random = RandomStringUtils.secure();
         // 未开启密码复杂度，则由8为数字构成
         if (!level3ProtectConfigService.isPasswordComplexityEnabled()) {
-            return RandomStringUtils.randomNumeric(PASSWORD_LENGTH);
+            return random.nextNumeric(PASSWORD_LENGTH);
         }
 
         // 3位大写字母，2位数字，2位小写字母 + 1位特殊符号
-        return RandomStringUtils.randomAlphabetic(3).toUpperCase()
-                + RandomStringUtils.randomNumeric(2)
-                + RandomStringUtils.randomAlphabetic(2).toLowerCase()
-                + (ThreadLocalRandom.current().nextBoolean() ? "#" : "@");
+        return random.nextAlphabetic(3).toUpperCase()
+                + random.nextNumeric(2)
+                + random.nextAlphabetic(2).toLowerCase()
+                + random.next(1, "#@");
     }
 
 

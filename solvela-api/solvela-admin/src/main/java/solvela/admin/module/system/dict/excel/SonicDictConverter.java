@@ -11,6 +11,7 @@ import java.lang.reflect.AnnotatedElement;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -47,7 +48,7 @@ public class SonicDictConverter implements SonicConverter<String, String> {
             return value;
         }
         SonicDict config = config(ctx);
-        return Arrays.stream(value.split(java.util.regex.Pattern.quote(config.separator())))
+        return Arrays.stream(value.split(Pattern.quote(config.separator())))
                 .map(String::trim)
                 .filter(code -> !code.isEmpty())
                 .map(code -> {
@@ -65,7 +66,7 @@ public class SonicDictConverter implements SonicConverter<String, String> {
         }
         SonicDict config = config(ctx);
         StringBuilder codes = new StringBuilder();
-        for (String label : value.split(java.util.regex.Pattern.quote(config.separator()))) {
+        for (String label : value.split(Pattern.quote(config.separator()))) {
             String trimmed = label.trim();
             if (trimmed.isEmpty()) {
                 continue;
