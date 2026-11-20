@@ -13,18 +13,19 @@ package solvela.admin.module.system.apiencrypt.service;
 public interface ApiEncryptService {
 
     /**
-     * 解密
+     * 解密。
      *
-     * @param data
-     * @return
+     * <p>密文来自请求，是外部输入：解不开时抛 {@link solvela.exception.BusinessException}（用户级 PARAM_ERROR），
+     * 既不打挂接口，也不把失败伪装成一个值。
+     * 🔴 以前这里解不开就返回空串，登录时空串会被当成「用户输入的密码」继续往下比对，
+     * 真正的原因（前后端密钥或算法对不上）只剩一行没有上下文的 ERROR 日志。
      */
     String decrypt(String data);
 
     /**
-     * 加密
+     * 加密。入参是服务端自己序列化的内容，加密失败只可能是系统故障，抛 {@link IllegalStateException}。
      *
-     * @param data
-     * @return
+     * <p>🔴 不能退回空串或明文：前者让前端拿到一个解不开的响应，后者正是加密注解要防的事。
      */
     String encrypt(String data);
 

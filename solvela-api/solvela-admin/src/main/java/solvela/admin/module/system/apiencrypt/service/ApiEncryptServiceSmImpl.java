@@ -1,7 +1,6 @@
 package solvela.admin.module.system.apiencrypt.service;
 
-import lombok.extern.slf4j.Slf4j;
-import solvela.base.constant.StringConst;
+import solvela.exception.BusinessException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.stereotype.Service;
 
@@ -45,7 +44,6 @@ import java.util.HexFormat;
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a>
  */
 
-@Slf4j
 @Service
 public class ApiEncryptServiceSmImpl implements ApiEncryptService {
 
@@ -73,8 +71,7 @@ public class ApiEncryptServiceSmImpl implements ApiEncryptService {
             return Base64.getEncoder().encodeToString(encryptHex.getBytes(StandardCharsets.UTF_8));
 
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            return StringConst.EMPTY;
+            throw new IllegalStateException("SM4 加密失败", e);
         }
     }
 
@@ -89,8 +86,7 @@ public class ApiEncryptServiceSmImpl implements ApiEncryptService {
             return new String(decrypted, StandardCharsets.UTF_8);
 
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            return StringConst.EMPTY;
+            throw new BusinessException("加密数据无法解密", e);
         }
     }
 

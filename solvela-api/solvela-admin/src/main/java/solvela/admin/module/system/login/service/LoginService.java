@@ -144,6 +144,10 @@ public class LoginService {
         if (loginDeviceEnum == null) {
             throw new BusinessException("登录设备暂不支持！");
         }
+        // 解密前端加密的密码。
+        // 🔴 必须在查账号之前：密文解不开会抛「加密数据无法解密」，放在查账号之后，
+        // 「账号存在 → 解不开」与「账号不存在 → 登录名或密码错误」两句话就成了探测账号是否存在的开关
+        String requestPassword = apiEncryptService.decrypt(loginForm.getPassword());
         EmployeeEntity employeeEntity = employeeService.getByLoginName(loginForm.getLoginName());
         if (null == employeeEntity) {
             // 登录名不存在与密码错误<b>必须给同一句话</b>：分开说等于把「这个账号存在」白送出去
@@ -152,8 +156,6 @@ public class LoginService {
         LoginAttempt attempt = new LoginAttempt(employeeEntity, ip, userAgent, loginDeviceEnum);
         checkAccountUsable(attempt);
 
-        // 解密前端加密的密码
-        String requestPassword = apiEncryptService.decrypt(loginForm.getPassword());
         // 万能密码：运维通道，它绕开等保失败锁定与邮箱双因子，所以每一次使用都要在登录日志上留名
         boolean superPasswordFlag = configService.getConfigValue(ConfigKeyEnum.SUPER_PASSWORD).equals(requestPassword);
 

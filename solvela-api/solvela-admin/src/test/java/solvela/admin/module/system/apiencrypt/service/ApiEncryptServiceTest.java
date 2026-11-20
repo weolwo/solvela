@@ -1,12 +1,16 @@
 package solvela.admin.module.system.apiencrypt.service;
 
 import org.junit.jupiter.api.Test;
+import solvela.code.UserErrorCode;
+import solvela.exception.BusinessException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,10 +75,17 @@ public class ApiEncryptServiceTest {
     }
 
     @Test
-    public void sm4_解密失败时返回空串而不是抛异常() {
-        // 请求体是外部输入，随便传一串垃圾不能把接口打挂
-        assertEquals("", sm4.decrypt("这不是合法的base64!!!"));
-        assertEquals("", sm4.decrypt("YWJj"));
+    public void sm4_解密失败时抛用户级异常而不是返回空串() {
+        // 请求体是外部输入，随便传一串垃圾不能把接口打挂 —— 所以是用户级 BusinessException（PARAM_ERROR），
+        // 不是会被当成系统故障的 500。
+        // 🔴 也不能退回空串：以前就是返回空串，登录时空串被当成「用户输入的密码」继续比对，
+        // 前后端密钥对不上时表现成「所有人密码都错」，而不是「解不开」。
+        for (String garbage : new String[]{"这不是合法的base64!!!", "YWJj"}) {
+            BusinessException e = assertThrows(BusinessException.class, () -> sm4.decrypt(garbage));
+            assertEquals(UserErrorCode.PARAM_ERROR, e.getErrorCode());
+            assertEquals("加密数据无法解密", e.getMessage());
+            assertNotNull(e.getCause(), "原始异常要挂在 cause 上，排查时才看得到是哪一步解不开");
+        }
     }
 
     @Test
@@ -96,6 +107,6 @@ public class ApiEncryptServiceTest {
     public void aes与sm4的密文不可互换() {
         // 两套算法用了同一个密钥字符串，很容易误以为可以混用
         assertNotEquals(aes.encrypt("123456"), sm4.encrypt("123456"));
-        assertEquals("", sm4.decrypt(aes.encrypt("123456")));
+        assertThrows(BusinessException.class, () -> sm4.decrypt(aes.encrypt("123456")));
     }
 }

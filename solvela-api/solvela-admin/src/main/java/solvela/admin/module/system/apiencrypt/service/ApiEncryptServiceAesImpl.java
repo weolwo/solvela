@@ -1,7 +1,6 @@
 package solvela.admin.module.system.apiencrypt.service;
 
-import lombok.extern.slf4j.Slf4j;
-import solvela.base.constant.StringConst;
+import solvela.exception.BusinessException;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -24,7 +23,8 @@ import java.util.Base64;
  * <p>
  * ⚠️ 当前没有任何地方注入这个实现（它没有 {@code @Service}，实际生效的是
  * {@link ApiEncryptServiceSmImpl}）。保留它是为了随时可切换，
- * 但真要启用前请先跑 ApiEncryptServiceAesImplTest 确认前端那侧的实现能对上。
+ * 但真要启用前得先补一条前端实测的黄金向量 —— ApiEncryptServiceTest 里 AES 只有往返用例，
+ * 证明不了前端那侧能对上（SM4 那边有，见 sm4_黄金向量必须双向对齐）。
  *
  * @Author 1024创新实验室-主任:卓大
  * @Date 2023/10/21 11:41:46
@@ -33,7 +33,6 @@ import java.util.Base64;
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a>
  */
 
-@Slf4j
 public class ApiEncryptServiceAesImpl implements ApiEncryptService {
 
     private static final String AES_KEY = "1024lab__1024lab";
@@ -53,8 +52,7 @@ public class ApiEncryptServiceAesImpl implements ApiEncryptService {
             return Base64.getEncoder().encodeToString(encrypted);
 
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            return StringConst.EMPTY;
+            throw new IllegalStateException("AES 加密失败", e);
         }
     }
 
@@ -69,8 +67,7 @@ public class ApiEncryptServiceAesImpl implements ApiEncryptService {
             return new String(decryptedBytes, StandardCharsets.UTF_8);
 
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            return StringConst.EMPTY;
+            throw new BusinessException("加密数据无法解密", e);
         }
     }
 
