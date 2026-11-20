@@ -270,10 +270,10 @@ public class GatewaySecurityE2E {
             send("GET", "/activity", honeypotIp, null, Map.of());
         }
 
-        boolean incidents = waitFor(Duration.ofSeconds(100), () ->
-                count("SELECT COUNT(*) FROM t_security_incident WHERE client_ip = ? AND incident_type = 1", honeypotIp) > 0
-                        && count("SELECT COUNT(*) FROM t_security_incident WHERE client_ip = ? AND incident_type = 3", keywordIp) > 0);
-        check("事件落库（落库任务每分钟一次）：蜜罐、关键字各一行", incidents, "");
+        boolean eventPublisher = waitFor(Duration.ofSeconds(100), () ->
+                count("SELECT COUNT(*) FROM t_security_event WHERE client_ip = ? AND event_type = 1", honeypotIp) > 0
+                        && count("SELECT COUNT(*) FROM t_security_event WHERE client_ip = ? AND event_type = 3", keywordIp) > 0);
+        check("事件落库（落库任务每分钟一次）：蜜罐、关键字各一行", eventPublisher, "");
         boolean listed = waitFor(Duration.ofSeconds(30), () ->
                 count("SELECT COUNT(*) FROM t_security_list WHERE list_value = ? AND list_type = 1 AND source = 2 AND source_rule = 'HONEYPOT' AND status = 1", honeypotIp) == 1
                         && count("SELECT COUNT(*) FROM t_security_list WHERE list_value = ? AND list_type = 1 AND source_rule = 'KEYWORD'", keywordIp) == 1);

@@ -7,7 +7,7 @@ import solvela.app.ratelimit.SecurityGateFilter.Probe;
 import solvela.app.ratelimit.SecurityGateFilter.Trap;
 import solvela.security.IpKeys;
 import solvela.security.IpRange;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 import solvela.security.SlidingWindowScripts;
 
@@ -45,7 +45,7 @@ final class TrapPenalty {
     private final PenaltyCache cache;
 
     /** 为 null 时不投事件（只在测试里） */
-    private final IncidentPublisher incidents;
+    private final SecurityEventPublisher eventPublisher;
 
     /** 熔断键的前缀：生产为空串；测试换一个，免得碰到本机网关真在用的熔断计数 */
     private final String breakerNamespace;
@@ -53,10 +53,10 @@ final class TrapPenalty {
     /** 每个熔断键上一次告警的时刻 */
     private final ConcurrentHashMap<String, Long> lastBreakerAlarm = new ConcurrentHashMap<>();
 
-    TrapPenalty(StringRedisTemplate redis, PenaltyCache cache, IncidentPublisher incidents, String breakerNamespace) {
+    TrapPenalty(StringRedisTemplate redis, PenaltyCache cache, SecurityEventPublisher eventPublisher, String breakerNamespace) {
         this.redis = redis;
         this.cache = cache;
-        this.incidents = incidents;
+        this.eventPublisher = eventPublisher;
         this.breakerNamespace = breakerNamespace;
     }
 
@@ -71,24 +71,24 @@ final class TrapPenalty {
     record Catch(String source, String code, String detail, String breakerKey) {
     }
 
-    Trap penalise(Catch what, Probe probe, SecurityIncidentEvent.Builder event, CompiledSnapshot snapshot,
+    Trap penalise(Catch what, Probe probe, SecurityEvent.Builder event, CompiledSnapshot snapshot,
                   SecurityGateConfig gate) {
         long nowMillis = System.currentTimeMillis();
         String ipKey = IpRange.single(probe.clientIp()) == null ? null : IpKeys.ip(probe.clientIp());
         if (ipKey != null && breakerOpen(what, ipKey, nowMillis, gate)) {
             log.warn("【{}】熔断中，只记录不处罚, 规则: {}, {}, IP: {}", what.source(), what.code(), what.detail(),
                     probe.clientIp());
-            record(event.suppressed(SecurityIncidentEvent.SUPPRESS_BREAKER), probe);
+            record(event.suppressed(SecurityEvent.SUPPRESS_BREAKER), probe);
             return Trap.BREAKER_OPEN;
         }
         if (ipKey != null && snapshot.oldDevice(probe.deviceIssuedAt(), nowMillis / 1000)) {
             ipKey = null;
-            event.suppressed(SecurityIncidentEvent.SUPPRESS_OLD_DEVICE);
+            event.suppressed(SecurityEvent.SUPPRESS_OLD_DEVICE);
         }
         long until = nowMillis / 1000 + gate.banSeconds();
         event.penalty(null, until);
         if (ipKey != null) {
-            event.action(SecurityIncidentEvent.ACTION_BLACK, until);
+            event.action(SecurityEvent.ACTION_BLACK, until);
         }
         boolean written = write(what, probe, ipKey, until, gate.banSeconds());
         if (written) {
@@ -102,11 +102,11 @@ final class TrapPenalty {
     }
 
     /** 投一条事件（被压下的、或罚过的）。请求上的东西从 {@code probe} 补齐 */
-    void record(SecurityIncidentEvent.Builder event, Probe probe) {
-        if (incidents == null) {
+    void record(SecurityEvent.Builder event, Probe probe) {
+        if (eventPublisher == null) {
             return;
         }
-        incidents.publish(event.who(probe.clientIp(), probe.deviceId(), null)
+        eventPublisher.publish(event.who(probe.clientIp(), probe.deviceId(), null)
                 .request(probe.method(), probe.path(), probe.userAgent(), probe.traceId())
                 .build());
     }

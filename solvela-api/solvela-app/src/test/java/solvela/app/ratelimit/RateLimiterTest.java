@@ -12,7 +12,7 @@ import solvela.app.web.ApiException;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
 import solvela.security.RateLimitDimension;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -45,14 +45,14 @@ class RateLimiterTest {
 
     private String snapshotKey;
 
-    private String incidentQueue;
+    private String eventQueue;
 
     private final List<String> touched = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
         snapshotKey = "test:gw:rl:snapshot:" + UUID.randomUUID();
-        incidentQueue = null;
+        eventQueue = null;
     }
 
     @AfterEach
@@ -209,7 +209,7 @@ class RateLimiterTest {
 
     @Test
     @DisplayName("🔴 判罚、升档各投一条事件；IP 维度罚到第 4 档 → 拉灰 7 天；处罚期间被挡的请求不投")
-    void penaltiesPublishIncidents() {
+    void penaltiesPublishEvents() {
         RateLimiter limiter = limiter(List.of(rule("LOGIN", RateLimitDimension.IP.code(), 100, 1, 100, 100)), Map.of());
         String ip = ip();
         limiter.check(login(null, null, ip));
@@ -220,16 +220,16 @@ class RateLimiterTest {
             expirePenalty("LOGIN", RateLimitDimension.IP.code(), IpKeys.ip(ip));
         }
 
-        List<SecurityIncidentEvent> events = events();
+        List<SecurityEvent> events = events();
         assertEquals(4, events.size(), "一次判罚一条，处罚期间被挡的不算");
         for (int i = 0; i < 3; i++) {
             assertEquals(i + 1, events.get(i).penaltyLevel());
-            assertEquals(SecurityIncidentEvent.ACTION_RECORD, events.get(i).action());
+            assertEquals(SecurityEvent.ACTION_RECORD, events.get(i).action());
         }
-        SecurityIncidentEvent fourth = events.get(3);
-        assertEquals(SecurityIncidentEvent.RATE_LIMIT, fourth.incidentType());
+        SecurityEvent fourth = events.get(3);
+        assertEquals(SecurityEvent.RATE_LIMIT, fourth.eventType());
         assertEquals("LOGIN", fourth.ruleCode());
-        assertEquals(SecurityIncidentEvent.ACTION_GREY, fourth.action());
+        assertEquals(SecurityEvent.ACTION_GREY, fourth.action());
         long days = (fourth.listUntilEpochSec() - Instant.now().getEpochSecond()) / 86400;
         assertTrue(days >= 6 && days <= 7, "拉灰 7 天：" + days);
         assertEquals("IP", fourth.matchedParam());
@@ -246,10 +246,10 @@ class RateLimiterTest {
             expirePenalty("LOGIN", RateLimitDimension.DEVICE.code(), device);
         }
 
-        List<SecurityIncidentEvent> events = events();
+        List<SecurityEvent> events = events();
         assertFalse(events.get(2).observeDevice());
         assertTrue(events.get(3).observeDevice());
-        assertEquals(SecurityIncidentEvent.ACTION_RECORD, events.get(3).action(), "设备不进名单，它有自己的状态位");
+        assertEquals(SecurityEvent.ACTION_RECORD, events.get(3).action(), "设备不进名单，它有自己的状态位");
     }
 
     @Test
@@ -291,7 +291,7 @@ class RateLimiterTest {
             expirePenalty("CODE_SEND", RateLimitDimension.ACCOUNT.code(), "m:" + member);
         }
 
-        List<SecurityIncidentEvent> events = events();
+        List<SecurityEvent> events = events();
         assertNull(events.get(2).memberListUntilEpochSec(), "第 3 档还不拉灰");
         assertNotNull(events.get(3).memberListUntilEpochSec());
         assertEquals(member, events.get(3).memberId());
@@ -313,11 +313,11 @@ class RateLimiterTest {
         touched.add(SecurityKeys.rateLimitPenalty("REDEEM", RateLimitDimension.ACCOUNT.code(), "m:" + memberId));
     }
 
-    private List<SecurityIncidentEvent> events() {
-        List<String> raw = redis.opsForList().range(incidentQueue, 0, -1);
-        List<SecurityIncidentEvent> events = new ArrayList<>();
+    private List<SecurityEvent> events() {
+        List<String> raw = redis.opsForList().range(eventQueue, 0, -1);
+        List<SecurityEvent> events = new ArrayList<>();
         for (int i = raw.size() - 1; i >= 0; i--) {
-            events.add(MAPPER.readValue(raw.get(i), SecurityIncidentEvent.class));
+            events.add(MAPPER.readValue(raw.get(i), SecurityEvent.class));
         }
         return events;
     }
@@ -345,16 +345,16 @@ class RateLimiterTest {
         touched.add(SecurityKeys.loadedVersion(instance));
         RuleSnapshotHolder holder = new RuleSnapshotHolder(redis, snapshotKey, instance);
         holder.refresh();
-        return new RateLimiter(redis, holder, new RateLimitProperties(true, KEY), incidents());
+        return new RateLimiter(redis, holder, new RateLimitProperties(true, KEY), eventPublisher());
     }
 
     /** 事件投进测试专用的队列：本机的落库任务不会把用例造的判罚写进库 */
-    private IncidentPublisher incidents() {
-        if (incidentQueue == null) {
-            incidentQueue = "test:sec:incident:" + UUID.randomUUID();
-            touched.add(incidentQueue);
+    private SecurityEventPublisher eventPublisher() {
+        if (eventQueue == null) {
+            eventQueue = "test:sec:event:" + UUID.randomUUID();
+            touched.add(eventQueue);
         }
-        return new IncidentPublisher(redis, incidentQueue);
+        return new SecurityEventPublisher(redis, eventQueue);
     }
 
     private static GatewayRuleSnapshot.Rule rule(String scene, int dim, int burst, int l3, int l5, int l10) {

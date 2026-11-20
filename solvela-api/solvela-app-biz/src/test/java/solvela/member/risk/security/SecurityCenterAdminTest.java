@@ -14,7 +14,7 @@ import solvela.biz.server.BizApplication;
 import solvela.member.RateLimitRule;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
 import solvela.security.IpKeys;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.time.Duration;
@@ -45,10 +45,10 @@ class SecurityCenterAdminTest {
     private SecurityGateAdminService gateService;
 
     @Autowired
-    private SecurityIncidentAdminService incidentService;
+    private SecurityEventAdminService eventService;
 
     @Autowired
-    private SecurityIncidentStore incidentStore;
+    private SecurityEventStore eventStore;
 
     @Autowired
     private ConfigService configService;
@@ -86,7 +86,7 @@ class SecurityCenterAdminTest {
                     r.get("limit_long"), r.get("mode"), r.get("id"));
         }
         jdbcTemplate.update("DELETE FROM t_rate_limit_rule WHERE target_type = 2 AND description LIKE '%用例%'");
-        jdbcTemplate.update("DELETE FROM t_security_incident WHERE client_ip LIKE '198.51.100.%'");
+        jdbcTemplate.update("DELETE FROM t_security_event WHERE client_ip LIKE '198.51.100.%'");
         redis.delete(List.of(SecurityKeys.securityPenaltyIp(IpKeys.ip(ip)),
                 SecurityKeys.rateLimitPenalty("LOGIN", 1, IpKeys.ip(ip))));
         snapshotPublisher.publishQuietly("用例清理");
@@ -183,15 +183,15 @@ class SecurityCenterAdminTest {
 
     @Test
     @DisplayName("安全事件按 IP 查得到；不带时间兜最近 7 天，超过 31 天拒绝")
-    void incidentQuery() {
-        incidentStore.store(SecurityIncidentEvent.builder(SecurityIncidentEvent.KEYWORD, "XSS_SCRIPT")
+    void eventQuery() {
+        eventStore.store(SecurityEvent.builder(SecurityEvent.KEYWORD, "XSS_SCRIPT")
                 .who(ip, null, null).request("POST", "/x", "<img src=x onerror=alert(1)>", "t").build());
 
-        var page = incidentService.queryPage(new SecurityIncidentAdminService.Query(ip, null, null, null, null, null, 1, 20));
+        var page = eventService.queryPage(new SecurityEventAdminService.Query(ip, null, null, null, null, null, 1, 20));
 
         assertEquals(1, page.total());
         assertEquals("<img src=x onerror=alert(1)>", page.list().get(0).userAgent(), "原样返回，转义是前端的事（只按纯文本渲染）");
-        assertThrows(IllegalArgumentException.class, () -> incidentService.queryPage(new SecurityIncidentAdminService.Query(
+        assertThrows(IllegalArgumentException.class, () -> eventService.queryPage(new SecurityEventAdminService.Query(
                 null, null, null, null, LocalDateTime.now().minusDays(40), null, 1, 20)));
     }
 

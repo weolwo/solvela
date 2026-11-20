@@ -23,14 +23,14 @@ SET NAMES utf8mb4;
 --    先把非必要账号删掉，只留一个 admin。
 --
 -- 生成方式：数据库SQL脚本/tools/DumpSeedData.java
--- 生成时间：2026-10-17
+-- 生成时间：2026-11-20
 -- =====================================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- -----------------------------------------------------------------------------------
--- t_menu  菜单树。没有它后台登录进去是空白（319 行）
+-- t_menu  菜单树。没有它后台登录进去是空白（318 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_menu`;
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
@@ -232,9 +232,9 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (459, '首页·营销大屏', 2, 370, 9, '/home', '/system/home/index.vue', 1, NULL, NULL, 'DashboardOutlined', NULL, 0, NULL, 0, 0, 0, 0, 1, '2026-08-15 15:05:58', NULL, '2026-08-15 15:05:58'),
 (460, '统计查询', 3, 459, NULL, NULL, NULL, 1, 'marketingStat:query', 'marketingStat:query', NULL, 459, 0, NULL, 0, 1, 0, 0, 1, '2026-08-15 15:05:58', NULL, '2026-08-15 15:05:58'),
 (461, '导入', 3, 365, NULL, NULL, NULL, 1, 'physicalDelivery:import', 'physicalDelivery:import', NULL, 365, 0, NULL, 0, 1, 0, 0, 1, '2026-08-15 15:05:58', NULL, '2026-08-15 15:05:58'),
-(462, '会员中心', 1, 0, 0, NULL, NULL, 1, NULL, NULL, 'UsergroupDeleteOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-22 17:34:56', NULL, '2026-08-22 17:34:56');
+(462, '会员中心', 1, 0, 0, NULL, NULL, 1, NULL, NULL, 'UsergroupDeleteOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-22 17:34:56', NULL, '2026-08-22 17:34:56'),
+(463, '积分商城', 1, 0, 7, NULL, NULL, 1, NULL, NULL, 'MediumOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-22 19:20:09', 1, '2026-08-22 19:20:39');
 INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, `path`, `component`, `perms_type`, `api_perms`, `web_perms`, `icon`, `context_menu_id`, `frame_flag`, `frame_url`, `cache_flag`, `visible_flag`, `disabled_flag`, `deleted_flag`, `create_user_id`, `create_time`, `update_user_id`, `update_time`) VALUES
-(463, '积分商城', 1, 0, 7, NULL, NULL, 1, NULL, NULL, 'MediumOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-22 19:20:09', 1, '2026-08-22 19:20:39'),
 (464, '会员管理', 2, 462, 0, '/member/list', '/business/member/member-list.vue', 1, NULL, NULL, 'CalendarOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-08-22 12:01:37', 1, '2026-08-22 20:55:58'),
 (465, '查询', 3, 464, NULL, NULL, NULL, 1, 'member:query', 'member:query', NULL, 464, 0, NULL, 0, 1, 0, 0, 1, '2026-08-22 12:01:37', NULL, '2026-08-22 12:01:37'),
 (466, '收货地址簿', 2, 463, 9, '/mall/mall-address/list', '/business/mall/mall-address/mall-address-list.vue', 1, NULL, NULL, 'AlignRightOutlined', NULL, 0, NULL, 0, 1, 0, 1, 1, '2026-08-22 12:20:32', 1, '2026-08-23 05:08:51'),
@@ -351,7 +351,7 @@ INSERT INTO `t_menu` (`menu_id`, `menu_name`, `menu_type`, `parent_id`, `sort`, 
 (644, '查询', 3, 643, 1, NULL, NULL, 1, 'security:query', 'security:query', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-10-17 11:48:31', NULL, '2026-10-17 11:48:31'),
 (645, '增删 / 停用', 3, 643, 2, NULL, NULL, 1, 'security:rule', 'security:rule', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-10-17 11:48:31', NULL, '2026-10-17 11:48:31'),
 (646, '建蜜罐账号', 3, 643, 3, NULL, NULL, 1, 'security:list', 'security:list', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-10-17 11:48:31', NULL, '2026-10-17 11:48:31'),
-(647, '安全事件', 2, 636, 7, '/security/incident', '/business/security/security-incident-list.vue', 1, NULL, NULL, 'AlertOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-10-17 11:48:31', NULL, '2026-10-17 11:48:31'),
+(647, '安全事件', 2, 636, 7, '/security/event', '/business/security/security-event-list.vue', 1, NULL, NULL, 'AlertOutlined', NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-10-17 11:48:31', NULL, '2026-11-20 19:13:39'),
 (648, '查询', 3, 647, 1, NULL, NULL, 1, 'security:query', 'security:query', NULL, NULL, 0, NULL, 0, 1, 0, 0, 1, '2026-10-17 11:48:31', NULL, '2026-10-17 11:48:31');
 
 -- -----------------------------------------------------------------------------------
@@ -366,7 +366,7 @@ INSERT INTO `t_role` (`role_id`, `role_name`, `role_code`, `remark`, `update_tim
 (37, '财务', NULL, '', '2019-08-30 09:31:16', '2019-08-30 09:31:16');
 
 -- -----------------------------------------------------------------------------------
--- t_role_menu  角色-菜单授权（97 行）
+-- t_role_menu  角色-菜单授权（96 行）
 -- -----------------------------------------------------------------------------------
 DELETE FROM `t_role_menu`;
 INSERT INTO `t_role_menu` (`role_menu_id`, `role_id`, `menu_id`, `update_time`, `create_time`) VALUES
@@ -601,7 +601,7 @@ INSERT INTO `t_solvela_job` (`job_id`, `job_code`, `job_name`, `handler_name`, `
 (28, 'JOBPARTMNT', '【基础】按月分区维护', 'partitionMaintain', 'SYSTEM', 'cron', '0 50 3 * * *', '2026-10-18 03:50:28', '2026-10-17 21:26:33', 1, 60, 1, NULL, 'NORMAL', 600, 1, 60, 'SKIP', 300, 'DISCARD', '2026-10-17 21:26:33', 47260, 0, '每天 03:50 给按月分区的表补下 2 个月的分区、删掉保留期（6 个月）之外的。🔴 不跑的后果是静默的：四张表（登录日志、风控决策流水与命中明细、安全事件流水）的分区只建到 2027-01，之后数据全落进 pmax，而它永不过期 —— 保留期形同虚设，而且之后只能靠 DELETE 清（长事务、主从延迟、碎片）。单次最多删 3 个分区，保留期误配时不会一口气抹掉几年数据。', 0, '管理员', '2026-10-15 16:17:37', '2026-10-17 21:26:33', 'dev', NULL, 0, 0, 0, 'SYSTEM', NULL, 'SYSTEM', 0),
 (29, 'JOBGWSNAPS', '【安全】网关规则快照重发', 'gatewaySnapshotPublish', 'SYSTEM', 'cron', '0 1/5 * * * *', '2026-10-17 21:41:09', '2026-10-17 21:36:09', 3, 10, 1, NULL, 'NORMAL', 30, 0, 60, 'SKIP', 300, 'DISCARD', '2026-10-17 21:36:09', 47287, 0, '每 5 分钟把限流规则、两条全局参数、IP 名单拼成快照重发到 Redis（gw:rl:snapshot）。主路径是后台保存后立即发布，本任务是自愈：Redis 被清、被内存淘汰、保存时发布失败，都在这里补回来。内容没变时版本不变，网关不会重载。见 docs/架构/网关阶梯限流-技术方案.md §6', 0, '管理员', '2026-10-17 12:00:00', '2026-10-17 21:36:09', 'dev', NULL, 0, 0, 0, 'SYSTEM', NULL, 'SYSTEM', 0),
 (30, 'JOBDEVBANM', '【安全】设备封禁镜像重建', 'deviceBanMirrorRebuild', 'SYSTEM', 'cron', '0 3/5 * * * *', '2026-10-17 21:43:00', '2026-10-17 21:38:00', 4, 10, 1, NULL, 'NORMAL', 30, 0, 60, 'SKIP', 300, 'DISCARD', '2026-10-17 21:38:00', 47293, 0, '每 5 分钟按 t_device.status 全量重建 Redis 里的设备封禁镜像（sec:dev:banned），网关安全闸靠它挡被封的设备。主路径是后台人工处置时立即同步，本任务是自愈：同步失败、Redis 被清或被内存淘汰，都在这里补回来。🔴 镜像丢了的后果是静默的：被封的设备照常能用。见 docs/架构/网关阶梯限流-技术方案.md §5.5', 0, '管理员', '2026-10-17 12:00:00', '2026-10-17 21:38:00', 'dev', NULL, 0, 0, 0, 'SYSTEM', NULL, 'SYSTEM', 0),
-(31, 'JOBSECINCD', '【安全】安全事件落库', 'securityIncidentDrain', 'SYSTEM', 'cron', '30 * * * * *', '2026-10-17 21:40:31', '2026-10-17 21:39:31', 14, 5, 1, NULL, 'NORMAL', 30, 0, 60, 'SKIP', 300, 'DISCARD', '2026-10-17 21:39:31', 47295, 0, '每分钟把 Redis 队列 sec:incident 里的安全事件（蜜罐、关键字、限流判罚）写进 t_security_incident，并按事件里的处置自动拉黑 / 拉灰 IP、把设备推进观察档；名单变了立即重发网关快照。取走的事件先挪到 sec:incident:processing，落完库才删，任务崩了下一轮接着做。处罚本身早已在 Redis 里生效，这个任务停了只影响留痕与名单。见 docs/架构/网关阶梯限流-技术方案.md §6.4', 0, '管理员', '2026-10-17 12:00:00', '2026-10-17 21:39:31', 'dev', NULL, 0, 0, 0, 'SYSTEM', NULL, 'SYSTEM', 0),
+(31, 'JOBSECINCD', '【安全】安全事件落库', 'securityEventDrain', 'SYSTEM', 'cron', '30 * * * * *', '2026-10-17 21:40:31', '2026-10-17 21:39:31', 14, 5, 1, NULL, 'NORMAL', 30, 0, 60, 'SKIP', 300, 'DISCARD', '2026-10-17 21:39:31', 47295, 0, '每分钟把 Redis 队列 sec:event 里的安全事件（蜜罐、关键字、限流判罚）写进 t_security_event，并按事件里的处置自动拉黑 / 拉灰 IP、把设备推进观察档；名单变了立即重发网关快照。取走的事件先挪到 sec:event:processing，落完库才删，任务崩了下一轮接着做。处罚本身早已在 Redis 里生效，这个任务停了只影响留痕与名单。见 docs/架构/网关阶梯限流-技术方案.md §6.4', 0, '管理员', '2026-10-17 12:00:00', '2026-11-20 19:13:39', 'dev', NULL, 0, 0, 0, 'SYSTEM', NULL, 'SYSTEM', 0),
 (32, 'JOBSECLIST', '【安全】安全名单维护', 'securityListMaintain', 'SYSTEM', 'cron', '0 2/5 * * * *', '2026-10-17 21:42:02', '2026-10-17 21:37:02', 4, 10, 1, NULL, 'NORMAL', 30, 0, 60, 'SKIP', 300, 'DISCARD', '2026-10-17 21:37:02', 47290, 0, '每 5 分钟：到期的自动黑名单转灰 30 天（ESCALATE）；24 小时内同一 /24（IPv6 /48）有 3 个以上 IP 被自动拉黑则整段拉灰 7 天（SEGMENT，只拉灰、从不自动拉黑整段）；把网关攒在 Redis 的被挡次数（sec:blocked:*）加到黑名单的 blocked_count。参数在 t_config.gateway_security_gate。见 docs/架构/网关阶梯限流-技术方案.md §5.5、§6.3', 0, '管理员', '2026-10-17 12:00:00', '2026-10-17 21:37:02', 'dev', NULL, 0, 0, 0, 'SYSTEM', NULL, 'SYSTEM', 0);
 
 -- -----------------------------------------------------------------------------------
@@ -755,6 +755,7 @@ INSERT INTO `t_rate_limit_rule` (`id`, `target_type`, `target`, `dimension`, `bu
 (26, 1, 'DEFAULT_READ', 2, 20, 300, 450, 600, NULL, NULL, 2, '其余读接口：会员。阈值很宽，只挡爬虫级别的量', '2026-10-17 12:00:00', '2026-10-17 12:00:00'),
 (27, 1, 'DEFAULT_READ', 3, 20, 300, 450, 600, NULL, NULL, 2, '其余读接口：设备', '2026-10-17 12:00:00', '2026-10-17 12:00:00'),
 (28, 1, 'DEFAULT_READ', 1, 50, 1000, 1500, 2000, NULL, NULL, 2, '其余读接口：IP', '2026-10-17 12:00:00', '2026-10-17 12:00:00');
+-- [跳过] t_code_generator_config : Table 'solvela.t_code_generator_config' doesn't exist
 
 -- -----------------------------------------------------------------------------------
 -- t_table_column  列配置（开发工具，可选）（3 行）

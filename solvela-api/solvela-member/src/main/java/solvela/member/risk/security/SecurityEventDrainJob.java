@@ -12,16 +12,16 @@ import solvela.base.module.jobspi.core.SolvelaJobContext;
 import solvela.base.module.jobspi.core.SolvelaJobHandler;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.util.List;
 
 /**
- * 每分钟把安全事件队列（{@link SecurityKeys#INCIDENT_QUEUE}）里的事件落库（网关方案 §6.4「写入链路」）。
+ * 每分钟把安全事件队列（{@link SecurityKeys#EVENT_QUEUE}）里的事件落库（网关方案 §6.4「写入链路」）。
  *
  * <h3>取走、处理完、再删</h3>
- * {@code RPOPLPUSH} 把一条从队列挪到「处理中」（{@link SecurityKeys#INCIDENT_PROCESSING}），落完库才从那里删掉。
+ * {@code RPOPLPUSH} 把一条从队列挪到「处理中」（{@link SecurityKeys#EVENT_PROCESSING}），落完库才从那里删掉。
  * 任务崩在半路，那一条还在「处理中」，下一次先把它处理掉 —— 不会丢。调度框架保证同一时刻只有一个在跑，
  * 所以「处理中」里的东西一定是上一次没做完的，不会和别人抢。
  *
@@ -37,14 +37,17 @@ import java.util.List;
 @Slf4j
 @Component
 @SolvelaJobHandler(
-        name = "securityIncidentDrain",
+        name = SecurityEventDrainJob.HANDLER_NAME,
         title = "【安全】安全事件落库",
         group = "SYSTEM",
         lane = SolvelaJobLaneEnum.FAST,
         idempotent = false,
         defaultTimeoutSeconds = 30
 )
-public class SecurityIncidentDrainJob implements SolvelaJob {
+public class SecurityEventDrainJob implements SolvelaJob {
+
+    /** 与 {@code t_solvela_job.handler_name} 对应。改名前叫 securityIncidentDrain，见 {@link LegacySecurityIncidentDrainJob} */
+    public static final String HANDLER_NAME = "securityEventDrain";
 
     /** 一轮最多处理这么多条、最多花这么久（FAST 通道的超时是 30 秒） */
     static final int MAX_PER_RUN = 5000;
@@ -53,31 +56,45 @@ public class SecurityIncidentDrainJob implements SolvelaJob {
 
     private final StringRedisTemplate redis;
 
-    private final SecurityIncidentStore store;
+    private final SecurityEventStore store;
 
     private final RiskListCache listCache;
 
     private final GatewaySnapshotPublisher snapshotPublisher;
 
-    private final String queueKey;
+    /** 一对「队列 + 处理中」 */
+    record Lane(String queueKey, String processingKey) {
+    }
 
-    private final String processingKey;
+    /**
+     * 按顺序清这几对队列，共用同一份条数与时间预算。
+     *
+     * <p>TEMP(安全事件改名-收口): 第二对是改名前的 {@code sec:incident}，发版间隙里旧版生产方还会往那里写。
+     * 移除条件见 {@link SecurityKeys#LEGACY_INCIDENT_QUEUE}；删掉之后这里只剩一对。
+     */
+    private final List<Lane> lanes;
 
     @Autowired
-    public SecurityIncidentDrainJob(StringRedisTemplate redis, SecurityIncidentStore store, RiskListCache listCache,
-                                    GatewaySnapshotPublisher snapshotPublisher) {
-        this(redis, store, listCache, snapshotPublisher, SecurityKeys.INCIDENT_QUEUE, SecurityKeys.INCIDENT_PROCESSING);
+    public SecurityEventDrainJob(StringRedisTemplate redis, SecurityEventStore store, RiskListCache listCache,
+                                 GatewaySnapshotPublisher snapshotPublisher) {
+        this(redis, store, listCache, snapshotPublisher, List.of(
+                new Lane(SecurityKeys.EVENT_QUEUE, SecurityKeys.EVENT_PROCESSING),
+                new Lane(SecurityKeys.LEGACY_INCIDENT_QUEUE, SecurityKeys.LEGACY_INCIDENT_PROCESSING)));
     }
 
     /** 测试换一对键：不和本机网关真在投的那个队列抢 */
-    SecurityIncidentDrainJob(StringRedisTemplate redis, SecurityIncidentStore store, RiskListCache listCache,
-                             GatewaySnapshotPublisher snapshotPublisher, String queueKey, String processingKey) {
+    SecurityEventDrainJob(StringRedisTemplate redis, SecurityEventStore store, RiskListCache listCache,
+                          GatewaySnapshotPublisher snapshotPublisher, String queueKey, String processingKey) {
+        this(redis, store, listCache, snapshotPublisher, List.of(new Lane(queueKey, processingKey)));
+    }
+
+    SecurityEventDrainJob(StringRedisTemplate redis, SecurityEventStore store, RiskListCache listCache,
+                          GatewaySnapshotPublisher snapshotPublisher, List<Lane> lanes) {
         this.redis = redis;
         this.store = store;
         this.listCache = listCache;
         this.snapshotPublisher = snapshotPublisher;
-        this.queueKey = queueKey;
-        this.processingKey = processingKey;
+        this.lanes = List.copyOf(lanes);
     }
 
     @Override
@@ -98,19 +115,24 @@ public class SecurityIncidentDrainJob implements SolvelaJob {
     public Result drain() {
         long deadline = System.currentTimeMillis() + BUDGET_MILLIS;
         Tally tally = new Tally();
-        // 先把上一次没做完的处理掉
-        List<String> leftovers = redis.opsForList().range(processingKey, 0, -1);
-        for (String raw : leftovers == null ? List.<String>of() : leftovers) {
-            if (!tally.add(handle(raw), true)) {
+        for (Lane lane : lanes) {
+            if (tally.dbError) {
                 break;
             }
-        }
-        while (!tally.dbError && tally.handled() < MAX_PER_RUN && System.currentTimeMillis() < deadline) {
-            String raw = redis.opsForList().rightPopAndLeftPush(queueKey, processingKey);
-            if (raw == null) {
-                break;
+            // 先把上一次没做完的处理掉
+            List<String> leftovers = redis.opsForList().range(lane.processingKey(), 0, -1);
+            for (String raw : leftovers == null ? List.<String>of() : leftovers) {
+                if (!tally.add(handle(raw, lane.processingKey()), true)) {
+                    break;
+                }
             }
-            tally.add(handle(raw), false);
+            while (!tally.dbError && tally.handled() < MAX_PER_RUN && System.currentTimeMillis() < deadline) {
+                String raw = redis.opsForList().rightPopAndLeftPush(lane.queueKey(), lane.processingKey());
+                if (raw == null) {
+                    break;
+                }
+                tally.add(handle(raw, lane.processingKey()), false);
+            }
         }
         if (tally.listChanged) {
             listCache.reload();
@@ -153,15 +175,15 @@ public class SecurityIncidentDrainJob implements SolvelaJob {
 
     private enum Handled { STORED, LIST_CHANGED, DROPPED, DB_ERROR }
 
-    private Handled handle(String raw) {
-        SecurityIncidentEvent event;
+    private Handled handle(String raw, String processingKey) {
+        SecurityEvent event;
         try {
-            event = JsonUtils.parseObject(raw, SecurityIncidentEvent.class);
+            event = JsonUtils.parseObject(raw, SecurityEvent.class);
         } catch (RuntimeException e) {
             event = null;
         }
         if (event == null) {
-            log.error("【安全事件】解不开的事件，丢弃: {}", SecurityIncidentEvent.truncate(raw, 512));
+            log.error("【安全事件】解不开的事件，丢弃: {}", SecurityEvent.truncate(raw, 512));
             redis.opsForList().remove(processingKey, 1, raw);
             return Handled.DROPPED;
         }
@@ -170,10 +192,10 @@ public class SecurityIncidentDrainJob implements SolvelaJob {
             redis.opsForList().remove(processingKey, 1, raw);
             return changed ? Handled.LIST_CHANGED : Handled.STORED;
         } catch (DataAccessException e) {
-            log.error("【安全事件】落库失败，留在处理中等下一轮, 类型: {}, 规则: {}", event.incidentType(), event.ruleCode(), e);
+            log.error("【安全事件】落库失败，留在处理中等下一轮, 类型: {}, 规则: {}", event.eventType(), event.ruleCode(), e);
             return Handled.DB_ERROR;
         } catch (RuntimeException e) {
-            log.error("【安全事件】事件处理失败，丢弃: {}", SecurityIncidentEvent.truncate(raw, 512), e);
+            log.error("【安全事件】事件处理失败，丢弃: {}", SecurityEvent.truncate(raw, 512), e);
             redis.opsForList().remove(processingKey, 1, raw);
             return Handled.DROPPED;
         }

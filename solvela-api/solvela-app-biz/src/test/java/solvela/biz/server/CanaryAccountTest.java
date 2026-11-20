@@ -24,11 +24,11 @@ import solvela.member.id.MemberIdAllocator;
 import solvela.member.auth.MemberAuthService;
 import solvela.member.register.MemberRegisterDao;
 import solvela.member.risk.security.CanaryAccountService;
-import solvela.member.risk.security.SecurityIncidentQueue;
+import solvela.member.risk.security.SecurityEventQueue;
 import solvela.member.service.MemberService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.security.IpKeys;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.util.ArrayList;
@@ -53,7 +53,7 @@ import static org.mockito.Mockito.verify;
 class CanaryAccountTest {
 
     @MockitoBean
-    private SecurityIncidentQueue incidents;
+    private SecurityEventQueue eventPublisher;
 
     @Autowired
     private CanaryAccountService canaryAccountService;
@@ -117,9 +117,9 @@ class CanaryAccountTest {
         assertNotNull(redis.opsForValue().get(devicePenalty));
         assertNull(redis.opsForValue().get(SecurityKeys.securityPenaltyIp(IpKeys.ip(realIp))), "真实账号输错密码不罚");
         String hash = piiHasher.hash(MemberEmailUtil.normalize(canaryEmail));
-        verify(incidents).publish(argThat(e -> e.incidentType() == SecurityIncidentEvent.CANARY
+        verify(eventPublisher).publish(argThat(e -> e.eventType() == SecurityEvent.CANARY
                 && "CANARY_ACCOUNT".equals(e.ruleCode())
-                && e.action() == SecurityIncidentEvent.ACTION_BLACK
+                && e.action() == SecurityEvent.ACTION_BLACK
                 && canaryIp.equals(e.clientIp())
                 && canaryDevice.equals(e.deviceId())
                 && hash.equalsIgnoreCase(e.identityHashHex())));
@@ -133,7 +133,7 @@ class CanaryAccountTest {
 
         assertTrue(login(email, "RealPass2026", freshIp(), DeviceTokenCodec.newDeviceId()).success());
 
-        verify(incidents, never()).publish(any());
+        verify(eventPublisher, never()).publish(any());
     }
 
     @Test

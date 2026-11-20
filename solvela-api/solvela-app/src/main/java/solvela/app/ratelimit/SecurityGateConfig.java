@@ -41,7 +41,7 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
-    /** 编码进日志与事件（{@code t_security_incident.rule_code} 宽 32） */
+    /** 编码进日志与事件（{@code t_security_event.rule_code} 宽 32） */
     private static final Pattern CODE = Pattern.compile("[A-Z0-9_]{1,32}");
 
     /** 一条蜜罐路径。{@code path} 是 Spring 的路径模板（{@code /.git/**} 这种），按解码后的路径匹配 */

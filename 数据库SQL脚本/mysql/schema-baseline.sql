@@ -34,18 +34,13 @@ SET NAMES utf8mb4;
 --    ⚠️ 这段话写在 DumpSchema 的模板里，不写在本文件里 ——
 --    写在这里的任何字，下一次导出都会被冲掉（2026-09-08 就冲掉过一段人工核对记录）。
 --
--- 生成时间：2026-10-17
--- 表数量：91 张
+-- 生成时间：2026-11-20
+-- 表数量：90 张
 -- =====================================================================================
-
--- 刻意排除（手工备份表，不属于系统结构）：
---   t_member_coupon_dup_20260915
---   t_menu_26081523
---   t_menu_2608169
 
 
 -- =====================================================================================
--- 系统底座（上游 Solvela）（21 张）
+-- 系统底座（上游 Solvela）（20 张）
 -- =====================================================================================
 
 DROP TABLE IF EXISTS `t_employee`;
@@ -274,9 +269,9 @@ CREATE TABLE `t_config` (
 DROP TABLE IF EXISTS `t_dict`;
 CREATE TABLE `t_dict` (
   `dict_id` bigint NOT NULL AUTO_INCREMENT COMMENT '字典id',
-  `dict_name` varchar(500) COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典名字',
-  `dict_code` varchar(500) COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典编码',
-  `remark` varchar(1000) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '字典备注',
+  `dict_name` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典名字',
+  `dict_code` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典编码',
+  `remark` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '字典备注',
   `disabled_flag` tinyint NOT NULL DEFAULT '0' COMMENT '禁用状态',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -288,10 +283,10 @@ DROP TABLE IF EXISTS `t_dict_data`;
 CREATE TABLE `t_dict_data` (
   `dict_data_id` bigint NOT NULL AUTO_INCREMENT COMMENT '字典数据id',
   `dict_id` bigint NOT NULL COMMENT '字典id',
-  `data_value` varchar(500) COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典项值',
-  `data_label` varchar(500) COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典项显示名称',
-  `data_style` varchar(500) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '字典项样式',
-  `remark` varchar(1000) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '备注',
+  `data_value` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典项值',
+  `data_label` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '字典项显示名称',
+  `data_style` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '字典项样式',
+  `remark` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '备注',
   `sort_order` int NOT NULL COMMENT '排序（越大越靠前）',
   `disabled_flag` tinyint NOT NULL DEFAULT '0' COMMENT '禁用状态',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -417,17 +412,17 @@ CREATE TABLE `t_file` (
   `storage_key` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '存储键，系统生成，不可变',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `storage_kind` varchar(16) COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'LOCAL' COMMENT '存储介质：LOCAL / S3',
-  `content_type` varchar(100) COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'application/octet-stream' COMMENT '嗅探出的真实MIME',
-  `extension` varchar(16) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '扩展名，从嗅探MIME反推',
-  `content_hash` char(64) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'SHA-256，去重预留',
+  `storage_kind` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'LOCAL' COMMENT '存储介质：LOCAL / S3',
+  `content_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'application/octet-stream' COMMENT '嗅探出的真实MIME',
+  `extension` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '扩展名，从嗅探MIME反推',
+  `content_hash` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'SHA-256，去重预留',
   `image_width` int DEFAULT NULL COMMENT '图片宽，非图片为NULL',
   `image_height` int DEFAULT NULL COMMENT '图片高',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT '1临时 2已确认',
-  `tags` varchar(500) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '标签，前后各带逗号：,双十一,banner,',
+  `tags` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '标签，前后各带逗号：,双十一,banner,',
   `deleted_flag` tinyint NOT NULL DEFAULT '0' COMMENT '删除标记',
-  `create_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
-  `update_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',
+  `create_by` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
+  `update_by` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',
   PRIMARY KEY (`file_id`) USING BTREE,
   UNIQUE KEY `uk_file_key` (`storage_key`) USING BTREE,
   KEY `idx_category_time` (`category_id`,`create_time` DESC),
@@ -438,14 +433,14 @@ CREATE TABLE `t_file` (
 DROP TABLE IF EXISTS `t_file_category`;
 CREATE TABLE `t_file_category` (
   `category_id` bigint NOT NULL AUTO_INCREMENT,
-  `category_code` varchar(50) COLLATE utf8mb4_general_ci NOT NULL COMMENT '稳定标识，代码引用它而非ID',
-  `category_name` varchar(50) COLLATE utf8mb4_general_ci NOT NULL COMMENT '显示名称，可随时改',
-  `category_tag` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '标签，选择器里分组用',
+  `category_code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '稳定标识，代码引用它而非ID',
+  `category_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '显示名称，可随时改',
+  `category_tag` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '标签，选择器里分组用',
   `sort` int NOT NULL DEFAULT '0' COMMENT '排序，小的在前',
   `public_flag` tinyint NOT NULL DEFAULT '0' COMMENT '该分类下的文件是否免登录可读：0-否(默认), 1-是。公开要显式开口子',
-  `create_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
+  `create_by` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',
+  `update_by` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`category_id`),
   UNIQUE KEY `uk_code` (`category_code`)
@@ -455,7 +450,7 @@ DROP TABLE IF EXISTS `t_file_relation`;
 CREATE TABLE `t_file_relation` (
   `relation_id` bigint NOT NULL AUTO_INCREMENT,
   `file_id` bigint NOT NULL,
-  `biz_type` varchar(50) COLLATE utf8mb4_general_ci NOT NULL COMMENT '业务类型：NOTICE / HELP_DOC / ACTIVITY_DISPLAY / ...',
+  `biz_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '业务类型：NOTICE / HELP_DOC / ACTIVITY_DISPLAY / ...',
   `biz_id` bigint NOT NULL,
   `sort` int NOT NULL DEFAULT '0' COMMENT '附件顺序，轮播图必需',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -872,7 +867,8 @@ CREATE TABLE `t_security_list` (
   `source_rule` varchar(32) DEFAULT NULL COMMENT '自动入名单的来源：HONEYPOT / CANARY / KEYWORD / RATE_LIMIT / ESCALATE（黑到期转灰） / SEGMENT（同段连坐）。人工条目为 NULL',
   `hit_count` int NOT NULL DEFAULT '1' COMMENT '有效期内命中次数：自动条目重复命中时累加',
   `last_hit_time` datetime DEFAULT NULL COMMENT '最近一次命中（人工条目为 NULL）',
-  `last_incident_id` bigint DEFAULT NULL COMMENT '最近一次证据，指向 t_security_incident',
+  `last_event_id` bigint DEFAULT NULL COMMENT '最近一次证据，指向 t_security_event.id',
+  `last_incident_id` bigint DEFAULT NULL COMMENT '改名过渡列，与 last_event_id 同值；收口脚本删除',
   `blocked_count` bigint NOT NULL DEFAULT '0' COMMENT '封禁期间被安全闸直接挡掉的请求数，定时从 Redis 计数器同步',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：1-有效, 0-已撤销。撤销不删行，留痕',
   `expire_time` datetime DEFAULT NULL COMMENT '到期时间。NULL 表示长期；后台新增默认 30 天；自动条目必填',
@@ -888,10 +884,10 @@ CREATE TABLE `t_security_list` (
   KEY `idx_sec_list_rule` (`source_rule`,`last_hit_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全名单（网关与登录风控共用）';
 
-DROP TABLE IF EXISTS `t_security_incident`;
-CREATE TABLE `t_security_incident` (
+DROP TABLE IF EXISTS `t_security_event`;
+CREATE TABLE `t_security_event` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
-  `incident_type` tinyint NOT NULL COMMENT '1-蜜罐接口, 2-蜜罐账号, 3-关键字, 4-限流判罚 / 升档, 5-未知字段（低置信，只记录）',
+  `event_type` tinyint NOT NULL COMMENT '1-蜜罐接口, 2-蜜罐账号, 3-关键字, 4-限流判罚 / 升档, 5-未知字段（低置信，只记录）',
   `rule_code` varchar(32) DEFAULT NULL COMMENT '命中的蜜罐路径 / 关键字规则 / 限流场景编码',
   `action` tinyint NOT NULL COMMENT '实际处置：0-仅记录, 1-拉灰, 2-拉黑',
   `suppress_reason` tinyint NOT NULL DEFAULT '0' COMMENT '处罚被压下的原因：0-无, 1-跨站发起, 2-熔断中, 3-老设备豁免（仅 IP 部分）',
@@ -910,10 +906,10 @@ CREATE TABLE `t_security_incident` (
   `trace_id` varchar(64) DEFAULT NULL COMMENT '全链路追踪ID',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
   PRIMARY KEY (`id`,`create_time`),
-  KEY `idx_sec_inc_ip` (`client_ip`,`create_time`),
-  KEY `idx_sec_inc_device` (`device_id`,`create_time`),
-  KEY `idx_sec_inc_member` (`member_id`,`create_time`),
-  KEY `idx_sec_inc_type` (`incident_type`,`create_time`)
+  KEY `idx_sec_evt_ip` (`client_ip`,`create_time`),
+  KEY `idx_sec_evt_device` (`device_id`,`create_time`),
+  KEY `idx_sec_evt_member` (`member_id`,`create_time`),
+  KEY `idx_sec_evt_type` (`event_type`,`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全事件流水（append-only，按月分区，保留 6 个月；只在状态变化时写）'
 /*!50500 PARTITION BY RANGE  COLUMNS(create_time)
 (PARTITION p202610 VALUES LESS THAN ('2026-11-01') ENGINE = InnoDB,
@@ -1200,15 +1196,15 @@ CREATE TABLE `t_activity_display` (
   `main_image_id` bigint DEFAULT NULL COMMENT '主视觉 file_id',
   `bg_image_id` bigint DEFAULT NULL COMMENT '背景图 file_id',
   `share_image_id` bigint DEFAULT NULL COMMENT '分享图 file_id',
-  `share_title` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '分享标题',
-  `share_desc` varchar(128) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '分享描述',
-  `sub_title` varchar(128) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '副标题',
-  `theme_color` varchar(16) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '主题色 #RRGGBB',
-  `rule_content` mediumtext COLLATE utf8mb4_general_ci COMMENT '活动规则，富文本HTML。禁止 base64 内联图片',
+  `share_title` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '分享标题',
+  `share_desc` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '分享描述',
+  `sub_title` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '副标题',
+  `theme_color` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '主题色 #RRGGBB',
+  `rule_content` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci COMMENT '活动规则，富文本HTML。禁止 base64 内联图片',
   `extra_config` json DEFAULT NULL COMMENT '按 activity_type 各自定义，后端只存不解析',
-  `create_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
+  `create_by` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '创建人（用户名）',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_by` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',
+  `update_by` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '更新人（用户名）',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_activity` (`activity_id`)

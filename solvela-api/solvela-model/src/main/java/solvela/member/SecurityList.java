@@ -46,7 +46,16 @@ public class SecurityList {
     /** 最近一次命中。人工条目为 null */
     private LocalDateTime lastHitTime;
 
-    /** 最近一次证据，指向 t_security_incident */
+    /** 最近一次证据，指向 {@code t_security_event.id} */
+    private Long lastEventId;
+
+    /**
+     * 改名前的那一列，与 {@link #lastEventId} 同值。
+     *
+     * <p>TEMP(安全事件改名-收口): 只为发版间隙里的旧版后台保留；新代码只读 {@link #lastEventId}。
+     * 移除条件同 SecurityListWriter 里那段双写。
+     */
+    @Deprecated
     private Long lastIncidentId;
 
     /** 封禁期间被安全闸直接挡掉的请求数，定时从 Redis 计数器同步。新增时留 null，取库里的默认值 0 */

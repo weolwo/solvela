@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import solvela.base.domain.PageResult;
-import solvela.member.risk.security.SecurityIncidentAdminService;
+import solvela.member.risk.security.SecurityEventAdminService;
 import solvela.web.RequiresPermission;
 
 import java.time.LocalDateTime;
@@ -23,21 +23,21 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @RestController
 @Tag(name = "安全中心 - 安全事件")
-@RequestMapping("/security/incident")
-public class SecurityIncidentController {
+@RequestMapping("/security/event")
+public class SecurityEventController {
 
-    private final SecurityIncidentAdminService service;
+    private final SecurityEventAdminService service;
 
-    public record QueryForm(String clientIp, String deviceId, Long memberId, Integer incidentType,
+    public record QueryForm(String clientIp, String deviceId, Long memberId, Integer eventType,
                             LocalDateTime createTimeBegin, LocalDateTime createTimeEnd, Long pageNum, Long pageSize) {
     }
 
     @Operation(summary = "安全事件分页。不传时间兜最近 7 天，一次最多 31 天")
     @PostMapping("/queryPage")
     @RequiresPermission("security:query")
-    public PageResult<SecurityIncidentAdminService.Row> queryPage(@RequestBody QueryForm form) {
-        return service.queryPage(new SecurityIncidentAdminService.Query(form.clientIp(), form.deviceId(),
-                form.memberId(), form.incidentType(), form.createTimeBegin(), form.createTimeEnd(),
+    public PageResult<SecurityEventAdminService.Row> queryPage(@RequestBody QueryForm form) {
+        return service.queryPage(new SecurityEventAdminService.Query(form.clientIp(), form.deviceId(),
+                form.memberId(), form.eventType(), form.createTimeBegin(), form.createTimeEnd(),
                 form.pageNum() == null ? 1 : form.pageNum(), form.pageSize() == null ? 20 : form.pageSize()));
     }
 }

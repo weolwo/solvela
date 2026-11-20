@@ -9,7 +9,7 @@ import solvela.base.module.config.ConfigService;
 import solvela.base.trace.Trace;
 import solvela.member.risk.RiskContext;
 import solvela.security.IpKeys;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.time.Duration;
@@ -42,7 +42,7 @@ public class CanaryTrap {
 
     private final ConfigService configService;
 
-    private final SecurityIncidentQueue incidents;
+    private final SecurityEventQueue eventPublisher;
 
     public void spring(RiskContext ctx) {
         try {
@@ -56,16 +56,16 @@ public class CanaryTrap {
                 redis.opsForValue().set(SecurityKeys.securityPenaltyDevice(ctx.getDeviceId()), String.valueOf(until),
                         Duration.ofSeconds(ban));
             }
-            SecurityIncidentEvent.Builder event = SecurityIncidentEvent
-                    .builder(SecurityIncidentEvent.CANARY, "CANARY_ACCOUNT")
+            SecurityEvent.Builder event = SecurityEvent
+                    .builder(SecurityEvent.CANARY, "CANARY_ACCOUNT")
                     .penalty(null, until)
                     .who(ctx.getClientIp(), ctx.getDeviceId(), ctx.memberId())
                     .identityHash(ctx.getIdentityHashHex())
                     .request("POST", "/auth/login", null, Trace.id());
             if (ipKey != null) {
-                event.action(SecurityIncidentEvent.ACTION_BLACK, until);
+                event.action(SecurityEvent.ACTION_BLACK, until);
             }
-            incidents.publish(event.build());
+            eventPublisher.publish(event.build());
             log.error("【告警】【蜜罐账号】有人用蜜罐账号登录 —— 我们的用户名单可能已经泄露。IP 与设备已罚 {} 秒, 会员: {}, IP: {}, 设备: {}",
                     ban, ctx.memberId(), ctx.getClientIp(), ctx.getDeviceId());
         } catch (Exception e) {

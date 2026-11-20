@@ -7,7 +7,7 @@ import solvela.app.auth.CurrentDevice;
 import solvela.app.auth.CurrentMember;
 import solvela.app.web.ClientIp;
 import solvela.app.web.Trace;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,7 +35,7 @@ public class UnknownFieldReporter {
     /** 去重表最多记多少条；满了整张清掉 —— 宁可多记几条，不让它无限长 */
     static final int MAX_TRACKED = 10_000;
 
-    private final IncidentPublisher incidents;
+    private final SecurityEventPublisher eventPublisher;
 
     private final ConcurrentHashMap<String, Long> lastReported = new ConcurrentHashMap<>();
 
@@ -51,10 +51,10 @@ public class UnknownFieldReporter {
             lastReported.clear();
         }
         lastReported.put(key, now);
-        incidents.publish(SecurityIncidentEvent.builder(SecurityIncidentEvent.UNKNOWN_FIELD, RULE_CODE)
+        eventPublisher.publish(SecurityEvent.builder(SecurityEvent.UNKNOWN_FIELD, RULE_CODE)
                 .who(ip, CurrentDevice.deviceIdOrNull(), CurrentMember.memberIdOrNull())
                 .request(request.getMethod(), request.getRequestURI(), request.getHeader("User-Agent"), Trace.id())
-                .matched(SecurityIncidentEvent.FIELD_BODY, field, null)
+                .matched(SecurityEvent.FIELD_BODY, field, null)
                 .build());
     }
 }

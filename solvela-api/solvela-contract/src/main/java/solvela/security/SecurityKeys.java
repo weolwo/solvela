@@ -80,25 +80,39 @@ public final class SecurityKeys {
 
     /**
      * 安全事件队列（Redis <b>List</b>）：网关与会员域 {@code LPUSH}，后台的落库任务从另一头取。
-     * 每个元素是一条 {@link SecurityIncidentEvent} 的 JSON。
+     * 每个元素是一条 {@link SecurityEvent} 的 JSON。
      *
      * <h3>为什么不是 Stream</h3>
      * 本地开发用的 Redis 是 3.0（没有 Stream，Stream 要 5.0），生产是 8。List 两边都能用，
-     * 而这里要的只是「排队、有上限、取走之后处理完再删」—— {@code RPOPLPUSH} 到 {@link #INCIDENT_PROCESSING} 就是这件事。
+     * 而这里要的只是「排队、有上限、取走之后处理完再删」—— {@code RPOPLPUSH} 到 {@link #EVENT_PROCESSING} 就是这件事。
      */
-    public static final String INCIDENT_QUEUE = "sec:incident";
+    public static final String EVENT_QUEUE = "sec:event";
 
     /** 取出来、还没落完库的事件：落库任务崩在半路，下一次先把这里的处理掉 */
-    public static final String INCIDENT_PROCESSING = "sec:incident:processing";
+    public static final String EVENT_PROCESSING = "sec:event:processing";
+
+    /**
+     * 改名前的那一对队列键（2026-11-20「incident」→「event」）。
+     *
+     * <p>TEMP(安全事件改名-收口): 网关与后台分开发版，旧版生产方在发版间隙里仍往这里写；落库任务把它和新队列一起清空，
+     * 一条也不丢。投递方一律不许再用它。
+     * 移除条件：所有进程都已是改名后的版本，且生产 Redis 里 {@code LLEN sec:incident} 与 {@code LLEN sec:incident:processing}
+     * 都为 0 —— 然后连同 {@code SecurityEventDrainJob} 里清旧队列的那一段一起删。
+     * 收口步骤见 docs/架构/安全事件改名-实施方案.md。
+     */
+    public static final String LEGACY_INCIDENT_QUEUE = "sec:incident";
+
+    /** 同上，旧的「处理中」。TEMP(安全事件改名-收口)，移除条件同 {@link #LEGACY_INCIDENT_QUEUE} */
+    public static final String LEGACY_INCIDENT_PROCESSING = "sec:incident:processing";
 
     /** 队列上限：消费方停了也只占这么多内存，超出丢的是最老的（处罚本身已经在 Redis 里，不受影响） */
-    public static final int INCIDENT_QUEUE_MAX = 100_000;
+    public static final int EVENT_QUEUE_MAX = 100_000;
 
     /**
      * 投递一条事件的脚本（KEYS[1] = 队列，ARGV[1] = 事件 JSON，ARGV[2] = 上限）：推进去，再把超出上限的最老那一截剪掉，一次往返。
      * 网关与会员域（蜜罐账号）各自包成 {@code RedisScript} 用，与 {@link SlidingWindowScripts} 同一个做法。
      */
-    public static final String INCIDENT_PUSH_SCRIPT = """
+    public static final String EVENT_PUSH_SCRIPT = """
             redis.call('LPUSH', KEYS[1], ARGV[1])
             redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]) - 1)
             return 1

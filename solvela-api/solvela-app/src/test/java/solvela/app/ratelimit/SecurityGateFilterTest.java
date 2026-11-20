@@ -21,7 +21,7 @@ import solvela.auth.device.DeviceTokenCodec;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
 import solvela.security.KeywordRules;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -279,7 +279,7 @@ class SecurityGateFilterTest {
                 RequestMappingHandlerMapping.class);
         String json = gateJson(50, """
                 {"code":"LOGIN","path":"/auth/login","enabled":true}""");
-        SecurityGateFilter withRoutes = new SecurityGateFilter(redis, holder(List.of(), json), null, mapping, breakerKey(), incidents(), null);
+        SecurityGateFilter withRoutes = new SecurityGateFilter(redis, holder(List.of(), json), null, mapping, breakerKey(), eventPublisher(), null);
         assertThrows(IllegalStateException.class, withRoutes::verifyHoneypotsAtStartup);
         assertEquals(SecurityGateFilter.Trap.MISS, trap(withRoutes, "/auth/login", trackedIp(), null, null, null),
                 "真实登录接口被当成蜜罐的话，所有人一登录就被封 24 小时");
@@ -307,7 +307,7 @@ class SecurityGateFilterTest {
 
     @Test
     @DisplayName("🔴 蜜罐罚了 → 投一条事件：拉黑到处罚到期那一刻；跨站 / 熔断也各投一条「仅记录」，写明是被哪道保险压下的")
-    void honeypotPublishesIncidents() {
+    void honeypotPublishesEvents() {
         SecurityGateFilter gate = honeypotGate(1);
         String ip = trackedIp();
         String device = newDeviceId();
@@ -317,20 +317,20 @@ class SecurityGateFilterTest {
         trap(gate, "/.env", trackedIp(), null, "cross-site", null);
         trap(gate, "/.env", trackedIp(), null, null, null);
 
-        List<SecurityIncidentEvent> events = incidentsPublished();
+        List<SecurityEvent> events = eventsPublished();
         assertEquals(3, events.size());
-        SecurityIncidentEvent penalised = events.get(0);
-        assertEquals(SecurityIncidentEvent.HONEYPOT, penalised.incidentType());
+        SecurityEvent penalised = events.get(0);
+        assertEquals(SecurityEvent.HONEYPOT, penalised.eventType());
         assertEquals("ENV", penalised.ruleCode());
-        assertEquals(SecurityIncidentEvent.ACTION_BLACK, penalised.action());
+        assertEquals(SecurityEvent.ACTION_BLACK, penalised.action());
         assertEquals(penalised.penaltyUntilEpochSec(), penalised.listUntilEpochSec(), "名单与处罚同一时刻到期");
         assertEquals(ip, penalised.clientIp());
         assertEquals(device, penalised.deviceId());
         assertEquals("curl/8.5.0", penalised.userAgent());
-        assertEquals(SecurityIncidentEvent.FIELD_PATH, penalised.matchedField());
-        assertEquals(SecurityIncidentEvent.SUPPRESS_CROSS_SITE, events.get(1).suppressReason());
-        assertEquals(SecurityIncidentEvent.ACTION_RECORD, events.get(1).action());
-        assertEquals(SecurityIncidentEvent.SUPPRESS_BREAKER, events.get(2).suppressReason());
+        assertEquals(SecurityEvent.FIELD_PATH, penalised.matchedField());
+        assertEquals(SecurityEvent.SUPPRESS_CROSS_SITE, events.get(1).suppressReason());
+        assertEquals(SecurityEvent.ACTION_RECORD, events.get(1).action());
+        assertEquals(SecurityEvent.SUPPRESS_BREAKER, events.get(2).suppressReason());
     }
 
     @Test
@@ -346,21 +346,21 @@ class SecurityGateFilterTest {
         assertNull(redis.opsForValue().get(SecurityKeys.securityPenaltyIp(IpKeys.ip(ip))));
         assertNotNull(redis.opsForValue().get(deviceKey));
         assertNull(gate.check(ip, newDevice(newDeviceId())), "同一出口后面别的设备照常放行");
-        SecurityIncidentEvent event = incidentsPublished().get(0);
-        assertEquals(SecurityIncidentEvent.SUPPRESS_OLD_DEVICE, event.suppressReason());
-        assertEquals(SecurityIncidentEvent.ACTION_RECORD, event.action());
+        SecurityEvent event = eventsPublished().get(0);
+        assertEquals(SecurityEvent.SUPPRESS_OLD_DEVICE, event.suppressReason());
+        assertEquals(SecurityEvent.ACTION_RECORD, event.action());
     }
 
     @Test
     @DisplayName("关键字事件写明命中位置与参数名、命中片段")
-    void keywordIncidentFields() {
+    void keywordEventFields() {
         SecurityGateFilter gate = keywordGate(50);
 
         keyword(gate, new KeywordRules.Hit("SQL_TAUTOLOGY", "query.id", "' or 1=1"), trackedIp(), null, null, null);
 
-        SecurityIncidentEvent event = incidentsPublished().get(0);
-        assertEquals(SecurityIncidentEvent.KEYWORD, event.incidentType());
-        assertEquals(SecurityIncidentEvent.FIELD_QUERY, event.matchedField());
+        SecurityEvent event = eventsPublished().get(0);
+        assertEquals(SecurityEvent.KEYWORD, event.eventType());
+        assertEquals(SecurityEvent.FIELD_QUERY, event.matchedField());
         assertEquals("id", event.matchedParam());
         assertEquals("' or 1=1", event.matchedSample());
     }
@@ -373,7 +373,7 @@ class SecurityGateFilterTest {
         BlockedCounter counter = new BlockedCounter(redis);
         SecurityGateFilter gate = new SecurityGateFilter(redis, holder(List.of(), null),
                 context.getBean("handlerExceptionResolver", HandlerExceptionResolver.class), null, breakerKey(),
-                incidents(), counter);
+                eventPublisher(), counter);
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(gate).build();
 
         for (int i = 0; i < 5; i++) {
@@ -384,7 +384,7 @@ class SecurityGateFilterTest {
 
         String key = track(SecurityKeys.blockedCounter(1, IpKeys.listValue(ip)));
         assertEquals("5", redis.opsForValue().get(key));
-        assertTrue(incidentsPublished().isEmpty());
+        assertTrue(eventsPublished().isEmpty());
     }
 
     // ------------------------------------------------------------------ 关键字
@@ -531,7 +531,7 @@ class SecurityGateFilterTest {
     // ------------------------------------------------------------------ 造数
 
     private SecurityGateFilter gate(List<GatewayRuleSnapshot.IpEntry> lists) {
-        return new SecurityGateFilter(redis, holder(lists, null), null, null, breakerKey(), incidents(), null);
+        return new SecurityGateFilter(redis, holder(lists, null), null, null, breakerKey(), eventPublisher(), null);
     }
 
     /** 一份带蜜罐的配置：/.env、/.git/**，外加一条停用的 /disabled */
@@ -541,7 +541,7 @@ class SecurityGateFilterTest {
                 {"code":"GIT","path":"/.git/**","enabled":true},
                 {"code":"OFF","path":"/disabled","enabled":false}""");
         return new SecurityGateFilter(redis, holder(List.of(), json),
-                context.getBean("handlerExceptionResolver", HandlerExceptionResolver.class), null, breakerKey(), incidents(), null);
+                context.getBean("handlerExceptionResolver", HandlerExceptionResolver.class), null, breakerKey(), eventPublisher(), null);
     }
 
     private static String gateJson(int breakerDistinctIps, String honeypots) {
@@ -559,7 +559,7 @@ class SecurityGateFilterTest {
                 .configs().get("gateway_security_gate");
         String json = seeded.replace("\"distinctIps\":50", "\"distinctIps\":" + breakerDistinctIps);
         return new SecurityGateFilter(redis, holder(List.of(), json),
-                context.getBean("handlerExceptionResolver", HandlerExceptionResolver.class), null, breakerKey(), incidents(), null);
+                context.getBean("handlerExceptionResolver", HandlerExceptionResolver.class), null, breakerKey(), eventPublisher(), null);
     }
 
     private RuleSnapshotHolder holder(List<GatewayRuleSnapshot.IpEntry> lists, String gateConfig) {
@@ -579,8 +579,8 @@ class SecurityGateFilterTest {
     }
 
     /** 事件投进这个用例自己的队列（在熔断前缀下面，用例结束一起删） */
-    private IncidentPublisher incidents() {
-        return new IncidentPublisher(redis, breakerKey() + "incident");
+    private SecurityEventPublisher eventPublisher() {
+        return new SecurityEventPublisher(redis, breakerKey() + "event");
     }
 
     /** 熔断键的前缀：每个用例一个，用例结束时把这个前缀下的键一起删掉 */
@@ -603,12 +603,12 @@ class SecurityGateFilterTest {
         return ip;
     }
 
-    private List<SecurityIncidentEvent> incidentsPublished() {
-        List<String> raw = redis.opsForList().range(breakerKey() + "incident", 0, -1);
-        List<SecurityIncidentEvent> events = new ArrayList<>();
+    private List<SecurityEvent> eventsPublished() {
+        List<String> raw = redis.opsForList().range(breakerKey() + "event", 0, -1);
+        List<SecurityEvent> events = new ArrayList<>();
         // LPUSH 进去的：最新的在最前面，倒过来按发生顺序
         for (int i = raw.size() - 1; i >= 0; i--) {
-            events.add(MAPPER.readValue(raw.get(i), SecurityIncidentEvent.class));
+            events.add(MAPPER.readValue(raw.get(i), SecurityEvent.class));
         }
         return events;
     }

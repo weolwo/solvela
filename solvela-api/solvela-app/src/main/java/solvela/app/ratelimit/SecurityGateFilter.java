@@ -24,7 +24,7 @@ import solvela.app.web.ClientIp;
 import solvela.app.web.Trace;
 import solvela.auth.device.DeviceIdentity;
 import solvela.security.KeywordRules;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.io.IOException;
@@ -95,20 +95,20 @@ public class SecurityGateFilter extends OncePerRequestFilter {
     public SecurityGateFilter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder,
                               @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
                               @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping,
-                              IncidentPublisher incidents, BlockedCounter blockedCounter) {
-        this(redis, snapshotHolder, exceptionResolver, handlerMapping, "", incidents, blockedCounter);
+                              SecurityEventPublisher eventPublisher, BlockedCounter blockedCounter) {
+        this(redis, snapshotHolder, exceptionResolver, handlerMapping, "", eventPublisher, blockedCounter);
     }
 
     SecurityGateFilter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder,
                        HandlerExceptionResolver exceptionResolver, RequestMappingHandlerMapping handlerMapping,
-                       String breakerNamespace, IncidentPublisher incidents, BlockedCounter blockedCounter) {
+                       String breakerNamespace, SecurityEventPublisher eventPublisher, BlockedCounter blockedCounter) {
         PenaltyCache cache = new PenaltyCache();
         this.snapshotHolder = snapshotHolder;
         this.exceptionResolver = exceptionResolver;
         this.handlerMapping = handlerMapping;
         this.blockedCounter = blockedCounter;
         this.banCheck = new BanCheck(redis, cache);
-        this.penalty = new TrapPenalty(redis, cache, incidents, breakerNamespace);
+        this.penalty = new TrapPenalty(redis, cache, eventPublisher, breakerNamespace);
     }
 
     /** 一个请求里安全闸要用到的东西。蜜罐与关键字的判定、事件都从这里取 */
@@ -180,12 +180,12 @@ public class SecurityGateFilter extends OncePerRequestFilter {
         if (honeypot == null) {
             return Trap.MISS;
         }
-        SecurityIncidentEvent.Builder event = SecurityIncidentEvent.builder(SecurityIncidentEvent.HONEYPOT, honeypot.code())
-                .matched(SecurityIncidentEvent.FIELD_PATH, null, probe.path());
+        SecurityEvent.Builder event = SecurityEvent.builder(SecurityEvent.HONEYPOT, honeypot.code())
+                .matched(SecurityEvent.FIELD_PATH, null, probe.path());
         if (probe.crossSite()) {
             log.warn("【蜜罐】跨站发起的命中，只记录不处罚, 蜜罐: {}, 路径: {}, IP: {}, Sec-Fetch-Site: {}, Origin: {}",
                     honeypot.code(), probe.path(), probe.clientIp(), probe.secFetchSite(), probe.origin());
-            penalty.record(event.suppressed(SecurityIncidentEvent.SUPPRESS_CROSS_SITE), probe);
+            penalty.record(event.suppressed(SecurityEvent.SUPPRESS_CROSS_SITE), probe);
             return Trap.CROSS_SITE;
         }
         TrapPenalty.Catch what = new TrapPenalty.Catch("蜜罐", honeypot.code(), "路径 " + probe.path(),
@@ -198,12 +198,12 @@ public class SecurityGateFilter extends OncePerRequestFilter {
      * 请求体与 UA 不看这一条：JSON 请求体从别的网站发不过来（要过 CORS 预检），UA 浏览器里改不了。
      */
     Trap keyword(KeywordRules.Hit hit, Probe probe) {
-        SecurityIncidentEvent.Builder event = SecurityIncidentEvent.builder(SecurityIncidentEvent.KEYWORD, hit.code())
+        SecurityEvent.Builder event = SecurityEvent.builder(SecurityEvent.KEYWORD, hit.code())
                 .matched(matchedField(hit.location()), matchedParam(hit.location()), hit.sample());
         if (urlBorne(hit.location()) && probe.crossSite()) {
             log.warn("【关键字】跨站发起的命中，拒绝但不处罚, 规则: {}, 位置: {}, 片段: {}, IP: {}",
                     hit.code(), hit.location(), hit.sample(), probe.clientIp());
-            penalty.record(event.suppressed(SecurityIncidentEvent.SUPPRESS_CROSS_SITE), probe);
+            penalty.record(event.suppressed(SecurityEvent.SUPPRESS_CROSS_SITE), probe);
             return Trap.CROSS_SITE;
         }
         TrapPenalty.Catch what = new TrapPenalty.Catch("关键字", hit.code(),
@@ -289,12 +289,12 @@ public class SecurityGateFilter extends OncePerRequestFilter {
     /** 命中位置 → 表里的 matched_field */
     private static int matchedField(String location) {
         if (location.equals("ua")) {
-            return SecurityIncidentEvent.FIELD_UA;
+            return SecurityEvent.FIELD_UA;
         }
         if (location.equals("path")) {
-            return SecurityIncidentEvent.FIELD_PATH;
+            return SecurityEvent.FIELD_PATH;
         }
-        return location.startsWith("query.") ? SecurityIncidentEvent.FIELD_QUERY : SecurityIncidentEvent.FIELD_BODY;
+        return location.startsWith("query.") ? SecurityEvent.FIELD_QUERY : SecurityEvent.FIELD_BODY;
     }
 
     /** 命中位置 → 参数 / 字段名（{@code query.id} → {@code id}，{@code body.items[1].name} → {@code items[1].name}） */

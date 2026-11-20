@@ -10,7 +10,7 @@ import solvela.security.GatewayRuleSnapshot;
 import solvela.security.IpKeys;
 import solvela.security.IpRange;
 import solvela.security.RateLimitDimension;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.time.Instant;
@@ -53,14 +53,14 @@ public class RateLimiter {
 
     private final AccountKey accountKey;
 
-    private final IncidentPublisher incidents;
+    private final SecurityEventPublisher eventPublisher;
 
     public RateLimiter(StringRedisTemplate redis, RuleSnapshotHolder snapshotHolder, RateLimitProperties properties,
-                       IncidentPublisher incidents) {
+                       SecurityEventPublisher eventPublisher) {
         this.redis = redis;
         this.snapshotHolder = snapshotHolder;
         this.properties = properties;
-        this.incidents = incidents;
+        this.eventPublisher = eventPublisher;
         this.accountKey = new AccountKey(properties.accountKey());
     }
 
@@ -256,7 +256,7 @@ public class RateLimiter {
             case PENALISED -> {
                 log.warn("【网关限流】判罚, 规则: {}, 维度: {}, 第 {} 档, {} 秒, 接口: {}, IP: {}", rule.target(), dimension,
                         outcome.level(), outcome.retryAfter(), request.endpointKey(), request.clientIp());
-                incidents.publish(incident(request, dimension, outcome, globals));
+                eventPublisher.publish(securityEvent(request, dimension, outcome, globals));
             }
             case SHADOW_PENALTY -> log.warn("【网关限流】陪跑命中（本来会判罚）, 规则: {}, 维度: {}, 接口: {}, IP: {}",
                     rule.target(), dimension, request.endpointKey(), request.clientIp());
@@ -276,20 +276,20 @@ public class RateLimiter {
      *       🔴 匿名场景的「账号」是请求体里别人填的目标，永远不拉灰 —— 否则就是一个拿别人的号去拉灰的办法（§2.4）。</li>
      * </ul>
      */
-    private static SecurityIncidentEvent incident(Request request, RateLimitDimension dimension, Outcome outcome,
+    private static SecurityEvent securityEvent(Request request, RateLimitDimension dimension, Outcome outcome,
                                                   RateLimitGlobals globals) {
         long now = Instant.now().getEpochSecond();
         long greyUntil = now + globals.greyDays() * 86400L;
         boolean high = outcome.level() >= globals.greyLevel();
-        SecurityIncidentEvent.Builder event = SecurityIncidentEvent
-                .builder(SecurityIncidentEvent.RATE_LIMIT, request.scene().name())
+        SecurityEvent.Builder event = SecurityEvent
+                .builder(SecurityEvent.RATE_LIMIT, request.scene().name())
                 .penalty(outcome.level(), now + outcome.retryAfter())
                 .who(request.clientIp(), request.deviceId(), request.memberId())
                 .request(method(request.endpointKey()), path(request.endpointKey()), null, Trace.id())
                 .matched(null, dimension.name(), null)
                 .observeDevice(high && dimension == RateLimitDimension.DEVICE && request.scene().anonymous());
         if (high && dimension == RateLimitDimension.IP) {
-            event.action(SecurityIncidentEvent.ACTION_GREY, greyUntil);
+            event.action(SecurityEvent.ACTION_GREY, greyUntil);
         }
         if (high && dimension == RateLimitDimension.ACCOUNT && request.memberId() != null && !request.scene().anonymous()) {
             event.greyMember(greyUntil);

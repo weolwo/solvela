@@ -73,7 +73,7 @@ public class DumpSchema {
             "t_member_risk_rule","t_member_risk_event","t_member_risk_hit"));
         // 2026-10-17 网关阶梯限流与安全闸（docs/架构/网关阶梯限流-技术方案.md §6）。
         // 单开一组：名单表从会员域挪过来 —— 它已经是网关与登录风控共用的平台级表（原 t_member_risk_list）
-        GROUPS.put("平台安全", List.of("t_security_list","t_security_incident","t_rate_limit_rule"));
+        GROUPS.put("平台安全", List.of("t_security_list","t_security_event","t_rate_limit_rule"));
         GROUPS.put("账务 / 履约", List.of(
             "t_member_wallet","t_member_asset_transaction","t_member_coupon",
             "t_physical_delivery","t_proposal_record","t_promotion_config",

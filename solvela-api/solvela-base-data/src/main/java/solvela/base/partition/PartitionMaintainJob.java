@@ -19,7 +19,7 @@ import java.util.List;
  *
  * <h3>它补的是一个一直存在的缺口</h3>
  * 四张按月分区的表（{@code t_member_login_log}、{@code t_member_risk_event}、
- * {@code t_member_risk_hit}、{@code t_security_incident}）的分区都是建表时一次性写死的，只建到 2027-01。
+ * {@code t_member_risk_hit}、{@code t_security_event}）的分区都是建表时一次性写死的，只建到 2027-01。
  * <b>在本任务之前没有任何东西会去补</b> —— 到那之后所有数据落进 {@code pmax}，
  * 而它永不过期：保留期形同虚设，表只会一直涨，想清的时候已经清不动了（只能 DELETE）。
  * 这件事没有任何症状，直到某天写入开始变慢。
@@ -69,7 +69,7 @@ public class PartitionMaintainJob implements SolvelaJob {
      * 漏了不会报错 —— 只是那张表到了预设分区的尽头之后，数据开始悄悄堆进 {@code pmax}。
      */
     public static final String DEFAULT_TABLES =
-            "t_member_login_log,t_member_risk_event,t_member_risk_hit,t_security_incident";
+            "t_member_login_log,t_member_risk_event,t_member_risk_hit,t_security_event";
 
     /** 🔴 保留期不接受 0：那意味着连当月的分区都算过期 */
     private static final int MIN_RETAIN_MONTHS = 1;

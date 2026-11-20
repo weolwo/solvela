@@ -20,7 +20,7 @@ import java.util.Map;
  *   <li>有效的<b>自动</b>条目：{@code hit_count + 1}、刷新最近命中与证据，到期取两者中更晚的；</li>
  *   <li>有效的<b>人工</b>条目：<b>不动</b> —— 人工设的长期黑名单不会被自动的 24 小时缩短；</li>
  *   <li>已撤销、或已过期的：复用这一行，重新置为有效、归为自动，撤销三列清空、{@code hit_count} 归 1。
- *       撤销的历史留在 {@code t_security_incident} 与 DataTracer 里。</li>
+ *       撤销的历史留在 {@code t_security_event} 与 DataTracer 里。</li>
  * </ul>
  *
  * <h3>时间交给 SQL</h3>
@@ -48,10 +48,10 @@ public class SecurityListWriter {
      * @param dimension    IP / IP 段 / 会员
      * @param sourceRule   HONEYPOT / CANARY / KEYWORD / RATE_LIMIT / ESCALATE / SEGMENT
      * @param untilEpochSec 到期（epoch 秒），🔴 自动条目必填
-     * @param incidentId   证据；没有（由任务推导出来的条目）为 null
+     * @param eventId   证据；没有（由任务推导出来的条目）为 null
      */
     public record Entry(SecurityListTypeEnum listType, SecurityListDimensionEnum dimension, String value,
-                        String sourceRule, String reason, long untilEpochSec, Long incidentId) {
+                        String sourceRule, String reason, long untilEpochSec, Long eventId) {
     }
 
     /** 写的结果 */
@@ -134,23 +134,30 @@ public class SecurityListWriter {
                 ((Number) row.get("source")).intValue() == SOURCE_MANUAL);
     }
 
+    /*
+     * 🔴 last_event_id 与 last_incident_id 两列写同一个值（改名前只有后者）。
+     * TEMP(安全事件改名-收口): 发版间隙里旧版后台只认 last_incident_id，两列都写，新旧版本读到的才是同一个证据。
+     * 移除条件：旧版后台全部下线、收口脚本删掉 last_incident_id 列之前，先把这里的那一列去掉（三处 SQL 都要删）。
+     */
     private void insert(Entry e) {
         jdbcTemplate.update("""
                 INSERT INTO t_security_list (list_type, dimension, list_value, score, reason, source, source_rule,
-                                             hit_count, last_hit_time, last_incident_id, status, expire_time, operator)
-                VALUES (?, ?, ?, ?, ?, 2, ?, 1, NOW(), ?, 1, FROM_UNIXTIME(?), ?)
+                                             hit_count, last_hit_time, last_event_id, last_incident_id, status, expire_time,
+                                             operator)
+                VALUES (?, ?, ?, ?, ?, 2, ?, 1, NOW(), ?, ?, 1, FROM_UNIXTIME(?), ?)
                 """, e.listType().getValue(), e.dimension().getValue(), e.value(), score(e), e.reason(), e.sourceRule(),
-                e.incidentId(), e.untilEpochSec(), SYSTEM);
+                e.eventId(), e.eventId(), e.untilEpochSec(), SYSTEM);
     }
 
     /** 有效的自动条目：命中次数 +1、刷新证据，到期取两者中更晚的 */
     private void extend(long id, Entry e) {
         jdbcTemplate.update("""
                 UPDATE t_security_list
-                   SET hit_count = hit_count + 1, last_hit_time = NOW(), last_incident_id = COALESCE(?, last_incident_id),
+                   SET hit_count = hit_count + 1, last_hit_time = NOW(),
+                       last_event_id = COALESCE(?, last_event_id), last_incident_id = COALESCE(?, last_incident_id),
                        source_rule = ?, expire_time = GREATEST(expire_time, FROM_UNIXTIME(?))
                  WHERE id = ?
-                """, e.incidentId(), e.sourceRule(), e.untilEpochSec(), id);
+                """, e.eventId(), e.eventId(), e.sourceRule(), e.untilEpochSec(), id);
     }
 
     /** 已撤销或已过期的：复用这一行，重新置为有效、归为自动 */
@@ -158,10 +165,10 @@ public class SecurityListWriter {
         jdbcTemplate.update("""
                 UPDATE t_security_list
                    SET status = 1, source = 2, source_rule = ?, reason = ?, score = ?, hit_count = 1, last_hit_time = NOW(),
-                       last_incident_id = ?, expire_time = FROM_UNIXTIME(?), operator = ?,
+                       last_event_id = ?, last_incident_id = ?, expire_time = FROM_UNIXTIME(?), operator = ?,
                        revoke_operator = NULL, revoke_reason = NULL, revoke_time = NULL
                  WHERE id = ?
-                """, e.sourceRule(), e.reason(), score(e), e.incidentId(), e.untilEpochSec(), SYSTEM, id);
+                """, e.sourceRule(), e.reason(), score(e), e.eventId(), e.eventId(), e.untilEpochSec(), SYSTEM, id);
     }
 
     private static Integer score(Entry e) {

@@ -21,7 +21,7 @@ import solvela.member.device.DeviceService;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
 import solvela.security.IpKeys;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.time.Instant;
@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @Date 2026-10-17
  */
 @SpringBootTest(classes = BizApplication.class)
-class SecurityIncidentPipelineTest {
+class SecurityEventPipelineTest {
 
     private static final String PREFIX = "198.51.100.";
 
@@ -53,7 +53,7 @@ class SecurityIncidentPipelineTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private SecurityIncidentStore store;
+    private SecurityEventStore store;
 
     @Autowired
     private SecurityListWriter listWriter;
@@ -83,14 +83,14 @@ class SecurityIncidentPipelineTest {
 
     private int nextIp = ThreadLocalRandom.current().nextInt(254);
 
-    private SecurityIncidentDrainJob drainJob;
+    private SecurityEventDrainJob drainJob;
 
     private final List<String> devices = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
         ns = "test:" + UUID.randomUUID() + ":";
-        drainJob = new SecurityIncidentDrainJob(redis, store, listCache, snapshotPublisher, ns + "queue", ns + "processing");
+        drainJob = new SecurityEventDrainJob(redis, store, listCache, snapshotPublisher, ns + "queue", ns + "processing");
         cleanDb();
     }
 
@@ -110,7 +110,37 @@ class SecurityIncidentPipelineTest {
 
     private void cleanDb() {
         jdbcTemplate.update("DELETE FROM t_security_list WHERE list_value LIKE ?", PREFIX + "%");
-        jdbcTemplate.update("DELETE FROM t_security_incident WHERE client_ip LIKE ?", PREFIX + "%");
+        jdbcTemplate.update("DELETE FROM t_security_event WHERE client_ip LIKE ?", PREFIX + "%");
+    }
+
+    // ------------------------------------------------------------------ 改名过渡（TEMP(安全事件改名-收口)：收口时整段删）
+
+    @Test
+    @DisplayName("🔴 改名过渡：旧队列里旧格式（incidentType）的事件照样落库，新旧两个队列一轮都清空")
+    void legacyQueueStillDrained() {
+        String fresh = ip();
+        String legacy = ip();
+        long until = now() + 86400;
+        SecurityEventDrainJob twoLanes = new SecurityEventDrainJob(redis, store, listCache, snapshotPublisher, List.of(
+                new SecurityEventDrainJob.Lane(ns + "queue", ns + "processing"),
+                new SecurityEventDrainJob.Lane(ns + "legacy", ns + "legacy:processing")));
+        push(honeypot(fresh, until));
+        // 发版间隙里旧版网关写的样子：旧键、旧字段名
+        String legacyJson = JsonUtils.toJson(honeypot(legacy, until)).replace("\"eventType\":", "\"incidentType\":");
+        assertTrue(legacyJson.contains("\"incidentType\":1") && !legacyJson.contains("eventType"), legacyJson);
+        redis.opsForList().leftPush(ns + "legacy", legacyJson);
+
+        SecurityEventDrainJob.Result result = twoLanes.drain();
+
+        assertEquals(2, result.stored());
+        assertEquals(0, result.dropped(), "旧格式被当成坏事件丢掉，就是改名把发版间隙里的事件弄丢了");
+        for (String ip : List.of(fresh, legacy)) {
+            assertEquals(SecurityEvent.HONEYPOT, jdbcTemplate.queryForObject(
+                    "SELECT event_type FROM t_security_event WHERE client_ip = ?", Integer.class, ip));
+        }
+        for (String key : List.of("queue", "processing", "legacy", "legacy:processing")) {
+            assertEquals(0L, redis.opsForList().size(ns + key), key + " 应当被清空");
+        }
     }
 
     // ------------------------------------------------------------------ 落库与名单
@@ -122,21 +152,24 @@ class SecurityIncidentPipelineTest {
         long until = now() + 86400;
         push(honeypot(ip, until));
 
-        SecurityIncidentDrainJob.Result result = drainJob.drain();
+        SecurityEventDrainJob.Result result = drainJob.drain();
 
         assertEquals(1, result.stored());
         assertTrue(result.listChanged());
-        Map<String, Object> incident = jdbcTemplate.queryForMap(
-                "SELECT id, incident_type, rule_code, action, UNIX_TIMESTAMP(penalty_until) AS pu FROM t_security_incident WHERE client_ip = ?", ip);
-        assertEquals(1, ((Number) incident.get("incident_type")).intValue());
-        assertEquals("ENV", incident.get("rule_code"));
-        assertEquals(until, ((Number) incident.get("pu")).longValue());
+        Map<String, Object> eventRow = jdbcTemplate.queryForMap(
+                "SELECT id, event_type, rule_code, action, UNIX_TIMESTAMP(penalty_until) AS pu FROM t_security_event WHERE client_ip = ?", ip);
+        assertEquals(1, ((Number) eventRow.get("event_type")).intValue());
+        assertEquals("ENV", eventRow.get("rule_code"));
+        assertEquals(until, ((Number) eventRow.get("pu")).longValue());
         Map<String, Object> row = listRow(ip, 1);
         assertEquals(2, ((Number) row.get("source")).intValue());
         assertEquals("HONEYPOT", row.get("source_rule"));
         assertEquals(1, ((Number) row.get("hit_count")).intValue());
         assertEquals(until, ((Number) row.get("exp")).longValue());
-        assertEquals(((Number) incident.get("id")).longValue(), ((Number) row.get("last_incident_id")).longValue());
+        long eventId = ((Number) eventRow.get("id")).longValue();
+        assertEquals(eventId, ((Number) row.get("last_event_id")).longValue());
+        // TEMP(安全事件改名-收口): 旧列与新列同值，发版间隙里的旧版后台读到的是同一个证据；收口删列时这行一起删
+        assertEquals(eventId, ((Number) row.get("last_incident_id")).longValue());
 
         push(honeypot(ip, until + 3600));
         drainJob.drain();
@@ -177,12 +210,12 @@ class SecurityIncidentPipelineTest {
     void rateLimitGreyAndObserve() {
         String grey = ip();
         String device = registeredDevice();
-        push(SecurityIncidentEvent.builder(SecurityIncidentEvent.RATE_LIMIT, "LOGIN").penalty(4, now() + 3600)
-                .action(SecurityIncidentEvent.ACTION_GREY, now() + 7 * 86400L).who(grey, null, null).build());
-        push(SecurityIncidentEvent.builder(SecurityIncidentEvent.RATE_LIMIT, "LOGIN").penalty(4, now() + 3600)
+        push(SecurityEvent.builder(SecurityEvent.RATE_LIMIT, "LOGIN").penalty(4, now() + 3600)
+                .action(SecurityEvent.ACTION_GREY, now() + 7 * 86400L).who(grey, null, null).build());
+        push(SecurityEvent.builder(SecurityEvent.RATE_LIMIT, "LOGIN").penalty(4, now() + 3600)
                 .observeDevice(true).who(ip(), device, null).build());
         String recordOnly = ip();
-        push(SecurityIncidentEvent.builder(SecurityIncidentEvent.RATE_LIMIT, "LOGIN").penalty(1, now() + 60)
+        push(SecurityEvent.builder(SecurityEvent.RATE_LIMIT, "LOGIN").penalty(1, now() + 60)
                 .who(recordOnly, null, null).build());
 
         assertEquals(3, drainJob.drain().stored());
@@ -193,7 +226,7 @@ class SecurityIncidentPipelineTest {
         assertEquals(DeviceStatusEnum.OBSERVE, dispositionService.currentStatus(device));
         assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_list WHERE list_value = ?",
                 Integer.class, recordOnly));
-        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_incident WHERE client_ip = ?",
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_event WHERE client_ip = ?",
                 Integer.class, recordOnly));
     }
 
@@ -205,13 +238,13 @@ class SecurityIncidentPipelineTest {
         redis.opsForList().leftPush(ns + "queue", "{not json");
         push(honeypot(ip(), now() + 86400));
 
-        SecurityIncidentDrainJob.Result result = drainJob.drain();
+        SecurityEventDrainJob.Result result = drainJob.drain();
 
         assertEquals(2, result.stored());
         assertEquals(1, result.recovered());
         assertEquals(1, result.dropped());
         assertEquals(0L, redis.opsForList().size(ns + "processing"), "处理完的都要从「处理中」删掉");
-        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_incident WHERE client_ip = ?",
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_event WHERE client_ip = ?",
                 Integer.class, ip));
     }
 
@@ -283,20 +316,21 @@ class SecurityIncidentPipelineTest {
                 ns + "blocked:");
     }
 
-    private void push(SecurityIncidentEvent event) {
+    private void push(SecurityEvent event) {
         redis.opsForList().leftPush(ns + "queue", JsonUtils.toJson(event));
     }
 
-    private static SecurityIncidentEvent honeypot(String ip, long until) {
-        return SecurityIncidentEvent.builder(SecurityIncidentEvent.HONEYPOT, "ENV")
-                .action(SecurityIncidentEvent.ACTION_BLACK, until).penalty(null, until)
+    private static SecurityEvent honeypot(String ip, long until) {
+        return SecurityEvent.builder(SecurityEvent.HONEYPOT, "ENV")
+                .action(SecurityEvent.ACTION_BLACK, until).penalty(null, until)
                 .who(ip, null, null).request("GET", "/.env", "curl/8.5.0", "t-test")
-                .matched(SecurityIncidentEvent.FIELD_PATH, null, "/.env").build();
+                .matched(SecurityEvent.FIELD_PATH, null, "/.env").build();
     }
 
     private Map<String, Object> listRow(String value, int listType) {
         return jdbcTemplate.queryForMap("""
-                SELECT id, source, source_rule, hit_count, status, score, last_incident_id, blocked_count, revoke_operator,
+                SELECT id, source, source_rule, hit_count, status, score, last_event_id, last_incident_id, blocked_count,
+                       revoke_operator,
                        UNIX_TIMESTAMP(expire_time) AS exp
                   FROM t_security_list WHERE list_value = ? AND list_type = ?""", value, listType);
     }

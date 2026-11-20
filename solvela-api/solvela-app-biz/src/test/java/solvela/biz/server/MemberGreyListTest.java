@@ -23,12 +23,12 @@ import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.domain.SecurityListAddCmd;
 import solvela.member.risk.feature.DeviceTrustProvider;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
-import solvela.member.risk.security.SecurityIncidentStore;
+import solvela.member.risk.security.SecurityEventStore;
 import solvela.member.risk.security.SecurityListAdminService;
 import solvela.member.stepup.DeviceTrustStore;
 import solvela.member.stepup.MemberStepUpService;
 import solvela.security.GatewayRuleSnapshot;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 
 import java.time.Instant;
@@ -64,7 +64,7 @@ class MemberGreyListTest {
     private MemberStepUpService stepUpService;
 
     @Autowired
-    private SecurityIncidentStore incidentStore;
+    private SecurityEventStore eventStore;
 
     @Autowired
     private GatewaySnapshotPublisher snapshotPublisher;
@@ -88,7 +88,7 @@ class MemberGreyListTest {
     @AfterEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM t_security_list WHERE dimension = 4 AND list_value = ?", String.valueOf(memberId));
-        jdbcTemplate.update("DELETE FROM t_security_incident WHERE member_id = ?", memberId);
+        jdbcTemplate.update("DELETE FROM t_security_event WHERE member_id = ?", memberId);
         trustStore.revoke(memberId, null);
         trustStore.consumeFresh(memberId, deviceId);
         listCache.reload();
@@ -133,9 +133,9 @@ class MemberGreyListTest {
 
     @Test
     @DisplayName("事件要求拉灰会员 → 进会员灰名单（带分、带到期）；网关快照里有它")
-    void incidentGreysMemberAndSnapshotCarriesIt() {
+    void eventGreysMemberAndSnapshotCarriesIt() {
         long until = Instant.now().getEpochSecond() + 7 * 86400L;
-        boolean changed = incidentStore.store(SecurityIncidentEvent.builder(SecurityIncidentEvent.RATE_LIMIT, "REDEEM")
+        boolean changed = eventStore.store(SecurityEvent.builder(SecurityEvent.RATE_LIMIT, "REDEEM")
                 .penalty(4, until).who("198.51.100.78", null, memberId).greyMember(until).build());
         assertTrue(changed);
 

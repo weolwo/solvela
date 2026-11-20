@@ -19,7 +19,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import solvela.app.ratelimit.UnknownFieldReporter;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
 import java.net.ConnectException;
@@ -118,11 +118,11 @@ public class ApiExceptionHandler {
         if (unknown != null && unknown.getPropertyName() != null) {
             String field = unknown.getPropertyName();
             log.info("[API] {} {} -> 未知字段 {}", request.getMethod(), request.getRequestURI(),
-                    SecurityIncidentEvent.truncate(field, 64));
+                    SecurityEvent.truncate(field, 64));
             if (unknownFields != null) {
                 unknownFields.report(request, field);
             }
-            return build(ApiErrors.INVALID_ARGUMENT, "未知字段 " + SecurityIncidentEvent.truncate(field, 32));
+            return build(ApiErrors.INVALID_ARGUMENT, "未知字段 " + SecurityEvent.truncate(field, 32));
         }
         return build(ApiErrors.INVALID_ARGUMENT, ApiErrors.INVALID_ARGUMENT.defaultMessage());
     }

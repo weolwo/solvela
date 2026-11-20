@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 后台「安全事件」页（网关方案 §6.2、§6.4）：按 IP / 设备 / 会员 / 类型 / 时间查 {@code t_security_incident}。
+ * 后台「安全事件」页（网关方案 §6.2、§6.4）：按 IP / 设备 / 会员 / 类型 / 时间查 {@code t_security_event}。
  *
  * <h3>必须带时间范围</h3>
  * 表按月分区；不带时间就扫所有分区。不传时兜最近 7 天，一次最多 31 天。
@@ -24,7 +24,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-public class SecurityIncidentAdminService {
+public class SecurityEventAdminService {
 
     private static final Duration DEFAULT_WINDOW = Duration.ofDays(7);
 
@@ -33,12 +33,12 @@ public class SecurityIncidentAdminService {
     private final JdbcTemplate jdbcTemplate;
 
     /** 查询条件。都可空；时间范围不给时兜最近 7 天 */
-    public record Query(String clientIp, String deviceId, Long memberId, Integer incidentType, LocalDateTime from,
+    public record Query(String clientIp, String deviceId, Long memberId, Integer eventType, LocalDateTime from,
                         LocalDateTime to, long pageNum, long pageSize) {
     }
 
     /** 一行事件 */
-    public record Row(long id, int incidentType, String ruleCode, int action, int suppressReason, Integer penaltyLevel,
+    public record Row(long id, int eventType, String ruleCode, int action, int suppressReason, Integer penaltyLevel,
                       String clientIp, String deviceId, Long memberId, String httpMethod, String requestPath,
                       Integer matchedField, String matchedParam, String matchedSample, String userAgent,
                       LocalDateTime penaltyUntil, String traceId, LocalDateTime createTime) {
@@ -81,23 +81,23 @@ public class SecurityIncidentAdminService {
             where.append(" AND member_id = ?");
             args.add(q.memberId());
         }
-        if (q.incidentType() != null) {
-            where.append(" AND incident_type = ?");
-            args.add(q.incidentType());
+        if (q.eventType() != null) {
+            where.append(" AND event_type = ?");
+            args.add(q.eventType());
         }
         long pageNum = Math.max(1, q.pageNum());
         long pageSize = Math.min(100, Math.max(1, q.pageSize()));
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_incident" + where, Long.class,
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_security_event" + where, Long.class,
                 args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add((pageNum - 1) * pageSize);
         pageArgs.add(pageSize);
         List<Row> rows = jdbcTemplate.query("""
-                SELECT id, incident_type, rule_code, action, suppress_reason, penalty_level, client_ip, device_id,
+                SELECT id, event_type, rule_code, action, suppress_reason, penalty_level, client_ip, device_id,
                        member_id, http_method, request_path, matched_field, matched_param, matched_sample, user_agent,
                        penalty_until, trace_id, create_time
-                  FROM t_security_incident""" + where + " ORDER BY create_time DESC, id DESC LIMIT ?, ?",
-                (rs, i) -> new Row(rs.getLong("id"), rs.getInt("incident_type"), rs.getString("rule_code"),
+                  FROM t_security_event""" + where + " ORDER BY create_time DESC, id DESC LIMIT ?, ?",
+                (rs, i) -> new Row(rs.getLong("id"), rs.getInt("event_type"), rs.getString("rule_code"),
                         rs.getInt("action"), rs.getInt("suppress_reason"), (Integer) rs.getObject("penalty_level", Integer.class),
                         rs.getString("client_ip"), rs.getString("device_id"), (Long) rs.getObject("member_id", Long.class),
                         rs.getString("http_method"), rs.getString("request_path"),

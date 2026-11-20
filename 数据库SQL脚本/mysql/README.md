@@ -7,20 +7,20 @@
 ## 🔴 新环境部署：两个文件，按顺序
 
 ```
-mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（89 张表）
+mysql> SOURCE 数据库SQL脚本/mysql/schema-baseline.sql;   -- ① 建结构（90 张表）
 mysql> SOURCE 数据库SQL脚本/mysql/data-baseline.sql;     -- ② 灌种子数据（菜单/字典/权限等）
 ```
 
 跑完就能登录并正常使用。之后按需执行造数脚本（都可重复执行，见 `*造数*.sql`）。
 
-## ✅ 2026-10-16：空库执行已实测通过（注册 / 重置密码 / 资产出口 / 换绑接进风控引擎、规则表 +14 条后复跑）
+## ✅ 2026-11-20：空库执行已实测通过（安全事件改名 incident → event 后复跑，MySQL 8.4）
 
 ```
 tools/VerifyFreshInstall.java  ->  RESULT: PASS
-  schema-baseline.sql  ->  ok=178  fail=0
+  schema-baseline.sql  ->  ok=180  fail=0
   data-baseline.sql    ->  ok=49   fail=0
-  建表      89 张
-  种子数据  23 张表 / 590 行
+  建表      90 张
+  种子数据  23 张表 / 602 行
 ```
 
 这不是从文件里数出来的，是**在一个全新的空库上真的跑了一遍**的结果
@@ -37,16 +37,16 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 
 | 表 | 行数 | 缺了会怎样 |
 |---|---|---|
-| `t_menu` | 296 | 后台登录进去是空白 |
-| `t_role_menu` | 74 | 任何角色都看不到菜单 |
+| `t_menu` | 318 | 后台登录进去是空白 |
+| `t_role_menu` | 96 | 任何角色都看不到菜单 |
 | `t_employee` | 12 | 无法登录 |
 | `t_file_category` | 7 | 代码按 code 引用，缺了直接抛异常 |
-| `t_solvela_job` | 19 | 定时任务不会注册（含【基础】按月分区维护 —— 缺了它分区没人补，见文末）|
+| `t_solvela_job` | 23 | 定时任务不会注册（含【基础】按月分区维护 —— 缺了它分区没人补，见文末）|
 | `t_task_event` | 10 | 任务事件识别不了 |
 | `t_notification_template` | 12 | 发不出任何站内信，**而且不报错** |
 | `t_coupon_template` | 6 | 发出去的券没有面额/门槛，**而且不报错** |
 | `t_member_id_seq` | 1 | **第一个注册的用户就撞 -1000** |
-| `t_member_risk_rule` | 34 | 风控规则（登录 20 + 注册 4 + 重置 4 + 资产出口 3 + 换绑 3）。与上面几张相反：**缺了 app-biz 启动失败**（规则表与代码双向校验） |
+| `t_member_risk_rule` | 19 | 风控规则（登录 17 + 资产出口 1 + 换绑 1）。与上面几张相反：**缺了 app-biz 启动失败**（规则表与代码双向校验） |
 
 业务表（会员/活动/任务记录/流水/通知/公告）全部 0 行 —— 基线不带任何测试数据。
 
@@ -64,8 +64,8 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 
 | 文件 | 内容 | 不含 |
 |---|---|---|
-| `schema-baseline.sql` | 89 张表的结构 | 任何数据 |
-| `data-baseline.sql` | 23 张配置表、590 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
+| `schema-baseline.sql` | 90 张表的结构 | 任何数据 |
+| `data-baseline.sql` | 23 张配置表、602 行种子数据 | 会员/活动/任务记录/流水/日志/通知/公告/风控流水与名单等业务数据 |
 
 > ⚠️ `data-baseline.sql` 里的 `t_employee` 含 Argon2 密码哈希与手机号
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。

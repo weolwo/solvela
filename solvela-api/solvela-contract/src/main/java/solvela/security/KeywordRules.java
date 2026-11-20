@@ -37,7 +37,7 @@ public final class KeywordRules {
     /** 单次匹配的时间上限 */
     public static final long MATCH_BUDGET_NANOS = 20_000_000L;
 
-    /** 编码进日志与事件（{@code t_security_incident.rule_code} 宽 32） */
+    /** 编码进日志与事件（{@code t_security_event.rule_code} 宽 32） */
     private static final Pattern CODE = Pattern.compile("[A-Z0-9_]{1,32}");
 
     /** 规则作用在哪：请求参数（路径、查询串、JSON 请求体的值），或 {@code User-Agent} */

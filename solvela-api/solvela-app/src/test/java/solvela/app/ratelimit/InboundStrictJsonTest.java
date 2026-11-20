@@ -15,7 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 import solvela.app.config.InboundJsonConfig;
 import solvela.app.domain.MemberLoginRequest;
 import solvela.apptest.stub.ApiContractDownstreamStub;
-import solvela.security.SecurityIncidentEvent;
+import solvela.security.SecurityEvent;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -58,8 +58,8 @@ class InboundStrictJsonTest {
     static class TestQueue {
         @Bean
         @Primary
-        IncidentPublisher testIncidentPublisher(StringRedisTemplate redis) {
-            return new IncidentPublisher(redis, QUEUE);
+        SecurityEventPublisher testSecurityEventPublisher(StringRedisTemplate redis) {
+            return new SecurityEventPublisher(redis, QUEUE);
         }
     }
 
@@ -93,13 +93,13 @@ class InboundStrictJsonTest {
         List<String> queued = redis.opsForList().range(QUEUE, 0, -1);
         assertNotNull(queued);
         assertEquals(1, queued.size(), "撞上未知字段要记一条事件");
-        SecurityIncidentEvent event = JSON.readValue(queued.getFirst(), SecurityIncidentEvent.class);
-        assertEquals(SecurityIncidentEvent.UNKNOWN_FIELD, event.incidentType());
-        assertEquals(SecurityIncidentEvent.ACTION_RECORD, event.action(),
+        SecurityEvent event = JSON.readValue(queued.getFirst(), SecurityEvent.class);
+        assertEquals(SecurityEvent.UNKNOWN_FIELD, event.eventType());
+        assertEquals(SecurityEvent.ACTION_RECORD, event.action(),
                 "低置信：前后端版本错开时真人也会撞到，只记录、不拉名单");
         assertEquals(null, event.penaltyUntilEpochSec(), "不处罚");
         assertEquals("phoneNum", event.matchedParam());
-        assertEquals(SecurityIncidentEvent.FIELD_BODY, event.matchedField());
+        assertEquals(SecurityEvent.FIELD_BODY, event.matchedField());
         assertEquals("/auth/register", event.requestPath());
     }
 
