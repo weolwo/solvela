@@ -3,6 +3,7 @@ package solvela.dispatch.outbox;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import solvela.event.UserPrizeEvent;
 
 /**
@@ -42,8 +43,21 @@ public class LocalPrizeEventPublisher implements PrizeEventPublisher {
 
     private final ApplicationEventPublisher applicationEventPublisher;
 
+    /**
+     * 🔴 事务外直接抛。这条前提此前只写在 {@link PrizeEventPublisher#publish} 的注释里：
+     * 事务外 publish 的事件不会触发 {@code AFTER_COMMIT} 监听器，奖静默不发、没有任何日志。
+     * 抛出来的话，调用方的事务（如果外层还有）会回滚，至少「判了中奖、奖没发」不会悄悄成立。
+     *
+     * <p>两个条件都要：{@code @TransactionalEventListener} 只在「有同步注册 + 有真实事务」时才挂得上，
+     * 只有同步、没有真实事务（{@code SUPPORTS} 传播）时它同样不投递。
+     */
     @Override
     public void publish(UserPrizeEvent event) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()
+                || !TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("发奖事件必须在业务事务内发布，否则 AFTER_COMMIT 监听器不会触发、奖静默不发。sourceBizId="
+                    + event.getSourceBizId() + ", prizeCode=" + event.getPrizeCode());
+        }
         applicationEventPublisher.publishEvent(event);
     }
 }

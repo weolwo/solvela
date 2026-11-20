@@ -30,6 +30,8 @@ public interface PrizeEventPublisher {
      * {@code @TransactionalEventListener(AFTER_COMMIT)} 上，而它<b>没有</b>开
      * {@code fallbackExecution}。在事务外 publish 的事件根本不会触发监听器 ——
      * 表现是<b>奖静默地不发</b>：没有异常、没有日志、流水停在原地。
+     * {@link LocalPrizeEventPublisher} 在事务外会直接抛 {@link IllegalStateException}，
+     * 由 {@code LocalPrizeEventPublisherTest} 钉住；将来加的实现也要守这一条。
      *
      * <p>本方法<b>不保证</b>派发已经完成，只保证「事务提交之后会派发」。
      * 「提交了、进程在派发前挂了」这个窗口它不覆盖，见 {@link LocalPrizeEventPublisher}。
