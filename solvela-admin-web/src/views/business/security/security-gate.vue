@@ -218,7 +218,7 @@
   } from '/@/constants/business/security/security-const';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
 
-  /** 后端 KeywordRules.CODE：进日志与 t_security_incident.rule_code（宽 32） */
+  /** 后端 KeywordRules.CODE：进日志与 t_security_event.rule_code（宽 32） */
   const CODE_PATTERN = /^[A-Z0-9_]{1,32}$/;
 
   const honeypotColumns = [

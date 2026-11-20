@@ -2,7 +2,7 @@ import Antd from 'ant-design-vue';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
-import SecurityIncidentList from '../security-incident-list.vue';
+import SecurityEventList from '../security-event-list.vue';
 
 /**
  * 安全事件页（网关方案 §6.4、任务 T13 的验收）。
@@ -21,12 +21,12 @@ const EVIL_SAMPLE = '<script>window.__pwned = true</script>';
 
 vi.mock('/@/api/business/security/security-api', () => ({
   securityApi: {
-    queryIncidentPage: () =>
+    queryEventPage: () =>
       Promise.resolve({
         list: [
           {
             id: 1,
-            incidentType: 3,
+            eventType: 3,
             ruleCode: 'XSS_SCRIPT',
             action: 2,
             suppressReason: 0,
@@ -58,7 +58,7 @@ const global = {
 };
 
 async function mountPage() {
-  const w = mount(SecurityIncidentList, { global, attachTo: document.body });
+  const w = mount(SecurityEventList, { global, attachTo: document.body });
   await new Promise((resolve) => setTimeout(resolve, 0));
   await w.vm.$nextTick();
   return w;

@@ -113,7 +113,7 @@ export const securityApi = {
    *
    * 🔴 返回的 matchedSample、userAgent 是**攻击者可控的内容** —— 只能按纯文本渲染。
    */
-  queryIncidentPage: (param) => {
-    return postRequest('/security/incident/queryPage', param);
+  queryEventPage: (param) => {
+    return postRequest('/security/event/queryPage', param);
   },
 };

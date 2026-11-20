@@ -2,7 +2,7 @@
  * 安全中心的枚举：名单、安全事件、限流规则、处罚。**与后端一一对应，取值不能自己改**。
  *
  * 后端：SecurityListTypeEnum / SecurityListDimensionEnum / SecurityListStatusEnum、
- *      SecurityIncidentEvent（事件的类型、处置、压下原因、命中位置）、t_rate_limit_rule（维度、档位）
+ *      SecurityEvent（事件的类型、处置、压下原因、命中位置）、t_rate_limit_rule（维度、档位）
  *
  * 风控规则、决策流水、看板的枚举仍在 member/risk-const.js（那是会员域的登录风控）。
  *
@@ -58,7 +58,7 @@ export const SECURITY_LIST_SOURCE_RULE_ENUM = {
 
 // ---------------------------------------------------------------- 安全事件
 
-export const SECURITY_INCIDENT_TYPE_ENUM = {
+export const SECURITY_EVENT_TYPE_ENUM = {
   HONEYPOT: { value: 1, desc: '蜜罐接口', color: 'volcano' },
   CANARY: { value: 2, desc: '蜜罐账号', color: 'red' },
   KEYWORD: { value: 3, desc: '关键字', color: 'magenta' },
@@ -67,17 +67,17 @@ export const SECURITY_INCIDENT_TYPE_ENUM = {
   UNKNOWN_FIELD: { value: 5, desc: '未知字段', color: 'default' },
 };
 
-export const SECURITY_INCIDENT_TYPE_OPTIONS = optionsOf(SECURITY_INCIDENT_TYPE_ENUM);
+export const SECURITY_EVENT_TYPE_OPTIONS = optionsOf(SECURITY_EVENT_TYPE_ENUM);
 
 /** 实际对 IP 做了什么 */
-export const SECURITY_INCIDENT_ACTION_ENUM = {
+export const SECURITY_EVENT_ACTION_ENUM = {
   RECORD: { value: 0, desc: '仅记录', color: 'default' },
   GREY: { value: 1, desc: '拉灰', color: 'orange' },
   BLACK: { value: 2, desc: '拉黑', color: 'red' },
 };
 
 /** 处罚被哪道保险压下了 */
-export const SECURITY_INCIDENT_SUPPRESS_ENUM = {
+export const SECURITY_EVENT_SUPPRESS_ENUM = {
   NONE: { value: 0, desc: '—', color: 'default' },
   CROSS_SITE: { value: 1, desc: '跨站发起', color: 'blue' },
   BREAKER: { value: 2, desc: '熔断中', color: 'purple' },
@@ -85,7 +85,7 @@ export const SECURITY_INCIDENT_SUPPRESS_ENUM = {
 };
 
 /** 命中位置 */
-export const SECURITY_INCIDENT_FIELD_ENUM = {
+export const SECURITY_EVENT_FIELD_ENUM = {
   UA: { value: 1, desc: 'UA' },
   PATH: { value: 2, desc: '路径' },
   QUERY: { value: 3, desc: '查询参数' },
