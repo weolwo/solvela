@@ -6,6 +6,7 @@ import solvela.base.json.serializer.enumeration.EnumSerialize;
 import solvela.web.swagger.SchemaEnum;
 import solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -39,7 +40,7 @@ public class SolvelaJobLogVO {
     private Integer retrySeq;
 
     @Schema(description = "业务日期")
-    private java.time.LocalDate bizDate;
+    private LocalDate bizDate;
 
     @Schema(description = "本次是哪条记录的重试")
     private Long retryOfLogId;

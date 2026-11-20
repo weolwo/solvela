@@ -1,6 +1,7 @@
 package solvela.admin.module.system.datascope;
 
 import jakarta.annotation.Resource;
+import org.apache.ibatis.executor.Executor;
 import solvela.admin.module.system.datascope.domain.DataScopeSqlConfig;
 import solvela.admin.module.system.datascope.service.DataScopeSqlConfigService;
 import org.apache.commons.lang3.StringUtils;
@@ -29,7 +30,7 @@ import java.util.HashMap;
  * @Email lab1024@163.com
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
-@Intercepts({@Signature(type = org.apache.ibatis.executor.Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})})
+@Intercepts({@Signature(type = Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})})
 @Component
 public class MyBatisPlugin implements Interceptor {
 

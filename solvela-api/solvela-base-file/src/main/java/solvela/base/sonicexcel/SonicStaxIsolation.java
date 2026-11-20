@@ -1,5 +1,6 @@
 package solvela.base.sonicexcel;
 
+import java.util.function.Supplier;
 import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
@@ -76,7 +77,7 @@ public final class SonicStaxIsolation {
                 && probe(() -> XMLEventFactory.newFactory().getClass().getName()).startsWith("com.sun.xml.internal.");
     }
 
-    private static String probe(java.util.function.Supplier<String> supplier) {
+    private static String probe(Supplier<String> supplier) {
         try {
             return supplier.get();
         } catch (Throwable t) {

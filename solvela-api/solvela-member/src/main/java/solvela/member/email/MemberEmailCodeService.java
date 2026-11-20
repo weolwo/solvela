@@ -1,5 +1,7 @@
 package solvela.member.email;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -68,7 +70,7 @@ public class MemberEmailCodeService {
      *
      * <p>{@code @RequiredArgsConstructor} 不便带 {@code @Qualifier}，故走字段注入。
      */
-    @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
+    @Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
     private AsyncTaskExecutor emailSendExecutor;
 
     /**
@@ -81,7 +83,7 @@ public class MemberEmailCodeService {
      * 他会以为这个开关不生效、转头去别处找原因 —— 而真正的问题
      * （生产配置文件里躺着一个危险开关）没有任何人知道。
      */
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     void checkTransport() {
         if (properties.getEmailTransport() != VerificationCodeProperties.Transport.LOG) {
             return;

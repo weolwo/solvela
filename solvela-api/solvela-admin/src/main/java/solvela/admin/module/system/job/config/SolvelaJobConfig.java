@@ -1,5 +1,7 @@
 package solvela.admin.module.system.job.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Data;
 import solvela.admin.module.system.job.constant.SolvelaJobRoleEnum;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -145,7 +147,7 @@ public class SolvelaJobConfig {
      *
      * <p>⚠️ 只能配在 yaml 里，<b>后台不可维护</b> —— 白名单若能在后台改，它就不是闸门了。
      */
-    private java.util.List<String> httpAllowHosts = new java.util.ArrayList<>();
+    private List<String> httpAllowHosts = new ArrayList<>();
 
     // ⚠️ dbRefreshEnabled / dbRefreshInterval 已删除：
     //    那是「定时全表轮询数据库刷新内存 Trigger」时代的配置。

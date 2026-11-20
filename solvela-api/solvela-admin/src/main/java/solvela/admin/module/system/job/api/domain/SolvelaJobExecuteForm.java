@@ -2,6 +2,7 @@ package solvela.admin.module.system.job.api.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 
@@ -29,7 +30,7 @@ public class SolvelaJobExecuteForm {
      * 没有这个字段根本表达不了，只能改系统时间或手改数据。
      */
     @Schema(description = "业务日期|可选，用于补跑历史日期")
-    private java.time.LocalDate bizDate;
+    private LocalDate bizDate;
 
     @Schema(hidden = true)
     private String updateName;

@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -34,7 +35,7 @@ public class MemberTraceFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain chain) throws ServletException, java.io.IOException {
+                                    FilterChain chain) throws ServletException, IOException {
         Long memberId = MemberContract.sanitize(request.getHeader(MemberContract.HEADER));
         if (memberId == null) {
             // 匿名接口（登录、注册、发码）本来就没有会员号 —— 这是常态，不绑定就行

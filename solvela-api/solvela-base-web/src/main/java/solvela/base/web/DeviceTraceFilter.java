@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -45,7 +46,7 @@ public class DeviceTraceFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain chain) throws ServletException, java.io.IOException {
+                                    FilterChain chain) throws ServletException, IOException {
         String deviceId = DeviceContract.sanitize(request.getHeader(DeviceContract.HEADER));
         if (deviceId == null) {
             // 不绑定：MDC 里没有这个键，DeviceTrace.id() 返回 null，下游按「没有设备」处理。

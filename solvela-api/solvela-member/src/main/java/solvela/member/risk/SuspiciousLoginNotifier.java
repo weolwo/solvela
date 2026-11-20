@@ -1,5 +1,6 @@
 package solvela.member.risk;
 
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,7 +71,7 @@ public class SuspiciousLoginNotifier {
     private final RedisService redisService;
 
     /** 发信线程池。容器里有多个 AsyncTaskExecutor，按名字精确注入 —— 同 {@code NewDeviceLoginNotifier} */
-    @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
+    @Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
     private AsyncTaskExecutor sendExecutor;
 
     /**

@@ -1,5 +1,6 @@
 package solvela.member.sms;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -109,7 +110,7 @@ public class MemberSmsCodeService {
      * 于是「配错了但没人发现」可以持续很久 —— 邮件至少还会有人问「怎么没收到信」，
      * 而短信在 LOG 模式下连账单都不会异常。
      */
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     void checkTransport() {
         if (properties.getSmsTransport() != VerificationCodeProperties.Transport.LOG) {
             // 🔴 反过来的那一半：配了 REAL，却根本没接厂商。

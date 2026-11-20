@@ -1,5 +1,6 @@
 package solvela.base.module.redis;
 
+import org.redisson.codec.SmileJackson3Codec;
 import solvela.base.util.SolvelaStringUtil;
 import org.redisson.config.Config;
 import org.redisson.spring.starter.RedissonAutoConfigurationCustomizer;
@@ -32,7 +33,7 @@ public class RedissonPasswordConfigurationCustomizer implements RedissonAutoConf
         // ⚠️ 用 SmileJackson3Codec 而不是 SmileJacksonCodec：后者是 Jackson 2 的实现，
         // 而 Spring Boot 4 全线已是 Jackson 3（tools.jackson），用旧的等于在运行包里
         // 多养一整套 Jackson 2（2.36MB）。Smile 是格式规范，两代实现产出的字节流一致。
-        configuration.setCodec(new org.redisson.codec.SmileJackson3Codec());
+        configuration.setCodec(new SmileJackson3Codec());
 
         // 2. 修复原代码因为调用废弃 API 导致无限打印警告的 Bug
         // ==========================================

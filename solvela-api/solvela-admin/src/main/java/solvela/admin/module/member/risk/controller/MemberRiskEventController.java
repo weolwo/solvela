@@ -3,6 +3,7 @@ package solvela.admin.module.member.risk.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -82,8 +83,8 @@ public class MemberRiskEventController {
 
     /** 详情的入参。两个字段缺一不可，所以不用 query string */
     public record MemberRiskEventDetailForm(
-            @jakarta.validation.constraints.NotNull(message = "id 不能为空") Long id,
-            @jakarta.validation.constraints.NotNull(message = "createTime 不能为空（分区裁剪要它）")
+            @NotNull(message = "id 不能为空") Long id,
+            @NotNull(message = "createTime 不能为空（分区裁剪要它）")
             LocalDateTime createTime) {
     }
 

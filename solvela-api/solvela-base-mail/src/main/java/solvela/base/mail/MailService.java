@@ -1,6 +1,7 @@
 package solvela.base.mail;
 
 
+import jakarta.annotation.PostConstruct;
 import solvela.exception.BusinessException;
 import solvela.base.util.SolvelaCollectionUtil;
 import solvela.base.util.SolvelaRandomUtil;
@@ -82,7 +83,7 @@ public class MailService {
      * <p>只在「已经配了 SMTP 用户名」时才检查：没配 SMTP 是合法状态
      * （发信功能没开），那种情况下 From 为空是正常的，不该拦启动。
      */
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     void checkFromAddress() {
         validateFrom(smtpUsername, clientMail);
     }

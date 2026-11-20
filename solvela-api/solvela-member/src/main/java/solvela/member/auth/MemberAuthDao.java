@@ -3,6 +3,7 @@ package solvela.member.auth;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import solvela.member.Member;
 
 /**
@@ -133,7 +134,7 @@ public interface MemberAuthDao {
      * <p>唯一约束 {@code uk_mbr_phone_hash} 会拦住「绑一个别人已经绑了的号」，
      * 那条异常由调用方翻译成 PHONE_TAKEN。
      */
-    @org.apache.ibatis.annotations.Update("""
+    @Update("""
             UPDATE t_member
                SET phone = #{phoneCipher}, phone_hash = UNHEX(#{phoneHashHex}), update_time = NOW()
              WHERE member_id = #{memberId}
@@ -165,7 +166,7 @@ public interface MemberAuthDao {
      * <p>唯一约束 {@code uk_mbr_email_hash} 会拦住「绑一个别人已经绑了的邮箱」——
      * 查重只是提前给一句人话，真正的防线是它。
      */
-    @org.apache.ibatis.annotations.Update("""
+    @Update("""
             UPDATE t_member
                SET email = #{emailCipher}, email_hash = UNHEX(#{emailHashHex}), update_time = NOW()
              WHERE member_id = #{memberId}
@@ -181,7 +182,7 @@ public interface MemberAuthDao {
      * 改了密码就自动解冻，那正是 {@code PasswordResetFailReason.ACCOUNT_UNAVAILABLE}
      * 要在上游拦住的事。
      */
-    @org.apache.ibatis.annotations.Update("""
+    @Update("""
             UPDATE t_member
                SET password = #{password}, update_time = NOW()
              WHERE member_id = #{memberId}

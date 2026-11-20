@@ -1,5 +1,6 @@
 package solvela.member.auth;
 
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -95,7 +96,7 @@ public class NewDeviceLoginNotifier {
     private static final long REGISTRATION_DEVICE_TTL_SECONDS = 400L * 24 * 3600;
 
     /** 发信线程池。容器里有多个 AsyncTaskExecutor，按名字精确注入，理由同 MemberEmailCodeService */
-    @jakarta.annotation.Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
+    @Resource(name = EmailSendExecutorConfig.EMAIL_SEND_EXECUTOR)
     private AsyncTaskExecutor sendExecutor;
 
     /** 总开关：误发成灾时的回退，不用发版 */

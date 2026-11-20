@@ -2,6 +2,7 @@ package solvela.base.sonicexcel.meta;
 
 import solvela.base.sonicexcel.converter.SonicConverter;
 
+import java.lang.reflect.AnnotatedElement;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -33,7 +34,7 @@ public record ColumnMeta(
         boolean forceText,
         Class<?> javaType,
         String fieldName,
-        java.lang.reflect.AnnotatedElement element,
+        AnnotatedElement element,
         Function<Object, Object> getter,
         BiConsumer<Object, Object> setter,
         int componentIndex,

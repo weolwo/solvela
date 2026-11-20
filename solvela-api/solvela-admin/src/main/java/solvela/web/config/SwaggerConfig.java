@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.constant.RequestHeaderConst;
+import solvela.base.constant.SwaggerWhitelistConst;
 import solvela.web.swagger.SolvelaOperationCustomizer;
 import solvela.base.constant.SwaggerTagConst;
 import org.apache.commons.lang3.StringUtils;
@@ -60,7 +61,7 @@ public class SwaggerConfig {
      * 而生产包里没有它们。保留这个别名只为兼容外部引用。
      */
     @Deprecated
-    public static final String[] SWAGGER_WHITELIST = solvela.base.constant.SwaggerWhitelistConst.SWAGGER_WHITELIST;
+    public static final String[] SWAGGER_WHITELIST = SwaggerWhitelistConst.SWAGGER_WHITELIST;
 
     @Bean
     public OpenAPI api() {

@@ -1,6 +1,7 @@
 package solvela.admin.module.system.job.api.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import lombok.Data;
 
 /**
@@ -42,7 +43,7 @@ public class SolvelaJobHandlerVO {
      * 参数声明，供后台渲染表单 —— 替掉「运营在文本框里手填 JSON」
      */
     @Schema(description = "参数声明列表")
-    private java.util.List<ParamSchema> paramSchemaList;
+    private List<ParamSchema> paramSchemaList;
 
     @lombok.Data
     public static class ParamSchema {
@@ -63,6 +64,6 @@ public class SolvelaJobHandlerVO {
         private String defaultValue;
 
         @Schema(description = "ENUM 类型的候选项")
-        private java.util.List<String> options;
+        private List<String> options;
     }
 }
