@@ -65,7 +65,7 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
                 try {
                     // 获取接口的 handle 方法
                     Method handleMethod = targetClass.getMethod("handle", BaseBizEvent.class);
-                    routeTable.put(classRoute.value(), new RouteTarget(bean, handleMethod));
+                    register(classRoute.value(), new RouteTarget(bean, handleMethod));
                     log.info("【事件路由】加载 [类级别] 分类: {} -> {}", classRoute.value(), targetClass.getSimpleName());
                 } catch (NoSuchMethodException e) {
                     // 启动期就失败：只打日志的话进程照常起来，这个分类的事件此后全部「无人处理」，没有任何报错
@@ -80,11 +80,27 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
             ReflectionUtils.doWithMethods(targetClass, method -> {
                 EventRoute methodRoute = AnnotationUtils.findAnnotation(method, EventRoute.class);
                 if (methodRoute != null) {
-                    routeTable.put(methodRoute.value(), new RouteTarget(bean, method));
+                    register(methodRoute.value(), new RouteTarget(bean, method));
                     log.info("【事件路由】加载 [方法级别] 分类: {} -> {}#{}", methodRoute.value(), targetClass.getSimpleName(), method.getName());
                 }
             });
         }
+    }
+
+    /**
+     * 🔴 同一分类只许一个处理器，重复即启动失败（{@code GlobalEventDispatcherTest} 钉住）。
+     * 以前是 {@code put} 直接覆盖：哪个生效取决于 bean 的遍历顺序，换个版本处理方就悄悄变了。
+     */
+    private void register(EventCategoryEnum category, RouteTarget target) {
+        RouteTarget existed = routeTable.putIfAbsent(category, target);
+        if (existed != null) {
+            throw new IllegalStateException("事件分类 " + category + " 注册了两个处理器: "
+                    + describe(existed) + " 与 " + describe(target));
+        }
+    }
+
+    private static String describe(RouteTarget target) {
+        return AopUtils.getTargetClass(target.bean).getName() + "#" + target.method.getName();
     }
 
     /**
