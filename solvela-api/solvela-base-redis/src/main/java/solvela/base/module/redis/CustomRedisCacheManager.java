@@ -112,7 +112,9 @@ public class CustomRedisCacheManager extends RedisCacheManager {
      * 从 cacheName 中解析 TTL
      *
      * @param name 缓存名称，格式如：users#10m, products#2h, config#-1（永久）
-     * @return 解析出的 Duration若无效则返回 null；若为 -1，则返回 Duration.ofMillis(-1) 表示永久缓存
+     * @return 解析出的 Duration；没有 TTL 段（或解析出不足 1 秒）返回 null，由调用方用默认值；
+     *         若为 -1，则返回 Duration.ofMillis(-1) 表示永久缓存
+     * @throws IllegalStateException TTL 段写错（如 {@code users#10mn}）
      */
     private Duration parseTtlFromCacheName(String name) {
         if (SolvelaStringUtil.isBlank(name)) {
@@ -138,8 +140,11 @@ public class CustomRedisCacheManager extends RedisCacheManager {
             Duration ttl = DurationStyle.detectAndParse(ttlStr);
             return ttl.getSeconds() > 0 ? ttl : null;
         } catch (IllegalArgumentException e) {
-            log.error("解析缓存 TTL 失败，cacheName='{}', ttl='{}', 错误: {}", name, ttlStr, e);
-            return null;
+            // 🔴 不吞成默认 TTL：写错的 @Cacheable 会静默按 7 天走，而「缓存怎么一直不过期」最难查。
+            // 与网关 AppCacheConfig.TtlInNameCacheManager 同一口径；CustomRedisCacheManagerTest 钉住
+            throw new IllegalStateException(
+                    "缓存名 '" + name + "' 的 TTL 段 '" + ttlStr + "' 解析失败，"
+                            + "格式见 DurationStyle（如 30m / 2h / 7d / -1 表示永久）", e);
         }
     }
 }
