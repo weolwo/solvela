@@ -108,8 +108,13 @@ class MemberRiskStatTest {
         long challenged = insertEvent(MemberRiskDecisionEnum.OTP, MemberRiskDecisionEnum.OTP,
                 MemberRiskOutcomeEnum.CHALLENGED, 1, 0, 0);
         insertVerifyEvent(challenged);
-        // 一张「窗口之前签的票」的验码：ref 指向一个不在窗口里的 id
-        insertVerifyEvent(1L);
+        /*
+         * 一张「窗口之前签的票」的验码：票是一天前签的，验码发生在窗口内。
+         * ⚠️ 以前这里写的是 ref = 1，假设 id 为 1 的那行早就在窗口外 —— 在攒了很久数据的开发库里成立，
+         *    在一个全新的库里 id 1 恰好是本类几秒钟前刚插的那行，于是落在窗口内，用例就红了。
+         *    前提要自己造出来，不能靠库里碰巧有什么。
+         */
+        insertVerifyEvent(insertChallengedDaysAgo(1));
 
         MemberRiskStatDTO.OtpFunnel after = riskAdminService.stat(from(), to()).getOtpFunnel();
 
@@ -167,6 +172,18 @@ class MemberRiskStatTest {
                   (event_type, member_id, decision, shadow_decision, outcome, create_time)
                 VALUES (1, ?, 1, 1, 3, NOW())
                 """, memberId);
+    }
+
+    /** 一条签发于 {@code days} 天前的核身挑战（不在 from()..to() 窗口里），返回它的 id */
+    private long insertChallengedDaysAgo(int days) {
+        jdbcTemplate.update("""
+                INSERT INTO t_member_risk_event
+                  (event_type, member_id, device_trust, ip_familiar, dormant,
+                   decision, shadow_decision, outcome, create_time)
+                VALUES (1, ?, 1, 0, 0, ?, ?, ?, NOW() - INTERVAL ? DAY)
+                """, memberId, MemberRiskDecisionEnum.OTP.getValue(), MemberRiskDecisionEnum.OTP.getValue(),
+                MemberRiskOutcomeEnum.CHALLENGED.getValue(), days);
+        return lastId();
     }
 
     private void insertVerifyEvent(long refEventId) {
