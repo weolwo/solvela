@@ -19,7 +19,6 @@ import solvela.base.mail.MailService;
 import solvela.base.mail.MailTemplateCodeEnum;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiHasher;
-import solvela.exception.BusinessException;
 import solvela.member.api.EmailCodeFailReason;
 import solvela.member.api.EmailCodeScene;
 import solvela.member.api.EmailCodeSendResult;
@@ -204,7 +203,7 @@ class MemberEmailCodeServiceTest {
     @DisplayName("🔴 发信失败 → 把刚存的码删掉，否则用户收不到信还被冷却挡住")
     void 发信失败要清掉码() {
         captureSets();
-        doThrow(new BusinessException("邮件发送失败")).when(mailService).sendMail(any(), any(), any());
+        doThrow(new IllegalStateException("邮件发送失败: LOGIN_VERIFICATION_CODE")).when(mailService).sendMail(any(), any(), any());
 
         EmailCodeSendResult r = service.send(EmailCodeScene.LOGIN, EMAIL, "10.0.0.1");
 

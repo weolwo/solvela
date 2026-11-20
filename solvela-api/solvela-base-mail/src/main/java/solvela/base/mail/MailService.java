@@ -7,10 +7,10 @@ import solvela.base.util.SolvelaRandomUtil;
 import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
+import freemarker.template.TemplateException;
 import jakarta.annotation.Resource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import lombok.extern.slf4j.Slf4j;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.util.SolvelaTemplateUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 import solvela.base.util.SolvelaStringUtil;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.List;
@@ -40,7 +41,6 @@ import java.util.Map;
  * @Email lab1024@163.com
  * @Copyright <a href="https://1024lab.net">1024创新实验室</a> ，Since 2012
  */
-@Slf4j
 @Component
 public class MailService {
 
@@ -122,20 +122,23 @@ public class MailService {
 
         String content = null;
         if (MailTemplateTypeEnum.FREEMARKER.name().equalsIgnoreCase(mailTemplateEntity.getTemplateType().trim())) {
-            content = freemarkerResolverContent(mailTemplateEntity.getTemplateContent(), templateParamsMap);
+            content = freemarkerResolverContent(templateCode, mailTemplateEntity.getTemplateContent(), templateParamsMap);
         } else if (MailTemplateTypeEnum.STRING.name().equalsIgnoreCase(mailTemplateEntity.getTemplateType().trim())) {
             content = stringResolverContent(mailTemplateEntity.getTemplateContent(), templateParamsMap);
         } else {
             throw new BusinessException("模版类型不存在");
         }
 
+        /*
+         * 🔴 投递失败（SMTP 连不上、认证失败、收件地址被拒）是系统故障，不包成 BusinessException ——
+         * 后者默认是用户级 PARAM_ERROR，会和「用户填错了」记在同一条曲线上，而且以前连 cause 都没挂。
+         * 这里只带上原因往外抛：同步调用方（管理端登录发码）由全局处理器按 500 记录并带 traceId，
+         * 异步调用方（会员验证码、新设备 / 可疑登录提醒）各自 catch 并落日志。
+         */
         try {
-
             this.sendMail(mailTemplateEntity.getTemplateSubject(), content, fileList, receiverUserList, true);
-
-        } catch (Throwable e) {
-            log.error("邮件发送失败", e);
-            throw new BusinessException("邮件发送失败");
+        } catch (MessagingException | RuntimeException e) {
+            throw new IllegalStateException("邮件发送失败: " + templateCode, e);
         }
     }
 
@@ -202,9 +205,13 @@ public class MailService {
 
 
     /**
-     * 使用 freemarker 生成最终内容
+     * 使用 freemarker 生成最终内容。
+     *
+     * <p>🔴 渲染失败直接抛，不退回空串：以前退回 {@code ""}，再被下游「邮件内容不能为空」拦下，
+     * 最后对外只剩一句「邮件发送失败」—— 模板写错这个真正的原因被盖掉了，而且被算成了用户级错误。
      */
-    private String freemarkerResolverContent(String htmlTemplate, Map<String, Object> templateParamsMap) {
+    private String freemarkerResolverContent(MailTemplateCodeEnum templateCode, String htmlTemplate,
+                                             Map<String, Object> templateParamsMap) {
         Configuration configuration = new Configuration(Configuration.VERSION_2_3_23);
         StringTemplateLoader stringLoader = new StringTemplateLoader();
         String templateName = SolvelaRandomUtil.simpleUuid();
@@ -215,9 +222,8 @@ public class MailService {
             Writer out = new StringWriter(2048);
             template.process(templateParamsMap, out);
             return out.toString();
-        } catch (Throwable e) {
-            log.error("freemarkerResolverContent error: ", e);
+        } catch (IOException | TemplateException e) {
+            throw new IllegalStateException("邮件模板渲染失败: " + templateCode, e);
         }
-        return "";
     }
 }
