@@ -325,8 +325,9 @@ public class FileAssetService {
      *
      * <p><b>两种 URL 形态都要认</b>，因为它们都是本模块自己生成的：
      * <ul>
-     *   <li>{@code /file/download/123} —— 私有文件或没配公开前缀时</li>
-     *   <li>{@code https://cdn.x.com/banner/202608/10/abc.png?x-oss-process=...} —— 公开文件</li>
+     *   <li>{@code /support/file/download/123} —— 没配公开前缀时（修前生成的 {@code /file/download/123} 同样认，
+     *       见 {@link #DOWNLOAD_PATH_MATCH}）</li>
+     *   <li>{@code https://cdn.x.com/banner/202608/10/abc.png?x-oss-process=...} —— 配了公开前缀时</li>
      * </ul>
      *
      * <p>从 URL 还原 storageKey 的做法是<b>取末尾若干段路径</b>而不是去剥前缀 ——

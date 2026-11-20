@@ -14,9 +14,11 @@ import java.util.List;
  * 中奖派奖：把核销出的中奖记录投递进公共派发链路。
  *
  * <h3>为什么与核销分开，而不是核销时顺手 publish</h3>
- * 一期可能有几千个中奖者。{@code GlobalEventDispatcher.dispatch} 现在挂着 {@code @Async}
- * 走有界线程池，在核销事务里逐条 publish 会直接把队列打满。
- * 拆成独立的分页任务后，投递节奏可控，核销事务也短。
+ * 一期可能有几千个中奖者。{@code GlobalEventDispatcher.dispatch} 不是 {@code @Async}，而是在
+ * {@code AFTER_COMMIT} 里把处理器显式提交给 {@code AsyncConfig} 的公共线程池 ——
+ * ⚠️ 那个池的队列是<b>无界</b>的（原因见 {@code TaskEventExecutorConfig} 类注释），而且抽奖派奖也在用它。
+ * 在核销事务里逐条 publish，提交那一刻几千个任务一次性压进队列：不会被拒，
+ * 而是堆在内存里、排在抽奖派奖前面。拆成独立的分页任务后，投递节奏可控，核销事务也短。
  *
  * <h3>为什么要 dispatch_status 列，而不是靠唯一索引拦重复</h3>
  * {@code t_prize_log.uk_external_biz} 确实能拦住重复派发，但那是<b>基于异常</b>的去重 ——
