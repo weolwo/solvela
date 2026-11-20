@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 
 import java.time.LocalDateTime;
@@ -78,8 +79,7 @@ public class Announcement {
      */
     private LocalDateTime expireTime;
 
-    /** 1-发布 0-下架 */
-    private Integer status;
+    private AnnouncementStatusEnum status;
 
     private String createBy;
 

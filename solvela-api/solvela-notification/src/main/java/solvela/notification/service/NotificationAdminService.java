@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.Announcement;
 import solvela.notification.NotificationTemplate;
@@ -229,7 +230,7 @@ public class NotificationAdminService {
     }
 
     /**
-     * 下架一条公告（{@code status = 0}）。
+     * 下架一条公告。
      *
      * <p>不物理删除：{@code t_announcement_ack} 里可能有它的确认记录，
      * 而那是合规留痕。真要清理走 {@link #deleteAnnouncement}。
@@ -237,7 +238,7 @@ public class NotificationAdminService {
     public void offlineAnnouncement(Long id) {
         Announcement update = new Announcement();
         update.setId(id);
-        update.setStatus(0);
+        update.setStatus(AnnouncementStatusEnum.OFFLINE);
         announcementDao.updateById(update);
     }
 

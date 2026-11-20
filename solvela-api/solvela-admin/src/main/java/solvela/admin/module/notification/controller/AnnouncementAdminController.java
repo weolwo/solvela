@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.admin.module.notification.domain.form.AnnouncementSaveForm;
+import solvela.admin.module.notification.domain.vo.AnnouncementVO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.notification.Announcement;
 import solvela.notification.service.NotificationAdminService;
 import solvela.web.RequiresPermission;
@@ -46,21 +49,22 @@ public class AnnouncementAdminController {
     @Operation(summary = "公告列表，新的在前")
     @GetMapping("/list")
     @RequiresPermission("announcement:query")
-    public List<Announcement> list(@RequestParam(required = false) Integer limit) {
-        return notificationAdminService.listAnnouncements(limit);
+    public List<AnnouncementVO> list(@RequestParam(required = false) Integer limit) {
+        return SolvelaBeanUtil.copyList(notificationAdminService.listAnnouncements(limit), AnnouncementVO.class);
     }
 
     @Operation(summary = "详情")
     @GetMapping("/detail")
     @RequiresPermission("announcement:query")
-    public Announcement detail(@RequestParam Long id) {
-        return notificationAdminService.getAnnouncement(id);
+    public AnnouncementVO detail(@RequestParam Long id) {
+        return SolvelaBeanUtil.copy(notificationAdminService.getAnnouncement(id), AnnouncementVO.class);
     }
 
     @Operation(summary = "新增或编辑")
     @PostMapping("/save")
     @RequiresPermission("announcement:save")
-    public void save(@RequestBody @Valid Announcement announcement) {
+    public void save(@RequestBody @Valid AnnouncementSaveForm form) {
+        Announcement announcement = SolvelaBeanUtil.copy(form, Announcement.class);
         if (announcement.getExpireTime() == null) {
             // expire_time 是 NOT NULL，而且它同时是未读计算的过滤条件和归档依据。
             // 运营没填时给个默认值，而不是让它撞一个看不懂的数据库错误

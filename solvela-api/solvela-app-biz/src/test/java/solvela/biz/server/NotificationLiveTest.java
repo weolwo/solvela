@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.Announcement;
@@ -267,7 +268,7 @@ class NotificationLiveTest {
         announcement.setAudienceType("ALL");
         announcement.setPublishTime(LocalDateTime.now().minusHours(1));
         announcement.setExpireTime(LocalDateTime.now().plusDays(30));
-        announcement.setStatus(1);
+        announcement.setStatus(AnnouncementStatusEnum.PUBLISHED);
         announcementDao.insert(announcement);
 
         try {
