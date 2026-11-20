@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import solvela.enums.AnnouncementAudienceEnum;
 import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 
@@ -42,8 +43,8 @@ public class AnnouncementSaveForm {
     @Schema(description = "是否强制确认：进 App 就弹窗、必须点「我已阅读」并留痕。不传按普通公告")
     private Boolean forceAck;
 
-    @Schema(description = "人群类型：ALL / REGISTER_BEFORE / REGISTER_AFTER。不传按 ALL")
-    private String audienceType;
+    @Schema(description = "人群类型：ALL / REGISTER_BEFORE / REGISTER_AFTER。不传按 ALL；其它值直接拒绝")
+    private AnnouncementAudienceEnum audienceType;
 
     @Schema(description = "人群规则 json，存规则不存名单")
     private String audienceRule;

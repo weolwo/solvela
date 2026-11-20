@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import solvela.enums.AnnouncementAudienceEnum;
 import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 
@@ -57,8 +58,8 @@ public class Announcement {
      */
     private Boolean forceAck;
 
-    /** 人群类型：ALL / REGISTER_BEFORE / REGISTER_AFTER */
-    private String audienceType;
+    /** 人群类型 */
+    private AnnouncementAudienceEnum audienceType;
 
     /**
      * 人群规则，json。

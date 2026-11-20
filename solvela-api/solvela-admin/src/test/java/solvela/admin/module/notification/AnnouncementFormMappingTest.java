@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import solvela.admin.module.notification.domain.form.AnnouncementSaveForm;
 import solvela.admin.module.notification.domain.vo.AnnouncementVO;
 import solvela.base.util.SolvelaBeanUtil;
+import solvela.enums.AnnouncementAudienceEnum;
 import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.notification.Announcement;
@@ -34,7 +35,7 @@ class AnnouncementFormMappingTest {
         a.setContent("今晚 0 点");
         a.setCategory(NotificationCategoryEnum.SYSTEM);
         a.setForceAck(true);
-        a.setAudienceType("REGISTER_BEFORE");
+        a.setAudienceType(AnnouncementAudienceEnum.REGISTER_BEFORE);
         a.setAudienceRule("{\"before\":\"2026-11-01 00:00:00\"}");
         a.setPublishTime(T);
         a.setExpireTime(T.plusDays(1));
@@ -71,7 +72,7 @@ class AnnouncementFormMappingTest {
         form.setContent("今晚 0 点");
         form.setCategory(NotificationCategoryEnum.SYSTEM);
         form.setForceAck(true);
-        form.setAudienceType("ALL");
+        form.setAudienceType(AnnouncementAudienceEnum.ALL);
         form.setAudienceRule(null);
         form.setPublishTime(T);
         form.setExpireTime(T.plusDays(1));

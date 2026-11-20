@@ -2,6 +2,7 @@ package solvela.admin.module.notification.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import solvela.enums.AnnouncementAudienceEnum;
 import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 
@@ -28,7 +29,7 @@ public class AnnouncementVO {
     private Boolean forceAck;
 
     @Schema(description = "人群类型：ALL / REGISTER_BEFORE / REGISTER_AFTER")
-    private String audienceType;
+    private AnnouncementAudienceEnum audienceType;
 
     @Schema(description = "人群规则 json")
     private String audienceRule;

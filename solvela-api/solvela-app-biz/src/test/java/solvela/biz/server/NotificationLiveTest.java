@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import solvela.enums.AnnouncementAudienceEnum;
 import solvela.enums.AnnouncementStatusEnum;
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
@@ -266,7 +267,7 @@ class NotificationLiveTest {
         announcement.setContent("点了确认就该算读过");
         announcement.setCategory(NotificationCategoryEnum.SYSTEM);
         announcement.setForceAck(true);
-        announcement.setAudienceType("ALL");
+        announcement.setAudienceType(AnnouncementAudienceEnum.ALL);
         announcement.setPublishTime(LocalDateTime.now().minusHours(1));
         announcement.setExpireTime(LocalDateTime.now().plusDays(30));
         announcement.setStatus(AnnouncementStatusEnum.PUBLISHED);
