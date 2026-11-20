@@ -13,7 +13,29 @@ import java.util.regex.*;
  */
 public class SyncFromBaseline {
 
-    static final String ROOT = "D:/workspace/solvela/数据库SQL脚本/";
+    /**
+     * 从当前目录往上找仓库里的 {@code 数据库SQL脚本} 目录；找不到就直接失败。
+     *
+     * <p>🔴 以前这里写死 {@code D:/workspace/solvela/...}（当时那台 Windows 开发机的路径）。
+     * 换到别的机器上，它不报错：Linux 把它当成相对路径，读写的是当前目录下一个叫 {@code D:} 的子目录，
+     * 基线文件写进了没人看的地方。这几个工具是单文件运行的，不能互相 import，所以每个文件各带一份这个方法。
+     */
+    static Path sqlRoot() {
+        for (Path p = Path.of("").toAbsolutePath(); p != null; p = p.getParent()) {
+            Path candidate = p.resolve("数据库SQL脚本");
+            if (Files.isDirectory(candidate.resolve("mysql"))) {
+                return candidate;
+            }
+            if (p.getFileName() != null && p.getFileName().toString().equals("数据库SQL脚本")
+                    && Files.isDirectory(p.resolve("mysql"))) {
+                return p;
+            }
+        }
+        throw new IllegalStateException("从 " + Path.of("").toAbsolutePath()
+                + " 往上找不到「数据库SQL脚本/mysql」目录：请在仓库里任一子目录下运行（README 里是在 数据库SQL脚本/tools 下）");
+    }
+
+    static final String ROOT = sqlRoot() + "/";
 
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {
