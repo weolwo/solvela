@@ -39,13 +39,13 @@ INSERT INTO `t_prize_config` (`activity_code`, `promotion_config_id`, `prize_typ
                               `create_by`)
 VALUES
     -- 压测主角：库存在工作台里卡到 5，用来验证「绝不超发」
-    ('0', '12278CBYW7', 0, 'PHYSICAL', 'iPhone 15 Pro', '9P6HK2T649', 1, 7999.0000, 1, 1, 1, 'seed'),
-    ('0', '12278CBYW7', 0, 'PHYSICAL', 'AirPods Pro 2', 'C25C44XCHJ', 2, 1899.0000, 1, 2, 1, 'seed'),
-    ('0', '12278CBYW7', 0, 'BALANCE', '88 元现金红包', 'FBJR9BAIWI', 3, 88.0000, 1, 3, 1, 'seed'),
-    ('0', '12278CBYW7', 0, 'COUPON', '满100减20优惠券', '0ZXXLZ0RZ1', 4, 20.0000, 0, 4, 1, 'seed'),
-    ('0', '12278CBYW7', 0, 'SCORE', '100 积分', 'G3TWEXS5L7', 5, 1.0000, 0, 5, 1, 'seed'),
+    ('12278CBYW7', 0, 'PHYSICAL', 'iPhone 15 Pro', '9P6HK2T649', 1, 7999.0000, 1, 1, 1, 'seed'),
+    ('12278CBYW7', 0, 'PHYSICAL', 'AirPods Pro 2', 'C25C44XCHJ', 2, 1899.0000, 1, 2, 1, 'seed'),
+    ('12278CBYW7', 0, 'BALANCE', '88 元现金红包', 'FBJR9BAIWI', 3, 88.0000, 1, 3, 1, 'seed'),
+    ('12278CBYW7', 0, 'COUPON', '满100减20优惠券', '0ZXXLZ0RZ1', 4, 20.0000, 0, 4, 1, 'seed'),
+    ('12278CBYW7', 0, 'SCORE', '100 积分', 'G3TWEXS5L7', 5, 1.0000, 0, 5, 1, 'seed'),
     -- 兜底奖项：在工作台里配成不限量 + 兜底，承接库存不足时的降级
-    ('0', '12278CBYW7', 0, 'SCORE', '谢谢参与', '2CJGRUOMUZ', 9, 0.0000, 0, 9, 1, 'seed');
+    ('12278CBYW7', 0, 'SCORE', '谢谢参与', '2CJGRUOMUZ', 9, 0.0000, 0, 9, 1, 'seed');
 
 -- 速查：跑压测时要用到活动编码和奖池编码
 -- SELECT activity_code, activity_name FROM t_activity_config WHERE activity_type = 'DRAW';

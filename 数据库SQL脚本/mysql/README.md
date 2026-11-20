@@ -71,6 +71,62 @@ tools/VerifyFreshInstall.java  ->  RESULT: PASS
 > （上游 `smart_admin_v3.sql` 本来也带，不是新增暴露面）。
 > 要发到公开仓库或交付外部前，先把非必要账号删掉、只留一个 admin。
 
+## 本机跑后端集成测试：要什么、能过多少（2026-11-20 实测）
+
+admin / app-biz / app 三个端模块的测试大多要起完整的 Spring 上下文，连真的 MySQL 与 Redis。
+没有它们时这 700 多个用例全部报「Failed to load ApplicationContext」—— 那不是代码坏了，是环境没起。
+
+### 1. 起库（只绑回环，用完即删）
+
+```bash
+# 在仓库根目录。数据库用基线初始化，等同于一个新装环境
+mkdir -p /tmp/solvela-initdb
+cp 数据库SQL脚本/mysql/schema-baseline.sql /tmp/solvela-initdb/01-schema.sql
+cp 数据库SQL脚本/mysql/data-baseline.sql   /tmp/solvela-initdb/02-data.sql
+podman run -d --rm --name solvela-probe-mysql -p 127.0.0.1:3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=solvela -e TZ=Asia/Shanghai \
+  -v /tmp/solvela-initdb:/docker-entrypoint-initdb.d:ro,Z docker.io/library/mysql:8.4 \
+  --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --sql-mode=NO_ENGINE_SUBSTITUTION
+podman run -d --rm --name solvela-probe-redis -p 127.0.0.1:6379:6379 docker.io/library/redis:8-alpine
+```
+
+（`docker` 同理，把 `podman` 换掉即可。账号、端口与 dev profile 一致：root / root、3306、6379。）
+
+> ⚠️ MySQL 8.4 默认 `caching_sha2_password`。`tools/` 下的工具连接串没带 `allowPublicKeyRetrieval=true`，
+> 在一个刚起的库上第一次连会报「Public Key Retrieval is not allowed」。任何一个带这个参数的客户端
+> 先连一次（服务端缓存了认证），之后工具就能连上。应用自己的连接不受影响。
+
+### 2. 灌造数（admin 的任务验收要用）
+
+```bash
+for f in 任务模块-运行态联调造数.sql 抽奖模块-联调造数.sql 彩票模块-联调造数.sql 派发链路-联调造数.sql; do
+  podman exec -i solvela-probe-mysql mysql -uroot -proot --default-character-set=utf8mb4 solvela < "数据库SQL脚本/mysql/$f"
+done
+```
+
+> 🔴 抽奖、彩票两个造数脚本 2026-08-22 起就跑不通：那次删 `tenant_id` 只删了 INSERT 的列清单，
+> 每行数据开头的 `'0'` 没删，报「Column count doesn't match value count」。2026-11-20 已修，四个脚本都实测可重复执行。
+
+### 3. 跑测试（两个目录要换到可写的位置）
+
+```bash
+cd solvela-api
+mvn test -fae -Dmaven.test.failure.ignore=true \
+  -DargLine="-DlocalPath=/tmp/solvela-test -Dfile.storage.local.upload-path=/tmp/solvela-test/upload/"
+```
+
+不给这两个参数，日志写 `/home/logs/...`、文件存储写 `/home/solvela/upload`，普通账号没有写权限，上下文起不来。
+
+### 4. 预期结果
+
+| 模块 | 结果 | 没过的是什么 |
+|---|---|---|
+| app | 全过 | — |
+| app-biz | 全过 | — |
+| admin | 237 个里约 40 个不过（随库里已有的运行态数据浮动：同一个库第二次跑会少几个，因为第一次跑写进了任务执行日志） | 枚举映射 / 统计用例（`*EnumMappingTest`、`FunnelStatTest`、`LedgerStatTest`）读的是**运行态数据**：登录日志、任务执行日志、会员、资产流水、提案、发奖记录、物流单 —— 要系统真用过一阵才有，没有造数脚本。它们自己会先断言「表里有数据」，空着就报「没有数据，这条用例失去意义」，不会假装通过。另 2 个 `ActivityPlayAcceptanceTest` 在新库上拿到 `NOT_ELIGIBLE`，升级前的代码在同一个库上也一样，是既有问题 |
+
+**判读规则**：只看「没有数据 / 造数前提不成立」以外的失败。这些用例在开发库（有运行态数据）上才完整有意义。
+
 ### 🔴 用别的客户端跑脚本前先看一眼钟
 
 本项目的 MySQL **服务端跑在 UTC**（`@@system_time_zone = UTC`）。

@@ -40,13 +40,13 @@ INSERT INTO `t_prize_config` (`activity_code`, `promotion_config_id`, `prize_typ
                               `prize_code`, `prize_level`, `prize_value`, `approve_mode`, `sort_weight`, `status`, `create_by`)
 VALUES
     -- 一等奖：实物，approve_mode=1 人工审批（大额实物不该自动发货）
-    ('0', 'LTQ7M3XKD8', 4, 'PHYSICAL', 'iPhone 15 Pro', 'PZ8KWQ3N7T', 1, 7999.0000, 1, 1, 1, 'seed'),
+    ('LTQ7M3XKD8', 4, 'PHYSICAL', 'iPhone 15 Pro', 'PZ8KWQ3N7T', 1, 7999.0000, 1, 1, 1, 'seed'),
     -- 二等奖：现金，approve_mode=1 人工审批
-    ('0', 'LTQ7M3XKD8', 2, 'BALANCE', '588 元现金红包', 'B5R2YHJ9MC', 2, 588.0000, 1, 2, 1, 'seed'),
+    ('LTQ7M3XKD8', 2, 'BALANCE', '588 元现金红包', 'B5R2YHJ9MC', 2, 588.0000, 1, 2, 1, 'seed'),
     -- 三等奖：优惠券，免审直发
-    ('0', 'LTQ7M3XKD8', 3, 'COUPON', '满100减20优惠券', 'CU4XN6VTLQ', 3, 20.0000, 0, 3, 1, 'seed'),
+    ('LTQ7M3XKD8', 3, 'COUPON', '满100减20优惠券', 'CU4XN6VTLQ', 3, 20.0000, 0, 3, 1, 'seed'),
     -- 四等奖：积分，免审直发
-    ('0', 'LTQ7M3XKD8', 1, 'SCORE', '100 积分', 'SC9DFB2WK5', 4, 1.0000, 0, 4, 1, 'seed')
+    ('LTQ7M3XKD8', 1, 'SCORE', '100 积分', 'SC9DFB2WK5', 4, 1.0000, 0, 4, 1, 'seed')
 ON DUPLICATE KEY UPDATE `prize_name`          = VALUES(`prize_name`),
                         `prize_type`          = VALUES(`prize_type`),
                         `prize_value`         = VALUES(`prize_value`),

@@ -33,6 +33,8 @@ mvn test -pl <模块> -am -Dtest=<测试类> -Dsurefire.failIfNoSpecifiedTests=f
 mvn -o test -pl solvela-app,solvela-app-biz,solvela-admin -am    # 全量
 ```
 
+admin / app-biz / app 的测试大多要真的 MySQL 与 Redis，还要把日志与上传目录指到可写位置。没有它们时会成片报「Failed to load ApplicationContext」，那是环境没起，不是代码坏了。起库、造数、参数与预期结果见 `数据库SQL脚本/mysql/README.md`「本机跑后端集成测试」。
+
 架构守卫测试（`*BoundaryTest`、`PrizeDispatchBypassTest`、`EnumMigrationRatchetTest`）扫的是 `target/classes`，必须在 compile 之后跑。
 
 C 端，在 `solvela-app-web/` 下（Node 版本见 `.nvmrc`）：
