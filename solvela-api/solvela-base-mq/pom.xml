@@ -45,10 +45,14 @@
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <!-- 🔴 Spring Boot 4.2 起 spring-boot-starter-amqp 只剩通用 AMQP，不再带 spring-rabbit：
-                 用旧名字 pom 不报错，但 RabbitTemplate / ConnectionFactory 整包消失，编译才失败。
-                 RabbitMQ 的连接、模板与自动配置挪到了这个新 starter -->
-            <artifactId>spring-boot-starter-amqp-rabbitmq</artifactId>
+            <!-- 🔴 Spring Boot 4.2 把 4.1 的 spring-boot-starter-amqp 拆成了三个，名字很像、内容完全不同：
+                   spring-boot-starter-amqp           → 通用 AMQP 1.0（qpid protonj2），不带 spring-rabbit
+                   spring-boot-starter-amqp-rabbitmq  → RabbitMQ 的【AMQP 1.0 客户端】，配置前缀 spring.amqp.rabbitmq
+                   spring-boot-starter-rabbitmq       → 经典 RabbitMQ（AMQP 0.9.1：RabbitTemplate / spring.rabbitmq.*）← 本项目用的是这个
+                 选错成 amqp-rabbitmq 照样编译通过（它间接带着 RabbitTemplate 这些类），
+                 但经典的 Rabbit 自动配置不在里面、spring.rabbitmq.* 没人读 —— 启动时才因为没有 ConnectionFactory 失败。
+                 RabbitAutoConfigurationWiringTest 盯着这一条 -->
+            <artifactId>spring-boot-starter-rabbitmq</artifactId>
         </dependency>
 
         <dependency>
