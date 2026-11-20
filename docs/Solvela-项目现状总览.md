@@ -43,7 +43,7 @@ Cloudflare 隧道 ─┤                                          只连 Redis  
 | 跨进程契约 | `solvela-member-api` / `solvela-marketing-api` / `solvela-contract` / `solvela-model` |
 | 底座 | `solvela-auth` · `solvela-base-*`（core / data / file / mail / mq / redis / web） |
 
-技术栈：Java 25 + Spring Boot 4.1 · MyBatis-Plus · MySQL 8.4（85 张表）· Redis 8 · MinIO · 自研 SonicExcel（替换 POI / EasyExcel）· 自研数据库抢占式调度。
+技术栈：Java 25 + Spring Boot 4.2 · MyBatis-Plus · MySQL 8.4（85 张表）· Redis 8 · MinIO · 自研 SonicExcel（替换 POI / EasyExcel）· 自研数据库抢占式调度。
 
 ---
 

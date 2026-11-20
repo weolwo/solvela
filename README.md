@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| 后端 | JDK 25 · Spring Boot 4.1 · MyBatis-Plus · MySQL 8.4 · Redis 8 · RabbitMQ · MinIO(S3) |
+| 后端 | JDK 25 · Spring Boot 4.2 · MyBatis-Plus · MySQL 8.4 · Redis 8 · RabbitMQ · MinIO(S3) |
 | 管理端 | Vue 3 · Ant Design Vue 4 · Vite · Tailwind v4 |
 | C 端 | Vue 3 · TypeScript · Pinia · vue-router · Vite（自建 UI 组件，无组件库） |
 | 部署 | Docker Compose + Cloudflare 隧道（**零公网端口**） |

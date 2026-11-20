@@ -49,7 +49,7 @@ v1 回答了"框架该长什么样"，**没有回答"底层引擎到底是什么
 
 | 维度 | 目标 |
 |---|---|
-| 运行环境 | Java 25 / Spring Boot 4.1，非模块化（无 JPMS） |
+| 运行环境 | Java 25 / Spring Boot 4.2，非模块化（无 JPMS） |
 | 底层引擎 | `org.dhatim:fastexcel` **0.20.2**（写）+ `org.dhatim:fastexcel-reader` **0.20.2**（读），**不引入任何 POI** |
 | 数据载体 | POJO（Lombok `@Data`）与 `record` **一等公民并列支持** |
 | 内存 | 导出堆占用与数据量解耦（前提：§7.6 的 inline strings 红线）；导入按行惰性流出（前提：§8.5 的 Path 入参） |

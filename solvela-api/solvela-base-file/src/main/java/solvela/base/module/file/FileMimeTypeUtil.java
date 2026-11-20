@@ -2,13 +2,14 @@ package solvela.base.module.file;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
-import org.apache.tika.config.TikaConfig;
-import org.apache.tika.exception.TikaException;
+import org.apache.tika.detect.DefaultDetector;
+import org.apache.tika.detect.Detector;
 import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.mime.MimeTypes;
+import org.apache.tika.parser.ParseContext;
 import solvela.base.module.file.domain.UploadSource;
 
 import java.io.IOException;
@@ -30,6 +31,15 @@ import java.io.InputStream;
 @Slf4j
 public final class FileMimeTypeUtil {
 
+    /**
+     * 与 Tika 3.x 里 {@code new TikaConfig().getDetector()} 拿到的是同一个东西：默认 MIME 库 + SPI 加载的探测器。
+     *
+     * <p>🔴 Tika 4 把 {@code TikaConfig} 移出了 tika-core。旧写法在没 clean 的增量编译下照样「编译通过」，
+     * 到运行时才抛 NoClassDefFoundError —— 而 detect() 是上传链路的必经之路，等于所有上传全挂。
+     * 探测器无状态、线程安全，所以建一次复用；以前每次上传都 new 一个 TikaConfig，白白重新加载一遍 MIME 库。
+     */
+    private static final Detector DETECTOR = new DefaultDetector();
+
     private FileMimeTypeUtil() {
     }
 
@@ -43,14 +53,13 @@ public final class FileMimeTypeUtil {
         InputStream inputStream = null;
         try {
             inputStream = file.open();
-            TikaConfig tika = new TikaConfig();
             Metadata metadata = new Metadata();
             // 带上原始文件名：Tika 在字节特征不足以区分时会参考它（如 csv 与 txt）
             metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.originalName());
             TikaInputStream stream = TikaInputStream.get(inputStream);
-            MediaType mimetype = tika.getDetector().detect(stream, metadata);
+            MediaType mimetype = DETECTOR.detect(stream, metadata, new ParseContext());
             return mimetype.toString();
-        } catch (IOException | TikaException e) {
+        } catch (IOException e) {
             log.error(e.getMessage(), e);
             return MimeTypes.OCTET_STREAM;
         } finally {
