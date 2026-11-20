@@ -196,7 +196,10 @@ public class PrizePoolConfigService {
 
     /**
      * white_list 列存的是 JSON 数组字符串。JsonUtils.parseList 遇到脏数据会抛异常，
-     * 单个奖项的脏名单不该让整个工作台打不开，故此处兜住并降级为空名单
+     * 单个奖项的脏名单不该让整个工作台打不开，故此处兜住并降级为空名单。
+     *
+     * <p>⚠️ 降级只在回显这一侧：前端提交时会把这个空名单原样交回来（{@code item.whiteList || []}），
+     * 所以保存侧由 {@link #checkCorruptWhiteListNotWiped} 拦着，不让它把库里那份旧值静默清空。
      */
     private List<String> parseWhiteList(String whiteListJson) {
         if (StringUtils.isBlank(whiteListJson)) {
@@ -208,6 +211,43 @@ public class PrizePoolConfigService {
         } catch (RuntimeException e) {
             log.warn("[抽奖工作台回显] 白名单 JSON 解析失败，已降级为空名单: {}", whiteListJson, e);
             return List.of();
+        }
+    }
+
+    /**
+     * 🔴 库里白名单解析不了、而这次提交的是空名单 → 拒绝保存。
+     *
+     * <p>回显把解析不了的白名单降级成了空名单（见 {@link #parseWhiteList}），前端又会把它当 [] 交回来。
+     * 不拦的话，运营只是改了库存、点一下保存，那份白名单就被 [] 覆盖了 —— 没有报错，原值也找不回来。
+     * white_list 是 JSON 列，存不进非法 JSON，会走到这里的是形状不对的值（对象而不是字符串数组），
+     * 一般来自手工订正或旧格式。
+     *
+     * <p>刻意只拦「空名单」：运营在「配置白名单」里重新填一份再保存，就是在界面上修它的路；
+     * 提交 {@code null} 不会覆盖（MyBatis-Plus 默认 NOT_NULL 策略跳过 null 字段），不用拦。
+     * 由 {@code DrawWorkbenchAcceptanceTest} 的三条白名单用例钉住。
+     */
+    private void checkCorruptWhiteListNotWiped(DrawWorkbenchSaveCommand form, Current current) {
+        for (DrawWorkbenchPoolItemCommand item : form.getPrizeItemList()) {
+            PrizePoolItem existed = current.itemMap().get(item.getPrizeCode());
+            if (existed == null || item.getWhiteList() == null || !item.getWhiteList().isEmpty()) {
+                continue;
+            }
+            if (isUnparseableWhiteList(existed.getWhiteList())) {
+                throw new BusinessException("奖项「" + item.getPrizeCode() + "」库里的白名单数据格式不对，工作台只能显示为空；"
+                        + "直接保存会把它清空。请在「配置白名单」里重新填写这个奖项的名单后再保存");
+            }
+        }
+    }
+
+    private static boolean isUnparseableWhiteList(String whiteListJson) {
+        if (StringUtils.isBlank(whiteListJson)) {
+            return false;
+        }
+        try {
+            JsonUtils.parseList(whiteListJson, String.class);
+            return false;
+        } catch (RuntimeException e) {
+            return true;
         }
     }
 
@@ -231,6 +271,7 @@ public class PrizePoolConfigService {
         if (activity.getStatus() == ActivityStatusEnum.ONLINE) {
             checkOnlineStructureLock(form, itemCodes, poolCodes, current);
         }
+        checkCorruptWhiteListNotWiped(form, current);
 
         saveItems(form, itemCodes, current);
         /*

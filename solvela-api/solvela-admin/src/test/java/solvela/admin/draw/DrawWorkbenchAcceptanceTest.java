@@ -16,6 +16,7 @@ import solvela.draw.poolconfig.domain.command.DrawWorkbenchPoolCommand;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchPoolItemCommand;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchSaveCommand;
 import solvela.draw.poolconfig.domain.dto.DrawWorkbenchDTO;
+import solvela.draw.poolconfig.domain.dto.DrawWorkbenchItemDTO;
 import solvela.draw.poolconfig.manager.PrizePoolConfigManager;
 import solvela.draw.poolconfig.service.PrizePoolConfigService;
 import solvela.enums.DrawModeEnum;
@@ -169,6 +170,65 @@ class DrawWorkbenchAcceptanceTest {
                 "SELECT used_stock FROM t_prize_pool_item WHERE activity_code = ? AND prize_code = ?",
                 Integer.class, ACTIVITY_CODE, PRIZE_1);
         assertEquals(7, used, "已发库存被保存动作清零了 —— 库存账当场作废，而且不会报错");
+    }
+
+    /**
+     * white_list 是 JSON 列，存不进非法 JSON；会解析失败的是<b>形状不对</b>的值（对象而不是字符串数组），
+     * 比如手工订正或旧格式留下的。回显把它降级成空名单，而前端提交时又会把它当 [] 交回来。
+     */
+    private static final String CORRUPT_WHITE_LIST = "{\"memberIds\": [1001, 1002]}";
+
+    @Test
+    @DisplayName("🔴 库里白名单解析不了、提交的是空名单 → 拒绝保存，不让一次保存静默清空它")
+    void 损坏的白名单不被空名单覆盖() {
+        prizePoolConfigService.workbenchSave(baseCommand());
+        jdbcTemplate.update("UPDATE t_prize_pool_item SET white_list = ? WHERE activity_code = ? AND prize_code = ?",
+                CORRUPT_WHITE_LIST, ACTIVITY_CODE, PRIZE_1);
+        // 前提：回显确实把它降级成了空名单 —— 否则运营看得到原值，这条拦截就无从谈起
+        DrawWorkbenchItemDTO echoed = prizePoolConfigService.workbenchDetail(ACTIVITY_CODE).prizeItemList().stream()
+                .filter(i -> PRIZE_1.equals(i.prizeCode())).findFirst().orElseThrow();
+        assertTrue(echoed.whiteList().isEmpty(), "前提不成立：回显没有降级成空名单");
+
+        DrawWorkbenchSaveCommand cmd = baseCommand();
+        cmd.getPrizeItemList().getFirst().setWhiteList(List.of());   // 前端 item.whiteList || [] 交回来的样子
+
+        BusinessException e = assertThrows(BusinessException.class, () -> prizePoolConfigService.workbenchSave(cmd));
+        assertTrue(e.getMessage().contains(PRIZE_1) && e.getMessage().contains("白名单"), "实际: " + e.getMessage());
+        assertTrue(storedWhiteList(PRIZE_1).contains("1001"), "被拒的保存仍然改动了库里的白名单");
+    }
+
+    @Test
+    @DisplayName("库里白名单解析不了、运营重新填了一份 → 照常覆盖，这就是在界面上修它的路")
+    void 损坏的白名单可以被新名单修复() {
+        prizePoolConfigService.workbenchSave(baseCommand());
+        jdbcTemplate.update("UPDATE t_prize_pool_item SET white_list = ? WHERE activity_code = ? AND prize_code = ?",
+                CORRUPT_WHITE_LIST, ACTIVITY_CODE, PRIZE_1);
+
+        DrawWorkbenchSaveCommand cmd = baseCommand();
+        cmd.getPrizeItemList().getFirst().setWhiteList(List.of("2001"));
+        prizePoolConfigService.workbenchSave(cmd);
+
+        assertEquals("[\"2001\"]", storedWhiteList(PRIZE_1).replace(" ", ""));
+    }
+
+    @Test
+    @DisplayName("库里白名单正常时提交空名单照常清空 —— 拦截只针对解析不了的旧值，不妨碍有意清空")
+    void 正常白名单可以被有意清空() {
+        DrawWorkbenchSaveCommand withList = baseCommand();
+        withList.getPrizeItemList().getFirst().setWhiteList(List.of("3001"));
+        prizePoolConfigService.workbenchSave(withList);
+
+        DrawWorkbenchSaveCommand cleared = baseCommand();
+        cleared.getPrizeItemList().getFirst().setWhiteList(List.of());
+        prizePoolConfigService.workbenchSave(cleared);
+
+        assertEquals("[]", storedWhiteList(PRIZE_1).replace(" ", ""));
+    }
+
+    private String storedWhiteList(String prizeCode) {
+        return jdbcTemplate.queryForObject(
+                "SELECT white_list FROM t_prize_pool_item WHERE activity_code = ? AND prize_code = ?",
+                String.class, ACTIVITY_CODE, prizeCode);
     }
 
     // =====================================================================
