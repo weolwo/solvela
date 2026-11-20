@@ -247,7 +247,7 @@ class MemberRiskAdminQueryTest {
         assertTrue(rules.stream()
                 .filter(r -> r.getEventType() == MemberRiskEventTypeEnum.ASSET_OUT
                         || r.getEventType() == MemberRiskEventTypeEnum.CONTACT_BIND)
-                .allMatch(r -> Integer.valueOf(0).equals(r.getBypassByTrust())),
+                .allMatch(r -> Boolean.FALSE.equals(r.getBypassByTrust())),
                 "可信设备跳过的话，「一台验证过的老设备被偷了会话」这件事就永远判不出来");
     }
 
@@ -334,10 +334,10 @@ class MemberRiskAdminQueryTest {
         event.setDeviceId("dev-admin-test");
         event.setDeviceTrust(1);
         event.setIpFamiliar(0);
-        event.setDormant(0);
+        event.setDormant(false);
         event.setClientIp("1.2.3.4");
         event.setIpRegion("中国|广东省|深圳市|电信");
-        event.setCaptchaPassed(1);
+        event.setCaptchaPassed(true);
         event.setPreScore(0);
         event.setPostScore(0);
         event.setShadowScore(0);

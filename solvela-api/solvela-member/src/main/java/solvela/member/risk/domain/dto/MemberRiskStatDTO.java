@@ -62,7 +62,7 @@ public class MemberRiskStatDTO {
     public static class MatrixCell {
         private Integer deviceTrust;
         private Integer ipFamiliar;
-        private Integer dormant;
+        private Boolean dormant;
         private Long count;
     }
 

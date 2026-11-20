@@ -71,7 +71,7 @@ class MemberRiskStatTest {
         assertTrue(stat.getDecisionDaily().stream()
                 .anyMatch(d -> MemberRiskDecisionEnum.PASS.getValue().equals(d.getDecision())));
         assertTrue(stat.getMatrixCells().stream()
-                        .anyMatch(c -> c.getDeviceTrust() == 2 && c.getIpFamiliar() == 2 && c.getDormant() == 0),
+                        .anyMatch(c -> c.getDeviceTrust() == 2 && c.getIpFamiliar() == 2 && Boolean.FALSE.equals(c.getDormant())),
                 "矩阵那一格要数得出来");
         assertTrue(stat.getShadowDiffCount() >= 1, "🔴 这个数就是「切生效会多打扰多少人」");
         assertTrue(stat.getRuleVerdicts().stream()

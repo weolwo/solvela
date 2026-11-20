@@ -79,12 +79,12 @@ public class MallCommodityDetailDTO {
     private Integer minGrade;
 
     /**
-     * 参不参与等级折扣：0-不参与，1-参与（默认）。
+     * 参不参与等级折扣：false-不参与，true-参与（默认）。
      *
      * <p>与 {@code minGrade} 不相干：那个是「够不够格兑」，这个是「兑的时候打不打折」。
-     * 成本价商品、秒杀品填 0。
+     * 成本价商品、秒杀品是 false。
      */
-    private Integer gradePriceFlag;
+    private Boolean gradePriceFlag;
 
     /**
      * 哨兵值（1970 / 2099）表示「不限」。<b>原样下发不做转换</b> ——

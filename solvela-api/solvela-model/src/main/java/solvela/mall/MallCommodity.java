@@ -145,7 +145,7 @@ public class MallCommodity {
      * <p>判断收在 {@code MallPricing.participates}，不在调用方 ——
      * 两条路各判一次，漏判的那条会给成本价商品打折，而那是真实的钱。
      */
-    private Integer gradePriceFlag;
+    private Boolean gradePriceFlag;
 
     /**
      * 上架开始时间：默认值代表不限。不是秒杀场次

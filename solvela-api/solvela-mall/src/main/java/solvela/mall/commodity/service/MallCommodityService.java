@@ -516,7 +516,7 @@ public class MallCommodityService {
          *    这一段留在保存里、没有跟着 toEntity 走：它是【写操作的副作用】，
          *    而 toEntity 是纯映射，预览也要调 —— 预览一次就打一条 WARN 是噪音。
          */
-        if (entity.getGradePriceFlag() == 0 && entity.getId() != null) {
+        if (!entity.getGradePriceFlag() && entity.getId() != null) {
             long overrides = mallGradePriceDao.selectCount(new LambdaQueryWrapper<MallGradePrice>()
                     .eq(MallGradePrice::getCommodityId, entity.getId()));
             if (overrides > 0) {
@@ -594,7 +594,7 @@ public class MallCommodityService {
      * 它必须和保存后的样子一致 —— 而「一致」唯一可靠的保证方式，
      * 就是两边走同一段代码。
      *
-     * <p>下面每一条兜底（现金价清零、minGrade 归 0、gradePriceFlag 默认 1…）
+     * <p>下面每一条兜底（现金价清零、minGrade 归 0、gradePriceFlag 默认参与…）
      * 都会直接改变用户看到的价格与标签。各写一份的话，预览里是一个样、
      * 存进去是另一个样，而<b>两边都不报错</b>。
      */
@@ -629,14 +629,13 @@ public class MallCommodityService {
         entity.setMinGrade(form.getMinGrade() == null || form.getMinGrade() < 0
                 ? 0 : form.getMinGrade());
         /*
-         * 🔴 不填按【参与】(1)，不是按 0。
+         * 🔴 不填按【参与】(true)，不是按 false。
          * 与 minGrade 那一行的方向刚好相反，因为两列的「空」含义不同：
          * 没填最低等级 = 不限（对用户最宽松）；没填这一列 = 跟着全场走（DDL 默认值就是 1）。
-         * 按 0 存的话，新建的商品全都悄悄不参与等级折扣，
+         * 按 false 存的话，新建的商品全都悄悄不参与等级折扣，
          * 而运营配了折扣率之后会发现一件都没便宜。
          */
-        entity.setGradePriceFlag(form.getGradePriceFlag() == null || form.getGradePriceFlag() != 0
-                ? 1 : 0);
+        entity.setGradePriceFlag(!Boolean.FALSE.equals(form.getGradePriceFlag()));
         entity.setStartTime(shelf.startTime());
         entity.setEndTime(shelf.endTime());
         entity.setStatus(shelf.status());

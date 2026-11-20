@@ -176,8 +176,7 @@ public final class MallPricing {
         if (commodity == null) {
             return false;
         }
-        Integer flag = commodity.getGradePriceFlag();
-        return flag == null || flag != 0;
+        return !Boolean.FALSE.equals(commodity.getGradePriceFlag());
     }
 
     /**

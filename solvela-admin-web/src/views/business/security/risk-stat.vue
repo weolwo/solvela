@@ -122,8 +122,8 @@
                 <a-tag :color="metaOf(RISK_IP_FAMILIAR_ENUM, record.ipFamiliar).color">
                   {{ metaOf(RISK_IP_FAMILIAR_ENUM, record.ipFamiliar).desc }}
                 </a-tag>
-                <a-tag :color="record.dormant === 1 ? 'volcano' : 'green'">
-                  {{ record.dormant === 1 ? '沉睡' : '活跃' }}
+                <a-tag :color="record.dormant === true ? 'volcano' : 'green'">
+                  {{ record.dormant === true ? '沉睡' : '活跃' }}
                 </a-tag>
               </template>
             </template>

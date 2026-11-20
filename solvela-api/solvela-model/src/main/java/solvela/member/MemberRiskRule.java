@@ -46,8 +46,8 @@ public class MemberRiskRule {
 
     private MemberRiskModeEnum mode;
 
-    /** 1 = 可信设备跳过本规则 */
-    private Integer bypassByTrust;
+    /** true = 可信设备跳过本规则（列是 tinyint 1/0） */
+    private Boolean bypassByTrust;
 
     /** JSON 原文，形状由各规则声明 */
     private String params;

@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 枚举化改造的<b>棘轮</b>：盯住散落在 service 里的「状态魔法常量」，只许变少，不许变多。
@@ -172,6 +173,41 @@ class EnumMigrationRatchetTest {
                 "这些地方拿 Integer.valueOf(...).equals(...) 去比一个并非处处都是 Integer 的字段。"
                         + "Integer.equals(Object) 接受任何类型，编译通过但恒为 false —— "
                         + "改成 == 枚举常量，或 Boolean.TRUE.equals(...)");
+    }
+
+    /**
+     * {@code private Integer xxxFlag;} / {@code private Integer xxxEnabled;} —— 0/1 标记用了 Integer。
+     *
+     * <p>项目约定 0/1 标记是 {@code Boolean}（根 CLAUDE.md「本项目里会静默出错的地方」）。
+     * 2026-11-20 清掉了 8 个：gradePriceFlag、bypassByTrust、readFlag、tradeEnabled、marketingEnabled、
+     * forceAck、dormant、captchaPassed（dormant 可为 null，表示「查无此人」，Boolean 正好三态）。
+     * Integer 版本的坑和上面装箱比较同源：{@code flag == 0}、{@code setXxx(1)} 读的人要回忆 0/1 哪个是开，
+     * 一旦有一层改成 Boolean，{@code SolvelaBeanUtil.copy} 遇到类型不匹配会<b>静默跳过</b>，字段变 null。
+     *
+     * <p>⚠️ 只按名字后缀抓（Flag / Enabled），名字不带这两个词的 0/1 列看不见（bypassByTrust、forceAck、dormant、captchaPassed 都是）——
+     * 这是棘轮，不是全面审计。record 组件不在 {@code private ...;} 形态里，所以跨进程契约里刻意保留 0/1 的
+     * {@code NotificationView.readFlag} 不受影响（理由见 NotificationInternalController#readFlagOnWire）。
+     */
+    private static final Pattern INTEGER_FLAG_FIELD = Pattern.compile(
+            "private\\s+(?:Integer|int)\\s+(\\w*(?:Flag|Enabled))\\s*;");
+
+    @Test
+    @DisplayName("0/1 标记字段不许是 Integer：用 Boolean")
+    void 标记字段不用Integer() throws IOException {
+        List<Path> sources = mainSources();
+        // 空扫通过比没有测试更糟：源码目录搬走之后它会永远绿着
+        assertTrue(sources.size() > 100, "扫到的主代码文件只有 " + sources.size() + " 个，扫描根目录多半不对");
+
+        Set<String> found = new TreeSet<>();
+        for (Path p : sources) {
+            Matcher m = INTEGER_FLAG_FIELD.matcher(Files.readString(p, StandardCharsets.UTF_8));
+            while (m.find()) {
+                found.add(shorten(root(), p) + "#" + m.group(1));
+            }
+        }
+        assertEquals(Set.of(), found,
+                "这些 0/1 标记字段是 Integer。改成 Boolean，并把 Entity、DTO、Command、Query、Form、VO、"
+                        + "DAO 形参与调用点一次改完 —— SolvelaBeanUtil.copy 对类型不匹配的属性静默跳过");
     }
 
     private Set<String> scan() throws IOException {

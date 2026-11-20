@@ -43,8 +43,8 @@ public class MemberRiskRuleVO {
     @Schema(description = "互斥组：同组命中只取最高分。只读")
     private String ruleGroup;
 
-    @Schema(description = "可信设备是否跳过：1-跳过 0-照常执行。只读")
-    private Integer bypassByTrust;
+    @Schema(description = "可信设备是否跳过：true-跳过 false-照常执行。只读")
+    private Boolean bypassByTrust;
 
     @Schema(description = "档位：0-关闭 1-陪跑 2-生效。可改")
     private MemberRiskModeEnum mode;

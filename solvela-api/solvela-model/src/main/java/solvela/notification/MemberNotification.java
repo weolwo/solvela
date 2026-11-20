@@ -102,13 +102,13 @@ public class MemberNotification {
     private String bizRefId;
 
     /**
-     * 0-未读 1-已读。
+     * false-未读 true-已读（列是 tinyint 0/1）。
      *
      * <p>通知侧的已读是<b>逐条</b>的，所以跳读天然支持、零成本。
      * 公告侧用的是一人一行的游标（不支持跳读），两边刻意分开 ——
      * 前端也是两个 tab，用户不会在同一个列表里看到两种已读行为。
      */
-    private Integer readFlag;
+    private Boolean readFlag;
 
     private LocalDateTime readTime;
 

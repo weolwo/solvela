@@ -39,13 +39,14 @@ public class MemberRiskEventDTO {
     /** 0-陌生, 1-宽松熟悉, 2-严格熟悉 */
     private Integer ipFamiliar;
 
-    private Integer dormant;
+    /** false-活跃, true-沉睡, null-查无此人 */
+    private Boolean dormant;
 
     private String clientIp;
 
     private String ipRegion;
 
-    private Integer captchaPassed;
+    private Boolean captchaPassed;
 
     private Integer preScore;
 

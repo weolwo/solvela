@@ -44,14 +44,15 @@ public class MemberRiskEventVO {
     @Schema(description = "IP 熟悉度：0-陌生 1-宽松熟悉 2-严格熟悉")
     private Integer ipFamiliar;
 
-    @Schema(description = "是否沉睡：0-活跃 1-沉睡")
-    private Integer dormant;
+    @Schema(description = "是否沉睡：false-活跃 true-沉睡 null-查无此人")
+    private Boolean dormant;
 
     private String clientIp;
 
     private String ipRegion;
 
-    private Integer captchaPassed;
+    @Schema(description = "本次请求是否带了有效滑块通行票")
+    private Boolean captchaPassed;
 
     private Integer preScore;
 

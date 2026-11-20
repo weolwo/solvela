@@ -263,7 +263,7 @@ class NotificationLiveTest {
         announcement.setTitle("[实测]强制确认-游标");
         announcement.setContent("点了确认就该算读过");
         announcement.setCategory(NotificationCategoryEnum.SYSTEM);
-        announcement.setForceAck(1);
+        announcement.setForceAck(true);
         announcement.setAudienceType("ALL");
         announcement.setPublishTime(LocalDateTime.now().minusHours(1));
         announcement.setExpireTime(LocalDateTime.now().plusDays(30));

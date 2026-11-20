@@ -23,6 +23,6 @@ public interface MemberNotificationPreferenceDao extends BaseMapper<MemberNotifi
      * 一个吓人的 DuplicateKeyException，而这只是一次正常的并发）。
      */
     int upsert(@Param("memberId") Long memberId,
-               @Param("tradeEnabled") Integer tradeEnabled,
-               @Param("marketingEnabled") Integer marketingEnabled);
+               @Param("tradeEnabled") boolean tradeEnabled,
+               @Param("marketingEnabled") boolean marketingEnabled);
 }

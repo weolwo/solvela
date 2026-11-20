@@ -40,11 +40,11 @@ public class MemberNotificationPreference {
     @TableId
     private Long memberId;
 
-    /** 交易物流类通知：1-接收 0-关闭 */
-    private Integer tradeEnabled;
+    /** 交易物流类通知：true-接收 false-关闭 */
+    private Boolean tradeEnabled;
 
-    /** 活动营销类通知：1-接收 0-关闭 */
-    private Integer marketingEnabled;
+    /** 活动营销类通知：true-接收 false-关闭 */
+    private Boolean marketingEnabled;
 
     private LocalDateTime createTime;
 

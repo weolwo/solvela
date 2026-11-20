@@ -284,7 +284,7 @@
                       专享等级 = 够不够格兑；这个 = 兑的时候打不打折。
                     一件不限等级的商品照样可以打等级折扣，一件白金专享的也可以不打折。
                   -->
-                  <a-switch v-model:checked="form.gradePriceFlag" :checked-value="1" :un-checked-value="0" />
+                  <a-switch v-model:checked="form.gradePriceFlag" />
                   <div class="form-tip mt-1">
                     默认参与。关掉表示这件商品对谁都是原价（成本价商品、秒杀品）
                   </div>
@@ -309,7 +309,7 @@
             </a-row>
 
             <a-alert
-              v-if="form.gradePriceFlag === 0"
+              v-if="form.gradePriceFlag === false"
               type="info"
               show-icon
               class="mb-3"
@@ -348,7 +348,7 @@
                 删掉一行，那一档<b>落回等级折扣率</b>，不是落回原价。
               </div>
               <a-alert
-                v-if="form.gradePriceFlag === 0 && gradePrices.length > 0"
+                v-if="form.gradePriceFlag === false && gradePrices.length > 0"
                 type="error"
                 show-icon
                 class="mb-3"
@@ -504,7 +504,7 @@
       limitCount: 0,
       minGrade: 0,
       // 默认参与：默认不参与的话，配完折扣率会发现一件商品都没变便宜
-      gradePriceFlag: 1,
+      gradePriceFlag: true,
       startTime: null,
       endTime: null,
       status: COMMODITY_STATUS_ENUM.DRAFT.value,
@@ -1074,7 +1074,7 @@
       payType: form.payType,
       limitPeriod: form.limitPeriod,
       minGrade: form.minGrade ?? 0,
-      gradePriceFlag: form.gradePriceFlag === 0 ? 0 : 1,
+      gradePriceFlag: form.gradePriceFlag !== false,
       limitCount: form.limitCount,
       isHome: form.isHome,
       sort: form.sort,

@@ -48,13 +48,13 @@ public class Announcement {
     private NotificationCategoryEnum category;
 
     /**
-     * 0-普通公告 1-强制确认。
+     * false-普通公告 true-强制确认（列是 tinyint 0/1）。
      *
      * <p>强制确认的公告进 App 就弹窗、必须点「我已阅读」，并在
      * {@link AnnouncementAck} 里留痕。那是整个设计里<b>唯一一个「广播但要写到人」</b>
      * 的例外 —— 但也只写确认记录，不写内容副本。
      */
-    private Integer forceAck;
+    private Boolean forceAck;
 
     /** 人群类型：ALL / REGISTER_BEFORE / REGISTER_AFTER */
     private String audienceType;

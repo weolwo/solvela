@@ -65,7 +65,7 @@ public class NotificationPreferenceService {
      * 用户改设置。
      */
     public void save(Long memberId, boolean tradeEnabled, boolean marketingEnabled) {
-        memberNotificationPreferenceDao.upsert(memberId, tradeEnabled ? 1 : 0, marketingEnabled ? 1 : 0);
+        memberNotificationPreferenceDao.upsert(memberId, tradeEnabled, marketingEnabled);
     }
 
     /**
@@ -79,13 +79,13 @@ public class NotificationPreferenceService {
         }
         MemberNotificationPreference defaults = new MemberNotificationPreference();
         defaults.setMemberId(memberId);
-        defaults.setTradeEnabled(1);
-        defaults.setMarketingEnabled(1);
+        defaults.setTradeEnabled(true);
+        defaults.setMarketingEnabled(true);
         return defaults;
     }
 
     /** null 也当成开：列是后加的，存量行上可能是 null */
-    private boolean isEnabled(Integer flag) {
-        return flag == null || flag == 1;
+    private boolean isEnabled(Boolean flag) {
+        return !Boolean.FALSE.equals(flag);
     }
 }

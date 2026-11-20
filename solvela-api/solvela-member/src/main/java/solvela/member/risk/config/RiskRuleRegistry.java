@@ -235,7 +235,7 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
         return new RiskRuleConfig(row.getRuleCode(), row.getRuleName(), row.getEventType(),
                 row.getPhase(), row.getRuleType(),
                 row.getDirectDecision(), row.getScore() == null ? 0 : row.getScore(), row.getRuleGroup(),
-                row.getMode(), Integer.valueOf(1).equals(row.getBypassByTrust()), params);
+                row.getMode(), Boolean.TRUE.equals(row.getBypassByTrust()), params);
     }
 
     /**

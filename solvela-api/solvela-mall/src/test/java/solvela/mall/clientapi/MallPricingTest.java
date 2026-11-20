@@ -63,7 +63,7 @@ class MallPricingTest {
     /** 不参与等级折扣的商品 */
     private static MallCommodity optedOut(Integer points) {
         MallCommodity c = commodity(points, null);
-        c.setGradePriceFlag(0);
+        c.setGradePriceFlag(false);
         return c;
     }
 

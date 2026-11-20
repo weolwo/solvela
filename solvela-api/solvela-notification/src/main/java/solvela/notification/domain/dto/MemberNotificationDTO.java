@@ -36,8 +36,8 @@ public class MemberNotificationDTO {
     /** 发送时渲染好的短摘要，列表页直接展示 */
     private String summary;
 
-    /** 0-未读 1-已读 */
-    private Integer readFlag;
+    /** false-未读 true-已读 */
+    private Boolean readFlag;
 
     private LocalDateTime readTime;
 

@@ -100,7 +100,7 @@
         </template>
 
         <template v-else-if="column.dataIndex === 'bypassByTrust'">
-          <span v-if="text === 1">跳过</span>
+          <span v-if="text === true">跳过</span>
           <span v-else class="cell-sub">照常执行</span>
         </template>
 

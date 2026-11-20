@@ -125,7 +125,7 @@
           <a-tag v-if="record.ipFamiliar !== null && record.ipFamiliar !== undefined" :color="familiarMeta(record.ipFamiliar).color">
             {{ familiarMeta(record.ipFamiliar).desc }}
           </a-tag>
-          <a-tag v-if="record.dormant === 1" color="orange">沉睡</a-tag>
+          <a-tag v-if="record.dormant === true" color="orange">沉睡</a-tag>
         </template>
 
         <template v-else-if="column.dataIndex === 'score'">

@@ -90,8 +90,8 @@ class NotificationPreferenceServiceTest {
     void 关掉的才拦() {
         MemberNotificationPreference preference = new MemberNotificationPreference();
         preference.setMemberId(MEMBER_ID);
-        preference.setTradeEnabled(1);
-        preference.setMarketingEnabled(0);
+        preference.setTradeEnabled(true);
+        preference.setMarketingEnabled(false);
         when(dao.selectById(anyLong())).thenReturn(preference);
 
         assertTrue(service.accepts(MEMBER_ID, NotificationCategoryEnum.TRADE));

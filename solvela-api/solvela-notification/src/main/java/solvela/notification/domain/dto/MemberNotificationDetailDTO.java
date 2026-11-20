@@ -29,7 +29,7 @@ public class MemberNotificationDetailDTO {
     /** 按发送当时的模板版本渲染 */
     private String content;
 
-    private Integer readFlag;
+    private Boolean readFlag;
 
     private LocalDateTime createTime;
 }

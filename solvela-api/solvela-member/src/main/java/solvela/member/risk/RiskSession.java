@@ -217,11 +217,11 @@ public final class RiskSession implements AutoCloseable {
         event.setDeviceId(context.getDeviceId());
         event.setDeviceTrust(context.getDeviceTrust() == null ? null : context.getDeviceTrust().value());
         event.setIpFamiliar(context.getIpFamiliar() == null ? null : context.getIpFamiliar().value());
-        event.setDormant(context.getDormant() == null ? null : (context.getDormant() ? 1 : 0));
+        event.setDormant(context.getDormant());
         event.setClientIp(context.getClientIp());
         // 归属地只为了让人看懂这一行，判断全程用的是重新解析出来的字段（方案 §4.4）
         event.setIpRegion(SolvelaIpUtil.getRegion(context.getClientIp()));
-        event.setCaptchaPassed(context.isCaptchaPassed() ? 1 : 0);
+        event.setCaptchaPassed(context.isCaptchaPassed());
         event.setPreScore(effective.score(MemberRiskPhaseEnum.PRE));
         event.setPostScore(effective.score(MemberRiskPhaseEnum.POST));
         event.setShadowScore(shadow.totalScore());

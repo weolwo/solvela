@@ -95,7 +95,7 @@ public class NotificationInternalController implements NotificationApi {
                 dto.getCategory() == null ? null : dto.getCategory().name(),
                 dto.getTitle(),
                 dto.getContent(),
-                dto.getReadFlag(),
+                readFlagOnWire(dto.getReadFlag()),
                 format(dto.getCreateTime()));
     }
 
@@ -175,7 +175,7 @@ public class NotificationInternalController implements NotificationApi {
                 dto.getTemplateCode(),
                 dto.getCategory() == null ? null : dto.getCategory().name(),
                 dto.getSummary(),
-                dto.getReadFlag(),
+                readFlagOnWire(dto.getReadFlag()),
                 format(dto.getCreateTime()));
     }
 
@@ -185,13 +185,24 @@ public class NotificationInternalController implements NotificationApi {
                 row.getTitle(),
                 row.getContent(),
                 row.getCategory() == null ? null : row.getCategory().name(),
-                row.getForceAck() != null && row.getForceAck() == 1,
+                Boolean.TRUE.equals(row.getForceAck()),
                 row.getId() > readCursor,
                 format(row.getPublishTime()));
     }
 
-    private static boolean isOn(Integer flag) {
-        return flag == null || flag == 1;
+    /**
+     * 已读标记在契约上仍是 0/1，域内是 Boolean。
+     *
+     * <p>🔴 不要顺手把 {@code NotificationView.readFlag} 也改成 boolean：它跨进程（网关 ↔ app-biz 分开发版），
+     * 一路到 C 端 PWA 的 {@code item.readFlag === 0}。改成 true/false 的话，发版间隙和用户手机上缓存的旧版 PWA
+     * 会把所有消息<b>静默</b>显示成已读。真要改形状，走先扩后收（新旧字段并存、PWA 迁完再删旧的）。
+     */
+    private static Integer readFlagOnWire(Boolean read) {
+        return Boolean.TRUE.equals(read) ? 1 : 0;
+    }
+
+    private static boolean isOn(Boolean flag) {
+        return !Boolean.FALSE.equals(flag);
     }
 
     private static String format(LocalDateTime time) {

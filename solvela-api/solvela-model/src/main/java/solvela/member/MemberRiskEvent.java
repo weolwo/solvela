@@ -55,15 +55,15 @@ public class MemberRiskEvent {
     /** 0-陌生, 1-宽松熟悉, 2-严格熟悉 */
     private Integer ipFamiliar;
 
-    /** 0-活跃, 1-沉睡 */
-    private Integer dormant;
+    /** false-活跃, true-沉睡, null-查无此人（列是 tinyint 0/1/NULL） */
+    private Boolean dormant;
 
     private String clientIp;
 
     private String ipRegion;
 
-    /** 1 = 本次请求带了有效滑块通行票 */
-    private Integer captchaPassed;
+    /** true = 本次请求带了有效滑块通行票（列是 tinyint NOT NULL DEFAULT 0） */
+    private Boolean captchaPassed;
 
     private Integer preScore;
 

@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -139,10 +138,8 @@ public class MallCommoditySaveForm {
      * <p>🔴 它和 {@code minGrade} 是两件事 —— 那个是「够不够格兑」，
      * 这个是「兑的时候打不打折」。一件不限等级的商品照样可以打等级折扣。
      */
-    @Schema(description = "参与等级折扣：0-不参与, 1-参与（默认）")
-    @Min(value = 0, message = "参与等级折扣只能是 0 或 1")
-    @Max(value = 1, message = "参与等级折扣只能是 0 或 1")
-    private Integer gradePriceFlag;
+    @Schema(description = "参与等级折扣：false-不参与, true-参与（不传按参与）")
+    private Boolean gradePriceFlag;
 
     /**
      * 商品的<b>上架有效期</b>，不是秒杀场次 —— DDL 把这个语义钉死过，别拿来当档期用。

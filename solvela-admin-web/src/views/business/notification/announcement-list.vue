@@ -32,7 +32,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.dataIndex === 'forceAck'">
-          <a-tag v-if="record.forceAck === 1" color="red">强制确认</a-tag>
+          <a-tag v-if="record.forceAck === true" color="red">强制确认</a-tag>
           <span v-else class="text-slate-400">普通</span>
         </template>
 
@@ -53,7 +53,7 @@
         <template v-if="column.dataIndex === 'action'">
           <a-space>
             <a @click="onEdit(record)">编辑</a>
-            <a v-if="record.forceAck === 1" @click="onViewAck(record)">确认情况</a>
+            <a v-if="record.forceAck === true" @click="onViewAck(record)">确认情况</a>
             <a-popconfirm title="下架后用户看不到，确认记录仍保留。确定？" @confirm="onOffline(record)">
               <a v-if="record.status === 1">下架</a>
             </a-popconfirm>
@@ -101,7 +101,7 @@
       </a-form-item>
 
       <a-form-item label="强制确认" name="forceAck">
-        <a-switch v-model:checked="forceAckOn" />
+        <a-switch v-model:checked="form.forceAck" />
         <div class="mt-1 text-xs text-slate-500">
           开启后用户进 App 就弹窗，<b>必须点「我已阅读并知悉」才能继续</b>，并留下确认记录。
           <br />
@@ -163,7 +163,7 @@
 </template>
 
 <script setup>
-  import { ref, reactive, computed, watch, onMounted } from 'vue';
+  import { ref, reactive, computed, onMounted } from 'vue';
   import { message } from 'ant-design-vue';
   import { PlusOutlined } from '@ant-design/icons-vue';
   import { announcementApi } from '/@/api/business/notification/announcement-api';
@@ -212,7 +212,6 @@
 
   const drawerOpen = ref(false);
   const formRef = ref();
-  const forceAckOn = ref(false);
   const audienceBoundary = ref(undefined);
 
   const formDefault = {
@@ -220,7 +219,7 @@
     title: undefined,
     content: undefined,
     category: 'SYSTEM',
-    forceAck: 0,
+    forceAck: false,
     audienceType: 'ALL',
     audienceRule: undefined,
     publishTime: undefined,
@@ -229,10 +228,6 @@
   };
 
   const form = reactive({ ...formDefault });
-
-  watch(forceAckOn, (on) => {
-    form.forceAck = on ? 1 : 0;
-  });
 
   const rules = computed(() => ({
     title: [{ required: true, message: '标题 必填' }],
@@ -245,14 +240,12 @@
 
   function onAdd() {
     Object.assign(form, formDefault);
-    forceAckOn.value = false;
     audienceBoundary.value = undefined;
     drawerOpen.value = true;
   }
 
   function onEdit(record) {
     Object.assign(form, formDefault, record);
-    forceAckOn.value = record.forceAck === 1;
     audienceBoundary.value = parseBoundary(record.audienceRule, record.audienceType);
     drawerOpen.value = true;
   }

@@ -58,7 +58,7 @@ public class InboxNotificationSender implements NotificationSender {
         entity.setSummary(notification.summary());
         entity.setCategory(notification.category());
         entity.setBizRefId(notification.bizRefId());
-        entity.setReadFlag(0);
+        entity.setReadFlag(false);
         // 人工发送才有操作人。系统发送留空 —— 那一列为空正好等于「不是人发的」，
         // 事后查人工发过什么就是一句 where create_by is not null
         entity.setCreateBy(notification.operator());
