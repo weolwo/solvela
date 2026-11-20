@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import solvela.admin.module.notification.domain.form.NotificationTemplateSaveForm;
+import solvela.admin.module.notification.domain.vo.NotificationTemplateVO;
+import solvela.base.util.SolvelaBeanUtil;
 import solvela.notification.NotificationTemplate;
 import solvela.notification.service.NotificationAdminService;
 import solvela.web.RequiresPermission;
@@ -45,15 +48,16 @@ public class NotificationTemplateController {
     @Operation(summary = "模板列表（每个编码取最新启用版）")
     @GetMapping("/list")
     @RequiresPermission("notificationTemplate:query")
-    public List<NotificationTemplate> list() {
-        return notificationAdminService.listLatestTemplates();
+    public List<NotificationTemplateVO> list() {
+        return SolvelaBeanUtil.copyList(notificationAdminService.listLatestTemplates(), NotificationTemplateVO.class);
     }
 
     @Operation(summary = "某个编码的全部历史版本，新的在前")
     @GetMapping("/versions")
     @RequiresPermission("notificationTemplate:query")
-    public List<NotificationTemplate> versions(@RequestParam String templateCode) {
-        return notificationAdminService.listTemplateVersions(templateCode);
+    public List<NotificationTemplateVO> versions(@RequestParam String templateCode) {
+        return SolvelaBeanUtil.copyList(notificationAdminService.listTemplateVersions(templateCode),
+                NotificationTemplateVO.class);
     }
 
     /**
@@ -65,8 +69,8 @@ public class NotificationTemplateController {
     @Operation(summary = "新增版本（编辑 = 新增下一版，不是原地改）")
     @PostMapping("/save")
     @RequiresPermission("notificationTemplate:save")
-    public int save(@RequestBody @Valid NotificationTemplate template) {
-        return notificationAdminService.saveTemplate(template);
+    public int save(@RequestBody @Valid NotificationTemplateSaveForm form) {
+        return notificationAdminService.saveTemplate(SolvelaBeanUtil.copy(form, NotificationTemplate.class));
     }
 
     @Operation(summary = "停用某一版（不删除 —— 删了历史通知就渲染不出来）")

@@ -10,6 +10,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import solvela.enums.EnableStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.NotificationTemplate;
@@ -76,7 +77,7 @@ class NotificationServiceTest {
         t.setCategory(NotificationCategoryEnum.MARKETING);
         t.setTitleTemplate(title);
         t.setContentTemplate(content);
-        t.setStatus(1);
+        t.setStatus(EnableStatusEnum.ENABLED);
         return t;
     }
 

@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import solvela.enums.AnnouncementStatusEnum;
+import solvela.enums.EnableStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.Announcement;
@@ -200,7 +201,7 @@ class NotificationLiveTest {
         next.setTitleTemplate(marker + " 账号受限");
         next.setContentTemplate(marker + " 您的账号因「${limitType}」受限，${unlockTime} 恢复。");
         next.setParamKeys(latest.getParamKeys());
-        next.setStatus(1);
+        next.setStatus(EnableStatusEnum.ENABLED);
         notificationTemplateDao.insert(next);
 
         try {

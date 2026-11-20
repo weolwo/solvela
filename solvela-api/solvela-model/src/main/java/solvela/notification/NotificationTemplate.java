@@ -2,6 +2,7 @@ package solvela.notification;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import solvela.enums.EnableStatusEnum;
 import solvela.enums.NotificationCategoryEnum;
 
 import java.time.LocalDateTime;
@@ -77,7 +78,7 @@ public class NotificationTemplate {
      * <p>🔴 <b>只停用不删除。</b> 删掉一行，所有指向它的历史通知就渲染不出来了 ——
      * 而那些通知是用户真收到过的，不该因为运营下线了一个模板就变成空白。
      */
-    private Integer status;
+    private EnableStatusEnum status;
 
     private String createBy;
 
