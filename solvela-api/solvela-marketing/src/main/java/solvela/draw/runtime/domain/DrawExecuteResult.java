@@ -34,12 +34,15 @@ import java.util.List;
 public sealed interface DrawExecuteResult {
 
     /**
-     * 整批没被受理：<b>这一批压根没抽</b>，机会与资产都没被消耗，上游该原样退回去。
+     * 整批没被受理：<b>这一批压根没抽</b>，机会与资产都没被消耗，上游该原样退回去 ——
+     * 唯一例外是 {@code DUPLICATE_REQUEST}，见下。
      *
-     * <p>⚠️ 幂等重试<b>不再落到这里</b>。上一版用 {@code DUPLICATE_REQUEST} 这个 reject
-     * 表达「你重试了」，而 reject 的契约是「压根没抽、请退还」—— 但第一次其实<b>真的抽了</b>。
-     * 于是网络重试会让上游把已经中奖的那一次资产退回去。连抽之后这是 N 份奖的事。
-     * 现在幂等命中返回的是<b>第一次的完整结果</b>（{@link Executed}），语义才对得上。
+     * <p>⚠️ 幂等重试<b>正常情况下不落到这里</b>：命中时返回第一次的完整结果（{@link Executed}）。
+     * 上一版一律用 {@code DUPLICATE_REQUEST} 表达「你重试了」，于是网络重试会让上游把已经中奖的那一次资产退回去。
+     *
+     * <p>🔴 但仍有三种情况会返回 {@code Rejected(DUPLICATE_REQUEST)}，而第一次<b>可能已经抽了</b>：
+     * 第一次还在处理中、结果回放反序列化失败、结果没写进 Redis（见 {@code DrawExecuteService.claimOrReplay}）。
+     * 所以上游退还前要看 {@link DrawRejectReason#provesNotDrawn()}，不能只看「是不是 Rejected」。
      */
     record Rejected(DrawRejectReason reason) implements DrawExecuteResult {
     }

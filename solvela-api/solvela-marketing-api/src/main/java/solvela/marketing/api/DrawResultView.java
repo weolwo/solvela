@@ -10,7 +10,9 @@ import java.util.List;
  * 而 hit / miss 是<b>每一次各自</b>的事。三种情况：
  * <ul>
  *   <li><b>没被受理</b>：{@code reject != null}，{@code records} 为空。
- *       这一批压根没抽，机会与资产都没被消耗，上游该原样退回去；</li>
+ *       这一批压根没抽，机会与资产都没被消耗，上游该原样退回去 ——
+ *       ⚠️ 唯一例外是 {@code DUPLICATE_REQUEST}（第一次可能已经抽了），退还前先看
+ *       {@link DrawRejectReason#provesNotDrawn()}；</li>
  *   <li><b>抽了但没中</b>：{@code reject == null}，某条记录 {@code hit=false}。
  *       这是<b>正常结果</b>，抽奖发生了；</li>
  *   <li><b>中了</b>：某条记录 {@code hit=true}。</li>

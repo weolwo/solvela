@@ -246,8 +246,10 @@ public class DrawExecuteService {
         if (replayed != null) {
             return replayed;
         }
-        // 拿到了锁标记但还没有结果 —— 上一次【正在处理中】，这是真正的并发重复提交。
-        // 这时说「重复请求」是准确的：那一次还没落定，没有结果可回放
+        // 有标记但没有可回放的结果，三种情况：上一次【正在处理中】（真正的并发重复提交）、
+        // 结果回放反序列化失败、结果没写进 Redis（标记停在 IN_FLIGHT，见 remember）。
+        // 🔴 后两种第一次已经抽了，第一种也可能马上抽完 —— 所以 DUPLICATE_REQUEST 不证明「没抽」，
+        // 上游退还要按 DrawRejectReason.provesNotDrawn() 判
         return new DrawExecuteResult.Rejected(DrawRejectReason.DUPLICATE_REQUEST);
     }
 

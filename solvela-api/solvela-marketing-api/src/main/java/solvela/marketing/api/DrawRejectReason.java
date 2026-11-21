@@ -8,7 +8,8 @@ package solvela.marketing.api;
  *   <li><b>中奖</b>：{@code hit=true}；</li>
  *   <li><b>没中奖</b>：{@code hit=false} 且 {@code reject=null} —— 这是<b>正常结果</b>，
  *       抽奖本身发生了，只是没抽中；</li>
- *   <li><b>没被受理</b>：{@code reject!=null} —— 这一次<b>压根没抽</b>，机会没被消耗。</li>
+ *   <li><b>没被受理</b>：{@code reject!=null} —— 这一次<b>压根没抽</b>，机会没被消耗。
+ *       ⚠️ 唯一例外是 {@link #DUPLICATE_REQUEST}，退还与否按 {@link #provesNotDrawn()} 判。</li>
  * </ul>
  * 前两者的区别决定要不要发奖，后两者的区别决定要不要退还机会/资产。
  * 混在一起表达（比如都用 message 字符串）时，这两个决定就只能靠猜。
@@ -25,7 +26,11 @@ package solvela.marketing.api;
  */
 public enum DrawRejectReason {
 
-    /** 同一个 requestId 已经在处理或处理过了。幂等拦截，<b>不是错误</b> —— 网络重试本来就该撞上它。 */
+    /**
+     * 同一个 requestId 已经在处理或处理过了。幂等拦截，<b>不是错误</b> —— 网络重试本来就该撞上它。
+     *
+     * <p>🔴 它是唯一<b>不表示「没抽」</b>的原因，见 {@link #provesNotDrawn()}。
+     */
     DUPLICATE_REQUEST,
 
     /**
@@ -104,5 +109,26 @@ public enum DrawRejectReason {
      * <p>与 {@link #POOL_NO_PRIZE} 分开，是因为处置方式不同 ——
      * 前者是「还没配」，后者是「配过又被删坏了」，后者要告警。
      */
-    POOL_BROKEN
+    POOL_BROKEN;
+
+    /**
+     * 这个原因能否证明这一批<b>压根没抽</b> —— 上游只有在它为 true 时才可以退还机会 / 资产。
+     *
+     * <p>🔴 {@link #DUPLICATE_REQUEST} 不能：撞上它时第一次<b>可能正在抽、也可能已经抽完</b>
+     * （结果回放失败、结果没写进 Redis 时同样落到它）。据它退还，就是把已经中奖的那一批的成本退回去 ——
+     * 连抽之后是 N 份奖的事。今天上游还没有消耗与退还，等加上时必须按这个方法判，而不是按「reject 非空」判。
+     *
+     * <p>其余原因都在开抽之前产生（入参、限流、奖池预检、活动与玩法配置、脚本拒绝），确实什么都没发生。
+     *
+     * <p>写成不带 default 的 switch：加一个原因时这里编译不过，逼着加的人回答「它能不能证明没抽」。
+     * 这是方法不是字段，JSON 里仍是枚举名，跨进程形状不变。
+     */
+    public boolean provesNotDrawn() {
+        return switch (this) {
+            case DUPLICATE_REQUEST -> false;
+            case INVALID_TIMES, TOO_FREQUENT, QUOTA_EXCEEDED, NOT_ELIGIBLE,
+                 POOL_NOT_FOUND, POOL_CLOSED, POOL_NO_PRIZE, POOL_BROKEN,
+                 ACTIVITY_NOT_FOUND, ACTIVITY_NOT_OPEN, NO_PLAY_CONFIG, NO_PLAY_SCRIPT -> true;
+        };
+    }
 }
