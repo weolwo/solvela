@@ -146,7 +146,10 @@ public class ProposalFunnelDTO {
     @Data
     public static class SourceStatDTO {
 
-        /** 来源编码：TASK/DRAW/LOTTERY/MANUAL */
+        /**
+         * 来源编码：TASK/DRAW/LOTTERY/MANUAL。
+         * 刻意是 String：这张报表要把字典外的取值原样亮出来（unknownSource），换成枚举就看不见它们了
+         */
         private String sourceType;
 
         /** 来源说明；不在字典内时回显原值 */

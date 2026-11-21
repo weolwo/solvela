@@ -2,6 +2,7 @@ package solvela.member.api;
 
 import java.math.BigDecimal;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ProposalSourceTypeEnum;
 
 /**
  * 新增资产提案：营销侧发出一笔奖，请会员服务收下。
@@ -33,7 +34,7 @@ public record CreateProposalCmd(
         String assetName,
         BigDecimal amount,
         Integer quantity,
-        String sourceType,
+        ProposalSourceTypeEnum sourceType,
         Long promotionConfigId,
         String remark) {
 }

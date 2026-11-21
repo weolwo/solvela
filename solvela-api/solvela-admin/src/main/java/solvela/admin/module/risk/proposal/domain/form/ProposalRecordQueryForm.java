@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ProposalSourceTypeEnum;
 
 import java.time.LocalDate;
 
@@ -51,7 +52,7 @@ public class ProposalRecordQueryForm extends PageParam {
     private ProposalStatusEnum status;
 
     @Schema(description = "来源：TASK(任务), DRAW(抽奖), MANUAL(人工)")
-    private String sourceType;
+    private ProposalSourceTypeEnum sourceType;
 
     @Schema(description = "来源单号(taskRecordId 或 drawLogTraceId)")
     private String sourceBizId;

@@ -27,6 +27,7 @@ import solvela.risk.proposal.dao.ProposalRecordDao;
 import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.spi.AssetDispatcher;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ProposalSourceTypeEnum;
 
 import java.math.BigDecimal;
 
@@ -251,7 +252,7 @@ class ProposalRecordServiceTest {
         req.setAssetType(PrizeTypeEnum.SCORE);
         req.setAmount(amount);
         req.setQuantity(1);
-        req.setSourceType("DRAW");
+        req.setSourceType(ProposalSourceTypeEnum.DRAW);
         req.setSourceBizId("BIZ-1");
         req.setRemark("中奖发放");
         return req;

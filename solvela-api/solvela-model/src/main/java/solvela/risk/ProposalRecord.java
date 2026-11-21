@@ -2,6 +2,7 @@ package solvela.risk;
 
 import solvela.enums.ProposalStatusEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ProposalSourceTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -96,7 +97,7 @@ public class ProposalRecord {
     /**
      * 来源：TASK, DRAW, MANUAL
      */
-    private String sourceType;
+    private ProposalSourceTypeEnum sourceType;
 
     /**
      * 来源单号

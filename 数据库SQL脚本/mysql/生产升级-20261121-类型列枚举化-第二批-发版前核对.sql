@@ -13,4 +13,8 @@ WHERE BINARY activity_type NOT IN ('BASIC', 'DRAW', 'TASK', 'LOTTERY') GROUP BY 
 UNION ALL
 -- t_prize_log.activity_type 允许为空（存量行没有这个值），空值不算非法
 SELECT 't_prize_log.activity_type', activity_type, COUNT(*) FROM t_prize_log
-WHERE activity_type IS NOT NULL AND BINARY activity_type NOT IN ('BASIC', 'DRAW', 'TASK', 'LOTTERY') GROUP BY activity_type;
+WHERE activity_type IS NOT NULL AND BINARY activity_type NOT IN ('BASIC', 'DRAW', 'TASK', 'LOTTERY') GROUP BY activity_type
+UNION ALL
+-- ProposalSourceTypeEnum：solvela-contract/src/main/java/solvela/enums/ProposalSourceTypeEnum.java
+SELECT 't_proposal_record.source_type', source_type, COUNT(*) FROM t_proposal_record
+WHERE BINARY source_type NOT IN ('TASK', 'DRAW', 'LOTTERY', 'MANUAL') GROUP BY source_type;

@@ -3,6 +3,7 @@ package solvela.risk.proposal.domain.dto;
 
 import solvela.enums.ProposalStatusEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ProposalSourceTypeEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -49,7 +50,7 @@ public class ProposalRecordDTO {
     private Integer quantity;
 
     /** 来源：TASK(任务), DRAW(抽奖), MANUAL(人工) */
-    private String sourceType;
+    private ProposalSourceTypeEnum sourceType;
 
     /** 来源单号(task_record_id 或 draw_log_trace_id) */
     private String sourceBizId;

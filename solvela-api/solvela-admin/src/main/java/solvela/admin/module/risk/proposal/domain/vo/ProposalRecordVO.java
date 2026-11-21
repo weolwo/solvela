@@ -2,6 +2,7 @@ package solvela.admin.module.risk.proposal.domain.vo;
 
 import solvela.enums.ProposalStatusEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ProposalSourceTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -53,7 +54,7 @@ public class ProposalRecordVO {
     private Integer quantity;
 
     @Schema(description = "来源：TASK(任务), DRAW(抽奖), MANUAL(人工)")
-    private String sourceType;
+    private ProposalSourceTypeEnum sourceType;
 
     @Schema(description = "来源单号(task_record_id 或 draw_log_trace_id)")
     private String sourceBizId;

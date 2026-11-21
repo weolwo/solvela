@@ -241,8 +241,6 @@ class EnumMigrationRatchetTest {
      * <p>⚠️ deviceType 两列是客户端上报的，收敛成枚举之前要先定「未知值怎么办」（拒绝还是归为 OTHER），那是业务决定。
      */
     private static final Set<String> STRING_TYPE_PENDING = Set.of(
-            // ProposalSourceTypeEnum 已存在
-            "risk/ProposalRecord.java#sourceType",
             // ScriptRefPoint 已存在（solvela-scriptengine）
             "scriptengine/ScriptRef.java#refType",
             // 封闭集合，还没有枚举

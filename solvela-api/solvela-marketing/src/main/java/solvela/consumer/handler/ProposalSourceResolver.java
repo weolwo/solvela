@@ -38,19 +38,19 @@ public class ProposalSourceResolver {
      * @param activityType 发奖流水上的玩法类型
      * @return 提案来源类型；为空时降级为 {@link ProposalSourceTypeEnum#MANUAL}
      */
-    public String resolve(ActivityTypeEnum activityType) {
+    public ProposalSourceTypeEnum resolve(ActivityTypeEnum activityType) {
         ActivityTypeEnum type = activityType;
         if (type == null) {
             // 不抛异常：来源类型只是归类维度，为它中断一次真实发奖不划算
             log.warn("【提案来源】玩法类型为空，来源降级为 MANUAL");
-            return ProposalSourceTypeEnum.MANUAL.getValue();
+            return ProposalSourceTypeEnum.MANUAL;
         }
         return switch (type) {
-            case DRAW -> ProposalSourceTypeEnum.DRAW.getValue();
-            case TASK -> ProposalSourceTypeEnum.TASK.getValue();
-            case LOTTERY -> ProposalSourceTypeEnum.LOTTERY.getValue();
+            case DRAW -> ProposalSourceTypeEnum.DRAW;
+            case TASK -> ProposalSourceTypeEnum.TASK;
+            case LOTTERY -> ProposalSourceTypeEnum.LOTTERY;
             // BASIC 不挂玩法引擎，它下面的奖只可能是人工发放
-            case BASIC -> ProposalSourceTypeEnum.MANUAL.getValue();
+            case BASIC -> ProposalSourceTypeEnum.MANUAL;
         };
     }
 }
