@@ -95,7 +95,7 @@ public final class TaskConst {
         }
     }
 
-    // t_task_config.limit_type 的取值见 TaskLimitTypeEnum（2026-11-21 起不再是这里的字符串常量）
+    // t_task_config.limit_type 的取值见 TaskLimitTypeEnum
 
     // ==================== rule_config 约定键 ====================
 

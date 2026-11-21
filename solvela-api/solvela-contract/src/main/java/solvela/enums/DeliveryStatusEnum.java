@@ -32,8 +32,7 @@ public enum DeliveryStatusEnum implements BaseEnum {
      * {@code LedgerStatTest#deliveryNumbersAddUp} 的注释里也写着「四个桶加起来比总数少 1」。
      * 统计层一直认它，只有类型层不认。2026-08-29 补齐。
      *
-     * <p>统计层原先叫它「作废(discarded)」，与本枚举的「取消」不是一套说法，
-     * 同日一并改成 {@code cancelledCount}（含前端展示文案），全链路只剩一种叫法。
+     * <p>统计层与前端也叫它「取消」（{@code cancelledCount}），全链路只有这一种叫法，别再起「作废」之类的别名。
      *
      * <p>用负数是刻意的：取消不是履约流程上的一环，不该排进 0..3 的推进序列。
      */

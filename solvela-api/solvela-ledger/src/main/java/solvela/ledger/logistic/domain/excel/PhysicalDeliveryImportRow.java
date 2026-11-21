@@ -11,7 +11,7 @@ import solvela.base.sonicexcel.annotation.SonicTitle;
  *
  * <p>原名以 Form 结尾会让人以为它和其它写入表单一样该移交端，故改名为 Row。
  * @param memberName  会员账号（不是会员号）。运营记得住的是账号，所以表头收账号， 由 {@code PhysicalDeliveryService.importAdd} 批量换成关联键 {@code member_id}； 换不到的账号<b>逐行报错退回</b>，不会静默生成一张无主履约单。
- * @param sourceBizId 来源单号。原先是「发奖提案ID」(Long)，随 t_physical_delivery 泛化成字符串单号。 ⚠️ forceText 理由同电话：单号不强制文本会被 Excel 吃掉前导 0。
+ * @param sourceBizId 来源单号（发奖提案 ID 或商城订单号），是字符串。 ⚠️ forceText 理由同电话：单号不强制文本会被 Excel 吃掉前导 0。
  */
 public record PhysicalDeliveryImportRow(
 
@@ -23,7 +23,7 @@ public record PhysicalDeliveryImportRow(
         @SonicTitle("会员账号") String memberName,
 
         /**
-         * 来源单号。原先是「发奖提案ID」(Long)，随 t_physical_delivery 泛化成字符串单号。
+         * 来源单号（发奖提案 ID 或商城订单号），是字符串。
          * ⚠️ forceText 理由同电话：单号不强制文本会被 Excel 吃掉前导 0。
          */
         @SonicTitle(value = "来源单号", forceText = true) String sourceBizId,

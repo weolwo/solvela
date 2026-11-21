@@ -7,9 +7,6 @@ import solvela.enums.BaseEnum;
 /**
  * 奖级匹配规则，对齐 t_lottery_prize_rule.match_rule
  *
- * 取代了此前零引用的 PatternModeEnum(0-前匹配/1-后匹配)——那是旧设计残留，
- * 与本枚举属于两套并存语义，已随 P0 清场删除。
- *
  * ⚠️ 字段必须叫 value：BaseEnum.getValue() 是 @CheckEnum 建合法值白名单的唯一来源，
  * 得让 Lombok 的 @Getter 直接生成出来。TicketStatusEnum 曾因字段名为 code 又手写
  * getValue(){return null;}，导致白名单全 null、任何取值都判非法。

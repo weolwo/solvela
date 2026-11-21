@@ -18,9 +18,7 @@ import org.hibernate.validator.constraints.Length;
  * @Copyright  <a href="https://1024lab.net">1024创新实验室</a>
  */
 /*
- * 2026-08-06：图形验证码功能已整体移除，本类不再继承 CaptchaForm
- * （原先带的 captchaCode / captchaUuid 两个字段随之消失）。
- * 暴力破解的防线现在只剩「连续登录失败 N 次锁定账号」那一条，见 LoginService。
+ * 没有图形验证码：暴力破解的防线只有「连续登录失败 N 次锁定账号」这一条，见 LoginService。
  */
 @Data
 public class LoginForm {

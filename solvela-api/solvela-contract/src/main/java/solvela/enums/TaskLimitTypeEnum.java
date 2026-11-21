@@ -2,8 +2,6 @@ package solvela.enums;
 
 /**
  * 任务参与频次：{@code t_task_config.limit_type}，按枚举名存，JSON 也是枚举名。
- *
- * <p>以前是 TaskConst 里的四个字符串常量，各处按字符串 switch / equals。
  */
 public enum TaskLimitTypeEnum {
 

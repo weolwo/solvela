@@ -24,9 +24,7 @@ public class DrawWorkbenchMappingCommand {
      * 是否兜底奖项。<b>落库</b>到 {@code t_pool_prize_mapping.is_fallback}，
      * 并且是运行期库存降级链路的<b>唯一依据</b>。
      *
-     * <p>⚠️ 这里原先写着「编辑期概念，概率已配平为具体数值，暂不落库」——
-     * 那句是过期的，照它理解会得出「兜底只是个 UI 概念」的错误结论。
-     * 实际上 {@code PrizePoolConfigService.workbenchSave} 明确 setIsFallback 存了库，
+     * <p>⚠️ 它不是只在编辑期有用的 UI 概念：{@code PrizePoolConfigService.workbenchSave} 会 setIsFallback 存库，
      * 而 {@link solvela.draw.engine.DrawEngine} 与 {@code DrawExecuteService.settle}
      * 两处都要靠这一列找到降级目标。
      *

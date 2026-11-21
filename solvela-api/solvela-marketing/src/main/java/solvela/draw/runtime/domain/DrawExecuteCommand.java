@@ -5,7 +5,6 @@ package solvela.draw.runtime.domain;
  *
  * <p>用 record：这个对象要穿过 settle / tryDeduct / saveLog / publishPrizeEvent 四层，
  * 可变的话「这个 memberId 到第三层还是不是调用方传的那个」要读全链路才能回答。
- * 上一版是 {@code @Data}。
  *
  * @param activityCode 活动编码
  * @param poolCode     奖池编码。<b>绝不能由客户端传</b> —— 那等于让用户自己挑奖池，

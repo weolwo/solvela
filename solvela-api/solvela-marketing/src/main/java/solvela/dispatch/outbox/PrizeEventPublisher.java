@@ -16,8 +16,7 @@ import solvela.event.UserPrizeEvent;
  * admin 是进程内的 {@code ProposalApiService}，营销服务是
  * {@code MemberServiceClientConfig} 造的 HTTP 代理。
  *
- * <p>⚠️ 2026-08-31 更正：这里原先写着「营销服务必须写 outbox 并投递到 MQ」——
- * <b>那个实现从来没有落地</b>，配套的实体与 Dao 已随本次一并删除（它们除了互相引用零使用）。
+ * <p>⚠️ <b>没有 outbox 实现，投递保证目前不存在</b>（见 {@link LocalPrizeEventPublisher}）。
  * 真要补投递保证时加一个实现即可，业务代码不用动 —— 那正是留着这个接口的意义。
  */
 public interface PrizeEventPublisher {
