@@ -2,6 +2,7 @@ package solvela.prize;
 
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.ApproveModeEnum;
+import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -48,7 +49,7 @@ public class PrizeConfig {
     /**
      * 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM
      */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /**
      * 奖品名称

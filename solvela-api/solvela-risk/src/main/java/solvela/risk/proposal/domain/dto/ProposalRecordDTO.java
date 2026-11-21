@@ -2,6 +2,7 @@ package solvela.risk.proposal.domain.dto;
 
 
 import solvela.enums.ProposalStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -33,7 +34,7 @@ public class ProposalRecordDTO {
     private String memberName;
 
     /** SCORE/BALANCE/COUPON/PHYSICAL */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /** 资产引用：券模/SKU，值类资产为空 */
     private String assetRef;

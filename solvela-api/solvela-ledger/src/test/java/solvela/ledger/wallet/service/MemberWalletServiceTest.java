@@ -90,13 +90,13 @@ class MemberWalletServiceTest {
         wallet = new MemberWallet();
         wallet.setId(WALLET_ID);
         wallet.setMemberId(MEMBER_ID);
-        wallet.setAssetType(PrizeTypeEnum.SCORE.name());
+        wallet.setAssetType(PrizeTypeEnum.SCORE);
         wallet.setBalance(new BigDecimal("500"));
         wallet.setStatus(WalletStatusEnum.NORMAL);
         wallet.setVersion(3);
 
         when(memberService.requireMemberName(MEMBER_ID)).thenReturn("sv900001");
-        when(memberWalletDao.getByMemberIdAndAssetType(eq(MEMBER_ID), eq(PrizeTypeEnum.SCORE.name())))
+        when(memberWalletDao.getByMemberIdAndAssetType(eq(MEMBER_ID), eq(PrizeTypeEnum.SCORE)))
                 .thenReturn(wallet);
     }
 
@@ -206,7 +206,7 @@ class MemberWalletServiceTest {
     @Test
     @DisplayName("入账：钱包不存在时自愈初始化，不是报错")
     void 入账时钱包自愈() {
-        when(memberWalletDao.getByMemberIdAndAssetType(eq(MEMBER_ID), eq(PrizeTypeEnum.SCORE.name())))
+        when(memberWalletDao.getByMemberIdAndAssetType(eq(MEMBER_ID), eq(PrizeTypeEnum.SCORE)))
                 .thenReturn(null);
         when(memberWalletDao.addBalanceWithVersion(any(), any(), anyInt())).thenReturn(1);
 

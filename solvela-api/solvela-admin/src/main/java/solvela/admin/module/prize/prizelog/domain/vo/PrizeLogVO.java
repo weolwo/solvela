@@ -2,6 +2,7 @@ package solvela.admin.module.prize.prizelog.domain.vo;
 
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -46,7 +47,7 @@ public class PrizeLogVO {
     private String prizeName;
 
     @Schema(description = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER")
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     @Schema(description = "奖励体值(积分数/券ID)")
     private String prizeValue;

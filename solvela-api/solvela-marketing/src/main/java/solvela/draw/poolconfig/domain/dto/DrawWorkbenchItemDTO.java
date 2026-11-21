@@ -2,6 +2,7 @@ package solvela.draw.poolconfig.domain.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 抽奖工作台回显 · Tab1 奖项物资项
@@ -21,7 +22,7 @@ import java.util.List;
  */
 public record DrawWorkbenchItemDTO(String prizeCode,
                                   String prizeName,
-                                  String prizeType,
+                                  PrizeTypeEnum prizeType,
                                   BigDecimal prizeValue,
                                   Integer totalStock,
                                   Integer userMaxCount,

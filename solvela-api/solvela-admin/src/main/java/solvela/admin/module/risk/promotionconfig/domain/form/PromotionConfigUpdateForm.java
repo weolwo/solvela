@@ -3,6 +3,7 @@ package solvela.admin.module.risk.promotionconfig.domain.form;
 import solvela.enums.ReviewLevelEnum;
 import java.time.LocalDateTime;
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,7 +33,7 @@ public class PromotionConfigUpdateForm {
 
     @Schema(description = "资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物), MARKER(标记)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物), MARKER(标记) 不能为空")
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     @Schema(description = "总库存(个数)：-1为不限制(适用于券/实物)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "总库存(个数)：-1为不限制(适用于券/实物) 不能为空")

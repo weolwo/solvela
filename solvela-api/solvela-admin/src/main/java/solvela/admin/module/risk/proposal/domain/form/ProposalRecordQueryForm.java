@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.PrizeTypeEnum;
 
 import java.time.LocalDate;
 
@@ -62,6 +63,6 @@ public class ProposalRecordQueryForm extends PageParam {
     private String tradeNo;
 
     @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL")
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
 }

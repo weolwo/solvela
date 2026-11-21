@@ -3,6 +3,7 @@ package solvela.prize.prizelog.domain.dto;
 
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -42,7 +43,7 @@ public class PrizeLogDTO {
     private String prizeName;
 
     /** 奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 奖励体值(积分数/券ID) */
     private String prizeValue;

@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import solvela.ledger.MemberWallet;
 import solvela.ledger.wallet.domain.dto.MemberWalletDTO;
 import solvela.ledger.wallet.domain.query.MemberWalletQuery;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -62,7 +63,7 @@ public interface MemberWalletDao extends BaseMapper<MemberWallet> {
      * @param assetType 资产类型 PrizeTypeEnum
      * @return 钱包账户
      */
-    MemberWallet getByMemberIdAndAssetType(@Param("memberId") Long memberId, @Param("assetType") String assetType);
+    MemberWallet getByMemberIdAndAssetType(@Param("memberId") Long memberId, @Param("assetType") PrizeTypeEnum assetType);
 
     /*
      * 原先这里有 deleteById / batchDelete 两个<b>物理删除</b>，已随写接口一起移除（v3.69.0）。

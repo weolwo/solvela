@@ -1,6 +1,7 @@
 package solvela.ledger.wallet.domain.dto;
 
 import solvela.enums.WalletStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -37,7 +38,7 @@ public class MemberWalletDTO {
     /**
      * 资产类型：SCORE-积分, BALANCE-现金
      */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     private BigDecimal balance;
 

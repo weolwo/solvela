@@ -2,6 +2,7 @@ package solvela.risk.promotionconfig.domain.query;
 
 import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.PrizeTypeEnum;
 
 import java.time.LocalDate;
 
@@ -24,7 +25,7 @@ public class PromotionConfigQuery extends PageParam {
     private String promoName;
 
     /** 资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物) */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 创建时间 */
     private LocalDate createTimeBegin;

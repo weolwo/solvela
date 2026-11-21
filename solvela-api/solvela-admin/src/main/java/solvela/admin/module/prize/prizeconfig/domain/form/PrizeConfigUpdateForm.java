@@ -2,6 +2,7 @@ package solvela.admin.module.prize.prizeconfig.domain.form;
 
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.ApproveModeEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
@@ -28,7 +29,7 @@ public class PrizeConfigUpdateForm {
     private Long promotionConfigId;
 
     @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM")
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     @Schema(description = "奖品名称")
     private String prizeName;

@@ -13,6 +13,7 @@ import solvela.ledger.transaction.dao.MemberAssetTransactionDao;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionDTO;
 import solvela.ledger.transaction.domain.query.MemberAssetTransactionQuery;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -123,7 +124,7 @@ public class MemberAssetTransactionService {
         BigDecimal expense = stat.amount("expenseAmount");
 
         MemberAssetTransactionStatDTO.AssetFlowDTO item = new MemberAssetTransactionStatDTO.AssetFlowDTO();
-        item.setAssetType(stat.text("assetType"));
+        item.setAssetType(stat.enumValue("assetType", PrizeTypeEnum.class));
         item.setIncomeCount(stat.count("incomeCount"));
         item.setIncomeAmount(income);
         item.setExpenseCount(stat.count("expenseCount"));

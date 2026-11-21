@@ -125,7 +125,7 @@ public class MemberWalletService {
             BigDecimal totalBalance = stat.amount("totalBalance");
 
             MemberWalletStatDTO.AssetBalanceDTO item = new MemberWalletStatDTO.AssetBalanceDTO();
-            item.setAssetType(stat.text("assetType"));
+            item.setAssetType(stat.enumValue("assetType", PrizeTypeEnum.class));
             item.setWalletCount(walletCount);
             item.setTotalBalance(totalBalance);
             item.setAvgBalance(walletCount == 0 ? BigDecimal.ZERO
@@ -172,7 +172,7 @@ public class MemberWalletService {
 
         // 钱包不存在就当场建一个：入账是「钱要进来」，为此让用户看到一个错误没有道理。
         // 注册时不预建全部资产类型的钱包，正是因为可以在这里自愈
-        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(proposal.getMemberId(), assetType.name());
+        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(proposal.getMemberId(), assetType);
         if (wallet == null) {
             wallet = initMemberWallet(proposal.getMemberId(), assetType);
         }
@@ -205,7 +205,7 @@ public class MemberWalletService {
         // 会员必须真实存在：关联键指向一个查不到的会员，等于凭空造出一笔无主流水，
         // 而且当场不报错。顺带把账号取回来做流水上的展示快照。
         String memberName = memberService.requireMemberName(memberId);
-        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
+        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType);
         if (wallet == null || wallet.getBalance() == null || wallet.getBalance().compareTo(amount) < 0) {
             throw new BusinessException(BizErrorCode.BALANCE_NOT_ENOUGH);
         }
@@ -220,7 +220,7 @@ public class MemberWalletService {
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setMemberId(memberId);
         txn.setMemberName(memberName);
-        txn.setAssetType(assetType.name());
+        txn.setAssetType(assetType);
         txn.setTransactionType(TransactionTypeEnum.EXPENSE);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(wallet.getBalance().subtract(amount));
@@ -241,7 +241,7 @@ public class MemberWalletService {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
         String memberName = memberService.requireMemberName(memberId);
-        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
+        MemberWallet wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType);
         if (wallet == null) {
             wallet = initMemberWallet(memberId, assetType);
         }
@@ -256,7 +256,7 @@ public class MemberWalletService {
         MemberAssetTransaction txn = new MemberAssetTransaction();
         txn.setMemberId(memberId);
         txn.setMemberName(memberName);
-        txn.setAssetType(assetType.name());
+        txn.setAssetType(assetType);
         txn.setTransactionType(TransactionTypeEnum.INCOME);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(balanceAfter);
@@ -282,7 +282,7 @@ public class MemberWalletService {
         txn.setMemberId(proposal.getMemberId());
         // 展示快照取提案上的那一份，不再查一次会员表：提案落库时已经把「当时那个账号」记下来了
         txn.setMemberName(proposal.getMemberName());
-        txn.setAssetType(assetType.name());
+        txn.setAssetType(assetType);
         txn.setTransactionType(TransactionTypeEnum.INCOME);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(balanceAfter); // 留下不可磨灭的财务对账证据
@@ -299,7 +299,7 @@ public class MemberWalletService {
     private MemberWallet initMemberWallet(Long memberId, PrizeTypeEnum assetType) {
         MemberWallet wallet = new MemberWallet();
         wallet.setMemberId(memberId);
-        wallet.setAssetType(assetType.name());
+        wallet.setAssetType(assetType);
         wallet.setBalance(BigDecimal.ZERO);
         wallet.setStatus(WalletStatusEnum.NORMAL);
         wallet.setVersion(0);
@@ -308,7 +308,7 @@ public class MemberWalletService {
             memberWalletDao.insert(wallet);
         } catch (DuplicateKeyException e) {
             // 防止高并发下同时初始化，如果报冲突，重新查一次即可
-            wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType.name());
+            wallet = memberWalletDao.getByMemberIdAndAssetType(memberId, assetType);
         }
         return wallet;
     }

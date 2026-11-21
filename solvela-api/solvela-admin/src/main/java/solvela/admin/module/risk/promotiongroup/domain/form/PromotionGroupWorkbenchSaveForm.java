@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.ReviewLevelEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -47,7 +48,7 @@ public class PromotionGroupWorkbenchSaveForm {
 
         @Schema(description = "资产类型：SCORE / BALANCE / COUPON / PHYSICAL", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "资产类型 不能为空")
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         @Schema(description = "配置名称：留空由服务端按「分组名-类型」生成")
         private String promoName;

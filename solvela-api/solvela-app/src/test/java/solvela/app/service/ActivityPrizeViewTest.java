@@ -9,6 +9,7 @@ import solvela.enums.ActivityStatusEnum;
 import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityPrizeView;
 import solvela.marketing.api.ActivityRuleView;
+import solvela.enums.PrizeTypeEnum;
 
 import java.lang.reflect.RecordComponent;
 import java.time.LocalDateTime;
@@ -46,9 +47,9 @@ class ActivityPrizeViewTest {
     @DisplayName("奖品盘面原样下发，MARKER 翻成「谢谢参与」那一格")
     void 盘面下发() {
         ActivityView view = translate(List.of(
-                new ActivityPrizeView("PIDOWALQUV", "Huawei Mate 90 Pro Max", "PHYSICAL", 1),
-                new ActivityPrizeView("P628BXATGQ", "积分1888", "SCORE", 0),
-                new ActivityPrizeView("PLNTDQBNI5", "谢谢参与", "MARKER", 0)));
+                new ActivityPrizeView("PIDOWALQUV", "Huawei Mate 90 Pro Max", PrizeTypeEnum.PHYSICAL, 1),
+                new ActivityPrizeView("P628BXATGQ", "积分1888", PrizeTypeEnum.SCORE, 0),
+                new ActivityPrizeView("PLNTDQBNI5", "谢谢参与", PrizeTypeEnum.MARKER, 0)));
 
         assertAll(
                 () -> assertEquals(3, view.prizes().size()),
@@ -69,8 +70,8 @@ class ActivityPrizeViewTest {
     @DisplayName("🔴 前端不该认识 PrizeTypeEnum —— 下发的是布尔，不是类型字符串")
     void 不下发奖品类型() {
         ActivityView view = translate(List.of(
-                new ActivityPrizeView("P1", "积分1888", "SCORE", 0),
-                new ActivityPrizeView("P2", "谢谢参与", "MARKER", 0)));
+                new ActivityPrizeView("P1", "积分1888", PrizeTypeEnum.SCORE, 0),
+                new ActivityPrizeView("P2", "谢谢参与", PrizeTypeEnum.MARKER, 0)));
         /*
          * 原样下发 prizeType 的话，前端就要维护一张「类型 → 怎么画」的映射表，
          * 而那是域里的字典 —— 域里加一种奖品类型时，那张表会静默说错话。

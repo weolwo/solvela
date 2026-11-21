@@ -21,6 +21,7 @@ import solvela.member.api.CouponWriteOffView;
 import solvela.member.api.AssetDebitResult;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 
@@ -230,7 +231,7 @@ public class MallOrderCancelService {
         }
         AssetDebitResult result = assetDebitApi.refund(new AssetDebitCmd(
                 order.getMemberId(),
-                "SCORE",
+                PrizeTypeEnum.SCORE,
                 BigDecimal.valueOf(payPoints),
                 BIZ_TYPE,
                 order.getOrderNo() + REFUND_SUFFIX,

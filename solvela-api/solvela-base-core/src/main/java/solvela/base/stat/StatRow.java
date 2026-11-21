@@ -80,6 +80,17 @@ public record StatRow(Map<String, Object> raw) {
     }
 
     /**
+     * 按枚举名存的类型列（GROUP BY 出来的 prize_type / asset_type 等），<b>可能为 null</b>。
+     *
+     * <p>库里出现枚举外的值时直接抛 {@link IllegalArgumentException}，不降级成 null：
+     * 统计按类型分组，悄悄丢掉一组，合计数就对不上了，而且没人会发现。
+     */
+    public <E extends Enum<E>> E enumValue(String key, Class<E> type) {
+        String text = text(key);
+        return text == null ? null : Enum.valueOf(type, text);
+    }
+
+    /**
      * 主键列，<b>可能为 null</b>。与 {@link #count} 的区别是它不兜 0：
      * id 为 0 是一个具体的（不存在的）行，而 null 表示这一组压根没有归属对象。
      */

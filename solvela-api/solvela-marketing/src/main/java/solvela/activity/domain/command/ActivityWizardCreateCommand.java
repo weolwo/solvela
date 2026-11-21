@@ -5,6 +5,7 @@ import solvela.base.util.SolvelaCodeUtil;
 import solvela.base.validation.enumeration.CheckEnum;
 import solvela.enums.ActivityTypeEnum;
 import solvela.enums.ApproveModeEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -71,7 +72,7 @@ public class ActivityWizardCreateCommand {
         private String prizeName;
 
         /** 资产类型：SCORE/BALANCE/COUPON/PHYSICAL 等 */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 优惠配置ID，承载预算与风控；服务端会校验其资产类型与奖品一致 */
         private Long promotionConfigId;

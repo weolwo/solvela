@@ -6,6 +6,7 @@ import java.util.List;
 
 import lombok.Data;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 钱包统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
@@ -67,7 +68,7 @@ public class MemberWalletStatDTO {
     public static class AssetBalanceDTO {
 
         /** 资产类型：SCORE/BALANCE */
-        private String assetType;
+        private PrizeTypeEnum assetType;
 
         /** 账户数 */
         private Long walletCount;

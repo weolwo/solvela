@@ -4,6 +4,7 @@ import solvela.enums.WalletStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.PrizeTypeEnum;
 
 import java.time.LocalDate;
 
@@ -35,7 +36,7 @@ public class MemberWalletQuery extends PageParam {
     /**
      * 资产类型：SCORE-积分, BALANCE-现金
      */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /**
      * 状态：0-冻结, 1-正常

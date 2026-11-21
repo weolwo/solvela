@@ -275,10 +275,10 @@ class LedgerStatTest {
         for (MemberAssetTransactionStatDTO.AssetFlowDTO asset : vo.getAssetList()) {
             Double income = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(change_amount), 0) FROM t_member_asset_transaction"
-                            + " WHERE asset_type = ? AND transaction_type = 1", Double.class, asset.getAssetType());
+                            + " WHERE asset_type = ? AND transaction_type = 1", Double.class, asset.getAssetType().name());
             Double expense = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(change_amount), 0) FROM t_member_asset_transaction"
-                            + " WHERE asset_type = ? AND transaction_type = 2", Double.class, asset.getAssetType());
+                            + " WHERE asset_type = ? AND transaction_type = 2", Double.class, asset.getAssetType().name());
             assertNotNull(income);
             assertNotNull(expense);
             assertEquals(income, asset.getIncomeAmount().doubleValue(), 0.01,
@@ -306,7 +306,7 @@ class LedgerStatTest {
         for (MemberWalletStatDTO.AssetBalanceDTO asset : vo.getAssetList()) {
             Double expected = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(balance), 0) FROM t_member_wallet WHERE asset_type = ?",
-                    Double.class, asset.getAssetType());
+                    Double.class, asset.getAssetType().name());
             assertNotNull(expected);
             assertEquals(expected, asset.getTotalBalance().doubleValue(), 0.01,
                     "资产 " + asset.getAssetType() + " 的余额合计与库里对不上");

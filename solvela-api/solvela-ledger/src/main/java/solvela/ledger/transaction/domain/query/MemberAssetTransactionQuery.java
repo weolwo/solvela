@@ -2,6 +2,7 @@ package solvela.ledger.transaction.domain.query;
 
 import solvela.enums.TransactionTypeEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.PrizeTypeEnum;
 
 import java.time.LocalDate;
 
@@ -33,7 +34,7 @@ public class MemberAssetTransactionQuery extends PageParam {
     /**
      * 资产类型：SCORE, BALANCE
      */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /**
      * 资金流向：1-收入, 2-支出

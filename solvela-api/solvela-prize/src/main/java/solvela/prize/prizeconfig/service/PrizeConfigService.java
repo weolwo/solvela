@@ -123,12 +123,12 @@ public class PrizeConfigService {
      *
      * @return null 表示通过
      */
-    public String checkPromotionConfigMatch(Long promotionConfigId, String prizeType) {
+    public String checkPromotionConfigMatch(Long promotionConfigId, PrizeTypeEnum prizeType) {
         // 标记类奖品不挂优惠配置，这是它的正常形态而不是漏配。
         // 优惠配置承载的是预算、库存、风控频次与审批阈值 —— 这四样对标记全都不适用：
         // 它不动账（没有预算可扣）、不进提案（没有审批可走），MarkerHandler 直接判成功。
         // 强行要求挂一个，只会让运营为每个「谢谢参与」建一条永远不会被消耗的空配置。
-        if (PrizeTypeEnum.MARKER.name().equals(prizeType)) {
+        if (prizeType == PrizeTypeEnum.MARKER) {
             return null;
         }
         /*
@@ -147,7 +147,7 @@ public class PrizeConfigService {
          * 真正会动账的是<b>开奖之后</b>：号码中奖 → 按中奖规则的 prize_code 再走一次
          * 正常发奖链路，那一次的奖品该挂什么配置就挂什么。发号和兑奖是两件事。
          */
-        if (PrizeTypeEnum.LOTTERY.name().equals(prizeType)) {
+        if (prizeType == PrizeTypeEnum.LOTTERY) {
             return null;
         }
         // 其余类型必须挂：这条「必填」刻意放在领域校验里而不是 Form 的 @NotNull 上 ——
@@ -159,7 +159,7 @@ public class PrizeConfigService {
         if (promotionConfig == null) {
             return "优惠配置不存在：" + promotionConfigId;
         }
-        if (!StringUtils.equals(promotionConfig.getPrizeType(), prizeType)) {
+        if (promotionConfig.getPrizeType() != prizeType) {
             return "优惠配置「" + promotionConfig.getPromoName() + "」的资产类型是 "
                     + promotionConfig.getPrizeType() + "，与奖品的 " + prizeType + " 不一致";
         }
@@ -183,7 +183,7 @@ public class PrizeConfigService {
         }
         PrizeConfig prizeConfig = SolvelaBeanUtil.copy(addForm, PrizeConfig.class);
         // 标记类即便调用方传了 id 也不落库：这一列对它没有语义，留着只会让人以为「这个池子会扣」
-        if (PrizeTypeEnum.MARKER.name().equals(addForm.getPrizeType())) {
+        if (addForm.getPrizeType() == PrizeTypeEnum.MARKER) {
             prizeConfig.setPromotionConfigId(null);
         }
         prizeConfigDao.insert(prizeConfig);
@@ -288,7 +288,7 @@ public class PrizeConfigService {
         // 🔴 判据不能再是「promotionConfigId != null」：标记类奖品本来就传 null，
         // 那样写会让「SCORE 改成 MARKER」这种编辑完全跳过校验。改成看 prizeType 有没有传，
         // 空值该不该放行交给 checkPromotionConfigMatch 按类型决定。
-        if (StringUtils.isNotBlank(updateForm.getPrizeType())) {
+        if (updateForm.getPrizeType() != null) {
             String matchError = checkPromotionConfigMatch(updateForm.getPromotionConfigId(), updateForm.getPrizeType());
             if (matchError != null) {
                 throw new BusinessException(matchError);
@@ -303,7 +303,7 @@ public class PrizeConfigService {
         // 所以上面那条 updateById 无论如何都清不掉它，会留下一个指向别的资产类型的悬挂 ID。
         // （不能图省事把该列改成 FieldStrategy.ALWAYS：updateStatus 那种「只 set id + status」
         //   的局部更新会因此把其余列一并写成 null。）
-        if (PrizeTypeEnum.MARKER.name().equals(updateForm.getPrizeType())) {
+        if (updateForm.getPrizeType() == PrizeTypeEnum.MARKER) {
             prizeConfigManager.lambdaUpdate()
                     .eq(PrizeConfig::getId, updateForm.getId())
                     .set(PrizeConfig::getPromotionConfigId, null)

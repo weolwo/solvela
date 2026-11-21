@@ -3,6 +3,7 @@ package solvela.draw.drawlog.domain.dto;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 抽奖转化漏斗：把一堆流水行压成「这个奖池到底跑得怎么样」。
@@ -64,7 +65,7 @@ public class DrawFunnelDTO {
         private String prizeName;
 
         /** 奖品类型 */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 发放次数 */
         private Long hitCount;

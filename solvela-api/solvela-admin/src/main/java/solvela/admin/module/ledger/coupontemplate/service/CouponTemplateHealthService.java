@@ -14,6 +14,7 @@ import solvela.mall.MallCommodity;
 import solvela.mall.commodity.dao.MallCommodityDao;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.dao.PrizeConfigDao;
+import solvela.enums.PrizeTypeEnum;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,9 +50,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CouponTemplateHealthService {
 
-    /** 奖品配置里的券类型取值，与 {@code PrizeTypeEnum.COUPON} 对应 */
-    private static final String PRIZE_TYPE_COUPON = "COUPON";
-
     /** 商城商品里的券类型取值 */
     private static final String COMMODITY_TYPE_COUPON = "COUPON";
 
@@ -73,7 +71,7 @@ public class CouponTemplateHealthService {
         List<CouponTemplateGapVO> gaps = new ArrayList<>();
 
         prizeConfigDao.selectList(Wrappers.<PrizeConfig>lambdaQuery()
-                        .eq(PrizeConfig::getPrizeType, PRIZE_TYPE_COUPON)
+                        .eq(PrizeConfig::getPrizeType, PrizeTypeEnum.COUPON)
                         .eq(PrizeConfig::getStatus, EnableStatusEnum.ENABLED))
                 .stream()
                 // prize_code 就是券模编码 —— 发奖链路把它当 assetRef 传给账务域

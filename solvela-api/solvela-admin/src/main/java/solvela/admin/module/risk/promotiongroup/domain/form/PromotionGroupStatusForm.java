@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.util.List;
 
@@ -30,5 +31,5 @@ public class PromotionGroupStatusForm {
     private EnableStatusEnum status;
 
     @Schema(description = "要启用的资产类型；仅 status=1 时有意义，组内有配置时不能为空")
-    private List<String> enablePrizeTypes;
+    private List<PrizeTypeEnum> enablePrizeTypes;
 }

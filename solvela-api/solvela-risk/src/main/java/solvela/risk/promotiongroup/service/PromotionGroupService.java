@@ -26,7 +26,7 @@ import solvela.risk.promotiongroup.manager.PromotionGroupManager;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,11 +60,11 @@ public class PromotionGroupService {
      * 预算/库存/风控/审批四样它一个都用不上，{@code t_prize_config.promotion_config_id}
      * 对它已经是可空的。让它进组只会产生一条永远不会被消耗的空池子。
      */
-    private static final Set<String> GROUPABLE_PRIZE_TYPES = Set.of(
-            PrizeTypeEnum.SCORE.name(),
-            PrizeTypeEnum.BALANCE.name(),
-            PrizeTypeEnum.COUPON.name(),
-            PrizeTypeEnum.PHYSICAL.name());
+    private static final Set<PrizeTypeEnum> GROUPABLE_PRIZE_TYPES = EnumSet.of(
+            PrizeTypeEnum.SCORE,
+            PrizeTypeEnum.BALANCE,
+            PrizeTypeEnum.COUPON,
+            PrizeTypeEnum.PHYSICAL);
 
     // ------------------------------------------------------------------ 查询
 
@@ -134,13 +134,13 @@ public class PromotionGroupService {
      * （本项目在提案域踩过这个坑）。
      */
     private void validateItems(List<PromotionGroupWorkbenchSaveCommand.PromotionGroupItemCommand> itemList) {
-        Set<String> seen = new HashSet<>();
+        Set<PrizeTypeEnum> seen = EnumSet.noneOf(PrizeTypeEnum.class);
         for (PromotionGroupWorkbenchSaveCommand.PromotionGroupItemCommand item : itemList) {
-            String prizeType = item.getPrizeType();
-            if (StringUtils.isBlank(prizeType)) {
+            PrizeTypeEnum prizeType = item.getPrizeType();
+            if (prizeType == null) {
                 throw new BusinessException("组内存在没有指定资产类型的配置");
             }
-            if (PrizeTypeEnum.MARKER.name().equals(prizeType)) {
+            if (prizeType == PrizeTypeEnum.MARKER) {
                 throw new BusinessException("标记类奖品不需要优惠配置，不能加入分组");
             }
             if (!GROUPABLE_PRIZE_TYPES.contains(prizeType)) {
@@ -196,11 +196,11 @@ public class PromotionGroupService {
                              List<PromotionGroupWorkbenchSaveCommand.PromotionGroupItemCommand> itemList) {
         // 定位一律按 (groupId, prizeType) 重查，不采信前端传的配置 ID ——
         // 传错一个就会把别的组的配置改掉，而且改得悄无声息
-        Map<String, PromotionConfig> existedMap = listConfigsByGroup(group.getId()).stream()
+        Map<PrizeTypeEnum, PromotionConfig> existedMap = listConfigsByGroup(group.getId()).stream()
                 .collect(Collectors.toMap(PromotionConfig::getPrizeType, Function.identity(),
                         (a, b) -> a, LinkedHashMap::new));
 
-        Set<String> submitted = new HashSet<>();
+        Set<PrizeTypeEnum> submitted = EnumSet.noneOf(PrizeTypeEnum.class);
         for (PromotionGroupWorkbenchSaveCommand.PromotionGroupItemCommand item : itemList) {
             submitted.add(item.getPrizeType());
             PromotionConfig config = SolvelaBeanUtil.copy(item, PromotionConfig.class);
@@ -228,7 +228,7 @@ public class PromotionGroupService {
 
         // 本次没提交的类型：停用，不删。那条配置可能已经发过奖，
         // 历史提案与奖品配置还指着它的 ID，删掉就是断链
-        for (Map.Entry<String, PromotionConfig> entry : existedMap.entrySet()) {
+        for (Map.Entry<PrizeTypeEnum, PromotionConfig> entry : existedMap.entrySet()) {
             if (submitted.contains(entry.getKey())) {
                 continue;
             }
@@ -344,7 +344,7 @@ public class PromotionGroupService {
      * @param enablePrizeTypes 要启用的资产类型；仅在 status=ENABLED 时有意义
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(Long id, EnableStatusEnum status, List<String> enablePrizeTypes) {
+    public void updateStatus(Long id, EnableStatusEnum status, List<PrizeTypeEnum> enablePrizeTypes) {
         PromotionGroup group = promotionGroupDao.selectById(id);
         if (group == null) {
             throw new BusinessException("优惠配置分组不存在：" + id);
@@ -354,12 +354,14 @@ public class PromotionGroupService {
         if (status == EnableStatusEnum.DISABLED) {
             switchConfigs(configList, config -> EnableStatusEnum.DISABLED);
         } else {
-            Set<String> toEnable = enablePrizeTypes == null ? Set.of() : new HashSet<>(enablePrizeTypes);
+            // EnumSet.copyOf 遇到空 List 会抛 IllegalArgumentException，空提交要落到下面那句人话提示
+            Set<PrizeTypeEnum> toEnable = enablePrizeTypes == null || enablePrizeTypes.isEmpty()
+                    ? Set.of() : EnumSet.copyOf(enablePrizeTypes);
             if (!configList.isEmpty() && toEnable.isEmpty()) {
                 throw new BusinessException("启用分组时至少要选择一种要启用的资产类型");
             }
-            Set<String> owned = configList.stream().map(PromotionConfig::getPrizeType).collect(Collectors.toSet());
-            for (String prizeType : toEnable) {
+            Set<PrizeTypeEnum> owned = configList.stream().map(PromotionConfig::getPrizeType).collect(Collectors.toSet());
+            for (PrizeTypeEnum prizeType : toEnable) {
                 if (!owned.contains(prizeType)) {
                     throw new BusinessException("资产类型 " + prizeType + " 不在本分组内，无法启用");
                 }

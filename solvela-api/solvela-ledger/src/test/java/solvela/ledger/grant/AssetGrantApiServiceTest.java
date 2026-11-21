@@ -275,10 +275,10 @@ class AssetGrantApiServiceTest {
     }
 
     @Test
-    @DisplayName("未知资产类型 → 拒绝，不表现成 500")
-    void 未知类型不抛异常() {
+    @DisplayName("没传资产类型 → 拒绝，不表现成 500（认不出的值在契约反序列化时就被拒，到不了这里）")
+    void 没传类型不抛异常() {
         AssetGrantResult result = service.grant(new AssetGrantCmd(
-                MEMBER_ID, "NOT_A_TYPE", null, null, 1, null,
+                MEMBER_ID, null, null, null, 1, null,
                 "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, null));
 
         assertAll(
@@ -289,7 +289,7 @@ class AssetGrantApiServiceTest {
     @Test
     @DisplayName("🔴 MARKER / LOTTERY / CUSTOM 没有发放通道 → 拒绝，不假装成功")
     void 没有通道的类型不假装成功() {
-        for (String type : List.of("MARKER", "LOTTERY", "CUSTOM")) {
+        for (PrizeTypeEnum type : List.of(PrizeTypeEnum.MARKER, PrizeTypeEnum.LOTTERY, PrizeTypeEnum.CUSTOM)) {
             AssetGrantResult result = service.grant(new AssetGrantCmd(
                     MEMBER_ID, type, null, null, 1, null,
                     "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, null));
@@ -298,24 +298,24 @@ class AssetGrantApiServiceTest {
              * 且没有任何一条记录说明本该发什么。
              */
             assertFalse(result.accepted(), type + " 不该被判成发放成功");
-            assertEquals(AssetGrantReason.UNSUPPORTED_ASSET_TYPE, result.reason(), type);
+            assertEquals(AssetGrantReason.UNSUPPORTED_ASSET_TYPE, result.reason(), type.name());
         }
     }
 
     /* ---------------- 造数 ---------------- */
 
     private static AssetGrantCmd physicalCmd(String name, String phone, String address) {
-        return new AssetGrantCmd(MEMBER_ID, "PHYSICAL", null, "限量T恤", 1, null,
+        return new AssetGrantCmd(MEMBER_ID, PrizeTypeEnum.PHYSICAL, null, "限量T恤", 1, null,
                 "MALL", ORDER_NO, "MALL_EXCHANGE", name, phone, address, "商城兑换");
     }
 
     private static AssetGrantCmd couponCmd(String assetRef, String assetName, int quantity) {
-        return new AssetGrantCmd(MEMBER_ID, "COUPON", assetRef, assetName, quantity, null,
+        return new AssetGrantCmd(MEMBER_ID, PrizeTypeEnum.COUPON, assetRef, assetName, quantity, null,
                 "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, "商城兑换");
     }
 
     private static AssetGrantCmd walletCmd(BigDecimal amount, int quantity) {
-        return new AssetGrantCmd(MEMBER_ID, "BALANCE", null, "5元红包", quantity, amount,
+        return new AssetGrantCmd(MEMBER_ID, PrizeTypeEnum.BALANCE, null, "5元红包", quantity, amount,
                 "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, "商城兑换");
     }
 }

@@ -9,6 +9,7 @@ import solvela.marketing.api.PrizeRecordApi;
 import solvela.marketing.api.PrizeRecordView;
 import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.ProposalRecordView;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -109,14 +110,17 @@ public class RecordService {
         if (record.assetName() != null && !record.assetName().isBlank()) {
             return record.assetName();
         }
-        return switch (record.assetType() == null ? "" : record.assetType()) {
-            case "SCORE" -> "积分";
-            case "BALANCE" -> "现金红包";
-            case "COUPON" -> "优惠券";
-            case "PHYSICAL" -> "实物奖品";
-            case "LOTTERY" -> "彩票";
-            // 认不出的类型不编一个名字：显示编码至少是可追溯的
-            default -> record.assetRef() == null ? "优惠" : record.assetRef();
+        if (record.assetType() == null) {
+            return record.assetRef() == null ? "优惠" : record.assetRef();
+        }
+        return switch (record.assetType()) {
+            case SCORE -> "积分";
+            case BALANCE -> "现金红包";
+            case COUPON -> "优惠券";
+            case PHYSICAL -> "实物奖品";
+            case LOTTERY -> "彩票";
+            // 没有展示名的类型不编一个名字：显示编码至少是可追溯的
+            case MARKER, CUSTOM -> record.assetRef() == null ? "优惠" : record.assetRef();
         };
     }
 
@@ -131,7 +135,7 @@ public class RecordService {
         if (amount == null) {
             return null;
         }
-        if ("SCORE".equals(record.assetType())) {
+        if (record.assetType() == PrizeTypeEnum.SCORE) {
             return amount.stripTrailingZeros().toBigInteger().toString();
         }
         return amount.stripTrailingZeros().toPlainString();

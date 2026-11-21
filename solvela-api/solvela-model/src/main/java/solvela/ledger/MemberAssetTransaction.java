@@ -1,6 +1,7 @@
 package solvela.ledger;
 
 import solvela.enums.TransactionTypeEnum;
+import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -49,7 +50,7 @@ public class MemberAssetTransaction {
     /**
      * 资产类型：SCORE, BALANCE
      */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /**
      * 资金流向：1-收入, 2-支出

@@ -217,7 +217,7 @@ class FunnelStatTest {
         for (ProposalFunnelDTO.AssetStatDTO asset : vo.getAssetList()) {
             Double expected = jdbcTemplate.queryForObject(
                     "SELECT COALESCE(SUM(amount * quantity), 0) FROM t_proposal_record"
-                            + " WHERE asset_type = ? AND status = 50", Double.class, asset.getAssetType());
+                            + " WHERE asset_type = ? AND status = 50", Double.class, asset.getAssetType().name());
             assertEquals(expected, asset.getSuccessAmount().doubleValue(), 0.001,
                     "资产 " + asset.getAssetType() + " 的已发出金额与库里对不上");
         }
@@ -294,7 +294,7 @@ class FunnelStatTest {
                     "SELECT COALESCE(SUM(CAST(prize_value AS DECIMAL(18,4))), 0) FROM t_prize_log"
                             + " WHERE prize_type = ? AND status = 1"
                             + " AND prize_value REGEXP '^-?[0-9]+([.][0-9]+)?$'",
-                    Double.class, type.getPrizeType());
+                    Double.class, type.getPrizeType().name());
             assertEquals(expected, type.getSuccessValue().doubleValue(), 0.01,
                     "奖励类型 " + type.getPrizeType() + " 的已发出价值与库里对不上");
         }

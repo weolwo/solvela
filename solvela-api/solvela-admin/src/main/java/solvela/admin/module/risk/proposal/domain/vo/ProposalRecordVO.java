@@ -1,6 +1,7 @@
 package solvela.admin.module.risk.proposal.domain.vo;
 
 import solvela.enums.ProposalStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -37,7 +38,7 @@ public class ProposalRecordVO {
     private String memberName;
 
     @Schema(description = "SCORE/BALANCE/COUPON/PHYSICAL")
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     @Schema(description = "资产引用：券模/SKU，值类资产为空")
     private String assetRef;

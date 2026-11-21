@@ -3,6 +3,7 @@ package solvela.risk.promotiongroup.domain.command;
 import lombok.Data;
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.ReviewLevelEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -67,7 +68,7 @@ public class PromotionGroupWorkbenchSaveCommand {
         private Long id;
 
         /** 资产类型：SCORE / BALANCE / COUPON / PHYSICAL。MARKER 不进组（它不需要优惠配置） */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 配置名称：留空时由服务端按「分组名-类型」生成，运营不必给每条子配置起名 */
         private String promoName;

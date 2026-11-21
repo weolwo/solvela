@@ -74,10 +74,10 @@ public class AssetGrantApiService implements AssetGrantApi {
 
     @Override
     public AssetGrantResult grant(AssetGrantCmd cmd) {
-        PrizeTypeEnum assetType = resolveAssetType(cmd.assetType());
+        // 契约里已是 PrizeTypeEnum：认不出的值在反序列化时就被拒，走到这里的只可能是没传
+        PrizeTypeEnum assetType = cmd.assetType();
         if (assetType == null) {
-            log.error("【资产发放】未知的资产类型 {}，bizRefId={} —— 调用方传了个域里没有的值",
-                    cmd.assetType(), cmd.bizRefId());
+            log.error("【资产发放】调用方没传资产类型，bizRefId={}", cmd.bizRefId());
             return AssetGrantResult.ofReject(AssetGrantReason.UNSUPPORTED_ASSET_TYPE);
         }
         try {
@@ -262,18 +262,5 @@ public class AssetGrantApiService implements AssetGrantApi {
             return AssetGrantReason.MEMBER_NOT_FOUND;
         }
         return AssetGrantReason.UNKNOWN;
-    }
-
-    /** 认不出的资产类型返回 null 而不是抛 —— 那是调用方的 bug，但不该表现成 500 */
-    private static PrizeTypeEnum resolveAssetType(String value) {
-        if (value == null) {
-            return null;
-        }
-        for (PrizeTypeEnum type : PrizeTypeEnum.values()) {
-            if (type.name().equals(value)) {
-                return type;
-            }
-        }
-        return null;
     }
 }

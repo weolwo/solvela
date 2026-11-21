@@ -10,6 +10,13 @@ import lombok.Getter;
  * consumer 的 {@code @PrizeStrategy}（生成提案/直接下发）与 ledger 的 {@code @AssetStrategy}（履约入账）。
  * 少任何一层，中奖后都会在 {@code AFTER_COMMIT} 里静默失败，只在 {@code t_prize_log.fail_reason} 留痕。
  * 前端 {@code prize-config-const.js} 的 dispatchable 标记就是这份能力的镜像，改这里记得同步改那里。
+ *
+ * <p>2026-11-21 起这几列在 Java 里就是本枚举（实体、事件、DTO、Form/VO、跨进程契约 member-api / marketing-api 与网关）：
+ * 按枚举名存、JSON 也是枚举名，库与接口形状不变。
+ *
+ * <p>🔴 <b>加一个值要先扩后收</b>：契约里也是本枚举，没升级的一方读到新值会整条反序列化失败
+ * （{@code PrizeTypeWireTest} 钉着）。先发所有<b>读</b>的一方（网关、管理端、app-biz），再让任何一方开始<b>写</b>这个新值；
+ * 库里也是一样 —— 新值落库之前，读库的进程都得认识它，否则读这一行直接报错。
  */
 @Getter
 public enum PrizeTypeEnum {

@@ -34,6 +34,7 @@ import solvela.risk.proposal.domain.query.ProposalRecordQuery;
 import solvela.risk.proposal.domain.dto.ProposalFunnelDTO;
 import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
 import solvela.exception.BusinessException;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -393,7 +394,7 @@ public class ProposalRecordService {
         List<ProposalFunnelDTO.AssetStatDTO> assetList = new ArrayList<>();
         for (StatRow stat : StatRow.of(proposalRecordDao.selectAssetStat(queryForm))) {
             ProposalFunnelDTO.AssetStatDTO item = new ProposalFunnelDTO.AssetStatDTO();
-            item.setAssetType(stat.text("assetType"));
+            item.setAssetType(stat.enumValue("assetType", PrizeTypeEnum.class));
             item.setProposalCount(stat.count("proposalCount"));
             item.setSuccessCount(stat.count("successCount"));
             item.setSuccessAmount(stat.amount("successAmount"));

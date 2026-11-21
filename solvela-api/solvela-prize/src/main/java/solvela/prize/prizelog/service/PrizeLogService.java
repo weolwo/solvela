@@ -20,6 +20,7 @@ import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
 
 import solvela.member.service.MemberService;
 import solvela.exception.BusinessException;
+import solvela.enums.PrizeTypeEnum;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -165,7 +166,7 @@ public class PrizeLogService {
             long success = stat.count("successCount");
 
             PrizeLogFunnelDTO.PrizeTypeStatDTO item = new PrizeLogFunnelDTO.PrizeTypeStatDTO();
-            item.setPrizeType(stat.text("prizeType"));
+            item.setPrizeType(stat.enumValue("prizeType", PrizeTypeEnum.class));
             item.setLogCount(logCount);
             item.setSuccessCount(success);
             item.setSuccessRate(Rate.share(success, logCount));
@@ -190,7 +191,7 @@ public class PrizeLogService {
             PrizeLogFunnelDTO.PrizeStatDTO item = new PrizeLogFunnelDTO.PrizeStatDTO();
             item.setPrizeCode(stat.text("prizeCode"));
             item.setPrizeName(stat.text("prizeName"));
-            item.setPrizeType(stat.text("prizeType"));
+            item.setPrizeType(stat.enumValue("prizeType", PrizeTypeEnum.class));
             item.setLogCount(logCount);
             item.setSuccessCount(success);
             item.setWaitingCount(stat.count("waitingCount"));

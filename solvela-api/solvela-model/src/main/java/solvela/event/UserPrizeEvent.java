@@ -3,6 +3,7 @@ package solvela.event;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import solvela.enums.EventCategoryEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -47,7 +48,7 @@ public class UserPrizeEvent extends BaseBizEvent implements Serializable {
     private String memberName;
 
     // ================== 4. 资产明细信息 ==================
-    private String prizeType;     // 奖品类型 (SCORE, BALANCE, COUPON)
+    private PrizeTypeEnum prizeType;     // 奖品类型 (SCORE, BALANCE, COUPON)
     private String prizeCode;     // 奖品code (具体发哪种券、哪个sku)
     private String prizeValue;    // 奖品值 (发多少钱/多少分)
     private Integer prizeLevel;   // 奖励等级

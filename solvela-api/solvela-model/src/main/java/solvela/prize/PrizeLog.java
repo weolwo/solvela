@@ -3,6 +3,7 @@ package solvela.prize;
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeProposalStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
@@ -78,7 +79,7 @@ public class PrizeLog {
     /**
      * 奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER
      */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /**
      * 奖励体值(积分数/券ID)

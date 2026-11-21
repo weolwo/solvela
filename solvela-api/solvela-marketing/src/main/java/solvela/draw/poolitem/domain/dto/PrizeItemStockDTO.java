@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
 import solvela.base.stat.HealthIssue;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 一个奖项的库存看板行。
@@ -36,7 +37,7 @@ public class PrizeItemStockDTO {
     private String prizeName;
 
     /** 奖品类型 */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 奖品单价 */
     private BigDecimal prizeValue;

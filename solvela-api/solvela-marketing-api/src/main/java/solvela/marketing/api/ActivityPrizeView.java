@@ -1,5 +1,7 @@
 package solvela.marketing.api;
 
+import solvela.enums.PrizeTypeEnum;
+
 /**
  * 活动里的一个奖品（C 端形状）。转盘的每一格对应一条。
  *
@@ -35,6 +37,6 @@ package solvela.marketing.api;
 public record ActivityPrizeView(
         String prizeCode,
         String prizeName,
-        String prizeType,
+        PrizeTypeEnum prizeType,
         int prizeLevel) {
 }

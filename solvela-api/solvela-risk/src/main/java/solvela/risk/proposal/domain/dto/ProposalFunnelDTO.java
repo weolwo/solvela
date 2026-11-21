@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.Data;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 提案漏斗：把一堆提案行压成「这笔钱走到哪一步了」。
@@ -121,7 +122,7 @@ public class ProposalFunnelDTO {
          * 只回编码，中文名由前端的 ASSET_TYPE_ENUM 解析 ——
          * {@code PrizeTypeEnum} 是个裸枚举（没有 desc），在这里再手写一份字典就是第二个真相源。
          */
-        private String assetType;
+        private PrizeTypeEnum assetType;
 
         /** 提案条数 */
         private Long proposalCount;

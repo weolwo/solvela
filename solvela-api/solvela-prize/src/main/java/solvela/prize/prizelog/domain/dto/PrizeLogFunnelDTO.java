@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.Data;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 奖励漏斗：把一堆发奖流水压成「奖到底发出去了没有、卡在哪、为什么没发出去」。
@@ -122,7 +123,7 @@ public class PrizeLogFunnelDTO {
         /**
          * 只回编码，中文名与单位由前端字典解析 —— 在这里再手写一份就是第二个真相源。
          */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 记录条数 */
         private Long logCount;
@@ -162,7 +163,7 @@ public class PrizeLogFunnelDTO {
         private String prizeName;
 
         /** 奖励类型 */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 记录条数 */
         private Long logCount;

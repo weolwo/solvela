@@ -18,6 +18,7 @@ import solvela.stat.domain.dto.PrizeHealthDTO;
 import solvela.stat.domain.dto.TaskFunnelDTO;
 import solvela.stat.domain.dto.TopMemberDTO;
 import solvela.task.constant.TaskDiscardCode;
+import solvela.enums.PrizeTypeEnum;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -164,10 +165,10 @@ public class MarketingStatService {
         Map<String, BigDecimal> indexed = rows.stream()
                 .collect(Collectors.toMap(r -> r.getStatDate() + "|" + r.getPrizeType(),
                         PrizeHealthDTO.TrendItem::getIssuedValue, (a, b) -> a));
-        List<String> types = assets.stream().map(PrizeHealthDTO.AssetItem::getPrizeType).toList();
+        List<PrizeTypeEnum> types = assets.stream().map(PrizeHealthDTO.AssetItem::getPrizeType).toList();
         List<PrizeHealthDTO.TrendItem> result = new ArrayList<>(dateList.size() * types.size());
         for (String date : dateList) {
-            for (String type : types) {
+            for (PrizeTypeEnum type : types) {
                 PrizeHealthDTO.TrendItem item = new PrizeHealthDTO.TrendItem();
                 item.setStatDate(date);
                 item.setPrizeType(type);

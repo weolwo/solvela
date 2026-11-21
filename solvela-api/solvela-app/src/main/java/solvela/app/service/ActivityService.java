@@ -23,6 +23,7 @@ import java.util.List;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import solvela.app.domain.PromoView;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 活动的接入层：<b>翻译 + 组装</b>，没有业务逻辑。
@@ -83,7 +84,7 @@ public class ActivityService {
         return new ActivityPrizeItem(
                 prize.prizeCode(),
                 prize.prizeName(),
-                "MARKER".equals(prize.prizeType()),
+                prize.prizeType() == PrizeTypeEnum.MARKER,
                 prize.prizeLevel() == 1);
     }
 

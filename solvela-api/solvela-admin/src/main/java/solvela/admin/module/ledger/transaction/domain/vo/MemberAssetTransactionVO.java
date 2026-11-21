@@ -1,6 +1,7 @@
 package solvela.admin.module.ledger.transaction.domain.vo;
 
 import solvela.enums.TransactionTypeEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -34,7 +35,7 @@ public class MemberAssetTransactionVO {
     private String memberName;
 
     @Schema(description = "资产类型：SCORE, BALANCE")
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     @Schema(description = "资金流向：1-收入, 2-支出")
     private TransactionTypeEnum transactionType;

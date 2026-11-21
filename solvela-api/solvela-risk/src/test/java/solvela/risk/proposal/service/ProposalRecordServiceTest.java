@@ -26,6 +26,7 @@ import solvela.risk.promotionconfig.service.PromotionConfigService;
 import solvela.risk.proposal.dao.ProposalRecordDao;
 import solvela.risk.proposal.domain.command.ProposalRecordAddCommand;
 import solvela.risk.spi.AssetDispatcher;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 
@@ -247,7 +248,7 @@ class ProposalRecordServiceTest {
         ProposalRecordAddCommand req = new ProposalRecordAddCommand();
         req.setMemberId(MEMBER_ID);
         req.setPromotionConfigId(CONFIG_ID);
-        req.setAssetType("SCORE");
+        req.setAssetType(PrizeTypeEnum.SCORE);
         req.setAmount(amount);
         req.setQuantity(1);
         req.setSourceType("DRAW");

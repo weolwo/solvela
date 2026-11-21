@@ -3,6 +3,7 @@ package solvela.risk.promotiongroup.domain.dto;
 import lombok.Data;
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.ReviewLevelEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,7 +39,7 @@ public class PromotionGroupWorkbenchDTO {
 
         private Long id;
 
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         private String promoName;
 

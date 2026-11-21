@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import solvela.app.domain.AssetView;
 import solvela.member.api.AssetApi;
 import solvela.member.api.MemberAssetView;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -45,9 +46,9 @@ public class AssetService {
      * 这边是<b>开放</b>的值域（多一种资产不需要网关做任何决定）。
      * 判据是「新增一个值时，这一层必须做决定吗」。
      */
-    private static final Map<String, Display> DISPLAY = Map.of(
-            "SCORE", new Display("积分", true),
-            "BALANCE", new Display("余额", true));
+    private static final Map<PrizeTypeEnum, Display> DISPLAY = Map.of(
+            PrizeTypeEnum.SCORE, new Display("积分", true),
+            PrizeTypeEnum.BALANCE, new Display("余额", true));
 
     private final AssetApi assetApi;
 
@@ -70,7 +71,7 @@ public class AssetService {
              * 这一行日志是为了让人知道该来这里加一条 —— 但它不该拦住用户看自己的钱。
              */
             log.warn("【资产类型未配展示】{} 没有对应的中文名，C 端会直接显示编码", asset.assetType());
-            display = new Display(asset.assetType(), true);
+            display = new Display(asset.assetType().name(), true);
         }
         // 余额可能为 null（历史数据/刚建的钱包），当 0 处理，不让 C 端拿到 null 去算
         BigDecimal balance = asset.balance() == null ? BigDecimal.ZERO : asset.balance();

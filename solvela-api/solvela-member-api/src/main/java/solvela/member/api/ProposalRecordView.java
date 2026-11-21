@@ -1,6 +1,7 @@
 package solvela.member.api;
 
 import solvela.enums.ProposalStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,7 +28,7 @@ import java.time.LocalDateTime;
  */
 public record ProposalRecordView(
         Long recordId,
-        String assetType,
+        PrizeTypeEnum assetType,
         String assetRef,
         String assetName,
         BigDecimal amount,

@@ -46,6 +46,7 @@ import solvela.member.api.CouponWriteOffApi;
 import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
 import solvela.member.service.MemberService;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -274,7 +275,7 @@ class MallRedeemServiceTest {
         // 两边不是同一个串，重复扣款就没有任何东西拦得住
         assertEquals(result.orderNo(), debit.bizRefId(), "扣款的 bizRefId 必须等于订单号");
         assertEquals(savedOrder().getOrderNo(), debit.bizRefId());
-        assertEquals("SCORE", debit.assetType());
+        assertEquals(PrizeTypeEnum.SCORE, debit.assetType());
     }
 
     @Test

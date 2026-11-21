@@ -17,6 +17,7 @@ import solvela.member.api.AssetGrantApi;
 import solvela.member.api.AssetGrantCmd;
 import solvela.member.api.AssetGrantReason;
 import solvela.member.api.AssetGrantResult;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 履约：把用户兑到的东西真正发出去。
@@ -188,7 +189,9 @@ public class MallFulfillService {
         MallAddress address = resolveAddress(order);
         return new AssetGrantCmd(
                 order.getMemberId(),
-                order.getCommodityType(),
+                // commodity_type 还是 String（EnumMigrationRatchetTest 的待枚举化名单）。
+                // 取值在建商品时已按 MallCommodityService.COMMODITY_TYPES 校验过，都是 PrizeTypeEnum 的名字
+                PrizeTypeEnum.valueOf(order.getCommodityType()),
                 order.getAssetRef(),
                 order.getCommodityName(),
                 order.getQuantity(),

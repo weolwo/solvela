@@ -2,6 +2,7 @@ package solvela.risk.promotionconfig.domain.command;
 
 
 import solvela.enums.ReviewLevelEnum;
+import solvela.enums.PrizeTypeEnum;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 
@@ -30,7 +31,7 @@ public class PromotionConfigAddCommand {
     private String promoName;
 
     /** 资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物) */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 总库存(个数)：-1为不限制(适用于券/实物) */
     private Integer totalQuota;

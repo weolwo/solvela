@@ -2,6 +2,7 @@ package solvela.admin.module.ledger.wallet.domain.form;
 
 import solvela.enums.WalletStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -32,7 +33,7 @@ public class MemberWalletQueryForm extends PageParam {
     private Long memberId;
 
     @Schema(description = "资产类型：SCORE-积分, BALANCE-现金")
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     @Schema(description = "状态：0-冻结, 1-正常")
     private WalletStatusEnum status;

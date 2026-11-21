@@ -113,7 +113,7 @@ public class LocalPrizeDispatchResultPublisher implements PrizeDispatchResultPub
      * 哪天上游改了判定，这里静默给全体用户发「恭喜获得 谢谢参与 ×0」。
      */
     private boolean isPlaceholderPrize(PrizeLog prizeLog) {
-        if (PrizeTypeEnum.MARKER.name().equals(prizeLog.getPrizeType())) {
+        if (prizeLog.getPrizeType() == PrizeTypeEnum.MARKER) {
             return true;
         }
         try {

@@ -3,6 +3,7 @@ package solvela.lottery.record.domain.dto;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 购彩记录漏斗：把一堆号码行压成「这一期跑得怎么样、奖发出去没有」。
@@ -78,7 +79,7 @@ public class LotteryRecordFunnelDTO {
         private String prizeName;
 
         /** 奖品类型 */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 中奖注数 */
         private Long winCount;

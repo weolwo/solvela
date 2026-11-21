@@ -1,6 +1,7 @@
 package solvela.admin.module.ledger.wallet.domain.vo;
 
 import solvela.enums.WalletStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -34,7 +35,7 @@ public class MemberWalletVO {
     private String memberName;
 
     @Schema(description = "资产类型：SCORE-积分, BALANCE-现金")
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     @Schema(description = "余额")
     private BigDecimal balance;

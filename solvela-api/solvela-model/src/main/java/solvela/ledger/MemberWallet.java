@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import solvela.code.UserErrorCode;
 import solvela.exception.BusinessException;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,7 +45,7 @@ public class MemberWallet {
     /**
      * 资产类型：SCORE-积分, BALANCE-现金，取值对齐 PrizeTypeEnum，与流水表 asset_type 同一字典
      */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /**
      * 余额

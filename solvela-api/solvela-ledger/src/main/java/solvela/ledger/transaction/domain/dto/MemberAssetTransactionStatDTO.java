@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.Data;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 资产流水统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
@@ -62,7 +63,7 @@ public class MemberAssetTransactionStatDTO {
     public static class AssetFlowDTO {
 
         /** 资产类型：SCORE/BALANCE */
-        private String assetType;
+        private PrizeTypeEnum assetType;
 
         /** 收入笔数：transaction_type=1 */
         private Long incomeCount;

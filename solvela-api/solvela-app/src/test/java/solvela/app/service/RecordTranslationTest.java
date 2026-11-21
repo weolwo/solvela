@@ -10,6 +10,7 @@ import solvela.marketing.api.MallApi;
 import solvela.marketing.api.MallOrderView;
 import solvela.member.api.ProposalRecordApi;
 import solvela.member.api.ProposalRecordView;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -97,9 +98,9 @@ class RecordTranslationTest {
     @DisplayName("🔴 积分显示整数，现金保留小数 —— 库里是同一个 decimal(13,4)")
     void 积分不带小数() {
         RecordView score = promoOf(ProposalStatusEnum.SUCCESS, null,
-                "SCORE", new BigDecimal("45000.0000"));
+                PrizeTypeEnum.SCORE, new BigDecimal("45000.0000"));
         RecordView cash = promoOf(ProposalStatusEnum.SUCCESS, null,
-                "BALANCE", new BigDecimal("10.5000"));
+                PrizeTypeEnum.BALANCE, new BigDecimal("10.5000"));
 
         assertAll(
                 // 「45000.0000 积分」是错的展示
@@ -111,7 +112,7 @@ class RecordTranslationTest {
     @DisplayName("值类资产没有名字时用类型兜底，不显示空标题")
     void 无名资产用类型兜底() {
         ProposalRecordView record = new ProposalRecordView(
-                1L, "SCORE", null, null, BigDecimal.TEN,
+                1L, PrizeTypeEnum.SCORE, null, null, BigDecimal.TEN,
                 ProposalStatusEnum.SUCCESS, null, LocalDateTime.now());
         assertEquals("积分", translate(record).title());
     }
@@ -180,11 +181,11 @@ class RecordTranslationTest {
     /* ---------------- 造数 ---------------- */
 
     private static RecordView promoOf(ProposalStatusEnum status, String remark) {
-        return promoOf(status, remark, "SCORE", BigDecimal.TEN);
+        return promoOf(status, remark, PrizeTypeEnum.SCORE, BigDecimal.TEN);
     }
 
     private static RecordView promoOf(ProposalStatusEnum status, String remark,
-                                      String assetType, BigDecimal amount) {
+                                      PrizeTypeEnum assetType, BigDecimal amount) {
         return translate(new ProposalRecordView(1L, assetType, "REF", "新人礼包",
                 amount, status, remark, LocalDateTime.now()));
     }

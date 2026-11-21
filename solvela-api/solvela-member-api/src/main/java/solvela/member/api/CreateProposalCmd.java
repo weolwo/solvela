@@ -1,6 +1,7 @@
 package solvela.member.api;
 
 import java.math.BigDecimal;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 新增资产提案：营销侧发出一笔奖，请会员服务收下。
@@ -27,7 +28,7 @@ import java.math.BigDecimal;
 public record CreateProposalCmd(
         String sourceBizId,
         Long memberId,
-        String assetType,
+        PrizeTypeEnum assetType,
         String assetRef,
         String assetName,
         BigDecimal amount,

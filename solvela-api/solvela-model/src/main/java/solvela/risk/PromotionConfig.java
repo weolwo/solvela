@@ -2,6 +2,7 @@ package solvela.risk;
 
 import solvela.enums.ReviewLevelEnum;
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -53,7 +54,7 @@ public class PromotionConfig {
     /**
      * 资产类型：SCORE(积分), BALANCE(现金), COUPON(优惠券), PHYSICAL(实物), MARKER(标记)
      */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /**
      * 总库存(个数)：-1为不限制(适用于券/实物)

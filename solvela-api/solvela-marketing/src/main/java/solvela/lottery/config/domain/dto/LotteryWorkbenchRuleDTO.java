@@ -1,6 +1,7 @@
 package solvela.lottery.config.domain.dto;
 
 import java.math.BigDecimal;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 彩票工作台 奖级规则回显节点
@@ -24,6 +25,6 @@ public record LotteryWorkbenchRuleDTO(Integer prizeLevel,
                                      Integer matchLength,
                                      String prizeCode,
                                      String prizeName,
-                                     String prizeType,
+                                     PrizeTypeEnum prizeType,
                                      BigDecimal prizeValue) {
 }

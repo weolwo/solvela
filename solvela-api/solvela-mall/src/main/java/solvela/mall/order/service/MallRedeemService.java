@@ -39,6 +39,7 @@ import solvela.member.api.CouponWriteOffApi;
 import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
 import solvela.member.service.MemberService;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -463,7 +464,7 @@ public class MallRedeemService {
             return null;
         }
         AssetDebitResult debit = assetDebitApi.debit(new AssetDebitCmd(
-                memberId, "SCORE", BigDecimal.valueOf(payPoints),
+                memberId, PrizeTypeEnum.SCORE, BigDecimal.valueOf(payPoints),
                 BIZ_TYPE, orderNo, "商城兑换 " + commodity.getCommodityName()));
         if (debit.accepted()) {
             return null;

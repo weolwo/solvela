@@ -1,6 +1,7 @@
 package solvela.risk;
 
 import solvela.enums.ProposalStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -65,7 +66,7 @@ public class ProposalRecord {
     /**
      * SCORE/BALANCE/COUPON/PHYSICAL
      */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /**
      * 资产引用：券模/SKU，值类资产为空

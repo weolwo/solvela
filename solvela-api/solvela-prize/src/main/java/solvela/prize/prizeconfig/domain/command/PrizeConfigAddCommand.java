@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 新增奖品的<b>领域命令</b>。与管理端的 {@code PrizeConfigAddCommand} 形状一致，但职责不同：
@@ -33,7 +34,7 @@ public class PrizeConfigAddCommand {
     private Long promotionConfigId;
 
     /** 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 奖品名称 */
     private String prizeName;

@@ -145,7 +145,7 @@ public class ProposalPrizeDispatcher {
         ProposalRecordAddCommand req = new ProposalRecordAddCommand();
         req.setMemberId(prizeLog.getMemberId());
         req.setPromotionConfigId(prizeConfig.getPromotionConfigId());
-        req.setAssetType(spec.assetType().name());
+        req.setAssetType(spec.assetType());
         if (spec.instanceAsset()) {
             /*
              * 实例类资产：光有金额发不出来，必须指明发哪一张券 / 哪一件货。

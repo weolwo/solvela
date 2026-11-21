@@ -3,6 +3,7 @@ package solvela.prize.prizeconfig.domain.dto;
 
 import solvela.enums.EnableStatusEnum;
 import solvela.enums.ApproveModeEnum;
+import solvela.enums.PrizeTypeEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -28,7 +29,7 @@ public class PrizeConfigDTO {
     private Long promotionConfigId;
 
     /** 资产类型：SCORE, BALANCE, COUPON, PHYSICAL, LOTTERY, CUSTOM */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 奖品名称 */
     private String prizeName;

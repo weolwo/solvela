@@ -1,5 +1,7 @@
 package solvela.app.domain;
 
+import solvela.enums.PrizeTypeEnum;
+
 /**
  * C 端看到的一种资产。
  *
@@ -17,7 +19,7 @@ package solvela.app.domain;
  *                  藏起来用户会以为资产没了。
  */
 public record AssetView(
-        String assetType,
+        PrizeTypeEnum assetType,
         String label,
         String amount,
         boolean currency,

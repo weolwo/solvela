@@ -2,6 +2,7 @@ package solvela.admin.module.prize.prizelog.domain.form;
 
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -46,7 +47,7 @@ public class PrizeLogAddForm {
 
     @Schema(description = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "奖励类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER 不能为空")
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     @Schema(description = "奖励体值(积分数/券ID)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "奖励体值(积分数/券ID) 不能为空")

@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 发奖健康度（大屏 C 位）
@@ -68,7 +69,7 @@ public class PrizeHealthDTO {
     public static class AssetItem {
 
         /** 资产类型 SCORE/BALANCE/COUPON/PHYSICAL */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 记录条数（含成功、失败、等待） */
         private Integer count;
@@ -96,7 +97,7 @@ public class PrizeHealthDTO {
         private String statDate;
 
         /** 资产类型 */
-        private String prizeType;
+        private PrizeTypeEnum prizeType;
 
         /** 当天该资产已发出价值 */
         private BigDecimal issuedValue;

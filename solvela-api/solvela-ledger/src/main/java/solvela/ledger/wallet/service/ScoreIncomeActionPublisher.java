@@ -62,7 +62,7 @@ public class ScoreIncomeActionPublisher {
      */
     public void publishIfScoreIncome(MemberAssetTransaction txn) {
         if (txn == null
-                || !PrizeTypeEnum.SCORE.name().equals(txn.getAssetType())
+                || txn.getAssetType() != PrizeTypeEnum.SCORE
                 || txn.getTransactionType() != TransactionTypeEnum.INCOME) {
             return;
         }

@@ -1,6 +1,7 @@
 package solvela.member.api;
 
 import java.math.BigDecimal;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 一种资产的余额。{@code t_member_wallet} 的对外投影。
@@ -24,7 +25,7 @@ import java.math.BigDecimal;
  *                  端上不该认识域内部的枚举值域，它多一个状态时端不必跟着改。
  */
 public record MemberAssetView(
-        String assetType,
+        PrizeTypeEnum assetType,
         BigDecimal balance,
         boolean frozen) {
 }

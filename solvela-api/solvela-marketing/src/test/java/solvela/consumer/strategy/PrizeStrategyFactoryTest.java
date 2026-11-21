@@ -29,7 +29,7 @@ class PrizeStrategyFactoryTest {
 
         PrizeStrategyFactory factory = factoryWith(proxied);
 
-        assertThat(factory.getHandler("SCORE")).isSameAs(proxied);
+        assertThat(factory.getHandler(PrizeTypeEnum.SCORE)).isSameAs(proxied);
     }
 
     @Test

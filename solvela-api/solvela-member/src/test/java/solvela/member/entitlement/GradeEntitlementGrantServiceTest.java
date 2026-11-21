@@ -19,6 +19,7 @@ import solvela.member.entitlement.dao.GradeEntitlementGrantDao;
 import solvela.member.entitlement.domain.EntitlementCandidate;
 import solvela.member.entitlement.service.GradeEntitlementGrantService;
 import solvela.member.entitlement.service.GradeEntitlementGrantService.GenerateResult;
+import solvela.enums.PrizeTypeEnum;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -68,7 +69,7 @@ class GradeEntitlementGrantServiceTest {
         e.setEntitlementName("白金生日礼");
         e.setEntitlementType(type);
         e.setMinGrade(minGrade);
-        e.setAssetType("COUPON");
+        e.setAssetType(PrizeTypeEnum.COUPON);
         e.setAssetRef("CPN001");
         e.setAssetName("生日 20 元券");
         e.setQuantity(1);

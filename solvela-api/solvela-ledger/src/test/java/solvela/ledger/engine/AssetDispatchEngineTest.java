@@ -19,6 +19,7 @@ import solvela.risk.PromotionConfig;
 import solvela.risk.ProposalRecord;
 import solvela.risk.promotionconfig.dao.PromotionConfigDao;
 import solvela.risk.proposal.dao.ProposalRecordDao;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 
@@ -85,7 +86,7 @@ class AssetDispatchEngineTest {
         proposal = new ProposalRecord();
         proposal.setId(PROPOSAL_ID);
         proposal.setTradeNo("PRP0000001");
-        proposal.setAssetType("SCORE");
+        proposal.setAssetType(PrizeTypeEnum.SCORE);
         proposal.setAmount(AMOUNT);
         proposal.setQuantity(1);
         proposal.setSourceBizId("BIZ-1");
@@ -93,7 +94,7 @@ class AssetDispatchEngineTest {
         config = new PromotionConfig();
         config.setId(CONFIG_ID);
 
-        when(strategyFactory.getHandler(anyString())).thenReturn(handler);
+        when(strategyFactory.getHandler(any(PrizeTypeEnum.class))).thenReturn(handler);
         // 默认：闸门抢到、预算扣得动
         when(proposalRecordDao.updateStatus(eq(PROPOSAL_ID), eq(ProposalStatusEnum.PENDING_EXECUTE),
                 eq(ProposalStatusEnum.EXECUTING))).thenReturn(1);

@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 权益配置 新增/编辑表单。
@@ -51,7 +52,7 @@ public class GradeEntitlementForm {
 
     @Schema(description = "资产类型：COUPON / BALANCE / SCORE", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "请选择资产类型")
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     @Schema(description = "COUPON 填券模板编码；BALANCE 填面额来源标识")
     @Size(max = 64, message = "资产引用最多 64 个字符")

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,7 +61,7 @@ public class GradeEntitlement {
     private Integer minGrade;
 
     /** 资产类型：COUPON / BALANCE / SCORE，对齐 {@code PrizeTypeEnum} */
-    private String assetType;
+    private PrizeTypeEnum assetType;
 
     /** COUPON 存券模板编码；BALANCE 存面额来源标识 */
     private String assetRef;

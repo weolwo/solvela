@@ -53,10 +53,10 @@ public class AssetDebitApiService implements AssetDebitApi {
     }
 
     private AssetDebitResult execute(AssetDebitCmd cmd, boolean deduct) {
-        PrizeTypeEnum assetType = resolveAssetType(cmd.assetType());
+        // 契约里已是 PrizeTypeEnum：认不出的值在反序列化时就被拒，走到这里的只可能是没传
+        PrizeTypeEnum assetType = cmd.assetType();
         if (assetType == null) {
-            log.error("【资产扣减】未知的资产类型 {}，bizRefId={} —— 调用方传了一个域里没有的值",
-                    cmd.assetType(), cmd.bizRefId());
+            log.error("【资产扣减】调用方没传资产类型，bizRefId={}", cmd.bizRefId());
             return AssetDebitResult.ofReject(AssetDebitReason.UNKNOWN);
         }
         try {
@@ -101,19 +101,6 @@ public class AssetDebitApiService implements AssetDebitApi {
             return AssetDebitReason.MEMBER_NOT_FOUND;
         }
         return AssetDebitReason.UNKNOWN;
-    }
-
-    /** 认不出的资产类型返回 null 而不是抛 —— 那是调用方的 bug，但不该表现成 500 */
-    private static PrizeTypeEnum resolveAssetType(String value) {
-        if (value == null) {
-            return null;
-        }
-        for (PrizeTypeEnum type : PrizeTypeEnum.values()) {
-            if (type.name().equals(value)) {
-                return type;
-            }
-        }
-        return null;
     }
 
     /** 金额必须为正。方向由调哪个方法决定，不是由正负号决定 —— 负号在日志里太容易看漏 */

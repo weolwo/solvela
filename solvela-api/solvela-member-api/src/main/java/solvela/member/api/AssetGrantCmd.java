@@ -1,6 +1,7 @@
 package solvela.member.api;
 
 import java.math.BigDecimal;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 发放指令。
@@ -29,7 +30,7 @@ import java.math.BigDecimal;
  */
 public record AssetGrantCmd(
         Long memberId,
-        String assetType,
+        PrizeTypeEnum assetType,
         String assetRef,
         String assetName,
         Integer quantity,

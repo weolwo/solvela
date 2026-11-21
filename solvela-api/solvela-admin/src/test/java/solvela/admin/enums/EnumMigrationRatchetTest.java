@@ -232,7 +232,7 @@ class EnumMigrationRatchetTest {
             "task/TaskEvent.java#metricSource");
 
     /**
-     * 尚未枚举化的 String 类型列，<b>只许删，不许加</b>（2026-11-21 首次分拣，34 个）。
+     * 尚未枚举化的 String 类型列，<b>只许删，不许加</b>（2026-11-21 首次分拣 34 个；同日 PrizeTypeEnum 那一个字典的 8 列已迁走）。
      *
      * <p>迁一列删一行，做法照 {@code AnnouncementAudienceEnum}：按枚举名存、JSON 也是枚举名，库与接口形状不变；
      * 已有对应 BaseEnum 的（如 {@code ActivityTypeEnum}、{@code ProposalSourceTypeEnum}）先确认它的 JSON 形状。
@@ -241,15 +241,6 @@ class EnumMigrationRatchetTest {
      * <p>⚠️ deviceType 两列是客户端上报的，收敛成枚举之前要先定「未知值怎么办」（拒绝还是归为 OTHER），那是业务决定。
      */
     private static final Set<String> STRING_TYPE_PENDING = Set.of(
-            // PrizeTypeEnum 那一个字典（SCORE / BALANCE / COUPON / PHYSICAL / MARKER / LOTTERY / CUSTOM）
-            "event/UserPrizeEvent.java#prizeType",
-            "ledger/MemberAssetTransaction.java#assetType",
-            "ledger/MemberWallet.java#assetType",
-            "member/GradeEntitlement.java#assetType",
-            "prize/PrizeConfig.java#prizeType",
-            "prize/PrizeLog.java#prizeType",
-            "risk/PromotionConfig.java#prizeType",
-            "risk/ProposalRecord.java#assetType",
             // ActivityTypeEnum（BaseEnum，value 是 String）
             "activity/ActivityConfig.java#activityType",
             "event/UserPrizeEvent.java#activityType",

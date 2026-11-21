@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
 import solvela.base.stat.HealthIssue;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 单条奖级规则的赔付模型与体检结果。
@@ -56,7 +57,7 @@ public class LotteryPrizeRuleAnalysisDTO {
     private String prizeName;
 
     /** 奖品类型 */
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     /** 奖品单价 */
     private BigDecimal prizeValue;

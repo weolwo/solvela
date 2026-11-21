@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
+import solvela.enums.PrizeTypeEnum;
 
 /**
  * 奖品配置表 新建表单
@@ -41,7 +42,7 @@ public class PrizeConfigAddForm {
 
     @Schema(description = "资产类型：SCORE, BALANCE, COUPON, PHYSICAL, MARKER, LOTTERY, CUSTOM", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "资产类型 不能为空")
-    private String prizeType;
+    private PrizeTypeEnum prizeType;
 
     @Schema(description = "奖品名称")
     private String prizeName;
