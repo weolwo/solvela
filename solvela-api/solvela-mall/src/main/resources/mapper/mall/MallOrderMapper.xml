@@ -101,13 +101,13 @@
                         <if test="queryForm.commodityName != null and queryForm.commodityName != ''">
                             AND commodity_name LIKE CONCAT('%', #{queryForm.commodityName}, '%')
                         </if>
-                        <if test="queryForm.commodityType != null and queryForm.commodityType != ''">
+                        <if test="queryForm.commodityType != null">
                             AND commodity_type = #{queryForm.commodityType}
                         </if>
                         <if test="queryForm.status != null">
                             AND status = #{queryForm.status}
                         </if>
-                        <if test="queryForm.sourceType != null and queryForm.sourceType != ''">
+                        <if test="queryForm.sourceType != null">
                             AND source_type = #{queryForm.sourceType}
                         </if>
                         <if test="queryForm.createTimeBegin != null">

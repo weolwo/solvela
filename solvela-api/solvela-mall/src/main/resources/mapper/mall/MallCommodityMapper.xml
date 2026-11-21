@@ -82,7 +82,7 @@
                         <if test="queryForm.status != null">
                             AND c.status = #{queryForm.status}
                         </if>
-                        <if test="queryForm.commodityType != null and queryForm.commodityType != ''">
+                        <if test="queryForm.commodityType != null">
                             AND c.commodity_type = #{queryForm.commodityType}
                         </if>
                         <!-- 搜索框走模糊：精确等于的话运营得把商品名一字不差地打出来 -->
