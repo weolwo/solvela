@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import solvela.base.util.SolvelaStringUtil;
 import solvela.enums.MqMessageStatusEnum;
 import solvela.mq.MqMessageLog;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 
@@ -114,6 +116,7 @@ public class MqMessageLogService {
             update.setHandleTime(LocalDateTime.now());
             mqMessageLogDao.updateById(update);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.MQ_LEDGER_WRITE_FAILED);
             log.error("【消息记账失败】messageId: {}, consumer: {}", messageId, consumerKey, e);
         }
     }

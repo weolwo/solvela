@@ -38,6 +38,8 @@ import solvela.member.risk.RiskLabelService;
 import solvela.member.risk.RiskSession;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.util.MemberEmailUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 
@@ -281,6 +283,7 @@ public class MemberStepUpService implements MemberStepUpApi {
             }
             return risk.end(MemberRiskOutcomeEnum.SUCCESS, AssetOutVerdict.pass(trust));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_FAIL_OPEN);
             log.error("【资产出口】风控执行失败，按放行处理, memberId: {}", cmd.memberId(), e);
             return AssetOutVerdict.pass(trust);
         }

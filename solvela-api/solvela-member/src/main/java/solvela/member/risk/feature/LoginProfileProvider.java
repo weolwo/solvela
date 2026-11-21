@@ -10,6 +10,8 @@ import solvela.member.Member;
 import solvela.member.loginlog.dao.MemberLoginLogDao;
 import solvela.member.loginlog.domain.dto.LoginTraceDTO;
 import solvela.member.risk.RiskContext;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.util.LinkedHashSet;
@@ -74,6 +76,7 @@ public class LoginProfileProvider {
         try {
             redisService.delete(key(memberId));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.CACHE_FALLBACK);
             log.warn("【风控画像】缓存清理失败, memberId: {}", memberId, e);
         }
     }
@@ -137,6 +140,7 @@ public class LoginProfileProvider {
             String raw = redisService.get(key(memberId));
             return raw == null ? null : JsonUtils.getMapper().readValue(raw, LoginProfile.class);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.CACHE_FALLBACK);
             // 缓存读不出来（格式变了、有人手改了）就重算一次。绝不能因此让登录失败
             log.warn("【风控画像】缓存读取失败，改为重算, memberId: {}", memberId, e);
             return null;
@@ -147,6 +151,7 @@ public class LoginProfileProvider {
         try {
             redisService.set(key(memberId), JsonUtils.getMapper().writeValueAsString(profile), TTL.toSeconds());
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.CACHE_FALLBACK);
             log.warn("【风控画像】缓存写入失败，不影响本次判断, memberId: {}", memberId, e);
         }
     }

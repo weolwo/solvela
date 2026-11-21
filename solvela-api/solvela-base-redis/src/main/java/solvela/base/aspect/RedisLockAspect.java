@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.annotation.RedisLock;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.logging.log4j.util.Strings;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -118,6 +120,7 @@ public class RedisLockAspect {
             lock.unlock();
             log.debug("释放分布式锁成功，Key: {}", lockKey);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.LOCK_RELEASE_FAILED);
             log.error("释放分布式锁出现异常，Key: {} (可能 Redis 连接异常或锁已过期自动释放)", lockKey, e);
         }
     }

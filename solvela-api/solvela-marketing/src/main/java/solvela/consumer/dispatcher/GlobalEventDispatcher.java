@@ -7,6 +7,8 @@ import solvela.base.config.AsyncConfig;
 import solvela.consumer.handler.BizEventHandler;
 import solvela.event.BaseBizEvent;
 import solvela.enums.EventCategoryEnum;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.ApplicationContext;
@@ -114,7 +116,7 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
      * 「Need to invoke method 'dispatch' ... but not found in any interface(s) of the exposed proxy type」。
      * 显式提交线程池既绕开了代理语义，也让「未找到处理器」这类路由错误仍留在请求线程里，最容易被发现。
      * <p>
-     * 注意：处理器一旦进池，异常就不再沿调用栈上抛，只能靠下面的 catch 落日志 + 下游表自查来发现问题。
+     * 注意：处理器一旦进池，异常就不再沿调用栈上抛 —— 下面的 catch 落日志并计入 EVENT_HANDLER_FAILED（面板「设计降级」），其余靠下游表自查。
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void dispatch(BaseBizEvent event) {
@@ -124,6 +126,7 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
         EventCategoryEnum category = resolveCategory(event.getCategory());
         RouteTarget target = category == null ? null : routeTable.get(category);
         if (target == null) {
+            Degradations.record(DegradePoint.EVENT_UNROUTED);
             log.warn("【事件分发】未找到分类 [{}] 的处理器", event.getCategory());
             return;
         }
@@ -135,6 +138,7 @@ public class GlobalEventDispatcher implements SmartInitializingSingleton {
             ReflectionUtils.makeAccessible(target.method);
             target.method.invoke(target.bean, event);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.EVENT_HANDLER_FAILED);
             log.error("【事件分发】处理异常: {}", event.getCategory(), e);
         }
     }

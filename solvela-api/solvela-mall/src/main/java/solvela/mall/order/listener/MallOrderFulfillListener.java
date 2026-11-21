@@ -7,6 +7,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import solvela.mall.order.event.MallOrderPendingEvent;
 import solvela.mall.order.service.MallFulfillService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 兑换事务<b>提交之后</b>发起履约。
@@ -54,6 +56,7 @@ public class MallOrderFulfillListener {
         try {
             mallFulfillService.fulfill(event.orderNo());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.MALL_FULFILL_FAILED);
             // 单子还在「待履约」，等重发。这条日志是今天唯一的发现途径
             log.error("【商城履约】{} 履约异常，单子停在待履约等重发", event.orderNo(), e);
         }

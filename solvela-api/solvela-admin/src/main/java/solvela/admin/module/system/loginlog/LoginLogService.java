@@ -10,6 +10,8 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.admin.module.system.loginlog.domain.LoginLogEntity;
 import solvela.admin.module.system.loginlog.domain.LoginLogQueryForm;
 import solvela.admin.module.system.loginlog.domain.LoginLogVO;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -49,6 +51,7 @@ public class LoginLogService {
         try {
             loginLogDao.insert(loginLogEntity);
         } catch (Throwable e) {
+            Degradations.record(DegradePoint.AUDIT_LOG_WRITE_FAILED);
             log.error(e.getMessage(), e);
         }
     }

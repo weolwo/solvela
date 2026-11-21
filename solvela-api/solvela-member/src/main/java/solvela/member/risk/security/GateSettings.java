@@ -2,6 +2,8 @@ package solvela.member.risk.security;
 
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.json.JsonUtils;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import tools.jackson.databind.JsonNode;
 
 import java.util.regex.Matcher;
@@ -46,6 +48,7 @@ record GateSettings(long banSeconds, long breakerWindowSeconds, int breakerDisti
                     seconds(seg.path("within").asString(null), d.segmentWithinSeconds()),
                     positive(seg.path("days"), d.segmentDays()));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
             log.warn("【安全名单】gateway_security_gate 解不开，用默认参数", e);
             return d;
         }

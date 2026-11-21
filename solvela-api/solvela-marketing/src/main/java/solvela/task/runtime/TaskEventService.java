@@ -20,6 +20,8 @@ import solvela.task.TaskConfig;
 import solvela.task.TaskEvent;
 import solvela.task.taskevent.service.TaskEventDefService;
 import solvela.exception.BusinessException;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -45,7 +47,7 @@ import java.util.List;
  * 那个坑该项目已经踩过一次并注释在案。手动 submit 没有这个隐患，行为也更直白。
  *
  * <p><b>异步的代价必须记住</b>：异常不再沿栈上抛（交接文档：「只能靠日志 + 下游表自查」）。
- * 所以每一条路径都必须在 {@code t_task_record_flow} 留痕 —— 那张表就是这条链路唯一的可观测面。
+ * 所以每一条路径都必须在 {@code t_task_record_flow} 留痕 —— 那张表加上 {@code TASK_*} 降级计数（面板「设计降级」）就是这条链路的可观测面。
  *
  * @author alaric
  * @date 2026-08-01
@@ -199,6 +201,7 @@ public class TaskEventService {
         try {
             return ctx.withMemberGrade(memberGrowthService.currentGrade(ctx.memberId()));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_MEMBER_INFO_UNAVAILABLE);
             log.error("[任务事件] 取会员等级失败，配了等级人群的任务本次会丢弃。memberId={}, eventCode={}",
                     ctx.memberId(), ctx.eventCode(), e);
             return ctx;
@@ -215,6 +218,7 @@ public class TaskEventService {
         try {
             handle(ctx);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_EVENT_HANDLE_FAILED);
             log.error("[任务事件] 处理异常。eventCode={}, member={}, eventBizId={}",
                     ctx.eventCode(), ctx.memberId(), ctx.eventBizId(), e);
         }
@@ -236,6 +240,7 @@ public class TaskEventService {
                 log.info("[任务推进] 并发冲突，第 {}/{} 次重试。taskConfigId={}, member={}, 原因={}",
                         attempt, MAX_RETRY_ATTEMPTS, config.getId(), ctx.memberId(), e.getMessage());
             } catch (RuntimeException e) {
+                Degradations.record(DegradePoint.TASK_ADVANCE_FAILED);
                 // 单个任务配置出错不影响同一事件命中的其它任务 —— 这正是「每任务一个事务」的意义
                 log.error("[任务推进] 失败。taskConfigId={}, member={}, eventBizId={}",
                         config.getId(), ctx.memberId(), ctx.eventBizId(), e);
@@ -358,6 +363,7 @@ public class TaskEventService {
         } catch (DuplicateKeyException ignored) {
             // 同一事件被拒多次，已记过一次
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_REJECTED_FLOW_WRITE_FAILED);
             // 留痕本身失败时至少留日志 —— 兜底动作不能把自己炸掉
             log.error("[任务事件] 记录被拒流水失败。eventBizId={}", ctx.eventBizId(), e);
         }

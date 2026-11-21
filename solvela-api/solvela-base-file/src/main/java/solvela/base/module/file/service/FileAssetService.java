@@ -28,6 +28,8 @@ import solvela.base.storage.ObjectStorage;
 import solvela.base.storage.StorageKey;
 import solvela.base.storage.StorageKeyGenerator;
 import solvela.base.storage.StoredObject;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.springframework.beans.factory.annotation.Value;
@@ -789,6 +791,7 @@ public class FileAssetService {
             objectStorage.delete(new StorageKey(file.getStorageKey()));
             return true;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.FILE_ORPHAN_CLEAN_FAILED);
             log.warn("[File] 清理孤儿 {} 失败，留到下一轮：{}", fileId, e.getMessage());
             return false;
         }

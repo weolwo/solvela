@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import solvela.base.json.JsonUtils;
 import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.List;
 
@@ -44,6 +46,7 @@ public class SecurityEventQueue {
         try {
             redis.execute(PUSH, List.of(queueKey), JsonUtils.toJson(event), String.valueOf(SecurityKeys.EVENT_QUEUE_MAX));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_EVENT_DROPPED);
             log.error("【安全事件】投递失败，这一条只留在日志里, 类型: {}, 规则: {}, IP: {}",
                     event.eventType(), event.ruleCode(), event.clientIp(), e);
         }

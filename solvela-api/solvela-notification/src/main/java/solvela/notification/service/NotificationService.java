@@ -10,6 +10,8 @@ import solvela.notification.NotificationTemplate;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.domain.RenderedNotification;
 import solvela.notification.spi.NotificationSender;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.List;
 import java.util.Map;
@@ -91,6 +93,7 @@ public class NotificationService {
         try {
             return doSend(request);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.NOTIFICATION_SEND_FAILED);
             // 通知不是业务的一部分，失败只记日志。带上模板与会员号，否则这条日志没法排查
             log.error("【通知】发送失败，模板:{} 会员:{} 业务单号:{}",
                     request.template(), request.memberId(), request.bizRefId(), e);
@@ -188,6 +191,7 @@ public class NotificationService {
             List<String> keys = JsonUtils.parseList(paramKeysJson, String.class);
             return keys == null ? List.of() : keys;
         } catch (Exception e) {
+            Degradations.record(DegradePoint.NOTIFICATION_TEMPLATE_UNPARSEABLE);
             // param_keys 是运营可改的自由文本，解析失败不该影响发送
             log.warn("【通知】param_keys 解析失败，按「不校验」处理: {}", paramKeysJson);
             return List.of();

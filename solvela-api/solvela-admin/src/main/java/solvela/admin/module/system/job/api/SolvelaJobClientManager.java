@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.api.domain.SolvelaJobMsg;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
 import solvela.admin.module.system.job.core.SolvelaJobRunningRegistry;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.listener.MessageListener;
@@ -83,6 +85,7 @@ public class SolvelaJobClientManager {
                 }
                 log.info("==== SolvelaJob ==== 收到任务变更通知（扫描线程将在下一轮生效）：{}", msg);
             } catch (Throwable t) {
+                Degradations.record(DegradePoint.JOB_INFRA_FAILED);
                 // 异常逃出去会污染 Redisson 的回调线程，且没有任何人会看到
                 log.error("==== SolvelaJob ==== 消息处理异常：{}", msg, t);
             }

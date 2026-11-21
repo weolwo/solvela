@@ -12,6 +12,8 @@ import solvela.notification.dao.MemberNotificationDao;
 import solvela.notification.domain.dto.MemberNotificationDTO;
 import solvela.notification.domain.dto.MemberNotificationDetailDTO;
 import solvela.notification.domain.query.MemberNotificationQuery;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -127,6 +129,7 @@ public class NotificationInboxService {
             Map<String, Object> parsed = JsonUtils.parseObject(paramsJson, Map.class);
             return parsed == null ? Map.of() : parsed;
         } catch (Exception e) {
+            Degradations.record(DegradePoint.NOTIFICATION_TEMPLATE_UNPARSEABLE);
             // params 解析失败不该让详情页整个打不开：按空参数渲染，
             // 用户会看到原样保留的 ${xxx}，但至少能看到模板的框架文字
             log.error("【通知】params 解析失败，按空参数渲染: {}", paramsJson, e);

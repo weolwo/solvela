@@ -8,6 +8,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import solvela.event.BizActionCodes;
 import solvela.event.BizActionEvent;
 import solvela.member.grade.GrowthProperties;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -90,6 +92,7 @@ public class GrowthEventListener {
                     BizActionCodes.SCORE_EARNED, bizType, event.bizId(), "积分入账");
 
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.GROWTH_ACCRUAL_FAILED);
             /*
              * 🔴 异常必须全吃掉。
              *

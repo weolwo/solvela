@@ -23,6 +23,8 @@ import solvela.task.tasktemplate.domain.dto.TaskTemplateDTO;
 import solvela.task.tasktemplate.domain.dto.TaskTemplateOptionDTO;
 import solvela.task.tasktemplate.domain.query.TaskTemplateQuery;
 import solvela.task.tasktemplate.manager.TaskTemplateManager;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,6 +110,7 @@ public class TaskTemplateService {
         try {
             return JsonUtils.parseObject(template.getUiSchema(), Map.class);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_CONFIG_UNPARSEABLE);
             log.error("[任务模板] ui_schema 解析失败，该模板已从向导列表剔除: {}", template.getTemplateCode(), e);
             return null;
         }

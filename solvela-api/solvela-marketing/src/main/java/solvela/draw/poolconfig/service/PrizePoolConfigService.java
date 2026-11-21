@@ -43,6 +43,8 @@ import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
 import solvela.exception.BusinessException;
 import solvela.draw.engine.Ppm;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -209,6 +211,7 @@ public class PrizePoolConfigService {
             List<String> whiteList = JsonUtils.parseList(whiteListJson, String.class);
             return whiteList == null ? List.of() : whiteList;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.DRAW_WHITELIST_UNPARSEABLE);
             log.warn("[抽奖工作台回显] 白名单 JSON 解析失败，已降级为空名单: {}", whiteListJson, e);
             return List.of();
         }

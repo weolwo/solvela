@@ -3,6 +3,8 @@ package solvela.app.ratelimit;
 import lombok.extern.slf4j.Slf4j;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -41,6 +43,7 @@ final class AccountKey {
             byte[] digest = mac.doFinal(normalize(rawAccount).getBytes(StandardCharsets.UTF_8));
             return "a:" + HexFormat.of().formatHex(digest, 0, 16);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RATE_LIMIT_FAIL_OPEN);
             log.error("【网关限流】账号键计算失败，跳过账号维度", e);
             return null;
         }

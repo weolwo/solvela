@@ -3,6 +3,8 @@ package solvela.mall.constant;
 import tools.jackson.core.type.TypeReference;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.json.JsonUtils;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.LinkedHashMap;
@@ -38,6 +40,7 @@ public final class MallSkuAttrs {
                     });
             return attrs == null ? new LinkedHashMap<>() : attrs;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.MALL_SKU_ATTRS_UNPARSEABLE);
             log.warn("[商城] SKU 规格 JSON 解析失败，已降级为空规格: {}", json, e);
             return new LinkedHashMap<>();
         }

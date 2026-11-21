@@ -8,6 +8,8 @@ import solvela.base.module.redis.RedisService;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 
@@ -93,6 +95,7 @@ public class LeakedPasswordNotifier {
             notificationService.send(
                     NotifyRequest.of(NotificationTemplateEnum.LEAKED_PASSWORD, memberId).build());
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【密码风险】提醒失败, memberId: {}", memberId, e);
         }
     }
@@ -111,6 +114,7 @@ public class LeakedPasswordNotifier {
             String key = redisService.generateRedisKey(KEY_THROTTLE, String.valueOf(memberId));
             return redisService.increment(key, throttle.toSeconds()) == 1L;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【密码风险】节流判断失败，本次不发, memberId: {}", memberId, e);
             return false;
         }

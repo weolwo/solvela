@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import solvela.enums.NotificationCategoryEnum;
 import solvela.notification.MemberNotificationPreference;
 import solvela.notification.dao.MemberNotificationPreferenceDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 免打扰偏好：这个用户还收不收这一类通知。
@@ -54,6 +56,7 @@ public class NotificationPreferenceService {
                 case SYSTEM -> true;
             };
         } catch (Exception e) {
+            Degradations.record(DegradePoint.NOTIFICATION_PREFERENCE_UNAVAILABLE);
             // 查偏好失败就放行：宁可多发一条用户关掉过的营销通知，
             // 也不要因为一次数据库抖动把发货通知吞掉
             log.error("【通知偏好】查询失败，按「接收」处理。会员:{} 分类:{}", memberId, category, e);

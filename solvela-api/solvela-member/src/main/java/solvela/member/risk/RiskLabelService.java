@@ -7,6 +7,8 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.enums.MemberRiskLabelEnum;
 import solvela.enums.MemberRiskLabelSourceEnum;
 import solvela.member.risk.dao.MemberRiskEventDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 
@@ -66,6 +68,7 @@ public class RiskLabelService {
             }
             return marked > 0;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 🔴 标不上只是少一条分析数据，绝不能让「这不是我」这件事失败 ——
             //    用户真正要的是下线和冻结，那两件事必须成
             log.error("【风控标注】打标失败, memberId: {}, deviceId: {}", memberId, deviceId, e);

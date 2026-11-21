@@ -8,6 +8,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -161,6 +163,7 @@ public class RuleSnapshotHolder {
                 }
             }
         } catch (Exception e) {
+            Degradations.record(DegradePoint.CONFIG_RELOAD_FAILED);
             log.error("【网关快照】读取失败，继续用手里这份（来源 {}，版本 {}）", source, current().version(), e);
         }
         reportLoaded();
@@ -206,6 +209,7 @@ public class RuleSnapshotHolder {
             loaded.put("reportedAt", System.currentTimeMillis());
             redis.opsForValue().set(SecurityKeys.loadedVersion(instance), MAPPER.writeValueAsString(loaded), LOADED_TTL);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.GATEWAY_REPORT_FAILED);
             log.warn("【网关快照】回报已加载版本失败", e);
         }
     }

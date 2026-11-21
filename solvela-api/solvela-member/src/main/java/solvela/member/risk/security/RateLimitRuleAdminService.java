@@ -12,6 +12,8 @@ import solvela.member.risk.dao.RateLimitRuleDao;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
 import solvela.security.RateLimitDimension;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
@@ -187,6 +189,7 @@ public class RateLimitRuleAdminService {
             }
             return routes;
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
             log.warn("【限流规则】路由清单解不开", e);
             return List.of();
         }

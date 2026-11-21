@@ -20,6 +20,8 @@ import solvela.member.loginlog.dao.MemberLoginLogDao;
 import solvela.member.risk.SecurityPromptService;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -113,6 +115,7 @@ public class NewDeviceLoginNotifier {
         try {
             redisService.set(registrationDeviceKey(memberId), deviceId, REGISTRATION_DEVICE_TTL_SECONDS);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.warn("【新设备登录】记录注册设备失败，该会员之后按老判据处理, memberId: {}", memberId, e);
         }
     }
@@ -152,6 +155,7 @@ public class NewDeviceLoginNotifier {
                     now.atZone(ZoneId.systemDefault()).toEpochSecond());
             sendExecutor.execute(() -> deliver(memberId, loginTime, device, location, deviceId));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【新设备登录】判断失败，本次不提醒, memberId: {}", memberId, e);
         }
     }
@@ -174,6 +178,7 @@ public class NewDeviceLoginNotifier {
             mailService.sendMail(MailTemplateCodeEnum.MEMBER_NEW_DEVICE_LOGIN, params,
                     List.of(piiCipher.decrypt(member.getEmail())));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【新设备登录】提醒邮件发送失败, memberId: {}", memberId, e);
         }
     }

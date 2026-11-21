@@ -10,6 +10,8 @@ import solvela.enums.MemberRiskPhaseEnum;
 import solvela.member.MemberRiskEvent;
 import solvela.member.MemberRiskHit;
 import solvela.member.api.MemberLoginType;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -202,6 +204,7 @@ public final class RiskSession implements AutoCloseable {
         try {
             eventId = recorder.record(toEvent(result), toHitRows());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RISK_AUDIT_WRITE_FAILED);
             // recorder 自己已经吞了异常，这里是最后一道：绝不让落库失败冒到登录链路上
             log.error("【风控】落库过程异常, traceId: {}", Trace.id(), e);
         }

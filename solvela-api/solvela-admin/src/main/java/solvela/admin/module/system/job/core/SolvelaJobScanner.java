@@ -13,6 +13,8 @@ import solvela.admin.module.system.job.constant.SolvelaJobUtil;
 import solvela.admin.module.system.job.repository.SolvelaJobRepository;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobLogEntity;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Duration;
@@ -110,6 +112,7 @@ public class SolvelaJobScanner {
         try {
             this.scan();
         } catch (Throwable t) {
+            Degradations.record(DegradePoint.JOB_INFRA_FAILED);
             log.error("==== SolvelaJob ==== 扫描异常（本轮跳过，下轮继续）", t);
         }
     }
@@ -144,6 +147,7 @@ public class SolvelaJobScanner {
             try {
                 this.handleDueJob(job, dbNow);
             } catch (Throwable t) {
+                Degradations.record(DegradePoint.JOB_INFRA_FAILED);
                 // 单条任务出错不影响同轮的其它任务
                 log.error("==== SolvelaJob ==== 处理到期任务异常：{}", job.getJobName(), t);
             }
@@ -286,6 +290,7 @@ public class SolvelaJobScanner {
             try {
                 this.handlePendingLog(pending, dbNow);
             } catch (Throwable t) {
+                Degradations.record(DegradePoint.JOB_INFRA_FAILED);
                 log.error("==== SolvelaJob ==== 处理待执行记录异常：logId={}", pending.getLogId(), t);
             }
         }

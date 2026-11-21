@@ -33,6 +33,8 @@ import solvela.member.stepup.MemberStepUpService;
 import solvela.member.util.MemberPhoneUtil;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 绑定 / 更换手机号。
@@ -239,6 +241,7 @@ public class MemberPhoneBindService {
                 coolingStore.start(memberId, MemberVerifyChannelEnum.SMS);
             }
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.error("【手机绑定】判断冷静期失败，本次不设, memberId: {}", memberId, e);
         }
     }

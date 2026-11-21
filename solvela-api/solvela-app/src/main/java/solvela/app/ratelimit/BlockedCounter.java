@@ -7,6 +7,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.security.IpKeys;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import java.time.Duration;
 import java.util.Map;
@@ -95,6 +97,7 @@ public class BlockedCounter {
                 redis.opsForValue().increment(e.getKey(), n);
                 redis.expire(e.getKey(), KEY_TTL);
             } catch (Exception ex) {
+                Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
                 log.warn("【安全闸】被挡次数写不进 Redis，这一轮的 {} 次不计, 键: {}", n, e.getKey(), ex);
             }
         }

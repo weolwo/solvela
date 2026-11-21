@@ -11,6 +11,8 @@ import solvela.member.risk.RiskContext;
 import solvela.member.risk.RiskDeviceTrust;
 import solvela.member.risk.config.RiskListCache;
 import solvela.member.stepup.MemberStepUpService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 「这台设备对这个账号可信到什么程度」。
@@ -97,6 +99,7 @@ public class DeviceTrustProvider {
             return deviceId.equals(redisService.get(
                     redisService.generateRedisKey(KEY_REGISTRATION_DEVICE, String.valueOf(memberId))));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_SIGNAL_UNAVAILABLE);
             // 取不到就当「不是注册设备」—— 往严的方向偏，代价只是多验一道码
             log.warn("【风控】读注册设备失败, memberId: {}", memberId, e);
             return false;

@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.LinkedHashMap;
@@ -68,6 +70,7 @@ public class RouteReporter {
             redis.opsForValue().set(SecurityKeys.ROUTES, MAPPER.writeValueAsString(payload));
             log.info("【网关路由】已上报 {} 个接口", routes.size());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.GATEWAY_REPORT_FAILED);
             // 上报失败只影响后台的下拉框与失效标红，不影响限流本身
             log.error("【网关路由】上报失败，后台接口覆盖暂时选不到接口", e);
         }

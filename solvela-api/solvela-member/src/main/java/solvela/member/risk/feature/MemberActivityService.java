@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import solvela.base.module.redis.RedisService;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.dao.MemberActivityDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 
@@ -57,6 +59,7 @@ public class MemberActivityService {
             }
             activityDao.touchActive(memberId);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.ACTIVITY_REFRESH_FAILED);
             log.warn("【会员活跃】刷新失败，已忽略, memberId: {}", memberId, e);
         }
     }

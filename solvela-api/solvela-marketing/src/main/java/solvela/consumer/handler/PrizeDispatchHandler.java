@@ -20,6 +20,8 @@ import solvela.prize.prizelog.dao.PrizeLogDao;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.service.PrizeLogService;
 import solvela.scriptengine.annotation.ScriptFunction;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +55,8 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         PrizeConfig config = prizeConfigService.getByPrizeCode(event.getPrizeCode());
         if (config == null || config.getStatus() == EnableStatusEnum.DISABLED) {
             // 事件已经发出来了才发现奖品配置没了 —— 运营停用配置不会撤回在途的事件。
-            // 这条日志是唯一线索：不打的话表现是「用户中了奖但什么都没收到」，查无对证
+            // 表现是「用户中了奖但什么都没收到」：除了这条日志，还计入 PRIZE_CONFIG_MISSING_AT_DISPATCH（面板「设计降级」）
+            Degradations.record(DegradePoint.PRIZE_CONFIG_MISSING_AT_DISPATCH);
             log.error("【重大异常】奖品配置不存在或已停用！prizeCode: {}", event.getPrizeCode());
             return;
         }
@@ -205,6 +208,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         try {
             prizeLogService.updateById(prizeLog);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.PRIZE_STATUS_WRITEBACK_FAILED);
             log.error("【发奖状态回写失败】LogId: {}, 状态将停留在旧值，请人工核对", prizeLog.getId(), e);
         }
     }

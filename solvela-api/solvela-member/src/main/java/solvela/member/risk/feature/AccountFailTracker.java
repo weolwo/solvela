@@ -6,6 +6,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -67,6 +69,7 @@ public class AccountFailTracker {
             redis.opsForZSet().removeRange(key, 0, -(MAX_ENTRIES + 1L));
             redis.expire(key, window);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.warn("【账号失败来源】记录失败，已忽略, memberId: {}", memberId, e);
         }
     }

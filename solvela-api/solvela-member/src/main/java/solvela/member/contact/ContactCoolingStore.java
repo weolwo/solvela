@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import solvela.base.module.redis.RedisService;
 import solvela.enums.MemberVerifyChannelEnum;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 
@@ -65,6 +67,7 @@ public class ContactCoolingStore {
             redisService.set(key(memberId, channel), String.valueOf(availableAt), COOLING.toSeconds());
             log.info("【联系方式冷静期】开始, memberId: {}, 通道: {}, 到期: {}", memberId, channel, availableAt);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             /*
              * 🔴 记不上就是「这次没有冷静期」—— 往宽的方向偏。
              * 这与大多数风控判断相反，是刻意的：往严的方向偏意味着 Redis 一抖动，
@@ -89,6 +92,7 @@ public class ContactCoolingStore {
             long at = Long.parseLong(raw);
             return at > System.currentTimeMillis() / 1000L ? at : 0L;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 读不出来当「不在冷静期」，理由同 start
             log.error("【联系方式冷静期】读取失败，按不冷静处理, memberId: {}", memberId, e);
             return 0L;
@@ -110,6 +114,7 @@ public class ContactCoolingStore {
         try {
             redisService.delete(key(memberId, channel));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.error("【联系方式冷静期】解除失败, memberId: {}", memberId, e);
         }
     }

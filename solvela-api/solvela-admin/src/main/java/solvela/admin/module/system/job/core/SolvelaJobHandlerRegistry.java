@@ -5,6 +5,8 @@ import solvela.base.module.jobspi.core.SolvelaJob;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.repository.SolvelaJobDao;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -126,6 +128,7 @@ public class SolvelaJobHandlerRegistry implements SmartInitializingSingleton {
         try {
             dbJobList = jobDao.selectList(null);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.JOB_INFRA_FAILED);
             // 对账失败不能拖垮启动 —— 表还没建、库还没连上都可能走到这里
             log.error("==== SolvelaJob ==== 启动对账失败，跳过（不影响启动）", e);
             return;

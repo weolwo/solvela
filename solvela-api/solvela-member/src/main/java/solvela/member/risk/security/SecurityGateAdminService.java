@@ -9,6 +9,8 @@ import solvela.base.module.config.ConfigKeyEnum;
 import solvela.base.module.config.ConfigService;
 import solvela.exception.BusinessException;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -140,6 +142,7 @@ public class SecurityGateAdminService {
                 return object;
             }
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
             log.warn("【安全闸】gateway_security_gate 解不开", e);
         }
         throw new IllegalArgumentException("网关安全闸配置（t_config.gateway_security_gate）解不开，先到系统参数里修好它");

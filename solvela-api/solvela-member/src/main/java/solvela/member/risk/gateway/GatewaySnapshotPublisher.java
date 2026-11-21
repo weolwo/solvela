@@ -17,6 +17,8 @@ import solvela.member.RateLimitRule;
 import solvela.member.risk.dao.RateLimitRuleDao;
 import solvela.security.GatewayRuleSnapshot;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -108,6 +110,7 @@ public class GatewaySnapshotPublisher {
         try {
             publish();
         } catch (Exception e) {
+            Degradations.record(DegradePoint.GATEWAY_SNAPSHOT_PUBLISH_FAILED);
             log.error("【网关快照】{}之后发布失败，5 分钟内由定时任务补发", reason, e);
         }
     }

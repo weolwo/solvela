@@ -197,6 +197,41 @@
           "legendFormat": "{{app}} 等待中"
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "设计降级（每 5 分钟次数，按点位）",
+      "description": "代码里 catch 住、不上抛、主流程照走的地方，每降级一次计一次（solvela_degraded_total）。点位含义见 solvela-contract 的 DegradePoint 枚举。正常时这里应当是空的或零星几点；某个点位持续出现就是有东西在悄悄失效 —— 尤其是 RISK_FAIL_OPEN / SECURITY_FAIL_OPEN（安全检查在放行）和 DRAW_* / PRIZE_*（钱和奖）。",
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 45
+      },
+      "targets": [
+        {
+          "expr": "sum by (app, point) (increase(solvela_degraded_total{app=~\"$app\"}[5m]))",
+          "legendFormat": "{{app}} {{point}}"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "近 24 小时降级次数",
+      "description": "按点位汇总的 24 小时次数，排在最前的就是最该先看的。计数器只在第一次降级时才出现，所以这里没有的点位就是 24 小时内一次都没降级过。",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 45
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (app, point) (increase(solvela_degraded_total{app=~\"$app\"}[24h])) > 0)",
+          "format": "table",
+          "instant": true
+        }
+      ]
     }
   ],
   "templating": {

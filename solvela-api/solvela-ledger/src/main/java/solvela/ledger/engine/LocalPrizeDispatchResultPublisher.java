@@ -12,6 +12,8 @@ import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.dao.PrizeLogDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.math.BigDecimal;
 
@@ -56,6 +58,7 @@ public class LocalPrizeDispatchResultPublisher implements PrizeDispatchResultPub
                 notifyPrizeWon(message.sourceBizId());
             }
         } catch (Exception e) {
+            Degradations.record(DegradePoint.PRIZE_RESULT_WRITEBACK_FAILED);
             // 回写失败不能影响已经完成的入账：钱已经到账了，为一次状态同步失败去回滚它更糟
             log.error("【发奖记录回写失败】业务单号: {}, 发奖记录状态可能与提案不一致，请人工核对",
                     message.sourceBizId(), e);

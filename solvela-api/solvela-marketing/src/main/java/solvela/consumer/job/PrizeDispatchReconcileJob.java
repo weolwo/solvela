@@ -14,6 +14,8 @@ import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeProposalStatusEnum;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.dao.PrizeLogDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -128,6 +130,7 @@ public class PrizeDispatchReconcileJob implements SolvelaJob {
                 prizeDispatchHandler.doDispatch(prizeLog);
                 retried++;
             } catch (Exception e) {
+                Degradations.record(DegradePoint.PRIZE_RECONCILE_RETRY_FAILED);
                 // 一条失败不能拖垮整批：剩下的还得继续捞
                 log.error("【发奖对账】重投失败，LogId: {}", prizeLog.getId(), e);
             }

@@ -12,6 +12,8 @@ import solvela.enums.SecurityListTypeEnum;
 import solvela.member.SecurityList;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.dao.SecurityListDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -92,6 +94,7 @@ public class RiskListCache implements SmartInitializingSingleton {
         try {
             snapshot.loadNow();
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.CONFIG_RELOAD_FAILED);
             log.warn("【风控】名单重载失败，等周期刷新", e);
         }
     }
@@ -157,6 +160,7 @@ public class RiskListCache implements SmartInitializingSingleton {
                             String.valueOf(Long.parseLong(row.getListValue().trim()))), k -> new ArrayList<>()).add(entry);
                 }
             } catch (RuntimeException e) {
+                Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
                 // 后台保存时校验过，走到这里只可能是有人直接改了库。跳过这一条，不让整份名单加载失败
                 log.error("【风控】名单第 {} 条的值读不出来，已跳过: {}", row.getId(), e.getMessage());
             }

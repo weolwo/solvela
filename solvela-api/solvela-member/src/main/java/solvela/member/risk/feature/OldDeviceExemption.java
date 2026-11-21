@@ -8,6 +8,8 @@ import solvela.enums.LoginLogResultEnum;
 import solvela.member.risk.MemberRiskProperties;
 import solvela.member.risk.RiskContext;
 import solvela.member.risk.dao.RiskDeviceDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 「这是一台用了很久的老设备」——  IP 维度规则的<b>限流档</b>对它不生效（方案 §4.1）。
@@ -55,6 +57,7 @@ public class OldDeviceExemption {
                     properties.getOldDeviceAge().toSeconds(),
                     LoginLogResultEnum.LOGIN_SUCCESS.getValue());
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_SIGNAL_UNAVAILABLE);
             /*
              * 查不到就<b>不豁免</b>（往严的方向偏）。
              * 反过来写的话，数据库一抖动，所有人都成了「老设备」—— 而被攻击时数据库恰恰最容易抖。

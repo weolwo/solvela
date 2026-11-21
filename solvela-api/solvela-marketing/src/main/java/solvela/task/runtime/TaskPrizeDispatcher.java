@@ -14,6 +14,8 @@ import solvela.task.TaskRecord;
 import solvela.task.runtime.domain.TaskProgressData;
 import solvela.task.runtime.domain.TaskRuleConfig;
 import solvela.dispatch.outbox.PrizeEventPublisher;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -184,6 +186,7 @@ public class TaskPrizeDispatcher {
             taskRecordDao.updateProgressData(record.getId(), json);
             record.setProgressData(json);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_STAGE_DISPLAY_WRITEBACK_FAILED);
             log.warn("[任务发奖] 回写 dispatchedStages 失败（不影响派发，它只是展示字段）。recordId={}",
                     record.getId(), e);
         }

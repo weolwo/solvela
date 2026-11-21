@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 字典反序列化
@@ -38,6 +40,7 @@ public class DictDataDeserializer extends ValueDeserializer<String> {
             }
             deserialize = String.join(",", list);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.DESERIALIZE_FALLBACK);
             log.error(e.getMessage(), e);
             deserialize = listOrObjectNode.asText();
         }

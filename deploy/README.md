@@ -158,7 +158,7 @@ Prometheus   http://127.0.0.1:9090
 
 ### 面板能看到什么
 
-`Solvela 应用与中间件`,**9 个面板**:JVM 堆(已用/上限)、GC 暂停、HTTP QPS、HTTP P99、HikariCP 连接池、MySQL 连接数与 QPS 与慢查询、Redis 内存与命中率与连接数。
+`Solvela 应用与中间件`,**11 个面板**:JVM 堆(已用/上限)、GC 暂停、HTTP QPS、HTTP P99、HikariCP 连接池、MySQL 连接数与 QPS 与慢查询、Redis 内存与命中率与连接数，以及设计降级两块（按点位的 5 分钟次数、近 24 小时汇总，指标 `solvela_degraded_total`，点位含义见 `DegradePoint`）。
 
 **没有容器层面板**(Pod/容器的 CPU 与内存)。k8s 那套靠 kubelet 自带的 cAdvisor,compose 下没有对应物;独立的 cAdvisor 容器在 **Docker Desktop on Windows 上连不上 docker daemon**(实测日志 `Registration of the docker container factory failed`,带容器名的内存序列一条都没有),所以刻意不做 —— 而不是留几个空面板。要看容器内存就 `docker stats`。
 

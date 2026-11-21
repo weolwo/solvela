@@ -12,6 +12,8 @@ import solvela.member.Device;
 import solvela.member.device.dao.DeviceDao;
 
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.util.List;
@@ -103,6 +105,7 @@ public class DeviceDispositionService {
                 log.warn("【设备活跃】令牌合法但库里查无此设备, deviceId: {}", deviceId);
             }
         } catch (Exception e) {
+            Degradations.record(DegradePoint.ACTIVITY_REFRESH_FAILED);
             log.warn("【设备活跃】刷新失败，已忽略, deviceId: {}", deviceId, e);
         }
     }
@@ -152,6 +155,7 @@ public class DeviceDispositionService {
             log.warn("【设备处置】命中规则但不降档, deviceId: {}, 原因: {}, 当前档位: {}",
                     deviceId, reason, stored.getDesc());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.warn("【设备处置】进入观察档失败，已忽略, deviceId: {}", deviceId, e);
         }
     }
@@ -202,6 +206,7 @@ public class DeviceDispositionService {
             }
             return stored;
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_FAIL_OPEN);
             log.warn("【设备处置】读取处置档失败，按正常放行, deviceId: {}", deviceId, e);
             return DeviceStatusEnum.NORMAL;
         }
@@ -269,6 +274,7 @@ public class DeviceDispositionService {
                 redis.opsForSet().remove(SecurityKeys.BANNED_DEVICES, deviceId);
             }
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.error("【设备处置】封禁镜像同步失败，等定时任务重建, deviceId: {}, 封禁: {}", deviceId, banned, e);
         }
     }

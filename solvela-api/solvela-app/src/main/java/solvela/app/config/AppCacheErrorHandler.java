@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.stereotype.Component;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 /**
  * 缓存出错时<b>降级成回源</b>，不让一条坏缓存拖垮整条认证链路。
@@ -44,24 +46,28 @@ public class AppCacheErrorHandler implements CacheErrorHandler {
 
     @Override
     public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
+        Degradations.record(DegradePoint.CACHE_FALLBACK);
         log.warn("[缓存] 读取失败，降级为回源: cache={}, key={}, 原因={}",
                 cache.getName(), key, exception.toString());
     }
 
     @Override
     public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
+        Degradations.record(DegradePoint.CACHE_FALLBACK);
         log.warn("[缓存] 写入失败，本次请求结果不受影响: cache={}, key={}, 原因={}",
                 cache.getName(), key, exception.toString());
     }
 
     @Override
     public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
+        Degradations.record(DegradePoint.CACHE_FALLBACK);
         log.warn("[缓存] 失效指令失败，条目将按 TTL 自然过期: cache={}, key={}, 原因={}",
                 cache.getName(), key, exception.toString());
     }
 
     @Override
     public void handleCacheClearError(RuntimeException exception, Cache cache) {
+        Degradations.record(DegradePoint.CACHE_FALLBACK);
         log.warn("[缓存] 清空失败: cache={}, 原因={}", cache.getName(), exception.toString());
     }
 }

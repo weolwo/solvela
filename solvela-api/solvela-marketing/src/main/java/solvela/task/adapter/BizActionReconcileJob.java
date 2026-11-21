@@ -19,6 +19,8 @@ import solvela.task.runtime.TaskEventService;
 import solvela.task.runtime.domain.TaskEventReportCommand;
 import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.taskevent.service.TaskEventDefService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -249,6 +251,7 @@ public class BizActionReconcileJob implements SolvelaJob {
                 taskEventService.report(cmd);
                 repushed++;
             } catch (RuntimeException e) {
+                Degradations.record(DegradePoint.TASK_ACTION_RECONCILE_FAILED);
                 log.error("【任务打点对账】补推失败，下一轮会再试。action={}, bizId={}",
                         actionCode, record.bizId(), e);
             }

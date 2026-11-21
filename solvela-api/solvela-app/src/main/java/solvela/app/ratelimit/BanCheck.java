@@ -7,6 +7,8 @@ import solvela.auth.device.DeviceIdentity;
 import solvela.security.IpKeys;
 import solvela.security.IpRange;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import java.util.List;
 
@@ -128,6 +130,7 @@ final class BanCheck {
                             SecurityKeys.BANNED_DEVICES),
                     subject.ipKey() == null ? "0" : "1", subject.deviceId() == null ? "" : subject.deviceId());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_FAIL_OPEN);
             log.error("【安全闸】查处罚失败，放行", e);
             return null;
         }

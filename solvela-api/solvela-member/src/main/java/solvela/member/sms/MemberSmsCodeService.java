@@ -17,6 +17,8 @@ import solvela.member.code.CodeVerifyOutcome;
 import solvela.member.code.VerificationCodeProperties;
 import solvela.member.code.VerificationCodeStore;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 短信验证码：<b>只管手机号那一半</b>。
@@ -197,6 +199,7 @@ public class MemberSmsCodeService {
         try {
             smsSender.send(phone, scene, issued.code(), properties.ttl().toMinutes());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.VERIFY_CODE_SEND_FAILED);
             // 🔴 把刚存的码删掉：留着它会让冷却生效，于是用户在收不到短信的同时
             //    还被告知「请稍后再试」
             codeStore.discard(CHANNEL, scene.name(), hash);

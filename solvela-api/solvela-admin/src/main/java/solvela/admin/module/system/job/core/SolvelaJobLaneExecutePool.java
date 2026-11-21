@@ -4,6 +4,8 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import solvela.admin.module.system.job.config.SolvelaJobConfig;
 import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -149,6 +151,7 @@ public class SolvelaJobLaneExecutePool {
                 runningRegistry.unregister(logId);
             }
         } catch (TaskRejectedException e) {
+            Degradations.record(DegradePoint.JOB_LANE_REJECTED);
             // ⚠️ 判水位与真正 submit 之间存在竞态：别的任务可能刚好把池占满。
             //    概率低且此处可见，接受 —— 但绝不能让它变成未捕获异常
             log.error("==== SolvelaJob ==== {} 车道已满，任务被拒：{}", lane.getValue(), jobName);

@@ -7,6 +7,8 @@ import solvela.enums.MemberOperationTypeEnum;
 import solvela.member.device.DeviceDispositionService;
 import solvela.member.operationlimit.service.MemberOperationLimitService;
 import solvela.member.risk.security.CanaryTrap;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 
@@ -80,6 +82,7 @@ public class RiskActionExecutor {
             operationLimitService.freeze(ctx.memberId(), MemberOperationTypeEnum.LOGIN, "密码连续错误过多，风控冷却",
                     LocalDateTime.now().plusSeconds(Math.max(1L, decision.retryAfterSeconds())));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 落不上只是后台少看见一行，绝不能让登录接口跟着失败
             log.error("【风控】记录操作限制失败, memberId: {}", ctx.memberId(), e);
         }

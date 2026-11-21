@@ -18,6 +18,8 @@ import solvela.member.auth.MemberAuthDao;
 import solvela.member.email.EmailSendExecutorConfig;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -119,6 +121,7 @@ public class SuspiciousLoginNotifier {
             log.warn("【可疑登录】通知主人, memberId: {}, 地点: {}", memberId, location);
             sendExecutor.execute(() -> deliver(memberId, loginTime, device, location));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【可疑登录】通知主人失败, memberId: {}", memberId, e);
         }
     }
@@ -137,6 +140,7 @@ public class SuspiciousLoginNotifier {
             String key = redisService.generateRedisKey(KEY_THROTTLE, String.valueOf(memberId));
             return redisService.increment(key, throttle.toSeconds()) == 1L;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【可疑登录】节流判断失败，本次不发, memberId: {}", memberId, e);
             return false;
         }
@@ -161,6 +165,7 @@ public class SuspiciousLoginNotifier {
                     Map.of("loginTime", loginTime, "deviceType", device, "location", location),
                     List.of(piiCipher.decrypt(member.getEmail())));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_NOTICE_FAILED);
             log.error("【可疑登录】提醒邮件发送失败, memberId: {}", memberId, e);
         }
     }

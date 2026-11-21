@@ -16,6 +16,8 @@ import solvela.member.api.CouponQueryApi;
 import solvela.member.api.DeliveryApi;
 import solvela.member.api.DeliverySummaryView;
 import solvela.member.api.MemberGradeApi;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import java.util.function.Supplier;
 
@@ -85,6 +87,7 @@ public class MeController {
         try {
             return loader.get();
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.GATEWAY_PARTIAL_RESPONSE);
             log.warn("[我的] 汇总里 {} 取不到，这一项给 null: {}", name, e.toString());
             return null;
         }

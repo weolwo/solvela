@@ -13,6 +13,8 @@ import solvela.risk.PromotionConfig;
 import solvela.risk.proposal.dao.ProposalRecordDao;
 import solvela.risk.ProposalRecord;
 import solvela.risk.spi.AssetDispatcher;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -170,6 +172,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
         try {
             proposalRecordDao.updateStatusAndRemark(proposal.getId(), ProposalStatusEnum.FAILED, remark);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.PROPOSAL_STATUS_WRITEBACK_FAILED);
             log.error("【引擎状态回写失败】提案ID: {} 将停留在 40(执行中)，请人工核对", proposal.getId(), e);
         }
         syncPrizeLog(proposal, PrizeDispatchStatusEnum.FAIL, remark);
@@ -206,6 +209,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
             // 必须按实际扣掉的数量还，扣 3 还 1 会让 used_quota 只增不减
             promotionConfigDao.releaseBudget(config.getId(), amount, quantity);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.BUDGET_RELEASE_FAILED);
             log.error("【预算回滚失败】优惠配置: {}, 金额: {}, 数量: {}，预算水位将虚高，请人工核对",
                     config.getId(), amount, quantity, e);
         }

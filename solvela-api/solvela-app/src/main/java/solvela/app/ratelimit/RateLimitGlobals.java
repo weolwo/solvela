@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 /**
  * {@code t_config.gateway_rate_limit} 解释成网关能直接用的样子（网关方案 §4、§2.3–§2.5）。
@@ -54,6 +56,7 @@ public record RateLimitGlobals(
         try {
             root = MAPPER.readTree(json);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
             log.warn("【网关限流】gateway_rate_limit 不是合法 JSON，全部用默认值: {}", json);
             return DEFAULTS;
         }

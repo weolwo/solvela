@@ -9,6 +9,8 @@ import solvela.admin.module.system.job.repository.SolvelaJobRepository;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobLogEntity;
 import solvela.admin.module.system.job.log.SolvelaJobLogContext;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.slf4j.MDC;
 
 import java.io.PrintWriter;
@@ -131,6 +133,7 @@ public class SolvelaJobRunner {
         try {
             this.finish(job, logEntity, handler, status, resultSummary, errorDetail, costMillis);
         } catch (Throwable t) {
+            Degradations.record(DegradePoint.JOB_INFRA_FAILED);
             log.error("==== SolvelaJob ==== 执行记录落库失败，该条将由僵尸扫描兜底：logId={}",
                     logEntity.getLogId(), t);
         } finally {

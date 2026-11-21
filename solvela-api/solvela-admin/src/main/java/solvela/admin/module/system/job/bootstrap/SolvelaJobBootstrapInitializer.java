@@ -6,6 +6,8 @@ import solvela.admin.module.system.job.constant.SolvelaJobPresetEnum;
 import solvela.admin.module.system.job.constant.SolvelaJobTriggerTypeEnum;
 import solvela.admin.module.system.job.repository.SolvelaJobDao;
 import solvela.admin.module.system.job.repository.domain.SolvelaJobEntity;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -58,6 +60,7 @@ public class SolvelaJobBootstrapInitializer implements SmartInitializingSingleto
                 log.info("==== SolvelaJob ==== 给 {} 个从没排过期的任务排上了下次触发", armed);
             }
         } catch (Exception e) {
+            Degradations.record(DegradePoint.JOB_INFRA_FAILED);
             // 自举失败不能拖垮启动 —— 表还没建、库还没连上都可能走到这里
             log.error("==== SolvelaJob ==== 内置任务自举失败（不影响启动，但系统任务不会运行）", e);
         }

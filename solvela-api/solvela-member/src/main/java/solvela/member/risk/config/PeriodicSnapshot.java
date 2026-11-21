@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 一份「过期了就重载」的本地快照：规则表、名单都用它。
@@ -74,6 +76,7 @@ public final class PeriodicSnapshot<T> {
                     loadNow();
                 }
             } catch (RuntimeException e) {
+                Degradations.record(DegradePoint.CONFIG_RELOAD_FAILED);
                 // 推迟下一次重试，免得库挂着的时候每个请求都去撞一次
                 loadedAt = clock.getAsLong();
                 log.warn("【风控】{} 重载失败，继续使用旧快照", name, e);

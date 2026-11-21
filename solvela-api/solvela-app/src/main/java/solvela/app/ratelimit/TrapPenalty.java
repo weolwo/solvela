@@ -10,6 +10,8 @@ import solvela.security.IpRange;
 import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
 import solvela.security.SlidingWindowScripts;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import java.time.Duration;
 import java.util.List;
@@ -120,6 +122,7 @@ final class TrapPenalty {
                     String.valueOf(gate.breakerWindowSeconds() * 1000), String.valueOf(nowMillis),
                     String.valueOf(BREAKER_MAX_IPS));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 数不了就不知道是不是在集中命中 —— 照常处罚：会碰到这些的本来就只有扫描器
             log.error("【安全闸】熔断计数失败，按未熔断处理, {} {}", what.source(), what.code(), e);
             return false;
@@ -155,6 +158,7 @@ final class TrapPenalty {
             }
             return true;
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_PENALTY_WRITE_FAILED);
             log.error("【{}】处罚写不进 Redis，这次只记录, 规则: {}, IP: {}", what.source(), what.code(), probe.clientIp(), e);
             return false;
         }

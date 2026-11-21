@@ -8,6 +8,8 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.rule.RiskRuleConfig;
 import solvela.security.SlidingWindowScripts;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.util.List;
@@ -203,6 +205,7 @@ public class LoginCounters {
             return new Window(result.get(0) == null ? 0L : result.get(0),
                     result.size() < 2 || result.get(1) == null ? -1L : result.get(1));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_SIGNAL_UNAVAILABLE);
             log.warn("【风控】读写 {} 失败，当作没数到", counter, e);
             return Window.EMPTY;
         }
@@ -217,6 +220,7 @@ public class LoginCounters {
             return redisService.slidingSetCount(key(counter, value), member,
                     windowSeconds(counter) * 1000L, System.currentTimeMillis(), MAX_SET_ENTRIES);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_SIGNAL_UNAVAILABLE);
             log.warn("【风控】写 {} 失败，当作没数到", counter, e);
             return 0L;
         }
@@ -266,6 +270,7 @@ public class LoginCounters {
                 return RiskParams.duration(config.params(), "window", counter.defaultWindow).toSeconds();
             }
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_SIGNAL_UNAVAILABLE);
             // 规则表取不到就用默认窗口。这里绝不能抛：它在写计数的路径上，而那条路径不该因为风控配置挂掉
             log.warn("【风控】取 {} 的窗口失败，用默认 {}", counter, counter.defaultWindow, e);
         }

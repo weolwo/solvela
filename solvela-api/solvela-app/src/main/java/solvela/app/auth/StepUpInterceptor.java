@@ -15,6 +15,8 @@ import solvela.member.api.AssetOutVerdict;
 import solvela.member.api.DeviceTrust;
 import solvela.member.api.MemberStepUpApi;
 import solvela.member.api.StepUpCmd;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import java.util.Map;
 
@@ -155,6 +157,7 @@ public class StepUpInterceptor implements HandlerInterceptor {
             // 冻结那一条要原样抛出去 —— 它不是「判断失败」
             throw e;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_FAIL_OPEN);
             log.error("【二次验证】观察档判断信任失败，已放行, memberId: {}, 接口: {} {}",
                     cmd.memberId(), request.getMethod(), request.getRequestURI(), e);
             return false;
@@ -186,6 +189,7 @@ public class StepUpInterceptor implements HandlerInterceptor {
         } catch (ApiException e) {
             throw e;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_FAIL_OPEN);
             log.error("【资产出口】判冻结 / 风控失败，已放行[off], memberId: {}, 接口: {} {}",
                     cmd.memberId(), request.getMethod(), request.getRequestURI(), e);
         }

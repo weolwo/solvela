@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import solvela.notification.NotificationTemplate;
 import solvela.notification.dao.NotificationTemplateDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -117,6 +119,7 @@ public class NotificationTemplateService {
             }
             log.debug("【通知模板】缓存刷新完成，启用中模板 {} 个", latestCache.size());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.CONFIG_RELOAD_FAILED);
             // 刷新失败不能让发通知这条路径挂掉：旧缓存继续用，下个周期再试
             log.error("【通知模板】缓存刷新失败，继续使用旧缓存", e);
         }

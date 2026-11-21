@@ -6,6 +6,8 @@ import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import solvela.base.module.file.domain.vo.FileVO;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,7 @@ public class FileKeyVoDeserializer extends ValueDeserializer<String> {
             }
             deserialize = list.stream().map(FileVO::getStorageKey).collect(Collectors.joining(","));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.DESERIALIZE_FALLBACK);
             log.error(e.getMessage(), e);
             deserialize = listOrObjectNode.asText();
         }

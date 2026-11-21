@@ -17,6 +17,8 @@ import solvela.scriptengine.manager.ScriptRefManager;
 import solvela.scriptengine.spi.ScriptEngine;
 import solvela.scriptengine.spi.ScriptRefPoint;
 import solvela.scriptengine.spi.ScriptScene;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -85,6 +87,7 @@ public class ScriptSeedImporter implements SmartInitializingSingleton {
         try {
             resources = new PathMatchingResourcePatternResolver().getResources(LOCATION_PATTERN);
         } catch (IOException e) {
+            Degradations.record(DegradePoint.SCRIPT_SEED_IMPORT_FAILED);
             log.error("[ScriptEngine] 扫描脚本目录失败：{}", LOCATION_PATTERN, e);
             return List.of();
         }
@@ -97,6 +100,7 @@ public class ScriptSeedImporter implements SmartInitializingSingleton {
             try (var in = resource.getInputStream()) {
                 content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             } catch (IOException e) {
+                Degradations.record(DegradePoint.SCRIPT_SEED_IMPORT_FAILED);
                 log.error("[ScriptEngine] 读取脚本文件失败：{}", filePath, e);
                 continue;
             }
@@ -105,6 +109,7 @@ public class ScriptSeedImporter implements SmartInitializingSingleton {
             try {
                 file = ScriptFileParser.parse(filePath, content);
             } catch (RuntimeException e) {
+                Degradations.record(DegradePoint.SCRIPT_SEED_IMPORT_FAILED);
                 log.error("[ScriptEngine] 脚本文件头解析失败：{} -> {}", filePath, e.getMessage());
                 continue;
             }

@@ -20,6 +20,8 @@ import solvela.task.record.manager.TaskRecordManager;
 import solvela.task.runtime.TaskPeriodResolver;
 import solvela.task.runtime.domain.TaskRuleConfig;
 import solvela.task.taskconfig.manager.TaskConfigManager;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -166,6 +168,7 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
         try {
             return memberGrowthService.currentGrade(memberId);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_MEMBER_INFO_UNAVAILABLE);
             log.error("[任务中心] 取会员等级失败，等级专享任务本次不展示。memberId={}", memberId, e);
             return null;
         }

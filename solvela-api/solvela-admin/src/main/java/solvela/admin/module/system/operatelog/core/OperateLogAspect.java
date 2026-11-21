@@ -16,6 +16,8 @@ import solvela.admin.auth.CurrentEmployee;
 import solvela.admin.module.system.operatelog.OperateLogDao;
 import solvela.admin.module.system.operatelog.domain.OperateLogEntity;
 import solvela.base.json.JsonUtils;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.Signature;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -166,6 +168,7 @@ public abstract class OperateLogAspect {
             }
             this.submitLog(joinPoint, e);
         } catch (Exception exp) {
+            Degradations.record(DegradePoint.AUDIT_LOG_WRITE_FAILED);
             // 操作日志是旁路，写不成不能让业务请求跟着失败；但要带上堆栈，只有 message 时连哪一步出错都看不出
             log.error("保存操作日志异常, 方法: {}", joinPoint.getSignature().toShortString(), exp);
         }

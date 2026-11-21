@@ -10,6 +10,8 @@ import solvela.enums.MemberRiskRuleTypeEnum;
 import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.rule.RiskHit;
 import solvela.member.risk.rule.RiskRuleConfig;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.List;
 import java.util.Objects;
@@ -86,6 +88,7 @@ public class MemberRiskEngine {
         try {
             return session.settle(phase, runRules(session, phase));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RISK_FAIL_OPEN);
             // 走到这里说明规则表快照也取不到了。放行，但要吵得够响
             log.error("【风控】{} 阶段整体执行失败，本次放行", phase, e);
             return session.current();
@@ -115,6 +118,7 @@ public class MemberRiskEngine {
             RiskHit hit = bound.rule().evaluate(session.context(), bound.config());
             return hit == null ? null : toEvaluated(bound, mode, hit);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RISK_RULE_ERROR);
             log.error("【风控】规则 {} 执行失败，按未命中处理", bound.config().code(), e);
             return errorHit(bound, mode, "规则执行异常: " + e.getClass().getSimpleName());
         } finally {

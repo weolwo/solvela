@@ -11,6 +11,8 @@ import solvela.member.risk.RiskContext;
 import solvela.security.IpKeys;
 import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 
@@ -69,6 +71,7 @@ public class CanaryTrap {
             log.error("【告警】【蜜罐账号】有人用蜜罐账号登录 —— 我们的用户名单可能已经泄露。IP 与设备已罚 {} 秒, 会员: {}, IP: {}, 设备: {}",
                     ban, ctx.memberId(), ctx.getClientIp(), ctx.getDeviceId());
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_PENALTY_WRITE_FAILED);
             log.error("【告警】【蜜罐账号】有人用蜜罐账号登录，但处罚没写成, 会员: {}, IP: {}",
                     ctx.memberId(), ctx.getClientIp(), e);
         }

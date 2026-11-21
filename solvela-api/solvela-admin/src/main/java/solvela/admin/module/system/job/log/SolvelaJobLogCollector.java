@@ -6,6 +6,8 @@ import org.redisson.api.RedissonClient;
 
 import java.time.Duration;
 import java.util.List;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 执行日志采集：把某次执行期间打的日志收进 Redis，供后台「查看实时日志」。
@@ -65,6 +67,7 @@ public class SolvelaJobLogCollector {
             }
             list.expire(TTL);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.JOB_INFRA_FAILED);
             // 采集失败绝不能影响任务本身
             log.warn("==== SolvelaJob ==== 执行日志采集失败 logId={}", logId, e);
         }
@@ -78,6 +81,7 @@ public class SolvelaJobLogCollector {
             RList<String> list = redissonClient.getList(KEY_PREFIX + logId);
             return list.readAll();
         } catch (Exception e) {
+            Degradations.record(DegradePoint.JOB_INFRA_FAILED);
             log.warn("==== SolvelaJob ==== 执行日志读取失败 logId={}", logId, e);
             return List.of();
         }

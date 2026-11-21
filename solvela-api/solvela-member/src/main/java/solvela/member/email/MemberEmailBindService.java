@@ -33,6 +33,8 @@ import solvela.member.stepup.MemberStepUpService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 绑定 / 更换邮箱。
@@ -266,6 +268,7 @@ public class MemberEmailBindService {
                 coolingStore.start(memberId, MemberVerifyChannelEnum.EMAIL);
             }
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.error("【邮箱绑定】判断冷静期失败，本次不设, memberId: {}", memberId, e);
         }
     }

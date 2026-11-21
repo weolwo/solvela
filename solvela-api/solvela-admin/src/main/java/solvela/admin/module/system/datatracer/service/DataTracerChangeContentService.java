@@ -17,6 +17,8 @@ import solvela.admin.module.system.datatracer.domain.bo.DataTracerContentBO;
 import solvela.admin.module.system.dict.domain.vo.DictDataVO;
 import solvela.admin.module.system.dict.service.DictService;
 import solvela.base.json.JsonUtils;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
@@ -312,6 +314,7 @@ public class DataTracerChangeContentService {
             Method get = pd.getReadMethod();
             return get.invoke(object);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.AUDIT_LOG_WRITE_FAILED);
             log.error("[数据变更日志] 读取字段失败，该字段记为 null: {}#{}", object.getClass().getName(), field.getName(), e);
             return null;
         }

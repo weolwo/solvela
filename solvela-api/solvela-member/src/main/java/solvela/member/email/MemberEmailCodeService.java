@@ -20,6 +20,8 @@ import solvela.member.code.CodeVerifyOutcome;
 import solvela.member.code.VerificationCodeProperties;
 import solvela.member.code.VerificationCodeStore;
 import solvela.member.util.MemberEmailUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -158,6 +160,7 @@ public class MemberEmailCodeService {
         try {
             emailSendExecutor.execute(() -> deliver(scene, email, hash, template, params, maskedEmail));
         } catch (RejectedExecutionException e) {
+            Degradations.record(DegradePoint.VERIFY_CODE_SEND_FAILED);
             // 队列都排不下（SMTP 持续变慢时才会到这一步）。同 catch 里的处理：
             // 把刚存的码删掉，否则用户收不到信还被冷却挡住。submit 在请求线程上同步发生，
             // 所以这个失败是【当场可感知】的，不会静默丢。
@@ -184,6 +187,7 @@ public class MemberEmailCodeService {
             mailService.sendMail(template, params, Collections.singletonList(email));
             log.info("【邮箱验证码】已发送, scene: {}, email: {}", scene, maskedEmail);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.VERIFY_CODE_SEND_FAILED);
             codeStore.discard(CHANNEL, scene.name(), hash);
             log.error("【邮箱验证码】发送失败, scene: {}, email: {}", scene, maskedEmail, e);
         }

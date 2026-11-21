@@ -8,6 +8,8 @@ import solvela.base.module.jobspi.core.JobParam;
 import solvela.base.module.jobspi.core.SolvelaJob;
 import solvela.base.module.jobspi.core.SolvelaJobContext;
 import solvela.base.module.jobspi.core.SolvelaJobHandler;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -100,6 +102,7 @@ public class PartitionMaintainJob implements SolvelaJob {
             try {
                 outcome = service.maintain(table, ahead, retain, maxDrop, today, dryRun);
             } catch (Exception e) {
+                Degradations.record(DegradePoint.PARTITION_MAINTAIN_FAILED);
                 /*
                  * 🔴 一张表失败不影响其它表。分区操作是 DDL，失败的原因通常是这一张表的状态
                  * （锁等待、磁盘、被人手工改过），而不是任务本身 —— 让它把剩下两张做完，

@@ -6,6 +6,8 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PatternParseException;
 import org.springframework.web.util.pattern.PathPatternParser;
 import solvela.security.KeywordRules;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -60,6 +62,7 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
         try {
             root = MAPPER.readTree(json);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
             log.warn("【安全闸】gateway_security_gate 不是合法 JSON，用默认参数且不启用蜜罐: {}", json);
             return DEFAULTS;
         }
@@ -145,6 +148,7 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
             try {
                 result.add(new Honeypot(code, path, PathPatternParser.defaultInstance.parse(path)));
             } catch (PatternParseException e) {
+                Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
                 log.warn("【安全闸】蜜罐路径解不开，忽略: {}", item);
             }
         }
@@ -168,6 +172,7 @@ record SecurityGateConfig(long banSeconds, long breakerWindowSeconds, int breake
                 result.add(KeywordRules.compile(item.path("code").asString(null), item.path("scope").asString(null),
                         item.path("pattern").asString(null)));
             } catch (IllegalArgumentException e) {
+                Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
                 log.error("【告警】【安全闸】关键字规则不启用: {}", e.getMessage());
             }
         }

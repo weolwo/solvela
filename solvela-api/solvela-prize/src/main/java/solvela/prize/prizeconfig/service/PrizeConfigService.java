@@ -23,6 +23,8 @@ import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.risk.PromotionConfig;
 import solvela.risk.promotionconfig.service.PromotionConfigService;
 import solvela.exception.BusinessException;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -214,6 +216,7 @@ public class PrizeConfigService {
             parsed = JsonUtils.parseType(ext, new TypeReference<Map<String, Object>>() {
             });
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.FILE_REFERENCE_SKIPPED);
             log.warn("[奖品] {} 的 ext 不是合法 JSON，本次跳过图片引用登记：{}", prizeConfigId, e.getMessage());
             return;
         }

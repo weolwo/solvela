@@ -14,6 +14,8 @@ import solvela.member.risk.config.RiskListCache;
 import solvela.member.risk.gateway.GatewaySnapshotPublisher;
 import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.List;
 
@@ -192,9 +194,11 @@ public class SecurityEventDrainJob implements SolvelaJob {
             redis.opsForList().remove(processingKey, 1, raw);
             return changed ? Handled.LIST_CHANGED : Handled.STORED;
         } catch (DataAccessException e) {
+            Degradations.record(DegradePoint.SECURITY_EVENT_DRAIN_FAILED);
             log.error("【安全事件】落库失败，留在处理中等下一轮, 类型: {}, 规则: {}", event.eventType(), event.ruleCode(), e);
             return Handled.DB_ERROR;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_EVENT_DROPPED);
             log.error("【安全事件】事件处理失败，丢弃: {}", SecurityEvent.truncate(raw, 512), e);
             redis.opsForList().remove(processingKey, 1, raw);
             return Handled.DROPPED;

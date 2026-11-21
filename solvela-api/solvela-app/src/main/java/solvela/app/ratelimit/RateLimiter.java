@@ -12,6 +12,8 @@ import solvela.security.IpRange;
 import solvela.security.RateLimitDimension;
 import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
+import solvela.observe.DegradePoint;
+import solvela.app.observe.Degradations;
 
 import java.time.Instant;
 import java.util.List;
@@ -226,6 +228,7 @@ public class RateLimiter {
             return new Outcome(RateLimitScript.asLong(r.get(0)) == 1, RateLimitScript.asLong(r.get(1)),
                     (int) RateLimitScript.asLong(r.get(2)), Verdict.of(RateLimitScript.asLong(r.get(3))));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RATE_LIMIT_FAIL_OPEN);
             log.error("【网关限流】脚本执行失败，放行这个维度, 规则: {}, 维度: {}", rule.target(), dimension, e);
             return null;
         }

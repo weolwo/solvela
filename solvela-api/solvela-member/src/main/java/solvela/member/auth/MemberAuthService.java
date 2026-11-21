@@ -68,6 +68,8 @@ import solvela.member.sms.MemberSmsCodeIssuer;
 import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -688,6 +690,7 @@ public class MemberAuthService implements MemberAuthApi {
         try {
             return mask.apply(piiCipher.decrypt(cipher));
         } catch (Exception e) {
+            Degradations.record(DegradePoint.PII_DECRYPT_FAILED);
             log.warn("【联系方式】解密失败, memberId 已省略", e);
             return null;
         }
@@ -939,6 +942,7 @@ public class MemberAuthService implements MemberAuthApi {
             loginLog.setCreateTime(LocalDateTime.now());
             memberLoginLogDao.insert(loginLog);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.AUDIT_LOG_WRITE_FAILED);
             log.error("会员登录日志写入失败, memberId: {}", memberId, e);
         }
     }

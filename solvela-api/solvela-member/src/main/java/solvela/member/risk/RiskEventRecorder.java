@@ -7,6 +7,8 @@ import solvela.member.MemberRiskEvent;
 import solvela.member.MemberRiskHit;
 import solvela.member.risk.dao.MemberRiskEventDao;
 import solvela.member.risk.dao.MemberRiskHitDao;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.util.List;
 
@@ -47,6 +49,7 @@ public class RiskEventRecorder {
         try {
             eventDao.insertEvent(event);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RISK_AUDIT_WRITE_FAILED);
             log.error("【风控】决策流水写入失败, traceId: {}, decision: {}", event.getTraceId(), event.getDecision(), e);
             return null;
         }
@@ -62,6 +65,7 @@ public class RiskEventRecorder {
             }
             hitDao.insertHits(hits);
         } catch (Exception e) {
+            Degradations.record(DegradePoint.RISK_AUDIT_WRITE_FAILED);
             log.error("【风控】命中明细写入失败（流水已写入, eventId: {}）, 命中 {} 条", eventId, hits.size(), e);
         }
         return eventId;

@@ -43,6 +43,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- 设计降级计数（solvela.base.observe.Degradations）。只要 core：注册表与导出由三个端模块的
+             actuator + micrometer-registry-prometheus 提供，版本由 Spring Boot BOM 管 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
         <!-- JsonUtils 与各种序列化器直接用 Jackson。
              原来是 starter-web 顺带带进来的，摘掉 starter-web 之后必须显式声明 -->
         <dependency>

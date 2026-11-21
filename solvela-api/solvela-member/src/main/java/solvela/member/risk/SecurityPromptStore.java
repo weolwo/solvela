@@ -6,6 +6,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import solvela.base.module.redis.RedisService;
 import solvela.base.util.SolvelaStringUtil;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -85,6 +87,7 @@ public class SecurityPromptStore {
             redis.expire(key, TTL);
             return promptId;
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 记不上只是少问一次，绝不能影响登录
             log.error("【安全确认】记录待确认失败, memberId: {}", memberId, e);
             return null;
@@ -109,6 +112,7 @@ public class SecurityPromptStore {
             prompts.sort((a, b) -> Long.compare(b.loginEpochSecond(), a.loginEpochSecond()));
             return List.copyOf(prompts);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 🔴 查不到就不弹。绝不能反过来「查失败就拦住用户」—— 那会让一次 Redis 抖动变成整个 App 打不开
             log.error("【安全确认】读待确认失败, memberId: {}", memberId, e);
             return List.of();

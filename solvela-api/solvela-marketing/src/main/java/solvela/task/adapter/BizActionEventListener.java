@@ -11,6 +11,8 @@ import solvela.task.TaskEvent;
 import solvela.task.runtime.TaskEventService;
 import solvela.task.runtime.domain.TaskEventReportCommand;
 import solvela.task.taskevent.service.TaskEventDefService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 /**
  * 业务动作 → 任务事件的<b>防腐层</b>：全仓唯一同时认识"商城/会员在发生什么"和
@@ -112,6 +114,7 @@ public class BizActionEventListener {
             taskEventService.report(toCommand(event));
 
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_ACTION_DELIVERY_FAILED);
             /*
              * 🔴 这里必须把异常全吃掉。
              *
@@ -175,6 +178,7 @@ public class BizActionEventListener {
         try {
             return memberService.isNewMember(memberId);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_MEMBER_INFO_UNAVAILABLE);
             // 判不出来不该让整条打点失败：没有人群限制的任务（绝大多数）不受影响
             log.warn("【任务打点】判定新老会员失败，按「未告知」下传。memberId={}", memberId, e);
             return null;

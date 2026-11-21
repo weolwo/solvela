@@ -12,6 +12,8 @@ import solvela.member.risk.RiskContext;
 import solvela.member.risk.config.RiskRuleRegistry;
 import solvela.member.risk.rule.RiskRuleConfig;
 import solvela.member.risk.rule.impl.PasswordCooldownRule;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.Duration;
 import java.util.List;
@@ -183,6 +185,7 @@ public class PasswordCooldownStore {
             // free = 2、已错 2 次 → 1（再错一次就冷却）；已错 1 次 → 2
             return (int) Math.max(0L, free - outcome.failures() + 1L);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             // 记不上只是「这次没算进去」，不该让登录接口跟着失败
             log.error("【密码冷却】记一次失败时出错", e);
             return null;
@@ -199,6 +202,7 @@ public class PasswordCooldownStore {
         try {
             clear(identityHashHex, deviceId);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.error("【密码冷却】清零失败", e);
         }
     }
@@ -207,6 +211,7 @@ public class PasswordCooldownStore {
         try {
             return registry.getObject().config("PWD_COOLDOWN");
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_CONFIG_INVALID);
             log.warn("【密码冷却】读规则配置失败，本次不记", e);
             return null;
         }

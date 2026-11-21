@@ -18,6 +18,8 @@ import solvela.member.operationlimit.dao.MemberOperationLimitDao;
 import solvela.member.risk.feature.PasswordCooldownStore;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -247,6 +249,7 @@ public class MemberOperationLimitService {
             clearByContact(store, contacts.getEmail());
             clearByContact(store, contacts.getPhone());
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.SECURITY_STATE_STORE_FAILED);
             log.error("会员操作限制解冻时清密码冷却失败 memberId={}", memberId, e);
         }
     }

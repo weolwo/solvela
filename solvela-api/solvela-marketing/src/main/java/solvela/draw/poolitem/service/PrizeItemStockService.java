@@ -19,6 +19,8 @@ import solvela.draw.runtime.DrawStockService;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.manager.PrizeConfigManager;
 import solvela.prize.prizeconfig.service.PrizeCatalog;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
@@ -369,6 +371,7 @@ public class PrizeItemStockService {
             });
             return list == null ? 0 : list.size();
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.DRAW_WHITELIST_UNPARSEABLE);
             log.warn("[库存看板] 白名单解析失败，原值={}", whiteListJson, e);
             return null;
         }

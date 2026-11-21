@@ -17,6 +17,8 @@ import solvela.member.risk.dao.MemberRiskRuleDao;
 import solvela.member.risk.feature.RiskParams;
 import solvela.member.risk.rule.RiskRule;
 import solvela.member.risk.rule.RiskRuleConfig;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
@@ -161,6 +163,7 @@ public class RiskRuleRegistry implements SmartInitializingSingleton {
         try {
             return new Bound(impl, toConfig(row, impl));
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.RISK_RULE_CONFIG_BROKEN);
             broken.add(row.getRuleCode());
             log.error("【风控】规则 {} 的配置读不出来，当作关闭：{}", row.getRuleCode(), e.getMessage());
             return null;

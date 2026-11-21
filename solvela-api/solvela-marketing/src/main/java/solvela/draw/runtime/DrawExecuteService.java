@@ -39,6 +39,8 @@ import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
 import solvela.dispatch.outbox.PrizeEventPublisher;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -485,6 +487,7 @@ public class DrawExecuteService {
             });
             return records == null ? null : new DrawExecuteResult.Executed(records);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.DRAW_REPLAY_FAILED);
             log.error("[抽奖幂等] 结果回放失败，key={}", resultKey, e);
             return null;
         }
@@ -504,6 +507,7 @@ public class DrawExecuteService {
             redissonClient.getBucket(resultKey, StringCodec.INSTANCE)
                     .set(JsonUtils.toJson(records), REQUEST_DEDUP_TTL);
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.DRAW_RESULT_CACHE_FAILED);
             log.error("[抽奖幂等] 结果写入失败，该批重试将拿到 DUPLICATE_REQUEST，key={}", resultKey, e);
         }
     }
@@ -638,6 +642,7 @@ public class DrawExecuteService {
                     log.warn("[抽奖预扣补偿] 事务未提交，已回滚 Redis 预扣, prizeItemId={}, status={}",
                             prizeItemId, status);
                 } catch (RuntimeException e) {
+                    Degradations.record(DegradePoint.DRAW_STOCK_COMPENSATION_FAILED);
                     // 补偿失败 = 库存漂移。库存看板会把它标成 STOCK_DRIFT，运维据此人工校准
                     log.error("[抽奖预扣补偿失败] 库存将出现漂移（Redis 偏少），prizeItemId={}", prizeItemId, e);
                 }

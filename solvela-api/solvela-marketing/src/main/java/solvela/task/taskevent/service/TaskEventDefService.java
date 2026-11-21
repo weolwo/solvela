@@ -21,6 +21,8 @@ import solvela.task.taskevent.domain.command.TaskEventUpdateCommand;
 import solvela.task.taskevent.domain.dto.TaskEventDTO;
 import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
 import solvela.task.taskevent.domain.query.TaskEventQuery;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
 import tools.jackson.core.type.TypeReference;
 
 import java.util.List;
@@ -80,6 +82,7 @@ public class TaskEventDefService {
             return JsonUtils.parseType(event.getPayloadSchema(), new TypeReference<Object>() {
             });
         } catch (RuntimeException e) {
+            Degradations.record(DegradePoint.TASK_CONFIG_UNPARSEABLE);
             log.warn("[任务事件] payload_schema 解析失败，该字段降级为空。eventCode={}", event.getEventCode(), e);
             return null;
         }
