@@ -2,6 +2,7 @@ package solvela.task.tasktemplate.domain.command;
 
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
+import solvela.enums.TaskTypeEnum;
 
 import java.util.Map;
 
@@ -21,7 +22,7 @@ public class TaskTemplateSaveCommand {
     private String templateName;
 
     /** 流转类型：SIMPLE, COUNT, AMOUNT */
-    private String taskType;
+    private TaskTypeEnum taskType;
 
     /** 默认触发事件：模板建议值，向导中可覆盖 */
     private String triggerEvent;

@@ -14,7 +14,7 @@ import solvela.base.util.SolvelaCollectionUtil;
 import solvela.enums.EnableStatusEnum;
 import solvela.exception.BusinessException;
 import solvela.task.TaskTemplate;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 import solvela.task.tasktemplate.dao.TaskTemplateDao;
 import solvela.task.tasktemplate.domain.command.TaskTemplateAddCommand;
 import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
@@ -195,10 +195,10 @@ public class TaskTemplateService {
      * @return null 表示通过
      */
     @SuppressWarnings("unchecked")
-    private String checkTargetParamDeclared(String taskTypeValue, Map<String, Object> uiSchema) {
-        TaskTypeEnum taskType = TaskTypeEnum.resolve(taskTypeValue);
+    private String checkTargetParamDeclared(TaskTypeEnum taskType, Map<String, Object> uiSchema) {
+        // 非法取值在入参反序列化时就被拒了，走到这里只可能是没传
         if (taskType == null) {
-            return "任务类型非法：" + taskTypeValue + "，可选值 "
+            return "任务类型必填，可选值 "
                     + Arrays.stream(TaskTypeEnum.values()).map(TaskTypeEnum::getValue).toList();
         }
         List<String> requiredKeys = taskType.targetParamKeys();
@@ -268,7 +268,7 @@ public class TaskTemplateService {
      * 后者会在向导拉模板列表时被静默剔除，运营只会看到「我建的模板不见了」。
      */
     @SuppressWarnings("unchecked")
-    private String checkRawUiSchema(String taskType, String uiSchemaJson) {
+    private String checkRawUiSchema(TaskTypeEnum taskType, String uiSchemaJson) {
         Map<String, Object> uiSchema;
         try {
             uiSchema = JsonUtils.parseObject(uiSchemaJson, Map.class);

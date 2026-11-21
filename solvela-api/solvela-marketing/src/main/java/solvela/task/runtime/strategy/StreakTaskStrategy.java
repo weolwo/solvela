@@ -1,7 +1,7 @@
 package solvela.task.runtime.strategy;
 
 import solvela.task.constant.TaskDiscardCode;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 import solvela.task.TaskRecord;
 import solvela.task.runtime.TaskPeriodResolver;
 import solvela.task.runtime.domain.MetricPlan;

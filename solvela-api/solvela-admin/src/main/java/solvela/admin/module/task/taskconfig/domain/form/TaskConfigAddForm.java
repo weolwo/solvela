@@ -1,6 +1,7 @@
 package solvela.admin.module.task.taskconfig.domain.form;
 
 import solvela.enums.TaskConfigStatusEnum;
+import solvela.enums.TaskLimitTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -42,7 +43,7 @@ public class TaskConfigAddForm {
 
     @Schema(description = "参与频次：ONCE(终身一次), DAILY(每日重复), WEEKLY(每周重复), UNLIMITED(无限制)", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "参与频次：ONCE(终身一次), DAILY(每日重复), WEEKLY(每周重复), UNLIMITED(无限制) 不能为空")
-    private String limitType;
+    private TaskLimitTypeEnum limitType;
 
     @Schema(description = "配合频次类型，限制次数", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "配合频次类型，限制次数 不能为空")

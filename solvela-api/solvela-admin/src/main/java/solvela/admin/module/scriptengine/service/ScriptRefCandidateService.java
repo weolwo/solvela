@@ -87,7 +87,8 @@ public class ScriptRefCandidateService {
     private List<ScriptRefCandidateVO> taskTemplates() {
         return taskTemplateManager.lambdaQuery()
                 .orderByDesc(TaskTemplate::getId).list().stream()
-                .map(t -> new ScriptRefCandidateVO(t.getTemplateCode(), t.getTemplateName(), t.getTaskType()))
+                .map(t -> new ScriptRefCandidateVO(t.getTemplateCode(), t.getTemplateName(),
+                        t.getTaskType() == null ? null : t.getTaskType().getValue()))
                 .toList();
     }
 

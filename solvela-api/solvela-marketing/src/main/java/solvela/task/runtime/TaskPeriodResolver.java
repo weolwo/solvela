@@ -1,7 +1,8 @@
 package solvela.task.runtime;
 
 import solvela.task.constant.TaskConst;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
+import solvela.enums.TaskLimitTypeEnum;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -36,11 +37,6 @@ public final class TaskPeriodResolver {
 
     public static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    private static final String LIMIT_ONCE = TaskConst.LIMIT_ONCE;
-    private static final String LIMIT_DAILY = TaskConst.LIMIT_DAILY;
-    private static final String LIMIT_WEEKLY = TaskConst.LIMIT_WEEKLY;
-    private static final String LIMIT_UNLIMITED = TaskConst.LIMIT_UNLIMITED;
-
     /**
      * 无天然单号的事件，幂等键按事件日兜底的前缀
      */
@@ -53,7 +49,7 @@ public final class TaskPeriodResolver {
      * 按天分片会让 current_metric 永远是 1。这一条与 limit_type 无关，
      * 即便运营把连续签到配成 {@code limit_type=DAILY} 也一样 —— 类型的语义优先于频次配置。
      */
-    public static String resolvePeriodKey(TaskTypeEnum taskType, String limitType, LocalDateTime eventTime) {
+    public static String resolvePeriodKey(TaskTypeEnum taskType, TaskLimitTypeEnum limitType, LocalDateTime eventTime) {
         if (taskType == TaskTypeEnum.STREAK) {
             return TaskConst.PERIOD_NONE;
         }
@@ -61,13 +57,12 @@ public final class TaskPeriodResolver {
             return TaskConst.PERIOD_NONE;
         }
         return switch (limitType) {
-            case LIMIT_DAILY -> eventTime.format(DAY_FORMAT);
+            case DAILY -> eventTime.format(DAY_FORMAT);
             // ISO-8601 周：跨年周的归属按 ISO 标准（12月31日可能属于次年第1周），
             // 带上 ISO 周所属年份，否则「2026年第1周」与「2027年第1周」会撞成同一个 key
-            case LIMIT_WEEKLY -> eventTime.get(IsoFields.WEEK_BASED_YEAR)
+            case WEEKLY -> eventTime.get(IsoFields.WEEK_BASED_YEAR)
                     + "W" + String.format("%02d", eventTime.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
-            case LIMIT_ONCE, LIMIT_UNLIMITED -> TaskConst.PERIOD_NONE;
-            default -> TaskConst.PERIOD_NONE;
+            case ONCE, UNLIMITED -> TaskConst.PERIOD_NONE;
         };
     }
 
@@ -142,7 +137,7 @@ public final class TaskPeriodResolver {
      *       「无限制 + 限制 1 次」会退化成「终身一次」，与它自己的名字矛盾。</li>
      * </ul>
      */
-    public static boolean supportsRoundLimit(String limitType) {
-        return LIMIT_DAILY.equals(limitType) || LIMIT_WEEKLY.equals(limitType);
+    public static boolean supportsRoundLimit(TaskLimitTypeEnum limitType) {
+        return limitType != null && limitType.isPeriodic();
     }
 }

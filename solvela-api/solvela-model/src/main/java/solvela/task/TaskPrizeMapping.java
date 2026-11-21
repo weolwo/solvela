@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
 import lombok.Data;
+import solvela.enums.TaskPrizeModeEnum;
 
 /**
  * 任务阶段与奖励映射表 实体类
@@ -50,7 +51,7 @@ public class TaskPrizeMapping {
     /**
      * 计算类型：FIXED(固定), RATIO(比例), FORMULA(公式)
      */
-    private String prizeMode;
+    private TaskPrizeModeEnum prizeMode;
 
     /**
      * 动态发奖策略JSON：如 {"amount": 20} 或 {"ratio": 0.05}

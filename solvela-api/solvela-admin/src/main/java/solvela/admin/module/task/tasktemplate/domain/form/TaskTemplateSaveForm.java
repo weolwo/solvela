@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
+import solvela.enums.TaskTypeEnum;
 
 import java.util.Map;
 
@@ -29,7 +30,7 @@ public class TaskTemplateSaveForm {
 
     @Schema(description = "流转类型：SIMPLE, COUNT, AMOUNT", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "任务类型 不能为空")
-    private String taskType;
+    private TaskTypeEnum taskType;
 
     @Schema(description = "默认触发事件：模板建议值，向导中可覆盖")
     private String triggerEvent;

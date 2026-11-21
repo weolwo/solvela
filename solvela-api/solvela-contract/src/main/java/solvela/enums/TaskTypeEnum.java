@@ -1,4 +1,4 @@
-package solvela.task.constant;
+package solvela.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -54,6 +54,15 @@ public enum TaskTypeEnum implements BaseEnum {
     STREAK("STREAK", "连续型", true),
     ;
 
+    /**
+     * rule_config 里的目标参数键。定义在这里而不是 TaskConst，是因为 {@link #targetParamKeys()} 要用，
+     * 而本枚举在 solvela-contract（实体要引用它），看不见营销模块里的 TaskConst；TaskConst 里的同名常量指向这里。
+     * 「为什么有 targetDays 这个兼容键、名单只出不进」见 TaskConst.RULE_KEY_TARGET_DAYS_LEGACY。
+     */
+    public static final String RULE_KEY_TARGET_COUNT = "targetCount";
+    public static final String RULE_KEY_TARGET_DAYS_LEGACY = "targetDays";
+    public static final String RULE_KEY_TARGET_AMOUNT = "targetAmount";
+
     private final String value;
 
     private final String desc;
@@ -84,10 +93,10 @@ public enum TaskTypeEnum implements BaseEnum {
      */
     public List<String> targetParamKeys() {
         return switch (this) {
-            case AMOUNT -> List.of(TaskConst.RULE_KEY_TARGET_AMOUNT);
-            // 主形态 targetCount，兼容存量的 targetDays（名单只出不进，见 TaskConst 的说明）
+            case AMOUNT -> List.of(RULE_KEY_TARGET_AMOUNT);
+            // 主形态 targetCount，兼容存量的 targetDays（名单只出不进，见 TaskConst.RULE_KEY_TARGET_DAYS_LEGACY）
             case COUNT, STREAK -> List.of(
-                    TaskConst.RULE_KEY_TARGET_COUNT, TaskConst.RULE_KEY_TARGET_DAYS_LEGACY);
+                    RULE_KEY_TARGET_COUNT, RULE_KEY_TARGET_DAYS_LEGACY);
             // SIMPLE 的目标恒为 1（SimpleTaskStrategy 在没配时兜底），不强制声明 ——
             // 强制反而会逼运营为「完善资料」这种一次性任务填一个永远是 1 的参数
             case SIMPLE -> List.of();

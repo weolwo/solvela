@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import solvela.enums.TaskLimitTypeEnum;
 
 /**
  * 任务配置向导 主表配置（提交 DTO 的 taskConfig 节点，对应 t_task_config）
@@ -51,7 +52,7 @@ public class TaskConfigWizardConfigCommand {
     private String actionUrl;
 
     /** 参与频次：ONCE, DAILY, WEEKLY, UNLIMITED */
-    private String limitType;
+    private TaskLimitTypeEnum limitType;
 
     /** 限制次数 */
     private Integer limitCount;

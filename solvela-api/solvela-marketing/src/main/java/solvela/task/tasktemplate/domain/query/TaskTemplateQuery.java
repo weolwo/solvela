@@ -2,6 +2,7 @@ package solvela.task.tasktemplate.domain.query;
 
 import solvela.enums.EnableStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.TaskTypeEnum;
 import java.time.LocalDate;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,7 +25,7 @@ public class TaskTemplateQuery extends PageParam {
     private String templateName;
 
     /** 流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型) */
-    private String taskType;
+    private TaskTypeEnum taskType;
 
     /** 状态：0-禁用, 1-启用 */
     private EnableStatusEnum status;

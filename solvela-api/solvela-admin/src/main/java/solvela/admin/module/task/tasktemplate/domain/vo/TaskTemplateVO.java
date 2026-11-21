@@ -1,6 +1,7 @@
 package solvela.admin.module.task.tasktemplate.domain.vo;
 
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.TaskTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -27,7 +28,7 @@ public class TaskTemplateVO {
     private String templateName;
 
     @Schema(description = "流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型)")
-    private String taskType;
+    private TaskTypeEnum taskType;
 
     @Schema(description = "默认触发事件：模板建议值，向导中可覆盖")
     private String triggerEvent;

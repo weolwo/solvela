@@ -16,6 +16,7 @@ import solvela.task.runtime.domain.TaskRuleConfig;
 import solvela.dispatch.outbox.PrizeEventPublisher;
 import solvela.observe.DegradePoint;
 import solvela.base.observe.Degradations;
+import solvela.enums.TaskPrizeModeEnum;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -145,7 +146,7 @@ public class TaskPrizeDispatcher {
      * 在派发入口临时实现一份，将来必然与真正的策略实现漂移。
      */
     private String resolvePrizeValue(TaskPrizeMapping mapping, PrizeConfig prizeConfig) {
-        if (TaskConst.PRIZE_MODE_FIXED.equals(mapping.getPrizeMode())) {
+        if (mapping.getPrizeMode() == TaskPrizeModeEnum.FIXED) {
             BigDecimal configured = readDecimal(mapping.getPrizeStrategy(), TaskConst.PRIZE_STRATEGY_KEY_VALUE);
             if (configured != null) {
                 return configured.toPlainString();

@@ -1,6 +1,7 @@
 package solvela.task.tasktemplate.domain.command;
 
 import lombok.Data;
+import solvela.enums.TaskTypeEnum;
 
 /**
  * 任务模板表 更新表单
@@ -19,7 +20,7 @@ public class TaskTemplateUpdateCommand {
     private String templateName;
 
     /** 流转类型：SIMPLE(单次节点型), COUNT(计次型), AMOUNT(计额型) */
-    private String taskType;
+    private TaskTypeEnum taskType;
 
     /** 默认触发事件：模板建议值，向导中可覆盖 */
     private String triggerEvent;

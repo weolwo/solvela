@@ -12,6 +12,7 @@ import solvela.task.TaskPrizeMapping;
 import solvela.task.prizemapping.domain.query.TaskPrizeMappingQuery;
 import solvela.task.prizemapping.domain.dto.TaskPrizeMappingDTO;
 import solvela.task.runtime.domain.TaskRuleConfig;
+import solvela.enums.TaskPrizeModeEnum;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -125,7 +126,7 @@ public class TaskPrizeMappingService {
 
         // RATIO / FORMULA 在 TaskPrizeDispatcher.resolvePrizeValue 里没有实现，
         // 会退回奖品配置的 prize_value —— 配了不报错，但发出来的不是运营以为的那个数
-        if (!TaskConst.PRIZE_MODE_FIXED.equals(vo.getPrizeMode())) {
+        if (vo.getPrizeMode() != TaskPrizeModeEnum.FIXED) {
             issues.add("计算类型 " + vo.getPrizeMode() + " 尚未实现，实际按奖品配置的固定值发放");
         }
 

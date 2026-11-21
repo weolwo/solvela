@@ -1,7 +1,7 @@
 package solvela.task.runtime.strategy;
 
 import lombok.extern.slf4j.Slf4j;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

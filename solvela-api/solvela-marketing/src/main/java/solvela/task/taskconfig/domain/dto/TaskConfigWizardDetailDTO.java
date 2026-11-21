@@ -1,6 +1,8 @@
 package solvela.task.taskconfig.domain.dto;
 
 import solvela.enums.TaskConfigStatusEnum;
+import solvela.enums.TaskLimitTypeEnum;
+import solvela.enums.TaskPrizeModeEnum;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -50,7 +52,7 @@ public class TaskConfigWizardDetailDTO {
     private String targetAudience;
 
     /** 参与频次 */
-    private String limitType;
+    private TaskLimitTypeEnum limitType;
 
     /** 限制次数 */
     private Integer limitCount;
@@ -101,7 +103,7 @@ public class TaskConfigWizardDetailDTO {
         private String prizeCode;
 
         /** 计算类型 */
-        private String prizeMode;
+        private TaskPrizeModeEnum prizeMode;
 
         /** 奖励额度 */
         private BigDecimal prizeValue;

@@ -1,7 +1,8 @@
 package solvela.task.runtime;
 
 import solvela.task.constant.TaskConst;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
+import solvela.enums.TaskLimitTypeEnum;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -29,15 +30,15 @@ class TaskPeriodResolverTest {
     @Test
     @DisplayName("DAILY 按自然日分片，WEEKLY 按 ISO 周分片")
     void periodKeyByLimitType() {
-        assertEquals("20260402", TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", APR_2));
-        assertEquals("2026W14", TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "WEEKLY", APR_2));
+        assertEquals("20260402", TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.DAILY, APR_2));
+        assertEquals("2026W14", TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.WEEKLY, APR_2));
     }
 
     @Test
     @DisplayName("ONCE / UNLIMITED / 未配置 都不分片")
     void periodKeyNoneCases() {
-        assertEquals(TaskConst.PERIOD_NONE, TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "ONCE", APR_2));
-        assertEquals(TaskConst.PERIOD_NONE, TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "UNLIMITED", APR_2));
+        assertEquals(TaskConst.PERIOD_NONE, TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.ONCE, APR_2));
+        assertEquals(TaskConst.PERIOD_NONE, TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.UNLIMITED, APR_2));
         assertEquals(TaskConst.PERIOD_NONE, TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, null, APR_2));
     }
 
@@ -45,14 +46,14 @@ class TaskPeriodResolverTest {
     @DisplayName("🔴 STREAK 恒不分片，即便运营把它配成了 DAILY —— 否则连续数没有地方累加")
     void streakNeverShardsByPeriod() {
         assertEquals(TaskConst.PERIOD_NONE,
-                TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.STREAK, "DAILY", APR_2),
+                TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.STREAK, TaskLimitTypeEnum.DAILY, APR_2),
                 "按天分片会让每天都是一条新记录、current_metric 永远是 1");
         assertEquals(TaskConst.PERIOD_NONE,
-                TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.STREAK, "WEEKLY", APR_2));
+                TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.STREAK, TaskLimitTypeEnum.WEEKLY, APR_2));
 
         // 前提确认：同样是 DAILY，COUNT 确实会分片 —— 否则上面两条是空过
         assertNotEquals(TaskConst.PERIOD_NONE,
-                TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", APR_2));
+                TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.DAILY, APR_2));
     }
 
     @Test
@@ -61,22 +62,22 @@ class TaskPeriodResolverTest {
         // 2024-12-30(周一) 属于 ISO 的 2025 年第 1 周 —— 12 月的日期落在次年，
         // 若只取 getYear() 会得到 "2024W01"，与 2024 年真正的第 1 周撞成同一个 period_key
         String crossYear = TaskPeriodResolver.resolvePeriodKey(
-                TaskTypeEnum.COUNT, "WEEKLY", LocalDateTime.of(2024, 12, 30, 10, 0));
+                TaskTypeEnum.COUNT, TaskLimitTypeEnum.WEEKLY, LocalDateTime.of(2024, 12, 30, 10, 0));
         assertEquals("2025W01", crossYear);
 
         // 紧邻的下一周，证明周序确实在递增而不是恒为 W01
         assertEquals("2025W02", TaskPeriodResolver.resolvePeriodKey(
-                TaskTypeEnum.COUNT, "WEEKLY", LocalDateTime.of(2025, 1, 6, 10, 0)));
+                TaskTypeEnum.COUNT, TaskLimitTypeEnum.WEEKLY, LocalDateTime.of(2025, 1, 6, 10, 0)));
 
         // 2024 年自身的第 1 周（2024-01-01 是周一），与上面的 crossYear 必须是不同的 key
         String realFirstWeekOf2024 = TaskPeriodResolver.resolvePeriodKey(
-                TaskTypeEnum.COUNT, "WEEKLY", LocalDateTime.of(2024, 1, 1, 10, 0));
+                TaskTypeEnum.COUNT, TaskLimitTypeEnum.WEEKLY, LocalDateTime.of(2024, 1, 1, 10, 0));
         assertEquals("2024W01", realFirstWeekOf2024);
         assertNotEquals(crossYear, realFirstWeekOf2024);
 
         // 有 53 周的年份（2026-01-01 是周四）不会溢出成次年
         assertEquals("2026W53", TaskPeriodResolver.resolvePeriodKey(
-                TaskTypeEnum.COUNT, "WEEKLY", LocalDateTime.of(2026, 12, 31, 10, 0)));
+                TaskTypeEnum.COUNT, TaskLimitTypeEnum.WEEKLY, LocalDateTime.of(2026, 12, 31, 10, 0)));
     }
 
     // ==================== event_biz_id ====================
@@ -97,7 +98,7 @@ class TaskPeriodResolverTest {
 
         // 决定性的一条：STREAK 的 period_key 恒为 NONE，
         // 若拿它当幂等键，同一个人对同一任务一辈子只有一个键 —— 第一次签到后全被唯一索引挡掉
-        String streakPeriodKey = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.STREAK, "DAILY", APR_2);
+        String streakPeriodKey = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.STREAK, TaskLimitTypeEnum.DAILY, APR_2);
         assertEquals(TaskConst.PERIOD_NONE, streakPeriodKey, "前提确认");
         assertNotEquals(streakPeriodKey, fallback, "拿 period_key 当幂等键会让「连续签到」彻底失效");
     }

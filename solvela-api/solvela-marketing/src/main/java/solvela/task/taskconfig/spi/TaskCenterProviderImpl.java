@@ -22,6 +22,7 @@ import solvela.task.runtime.domain.TaskRuleConfig;
 import solvela.task.taskconfig.manager.TaskConfigManager;
 import solvela.observe.DegradePoint;
 import solvela.base.observe.Degradations;
+import solvela.enums.TaskLimitTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -276,21 +277,17 @@ public class TaskCenterProviderImpl implements TaskCenterProvider {
     }
 
     /**
-     * 周期。<b>字典在域里</b>（TaskConst.LIMIT_*），前端不该认识这些字符串。
-     *
-     * <p>认不出的取值原样返回而不是编一句话 —— 那是配置里出现了字典外的值，
-     * 显示原文至少让人看得出「这儿不对」。
+     * 周期。<b>字典在域里</b>（TaskLimitTypeEnum），前端不该认识这些值。按枚举穷举，加一种频次漏补文案时编译不过。
      */
-    private static String periodText(String limitType) {
-        if (limitType == null || limitType.isBlank()) {
+    private static String periodText(TaskLimitTypeEnum limitType) {
+        if (limitType == null) {
             return "不限";
         }
         return switch (limitType) {
-            case TaskConst.LIMIT_DAILY -> "每日";
-            case TaskConst.LIMIT_WEEKLY -> "每周";
-            case TaskConst.LIMIT_ONCE -> "仅一次";
-            case TaskConst.LIMIT_UNLIMITED -> "不限";
-            default -> limitType;
+            case DAILY -> "每日";
+            case WEEKLY -> "每周";
+            case ONCE -> "仅一次";
+            case UNLIMITED -> "不限";
         };
     }
 

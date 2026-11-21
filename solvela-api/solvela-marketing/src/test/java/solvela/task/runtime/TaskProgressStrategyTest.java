@@ -3,7 +3,7 @@ package solvela.task.runtime;
 import solvela.enums.TaskRecordStatusEnum;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 import solvela.task.TaskRecord;
 import solvela.task.runtime.domain.MetricPlan;
 import solvela.task.runtime.domain.TaskEventContext;

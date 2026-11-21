@@ -1,6 +1,7 @@
 package solvela.task;
 
 import solvela.enums.TaskConfigStatusEnum;
+import solvela.enums.TaskLimitTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -61,7 +62,7 @@ public class TaskConfig {
     /**
      * 参与频次：ONCE(终身一次), DAILY(每日重复), WEEKLY(每周重复), UNLIMITED(无限制)
      */
-    private String limitType;
+    private TaskLimitTypeEnum limitType;
 
     /**
      * 配合频次类型，限制次数

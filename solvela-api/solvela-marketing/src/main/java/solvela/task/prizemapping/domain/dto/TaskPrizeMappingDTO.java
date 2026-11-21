@@ -3,6 +3,7 @@ package solvela.task.prizemapping.domain.dto;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.enums.TaskPrizeModeEnum;
 
 /**
  * 任务奖品映射列表的<b>读模型</b>：mapper 的 resultMap 映射到这里，service 也返回它。
@@ -44,7 +45,7 @@ public class TaskPrizeMappingDTO {
     private String prizeName;
 
     /** 计算类型：FIXED(固定), RATIO(比例), FORMULA(公式) */
-    private String prizeMode;
+    private TaskPrizeModeEnum prizeMode;
 
     /** 动态发奖策略原文 JSON */
     private String prizeStrategy;

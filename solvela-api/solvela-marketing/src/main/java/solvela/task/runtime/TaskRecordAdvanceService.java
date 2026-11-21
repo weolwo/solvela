@@ -15,7 +15,7 @@ import solvela.task.TaskRecord;
 import solvela.task.TaskRecordFlow;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 import solvela.task.prizemapping.manager.TaskPrizeMappingManager;
 import solvela.task.record.dao.TaskRecordDao;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;

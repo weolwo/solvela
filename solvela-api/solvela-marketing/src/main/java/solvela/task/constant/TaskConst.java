@@ -1,5 +1,6 @@
 package solvela.task.constant;
 
+import solvela.enums.TaskTypeEnum;
 /**
  * 任务模块常量（铁律 3：消除魔法值）。
  *
@@ -94,30 +95,7 @@ public final class TaskConst {
         }
     }
 
-    // ==================== t_task_config.limit_type ====================
-
-    /**
-     * 参与频次：终身一次
-     */
-    public static final String LIMIT_ONCE = "ONCE";
-
-    /**
-     * 参与频次：每日重复
-     */
-    public static final String LIMIT_DAILY = "DAILY";
-
-    /**
-     * 参与频次：每周重复
-     */
-    public static final String LIMIT_WEEKLY = "WEEKLY";
-
-    /**
-     * 参与频次：无限制。
-     *
-     * <p>⚠️ 「无限制」指<b>轮次不限</b>，此时 {@code limit_count} 不参与判定 ——
-     * 否则「无限制 + 限制 1 次」会变成「终身一次」，与它自己的名字矛盾。
-     */
-    public static final String LIMIT_UNLIMITED = "UNLIMITED";
+    // t_task_config.limit_type 的取值见 TaskLimitTypeEnum（2026-11-21 起不再是这里的字符串常量）
 
     // ==================== rule_config 约定键 ====================
 
@@ -129,7 +107,7 @@ public final class TaskConst {
     /**
      * 目标次数（COUNT / SIMPLE / STREAK）—— <b>契约主形态</b>
      */
-    public static final String RULE_KEY_TARGET_COUNT = "targetCount";
+    public static final String RULE_KEY_TARGET_COUNT = TaskTypeEnum.RULE_KEY_TARGET_COUNT;
 
     /**
      * 目标次数的兼容形态：存量模板 {@code FRWAYF2X6N}（每日签到）的 ui_schema 用的是这个键。
@@ -145,12 +123,12 @@ public final class TaskConst {
      * 但<b>新增模板一律用 {@link #RULE_KEY_TARGET_COUNT}</b>。
      * 兼容名单只出不进 —— 每加一个都是在削弱契约。
      */
-    public static final String RULE_KEY_TARGET_DAYS_LEGACY = "targetDays";
+    public static final String RULE_KEY_TARGET_DAYS_LEGACY = TaskTypeEnum.RULE_KEY_TARGET_DAYS_LEGACY;
 
     /**
      * 目标金额（AMOUNT）
      */
-    public static final String RULE_KEY_TARGET_AMOUNT = "targetAmount";
+    public static final String RULE_KEY_TARGET_AMOUNT = TaskTypeEnum.RULE_KEY_TARGET_AMOUNT;
 
     /**
      * 单次事件的最小金额门槛（AMOUNT，如「单笔满 100 才计入」），缺省不限
@@ -190,10 +168,7 @@ public final class TaskConst {
      */
     public static final String PRIZE_STRATEGY_KEY_VALUE = "value";
 
-    /**
-     * 发奖计算类型：固定值
-     */
-    public static final String PRIZE_MODE_FIXED = "FIXED";
+    // 发奖计算类型见 TaskPrizeModeEnum
 
     // ==================== 幂等键 ====================
 

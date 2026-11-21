@@ -21,4 +21,14 @@ WHERE BINARY source_type NOT IN ('TASK', 'DRAW', 'LOTTERY', 'MANUAL') GROUP BY s
 UNION ALL
 -- ScriptRefOwnerTypeEnum：solvela-contract/src/main/java/solvela/enums/ScriptRefOwnerTypeEnum.java
 SELECT 't_script_ref.ref_type', ref_type, COUNT(*) FROM t_script_ref
-WHERE BINARY ref_type NOT IN ('TASK_TEMPLATE', 'PRIZE_POOL', 'ACTIVITY', 'DRAW') GROUP BY ref_type;
+WHERE BINARY ref_type NOT IN ('TASK_TEMPLATE', 'PRIZE_POOL', 'ACTIVITY', 'DRAW') GROUP BY ref_type
+UNION ALL
+-- TaskTypeEnum / TaskLimitTypeEnum / TaskPrizeModeEnum：solvela-contract/src/main/java/solvela/enums/
+SELECT 't_task_template.task_type', task_type, COUNT(*) FROM t_task_template
+WHERE BINARY task_type NOT IN ('SIMPLE', 'COUNT', 'AMOUNT', 'STREAK') GROUP BY task_type
+UNION ALL
+SELECT 't_task_config.limit_type', limit_type, COUNT(*) FROM t_task_config
+WHERE limit_type IS NOT NULL AND BINARY limit_type NOT IN ('ONCE', 'DAILY', 'WEEKLY', 'UNLIMITED') GROUP BY limit_type
+UNION ALL
+SELECT 't_task_prize_mapping.prize_mode', prize_mode, COUNT(*) FROM t_task_prize_mapping
+WHERE prize_mode IS NOT NULL AND BINARY prize_mode NOT IN ('FIXED', 'RATIO', 'FORMULA') GROUP BY prize_mode;

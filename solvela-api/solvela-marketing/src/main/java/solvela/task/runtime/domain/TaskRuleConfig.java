@@ -3,7 +3,7 @@ package solvela.task.runtime.domain;
 import tools.jackson.core.type.TypeReference;
 import solvela.base.json.JsonUtils;
 import solvela.task.constant.TaskConst;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.HashMap;

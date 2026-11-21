@@ -25,7 +25,7 @@ import solvela.task.TaskRecord;
 import solvela.task.TaskRecordFlow;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
-import solvela.task.constant.TaskTypeEnum;
+import solvela.enums.TaskTypeEnum;
 import solvela.task.record.dao.TaskRecordDao;
 import solvela.task.recordflow.dao.TaskRecordFlowDao;
 import solvela.task.runtime.TaskEventExecutorConfig;
@@ -39,6 +39,7 @@ import solvela.task.taskevent.domain.dto.TaskEventOptionDTO;
 import solvela.task.taskevent.service.TaskEventDefService;
 import solvela.task.tasktemplate.domain.command.TaskTemplateSaveCommand;
 import solvela.task.tasktemplate.service.TaskTemplateService;
+import solvela.enums.TaskLimitTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -795,10 +796,10 @@ class TaskRuntimeP0AcceptanceTest {
     @DisplayName("参与轮次：每日 2 轮 -> 第1、2 个事件各完成一轮，第 3 个被判本周期已达上限")
     void roundLimitAllowsConfiguredRoundsThenBlocks() {
         TaskConfig config = configOf(TASK_ROUNDS);
-        assertEquals("DAILY", config.getLimitType(), "前提确认");
+        assertEquals(TaskLimitTypeEnum.DAILY, config.getLimitType(), "前提确认");
         assertEquals(2, config.getLimitCount().intValue(), "前提确认：本用例要验的是 2 轮");
 
-        String basePeriod = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", DAY_1);
+        String basePeriod = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.DAILY, DAY_1);
 
         // 第 1 轮：周期键是裸键（不带 #1）—— 存量记录兼容的关键
         taskEventService.handle(new TaskEventContext("ROUND_TEST", memberId, member, "r1", null, DAY_1, null, null, Map.of()));
@@ -841,7 +842,7 @@ class TaskRuntimeP0AcceptanceTest {
         List<TaskRecord> all = recordsOf(config.getId());
         assertEquals(3, all.size(), "换一天应重新计轮");
 
-        String day2Base = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, "DAILY", DAY_2);
+        String day2Base = TaskPeriodResolver.resolvePeriodKey(TaskTypeEnum.COUNT, TaskLimitTypeEnum.DAILY, DAY_2);
         assertTrue(all.stream().anyMatch(r -> day2Base.equals(r.getPeriodKey())),
                 "第二天的第 1 轮同样是裸键：" + all.stream().map(TaskRecord::getPeriodKey).toList());
     }
@@ -873,7 +874,7 @@ class TaskRuntimeP0AcceptanceTest {
 
     // ==================== 模板契约校验（方案 §4.10） ====================
 
-    private TaskTemplateSaveCommand templateForm(String code, String taskType, List<Map<String, Object>> params) {
+    private TaskTemplateSaveCommand templateForm(String code, TaskTypeEnum taskType, List<Map<String, Object>> params) {
         TaskTemplateSaveCommand form = new TaskTemplateSaveCommand();
         form.setTemplateCode(code);
         form.setTemplateName("契约校验用-" + code);
@@ -891,7 +892,7 @@ class TaskRuntimeP0AcceptanceTest {
     @DisplayName("🔴 契约校验：COUNT 模板没声明 targetCount 必须存不进去（否则任务会永远不完成且零报错）")
     void templateWithoutTargetParamIsRejected() {
         BusinessException result = assertThrows(BusinessException.class,
-                () -> taskTemplateService.save(templateForm("TCONTRACT1", "COUNT", List.of(numberParam("targetX")))),
+                () -> taskTemplateService.save(templateForm("TCONTRACT1", TaskTypeEnum.COUNT, List.of(numberParam("targetX")))),
                 "起错参数名的模板必须在保存时就被拦下 —— 放过去的话，运营能配任务、事件能进来、"
                         + "进度也涨，就是永远不完成，而且一条报错都没有");
         assertTrue(result.getMessage().contains("targetCount"),
@@ -904,7 +905,7 @@ class TaskRuntimeP0AcceptanceTest {
     @DisplayName("契约校验：AMOUNT 要的是 targetAmount，给 targetCount 不算数")
     void amountTemplateRequiresTargetAmount() {
         BusinessException wrong = assertThrows(BusinessException.class,
-                () -> taskTemplateService.save(templateForm("TCONTRACT2", "AMOUNT", List.of(numberParam("targetCount")))),
+                () -> taskTemplateService.save(templateForm("TCONTRACT2", TaskTypeEnum.AMOUNT, List.of(numberParam("targetCount")))),
                 "AMOUNT 判达标读的是 targetAmount，声明 targetCount 一样读不到");
         assertTrue(wrong.getMessage().contains("targetAmount"), wrong.getMessage());
     }
@@ -914,22 +915,22 @@ class TaskRuntimeP0AcceptanceTest {
     void legacyKeyAndSimpleTypeAreAccepted() {
         // 存量模板 FRWAYF2X6N 用的就是 targetDays，不兼容的话它一编辑就存不回去
         assertDoesNotThrow(() -> taskTemplateService.save(
-                templateForm("TCONTRACT3", "COUNT", List.of(numberParam("targetDays")))),
+                templateForm("TCONTRACT3", TaskTypeEnum.COUNT, List.of(numberParam("targetDays")))),
                 "兼容形态 targetDays 应放行");
 
         // SIMPLE 目标恒为 1，强制声明反而是逼运营填一个永远是 1 的参数
         assertDoesNotThrow(() -> taskTemplateService.save(
-                templateForm("TCONTRACT4", "SIMPLE", List.of(numberParam("someFlag")))),
+                templateForm("TCONTRACT4", TaskTypeEnum.SIMPLE, List.of(numberParam("someFlag")))),
                 "SIMPLE 不该强制声明目标参数");
 
         jdbcTemplate.update("DELETE FROM t_task_template WHERE template_code IN ('TCONTRACT3','TCONTRACT4')");
     }
 
     @Test
-    @DisplayName("契约校验：非法 task_type 直接拒绝，并列出可选值")
-    void illegalTaskTypeIsRejected() {
+    @DisplayName("契约校验：缺 task_type 直接拒绝，并列出可选值（非法取值在入参反序列化时就被拒，到不了这里）")
+    void missingTaskTypeIsRejected() {
         BusinessException result = assertThrows(BusinessException.class,
-                () -> taskTemplateService.save(templateForm("TCONTRACT5", "NOT_A_TYPE", List.of(numberParam("targetCount")))));
+                () -> taskTemplateService.save(templateForm("TCONTRACT5", null, List.of(numberParam("targetCount")))));
         assertTrue(result.getMessage().contains("STREAK"), "报错要列出可选值：" + result.getMessage());
     }
 

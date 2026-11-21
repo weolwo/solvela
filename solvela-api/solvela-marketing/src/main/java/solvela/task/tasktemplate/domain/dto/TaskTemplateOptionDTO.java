@@ -1,6 +1,7 @@
 package solvela.task.tasktemplate.domain.dto;
 
 import java.util.Map;
+import solvela.enums.TaskTypeEnum;
 
 /**
  * 任务模板选项VO：供任务配置向导第1步选模板、第2步按 uiSchema 渲染动态表单
@@ -20,7 +21,7 @@ import java.util.Map;
  */
 public record TaskTemplateOptionDTO(String templateCode,
                                    String templateName,
-                                   String taskType,
+                                   TaskTypeEnum taskType,
                                    String triggerEvent,
                                    String icon,
                                    String description,

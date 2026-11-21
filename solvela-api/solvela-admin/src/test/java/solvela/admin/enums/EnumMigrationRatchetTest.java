@@ -255,9 +255,6 @@ class EnumMigrationRatchetTest {
             "member/MemberGrowthLog.java#bizType",
             "member/MemberGrowthLog.java#source",
             "member/Member.java#registerSource",
-            "task/TaskConfig.java#limitType",
-            "task/TaskPrizeMapping.java#prizeMode",
-            "task/TaskTemplate.java#taskType",
             // 客户端上报，见上面的 ⚠️
             "member/Device.java#deviceType",
             "member/MemberLoginLog.java#deviceType");

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
+import solvela.enums.TaskPrizeModeEnum;
 
 /**
  * 任务阶段与奖励映射表 列表VO
@@ -50,7 +51,7 @@ public class TaskPrizeMappingVO {
     private String prizeName;
 
     @Schema(description = "计算类型：FIXED(固定), RATIO(比例), FORMULA(公式)")
-    private String prizeMode;
+    private TaskPrizeModeEnum prizeMode;
 
     @Schema(description = "动态发奖策略原文 JSON")
     private String prizeStrategy;
