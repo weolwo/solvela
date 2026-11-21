@@ -210,6 +210,112 @@ class EnumMigrationRatchetTest {
                         + "DAO 形参与调用点一次改完 —— SolvelaBeanUtil.copy 对类型不匹配的属性静默跳过");
     }
 
+    /**
+     * 实体上「类型 / 状态语义」的 String 字段：{@code private String xxxType;}、{@code xxxStatus}、{@code category}…
+     *
+     * <p>上面三条盯的都是 Integer 形态，而 String 形态同样会静默出错：拼错一个字母的值存得进去，
+     * 按字面量判等或写在 SQL 里的地方却永远匹配不上（{@code AnnouncementAudienceEnum} 就是这么来的）。
+     *
+     * <p>只扫 solvela-model（持久化实体与事件），那里是这些值的源头；DTO / VO / Form 随实体一次改完。
+     * 按名字后缀抓，名字不带这些词的类型列看不见 —— 这是棘轮，不是全面审计。
+     */
+    private static final Pattern STRING_TYPE_FIELD = Pattern.compile(
+            "private\\s+String\\s+(\\w*(?:[Tt]ype|[Ss]tatus|[Cc]ategory|[Mm]ode|[Kk]ind|[Ss]ource|[Cc]hannel))\\s*[;=]");
+
+    /**
+     * 刻意保留 String 的字段：取值本身是开放的，不是一个封闭集合。每一行写清为什么。
+     */
+    private static final Set<String> STRING_TYPE_OPEN = Set.of(
+            // 脚本返回值的 Java 类型名（ScriptEngineController 里取 getSimpleName()），不是枚举值
+            "scriptengine/Script.java#returnType",
+            // NONE 或 payload 里的字段名（计额时按哪个字段累加），字段名由运营配置
+            "task/TaskEvent.java#metricSource");
+
+    /**
+     * 尚未枚举化的 String 类型列，<b>只许删，不许加</b>（2026-11-21 首次分拣，34 个）。
+     *
+     * <p>迁一列删一行，做法照 {@code AnnouncementAudienceEnum}：按枚举名存、JSON 也是枚举名，库与接口形状不变；
+     * 已有对应 BaseEnum 的（如 {@code ActivityTypeEnum}、{@code ProposalSourceTypeEnum}）先确认它的 JSON 形状。
+     * 读的一方在库里遇到枚举外的值会直接报错，所以每迁一列先在各环境查一遍现存的取值。
+     *
+     * <p>⚠️ deviceType 两列是客户端上报的，收敛成枚举之前要先定「未知值怎么办」（拒绝还是归为 OTHER），那是业务决定。
+     */
+    private static final Set<String> STRING_TYPE_PENDING = Set.of(
+            // PrizeTypeEnum 那一个字典（SCORE / BALANCE / COUPON / PHYSICAL / MARKER / LOTTERY / CUSTOM）
+            "event/UserPrizeEvent.java#prizeType",
+            "ledger/MemberAssetTransaction.java#assetType",
+            "ledger/MemberWallet.java#assetType",
+            "member/GradeEntitlement.java#assetType",
+            "prize/PrizeConfig.java#prizeType",
+            "prize/PrizeLog.java#prizeType",
+            "risk/PromotionConfig.java#prizeType",
+            "risk/ProposalRecord.java#assetType",
+            // ActivityTypeEnum（BaseEnum，value 是 String）
+            "activity/ActivityConfig.java#activityType",
+            "event/UserPrizeEvent.java#activityType",
+            "prize/PrizeLog.java#activityType",
+            // EventCategoryEnum / EventTypeEnum 已存在，事件字段还是 String
+            "event/BaseBizEvent.java#category",
+            "event/BaseBizEvent.java#eventType",
+            "event/UserPrizeEvent.java#category",
+            // ProposalSourceTypeEnum 已存在
+            "risk/ProposalRecord.java#sourceType",
+            // ScriptRefPoint 已存在（solvela-scriptengine）
+            "scriptengine/ScriptRef.java#refType",
+            // 封闭集合，还没有枚举
+            "coupon/CouponWriteOff.java#bizType",
+            "ledger/MemberAssetTransaction.java#bizType",
+            "ledger/MemberCoupon.java#couponType",
+            "ledger/MemberCoupon.java#sourceType",
+            "ledger/PhysicalDelivery.java#sourceType",
+            "mall/MallCommodity.java#commodityType",
+            "mall/MallOrder.java#commodityType",
+            "mall/MallOrder.java#sourceType",
+            "member/GradeEntitlement.java#entitlementType",
+            "member/MemberGradeLog.java#changeType",
+            "member/MemberGrowthLog.java#bizType",
+            "member/MemberGrowthLog.java#source",
+            "member/Member.java#registerSource",
+            "task/TaskConfig.java#limitType",
+            "task/TaskPrizeMapping.java#prizeMode",
+            "task/TaskTemplate.java#taskType",
+            // 客户端上报，见上面的 ⚠️
+            "member/Device.java#deviceType",
+            "member/MemberLoginLog.java#deviceType");
+
+    @Test
+    @DisplayName("实体上类型/状态语义的 String 字段只许变少")
+    void String类型列只许变少() throws IOException {
+        Path modelRoot = root().resolve("solvela-model/src/main/java/solvela");
+        List<Path> sources;
+        try (Stream<Path> paths = Files.walk(modelRoot)) {
+            sources = paths.filter(p -> p.toString().endsWith(".java")).toList();
+        }
+        // 空扫通过比没有测试更糟：solvela-model 搬家之后它会永远绿着
+        assertTrue(sources.size() > 50, "solvela-model 里只扫到 " + sources.size() + " 个文件，扫描根目录多半不对");
+
+        Set<String> found = new TreeSet<>();
+        for (Path p : sources) {
+            Matcher m = STRING_TYPE_FIELD.matcher(Files.readString(p, StandardCharsets.UTF_8));
+            while (m.find()) {
+                found.add(modelRoot.relativize(p).toString().replace('\\', '/') + "#" + m.group(1));
+            }
+        }
+
+        Set<String> added = new TreeSet<>(found);
+        added.removeAll(STRING_TYPE_OPEN);
+        added.removeAll(STRING_TYPE_PENDING);
+        assertEquals(Set.of(), added,
+                "出现了名单之外的 String 类型/状态字段。封闭取值用枚举（按枚举名存，JSON 形状不变）；"
+                        + "取值确实开放的，写清理由后加进 STRING_TYPE_OPEN");
+
+        Set<String> stale = new TreeSet<>(STRING_TYPE_PENDING);
+        stale.addAll(STRING_TYPE_OPEN);
+        stale.removeAll(found);
+        assertEquals(Set.of(), stale,
+                "这些字段已经不是 String 了（或已改名），请从名单里删掉 —— 名单不缩短，棘轮就失去意义");
+    }
+
     private Set<String> scan() throws IOException {
         Set<String> found = new TreeSet<>();
         for (Path p : mainSources()) {
