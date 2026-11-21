@@ -146,7 +146,7 @@ class RecordTranslationTest {
     @DisplayName("🔴 域侧的失败原因是给运营看的，不下发给用户")
     void 运营话术不下发() {
         MallOrderView order = new MallOrderView(
-                "M2026", 1L, "限量T恤", "COUPON", null, Map.of(), 1, 5000, BigDecimal.ZERO,
+                "M2026", 1L, "限量T恤", PrizeTypeEnum.COUPON, null, Map.of(), 1, 5000, BigDecimal.ZERO,
                 MallOrderStatusEnum.FAILED, "券商品未配置券模编码（asset_ref），补齐后可重发",
                 LocalDateTime.now());
         OrderView view = translate(order);
@@ -201,7 +201,7 @@ class RecordTranslationTest {
 
     private static OrderView orderOf(MallOrderStatusEnum status, int points, BigDecimal cash) {
         return translate(new MallOrderView(
-                "M2026", 1L, "限量T恤", "PHYSICAL", null, Map.of("颜色", "黑"),
+                "M2026", 1L, "限量T恤", PrizeTypeEnum.PHYSICAL, null, Map.of("颜色", "黑"),
                 1, points, cash, status, null, LocalDateTime.now()));
     }
 

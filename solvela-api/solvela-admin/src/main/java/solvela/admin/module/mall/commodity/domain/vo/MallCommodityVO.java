@@ -2,6 +2,7 @@ package solvela.admin.module.mall.commodity.domain.vo;
 
 import solvela.enums.MallPayTypeEnum;
 import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,7 +34,7 @@ public class MallCommodityVO {
     private String categoryName;
 
     @Schema(description = "商品类型：PHYSICAL-实物(走t_physical_delivery), COUPON-优惠券(走t_member_coupon), BALANCE-现金/红包(走钱包入账)")
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     @Schema(description = "资产引用：COUPON 存券模编码，PHYSICAL 为空。语义对齐 t_proposal_record.asset_ref")
     private String assetRef;

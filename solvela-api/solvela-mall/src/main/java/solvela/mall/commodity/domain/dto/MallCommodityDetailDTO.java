@@ -2,6 +2,7 @@ package solvela.mall.commodity.domain.dto;
 
 import solvela.enums.MallPayTypeEnum;
 import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -34,7 +35,7 @@ public class MallCommodityDetailDTO {
     private String categoryName;
 
     /** 商品类型：PHYSICAL / COUPON / BALANCE */
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     /** 资产引用：COUPON 存券模编码 */
     private String assetRef;

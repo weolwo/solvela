@@ -50,8 +50,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CouponTemplateHealthService {
 
-    /** 商城商品里的券类型取值 */
-    private static final String COMMODITY_TYPE_COUPON = "COUPON";
 
     private final CouponTemplateDao couponTemplateDao;
     private final PrizeConfigDao prizeConfigDao;
@@ -81,7 +79,7 @@ public class CouponTemplateHealthService {
                         prize.getPrizeCode(), "PRIZE", prize.getPrizeCode(), prize.getPrizeName())));
 
         mallCommodityDao.selectList(Wrappers.<MallCommodity>lambdaQuery()
-                        .eq(MallCommodity::getCommodityType, COMMODITY_TYPE_COUPON)
+                        .eq(MallCommodity::getCommodityType, PrizeTypeEnum.COUPON)
                         .eq(MallCommodity::getStatus, MallCommodityStatusEnum.ON))
                 .stream()
                 .filter(commodity -> StringUtils.isNotBlank(commodity.getAssetRef()))

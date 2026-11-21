@@ -33,11 +33,7 @@ public final class MallConst {
      */
     public static final int MAX_CATEGORY_BATCH = 10;
 
-    // ------------------------------------------------------------------ 订单来源
-
-    public static final String ORDER_SOURCE_NORMAL = "NORMAL";
-    /** 限时抢购场次。秒杀模块还没做，这个值先留着 —— DDL 已经写进注释了 */
-    public static final String ORDER_SOURCE_FLASH_SALE = "FLASH_SALE";
+    // 订单来源见 MallOrderSourceEnum
 
     /**
      * 排行榜默认取多少条。榜单是给人看的，前十已经能回答「哪些商品最受欢迎」；

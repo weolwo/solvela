@@ -31,4 +31,15 @@ SELECT 't_task_config.limit_type', limit_type, COUNT(*) FROM t_task_config
 WHERE limit_type IS NOT NULL AND BINARY limit_type NOT IN ('ONCE', 'DAILY', 'WEEKLY', 'UNLIMITED') GROUP BY limit_type
 UNION ALL
 SELECT 't_task_prize_mapping.prize_mode', prize_mode, COUNT(*) FROM t_task_prize_mapping
-WHERE prize_mode IS NOT NULL AND BINARY prize_mode NOT IN ('FIXED', 'RATIO', 'FORMULA') GROUP BY prize_mode;
+WHERE prize_mode IS NOT NULL AND BINARY prize_mode NOT IN ('FIXED', 'RATIO', 'FORMULA') GROUP BY prize_mode
+UNION ALL
+-- 商品类型对齐 PrizeTypeEnum（只用其中 PHYSICAL / COUPON / BALANCE，但库里只要是 PrizeTypeEnum 的名字就读得出来）
+SELECT 't_mall_commodity.commodity_type', commodity_type, COUNT(*) FROM t_mall_commodity
+WHERE BINARY commodity_type NOT IN ('SCORE', 'BALANCE', 'COUPON', 'PHYSICAL', 'MARKER', 'LOTTERY', 'CUSTOM') GROUP BY commodity_type
+UNION ALL
+SELECT 't_mall_order.commodity_type', commodity_type, COUNT(*) FROM t_mall_order
+WHERE BINARY commodity_type NOT IN ('SCORE', 'BALANCE', 'COUPON', 'PHYSICAL', 'MARKER', 'LOTTERY', 'CUSTOM') GROUP BY commodity_type
+UNION ALL
+-- MallOrderSourceEnum
+SELECT 't_mall_order.source_type', source_type, COUNT(*) FROM t_mall_order
+WHERE source_type IS NOT NULL AND BINARY source_type NOT IN ('NORMAL', 'FLASH_SALE') GROUP BY source_type;

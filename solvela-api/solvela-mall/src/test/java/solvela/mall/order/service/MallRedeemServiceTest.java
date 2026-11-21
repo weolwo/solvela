@@ -182,7 +182,7 @@ class MallRedeemServiceTest {
         commodity.setId(COMMODITY_ID);
         commodity.setCommodityCode("CMD001");
         commodity.setCommodityName("联名T恤");
-        commodity.setCommodityType("VIRTUAL");
+        commodity.setCommodityType(PrizeTypeEnum.COUPON); // 任一非实物类型：兑换只按是不是 PHYSICAL 分支（要不要地址）
         commodity.setStatus(MallCommodityStatusEnum.ON);
         commodity.setPayType(MallPayTypeEnum.POINTS);
         commodity.setPointsPrice(5000);
@@ -400,7 +400,7 @@ class MallRedeemServiceTest {
     @Test
     @DisplayName("实物没选地址：拒绝，不占库存")
     void 实物必须有地址() {
-        commodity.setCommodityType("PHYSICAL");
+        commodity.setCommodityType(PrizeTypeEnum.PHYSICAL);
 
         assertRejectedWithoutTouchingAnything(
                 service.redeem(MallRedeemCmd.withoutCoupon(MEMBER_ID, SKU_ID, 1, null)),
@@ -410,7 +410,7 @@ class MallRedeemServiceTest {
     @Test
     @DisplayName("🔴 地址不是自己的（或支付期间被删了）：重查拿不到就拦下，不拿空地址去建履约单")
     void 地址查不到就拦住() {
-        commodity.setCommodityType("PHYSICAL");
+        commodity.setCommodityType(PrizeTypeEnum.PHYSICAL);
         when(mallAddressService.getOwned(ADDRESS_ID, MEMBER_ID)).thenReturn(null);
 
         assertRejectedWithoutTouchingAnything(service.redeem(cmd(1)), MallRedeemReason.ADDRESS_NOT_FOUND);

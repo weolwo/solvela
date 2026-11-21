@@ -1,6 +1,7 @@
 package solvela.marketing.api;
 
 import solvela.enums.MallOrderStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,7 +30,7 @@ public record MallOrderView(
         String orderNo,
         Long commodityId,
         String commodityName,
-        String commodityType,
+        PrizeTypeEnum commodityType,
         String coverUrl,
         Map<String, String> skuAttrs,
         Integer quantity,

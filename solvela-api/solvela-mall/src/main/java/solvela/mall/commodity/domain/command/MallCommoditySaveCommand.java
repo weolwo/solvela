@@ -4,6 +4,7 @@ import solvela.enums.MallPayTypeEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -47,7 +48,7 @@ public class MallCommoditySaveCommand {
      * 取值对齐 {@code solvela.enums.PrizeTypeEnum}（不含 SCORE，积分换积分无意义）——
      * 履约 handler 就是按它分派的，类型对齐了发货/发券基本不用写新代码。
      */
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     /** 资产引用：COUPON 存券模编码，PHYSICAL 留空 */
     private String assetRef;

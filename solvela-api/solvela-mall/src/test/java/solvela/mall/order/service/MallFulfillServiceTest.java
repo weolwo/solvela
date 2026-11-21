@@ -135,7 +135,7 @@ class MallFulfillServiceTest {
     @DisplayName("券：份数带过去，发放成功后回填履约单引用")
     void 券履约带上份数() {
         MallOrder order = physicalOrder();
-        order.setCommodityType("COUPON");
+        order.setCommodityType(PrizeTypeEnum.COUPON);
         order.setAssetRef("SUMMER2026");
         order.setQuantity(3);
         order.setAddressId(null);
@@ -175,7 +175,7 @@ class MallFulfillServiceTest {
     @DisplayName("🔴 BALANCE 商品直接标失败，且一次都不去调发放")
     void 现金商品暂不履约() {
         MallOrder order = physicalOrder();
-        order.setCommodityType("BALANCE");
+        order.setCommodityType(PrizeTypeEnum.BALANCE);
         order.setAddressId(null);
         givenOrder(order);
 
@@ -220,7 +220,7 @@ class MallFulfillServiceTest {
         order.setOrderNo(ORDER_NO);
         order.setMemberId(1001L);
         order.setCommodityCode("TSHIRT0001");
-        order.setCommodityType("PHYSICAL");
+        order.setCommodityType(PrizeTypeEnum.PHYSICAL);
         order.setCommodityName("限量T恤");
         order.setQuantity(1);
         order.setAddressId(9L);

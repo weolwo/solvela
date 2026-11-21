@@ -43,6 +43,7 @@ import solvela.mall.sku.manager.MallSkuManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -87,8 +88,8 @@ public class MallCommodityService {
     private final FileAssetService fileAssetService;
 
     /** 商品类型允许的取值：对齐 PrizeTypeEnum，但不含 SCORE（积分换积分无意义）与 LOTTERY / CUSTOM */
-    private static final Set<String> COMMODITY_TYPES = Set.of(
-            PrizeTypeEnum.PHYSICAL.name(), PrizeTypeEnum.COUPON.name(), PrizeTypeEnum.BALANCE.name());
+    private static final Set<PrizeTypeEnum> COMMODITY_TYPES = EnumSet.of(
+            PrizeTypeEnum.PHYSICAL, PrizeTypeEnum.COUPON, PrizeTypeEnum.BALANCE);
 
     private static final Set<String> LIMIT_PERIODS = Set.of(
             MallConst.LIMIT_PERIOD_LIFETIME, MallConst.LIMIT_PERIOD_DAILY,
@@ -305,7 +306,7 @@ public class MallCommodityService {
         }
         // COUPON 必须说清楚发哪张券。不卡这一条的话，兑换会在履约阶段失败 ——
         // 而那时用户的积分已经扣掉了
-        if (PrizeTypeEnum.COUPON.name().equals(form.getCommodityType()) && StringUtils.isBlank(form.getAssetRef())) {
+        if (form.getCommodityType() == PrizeTypeEnum.COUPON && StringUtils.isBlank(form.getAssetRef())) {
             throw new BusinessException("优惠券商品必须填写券模编码");
         }
         if (form.getPayType() == null) {
@@ -606,7 +607,7 @@ public class MallCommodityService {
         entity.setCommodityType(form.getCommodityType());
         // 实物没有资产引用。类型从 COUPON 改回 PHYSICAL 时必须真的清掉，
         // 留着的话履约会拿残留的券模编码去发券
-        entity.setAssetRef(PrizeTypeEnum.PHYSICAL.name().equals(form.getCommodityType())
+        entity.setAssetRef(form.getCommodityType() == PrizeTypeEnum.PHYSICAL
                 ? null : StringUtils.trimToNull(form.getAssetRef()));
         entity.setCommodityName(form.getCommodityName());
         entity.setCommodityIntro(StringUtils.trimToNull(form.getCommodityIntro()));

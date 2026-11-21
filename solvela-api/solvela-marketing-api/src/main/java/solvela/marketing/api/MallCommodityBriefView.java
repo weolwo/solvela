@@ -1,6 +1,7 @@
 package solvela.marketing.api;
 
 import solvela.enums.MallPayTypeEnum;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 
@@ -25,7 +26,7 @@ public record MallCommodityBriefView(
         Long commodityId,
         String commodityCode,
         Long categoryId,
-        String commodityType,
+        PrizeTypeEnum commodityType,
         String commodityName,
         String commodityIntro,
         String coverUrl,

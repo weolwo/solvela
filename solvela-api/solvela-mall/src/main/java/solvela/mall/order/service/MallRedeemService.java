@@ -40,6 +40,7 @@ import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
 import solvela.member.service.MemberService;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.MallOrderSourceEnum;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -551,7 +552,7 @@ public class MallRedeemService {
     }
 
     private static boolean isPhysical(MallCommodity commodity) {
-        return "PHYSICAL".equals(commodity.getCommodityType());
+        return commodity.getCommodityType() == PrizeTypeEnum.PHYSICAL;
     }
 
     /*
@@ -627,7 +628,7 @@ public class MallRedeemService {
             order.setPayTime(LocalDateTime.now());
         }
         // 秒杀那两列对普通订单填 NORMAL 即可（DDL 里为将来的场次预留）
-        order.setSourceType("NORMAL");
+        order.setSourceType(MallOrderSourceEnum.NORMAL);
         return order;
     }
 

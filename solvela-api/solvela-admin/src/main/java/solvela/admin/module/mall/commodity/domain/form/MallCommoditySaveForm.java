@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import solvela.base.util.SolvelaCodeUtil;
+import solvela.enums.PrizeTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,7 +61,7 @@ public class MallCommoditySaveForm {
      */
     @Schema(description = "商品类型：PHYSICAL-实物, COUPON-优惠券, BALANCE-现金/红包", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "请选择商品类型")
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     @Schema(description = "资产引用：COUPON 存券模编码，PHYSICAL 留空")
     private String assetRef;

@@ -2,6 +2,7 @@ package solvela.mall;
 
 import solvela.enums.MallPayTypeEnum;
 import solvela.enums.MallCommodityStatusEnum;
+import solvela.enums.PrizeTypeEnum;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -44,7 +45,7 @@ public class MallCommodity {
     /**
      * 商品类型：PHYSICAL-实物(走t_physical_delivery), COUPON-优惠券(走t_member_coupon), BALANCE-现金/红包(走钱包入账)
      */
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     /**
      * 资产引用：COUPON 存券模编码，PHYSICAL 为空。语义对齐 t_proposal_record.asset_ref

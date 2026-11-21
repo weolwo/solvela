@@ -3,6 +3,7 @@ package solvela.mall.commodity.domain.query;
 import solvela.enums.MallPayTypeEnum;
 import solvela.enums.MallCommodityStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.PrizeTypeEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -27,7 +28,7 @@ public class MallCommodityQuery extends PageParam {
     private MallCommodityStatusEnum status;
 
     /** 商品类型：PHYSICAL-实物, COUPON-优惠券, BALANCE-现金/红包 */
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     /** 模糊匹配。列表页那个输入框是「搜索」，精确等于的话运营得把商品名一字不差地打出来 */
     private String commodityName;

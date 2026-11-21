@@ -1,6 +1,8 @@
 package solvela.mall;
 
 import solvela.enums.MallOrderStatusEnum;
+import solvela.enums.PrizeTypeEnum;
+import solvela.enums.MallOrderSourceEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -66,7 +68,7 @@ public class MallOrder {
     /**
      * 商品类型快照：PHYSICAL / COUPON / BALANCE，履约分派靠它
      */
-    private String commodityType;
+    private PrizeTypeEnum commodityType;
 
     /**
      * 资产引用快照：券模编码等
@@ -197,7 +199,7 @@ public class MallOrder {
     /**
      * 订单来源：NORMAL-日常兑换, FLASH_SALE-限时抢购场次
      */
-    private String sourceType;
+    private MallOrderSourceEnum sourceType;
 
     /**
      * 来源单号：FLASH_SALE 时存场次编码，NORMAL 为空

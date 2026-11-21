@@ -59,9 +59,6 @@ public class MallFulfillService {
 
     private static final String BIZ_TYPE = "MALL_EXCHANGE";
 
-    /** 现金/红包。见 fulfill 里那段红字：面额在 DDL 里没有归宿，暂不履约 */
-    private static final String ASSET_TYPE_BALANCE = "BALANCE";
-
     /** {@code fail_reason} 是 varchar(255)，超了 MySQL 严格模式会整条拒绝 */
     private static final int FAIL_REASON_MAX = 255;
 
@@ -118,7 +115,8 @@ public class MallFulfillService {
      * @return true 表示已经标失败并处理完毕，调用方应当停止
      */
     private boolean rejectIfBalanceCommodity(String orderNo, MallOrder order) {
-        if (!ASSET_TYPE_BALANCE.equals(order.getCommodityType())) {
+        // 现金/红包暂不履约：面额在 DDL 里没有归宿，见本方法里那段红字
+        if (order.getCommodityType() != PrizeTypeEnum.BALANCE) {
             return false;
         }
         String reason = "现金/红包商品尚不支持履约：商品表还没有「兑到手面额」这一列，"
@@ -189,9 +187,7 @@ public class MallFulfillService {
         MallAddress address = resolveAddress(order);
         return new AssetGrantCmd(
                 order.getMemberId(),
-                // commodity_type 还是 String（EnumMigrationRatchetTest 的待枚举化名单）。
-                // 取值在建商品时已按 MallCommodityService.COMMODITY_TYPES 校验过，都是 PrizeTypeEnum 的名字
-                PrizeTypeEnum.valueOf(order.getCommodityType()),
+                order.getCommodityType(),
                 order.getAssetRef(),
                 order.getCommodityName(),
                 order.getQuantity(),
