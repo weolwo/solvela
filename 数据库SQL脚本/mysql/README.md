@@ -92,9 +92,20 @@ podman run -d --rm --name solvela-probe-redis -p 127.0.0.1:6379:6379 docker.io/l
 
 （`docker` 同理，把 `podman` 换掉即可。账号、端口与 dev profile 一致：root / root、3306、6379。）
 
-> ⚠️ MySQL 8.4 默认 `caching_sha2_password`。`tools/` 下的工具连接串没带 `allowPublicKeyRetrieval=true`，
-> 在一个刚起的库上第一次连会报「Public Key Retrieval is not allowed」。任何一个带这个参数的客户端
-> 先连一次（服务端缓存了认证），之后工具就能连上。应用自己的连接不受影响。
+> ⚠️ MySQL 8.4 默认 `caching_sha2_password`。应用的连接串（`useSSL=false`）和 `tools/` 下的工具都没带
+> `allowPublicKeyRetrieval=true`，在一个刚起的库上第一次连会报「Public Key Retrieval is not allowed」——
+> 集成测试表现为成片的「Failed to load ApplicationContext」（2026-11-21 实测，此前这里写的「应用不受影响」不对）。
+> 起库后先用 TLS 以 `root@'%'` 登录一次，服务端缓存了认证，之后应用和工具都能连上：
+>
+> ```bash
+> ip=$(podman exec solvela-probe-mysql sh -c "awk 'END{print \$1}' /etc/hosts")
+> until podman exec solvela-probe-mysql mysql -uroot -proot -h "$ip" --ssl-mode=REQUIRED -e "SELECT CURRENT_USER()"; do sleep 2; done
+> ```
+>
+> 要循环：初始化阶段 MySQL 只开 socket、不开 TCP，过早连会报 `Can't connect ... (111)`；
+> 灌造数也要等这一步成功之后再做，否则可能灌进了初始化用的临时实例。
+>
+> 用容器自己的 IP 而不是 127.0.0.1：后者匹配的是 `root@localhost`，缓存的不是应用用的那个账号。
 
 ### 2. 灌造数（admin 的任务验收要用）
 

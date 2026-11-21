@@ -194,11 +194,16 @@ class MemberRiskStatTest {
                 """, refEventId, memberId, MemberRiskOutcomeEnum.VERIFY_PASSED.getValue());
     }
 
+    /**
+     * 命中的 create_time 取它所属事件的那一刻，和生产写法一致（MemberRiskHitDao 显式写 createTime）：
+     * 统计 SQL 按 {@code e.create_time = h.create_time} 关联以命中分区。
+     * 以前这里各写一次 NOW()，事件与命中之间跨过一秒边界时这条命中就关联不上，用例偶发失败。
+     */
     private void insertHit(long eventId, String ruleCode, MemberRiskModeEnum mode, int error) {
         jdbcTemplate.update("""
                 INSERT INTO t_member_risk_hit (event_id, rule_code, mode, score, error, create_time)
-                VALUES (?, ?, ?, 0, ?, NOW())
-                """, eventId, ruleCode, mode.getValue(), error);
+                SELECT ?, ?, ?, 0, ?, create_time FROM t_member_risk_event WHERE id = ?
+                """, eventId, ruleCode, mode.getValue(), error, eventId);
     }
 
     private long lastId() {
