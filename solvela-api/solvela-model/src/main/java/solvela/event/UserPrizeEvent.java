@@ -23,7 +23,7 @@ public class UserPrizeEvent extends BaseBizEvent implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
     @Builder.Default
-    private String category = EventCategoryEnum.PRIZE.name();
+    private EventCategoryEnum category = EventCategoryEnum.PRIZE;
     // ================== 2. 溯源与路由信息 ==================
     private String sourceBizId;   // 来源单号（LotteryRecord的ID）
     private String activityCode;  // 追踪用：活动/彩票编码

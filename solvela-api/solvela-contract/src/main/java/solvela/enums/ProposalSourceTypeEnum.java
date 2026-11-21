@@ -9,7 +9,7 @@ import java.util.Arrays;
 /**
  * 提案来源类型，对齐 {@code t_proposal_record.source_type}（varchar，故 value 是 String）。
  *
- * <p>🔴 <b>为什么新建这个枚举而不用 {@link EventTypeEnum}</b>：
+ * <p>🔴 <b>为什么新建这个枚举而不用 {@code EventTypeEnum}（2026-11-21 已删除，它从来没被用上）</b>：
  * 四个 {@code @PrizeStrategy} handler 此前都硬编码 {@code EventTypeEnum.LOTTERY_DRAW}，
  * 于是<b>任务发出去的奖在提案表里被记成「彩票抽奖」</b>，抽奖发的也一样。
  * 而 DDL 注释与 {@code ProposalRecordAddCommand} 的 {@code @Schema} 写的一直是
