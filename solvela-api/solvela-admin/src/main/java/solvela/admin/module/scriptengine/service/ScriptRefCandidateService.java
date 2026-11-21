@@ -49,19 +49,15 @@ public class ScriptRefCandidateService {
     /**
      * 某个挂载点能挂到哪些业务对象上。
      *
-     * <p>未识别的类型返回空列表而不是抛异常 —— 新增挂载点时忘了在这里补一条，
-     * 表现应该是「下拉是空的」这种一眼能看见的样子，而不是整个挂载表单打不开。
+     * <p>按对象类型穷举、没有 default：新加一类挂载对象（ScriptRefOwnerTypeEnum）忘了在这里补，编译就不过。
+     * 以前按字符串 switch，漏补的表现是下拉静默变空。
      */
     public List<ScriptRefCandidateVO> list(ScriptRefPoint point) {
         return switch (point.getRefType()) {
-            case "ACTIVITY" -> activities();
-            case "DRAW" -> draws();
-            case "TASK_TEMPLATE" -> taskTemplates();
-            case "PRIZE_POOL" -> pools();
-            default -> {
-                log.warn("【脚本挂载】挂载点 {} 的候选清单没有实现，下拉将是空的", point.name());
-                yield List.of();
-            }
+            case ACTIVITY -> activities();
+            case DRAW -> draws();
+            case TASK_TEMPLATE -> taskTemplates();
+            case PRIZE_POOL -> pools();
         };
     }
 

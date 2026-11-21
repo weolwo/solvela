@@ -12,6 +12,7 @@ import solvela.scriptengine.manager.ScriptRefManager;
 import solvela.scriptengine.spi.ScriptRefPoint;
 import solvela.scriptengine.spi.ScriptScene;
 import solvela.scriptengine.store.ScriptStore;
+import solvela.enums.ScriptRefOwnerTypeEnum;
 
 import java.util.List;
 import java.util.Optional;
@@ -136,7 +137,7 @@ public class ScriptRefService {
     /**
      * 某个业务对象身上挂了哪些脚本
      */
-    public List<ScriptRefDTO> findRefsOfOwner(String refType, String refId) {
+    public List<ScriptRefDTO> findRefsOfOwner(ScriptRefOwnerTypeEnum refType, String refId) {
         return scriptRefManager.lambdaQuery()
                 .eq(ScriptRef::getRefType, refType)
                 .eq(ScriptRef::getRefId, refId)

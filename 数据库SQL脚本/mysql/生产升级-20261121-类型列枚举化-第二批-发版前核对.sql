@@ -17,4 +17,8 @@ WHERE activity_type IS NOT NULL AND BINARY activity_type NOT IN ('BASIC', 'DRAW'
 UNION ALL
 -- ProposalSourceTypeEnum：solvela-contract/src/main/java/solvela/enums/ProposalSourceTypeEnum.java
 SELECT 't_proposal_record.source_type', source_type, COUNT(*) FROM t_proposal_record
-WHERE BINARY source_type NOT IN ('TASK', 'DRAW', 'LOTTERY', 'MANUAL') GROUP BY source_type;
+WHERE BINARY source_type NOT IN ('TASK', 'DRAW', 'LOTTERY', 'MANUAL') GROUP BY source_type
+UNION ALL
+-- ScriptRefOwnerTypeEnum：solvela-contract/src/main/java/solvela/enums/ScriptRefOwnerTypeEnum.java
+SELECT 't_script_ref.ref_type', ref_type, COUNT(*) FROM t_script_ref
+WHERE BINARY ref_type NOT IN ('TASK_TEMPLATE', 'PRIZE_POOL', 'ACTIVITY', 'DRAW') GROUP BY ref_type;

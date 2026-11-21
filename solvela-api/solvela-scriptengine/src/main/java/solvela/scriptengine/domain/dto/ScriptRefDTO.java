@@ -1,6 +1,7 @@
 package solvela.scriptengine.domain.dto;
 
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.ScriptRefOwnerTypeEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -30,7 +31,7 @@ public class ScriptRefDTO {
     private String refPointTitle;
 
     /** 引用方类型 */
-    private String refType;
+    private ScriptRefOwnerTypeEnum refType;
 
     /** 引用方业务编码 */
     private String refId;

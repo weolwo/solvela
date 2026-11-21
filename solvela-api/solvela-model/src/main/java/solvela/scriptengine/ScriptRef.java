@@ -1,6 +1,7 @@
 package solvela.scriptengine;
 
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.ScriptRefOwnerTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -29,7 +30,7 @@ public class ScriptRef {
     /**
      * 引用方类型，见 ScriptRefPoint 枚举
      */
-    private String refType;
+    private ScriptRefOwnerTypeEnum refType;
 
     /**
      * 引用方业务编码（template_code / pool_code / activity_code）

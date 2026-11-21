@@ -2,6 +2,7 @@ package solvela.admin.module.scriptengine.domain.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import solvela.enums.ScriptRefOwnerTypeEnum;
 
 /**
  * 可挂载点，前端下拉用
@@ -16,7 +17,7 @@ public class ScriptRefPointVO {
     private String title;
 
     @Schema(description = "引用方类型")
-    private String refType;
+    private ScriptRefOwnerTypeEnum refType;
 
     @Schema(description = "挂载槽位")
     private String refSlot;

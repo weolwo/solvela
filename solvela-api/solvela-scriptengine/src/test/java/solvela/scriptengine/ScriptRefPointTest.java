@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import solvela.scriptengine.spi.ScriptRefPoint;
 import solvela.scriptengine.spi.ScriptScene;
+import solvela.enums.ScriptRefOwnerTypeEnum;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -47,9 +48,9 @@ public class ScriptRefPointTest {
         assertEquals(ScriptScene.POOL_ENTRY, ScriptRefPoint.PRIZE_POOL_ENTRY.getExpectedScene());
         assertEquals(ScriptScene.ACTIVITY_RULE, ScriptRefPoint.ACTIVITY_ENTRY.getExpectedScene());
 
-        assertEquals("TASK_TEMPLATE", ScriptRefPoint.TASK_TEMPLATE_RULE.getRefType());
-        assertEquals("PRIZE_POOL", ScriptRefPoint.PRIZE_POOL_ENTRY.getRefType());
-        assertEquals("ACTIVITY", ScriptRefPoint.ACTIVITY_ENTRY.getRefType());
+        assertEquals("TASK_TEMPLATE", ScriptRefPoint.TASK_TEMPLATE_RULE.getRefType().name());
+        assertEquals("PRIZE_POOL", ScriptRefPoint.PRIZE_POOL_ENTRY.getRefType().name());
+        assertEquals("ACTIVITY", ScriptRefPoint.ACTIVITY_ENTRY.getRefType().name());
     }
 
     @Test
@@ -59,7 +60,7 @@ public class ScriptRefPointTest {
             assertEquals(point, ScriptRefPoint.of(point.getRefType(), point.getRefSlot()).orElseThrow());
             assertEquals(point, ScriptRefPoint.of(point.name()).orElseThrow());
         }
-        assertTrue(ScriptRefPoint.of("NOT_A_TYPE", "NOT_A_SLOT").isEmpty());
+        assertTrue(ScriptRefPoint.of(ScriptRefOwnerTypeEnum.DRAW, "NOT_A_SLOT").isEmpty());
         assertTrue(ScriptRefPoint.of("NOT_A_POINT").isEmpty());
     }
 }

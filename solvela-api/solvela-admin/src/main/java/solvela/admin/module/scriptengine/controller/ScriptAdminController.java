@@ -28,6 +28,7 @@ import solvela.scriptengine.service.ScriptQueryService;
 import solvela.scriptengine.service.ScriptRefService;
 import solvela.scriptengine.spi.ScriptRefPoint;
 import solvela.web.RequiresPermission;
+import solvela.enums.ScriptRefOwnerTypeEnum;
 
 import java.util.Arrays;
 import java.util.List;
@@ -106,7 +107,7 @@ public class ScriptAdminController {
     @Operation(summary = "【用户】脚本-某个业务对象身上挂了哪些脚本")
     @RequiresPermission("script:query")
     @GetMapping("/refs/owner")
-    public List<ScriptRefDTO> refsOfOwner(@RequestParam String refType, @RequestParam String refId) {
+    public List<ScriptRefDTO> refsOfOwner(@RequestParam ScriptRefOwnerTypeEnum refType, @RequestParam String refId) {
         return scriptRefService.findRefsOfOwner(refType, refId);
     }
 

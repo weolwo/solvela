@@ -1,5 +1,6 @@
 package solvela.scriptengine.spi;
 
+import solvela.enums.ScriptRefOwnerTypeEnum;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -22,19 +23,19 @@ public enum ScriptRefPoint {
     /**
      * 任务模板的完成判定规则。挂在 {@code t_task_template.template_code} 上。
      */
-    TASK_TEMPLATE_RULE("TASK_TEMPLATE", "RULE", ScriptScene.TASK_RULE,
+    TASK_TEMPLATE_RULE(ScriptRefOwnerTypeEnum.TASK_TEMPLATE, "RULE", ScriptScene.TASK_RULE,
             "任务模板", "完成判定规则", false),
 
     /**
      * 奖池的准入判定。挂在 {@code t_prize_pool_config.pool_code} 上。
      */
-    PRIZE_POOL_ENTRY("PRIZE_POOL", "ENTRY", ScriptScene.POOL_ENTRY,
+    PRIZE_POOL_ENTRY(ScriptRefOwnerTypeEnum.PRIZE_POOL, "ENTRY", ScriptScene.POOL_ENTRY,
             "奖池", "准入判定", false),
 
     /**
      * 活动的准入判定。挂在 {@code t_activity_config.activity_code} 上。
      */
-    ACTIVITY_ENTRY("ACTIVITY", "ENTRY", ScriptScene.ACTIVITY_RULE,
+    ACTIVITY_ENTRY(ScriptRefOwnerTypeEnum.ACTIVITY, "ENTRY", ScriptScene.ACTIVITY_RULE,
             "活动", "准入判定", false),
 
     /**
@@ -44,7 +45,7 @@ public enum ScriptRefPoint {
      * 这个真的去参与（抽奖、发奖）。两个挂载点<b>各挂各的脚本</b>，
      * 因为它们的失败含义完全不同 —— 准入不通过是正常拒绝，编排出错是事故。
      */
-    ACTIVITY_PLAY("ACTIVITY", "PLAY", ScriptScene.ACTIVITY_PLAY,
+    ACTIVITY_PLAY(ScriptRefOwnerTypeEnum.ACTIVITY, "PLAY", ScriptScene.ACTIVITY_PLAY,
             "活动", "玩法编排", true),
 
     /**
@@ -55,7 +56,7 @@ public enum ScriptRefPoint {
      * 一个活动一套抽奖，所以两者今天是一一对应的 —— 但「一次抽奖的脚本」
      * 这个说法只有挂在抽奖配置上才立得住，将来放开成一活动多套抽奖时不用再搬一次。
      */
-    DRAW_PLAY("DRAW", "PLAY", ScriptScene.ACTIVITY_PLAY,
+    DRAW_PLAY(ScriptRefOwnerTypeEnum.DRAW, "PLAY", ScriptScene.ACTIVITY_PLAY,
             "抽奖配置", "玩法编排", true),
     ;
 
@@ -67,7 +68,7 @@ public enum ScriptRefPoint {
      */
     public static final String SINGLE_KEY = "";
 
-    private final String refType;
+    private final ScriptRefOwnerTypeEnum refType;
 
     private final String refSlot;
 
@@ -84,7 +85,7 @@ public enum ScriptRefPoint {
     /**
      * 单值槽位：一个业务对象在这个槽位上只能挂一个脚本。
      */
-    ScriptRefPoint(String refType, String refSlot, ScriptScene expectedScene,
+    ScriptRefPoint(ScriptRefOwnerTypeEnum refType, String refSlot, ScriptScene expectedScene,
                    String ownerTitle, String slotTitle, boolean wired) {
         this(refType, refSlot, expectedScene, ownerTitle, slotTitle, null, wired);
     }
@@ -95,7 +96,7 @@ public enum ScriptRefPoint {
      * <p>{@code keyTitle} 是必填的，这不是形式主义 —— 一个多值槽位如果说不清
      * 「这个 key 是什么」，那它多半只是想绕开单值约束，而不是真的有分组语义。
      */
-    ScriptRefPoint(String refType, String refSlot, ScriptScene expectedScene,
+    ScriptRefPoint(ScriptRefOwnerTypeEnum refType, String refSlot, ScriptScene expectedScene,
                    String ownerTitle, String slotTitle, String keyTitle, boolean wired) {
         this.refType = refType;
         this.refSlot = refSlot;
@@ -109,7 +110,7 @@ public enum ScriptRefPoint {
     /**
      * 对应 t_script_ref.ref_type
      */
-    public String getRefType() {
+    public ScriptRefOwnerTypeEnum getRefType() {
         return refType;
     }
 
@@ -204,9 +205,9 @@ public enum ScriptRefPoint {
         return ownerTitle + " - " + slotTitle;
     }
 
-    public static Optional<ScriptRefPoint> of(String refType, String refSlot) {
+    public static Optional<ScriptRefPoint> of(ScriptRefOwnerTypeEnum refType, String refSlot) {
         return Arrays.stream(values())
-                .filter(point -> point.refType.equals(refType) && point.refSlot.equals(refSlot))
+                .filter(point -> point.refType == refType && point.refSlot.equals(refSlot))
                 .findFirst();
     }
 
