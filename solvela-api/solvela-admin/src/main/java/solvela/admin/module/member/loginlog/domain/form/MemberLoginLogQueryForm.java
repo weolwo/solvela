@@ -2,6 +2,7 @@ package solvela.admin.module.member.loginlog.domain.form;
 
 import solvela.enums.LoginLogResultEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.DeviceTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -44,7 +45,7 @@ public class MemberLoginLogQueryForm extends PageParam {
     private LoginLogResultEnum status;
 
     @Schema(description = "设备端：APP/H5/WECHAT/PC")
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     @Schema(description = "设备号。查「这台设备碰过哪些账号」用它 —— 那正是这一列存在的理由")
     private String deviceId;

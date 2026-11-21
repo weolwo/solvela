@@ -52,6 +52,7 @@ import solvela.member.risk.feature.AccountFailTracker;
 import solvela.member.risk.feature.LoginProfileProvider;
 import solvela.member.risk.feature.PasswordCooldownStore;
 import solvela.member.sms.MemberSmsCodeService;
+import solvela.enums.DeviceTypeEnum;
 
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -433,9 +434,25 @@ class MemberAuthServiceTest {
         service.authenticate(MemberAuthCmd.byPhonePassword(PHONE, RAW_PASSWORD, null, "10.0.0.7", DEVICE_ID));
 
         MemberLoginLog log = savedLog();
-        assertEquals("H5", log.getDeviceType());
+        assertEquals(DeviceTypeEnum.H5, log.getDeviceType());
         assertEquals("10.0.0.7", log.getClientIp());
         assertNull(log.getRemark(), "成功不需要备注");
+    }
+
+    @Test
+    @DisplayName("🔴 上报了认不出的设备端：照常登录，日志落成 UNKNOWN —— 不能因为一个上报字段写错就把人挡在门外")
+    void 认不出的设备端落成UNKNOWN() {
+        service.authenticate(MemberAuthCmd.byPhonePassword(PHONE, RAW_PASSWORD, "TOASTER", "10.0.0.7", DEVICE_ID));
+
+        assertEquals(DeviceTypeEnum.UNKNOWN, savedLog().getDeviceType());
+    }
+
+    @Test
+    @DisplayName("设备端大小写与首尾空白不算认不出")
+    void 设备端按大写匹配() {
+        service.authenticate(MemberAuthCmd.byPhonePassword(PHONE, RAW_PASSWORD, " app ", "10.0.0.7", DEVICE_ID));
+
+        assertEquals(DeviceTypeEnum.APP, savedLog().getDeviceType());
     }
 
     // ------------------------------------------------------------------ 按会员号取身份

@@ -35,6 +35,7 @@ import solvela.member.risk.rule.impl.IpFailLimitRule;
 import solvela.member.risk.rule.impl.IpGreylistRule;
 import solvela.member.risk.rule.impl.IpUnknownLimitRule;
 import solvela.member.risk.security.CanaryAccountService;
+import solvela.enums.RegisterSourceEnum;
 import tools.jackson.databind.JsonNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -254,7 +255,7 @@ class LoginRuleTest {
         assertTrue(hit.actions().contains(RiskAction.CANARY_TRAP));
         assertTrue(rule.alwaysEnforce(), "保命开关不该把它也关掉：它从不误伤真人");
         Member normal = member();
-        normal.setRegisterSource("H5");
+        normal.setRegisterSource(RegisterSourceEnum.H5);
         assertNull(rule.evaluate(new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,
                 "a@x.com", "ab".repeat(32), normal, "dev-1", "H5", "1.2.3.4", false), config(MemberRiskDecisionEnum.PASS)));
         assertNull(rule.evaluate(new RiskContext(MemberRiskEventTypeEnum.LOGIN, MemberLoginType.EMAIL_PASSWORD,

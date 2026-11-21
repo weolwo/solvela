@@ -12,6 +12,7 @@ import solvela.enums.MemberStatusEnum;
 import solvela.member.id.MemberIdAllocator;
 import solvela.member.register.MemberRegisterDao;
 import solvela.member.util.MemberEmailUtil;
+import solvela.enums.RegisterSourceEnum;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -42,7 +43,7 @@ import java.util.Base64;
 public class CanaryAccountService {
 
     /** 蜜罐账号的注册来源 */
-    public static final String REGISTER_SOURCE = "CANARY";
+    public static final RegisterSourceEnum REGISTER_SOURCE = RegisterSourceEnum.CANARY;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 

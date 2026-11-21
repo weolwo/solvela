@@ -1,6 +1,7 @@
 package solvela.admin.module.member.loginlog.domain.vo;
 
 import solvela.enums.LoginLogResultEnum;
+import solvela.enums.DeviceTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -42,7 +43,7 @@ public class MemberLoginLogVO {
     private String ipRegion;
 
     @Schema(description = "设备端：APP/H5/WECHAT/PC")
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     @Schema(description = "设备号（服务端签发的 32 位 hex）。老客户端没有设备令牌时为空")
     private String deviceId;

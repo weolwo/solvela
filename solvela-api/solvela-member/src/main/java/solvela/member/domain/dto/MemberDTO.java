@@ -3,6 +3,7 @@ package solvela.member.domain.dto;
 
 import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
+import solvela.enums.RegisterSourceEnum;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -60,7 +61,7 @@ public class MemberDTO {
     private MemberStatusEnum status;
 
     /** 注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT... */
-    private String registerSource;
+    private RegisterSourceEnum registerSource;
 
     /** 注册IP：批量注册的识别依据 */
     private String registerIp;

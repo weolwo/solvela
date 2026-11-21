@@ -2,6 +2,7 @@ package solvela.admin.module.member.domain.vo;
 
 import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
+import solvela.enums.RegisterSourceEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -64,7 +65,7 @@ public class MemberVO {
     private MemberStatusEnum status;
 
     @Schema(description = "注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT...")
-    private String registerSource;
+    private RegisterSourceEnum registerSource;
 
     @Schema(description = "注册IP：批量注册的识别依据")
     private String registerIp;

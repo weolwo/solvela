@@ -2,6 +2,7 @@ package solvela.member.loginlog.domain.query;
 
 import solvela.enums.LoginLogResultEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.DeviceTypeEnum;
 
 import java.time.LocalDate;
 
@@ -42,7 +43,7 @@ public class MemberLoginLogQuery extends PageParam {
     private LoginLogResultEnum status;
 
     /** 设备端：APP/H5/WECHAT/PC */
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     private String deviceId;
 

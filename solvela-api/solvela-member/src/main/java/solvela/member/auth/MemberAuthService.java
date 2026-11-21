@@ -70,6 +70,7 @@ import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
 import solvela.observe.DegradePoint;
 import solvela.base.observe.Degradations;
+import solvela.enums.DeviceTypeEnum;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -101,7 +102,7 @@ import java.util.function.UnaryOperator;
 @RequiredArgsConstructor
 public class MemberAuthService implements MemberAuthApi {
 
-    private static final String DEFAULT_DEVICE_TYPE = "H5";
+    private static final DeviceTypeEnum DEFAULT_DEVICE_TYPE = DeviceTypeEnum.H5;
 
     /**
      * 查无此人时拿来「验」一次的假哈希，让两条路径的耗时落在同一个量级。
@@ -923,6 +924,22 @@ public class MemberAuthService implements MemberAuthApi {
      * <p>⚠️ 日志失败绝不能影响认证本身 —— 「登不上去是因为日志表满了」这种事排查极其费劲，
      * 而登录日志的价值再高也高不过登录本身。
      */
+    /**
+     * 登录日志里的设备端。客户端上报值在这里才解析：没传按 H5 记（与 MemberAuthCmd 的约定一致）；
+     * 传了但认不出，落成 UNKNOWN 并计一次降级 —— 不能因为一个上报字段写错就让登录失败。
+     */
+    private static DeviceTypeEnum resolveLoggedDeviceType(String reported) {
+        if (SolvelaStringUtil.isEmpty(reported)) {
+            return DEFAULT_DEVICE_TYPE;
+        }
+        DeviceTypeEnum parsed = DeviceTypeEnum.parseReported(reported);
+        if (parsed == null) {
+            Degradations.record(DegradePoint.CLIENT_VALUE_UNRECOGNIZED);
+            return DeviceTypeEnum.UNKNOWN;
+        }
+        return parsed;
+    }
+
     private void saveLoginLog(Long memberId, String clientIp, String deviceType, String deviceId,
                               LoginLogResultEnum status, String remark) {
         try {
@@ -930,7 +947,7 @@ public class MemberAuthService implements MemberAuthApi {
             loginLog.setMemberId(memberId);
             loginLog.setClientIp(clientIp);
             loginLog.setIpRegion(SolvelaIpUtil.getRegion(clientIp));
-            loginLog.setDeviceType(SolvelaStringUtil.isEmpty(deviceType) ? DEFAULT_DEVICE_TYPE : deviceType);
+            loginLog.setDeviceType(resolveLoggedDeviceType(deviceType));
             // 🔴 允许为 null，而且【为空是正常的】：灰度期间老客户端还没带设备令牌。
             // 查询侧要认这一点，别把 NULL 当异常 —— 它的语义是「设备身份上线前的登录」
             loginLog.setDeviceId(deviceId);

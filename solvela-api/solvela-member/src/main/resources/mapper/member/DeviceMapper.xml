@@ -14,7 +14,7 @@
             <if test="queryForm.registerIp != null and queryForm.registerIp != ''">
                 AND register_ip = #{queryForm.registerIp}
             </if>
-            <if test="queryForm.deviceType != null and queryForm.deviceType != ''">
+            <if test="queryForm.deviceType != null">
                 AND device_type = #{queryForm.deviceType}
             </if>
             <if test="queryForm.status != null">

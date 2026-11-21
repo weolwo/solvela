@@ -98,6 +98,8 @@ public enum DegradePoint {
     VERIFY_CODE_SEND_FAILED("验证码发送失败"),
     /** 联系方式解密失败，按没有处理 */
     PII_DECRYPT_FAILED("联系方式解密失败"),
+    /** 客户端上报的取值（设备端、注册来源）认不出，落成 UNKNOWN，登录 / 注册照常 */
+    CLIENT_VALUE_UNRECOGNIZED("客户端上报值认不出"),
 
     // ------------------------------------------------------------------ 基础设施与旁路
 

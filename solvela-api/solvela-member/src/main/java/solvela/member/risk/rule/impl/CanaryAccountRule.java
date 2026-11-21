@@ -42,7 +42,7 @@ public class CanaryAccountRule implements RiskRule {
 
     @Override
     public RiskHit evaluate(RiskContext ctx, RiskRuleConfig config) {
-        if (ctx.getMember() == null || !CanaryAccountService.REGISTER_SOURCE.equals(ctx.getMember().getRegisterSource())) {
+        if (ctx.getMember() == null || ctx.getMember().getRegisterSource() != CanaryAccountService.REGISTER_SOURCE) {
             return null;
         }
         return RiskHit.decide(config.directDecision(), "蜜罐账号 #" + ctx.getMember().getMemberId())

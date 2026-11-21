@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import solvela.enums.DeviceTypeEnum;
 
 /**
  * 设备注册表（服务端签发，不带 member_id） 实体类。
@@ -39,7 +40,7 @@ public class Device {
     /**
      * 设备端：APP/H5/WECHAT/PC。与 t_member_login_log.device_type 同名同口径
      */
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     /**
      * 品牌型号，客户端自报，仅供人工排查

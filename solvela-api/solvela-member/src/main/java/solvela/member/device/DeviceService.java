@@ -13,6 +13,7 @@ import solvela.member.api.DeviceRegisterCmd;
 import solvela.member.api.DeviceRegisterFailReason;
 import solvela.member.api.DeviceRegisterResult;
 import solvela.member.device.dao.DeviceDao;
+import solvela.enums.DeviceTypeEnum;
 
 import java.util.Locale;
 import java.util.Set;
@@ -105,7 +106,8 @@ public class DeviceService implements DeviceApi {
     private Device buildDevice(String deviceId, String deviceType, DeviceRegisterCmd cmd) {
         Device device = new Device();
         device.setDeviceId(deviceId);
-        device.setDeviceType(deviceType);
+        // 已经过 normalizeDeviceType：只会是 APP / H5 / WECHAT / PC 之一
+        device.setDeviceType(DeviceTypeEnum.valueOf(deviceType));
         // 下面三个都是客户端自报、不验的，只供人工排查。截断到列宽，
         // 而不是让一个超长值把整次签发变成 500 —— 客户端撒谎不该是服务端的错误
         device.setModel(truncate(cmd.model(), 64));

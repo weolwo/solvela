@@ -183,7 +183,8 @@ public class MemberScriptFunctions implements ScriptFunctionHandler {
         info.put("nickname", member.getNickname());
         info.put("gender", member.getGender() == null ? null : member.getGender().name());
         info.put("status", member.getStatus() == null ? null : member.getStatus().name());
-        info.put("registerSource", member.getRegisterSource());
+        // 脚本里写的是 m.registerSource == 'INVITE'：给字符串，与 gender / status 同一个做法
+        info.put("registerSource", member.getRegisterSource() == null ? null : member.getRegisterSource().name());
         info.put("registerTime", member.getCreateTime());
         info.put("registerDays", daysSince(member.getCreateTime()));
         info.put("birthday", member.getBirthday());

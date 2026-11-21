@@ -3,6 +3,7 @@ package solvela.member.device.domain.query;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.DeviceTypeEnum;
 
 import java.time.LocalDate;
 
@@ -31,7 +32,7 @@ public class DeviceQuery extends PageParam {
     /** 签发时 IP：精确匹配 */
     private String registerIp;
 
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     /** 处置档：0-正常 1-观察 2-封禁 */
     private Integer status;

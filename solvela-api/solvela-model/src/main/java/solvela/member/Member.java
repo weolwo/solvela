@@ -2,6 +2,7 @@ package solvela.member;
 
 import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
+import solvela.enums.RegisterSourceEnum;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -101,7 +102,7 @@ public class Member {
     /**
      * 注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT...
      */
-    private String registerSource;
+    private RegisterSourceEnum registerSource;
 
     /**
      * 注册IP：批量注册的识别依据

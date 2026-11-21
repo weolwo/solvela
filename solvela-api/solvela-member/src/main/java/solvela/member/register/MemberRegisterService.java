@@ -41,6 +41,10 @@ import solvela.member.risk.RiskSession;
 import solvela.member.sms.MemberSmsCodeService;
 import solvela.member.util.MemberEmailUtil;
 import solvela.member.util.MemberPhoneUtil;
+import solvela.enums.RegisterSourceEnum;
+import solvela.observe.DegradePoint;
+import solvela.base.observe.Degradations;
+import java.util.Locale;
 
 /**
  * 会员注册：手机号 + 密码建号，仅此而已。
@@ -89,7 +93,7 @@ public class MemberRegisterService {
 
     private static final String DEFAULT_NICKNAME_PREFIX = "会员";
 
-    private static final String DEFAULT_REGISTER_SOURCE = "UNKNOWN";
+    private static final RegisterSourceEnum DEFAULT_REGISTER_SOURCE = RegisterSourceEnum.UNKNOWN;
 
     private final MemberRegisterDao memberRegisterDao;
     private final MemberIdAllocator memberIdAllocator;
@@ -322,14 +326,28 @@ public class MemberRegisterService {
      * 再写一条 LOGIN_SUCCESS 只是让登录轨迹里多一条语义不同的行，
      * 查一个人「什么时候登过」时反而要先把它剔掉。
      */
+    /**
+     * 注册来源在落库这一刻解析（网关按设备端推导后原样传过来）。没传记 UNKNOWN；
+     * 传了但认不出，同样记 UNKNOWN 并计一次降级 —— 注册不该因为这一列失败。
+     */
+    private static RegisterSourceEnum resolveRegisterSource(String raw) {
+        if (SolvelaStringUtil.isEmpty(raw)) {
+            return DEFAULT_REGISTER_SOURCE;
+        }
+        try {
+            return RegisterSourceEnum.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            Degradations.record(DegradePoint.CLIENT_VALUE_UNRECOGNIZED);
+            return DEFAULT_REGISTER_SOURCE;
+        }
+    }
+
     private MemberRegisterResult createMember(MemberRegisterCmd cmd, boolean byEmail,
                                               String identity, String identityHashHex) {
         long memberId = memberIdAllocator.nextMemberId();
         String memberName = MEMBER_NAME_PREFIX + memberId;
         String nickname = DEFAULT_NICKNAME_PREFIX + memberId;
-        String registerSource = SolvelaStringUtil.isEmpty(cmd.registerSource())
-                ? DEFAULT_REGISTER_SOURCE
-                : cmd.registerSource();
+        RegisterSourceEnum registerSource = resolveRegisterSource(cmd.registerSource());
 
         try {
             memberRegisterDao.insertMember(

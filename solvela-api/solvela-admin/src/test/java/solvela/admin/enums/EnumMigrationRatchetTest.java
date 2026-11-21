@@ -241,16 +241,13 @@ class EnumMigrationRatchetTest {
      * 已有对应 BaseEnum 的（如 {@code ActivityTypeEnum}、{@code ProposalSourceTypeEnum}）先确认它的 JSON 形状。
      * 读的一方在库里遇到枚举外的值会直接报错，所以每迁一列先在各环境查一遍现存的取值。
      *
-     * <p>⚠️ deviceType 两列是客户端上报的，收敛成枚举之前要先定「未知值怎么办」（拒绝还是归为 OTHER），那是业务决定。
+     * <p>⚠️ 剩下的两列各自的类注释里写着「为什么不是枚举」（EntitlementType、GradeChangeType 是代码里写死的发放 / 变更路径），
+     * 是前人刻意的决定；要不要推翻它，等定下来再处理，别顺手改。
      */
     private static final Set<String> STRING_TYPE_PENDING = Set.of(
-            // 封闭集合，还没有枚举
+            // 类注释写明了「为什么不是枚举」，待定，见上面的 ⚠️
             "member/GradeEntitlement.java#entitlementType",
-            "member/MemberGradeLog.java#changeType",
-            "member/Member.java#registerSource",
-            // 客户端上报，见上面的 ⚠️
-            "member/Device.java#deviceType",
-            "member/MemberLoginLog.java#deviceType");
+            "member/MemberGradeLog.java#changeType");
 
     @Test
     @DisplayName("实体上类型/状态语义的 String 字段只许变少")

@@ -3,6 +3,7 @@ package solvela.member.domain.query;
 import solvela.enums.GenderEnum;
 import solvela.enums.MemberStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.RegisterSourceEnum;
 
 import java.time.LocalDate;
 
@@ -39,7 +40,7 @@ public class MemberQuery extends PageParam {
     private MemberStatusEnum status;
 
     /** 注册来源渠道：H5/APP/WECHAT/INVITE/IMPORT... */
-    private String registerSource;
+    private RegisterSourceEnum registerSource;
 
     /** 邀请人memberId：没有邀请体系时恒为空，留着比事后加表便宜 */
     private Long inviteId;

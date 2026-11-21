@@ -42,6 +42,7 @@ import solvela.member.risk.RiskSession;
 import solvela.member.risk.SuspiciousLoginNotifier;
 import solvela.member.risk.security.CanaryTrap;
 import solvela.member.sms.MemberSmsCodeService;
+import solvela.enums.RegisterSourceEnum;
 
 import java.util.Set;
 
@@ -157,7 +158,7 @@ class MemberRegisterServiceTest {
         when(memberRegisterDao.countByPhoneHash(PHONE_HASH)).thenReturn(0);
         // 12 个参数：2026-09-09 加了 emailCipher / emailHashHex 两个
         when(memberRegisterDao.insertMember(anyLong(), anyString(), anyString(), anyInt(),
-                any(), any(), any(), any(), any(), anyInt(), anyString(), anyString())).thenReturn(1);
+                any(), any(), any(), any(), any(), anyInt(), any(), anyString())).thenReturn(1);
         // 假引擎 + 真会话：结论由用例指定，落库照真发生
         when(riskEngine.open(any())).thenAnswer(i ->
                 new RiskSession(i.getArgument(0), riskProperties, recorder, null));
@@ -198,7 +199,27 @@ class MemberRegisterServiceTest {
 
         verify(memberRegisterDao).insertMember(anyLong(), anyString(), anyString(), anyInt(),
                 any(), any(), any(), any(), any(), anyInt(),
-                ArgumentMatchers.argThat(s -> s != null && !s.isBlank()), anyString());
+                eq(RegisterSourceEnum.UNKNOWN), anyString());
+    }
+
+    @Test
+    @DisplayName("注册来源认不出：照常注册，来源落成 UNKNOWN —— 注册不该因为这一列失败")
+    void 认不出的来源落成UNKNOWN() {
+        service.register(MemberRegisterCmd.byPhonePassword(PHONE, STRONG_PASSWORD, SMS_CODE, "H5", CLIENT_IP, "TOASTER", DEVICE_ID));
+
+        verify(memberRegisterDao).insertMember(anyLong(), anyString(), anyString(), anyInt(),
+                any(), any(), any(), any(), any(), anyInt(),
+                eq(RegisterSourceEnum.UNKNOWN), anyString());
+    }
+
+    @Test
+    @DisplayName("网关推导的来源（与设备端同名）原样认得")
+    void 推导来源认得() {
+        service.register(MemberRegisterCmd.byPhonePassword(PHONE, STRONG_PASSWORD, SMS_CODE, "APP", CLIENT_IP, "APP", DEVICE_ID));
+
+        verify(memberRegisterDao).insertMember(anyLong(), anyString(), anyString(), anyInt(),
+                any(), any(), any(), any(), any(), anyInt(),
+                eq(RegisterSourceEnum.APP), anyString());
     }
 
     @Test
@@ -208,7 +229,7 @@ class MemberRegisterServiceTest {
         // 再写一条 LOGIN_SUCCESS 只会让登录轨迹里多一条语义不同的行，
         // 查「这个人什么时候登过」时反而要先把它剔掉
         verify(memberRegisterDao).insertMember(anyLong(), anyString(), anyString(), anyInt(),
-                any(), any(), any(), any(), any(), anyInt(), anyString(), anyString());
+                any(), any(), any(), any(), any(), anyInt(), any(), anyString());
     }
 
     // ------------------------------------------------------------------ 顺序
@@ -375,7 +396,7 @@ class MemberRegisterServiceTest {
     void 并发重复注册() {
         // 查重和插入之间的窗口，靠库上的唯一约束闭合
         when(memberRegisterDao.insertMember(anyLong(), anyString(), anyString(), anyInt(),
-                any(), any(), any(), any(), any(), anyInt(), anyString(), anyString()))
+                any(), any(), any(), any(), any(), anyInt(), any(), anyString()))
                 .thenThrow(new DuplicateKeyException("uk_member_phone_hash"));
 
         MemberRegisterResult result = service.register(cmd(PHONE, STRONG_PASSWORD));

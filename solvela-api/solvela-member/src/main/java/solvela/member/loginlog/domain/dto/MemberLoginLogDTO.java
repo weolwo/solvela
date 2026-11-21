@@ -2,6 +2,7 @@ package solvela.member.loginlog.domain.dto;
 
 
 import solvela.enums.LoginLogResultEnum;
+import solvela.enums.DeviceTypeEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -38,7 +39,7 @@ public class MemberLoginLogDTO {
     private String ipRegion;
 
     /** 设备端：APP/H5/WECHAT/PC */
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     private String deviceId;
 

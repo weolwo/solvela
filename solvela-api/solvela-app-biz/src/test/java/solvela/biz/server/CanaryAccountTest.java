@@ -30,6 +30,7 @@ import solvela.member.util.MemberEmailUtil;
 import solvela.security.IpKeys;
 import solvela.security.SecurityEvent;
 import solvela.security.SecurityKeys;
+import solvela.enums.RegisterSourceEnum;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -169,7 +170,7 @@ class CanaryAccountTest {
         long id = memberIdAllocator.nextMemberId();
         String normalized = MemberEmailUtil.normalize(email);
         memberRegisterDao.insertMember(id, "sv" + id, "会员" + id, 0, null, null, piiCipher.encrypt(normalized),
-                piiHasher.hash(normalized), PasswordCipher.encode(password), MemberStatusEnum.NORMAL.getValue(), "H5",
+                piiHasher.hash(normalized), PasswordCipher.encode(password), MemberStatusEnum.NORMAL.getValue(), RegisterSourceEnum.H5,
                 null);
         members.add(id);
     }

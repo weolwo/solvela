@@ -1,6 +1,7 @@
 package solvela.member;
 
 import solvela.enums.LoginLogResultEnum;
+import solvela.enums.DeviceTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -45,7 +46,7 @@ public class MemberLoginLog {
     /**
      * 设备端：APP/H5/WECHAT/PC
      */
-    private String deviceType;
+    private DeviceTypeEnum deviceType;
 
     /**
      * 操作系统：iOS/Android/Windows

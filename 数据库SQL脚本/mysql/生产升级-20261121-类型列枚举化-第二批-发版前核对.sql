@@ -64,4 +64,15 @@ SELECT 't_member_asset_transaction.biz_type', biz_type, COUNT(*) FROM t_member_a
 WHERE BINARY biz_type NOT IN ('PROPOSAL_REWARD', 'MALL_EXCHANGE', 'GRADE_ENTITLEMENT', 'TASK_PRIZE', 'CONSUME', 'MANUAL_ADJUST') GROUP BY biz_type
 UNION ALL
 SELECT 't_member_growth_log.biz_type', biz_type, COUNT(*) FROM t_member_growth_log
-WHERE biz_type IS NOT NULL AND BINARY biz_type NOT IN ('PROPOSAL_REWARD', 'MALL_EXCHANGE', 'GRADE_ENTITLEMENT', 'TASK_PRIZE', 'CONSUME', 'MANUAL_ADJUST') GROUP BY biz_type;
+WHERE biz_type IS NOT NULL AND BINARY biz_type NOT IN ('PROPOSAL_REWARD', 'MALL_EXCHANGE', 'GRADE_ENTITLEMENT', 'TASK_PRIZE', 'CONSUME', 'MANUAL_ADJUST') GROUP BY biz_type
+UNION ALL
+-- RegisterSourceEnum。⚠️ 这一列以前存的是网关原样传来的值，老数据里可能有枚举外的写法；查出来要先订正（改成 UNKNOWN 会丢原值，订正前先导出留底）
+SELECT 't_member.register_source', register_source, COUNT(*) FROM t_member
+WHERE BINARY register_source NOT IN ('H5', 'APP', 'WECHAT', 'PC', 'INVITE', 'IMPORT', 'CANARY', 'UNKNOWN') GROUP BY register_source
+UNION ALL
+-- DeviceTypeEnum。设备表在注册时就校验过；登录日志以前原样记客户端上报值，同上，订正前先导出留底
+SELECT 't_device.device_type', device_type, COUNT(*) FROM t_device
+WHERE BINARY device_type NOT IN ('APP', 'H5', 'WECHAT', 'PC', 'UNKNOWN') GROUP BY device_type
+UNION ALL
+SELECT 't_member_login_log.device_type', device_type, COUNT(*) FROM t_member_login_log
+WHERE device_type IS NOT NULL AND BINARY device_type NOT IN ('APP', 'H5', 'WECHAT', 'PC', 'UNKNOWN') GROUP BY device_type;

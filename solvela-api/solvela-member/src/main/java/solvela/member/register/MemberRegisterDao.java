@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import solvela.enums.RegisterSourceEnum;
 
 /**
  * 注册要用的两个写/读操作。
@@ -114,6 +115,6 @@ public interface MemberRegisterDao {
                      @Param("emailHashHex") String emailHashHex,
                      @Param("password") String password,
                      @Param("status") int status,
-                     @Param("registerSource") String registerSource,
+                     @Param("registerSource") RegisterSourceEnum registerSource,
                      @Param("registerIp") String registerIp);
 }
