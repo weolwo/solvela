@@ -12,6 +12,8 @@ import solvela.member.api.AssetGrantResult;
 import solvela.member.entitlement.EntitlementGrantStatus;
 import solvela.member.entitlement.dao.GradeEntitlementDao;
 import solvela.member.entitlement.dao.GradeEntitlementGrantDao;
+import solvela.enums.AssetBizTypeEnum;
+import solvela.enums.AssetSourceEnum;
 
 import java.time.LocalDateTime;
 
@@ -103,14 +105,14 @@ public class GradeEntitlementClaimService {
                 entitlement.getQuantity(),
                 entitlement.getAmount(),
                 // 来源类型让资产侧的流水看得出这笔是从哪来的 —— 与商城的 MALL 并列
-                "GRADE_ENTITLEMENT",
+                AssetSourceEnum.GRADE_ENTITLEMENT,
                 /*
                  * 🔴 单号用生成时就定死的那个，不是现生成。
                  * 资产侧的防重唯一键认的正是它：重试多少次都是同一个号，
                  * 所以「抢占成功但发放超时」再点一次也不会多发。
                  */
                 grant.getGrantBizId(),
-                "GRADE_ENTITLEMENT",
+                AssetBizTypeEnum.GRADE_ENTITLEMENT,
                 null, null, null,
                 entitlement.getEntitlementName());
 

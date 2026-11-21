@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import solvela.enums.CouponDeductTargetEnum;
 import solvela.enums.CouponWriteOffActionEnum;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,7 +50,7 @@ public class CouponWriteOff {
     private CouponWriteOffActionEnum action;
 
     /** MALL-商城订单 / EXTERNAL-外部场景 */
-    private String bizType;
+    private CouponWriteOffBizEnum bizType;
 
     /** 订单号 / 外部单号 */
     private String bizRefId;

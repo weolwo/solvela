@@ -22,6 +22,8 @@ import solvela.member.api.AssetDebitResult;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 
@@ -72,7 +74,7 @@ import java.math.BigDecimal;
 public class MallOrderCancelService {
 
     /** 与 MallRedeemService 扣分时用的 bizType 保持一致，对账才对得上 */
-    private static final String BIZ_TYPE = "MALL_EXCHANGE";
+    private static final AssetBizTypeEnum BIZ_TYPE = AssetBizTypeEnum.MALL_EXCHANGE;
 
     /**
      * 退款的 bizRefId 后缀。
@@ -93,7 +95,7 @@ public class MallOrderCancelService {
      * 券核销流水里的业务类型。与 {@code MallRedeemService.BIZ_TYPE_COUPON} 一致 ——
      * 锁定和释放必须落在同一个 bizType 下，否则按单号对账时两半对不上。
      */
-    private static final String BIZ_TYPE_COUPON = "MALL";
+    private static final CouponWriteOffBizEnum BIZ_TYPE_COUPON = CouponWriteOffBizEnum.MALL;
 
     private final MallOrderDao mallOrderDao;
     private final MallSkuDao mallSkuDao;

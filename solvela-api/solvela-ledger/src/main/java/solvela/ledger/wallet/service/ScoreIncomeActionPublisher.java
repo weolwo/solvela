@@ -74,7 +74,8 @@ public class ScoreIncomeActionPublisher {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         // 🔴 会员域的白名单判据就是它，不能不带
-        payload.put("bizType", txn.getBizType());
+        // 负载只放普通值（它会被序列化、落库重放），枚举取名字，读的一方 GrowthEventListener 再解析回来
+        payload.put("bizType", txn.getBizType() == null ? null : txn.getBizType().name());
         payload.put("bizRefId", txn.getBizRefId());
         payload.put("amount", txn.getChangeAmount());
 

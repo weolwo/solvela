@@ -4,6 +4,7 @@ import solvela.enums.DeliveryStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.AssetSourceEnum;
 
 import java.time.LocalDate;
 
@@ -37,7 +38,7 @@ public class PhysicalDeliveryQuery extends PageParam {
     /**
      * 来源类型：PROPOSAL / MALL
      */
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /**
      * 物流单号

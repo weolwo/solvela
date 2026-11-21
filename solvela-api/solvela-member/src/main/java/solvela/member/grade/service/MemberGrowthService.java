@@ -11,6 +11,7 @@ import solvela.member.grade.GrowthProperties;
 import solvela.member.grade.GradeChangeType;
 import solvela.member.grade.dao.MemberGrowthDao;
 import solvela.member.grade.dao.MemberGrowthLogDao;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -56,7 +57,7 @@ public class MemberGrowthService {
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean accrue(Long memberId, long baseValue, String source,
-                          String bizType, String bizId, String remark) {
+                          AssetBizTypeEnum bizType, String bizId, String remark) {
         if (memberId == null || baseValue <= 0 || bizId == null || bizId.isBlank()) {
             log.warn("【成长值】参数不完整，本次不记。memberId={}, base={}, bizId={}",
                     memberId, baseValue, bizId);

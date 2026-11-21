@@ -6,6 +6,7 @@ import java.util.List;
 
 import lombok.Data;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 资产流水统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
@@ -96,7 +97,7 @@ public class MemberAssetTransactionStatDTO {
     public static class BizTypeStatDTO {
 
         /** 业务类型原值 */
-        private String bizType;
+        private AssetBizTypeEnum bizType;
 
         /** 笔数 */
         private Long txCount;

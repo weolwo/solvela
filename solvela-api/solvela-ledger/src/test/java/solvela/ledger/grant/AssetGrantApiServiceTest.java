@@ -24,6 +24,8 @@ import solvela.member.api.AssetGrantCmd;
 import solvela.member.api.AssetGrantReason;
 import solvela.member.api.AssetGrantResult;
 import solvela.member.service.MemberService;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -122,7 +124,7 @@ class AssetGrantApiServiceTest {
                 () -> assertTrue(result.accepted()),
                 // fulfill_ref_id 是「东西发到哪去了」的唯一线索，不能是空
                 () -> assertEquals("777", result.fulfillRefId()),
-                () -> assertEquals("MALL", saved.getSourceType()),
+                () -> assertEquals(AssetSourceEnum.MALL, saved.getSourceType()),
                 () -> assertEquals(ORDER_NO, saved.getSourceBizId()),
                 () -> assertEquals("张三", saved.getReceiverName()),
                 () -> assertEquals("上海市黄浦区XX路1号", saved.getReceiverAddress()));
@@ -189,7 +191,7 @@ class AssetGrantApiServiceTest {
                 // 券名直接显示给用户，必须是商品名而不是编码
                 () -> assertEquals("夏日券", saved.get(0).getCouponName()),
                 () -> assertEquals("SUMMER2026", saved.get(0).getCouponCode()),
-                () -> assertEquals("MALL", saved.get(0).getSourceType()));
+                () -> assertEquals(AssetSourceEnum.MALL, saved.get(0).getSourceType()));
     }
 
     @Test
@@ -227,7 +229,7 @@ class AssetGrantApiServiceTest {
 
         ArgumentCaptor<BigDecimal> amount = ArgumentCaptor.forClass(BigDecimal.class);
         verify(memberWalletService).executeWalletRefund(
-                anyLong(), any(PrizeTypeEnum.class), amount.capture(), anyString(), anyString(), anyString());
+                anyLong(), any(PrizeTypeEnum.class), amount.capture(), any(), anyString(), anyString());
         assertEquals(0, new BigDecimal("15.00").compareTo(amount.getValue()));
     }
 
@@ -279,7 +281,7 @@ class AssetGrantApiServiceTest {
     void 没传类型不抛异常() {
         AssetGrantResult result = service.grant(new AssetGrantCmd(
                 MEMBER_ID, null, null, null, 1, null,
-                "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, null));
+                AssetSourceEnum.MALL, ORDER_NO, AssetBizTypeEnum.MALL_EXCHANGE, null, null, null, null));
 
         assertAll(
                 () -> assertFalse(result.accepted()),
@@ -292,7 +294,7 @@ class AssetGrantApiServiceTest {
         for (PrizeTypeEnum type : List.of(PrizeTypeEnum.MARKER, PrizeTypeEnum.LOTTERY, PrizeTypeEnum.CUSTOM)) {
             AssetGrantResult result = service.grant(new AssetGrantCmd(
                     MEMBER_ID, type, null, null, 1, null,
-                    "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, null));
+                    AssetSourceEnum.MALL, ORDER_NO, AssetBizTypeEnum.MALL_EXCHANGE, null, null, null, null));
             /*
              * 假装成功的表现是：用户的订单显示「已完成」，而他手里什么都没有，
              * 且没有任何一条记录说明本该发什么。
@@ -306,16 +308,16 @@ class AssetGrantApiServiceTest {
 
     private static AssetGrantCmd physicalCmd(String name, String phone, String address) {
         return new AssetGrantCmd(MEMBER_ID, PrizeTypeEnum.PHYSICAL, null, "限量T恤", 1, null,
-                "MALL", ORDER_NO, "MALL_EXCHANGE", name, phone, address, "商城兑换");
+                AssetSourceEnum.MALL, ORDER_NO, AssetBizTypeEnum.MALL_EXCHANGE, name, phone, address, "商城兑换");
     }
 
     private static AssetGrantCmd couponCmd(String assetRef, String assetName, int quantity) {
         return new AssetGrantCmd(MEMBER_ID, PrizeTypeEnum.COUPON, assetRef, assetName, quantity, null,
-                "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, "商城兑换");
+                AssetSourceEnum.MALL, ORDER_NO, AssetBizTypeEnum.MALL_EXCHANGE, null, null, null, "商城兑换");
     }
 
     private static AssetGrantCmd walletCmd(BigDecimal amount, int quantity) {
         return new AssetGrantCmd(MEMBER_ID, PrizeTypeEnum.BALANCE, null, "5元红包", quantity, amount,
-                "MALL", ORDER_NO, "MALL_EXCHANGE", null, null, null, "商城兑换");
+                AssetSourceEnum.MALL, ORDER_NO, AssetBizTypeEnum.MALL_EXCHANGE, null, null, null, "商城兑换");
     }
 }

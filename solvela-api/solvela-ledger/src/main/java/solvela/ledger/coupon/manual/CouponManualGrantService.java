@@ -18,6 +18,7 @@ import solvela.ledger.coupon.template.service.CouponTemplateService;
 import solvela.member.service.MemberService;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.enums.AssetSourceEnum;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -79,7 +80,7 @@ public class CouponManualGrantService {
     /** 每人最多几张。不拦的话「每人 1000 张」和「发给 1000 个人」是一回事 */
     private static final int MAX_QUANTITY_PER_MEMBER = 10;
 
-    private static final String SOURCE_TYPE_MANUAL = "MANUAL";
+    private static final AssetSourceEnum SOURCE_TYPE_MANUAL = AssetSourceEnum.MANUAL;
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 

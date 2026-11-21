@@ -3,6 +3,7 @@ package solvela.member.grade.domain.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 一条成长值流水。
@@ -35,7 +36,7 @@ public class MemberGrowthLogDTO {
     private String source;
 
     /** 上游业务类型。白名单判据就是它 */
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     /** 上游业务单号：幂等键 */
     private String bizId;

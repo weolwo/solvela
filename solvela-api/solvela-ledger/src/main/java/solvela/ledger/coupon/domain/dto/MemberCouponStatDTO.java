@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.Data;
+import solvela.enums.AssetSourceEnum;
 
 /**
  * 会员券统计的<b>结果模型</b>。管理端直接把它作为响应体返回，<b>没有再装配一层 VO</b>。
@@ -164,7 +165,7 @@ public class MemberCouponStatDTO {
     public static class SourceStatDTO {
 
         /** 来源类型原值 */
-        private String sourceType;
+        private AssetSourceEnum sourceType;
 
         /** 本期发放张数 */
         private Long issuedCount;

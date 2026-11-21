@@ -34,7 +34,9 @@ import solvela.member.service.MemberService;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
 import solvela.exception.BusinessException;
+import solvela.enums.AssetSourceEnum;
 
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -145,7 +147,7 @@ public class PhysicalDeliveryService {
             long cancelled = stat.count("cancelledCount");
 
             PhysicalDeliveryStatDTO.SourceStatDTO item = new PhysicalDeliveryStatDTO.SourceStatDTO();
-            item.setSourceType(stat.text("sourceType"));
+            item.setSourceType(stat.enumValue("sourceType", AssetSourceEnum.class));
             item.setDeliveryCount(count);
             item.setPendingCount(stat.count("pendingCount"));
             item.setCancelledCount(cancelled);
@@ -284,6 +286,8 @@ public class PhysicalDeliveryService {
             }
             if (SolvelaStringUtil.isBlank(row.sourceType())) {
                 errors.add(i, "「来源类型」不能为空");
+            } else if (!checkSourceType(row.sourceType())) {
+                errors.add(i, "「来源类型」不合法：" + row.sourceType() + "，可选 " + Arrays.toString(AssetSourceEnum.values()));
             }
             // 🔴 收件三项要落进密文列，上限由密文列宽反推（算式见 PiiCipher.cipherTextLength）。
             //    这里逐行拦，是因为再往下就是 MySQL 非严格模式的静默截断 ——
@@ -346,7 +350,8 @@ public class PhysicalDeliveryService {
         // 账号同时作为展示快照落库（履约单是单据，记的是「导入当时那个账号」）
         entity.setMemberName(row.memberName());
         entity.setSourceBizId(row.sourceBizId());
-        entity.setSourceType(row.sourceType());
+        // 校验阶段已确认能解析（checkSourceType），这里不会再碰到非法值
+        entity.setSourceType(AssetSourceEnum.valueOf(row.sourceType()));
         entity.setReceiverName(row.receiverName());
         entity.setReceiverPhone(row.receiverPhone());
         entity.setReceiverAddress(row.receiverAddress());
@@ -403,6 +408,8 @@ public class PhysicalDeliveryService {
             }
             if (SolvelaStringUtil.isBlank(row.sourceType())) {
                 errors.add(i, "「来源类型」不能为空");
+            } else if (!checkSourceType(row.sourceType())) {
+                errors.add(i, "「来源类型」不合法：" + row.sourceType() + "，可选 " + Arrays.toString(AssetSourceEnum.values()));
             }
             if (hasKey(row.sourceBizId(), row.sourceType())
                     && !fileKeySet.add(uniqueKey(row.sourceBizId(), row.sourceType()))) {
@@ -498,6 +505,19 @@ public class PhysicalDeliveryService {
     }
 
     /** 复合键两列都填了才谈得上查重 —— 缺列的行上面已经单独报过错了 */
+    /**
+     * Excel 里的来源类型是运营手填的文本，在这里一次性认成 AssetSourceEnum —— 这是这条数据进系统的边界。
+     * 认不出就按行报错，而不是导进去一个读出来就报错的值。
+     */
+    private static boolean checkSourceType(String sourceType) {
+        try {
+            AssetSourceEnum.valueOf(sourceType);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     private boolean hasKey(String sourceBizId, String sourceType) {
         return SolvelaStringUtil.isNotBlank(sourceBizId) && SolvelaStringUtil.isNotBlank(sourceType);
     }
@@ -559,7 +579,7 @@ public class PhysicalDeliveryService {
                 .in(PhysicalDelivery::getSourceType, sourceTypeSet));
 
         Map<String, PhysicalDelivery> map = new HashMap<>();
-        list.forEach(e -> map.put(uniqueKey(e.getSourceBizId(), e.getSourceType()), e));
+        list.forEach(e -> map.put(uniqueKey(e.getSourceBizId(), e.getSourceType().name()), e));
         return map;
     }
 

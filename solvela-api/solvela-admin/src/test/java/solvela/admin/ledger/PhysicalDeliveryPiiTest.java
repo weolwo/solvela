@@ -16,6 +16,7 @@ import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.domain.dto.PhysicalDeliveryDTO;
 import solvela.ledger.logistic.domain.query.PhysicalDeliveryQuery;
 import solvela.ledger.logistic.service.PhysicalDeliveryService;
+import solvela.enums.AssetSourceEnum;
 
 import java.util.List;
 import java.util.Map;
@@ -65,7 +66,7 @@ class PhysicalDeliveryPiiTest {
         entity.setMemberId(MEMBER_ID);
         entity.setMemberName("pii_test");
         entity.setSourceBizId(sourceBizId);
-        entity.setSourceType("TEST");
+        entity.setSourceType(AssetSourceEnum.MANUAL);
         entity.setReceiverName(NAME);
         entity.setReceiverPhone(PHONE);
         entity.setReceiverAddress(ADDRESS);
@@ -114,7 +115,7 @@ class PhysicalDeliveryPiiTest {
             PhysicalDelivery second = new PhysicalDelivery();
             second.setMemberId(MEMBER_ID);
             second.setSourceBizId(sourceBizId + "_2");
-            second.setSourceType("TEST");
+            second.setSourceType(AssetSourceEnum.MANUAL);
             second.setReceiverAddress(ADDRESS);
             second.setStatus(DeliveryStatusEnum.PENDING);
             physicalDeliveryDao.insert(second);
@@ -143,7 +144,7 @@ class PhysicalDeliveryPiiTest {
         PhysicalDelivery entity = new PhysicalDelivery();
         entity.setMemberId(MEMBER_ID);
         entity.setSourceBizId(sourceBizId);
-        entity.setSourceType("TEST");
+        entity.setSourceType(AssetSourceEnum.MANUAL);
         entity.setReceiverName("");
         entity.setStatus(DeliveryStatusEnum.PENDING);
         physicalDeliveryDao.insert(entity);
@@ -176,7 +177,7 @@ class PhysicalDeliveryPiiTest {
         PhysicalDelivery entity = new PhysicalDelivery();
         entity.setMemberId(MEMBER_ID);
         entity.setSourceBizId(orderNo);
-        entity.setSourceType("MALL");
+        entity.setSourceType(AssetSourceEnum.MALL);
         entity.setStatus(DeliveryStatusEnum.PENDING);
         physicalDeliveryDao.insert(entity);
 
@@ -185,7 +186,7 @@ class PhysicalDeliveryPiiTest {
                     new LambdaQueryWrapper<PhysicalDelivery>()
                             .eq(PhysicalDelivery::getSourceBizId, orderNo));
             assertEquals(1, list.size());
-            assertEquals("MALL", list.get(0).getSourceType());
+            assertEquals(AssetSourceEnum.MALL, list.get(0).getSourceType());
         } finally {
             physicalDeliveryDao.deleteById(entity.getId());
         }

@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import solvela.coupon.CouponWriteOff;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,7 +33,7 @@ public interface CouponWriteOffDao extends BaseMapper<CouponWriteOff> {
      *
      * <p>🔴 <b>对账的入口</b>。走 {@code idx_biz}。
      */
-    List<CouponWriteOff> selectByBiz(@Param("bizType") String bizType,
+    List<CouponWriteOff> selectByBiz(@Param("bizType") CouponWriteOffBizEnum bizType,
                                      @Param("bizRefId") String bizRefId);
 
     /**

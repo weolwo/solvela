@@ -9,6 +9,7 @@ import solvela.enums.PrizeTypeEnum;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
 import solvela.ledger.PhysicalDelivery;
 import solvela.risk.ProposalRecord;
+import solvela.enums.AssetSourceEnum;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +29,7 @@ import org.springframework.stereotype.Service;
 @AssetStrategy(PrizeTypeEnum.PHYSICAL)
 public class PhysicalAssetHandler implements IAssetHandler {
 
-    private static final String SOURCE_TYPE_PROPOSAL = "PROPOSAL";
+    private static final AssetSourceEnum SOURCE_TYPE_PROPOSAL = AssetSourceEnum.PROPOSAL;
 
     @Resource
     private PhysicalDeliveryDao deliveryDao;

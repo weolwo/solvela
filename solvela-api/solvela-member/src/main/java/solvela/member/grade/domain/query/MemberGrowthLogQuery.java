@@ -3,6 +3,7 @@ package solvela.member.grade.domain.query;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.time.LocalDate;
 
@@ -26,7 +27,7 @@ public class MemberGrowthLogQuery extends PageParam {
     private String source;
 
     /** 上游业务类型：PROPOSAL_REWARD 等 —— 排查「这笔为什么没算成长值」时按它筛 */
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     /** 计入哪个周期（period_start 的 yyyyMMdd） */
     private String periodTag;

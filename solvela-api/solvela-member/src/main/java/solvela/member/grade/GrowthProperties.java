@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Period;
 import java.util.List;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 成长值口径。
@@ -53,7 +54,7 @@ public class GrowthProperties {
      * <p>默认只有 {@code PROPOSAL_REWARD}（发奖入账）—— 库里 4413 条 SCORE 收入
      * 全是它（2026-09-18 实测）。
      */
-    private List<String> countableBizTypes = List.of("PROPOSAL_REWARD");
+    private List<AssetBizTypeEnum> countableBizTypes = List.of(AssetBizTypeEnum.PROPOSAL_REWARD);
 
     /**
      * 积分 → 成长值的系数。默认 1:1。

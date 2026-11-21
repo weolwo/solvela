@@ -2,6 +2,7 @@ package solvela.admin.module.ledger.coupon.domain.form;
 
 import solvela.enums.CouponStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.CouponTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -45,7 +46,7 @@ public class MemberCouponQueryForm extends PageParam {
     private String couponName;
 
     @Schema(description = "券类型")
-    private String couponType;
+    private CouponTypeEnum couponType;
 
     @Schema(description = "状态：0-未使用, 1-已使用, 2-已过期, 3-已作废")
     private CouponStatusEnum status;

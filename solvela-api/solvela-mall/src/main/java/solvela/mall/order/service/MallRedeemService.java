@@ -41,6 +41,8 @@ import solvela.member.api.CouponWriteOffView;
 import solvela.member.service.MemberService;
 import solvela.enums.PrizeTypeEnum;
 import solvela.enums.MallOrderSourceEnum;
+import solvela.enums.AssetBizTypeEnum;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -90,7 +92,7 @@ public class MallRedeemService {
     /** 待支付超时。只有 payType=2 会用到 */
     private static final int PAY_EXPIRE_MINUTES = 30;
 
-    private static final String BIZ_TYPE = "MALL_EXCHANGE";
+    private static final AssetBizTypeEnum BIZ_TYPE = AssetBizTypeEnum.MALL_EXCHANGE;
 
     /**
      * 券核销流水里的业务类型。
@@ -100,7 +102,7 @@ public class MallRedeemService {
      *（{@code t_coupon_write_off}）。两张表各自的取值域不该被绑在一起 ——
      * 哪天资产流水要细分兑换类型，券那边不该跟着变。
      */
-    private static final String BIZ_TYPE_COUPON = "MALL";
+    private static final CouponWriteOffBizEnum BIZ_TYPE_COUPON = CouponWriteOffBizEnum.MALL;
 
     /** 一次最多兑几件。不封的话一个 quantity=99999 会把库存条件判断变成一次巨额扣减 */
     private static final int MAX_QUANTITY = 20;

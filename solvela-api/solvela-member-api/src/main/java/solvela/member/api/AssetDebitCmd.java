@@ -2,6 +2,7 @@ package solvela.member.api;
 
 import java.math.BigDecimal;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 扣减 / 退还一笔资产。
@@ -26,7 +27,7 @@ public record AssetDebitCmd(
         Long memberId,
         PrizeTypeEnum assetType,
         BigDecimal amount,
-        String bizType,
+        AssetBizTypeEnum bizType,
         String bizRefId,
         String remark) {
 }

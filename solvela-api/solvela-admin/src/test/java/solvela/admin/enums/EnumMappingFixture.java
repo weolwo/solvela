@@ -55,8 +55,9 @@ final class EnumMappingFixture {
     }
 
     private static void insertDelivery(JdbcTemplate jdbc, String bizId, int status) {
+        // source_type 必须是 AssetSourceEnum 里的值：它已是枚举列，写个 'FIXTURE' 进去读的时候整条报错
         jdbc.update("INSERT INTO t_physical_delivery (member_id, source_type, source_biz_id, status) "
-                + "VALUES (?, 'FIXTURE', ?, ?)", MEMBER_ID, bizId, status);
+                + "VALUES (?, 'MANUAL', ?, ?)", MEMBER_ID, bizId, status);
     }
 
     /**

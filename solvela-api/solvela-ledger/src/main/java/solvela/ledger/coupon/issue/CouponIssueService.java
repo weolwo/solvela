@@ -8,6 +8,7 @@ import solvela.coupon.CouponTemplate;
 import solvela.enums.CouponStatusEnum;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
+import solvela.enums.CouponTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -62,7 +63,7 @@ public class CouponIssueService {
      * 这一列今天没有任何代码读它，在它有语义之前，给它编一个值只会制造
      * 「看起来有意义其实没有」的数据。
      */
-    private static final String DEFAULT_COUPON_TYPE = "GENERAL";
+    private static final CouponTypeEnum DEFAULT_COUPON_TYPE = CouponTypeEnum.GENERAL;
 
     private final CouponTemplateService couponTemplateService;
 

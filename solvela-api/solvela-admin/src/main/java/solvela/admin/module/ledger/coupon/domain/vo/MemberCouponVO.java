@@ -4,6 +4,8 @@ import solvela.enums.CouponDeductTargetEnum;
 import solvela.enums.CouponDiscountTypeEnum;
 import solvela.enums.CouponScopeTypeEnum;
 import solvela.enums.CouponStatusEnum;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.CouponTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -40,7 +42,7 @@ public class MemberCouponVO {
     private String couponCode;
 
     @Schema(description = "券类型")
-    private String couponType;
+    private CouponTypeEnum couponType;
 
     @Schema(description = "券名称")
     private String couponName;
@@ -49,7 +51,7 @@ public class MemberCouponVO {
     private CouponStatusEnum status;
 
     @Schema(description = "来源：DRAW, TASK, MANUAL_SEND")
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     @Schema(description = "关联单号")
     private String sourceBizId;

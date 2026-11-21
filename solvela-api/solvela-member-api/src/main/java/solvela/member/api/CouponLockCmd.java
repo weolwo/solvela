@@ -1,6 +1,7 @@
 package solvela.member.api;
 
 import java.math.BigDecimal;
+import solvela.enums.CouponWriteOffBizEnum;
 
 /**
  * 锁定一张券。
@@ -20,7 +21,7 @@ import java.math.BigDecimal;
 public record CouponLockCmd(
         Long couponId,
         Long memberId,
-        String bizType,
+        CouponWriteOffBizEnum bizType,
         String bizRefId,
         String sceneCode,
         BigDecimal payAmount,

@@ -1,6 +1,7 @@
 package solvela.admin.module.ledger.logistic.domain.vo;
 
 import solvela.enums.DeliveryStatusEnum;
+import solvela.enums.AssetSourceEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -36,7 +37,7 @@ public class PhysicalDeliveryVO {
     private String sourceBizId;
 
     @Schema(description = "来源类型：PROPOSAL / MALL")
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /*
      * 收件三项库里是密文，这里是<b>解密后的明文</b>（resultMap 上挂了 PiiTypeHandler）。

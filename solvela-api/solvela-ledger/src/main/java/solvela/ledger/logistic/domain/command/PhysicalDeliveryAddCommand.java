@@ -1,6 +1,7 @@
 package solvela.ledger.logistic.domain.command;
 
 import lombok.Data;
+import solvela.enums.AssetSourceEnum;
 
 /**
  * 新增实物履约单的<b>领域命令</b>。与管理端的 {@code PhysicalDeliveryAddCommand} 形状一致，但职责不同：
@@ -34,7 +35,7 @@ public class PhysicalDeliveryAddCommand {
     private String sourceBizId;
 
     /** 来源类型：PROPOSAL / MALL */
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /*
      * 🔴 下面三个字段有<b>密文列宽的硬约束</b>（姓名 40 / 电话 30 / 地址 100 字符）。

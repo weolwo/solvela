@@ -1,5 +1,6 @@
 package solvela.member.api;
 
+import solvela.enums.CouponWriteOffBizEnum;
 /**
  * 确认 / 释放一张券。
  *
@@ -12,7 +13,7 @@ package solvela.member.api;
  */
 public record CouponWriteOffCmd(
         Long couponId,
-        String bizType,
+        CouponWriteOffBizEnum bizType,
         String bizRefId,
         String remark) {
 }

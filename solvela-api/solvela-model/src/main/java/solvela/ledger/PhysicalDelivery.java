@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 
 import lombok.Data;
 import solvela.crypto.PiiTypeHandler;
+import solvela.enums.AssetSourceEnum;
 
 /**
  * 发货物流表 实体类
@@ -69,7 +70,7 @@ public class PhysicalDelivery {
     /**
      * 来源类型：PROPOSAL-发奖提案 / MALL-商城兑换。与 sourceBizId 一起构成唯一键
      */
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /**
      * 奖品 / 商品名 —— <b>快照</b>，不是外键。

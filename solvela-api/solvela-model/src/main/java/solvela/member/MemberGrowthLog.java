@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 成长值流水。
@@ -56,7 +57,7 @@ public class MemberGrowthLog {
      * 资产域的 {@code executeWalletRefund} 同时承担「商城发积分」和「真正的退回」，
      * 按方法判会把商城发的积分一起漏掉。详见方案 §4.2。
      */
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     /** 上游业务单号：<b>幂等键</b> */
     private String bizId;

@@ -18,6 +18,7 @@ import solvela.member.grade.dao.MemberGrowthLogDao;
 import solvela.member.grade.service.MemberGradeChangeService;
 import solvela.member.grade.service.MemberGradeResolver;
 import solvela.member.grade.service.MemberGrowthService;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -95,7 +96,7 @@ class MemberGrowthServiceUpgradeTest {
         when(memberGradeResolver.gradeOf(25000L)).thenReturn(3);
 
         assertTrue(service.accrue(MEMBER_ID, 24100L, BizActionCodes.SCORE_EARNED,
-                "PROPOSAL_REWARD", "P-1", "发奖"));
+                AssetBizTypeEnum.PROPOSAL_REWARD, "P-1", "发奖"));
 
         // 0 → 3 是一次变更，不是三次
         verify(memberGradeChangeService).change(eq(MEMBER_ID), eq(0), eq(3),
@@ -108,7 +109,7 @@ class MemberGrowthServiceUpgradeTest {
         givenGrowth(1, 1000L, 1100L);
         when(memberGradeResolver.gradeOf(1100L)).thenReturn(1);
 
-        service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-2", "发奖");
+        service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-2", "发奖");
 
         verify(memberGradeChangeService, never())
                 .change(anyLong(), anyInt(), anyInt(), anyString(), anyLong(), any(), any());
@@ -125,7 +126,7 @@ class MemberGrowthServiceUpgradeTest {
         givenGrowth(3, 20000L, 20100L);
         when(memberGradeResolver.gradeOf(20100L)).thenReturn(1);
 
-        service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-3", "发奖");
+        service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-3", "发奖");
 
         verify(memberGradeChangeService, never())
                 .change(anyLong(), anyInt(), anyInt(), anyString(), anyLong(), any(), any());
@@ -138,7 +139,7 @@ class MemberGrowthServiceUpgradeTest {
         doThrowOnInsert();
 
         assertFalse(service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED,
-                "PROPOSAL_REWARD", "P-4", "发奖"));
+                AssetBizTypeEnum.PROPOSAL_REWARD, "P-4", "发奖"));
 
         // 成长值没加，等级自然也不该动 —— 对账 job 每轮都会重推，这里松一次就是每轮多升一次
         verify(memberGrowthDao, never()).addValue(anyLong(), anyLong());
@@ -158,7 +159,7 @@ class MemberGrowthServiceUpgradeTest {
         when(memberGradeResolver.gradeOf(5000L)).thenReturn(2);
         when(memberGradeResolver.gradeOf(1000L)).thenReturn(1);
 
-        service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-5", "发奖");
+        service.accrue(MEMBER_ID, 100L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-5", "发奖");
 
         verify(memberGradeChangeService).change(eq(MEMBER_ID), eq(1), eq(2),
                 eq(GradeChangeType.UPGRADE), eq(5000L), isNull(), isNull());

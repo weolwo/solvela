@@ -22,6 +22,7 @@ import solvela.ledger.coupon.writeoff.domain.CouponTrialCmd;
 import solvela.ledger.coupon.writeoff.domain.CouponTrialResult;
 import solvela.ledger.coupon.writeoff.domain.CouponUnusableReason;
 import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -197,7 +198,7 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.lockCoupon(anyLong(), anyLong(), anyString(), any(), any())).thenReturn(1);
         when(memberCouponDao.selectById(1L)).thenReturn(coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0"));
 
-        CouponWriteOffResult result = service.lock(1L, MEMBER_ID, "MALL", ORDER_NO, null,
+        CouponWriteOffResult result = service.lock(1L, MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_NO, null,
                 new BigDecimal("150"), new BigDecimal("20"));
 
         ArgumentCaptor<CouponWriteOff> captor = ArgumentCaptor.forClass(CouponWriteOff.class);
@@ -226,7 +227,7 @@ class CouponWriteOffServiceTest {
         mine.setDiscountAmount(new BigDecimal("20"));
         when(memberCouponDao.selectById(1L)).thenReturn(mine);
 
-        CouponWriteOffResult same = service.lock(1L, MEMBER_ID, "MALL", ORDER_NO, null,
+        CouponWriteOffResult same = service.lock(1L, MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_NO, null,
                 new BigDecimal("150"), new BigDecimal("20"));
         assertAll(
                 () -> assertTrue(same.ok()),
@@ -239,7 +240,7 @@ class CouponWriteOffServiceTest {
         theirs.setLockedBizId("ANOTHER_ORDER");
         when(memberCouponDao.selectById(1L)).thenReturn(theirs);
 
-        assertFalse(service.lock(1L, MEMBER_ID, "MALL", ORDER_NO, null,
+        assertFalse(service.lock(1L, MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_NO, null,
                 new BigDecimal("150"), new BigDecimal("20")).ok());
     }
 
@@ -255,7 +256,7 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.selectById(1L)).thenReturn(used);
         when(couponWriteOffDao.selectLockRow(1L, ORDER_NO)).thenReturn(lockRow());
 
-        CouponWriteOffResult result = service.confirm(1L, "MALL", ORDER_NO);
+        CouponWriteOffResult result = service.confirm(1L, CouponWriteOffBizEnum.MALL, ORDER_NO);
 
         ArgumentCaptor<CouponWriteOff> captor = ArgumentCaptor.forClass(CouponWriteOff.class);
         verify(couponWriteOffDao).insert(captor.capture());
@@ -275,7 +276,7 @@ class CouponWriteOffServiceTest {
         released.setStatus(CouponStatusEnum.UNUSED);
         when(memberCouponDao.selectById(1L)).thenReturn(released);
 
-        CouponWriteOffResult result = service.confirm(1L, "MALL", ORDER_NO);
+        CouponWriteOffResult result = service.confirm(1L, CouponWriteOffBizEnum.MALL, ORDER_NO);
 
         // 当没看见的话：订单按打折价结算，而券还躺在券包里可以再用一次
         assertFalse(result.ok());
@@ -292,7 +293,7 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.releaseCoupon(eq(1L), eq(ORDER_NO))).thenReturn(1);
         when(couponWriteOffDao.selectLockRow(1L, ORDER_NO)).thenReturn(lockRow());
 
-        CouponWriteOffResult result = service.release(1L, "MALL", ORDER_NO, "订单超时取消");
+        CouponWriteOffResult result = service.release(1L, CouponWriteOffBizEnum.MALL, ORDER_NO, "订单超时取消");
 
         ArgumentCaptor<CouponWriteOff> captor = ArgumentCaptor.forClass(CouponWriteOff.class);
         verify(couponWriteOffDao).insert(captor.capture());
@@ -316,7 +317,7 @@ class CouponWriteOffServiceTest {
         when(memberCouponDao.selectById(1L)).thenReturn(free);
         when(memberCouponDao.releaseCoupon(anyLong(), anyString())).thenReturn(0);
 
-        CouponWriteOffResult result = service.release(1L, "MALL", ORDER_NO, "重复取消");
+        CouponWriteOffResult result = service.release(1L, CouponWriteOffBizEnum.MALL, ORDER_NO, "重复取消");
 
         assertAll(
                 () -> assertTrue(result.ok()),

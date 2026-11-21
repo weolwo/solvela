@@ -14,6 +14,7 @@ import solvela.event.BizActionCodes;
 import solvela.event.BizActionEvent;
 import solvela.member.grade.service.GrowthEventListener;
 import solvela.member.grade.service.MemberGrowthService;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -72,7 +73,7 @@ class GrowthEventListenerTest {
 
         ArgumentCaptor<Long> base = ArgumentCaptor.forClass(Long.class);
         verify(memberGrowthService).accrue(eq(MEMBER_ID), base.capture(),
-                eq(BizActionCodes.SCORE_EARNED), eq("PROPOSAL_REWARD"), eq("P-1"), anyString());
+                eq(BizActionCodes.SCORE_EARNED), eq(AssetBizTypeEnum.PROPOSAL_REWARD), eq("P-1"), anyString());
         assertEquals(188L, base.getValue());
     }
 
@@ -86,7 +87,7 @@ class GrowthEventListenerTest {
         listener.onBizAction(scoreEarned("MALL_EXCHANGE", "5000", "M-1"));
 
         verify(memberGrowthService, never()).accrue(anyLong(), anyLong(),
-                anyString(), anyString(), anyString(), anyString());
+                anyString(), any(), anyString(), anyString());
     }
 
     @Test
@@ -100,7 +101,7 @@ class GrowthEventListenerTest {
         listener.onBizAction(scoreEarned("SOME_NEW_SOURCE_NOBODY_THOUGHT_OF", "9999", "X-1"));
 
         verify(memberGrowthService, never()).accrue(anyLong(), anyLong(),
-                anyString(), anyString(), anyString(), anyString());
+                anyString(), any(), anyString(), anyString());
     }
 
     @Test
@@ -112,7 +113,7 @@ class GrowthEventListenerTest {
         listener.onBizAction(event);
 
         verify(memberGrowthService, never()).accrue(anyLong(), anyLong(),
-                anyString(), anyString(), anyString(), anyString());
+                anyString(), any(), anyString(), anyString());
     }
 
     @Test
@@ -122,7 +123,7 @@ class GrowthEventListenerTest {
                 "O-1", new BigDecimal("100"), LocalDateTime.now(), Map.of()));
 
         verify(memberGrowthService, never()).accrue(anyLong(), anyLong(),
-                anyString(), anyString(), anyString(), anyString());
+                anyString(), any(), anyString(), anyString());
     }
 
     @Test
@@ -135,13 +136,13 @@ class GrowthEventListenerTest {
          * 宁可少给 —— 少给用户不会来问，多给没人会发现。
          */
         verify(memberGrowthService, never()).accrue(anyLong(), anyLong(),
-                anyString(), anyString(), anyString(), anyString());
+                anyString(), any(), anyString(), anyString());
 
         listener.onBizAction(scoreEarned("PROPOSAL_REWARD", "1.9", "P-3"));
 
         ArgumentCaptor<Long> base = ArgumentCaptor.forClass(Long.class);
         verify(memberGrowthService).accrue(eq(MEMBER_ID), base.capture(),
-                anyString(), anyString(), eq("P-3"), anyString());
+                anyString(), any(), eq("P-3"), anyString());
         assertEquals(1L, base.getValue(), "1.9 应当向下取整成 1");
     }
 

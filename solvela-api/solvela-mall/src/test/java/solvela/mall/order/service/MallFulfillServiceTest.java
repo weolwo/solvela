@@ -20,6 +20,7 @@ import solvela.member.api.AssetGrantReason;
 import solvela.member.api.AssetGrantResult;
 import solvela.notification.service.NotificationService;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetSourceEnum;
 
 import java.math.BigDecimal;
 
@@ -103,7 +104,7 @@ class MallFulfillServiceTest {
         AssetGrantCmd cmd = captor.getValue();
         assertAll(
                 () -> assertEquals(PrizeTypeEnum.PHYSICAL, cmd.assetType()),
-                () -> assertEquals("MALL", cmd.sourceType()),
+                () -> assertEquals(AssetSourceEnum.MALL, cmd.sourceType()),
                 // 来源单号就是订单号，运营在发货台上按它找回这一单
                 () -> assertEquals(ORDER_NO, cmd.bizRefId()),
                 () -> assertEquals("张三", cmd.receiverName()),

@@ -2,6 +2,7 @@ package solvela.ledger;
 
 import solvela.enums.TransactionTypeEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -70,7 +71,7 @@ public class MemberAssetTransaction {
     /**
      * 业务类型：TASK_PRIZE, CONSUME, MANUAL_ADJUST
      */
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     /**
      * 关联外部业务ID(如 prize_code)

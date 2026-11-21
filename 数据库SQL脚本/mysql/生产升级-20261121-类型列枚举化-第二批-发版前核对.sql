@@ -42,4 +42,26 @@ WHERE BINARY commodity_type NOT IN ('SCORE', 'BALANCE', 'COUPON', 'PHYSICAL', 'M
 UNION ALL
 -- MallOrderSourceEnum
 SELECT 't_mall_order.source_type', source_type, COUNT(*) FROM t_mall_order
-WHERE source_type IS NOT NULL AND BINARY source_type NOT IN ('NORMAL', 'FLASH_SALE') GROUP BY source_type;
+WHERE source_type IS NOT NULL AND BINARY source_type NOT IN ('NORMAL', 'FLASH_SALE') GROUP BY source_type
+UNION ALL
+-- AssetSourceEnum（含只为读老数据的 REISSUE / DRAW / TASK / MANUAL_SEND）
+SELECT 't_member_coupon.source_type', source_type, COUNT(*) FROM t_member_coupon
+WHERE BINARY source_type NOT IN ('PROPOSAL', 'MALL', 'GRADE_ENTITLEMENT', 'MANUAL', 'REISSUE', 'DRAW', 'TASK', 'MANUAL_SEND') GROUP BY source_type
+UNION ALL
+SELECT 't_physical_delivery.source_type', source_type, COUNT(*) FROM t_physical_delivery
+WHERE BINARY source_type NOT IN ('PROPOSAL', 'MALL', 'GRADE_ENTITLEMENT', 'MANUAL', 'REISSUE', 'DRAW', 'TASK', 'MANUAL_SEND') GROUP BY source_type
+UNION ALL
+-- CouponTypeEnum
+SELECT 't_member_coupon.coupon_type', coupon_type, COUNT(*) FROM t_member_coupon
+WHERE BINARY coupon_type NOT IN ('GENERAL') GROUP BY coupon_type
+UNION ALL
+-- CouponWriteOffBizEnum
+SELECT 't_coupon_write_off.biz_type', biz_type, COUNT(*) FROM t_coupon_write_off
+WHERE BINARY biz_type NOT IN ('MALL', 'EXTERNAL', 'BOUNCE') GROUP BY biz_type
+UNION ALL
+-- AssetBizTypeEnum（含只为读老数据的 TASK_PRIZE / CONSUME / MANUAL_ADJUST）
+SELECT 't_member_asset_transaction.biz_type', biz_type, COUNT(*) FROM t_member_asset_transaction
+WHERE BINARY biz_type NOT IN ('PROPOSAL_REWARD', 'MALL_EXCHANGE', 'GRADE_ENTITLEMENT', 'TASK_PRIZE', 'CONSUME', 'MANUAL_ADJUST') GROUP BY biz_type
+UNION ALL
+SELECT 't_member_growth_log.biz_type', biz_type, COUNT(*) FROM t_member_growth_log
+WHERE biz_type IS NOT NULL AND BINARY biz_type NOT IN ('PROPOSAL_REWARD', 'MALL_EXCHANGE', 'GRADE_ENTITLEMENT', 'TASK_PRIZE', 'CONSUME', 'MANUAL_ADJUST') GROUP BY biz_type;

@@ -5,6 +5,8 @@ import solvela.enums.CouponDeductTargetEnum;
 import solvela.enums.CouponDiscountTypeEnum;
 import solvela.enums.CouponScopeTypeEnum;
 import solvela.enums.CouponStatusEnum;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.CouponTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -42,7 +44,7 @@ public class MemberCouponDTO {
     /**
      * 券类型
      */
-    private String couponType;
+    private CouponTypeEnum couponType;
 
     /**
      * 券名称
@@ -57,7 +59,7 @@ public class MemberCouponDTO {
     /**
      * 来源：DRAW, TASK, MANUAL_SEND
      */
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /**
      * 关联单号

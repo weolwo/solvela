@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.AssetSourceEnum;
 
 import java.time.LocalDate;
 
@@ -35,7 +36,7 @@ public class PhysicalDeliveryQueryForm extends PageParam {
     private String sourceBizId;
 
     @Schema(description = "来源类型：PROPOSAL / MALL")
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     @Schema(description = "物流单号")
     private String logisticsNo;

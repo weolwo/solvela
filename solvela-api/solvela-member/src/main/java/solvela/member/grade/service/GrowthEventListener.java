@@ -10,6 +10,7 @@ import solvela.event.BizActionEvent;
 import solvela.member.grade.GrowthProperties;
 import solvela.observe.DegradePoint;
 import solvela.base.observe.Degradations;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -69,7 +70,7 @@ public class GrowthEventListener {
                 // 其它动作今天不产生成长值。将来加来源就是在这里多一个分支
                 return;
             }
-            String bizType = asString(event.payload().get("bizType"));
+            AssetBizTypeEnum bizType = parseBizType(asString(event.payload().get("bizType")));
             if (!countable(bizType)) {
                 /*
                  * 最典型的就是【退回】：用户取消订单，积分退回钱包。
@@ -109,8 +110,20 @@ public class GrowthEventListener {
     }
 
     /** 这个来源算不算成长值。白名单 —— 新来源默认不算，那是安全的一边 */
-    private boolean countable(String bizType) {
+    private boolean countable(AssetBizTypeEnum bizType) {
         return bizType != null && growthProperties.getCountableBizTypes().contains(bizType);
+    }
+
+    /** 负载里是枚举名（ScoreIncomeActionPublisher 写的）。认不出就当「不算」—— 与白名单同一个安全方向 */
+    private static AssetBizTypeEnum parseBizType(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return AssetBizTypeEnum.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**

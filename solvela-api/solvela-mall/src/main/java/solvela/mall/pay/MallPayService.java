@@ -17,6 +17,7 @@ import solvela.marketing.api.MallPayResult;
 import solvela.member.api.CouponWriteOffApi;
 import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
+import solvela.enums.CouponWriteOffBizEnum;
 
 /**
  * 「支付」一笔待支付的商城订单。
@@ -47,7 +48,7 @@ import solvela.member.api.CouponWriteOffView;
 public class MallPayService {
 
     /** 券核销流水里的业务类型。与 MallRedeemService / MallOrderCancelService 一致 */
-    private static final String BIZ_TYPE_COUPON = "MALL";
+    private static final CouponWriteOffBizEnum BIZ_TYPE_COUPON = CouponWriteOffBizEnum.MALL;
 
     private final MallOrderDao mallOrderDao;
     private final MallSkuDao mallSkuDao;

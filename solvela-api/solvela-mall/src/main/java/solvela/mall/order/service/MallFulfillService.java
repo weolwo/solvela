@@ -18,6 +18,8 @@ import solvela.member.api.AssetGrantCmd;
 import solvela.member.api.AssetGrantReason;
 import solvela.member.api.AssetGrantResult;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 履约：把用户兑到的东西真正发出去。
@@ -55,9 +57,9 @@ import solvela.enums.PrizeTypeEnum;
 public class MallFulfillService {
 
     /** 履约单上的来源类型。运营的发货台按它区分「中奖寄出」和「商城兑换」 */
-    private static final String SOURCE_TYPE_MALL = "MALL";
+    private static final AssetSourceEnum SOURCE_TYPE_MALL = AssetSourceEnum.MALL;
 
-    private static final String BIZ_TYPE = "MALL_EXCHANGE";
+    private static final AssetBizTypeEnum BIZ_TYPE = AssetBizTypeEnum.MALL_EXCHANGE;
 
     /** {@code fail_reason} 是 varchar(255)，超了 MySQL 严格模式会整条拒绝 */
     private static final int FAIL_REASON_MAX = 255;

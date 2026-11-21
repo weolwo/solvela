@@ -17,6 +17,7 @@ import solvela.ledger.coupon.writeoff.domain.CouponTrialItem;
 import solvela.ledger.coupon.writeoff.domain.CouponTrialResult;
 import solvela.ledger.coupon.writeoff.domain.CouponUnusableReason;
 import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -220,7 +221,7 @@ public class CouponWriteOffService {
      * @param bizRefId 单据号。它同时是<b>幂等依据</b>：同一笔单重复锁定，
      *                 看到已经是自己锁的就直接放行
      */
-    public CouponWriteOffResult lock(Long couponId, Long memberId, String bizType, String bizRefId,
+    public CouponWriteOffResult lock(Long couponId, Long memberId, CouponWriteOffBizEnum bizType, String bizRefId,
                                      String sceneCode, BigDecimal payAmount, BigDecimal discountAmount) {
         LocalDateTime now = LocalDateTime.now();
         int rows = memberCouponDao.lockCoupon(couponId, memberId, bizRefId, discountAmount, now);
@@ -256,7 +257,7 @@ public class CouponWriteOffService {
      * {@code CouponStuckLockReleaseJob}）—— 也就是说这一单实际上没有用券。
      * 当没看见的话，订单按打折后的金额结算，而券还躺在用户的券包里可以再用一次。
      */
-    public CouponWriteOffResult confirm(Long couponId, String bizType, String bizRefId) {
+    public CouponWriteOffResult confirm(Long couponId, CouponWriteOffBizEnum bizType, String bizRefId) {
         LocalDateTime now = LocalDateTime.now();
         int rows = memberCouponDao.confirmCoupon(couponId, bizRefId, now);
         if (rows > 0) {
@@ -288,7 +289,7 @@ public class CouponWriteOffService {
      *
      * <p>幂等：已经放回去了就直接返回成功 —— 两条取消路径同时跑到是常态。
      */
-    public CouponWriteOffResult release(Long couponId, String bizType, String bizRefId, String remark) {
+    public CouponWriteOffResult release(Long couponId, CouponWriteOffBizEnum bizType, String bizRefId, String remark) {
         // 先把金额抄下来：释放会把券行上的 discount_amount 清掉
         MemberCoupon before = memberCouponDao.selectById(couponId);
         BigDecimal locked = before == null ? null : before.getDiscountAmount();
@@ -323,7 +324,7 @@ public class CouponWriteOffService {
      * <p>这一点和通知发送刻意相反：通知失败不该拖垮业务，流水失败必须。
      */
     private void writeFlow(MemberCoupon coupon, CouponWriteOffActionEnum action,
-                           String bizType, String bizRefId, String sceneCode,
+                           CouponWriteOffBizEnum bizType, String bizRefId, String sceneCode,
                            BigDecimal originalAmount, BigDecimal discountAmount, String remark) {
         CouponWriteOff flow = new CouponWriteOff();
         flow.setCouponId(coupon.getId());

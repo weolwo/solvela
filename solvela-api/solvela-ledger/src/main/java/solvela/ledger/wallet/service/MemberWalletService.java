@@ -28,6 +28,7 @@ import solvela.ledger.wallet.domain.query.MemberWalletQuery;
 import solvela.ledger.wallet.domain.dto.MemberWalletStatDTO;
 import solvela.member.service.MemberService;
 import solvela.risk.ProposalRecord;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -198,7 +199,7 @@ public class MemberWalletService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void executeWalletDeduct(Long memberId, PrizeTypeEnum assetType, BigDecimal amount,
-                                    String bizType, String bizRefId, String remark) {
+                                    AssetBizTypeEnum bizType, String bizRefId, String remark) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
@@ -236,7 +237,7 @@ public class MemberWalletService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void executeWalletRefund(Long memberId, PrizeTypeEnum assetType, BigDecimal amount,
-                                    String bizType, String bizRefId, String remark) {
+                                    AssetBizTypeEnum bizType, String bizRefId, String remark) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(BizErrorCode.AMOUNT_MUST_BE_GREATER_THAN_ZERO);
         }
@@ -286,7 +287,7 @@ public class MemberWalletService {
         txn.setTransactionType(TransactionTypeEnum.INCOME);
         txn.setChangeAmount(amount);
         txn.setBalanceAfter(balanceAfter); // 留下不可磨灭的财务对账证据
-        txn.setBizType("PROPOSAL_REWARD"); // 业务来源分类
+        txn.setBizType(AssetBizTypeEnum.PROPOSAL_REWARD); // 业务来源分类
         txn.setBizRefId(proposal.getId().toString()); // 极度关键：溯源单号
         txn.setRemark(proposal.getRemark() != null ? proposal.getRemark() : "营销活动余额派发");
         return txn;

@@ -14,6 +14,7 @@ import solvela.ledger.transaction.domain.dto.MemberAssetTransactionDTO;
 import solvela.ledger.transaction.domain.query.MemberAssetTransactionQuery;
 import solvela.ledger.transaction.domain.dto.MemberAssetTransactionStatDTO;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -86,7 +87,7 @@ public class MemberAssetTransactionService {
             long count = stat.count("txCount");
 
             MemberAssetTransactionStatDTO.BizTypeStatDTO item = new MemberAssetTransactionStatDTO.BizTypeStatDTO();
-            item.setBizType(stat.text("bizType"));
+            item.setBizType(stat.enumValue("bizType", AssetBizTypeEnum.class));
             item.setTxCount(count);
             item.setMemberCount(stat.count("memberCount"));
             item.setTxShare(Rate.share(count, txTotal));

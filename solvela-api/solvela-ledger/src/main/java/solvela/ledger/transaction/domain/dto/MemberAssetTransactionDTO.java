@@ -2,6 +2,7 @@ package solvela.ledger.transaction.domain.dto;
 
 import solvela.enums.TransactionTypeEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -55,7 +56,7 @@ public class MemberAssetTransactionDTO {
     /**
      * 业务类型：TASK_PRIZE, CONSUME, MANUAL_ADJUST
      */
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     /**
      * 关联外部业务ID(如 prize_code)

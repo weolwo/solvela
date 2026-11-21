@@ -19,6 +19,9 @@ import solvela.ledger.coupon.writeoff.domain.CouponTrialCmd;
 import solvela.ledger.coupon.writeoff.domain.CouponTrialItem;
 import solvela.ledger.coupon.writeoff.domain.CouponTrialResult;
 import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.CouponTypeEnum;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -73,7 +76,7 @@ class CouponWriteOffLiveTest {
         MemberCoupon coupon = insertCoupon();
 
         CouponWriteOffResult locked = couponWriteOffService.lock(
-                coupon.getId(), TEST_MEMBER_ID, "MALL", ORDER_A, null,
+                coupon.getId(), TEST_MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_A, null,
                 new BigDecimal("150.00"), new BigDecimal("20.00"));
         assertTrue(locked.ok());
 
@@ -84,7 +87,7 @@ class CouponWriteOffLiveTest {
                 () -> assertNotNull(afterLock.getLockedTime()),
                 () -> assertEquals(0, new BigDecimal("20.00").compareTo(afterLock.getDiscountAmount())));
 
-        CouponWriteOffResult confirmed = couponWriteOffService.confirm(coupon.getId(), "MALL", ORDER_A);
+        CouponWriteOffResult confirmed = couponWriteOffService.confirm(coupon.getId(), CouponWriteOffBizEnum.MALL, ORDER_A);
         assertTrue(confirmed.ok());
 
         MemberCoupon afterConfirm = memberCouponDao.selectById(coupon.getId());
@@ -105,7 +108,7 @@ class CouponWriteOffLiveTest {
                 () -> assertEquals(0, new BigDecimal("20.00").compareTo(flows.get(0).getDiscountAmount())));
 
         // 对账入口：按单号反查这一单用了哪张券、减了多少
-        assertEquals(2, couponWriteOffDao.selectByBiz("MALL", ORDER_A).size());
+        assertEquals(2, couponWriteOffDao.selectByBiz(CouponWriteOffBizEnum.MALL, ORDER_A).size());
     }
 
     @Test
@@ -113,10 +116,10 @@ class CouponWriteOffLiveTest {
     void 锁定后释放还能再用() {
         MemberCoupon coupon = insertCoupon();
 
-        couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, "MALL", ORDER_A, null,
+        couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_A, null,
                 new BigDecimal("150.00"), new BigDecimal("20.00"));
         CouponWriteOffResult released = couponWriteOffService.release(
-                coupon.getId(), "MALL", ORDER_A, "订单超时取消");
+                coupon.getId(), CouponWriteOffBizEnum.MALL, ORDER_A, "订单超时取消");
         assertTrue(released.ok());
 
         MemberCoupon afterRelease = memberCouponDao.selectById(coupon.getId());
@@ -127,7 +130,7 @@ class CouponWriteOffLiveTest {
                 () -> assertNull(afterRelease.getDiscountAmount()));
 
         // 这正是三阶段存在的意义：订单没成，券要回得来，而且回来之后还能用
-        assertTrue(couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, "MALL", ORDER_B, null,
+        assertTrue(couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_B, null,
                 new BigDecimal("200.00"), new BigDecimal("20.00")).ok());
 
         // 释放那一行必须带着金额：锁了又释放，这件事的金额痕迹不能丢
@@ -145,15 +148,15 @@ class CouponWriteOffLiveTest {
     void 同一张券不会被两单同时锁上() {
         MemberCoupon coupon = insertCoupon();
 
-        assertTrue(couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, "MALL", ORDER_A, null,
+        assertTrue(couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_A, null,
                 new BigDecimal("150.00"), new BigDecimal("20.00")).ok());
 
         CouponWriteOffResult second = couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID,
-                "MALL", ORDER_B, null, new BigDecimal("150.00"), new BigDecimal("20.00"));
+                CouponWriteOffBizEnum.MALL, ORDER_B, null, new BigDecimal("150.00"), new BigDecimal("20.00"));
         assertFalse(second.ok(), "同一张券被两单锁上，就是一张券被用了两次");
 
         // 而且 B 单也确认不了它 —— locked_biz_id 必须对上
-        assertFalse(couponWriteOffService.confirm(coupon.getId(), "MALL", ORDER_B).ok());
+        assertFalse(couponWriteOffService.confirm(coupon.getId(), CouponWriteOffBizEnum.MALL, ORDER_B).ok());
     }
 
     @Test
@@ -161,10 +164,10 @@ class CouponWriteOffLiveTest {
     void 同一笔单重复锁定是幂等的() {
         MemberCoupon coupon = insertCoupon();
 
-        couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, "MALL", ORDER_A, null,
+        couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID, CouponWriteOffBizEnum.MALL, ORDER_A, null,
                 new BigDecimal("150.00"), new BigDecimal("20.00"));
         CouponWriteOffResult again = couponWriteOffService.lock(coupon.getId(), TEST_MEMBER_ID,
-                "MALL", ORDER_A, null, new BigDecimal("150.00"), new BigDecimal("20.00"));
+                CouponWriteOffBizEnum.MALL, ORDER_A, null, new BigDecimal("150.00"), new BigDecimal("20.00"));
 
         assertAll(
                 () -> assertTrue(again.ok()),
@@ -206,10 +209,10 @@ class CouponWriteOffLiveTest {
         coupon.setMemberId(TEST_MEMBER_ID);
         coupon.setMemberName("zz-test");
         coupon.setCouponCode("ZZTESTCOUPON");
-        coupon.setCouponType("GENERAL");
+        coupon.setCouponType(CouponTypeEnum.GENERAL);
         coupon.setCouponName("单元测试用券");
         coupon.setStatus(CouponStatusEnum.UNUSED);
-        coupon.setSourceType("TEST");
+        coupon.setSourceType(AssetSourceEnum.MANUAL);
         /*
          * 🔴 每张券一个不同的 source_biz_id。
          *

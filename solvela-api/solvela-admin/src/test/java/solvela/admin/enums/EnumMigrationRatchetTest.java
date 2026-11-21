@@ -229,7 +229,10 @@ class EnumMigrationRatchetTest {
             // 脚本返回值的 Java 类型名（ScriptEngineController 里取 getSimpleName()），不是枚举值
             "scriptengine/Script.java#returnType",
             // NONE 或 payload 里的字段名（计额时按哪个字段累加），字段名由运营配置
-            "task/TaskEvent.java#metricSource");
+            "task/TaskEvent.java#metricSource",
+            // 业务动作编码（BizActionCodes，如 SCORE_EARNED）。项目刻意让动作编码是数据不是类：
+            // 加一个打点是后台加一行（见 BizActionEvent 类注释），所以这里是开放取值
+            "member/MemberGrowthLog.java#source");
 
     /**
      * 尚未枚举化的 String 类型列，<b>只许删，不许加</b>（2026-11-21 首次分拣 34 个；同日 PrizeTypeEnum 那一个字典的 8 列已迁走）。
@@ -242,15 +245,8 @@ class EnumMigrationRatchetTest {
      */
     private static final Set<String> STRING_TYPE_PENDING = Set.of(
             // 封闭集合，还没有枚举
-            "coupon/CouponWriteOff.java#bizType",
-            "ledger/MemberAssetTransaction.java#bizType",
-            "ledger/MemberCoupon.java#couponType",
-            "ledger/MemberCoupon.java#sourceType",
-            "ledger/PhysicalDelivery.java#sourceType",
             "member/GradeEntitlement.java#entitlementType",
             "member/MemberGradeLog.java#changeType",
-            "member/MemberGrowthLog.java#bizType",
-            "member/MemberGrowthLog.java#source",
             "member/Member.java#registerSource",
             // 客户端上报，见上面的 ⚠️
             "member/Device.java#deviceType",

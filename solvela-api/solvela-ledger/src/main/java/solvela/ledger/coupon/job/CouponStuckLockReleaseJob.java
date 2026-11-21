@@ -12,6 +12,7 @@ import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.ledger.coupon.writeoff.CouponWriteOffService;
 import solvela.ledger.coupon.writeoff.domain.CouponWriteOffResult;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -84,7 +85,7 @@ public class CouponStuckLockReleaseJob implements SolvelaJob {
     /** 单批条数。释放是一张一张做的（每张要写一行流水），批小一点，跑不完下次接着来 */
     private static final int BATCH_SIZE = 200;
 
-    private static final String BIZ_TYPE_BOUNCE = "BOUNCE";
+    private static final CouponWriteOffBizEnum BIZ_TYPE_BOUNCE = CouponWriteOffBizEnum.BOUNCE;
 
     private final MemberCouponDao memberCouponDao;
     private final CouponWriteOffService couponWriteOffService;

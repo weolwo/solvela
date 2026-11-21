@@ -1,5 +1,6 @@
 package solvela.ledger.coupon.issue;
 
+import solvela.enums.AssetSourceEnum;
 /**
  * 发一张券要知道的全部信息。
  *
@@ -23,7 +24,7 @@ package solvela.ledger.coupon.issue;
 public record CouponIssueCmd(String couponCode,
                              Long memberId,
                              String memberName,
-                             String sourceType,
+                             AssetSourceEnum sourceType,
                              String sourceBizId,
                              String fallbackName) {
 }

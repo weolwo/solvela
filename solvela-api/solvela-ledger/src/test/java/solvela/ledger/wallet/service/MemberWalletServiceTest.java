@@ -21,6 +21,7 @@ import solvela.ledger.transaction.service.MemberAssetTransactionService;
 import solvela.ledger.wallet.dao.MemberWalletDao;
 import solvela.member.service.MemberService;
 import solvela.risk.ProposalRecord;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.math.BigDecimal;
 
@@ -106,9 +107,9 @@ class MemberWalletServiceTest {
     @DisplayName("扣减：金额非正一律拒绝")
     void 扣减金额必须为正() {
         assertThrows(BusinessException.class,
-                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, BigDecimal.ZERO, "DRAW", "1", null));
+                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, BigDecimal.ZERO, AssetBizTypeEnum.MALL_EXCHANGE, "1", null));
         assertThrows(BusinessException.class,
-                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, new BigDecimal("-1"), "DRAW", "1", null));
+                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, new BigDecimal("-1"), AssetBizTypeEnum.MALL_EXCHANGE, "1", null));
 
         verify(memberWalletDao, never()).deductBalanceWithVersion(anyLong(), any(), anyInt());
     }
@@ -119,7 +120,7 @@ class MemberWalletServiceTest {
         wallet.setBalance(new BigDecimal("99"));
 
         assertThrows(BusinessException.class,
-                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "DRAW", "1", null));
+                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "1", null));
 
         verify(memberWalletDao, never()).deductBalanceWithVersion(anyLong(), any(), anyInt());
         verify(memberAssetTransactionDao, never()).insert(any(MemberAssetTransaction.class));
@@ -131,7 +132,7 @@ class MemberWalletServiceTest {
         wallet.setStatus(WalletStatusEnum.FROZEN);
 
         assertThrows(BusinessException.class,
-                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "DRAW", "1", null));
+                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "1", null));
 
         verify(memberWalletDao, never()).deductBalanceWithVersion(anyLong(), any(), anyInt());
     }
@@ -142,7 +143,7 @@ class MemberWalletServiceTest {
         when(memberWalletDao.deductBalanceWithVersion(eq(WALLET_ID), eq(AMOUNT), eq(3))).thenReturn(0);
 
         assertThrows(BusinessException.class,
-                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "DRAW", "1", null));
+                () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "1", null));
 
         // 钱没扣成却落一条流水，就是账实不符 —— 而且事后没有任何办法分辨
         verify(memberAssetTransactionDao, never()).insert(any(MemberAssetTransaction.class));
@@ -153,7 +154,7 @@ class MemberWalletServiceTest {
     void 扣减成功落流水() {
         when(memberWalletDao.deductBalanceWithVersion(eq(WALLET_ID), eq(AMOUNT), eq(3))).thenReturn(1);
 
-        service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "DRAW_TICKET", "REF-9", "抽奖门票");
+        service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "REF-9", "抽奖门票");
 
         MemberAssetTransaction txn = capturedTransaction();
         assertEquals(TransactionTypeEnum.EXPENSE, txn.getTransactionType());
@@ -161,7 +162,7 @@ class MemberWalletServiceTest {
         assertEquals(0, AMOUNT.compareTo(txn.getChangeAmount()), "变动金额必须是正的绝对值");
         assertEquals(0, new BigDecimal("400").compareTo(txn.getBalanceAfter()), "变动后余额 = 扣之前 - 变动额");
         assertEquals("sv900001", txn.getMemberName(), "流水是单据，要留下当时那个账号");
-        assertEquals("DRAW_TICKET", txn.getBizType());
+        assertEquals(AssetBizTypeEnum.MALL_EXCHANGE, txn.getBizType());
         assertEquals("REF-9", txn.getBizRefId(), "溯源单号不能丢，对账靠它");
     }
 
@@ -226,7 +227,7 @@ class MemberWalletServiceTest {
     @DisplayName("退还：走的是入账方向，金额同样必须为正")
     void 退还金额必须为正() {
         assertThrows(BusinessException.class,
-                () -> service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, BigDecimal.ZERO, "DRAW", "1", null));
+                () -> service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, BigDecimal.ZERO, AssetBizTypeEnum.MALL_EXCHANGE, "1", null));
 
         verify(memberWalletDao, never()).addBalanceWithVersion(anyLong(), any(), anyInt());
     }
@@ -236,7 +237,7 @@ class MemberWalletServiceTest {
     void 退还成功落流水() {
         when(memberWalletDao.addBalanceWithVersion(eq(WALLET_ID), eq(AMOUNT), eq(3))).thenReturn(1);
 
-        service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "DRAW_REFUND", "REF-9", "无货退门票");
+        service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "REF-9", "无货退门票");
 
         MemberAssetTransaction txn = capturedTransaction();
         assertEquals(TransactionTypeEnum.INCOME, txn.getTransactionType());
@@ -258,7 +259,7 @@ class MemberWalletServiceTest {
          * 这正是 ORDER_PAID 漏掉纯积分单的同一个形状。
          */
         service.executeWalletCharge(proposalOf(AMOUNT), PrizeTypeEnum.SCORE);
-        service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "MALL", "REF-1", "商城发积分");
+        service.executeWalletRefund(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "REF-1", "商城发积分");
 
         verify(scoreIncomeActionPublisher, times(2))
                 .publishIfScoreIncome(any(MemberAssetTransaction.class));
@@ -269,7 +270,7 @@ class MemberWalletServiceTest {
     void 扣减不打点() {
         when(memberWalletDao.deductBalanceWithVersion(eq(WALLET_ID), eq(AMOUNT), eq(3))).thenReturn(1);
 
-        service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, "MALL", "ORD-1", "商城兑换");
+        service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "ORD-1", "商城兑换");
 
         verify(scoreIncomeActionPublisher, never())
                 .publishIfScoreIncome(any(MemberAssetTransaction.class));

@@ -13,6 +13,7 @@ import solvela.enums.CouponScopeTypeEnum;
 import solvela.enums.CouponStatusEnum;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
+import solvela.enums.AssetSourceEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -176,7 +177,7 @@ class CouponIssueServiceTest {
     }
 
     private static CouponIssueCmd cmd(String fallbackName) {
-        return new CouponIssueCmd(CODE, 1001L, "tester", "MALL", "M2026:1", fallbackName);
+        return new CouponIssueCmd(CODE, 1001L, "tester", AssetSourceEnum.MALL, "M2026:1", fallbackName);
     }
 
     private static CouponTemplate percentTemplate() {

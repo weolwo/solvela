@@ -1,6 +1,7 @@
 package solvela.ledger.logistic.domain.dto;
 
 import solvela.enums.DeliveryStatusEnum;
+import solvela.enums.AssetSourceEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -43,7 +44,7 @@ public class PhysicalDeliveryDTO {
     /**
      * 来源类型：PROPOSAL / MALL
      */
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /*
      * 收件三项库里是密文，这里是<b>解密后的明文</b>（resultMap 上挂了 PiiTypeHandler）。

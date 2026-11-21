@@ -95,7 +95,7 @@ public class MemberGradeAdminService {
         LambdaQueryWrapper<MemberGrowthLog> wrapper = new LambdaQueryWrapper<MemberGrowthLog>()
                 .eq(MemberGrowthLog::getMemberId, query.getMemberId())
                 .eq(StringUtils.isNotBlank(query.getSource()), MemberGrowthLog::getSource, query.getSource())
-                .eq(StringUtils.isNotBlank(query.getBizType()), MemberGrowthLog::getBizType, query.getBizType())
+                .eq(query.getBizType() != null, MemberGrowthLog::getBizType, query.getBizType())
                 .eq(StringUtils.isNotBlank(query.getPeriodTag()), MemberGrowthLog::getPeriodTag, query.getPeriodTag())
                 .ge(query.getCreateTimeBegin() != null, MemberGrowthLog::getCreateTime,
                         query.getCreateTimeBegin() == null ? null : query.getCreateTimeBegin().atStartOfDay())

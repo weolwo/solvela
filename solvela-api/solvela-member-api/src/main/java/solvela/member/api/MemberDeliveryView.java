@@ -1,6 +1,7 @@
 package solvela.member.api;
 
 import java.time.LocalDateTime;
+import solvela.enums.AssetSourceEnum;
 
 /**
  * 一张实物履约单，给<b>本人</b>看的形状。
@@ -34,7 +35,7 @@ import java.time.LocalDateTime;
 public record MemberDeliveryView(
         Long deliveryId,
         String prizeName,
-        String sourceType,
+        AssetSourceEnum sourceType,
         String sourceBizId,
         Integer status,
         String statusText,

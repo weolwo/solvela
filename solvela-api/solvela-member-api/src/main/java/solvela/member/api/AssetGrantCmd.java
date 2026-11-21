@@ -2,6 +2,8 @@ package solvela.member.api;
 
 import java.math.BigDecimal;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.AssetBizTypeEnum;
 
 /**
  * 发放指令。
@@ -35,9 +37,9 @@ public record AssetGrantCmd(
         String assetName,
         Integer quantity,
         BigDecimal amount,
-        String sourceType,
+        AssetSourceEnum sourceType,
         String bizRefId,
-        String bizType,
+        AssetBizTypeEnum bizType,
         /* 🔴 明文。只在服务端内部流转，不要写进面向用户的日志 */
         String receiverName,
         String receiverPhone,

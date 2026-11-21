@@ -18,6 +18,7 @@ import solvela.member.grade.dao.MemberGrowthLogDao;
 import solvela.member.grade.service.MemberGradeChangeService;
 import solvela.member.grade.service.MemberGradeResolver;
 import solvela.member.grade.service.MemberGrowthService;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -96,7 +97,7 @@ class MemberGrowthProtectBoostTest {
     void 常态不加速() {
         givenMember(null);
 
-        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-1", "发奖");
+        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-1", "发奖");
 
         MemberGrowthLog row = capturedLog();
         assertEquals(1, row.getMultiplier());
@@ -109,7 +110,7 @@ class MemberGrowthProtectBoostTest {
     void 缓冲期加速() {
         givenMember(NOW.plusDays(30));
 
-        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-2", "发奖");
+        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-2", "发奖");
 
         MemberGrowthLog row = capturedLog();
         assertEquals(2, row.getMultiplier());
@@ -124,7 +125,7 @@ class MemberGrowthProtectBoostTest {
     void 缓冲期已过不加速() {
         givenMember(NOW.minusDays(1));
 
-        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-3", "发奖");
+        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-3", "发奖");
 
         assertEquals(1, capturedLog().getMultiplier());
     }
@@ -134,7 +135,7 @@ class MemberGrowthProtectBoostTest {
     void 缓冲期的流水归当前周期() {
         givenMember(NOW.plusDays(30));
 
-        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-4", "发奖");
+        service.accrue(MEMBER_ID, 500L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-4", "发奖");
 
         // tag 到上上个周期的话，那期早已结算完，对账会出现「流水找不到对应快照」
         assertEquals("20260918", capturedLog().getPeriodTag());
@@ -145,7 +146,7 @@ class MemberGrowthProtectBoostTest {
     void 倍率不封顶() {
         givenMember(NOW.plusDays(30));
 
-        service.accrue(MEMBER_ID, 50_000L, BizActionCodes.SCORE_EARNED, "PROPOSAL_REWARD", "P-5", "发奖");
+        service.accrue(MEMBER_ID, 50_000L, BizActionCodes.SCORE_EARNED, AssetBizTypeEnum.PROPOSAL_REWARD, "P-5", "发奖");
 
         assertEquals(100_000L, capturedLog().getDelta());
         verify(memberGrowthDao).addValue(MEMBER_ID, 100_000L);

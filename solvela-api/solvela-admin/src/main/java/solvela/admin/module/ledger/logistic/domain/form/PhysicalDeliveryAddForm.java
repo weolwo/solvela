@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import solvela.enums.AssetSourceEnum;
 
 /**
  * 发货物流表 新建表单
@@ -36,7 +37,7 @@ public class PhysicalDeliveryAddForm {
 
     @Schema(description = "来源类型：PROPOSAL / MALL", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "来源类型 不能为空")
-    private String sourceType;
+    private AssetSourceEnum sourceType;
 
     /*
      * 🔴 下面三处 @Size 不是 UI 层面的挑剔，是<b>密文列宽的硬约束</b>。

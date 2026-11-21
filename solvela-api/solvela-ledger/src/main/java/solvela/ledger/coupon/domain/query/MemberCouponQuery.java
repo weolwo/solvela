@@ -2,6 +2,7 @@ package solvela.ledger.coupon.domain.query;
 
 import solvela.enums.CouponStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.CouponTypeEnum;
 
 import java.time.LocalDate;
 
@@ -53,7 +54,7 @@ public class MemberCouponQuery extends PageParam {
     /**
      * 券类型
      */
-    private String couponType;
+    private CouponTypeEnum couponType;
 
     /**
      * 状态：0-未使用, 1-已使用, 2-已过期, 3-已作废

@@ -28,6 +28,7 @@ import solvela.member.api.CouponWriteOffView;
 import solvela.member.service.MemberService;
 import solvela.notification.domain.NotifyRequest;
 import solvela.notification.service.NotificationService;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -75,7 +76,7 @@ public class ExternalRechargeService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     /** 券核销流水里的业务类型。和商城的 {@code MALL} 分开 —— 对账时要分得出两条业务线 */
-    private static final String BIZ_TYPE_COUPON = "EXTERNAL";
+    private static final CouponWriteOffBizEnum BIZ_TYPE_COUPON = CouponWriteOffBizEnum.EXTERNAL;
 
     /** 手机号：11 位数字。校验只做形状，不做归属地那种会过期的判断 */
     private static final String PHONE_PATTERN = "^1\\d{10}$";

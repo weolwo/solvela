@@ -2,6 +2,7 @@ package solvela.admin.module.ledger.transaction.domain.vo;
 
 import solvela.enums.TransactionTypeEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.AssetBizTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -47,7 +48,7 @@ public class MemberAssetTransactionVO {
     private BigDecimal balanceAfter;
 
     @Schema(description = "业务类型：TASK_PRIZE, CONSUME, MANUAL_ADJUST")
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     @Schema(description = "关联外部业务ID(如 prize_code)")
     private String bizRefId;

@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import solvela.enums.CouponStatusEnum;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.dao.MemberCouponDao;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.CouponTypeEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -86,9 +88,9 @@ class CouponSourceIdempotencyLiveTest {
     @DisplayName("🔴 同一个提案重复发券 → 也被挡住。这一条 2026-09-15 之前是【红的反面】")
     void 发奖来源重复也会被挡住() {
         MemberCoupon first = manualCoupon("ZZTEST-PROPOSAL-1");
-        first.setSourceType("PROPOSAL");
+        first.setSourceType(AssetSourceEnum.PROPOSAL);
         MemberCoupon second = manualCoupon("ZZTEST-PROPOSAL-1");
-        second.setSourceType("PROPOSAL");
+        second.setSourceType(AssetSourceEnum.PROPOSAL);
 
         memberCouponDao.insert(first);
 
@@ -108,9 +110,9 @@ class CouponSourceIdempotencyLiveTest {
     @DisplayName("不同来源类型用同一个单号不冲突 —— 唯一键是 (source_type, source_biz_id) 两列")
     void 不同来源类型不互相干扰() {
         MemberCoupon proposal = manualCoupon("ZZTEST-SAME-ID");
-        proposal.setSourceType("PROPOSAL");
+        proposal.setSourceType(AssetSourceEnum.PROPOSAL);
         MemberCoupon reissue = manualCoupon("ZZTEST-SAME-ID");
-        reissue.setSourceType("REISSUE");
+        reissue.setSourceType(AssetSourceEnum.REISSUE);
 
         // 提案 id 和旧券 id 是两套独立的号，撞上纯属巧合，不该互相挡
         assertAll(
@@ -124,10 +126,10 @@ class CouponSourceIdempotencyLiveTest {
         coupon.setMemberId(TEST_MEMBER_ID);
         coupon.setMemberName("zz-test");
         coupon.setCouponCode("ZZTESTCOUPON");
-        coupon.setCouponType("GENERAL");
+        coupon.setCouponType(CouponTypeEnum.GENERAL);
         coupon.setCouponName("单元测试用券");
         coupon.setStatus(CouponStatusEnum.UNUSED);
-        coupon.setSourceType("MANUAL");
+        coupon.setSourceType(AssetSourceEnum.MANUAL);
         coupon.setSourceBizId(sourceBizId);
         coupon.setValidStartTime(LocalDateTime.now());
         coupon.setValidEndTime(LocalDateTime.now().plusDays(30));

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import solvela.base.domain.PageParam;
+import solvela.enums.AssetBizTypeEnum;
 
 import java.time.LocalDate;
 
@@ -30,7 +31,7 @@ public class MemberGrowthLogQueryForm extends PageParam {
     private String source;
 
     @Schema(description = "上游业务类型：PROPOSAL_REWARD 等")
-    private String bizType;
+    private AssetBizTypeEnum bizType;
 
     @Schema(description = "计入周期（period_start 的 yyyyMMdd）")
     private String periodTag;

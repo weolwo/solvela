@@ -18,6 +18,8 @@ import solvela.ledger.coupon.template.dao.CouponTemplateDao;
 import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
+import solvela.enums.AssetSourceEnum;
+import solvela.enums.CouponWriteOffBizEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -178,7 +180,7 @@ class CouponTemplateLiveTest {
     @DisplayName("核销流水的查询 SQL 跑得通")
     void 核销流水查询可用() {
         assertTrue(couponWriteOffDao.selectByCoupon(-1L).isEmpty());
-        assertTrue(couponWriteOffDao.selectByBiz("MALL_ORDER", "NOT_EXIST").isEmpty());
+        assertTrue(couponWriteOffDao.selectByBiz(CouponWriteOffBizEnum.MALL, "NOT_EXIST").isEmpty());
     }
 
     @Test
@@ -211,7 +213,7 @@ class CouponTemplateLiveTest {
         couponTemplateService.save(fixedTemplate());
 
         MemberCoupon coupon = couponIssueService.newCoupon(new CouponIssueCmd(
-                TEST_CODE, 1001L, "tester", "PROPOSAL", "live-test", "活动侧的展示名"));
+                TEST_CODE, 1001L, "tester", AssetSourceEnum.PROPOSAL, "live-test", "活动侧的展示名"));
 
         assertAll(
                 // 模板名赢过活动侧展示名 —— 名字和规则必须是同一个人配的
@@ -237,7 +239,7 @@ class CouponTemplateLiveTest {
 
         for (CouponTemplate seed : seeds) {
             MemberCoupon coupon = couponIssueService.newCoupon(new CouponIssueCmd(
-                    seed.getCouponCode(), 1001L, "tester", "PROPOSAL", "live-test", null));
+                    seed.getCouponCode(), 1001L, "tester", AssetSourceEnum.PROPOSAL, "live-test", null));
             // 规则列非空 = 这个券编码真的匹配上了模板。为空说明发出去的券没有规则
             assertNotNull(coupon.getDiscountType(), seed.getCouponCode() + " 没有匹配到模板");
             assertNotNull(coupon.getDiscountValue(), seed.getCouponCode() + " 没有抵扣值");

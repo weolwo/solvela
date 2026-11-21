@@ -14,6 +14,7 @@ import solvela.ledger.coupon.domain.query.MemberCouponQuery;
 import solvela.ledger.coupon.template.dao.CouponWriteOffDao;
 import solvela.ledger.coupon.domain.dto.MemberCouponStatDTO;
 import solvela.ledger.stat.domain.query.LedgerStatQuery;
+import solvela.enums.AssetSourceEnum;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -144,7 +145,7 @@ public class MemberCouponService {
             long count = row.count("issuedCount");
 
             MemberCouponStatDTO.SourceStatDTO item = new MemberCouponStatDTO.SourceStatDTO();
-            item.setSourceType(row.text("sourceType"));
+            item.setSourceType(row.enumValue("sourceType", AssetSourceEnum.class));
             item.setIssuedCount(count);
             item.setIssuedShare(Rate.share(count, issuedTotal));
             sourceList.add(item);
