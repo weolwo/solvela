@@ -2,6 +2,7 @@ package solvela.stat.domain.dto;
 
 import solvela.enums.IssueStatusEnum;
 import solvela.enums.DrawResultEnum;
+import solvela.enums.ActivityTypeEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -20,7 +21,7 @@ import java.util.List;
 public class GameplayDTO {
 
     /** 活动类型 BASIC/DRAW/TASK/LOTTERY */
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     /** 抽奖状态分布（activityType=DRAW 时有值） */
     private List<DrawStatItem> drawStatList;

@@ -115,10 +115,10 @@ public class ActivityConfigService {
                 .list();
     }
 
-    public List<ActivityConfigDTO> queryOptionList(String activityType, Boolean includeInactive) {
+    public List<ActivityConfigDTO> queryOptionList(ActivityTypeEnum activityType, Boolean includeInactive) {
         boolean keepAll = Boolean.TRUE.equals(includeInactive);
         List<ActivityConfig> list = activityConfigManager.lambdaQuery()
-                .eq(StringUtils.isNotBlank(activityType), ActivityConfig::getActivityType, activityType)
+                .eq(activityType != null, ActivityConfig::getActivityType, activityType)
                 .ne(!keepAll, ActivityConfig::getStatus, ActivityStatusEnum.OFFLINE)
                 .ge(!keepAll, ActivityConfig::getEndTime, LocalDateTime.now())
                 .orderByDesc(ActivityConfig::getId)
@@ -151,7 +151,7 @@ public class ActivityConfigService {
      * 判据委托给对应玩法的 Provider（= 它自己的上线前校验），本类不自造一套。
      */
     private String checkConfigured(ActivityConfig activity) {
-        if (!ActivityTypeEnum.hasGameplay(activity.getActivityType())) {
+        if (activity.getActivityType() == null || !activity.getActivityType().isGameplay()) {
             // BASIC（以及理论上不该出现的非法类型）无需配置玩法
             return null;
         }
@@ -163,12 +163,11 @@ public class ActivityConfigService {
         return provider.checkConfigured(activity.getActivityCode());
     }
 
-    private ActivityRefProvider findProvider(String activityType) {
-        ActivityTypeEnum type = ActivityTypeEnum.resolve(activityType);
-        if (type == null) {
+    private ActivityRefProvider findProvider(ActivityTypeEnum activityType) {
+        if (activityType == null) {
             return null;
         }
-        return refProviders.stream().filter(p -> type == p.supportType()).findFirst().orElse(null);
+        return refProviders.stream().filter(p -> activityType == p.supportType()).findFirst().orElse(null);
     }
 
     /**
@@ -506,21 +505,21 @@ public class ActivityConfigService {
      * 升级成 DRAW 后正好成为抽奖的资产大库，不但不冲突，反而顺理成章。
      * 而玩法类之间互转、或降级回 BASIC，都会遗弃已配好的玩法配置，一律拒绝。
      */
-    public void upgradeType(Long id, String targetType) {
+    public void upgradeType(Long id, ActivityTypeEnum targetType) {
         ActivityConfig activity = activityConfigDao.selectById(id);
         if (activity == null) {
             throw new BusinessException("活动不存在");
         }
-        if (ActivityTypeEnum.hasGameplay(activity.getActivityType())) {
+        if (activity.getActivityType() != null && activity.getActivityType().isGameplay()) {
             throw new BusinessException("只有基础活动可以升级玩法；玩法类活动之间不可互转，也不可降级回基础活动 —— 那会遗弃已配好的玩法配置。");
         }
-        ActivityTypeEnum target = ActivityTypeEnum.resolve(targetType);
+        ActivityTypeEnum target = targetType;
         if (target == null || !target.isGameplay()) {
             throw new BusinessException("升级目标必须是 DRAW / TASK / LOTTERY 之一");
         }
 
         // 二次校验：BASIC 理论上没有玩法下游，但编码可能被历史数据复用过，落库前再确认一次
-        ActivityRefProvider provider = findProvider(target.getValue());
+        ActivityRefProvider provider = findProvider(target);
         if (provider != null) {
             List<ActivityRefItem> refs = provider.countRefs(activity.getActivityCode());
             if (SolvelaCollectionUtil.isNotEmpty(refs)) {
@@ -533,7 +532,7 @@ public class ActivityConfigService {
 
         ActivityConfig update = new ActivityConfig();
         update.setId(activity.getId());
-        update.setActivityType(target.getValue());
+        update.setActivityType(target);
         activityConfigDao.updateById(update);
     }
 

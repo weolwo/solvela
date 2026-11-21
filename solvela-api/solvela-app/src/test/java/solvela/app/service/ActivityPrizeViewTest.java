@@ -10,6 +10,7 @@ import solvela.marketing.api.ActivityApi;
 import solvela.marketing.api.ActivityPrizeView;
 import solvela.marketing.api.ActivityRuleView;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ActivityTypeEnum;
 
 import java.lang.reflect.RecordComponent;
 import java.time.LocalDateTime;
@@ -110,7 +111,7 @@ class ActivityPrizeViewTest {
     private static ActivityView translate(List<ActivityPrizeView> prizes) {
         ActivityApi api = Mockito.mock(ActivityApi.class);
         Mockito.when(api.getActivityRule("A8P0Y3ANGI")).thenReturn(new ActivityRuleView(
-                "A8P0Y3ANGI", "中秋", "DRAW", ActivityStatusEnum.ONLINE,
+                "A8P0Y3ANGI", "中秋", ActivityTypeEnum.DRAW, ActivityStatusEnum.ONLINE,
                 LocalDateTime.now().minusDays(1), null, LocalDateTime.now().plusDays(20),
                 "中秋佳节", null, 126L, 126L, null, "中秋佳节", "花好月圆",
                 null, "<p>规则</p>", prizes));

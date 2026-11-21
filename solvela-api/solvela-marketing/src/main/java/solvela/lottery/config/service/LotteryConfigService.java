@@ -67,11 +67,6 @@ public class LotteryConfigService {
     private final ActivityConfigService activityConfigService;
     private final PrizeConfigService prizeConfigService;
     private final FpeCipherFactory fpeCipherFactory;
-    /**
-     * 活动类型：彩票工作台只接受这一类活动。
-     * 取值统一走 ActivityTypeEnum，不再在本类里裸写 "LOTTERY" 字符串（铁律 3：消除魔法值）。
-     */
-    private static final String ACTIVITY_TYPE_LOTTERY = ActivityTypeEnum.LOTTERY.getValue();
 
     // ==================== 编码 ====================
 
@@ -252,7 +247,7 @@ public class LotteryConfigService {
         if (activity == null) {
             throw new BusinessException("活动不存在：" + activityCode);
         }
-        if (!ACTIVITY_TYPE_LOTTERY.equals(activity.getActivityType())) {
+        if (activity.getActivityType() != ActivityTypeEnum.LOTTERY) {
             throw new BusinessException("活动「" + activity.getActivityName() + "」不是彩票类活动");
         }
         return activity;

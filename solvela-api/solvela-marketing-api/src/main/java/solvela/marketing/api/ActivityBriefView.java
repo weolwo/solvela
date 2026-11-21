@@ -1,6 +1,7 @@
 package solvela.marketing.api;
 
 import solvela.enums.ActivityStatusEnum;
+import solvela.enums.ActivityTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -29,7 +30,7 @@ import java.time.LocalDateTime;
 public record ActivityBriefView(
         String activityCode,
         String activityName,
-        String activityType,
+        ActivityTypeEnum activityType,
         ActivityStatusEnum status,
         LocalDateTime startTime,
         LocalDateTime dataEndTime,

@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +42,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MarketingStatService {
 
-    /** 有参与行为的玩法类型。BASIC 没有参与行为，不出现在图上 */
-    private static final List<String> GAMEPLAY_TYPES = List.of("DRAW", "TASK", "LOTTERY");
+    /** 有参与行为的玩法类型。BASIC 没有参与行为，不出现在图上 —— 判据就是 ActivityTypeEnum.isGameplay()，不另抄一份 */
+    private static final List<ActivityTypeEnum> GAMEPLAY_TYPES = Arrays.stream(ActivityTypeEnum.values())
+            .filter(ActivityTypeEnum::isGameplay).toList();
 
     private static final int DEFAULT_DAYS = 7;
     private static final int MAX_DAYS = 90;
@@ -115,9 +117,9 @@ public class MarketingStatService {
     }
 
     /** BASIC 与未装载玩法模块时都返回 0，不抛异常 —— 大屏少一个数好过整块打不开 */
-    private long countGameplay(String activityType, String activityCode) {
-        ActivityTypeEnum type = ActivityTypeEnum.resolve(activityType);
-        if (type == null || !ActivityTypeEnum.hasGameplay(activityType)) {
+    private long countGameplay(ActivityTypeEnum activityType, String activityCode) {
+        ActivityTypeEnum type = activityType;
+        if (type == null || !type.isGameplay()) {
             return 0L;
         }
         return refProviders.stream()
@@ -188,7 +190,7 @@ public class MarketingStatService {
             return vo;
         }
         vo.setActivityType(activity.getActivityType());
-        ActivityTypeEnum type = ActivityTypeEnum.resolve(activity.getActivityType());
+        ActivityTypeEnum type = activity.getActivityType();
         if (type == null) {
             return vo;
         }
@@ -313,7 +315,7 @@ public class MarketingStatService {
                         ParticipationTrendDTO::getMemberCount, (a, b) -> a));
         List<ParticipationTrendDTO> result = new ArrayList<>(dateList.size() * GAMEPLAY_TYPES.size());
         for (String date : dateList) {
-            for (String type : GAMEPLAY_TYPES) {
+            for (ActivityTypeEnum type : GAMEPLAY_TYPES) {
                 ParticipationTrendDTO item = new ParticipationTrendDTO();
                 item.setStatDate(date);
                 item.setActivityType(type);
@@ -326,7 +328,7 @@ public class MarketingStatService {
 
     /** 三种玩法都要出现，没有数据的补 0，否则柱子会时有时无 */
     private List<ParticipationByTypeDTO> fillByType(List<ParticipationByTypeDTO> rows) {
-        Map<String, Integer> indexed = rows.stream()
+        Map<ActivityTypeEnum, Integer> indexed = rows.stream()
                 .collect(Collectors.toMap(ParticipationByTypeDTO::getActivityType,
                         ParticipationByTypeDTO::getMemberCount, (a, b) -> a));
         return GAMEPLAY_TYPES.stream().map(type -> {

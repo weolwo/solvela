@@ -43,7 +43,7 @@ public class ActivityWizardCreateForm {
 
     @Schema(description = "活动类型：BASIC/DRAW/TASK/LOTTERY", requiredMode = Schema.RequiredMode.REQUIRED)
     @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "活动类型非法")
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     @Schema(description = "活动开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "活动开始时间 不能为空")

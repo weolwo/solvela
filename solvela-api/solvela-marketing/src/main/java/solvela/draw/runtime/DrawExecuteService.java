@@ -528,7 +528,7 @@ public class DrawExecuteService {
                 .activityCode(batch.activityCode())
                 // 抽奖发出来的奖，类型必然是 DRAW。派发方据它归类提案来源，
                 // 不填的话那边只能降级成 MANUAL —— 对账时这批奖就归错类了
-                .activityType(ActivityTypeEnum.DRAW.getValue())
+                .activityType(ActivityTypeEnum.DRAW)
                 .memberId(batch.memberId())
                 .memberName(batch.memberName())
                 .prizeCode(prizeCode)

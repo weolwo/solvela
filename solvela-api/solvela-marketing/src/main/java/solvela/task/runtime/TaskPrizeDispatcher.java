@@ -119,7 +119,7 @@ public class TaskPrizeDispatcher {
 
         UserPrizeEvent event = UserPrizeEvent.builder()
                 .sourceBizId(TaskConst.buildSourceBizId(record.getId(), mapping.getStageLevel()))
-                .activityType(ActivityTypeEnum.TASK.getValue())
+                .activityType(ActivityTypeEnum.TASK)
                 .activityCode(activityCode)
                 // 关联键取记录上的 member_id；展示名由上下文传进来 —— 任务记录是状态表，没有账号快照
                 .memberId(record.getMemberId())

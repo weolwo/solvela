@@ -37,7 +37,7 @@ public class ActivityWizardCreateCommand {
 
     /** 活动类型：BASIC/DRAW/TASK/LOTTERY */
     @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "活动类型非法")
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     /** 活动开始时间 */
     private LocalDateTime startTime;

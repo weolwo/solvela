@@ -4,6 +4,7 @@ import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeProposalStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ActivityTypeEnum;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
@@ -64,7 +65,7 @@ public class PrizeLog {
      *
      * <p>允许为空：存量行没有这个值，派发链路对空值降级为 MANUAL。
      */
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     /**
      * 奖品级别

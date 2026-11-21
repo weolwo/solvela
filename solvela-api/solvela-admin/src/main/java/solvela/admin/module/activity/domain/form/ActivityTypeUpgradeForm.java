@@ -28,5 +28,5 @@ public class ActivityTypeUpgradeForm {
     @Schema(description = "升级到的玩法类型：DRAW / TASK / LOTTERY（不接受 BASIC）",
             requiredMode = Schema.RequiredMode.REQUIRED)
     @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "目标活动类型非法")
-    private String targetType;
+    private ActivityTypeEnum targetType;
 }

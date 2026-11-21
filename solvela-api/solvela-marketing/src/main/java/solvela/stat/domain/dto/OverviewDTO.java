@@ -1,6 +1,7 @@
 package solvela.stat.domain.dto;
 
 import solvela.enums.ActivityStatusEnum;
+import solvela.enums.ActivityTypeEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -42,7 +43,7 @@ public class OverviewDTO {
         private String activityName;
 
         /** 活动类型 BASIC/DRAW/TASK/LOTTERY */
-        private String activityType;
+        private ActivityTypeEnum activityType;
 
         /** 原始状态值，1-启用 2-禁用 0-历史值（按启用处理） */
         private ActivityStatusEnum status;

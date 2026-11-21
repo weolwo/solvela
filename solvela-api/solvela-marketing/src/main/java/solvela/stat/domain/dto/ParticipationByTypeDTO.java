@@ -1,6 +1,7 @@
 package solvela.stat.domain.dto;
 
 import lombok.Data;
+import solvela.enums.ActivityTypeEnum;
 
 /**
  * 各玩法类型参与人数
@@ -15,7 +16,7 @@ import lombok.Data;
 public class ParticipationByTypeDTO {
 
     /** 玩法类型：DRAW / TASK / LOTTERY */
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     /** 参与人数（该类型内按 member_id 去重） */
     private Integer memberCount;

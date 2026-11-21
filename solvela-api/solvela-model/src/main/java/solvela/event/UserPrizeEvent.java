@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import solvela.enums.EventCategoryEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ActivityTypeEnum;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -33,7 +34,7 @@ public class UserPrizeEvent extends BaseBizEvent implements Serializable {
      * <p><b>发送方必须填</b>：派发方据它归类提案来源，而拆成独立服务后它<b>没法回头查活动表</b>
      * —— 活动配置在营销服务，派发在会员服务。为空时派发方降级为 MANUAL，不中断发奖。
      */
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     // ================== 3. 用户信息 ==================
     /**

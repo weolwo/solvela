@@ -2,6 +2,7 @@ package solvela.marketing.api;
 
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeTypeEnum;
+import solvela.enums.ActivityTypeEnum;
 
 import java.time.LocalDateTime;
 
@@ -33,7 +34,7 @@ public record PrizeRecordView(
         PrizeTypeEnum prizeType,
         String prizeValue,
         String activityCode,
-        String activityType,
+        ActivityTypeEnum activityType,
         PrizeDispatchStatusEnum status,
         String failReason,
         LocalDateTime createTime) {

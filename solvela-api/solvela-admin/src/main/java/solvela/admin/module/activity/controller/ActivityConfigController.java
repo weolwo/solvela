@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import solvela.web.RequiresPermission;
+import solvela.enums.ActivityTypeEnum;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -63,7 +64,7 @@ public class ActivityConfigController {
     @GetMapping("/optionList")
     @RequiresPermission("activityConfig:query")
     public List<ActivityConfigVO> queryOptionList(
-            @RequestParam(required = false) String activityType,
+            @RequestParam(required = false) ActivityTypeEnum activityType,
             @RequestParam(required = false, defaultValue = "false") Boolean includeInactive) {
         return SolvelaBeanUtil.copyList(
                 activityConfigService.queryOptionList(activityType, includeInactive), ActivityConfigVO.class);

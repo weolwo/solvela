@@ -36,13 +36,13 @@ public class ProposalSourceResolver {
      * 这里只做翻译。事件驱动里的通则：<b>消息自带上下文，消费方不回头查发送方</b>。
      *
      * @param activityType 发奖流水上的玩法类型
-     * @return 提案来源类型；为空或类型非法时降级为 {@link ProposalSourceTypeEnum#MANUAL}
+     * @return 提案来源类型；为空时降级为 {@link ProposalSourceTypeEnum#MANUAL}
      */
-    public String resolve(String activityType) {
-        ActivityTypeEnum type = ActivityTypeEnum.resolve(activityType);
+    public String resolve(ActivityTypeEnum activityType) {
+        ActivityTypeEnum type = activityType;
         if (type == null) {
             // 不抛异常：来源类型只是归类维度，为它中断一次真实发奖不划算
-            log.warn("【提案来源】玩法类型为空或非法，来源降级为 MANUAL。activityType={}", activityType);
+            log.warn("【提案来源】玩法类型为空，来源降级为 MANUAL");
             return ProposalSourceTypeEnum.MANUAL.getValue();
         }
         return switch (type) {

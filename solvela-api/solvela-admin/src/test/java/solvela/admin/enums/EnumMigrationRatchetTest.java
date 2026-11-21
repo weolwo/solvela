@@ -241,10 +241,6 @@ class EnumMigrationRatchetTest {
      * <p>⚠️ deviceType 两列是客户端上报的，收敛成枚举之前要先定「未知值怎么办」（拒绝还是归为 OTHER），那是业务决定。
      */
     private static final Set<String> STRING_TYPE_PENDING = Set.of(
-            // ActivityTypeEnum（BaseEnum，value 是 String）
-            "activity/ActivityConfig.java#activityType",
-            "event/UserPrizeEvent.java#activityType",
-            "prize/PrizeLog.java#activityType",
             // EventCategoryEnum / EventTypeEnum 已存在，事件字段还是 String
             "event/BaseBizEvent.java#category",
             "event/BaseBizEvent.java#eventType",

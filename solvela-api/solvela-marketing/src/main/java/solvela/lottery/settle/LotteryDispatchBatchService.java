@@ -97,7 +97,7 @@ public class LotteryDispatchBatchService {
         prizeEventPublisher.publish(UserPrizeEvent.builder()
                 // 跨域幂等键：配合 t_prize_log.uk_external_biz，事件重投也不会重复发奖
                 .sourceBizId(String.valueOf(record.getId()))
-                .activityType(ActivityTypeEnum.LOTTERY.getValue())
+                .activityType(ActivityTypeEnum.LOTTERY)
                 .activityCode(config.getActivityCode())
                 .memberId(record.getMemberId())
                 .memberName(record.getMemberName())

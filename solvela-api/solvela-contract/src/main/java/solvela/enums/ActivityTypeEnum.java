@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import solvela.enums.BaseEnum;
 
-import java.util.Arrays;
 
 /**
  * 活动类型，对齐 t_activity_config.activity_type（varchar，故 value 是 String）
@@ -58,25 +57,4 @@ public enum ActivityTypeEnum implements BaseEnum {
      * component !== null。判据收在这一处，别在各处散写 if (BASIC.equals(type))（铁律 3）。
      */
     private final boolean gameplay;
-
-    /**
-     * 按 value 解析，非法值返回 null（由调用方决定是报错还是降级）。
-     * <p>
-     * 刻意不接受大小写变体：三个工作台的下拉是 activityType=DRAW 精确匹配的，
-     * 这里若宽容地把 "draw" 也认了，反而会放进一个在工作台里永远查不到的活动。
-     */
-    public static ActivityTypeEnum resolve(String value) {
-        return Arrays.stream(values())
-                .filter(e -> e.value.equals(value))
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * 是否为挂玩法的类型；类型非法时返回 false（当作没有玩法下游处理，由上游的 @CheckEnum 负责拦非法值）
-     */
-    public static boolean hasGameplay(String value) {
-        ActivityTypeEnum type = resolve(value);
-        return type != null && type.gameplay;
-    }
 }

@@ -73,7 +73,8 @@ public class ScriptRefCandidateService {
         return activityConfigManager.lambdaQuery()
                 .orderByDesc(ActivityConfig::getId).list().stream()
                 .map(a -> new ScriptRefCandidateVO(a.getActivityCode(), a.getActivityName(),
-                        a.getActivityType()))
+                        // 第三列是给人看的提示文本，不是类型字段：照旧给类型编码
+                        a.getActivityType() == null ? null : a.getActivityType().getValue()))
                 .toList();
     }
 

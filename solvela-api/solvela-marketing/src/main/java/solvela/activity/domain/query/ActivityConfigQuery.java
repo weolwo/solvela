@@ -2,6 +2,7 @@ package solvela.activity.domain.query;
 
 import solvela.enums.ActivityStatusEnum;
 import solvela.base.domain.PageParam;
+import solvela.enums.ActivityTypeEnum;
 
 import java.time.LocalDate;
 
@@ -33,7 +34,7 @@ public class ActivityConfigQuery extends PageParam {
     private LocalDate createTimeEnd;
 
     /** 活动类型：BASIC / DRAW / TASK / LOTTERY */
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     /** 状态：0-未开始, 1-上线, 2-下线 */
     private ActivityStatusEnum status;

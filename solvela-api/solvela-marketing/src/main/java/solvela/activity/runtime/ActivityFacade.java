@@ -116,7 +116,7 @@ public class ActivityFacade implements ActivityApi {
     public List<TaskCenterItem> getMyTasks(Long memberId) {
         return activityConfigService.listVisibleForClient().stream()
                 .filter(activity -> ActivityTypeEnum.TASK
-                        == ActivityTypeEnum.resolve(activity.getActivityType()))
+                        == activity.getActivityType())
                 .flatMap(activity -> getTaskCenter(activity.getActivityCode(), memberId).stream())
                 .toList();
     }
@@ -133,7 +133,7 @@ public class ActivityFacade implements ActivityApi {
         if (activity == null) {
             return List.of();
         }
-        ActivityTypeEnum type = ActivityTypeEnum.resolve(activity.getActivityType());
+        ActivityTypeEnum type = activity.getActivityType();
         TaskCenterProvider provider = taskCenterProviders.stream()
                 .filter(p -> type == p.supportType())
                 .findFirst().orElse(null);
@@ -190,7 +190,7 @@ public class ActivityFacade implements ActivityApi {
     private ActivityPlayMountProvider.PlayMount resolveMount(ActivityConfig activity) {
         ActivityPlayMountProvider provider = playMountProviders.stream()
                 .filter(item -> item.supportType() != null
-                        && item.supportType().getValue().equals(activity.getActivityType()))
+                        && item.supportType() == activity.getActivityType())
                 .findFirst()
                 .orElse(null);
         if (provider == null) {
@@ -217,7 +217,9 @@ public class ActivityFacade implements ActivityApi {
                 // --- 脚本可见：给运营写判断用 ---
                 .bind("memberId", cmd.memberId())
                 .bind("activityCode", activity.getActivityCode())
-                .bind("activityType", activity.getActivityType())
+                // 🔴 脚本契约里 activityType 是 String（ScriptScene.ACTIVITY_PLAY），脚本写的是 activityType != 'DRAW'。
+                //    bind 收 Object，传枚举编译照过，运行时被 validateInput 以类型不匹配拒掉 —— 必须取 value
+                .bind("activityType", activity.getActivityType().getValue())
                 // 客户端点的是「单抽」还是「十连抽」。⚠️ 只是【意愿】——
                 // 脚本拿它跟剩余次数一比，算出真正的次数再传给抽奖函数。
                 // 脚本可以改这个变量，改了也只影响它自己传进去的那个数，这正是我们要的

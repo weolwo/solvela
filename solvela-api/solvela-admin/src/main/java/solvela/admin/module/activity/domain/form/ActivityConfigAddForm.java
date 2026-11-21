@@ -36,7 +36,7 @@ public class ActivityConfigAddForm {
     @Schema(description = "活动类型：BASIC-基础活动 / DRAW-奖池抽奖 / TASK-任务驱动 / LOTTERY-FPE彩票",
             requiredMode = Schema.RequiredMode.REQUIRED)
     @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "活动类型非法")
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     @Schema(description = "状态：0-未开始, 1-上线, 2-下线")
     private ActivityStatusEnum status;

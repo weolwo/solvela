@@ -1,6 +1,7 @@
 package solvela.activity;
 
 import solvela.enums.ActivityStatusEnum;
+import solvela.enums.ActivityTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -41,7 +42,7 @@ public class ActivityConfig {
     /**
      * 活动类型
      */
-    private String activityType;
+    private ActivityTypeEnum activityType;
 
     /**
      * 状态：0-未开始, 1-上线, 2-下线
