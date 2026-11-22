@@ -143,6 +143,14 @@ public interface LotteryRecordDao extends BaseMapper<LotteryRecord> {
                                               @Param("limit") int limit);
 
     /**
+     * 中奖且待派发 → 投递失败。奖品配置被删时用，见 {@code LotteryDispatchBatchService#markDispatchFailed}。
+     *
+     * @return 1 = 已标失败；0 = 记录已不在待派发（别的批次处理过），什么都没改
+     */
+    int markDispatchFailed(@Param("id") Long id);
+
+
+    /**
      * 批量标记已投递。用条件更新（AND dispatch_status = 0）避免重复投递被记两次
      */
     int markDispatched(@Param("idList") List<Long> idList);

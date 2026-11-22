@@ -1,6 +1,5 @@
 package solvela.lottery.runtime;
 
-import solvela.enums.TicketStatusEnum;
 import lombok.RequiredArgsConstructor;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.constant.LotteryConst;
@@ -64,7 +63,7 @@ public class TicketPersistService {
         // 账号只作展示快照 —— 同时它还是 security_sign 的签名要素，见 LotteryRecord.memberName
         record.setMemberName(memberName);
         record.setObtainTime(now);
-        record.setWinStatus(TicketStatusEnum.WAIT);
+        record.openTicket();
         // 未开奖统一落 99，让 C 端「我的号码」可以直接 ORDER BY prize_level ASC
         record.setPrizeLevel(LotteryConst.PRIZE_LEVEL_NONE);
         // security_sign 是 NOT NULL 无默认值，漏赋值会被 MySQL 严格模式直接拒绝

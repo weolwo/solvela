@@ -88,16 +88,16 @@
     <select id="selectFunnel" resultType="java.util.Map">
         SELECT
             COUNT(*)                                                      AS totalCount,
-            COALESCE(SUM(win_status = 0), 0)                              AS waitCount,
-            COALESCE(SUM(win_status = 1), 0)                              AS loseCount,
-            COALESCE(SUM(win_status = 2), 0)                              AS winCount,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@WAIT.value}), 0)                              AS waitCount,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@FAILURE_MATCH.value}), 0)                              AS loseCount,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value}), 0)                              AS winCount,
             COUNT(DISTINCT member_id)                                   AS memberCount,
-            COALESCE(SUM(win_status = 2 AND dispatch_status = 0), 0)      AS dispatchWaitCount,
-            COALESCE(SUM(win_status = 2 AND dispatch_status = 1), 0)      AS dispatchedCount,
-            COALESCE(SUM(win_status = 2 AND dispatch_status = 2), 0)      AS dispatchFailedCount,
-            COALESCE(SUM(win_status = 2 AND (prize_code IS NULL OR prize_code = '')), 0) AS winButNoPrize,
-            COALESCE(SUM(win_status = 2 AND prize_level = 99), 0)         AS winButLevelNone,
-            COALESCE(SUM(win_status &lt;&gt; 2 AND prize_level &lt;&gt; 99), 0) AS loseButHasLevel,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@WAITING.value}), 0)      AS dispatchWaitCount,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@DISPATCHED.value}), 0)      AS dispatchedCount,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@FAILED.value}), 0)      AS dispatchFailedCount,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND (prize_code IS NULL OR prize_code = '')), 0) AS winButNoPrize,
+            COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND prize_level = 99), 0)         AS winButLevelNone,
+            COALESCE(SUM(win_status &lt;&gt; ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND prize_level &lt;&gt; 99), 0) AS loseButHasLevel,
             COALESCE(SUM(security_sign IS NULL OR security_sign = ''), 0) AS noSign
         FROM t_lottery_record
         <where><include refid="funnel_conditions"/></where>
@@ -108,7 +108,7 @@
         SELECT prize_level AS prizeLevel, prize_code AS prizeCode, COUNT(*) AS winCount
         FROM t_lottery_record
         <where>
-            AND win_status = 2
+            AND win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value}
             <include refid="funnel_conditions"/>
         </where>
         GROUP BY prize_level, prize_code
@@ -122,7 +122,7 @@
     <select id="selectStatByLottery" resultType="java.util.Map">
         SELECT lottery_code                            AS lotteryCode,
                COUNT(DISTINCT member_id)             AS memberCount,
-               COALESCE(SUM(win_status = 2), 0)        AS winCount
+               COALESCE(SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value}), 0)        AS winCount
         FROM t_lottery_record
         GROUP BY lottery_code
     </select>
@@ -204,6 +204,10 @@
     <!--
         按一条奖级规则认领中奖记录。
 
+        🔴 本文件里的 win_status / dispatch_status 值一律写成 ${@solvela.enums.XxxEnum@X.value}，不写数字。
+           常量改名时这里不会编译报错，而是运行期求值失败 —— LotteryRecordStatusSqlTest 会渲染这些 SQL，
+           并断言开奖、派发的闸门与 TicketStatusEnum / LotteryDispatchStatusEnum 的 canTransitTo 一致。
+
         ⚠️ win_status = 0 是「奖级互斥」的实现，不是可有可无的条件：
         按 prizeLevel 升序依次执行，高奖级先把票认走并改掉 win_status，
         低奖级就再也匹配不到它。这等价于 Java 侧 TicketMatcher 的「命中即止」，
@@ -216,12 +220,12 @@
     -->
     <update id="claimByRule">
         UPDATE t_lottery_record
-        SET win_status = 2,
+        SET win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value},
             prize_level = #{prizeLevel},
             prize_code = #{prizeCode}
         WHERE lottery_code = #{lotteryCode}
           AND issue_no = #{issueNo}
-          AND win_status = 0
+          AND win_status = ${@solvela.enums.TicketStatusEnum@WAIT.value}
         <choose>
             <when test="matchRule == 'EXACT'">
                 AND ticket_number = #{winningNumber}
@@ -243,11 +247,11 @@
     <!-- 全部奖级认领完后，剩下的判未中奖。prize_level 落 99 见 LotteryConst.PRIZE_LEVEL_NONE -->
     <update id="markNoWin">
         UPDATE t_lottery_record
-        SET win_status = 1,
+        SET win_status = ${@solvela.enums.TicketStatusEnum@FAILURE_MATCH.value},
             prize_level = 99
         WHERE lottery_code = #{lotteryCode}
           AND issue_no = #{issueNo}
-          AND win_status = 0
+          AND win_status = ${@solvela.enums.TicketStatusEnum@WAIT.value}
         LIMIT #{limit}
     </update>
 
@@ -256,17 +260,26 @@
         FROM t_lottery_record
         WHERE lottery_code = #{lotteryCode}
           AND issue_no = #{issueNo}
-          AND win_status = 2
-          AND dispatch_status = 0
+          AND win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value}
+          AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@WAITING.value}
         ORDER BY id
         LIMIT #{limit}
     </select>
 
+    <!-- 奖品配置被删：中奖且待派发才标投递失败，别的批次已处理过的不覆盖 -->
+    <update id="markDispatchFailed">
+        UPDATE t_lottery_record
+        SET dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@FAILED.value}
+        WHERE id = #{id}
+          AND win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value}
+          AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@WAITING.value}
+    </update>
+
     <!-- AND dispatch_status = 0：避免并发下重复标记，也让返回行数能真实反映本次投递量 -->
     <update id="markDispatched">
         UPDATE t_lottery_record
-        SET dispatch_status = 1
-        WHERE dispatch_status = 0
+        SET dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@DISPATCHED.value}
+        WHERE dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@WAITING.value}
           AND id IN
         <foreach collection="idList" item="id" open="(" separator="," close=")">
             #{id}
@@ -275,11 +288,11 @@
 
     <select id="settleSummary" resultType="java.util.Map">
         SELECT COUNT(*)                                        AS total,
-               SUM(win_status = 0)                             AS pending,
-               SUM(win_status = 1)                             AS lose,
-               SUM(win_status = 2)                             AS win,
-               SUM(win_status = 2 AND dispatch_status = 0)     AS waitDispatch,
-               SUM(win_status = 2 AND dispatch_status = 1)     AS dispatched
+               SUM(win_status = ${@solvela.enums.TicketStatusEnum@WAIT.value})                             AS pending,
+               SUM(win_status = ${@solvela.enums.TicketStatusEnum@FAILURE_MATCH.value})                             AS lose,
+               SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value})                             AS win,
+               SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@WAITING.value})     AS waitDispatch,
+               SUM(win_status = ${@solvela.enums.TicketStatusEnum@SUCCESS_MATCH.value} AND dispatch_status = ${@solvela.enums.LotteryDispatchStatusEnum@DISPATCHED.value})     AS dispatched
         FROM t_lottery_record
         WHERE lottery_code = #{lotteryCode}
           AND issue_no = #{issueNo}

@@ -41,4 +41,20 @@ public enum TicketStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}。开奖只发生一次：已中奖、未中奖都是终态。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code LotteryRecordMapper.xml} 的认领与判未中奖都带 {@code win_status = 未开奖}，
+     * 那也是「奖级互斥」的实现。{@code LotteryRecordStatusSqlTest} 断言这些 SQL 的迁移都在这里。
+     * 约定见 {@code docs/架构/领域实体轻充血-架构设计文档.md}。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(TicketStatusEnum to) {
+        return switch (this) {
+            case WAIT -> to == SUCCESS_MATCH || to == FAILURE_MATCH;
+            case SUCCESS_MATCH, FAILURE_MATCH -> false;
+        };
+    }
 }

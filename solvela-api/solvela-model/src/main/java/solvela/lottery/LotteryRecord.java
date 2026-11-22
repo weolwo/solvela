@@ -9,7 +9,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 用户号码记录 实体类
@@ -74,7 +76,12 @@ public class LotteryRecord {
 
     /**
      * 中奖状态: 0-未开奖, 1-未中奖, 2-已中奖
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #openTicket} 定，开奖只走
+     * {@code LotteryRecordMapper.xml} 带「未开奖」条件的批量 UPDATE（状态机见 {@link TicketStatusEnum#canTransitTo}）。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private TicketStatusEnum winStatus;
 
     /**
@@ -89,7 +96,12 @@ public class LotteryRecord {
 
     /**
      * 派发状态：0-待派发/无需派发, 1-已投递, 2-投递失败（v3.40 新增）
+     *
+     * <p>🔴 没有公开 setter：迁移只走 {@code LotteryRecordMapper.xml} 带「待派发」条件的 UPDATE
+     *（状态机见 {@link LotteryDispatchStatusEnum#canTransitTo}）。
+     * 以前标失败是 new 一个实体 {@code updateById}，不看当前状态。
      */
+    @Setter(AccessLevel.NONE)
     private LotteryDispatchStatusEnum dispatchStatus;
 
     /**
@@ -117,4 +129,14 @@ public class LotteryRecord {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 出票：未开奖、待派发。号码、签名等由调用方填；这两个状态之后只走条件 UPDATE。
+     */
+    public void openTicket() {
+        if (winStatus != null || dispatchStatus != null) {
+            throw new IllegalStateException("彩票记录 " + id + " 已有状态（" + winStatus + " / " + dispatchStatus + "），不能再出票");
+        }
+        this.winStatus = TicketStatusEnum.WAIT;
+        this.dispatchStatus = LotteryDispatchStatusEnum.WAITING;
+    }
 }

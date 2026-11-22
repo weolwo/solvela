@@ -1,7 +1,6 @@
 package solvela.lottery.settle;
 
 import solvela.enums.ActivityTypeEnum;
-import solvela.enums.LotteryDispatchStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import solvela.event.UserPrizeEvent;
@@ -81,10 +80,10 @@ public class LotteryDispatchBatchService {
     private void markDispatchFailed(LotteryConfig config, LotteryRecord record) {
         log.error("[彩票派奖] 奖品配置不存在，记录 {} 标记为投递失败：activityCode={}, prizeCode={}",
                 record.getId(), config.getActivityCode(), record.getPrizeCode());
-        LotteryRecord fail = new LotteryRecord();
-        fail.setId(record.getId());
-        fail.setDispatchStatus(LotteryDispatchStatusEnum.FAILED);
-        lotteryRecordDao.updateById(fail);
+        // 条件更新：只有「中奖且待派发」才标失败。0 行说明别的批次已经处理过这条，不覆盖
+        if (lotteryRecordDao.markDispatchFailed(record.getId()) == 0) {
+            log.warn("[彩票派奖] 记录 {} 已不在待派发状态，本次不标失败", record.getId());
+        }
     }
 
     /**
