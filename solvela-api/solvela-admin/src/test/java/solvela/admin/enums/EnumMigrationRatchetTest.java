@@ -91,6 +91,18 @@ class EnumMigrationRatchetTest {
             List.of("LENGTH", "SCALE", "SIZE", "MINUTES", "SECONDS", "HOURS", "DAYS");
 
     /**
+     * 类名以这些词结尾的，里面的整型常量一律算状态常量，不再看常量名。
+     *
+     * <p>🔴 这条是补盲区：{@code EntitlementGrantStatus} 里的 {@code PENDING = 0 / CLAIMED = 1 / EXPIRED = 2}
+     * 名字里一个状态词都没有，上面那份按常量名的过滤看不见它 —— 它就这样以「常量持有类」的形态
+     * 躲过了棘轮，直到 2026-11-22 才被手工扫出来迁成枚举。状态语义此时在<b>类名</b>上。
+     *
+     * <p>刻意不收 {@code Result}：{@code StockDeductResult} 的 {@code CODE_*} 是 Redis Lua 脚本的返回码，
+     * 是跨进程协议的线上取值，在入口一次性解析成 record，不是库里的状态列。
+     */
+    private static final List<String> STATUS_CLASS_SUFFIXES = List.of("Status", "State", "Type", "Mode");
+
+    /**
      * 尚未枚举化的列留下的常量，<b>只许删，不许加</b> —— 现在是空的。
      *
      * <p>A/B/C 三桶全部枚举化之后，仓库里已经没有「状态/类型语义的裸 int 常量」了。
@@ -285,10 +297,12 @@ class EnumMigrationRatchetTest {
     private Set<String> scan() throws IOException {
         Set<String> found = new TreeSet<>();
         for (Path p : mainSources()) {
+            String className = p.getFileName().toString().replace(".java", "");
+            boolean statusClass = STATUS_CLASS_SUFFIXES.stream().anyMatch(className::endsWith);
             Matcher m = MAGIC_STATUS_CONST.matcher(Files.readString(p, StandardCharsets.UTF_8));
             while (m.find()) {
                 String name = m.group(1);
-                boolean statusLike = STATUS_WORDS.stream().anyMatch(name::contains)
+                boolean statusLike = (statusClass || STATUS_WORDS.stream().anyMatch(name::contains))
                         && NOT_STATUS_WORDS.stream().noneMatch(name::contains);
                 if (statusLike) {
                     found.add(shorten(root(), p) + "#" + name);
