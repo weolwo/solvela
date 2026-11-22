@@ -104,12 +104,13 @@ class MemberCouponStatusSqlTest {
     }
 
     @Test
-    @DisplayName("库存统计按四个状态分别计数，引用全部求值成功")
-    void 库存统计能渲染() {
+    @DisplayName("🔴 库存统计给每个状态都留了桶 —— 漏一个，各桶之和就对不上总数")
+    void 库存统计每个状态都有桶() {
         String sql = sqlOf("selectStockStat");
-        for (CouponStatusEnum s : List.of(CouponStatusEnum.UNUSED, CouponStatusEnum.USED,
-                CouponStatusEnum.EXPIRED, CouponStatusEnum.VOIDED)) {
-            assertTrue(sql.contains("status = " + s.getValue()), () -> s + " 没出现在库存统计里：" + sql);
+        for (CouponStatusEnum s : CouponStatusEnum.values()) {
+            assertTrue(sql.contains("SUM(status = " + s.getValue() + ")"),
+                    () -> s + " 在库存统计里没有自己的桶（MemberCouponMapper.xml#selectStockStat）："
+                            + "管理端的各状态张数加起来会比总数少，而且不报错。SQL: " + sql);
         }
         sqlOf("selectIssuedStat");
         sqlOf("selectCouponStat");

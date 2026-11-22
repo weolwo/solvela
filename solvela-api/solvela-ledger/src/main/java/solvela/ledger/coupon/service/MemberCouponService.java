@@ -110,6 +110,7 @@ public class MemberCouponService {
         vo.setStockUsedCount(stock.count("stockUsedCount"));
         vo.setStockExpiredCount(stock.count("stockExpiredCount"));
         vo.setStockVoidCount(stock.count("stockVoidCount"));
+        vo.setStockLockedCount(stock.count("stockLockedCount"));
         vo.setStaleUnusedCount(stock.count("staleUnusedCount"));
         vo.setExpiringSoonCount(stock.count("expiringSoonCount"));
     }

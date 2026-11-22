@@ -105,7 +105,7 @@ class LedgerStatTest {
         assertEquals(Set.of("usedCount", "usedMemberCount"),
                 couponDao.selectUsedStat(form).keySet(), "优惠券本期核销：key 对不上");
         assertEquals(Set.of("stockTotalCount", "stockUnusedCount", "stockUsedCount", "stockExpiredCount",
-                        "stockVoidCount", "staleUnusedCount", "expiringSoonCount",
+                        "stockVoidCount", "stockLockedCount", "staleUnusedCount", "expiringSoonCount",
                         "usedNoTimeCount", "unusedWithTimeCount", "badValidRangeCount"),
                 couponDao.selectStockStat().keySet(), "优惠券库存：key 对不上");
         List<Map<String, Object>> couponStat = couponDao.selectCouponStat(form);
@@ -214,7 +214,7 @@ class LedgerStatTest {
     // ==================== 数值自洽 ====================
 
     @Test
-    @DisplayName("优惠券：四个状态桶之和 = 券总张数，且核销与发放走的是两个不同的时间列")
+    @DisplayName("优惠券：五个状态桶之和 = 券总张数，且核销与发放走的是两个不同的时间列")
     void couponNumbersAddUp() {
         long dbTotal = count("SELECT COUNT(*) FROM t_member_coupon");
         assertTrue(dbTotal > 0, "t_member_coupon 没有数据，本用例无法证明任何事 —— 先造数再跑");
@@ -223,8 +223,8 @@ class LedgerStatTest {
         assertEquals(dbTotal, vo.getStockTotalCount());
         assertEquals(vo.getStockTotalCount(),
                 vo.getStockUnusedCount() + vo.getStockUsedCount()
-                        + vo.getStockExpiredCount() + vo.getStockVoidCount(),
-                "状态桶之和不等于总数：库里出现了 0/1/2/3 之外的 status");
+                        + vo.getStockExpiredCount() + vo.getStockVoidCount() + vo.getStockLockedCount(),
+                "状态桶之和不等于总数：库里出现了没有桶的 status（CouponStatusEnum 加了取值却没加统计桶？）");
 
         /*
          * 核销口径走 used_time，发放口径走 create_time。全量窗口下，

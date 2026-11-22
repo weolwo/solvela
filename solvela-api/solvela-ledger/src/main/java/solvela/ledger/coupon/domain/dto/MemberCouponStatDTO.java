@@ -86,11 +86,11 @@ public class MemberCouponStatDTO {
 
     // ---------------- 券库存（全量，不受时间范围影响） ----------------
 
-    /** 券总张数（全量） */
+    /** 券总张数（全量）。等于下面五个状态桶之和 */
     private Long stockTotalCount;
 
     /**
-     * ⚠️ 这个数是<b>虚高</b>的：没有过期扫描任务，过了有效期的券也还挂在这里。
+     * ⚠️ 这个数偏高：过了有效期的券要等 {@code couponExpire} 任务收口，在那之前还挂在这里。
      * 真正还能用的是 {@code stockUnusedCount - staleUnusedCount}。
      */
     private Long stockUnusedCount;
@@ -98,14 +98,22 @@ public class MemberCouponStatDTO {
     /** 已使用张数（全量）：status=1 */
     private Long stockUsedCount;
 
-    /** 已过期张数（全量）：status=2。全工程没有任何地方写这个状态 */
+    /** 已过期张数（全量）：status=2，由 {@code couponExpire} 任务写入 */
     private Long stockExpiredCount;
 
     /** 已作废张数（全量）：status=3 */
     private Long stockVoidCount;
 
     /**
-     * 已过有效期却仍是「未使用」。没有过期扫描任务，这些券永远不会自己收口。
+     * 锁定中张数（全量）：status=4，下了单还没支付 / 确认的券。
+     *
+     * <p>它不算「还能用」：已经被一笔订单占着，确认后变已使用，取消或超时释放后回到未使用。
+     * 卡得久的由 {@code CouponStuckLockReleaseJob} 放回去，所以这个数长期偏大说明那个任务没在跑。
+     */
+    private Long stockLockedCount;
+
+    /**
+     * 已过有效期却仍是「未使用」，等 {@code couponExpire} 任务收口。长期不归零说明那个任务没在跑。
      */
     private Long staleUnusedCount;
 

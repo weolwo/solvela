@@ -174,10 +174,14 @@
         「手上还压着多少张没用的券」是个存量问题，限制在今天只会把它藏起来 ——
         今天发的券当然全是未使用，那个数字什么也回答不了。
 
-        staleUnusedCount 是本页最该被盯住的数：全工程没有任何地方把券置为 2-已过期
-        （没有这样的定时任务，也没有任何 Java 代码写这个状态），
-        所以过了有效期的券会一直挂在「未使用」里 —— 也就是说 stockUnusedCount 本身是虚高的，
-        真正还能用的是 stockUnusedCount - staleUnusedCount。
+        staleUnusedCount：过了有效期却还是「未使用」的券。它们要等 couponExpire 任务
+        （基线配置每天 03:10）收口成已过期，两次运行之间会挂在「未使用」里 ——
+        所以 stockUnusedCount 偏高，真正还能用的是 stockUnusedCount - staleUnusedCount。
+        这个数长期不归零，说明收口任务没在跑。
+
+        🔴 五个状态桶（未使用 / 已使用 / 已过期 / 已作废 / 锁定中）之和必须等于 stockTotalCount：
+        CouponStatusEnum 每加一个取值，这里就要加一个桶。漏了的话总数对不上而不报错 ——
+        锁定中就是这样漏过一次。MemberCouponStatusSqlTest 断言每个枚举取值都有桶。
 
         末尾三个是一致性体检：
           - usedNoTimeCount   ：已使用却没有核销时间，事后说不清是哪天用的
@@ -190,6 +194,7 @@
                COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@USED.value}), 0)                                     AS stockUsedCount,
                COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@EXPIRED.value}), 0)                                     AS stockExpiredCount,
                COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@VOIDED.value}), 0)                                     AS stockVoidCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@LOCKED.value}), 0)                                     AS stockLockedCount,
                COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value} AND valid_end_time &lt; now()), 0)       AS staleUnusedCount,
                COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value} AND valid_end_time &gt;= now()
                    AND valid_end_time &lt; DATE_ADD(now(), INTERVAL 7 DAY)), 0) AS expiringSoonCount,
