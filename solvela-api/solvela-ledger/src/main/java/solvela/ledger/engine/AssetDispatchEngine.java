@@ -56,10 +56,8 @@ public class AssetDispatchEngine implements AssetDispatcher {
     private static final int REMARK_MAX_LENGTH = 255;
 
     /**
-     * 发奖记录状态（对齐 t_prize_log.status）与其 fail_reason 列长度
+     * 发奖记录 fail_reason 的列长度
      */
-    private static final int PRIZE_LOG_SUCCESS = 1;
-    private static final int PRIZE_LOG_FAILED = 2;
     private static final int FAIL_REASON_MAX_LENGTH = 128;
 
     /**
