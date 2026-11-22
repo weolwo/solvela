@@ -1,6 +1,5 @@
 package solvela.task.runtime;
 
-import solvela.enums.TaskRecordStatusEnum;
 import solvela.task.constant.TaskConst;
 import solvela.task.constant.TaskDiscardCode;
 import solvela.enums.TaskTypeEnum;
@@ -62,7 +61,7 @@ class TaskProgressStrategyTest {
         record.setCurrentMetric(new BigDecimal(metric));
         record.setProgressData(progressData);
         record.setVersion(0);
-        record.setStatus(TaskRecordStatusEnum.RUNNING);
+        record.start();
         return record;
     }
 

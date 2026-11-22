@@ -1,6 +1,5 @@
 package solvela.admin.module.task.record.domain.form;
 
-import solvela.enums.TaskRecordStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,9 +32,6 @@ public class TaskRecordUpdateForm {
     @Schema(description = "过期时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "过期时间 不能为空")
     private LocalDateTime validEndTime;
-
-    @Schema(description = "状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期")
-    private TaskRecordStatusEnum status;
 
     @Schema(description = "进度详情")
     private String progressData;

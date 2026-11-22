@@ -140,6 +140,13 @@ public interface TaskRecordDao extends BaseMapper<TaskRecord> {
     int markDispatched(@Param("id") Long id);
 
     /**
+     * 管理端禁用：0-进行中 -> 3-已过期。只认进行中，与过期任务同一个口径。
+     *
+     * @return 1 = 已禁用；0 = 记录不在进行中（已达标、已发奖或已过期），什么都没改
+     */
+    int expireByAdmin(@Param("id") Long id);
+
+    /**
      * 仅更新进度详情（dispatchedStages 这类展示字段），不碰 current_metric / status。
      *
      * <p>⚠️ 它<b>不是</b>发奖防重的判据，允许滞后 —— 真正的防重是 t_prize_log.uk_external_biz。

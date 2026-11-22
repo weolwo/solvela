@@ -9,7 +9,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 任务记录表 实体类
@@ -94,7 +96,13 @@ public class TaskRecord {
      * 这是刻意的：status 只表示<b>最高档</b>是否达标，低档的发放情况记在
      * progress_data.dispatchedStages（展示用，非判据）。发奖防重的唯一判据是
      * t_prize_log.uk_external_biz。详见方案 §4.8。
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #start} 定，之后的迁移只走
+     * {@code TaskRecordMapper.xml} 的条件 UPDATE（状态机见 {@link TaskRecordStatusEnum#canTransitTo}）。
+     * 管理端「修改」也改不了它 —— 以前能，等于给了一条绕过运行态直接改成已发奖的路。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private TaskRecordStatusEnum status;
 
     /**
@@ -137,4 +145,13 @@ public class TaskRecord {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 接取为<b>进行中</b>。任务记录只有这一种初始状态。
+     */
+    public void start() {
+        if (status != null) {
+            throw new IllegalStateException("任务记录 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = TaskRecordStatusEnum.RUNNING;
+    }
 }

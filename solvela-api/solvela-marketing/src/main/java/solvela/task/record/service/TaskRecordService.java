@@ -216,6 +216,7 @@ public class TaskRecordService {
      */
     public void add(TaskRecordAddCommand addForm) {
         TaskRecord taskRecord = SolvelaBeanUtil.copy(addForm, TaskRecord.class);
+        taskRecord.start();
         // 任务记录是状态表，不留账号快照；但会员号必须真实存在 ——
         // 关联键指向一个查不到的会员，列表里会是一行没有名字的孤儿记录，且当场不报错
         memberService.requireExists(addForm.getMemberId());
@@ -223,8 +224,10 @@ public class TaskRecordService {
     }
 
     /**
-     * 更新
+     * 更新。
      *
+     * <p>🔴 改不了状态：命令里刻意没有 status。状态只能经运行态（达标 / 发奖）、
+     * 过期任务或 {@link #updateStatus} 的条件更新改变。
      */
     public void update(TaskRecordUpdateCommand updateForm) {
         TaskRecord taskRecord = SolvelaBeanUtil.copy(updateForm, TaskRecord.class);
@@ -245,11 +248,23 @@ public class TaskRecordService {
         if (status != TaskRecordStatusEnum.EXPIRED) {
             throw new BusinessException("任务记录只支持置为「已过期」（即管理端的「禁用」）");
         }
+        /*
+         * 🔴 只认进行中：条件更新 WHERE status = 进行中。
+         *    已完成（达标未发奖）、已发奖的记录影响 0 行 —— 以前是不带条件的 updateById，
+         *    会把已发奖的记录也改成已过期，事后看起来像「发了奖的任务过期了」。
+         *
+         * 没有包事务：逐条提交，能禁用的照常禁用，最后把没改动的告诉运营。
+         * 包成一个事务、有一条不行就整批回滚的话，运营得一条条排查是哪条拦住了整批。
+         */
+        List<Long> skipped = new ArrayList<>();
         for (Long id : idList) {
-            TaskRecord update = new TaskRecord();
-            update.setId(id);
-            update.setStatus(status);
-            taskRecordDao.updateById(update);
+            if (taskRecordDao.expireByAdmin(id) == 0) {
+                skipped.add(id);
+            }
+        }
+        if (!skipped.isEmpty()) {
+            throw new BusinessException("已禁用 " + (idList.size() - skipped.size()) + " 条；以下 "
+                    + skipped.size() + " 条不在「进行中」，未改动：" + skipped);
         }
     }
 

@@ -93,14 +93,14 @@
         SELECT
             COUNT(*)                                                      AS totalCount,
             COUNT(DISTINCT member_id)                                     AS memberCount,
-            COALESCE(SUM(status = 0), 0)                                  AS runningCount,
-            COALESCE(SUM(status = 1), 0)                                  AS completedCount,
-            COALESCE(SUM(status = 2), 0)                                  AS dispatchedCount,
-            COALESCE(SUM(status = 3), 0)                                  AS expiredCount,
-            COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0)    AS staleRunningCount,
-            COALESCE(SUM(status IN (1, 2) AND complete_time IS NULL), 0)  AS reachedNoCompleteTime,
-            COALESCE(SUM(status = 0 AND complete_time IS NOT NULL), 0)    AS runningWithCompleteTime,
-            COALESCE(SUM(status IN (1, 2)
+            COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value}), 0)                                  AS runningCount,
+            COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@COMPLETED.value}), 0)                                  AS completedCount,
+            COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@DISPATCHED.value}), 0)                                  AS dispatchedCount,
+            COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@EXPIRED.value}), 0)                                  AS expiredCount,
+            COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value} AND valid_end_time &lt; now()), 0)    AS staleRunningCount,
+            COALESCE(SUM(status IN (${@solvela.enums.TaskRecordStatusEnum@COMPLETED.value}, ${@solvela.enums.TaskRecordStatusEnum@DISPATCHED.value}) AND complete_time IS NULL), 0)  AS reachedNoCompleteTime,
+            COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value} AND complete_time IS NOT NULL), 0)    AS runningWithCompleteTime,
+            COALESCE(SUM(status IN (${@solvela.enums.TaskRecordStatusEnum@COMPLETED.value}, ${@solvela.enums.TaskRecordStatusEnum@DISPATCHED.value})
                      AND (prize_snapshot IS NULL OR JSON_LENGTH(prize_snapshot) = 0)), 0) AS reachedNoPrizeSnapshot,
             COALESCE(SUM(rule_snapshot IS NULL OR JSON_LENGTH(rule_snapshot) = 0), 0)     AS noRuleSnapshot
         FROM t_task_record
@@ -115,8 +115,8 @@
         SELECT task_config_id                                          AS taskConfigId,
                COUNT(*)                                                AS recordCount,
                COUNT(DISTINCT member_id)                               AS memberCount,
-               COALESCE(SUM(status IN (1, 2)), 0)                      AS reachedCount,
-               COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0) AS staleRunningCount
+               COALESCE(SUM(status IN (${@solvela.enums.TaskRecordStatusEnum@COMPLETED.value}, ${@solvela.enums.TaskRecordStatusEnum@DISPATCHED.value})), 0)                      AS reachedCount,
+               COALESCE(SUM(status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value} AND valid_end_time &lt; now()), 0) AS staleRunningCount
         FROM t_task_record
         <where><include refid="funnel_conditions"/></where>
         GROUP BY task_config_id
@@ -295,7 +295,7 @@
     <update id="advanceMetric">
         UPDATE t_task_record
         SET current_metric = current_metric + #{delta}
-        WHERE id = #{id} AND status = 0
+        WHERE id = #{id} AND status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value}
     </update>
 
     <!--
@@ -307,24 +307,35 @@
         SET current_metric = #{metric},
             progress_data  = #{progressData},
             version        = version + 1
-        WHERE id = #{id} AND status = 0 AND version = #{version}
+        WHERE id = #{id} AND status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value} AND version = #{version}
     </update>
 
     <!--
+      🔴 本文件里的状态值一律写成 ${@solvela.enums.TaskRecordStatusEnum@X.value}，不写数字。
+         常量改名时这里不会编译报错，而是运行期求值失败 —— TaskRecordStatusSqlTest 会渲染这些 SQL，
+         并断言达标 / 发奖 / 过期 / 禁用四条闸门与 TaskRecordStatusEnum#canTransitTo 一致。
+
       达标闸门：0-进行中 -> 1-已完成。
       complete_time 必须显式写 now()：这一列没有 ON UPDATE 兜底（铁律 9 的例外分支，
       与 approve_time / first_review_time 同类）。
     -->
     <update id="markCompleted">
         UPDATE t_task_record
-        SET status = 1, complete_time = now()
-        WHERE id = #{id} AND status = 0
+        SET status = ${@solvela.enums.TaskRecordStatusEnum@COMPLETED.value}, complete_time = now()
+        WHERE id = #{id} AND status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value}
     </update>
 
     <update id="markDispatched">
         UPDATE t_task_record
-        SET status = 2
-        WHERE id = #{id} AND status = 1
+        SET status = ${@solvela.enums.TaskRecordStatusEnum@DISPATCHED.value}
+        WHERE id = #{id} AND status = ${@solvela.enums.TaskRecordStatusEnum@COMPLETED.value}
+    </update>
+
+    <!-- 管理端禁用：只认进行中。已达标 / 已发奖的记录影响 0 行，由服务层告诉运营 -->
+    <update id="expireByAdmin">
+        UPDATE t_task_record
+        SET status = ${@solvela.enums.TaskRecordStatusEnum@EXPIRED.value}
+        WHERE id = #{id} AND status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value}
     </update>
 
     <!-- 只更新展示用的 progress_data，不碰 current_metric / status -->
@@ -350,7 +361,7 @@
     -->
     <select id="countExpirableRecord" resultType="long">
         SELECT COUNT(*) FROM t_task_record
-        WHERE status = 0 AND valid_end_time &lt; #{now}
+        WHERE status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value} AND valid_end_time &lt; #{now}
     </select>
 
     <!--
@@ -359,8 +370,8 @@
     -->
     <update id="expireRecordBatch">
         UPDATE t_task_record
-        SET status = 3
-        WHERE status = 0 AND valid_end_time &lt; #{now}
+        SET status = ${@solvela.enums.TaskRecordStatusEnum@EXPIRED.value}
+        WHERE status = ${@solvela.enums.TaskRecordStatusEnum@RUNNING.value} AND valid_end_time &lt; #{now}
         LIMIT #{limit}
     </update>
 

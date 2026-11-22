@@ -509,7 +509,7 @@ public class TaskRecordAdvanceService {
         record.setValidEndTime(config.getEndTime() == null ? FOREVER : config.getEndTime());
         record.setCurrentMetric(BigDecimal.ZERO);
         record.setVersion(0);
-        record.setStatus(TaskRecordStatusEnum.RUNNING);
+        record.start();
         record.setProgressData(JsonUtils.toJson(Map.of()));
         record.setRuleSnapshot(config.getRuleConfig() == null ? "{}" : config.getRuleConfig());
         record.setPrizeSnapshot(buildPrizeSnapshot(config.getId()));
