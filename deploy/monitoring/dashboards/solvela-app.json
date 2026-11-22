@@ -232,6 +232,81 @@
           "instant": true
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "滑块验证码：出图与判题（每 5 分钟，按结果）",
+      "description": "solvela_captcha_total。ISSUED 出图、PASSED 通过，其余是判题失败的几种（对客户端都是同一个 CAPTCHA_FAILED）：WRONG_POSITION 位置不对、TRACK_REJECTED 位置对但轨迹不像人、CHALLENGE_GONE 图过期或已验过或 id 是编的、MALFORMED 缺字段。含义见 CaptchaService.Outcome。MALFORMED / CHALLENGE_GONE 成片出现多半是脚本在直接打接口。",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 54
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(solvela_captcha_total{app=~\"$app\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "滑块通过率（通过 / 出图，15 分钟窗）",
+      "description": "自建滑块挡不住专门针对它写的脚本，这条线是「被破了」的第一信号：真人的通过率相对稳定，通过率突然抬升且出图量同时放大，就是有脚本开始解得出图了。没有基线之前先观察，不设告警阈值。",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 54
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(solvela_captcha_total{app=~\"$app\",outcome=\"PASSED\"}[15m])) / clamp_min(sum(increase(solvela_captcha_total{app=~\"$app\",outcome=\"ISSUED\"}[15m])), 1)",
+          "legendFormat": "通过率"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "滑块轨迹被拒原因（每 5 分钟）",
+      "description": "solvela_captcha_track_rejected_total。位置拖对了、轨迹不像人：有人解出了图，还没学会装人手。原因含义见 TrackChecker.Reject。某个原因突然集中出现，先确认不是误伤真人（例如某类设备的 y 天然不抖），再决定是否收紧规则。",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 63
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(solvela_captcha_track_rejected_total{app=~\"$app\"}[5m])) > 0",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "滑块通行票核销（每 5 分钟，按结果）",
+      "description": "solvela_captcha_ticket_total。CONSUMED 有效票被受保护接口核销；MISSING 没带票（发码时是还没拖的正常第一步，登录每个请求都核销所以不需要滑块的登录也落在这里，本身不是异常）；INVALID 带了过期、已用过或编造的票 —— 持续出现就是有人在重放或伪造通行票。「过了滑块但密码错」不在这里，查 t_member_risk_event 的 captcha_passed。",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 63
+      },
+      "targets": [
+        {
+          "expr": "sum by (result) (increase(solvela_captcha_ticket_total{app=~\"$app\"}[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
     }
   ],
   "templating": {

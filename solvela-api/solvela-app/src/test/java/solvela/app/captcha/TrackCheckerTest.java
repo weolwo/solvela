@@ -40,8 +40,8 @@ public class TrackCheckerTest {
     @Test
     @DisplayName("🔴 没有轨迹 / 点太少 → 拒（只交一个 x 的脚本）")
     void 没轨迹() {
-        assertEquals("too-few-points", TrackChecker.reject(null, 137, 5));
-        assertEquals("too-few-points", TrackChecker.reject(new int[][] {{0, 0, 0}, {300, 137, 1}}, 137, 5));
+        assertEquals(TrackChecker.Reject.TOO_FEW_POINTS, TrackChecker.reject(null, 137, 5));
+        assertEquals(TrackChecker.Reject.TOO_FEW_POINTS, TrackChecker.reject(new int[][] {{0, 0, 0}, {300, 137, 1}}, 137, 5));
     }
 
     @Test
@@ -51,7 +51,7 @@ public class TrackCheckerTest {
         for (int i = 0; i < 30; i++) {
             track[i] = new int[] {i * 16, i * 5, i % 2};
         }
-        assertEquals("uniform-speed", TrackChecker.reject(track, 145, 5));
+        assertEquals(TrackChecker.Reject.UNIFORM_SPEED, TrackChecker.reject(track, 145, 5));
     }
 
     @Test
@@ -61,7 +61,7 @@ public class TrackCheckerTest {
         for (int[] point : track) {
             point[2] = 0;
         }
-        assertEquals("no-y-jitter", TrackChecker.reject(track, 137, 5));
+        assertEquals(TrackChecker.Reject.NO_Y_JITTER, TrackChecker.reject(track, 137, 5));
     }
 
     @Test
@@ -71,8 +71,8 @@ public class TrackCheckerTest {
         for (int i = 0; i < fast.length; i++) {
             fast[i][0] = i;
         }
-        assertEquals("too-fast", TrackChecker.reject(fast, 137, 5));
-        assertEquals("end-mismatch", TrackChecker.reject(humanTrack(80), 137, 5));
+        assertEquals(TrackChecker.Reject.TOO_FAST, TrackChecker.reject(fast, 137, 5));
+        assertEquals(TrackChecker.Reject.END_MISMATCH, TrackChecker.reject(humanTrack(80), 137, 5));
     }
 
     @Test
@@ -80,13 +80,13 @@ public class TrackCheckerTest {
     void 畸形() {
         int[][] back = humanTrack(137);
         back[5][0] = 0;
-        assertEquals("time-goes-back", TrackChecker.reject(back, 137, 5));
+        assertEquals(TrackChecker.Reject.TIME_GOES_BACK, TrackChecker.reject(back, 137, 5));
 
         int[][] malformed = humanTrack(137);
         malformed[3] = new int[] {1, 2};
-        assertEquals("malformed", TrackChecker.reject(malformed, 137, 5));
+        assertEquals(TrackChecker.Reject.MALFORMED, TrackChecker.reject(malformed, 137, 5));
 
-        assertEquals("too-many-points",
+        assertEquals(TrackChecker.Reject.TOO_MANY_POINTS,
                 TrackChecker.reject(new int[TrackChecker.MAX_POINTS + 1][], 137, 5));
     }
 }

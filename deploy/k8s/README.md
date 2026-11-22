@@ -48,7 +48,7 @@ bash deploy/k8s/teardown.sh   # 拆
 ### 面板定义和 docker compose 那套共用
 
 ```
-deploy/monitoring/dashboards/solvela-app.json    应用与中间件层,11 个面板（含设计降级两块）—— 两边【共用同一份】
+deploy/monitoring/dashboards/solvela-app.json    应用与中间件层,15 个面板（含设计降级两块、滑块验证码四块）—— 两边【共用同一份】
 deploy/monitoring/dashboards/solvela-k8s.json    Pod/节点层,5 个面板 —— 只有这里有数据源
 ```
 

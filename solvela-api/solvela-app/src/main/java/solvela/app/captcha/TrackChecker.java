@@ -33,43 +33,70 @@ public final class TrackChecker {
     }
 
     /**
+     * 不像人的原因。只进日志和指标，绝不回给客户端。
+     *
+     * <p>⚠️ 枚举名就是指标 {@code solvela_captcha_track_rejected_total} 的 {@code reason} 标签值，
+     * 面板与告警按它查。改名等于把那条序列断掉，旧名的历史数据和新名对不上。
+     */
+    public enum Reject {
+        /** 没有轨迹或点太少 —— 只交一个 x 的脚本 */
+        TOO_FEW_POINTS,
+        /** 点数超上限 —— 在塞大包 */
+        TOO_MANY_POINTS,
+        /** 点不是 [t, x, y] 三元组 */
+        MALFORMED,
+        /** 时间戳倒退 */
+        TIME_GOES_BACK,
+        /** 拖完用时太短 —— 瞬移 */
+        TOO_FAST,
+        /** 拖完用时太长 */
+        TOO_SLOW,
+        /** 轨迹终点与提交的 x 对不上 */
+        END_MISMATCH,
+        /** y 纹丝不动 */
+        NO_Y_JITTER,
+        /** 匀速直线 */
+        UNIFORM_SPEED
+    }
+
+    /**
      * @param track   轨迹点 {@code [t, x, y]}
      * @param finalX  提交的答案 x
      * @param slack   轨迹终点与答案之间允许的误差（原图像素）
-     * @return 不像人的原因（只进日志，绝不回给客户端）；像人返回 null
+     * @return 不像人的原因；像人返回 null
      */
-    public static String reject(int[][] track, int finalX, int slack) {
+    public static Reject reject(int[][] track, int finalX, int slack) {
         if (track == null || track.length < MIN_POINTS) {
-            return "too-few-points";
+            return Reject.TOO_FEW_POINTS;
         }
         if (track.length > MAX_POINTS) {
-            return "too-many-points";
+            return Reject.TOO_MANY_POINTS;
         }
         for (int[] point : track) {
             if (point == null || point.length != 3) {
-                return "malformed";
+                return Reject.MALFORMED;
             }
         }
         for (int i = 1; i < track.length; i++) {
             if (track[i][0] < track[i - 1][0]) {
-                return "time-goes-back";
+                return Reject.TIME_GOES_BACK;
             }
         }
         long duration = (long) track[track.length - 1][0] - track[0][0];
         if (duration < MIN_DURATION_MS) {
-            return "too-fast";
+            return Reject.TOO_FAST;
         }
         if (duration > MAX_DURATION_MS) {
-            return "too-slow";
+            return Reject.TOO_SLOW;
         }
         if (Math.abs(track[track.length - 1][1] - finalX) > slack) {
-            return "end-mismatch";
+            return Reject.END_MISMATCH;
         }
         if (yNeverMoves(track)) {
-            return "no-y-jitter";
+            return Reject.NO_Y_JITTER;
         }
         if (uniformSpeed(track)) {
-            return "uniform-speed";
+            return Reject.UNIFORM_SPEED;
         }
         return null;
     }

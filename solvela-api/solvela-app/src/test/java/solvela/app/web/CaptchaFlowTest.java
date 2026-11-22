@@ -9,6 +9,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import solvela.app.captcha.CaptchaService;
+import solvela.app.captcha.TrackChecker;
 import solvela.app.captcha.TrackCheckerTest;
 import solvela.apptest.stub.CookieSessionStub;
 import solvela.auth.member.MemberTokenStore;
@@ -23,6 +26,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 滑块验证码端到端：真端口、真 Redis。下游用 {@link CookieSessionStub}。
@@ -33,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  *   <li>🔴 一张图只能验一次；一张通行票只能放行一次请求；</li>
  *   <li>🔴 位置对但不带轨迹（只交一个 x 的脚本）→ 400；</li>
  *   <li>邮箱验证码登录不拦（它的码在发码那一步已过过一次滑块）；</li>
- *   <li>同一 IP 出图超限 → 429（出图吃 CPU）。</li>
+ *   <li>同一 IP 出图超限 → 429（出图吃 CPU）；</li>
+ *   <li>🔴 出图、判题、核销票的每种结果都计到各自的标签上，并且出现在 Prometheus 抓取结果里。</li>
  * </ul>
  *
  * <h3>⚠️ 2026-10-15：登录那条路上「谁拦」变了，对外的表现没变</h3>
@@ -69,6 +75,9 @@ class CaptchaFlowTest {
 
     @Autowired
     private MemberTokenStore tokenStore;
+
+    @Autowired
+    private PrometheusMeterRegistry prometheus;
 
     @Test
     @DisplayName("🔴 发码、密码登录不带通行票 → 403 CAPTCHA_REQUIRED")
@@ -139,9 +148,71 @@ class CaptchaFlowTest {
         tokenStore.revokeAll(CookieSessionStub.MEMBER_ID);
     }
 
+    @Test
+    @DisplayName("🔴 出图、判题、核销票的每种结果各计一次，抓取结果里有这三条序列")
+    void 指标按结果计数() throws Exception {
+        Map<String, Double> before = captchaCounts();
+
+        // 判题：拖错 → 同一张图再交 → 没轨迹 → 缺 x
+        String wrong = create(freshIp()).path("captchaId").asText();
+        assertCode(post("/captcha/verify", verifyBody(wrong, answerOf(wrong) + 60), Map.of()), 400, "CAPTCHA_FAILED");
+        assertCode(post("/captcha/verify", verifyBody(wrong, 0), Map.of()), 400, "CAPTCHA_FAILED");
+        String noTrack = create(freshIp()).path("captchaId").asText();
+        assertCode(post("/captcha/verify", "{\"captchaId\":\"" + noTrack + "\",\"x\":" + answerOf(noTrack) + "}",
+                Map.of()), 400, "CAPTCHA_FAILED");
+        assertCode(post("/captcha/verify", "{\"captchaId\":\"" + noTrack + "\"}", Map.of()), 400, "CAPTCHA_FAILED");
+
+        // 核销票：有效票 → 同一张票重放 → 不带票
+        String token = solve(freshIp());
+        assertEquals(200, post("/auth/login", PASSWORD_LOGIN, Map.of("X-Captcha-Token", token)).statusCode());
+        tokenStore.revokeAll(CookieSessionStub.MEMBER_ID);
+        assertCode(post("/auth/login", PASSWORD_LOGIN, Map.of("X-Captcha-Token", token)), 403, "CAPTCHA_REQUIRED");
+        assertCode(post("/auth/login", PASSWORD_LOGIN, Map.of()), 403, "CAPTCHA_REQUIRED");
+
+        Map<String, Double> after = captchaCounts();
+        Map<String, Double> delta = new java.util.TreeMap<>();
+        after.forEach((series, count) -> delta.put(series, count - before.getOrDefault(series, 0.0)));
+        assertEquals(new java.util.TreeMap<>(Map.ofEntries(
+                Map.entry("outcome=ISSUED", 3.0),
+                Map.entry("outcome=PASSED", 1.0),
+                Map.entry("outcome=MALFORMED", 1.0),
+                Map.entry("outcome=CHALLENGE_GONE", 1.0),
+                Map.entry("outcome=WRONG_POSITION", 1.0),
+                Map.entry("outcome=TRACK_REJECTED", 1.0),
+                Map.entry("reason=TOO_FEW_POINTS", 1.0),
+                Map.entry("result=CONSUMED", 1.0),
+                Map.entry("result=INVALID", 1.0),
+                Map.entry("result=MISSING", 1.0))),
+                delta.entrySet().stream().filter(e -> e.getValue() != 0)
+                        .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                                (a, b) -> a, java.util.TreeMap::new)));
+
+        // 从没发生过的取值也要在抓取结果里（初值 0），否则「通过 / 出图」这类比值在出事前一直算不出来
+        assertThat(prometheus.scrape())
+                .contains("solvela_captcha_total{", "outcome=\"PASSED\"")
+                .contains("solvela_captcha_track_rejected_total{", "reason=\"UNIFORM_SPEED\"")
+                .contains("solvela_captcha_ticket_total{", "result=\"INVALID\"");
+    }
+
     // 「同一 IP 出图超限 → 429」2026-10-17 移交网关限流的 CAPTCHA 场景，用例在 RateLimitHttpTest
 
     // ============================== 工具 ==============================
+
+    /** 三条滑块计数的当前值，键是「标签名=取值」；同时断言每个枚举取值都已注册（初值 0 也算） */
+    private Map<String, Double> captchaCounts() {
+        Map<String, Double> counts = new java.util.HashMap<>();
+        collect(counts, "solvela.captcha", "outcome", CaptchaService.Outcome.values());
+        collect(counts, "solvela.captcha.track.rejected", "reason", TrackChecker.Reject.values());
+        collect(counts, "solvela.captcha.ticket", "result", CaptchaService.TicketResult.values());
+        return counts;
+    }
+
+    private void collect(Map<String, Double> counts, String meter, String tag, Enum<?>[] values) {
+        assertTrue(values.length > 0);
+        for (Enum<?> value : values) {
+            counts.put(tag + "=" + value.name(), prometheus.get(meter).tag(tag, value.name()).counter().count());
+        }
+    }
 
     /** 出一张图并按 Redis 里的答案拖对，返回通行票 —— 测试里读答案，真实客户端读不到 */
     private String solve(String ip) throws Exception {
