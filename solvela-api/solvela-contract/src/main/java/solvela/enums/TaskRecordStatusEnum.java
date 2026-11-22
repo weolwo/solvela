@@ -15,7 +15,7 @@ import lombok.Getter;
  * 有人调换一下常量位置就会静默改变语义。
  *
  * <p>{@link #EXPIRED} 不在这条链上：它是时间到了的旁路终态，与达标程度无关，
- * 所以 {@code atLeast} 对它没有意义。
+ * {@code atLeast} 对它单独处理（见方法注释）。
  *
  * <h3>🔴 状态机的规则在这里，闸门在 SQL 里</h3>
  * {@link #canTransitTo} 是唯一一份「谁能变成谁」的声明；真正执行迁移的是
@@ -58,13 +58,20 @@ public enum TaskRecordStatusEnum implements BaseEnum {
     private final String desc;
 
     /**
-     * 是否至少达到了 {@code other} 这一档。
+     * 是否至少达到了 {@code other} 这一档（进行中 &lt; 已完成 &lt; 已发奖）。
      *
      * <p>刻意基于 {@code value} 而不是 {@code ordinal()}：ordinal 依赖常量声明顺序，
      * 调换位置就会静默改变语义，而 value 是落库的、不可能被随手改。
+     *
+     * <p>🔴 已过期不在这条链上，要单独处理：只按 value 比的话，已过期(3) 比已完成(1) 大，
+     * {@code EXPIRED.atLeast(COMPLETED)} 会是 true —— 一条过期没达标的记录被算成「达标了」，
+     * 而且不报错。所以已过期一律不算达到任何一档；拿已过期当门槛则直接抛错，那是调用方写错了。
      */
     public boolean atLeast(TaskRecordStatusEnum other) {
-        return this.value >= other.value;
+        if (other == EXPIRED) {
+            throw new IllegalArgumentException("已过期不在达标链上，不能拿它当 atLeast 的门槛");
+        }
+        return this != EXPIRED && this.value >= other.value;
     }
 
     /**

@@ -126,6 +126,8 @@ class TaskEnumMappingTest {
         assertTrue(TaskRecordStatusEnum.DISPATCHED.atLeast(TaskRecordStatusEnum.COMPLETED));
         assertTrue(TaskRecordStatusEnum.COMPLETED.atLeast(TaskRecordStatusEnum.COMPLETED));
         assertFalse(TaskRecordStatusEnum.RUNNING.atLeast(TaskRecordStatusEnum.COMPLETED));
+        // 已过期按数值比它比已完成大，但它不是达标：曾经这里返回 true
+        assertFalse(TaskRecordStatusEnum.EXPIRED.atLeast(TaskRecordStatusEnum.COMPLETED));
 
         // 库里是 0×2257 / 2×840
         long reached = list.stream()
