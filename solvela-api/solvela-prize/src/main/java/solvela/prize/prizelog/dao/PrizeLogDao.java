@@ -2,6 +2,7 @@ package solvela.prize.prizelog.dao;
 
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
+import solvela.enums.PrizeProposalStatusEnum;
 
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,29 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
     int updateStatusByExternalBizNo(@Param("externalBizNo") String externalBizNo,
                                     @Param("status") PrizeDispatchStatusEnum status,
                                     @Param("failReason") String failReason);
+
+    /*
+     * ================= 派发处理器的三条回写 =================
+     *
+     * 🔴 都只动自己的那几列，不整行 updateById：拿着读出来的整行写回，
+     *    会把资产引擎刚写好的终态、运营刚改的审批状态一起盖回旧值。
+     *    改状态的两条带「仍是等待」的条件，抢不到返回 0，由调用方记一笔、不覆盖。
+     */
+
+    /** 等待(0) → 成功(1)：无需实际发放的奖（价值为 0），当场判成功 */
+    int markDispatchSucceeded(@Param("id") Long id);
+
+    /**
+     * 等待(0) → 失败(2)，留下原因。
+     *
+     * @param proposalStatus 同时改提案侧结果；{@code null} = 不动那一列（执行异常时还不知道提案结果）
+     */
+    int markDispatchFailed(@Param("id") Long id,
+                           @Param("failReason") String failReason,
+                           @Param("proposalStatus") PrizeProposalStatusEnum proposalStatus);
+
+    /** 提案已受理：只记提案侧结果与提案号，不碰 status —— 终态由资产引擎回写 */
+    int markProposalAccepted(@Param("id") Long id, @Param("proposalId") Long proposalId);
 
     /**
      * 按来源单号取一条发奖流水。走 {@code uk_external_biz} 唯一索引。

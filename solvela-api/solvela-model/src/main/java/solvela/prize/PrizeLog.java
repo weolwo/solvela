@@ -6,7 +6,9 @@ import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import solvela.enums.ActivityTypeEnum;
 import com.baomidou.mybatisplus.annotation.*;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -114,7 +116,13 @@ public class PrizeLog {
 
     /**
      * 执行状态：0-等待, 1-成功, 2-失败
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #awaitDispatch} 定，之后只走
+     * {@code PrizeLogMapper.xml} 带「仍是等待」条件的回写（状态机见 {@link PrizeDispatchStatusEnum#canTransitTo}）。
+     * 以前是拿着读出来的整行 set 完 {@code updateById}，会把资产引擎刚写好的终态盖回去。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private PrizeDispatchStatusEnum status;
 
     /**
@@ -160,4 +168,13 @@ public class PrizeLog {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 落为<b>等待执行</b>。发奖记录只有这一种初始状态，成功 / 失败都走条件回写。
+     */
+    public void awaitDispatch() {
+        if (status != null) {
+            throw new IllegalStateException("发奖记录 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = PrizeDispatchStatusEnum.WAITING;
+    }
 }

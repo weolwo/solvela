@@ -19,7 +19,6 @@ import solvela.prize.prizelog.domain.dto.PrizeLogFunnelDTO;
 import solvela.prize.prizelog.domain.dto.PrizeLogDTO;
 
 import solvela.member.service.MemberService;
-import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
 
 import java.util.ArrayList;
@@ -266,18 +265,12 @@ public class PrizeLogService {
      */
     public void add(PrizeLogAddCommand addForm) {
         PrizeLog prizeLog = SolvelaBeanUtil.copy(addForm, PrizeLog.class);
+        // 补发一律落「等待执行」：真正发出去要走审批通过（PrizeDispatchHandler.approveDispatch）
+        prizeLog.awaitDispatch();
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
         // ⚠️ member_name 仍是 NOT NULL 且无默认值，漏了这一句整条 INSERT 会被拒。
         prizeLog.setMemberName(memberService.requireMemberName(addForm.getMemberId()));
         prizeLogDao.insert(prizeLog);
-    }
-
-    public void updateById(PrizeLog prizeLog) {
-        int updated = prizeLogDao.updateById(prizeLog);
-        if (updated > 0) {
-            return;
-        }
-        throw new BusinessException();
     }
 
     public int save(PrizeLog prizeLog) {

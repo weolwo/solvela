@@ -1,6 +1,5 @@
 package solvela.admin.module.prize.prizelog.domain.form;
 
-import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -68,9 +67,6 @@ public class PrizeLogAddForm {
 
     @Schema(description = "过期时间")
     private LocalDateTime validUntil;
-
-    @Schema(description = "执行状态：0-等待, 1-成功, 2-失败")
-    private PrizeDispatchStatusEnum status;
 
     @Schema(description = "外部单号")
     private String externalBizNo;

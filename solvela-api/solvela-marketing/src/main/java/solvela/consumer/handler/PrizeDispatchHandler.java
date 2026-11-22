@@ -1,6 +1,5 @@
 package solvela.consumer.handler;
 
-import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.EnableStatusEnum;
 import jakarta.annotation.Resource;
@@ -28,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.function.IntSupplier;
 
 @Slf4j
 @Service
@@ -141,11 +141,10 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             applyOutcome(prizeLog, handler.dispatch(prizeLog));
         } catch (Exception e) {
             log.error("【发奖异常】执行策略时发生严重错误，LogId: {}", prizeLog.getId(), e);
-            prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
             // 必须截断：异常 message 动辄几百字，直接塞 varchar(128) 会抛 Data too long，
             // 一抛异常连状态都刷不进去，最终表现为「状态永远停在 0」——已踩过
-            prizeLog.setFailReason(SolvelaStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH));
-            updateQuietly(prizeLog);
+            String reason = SolvelaStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH);
+            writeQuietly(prizeLog, "失败", () -> prizeLogDao.markDispatchFailed(prizeLog.getId(), reason, null));
         }
     }
 
@@ -166,24 +165,23 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
      */
     private void applyOutcome(PrizeLog prizeLog, DispatchOutcome outcome) {
         if (!outcome.ok()) {
-            prizeLog.setStatus(PrizeDispatchStatusEnum.FAIL);
             // 提案侧被拒 —— 原因来自会员服务，会落库并可能展示给用户，
             // 这正是「同步调用」而不是发消息的理由：拒绝的原因当场就要拿到
-            prizeLog.setProposalStatus(PrizeProposalStatusEnum.REJECTED);
-            prizeLog.setFailReason(SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH));
+            String reason = SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH);
             log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
-            updateQuietly(prizeLog);
+            writeQuietly(prizeLog, "失败", () -> prizeLogDao.markDispatchFailed(
+                    prizeLog.getId(), reason, PrizeProposalStatusEnum.REJECTED));
             return;
         }
         if (isNoDeliveryNeeded(prizeLog)) {
-            prizeLog.setStatus(PrizeDispatchStatusEnum.SUCCESS);
-            updateQuietly(prizeLog);
+            writeQuietly(prizeLog, "成功", () -> prizeLogDao.markDispatchSucceeded(prizeLog.getId()));
             log.info("【无需发放】LogId: {}, 奖品价值为0，直接判成功", prizeLog.getId());
             return;
         }
-        prizeLog.setProposalStatus(PrizeProposalStatusEnum.ACCEPTED);
-        prizeLog.setProposalId(outcome.proposalId());
-        updateQuietly(prizeLog);
+        // 只记提案侧结果，不碰 status。以前这里整行 updateById，内存里那份 status 还是「等待」，
+        // 资产引擎若已先回写了终态，会被这一下盖回「等待」
+        writeQuietly(prizeLog, "已受理",
+                () -> prizeLogDao.markProposalAccepted(prizeLog.getId(), outcome.proposalId()));
         log.info("【发货已受理】LogId: {}, 提案ID: {}, 最终状态由资产分发引擎回写",
                 prizeLog.getId(), outcome.proposalId());
     }
@@ -202,11 +200,19 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
     }
 
     /**
-     * 状态回写自身再失败就彻底没痕迹了，单独兜一层，只落日志不外抛
+     * 回写一次结果。
+     *
+     * <p>影响 0 行不是故障：改状态的回写带着「仍是等待」的条件，0 行说明终态已经被别人写过
+     *（资产引擎的异步回写、对账任务重投），这一次不覆盖。
+     *
+     * <p>回写自身抛异常才是故障：再往外抛就彻底没痕迹了，所以计降级、落日志、不外抛
+     *（降级点 {@code PRIZE_STATUS_WRITEBACK_FAILED} 在后台看得见）。
      */
-    private void updateQuietly(PrizeLog prizeLog) {
+    private void writeQuietly(PrizeLog prizeLog, String what, IntSupplier write) {
         try {
-            prizeLogService.updateById(prizeLog);
+            if (write.getAsInt() == 0) {
+                log.warn("【发奖状态回写】LogId: {} 想写成「{}」，但它已不在等待状态，本次不覆盖", prizeLog.getId(), what);
+            }
         } catch (Exception e) {
             Degradations.record(DegradePoint.PRIZE_STATUS_WRITEBACK_FAILED);
             log.error("【发奖状态回写失败】LogId: {}, 状态将停留在旧值，请人工核对", prizeLog.getId(), e);
@@ -244,7 +250,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         log.setApproveStatus(config.getApproveMode() == ApproveModeEnum.MANUAL
                 ? PrizeApproveStatusEnum.PENDING
                 : PrizeApproveStatusEnum.NOT_REQUIRED);
-        log.setStatus(PrizeDispatchStatusEnum.WAITING);
+        log.awaitDispatch();
 
         return log;
     }

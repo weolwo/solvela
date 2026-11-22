@@ -1,7 +1,6 @@
 package solvela.prize.prizelog.domain.command;
 
 
-import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import java.time.LocalDateTime;
@@ -65,9 +64,6 @@ public class PrizeLogAddCommand {
 
     /** 过期时间 */
     private LocalDateTime validUntil;
-
-    /** 执行状态：0-等待, 1-成功, 2-失败 */
-    private PrizeDispatchStatusEnum status;
 
     /** 外部单号 */
     private String externalBizNo;

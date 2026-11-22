@@ -1,6 +1,7 @@
 package solvela.admin.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -267,8 +268,10 @@ class TaskRuntimeP0AcceptanceTest {
                     log.setPrizeCode(rs.getString("prize_code"));
                     log.setPrizeName(rs.getString("prize_name"));
                     log.setExternalBizNo(rs.getString("external_biz_no"));
-                    // 手工装配：JdbcTemplate 不经过 MyBatis 的 TypeHandler，得自己把 int 映回枚举
-                    log.setStatus(SolvelaEnumUtil.getEnumByValue(rs.getInt("status"), PrizeDispatchStatusEnum.class));
+                    // 手工装配：JdbcTemplate 不经过 MyBatis 的 TypeHandler，得自己把 int 映回枚举。
+                    // status 没有公开 setter（迁移只走条件回写），这里走 MyBatis 读库时的同一条反射路径
+                    SystemMetaObject.forObject(log).setValue("status",
+                            SolvelaEnumUtil.getEnumByValue(rs.getInt("status"), PrizeDispatchStatusEnum.class));
                     log.setFailReason(rs.getString("fail_reason"));
                     return log;
                 }, memberId, recordId + ":%");

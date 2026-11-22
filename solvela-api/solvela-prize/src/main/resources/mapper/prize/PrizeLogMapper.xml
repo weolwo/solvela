@@ -267,7 +267,35 @@
         set status      = #{status},
             fail_reason = #{failReason}
         where external_biz_no = #{externalBizNo}
-          and status = 0
+          and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
+    </update>
+
+    <!--
+      派发处理器的三条回写。🔴 只动自己的列，不整行写回；改状态的两条带「仍是等待」的条件。
+      状态值写成 ${@...@X.value} 引用枚举，PrizeLogStatusSqlTest 渲染这些 SQL 并断言迁移都在
+      PrizeDispatchStatusEnum#canTransitTo 里。
+    -->
+    <update id="markDispatchSucceeded">
+        update t_prize_log
+        set status = ${@solvela.enums.PrizeDispatchStatusEnum@SUCCESS.value}
+        where id = #{id}
+          and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
+    </update>
+
+    <update id="markDispatchFailed">
+        update t_prize_log
+        set status      = ${@solvela.enums.PrizeDispatchStatusEnum@FAIL.value},
+            fail_reason = #{failReason}
+            <if test="proposalStatus != null">, proposal_status = #{proposalStatus}</if>
+        where id = #{id}
+          and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
+    </update>
+
+    <update id="markProposalAccepted">
+        update t_prize_log
+        set proposal_status = ${@solvela.enums.PrizeProposalStatusEnum@ACCEPTED.value},
+            proposal_id     = #{proposalId}
+        where id = #{id}
     </update>
 
     <!--
