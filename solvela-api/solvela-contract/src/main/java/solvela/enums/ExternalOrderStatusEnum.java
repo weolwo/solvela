@@ -1,6 +1,5 @@
 package solvela.enums;
 
-import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
@@ -25,7 +24,7 @@ import lombok.Getter;
  * @Date 2026-09-15
  */
 @Getter
-public enum ExternalOrderStatusEnum {
+public enum ExternalOrderStatusEnum implements BaseEnum {
 
     /** 待支付。券已经<b>锁定</b>但还没确认 —— 这一段就是三阶段核销存在的理由 */
     UNPAID(0, "待支付"),
@@ -56,7 +55,6 @@ public enum ExternalOrderStatusEnum {
     FAILED(60, "充值失败"),
     ;
 
-    @EnumValue
     private final Integer value;
 
     private final String desc;
