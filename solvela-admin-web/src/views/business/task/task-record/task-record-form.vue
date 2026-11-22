@@ -42,9 +42,7 @@
       <a-form-item label="当前进度值" name="currentMetric">
         <a-input-number style="width: 100%" v-model:value="form.currentMetric" placeholder="如已签到 3 天" />
       </a-form-item>
-      <a-form-item label="状态" name="status">
-        <a-select style="width: 100%" v-model:value="form.status" :options="RECORD_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
-      </a-form-item>
+      <!-- 状态不在这里改：后端的「修改」刻意不接收 status，只能经运行态、过期任务或列表页的「禁用」改变 -->
       <a-form-item label="达标时间" name="completeTime">
         <a-date-picker show-time valueFormat="YYYY-MM-DD HH:mm:ss" v-model:value="form.completeTime" style="width: 100%" placeholder="达标时间" />
       </a-form-item>
@@ -66,7 +64,6 @@
   import { SolvelaLoading } from '/@/components/framework/solvela-loading';
   import { taskRecordApi } from '/src/api/business/task/task-record-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
-  import { RECORD_STATUS_OPTIONS } from '/src/constants/business/task/task-record-const';
   import SolvelaEnumSelect from '/@/components/framework/solvela-enum-select/index.vue';
 
   // ------------------------ 事件 ------------------------
@@ -111,7 +108,6 @@
     validStartTime: undefined, //开始时间
     validEndTime: undefined, //过期时间
     currentMetric: undefined, //当前进度值：如已签到 3.0000 天
-    status: undefined, //状态：0-进行中, 1-已完成, 2-已发奖, 3-已过期
     progressData: undefined, //进度详情
     ruleSnapshot: undefined, //接取任务时的规则快照
     prizeSnapshot: undefined, //接取任务时的奖励快照

@@ -116,7 +116,7 @@
   import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
   import { PRIZE_TYPE_ENUM } from '/src/constants/business/prize/prize-config-const';
-  import { APPROVE_STATUS_ENUM, DISPATCH_STATUS_ENUM } from '/src/constants/business/prize/prize-log-const';
+  import { APPROVE_STATUS_ENUM } from '/src/constants/business/prize/prize-log-const';
 
   const emits = defineEmits(['reloadList']);
 
@@ -150,9 +150,8 @@
     validUntil: undefined,
     remark: undefined,
     externalBizNo: undefined,
-    // 见文件头注释：这两个值刻意写死，不给运营选
+    // 见文件头注释：审批状态刻意写死，不给运营选。派发状态不由前端传，后端一律落「等待执行」
     approveStatus: APPROVE_STATUS_ENUM.PENDING.value,
-    status: DISPATCH_STATUS_ENUM.WAITING.value,
   };
 
   const form = reactive({ ...formDefault });
