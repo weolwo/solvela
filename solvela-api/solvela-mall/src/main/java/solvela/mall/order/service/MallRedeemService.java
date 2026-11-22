@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import solvela.enums.MallCommodityStatusEnum;
-import solvela.enums.MallOrderStatusEnum;
 import solvela.enums.MallPayTypeEnum;
 import solvela.mall.MallAddress;
 import solvela.mall.MallCommodity;
@@ -372,7 +371,7 @@ public class MallRedeemService {
      * 而且这条几乎不可能发生：券是本事务几行之前刚锁上的。
      */
     private void confirmCouponIfSettled(MallOrder order, CouponUse couponUse) {
-        if (couponUse.couponId() == null || MallOrderStatusEnum.PENDING != order.getStatus()) {
+        if (couponUse.couponId() == null || !order.getStatus().isSettled()) {
             return;
         }
         CouponWriteOffView confirmed = couponWriteOffApi.confirm(new CouponWriteOffCmd(
@@ -491,12 +490,12 @@ public class MallRedeemService {
      * 那条路要等支付回调把它推到 10，而支付链路至今一行代码都没有。
      */
     private void publishFulfillment(MallOrder order) {
-        if (MallOrderStatusEnum.PENDING == order.getStatus()) {
+        if (order.getStatus().isSettled()) {
             eventPublisher.publishEvent(new MallOrderPendingEvent(order.getOrderNo()));
             /*
              * 打点：这一单付掉了。
              *
-             * 🔴 判据和履约<b>刻意是同一个</b>（status == PENDING），不是巧合：
+             * 🔴 判据和履约<b>刻意是同一个</b>（{@code isSettled()}，落单时即 PENDING），不是巧合：
              *    「资产已经结清」这件事同时决定了「可以发货」和「算不算消费」。
              *    payType=2 的混合单此刻落在 0-待支付，钱还没收 —— 它的 ORDER_PAID
              *    由 MallPayService 在支付确认时发，不在这里。
@@ -621,13 +620,9 @@ public class MallRedeemService {
         order.setAddressId(address == null ? null : address.getId());
 
         if (hangs) {
-            // 积分+现金要等支付回调，中间悬着；到点由超时释放 job 取消并放回库存
-            order.setStatus(MallOrderStatusEnum.UNPAID);
-            order.setExpireTime(LocalDateTime.now().plusMinutes(PAY_EXPIRE_MINUTES));
+            order.awaitPayment(LocalDateTime.now().plusMinutes(PAY_EXPIRE_MINUTES));
         } else {
-            // 纯积分是同步扣的，不存在悬挂：直接进待履约
-            order.setStatus(MallOrderStatusEnum.PENDING);
-            order.setPayTime(LocalDateTime.now());
+            order.settleOnCreate(LocalDateTime.now());
         }
         // 秒杀那两列对普通订单填 NORMAL 即可（DDL 里为将来的场次预留）
         order.setSourceType(MallOrderSourceEnum.NORMAL);

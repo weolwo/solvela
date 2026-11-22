@@ -10,7 +10,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 商城-兑换订单 实体类
@@ -173,7 +175,13 @@ public class MallOrder {
 
     /**
      * 状态：0-待支付, 10-待履约, 20-履约中, 30-已完成, 40-已取消, 50-已退款, 60-履约失败
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #awaitPayment} / {@link #settleOnCreate} 定，
+     * 之后的迁移只走 {@code MallOrderDao} 的条件 UPDATE（状态机见 {@link MallOrderStatusEnum#canTransitTo}）。
+     * 在内存里改完再整行写回，并发下会覆盖掉别人刚抢到的状态。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private MallOrderStatusEnum status;
 
     /**
@@ -240,5 +248,30 @@ public class MallOrder {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 落单为<b>待支付</b>：积分+现金单要等支付，中间悬着，到 {@code expireTime} 由超时 job 取消并放回库存。
+     */
+    public void awaitPayment(LocalDateTime expireTime) {
+        requireNew();
+        this.status = MallOrderStatusEnum.UNPAID;
+        this.expireTime = expireTime;
+    }
+
+    /**
+     * 落单即<b>待履约</b>：纯积分单在落单前已经同步扣完积分，不存在悬挂。
+     */
+    public void settleOnCreate(LocalDateTime payTime) {
+        requireNew();
+        this.status = MallOrderStatusEnum.PENDING;
+        this.payTime = payTime;
+    }
+
+    /** 两个落单方法只对还没定过状态的新单有效：对已有订单调用说明调用方拿错了对象 */
+    private void requireNew() {
+        if (status != null) {
+            throw new IllegalStateException("订单 " + orderNo + " 已是 " + status + "，不能再定初始状态");
+        }
+    }
 
 }

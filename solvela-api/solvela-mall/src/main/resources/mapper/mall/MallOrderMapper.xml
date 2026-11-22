@@ -136,12 +136,13 @@
       这个数随退款进度来回跳。
     -->
     <!--
-        下面这些 status 字面量对应 MallOrderStatusEnum（0/10/20/30/40/50/60）。
-        聚合表达式没法引用 Java 枚举 —— SUM(CASE WHEN ...) 是在库里算的，
-        改枚举取值时必须回来手动同步这里，编译器帮不上忙。
+        🔴 本文件里的状态值一律写成 ${@solvela.enums.MallOrderStatusEnum@X.value}，不写数字：
+        MyBatis 在发 SQL 之前就把它求值成常量，库里看到的仍是 status NOT IN (0, 40)。
+        枚举常量改名时这里不会编译报错，而是运行期求值失败 ——
+        MallOrderStatusSqlTest 会渲染这些 SQL，并断言本片段与 MallOrderStatusEnum#isSettled 口径一致。
     -->
     <sql id="paid_statuses">
-        status NOT IN (0, 40)
+        status NOT IN (${@solvela.enums.MallOrderStatusEnum@UNPAID.value}, ${@solvela.enums.MallOrderStatusEnum@CANCELLED.value})
     </sql>
 
     <select id="queryPage" resultMap="MallOrderDTO">
@@ -166,10 +167,10 @@
             COUNT(1)                                                              AS orderCount,
             COUNT(DISTINCT member_id)                                             AS memberCount,
             IFNULL(SUM(quantity), 0)                                              AS quantitySum,
-            SUM(CASE WHEN status = 30 THEN 1 ELSE 0 END)                          AS finishedCount,
-            SUM(CASE WHEN status IN (10, 20) THEN 1 ELSE 0 END)                   AS processingCount,
-            SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END)                   AS cancelledCount,
-            SUM(CASE WHEN status = 60 THEN 1 ELSE 0 END)                          AS failedCount,
+            SUM(CASE WHEN status = ${@solvela.enums.MallOrderStatusEnum@FINISHED.value} THEN 1 ELSE 0 END) AS finishedCount,
+            SUM(CASE WHEN status IN (${@solvela.enums.MallOrderStatusEnum@PENDING.value}, ${@solvela.enums.MallOrderStatusEnum@FULFILLING.value}) THEN 1 ELSE 0 END) AS processingCount,
+            SUM(CASE WHEN status IN (${@solvela.enums.MallOrderStatusEnum@CANCELLED.value}, ${@solvela.enums.MallOrderStatusEnum@REFUNDED.value}) THEN 1 ELSE 0 END) AS cancelledCount,
+            SUM(CASE WHEN status = ${@solvela.enums.MallOrderStatusEnum@FAILED.value} THEN 1 ELSE 0 END) AS failedCount,
             IFNULL(SUM(CASE WHEN <include refid="paid_statuses"/> THEN pay_points ELSE 0 END), 0) AS payPointsSum,
             IFNULL(SUM(CASE WHEN <include refid="paid_statuses"/> THEN pay_cash   ELSE 0 END), 0) AS payCashSum
         FROM t_mall_order

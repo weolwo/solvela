@@ -9,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import solvela.enums.MallOrderStatusEnum;
 import solvela.mall.MallOrder;
 import solvela.mall.commodity.dao.MallCommodityDao;
 import solvela.mall.exchangelimit.dao.MallExchangeLimitDao;
@@ -24,6 +23,7 @@ import solvela.member.api.CouponWriteOffView;
 import solvela.notification.service.NotificationService;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -163,7 +163,7 @@ class MallOrderCancelServiceTest {
         order.setSkuId(1L);
         order.setQuantity(1);
         order.setPayPoints(4000);
-        order.setStatus(MallOrderStatusEnum.UNPAID);
+        order.awaitPayment(LocalDateTime.now().plusMinutes(15));
         order.setCouponId(COUPON_ID);
         order.setCouponDiscount(new BigDecimal("1000"));
         return order;

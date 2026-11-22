@@ -12,7 +12,6 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.enumeration.SystemEnvironmentEnum;
-import solvela.enums.MallOrderStatusEnum;
 import solvela.mall.order.event.MallOrderActionPublisher;
 import solvela.mall.MallOrder;
 import solvela.mall.order.dao.MallOrderDao;
@@ -25,6 +24,7 @@ import solvela.member.api.CouponWriteOffCmd;
 import solvela.member.api.CouponWriteOffView;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -249,7 +249,7 @@ class MallPayServiceTest {
         order.setMemberId(MEMBER_ID);
         order.setSkuId(1L);
         order.setQuantity(1);
-        order.setStatus(MallOrderStatusEnum.UNPAID);
+        order.awaitPayment(LocalDateTime.now().plusMinutes(15));
         order.setPayPoints(5000);
         order.setPayCash(new BigDecimal("40.00"));
         order.setCouponId(COUPON_ID);

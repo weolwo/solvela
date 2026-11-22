@@ -54,15 +54,18 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
 
     /* ================= 履约状态机 =================
      *
-     * 三个方法都是「条件 UPDATE」，都靠 affected rows 判成败，都不读后写。
+     * 五个 mark* 都是「条件 UPDATE」，都靠 affected rows 判成败，都不读后写。
      * 状态迁移写在 WHERE 里而不是先 select 再判断 —— 后者在并发下必然出现
      * 两个线程同时读到 10、同时认为自己该发货。
      *
      * 🔴 update_time 一律不出现在 SET 里：那一列是 ON UPDATE CURRENT_TIMESTAMP，
      * 数据库自己会填（铁律 9：时间只认数据库时钟）。
      *
-     * ⚠️ 状态值这里是硬编码的数字，因为它们要进 SQL。改 MallOrderStatusEnum
-     * 的取值时这几条要一起改 —— MallFulfillStateTest 会在改错时变红。
+     * 🔴 状态值写成 ${@solvela.enums.MallOrderStatusEnum@X.value}（OGNL 静态引用），不写数字：
+     * 改枚举取值时 SQL 自动跟着变。代价是枚举常量改名时这里不会编译报错，
+     * 而是运行期 OGNL 求值失败 —— MallOrderStatusSqlTest 会渲染每一条 SQL，
+     * 并断言 DAO 的迁移与 MallOrderStatusEnum#canTransitTo 一一对应。
+     * ${} 里只有常量、没有入参，不存在注入。
      */
 
     /**
@@ -75,14 +78,18 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      * <b>没有</b> {@code UNIQUE(source_type, source_biz_id)}，重复发券拦不住。
      * 实物和钱包那两条路各自有唯一键兜底，券这条只有这里。
      */
-    @Update("UPDATE t_mall_order SET status = 20 WHERE order_no = #{orderNo} AND status = 10")
+    @Update("""
+            UPDATE t_mall_order
+               SET status = ${@solvela.enums.MallOrderStatusEnum@FULFILLING.value}
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.MallOrderStatusEnum@PENDING.value}
+            """)
     int markFulfilling(@Param("orderNo") String orderNo);
 
     /** 履约中(20) → 已完成(30)，回填履约单引用 */
     @Update("""
             UPDATE t_mall_order
-               SET status = 30, fulfill_ref_id = #{fulfillRefId}, finish_time = NOW()
-             WHERE order_no = #{orderNo} AND status = 20
+               SET status = ${@solvela.enums.MallOrderStatusEnum@FINISHED.value}, fulfill_ref_id = #{fulfillRefId}, finish_time = NOW()
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.MallOrderStatusEnum@FULFILLING.value}
             """)
     int markFinished(@Param("orderNo") String orderNo, @Param("fulfillRefId") String fulfillRefId);
 
@@ -95,8 +102,8 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      */
     @Update("""
             UPDATE t_mall_order
-               SET status = 60, fail_reason = #{failReason}
-             WHERE order_no = #{orderNo} AND status = 20
+               SET status = ${@solvela.enums.MallOrderStatusEnum@FAILED.value}, fail_reason = #{failReason}
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.MallOrderStatusEnum@FULFILLING.value}
             """)
     int markFailed(@Param("orderNo") String orderNo, @Param("failReason") String failReason);
 
@@ -115,8 +122,8 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      */
     @Update("""
             UPDATE t_mall_order
-               SET status = 10, pay_time = NOW()
-             WHERE order_no = #{orderNo} AND status = 0
+               SET status = ${@solvela.enums.MallOrderStatusEnum@PENDING.value}, pay_time = NOW()
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.MallOrderStatusEnum@UNPAID.value}
             """)
     int markPaid(@Param("orderNo") String orderNo);
 
@@ -132,8 +139,8 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      */
     @Update("""
             UPDATE t_mall_order
-               SET status = 40, cancel_time = NOW(), fail_reason = #{reason}
-             WHERE order_no = #{orderNo} AND status = 0
+               SET status = ${@solvela.enums.MallOrderStatusEnum@CANCELLED.value}, cancel_time = NOW(), fail_reason = #{reason}
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.MallOrderStatusEnum@UNPAID.value}
             """)
     int markCancelled(@Param("orderNo") String orderNo, @Param("reason") String reason);
 
@@ -145,7 +152,7 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
      */
     @Select("""
             SELECT * FROM t_mall_order
-             WHERE status = 0 AND expire_time IS NOT NULL AND expire_time < #{now}
+             WHERE status = ${@solvela.enums.MallOrderStatusEnum@UNPAID.value} AND expire_time IS NOT NULL AND expire_time < #{now}
              ORDER BY expire_time
              LIMIT #{limit}
             """)
@@ -158,10 +165,11 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
     /**
      * 窗口内<b>已经扣款成功</b>的订单，供打点反查补推用（{@code MallOrderAuditProvider}）。
      *
-     * <h3>🔴 判据 {@code status NOT IN (0, 40)} 和统计口径是<b>同一份</b></h3>
-     * 它就是 {@code MallOrderMapper.xml} 里 {@code paid_statuses} 那个片段的字面复制：
-     * 待支付(0) 与已取消(40) 不算，其余都算过款（已退款(50) 也算 ——
-     * 它确实扣过，退款是另一笔账）。
+     * <h3>🔴 判据 {@code status NOT IN (待支付, 已取消)} 和统计口径是<b>同一份</b></h3>
+     * 它和 {@code MallOrderMapper.xml} 的 {@code paid_statuses} 片段、
+     * {@link solvela.enums.MallOrderStatusEnum#isSettled} 是同一条口径：
+     * 待支付与已取消不算，其余都算过款（已退款也算 —— 它确实扣过，退款是另一笔账）。
+     * 三处由 {@code MallOrderStatusSqlTest} 守着一致。
      *
      * <p>另写一套判断是漂移的开始：宽了会给一批没付钱的单补出任务进度，
      * 窄了则补不全 —— 而"补不全"的表现和"根本没配这个任务"一模一样，不会有人发现。
@@ -176,7 +184,7 @@ public interface MallOrderDao extends BaseMapper<MallOrder> {
             SELECT * FROM t_mall_order
              WHERE pay_time IS NOT NULL
                AND pay_time >= #{from} AND pay_time <= #{to}
-               AND status NOT IN (0, 40)
+               AND status NOT IN (${@solvela.enums.MallOrderStatusEnum@UNPAID.value}, ${@solvela.enums.MallOrderStatusEnum@CANCELLED.value})
              ORDER BY pay_time
              LIMIT #{limit}
             """)
