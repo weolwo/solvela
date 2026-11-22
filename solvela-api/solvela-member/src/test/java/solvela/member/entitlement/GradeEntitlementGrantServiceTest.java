@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DuplicateKeyException;
 import solvela.enums.EnableStatusEnum;
+import solvela.enums.EntitlementGrantStatusEnum;
 import solvela.member.GradeEntitlement;
 import solvela.member.GradeEntitlementGrant;
 import solvela.member.entitlement.dao.GradeEntitlementDao;
@@ -110,7 +111,7 @@ class GradeEntitlementGrantServiceTest {
 
         assertEquals("202609", g.getPeriodKey(), "月度券的周期键是 yyyyMM");
         assertEquals(4, g.getGradeCode(), "等级是生成时的快照，不是配置里的 minGrade");
-        assertEquals(EntitlementGrantStatus.PENDING, g.getStatus());
+        assertEquals(EntitlementGrantStatusEnum.PENDING, g.getStatus());
         assertEquals("ENT0000001", g.getEntitlementCode(), "编码要快照，配置改名后历史记录仍是当时那个");
         assertTrue(g.getGrantBizId() != null && !g.getGrantBizId().isBlank(),
                 "发放单号必须在生成时就定下来 —— 领取时现生成的话，一次超时重试就换号，资产侧的防重失效");

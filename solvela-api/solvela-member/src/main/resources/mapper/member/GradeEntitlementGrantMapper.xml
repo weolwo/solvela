@@ -47,14 +47,18 @@
     -->
     <update id="expirePending">
         UPDATE t_grade_entitlement_grant
-        SET status = 2
-        WHERE status = 0
+        SET status = ${@solvela.enums.EntitlementGrantStatusEnum@EXPIRED.value}
+        WHERE status = ${@solvela.enums.EntitlementGrantStatusEnum@PENDING.value}
         AND expire_time &lt;= #{now}
         LIMIT #{limit}
     </update>
 
     <!--
       领取：条件更新抢占。
+
+      🔴 本文件里的状态值写成 ${@solvela.enums.EntitlementGrantStatusEnum@X.value}，不写数字。
+         常量改名时这里不会编译报错，而是运行期求值失败 —— EntitlementGrantStatusSqlTest 会渲染这些 SQL，
+         并断言领取 / 过期两条闸门与 EntitlementGrantStatusEnum#canTransitTo 一一对应。
 
       🔴 带 member_id 是【越权防线】，不是冗余条件：只用 id 的话，
          改一个请求参数就能领走别人的权益。
@@ -63,10 +67,10 @@
     -->
     <update id="tryClaim">
         UPDATE t_grade_entitlement_grant
-        SET status = 1, claim_time = #{now}
+        SET status = ${@solvela.enums.EntitlementGrantStatusEnum@CLAIMED.value}, claim_time = #{now}
         WHERE id = #{id}
         AND member_id = #{memberId}
-        AND status = 0
+        AND status = ${@solvela.enums.EntitlementGrantStatusEnum@PENDING.value}
         AND expire_time &gt; #{now}
     </update>
 

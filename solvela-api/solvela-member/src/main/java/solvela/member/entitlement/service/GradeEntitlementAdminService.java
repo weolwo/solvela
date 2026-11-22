@@ -10,7 +10,7 @@ import solvela.enums.EnableStatusEnum;
 import solvela.exception.BusinessException;
 import solvela.member.GradeEntitlement;
 import solvela.member.GradeEntitlementGrant;
-import solvela.member.entitlement.EntitlementGrantStatus;
+import solvela.enums.EntitlementGrantStatusEnum;
 import solvela.member.entitlement.EntitlementType;
 import solvela.member.entitlement.dao.GradeEntitlementDao;
 import solvela.member.entitlement.dao.GradeEntitlementGrantDao;
@@ -99,7 +99,7 @@ public class GradeEntitlementAdminService {
             long pending = gradeEntitlementGrantDao.selectCount(
                     new LambdaQueryWrapper<GradeEntitlementGrant>()
                             .eq(GradeEntitlementGrant::getEntitlementId, id)
-                            .eq(GradeEntitlementGrant::getStatus, EntitlementGrantStatus.PENDING));
+                            .eq(GradeEntitlementGrant::getStatus, EntitlementGrantStatusEnum.PENDING));
             if (pending > 0) {
                 // 说清影响面：这些人还能领，停用只是不再生成新的
                 log.warn("【权益配置】停用 {}（{}），当前还有 {} 条待领取 —— 它们仍然可以领取，"

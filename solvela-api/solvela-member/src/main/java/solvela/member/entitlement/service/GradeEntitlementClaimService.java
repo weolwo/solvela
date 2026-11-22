@@ -9,7 +9,7 @@ import solvela.member.GradeEntitlementGrant;
 import solvela.member.api.AssetGrantApi;
 import solvela.member.api.AssetGrantCmd;
 import solvela.member.api.AssetGrantResult;
-import solvela.member.entitlement.EntitlementGrantStatus;
+import solvela.enums.EntitlementGrantStatusEnum;
 import solvela.member.entitlement.dao.GradeEntitlementDao;
 import solvela.member.entitlement.dao.GradeEntitlementGrantDao;
 import solvela.enums.AssetBizTypeEnum;
@@ -151,10 +151,10 @@ public class GradeEntitlementClaimService {
      * 并发下另一个请求刚刚领走的。两种情况对用户是同一句话，不必区分。
      */
     private String describeWhyNotClaimable(GradeEntitlementGrant grant, LocalDateTime now) {
-        if (grant.getStatus() != null && grant.getStatus() == EntitlementGrantStatus.CLAIMED) {
+        if (grant.getStatus() == EntitlementGrantStatusEnum.CLAIMED) {
             return "这份权益已经领过了";
         }
-        if (grant.getStatus() != null && grant.getStatus() == EntitlementGrantStatus.EXPIRED) {
+        if (grant.getStatus() == EntitlementGrantStatusEnum.EXPIRED) {
             return "这份权益已过期";
         }
         if (grant.getExpireTime() != null && !grant.getExpireTime().isAfter(now)) {

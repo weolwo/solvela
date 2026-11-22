@@ -10,7 +10,6 @@ import solvela.base.util.SolvelaCodeUtil;
 import solvela.enums.EnableStatusEnum;
 import solvela.member.GradeEntitlement;
 import solvela.member.GradeEntitlementGrant;
-import solvela.member.entitlement.EntitlementGrantStatus;
 import solvela.member.entitlement.EntitlementType;
 import solvela.member.entitlement.dao.GradeEntitlementDao;
 import solvela.member.entitlement.dao.GradeEntitlementGrantDao;
@@ -169,8 +168,7 @@ public class GradeEntitlementGrantService {
         grant.setMemberId(candidate.getMemberId());
         grant.setPeriodKey(periodKey);
         grant.setGradeCode(candidate.getGradeCode());
-        grant.setStatus(EntitlementGrantStatus.PENDING);
-        grant.setExpireTime(expireTime);
+        grant.awaitClaim(expireTime);
         /*
          * 🔴 发放单号在【生成时】就定下来并落库，不是领取时现生成。
          *

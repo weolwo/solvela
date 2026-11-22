@@ -3,7 +3,10 @@ package solvela.member;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
+import solvela.enums.EntitlementGrantStatusEnum;
 
 import java.time.LocalDateTime;
 
@@ -50,8 +53,15 @@ public class GradeEntitlementGrant {
     /** 生成时的会员等级<b>快照</b> */
     private Integer gradeCode;
 
-    /** 0-待领取, 1-已领取, 2-已过期。取值见 {@code EntitlementGrantStatus} */
-    private Integer status;
+    /**
+     * 0-待领取, 1-已领取, 2-已过期。
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #awaitClaim} 定，
+     * 之后的迁移只走 {@code GradeEntitlementGrantMapper.xml} 的条件 UPDATE
+     *（状态机见 {@link EntitlementGrantStatusEnum#canTransitTo}）。MyBatis 读库时直接写字段，不需要 setter。
+     */
+    @Setter(AccessLevel.NONE)
+    private EntitlementGrantStatusEnum status;
 
     /** 领取截止时间。到点由 job 置为已过期 */
     private LocalDateTime expireTime;
@@ -75,4 +85,15 @@ public class GradeEntitlementGrant {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    /**
+     * 生成为<b>待领取</b>，到 {@code expireTime} 由 job 置为已过期。权益发放只有这一种初始状态。
+     */
+    public void awaitClaim(LocalDateTime expireTime) {
+        if (status != null) {
+            throw new IllegalStateException("权益发放 " + grantBizId + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = EntitlementGrantStatusEnum.PENDING;
+        this.expireTime = expireTime;
+    }
 }

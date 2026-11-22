@@ -76,7 +76,8 @@ public class GradeEntitlementQueryService {
                     e == null ? g.getEntitlementCode() : e.getEntitlementName(),
                     e == null ? "" : e.getAssetName(),
                     g.getPeriodKey(),
-                    g.getStatus(),
+                    // 契约上仍是数值：枚举化不改对外形状，C 端按 0/1/2 判
+                    g.getStatus() == null ? null : g.getStatus().getValue(),
                     g.getExpireTime(),
                     g.getClaimTime());
         }).toList();
