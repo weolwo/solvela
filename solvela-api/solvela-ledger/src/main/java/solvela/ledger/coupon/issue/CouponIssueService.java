@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import solvela.coupon.CouponTemplate;
-import solvela.enums.CouponStatusEnum;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.template.service.CouponTemplateService;
 import solvela.enums.CouponTypeEnum;
@@ -91,7 +90,7 @@ public class CouponIssueService {
         coupon.setCouponType(DEFAULT_COUPON_TYPE);
         coupon.setSourceType(cmd.sourceType());
         coupon.setSourceBizId(cmd.sourceBizId());
-        coupon.setStatus(CouponStatusEnum.UNUSED);
+        coupon.issue();
 
         LocalDateTime now = LocalDateTime.now();
         coupon.setValidStartTime(now);

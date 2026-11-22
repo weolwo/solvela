@@ -148,7 +148,7 @@
         SELECT
         COUNT(*) AS issuedCount,
         COUNT(DISTINCT member_id) AS issuedMemberCount,
-        COALESCE(SUM(status = 1), 0) AS issuedUsedCount
+        COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@USED.value}), 0) AS issuedUsedCount
         FROM t_member_coupon
         <where>
             <include refid="stat_window_issued"/>
@@ -186,15 +186,15 @@
     -->
     <select id="selectStockStat" resultType="java.util.Map">
         SELECT COUNT(*)                                                         AS stockTotalCount,
-               COALESCE(SUM(status = 0), 0)                                     AS stockUnusedCount,
-               COALESCE(SUM(status = 1), 0)                                     AS stockUsedCount,
-               COALESCE(SUM(status = 2), 0)                                     AS stockExpiredCount,
-               COALESCE(SUM(status = 3), 0)                                     AS stockVoidCount,
-               COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0)       AS staleUnusedCount,
-               COALESCE(SUM(status = 0 AND valid_end_time &gt;= now()
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value}), 0)                                     AS stockUnusedCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@USED.value}), 0)                                     AS stockUsedCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@EXPIRED.value}), 0)                                     AS stockExpiredCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@VOIDED.value}), 0)                                     AS stockVoidCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value} AND valid_end_time &lt; now()), 0)       AS staleUnusedCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value} AND valid_end_time &gt;= now()
                    AND valid_end_time &lt; DATE_ADD(now(), INTERVAL 7 DAY)), 0) AS expiringSoonCount,
-               COALESCE(SUM(status = 1 AND used_time IS NULL), 0)               AS usedNoTimeCount,
-               COALESCE(SUM(status = 0 AND used_time IS NOT NULL), 0)           AS unusedWithTimeCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@USED.value} AND used_time IS NULL), 0)               AS usedNoTimeCount,
+               COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value} AND used_time IS NOT NULL), 0)           AS unusedWithTimeCount,
                COALESCE(SUM(valid_end_time &lt;= valid_start_time), 0)          AS badValidRangeCount
         FROM t_member_coupon
     </select>
@@ -209,8 +209,8 @@
         MIN(coupon_name) AS couponName,
         COUNT(*) AS issuedCount,
         COUNT(DISTINCT member_id) AS memberCount,
-        COALESCE(SUM(status = 1), 0) AS usedCount,
-        COALESCE(SUM(status = 0 AND valid_end_time &lt; now()), 0) AS staleCount
+        COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@USED.value}), 0) AS usedCount,
+        COALESCE(SUM(status = ${@solvela.enums.CouponStatusEnum@UNUSED.value} AND valid_end_time &lt; now()), 0) AS staleCount
         FROM t_member_coupon
         <where>
             <include refid="stat_window_issued"/>
@@ -243,7 +243,7 @@
     <select id="countExpirableCoupon" resultType="long">
         SELECT COUNT(*)
         FROM t_member_coupon
-        WHERE status = 0
+        WHERE status = ${@solvela.enums.CouponStatusEnum@UNUSED.value}
           AND valid_end_time &lt; #{now}
     </select>
 
@@ -266,7 +266,7 @@
                COUNT(*)           AS count,
                MIN(valid_end_time) AS nearestExpireTime
         FROM t_member_coupon
-        WHERE status = 0
+        WHERE status = ${@solvela.enums.CouponStatusEnum@UNUSED.value}
           AND valid_end_time &gt;= #{from}
           AND valid_end_time &lt; #{to}
         GROUP BY member_id
@@ -276,8 +276,8 @@
 
     <update id="expireCouponBatch">
         UPDATE t_member_coupon
-        SET status = 2
-        WHERE status = 0
+        SET status = ${@solvela.enums.CouponStatusEnum@EXPIRED.value}
+        WHERE status = ${@solvela.enums.CouponStatusEnum@UNUSED.value}
           AND valid_end_time &lt; #{now}
         LIMIT #{limit}
     </update>
@@ -285,6 +285,11 @@
 
     <!--
         ==================== 三阶段核销（2026-09-15 阶段 3） ====================
+
+        🔴 本文件里的状态值一律写成 ${@solvela.enums.CouponStatusEnum@X.value}，不写数字：
+           MyBatis 在发 SQL 之前就把它求值成常量。枚举常量改名时这里不会编译报错，
+           而是运行期求值失败 —— MemberCouponStatusSqlTest 会渲染这些 SQL，
+           并断言锁定 / 确认 / 释放 / 过期四条闸门与 CouponStatusEnum#canTransitTo 一一对应。
 
         🔴 锁定 / 确认 / 释放三条 UPDATE 的 WHERE 里都带着状态，
            那不是防御性写法，是并发闸本身：
@@ -320,7 +325,7 @@
         <include refid="full_columns"/>
         FROM t_member_coupon
         WHERE member_id = #{memberId}
-          AND status = 0
+          AND status = ${@solvela.enums.CouponStatusEnum@UNUSED.value}
           AND valid_start_time &lt;= #{now}
           AND valid_end_time &gt; #{now}
         ORDER BY valid_end_time, id
@@ -333,13 +338,13 @@
     -->
     <update id="lockCoupon">
         UPDATE t_member_coupon
-        SET status          = 4,
+        SET status          = ${@solvela.enums.CouponStatusEnum@LOCKED.value},
             locked_biz_id   = #{bizRefId},
             locked_time     = #{now},
             discount_amount = #{discountAmount}
         WHERE id = #{couponId}
           AND member_id = #{memberId}
-          AND status = 0
+          AND status = ${@solvela.enums.CouponStatusEnum@UNUSED.value}
     </update>
 
     <!--
@@ -349,10 +354,10 @@
     -->
     <update id="confirmCoupon">
         UPDATE t_member_coupon
-        SET status    = 1,
+        SET status    = ${@solvela.enums.CouponStatusEnum@USED.value},
             used_time = #{now}
         WHERE id = #{couponId}
-          AND status = 4
+          AND status = ${@solvela.enums.CouponStatusEnum@LOCKED.value}
           AND locked_biz_id = #{bizRefId}
     </update>
 
@@ -363,12 +368,12 @@
     -->
     <update id="releaseCoupon">
         UPDATE t_member_coupon
-        SET status          = 0,
+        SET status          = ${@solvela.enums.CouponStatusEnum@UNUSED.value},
             locked_biz_id   = NULL,
             locked_time     = NULL,
             discount_amount = NULL
         WHERE id = #{couponId}
-          AND status = 4
+          AND status = ${@solvela.enums.CouponStatusEnum@LOCKED.value}
           AND locked_biz_id = #{bizRefId}
     </update>
 
@@ -377,7 +382,7 @@
         SELECT
         <include refid="full_columns"/>
         FROM t_member_coupon
-        WHERE status = 4
+        WHERE status = ${@solvela.enums.CouponStatusEnum@LOCKED.value}
           AND locked_time &lt; #{before}
         ORDER BY locked_time
         LIMIT #{limit}

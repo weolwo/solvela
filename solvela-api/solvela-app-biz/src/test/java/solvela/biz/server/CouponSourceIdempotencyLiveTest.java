@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
-import solvela.enums.CouponStatusEnum;
 import solvela.ledger.MemberCoupon;
 import solvela.ledger.coupon.dao.MemberCouponDao;
 import solvela.enums.AssetSourceEnum;
@@ -128,7 +127,7 @@ class CouponSourceIdempotencyLiveTest {
         coupon.setCouponCode("ZZTESTCOUPON");
         coupon.setCouponType(CouponTypeEnum.GENERAL);
         coupon.setCouponName("单元测试用券");
-        coupon.setStatus(CouponStatusEnum.UNUSED);
+        coupon.issue();
         coupon.setSourceType(AssetSourceEnum.MANUAL);
         coupon.setSourceBizId(sourceBizId);
         coupon.setValidStartTime(LocalDateTime.now());

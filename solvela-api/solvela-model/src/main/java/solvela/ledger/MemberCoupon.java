@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.enums.CouponDeductTargetEnum;
 import solvela.enums.CouponDiscountTypeEnum;
 import solvela.enums.CouponScopeTypeEnum;
@@ -66,8 +68,14 @@ public class MemberCoupon {
     private String couponName;
 
     /**
-     * 状态：0-未使用, 1-已使用, 2-已过期, 3-已作废
+     * 状态：0-未使用, 1-已使用, 2-已过期, 3-已作废, 4-锁定中
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #issue} 定，
+     * 之后的迁移只走 {@code MemberCouponMapper.xml} 的条件 UPDATE（状态机见 {@link CouponStatusEnum#canTransitTo}）。
+     * 在内存里改完再整行写回，并发下会把别人刚锁上的券改回去 —— 一张券被两单用掉。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private CouponStatusEnum status;
 
     /**
@@ -172,4 +180,13 @@ public class MemberCoupon {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 发券：落为<b>未使用</b>。券只有这一种初始状态，锁定 / 确认 / 释放 / 过期都走条件 UPDATE。
+     */
+    public void issue() {
+        if (status != null) {
+            throw new IllegalStateException("券 " + id + " 已是 " + status + "，不能再发一次");
+        }
+        this.status = CouponStatusEnum.UNUSED;
+    }
 }

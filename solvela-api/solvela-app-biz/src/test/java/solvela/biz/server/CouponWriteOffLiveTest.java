@@ -211,7 +211,7 @@ class CouponWriteOffLiveTest {
         coupon.setCouponCode("ZZTESTCOUPON");
         coupon.setCouponType(CouponTypeEnum.GENERAL);
         coupon.setCouponName("单元测试用券");
-        coupon.setStatus(CouponStatusEnum.UNUSED);
+        coupon.issue();
         coupon.setSourceType(AssetSourceEnum.MANUAL);
         /*
          * 🔴 每张券一个不同的 source_biz_id。

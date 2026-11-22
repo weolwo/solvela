@@ -13,6 +13,7 @@ import solvela.coupon.CouponWriteOff;
 import solvela.enums.CouponDeductTargetEnum;
 import solvela.enums.CouponDiscountTypeEnum;
 import solvela.enums.CouponScopeTypeEnum;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import solvela.enums.CouponStatusEnum;
 import solvela.enums.CouponWriteOffActionEnum;
 import solvela.ledger.MemberCoupon;
@@ -222,7 +223,7 @@ class CouponWriteOffServiceTest {
 
         // ① 已经是自己锁的 —— 重复提交、重试，是幂等成功
         MemberCoupon mine = coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0");
-        mine.setStatus(CouponStatusEnum.LOCKED);
+        loadedAs(mine, CouponStatusEnum.LOCKED);
         mine.setLockedBizId(ORDER_NO);
         mine.setDiscountAmount(new BigDecimal("20"));
         when(memberCouponDao.selectById(1L)).thenReturn(mine);
@@ -236,7 +237,7 @@ class CouponWriteOffServiceTest {
 
         // ② 被另一笔锁走了 —— 失败，别再试
         MemberCoupon theirs = coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0");
-        theirs.setStatus(CouponStatusEnum.LOCKED);
+        loadedAs(theirs, CouponStatusEnum.LOCKED);
         theirs.setLockedBizId("ANOTHER_ORDER");
         when(memberCouponDao.selectById(1L)).thenReturn(theirs);
 
@@ -251,7 +252,7 @@ class CouponWriteOffServiceTest {
     void 确认成功() {
         when(memberCouponDao.confirmCoupon(anyLong(), anyString(), any())).thenReturn(1);
         MemberCoupon used = coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0");
-        used.setStatus(CouponStatusEnum.USED);
+        loadedAs(used, CouponStatusEnum.USED);
         used.setDiscountAmount(new BigDecimal("20"));
         when(memberCouponDao.selectById(1L)).thenReturn(used);
         when(couponWriteOffDao.selectLockRow(1L, ORDER_NO)).thenReturn(lockRow());
@@ -273,7 +274,7 @@ class CouponWriteOffServiceTest {
     void 确认不上时明确失败() {
         when(memberCouponDao.confirmCoupon(anyLong(), anyString(), any())).thenReturn(0);
         MemberCoupon released = coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0");
-        released.setStatus(CouponStatusEnum.UNUSED);
+        loadedAs(released, CouponStatusEnum.UNUSED);
         when(memberCouponDao.selectById(1L)).thenReturn(released);
 
         CouponWriteOffResult result = service.confirm(1L, CouponWriteOffBizEnum.MALL, ORDER_NO);
@@ -287,7 +288,7 @@ class CouponWriteOffServiceTest {
     @DisplayName("释放：券放回未使用，落一行 RELEASE 并记下原因")
     void 释放成功并记原因() {
         MemberCoupon locked = coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0");
-        locked.setStatus(CouponStatusEnum.LOCKED);
+        loadedAs(locked, CouponStatusEnum.LOCKED);
         locked.setDiscountAmount(new BigDecimal("20"));
         when(memberCouponDao.selectById(1L)).thenReturn(locked);
         when(memberCouponDao.releaseCoupon(eq(1L), eq(ORDER_NO))).thenReturn(1);
@@ -313,7 +314,7 @@ class CouponWriteOffServiceTest {
     @DisplayName("重复释放 = 幂等成功：两条取消路径同时跑到是常态")
     void 重复释放是幂等成功() {
         MemberCoupon free = coupon(1L, "券", CouponDiscountTypeEnum.FIXED, "20", null, "0");
-        free.setStatus(CouponStatusEnum.UNUSED);
+        loadedAs(free, CouponStatusEnum.UNUSED);
         when(memberCouponDao.selectById(1L)).thenReturn(free);
         when(memberCouponDao.releaseCoupon(anyLong(), anyString())).thenReturn(0);
 
@@ -347,7 +348,7 @@ class CouponWriteOffServiceTest {
         coupon.setMemberId(MEMBER_ID);
         coupon.setCouponCode("C" + id);
         coupon.setCouponName(name);
-        coupon.setStatus(CouponStatusEnum.UNUSED);
+        loadedAs(coupon, CouponStatusEnum.UNUSED);
         coupon.setDiscountType(type);
         coupon.setDiscountValue(value == null ? null : new BigDecimal(value));
         coupon.setMaxDiscount(maxDiscount == null ? null : new BigDecimal(maxDiscount));
@@ -356,5 +357,15 @@ class CouponWriteOffServiceTest {
         coupon.setScopeType(CouponScopeTypeEnum.ALL);
         coupon.setValidEndTime(LocalDateTime.now().plusDays(10));
         return coupon;
+    }
+
+    /**
+     * 让这张券看起来像<b>从库里读出来时就是 {@code status}</b>。
+     *
+     * <p>{@code MemberCoupon} 的 status 没有公开 setter（迁移只走条件 UPDATE）。
+     * 这里用 MyBatis 读库时的同一条反射路径写字段 —— 生产代码里只有 MyBatis 走这条路。
+     */
+    private static void loadedAs(MemberCoupon coupon, CouponStatusEnum status) {
+        SystemMetaObject.forObject(coupon).setValue("status", status);
     }
 }
