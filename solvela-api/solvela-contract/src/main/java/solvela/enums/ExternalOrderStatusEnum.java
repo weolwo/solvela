@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
- * 外部场景消费单状态。<b>数值就是契约</b>，改取值要连 SQL 里那几条硬编码一起改。
+ * 外部场景消费单状态。<b>数值就是契约</b>：库里存的、C 端视图里给出去的都是它。
  *
  * <p>状态机与商城订单同构，刻意取一样的数字 —— 两张单据在运营眼里是同一类东西，
  * 数字不一样只会让人每次都去查一遍对照表：
@@ -13,6 +13,13 @@ import lombok.Getter;
  *   0-待支付 → 10-待执行 → 20-执行中 → 30-成功 / 60-失败
  *            ↘ 40-已取消（超时或用户取消，券要放回去）
  * </pre>
+ *
+ * <h3>🔴 状态机的规则在这里，闸门在 SQL 里</h3>
+ * {@link #canTransitTo} 是唯一一份「谁能变成谁」的声明；真正执行迁移的是
+ * {@code ExternalOrderDao} 里带旧状态条件的 UPDATE，不要改成先读出实体、在内存里判断再写回。
+ * 那几条 SQL 里的状态值引用本枚举，不写数字；{@code ExternalOrderStatusSqlTest}
+ * 渲染出真正发给数据库的 SQL，断言 DAO 的迁移与 {@link #canTransitTo} 一条不多、一条不少。
+ * 约定见 {@code docs/架构/领域实体轻充血-架构设计文档.md}。
  *
  * @Author alaric
  * @Date 2026-09-15
@@ -57,5 +64,21 @@ public enum ExternalOrderStatusEnum {
     ExternalOrderStatusEnum(Integer value, String desc) {
         this.value = value;
         this.desc = desc;
+    }
+
+    /**
+     * 本状态能否迁到 {@code to}。成功、取消、失败都是终态 ——
+     * 失败(60) 之后的退款或重试还没实现，实现时先在这里加边，
+     * {@code ExternalOrderStatusSqlTest} 会逼着 DAO 补上对应的闸门 SQL。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(ExternalOrderStatusEnum to) {
+        return switch (this) {
+            case UNPAID -> to == PENDING || to == CANCELLED;
+            case PENDING -> to == EXECUTING;
+            case EXECUTING -> to == SUCCESS || to == FAILED;
+            case SUCCESS, CANCELLED, FAILED -> false;
+        };
     }
 }

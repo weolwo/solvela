@@ -29,6 +29,7 @@ import solvela.member.service.MemberService;
 import solvela.notification.service.NotificationService;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -333,7 +334,7 @@ class ExternalRechargeServiceTest {
         order.setCouponId(COUPON_ID);
         order.setCouponDiscount(new BigDecimal("10"));
         order.setPayAmount(new BigDecimal("90"));
-        order.setStatus(ExternalOrderStatusEnum.UNPAID);
+        order.awaitPayment(LocalDateTime.now().plusMinutes(15));
         return order;
     }
 

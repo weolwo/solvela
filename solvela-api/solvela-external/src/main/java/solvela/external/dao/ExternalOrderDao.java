@@ -21,8 +21,11 @@ import java.util.List;
  * <p>🔴 {@code update_time} 一律不出现在 SET 里：那一列是
  * {@code ON UPDATE CURRENT_TIMESTAMP}，数据库自己会填（铁律 9：时间只认数据库时钟）。
  *
- * <p>⚠️ 状态值这里是硬编码的数字，因为它们要进 SQL。改
- * {@code ExternalOrderStatusEnum} 的取值时这几条要一起改。
+ * <p>🔴 状态值写成 {@code ${@solvela.enums.ExternalOrderStatusEnum@X.value}}（OGNL 静态引用），不写数字：
+ * 改枚举取值时 SQL 自动跟着变。代价是枚举常量改名时这里不会编译报错，
+ * 而是运行期求值失败 —— {@code ExternalOrderStatusSqlTest} 会渲染每一条 SQL，
+ * 并断言 DAO 的迁移与 {@code ExternalOrderStatusEnum#canTransitTo} 一一对应。
+ * {@code ${}} 里只有常量、没有入参，不存在注入。
  *
  * @Author alaric
  * @Date 2026-09-15
@@ -42,8 +45,8 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
      */
     @Update("""
             UPDATE t_external_order
-               SET status = 10, pay_time = NOW()
-             WHERE order_no = #{orderNo} AND status = 0
+               SET status = ${@solvela.enums.ExternalOrderStatusEnum@PENDING.value}, pay_time = NOW()
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.ExternalOrderStatusEnum@UNPAID.value}
             """)
     int markPaid(@Param("orderNo") String orderNo);
 
@@ -55,16 +58,16 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
      */
     @Update("""
             UPDATE t_external_order
-               SET status = 20
-             WHERE order_no = #{orderNo} AND status = 10
+               SET status = ${@solvela.enums.ExternalOrderStatusEnum@EXECUTING.value}
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.ExternalOrderStatusEnum@PENDING.value}
             """)
     int markExecuting(@Param("orderNo") String orderNo);
 
     /** 充值中(20) → 成功(30)，回填外部流水号（对账靠它） */
     @Update("""
             UPDATE t_external_order
-               SET status = 30, external_ref_no = #{externalRefNo}, finish_time = NOW()
-             WHERE order_no = #{orderNo} AND status = 20
+               SET status = ${@solvela.enums.ExternalOrderStatusEnum@SUCCESS.value}, external_ref_no = #{externalRefNo}, finish_time = NOW()
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.ExternalOrderStatusEnum@EXECUTING.value}
             """)
     int markSuccess(@Param("orderNo") String orderNo, @Param("externalRefNo") String externalRefNo);
 
@@ -76,8 +79,8 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
      */
     @Update("""
             UPDATE t_external_order
-               SET status = 60, fail_reason = #{failReason}, finish_time = NOW()
-             WHERE order_no = #{orderNo} AND status = 20
+               SET status = ${@solvela.enums.ExternalOrderStatusEnum@FAILED.value}, fail_reason = #{failReason}, finish_time = NOW()
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.ExternalOrderStatusEnum@EXECUTING.value}
             """)
     int markFailed(@Param("orderNo") String orderNo, @Param("failReason") String failReason);
 
@@ -88,15 +91,15 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
      */
     @Update("""
             UPDATE t_external_order
-               SET status = 40, fail_reason = #{reason}
-             WHERE order_no = #{orderNo} AND status = 0
+               SET status = ${@solvela.enums.ExternalOrderStatusEnum@CANCELLED.value}, fail_reason = #{reason}
+             WHERE order_no = #{orderNo} AND status = ${@solvela.enums.ExternalOrderStatusEnum@UNPAID.value}
             """)
     int markCancelled(@Param("orderNo") String orderNo, @Param("reason") String reason);
 
     /** 捞出已经超时的待支付单。按 expire_time 升序：最早过期的先处理 */
     @Select("""
             SELECT * FROM t_external_order
-             WHERE status = 0 AND expire_time IS NOT NULL AND expire_time < #{now}
+             WHERE status = ${@solvela.enums.ExternalOrderStatusEnum@UNPAID.value} AND expire_time IS NOT NULL AND expire_time < #{now}
              ORDER BY expire_time
              LIMIT #{limit}
             """)
@@ -105,7 +108,7 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
     /**
      * 窗口内<b>充值成功</b>的单，供打点反查补推用（{@code RechargeAuditProvider}）。
      *
-     * <h3>🔴 判据必须是 status=30，和打点那一刻一致</h3>
+     * <h3>🔴 判据必须是「充值成功」，和打点那一刻一致</h3>
      * 打点发生在 {@code markSuccess} 之后，不是 {@code markPaid} 之后 ——
      * 收了钱不等于充值成功，运营商那一步还可能失败(60)，而失败的单是要退的。
      * 这里放宽到「付过款」会给一批充值失败的用户补出任务进度。
@@ -115,7 +118,7 @@ public interface ExternalOrderDao extends BaseMapper<ExternalOrder> {
      */
     @Select("""
             SELECT * FROM t_external_order
-             WHERE status = 30
+             WHERE status = ${@solvela.enums.ExternalOrderStatusEnum@SUCCESS.value}
                AND finish_time IS NOT NULL
                AND finish_time >= #{from} AND finish_time <= #{to}
              ORDER BY finish_time

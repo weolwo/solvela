@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import solvela.base.domain.SystemEnvironment;
 import solvela.base.event.BizEventPublisher;
-import solvela.enums.ExternalOrderStatusEnum;
 import solvela.enums.NotificationTemplateEnum;
 import solvela.event.BizActionCodes;
 import solvela.event.BizActionEvent;
@@ -214,8 +213,7 @@ public class ExternalRechargeService {
         order.setCouponId(cmd.couponId());
         order.setCouponDiscount(cmd.couponId() == null ? null : discount);
         order.setPayAmount(amount.subtract(discount).max(BigDecimal.ZERO));
-        order.setStatus(ExternalOrderStatusEnum.UNPAID);
-        order.setExpireTime(LocalDateTime.now().plusMinutes(sceneProperties.getPayExpireMinutes()));
+        order.awaitPayment(LocalDateTime.now().plusMinutes(sceneProperties.getPayExpireMinutes()));
         externalOrderDao.insert(order);
 
         return RechargeResult.ofAccepted(orderNo, order.getPayAmount());

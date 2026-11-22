@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.crypto.PiiTypeHandler;
 import solvela.enums.ExternalOrderStatusEnum;
 
@@ -83,6 +85,12 @@ public class ExternalOrder {
     /** 实付 = 抵扣前 - 券抵扣 */
     private BigDecimal payAmount;
 
+    /**
+     * 🔴 没有公开 setter：初始状态只能经 {@link #awaitPayment} 定，
+     * 之后的迁移只走 {@code ExternalOrderDao} 的条件 UPDATE（状态机见 {@link ExternalOrderStatusEnum#canTransitTo}）。
+     * 在内存里改完再整行写回，并发下会覆盖掉别人刚抢到的状态。MyBatis 读库时直接写字段，不需要 setter。
+     */
+    @Setter(AccessLevel.NONE)
     private ExternalOrderStatusEnum status;
 
     /** 待支付超时时间，到点由 {@code externalOrderExpire} 取消并放回券 */
@@ -104,4 +112,16 @@ public class ExternalOrder {
     private String updateBy;
 
     private LocalDateTime updateTime;
+
+    /**
+     * 落单为<b>待支付</b>：外部单只有这一种初始状态 —— 券已锁定、钱还没收，
+     * 到 {@code expireTime} 由超时 job 取消并放回券。
+     */
+    public void awaitPayment(LocalDateTime expireTime) {
+        if (status != null) {
+            throw new IllegalStateException("外部单 " + orderNo + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = ExternalOrderStatusEnum.UNPAID;
+        this.expireTime = expireTime;
+    }
 }
