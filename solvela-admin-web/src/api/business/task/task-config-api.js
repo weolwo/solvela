@@ -16,20 +16,6 @@ export const taskConfigApi = {
   },
 
   /**
-   * 增加  @author  weolwo
-   */
-  add: (param) => {
-    return postRequest('/taskConfig/add', param);
-  },
-
-  /**
-   * 修改  @author  weolwo
-   */
-  update: (param) => {
-    return postRequest('/taskConfig/update', param);
-  },
-
-  /**
    * 上/下线：列表页的批量下线用它，替代删除。
    * ⚠️ 任务记录里存着 task_config_id，删配置会让历史记录指向一条不存在的配置  @author  alaric
    */
