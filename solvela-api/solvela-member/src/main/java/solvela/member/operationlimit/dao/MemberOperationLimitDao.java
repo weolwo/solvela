@@ -17,6 +17,12 @@ import java.util.List;
  *
  * @Date 2026-08-26
  */
+/*
+ * 🔴 改状态的两条 UPDATE（unlock / settleExpired）都带「仍是冻结中」的条件，是
+ * MemberOperationLimitStatusEnum#canTransitTo 的同一条边。状态值写成 ${@...@X.value}，${} 里只放常量；
+ * 常量改名编译器管不到，由 MemberOperationLimitStatusSqlTest 渲染 SQL 兜住。
+ * 都不写 update_time：DDL 是 ON UPDATE CURRENT_TIMESTAMP，归数据库时钟管。
+ */
 @Mapper
 public interface MemberOperationLimitDao extends BaseMapper<MemberOperationLimit> {
 
@@ -32,7 +38,7 @@ public interface MemberOperationLimitDao extends BaseMapper<MemberOperationLimit
     @Select("""
             SELECT * FROM t_member_operation_limit
             WHERE member_id = #{memberId} AND operation_type = #{operationType}
-              AND status = 0 AND expire_time > #{now}
+              AND status = ${@solvela.enums.MemberOperationLimitStatusEnum@LOCKED.value} AND expire_time > #{now}
             ORDER BY expire_time DESC LIMIT 1
             """)
     MemberOperationLimit selectActive(@Param("memberId") Long memberId,
@@ -42,16 +48,16 @@ public interface MemberOperationLimitDao extends BaseMapper<MemberOperationLimit
     /**
      * 解冻：把仍处于「冻结中」的行推到终态。
      *
-     * <p>{@code status = 0} 这个条件是幂等保护 —— 客服连点两次、或人工解冻与到期回写撞车时，
+     * <p>「仍是冻结中」这个条件是幂等保护 —— 客服连点两次、或人工解冻与到期回写撞车时，
      * 第二次影响 0 行，不会把第一次记的 unlock_type / operator 覆盖掉。
      *
      * @return 实际更新的行数，0 表示没有生效中的限制
      */
     @Update("""
             UPDATE t_member_operation_limit
-            SET status = 1, unlock_time = #{unlockTime}, unlock_type = #{unlockType},
-                `operator` = #{unlockOperator}, remark = #{remark}, update_time = #{unlockTime}
-            WHERE member_id = #{memberId} AND operation_type = #{operationType} AND status = 0
+            SET status = ${@solvela.enums.MemberOperationLimitStatusEnum@UNLOCKED.value}, unlock_time = #{unlockTime}, unlock_type = #{unlockType},
+                `operator` = #{unlockOperator}, remark = #{remark}
+            WHERE member_id = #{memberId} AND operation_type = #{operationType} AND status = ${@solvela.enums.MemberOperationLimitStatusEnum@LOCKED.value}
             """)
     int unlock(@Param("memberId") Long memberId,
                @Param("operationType") MemberOperationTypeEnum operationType,
@@ -68,8 +74,8 @@ public interface MemberOperationLimitDao extends BaseMapper<MemberOperationLimit
      */
     @Update("""
             UPDATE t_member_operation_limit
-            SET status = 1, unlock_time = expire_time, unlock_type = 1, update_time = #{now}
-            WHERE status = 0 AND expire_time <= #{now}
+            SET status = ${@solvela.enums.MemberOperationLimitStatusEnum@UNLOCKED.value}, unlock_time = expire_time, unlock_type = ${@solvela.enums.MemberOperationUnlockTypeEnum@AUTO_EXPIRE.value}
+            WHERE status = ${@solvela.enums.MemberOperationLimitStatusEnum@LOCKED.value} AND expire_time <= #{now}
             """)
     int settleExpired(@Param("now") LocalDateTime now);
 

@@ -6,7 +6,9 @@ import solvela.enums.MemberOperationTypeEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -75,7 +77,12 @@ public class MemberOperationLimit {
 
     /**
      * 0 冻结中，1 已解冻
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #lockUntil} 定，之后只走 {@code MemberOperationLimitDao}
+     * 带「仍是冻结中」条件的 UPDATE（状态机见 {@link MemberOperationLimitStatusEnum#canTransitTo}）。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private MemberOperationLimitStatusEnum status;
 
     /**
@@ -88,4 +95,18 @@ public class MemberOperationLimit {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    /**
+     * 落为<b>冻结中</b>，连同冻结时间与到期时间一起定：冻结中的行一定有这两个时间。
+     *
+     * @param expireTime 到期时间。靠改密解除的（如 {@code ASSET_OUT}）给一个很远的日期 —— 那一列是 NOT NULL
+     */
+    public void lockUntil(LocalDateTime lockTime, LocalDateTime expireTime) {
+        if (status != null) {
+            throw new IllegalStateException("操作限制 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = MemberOperationLimitStatusEnum.LOCKED;
+        this.lockTime = lockTime;
+        this.expireTime = expireTime;
+    }
 }

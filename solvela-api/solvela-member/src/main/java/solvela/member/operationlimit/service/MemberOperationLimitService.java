@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 import solvela.base.module.redis.RedisService;
 import solvela.crypto.PiiCipher;
 import solvela.crypto.PiiHasher;
-import solvela.enums.MemberOperationLimitStatusEnum;
 import solvela.enums.MemberOperationTypeEnum;
 import solvela.enums.MemberOperationUnlockTypeEnum;
 import solvela.enums.NotificationTemplateEnum;
@@ -151,12 +150,9 @@ public class MemberOperationLimitService {
         MemberOperationLimit limit = new MemberOperationLimit();
         limit.setMemberId(memberId);
         limit.setOperationType(operationType);
-        limit.setLockTime(now);
-        limit.setExpireTime(now.plusSeconds(properties.getLockSeconds()));
-        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
+        limit.lockUntil(now, now.plusSeconds(properties.getLockSeconds()));
         limit.setReason(reason);
-        limit.setCreateTime(now);
-        limit.setUpdateTime(now);
+        // create_time / update_time 不填：DDL 有默认值与 ON UPDATE，时间只认数据库的钟
         memberOperationLimitDao.insert(limit);
 
         // 计数已经兑现成一条限制，留着它会让解冻后「一次失败就又被限」
@@ -211,12 +207,8 @@ public class MemberOperationLimitService {
         MemberOperationLimit limit = new MemberOperationLimit();
         limit.setMemberId(memberId);
         limit.setOperationType(operationType);
-        limit.setLockTime(now);
-        limit.setExpireTime(expireTime);
-        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
+        limit.lockUntil(now, expireTime);
         limit.setReason(reason);
-        limit.setCreateTime(now);
-        limit.setUpdateTime(now);
         memberOperationLimitDao.insert(limit);
         log.info("会员操作限制（直接冻结） memberId={} operation={} 到期={} 原因={}",
                 memberId, operationType.getDesc(), expireTime, reason);

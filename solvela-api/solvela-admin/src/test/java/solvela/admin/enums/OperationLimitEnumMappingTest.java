@@ -60,9 +60,7 @@ class OperationLimitEnumMappingTest {
         MemberOperationLimit limit = new MemberOperationLimit();
         limit.setMemberId(FAKE_MEMBER_ID);
         limit.setOperationType(MemberOperationTypeEnum.CHANGE_PASSWORD);
-        limit.setLockTime(now);
-        limit.setExpireTime(now.plusHours(1));
-        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
+        limit.lockUntil(now, now.plusHours(1));
         limit.setReason("枚举往返用例");
         limit.setCreateTime(now);
         limit.setUpdateTime(now);
@@ -87,9 +85,7 @@ class OperationLimitEnumMappingTest {
         MemberOperationLimit limit = new MemberOperationLimit();
         limit.setMemberId(FAKE_MEMBER_ID);
         limit.setOperationType(MemberOperationTypeEnum.LOGIN);
-        limit.setLockTime(now);
-        limit.setExpireTime(now.plusHours(1));
-        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
+        limit.lockUntil(now, now.plusHours(1));
         limit.setReason("枚举形参用例");
         limit.setCreateTime(now);
         limit.setUpdateTime(now);

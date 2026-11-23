@@ -31,4 +31,20 @@ public enum MemberOperationLimitStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}。冻结中是唯一的初始状态，已解冻是终态。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code MemberOperationLimitDao} 的 {@code unlock} / {@code settleExpired}
+     * 都带「仍是冻结中」的条件，人工解冻与到期回写撞车时第二次影响 0 行，不覆盖第一次记的解冻方式。
+     * {@code MemberOperationLimitStatusSqlTest} 断言那些 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(MemberOperationLimitStatusEnum to) {
+        return switch (this) {
+            case LOCKED -> to == UNLOCKED;
+            case UNLOCKED -> false;
+        };
+    }
 }

@@ -221,8 +221,7 @@ class MemberOperationLimitServiceTest {
         MemberOperationLimit limit = new MemberOperationLimit();
         limit.setMemberId(MEMBER_ID);
         limit.setOperationType(LOGIN);
-        limit.setStatus(MemberOperationLimitStatusEnum.LOCKED);
-        limit.setExpireTime(LocalDateTime.now().plusSeconds(seconds));
+        limit.lockUntil(LocalDateTime.now(), LocalDateTime.now().plusSeconds(seconds));
         return limit;
     }
 
