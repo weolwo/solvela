@@ -15,9 +15,10 @@
         · 少 status      → 下架的公告还在显示
         · 少 publish_time → 预发布的提前泄露
         · 少 expire_time  → 过期的永远占着红点，而且未读数要扫全部历史
+      状态值写成 ${@...@X.value}：改取值自动跟着变，常量改名由 AnnouncementVisibleSqlTest 渲染兜住。
     -->
     <sql id="visible_conditions">
-        status = 1
+        status = ${@solvela.enums.AnnouncementStatusEnum@PUBLISHED.value}
         AND publish_time &lt;= #{now}
         AND expire_time &gt; #{now}
     </sql>
@@ -97,7 +98,7 @@
         LEFT JOIN t_announcement_ack ack
                ON ack.announcement_id = a.id AND ack.member_id = #{memberId}
         WHERE a.force_ack = 1
-          AND a.status = 1
+          AND a.status = ${@solvela.enums.AnnouncementStatusEnum@PUBLISHED.value}
           AND a.publish_time &lt;= #{now}
           AND a.expire_time &gt; #{now}
           AND ack.member_id IS NULL

@@ -11,10 +11,11 @@ import java.util.List;
 /**
  * 公告 Dao。
  *
- * <p>🔴 所有面向 C 端的查询都必须带上三个条件：{@code status = 1}、
+ * <p>🔴 所有面向 C 端的查询都必须带上三个条件：已发布、
  * {@code publish_time <= now}、{@code expire_time > now}。少一个的表现分别是
  * 「下架的公告还在显示」「预发布的提前泄露」「过期的永远占着红点」。
- * 这三条写在 {@code visible_conditions} 这个 SQL 片段里，各处 include 它，别各写一遍。
+ * 这三条写在 {@code visible_conditions} 这个 SQL 片段里，各处 include 它；带 LEFT JOIN 的
+ * {@code selectPendingAck} 要加表别名，只能另写一份。{@code AnnouncementVisibleSqlTest} 逐条断言四条 C 端查询都带齐三个条件。
  *
  * @Author alaric
  * @Date 2026-09-14
