@@ -16,9 +16,7 @@ import solvela.task.prizemapping.dao.TaskPrizeMappingDao;
 import solvela.task.TaskPrizeMapping;
 import solvela.task.taskconfig.dao.TaskConfigDao;
 import solvela.task.TaskConfig;
-import solvela.task.taskconfig.domain.command.TaskConfigAddCommand;
 import solvela.task.taskconfig.domain.query.TaskConfigQuery;
-import solvela.task.taskconfig.domain.command.TaskConfigUpdateCommand;
 import solvela.task.taskconfig.domain.command.TaskConfigWizardConfigCommand;
 import solvela.task.taskconfig.domain.command.TaskConfigWizardSubmitCommand;
 import solvela.task.taskconfig.domain.command.TaskConfigWizardUpdateCommand;
@@ -99,7 +97,7 @@ public class TaskConfigService {
         TaskConfig taskConfig = SolvelaBeanUtil.copy(configForm, TaskConfig.class);
         taskConfig.setRuleConfig(configJson.ruleConfig());
         taskConfig.setUiConfig(configJson.uiConfig());
-        taskConfig.setStatus(TaskConfigStatusEnum.PENDING);
+        taskConfig.startPending();
         taskConfigDao.insert(taskConfig);
 
         // 子表批量落库（insertBatch 由 CustomizedBaseMapper 提供）
@@ -217,14 +215,24 @@ public class TaskConfigService {
      * 下线后运行态不再订阅该任务的事件（判据是 status != OFFLINE，见 TaskConfigStatusEnum），
      * 已在跑的记录按接取时的快照走完，不受影响。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void updateStatus(List<Long> idList, TaskConfigStatusEnum status) {
-        // 原先这里逐个比对三个合法值。入参换成枚举之后，非法值在反序列化阶段就被拒了
-        // （400 / INVALID_ARGUMENT），这段校验没有存在意义。
-        for (Long id : idList) {
-            TaskConfig update = new TaskConfig();
-            update.setId(id);
-            update.setStatus(status);
-            taskConfigDao.updateById(update);
+        // 目标只能是待生效（上线）或已下线：生效中没有任何代码认它，写进去只会造出一种谁都不处理的状态
+        if (status != TaskConfigStatusEnum.PENDING && status != TaskConfigStatusEnum.OFFLINE) {
+            throw new BusinessException("目标状态只能是 待生效 或 已下线");
+        }
+        for (TaskConfig config : taskConfigDao.selectBatchIds(idList)) {
+            // 已经是目标状态的跳过（重复点不报错）；其余走带旧状态条件的闸门
+            if (config.getStatus() == status) {
+                continue;
+            }
+            int rows = status == TaskConfigStatusEnum.OFFLINE
+                    ? taskConfigDao.markOffline(config.getId())
+                    : taskConfigDao.markPending(config.getId());
+            if (rows == 0) {
+                // 读出来之后被别人改了状态：整批回滚，让运营刷新后重来
+                throw new BusinessException("任务「" + config.getTaskName() + "」的状态刚被别人改过，请刷新后重试");
+            }
         }
     }
 
@@ -299,8 +307,7 @@ public class TaskConfigService {
         update.setActivityCode(exist.getActivityCode());
         update.setRuleConfig(configJson.ruleConfig());
         update.setUiConfig(configJson.uiConfig());
-        // status 不在更新范围内：MyBatis-Plus 默认 NOT_NULL 策略会把 null 字段排除出 UPDATE
-        update.setStatus(null);
+        // status 不在更新范围内：它没有 setter，拷贝时跳过、保持 null，MyBatis-Plus 默认 NOT_NULL 策略把它排除出 UPDATE
         taskConfigDao.updateById(update);
 
         // 子表整体替换：阶梯的增删改在向导里是「一张表格提交一次」，
@@ -416,22 +423,11 @@ public class TaskConfigService {
         return SolvelaPageUtil.convert2PageResult(page, list);
     }
 
-    /**
-     * 添加
+    /*
+     * 生成器给的「添加 / 更新」已移除：它们把表单原样拷进实体，绕过向导的全部校验（模板、规则参数、
+     * 归属活动锁定），还能写任意状态；新增不传状态时落 DDL 默认值 0，0 不在枚举里，读出来就抛异常。
+     * 新增、编辑一律走 wizardSubmit / wizardUpdate，上下线走 updateStatus。
      */
-    public void add(TaskConfigAddCommand addForm) {
-        TaskConfig taskConfig = SolvelaBeanUtil.copy(addForm, TaskConfig.class);
-        taskConfigDao.insert(taskConfig);
-    }
-
-    /**
-     * 更新
-     *
-     */
-    public void update(TaskConfigUpdateCommand updateForm) {
-        TaskConfig taskConfig = SolvelaBeanUtil.copy(updateForm, TaskConfig.class);
-        taskConfigDao.updateById(taskConfig);
-    }
 
     /**
      * 批量删除

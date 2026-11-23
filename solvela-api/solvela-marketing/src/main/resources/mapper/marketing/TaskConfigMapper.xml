@@ -99,4 +99,22 @@
                         where id = #{id}
                 </delete>
 
+    <!--
+      上 / 下线闸门：WHERE 里的旧状态是并发闸门。每条是 TaskConfigStatusEnum#canTransitTo 的边，
+      TaskConfigStatusSqlTest 断言。状态值写成 ${@...@X.value}，${} 里只放常量。
+    -->
+    <update id="markPending">
+        update t_task_config
+        set status = ${@solvela.enums.TaskConfigStatusEnum@PENDING.value}
+        where id = #{id}
+          and status = ${@solvela.enums.TaskConfigStatusEnum@OFFLINE.value}
+    </update>
+
+    <update id="markOffline">
+        update t_task_config
+        set status = ${@solvela.enums.TaskConfigStatusEnum@OFFLINE.value}
+        where id = #{id}
+          and status in (${@solvela.enums.TaskConfigStatusEnum@PENDING.value}, ${@solvela.enums.TaskConfigStatusEnum@ACTIVE.value})
+    </update>
+
 </mapper>

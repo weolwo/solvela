@@ -43,4 +43,21 @@ public enum TaskConfigStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}：待生效 ↔ 已下线（经确认允许下线后再上线）。
+     * 生效中没有代码会写入，只留一条到已下线的边，存量里若真有这种行也能下线。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code TaskConfigMapper.xml} 的 {@code markPending} / {@code markOffline} 带旧状态条件。
+     * {@code TaskConfigStatusSqlTest} 断言那些 SQL 与这里一条不多、一条不少。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(TaskConfigStatusEnum to) {
+        return switch (this) {
+            case PENDING -> to == OFFLINE;
+            case ACTIVE -> to == OFFLINE;
+            case OFFLINE -> to == PENDING;
+        };
+    }
 }

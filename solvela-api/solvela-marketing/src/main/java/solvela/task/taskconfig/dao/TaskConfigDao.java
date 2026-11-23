@@ -47,4 +47,15 @@ public interface TaskConfigDao extends BaseMapper<TaskConfig> {
                  * 批量物理删除
                  */
                 void batchDelete(@Param("idList") List<Long> idList);
+
+    /*
+     * 🔴 上 / 下线闸门，带旧状态条件，返回影响行数：0 表示已不在前置状态。
+     * 迁移见 TaskConfigStatusEnum#canTransitTo，TaskConfigStatusSqlTest 断言一一对应。
+     */
+
+    /** 重新上线：已下线 → 待生效（运行态的判据是「不是已下线」，待生效就是可用） */
+    int markPending(@Param("id") Long id);
+
+    /** 下线：待生效 / 生效中 → 已下线 */
+    int markOffline(@Param("id") Long id);
 }

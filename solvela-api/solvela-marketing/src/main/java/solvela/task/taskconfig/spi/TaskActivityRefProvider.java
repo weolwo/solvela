@@ -85,7 +85,8 @@ public class TaskActivityRefProvider implements ActivityRefProvider {
             TaskConfig copy = SolvelaBeanUtil.copy(source, TaskConfig.class);
             copy.setId(null);
             copy.setActivityCode(targetActivityCode);
-            copy.setStatus(TaskConfigStatusEnum.PENDING);
+            // 拷贝会跳过 status（没有 setter），源任务是下线的也不会带过来
+            copy.startPending();
             copy.setCreateBy(null);
             copy.setCreateTime(null);
             copy.setUpdateBy(null);

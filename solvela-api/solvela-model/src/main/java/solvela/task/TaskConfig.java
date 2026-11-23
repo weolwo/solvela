@@ -9,7 +9,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 任务配置表 实体类
@@ -91,7 +93,12 @@ public class TaskConfig {
 
     /**
      * 任务状态 1-待生效, 2-生效中, 3-已下线
+     *
+     * <p>🔴 没有公开 setter：向导提交与复制活动都经 {@link #startPending} 落为待生效，上下线只走
+     * {@code TaskConfigDao.markPending / markOffline}（状态机见 {@link TaskConfigStatusEnum#canTransitTo}）。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private TaskConfigStatusEnum status;
 
     /**
@@ -124,4 +131,13 @@ public class TaskConfig {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 落为<b>待生效</b>：新建与复制出来的任务配置一律从这里开始。运行态认「不是已下线」，所以待生效即可用。
+     */
+    public void startPending() {
+        if (status != null) {
+            throw new IllegalStateException("任务配置 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = TaskConfigStatusEnum.PENDING;
+    }
 }

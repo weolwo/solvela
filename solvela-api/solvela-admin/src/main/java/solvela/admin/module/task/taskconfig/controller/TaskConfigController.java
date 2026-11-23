@@ -2,12 +2,8 @@ package solvela.admin.module.task.taskconfig.controller;
 
 import solvela.base.domain.ValidateList;
 import solvela.task.TaskConfig;
-import solvela.admin.module.task.taskconfig.domain.form.TaskConfigAddForm;
-import solvela.task.taskconfig.domain.command.TaskConfigAddCommand;
 import solvela.admin.module.task.taskconfig.domain.form.TaskConfigQueryForm;
 import solvela.task.taskconfig.domain.query.TaskConfigQuery;
-import solvela.admin.module.task.taskconfig.domain.form.TaskConfigUpdateForm;
-import solvela.task.taskconfig.domain.command.TaskConfigUpdateCommand;
 import solvela.admin.module.task.taskconfig.domain.form.TaskConfigStatusUpdateForm;
 import solvela.admin.module.task.taskconfig.domain.form.TaskConfigWizardSubmitForm;
 import solvela.task.taskconfig.domain.command.TaskConfigWizardSubmitCommand;
@@ -52,13 +48,6 @@ public class TaskConfigController {
         return SolvelaPageUtil.convert2PageResult(page, TaskConfigVO.class);
     }
 
-    @Operation(summary = "添加")
-    @PostMapping("/add")
-    @RequiresPermission("taskConfig:add")
-    public void add(@RequestBody @Valid TaskConfigAddForm addForm) {
-        Service.add(SolvelaBeanUtil.copy(addForm, TaskConfigAddCommand.class));
-    }
-
     @Operation(summary = "任务配置向导提交（主子表：taskConfig + prizeMappingList）")
     @PostMapping("/wizard/submit")
     @RequiresPermission("taskConfig:wizard:submit")
@@ -87,13 +76,6 @@ public class TaskConfigController {
     @RequiresPermission("taskConfig:wizard:submit")
     public Long wizardUpdate(@RequestBody @Valid TaskConfigWizardUpdateForm updateForm) {
         return Service.wizardUpdate(SolvelaBeanUtil.deepCopy(updateForm, TaskConfigWizardUpdateCommand.class));
-    }
-
-    @Operation(summary = "更新")
-    @PostMapping("/update")
-    @RequiresPermission("taskConfig:update")
-    public void update(@RequestBody @Valid TaskConfigUpdateForm updateForm) {
-        Service.update(SolvelaBeanUtil.copy(updateForm, TaskConfigUpdateCommand.class));
     }
 
     @Operation(summary = "批量删除")
