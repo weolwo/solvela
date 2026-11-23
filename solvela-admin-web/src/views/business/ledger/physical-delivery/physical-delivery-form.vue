@@ -33,9 +33,7 @@
       <a-form-item label="物流单号" name="logisticsNo">
         <a-input style="width: 100%" v-model:value="form.logisticsNo" placeholder="物流单号" />
       </a-form-item>
-      <a-form-item label="状态" name="status">
-        <a-select style="width: 100%" v-model:value="form.status" :options="DELIVERY_STATUS_OPTIONS" placeholder="请选择状态" allowClear />
-      </a-form-item>
+      <!-- 状态刻意不在这里改：只经回填导入与作废推进，后端按迁移规则校验（PhysicalDeliveryService#update） -->
     </a-form>
 
     <template #footer>
@@ -53,7 +51,6 @@
   import { SolvelaLoading } from '/@/components/framework/solvela-loading';
   import { physicalDeliveryApi } from '/src/api/business/ledger/physical-delivery-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
-  import { DELIVERY_STATUS_OPTIONS } from '/src/constants/business/ledger/physical-delivery-const';
 
   // ------------------------ 事件 ------------------------
 
@@ -94,7 +91,6 @@
     receiverAddress: undefined, //收件详细地址
     logisticsCompany: undefined, //物流公司
     logisticsNo: undefined, //物流单号
-    status: undefined, //状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回
   };
 
   let form = reactive({ ...formDefault });
