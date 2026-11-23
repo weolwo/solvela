@@ -112,4 +112,28 @@
         WHERE v.id = #{id}
     </select>
 
+    <!--
+      审核的两条闸门：WHERE 里「仍是认证中」是并发闸门，两个运营同时点，第二个影响 0 行。
+      每条是 MemberVerifyStatusEnum#canTransitTo 的一条边，MemberVerifyStatusSqlTest 断言。${} 里只放常量。
+      verify_time 用 NOW()：「什么时候通过的」是合规审计要回答的问题，只认数据库一个钟。
+      通过时清掉上一次的驳回原因，否则界面上「已认证」旁边还挂着一条失败理由。
+    -->
+    <update id="markVerified">
+        update t_member_verify
+        set verify_status = ${@solvela.enums.MemberVerifyStatusEnum@VERIFIED.value},
+            verify_time = NOW(),
+            fail_reason = NULL
+        where id = #{id}
+          and verify_status = ${@solvela.enums.MemberVerifyStatusEnum@PENDING.value}
+    </update>
+
+    <!-- 驳回不写 verify_time：那一列的语义是「认证通过时间」 -->
+    <update id="markRejected">
+        update t_member_verify
+        set verify_status = ${@solvela.enums.MemberVerifyStatusEnum@FAILED.value},
+            fail_reason = #{failReason}
+        where id = #{id}
+          and verify_status = ${@solvela.enums.MemberVerifyStatusEnum@PENDING.value}
+    </update>
+
 </mapper>

@@ -1,6 +1,5 @@
 package solvela.member.verify.service;
 
-import solvela.enums.MemberVerifyStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -11,14 +10,11 @@ import solvela.base.dao.SolvelaPageUtil;
 import solvela.member.constant.MemberConst;
 import solvela.member.verify.MemberVerifyMask;
 import solvela.member.verify.dao.MemberVerifyDao;
-import solvela.member.MemberVerify;
 import solvela.member.verify.domain.query.MemberVerifyQuery;
 import solvela.member.verify.domain.dto.MemberVerifyDetailDTO;
 import solvela.member.verify.domain.dto.MemberVerifyDTO;
-import solvela.member.verify.manager.MemberVerifyManager;
 import solvela.exception.BusinessException;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -43,7 +39,6 @@ import java.util.List;
 public class MemberVerifyService {
 
     private final MemberVerifyDao memberVerifyDao;
-    private final MemberVerifyManager memberVerifyManager;
 
     /**
      * 分页查询。<b>姓名与身份证在这里被脱敏</b>，明文不出这个方法。
@@ -85,20 +80,13 @@ public class MemberVerifyService {
      *
      * <p>只有「认证中」能被审核：已认证的再点一次会把 verify_time 刷成今天，
      * 那个时间是有业务含义的（合规审计要回答「什么时候通过的」）。
+     * 这条规则压在 {@code markVerified} 的 WHERE 里，两个运营同时点，第二个影响 0 行。
      */
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long id) {
-        MemberVerify verify = requireAuditable(id);
-        if (verify == null) {
-            throw new BusinessException("只有「认证中」的记录可以审核");
+        if (id == null || memberVerifyDao.markVerified(id) == 0) {
+            throw new BusinessException(NOT_AUDITABLE);
         }
-        MemberVerify update = new MemberVerify();
-        update.setId(id);
-        update.setVerifyStatus(MemberVerifyStatusEnum.VERIFIED);
-        update.setVerifyTime(LocalDateTime.now());
-        // 通过时清掉上一次的驳回原因，否则界面上会出现「已认证」旁边挂着一条失败理由
-        update.setFailReason(null);
-        memberVerifyDao.updateById(update);
     }
 
     /**
@@ -113,28 +101,13 @@ public class MemberVerifyService {
         if (failReason.length() > MemberConst.MAX_FAIL_REASON_LENGTH) {
             throw new BusinessException("驳回原因最长 " + MemberConst.MAX_FAIL_REASON_LENGTH + " 字");
         }
-        MemberVerify verify = requireAuditable(id);
-        if (verify == null) {
-            throw new BusinessException("只有「认证中」的记录可以审核");
+        if (id == null || memberVerifyDao.markRejected(id, failReason.trim()) == 0) {
+            throw new BusinessException(NOT_AUDITABLE);
         }
-        MemberVerify update = new MemberVerify();
-        update.setId(id);
-        update.setVerifyStatus(MemberVerifyStatusEnum.FAILED);
-        update.setFailReason(failReason.trim());
-        // 驳回不写 verify_time：那一列的语义是「认证通过时间」，驳回没有通过
-        memberVerifyDao.updateById(update);
     }
 
-    /**
-     * 取一条可审核的记录；不存在或状态不对返回 null
-     */
-    private MemberVerify requireAuditable(Long id) {
-        MemberVerify verify = id == null ? null : memberVerifyManager.getById(id);
-        if (verify == null) {
-            return null;
-        }
-        return verify.getVerifyStatus() == MemberVerifyStatusEnum.PENDING ? verify : null;
-    }
+    /** 闸门影响 0 行：记录不存在、本就不是认证中，或刚被别人审核过 —— 对运营是同一句话 */
+    private static final String NOT_AUDITABLE = "只有「认证中」的记录可以审核，该记录可能已被他人处理，请刷新后重试";
 
     private static void mask(MemberVerifyDTO vo) {
         vo.setRealName(MemberVerifyMask.maskName(vo.getRealName()));

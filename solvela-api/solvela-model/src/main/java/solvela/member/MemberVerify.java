@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.crypto.PiiTypeHandler;
 
 import java.time.LocalDateTime;
@@ -64,12 +66,18 @@ public class MemberVerify {
 
     /**
      * 认证状态：0-未认证, 1-认证中, 2-已认证, 3-认证失败
+     *
+     * <p>🔴 没有公开 setter，通过时间也没有：只走 {@code MemberVerifyDao} 的审核闸门
+     * （状态机见 {@link MemberVerifyStatusEnum#canTransitTo}），两者在同一条 UPDATE 里一起写。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private MemberVerifyStatusEnum verifyStatus;
 
     /**
-     * 认证通过时间
+     * 认证通过时间（数据库时钟，由审核通过那条 UPDATE 写）
      */
+    @Setter(AccessLevel.NONE)
     private LocalDateTime verifyTime;
 
     /**

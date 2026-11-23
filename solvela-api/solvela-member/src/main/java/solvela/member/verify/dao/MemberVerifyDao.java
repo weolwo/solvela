@@ -42,4 +42,15 @@ public interface MemberVerifyDao extends BaseMapper<MemberVerify> {
      */
     List<MemberVerifyDTO> queryList(@Param("queryForm") MemberVerifyQuery queryForm);
 
+    /*
+     * 🔴 审核闸门：带「仍是认证中」条件，返回影响行数，0 表示已被别人审核过或本就不是认证中。
+     * 不要改回「读出来判一下再 updateById」—— 两个人同时点都会成功。迁移见 MemberVerifyStatusEnum#canTransitTo。
+     */
+
+    /** 审核通过：认证中 → 已认证，写数据库时钟的通过时间，清掉上次的驳回原因 */
+    int markVerified(@Param("id") Long id);
+
+    /** 审核驳回：认证中 → 认证失败 */
+    int markRejected(@Param("id") Long id, @Param("failReason") String failReason);
+
 }
