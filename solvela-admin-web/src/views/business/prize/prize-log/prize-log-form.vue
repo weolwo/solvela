@@ -4,10 +4,10 @@
   * 补发不是「改一条旧流水」，而是往前追加一条新的发奖流水，它本身就是一次真实发放的起点。
   *
   * 🔴 两步才算发出去：
-  *   ① 本弹窗新建一条 approve_status=1（待审批）的记录 —— /prizeLog/add 是纯 insert，不派发任何东西；
+  *   ① 本弹窗新建一条待审批的记录 —— /prizeLog/add 是纯 insert，不派发任何东西；
   *   ② 回列表点「通过」走 /prizeLog/approve/{id}，那里才会跑 PrizeDispatchHandler.doDispatch，
   *      生成提案、扣预算、最后由账务落到钱包/券/发货单。
-  * 所以这里把审批状态锁死成「待审批」，不给选 —— 落 0-无需审批只会造出一条永远不到账的死记录。
+  * 审批状态不由这里传：后端一律落「待审批」（PrizeLogService#add），表单里也不给选。
   *
   * @Author:    alaric
   * @Date:      2026-08-15
@@ -116,7 +116,6 @@
   import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
   import { PRIZE_TYPE_ENUM } from '/src/constants/business/prize/prize-config-const';
-  import { APPROVE_STATUS_ENUM } from '/src/constants/business/prize/prize-log-const';
 
   const emits = defineEmits(['reloadList']);
 
@@ -150,8 +149,7 @@
     validUntil: undefined,
     remark: undefined,
     externalBizNo: undefined,
-    // 见文件头注释：审批状态刻意写死，不给运营选。派发状态不由前端传，后端一律落「等待执行」
-    approveStatus: APPROVE_STATUS_ENUM.PENDING.value,
+    // 审批状态、派发状态都不由前端传：后端一律落「待审批 + 等待执行」，见文件头注释
   };
 
   const form = reactive({ ...formDefault });
