@@ -8,7 +8,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.crypto.PiiTypeHandler;
 import solvela.enums.AssetSourceEnum;
 
@@ -120,8 +122,13 @@ public class PhysicalDelivery {
     private String logisticsNo;
 
     /**
-     * 状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回
+     * 状态：-1-已取消, 0-待发货, 1-已发货, 2-已签收, 3-异常退回
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #awaitShipment} 定，之后只走 {@code PhysicalDeliveryDao}
+     * 带旧状态条件的 UPDATE（状态机见 {@link DeliveryStatusEnum#canTransitTo}）。
+     * 以前后台修改表单和回填导入都是整行 updateById，已签收的单也能改回待发货。MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private DeliveryStatusEnum status;
 
     /**
@@ -144,4 +151,13 @@ public class PhysicalDelivery {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 落为<b>待发货</b>：履约单唯一的初始状态。收件信息可以后补，发货由回填导入推进。
+     */
+    public void awaitShipment() {
+        if (status != null) {
+            throw new IllegalStateException("履约单 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = DeliveryStatusEnum.PENDING;
+    }
 }

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import solvela.enums.DeliveryStatusEnum;
 import solvela.ledger.PhysicalDelivery;
 import solvela.ledger.logistic.dao.PhysicalDeliveryDao;
@@ -55,7 +56,8 @@ class DeliverySummaryTest {
 
     private static PhysicalDelivery row(DeliveryStatusEnum status, String address) {
         PhysicalDelivery d = new PhysicalDelivery();
-        d.setStatus(status);
+        // status 没有 setter：走 MyBatis 读库时的同一条反射路径
+        SystemMetaObject.forObject(d).setValue("status", status);
         d.setReceiverAddress(address);
         return d;
     }

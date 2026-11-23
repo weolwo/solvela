@@ -140,7 +140,7 @@ public class AssetGrantApiService implements AssetGrantApi {
         delivery.setReceiverName(cmd.receiverName());
         delivery.setReceiverPhone(cmd.receiverPhone());
         delivery.setReceiverAddress(cmd.receiverAddress());
-        delivery.setStatus(DeliveryStatusEnum.PENDING);
+        delivery.awaitShipment();
 
         try {
             physicalDeliveryDao.insert(delivery);

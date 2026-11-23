@@ -1,6 +1,5 @@
 package solvela.admin.ledger;
 
-import solvela.enums.DeliveryStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,7 +69,7 @@ class PhysicalDeliveryPiiTest {
         entity.setReceiverName(NAME);
         entity.setReceiverPhone(PHONE);
         entity.setReceiverAddress(ADDRESS);
-        entity.setStatus(DeliveryStatusEnum.PENDING);
+        entity.awaitShipment();
 
         physicalDeliveryDao.insert(entity);
         Long id = entity.getId();
@@ -117,7 +116,7 @@ class PhysicalDeliveryPiiTest {
             second.setSourceBizId(sourceBizId + "_2");
             second.setSourceType(AssetSourceEnum.MANUAL);
             second.setReceiverAddress(ADDRESS);
-            second.setStatus(DeliveryStatusEnum.PENDING);
+            second.awaitShipment();
             physicalDeliveryDao.insert(second);
             try {
                 String rawA = jdbcTemplate.queryForObject(
@@ -146,7 +145,7 @@ class PhysicalDeliveryPiiTest {
         entity.setSourceBizId(sourceBizId);
         entity.setSourceType(AssetSourceEnum.MANUAL);
         entity.setReceiverName("");
-        entity.setStatus(DeliveryStatusEnum.PENDING);
+        entity.awaitShipment();
         physicalDeliveryDao.insert(entity);
 
         try {
@@ -178,7 +177,7 @@ class PhysicalDeliveryPiiTest {
         entity.setMemberId(MEMBER_ID);
         entity.setSourceBizId(orderNo);
         entity.setSourceType(AssetSourceEnum.MALL);
-        entity.setStatus(DeliveryStatusEnum.PENDING);
+        entity.awaitShipment();
         physicalDeliveryDao.insert(entity);
 
         try {

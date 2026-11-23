@@ -1,6 +1,5 @@
 package solvela.ledger.logistic.domain.command;
 
-import solvela.enums.DeliveryStatusEnum;
 import lombok.Data;
 
 /**
@@ -44,7 +43,6 @@ public class PhysicalDeliveryUpdateCommand {
     /** 物流单号 */
     private String logisticsNo;
 
-    /** 状态：0-待发货, 1-已发货, 2-已签收, 3-异常退回 */
-    private DeliveryStatusEnum status;
+    // 状态刻意不收：只经回填导入与作废推进，那两条路都带旧状态条件（PhysicalDeliveryService#update）
 
 }

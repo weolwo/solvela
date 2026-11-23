@@ -50,7 +50,7 @@ public class PhysicalAssetHandler implements IAssetHandler {
         delivery.setPrizeName(proposal.getAssetName());
         // 此时收件三要素为空，运营列表用 status=0 AND receiver_address IS NULL
         // 筛出「待用户补地址」的单子
-        delivery.setStatus(DeliveryStatusEnum.PENDING);
+        delivery.awaitShipment();
         // receiver_name / receiver_phone / receiver_address 刻意不设：
         // 中奖时用户尚未填写地址，v3.37 已把这三列改为可空，由第 ② 步补齐。
         // （此前它们是 NOT NULL 无默认值，实物审批通过必抛

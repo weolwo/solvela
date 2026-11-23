@@ -63,6 +63,25 @@ public enum DeliveryStatusEnum implements BaseEnum {
 
     private final String desc;
 
+    /**
+     * 本状态能否迁到 {@code to}。待发货是唯一的初始状态；已签收、异常退回、已取消都是终态，不能改回。
+     *
+     * <p>待发货可以直接到已签收：回填时东西已经签收了，就一步到位，不用先回填一次「已发货」。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code PhysicalDeliveryMapper.xml} 的每条改状态的 UPDATE 都带旧状态条件。
+     * {@code PhysicalDeliveryStatusSqlTest} 断言那些 SQL 与这里一条不多、一条不少。
+     * 回填导入在落库前先按本方法校验每一行，有一行不合法整批退回。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(DeliveryStatusEnum to) {
+        return switch (this) {
+            case PENDING -> to == DELIVERED || to == SIGNED || to == CANCELLED;
+            case DELIVERED -> to == SIGNED || to == RETURNED;
+            case SIGNED, RETURNED, CANCELLED -> false;
+        };
+    }
+
     public static DeliveryStatusEnum resolve(Integer value) {
         return Arrays.stream(values())
                 .filter(e -> e.value.equals(value))

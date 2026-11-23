@@ -61,15 +61,34 @@ public interface PhysicalDeliveryDao extends BaseMapper<PhysicalDelivery> {
      */
     List<Map<String, Object>> selectSourceStat();
 
-    // ----- 物理删除 -----
-
-    /**
-     * 单个物理删除
+    /*
+     * ==================== 状态闸门 ====================
+     *
+     * 🔴 每个改状态的方法都带旧状态条件，返回影响行数：0 表示状态已被别人推进或不在前置状态。
+     * 不要改成「读出实体 → set → updateById」。迁移见 DeliveryStatusEnum#canTransitTo，
+     * PhysicalDeliveryStatusSqlTest 断言 SQL 与状态机一一对应。
+     * 物流两列传 null 表示不改。
      */
+
+    /** 作废：待发货 → 已取消（页面上的「删除」，软作废） */
     long discardById(@Param("id") Long id);
 
-    /**
-     * 批量物理删除
-     */
+    /** 批量作废：待发货 → 已取消，不是待发货的那些不动 */
     void discardBatchIds(@Param("idList") List<Long> idList);
+
+    /** 发货：待发货 → 已发货 */
+    int markShipped(@Param("id") Long id, @Param("logisticsCompany") String logisticsCompany,
+                    @Param("logisticsNo") String logisticsNo);
+
+    /** 签收：待发货 / 已发货 → 已签收 */
+    int markSigned(@Param("id") Long id, @Param("logisticsCompany") String logisticsCompany,
+                   @Param("logisticsNo") String logisticsNo);
+
+    /** 异常退回：已发货 → 异常退回 */
+    int markReturned(@Param("id") Long id, @Param("logisticsCompany") String logisticsCompany,
+                     @Param("logisticsNo") String logisticsNo);
+
+    /** 只补物流信息，不碰状态 */
+    int updateLogistics(@Param("id") Long id, @Param("logisticsCompany") String logisticsCompany,
+                        @Param("logisticsNo") String logisticsNo);
 }

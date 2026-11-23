@@ -200,6 +200,7 @@ public class PhysicalDeliveryService {
         // ⚠️ 这一句不能省：member_name 仍是 NOT NULL 且无默认值，
         //    漏了会以「Field 'member_name' doesn't have a default value」整条被拒。
         physicalDelivery.setMemberName(memberService.requireMemberName(addForm.getMemberId()));
+        physicalDelivery.awaitShipment();
         physicalDeliveryDao.insert(physicalDelivery);
     }
 
@@ -212,14 +213,10 @@ public class PhysicalDeliveryService {
         if (tooLong != null) {
             throw new BusinessException(tooLong);
         }
-        // 发通知要判断「是不是刚转成已发货」，而那需要旧状态 —— 所以先读一次。
-        // 这是后台手工改单的路径，频率极低，多一次按主键的 SELECT 无所谓
-        PhysicalDelivery before = physicalDeliveryDao.selectById(updateForm.getId());
-
+        // 🔴 修改表单不收状态：状态只经回填导入与作废推进，那两条路都带旧状态条件。
+        // 以前这里能把已签收的单改回待发货。status 没有 setter，拷贝时跳过，updateById 也就不碰那一列
         PhysicalDelivery physicalDelivery = SolvelaBeanUtil.copy(updateForm, PhysicalDelivery.class);
         physicalDeliveryDao.updateById(physicalDelivery);
-
-        notifyIfJustShipped(before, physicalDelivery);
     }
 
     /**
@@ -357,7 +354,7 @@ public class PhysicalDeliveryService {
         entity.setReceiverAddress(row.receiverAddress());
         entity.setLogisticsCompany(row.logisticsCompany());
         entity.setLogisticsNo(row.logisticsNo());
-        entity.setStatus(DeliveryStatusEnum.PENDING);
+        entity.awaitShipment();
         return entity;
     }
 
@@ -384,15 +381,70 @@ public class PhysicalDeliveryService {
         }
         errors.throwIfAny();
 
-        for (PhysicalDeliveryShipImportRow row : dataList) {
-            PhysicalDelivery exist = existMap.get(uniqueKey(row.sourceBizId(), row.sourceType()));
-            PhysicalDelivery update = toShipUpdate(row, exist.getId());
-            physicalDeliveryDao.updateById(update);
-            // 批量回填是发货通知真正的主路径（后台手工改单只是补漏），
-            // 所以这里不能漏。exist 就是旧行，判状态迁移不用再查库
-            notifyIfJustShipped(exist, update);
+        // 第三段：与库内状态比对。先全部校验再落库，有一行迁移不合法整批退回
+        for (int i = 0; i < dataList.size(); i++) {
+            PhysicalDeliveryShipImportRow row = dataList.get(i);
+            checkShipTransition(i, row, existMap.get(uniqueKey(row.sourceBizId(), row.sourceType())), errors);
+        }
+        errors.throwIfAny();
+
+        for (int i = 0; i < dataList.size(); i++) {
+            PhysicalDeliveryShipImportRow row = dataList.get(i);
+            applyShipRow(i, row, existMap.get(uniqueKey(row.sourceBizId(), row.sourceType())));
         }
         return "成功回填 " + dataList.size() + " 条";
+    }
+
+    /**
+     * 这一行要改的状态合不合法（{@link DeliveryStatusEnum#canTransitTo}）。
+     * 状态列为空或与当前相同，表示这次不改状态、只回填物流信息。
+     */
+    private void checkShipTransition(int index, PhysicalDeliveryShipImportRow row, PhysicalDelivery exist, RowErrors errors) {
+        DeliveryStatusEnum target = DeliveryStatusEnum.resolve(row.status());
+        if (target == null || target == exist.getStatus()) {
+            return;
+        }
+        if (!exist.getStatus().canTransitTo(target)) {
+            errors.add(index, "状态不能从「" + exist.getStatus().getDesc() + "」改成「" + target.getDesc() + "」");
+        } else if (target == DeliveryStatusEnum.CANCELLED
+                && (SolvelaStringUtil.isNotBlank(row.logisticsCompany()) || SolvelaStringUtil.isNotBlank(row.logisticsNo()))) {
+            // 作废不写物流信息：填了也不会落库，与其悄悄丢掉不如当场说清楚
+            errors.add(index, "改成「已取消」的行不要填物流公司、物流单号");
+        }
+    }
+
+    /**
+     * 落一行回填。改状态走带旧状态条件的闸门：校验与落库之间状态被别人改了（并发回填、会员补地址后被作废），
+     * 闸门影响 0 行，整批回滚，让运营刷新后重导，而不是覆盖别人刚写的状态。
+     */
+    private void applyShipRow(int index, PhysicalDeliveryShipImportRow row, PhysicalDelivery exist) {
+        // 回填表通常只填变动的那几列：空值一律是「不改」，SQL 里用 COALESCE 接住
+        String company = SolvelaStringUtil.isNotBlank(row.logisticsCompany()) ? row.logisticsCompany() : null;
+        String no = SolvelaStringUtil.isNotBlank(row.logisticsNo()) ? row.logisticsNo() : null;
+        // Excel 行模型刻意保持 Integer（那是文件格式的边界），合法性已在 checkShipRows 里保证过
+        DeliveryStatusEnum target = DeliveryStatusEnum.resolve(row.status());
+        Long id = exist.getId();
+        if (target == null || target == exist.getStatus()) {
+            physicalDeliveryDao.updateLogistics(id, company, no);
+            return;
+        }
+        int rows = switch (target) {
+            case DELIVERED -> physicalDeliveryDao.markShipped(id, company, no);
+            case SIGNED -> physicalDeliveryDao.markSigned(id, company, no);
+            case RETURNED -> physicalDeliveryDao.markReturned(id, company, no);
+            case CANCELLED -> (int) physicalDeliveryDao.discardById(id);
+            case PENDING -> throw new IllegalStateException("没有能迁到待发货的边，checkShipTransition 应已拦下");
+        };
+        if (rows == 0) {
+            RowErrors conflict = new RowErrors();
+            conflict.add(index, "的履约单状态刚被别人改过（导入时读到的是「" + exist.getStatus().getDesc()
+                    + "」），整批未导入，请刷新后重新导入");
+            conflict.throwIfAny();
+        }
+        // 批量回填是发货通知真正的主路径。闸门拿到 1 就说明它刚从待发货变成已发货
+        if (target == DeliveryStatusEnum.DELIVERED) {
+            notifyShipped(exist, company, no);
+        }
     }
 
     /**
@@ -427,12 +479,12 @@ public class PhysicalDeliveryService {
     }
 
     /**
-     * 状态<b>刚</b>从「非已发货」变成「已发货」时，给会员发一条站内信。
+     * 履约单<b>刚</b>从待发货变成已发货时，给会员发一条站内信。
      *
-     * <h3>为什么要判「刚」</h3>
-     * 后台改单和批量回填都可能对一张<b>已经是已发货</b>的单再更新一次
-     * （补个运单号、改个承运商）。不判迁移的话，用户每被改一次就收一条
-     * 「您的商品已发货」—— 这正是消息中心变成垃圾场的典型起手式。
+     * <h3>「刚」由谁保证</h3>
+     * 只在 {@code markShipped} 闸门拿到 1 之后调：那条 UPDATE 只认待发货，
+     * 对一张已经是已发货的单再回填一次（补个运单号、改个承运商）走的是 {@code updateLogistics}，不会到这里。
+     * 不这样判的话，用户每被改一次就收一条「您的商品已发货」。
      *
      * <h3>为什么参数里没有商品名</h3>
      * 拿不到。{@code t_physical_delivery} 上只有 {@code source_biz_id}，
@@ -443,48 +495,19 @@ public class PhysicalDeliveryService {
      * <p>⚠️ 空值不覆盖的语义在这里要接住：回填行可能只填了状态没填运单号，
      * 那两列要从旧行上取，否则通知里就是两个原样保留的 {@code ${...}}。
      */
-    private void notifyIfJustShipped(PhysicalDelivery before, PhysicalDelivery after) {
-        if (before == null || after == null) {
-            return;
-        }
-        if (after.getStatus() != DeliveryStatusEnum.DELIVERED || before.getStatus() == DeliveryStatusEnum.DELIVERED) {
-            return;
-        }
+    private void notifyShipped(PhysicalDelivery before, String company, String no) {
         if (before.getMemberId() == null) {
             return;
         }
-
-        String company = after.getLogisticsCompany() != null ? after.getLogisticsCompany() : before.getLogisticsCompany();
-        String no = after.getLogisticsNo() != null ? after.getLogisticsNo() : before.getLogisticsNo();
-
         // send() 永不抛异常：通知发不出去不该让发货这件事失败。
         // 反过来，本方法跑在调用方的事务里 —— 回填整批回滚时通知也跟着回滚，
         // 「没发货却收到已发货」比「发了货没收到通知」严重得多
         notificationService.send(NotifyRequest.of(NotificationTemplateEnum.DELIVERY_SHIPPED, before.getMemberId())
                 .param("sourceBizId", before.getSourceBizId())
-                .param("logisticsCompany", company)
-                .param("logisticsNo", no)
+                .param("logisticsCompany", company != null ? company : before.getLogisticsCompany())
+                .param("logisticsNo", no != null ? no : before.getLogisticsNo())
                 .bizRefId(before.getSourceBizId())
                 .build());
-    }
-
-    /**
-     * 回填只带上这次真要改的列：<b>空值一律不覆盖</b>。
-     * 回填表通常只填变动的那几列，null 在这里是「不改」而不是「清空」。
-     */
-    private PhysicalDelivery toShipUpdate(PhysicalDeliveryShipImportRow row, Long id) {
-        PhysicalDelivery update = new PhysicalDelivery();
-        update.setId(id);
-        if (SolvelaStringUtil.isNotBlank(row.logisticsCompany())) {
-            update.setLogisticsCompany(row.logisticsCompany());
-        }
-        if (SolvelaStringUtil.isNotBlank(row.logisticsNo())) {
-            update.setLogisticsNo(row.logisticsNo());
-        }
-        // Excel 行模型刻意保持 Integer（那是文件格式的边界，单元格里是人手填的文本），
-        // 到这里做一次显式转换。合法性已经在上面的校验里保证过，null 表示不改状态。
-        update.setStatus(DeliveryStatusEnum.resolve(row.status()));
-        return update;
     }
 
     /**
