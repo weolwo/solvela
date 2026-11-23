@@ -44,9 +44,7 @@
         />
         <div v-if="form.id" class="text-xs text-slate-400 mt-1">活动类型创建后不可修改；基础活动可在列表点「升级玩法」。</div>
       </a-form-item>
-      <a-form-item label="状态" name="status">
-        <a-select style="width: 100%" v-model:value="form.status" placeholder="请选择状态" :options="activityStatusOptions" />
-      </a-form-item>
+      <!-- 状态刻意不在这里改：新建一律未开始，上下线走列表上的开关（后端会做上线前完备度检查） -->
       <a-form-item label="活动开始时间" name="startTime">
         <a-date-picker
           :show-time="DAY_START_SHOW_TIME"
@@ -97,11 +95,10 @@
   import { activityConfigApi } from '/src/api/business/activity/activity-config-api';
   import { solvelaSentry } from '/@/lib/solvela-sentry';
   import { regular } from '/@/constants/regular-const';
-  import { ACTIVITY_STATUS_LIST, ACTIVITY_TYPE_LIST } from '/src/constants/business/activity/activity-config-const';
+  import { ACTIVITY_TYPE_LIST } from '/src/constants/business/activity/activity-config-const';
 
-  // 取值对齐后端 ActivityTypeEnum / t_activity_config.status，唯一真源在常量文件（铁律 3）
+  // 取值对齐后端 ActivityTypeEnum，唯一真源在常量文件（铁律 3）
   const activityTypeOptions = ACTIVITY_TYPE_LIST.map((t) => ({ value: t.value, label: `${t.icon} ${t.desc}` }));
-  const activityStatusOptions = ACTIVITY_STATUS_LIST.map((s) => ({ value: s.value, label: s.desc }));
 
   // ------------------------ 事件 ------------------------
 
@@ -140,7 +137,6 @@
     activityCode: undefined, //活动编码
     activityName: undefined, //活动名称
     activityType: undefined, //活动类型
-    status: undefined, //状态：1-启用, 2-禁用（不传则落库取默认值，列表上显示为「禁用」）
     startTime: undefined, //活动开始时间
     endTime: undefined, //活动结束时间
     dataEndTime: undefined, //数据截止时间：不填表示与活动结束时间相同
