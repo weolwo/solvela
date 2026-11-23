@@ -1,6 +1,5 @@
 package solvela.ledger.engine;
 
-import solvela.enums.ProposalStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,10 +62,11 @@ public class AssetDispatchEngine implements AssetDispatcher {
     /**
      * 核心执行入口：<b>抢闸门 → 扣预算 → 下发 → 落终态</b>，四步都在同一个 try 里。
      *
-     * <p>🔴 try 必须罩住前两步，不能只罩下发：{@code updateStatus} 或
+     * <p>🔴 try 必须罩住前两步，不能只罩下发：{@code claimForExecution} 或
      * {@code deductBudget} 自己抛异常时，提案要么还停在 30、要么已经进了 40，
-     * 不兜底就会永远卡在那里没人管。{@code budgetDeducted} 这个布尔量的全部作用
-     * 就是让兜底知道「该不该还预算」—— 还没扣就还，等于把没占用的额度凭空补进去。
+     * 不兜底就会永远卡在那里没人管。{@code budgetDeducted} 让兜底知道「该不该还预算」——
+     * 还没扣就还，等于把没占用的额度凭空补进去；{@code claimed} 让兜底知道「该从哪个状态落失败」，
+     * 见 {@link ProposalRecordDao#markFailedUnclaimed}。
      */
     @Override
     public void execute(ProposalRecord proposal, PromotionConfig config) {
@@ -76,14 +76,16 @@ public class AssetDispatchEngine implements AssetDispatcher {
         BigDecimal amount = proposal.getAmount() == null ? BigDecimal.ZERO : proposal.getAmount();
         // 数量参与 used_quota 扣减：券/实物靠它卡总量，值类资产恒为 1
         int quantity = proposal.getQuantity() == null ? DEFAULT_QUANTITY : proposal.getQuantity();
+        boolean claimed = false;
         boolean budgetDeducted = false;
 
         try {
             if (!claimForExecution(proposal)) {
                 return;
             }
+            claimed = true;
             if (!deductBudget(proposal, config, amount, quantity)) {
-                markFailed(proposal, "预算或发放数量已耗尽");
+                markFailed(proposal, true, "预算或发放数量已耗尽");
                 return;
             }
             budgetDeducted = true;
@@ -95,8 +97,8 @@ public class AssetDispatchEngine implements AssetDispatcher {
             if (budgetDeducted) {
                 releaseBudgetQuietly(config, amount, quantity);
             }
-            // 状态已经是 40(执行中)，不落终态就会永远卡住，必须兜底改成 70 让它可被排查/重试
-            markFailed(proposal, "系统执行异常: " + e.getMessage());
+            // 不落终态就会永远卡在 30 / 40，必须兜底改成 70 让它可被排查/重试
+            markFailed(proposal, claimed, "系统执行异常: " + e.getMessage());
         }
     }
 
@@ -107,8 +109,7 @@ public class AssetDispatchEngine implements AssetDispatcher {
      * 直接退出而不是重试 —— 重试等于同一笔奖被发两次。
      */
     private boolean claimForExecution(ProposalRecord proposal) {
-        int rows = proposalRecordDao.updateStatus(proposal.getId(),
-                ProposalStatusEnum.PENDING_EXECUTE, ProposalStatusEnum.EXECUTING);
+        int rows = proposalRecordDao.claimForExecution(proposal.getId());
         if (rows == 0) {
             log.warn("【引擎拦截】提案正在执行中或已完结，忽略本次调用。提案ID: {}", proposal.getId());
             return false;
@@ -153,25 +154,44 @@ public class AssetDispatchEngine implements AssetDispatcher {
     private void settle(ProposalRecord proposal, PromotionConfig config,
                         BigDecimal amount, int quantity, DispatchOutcome outcome) {
         if (outcome.ok()) {
-            proposalRecordDao.updateStatusAndRemark(proposal.getId(), ProposalStatusEnum.SUCCESS, "资产下发成功");
+            // 走到这里的一定是抢到执行权的那个线程，没有别人会动 40 的提案，影响 0 行只可能是有人手工改了库。
+            // 钱已经出去了，发奖侧照样要知道成功，所以不因 0 行而不通知
+            if (proposalRecordDao.markSucceeded(proposal.getId(), "资产下发成功") == 0) {
+                log.error("【引擎状态回写未命中】资产已下发，但提案ID: {} 已不是执行中，成功态没写进去，请人工核对",
+                        proposal.getId());
+            }
             syncPrizeLog(proposal, PrizeDispatchStatusEnum.SUCCESS, null);
             return;
         }
         releaseBudgetQuietly(config, amount, quantity);
-        markFailed(proposal, "资产下发失败：" + outcome.failReason());
+        markFailed(proposal, true, "资产下发失败：" + outcome.failReason());
     }
 
     /**
      * 落失败终态：提案 -> 70，同时把发奖记录也标成失败
      * 两处回写各自兜异常，任何一处挂了都不能影响另一处，否则又会出现「一半状态是对的」
+     *
+     * @param claimed 本线程是否已抢到执行权。抢到了从 40 落，没抢到（抢的那一步抛了异常）只从 30 落
      */
-    private void markFailed(ProposalRecord proposal, String reason) {
+    private void markFailed(ProposalRecord proposal, boolean claimed, String reason) {
         String remark = SolvelaStringUtil.truncate(reason, REMARK_MAX_LENGTH);
         try {
-            proposalRecordDao.updateStatusAndRemark(proposal.getId(), ProposalStatusEnum.FAILED, remark);
+            int rows = claimed
+                    ? proposalRecordDao.markFailed(proposal.getId(), remark)
+                    : proposalRecordDao.markFailedUnclaimed(proposal.getId(), remark);
+            if (rows == 0) {
+                /*
+                 * 提案已不在本线程以为的状态，终态归别人写，发奖侧的结果也归它通知。
+                 * 这里再发一条失败过去，发奖记录「先到先写」，会把随后真正的成功挡在外面 ——
+                 * 钱出去了，发奖记录却是失败。没抢到执行权时停在 40 的那种，由卡单扫描报出来。
+                 */
+                log.warn("【引擎状态回写未命中】提案ID: {} 已不是{}，不落失败、不通知发奖侧。原因: {}",
+                        proposal.getId(), claimed ? "执行中" : "待执行", remark);
+                return;
+            }
         } catch (Exception e) {
             Degradations.record(DegradePoint.PROPOSAL_STATUS_WRITEBACK_FAILED);
-            log.error("【引擎状态回写失败】提案ID: {} 将停留在 40(执行中)，请人工核对", proposal.getId(), e);
+            log.error("【引擎状态回写失败】提案ID: {} 将停留在 30(待执行) 或 40(执行中)，请人工核对", proposal.getId(), e);
         }
         syncPrizeLog(proposal, PrizeDispatchStatusEnum.FAIL, remark);
     }

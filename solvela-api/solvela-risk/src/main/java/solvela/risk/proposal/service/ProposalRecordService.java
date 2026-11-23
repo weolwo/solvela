@@ -105,12 +105,15 @@ public class ProposalRecordService {
         PromotionConfig config = requireEnabledConfig(req.getPromotionConfigId());
         checkRisk(req, config);
 
-        ProposalStatusEnum targetStatus = calculateInitStatus(req.getAmount(), config);
-        ProposalRecord proposal;
+        ProposalRecord proposal = newProposal(req, config, "提案生成成功");
+        if (needsReview(req.getAmount(), config)) {
+            proposal.awaitFirstReview();
+        } else {
+            proposal.awaitExecution();
+        }
         try {
-            // 没被拦截，risk_code 留空 —— 它只在 status=80 时有意义。
             // 防重靠 uk_t_prm_prop_tsk_stg
-            proposal = saveProposal(req, config, targetStatus, "提案生成成功", null);
+            proposalRecordDao.insert(proposal);
         } catch (DuplicateKeyException e) {
             log.warn("【提案防重】该业务单号已存在提案记录，直接忽略: {}", req.getSourceBizId());
             // 幂等返回成功。id 给 null 而不是回查一次：调用方拿它只为人工排查，
@@ -120,11 +123,11 @@ public class ProposalRecordService {
         }
 
         // 分流：免审的当场发钱，触发阈值的驻留在审批池，等财务在后台调 approve()
-        if (targetStatus == ProposalStatusEnum.PENDING_EXECUTE) {
+        if (proposal.getStatus() == ProposalStatusEnum.PENDING_EXECUTE) {
             log.info("【提案免审】金额未触发审批阈值，提交后立即调起底层资产服务发钱! 提案ID: {}", proposal.getId());
             dispatchAfterCommit(proposal, config);
         } else {
-            log.info("【提案挂起】金额触发审批阈值，进入人工审核池。提案ID: {}, 状态: {}", proposal.getId(), targetStatus);
+            log.info("【提案挂起】金额触发审批阈值，进入人工审核池。提案ID: {}, 状态: {}", proposal.getId(), proposal.getStatus());
         }
         return proposal.getId();
     }
@@ -157,16 +160,12 @@ public class ProposalRecordService {
             return;
         }
         log.warn("【风控拦截】提案未通过安全校验: {}", riskResult.getReason());
-        saveProposal(req, config, ProposalStatusEnum.RISK_BLOCKED,
-                "风控拦截: " + riskResult.getReason(), riskResult.getRuleCode());
+        ProposalRecord blocked = newProposal(req, config, "风控拦截: " + riskResult.getReason());
+        blocked.blockByRisk(riskResult.getRuleCode());
+        proposalRecordDao.insert(blocked);
         throw new BusinessException(riskResult.getReason());
     }
 
-    /**
-     * 审批人字段名，收敛在此，不接受外部传入（Mapper 里用 ${} 拼接）
-     */
-    private static final String FIELD_FIRST_REVIEWER = "first_reviewer";
-    private static final String FIELD_SECOND_REVIEWER = "second_reviewer";
     /**
      * 审批通过：一审通过后按 review_level 决定进二审还是直接放行下发
      * <p>
@@ -186,18 +185,16 @@ public class ProposalRecordService {
 
         ProposalStatusEnum current = proposal.getStatus();
         int rows;
-        ProposalStatusEnum targetStatus;
+        boolean readyToExecute;
         if (current == ProposalStatusEnum.FIRST_REVIEW) {
             // 一审通过：双层审批则转二审，否则直接待执行
-            targetStatus = config.getReviewLevel() == ReviewLevelEnum.DOUBLE
-                    ? ProposalStatusEnum.SECOND_REVIEW
-                    : ProposalStatusEnum.PENDING_EXECUTE;
-            rows = proposalRecordDao.updateReview(id, ProposalStatusEnum.FIRST_REVIEW, targetStatus,
-                    FIELD_FIRST_REVIEWER, reviewer, comment);
+            readyToExecute = config.getReviewLevel() != ReviewLevelEnum.DOUBLE;
+            rows = readyToExecute
+                    ? proposalRecordDao.passFirstReview(id, reviewer, comment)
+                    : proposalRecordDao.escalateToSecondReview(id, reviewer, comment);
         } else if (current == ProposalStatusEnum.SECOND_REVIEW) {
-            targetStatus = ProposalStatusEnum.PENDING_EXECUTE;
-            rows = proposalRecordDao.updateReview(id, ProposalStatusEnum.SECOND_REVIEW, targetStatus,
-                    FIELD_SECOND_REVIEWER, reviewer, comment);
+            readyToExecute = true;
+            rows = proposalRecordDao.passSecondReview(id, reviewer, comment);
         } else {
             throw new BusinessException("当前状态不可审批：" + current.getDesc());
         }
@@ -207,9 +204,10 @@ public class ProposalRecordService {
         }
 
         // 审批到「待执行」才触发下发，且同样放在事务提交后 —— 理由与 addProposal 一致：
-        // 下发失败不能把审批记录一起回滚掉
-        if (targetStatus == ProposalStatusEnum.PENDING_EXECUTE) {
-            proposal.setStatus(ProposalStatusEnum.PENDING_EXECUTE);
+        // 下发失败不能把审批记录一起回滚掉。
+        // 手里这个 proposal 的 status 还是读出来时的审批态，不用改它：引擎不读内存里的状态，
+        // 抢执行权靠的是 claimForExecution 那条带「仍是待执行」条件的 UPDATE。
+        if (readyToExecute) {
             dispatchAfterCommit(proposal, config);
         }
     }
@@ -224,15 +222,14 @@ public class ProposalRecordService {
             throw new BusinessException("提案不存在");
         }
         ProposalStatusEnum current = proposal.getStatus();
-        String reviewerField;
+        int rows;
         if (current == ProposalStatusEnum.FIRST_REVIEW) {
-            reviewerField = FIELD_FIRST_REVIEWER;
+            rows = proposalRecordDao.rejectAtFirstReview(id, reviewer, comment);
         } else if (current == ProposalStatusEnum.SECOND_REVIEW) {
-            reviewerField = FIELD_SECOND_REVIEWER;
+            rows = proposalRecordDao.rejectAtSecondReview(id, reviewer, comment);
         } else {
             throw new BusinessException("当前状态不可驳回：" + current.getDesc());
         }
-        int rows = proposalRecordDao.updateReview(id, current, ProposalStatusEnum.REJECTED, reviewerField, reviewer, comment);
         if (rows == 0) {
             throw new BusinessException("该提案已被处理，请刷新后重试");
         }
@@ -264,30 +261,22 @@ public class ProposalRecordService {
     }
 
     /**
-     * 根据 t_promotion_config 的配置，精准计算提案状态
+     * 按 t_promotion_config 的配置判断本次发放要不要进审批池
      */
-    private ProposalStatusEnum calculateInitStatus(BigDecimal amount, PromotionConfig config) {
+    private boolean needsReview(BigDecimal amount, PromotionConfig config) {
         // 配置了不需要审批，直接待执行
         if (config.getReviewLevel() == ReviewLevelEnum.NONE) {
-            return ProposalStatusEnum.PENDING_EXECUTE;
+            return false;
         }
-
-        // 需要审批，且发放金额 >= 一审阈值，落待一审
-        if (amount.compareTo(config.getFirstReviewThreshold()) >= 0) {
-            return ProposalStatusEnum.FIRST_REVIEW;
-        }
-
-        // 配置了审批，但本次发的钱太少（比如只发 1 毛钱），没达到一审门槛，自动豁免
-        return ProposalStatusEnum.PENDING_EXECUTE;
+        // 需要审批，且发放金额 >= 一审阈值，落待一审；
+        // 没达到一审门槛（比如只发 1 毛钱）的自动豁免
+        return amount.compareTo(config.getFirstReviewThreshold()) >= 0;
     }
 
     /**
-     * 构建并保存提案实体
-     *
-     * @param riskCode 风控拦截分类，仅 status=80 时传值；其余场景传 null
+     * 构建提案实体，不定状态也不落库：初始状态由调用方经实体方法定（待一审 / 待执行 / 风控拦截）
      */
-    private ProposalRecord saveProposal(ProposalRecordAddCommand req, PromotionConfig config,
-                                        ProposalStatusEnum status, String remark, String riskCode) {
+    private ProposalRecord newProposal(ProposalRecordAddCommand req, PromotionConfig config, String remark) {
         ProposalRecord record = new ProposalRecord();
         // 单号由提案域自己生成，不采信调用方传值：它是本域对外的凭证，交易号的唯一性必须由发号方保证
         record.setTradeNo(SolvelaCodeUtil.generateTradeNo(TRADE_NO_PREFIX));
@@ -312,12 +301,7 @@ public class ProposalRecordService {
         record.setSourceType(req.getSourceType());
         record.setSourceBizId(req.getSourceBizId());
         record.setPromotionConfigId(config.getId());
-
-        record.setStatus(status);
         record.setRemark(remark);
-        record.setRiskCode(riskCode);
-
-        proposalRecordDao.insert(record);
         return record;
     }
 

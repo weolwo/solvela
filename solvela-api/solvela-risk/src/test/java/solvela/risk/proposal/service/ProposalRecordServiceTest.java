@@ -1,11 +1,11 @@
 package solvela.risk.proposal.service;
 
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -195,9 +195,9 @@ class ProposalRecordServiceTest {
     @Test
     @DisplayName("审批：抢不到条件更新就抛，绝不下发")
     void 审批并发抢不到不下发() {
-        ProposalRecord pending = proposalAt(ProposalStatusEnum.FIRST_REVIEW);
-        when(proposalRecordDao.selectById(anyLong())).thenReturn(pending);
-        when(proposalRecordDao.updateReview(anyLong(), any(), any(), any(), any(), any())).thenReturn(0);
+        config.setReviewLevel(ReviewLevelEnum.SINGLE);
+        when(proposalRecordDao.selectById(anyLong())).thenReturn(proposalAt(ProposalStatusEnum.FIRST_REVIEW));
+        when(proposalRecordDao.passFirstReview(anyLong(), any(), any())).thenReturn(0);
 
         assertThrows(BusinessException.class, () -> service.approve(1L, "财务A", "同意"));
 
@@ -210,10 +210,11 @@ class ProposalRecordServiceTest {
     void 单层审批一次放行() {
         config.setReviewLevel(ReviewLevelEnum.SINGLE);
         when(proposalRecordDao.selectById(anyLong())).thenReturn(proposalAt(ProposalStatusEnum.FIRST_REVIEW));
-        when(proposalRecordDao.updateReview(anyLong(), any(), any(), any(), any(), any())).thenReturn(1);
+        when(proposalRecordDao.passFirstReview(anyLong(), any(), any())).thenReturn(1);
 
         service.approve(1L, "财务A", "同意");
 
+        verify(proposalRecordDao, never()).escalateToSecondReview(anyLong(), any(), any());
         verify(assetDispatcher).execute(any(), any());
     }
 
@@ -222,13 +223,26 @@ class ProposalRecordServiceTest {
     void 双层审批一审不下发() {
         config.setReviewLevel(ReviewLevelEnum.DOUBLE);
         when(proposalRecordDao.selectById(anyLong())).thenReturn(proposalAt(ProposalStatusEnum.FIRST_REVIEW));
-        when(proposalRecordDao.updateReview(anyLong(), any(), any(), any(), any(), any())).thenReturn(1);
+        when(proposalRecordDao.escalateToSecondReview(anyLong(), any(), any())).thenReturn(1);
 
         service.approve(1L, "财务A", "同意");
 
-        verify(proposalRecordDao).updateReview(anyLong(), any(), eqStatus(ProposalStatusEnum.SECOND_REVIEW),
-                any(), any(), any());
+        verify(proposalRecordDao).escalateToSecondReview(1L, "财务A", "同意");
+        verify(proposalRecordDao, never()).passFirstReview(anyLong(), any(), any());
         verify(assetDispatcher, never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("二审通过：待执行并下发")
+    void 二审通过下发() {
+        config.setReviewLevel(ReviewLevelEnum.DOUBLE);
+        when(proposalRecordDao.selectById(anyLong())).thenReturn(proposalAt(ProposalStatusEnum.SECOND_REVIEW));
+        when(proposalRecordDao.passSecondReview(anyLong(), any(), any())).thenReturn(1);
+
+        service.approve(1L, "财务B", "同意");
+
+        verify(proposalRecordDao).passSecondReview(1L, "财务B", "同意");
+        verify(assetDispatcher).execute(any(), any());
     }
 
     @Test
@@ -238,11 +252,24 @@ class ProposalRecordServiceTest {
 
         assertThrows(BusinessException.class, () -> service.approve(1L, "财务A", "同意"));
 
-        verify(proposalRecordDao, never()).updateReview(anyLong(), any(), any(), any(), any(), any());
+        verify(proposalRecordDao, never()).passFirstReview(anyLong(), any(), any());
+        verify(proposalRecordDao, never()).escalateToSecondReview(anyLong(), any(), any());
+        verify(proposalRecordDao, never()).passSecondReview(anyLong(), any(), any());
     }
 
-    private ProposalStatusEnum eqStatus(ProposalStatusEnum status) {
-        return ArgumentMatchers.eq(status);
+    @Test
+    @DisplayName("驳回：一审、二审各走自己那条闸门；抢不到就抛")
+    void 驳回按所在审批级() {
+        when(proposalRecordDao.selectById(1L)).thenReturn(proposalAt(ProposalStatusEnum.FIRST_REVIEW));
+        when(proposalRecordDao.rejectAtFirstReview(anyLong(), any(), any())).thenReturn(1);
+        service.reject(1L, "财务A", "金额不对");
+        verify(proposalRecordDao).rejectAtFirstReview(1L, "财务A", "金额不对");
+
+        when(proposalRecordDao.selectById(2L)).thenReturn(proposalAt(ProposalStatusEnum.SECOND_REVIEW));
+        when(proposalRecordDao.rejectAtSecondReview(anyLong(), any(), any())).thenReturn(0);
+        assertThrows(BusinessException.class, () -> service.reject(2L, "财务B", "重复申请"));
+
+        verify(assetDispatcher, never()).execute(any(), any());
     }
 
     private ProposalRecordAddCommand command(BigDecimal amount) {
@@ -263,8 +290,9 @@ class ProposalRecordServiceTest {
         proposal.setId(1L);
         proposal.setMemberId(MEMBER_ID);
         proposal.setPromotionConfigId(CONFIG_ID);
-        proposal.setStatus(status);
         proposal.setAmount(new BigDecimal("10"));
+        // status 没有 setter：走 MyBatis 读库时的同一条反射路径，造出「库里读出来就是这个状态」的对象
+        SystemMetaObject.forObject(proposal).setValue("status", status);
         return proposal;
     }
 

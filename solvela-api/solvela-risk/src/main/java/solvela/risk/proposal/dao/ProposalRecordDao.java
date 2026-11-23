@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.enums.ProposalStatusEnum;
 import solvela.risk.ProposalRecord;
 import solvela.risk.proposal.domain.dto.ProposalRecordDTO;
 import solvela.risk.proposal.domain.query.ProposalRecordQuery;
@@ -32,36 +31,66 @@ public interface ProposalRecordDao extends BaseMapper<ProposalRecord> {
      */
     List<ProposalRecordDTO> queryPage(Page<?> page, @Param("queryForm") ProposalRecordQuery queryForm);
 
-    /**
-     * 条件流转提案状态：只有当前状态等于 fromStatus 才会更新
-     * <p>
-     * 这是资产下发的并发闸门：多个线程/重投事件同时进来，只有抢到状态跃迁的那一个拿到 rows=1，
-     * 其余拿到 0 直接退出，避免同一提案被重复执行。
+    /*
+     * ==================== 状态闸门 ====================
      *
-     * @return 更新行数，0 表示状态已被别人推进或提案已完结
+     * 🔴 下面每个方法是 ProposalStatusEnum#canTransitTo 里的一条边，SQL 带旧状态条件，
+     * 返回影响行数：0 表示状态已被别人推进或提案已完结。不要改成「读出实体 → set → updateById」，
+     * 并发下两个线程会同时读到同一个旧状态，同一笔奖被发两次。
+     * ProposalRecordStatusSqlTest 断言这些 SQL 与状态机一一对应。
      */
-    int updateStatus(@Param("id") Long id, @Param("fromStatus") ProposalStatusEnum fromStatus, @Param("toStatus") ProposalStatusEnum toStatus);
 
     /**
-     * 无条件写入终态与备注（成功/失败的收尾，不参与并发竞争）
+     * 抢执行权：待执行 → 执行中。资产下发的并发闸门，只有拿到 1 的那个线程往下发。
      */
-    int updateStatusAndRemark(@Param("id") Long id, @Param("status") ProposalStatusEnum status, @Param("remark") String remark);
+    int claimForExecution(@Param("id") Long id);
 
     /**
-     * 审批流转：只有当前状态等于 fromStatus 才更新，同时记录审批人与意见
-     * <p>
-     * 条件更新即并发闸门 —— 两个审批人同时点「通过」，只有一个能拿到 rows=1，
-     * 另一个拿到 0 会被告知「已被处理」，避免重复审批导致重复发放。
-     *
-     * @param reviewerField 写入哪个审批人字段：first_reviewer / second_reviewer
-     * @return 更新行数，0 表示状态已被别人推进
+     * 下发成功：执行中 → 成功。只有抢到执行权的那个线程会调。
      */
-    int updateReview(@Param("id") Long id,
-                     @Param("fromStatus") ProposalStatusEnum fromStatus,
-                     @Param("toStatus") ProposalStatusEnum toStatus,
-                     @Param("reviewerField") String reviewerField,
-                     @Param("reviewer") String reviewer,
-                     @Param("comment") String comment);
+    int markSucceeded(@Param("id") Long id, @Param("remark") String remark);
+
+    /**
+     * 下发失败：执行中 → 彻底失败。只有抢到执行权的那个线程会调。
+     */
+    int markFailed(@Param("id") Long id, @Param("remark") String remark);
+
+    /**
+     * 抢执行权那一步自己抛了异常：待执行 → 彻底失败。
+     *
+     * <p>⚠️ 只认待执行，不认执行中：抛异常时分不清那次抢占到底提交了没有。
+     * 若其实已经是执行中，这里影响 0 行，提案留在执行中，由卡单扫描（{@link #countStuckDispatch}）报出来；
+     * 若认执行中，会把别的线程正在下发的提案改成失败，它发完回写成功时又影响 0 行 —— 钱出去了，单子却是失败。
+     */
+    int markFailedUnclaimed(@Param("id") Long id, @Param("remark") String remark);
+
+    /**
+     * 单层审批一审通过：待一审 → 待执行。
+     *
+     * <p>审批的五条 UPDATE 同样是并发闸门：两个审批人同时点，只有一个拿到 1，
+     * 另一个拿到 0 被告知「已被处理」。
+     */
+    int passFirstReview(@Param("id") Long id, @Param("reviewer") String reviewer, @Param("comment") String comment);
+
+    /**
+     * 双层审批一审通过：待一审 → 待二审。
+     */
+    int escalateToSecondReview(@Param("id") Long id, @Param("reviewer") String reviewer, @Param("comment") String comment);
+
+    /**
+     * 二审通过：待二审 → 待执行。
+     */
+    int passSecondReview(@Param("id") Long id, @Param("reviewer") String reviewer, @Param("comment") String comment);
+
+    /**
+     * 一审驳回：待一审 → 驳回。
+     */
+    int rejectAtFirstReview(@Param("id") Long id, @Param("reviewer") String reviewer, @Param("comment") String comment);
+
+    /**
+     * 二审驳回：待二审 → 驳回。
+     */
+    int rejectAtSecondReview(@Param("id") Long id, @Param("reviewer") String reviewer, @Param("comment") String comment);
 
     /**
      * 列表查询 (无分页)

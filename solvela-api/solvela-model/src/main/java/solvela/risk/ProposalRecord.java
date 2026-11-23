@@ -11,7 +11,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 提案表 实体类
@@ -111,7 +113,12 @@ public class ProposalRecord {
 
     /**
      * 0-等待中, 10-待一审, 11-待二审, 20-驳回, 30-待执行, 40-执行中, 50-成功, 60-部分成功, 70-彻底失败, 80-风控拦截
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #awaitFirstReview} / {@link #awaitExecution} /
+     * {@link #blockByRisk} 定，之后只走 {@code ProposalRecordDao} 带旧状态条件的 UPDATE
+     * （状态机见 {@link ProposalStatusEnum#canTransitTo}）。MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private ProposalStatusEnum status;
 
     /**
@@ -125,7 +132,10 @@ public class ProposalRecord {
      * <p>与 {@link #remark} <b>并存且用途相反</b>：这一列取值封闭、给漏斗聚类用；
      * remark 是给用户/客服看的话术，会改、也早晚会带上具体数值。
      * 只留文案会统计不了，只留编码会查不了客诉 —— 与 {@code t_task_record_flow.discard_code} 同一模式。
+     *
+     * <p>没有公开 setter：只由 {@link #blockByRisk} 跟状态一起写，保证「仅风控拦截时有值」。
      */
+    @Setter(AccessLevel.NONE)
     private String riskCode;
 
     /**
@@ -173,4 +183,37 @@ public class ProposalRecord {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 落为<b>待一审</b>：金额达到一审阈值，挂进审批池，不当场下发。
+     */
+    public void awaitFirstReview() {
+        requireNew();
+        this.status = ProposalStatusEnum.FIRST_REVIEW;
+    }
+
+    /**
+     * 落为<b>待执行</b>：免审，提交后当场下发。
+     */
+    public void awaitExecution() {
+        requireNew();
+        this.status = ProposalStatusEnum.PENDING_EXECUTE;
+    }
+
+    /**
+     * 落为<b>风控拦截</b>，连同拦截分类一起写。
+     *
+     * @param riskCode 拦截分类，对齐 {@code RiskBlockCode}
+     */
+    public void blockByRisk(String riskCode) {
+        requireNew();
+        this.status = ProposalStatusEnum.RISK_BLOCKED;
+        this.riskCode = riskCode;
+    }
+
+    /** 初始状态只能定一次：已有状态的提案（读库出来的）再调就是绕过了 DAO 的闸门 */
+    private void requireNew() {
+        if (status != null) {
+            throw new IllegalStateException("提案 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+    }
 }

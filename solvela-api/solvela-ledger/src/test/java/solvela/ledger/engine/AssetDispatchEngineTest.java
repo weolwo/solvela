@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import solvela.dispatch.DispatchOutcome;
-import solvela.enums.ProposalStatusEnum;
 import solvela.ledger.handler.IAssetHandler;
 import solvela.ledger.strategy.AssetStrategyFactory;
 import solvela.member.api.PrizeDispatchResultMessage;
@@ -96,16 +95,18 @@ class AssetDispatchEngineTest {
 
         when(strategyFactory.getHandler(any(PrizeTypeEnum.class))).thenReturn(handler);
         // 默认：闸门抢到、预算扣得动
-        when(proposalRecordDao.updateStatus(eq(PROPOSAL_ID), eq(ProposalStatusEnum.PENDING_EXECUTE),
-                eq(ProposalStatusEnum.EXECUTING))).thenReturn(1);
+        when(proposalRecordDao.claimForExecution(PROPOSAL_ID)).thenReturn(1);
+        // 默认：终态回写都命中
+        when(proposalRecordDao.markSucceeded(eq(PROPOSAL_ID), anyString())).thenReturn(1);
+        when(proposalRecordDao.markFailed(eq(PROPOSAL_ID), anyString())).thenReturn(1);
+        when(proposalRecordDao.markFailedUnclaimed(eq(PROPOSAL_ID), anyString())).thenReturn(1);
         when(promotionConfigDao.deductBudget(eq(CONFIG_ID), any(), anyInt())).thenReturn(1);
     }
 
     @Test
     @DisplayName("抢不到 30->40 的闸门就直接退出，绝不下发")
     void 抢不到闸门不下发() {
-        when(proposalRecordDao.updateStatus(eq(PROPOSAL_ID), eq(ProposalStatusEnum.PENDING_EXECUTE),
-                eq(ProposalStatusEnum.EXECUTING))).thenReturn(0);
+        when(proposalRecordDao.claimForExecution(PROPOSAL_ID)).thenReturn(0);
 
         engine.execute(proposal, config);
 
@@ -123,7 +124,7 @@ class AssetDispatchEngineTest {
         engine.execute(proposal, config);
 
         verify(handler, never()).dispatch(any());
-        verify(proposalRecordDao).updateStatusAndRemark(eq(PROPOSAL_ID), eq(ProposalStatusEnum.FAILED), anyString());
+        verify(proposalRecordDao).markFailed(eq(PROPOSAL_ID), anyString());
         // 没扣成功就不能还，还了会把没占用的预算凭空加回去
         verify(promotionConfigDao, never()).releaseBudget(any(), any(), anyInt());
         assertFalse(publishedMessage().success());
@@ -136,7 +137,7 @@ class AssetDispatchEngineTest {
 
         engine.execute(proposal, config);
 
-        verify(proposalRecordDao).updateStatusAndRemark(eq(PROPOSAL_ID), eq(ProposalStatusEnum.SUCCESS), anyString());
+        verify(proposalRecordDao).markSucceeded(eq(PROPOSAL_ID), anyString());
         verify(promotionConfigDao, never()).releaseBudget(any(), any(), anyInt());
         assertTrue(publishedMessage().success());
     }
@@ -150,7 +151,7 @@ class AssetDispatchEngineTest {
 
         // 「按实际扣掉的数量还」——扣 3 还 1 会让 used_quota 只增不减
         verify(promotionConfigDao, times(1)).releaseBudget(CONFIG_ID, AMOUNT, 1);
-        verify(proposalRecordDao).updateStatusAndRemark(eq(PROPOSAL_ID), eq(ProposalStatusEnum.FAILED), anyString());
+        verify(proposalRecordDao).markFailed(eq(PROPOSAL_ID), anyString());
         PrizeDispatchResultMessage message = publishedMessage();
         assertFalse(message.success());
         assertTrue(message.failReason().contains("账户已冻结"), "失败原因要原样带回给发奖侧");
@@ -165,7 +166,7 @@ class AssetDispatchEngineTest {
 
         verify(promotionConfigDao, times(1)).releaseBudget(CONFIG_ID, AMOUNT, 1);
         // 不落终态的话，这条提案既不会被重试也不会被任何人看见
-        verify(proposalRecordDao).updateStatusAndRemark(eq(PROPOSAL_ID), eq(ProposalStatusEnum.FAILED), anyString());
+        verify(proposalRecordDao).markFailed(eq(PROPOSAL_ID), anyString());
         assertFalse(publishedMessage().success());
     }
 
@@ -179,14 +180,14 @@ class AssetDispatchEngineTest {
 
         // budgetDeducted 还是 false —— 这就是那个布尔量存在的理由
         verify(promotionConfigDao, never()).releaseBudget(any(), any(), anyInt());
-        verify(proposalRecordDao).updateStatusAndRemark(eq(PROPOSAL_ID), eq(ProposalStatusEnum.FAILED), anyString());
+        verify(proposalRecordDao).markFailed(eq(PROPOSAL_ID), anyString());
     }
 
     @Test
     @DisplayName("回写状态自己失败，也不能连累结果消息发不出去")
     void 状态回写失败不影响结果通知() {
         when(handler.dispatch(proposal)).thenReturn(DispatchOutcome.failed("余额不足"));
-        when(proposalRecordDao.updateStatusAndRemark(any(), any(), anyString()))
+        when(proposalRecordDao.markFailed(any(), anyString()))
                 .thenThrow(new IllegalStateException("提案表写不进去"));
 
         engine.execute(proposal, config);
@@ -217,6 +218,45 @@ class AssetDispatchEngineTest {
         engine.execute(proposal, config);
 
         verify(promotionConfigDao).deductBudget(CONFIG_ID, BigDecimal.ZERO, 1);
+    }
+
+    @Test
+    @DisplayName("🔴 抢执行权那一步抛异常：只从待执行落失败，不碰执行中")
+    void 抢占抛异常只从待执行落失败() {
+        when(proposalRecordDao.claimForExecution(PROPOSAL_ID)).thenThrow(new IllegalStateException("锁等待超时"));
+
+        engine.execute(proposal, config);
+
+        // 分不清那次抢占提交了没有：认执行中的话，会把别的线程正在下发的提案改成失败
+        verify(proposalRecordDao).markFailedUnclaimed(eq(PROPOSAL_ID), anyString());
+        verify(proposalRecordDao, never()).markFailed(any(), anyString());
+        verify(promotionConfigDao, never()).deductBudget(any(), any(), anyInt());
+        verify(handler, never()).dispatch(any());
+        assertFalse(publishedMessage().success());
+    }
+
+    @Test
+    @DisplayName("🔴 失败回写影响 0 行：提案终态归别人写，不往发奖侧发失败")
+    void 失败回写未命中不通知() {
+        when(proposalRecordDao.claimForExecution(PROPOSAL_ID)).thenThrow(new IllegalStateException("锁等待超时"));
+        when(proposalRecordDao.markFailedUnclaimed(eq(PROPOSAL_ID), anyString())).thenReturn(0);
+
+        engine.execute(proposal, config);
+
+        // 发奖记录先到先写：这里发一条失败，会把随后真正的成功挡在外面
+        verify(dispatchResultPublisher, never()).publish(any());
+    }
+
+    @Test
+    @DisplayName("成功回写影响 0 行：钱已经出去了，发奖侧照样要知道成功")
+    void 成功回写未命中仍通知() {
+        when(handler.dispatch(proposal)).thenReturn(DispatchOutcome.success());
+        when(proposalRecordDao.markSucceeded(eq(PROPOSAL_ID), anyString())).thenReturn(0);
+
+        engine.execute(proposal, config);
+
+        assertTrue(publishedMessage().success());
+        verify(promotionConfigDao, never()).releaseBudget(any(), any(), anyInt());
     }
 
     /** 取引擎发出去的那条派发结果消息 */

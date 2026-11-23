@@ -163,7 +163,7 @@
 
         另外两个是流程体检：
           - rejectNoCommentCount ：驳回却没写理由，事后说不清为什么不给这个人发；
-          - reviewerNoTimeCount  ：有审批人却没有审批时间。updateReview 是同一条 SQL 同时写这两个
+          - reviewerNoTimeCount  ：有审批人却没有审批时间。审批的五条 UPDATE 都是同一条 SQL 同时写这两个
             字段的，正常不可能只有一半 —— 出现即说明这行被人工改过（本页的「编辑」按钮
             对这张财务审批表是全字段可写的）。
     -->
@@ -171,23 +171,23 @@
         SELECT
         COUNT(*) AS totalCount,
         COUNT(DISTINCT member_id) AS memberCount,
-        COALESCE(SUM(status = 0), 0) AS waitingCount,
-        COALESCE(SUM(status = 10), 0) AS firstReviewCount,
-        COALESCE(SUM(status = 11), 0) AS secondReviewCount,
-        COALESCE(SUM(status = 20), 0) AS rejectedCount,
-        COALESCE(SUM(status = 30), 0) AS pendingExecuteCount,
-        COALESCE(SUM(status = 40), 0) AS executingCount,
-        COALESCE(SUM(status = 50), 0) AS successCount,
-        COALESCE(SUM(status = 60), 0) AS partialCount,
-        COALESCE(SUM(status = 70), 0) AS failedCount,
-        COALESCE(SUM(status = 80), 0) AS blockedCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@WAITING.value}), 0) AS waitingCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@FIRST_REVIEW.value}), 0) AS firstReviewCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@SECOND_REVIEW.value}), 0) AS secondReviewCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@REJECTED.value}), 0) AS rejectedCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}), 0) AS pendingExecuteCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@EXECUTING.value}), 0) AS executingCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@SUCCESS.value}), 0) AS successCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@PARTIAL_SUCCESS.value}), 0) AS partialCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@FAILED.value}), 0) AS failedCount,
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@RISK_BLOCKED.value}), 0) AS blockedCount,
         COALESCE(TIMESTAMPDIFF(MINUTE,
-        MIN(CASE WHEN status IN (10, 11) THEN create_time END), now()), 0) AS pendingReviewOldestMinutes,
-        COALESCE(SUM(status IN (30, 40)
+        MIN(CASE WHEN status IN (${@solvela.enums.ProposalStatusEnum@FIRST_REVIEW.value}, ${@solvela.enums.ProposalStatusEnum@SECOND_REVIEW.value}) THEN create_time END), now()), 0) AS pendingReviewOldestMinutes,
+        COALESCE(SUM(status IN (${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}, ${@solvela.enums.ProposalStatusEnum@EXECUTING.value})
         AND update_time &lt; DATE_SUB(now(), INTERVAL 30 MINUTE)), 0) AS stuckDispatchCount,
         COALESCE(SUM(second_reviewer IS NOT NULL
         AND second_reviewer = first_reviewer), 0) AS sameReviewerCount,
-        COALESCE(SUM(status = 20
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@REJECTED.value}
         AND (review_comment IS NULL OR review_comment = '')), 0) AS rejectNoCommentCount,
         COALESCE(SUM((first_reviewer IS NOT NULL AND first_review_time IS NULL)
         OR (second_reviewer IS NOT NULL AND second_review_time IS NULL)), 0) AS reviewerNoTimeCount
@@ -205,10 +205,10 @@
     <select id="selectAssetStat" resultType="java.util.Map">
         SELECT asset_type AS assetType,
         COUNT(*) AS proposalCount,
-        COALESCE(SUM(status = 50), 0) AS successCount,
-        COALESCE(SUM(CASE WHEN status = 50 THEN amount * quantity END), 0) AS successAmount,
-        COALESCE(SUM(CASE WHEN status IN (10, 11, 30, 40) THEN amount * quantity END), 0) AS pendingAmount,
-        COALESCE(SUM(CASE WHEN status = 80 THEN amount * quantity END), 0) AS blockedAmount
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@SUCCESS.value}), 0) AS successCount,
+        COALESCE(SUM(CASE WHEN status = ${@solvela.enums.ProposalStatusEnum@SUCCESS.value} THEN amount * quantity END), 0) AS successAmount,
+        COALESCE(SUM(CASE WHEN status IN (${@solvela.enums.ProposalStatusEnum@FIRST_REVIEW.value}, ${@solvela.enums.ProposalStatusEnum@SECOND_REVIEW.value}, ${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}, ${@solvela.enums.ProposalStatusEnum@EXECUTING.value}) THEN amount * quantity END), 0) AS pendingAmount,
+        COALESCE(SUM(CASE WHEN status = ${@solvela.enums.ProposalStatusEnum@RISK_BLOCKED.value} THEN amount * quantity END), 0) AS blockedAmount
         FROM t_proposal_record
         <where>
             <include refid="funnel_conditions"/>
@@ -221,7 +221,7 @@
     <select id="selectSourceStat" resultType="java.util.Map">
         SELECT source_type AS sourceType,
         COUNT(*) AS proposalCount,
-        COALESCE(SUM(status = 50), 0) AS successCount
+        COALESCE(SUM(status = ${@solvela.enums.ProposalStatusEnum@SUCCESS.value}), 0) AS successCount
         FROM t_proposal_record
         <where>
             <include refid="funnel_conditions"/>
@@ -244,7 +244,7 @@
         SELECT risk_code AS riskCode, MIN(remark) AS sampleRemark, COUNT(*) AS blockCount
         FROM t_proposal_record
         <where>
-            AND status = 80
+            AND status = ${@solvela.enums.ProposalStatusEnum@RISK_BLOCKED.value}
             <include refid="funnel_conditions"/>
         </where>
         GROUP BY risk_code
@@ -273,43 +273,97 @@
         账务与审计流水删掉就再也查不回来，事后连「少了什么」都不知道。
     -->
     <!--
-      条件流转：把 from -> to 的判断压进 SQL，靠行锁保证同一提案只有一个线程能推进状态。
+      ==================== 状态闸门 ====================
 
-      注意本文件所有 update 都刻意不写 update_time：DDL 已有 ON UPDATE CURRENT_TIMESTAMP，
-      显式再写一遍是冗余。真正要留意的是**时区**——now() 与 ON UPDATE CURRENT_TIMESTAMP 都按
-      MySQL 的 session 时区求值，而 create_time 走 MyBatis-Plus 的 Java 自动填充（JVM 时区）。
-      两者不一致时会出现「更新时间早于创建时间」，靠连接串的
-      connectionTimeZone + forceConnectionTimeZoneToSession 统一（见 solvela-base.yaml）。
+      🔴 每条 UPDATE 是 ProposalStatusEnum#canTransitTo 里的一条边，带旧状态条件，
+      靠行锁保证同一提案只有一个线程能推进状态；调用方按影响行数判成败。
+      状态值写成 ${@...@X.value}：MyBatis 发 SQL 之前就把它求值成常量，库里看到的仍是数字。
+      常量改名时编译器不报错，由 ProposalRecordStatusSqlTest 渲染 SQL 兜住。
+      ${} 里只放常量，不放入参。
+
+      都不写 update_time：DDL 是 ON UPDATE CURRENT_TIMESTAMP，归数据库时钟管。
+      first_review_time / second_review_time 用 now()，同样是数据库时钟。
     -->
-    <update id="updateStatus">
+    <update id="claimForExecution">
         update t_proposal_record
-        set status = #{toStatus}
+        set status = ${@solvela.enums.ProposalStatusEnum@EXECUTING.value}
         where id = #{id}
-          and status = #{fromStatus}
+          and status = ${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}
     </update>
 
-    <update id="updateStatusAndRemark">
+    <update id="markSucceeded">
         update t_proposal_record
-        set status = #{status},
+        set status = ${@solvela.enums.ProposalStatusEnum@SUCCESS.value},
             remark = #{remark}
         where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@EXECUTING.value}
     </update>
 
-    <!--
-      审批流转。reviewerField 只允许取 first_reviewer / second_reviewer 两个字面量，
-      由 Service 侧用枚举收敛后传入，不接受外部输入，避免 ${} 拼接引入注入风险。
-    -->
-    <update id="updateReview">
+    <update id="markFailed">
         update t_proposal_record
-        set status = #{toStatus},
-        ${reviewerField} = #{reviewer},
-        <choose>
-            <when test="reviewerField == 'first_reviewer'">first_review_time = now(),</when>
-            <otherwise>second_review_time = now(),</otherwise>
-        </choose>
-        review_comment = #{comment}
+        set status = ${@solvela.enums.ProposalStatusEnum@FAILED.value},
+            remark = #{remark}
         where id = #{id}
-        and status = #{fromStatus}
+          and status = ${@solvela.enums.ProposalStatusEnum@EXECUTING.value}
+    </update>
+
+    <!-- 只认待执行：为什么不认执行中，见 ProposalRecordDao#markFailedUnclaimed -->
+    <update id="markFailedUnclaimed">
+        update t_proposal_record
+        set status = ${@solvela.enums.ProposalStatusEnum@FAILED.value},
+            remark = #{remark}
+        where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}
+    </update>
+
+    <update id="passFirstReview">
+        update t_proposal_record
+        set status = ${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value},
+            first_reviewer = #{reviewer},
+            first_review_time = now(),
+            review_comment = #{comment}
+        where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@FIRST_REVIEW.value}
+    </update>
+
+    <update id="escalateToSecondReview">
+        update t_proposal_record
+        set status = ${@solvela.enums.ProposalStatusEnum@SECOND_REVIEW.value},
+            first_reviewer = #{reviewer},
+            first_review_time = now(),
+            review_comment = #{comment}
+        where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@FIRST_REVIEW.value}
+    </update>
+
+    <update id="passSecondReview">
+        update t_proposal_record
+        set status = ${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value},
+            second_reviewer = #{reviewer},
+            second_review_time = now(),
+            review_comment = #{comment}
+        where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@SECOND_REVIEW.value}
+    </update>
+
+    <update id="rejectAtFirstReview">
+        update t_proposal_record
+        set status = ${@solvela.enums.ProposalStatusEnum@REJECTED.value},
+            first_reviewer = #{reviewer},
+            first_review_time = now(),
+            review_comment = #{comment}
+        where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@FIRST_REVIEW.value}
+    </update>
+
+    <update id="rejectAtSecondReview">
+        update t_proposal_record
+        set status = ${@solvela.enums.ProposalStatusEnum@REJECTED.value},
+            second_reviewer = #{reviewer},
+            second_review_time = now(),
+            review_comment = #{comment}
+        where id = #{id}
+          and status = ${@solvela.enums.ProposalStatusEnum@SECOND_REVIEW.value}
     </update>
 
     <!--
@@ -327,7 +381,7 @@
     <select id="countStuckDispatch" resultType="long">
         SELECT COUNT(*)
         FROM t_proposal_record
-        WHERE status IN (30, 40)
+        WHERE status IN (${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}, ${@solvela.enums.ProposalStatusEnum@EXECUTING.value})
           AND update_time &lt; DATE_SUB(#{now}, INTERVAL #{minutes} MINUTE)
     </select>
 
@@ -339,7 +393,7 @@
                member_name                                AS memberName,
                TIMESTAMPDIFF(MINUTE, update_time, #{now}) AS stuckMinutes
         FROM t_proposal_record
-        WHERE status IN (30, 40)
+        WHERE status IN (${@solvela.enums.ProposalStatusEnum@PENDING_EXECUTE.value}, ${@solvela.enums.ProposalStatusEnum@EXECUTING.value})
           AND update_time &lt; DATE_SUB(#{now}, INTERVAL #{minutes} MINUTE)
         ORDER BY update_time
         LIMIT #{limit}

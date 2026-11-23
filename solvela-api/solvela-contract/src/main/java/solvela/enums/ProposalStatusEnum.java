@@ -18,9 +18,11 @@ import lombok.Getter;
  *             └─ 免审 ───────────────────────────→ 30 待执行
  *
  *   30 待执行 ─→ 40 执行中 ─→ 50 成功 / 70 彻底失败
+ *   30 待执行 ─────────────→ 70 彻底失败（抢执行权那一步自己抛了异常，钱没出去）
  *   风控拦截 ─────────────────────────────────→ 80 风控拦截（终态）
  * </pre>
  * 30 → 40 是条件更新做的并发闸门，抢不到的直接退出，保证同一提案只被执行一次。
+ * 每条边对应 {@code ProposalRecordMapper.xml} 里一条带旧状态条件的 UPDATE，见 {@link #canTransitTo}。
  *
  * <h3>🔴 这个枚举存在的理由</h3>
  * 改造之前，这台十个状态的机器<b>没有任何一处列全过</b>：
@@ -29,8 +31,9 @@ import lombok.Getter;
  * 其中 30 两边各写了一遍，而 0/60/80 谁都没声明 —— 只散落在注释和 SQL 字面量里。
  * 要看懂完整流转得同时打开两个模块再对着 DDL 注释拼。
  *
- * <p>⚠️ 统计类 SQL（ProposalRecordMapper 的漏斗聚合）里仍是 {@code SUM(status = 10)}
- * 这样的字面量 —— SQL 引用不了 Java 枚举。改这里的取值必须同步那些聚合。
+ * <p>⚠️ {@code ProposalRecordMapper.xml} 里的状态值（闸门与统计）都写成
+ * {@code ${@solvela.enums.ProposalStatusEnum@X.value}}，改取值 SQL 自动跟着变；
+ * 但常量改名编译器管不到，由 {@code ProposalRecordStatusSqlTest} 渲染 SQL 兜住。
  *
  * @Author alaric
  * @Date 2026-08-29
@@ -84,4 +87,26 @@ public enum ProposalStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code ProposalRecordMapper.xml} 的每条改状态的 UPDATE 都带旧状态条件，
+     * 按影响行数判成败。{@code ProposalRecordStatusSqlTest} 断言那些 SQL 的迁移与这里一条不多、一条不少。
+     * 约定见 {@code docs/架构/领域实体轻充血-架构设计文档.md}。
+     *
+     * <p>等待中、部分成功没有任何入边或出边：全工程没有代码会写出 60，也没有流程会推进 0。
+     * 将来要产生它们，先在这里加边，再写带旧状态条件的 UPDATE。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(ProposalStatusEnum to) {
+        return switch (this) {
+            case FIRST_REVIEW -> to == SECOND_REVIEW || to == PENDING_EXECUTE || to == REJECTED;
+            case SECOND_REVIEW -> to == PENDING_EXECUTE || to == REJECTED;
+            case PENDING_EXECUTE -> to == EXECUTING || to == FAILED;
+            case EXECUTING -> to == SUCCESS || to == FAILED;
+            case WAITING, REJECTED, SUCCESS, PARTIAL_SUCCESS, FAILED, RISK_BLOCKED -> false;
+        };
+    }
 }
