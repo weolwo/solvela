@@ -62,4 +62,20 @@ public enum PrizeApproveStatusEnum implements BaseEnum {
             case PENDING, REJECTED -> false;
         };
     }
+
+    /**
+     * 本状态能否迁到 {@code to}。初始状态（无需审批 / 待审批）由 {@code PrizeLog} 的实体方法在落库前定，
+     * 之后只有待审批能被运营批准或驳回。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code PrizeLogMapper.xml} 的 {@code markApproved} / {@code markApprovalRejected}
+     * 带「仍是待审批」的条件，两个运营同时点只有一个生效。{@code PrizeLogStatusSqlTest} 断言那些 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(PrizeApproveStatusEnum to) {
+        return switch (this) {
+            case PENDING -> to == PASSED || to == REJECTED;
+            case NOT_REQUIRED, PASSED, REJECTED -> false;
+        };
+    }
 }

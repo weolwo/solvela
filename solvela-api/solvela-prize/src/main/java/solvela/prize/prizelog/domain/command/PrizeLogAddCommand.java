@@ -1,7 +1,6 @@
 package solvela.prize.prizelog.domain.command;
 
 
-import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import java.time.LocalDateTime;
 
@@ -53,14 +52,7 @@ public class PrizeLogAddCommand {
     /** 异常原因 */
     private String failReason;
 
-    /** 审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 */
-    private PrizeApproveStatusEnum approveStatus;
-
-    /** 审批人 */
-    private String approveBy;
-
-    /** 审批时间 */
-    private LocalDateTime approveTime;
+    // 审批状态、审批人、审批时间刻意不收：补发一律落待审批，由服务端定（PrizeLogService#add）
 
     /** 过期时间 */
     private LocalDateTime validUntil;

@@ -6,6 +6,7 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import solvela.enums.BaseEnum;
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeProposalStatusEnum;
@@ -14,8 +15,11 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -53,14 +57,29 @@ class PrizeLogStatusSqlTest {
     }
 
     @Test
-    @DisplayName("🔴 处理器的两条改状态回写：等待 → 成功 / 失败，且都在状态机里")
+    @DisplayName("🔴 处理器的三条改派发状态回写：等待 → 成功 / 失败，且都在状态机里")
     void 处理器回写() {
         assertGate("markDispatchSucceeded", PrizeDispatchStatusEnum.WAITING, PrizeDispatchStatusEnum.SUCCESS);
         assertGate("markDispatchFailed", PrizeDispatchStatusEnum.WAITING, PrizeDispatchStatusEnum.FAIL);
-        // 带上提案侧结果的那一种也渲染一遍：<if> 分支里的 SQL 同样要能求值
-        Map<String, Object> rejected = new HashMap<>();
-        rejected.put("proposalStatus", PrizeProposalStatusEnum.REJECTED);
-        assertTrue(sqlOf("markDispatchFailed", rejected).contains("proposal_status"));
+        assertGate("markProposalRejected", PrizeDispatchStatusEnum.WAITING, PrizeDispatchStatusEnum.FAIL);
+        // 执行异常那条还不知道提案结果，不该动提案列
+        assertFalse(sqlOf("markDispatchFailed", new HashMap<>()).contains("proposal_status"));
+    }
+
+    @Test
+    @DisplayName("🔴 审批列的闸门与 PrizeApproveStatusEnum 状态机一条不多、一条不少")
+    void 审批闸门与状态机一一对应() {
+        assertColumnGates("approve_status", PrizeApproveStatusEnum.class, PrizeApproveStatusEnum::canTransitTo, Map.of(
+                "markApproved", List.of(PrizeApproveStatusEnum.PENDING, PrizeApproveStatusEnum.PASSED),
+                "markApprovalRejected", List.of(PrizeApproveStatusEnum.PENDING, PrizeApproveStatusEnum.REJECTED)));
+    }
+
+    @Test
+    @DisplayName("🔴 提案列的闸门与 PrizeProposalStatusEnum 状态机一条不多、一条不少")
+    void 提案闸门与状态机一一对应() {
+        assertColumnGates("proposal_status", PrizeProposalStatusEnum.class, PrizeProposalStatusEnum::canTransitTo, Map.of(
+                "markProposalAccepted", List.of(PrizeProposalStatusEnum.PENDING, PrizeProposalStatusEnum.ACCEPTED),
+                "markProposalRejected", List.of(PrizeProposalStatusEnum.PENDING, PrizeProposalStatusEnum.REJECTED)));
     }
 
     @Test
@@ -103,6 +122,46 @@ class PrizeLogStatusSqlTest {
         assertFalse(fromEnum.contains(PrizeApproveStatusEnum.PENDING) || fromEnum.contains(PrizeApproveStatusEnum.REJECTED),
                 "待审批、已驳回的奖不能派发");
         assertEquals(fromEnum, fromSql, "selectRetryable 的审批状态与 PrizeApproveStatusEnum#allowsDispatch 对不上");
+    }
+
+    /**
+     * 某一列的闸门：每条 SQL 的「SET 列 = 目标」与「WHERE 列 = 前置」两端对得上 {@code expected}，
+     * 且这些边与枚举的 canTransitTo 一条不多、一条不少。
+     */
+    private static <E extends Enum<E> & BaseEnum> void assertColumnGates(
+            String column, Class<E> type, BiPredicate<E, E> canTransit, Map<String, List<E>> expected) {
+        Pattern value = Pattern.compile("(?<![\\w])" + column + "\\s*=\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
+        Set<String> fromSql = new HashSet<>();
+        expected.forEach((id, ends) -> {
+            String sql = sqlOf(id, new HashMap<>());
+            int where = sql.toLowerCase().indexOf(" where ");
+            assertTrue(where > 0, id + " 没有 WHERE：" + sql);
+            E from = enumOf(type, value, sql.substring(where), id + " 的前置 " + column);
+            E to = enumOf(type, value, sql.substring(0, where), id + " 的目标 " + column);
+            assertEquals(ends.get(0), from, () -> id + " 的前置状态不对，SQL: " + sql);
+            assertEquals(ends.get(1), to, () -> id + " 的目标状态不对，SQL: " + sql);
+            fromSql.add(from + "->" + to);
+        });
+        Set<String> fromEnum = new HashSet<>();
+        for (E from : type.getEnumConstants()) {
+            for (E to : type.getEnumConstants()) {
+                if (canTransit.test(from, to)) {
+                    fromEnum.add(from + "->" + to);
+                }
+            }
+        }
+        // 空对空也相等：先确认真的有边
+        assertEquals(expected.size(), fromSql.size(), column + " 的闸门应当各是一条不同的迁移：" + fromSql);
+        assertEquals(fromEnum, fromSql, column + " 的闸门与 " + type.getSimpleName() + "#canTransitTo 对不上。"
+                + "加了新迁移要两边一起加：枚举里加边，DAO 里加带旧状态条件的 UPDATE");
+    }
+
+    private static <E extends Enum<E> & BaseEnum> E enumOf(Class<E> type, Pattern pattern, String sql, String what) {
+        Matcher matcher = pattern.matcher(sql);
+        assertTrue(matcher.find(), () -> what + " 找不到。SQL 片段: " + sql);
+        int v = Integer.parseInt(matcher.group(1));
+        return Arrays.stream(type.getEnumConstants()).filter(e -> Integer.valueOf(v).equals(e.getValue())).findFirst()
+                .orElseThrow(() -> new AssertionError(what + " 的值 " + v + " 不是任何一个 " + type.getSimpleName()));
     }
 
     private static void assertGate(String id, PrizeDispatchStatusEnum from, PrizeDispatchStatusEnum to) {

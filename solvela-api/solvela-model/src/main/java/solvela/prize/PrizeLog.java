@@ -96,17 +96,24 @@ public class PrizeLog {
 
     /**
      * 审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回
+     *
+     * <p>🔴 没有公开 setter：初始状态只能经 {@link #awaitApproval} / {@link #exemptFromApproval} 定，
+     * 之后只走 {@code PrizeLogDao#markApproved} / {@code markApprovalRejected}（状态机见 {@link PrizeApproveStatusEnum#canTransitTo}）。
+     * 后台人工补发以前把表单里的审批状态原样拷进来，「必须待审批」只靠前端写死。
      */
+    @Setter(AccessLevel.NONE)
     private PrizeApproveStatusEnum approveStatus;
 
     /**
-     * 审批人
+     * 审批人。没有公开 setter：只由审批闸门与审批状态一起写
      */
+    @Setter(AccessLevel.NONE)
     private String approveBy;
 
     /**
-     * 审批时间
+     * 审批时间。没有公开 setter：只由审批闸门用数据库时钟写
      */
+    @Setter(AccessLevel.NONE)
     private LocalDateTime approveTime;
 
     /**
@@ -131,8 +138,12 @@ public class PrizeLog {
      * <p>与 {@link #status} 是两件事：本列说「提交过去了没有」，status 说「用户最终有没有拿到」。
      * 拆成两列之前这两件事压在一个字段上，「已受理但还在审批」与「已入账」长得一模一样。
      *
-     * <p>停在 {@code PENDING} 的行是<b>可重试的</b> —— 重投任务扫的就是它们。
+     * <p>停在 {@code PENDING} 的行是<b>可重试的</b> —— 重投任务扫的就是它们（还要看审批与派发状态，见 {@code PrizeLogDao#selectRetryable}）。
+     *
+     * <p>没有公开 setter：初始状态随 {@link #awaitDispatch} 定为待提交，之后只走 {@code PrizeLogDao} 带「仍是待提交」条件的回写
+     * （状态机见 {@link PrizeProposalStatusEnum#canTransitTo}）。
      */
+    @Setter(AccessLevel.NONE)
     private PrizeProposalStatusEnum proposalStatus;
 
     /** 会员服务返回的提案 id。回调靠 externalBizNo 关联即可，这个 id 是给人工排查用的 */
@@ -169,12 +180,35 @@ public class PrizeLog {
     private LocalDateTime updateTime;
 
     /**
-     * 落为<b>等待执行</b>。发奖记录只有这一种初始状态，成功 / 失败都走条件回写。
+     * 落为<b>等待执行、提案待提交</b>：还没派发，也还没提交给会员服务。成功 / 失败 / 受理 / 被拒都走条件回写。
      */
     public void awaitDispatch() {
-        if (status != null) {
-            throw new IllegalStateException("发奖记录 " + id + " 已是 " + status + "，不能再定初始状态");
+        if (status != null || proposalStatus != null) {
+            throw new IllegalStateException("发奖记录 " + id + " 已是 " + status + " / " + proposalStatus + "，不能再定初始状态");
         }
         this.status = PrizeDispatchStatusEnum.WAITING;
+        this.proposalStatus = PrizeProposalStatusEnum.PENDING;
+    }
+
+    /**
+     * 落为<b>待审批</b>：奖品配了人工审批，或后台人工补发。要等运营批准才能派发。
+     */
+    public void awaitApproval() {
+        requireNoApproval();
+        this.approveStatus = PrizeApproveStatusEnum.PENDING;
+    }
+
+    /**
+     * 落为<b>无需审批</b>：奖品配的是自动免审。
+     */
+    public void exemptFromApproval() {
+        requireNoApproval();
+        this.approveStatus = PrizeApproveStatusEnum.NOT_REQUIRED;
+    }
+
+    private void requireNoApproval() {
+        if (approveStatus != null) {
+            throw new IllegalStateException("发奖记录 " + id + " 审批状态已是 " + approveStatus + "，不能再定初始状态");
+        }
     }
 }

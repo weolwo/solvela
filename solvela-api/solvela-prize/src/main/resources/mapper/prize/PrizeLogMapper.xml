@@ -282,20 +282,33 @@
           and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
     </update>
 
+    <!-- 执行异常：还不知道提案结果，只落派发失败，提案列不动 -->
     <update id="markDispatchFailed">
         update t_prize_log
         set status      = ${@solvela.enums.PrizeDispatchStatusEnum@FAIL.value},
             fail_reason = #{failReason}
-            <if test="proposalStatus != null">, proposal_status = #{proposalStatus}</if>
         where id = #{id}
           and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
     </update>
 
+    <!-- 会员服务拒收：派发失败与提案被拒一起落，两列都要求还在初始态 -->
+    <update id="markProposalRejected">
+        update t_prize_log
+        set status          = ${@solvela.enums.PrizeDispatchStatusEnum@FAIL.value},
+            proposal_status = ${@solvela.enums.PrizeProposalStatusEnum@REJECTED.value},
+            fail_reason     = #{failReason}
+        where id = #{id}
+          and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
+          and proposal_status = ${@solvela.enums.PrizeProposalStatusEnum@PENDING.value}
+    </update>
+
+    <!-- 会员服务已受理：只动提案列，不碰 status —— 终态归资产引擎回写 -->
     <update id="markProposalAccepted">
         update t_prize_log
         set proposal_status = ${@solvela.enums.PrizeProposalStatusEnum@ACCEPTED.value},
             proposal_id     = #{proposalId}
         where id = #{id}
+          and proposal_status = ${@solvela.enums.PrizeProposalStatusEnum@PENDING.value}
     </update>
 
     <!--
@@ -325,14 +338,26 @@
         limit #{limit}
     </select>
 
-    <!-- 发奖审批流转，条件更新防止两个运营同时点通过导致重复派发 -->
-    <update id="updateApproveStatus">
+    <!--
+      发奖审批的两条闸门：带「仍是待审批」的条件，两个运营同时点只有一个生效，防止重复派发。
+      每条是 PrizeApproveStatusEnum#canTransitTo 的一条边，PrizeLogStatusSqlTest 断言。
+    -->
+    <update id="markApproved">
         update t_prize_log
-        set approve_status = #{toApproveStatus},
+        set approve_status = ${@solvela.enums.PrizeApproveStatusEnum@PASSED.value},
             approve_by     = #{approveBy},
             approve_time   = now()
         where id = #{id}
-          and approve_status = #{fromApproveStatus}
+          and approve_status = ${@solvela.enums.PrizeApproveStatusEnum@PENDING.value}
+    </update>
+
+    <update id="markApprovalRejected">
+        update t_prize_log
+        set approve_status = ${@solvela.enums.PrizeApproveStatusEnum@REJECTED.value},
+            approve_by     = #{approveBy},
+            approve_time   = now()
+        where id = #{id}
+          and approve_status = ${@solvela.enums.PrizeApproveStatusEnum@PENDING.value}
     </update>
 
 </mapper>

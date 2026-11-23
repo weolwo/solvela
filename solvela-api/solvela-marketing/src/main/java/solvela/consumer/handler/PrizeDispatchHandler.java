@@ -1,6 +1,5 @@
 package solvela.consumer.handler;
 
-import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.EnableStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +10,6 @@ import solvela.base.util.SolvelaStringUtil;
 import solvela.consumer.strategy.PrizeStrategyFactory;
 import solvela.event.UserPrizeEvent;
 import solvela.enums.ApproveModeEnum;
-import solvela.enums.PrizeProposalStatusEnum;
 import solvela.enums.EventCategoryEnum;
 import solvela.prize.PrizeConfig;
 import solvela.prize.prizeconfig.service.PrizeConfigService;
@@ -101,15 +99,13 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
         if (prizeLog == null) {
             throw new BusinessException("发奖记录不存在");
         }
-        int rows = prizeLogDao.updateApproveStatus(prizeLogId, PrizeApproveStatusEnum.PENDING, PrizeApproveStatusEnum.PASSED, approveBy);
-        if (rows == 0) {
+        if (prizeLogDao.markApproved(prizeLogId, approveBy) == 0) {
             throw new BusinessException("该发奖记录已被处理，请刷新后重试");
         }
         log.info("【发奖审批通过】LogId: {}, 审批人: {}", prizeLogId, approveBy);
-        // 状态已在内存里同步，避免 doDispatch 里回写时把审批结果覆盖掉
-        prizeLog.setApproveStatus(PrizeApproveStatusEnum.PASSED);
-        prizeLog.setApproveBy(approveBy);
-        doDispatch(prizeLog);
+        // 重读一次而不是改内存里那份：审批状态没有 setter，doDispatch 的入口检查要看到「已批准」。
+        // 同一事务内读得到刚才那条 UPDATE
+        doDispatch(prizeLogDao.selectById(prizeLogId));
     }
 
     /**
@@ -117,8 +113,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
      */
     @Transactional(rollbackFor = Exception.class)
     public void rejectDispatch(Long prizeLogId, String approveBy, String reason) {
-        int rows = prizeLogDao.updateApproveStatus(prizeLogId, PrizeApproveStatusEnum.PENDING, PrizeApproveStatusEnum.REJECTED, approveBy);
-        if (rows == 0) {
+        if (prizeLogDao.markApprovalRejected(prizeLogId, approveBy) == 0) {
             throw new BusinessException("该发奖记录已被处理，请刷新后重试");
         }
         log.info("【发奖审批驳回】LogId: {}, 审批人: {}, 理由: {}", prizeLogId, approveBy, reason);
@@ -153,7 +148,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             // 必须截断：异常 message 动辄几百字，直接塞 varchar(128) 会抛 Data too long，
             // 一抛异常连状态都刷不进去，最终表现为「状态永远停在 0」——已踩过
             String reason = SolvelaStringUtil.truncate(e.getMessage(), FAIL_REASON_MAX_LENGTH);
-            writeQuietly(prizeLog, "失败", () -> prizeLogDao.markDispatchFailed(prizeLog.getId(), reason, null));
+            writeQuietly(prizeLog, "失败", () -> prizeLogDao.markDispatchFailed(prizeLog.getId(), reason));
         }
     }
 
@@ -178,8 +173,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
             // 这正是「同步调用」而不是发消息的理由：拒绝的原因当场就要拿到
             String reason = SolvelaStringUtil.truncate(outcome.failReason(), FAIL_REASON_MAX_LENGTH);
             log.warn("【发货失败】LogId: {}, 原因: {}", prizeLog.getId(), outcome.failReason());
-            writeQuietly(prizeLog, "失败", () -> prizeLogDao.markDispatchFailed(
-                    prizeLog.getId(), reason, PrizeProposalStatusEnum.REJECTED));
+            writeQuietly(prizeLog, "失败", () -> prizeLogDao.markProposalRejected(prizeLog.getId(), reason));
             return;
         }
         if (isNoDeliveryNeeded(prizeLog)) {
@@ -211,8 +205,8 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
     /**
      * 回写一次结果。
      *
-     * <p>影响 0 行不是故障：改状态的回写带着「仍是等待」的条件，0 行说明终态已经被别人写过
-     *（资产引擎的异步回写、对账任务重投），这一次不覆盖。
+     * <p>影响 0 行不是故障：每条回写都带旧状态条件（派发列「仍是等待」、提案列「仍是待提交」），
+     * 0 行说明终态已经被别人写过（资产引擎的异步回写、对账任务重投），这一次不覆盖。
      *
      * <p>回写自身抛异常才是故障：再往外抛就彻底没痕迹了，所以计降级、落日志、不外抛
      *（降级点 {@code PRIZE_STATUS_WRITEBACK_FAILED} 在后台看得见）。
@@ -220,7 +214,7 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
     private void writeQuietly(PrizeLog prizeLog, String what, IntSupplier write) {
         try {
             if (write.getAsInt() == 0) {
-                log.warn("【发奖状态回写】LogId: {} 想写成「{}」，但它已不在等待状态，本次不覆盖", prizeLog.getId(), what);
+                log.warn("【发奖状态回写】LogId: {} 想写成「{}」，但它已不在等待 / 待提交状态，本次不覆盖", prizeLog.getId(), what);
             }
         } catch (Exception e) {
             Degradations.record(DegradePoint.PRIZE_STATUS_WRITEBACK_FAILED);
@@ -256,9 +250,11 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
 
         // 审批状态在落库时就定下来，不留 null：null 会让「不需要审批」和「还没决定」
         // 变成同一个值，而后台的待审列表正是按这一列筛的
-        log.setApproveStatus(config.getApproveMode() == ApproveModeEnum.MANUAL
-                ? PrizeApproveStatusEnum.PENDING
-                : PrizeApproveStatusEnum.NOT_REQUIRED);
+        if (config.getApproveMode() == ApproveModeEnum.MANUAL) {
+            log.awaitApproval();
+        } else {
+            log.exemptFromApproval();
+        }
         log.awaitDispatch();
 
         return log;

@@ -1,6 +1,5 @@
 package solvela.admin.module.prize.prizelog.domain.form;
 
-import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -55,15 +54,7 @@ public class PrizeLogAddForm {
     @Schema(description = "异常原因")
     private String failReason;
 
-    @Schema(description = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "审批状态：0-无需审批, 1-待审批, 2-已批准, 3-已驳回 不能为空")
-    private PrizeApproveStatusEnum approveStatus;
-
-    @Schema(description = "审批人")
-    private String approveBy;
-
-    @Schema(description = "审批时间")
-    private LocalDateTime approveTime;
+    // 审批状态、审批人、审批时间刻意不收：补发一律落待审批，由服务端定（PrizeLogService#add）
 
     @Schema(description = "过期时间")
     private LocalDateTime validUntil;

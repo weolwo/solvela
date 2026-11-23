@@ -40,4 +40,19 @@ public enum PrizeProposalStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}。待提交是唯一的初始状态，受理、被拒都是终态。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code PrizeLogMapper.xml} 的 {@code markProposalAccepted} / {@code markProposalRejected}
+     * 带「仍是待提交」的条件。{@code PrizeLogStatusSqlTest} 断言那些 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(PrizeProposalStatusEnum to) {
+        return switch (this) {
+            case PENDING -> to == ACCEPTED || to == REJECTED;
+            case ACCEPTED, REJECTED -> false;
+        };
+    }
 }

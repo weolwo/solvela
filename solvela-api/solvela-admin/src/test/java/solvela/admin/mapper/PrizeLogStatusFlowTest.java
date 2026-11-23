@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * 发奖记录派发状态在真库上走一遍：落等待 → 条件回写 → 读回实体。
@@ -55,7 +56,7 @@ class PrizeLogStatusFlowTest {
     void 失败不覆盖成功() {
         PrizeLog log = insert();
         assertEquals(1, prizeLogDao.markDispatchSucceeded(log.getId()));
-        assertEquals(0, prizeLogDao.markDispatchFailed(log.getId(), "晚到的失败", PrizeProposalStatusEnum.REJECTED));
+        assertEquals(0, prizeLogDao.markProposalRejected(log.getId(), "晚到的失败"));
         assertEquals(PrizeDispatchStatusEnum.SUCCESS, statusOf(log));
     }
 
@@ -63,7 +64,8 @@ class PrizeLogStatusFlowTest {
     @DisplayName("等待 → 失败，带上提案侧被拒；之后引擎的回写也不覆盖")
     void 失败带提案结果() {
         PrizeLog log = insert();
-        assertEquals(1, prizeLogDao.markDispatchFailed(log.getId(), "预算耗尽", PrizeProposalStatusEnum.REJECTED));
+        assertEquals(1, prizeLogDao.markProposalRejected(log.getId(), "预算耗尽"));
+        assertEquals(0, prizeLogDao.markProposalAccepted(log.getId(), 9L), "被拒的提案又被写成了已受理");
         assertEquals(0, prizeLogDao.updateStatusByExternalBizNo(log.getExternalBizNo(), PrizeDispatchStatusEnum.SUCCESS, null));
         PrizeLog after = prizeLogDao.selectById(log.getId());
         assertAll(
@@ -82,7 +84,7 @@ class PrizeLogStatusFlowTest {
         PrizeLog pending = insert(PrizeApproveStatusEnum.PENDING, longAgo);
         PrizeLog rejected = insert(PrizeApproveStatusEnum.REJECTED, longAgo);
         PrizeLog failed = insert(PrizeApproveStatusEnum.NOT_REQUIRED, longAgo);
-        assertEquals(1, prizeLogDao.markDispatchFailed(failed.getId(), "执行异常", null));
+        assertEquals(1, prizeLogDao.markDispatchFailed(failed.getId(), "执行异常"));
         PrizeLog accepted = insert(PrizeApproveStatusEnum.NOT_REQUIRED, longAgo);
         assertEquals(1, prizeLogDao.markProposalAccepted(accepted.getId(), 1L));
 
@@ -93,6 +95,24 @@ class PrizeLogStatusFlowTest {
         assertEquals(Set.of(notRequired.getId(), passed.getId()), picked,
                 "待审批 " + pending.getId() + "、已驳回 " + rejected.getId() + "、已失败 " + failed.getId()
                         + "、已受理 " + accepted.getId() + " 都不该被重投");
+    }
+
+    @Test
+    @DisplayName("🔴 审批：待审批 → 已批准只放行一次，批准后不能再驳回；审批人与时间由闸门写")
+    void 审批闸门() {
+        PrizeLog log = insert(PrizeApproveStatusEnum.PENDING, null);
+        assertEquals(PrizeApproveStatusEnum.PENDING, prizeLogDao.selectById(log.getId()).getApproveStatus());
+
+        assertEquals(1, prizeLogDao.markApproved(log.getId(), "运营A"));
+        assertEquals(0, prizeLogDao.markApproved(log.getId(), "运营B"), "同一条记录被批准了两次");
+        assertEquals(0, prizeLogDao.markApprovalRejected(log.getId(), "运营C"));
+
+        PrizeLog after = prizeLogDao.selectById(log.getId());
+        assertAll(
+                () -> assertEquals(PrizeApproveStatusEnum.PASSED, after.getApproveStatus()),
+                () -> assertEquals("运营A", after.getApproveBy()),
+                () -> assertNotNull(after.getApproveTime()),
+                () -> assertEquals(PrizeProposalStatusEnum.PENDING, after.getProposalStatus(), "落库时提案列应是待提交"));
     }
 
     private PrizeDispatchStatusEnum statusOf(PrizeLog log) {
@@ -115,10 +135,20 @@ class PrizeLogStatusFlowTest {
         log.setPrizeName("状态机验收");
         log.setPrizeType(PrizeTypeEnum.COUPON);
         log.setPrizeValue("1");
-        log.setApproveStatus(approve);
         log.setCreateTime(createTime);
+        // 审批状态没有 setter：初始两种走实体方法，批准 / 驳回走真正的审批闸门
+        if (approve == PrizeApproveStatusEnum.NOT_REQUIRED) {
+            log.exemptFromApproval();
+        } else {
+            log.awaitApproval();
+        }
         log.awaitDispatch();
         prizeLogDao.insert(log);
+        if (approve == PrizeApproveStatusEnum.PASSED) {
+            assertEquals(1, prizeLogDao.markApproved(log.getId(), "运营A"));
+        } else if (approve == PrizeApproveStatusEnum.REJECTED) {
+            assertEquals(1, prizeLogDao.markApprovalRejected(log.getId(), "运营A"));
+        }
         return log;
     }
 }

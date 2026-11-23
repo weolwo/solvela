@@ -265,7 +265,10 @@ public class PrizeLogService {
      */
     public void add(PrizeLogAddCommand addForm) {
         PrizeLog prizeLog = SolvelaBeanUtil.copy(addForm, PrizeLog.class);
-        // 补发一律落「等待执行」：真正发出去要走审批通过（PrizeDispatchHandler.approveDispatch）
+        // 🔴 补发一律落「待审批 + 等待执行」，由服务端定、不收前端传值：真正发出去要走审批通过
+        // （PrizeDispatchHandler.approveDispatch）。审批状态没有 setter，拷贝时被跳过；
+        // 漏了这一句，库里会按列默认值落成 0-无需审批，对账任务十分钟后就把它发出去了
+        prizeLog.awaitApproval();
         prizeLog.awaitDispatch();
         // 表单只收会员号，账号快照由服务端补 —— 顺带校验会员真实存在。
         // ⚠️ member_name 仍是 NOT NULL 且无默认值，漏了这一句整条 INSERT 会被拒。

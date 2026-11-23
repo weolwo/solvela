@@ -2,7 +2,6 @@ package solvela.prize.prizelog.dao;
 
 import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
-import solvela.enums.PrizeProposalStatusEnum;
 
 import java.util.List;
 import java.time.LocalDateTime;
@@ -51,26 +50,24 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
                                     @Param("failReason") String failReason);
 
     /*
-     * ================= 派发处理器的三条回写 =================
+     * ================= 派发处理器的四条回写 =================
      *
      * 🔴 都只动自己的那几列，不整行 updateById：拿着读出来的整行写回，
      *    会把资产引擎刚写好的终态、运营刚改的审批状态一起盖回旧值。
-     *    改状态的两条带「仍是等待」的条件，抢不到返回 0，由调用方记一笔、不覆盖。
+     *    每条都带旧状态条件（派发列「仍是等待」、提案列「仍是待提交」），抢不到返回 0，由调用方记一笔、不覆盖。
+     *    迁移见 PrizeDispatchStatusEnum / PrizeProposalStatusEnum 的 canTransitTo。
      */
 
-    /** 等待(0) → 成功(1)：无需实际发放的奖（价值为 0），当场判成功 */
+    /** 派发：等待 → 成功。无需实际发放的奖（价值为 0），当场判成功 */
     int markDispatchSucceeded(@Param("id") Long id);
 
-    /**
-     * 等待(0) → 失败(2)，留下原因。
-     *
-     * @param proposalStatus 同时改提案侧结果；{@code null} = 不动那一列（执行异常时还不知道提案结果）
-     */
-    int markDispatchFailed(@Param("id") Long id,
-                           @Param("failReason") String failReason,
-                           @Param("proposalStatus") PrizeProposalStatusEnum proposalStatus);
+    /** 派发：等待 → 失败，留下原因。执行异常时用：还不知道提案结果，提案列不动 */
+    int markDispatchFailed(@Param("id") Long id, @Param("failReason") String failReason);
 
-    /** 提案已受理：只记提案侧结果与提案号，不碰 status —— 终态由资产引擎回写 */
+    /** 会员服务拒收：派发 等待 → 失败，提案 待提交 → 被拒，一起落 */
+    int markProposalRejected(@Param("id") Long id, @Param("failReason") String failReason);
+
+    /** 会员服务已受理：提案 待提交 → 已受理，记下提案号，不碰 status —— 终态由资产引擎回写 */
     int markProposalAccepted(@Param("id") Long id, @Param("proposalId") Long proposalId);
 
     /**
@@ -96,17 +93,11 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      */
     List<PrizeLog> selectRetryable(@Param("before") LocalDateTime before, @Param("limit") int limit);
 
-    /**
-     * 发奖审批流转：只有当前审批状态等于 fromApproveStatus 才更新
-     * <p>
-     * 条件更新即并发闸门，防止两个运营同时点通过导致重复派发。
-     *
-     * @return 更新行数，0 表示已被别人处理
-     */
-    int updateApproveStatus(@Param("id") Long id,
-                            @Param("fromApproveStatus") PrizeApproveStatusEnum fromApproveStatus,
-                            @Param("toApproveStatus") PrizeApproveStatusEnum toApproveStatus,
-                            @Param("approveBy") String approveBy);
+    /** 发奖审批：待审批 → 已批准。带「仍是待审批」条件，两个运营同时点只有一个拿到 1 */
+    int markApproved(@Param("id") Long id, @Param("approveBy") String approveBy);
+
+    /** 发奖审批：待审批 → 已驳回 */
+    int markApprovalRejected(@Param("id") Long id, @Param("approveBy") String approveBy);
 
     /**
      * 列表查询 (无分页)
