@@ -318,7 +318,7 @@ public class LotteryConfigService {
             entity.setTotalCount(form.getTotalCount());
             entity.setNumberCharset(LotteryConst.NUMBER_CHARSET);
             // 新建默认下线，上线是独立的动作
-            entity.setStatus(LotteryConfigStatusEnum.OFFLINE);
+            entity.startOffline();
             lotteryConfigDao.insert(entity);
             return;
         }
@@ -414,7 +414,7 @@ public class LotteryConfigService {
         if (notReady != null) {
             throw new BusinessException(notReady);
         }
-        int rows = lotteryConfigDao.updateStatus(config.getId(), LotteryConfigStatusEnum.OFFLINE, LotteryConfigStatusEnum.ONLINE);
+        int rows = lotteryConfigDao.markOnline(config.getId());
         if (rows == 0) {
             throw new BusinessException("上线失败：状态已被其他人变更，请刷新后重试");
         }
@@ -454,7 +454,7 @@ public class LotteryConfigService {
         if (config.getStatus() == LotteryConfigStatusEnum.OFFLINE) {
             throw new BusinessException("该玩法已经是下线状态");
         }
-        int rows = lotteryConfigDao.updateStatus(config.getId(), LotteryConfigStatusEnum.ONLINE, LotteryConfigStatusEnum.OFFLINE);
+        int rows = lotteryConfigDao.markOffline(config.getId());
         if (rows == 0) {
             throw new BusinessException("下线失败：状态已被其他人变更，请刷新后重试");
         }

@@ -77,7 +77,7 @@ public class LotteryIssueService {
         }
         LotteryIssue lotteryIssue = SolvelaBeanUtil.copy(addForm, LotteryIssue.class);
         lotteryIssue.setSoldCount(0);
-        lotteryIssue.setStatus(IssueStatusEnum.WAIT);
+        lotteryIssue.awaitDraw();
         lotteryIssueDao.insert(lotteryIssue);
     }
 
@@ -232,6 +232,8 @@ public class LotteryIssueService {
         if (error != null) {
             throw new BusinessException(error);
         }
-        lotteryIssueDao.deleteById(id);
+        if (lotteryIssueDao.deleteUnsold(id) == 0) {
+            throw new BusinessException("期号状态刚被改动（可能有人领了号或开始开奖），未删除，请刷新后重试");
+        }
     }
 }

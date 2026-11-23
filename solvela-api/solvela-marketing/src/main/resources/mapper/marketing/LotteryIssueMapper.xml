@@ -74,8 +74,8 @@
     -->
     <sql id="sale_state_expr">
         CASE
-            WHEN c.lottery_code IS NULL OR c.status &lt;&gt; 1 THEN 4
-            WHEN i.status &lt;&gt; 0 THEN 3
+            WHEN c.lottery_code IS NULL OR c.status &lt;&gt; ${@solvela.enums.LotteryConfigStatusEnum@ONLINE.value} THEN 4
+            WHEN i.status &lt;&gt; ${@solvela.enums.IssueStatusEnum@WAIT.value} THEN 3
             WHEN i.sale_start_time IS NOT NULL AND NOW() &lt; i.sale_start_time THEN 0
             WHEN i.sale_end_time IS NOT NULL AND NOW() &gt; i.sale_end_time THEN 2
             WHEN i.sold_count &gt;= c.total_count THEN 5
@@ -90,7 +90,7 @@
         开奖跑到一半中断、卡在 1 上不动，是比「压根没点开奖」更需要被看见的故障。
     -->
     <sql id="overdue_expr">
-        (i.plan_draw_time IS NOT NULL AND i.plan_draw_time &lt; NOW() AND i.status &lt;&gt; 2)
+        (i.plan_draw_time IS NOT NULL AND i.plan_draw_time &lt; NOW() AND i.status &lt;&gt; ${@solvela.enums.IssueStatusEnum@OPENED.value})
     </sql>
 
     <!--
@@ -100,7 +100,7 @@
         概览卡片与列表筛选共用这一份，两边数字必然对得上。
     -->
     <sql id="today_draw_expr">
-        (i.plan_draw_time IS NOT NULL AND DATE(i.plan_draw_time) = CURDATE() AND i.status &lt;&gt; 2)
+        (i.plan_draw_time IS NOT NULL AND DATE(i.plan_draw_time) = CURDATE() AND i.status &lt;&gt; ${@solvela.enums.IssueStatusEnum@OPENED.value})
     </sql>
 
     <!--
@@ -216,10 +216,13 @@
 
                 <!-- 批量物理删除已移除：期号是一期期建的，没有批量删的场景。
                      列表页原先那个「批量删除」已换成批量停售（改售卖结束时间），见 LotteryIssueService.batchStopSale -->
-                <delete id="deleteById">
-                    delete from t_lottery_issue
-                        where id = #{id}
-                </delete>
+    <!-- 只删零发号的待开奖空期：守卫压进 WHERE，校验与删除之间有人领了号就影响 0 行 -->
+    <delete id="deleteUnsold">
+        delete from t_lottery_issue
+        where id = #{id}
+          and status = ${@solvela.enums.IssueStatusEnum@WAIT.value}
+          and sold_count = 0
+    </delete>
 
     <select id="selectDbNow" resultType="java.time.LocalDateTime">
         SELECT NOW()
@@ -230,22 +233,25 @@
         每个玩法自己的发行规格），所以这里 join 过去取，不在期号表里冗余存一份 ——
         冗余就意味着两处可改、迟早不一致。
         WHERE sold_count < total_count 是防超发的 DB 兜底闸门。
+        🔴 i.status = 待开奖 是与开奖的并发闸门：这条 UPDATE 与 startSettle 抢同一行锁，
+        开奖先抢到，这里影响 0 行，调用方回滚这张票；这里先抢到，开奖等它提交后再定案，核销扫得到这张票。
     -->
     <update id="increaseSoldCount">
         UPDATE t_lottery_issue i
         JOIN t_lottery_config c ON c.lottery_code = i.lottery_code
         SET i.sold_count = i.sold_count + 1
         WHERE i.id = #{id}
+          AND i.status = ${@solvela.enums.IssueStatusEnum@WAIT.value}
           AND i.sold_count &lt; c.total_count
     </update>
 
     <!-- 抢开奖闸门：WHERE status 是并发保护，不是多余条件 -->
     <update id="startSettle">
         UPDATE t_lottery_issue
-        SET status = #{to},
+        SET status = ${@solvela.enums.IssueStatusEnum@STAGED.value},
             winning_number = #{winningNumber}
         WHERE id = #{id}
-          AND status = #{from}
+          AND status = ${@solvela.enums.IssueStatusEnum@WAIT.value}
     </update>
 
     <!--
@@ -255,10 +261,10 @@
     -->
     <update id="finishSettle">
         UPDATE t_lottery_issue
-        SET status = #{to},
+        SET status = ${@solvela.enums.IssueStatusEnum@OPENED.value},
             settle_time = NOW()
         WHERE id = #{id}
-          AND status = #{from}
+          AND status = ${@solvela.enums.IssueStatusEnum@STAGED.value}
     </update>
 
 </mapper>

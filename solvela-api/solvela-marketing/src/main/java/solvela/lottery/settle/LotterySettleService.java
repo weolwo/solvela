@@ -128,7 +128,7 @@ public class LotterySettleService {
         int lose = markRestAsLose(issue);
 
         // settle_time 没有 ON UPDATE CURRENT_TIMESTAMP 兜底，必须显式写（铁律 9 的例外分支）
-        lotteryIssueDao.finishSettle(issueId, IssueStatusEnum.STAGED, IssueStatusEnum.OPENED);
+        lotteryIssueDao.finishSettle(issueId);
 
         StatRow summary = StatRow.of(lotteryRecordDao.settleSummary(issue.getLotteryCode(), issue.getIssueNo()));
         log.info("[彩票开奖] 期号 {} 核销完成，开奖号码 {}，中奖 {} 张、未中奖 {} 张",
@@ -154,8 +154,7 @@ public class LotterySettleService {
         if (error != null) {
             throw new BusinessException(error);
         }
-        int rows = lotteryIssueDao.startSettle(issue.getId(), IssueStatusEnum.WAIT,
-                IssueStatusEnum.STAGED, winningNumber);
+        int rows = lotteryIssueDao.startSettle(issue.getId(), winningNumber);
         if (rows == 0) {
             throw new BusinessException("开奖失败：该期状态已被其他操作变更，请刷新后重试");
         }

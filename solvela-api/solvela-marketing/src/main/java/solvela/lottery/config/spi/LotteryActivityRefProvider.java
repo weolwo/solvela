@@ -141,7 +141,7 @@ public class LotteryActivityRefProvider implements ActivityRefProvider {
             copy.setLotteryCode(SolvelaCodeUtil.generateUniqueBizCode(
                     SolvelaCodeUtil.BizCodePrefix.LOTTERY, this::existsByLotteryCode));
             // 见方法注释：这一步不能省
-            copy.setStatus(LotteryConfigStatusEnum.OFFLINE);
+            copy.startOffline();
             copy.setCreateBy(null);
             copy.setCreateTime(null);
             copy.setUpdateBy(null);

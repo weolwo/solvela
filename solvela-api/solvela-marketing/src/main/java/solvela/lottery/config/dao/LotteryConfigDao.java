@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.enums.LotteryConfigStatusEnum;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.config.domain.dto.LotteryConfigDTO;
 import solvela.lottery.config.domain.query.LotteryConfigQuery;
@@ -39,13 +38,19 @@ public interface LotteryConfigDao extends BaseMapper<LotteryConfig> {
     List<LotteryConfigDTO> queryList(@Param("queryForm") LotteryConfigQuery queryForm);
 
     /**
-     * 状态条件流转，做并发闸门用。
-     * 把「当前状态必须是 from」压进 WHERE，两个人同时点第二次会拿到 rows=0，
-     * 而不是两次都「成功」。与提案域审批、开奖闸门是同一套做法。
+     * 上线：下线 → 上线。旧状态压进 WHERE，两个人同时点第二次会拿到 0，而不是两次都「成功」。
+     * 迁移见 {@link solvela.enums.LotteryConfigStatusEnum#canTransitTo}。
      *
      * @return 影响行数，0 表示状态已被别人改过
      */
-    int updateStatus(@Param("id") Long id, @Param("from") LotteryConfigStatusEnum from, @Param("to") LotteryConfigStatusEnum to);
+    int markOnline(@Param("id") Long id);
+
+    /**
+     * 下线：上线 → 下线。
+     *
+     * @return 影响行数，0 表示状态已被别人改过
+     */
+    int markOffline(@Param("id") Long id);
 
     // 物理删除已移除：t_lottery_record 里存着 lottery_code，删配置会让用户手里已发出的号码断链。
     // 停售走 updateStatus 下线 —— 见 LotteryConfigController 的类注释

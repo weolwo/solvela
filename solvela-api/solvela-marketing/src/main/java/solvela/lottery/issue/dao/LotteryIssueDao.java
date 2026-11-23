@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import solvela.enums.IssueStatusEnum;
 import solvela.lottery.LotteryIssue;
 import solvela.lottery.issue.domain.dto.LotteryIssueDTO;
 import solvela.lottery.issue.domain.dto.LotteryIssueOverviewDTO;
@@ -64,40 +63,42 @@ public interface LotteryIssueDao extends BaseMapper<LotteryIssue> {
      *
      * WHERE sold_count < total_count 让 DB 成为最后一道闸门：
      * 即便 Redis 游标判定被绕过（比如误清了 Redis），这里也不会让已发数超过上限。
+     * 同时只认待开奖：与 {@link #startSettle} 抢同一行锁，开奖开始之后发不出号。
      *
-     * @return 影响行数，0 表示已达上限
+     * <p>🔴 返回值必须看：0 行时调用方要回滚这张票，否则这道闸门形同虚设（见 {@code TicketPersistService#persist}）。
+     *
+     * @return 影响行数，0 表示已达上限或已不在待开奖
      */
     int increaseSoldCount(@Param("id") Long id);
 
     /**
-     * 抢开奖闸门：状态 0->1 并定案开奖号码，一条 SQL 完成。
+     * 抢开奖闸门：待开奖 → 核销中，并定案开奖号码，一条 SQL 完成。
      *
-     * WHERE status = #{from} 是并发闸门 —— 两个运营同时点开奖，
+     * WHERE 里的旧状态是并发闸门 —— 两个运营同时点开奖，
      * 第二个人拿到 rows=0 直接退出，不会重复核销。
      * 开奖号码在这一刻定案且不再变，所以中断重跑的结果必然一致。
      *
      * @return 影响行数，0 表示没抢到（状态已被别人改过）
      */
-    int startSettle(@Param("id") Long id, @Param("from") IssueStatusEnum from,
-                    @Param("to") IssueStatusEnum to, @Param("winningNumber") String winningNumber);
+    int startSettle(@Param("id") Long id, @Param("winningNumber") String winningNumber);
 
     /**
-     * 核销完成：1->2，并显式写 settle_time。
+     * 核销完成：核销中 → 已开奖，并显式写 settle_time。
      *
      * ⚠️ settle_time 没有 ON UPDATE CURRENT_TIMESTAMP 兜底，
      * 必须在这里显式赋值 —— 这是铁律 9「时间只由数据库产生」的例外分支
      * （同 t_proposal_record.approve_time）。用 NOW() 而不是 Java 时间，仍然只有数据库一个时钟。
      */
-    int finishSettle(@Param("id") Long id, @Param("from") IssueStatusEnum from, @Param("to") IssueStatusEnum to);
+    int finishSettle(@Param("id") Long id);
 
 
-            // ----- 物理删除 -----
-                /**
-                 * 单个物理删除。
-                 *
-                 * 只用于清理「零发号 + 待开奖」的空期（守卫见 LotteryIssueService.checkDeletable）——
-                 * 发过号的期删不得：t_lottery_record 里的记录既是用户凭证，也是开奖核销的依据。
-                 * 批量版本已移除，期号是一期期建的，没有批量删的场景。
-                 */
-                long deleteById(@Param("id") Long id);
+    /**
+     * 物理删除一个「零发号 + 待开奖」的空期。两个条件压进 WHERE：
+     * {@code LotteryIssueService.checkDeletable} 是先读后判，读完到删之间有人领了号，这里影响 0 行。
+     * 发过号的期删不得：t_lottery_record 里的记录既是用户凭证，也是开奖核销的依据。
+     * 批量版本已移除，期号是一期期建的，没有批量删的场景。
+     *
+     * @return 影响行数，0 表示已不是零发号的待开奖空期
+     */
+    int deleteUnsold(@Param("id") Long id);
 }

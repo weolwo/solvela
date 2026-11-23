@@ -72,12 +72,22 @@
         ORDER BY create_time DESC
     </select>
 
-    <!-- 状态条件流转：WHERE status = #{from} 是并发闸门，不是多余条件 -->
-    <update id="updateStatus">
+    <!--
+      上下线闸门：WHERE 里的旧状态是并发闸门，不是多余条件。
+      每条是 LotteryConfigStatusEnum#canTransitTo 的一条边，LotteryConfigStatusSqlTest 断言。
+    -->
+    <update id="markOnline">
         UPDATE t_lottery_config
-        SET status = #{to}
+        SET status = ${@solvela.enums.LotteryConfigStatusEnum@ONLINE.value}
         WHERE id = #{id}
-          AND status = #{from}
+          AND status = ${@solvela.enums.LotteryConfigStatusEnum@OFFLINE.value}
+    </update>
+
+    <update id="markOffline">
+        UPDATE t_lottery_config
+        SET status = ${@solvela.enums.LotteryConfigStatusEnum@OFFLINE.value}
+        WHERE id = #{id}
+          AND status = ${@solvela.enums.LotteryConfigStatusEnum@ONLINE.value}
     </update>
 
 </mapper>

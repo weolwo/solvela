@@ -8,7 +8,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 期号配置 实体类
@@ -62,16 +64,23 @@ public class LotteryIssue {
      * 实际开奖时间：由开奖流程写入，只读。
      * 该列没有 ON UPDATE CURRENT_TIMESTAMP 兜底，必须在开奖 SQL 里显式赋值（铁律 9 的例外分支）
      */
+    @Setter(AccessLevel.NONE)
     private LocalDateTime settleTime;
 
     /**
      * 开奖号码
      */
+    @Setter(AccessLevel.NONE)
     private String winningNumber;
 
     /**
-     * 状态: 0-待开奖, 1-部分开奖, 2-已开奖
+     * 状态: 0-待开奖, 1-核销中, 2-已开奖
+     *
+     * <p>🔴 没有公开 setter，开奖号码、结算时间也没有：初始状态只能经 {@link #awaitDraw} 定，
+     * 之后只走 {@code LotteryIssueDao} 的 startSettle / finishSettle（状态机见 {@link IssueStatusEnum#canTransitTo}）。
+     * 开奖号码是在抢到开奖闸门那一刻随状态一起定案的，不能单独改。MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private IssueStatusEnum status;
 
     /**
@@ -94,4 +103,13 @@ public class LotteryIssue {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 落为<b>待开奖</b>：期号唯一的初始状态，可售卖、可改时间、零发号时可删除。
+     */
+    public void awaitDraw() {
+        if (status != null) {
+            throw new IllegalStateException("期号 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = IssueStatusEnum.WAIT;
+    }
 }

@@ -1,5 +1,6 @@
 package solvela.lottery.runtime;
 
+import solvela.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import solvela.lottery.LotteryConfig;
 import solvela.lottery.constant.LotteryConst;
@@ -70,7 +71,12 @@ public class TicketPersistService {
         record.setSecuritySign(securitySign);
         lotteryRecordDao.insert(record);
 
-        lotteryIssueDao.increaseSoldCount(issue.getId());
+        // 🔴 返回值必须看：0 行（已达上限，或开奖已经开始）时抛出去让本事务回滚这张票。
+        // 以前这里不看返回值，号照样发出去，注释里说的「DB 兜底不让已发数超过上限」并不成立；
+        // 开奖抢到闸门之后进来的票也照样落库，可能落在核销扫描之外
+        if (lotteryIssueDao.increaseSoldCount(issue.getId()) == 0) {
+            throw new BusinessException("本期已停止发号（已开奖或号码已发完）");
+        }
 
         return new TicketObtainDTO(config.getLotteryCode(), issue.getIssueNo(), ticketNumber,
                 sequenceNo, securitySign, now.format(TIME_FORMAT));

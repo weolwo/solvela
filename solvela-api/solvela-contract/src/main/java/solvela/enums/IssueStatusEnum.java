@@ -38,4 +38,21 @@ public enum IssueStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}：待开奖 → 核销中 → 已开奖，单向，一期只开一次奖。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code LotteryIssueMapper.xml} 的 {@code startSettle}（同时定案开奖号码）与
+     * {@code finishSettle} 都带旧状态条件。发号的 {@code increaseSoldCount} 与删除也只认待开奖。
+     * {@code LotteryIssueStatusSqlTest} 断言那些 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(IssueStatusEnum to) {
+        return switch (this) {
+            case WAIT -> to == STAGED;
+            case STAGED -> to == OPENED;
+            case OPENED -> false;
+        };
+    }
 }

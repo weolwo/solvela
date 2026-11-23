@@ -2,6 +2,7 @@ package solvela.lottery.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,8 @@ class LotteryActivityRefProviderTest {
         LotteryConfig c = new LotteryConfig();
         c.setLotteryCode(code);
         c.setLotteryName(name);
-        c.setStatus(status);
+        // status 没有 setter：走 MyBatis 读库时的同一条反射路径
+        SystemMetaObject.forObject(c).setValue("status", status);
         c.setActivityCode(ACTIVITY);
         return c;
     }
