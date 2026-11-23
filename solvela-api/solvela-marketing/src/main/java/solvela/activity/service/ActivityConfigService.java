@@ -285,6 +285,8 @@ public class ActivityConfigService {
             throw new BusinessException("活动编码已存在：" + addForm.getActivityCode());
         }
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(addForm, ActivityConfig.class);
+        // 新建一律未开始，由服务端定：上线要走 updateStatus 并过完备度检查
+        activityConfig.awaitLaunch();
         activityConfigDao.insert(activityConfig);
     }
 
@@ -311,7 +313,7 @@ public class ActivityConfigService {
         checkPrizes(prizeList);
 
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(form, ActivityConfig.class);
-        activityConfig.setStatus(ActivityStatusEnum.NOT_START);
+        activityConfig.awaitLaunch();
         activityConfigDao.insert(activityConfig);
         insertPrizes(form.getActivityCode(), prizeList);
     }
@@ -415,7 +417,7 @@ public class ActivityConfigService {
         target.setActivityType(source.getActivityType());
         target.setStartTime(source.getStartTime());
         target.setEndTime(source.getEndTime());
-        target.setStatus(ActivityStatusEnum.NOT_START);
+        target.awaitLaunch();
         activityConfigDao.insert(target);
 
         // 奖品先复制，玩法侧要靠这份映射重指向
@@ -446,6 +448,7 @@ public class ActivityConfigService {
      */
     public void update(ActivityConfigUpdateCommand updateForm) {
         validateDataEndTime(updateForm.getStartTime(), updateForm.getEndTime(), updateForm.getDataEndTime());
+        // 状态不在修改命令里，也没有 setter：拷贝时跳过，updateById 不碰那一列。状态只走 updateStatus
         ActivityConfig activityConfig = SolvelaBeanUtil.copy(updateForm, ActivityConfig.class);
         activityConfig.setActivityType(null);
         activityConfig.setActivityCode(null);
@@ -489,10 +492,17 @@ public class ActivityConfigService {
         }
 
         for (ActivityConfig activity : activityList) {
-            ActivityConfig update = new ActivityConfig();
-            update.setId(activity.getId());
-            update.setStatus(status);
-            activityConfigDao.updateById(update);
+            // 已经是目标状态的跳过（重复点开关不报错）；其余走带旧状态条件的闸门
+            if (activity.getStatus() == status) {
+                continue;
+            }
+            int rows = status == ActivityStatusEnum.ONLINE
+                    ? activityConfigDao.markOnline(activity.getId())
+                    : activityConfigDao.markOffline(activity.getId());
+            if (rows == 0) {
+                // 读出来之后被别人改了状态：整批回滚，让运营刷新后重来，不覆盖别人刚做的操作
+                throw new BusinessException("「" + activity.getActivityName() + "」的状态刚被别人改过，请刷新后重试");
+            }
         }
     }
 
@@ -540,6 +550,7 @@ public class ActivityConfigService {
      * 批量删除：逐个走与单个删除相同的守卫，任一不通过则整批拒绝并说明是哪个活动。
      * 不做「跳过不能删的、删掉能删的」—— 部分成功对运营是更难排查的结果。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void batchDelete(List<Long> idList) {
         if (SolvelaCollectionUtil.isEmpty(idList)) {
             return;
@@ -551,7 +562,10 @@ public class ActivityConfigService {
                 throw new BusinessException("「" + activity.getActivityName() + "」" + check.reason());
             }
         }
-        activityConfigDao.deleteBatchIds(idList);
+        if (activityConfigDao.deleteNotStartedBatch(idList) != activityList.size()) {
+            // 校验之后有活动被上线了：整批回滚（本方法带事务），一个都不删
+            throw new BusinessException("有活动在删除前被改了状态，未删除，请刷新后重试");
+        }
     }
 
     /**
@@ -570,6 +584,8 @@ public class ActivityConfigService {
         if (!check.deletable()) {
             throw new BusinessException(check.reason());
         }
-        activityConfigDao.deleteById(id);
+        if (activityConfigDao.deleteNotStarted(id) == 0) {
+            throw new BusinessException("活动状态刚被改动，未删除，请刷新后重试");
+        }
     }
 }

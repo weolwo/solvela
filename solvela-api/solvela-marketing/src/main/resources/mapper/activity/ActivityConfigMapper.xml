@@ -70,17 +70,41 @@
         ORDER BY create_time DESC
     </select>
 
-    <delete id="batchDelete">
+    <!--
+      ==================== 状态闸门 ====================
+
+      🔴 每条改状态的 UPDATE 带旧状态条件，是 ActivityStatusEnum#canTransitTo 的边，
+      ActivityConfigStatusSqlTest 断言一一对应。状态值写成 ${@...@X.value}，${} 里只放常量。
+      删除只认未开始：上过线的活动删掉等于把发奖流水的追溯链断在源头，
+      ActivityConfigService#checkDeletable 是先读后判，这里压进 WHERE 兜住读与删之间被人上线的情况。
+    -->
+    <update id="markOnline">
+        update t_activity_config
+        set status = ${@solvela.enums.ActivityStatusEnum@ONLINE.value}
+        where id = #{id}
+          and status in (${@solvela.enums.ActivityStatusEnum@NOT_START.value}, ${@solvela.enums.ActivityStatusEnum@OFFLINE.value})
+    </update>
+
+    <update id="markOffline">
+        update t_activity_config
+        set status = ${@solvela.enums.ActivityStatusEnum@OFFLINE.value}
+        where id = #{id}
+          and status in (${@solvela.enums.ActivityStatusEnum@NOT_START.value}, ${@solvela.enums.ActivityStatusEnum@ONLINE.value})
+    </update>
+
+    <delete id="deleteNotStarted">
         delete from t_activity_config
-        where id in
+        where id = #{id}
+          and status = ${@solvela.enums.ActivityStatusEnum@NOT_START.value}
+    </delete>
+
+    <delete id="deleteNotStartedBatch">
+        delete from t_activity_config
+        where status = ${@solvela.enums.ActivityStatusEnum@NOT_START.value}
+          and id in
         <foreach collection="idList" open="(" close=")" separator="," item="item">
             #{item}
         </foreach>
-    </delete>
-    <delete id="deleteById">
-        delete
-        from t_activity_config
-        where id = #{id}
     </delete>
 
 </mapper>

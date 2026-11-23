@@ -37,15 +37,22 @@ public interface ActivityConfigDao extends BaseMapper<ActivityConfig> {
      */
     List<ActivityConfigDTO> queryList(@Param("queryForm") ActivityConfigQuery queryForm);
 
-    // ----- 物理删除 -----
-
-    /**
-     * 单个物理删除
+    /*
+     * ==================== 状态闸门 ====================
+     *
+     * 🔴 带旧状态条件，返回影响行数：0 表示状态已被别人改过。迁移见 ActivityStatusEnum#canTransitTo，
+     * ActivityConfigStatusSqlTest 断言 SQL 与状态机一一对应。不要改回「new 一个实体 set 状态再 updateById」。
      */
-    long deleteById(@Param("id") Long id);
 
-    /**
-     * 批量物理删除
-     */
-    void batchDelete(@Param("idList") List<Long> idList);
+    /** 上线：未开始 / 下线 → 上线 */
+    int markOnline(@Param("id") Long id);
+
+    /** 下线：未开始 / 上线 → 下线 */
+    int markOffline(@Param("id") Long id);
+
+    /** 物理删除，只删未开始的活动 */
+    int deleteNotStarted(@Param("id") Long id);
+
+    /** 批量物理删除，只删未开始的活动；返回值小于入参条数说明有活动在校验之后被改了状态 */
+    int deleteNotStartedBatch(@Param("idList") List<Long> idList);
 }

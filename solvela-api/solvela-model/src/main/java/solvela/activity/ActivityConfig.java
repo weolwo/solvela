@@ -9,7 +9,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 活动配置 实体类
@@ -46,7 +48,13 @@ public class ActivityConfig {
 
     /**
      * 状态：0-未开始, 1-上线, 2-下线
+     *
+     * <p>🔴 没有公开 setter：新建与复制都经 {@link #awaitLaunch} 落为未开始，之后只走
+     * {@code ActivityConfigDao.markOnline / markOffline}（状态机见 {@link ActivityStatusEnum#canTransitTo}）。
+     * 以前新增、修改表单都带状态并原样拷进实体：能直接新建成上线（绕过上线前完备度检查），
+     * 也能把上过线的活动改回未开始（绕过「上过线的活动不能删」）。MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private ActivityStatusEnum status;
 
     /**
@@ -94,4 +102,13 @@ public class ActivityConfig {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 落为<b>未开始</b>：活动唯一的初始状态，还没配完、从未上过线。上线是独立的动作（要先过完备度检查）。
+     */
+    public void awaitLaunch() {
+        if (status != null) {
+            throw new IllegalStateException("活动 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = ActivityStatusEnum.NOT_START;
+    }
 }

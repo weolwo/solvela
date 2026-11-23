@@ -13,7 +13,7 @@ import lombok.Getter;
  * 新建的活动落在这一档，表示<b>还没配完、从未上过线</b>；{@link #OFFLINE} 表示<b>上过线又撤下来</b>。
  * 两者对运营是不同的事：前者要接着配，后者要查为什么撤。
  * 也因此 {@code updateStatus} 只接受 ONLINE / OFFLINE 两个目标值 ——
- * 活动一旦上过线就回不到「未开始」。
+ * 活动一旦离开「未开始」就回不去，见 {@link #canTransitTo}。
  *
  * <p>上线还是结构锁的开关：{@code PrizePoolConfigService} 判到 {@link #ONLINE} 之后
  * 库存只增不减、禁止删奖项/删池/池内增删坑位。
@@ -41,4 +41,23 @@ public enum ActivityStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}。未开始是唯一的初始状态，离开就回不去：
+     * 回到未开始等于让上过线的活动又能被删掉（删除只认未开始），发奖流水的追溯链就断在源头。
+     *
+     * <p>未开始可以直接到下线：批量「禁用」里混着还没上过线的活动时照常处理（经确认保留的现状）。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code ActivityConfigMapper.xml} 的 {@code markOnline} / {@code markOffline}
+     * 带旧状态条件，删除也只认未开始。{@code ActivityConfigStatusSqlTest} 断言 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(ActivityStatusEnum to) {
+        return switch (this) {
+            case NOT_START -> to == ONLINE || to == OFFLINE;
+            case ONLINE -> to == OFFLINE;
+            case OFFLINE -> to == ONLINE;
+        };
+    }
 }

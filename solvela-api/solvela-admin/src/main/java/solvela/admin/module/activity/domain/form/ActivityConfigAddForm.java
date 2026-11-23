@@ -1,6 +1,5 @@
 package solvela.admin.module.activity.domain.form;
 
-import solvela.enums.ActivityStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -38,8 +37,7 @@ public class ActivityConfigAddForm {
     @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "活动类型非法")
     private ActivityTypeEnum activityType;
 
-    @Schema(description = "状态：0-未开始, 1-上线, 2-下线")
-    private ActivityStatusEnum status;
+    // 状态刻意不收：新建一律未开始，修改不改状态，上下线只走 updateStatus（ActivityConfigService）
 
     @Schema(description = "活动开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "活动开始时间 不能为空")

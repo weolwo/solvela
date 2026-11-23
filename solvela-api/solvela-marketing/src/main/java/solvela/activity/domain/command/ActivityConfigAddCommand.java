@@ -1,7 +1,6 @@
 package solvela.activity.domain.command;
 
 
-import solvela.enums.ActivityStatusEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -38,8 +37,7 @@ public class ActivityConfigAddCommand {
     @CheckEnum(value = ActivityTypeEnum.class, required = true, message = "活动类型非法")
     private ActivityTypeEnum activityType;
 
-    /** 状态：0-未开始, 1-上线, 2-下线 */
-    private ActivityStatusEnum status;
+    // 状态刻意不收：新建一律未开始，修改不改状态，上下线只走 updateStatus（ActivityConfigService）
 
     /** 活动开始时间 */
     private LocalDateTime startTime;

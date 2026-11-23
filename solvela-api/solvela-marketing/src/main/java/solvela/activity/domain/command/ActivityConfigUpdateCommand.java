@@ -1,7 +1,6 @@
 package solvela.activity.domain.command;
 
 
-import solvela.enums.ActivityStatusEnum;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -43,7 +42,7 @@ public class ActivityConfigUpdateCommand {
      * 服务端会校验「当前必须是 BASIC」+「下游玩法表为空」两条。
      */
 
-    private ActivityStatusEnum status;
+    // 状态刻意不收：新建一律未开始，修改不改状态，上下线只走 updateStatus（ActivityConfigService）
 
     /** 活动开始时间 */
     private LocalDateTime startTime;
