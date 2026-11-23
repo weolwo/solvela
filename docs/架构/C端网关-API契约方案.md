@@ -590,7 +590,7 @@ member ────异步消息────▶ marketing  资产真正入账完�
 | ledger 停写 `t_prize_log`，改成发消息 | ✅ 不写别人的表这条守住了 —— 它调 `PrizeDispatchResultPublisher`，今天的实现是进程内更新 |
 | marketing 订阅回写消息落终态 | ❎ **不需要了**，同进程直接落 |
 | `t_mq_message_log` + 消费幂等 + 7 天清理 | ⚠️ 代码与表都在，但**目前没有任何使用者** —— 唯一的消费者随发奖 listener 一起删了。留着是给下一摊（活动事件订阅）用的 |
-| 重投任务：扫 `proposal_status = PENDING` | ⏳ 仍然要做。`PrizeDispatchReconcileJob` 已在，覆盖面待核 |
+| 重投任务：扫 `proposal_status = PENDING` | ⏳ 仍然要做。`PrizeDispatchReconcileJob` 已在，只重投仍在等待、审批允许派发的（`PrizeLogDao#selectRetryable`）；只看提案列会把待审批、已驳回的奖发出去 |
 
 **上表那三个 ❎/✅ 在拆资产域那天会重新变成待办** —— 所以 `PrizeDispatchResultPublisher`
 这个接口刻意留着（今天只有一个实现），到时候加一个 MQ 实现、在端模块换装配即可。

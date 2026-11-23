@@ -309,6 +309,22 @@
         limit 1
     </select>
 
+    <!--
+      对账重投的取数，三个条件为什么缺一不可见 PrizeLogDao#selectRetryable。
+      🔴 approve_status 的取值必须与 PrizeApproveStatusEnum#allowsDispatch 一致，PrizeLogStatusSqlTest 断言。
+    -->
+    <select id="selectRetryable" resultType="solvela.prize.PrizeLog">
+        select *
+        from t_prize_log
+        where proposal_status = ${@solvela.enums.PrizeProposalStatusEnum@PENDING.value}
+          and status = ${@solvela.enums.PrizeDispatchStatusEnum@WAITING.value}
+          and approve_status in (${@solvela.enums.PrizeApproveStatusEnum@NOT_REQUIRED.value},
+                                 ${@solvela.enums.PrizeApproveStatusEnum@PASSED.value})
+          and create_time &lt; #{before}
+        order by id
+        limit #{limit}
+    </select>
+
     <!-- 发奖审批流转，条件更新防止两个运营同时点通过导致重复派发 -->
     <update id="updateApproveStatus">
         update t_prize_log

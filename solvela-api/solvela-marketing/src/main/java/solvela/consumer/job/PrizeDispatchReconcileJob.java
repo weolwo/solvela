@@ -30,7 +30,8 @@ import java.util.List;
  * </pre>
  * <ul>
  *   <li><b>① proposal_status = PENDING</b>：同步调用没发出去或没回来
- *       （进程挂了、网络断了、下游超时）。<b>本任务会重投</b>；</li>
+ *       （进程挂了、网络断了、下游超时）。<b>本任务会重投</b>，但只重投仍在等待、审批允许派发的那些，
+ *       见 {@code PrizeLogDao#selectRetryable}；</li>
  *   <li><b>② ACCEPTED 但 status 还是等待</b>：提案生成了，但入账结果那条消息没回来
  *       （消息丢了），<b>或者提案还在人工审批池里</b>。</li>
  * </ul>
@@ -84,11 +85,8 @@ public class PrizeDispatchReconcileJob implements SolvelaJob {
         LocalDateTime before = now.minusMinutes(ctx.intParam("delayMinutes", 10));
         int limit = ctx.intParam("limit", 200);
 
-        List<PrizeLog> pending = prizeLogDao.selectList(Wrappers.<PrizeLog>lambdaQuery()
-                .eq(PrizeLog::getProposalStatus, PrizeProposalStatusEnum.PENDING)
-                .lt(PrizeLog::getCreateTime, before)
-                .orderByAsc(PrizeLog::getId)
-                .last("limit " + limit));
+        // 🔴 不能只按提案列捞：待审批、已驳回的记录提案列也是「待提交」。条件见 PrizeLogDao#selectRetryable
+        List<PrizeLog> pending = prizeLogDao.selectRetryable(before, limit);
 
         long stale = prizeLogDao.selectCount(Wrappers.<PrizeLog>lambdaQuery()
                 .eq(PrizeLog::getProposalStatus, PrizeProposalStatusEnum.ACCEPTED)

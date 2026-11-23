@@ -134,6 +134,15 @@ public class PrizeDispatchHandler implements BizEventHandler<UserPrizeEvent> {
      */
     @ScriptFunction(name = "_doDispatch", description = "奖励派发")
     public void doDispatch(PrizeLog prizeLog) {
+        /*
+         * 🔴 入口检查放在 try 外面、直接抛：这个方法 public，对账重投、审批通过、脚本（_doDispatch）都能调。
+         * 对账重投曾经不看审批状态，把待审批、已驳回的奖一起发了出去。
+         * 抛出去而不是静默 return：调用方要知道这次没发，对账任务会逐条计降级。
+         */
+        if (!prizeLog.getApproveStatus().allowsDispatch()) {
+            throw new IllegalStateException("发奖记录 " + prizeLog.getId() + " 审批状态是「"
+                    + prizeLog.getApproveStatus().getDesc() + "」，不能派发");
+        }
         log.info(">>>> [执行发货] 开始派发奖品，LogId: {}, 类型: {}", prizeLog.getId(), prizeLog.getPrizeType());
         try {
             // 工厂选策略，彻底消灭 switch/if-else

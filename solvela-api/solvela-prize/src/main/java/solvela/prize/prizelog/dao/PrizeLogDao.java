@@ -5,6 +5,7 @@ import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeProposalStatusEnum;
 
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import solvela.prize.PrizeLog;
@@ -80,6 +81,20 @@ public interface PrizeLogDao extends BaseMapper<PrizeLog> {
      * 所以重复投递不会多查这一次。
      */
     PrizeLog selectByExternalBizNo(@Param("externalBizNo") String externalBizNo);
+
+    /**
+     * 对账任务要重投的发奖记录：还没提交给会员服务、仍在等待、审批允许派发，且早于 {@code before} 落库。
+     *
+     * <p>三个条件缺一不可：
+     * <ul>
+     *   <li>不看审批状态，会把待审批、已驳回的奖直接发出去（{@link PrizeApproveStatusEnum#allowsDispatch}）；</li>
+     *   <li>不看派发状态，执行异常落成失败的记录也会被重投：用户可能真拿到了奖，
+     *       资产引擎却只回写「仍是等待」的行，记录永远是失败。这类由人工处理。</li>
+     * </ul>
+     *
+     * @param before 只捞这个时间之前落库的：刚落库那条可能正被同步调用处理，捞它等于和自己抢
+     */
+    List<PrizeLog> selectRetryable(@Param("before") LocalDateTime before, @Param("limit") int limit);
 
     /**
      * 发奖审批流转：只有当前审批状态等于 fromApproveStatus 才更新

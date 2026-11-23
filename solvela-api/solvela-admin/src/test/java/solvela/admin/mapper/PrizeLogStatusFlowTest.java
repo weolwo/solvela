@@ -13,6 +13,10 @@ import solvela.enums.PrizeTypeEnum;
 import solvela.prize.PrizeLog;
 import solvela.prize.prizelog.dao.PrizeLogDao;
 
+import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -68,11 +72,39 @@ class PrizeLogStatusFlowTest {
                 () -> assertEquals("预算耗尽", after.getFailReason()));
     }
 
+    @Test
+    @DisplayName("🔴 对账重投只捞仍在等待、审批允许派发的；待审批、已驳回、执行异常落失败的都不捞")
+    void 对账重投的取数() {
+        // 造在很早以前，并且只看这段时间：不受库里其它记录影响
+        LocalDateTime longAgo = LocalDateTime.of(2001, 1, 1, 0, 0);
+        PrizeLog notRequired = insert(PrizeApproveStatusEnum.NOT_REQUIRED, longAgo);
+        PrizeLog passed = insert(PrizeApproveStatusEnum.PASSED, longAgo);
+        PrizeLog pending = insert(PrizeApproveStatusEnum.PENDING, longAgo);
+        PrizeLog rejected = insert(PrizeApproveStatusEnum.REJECTED, longAgo);
+        PrizeLog failed = insert(PrizeApproveStatusEnum.NOT_REQUIRED, longAgo);
+        assertEquals(1, prizeLogDao.markDispatchFailed(failed.getId(), "执行异常", null));
+        PrizeLog accepted = insert(PrizeApproveStatusEnum.NOT_REQUIRED, longAgo);
+        assertEquals(1, prizeLogDao.markProposalAccepted(accepted.getId(), 1L));
+
+        Set<Long> picked = prizeLogDao.selectRetryable(longAgo.plusDays(1), 1000).stream()
+                .map(PrizeLog::getId)
+                .collect(Collectors.toSet());
+
+        assertEquals(Set.of(notRequired.getId(), passed.getId()), picked,
+                "待审批 " + pending.getId() + "、已驳回 " + rejected.getId() + "、已失败 " + failed.getId()
+                        + "、已受理 " + accepted.getId() + " 都不该被重投");
+    }
+
     private PrizeDispatchStatusEnum statusOf(PrizeLog log) {
         return prizeLogDao.selectById(log.getId()).getStatus();
     }
 
     private PrizeLog insert() {
+        return insert(PrizeApproveStatusEnum.NOT_REQUIRED, null);
+    }
+
+    /** @param createTime 为 null 时由 DDL 填当前时间 */
+    private PrizeLog insert(PrizeApproveStatusEnum approve, LocalDateTime createTime) {
         PrizeLog log = new PrizeLog();
         log.setMemberId(940001L);
         log.setMemberName("zz-test");
@@ -83,7 +115,8 @@ class PrizeLogStatusFlowTest {
         log.setPrizeName("状态机验收");
         log.setPrizeType(PrizeTypeEnum.COUPON);
         log.setPrizeValue("1");
-        log.setApproveStatus(PrizeApproveStatusEnum.NOT_REQUIRED);
+        log.setApproveStatus(approve);
+        log.setCreateTime(createTime);
         log.awaitDispatch();
         prizeLogDao.insert(log);
         return log;

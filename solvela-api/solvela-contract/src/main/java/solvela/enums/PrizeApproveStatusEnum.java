@@ -45,4 +45,21 @@ public enum PrizeApproveStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 这条发奖记录能不能派发：无需审批，或审批通过了。
+     *
+     * <p>🔴 待审批、已驳回的记录 {@code proposal_status} 也还是「待提交」，只看提案列分不出来。
+     * 对账重投曾经只看提案列，把等运营点头的、运营已经驳回的奖一起发了出去。
+     * 守它的有两处：{@code PrizeLogMapper.xml} 的 {@code selectRetryable}（{@code PrizeLogStatusSqlTest} 断言口径一致）、
+     * {@code PrizeDispatchHandler#doDispatch} 的入口检查。
+     *
+     * <p>不写 default：新增一个审批状态时编译器会要求在这里表态。
+     */
+    public boolean allowsDispatch() {
+        return switch (this) {
+            case NOT_REQUIRED, PASSED -> true;
+            case PENDING, REJECTED -> false;
+        };
+    }
 }

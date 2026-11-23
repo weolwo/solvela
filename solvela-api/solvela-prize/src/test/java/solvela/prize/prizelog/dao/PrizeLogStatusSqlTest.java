@@ -6,15 +6,19 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import solvela.enums.PrizeApproveStatusEnum;
 import solvela.enums.PrizeDispatchStatusEnum;
 import solvela.enums.PrizeProposalStatusEnum;
 
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -75,6 +79,30 @@ class PrizeLogStatusSqlTest {
         String sql = sqlOf("markProposalAccepted", new HashMap<>());
         assertFalse(SET_STATUS.matcher(sql).find(), "markProposalAccepted 不该改 status：" + sql);
         assertTrue(sql.contains("proposal_status = " + PrizeProposalStatusEnum.ACCEPTED.getValue()), sql);
+    }
+
+    @Test
+    @DisplayName("🔴 对账重投只捞：提案待提交、仍在等待、审批允许派发（与 allowsDispatch 同一口径）")
+    void 对账重投的取数口径() {
+        String sql = sqlOf("selectRetryable", new HashMap<>());
+        assertTrue(sql.contains("proposal_status = " + PrizeProposalStatusEnum.PENDING.getValue()), sql);
+        assertEquals(PrizeDispatchStatusEnum.WAITING, statusOf(WHERE_STATUS, sql, "selectRetryable"));
+
+        Matcher matcher = Pattern.compile("approve_status\\s+in\\s*\\(([\\d,\\s]+)\\)", Pattern.CASE_INSENSITIVE).matcher(sql);
+        assertTrue(matcher.find(), "selectRetryable 里找不到 approve_status in (...)：" + sql);
+        Set<PrizeApproveStatusEnum> fromSql = Arrays.stream(matcher.group(1).split(","))
+                .map(v -> Integer.parseInt(v.trim()))
+                .map(v -> Arrays.stream(PrizeApproveStatusEnum.values()).filter(s -> s.getValue() == v).findFirst()
+                        .orElseThrow(() -> new AssertionError("审批状态值 " + v + " 不是任何一个 PrizeApproveStatusEnum")))
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(PrizeApproveStatusEnum.class)));
+        Set<PrizeApproveStatusEnum> fromEnum = Arrays.stream(PrizeApproveStatusEnum.values())
+                .filter(PrizeApproveStatusEnum::allowsDispatch)
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(PrizeApproveStatusEnum.class)));
+        // 空对空也相等：口径被改成「谁都不能发」时本测试不该绿着
+        assertFalse(fromEnum.isEmpty(), "allowsDispatch 对所有审批状态都为假");
+        assertFalse(fromEnum.contains(PrizeApproveStatusEnum.PENDING) || fromEnum.contains(PrizeApproveStatusEnum.REJECTED),
+                "待审批、已驳回的奖不能派发");
+        assertEquals(fromEnum, fromSql, "selectRetryable 的审批状态与 PrizeApproveStatusEnum#allowsDispatch 对不上");
     }
 
     private static void assertGate(String id, PrizeDispatchStatusEnum from, PrizeDispatchStatusEnum to) {
