@@ -3,7 +3,9 @@ package solvela.member;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.enums.SecurityListDimensionEnum;
 import solvela.enums.SecurityListStatusEnum;
 import solvela.enums.SecurityListTypeEnum;
@@ -61,6 +63,11 @@ public class SecurityList {
     /** 封禁期间被安全闸直接挡掉的请求数，定时从 Redis 计数器同步。新增时留 null，取库里的默认值 0 */
     private Long blockedCount;
 
+    /**
+     * 🔴 没有公开 setter：后台新增经 {@link #startValid} 落为有效，之后只走带旧状态条件的 UPDATE
+     * （状态机见 {@link SecurityListStatusEnum#canTransitTo}）。MyBatis 读库时直接写字段，不需要 setter。
+     */
+    @Setter(AccessLevel.NONE)
     private SecurityListStatusEnum status;
 
     /** null = 长期 */
@@ -77,4 +84,14 @@ public class SecurityList {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    /**
+     * 落为<b>有效</b>：后台人工新增的条目。自动条目由 {@code SecurityListWriter} 用 SQL 直接写。
+     */
+    public void startValid() {
+        if (status != null) {
+            throw new IllegalStateException("名单条目 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = SecurityListStatusEnum.VALID;
+    }
 }

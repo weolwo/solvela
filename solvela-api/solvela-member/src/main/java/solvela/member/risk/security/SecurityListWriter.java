@@ -86,12 +86,25 @@ public class SecurityListWriter {
      * @param onlyIfAbsent 已有一条有效的就什么都不做（连坐这种每个周期都会重新推导一遍的，不该每次都 +1）
      */
     public Outcome upsert(Entry e, boolean onlyIfAbsent) {
+        Outcome outcome;
         try {
-            return doUpsert(e, onlyIfAbsent);
+            outcome = doUpsert(e, onlyIfAbsent);
         } catch (DuplicateKeyException race) {
             // 读到「没有」之后、插入之前，有人（后台人工、另一个任务）先插了一行：按冲突规则再走一遍
-            return doUpsert(e, onlyIfAbsent);
+            return retry(e, onlyIfAbsent);
         }
+        // 读到之后、写之前那一行被人改了（人工重新加上、被撤销、另一个任务先复用了）：条件 UPDATE 影响 0 行，同样再走一遍
+        return outcome != null ? outcome : retry(e, onlyIfAbsent);
+    }
+
+    private Outcome retry(Entry e, boolean onlyIfAbsent) {
+        Outcome outcome = doUpsert(e, onlyIfAbsent);
+        if (outcome == null) {
+            // 连着两次读完就被改，不该发生；抛出去让调用方看见，而不是假装写成了
+            throw new IllegalStateException("安全名单条目连续两次被并发改动，未写入: "
+                    + e.dimension() + " " + e.value() + " " + e.listType());
+        }
+        return outcome;
     }
 
     private Outcome doUpsert(Entry e, boolean onlyIfAbsent) {
@@ -107,11 +120,9 @@ public class SecurityListWriter {
             return Outcome.KEPT_EXISTING;
         }
         if (existing.valid()) {
-            extend(existing.id(), e);
-            return Outcome.EXTENDED;
+            return extend(existing.id(), e) == 0 ? null : Outcome.EXTENDED;
         }
-        reuse(existing.id(), e);
-        return Outcome.REUSED;
+        return reuse(existing.id(), e) == 0 ? null : Outcome.REUSED;
     }
 
     /** 唯一键上已有的那一行。{@code valid} = 有效且没过期 */
@@ -144,31 +155,44 @@ public class SecurityListWriter {
                 INSERT INTO t_security_list (list_type, dimension, list_value, score, reason, source, source_rule,
                                              hit_count, last_hit_time, last_event_id, last_incident_id, status, expire_time,
                                              operator)
-                VALUES (?, ?, ?, ?, ?, 2, ?, 1, NOW(), ?, ?, 1, FROM_UNIXTIME(?), ?)
+                VALUES (?, ?, ?, ?, ?, 2, ?, 1, NOW(), ?, ?, ?, FROM_UNIXTIME(?), ?)
                 """, e.listType().getValue(), e.dimension().getValue(), e.value(), score(e), e.reason(), e.sourceRule(),
-                e.eventId(), e.eventId(), e.untilEpochSec(), SYSTEM);
+                e.eventId(), e.eventId(), SecurityListStatusEnum.VALID.getValue(), e.untilEpochSec(), SYSTEM);
     }
 
-    /** 有效的自动条目：命中次数 +1、刷新证据，到期取两者中更晚的 */
-    private void extend(long id, Entry e) {
-        jdbcTemplate.update("""
+    /**
+     * 有效的自动条目：命中次数 +1、刷新证据，到期取两者中更晚的。
+     *
+     * <p>🔴 WHERE 里再判一次「仍是有效的自动条目」：读完之后它可能被撤销、或被人工改成了长期条目，
+     * 那时不该再动它。返回 0 由 {@link #upsert} 重新读一遍再决定。
+     */
+    private int extend(long id, Entry e) {
+        return jdbcTemplate.update("""
                 UPDATE t_security_list
                    SET hit_count = hit_count + 1, last_hit_time = NOW(),
                        last_event_id = COALESCE(?, last_event_id), last_incident_id = COALESCE(?, last_incident_id),
                        source_rule = ?, expire_time = GREATEST(expire_time, FROM_UNIXTIME(?))
-                 WHERE id = ?
-                """, e.eventId(), e.eventId(), e.sourceRule(), e.untilEpochSec(), id);
+                 WHERE id = ? AND status = ? AND source = 2
+                   AND (expire_time IS NULL OR expire_time > NOW())
+                """, e.eventId(), e.eventId(), e.sourceRule(), e.untilEpochSec(), id, SecurityListStatusEnum.VALID.getValue());
     }
 
-    /** 已撤销或已过期的：复用这一行，重新置为有效、归为自动 */
-    private void reuse(long id, Entry e) {
-        jdbcTemplate.update("""
+    /**
+     * 已撤销或已过期的：复用这一行，重新置为有效、归为自动（已撤销 → 有效，见 {@link SecurityListStatusEnum#canTransitTo}）。
+     *
+     * <p>🔴 WHERE 里再判一次「仍不是有效的」：读完之后若被人工重新加成了有效条目，这里影响 0 行，
+     * 不会把人工条目改成自动、把长期封禁缩成 24 小时。返回 0 由 {@link #upsert} 重新读一遍再决定。
+     */
+    private int reuse(long id, Entry e) {
+        return jdbcTemplate.update("""
                 UPDATE t_security_list
-                   SET status = 1, source = 2, source_rule = ?, reason = ?, score = ?, hit_count = 1, last_hit_time = NOW(),
+                   SET status = ?, source = 2, source_rule = ?, reason = ?, score = ?, hit_count = 1, last_hit_time = NOW(),
                        last_event_id = ?, last_incident_id = ?, expire_time = FROM_UNIXTIME(?), operator = ?,
                        revoke_operator = NULL, revoke_reason = NULL, revoke_time = NULL
                  WHERE id = ?
-                """, e.sourceRule(), e.reason(), score(e), e.eventId(), e.eventId(), e.untilEpochSec(), SYSTEM, id);
+                   AND NOT (status = ? AND (expire_time IS NULL OR expire_time > NOW()))
+                """, SecurityListStatusEnum.VALID.getValue(), e.sourceRule(), e.reason(), score(e), e.eventId(), e.eventId(),
+                e.untilEpochSec(), SYSTEM, id, SecurityListStatusEnum.VALID.getValue());
     }
 
     private static Integer score(Entry e) {

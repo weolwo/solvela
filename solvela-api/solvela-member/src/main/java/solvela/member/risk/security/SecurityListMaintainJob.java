@@ -13,6 +13,7 @@ import solvela.base.module.jobspi.constant.SolvelaJobLaneEnum;
 import solvela.base.module.jobspi.core.SolvelaJob;
 import solvela.base.module.jobspi.core.SolvelaJobContext;
 import solvela.base.module.jobspi.core.SolvelaJobHandler;
+import solvela.enums.SecurityListStatusEnum;
 import solvela.enums.SecurityListDimensionEnum;
 import solvela.enums.SecurityListTypeEnum;
 import solvela.member.risk.config.RiskListCache;
@@ -124,11 +125,12 @@ public class SecurityListMaintainJob implements SolvelaJob {
     private int escalate(GateSettings s) {
         List<ExpiredBlack> expired = jdbcTemplate.query("""
                 SELECT id, dimension, list_value FROM t_security_list
-                 WHERE list_type = 1 AND source = 2 AND status = 1 AND dimension IN (1, 2)
+                 WHERE list_type = 1 AND source = 2 AND status = ? AND dimension IN (1, 2)
                    AND expire_time IS NOT NULL AND expire_time <= NOW()
                  ORDER BY id LIMIT ?
                 """, (rs, i) -> new ExpiredBlack(rs.getLong("id"),
-                SecurityListWriter.dimension(rs.getInt("dimension")), rs.getString("list_value")), ESCALATE_BATCH);
+                SecurityListWriter.dimension(rs.getInt("dimension")), rs.getString("list_value")),
+                SecurityListStatusEnum.VALID.getValue(), ESCALATE_BATCH);
         long until = epochSecondsAfterDays(s.escalateGreyDays());
         expired.forEach(black -> escalateOne(black, until, s.escalateGreyDays()));
         if (!expired.isEmpty()) {
@@ -143,9 +145,10 @@ public class SecurityListMaintainJob implements SolvelaJob {
                 "ESCALATE", "自动黑名单到期，转灰 " + greyDays + " 天（自动）", until, null));
         jdbcTemplate.update("""
                 UPDATE t_security_list
-                   SET status = 0, revoke_operator = ?, revoke_reason = '到期，已转灰（ESCALATE）', revoke_time = NOW()
-                 WHERE id = ? AND status = 1
-                """, SecurityListWriter.SYSTEM, black.id());
+                   SET status = ?, revoke_operator = ?, revoke_reason = '到期，已转灰（ESCALATE）', revoke_time = NOW()
+                 WHERE id = ? AND status = ?
+                """, SecurityListStatusEnum.REVOKED.getValue(), SecurityListWriter.SYSTEM, black.id(),
+                SecurityListStatusEnum.VALID.getValue());
     }
 
     // ------------------------------------------------------------------ 同段连坐
@@ -171,9 +174,9 @@ public class SecurityListMaintainJob implements SolvelaJob {
                 SELECT list_value FROM t_security_list
                  WHERE list_type = 1 AND source = 2 AND dimension IN (1, 2)
                    AND source_rule IN ('HONEYPOT', 'KEYWORD', 'CANARY')
-                   AND (status = 1 OR revoke_operator = ?)
+                   AND (status = ? OR revoke_operator = ?)
                    AND last_hit_time >= NOW() - INTERVAL ? SECOND
-                """, String.class, SecurityListWriter.SYSTEM, s.segmentWithinSeconds());
+                """, String.class, SecurityListStatusEnum.VALID.getValue(), SecurityListWriter.SYSTEM, s.segmentWithinSeconds());
         Map<String, Set<String>> bySegment = new HashMap<>();
         for (String value : values) {
             String address = value.contains("/") ? value.substring(0, value.indexOf('/')) : value;

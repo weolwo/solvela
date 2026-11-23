@@ -30,4 +30,24 @@ public enum SecurityListStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}：有效 ↔ 已撤销。
+     *
+     * <p>🔴 每条边的 UPDATE 都带旧状态条件：
+     * <ul>
+     *   <li>有效 → 已撤销：后台撤销 {@code SecurityListDao#revokeValid}、黑到期转灰 {@code SecurityListMaintainJob#escalateOne}；</li>
+     *   <li>已撤销（或有效但已过期）→ 有效：自动写入复用旧行 {@code SecurityListWriter#reuse}，条件是「仍不是有效的」，
+     *       这样读完到写之间被人工重新加上的有效条目不会被自动条目覆盖。</li>
+     * </ul>
+     * 后者与转灰是 JdbcTemplate 写的 SQL，状态值绑的是本枚举的取值，不是字面量。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(SecurityListStatusEnum to) {
+        return switch (this) {
+            case VALID -> to == REVOKED;
+            case REVOKED -> to == VALID;
+        };
+    }
 }

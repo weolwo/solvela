@@ -139,17 +139,11 @@ public class SecurityListAdminService {
         if (id == null || SolvelaStringUtil.isBlank(reason)) {
             throw new IllegalArgumentException("撤销必须写原因 —— 「上次为什么解的」和「为什么加的」一样重要");
         }
+        // 先读一次是为了下面删网关处罚键要知道维度和值；撤不撤得成只看闸门
         SecurityList row = listDao.selectById(id);
-        if (row == null || row.getStatus() == SecurityListStatusEnum.REVOKED) {
+        if (row == null || listDao.revokeValid(id, operator, reason) == 0) {
             return false;
         }
-        SecurityList update = new SecurityList();
-        update.setId(id);
-        update.setStatus(SecurityListStatusEnum.REVOKED);
-        update.setRevokeOperator(operator);
-        update.setRevokeReason(reason);
-        update.setRevokeTime(LocalDateTime.now());
-        listDao.updateById(update);
         releaseIpPenalty(row);
         listCache.reload();
         snapshotPublisher.publishQuietly("撤销名单");
@@ -179,7 +173,7 @@ public class SecurityListAdminService {
         row.setScore(cmd.getScore());
         row.setReason(cmd.getReason());
         row.setSource(SecurityListWriter.SOURCE_MANUAL);
-        row.setStatus(SecurityListStatusEnum.VALID);
+        row.startValid();
         row.setExpireTime(expireTime);
         row.setOperator(cmd.getOperator());
         return row;
