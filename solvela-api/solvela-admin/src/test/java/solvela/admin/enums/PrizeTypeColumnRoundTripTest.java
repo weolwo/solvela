@@ -10,7 +10,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import solvela.enums.PrizeTypeEnum;
-import solvela.enums.WalletStatusEnum;
 import solvela.ledger.MemberWallet;
 import solvela.ledger.wallet.dao.MemberWalletDao;
 import solvela.ledger.wallet.domain.dto.MemberWalletDTO;
@@ -66,7 +65,7 @@ class PrizeTypeColumnRoundTripTest {
         wallet.setMemberId(MEMBER_ID);
         wallet.setAssetType(PrizeTypeEnum.BALANCE);
         wallet.setBalance(new BigDecimal("12.3400"));
-        wallet.setStatus(WalletStatusEnum.NORMAL);
+        wallet.openNormal();
         wallet.setVersion(0);
         memberWalletDao.insert(wallet);
 

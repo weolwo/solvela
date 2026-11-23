@@ -58,12 +58,18 @@
             </if>
         </where>
     </sql>
+    <!--
+      加减余额都带「钱包正常」：冻结是直接改库、不动 version，只靠 Java 里读出来先判，
+      读完到写之间被冻结的钱包照样能动。状态取值与 WalletStatusEnum#allowsBalanceChange 一致，
+      MemberWalletStatusSqlTest 断言。${} 里只放常量。
+    -->
     <update id="addBalanceWithVersion">
         UPDATE t_member_wallet
         SET balance = balance + #{amount},
             version = version + 1
         WHERE id = #{id}
           AND version = #{version}
+          AND status = ${@solvela.enums.WalletStatusEnum@NORMAL.value}
     </update>
     <!-- 扣减：乐观锁 + 余额充足双重条件，杜绝扣成负数 -->
     <update id="deductBalanceWithVersion">
@@ -72,6 +78,7 @@
             version = version + 1
         WHERE id = #{id}
           AND version = #{version}
+          AND status = ${@solvela.enums.WalletStatusEnum@NORMAL.value}
           AND balance &gt;= #{amount}
     </update>
 
@@ -145,9 +152,9 @@
     <select id="selectStat" resultType="java.util.Map">
         SELECT COUNT(*)                                        AS walletCount,
                COUNT(DISTINCT member_id)                       AS memberCount,
-               COALESCE(SUM(status = 0), 0)                    AS frozenCount,
+               COALESCE(SUM(status = ${@solvela.enums.WalletStatusEnum@FROZEN.value}), 0)                    AS frozenCount,
                COALESCE(SUM(balance &lt; 0), 0)                AS negativeBalanceCount,
-               COALESCE(SUM(status = 0 AND balance &gt; 0), 0) AS frozenWithBalanceCount
+               COALESCE(SUM(status = ${@solvela.enums.WalletStatusEnum@FROZEN.value} AND balance &gt; 0), 0) AS frozenWithBalanceCount
         FROM t_member_wallet
     </select>
 
@@ -159,7 +166,7 @@
         SELECT asset_type                                              AS assetType,
                COUNT(*)                                                AS walletCount,
                COALESCE(SUM(balance), 0)                               AS totalBalance,
-               COALESCE(SUM(CASE WHEN status = 0 THEN balance END), 0) AS frozenBalance
+               COALESCE(SUM(CASE WHEN status = ${@solvela.enums.WalletStatusEnum@FROZEN.value} THEN balance END), 0) AS frozenBalance
         FROM t_member_wallet
         GROUP BY asset_type
         ORDER BY asset_type

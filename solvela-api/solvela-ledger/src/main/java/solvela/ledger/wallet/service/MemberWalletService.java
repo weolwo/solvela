@@ -1,7 +1,6 @@
 package solvela.ledger.wallet.service;
 
 import solvela.enums.TransactionTypeEnum;
-import solvela.enums.WalletStatusEnum;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -302,7 +301,7 @@ public class MemberWalletService {
         wallet.setMemberId(memberId);
         wallet.setAssetType(assetType);
         wallet.setBalance(BigDecimal.ZERO);
-        wallet.setStatus(WalletStatusEnum.NORMAL);
+        wallet.openNormal();
         wallet.setVersion(0);
 
         try {

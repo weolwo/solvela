@@ -1,5 +1,6 @@
 package solvela.ledger.wallet.service;
 
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -93,7 +94,7 @@ class MemberWalletServiceTest {
         wallet.setMemberId(MEMBER_ID);
         wallet.setAssetType(PrizeTypeEnum.SCORE);
         wallet.setBalance(new BigDecimal("500"));
-        wallet.setStatus(WalletStatusEnum.NORMAL);
+        wallet.openNormal();
         wallet.setVersion(3);
 
         when(memberService.requireMemberName(MEMBER_ID)).thenReturn("sv900001");
@@ -129,7 +130,8 @@ class MemberWalletServiceTest {
     @Test
     @DisplayName("扣减：冻结账户不许动")
     void 冻结账户不许扣() {
-        wallet.setStatus(WalletStatusEnum.FROZEN);
+        // status 没有 setter：走 MyBatis 读库时的同一条反射路径，造出「库里读出来就是冻结」的钱包
+        SystemMetaObject.forObject(wallet).setValue("status", WalletStatusEnum.FROZEN);
 
         assertThrows(BusinessException.class,
                 () -> service.executeWalletDeduct(MEMBER_ID, PrizeTypeEnum.SCORE, AMOUNT, AssetBizTypeEnum.MALL_EXCHANGE, "1", null));

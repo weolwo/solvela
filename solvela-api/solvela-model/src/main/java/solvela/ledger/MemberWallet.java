@@ -2,7 +2,9 @@ package solvela.ledger;
 
 import solvela.enums.WalletStatusEnum;
 import com.baomidou.mybatisplus.annotation.*;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.code.UserErrorCode;
 import solvela.exception.BusinessException;
 import solvela.enums.PrizeTypeEnum;
@@ -54,7 +56,11 @@ public class MemberWallet {
 
     /**
      * 状态：0-冻结, 1-正常
+     *
+     * <p>没有公开 setter：建钱包经 {@link #openNormal} 落为正常。目前没有代码会改它（冻结只能直接改库），
+     * 见 {@link WalletStatusEnum} 的类注释。MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private WalletStatusEnum status;
 
     /**
@@ -87,7 +93,7 @@ public class MemberWallet {
      * 实体自带业务校验逻辑
      */
     public void checkAvailable() {
-        if (this.status != WalletStatusEnum.NORMAL) {
+        if (this.status == null || !this.status.allowsBalanceChange()) {
             throw new BusinessException(UserErrorCode.ACCOUNT_FROZEN);
         }
     }
@@ -98,5 +104,15 @@ public class MemberWallet {
     public BigDecimal calculateAfterBalance(BigDecimal addAmount) {
         BigDecimal current = this.balance == null ? BigDecimal.ZERO : this.balance;
         return current.add(addAmount);
+    }
+
+    /**
+     * 落为<b>正常</b>：钱包唯一的初始状态。
+     */
+    public void openNormal() {
+        if (status != null) {
+            throw new IllegalStateException("钱包 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = WalletStatusEnum.NORMAL;
     }
 }
