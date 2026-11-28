@@ -118,5 +118,25 @@
         ORDER BY create_time DESC
     </select>
 
+    <!--
+      后台冻结 / 解冻的两条闸门：WHERE 里的旧状态是并发闸门，已注销的会员两条都影响 0 行。
+      每条是 MemberStatusEnum#canTransitTo 的一条边，MemberStatusSqlTest 断言。${} 里只放常量。
+      不写 update_time：DDL 是 ON UPDATE CURRENT_TIMESTAMP。
+    -->
+    <update id="markFrozen">
+        update t_member
+        set status = ${@solvela.enums.MemberStatusEnum@FROZEN.value},
+            update_by = #{operator}
+        where member_id = #{memberId}
+          and status = ${@solvela.enums.MemberStatusEnum@NORMAL.value}
+    </update>
+
+    <update id="markNormal">
+        update t_member
+        set status = ${@solvela.enums.MemberStatusEnum@NORMAL.value},
+            update_by = #{operator}
+        where member_id = #{memberId}
+          and status = ${@solvela.enums.MemberStatusEnum@FROZEN.value}
+    </update>
 
 </mapper>

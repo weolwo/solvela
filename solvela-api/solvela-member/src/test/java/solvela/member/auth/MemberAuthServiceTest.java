@@ -1,5 +1,6 @@
 package solvela.member.auth;
 
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -167,7 +168,7 @@ class MemberAuthServiceTest {
         member.setMemberId(MEMBER_ID);
         member.setMemberName("sv900001");
         member.setNickname("小明");
-        member.setStatus(MemberStatusEnum.NORMAL);
+        loadedAs(member, MemberStatusEnum.NORMAL);
         member.setPassword(PasswordCipher.encode(RAW_PASSWORD));
         // 发码 / 验码按会员号现取联系方式（换通道时票上的 identity 不是那个东西），所以这里要有
         member.setPhone(PHONE);
@@ -224,7 +225,7 @@ class MemberAuthServiceTest {
     @Test
     @DisplayName("🔴 冻结账号不进密码比对：不给「密码猜对了没有」这个信号")
     void 冻结账号不验密码() {
-        member.setStatus(MemberStatusEnum.FROZEN);
+        loadedAs(member, MemberStatusEnum.FROZEN);
 
         MemberAuthResult result = service.authenticate(cmd("随便一个错密码"));
 
@@ -300,7 +301,7 @@ class MemberAuthServiceTest {
     @Test
     @DisplayName("已注销：与查无此人给同一个原因")
     void 已注销() {
-        member.setStatus(MemberStatusEnum.CANCELLED);
+        loadedAs(member, MemberStatusEnum.CANCELLED);
 
         assertEquals(AuthFailReason.BAD_CREDENTIALS, service.authenticate(cmd(RAW_PASSWORD)).reason());
     }
@@ -465,10 +466,10 @@ class MemberAuthServiceTest {
 
         // 「什么算一个可用身份」只该有一个定义 —— 多一处判断就多一次判漏的机会，
         // 而判漏的表现是「被冻结的人还能正常用」，没有任何报错
-        member.setStatus(MemberStatusEnum.FROZEN);
+        loadedAs(member, MemberStatusEnum.FROZEN);
         assertNull(service.getAuthIdentity(MEMBER_ID));
 
-        member.setStatus(MemberStatusEnum.CANCELLED);
+        loadedAs(member, MemberStatusEnum.CANCELLED);
         assertNull(service.getAuthIdentity(MEMBER_ID));
 
         assertNull(service.getAuthIdentity(null));
@@ -745,5 +746,10 @@ class MemberAuthServiceTest {
         ArgumentCaptor<MemberRiskEvent> captor = ArgumentCaptor.forClass(MemberRiskEvent.class);
         verify(recorder).record(captor.capture(), any());
         return captor.getValue();
+    }
+
+    /** status 没有 setter：走 MyBatis 读库时的同一条反射路径，造出「库里读出来就是这个状态」的会员 */
+    private static void loadedAs(Member member, MemberStatusEnum status) {
+        SystemMetaObject.forObject(member).setValue("status", status);
     }
 }

@@ -105,11 +105,16 @@ public class MemberService {
         if (member.getStatus() == MemberStatusEnum.CANCELLED) {
             throw new BusinessException("该会员已注销，注销是终态，不能改回其它状态");
         }
-        Member update = new Member();
-        update.setMemberId(memberId);
-        update.setStatus(status);
-        update.setUpdateBy(operator);
-        memberDao.updateById(update);
+        // 已是目标状态的不再写库（重复冻结照样往下走，再吊销一遍会话，与原来一致）；
+        // 其余走带旧状态条件的闸门：读完之后被别人改了状态（含被注销），这里影响 0 行，整个操作回滚
+        if (member.getStatus() != status) {
+            int rows = status == MemberStatusEnum.FROZEN
+                    ? memberDao.markFrozen(memberId, operator)
+                    : memberDao.markNormal(memberId, operator);
+            if (rows == 0) {
+                throw new BusinessException("该会员的状态刚被别人改过，请刷新后重试");
+            }
+        }
 
         if (status == MemberStatusEnum.FROZEN) {
             int revoked = tokenStore.revokeAll(memberId);

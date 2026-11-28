@@ -99,4 +99,14 @@ public interface MemberDao extends BaseMapper<Member> {
             """)
     Map<String, Map<String, Object>> selectIdMapByNames(@Param("memberNames") Collection<String> memberNames);
 
+    /*
+     * 🔴 后台冻结 / 解冻闸门：带旧状态条件，返回影响行数，0 表示已不在前置状态（含已注销）。
+     * 迁移见 MemberStatusEnum#canTransitTo，MemberStatusSqlTest 断言一一对应。
+     */
+
+    /** 冻结：正常 → 冻结 */
+    int markFrozen(@Param("memberId") Long memberId, @Param("operator") String operator);
+
+    /** 解冻：冻结 → 正常 */
+    int markNormal(@Param("memberId") Long memberId, @Param("operator") String operator);
 }

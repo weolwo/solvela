@@ -11,7 +11,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 /**
  * 会员主表 实体类
@@ -96,7 +98,12 @@ public class Member {
 
     /**
      * 状态：1-正常, 2-冻结(风控/违规), 3-已注销
+     *
+     * <p>🔴 没有公开 setter：注册由 {@code MemberRegisterService} 用 SQL 直接落正常，冻结 / 解冻只走
+     * {@code MemberDao.markFrozen / markNormal}（状态机见 {@link MemberStatusEnum#canTransitTo}）。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private MemberStatusEnum status;
 
     /**

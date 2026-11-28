@@ -35,4 +35,23 @@ public enum MemberStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}：正常 ↔ 冻结；已注销是终态。
+     *
+     * <p>注销目前没有任何代码会写入（C 端注销还没做），所以没有到已注销的边 ——
+     * 做注销时在这里加边，并配上带旧状态条件的 UPDATE。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code MemberMapper.xml} 的 {@code markFrozen} / {@code markNormal} 带旧状态条件，
+     * 已注销的会员两条都影响 0 行。{@code MemberStatusSqlTest} 断言那些 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(MemberStatusEnum to) {
+        return switch (this) {
+            case NORMAL -> to == FROZEN;
+            case FROZEN -> to == NORMAL;
+            case CANCELLED -> false;
+        };
+    }
 }
