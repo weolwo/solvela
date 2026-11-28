@@ -79,15 +79,22 @@
                 </delete>
 
     <!--
-        奖池开关的条件更新。WHERE status = #{from} 是并发闸门：
+        奖池开关的两条闸门。WHERE 里的旧状态是并发闸门：
         两个运营同时点禁用，第二个人 rows=0，不会出现「都以为自己成功了」。
-        与 LotteryConfigMapper.updateStatus 同构。
+        每条是 PrizePoolStatusEnum#canTransitTo 的一条边，PrizePoolStatusSqlTest 断言。${} 里只放常量。
     -->
-    <update id="updateStatus">
+    <update id="markOpen">
         UPDATE t_prize_pool_config
-        SET status = #{to}
+        SET status = ${@solvela.enums.PrizePoolStatusEnum@OPEN.value}
         WHERE id = #{id}
-          AND status = #{from}
+          AND status = ${@solvela.enums.PrizePoolStatusEnum@CLOSED.value}
+    </update>
+
+    <update id="markClosed">
+        UPDATE t_prize_pool_config
+        SET status = ${@solvela.enums.PrizePoolStatusEnum@CLOSED.value}
+        WHERE id = #{id}
+          AND status = ${@solvela.enums.PrizePoolStatusEnum@OPEN.value}
     </update>
 
 </mapper>

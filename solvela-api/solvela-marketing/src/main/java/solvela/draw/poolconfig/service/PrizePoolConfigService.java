@@ -455,6 +455,8 @@ public class PrizePoolConfigService {
                 entity.setDrawCode(drawCode);
                 entity.setPoolCode(pool.getPoolCode());
                 entity.setPoolName(pool.getPoolName());
+                // 新建一律开启：以前靠 DDL 默认值 1 隐式落成开启，这里写明
+                entity.startOpen();
                 prizePoolConfigDao.insert(entity);
             } else if (existed.getDrawCode() == null) {
                 // 存量奖池：迁移之前建的，顺手补上归属（同时也可能要改名）
@@ -651,7 +653,7 @@ public class PrizePoolConfigService {
         if (pool.getStatus() != PrizePoolStatusEnum.OPEN) {
             throw new BusinessException("奖池「" + pool.getPoolName() + "」本来就是关闭状态");
         }
-        int rows = prizePoolConfigDao.updateStatus(id, PrizePoolStatusEnum.OPEN, PrizePoolStatusEnum.CLOSED);
+        int rows = prizePoolConfigDao.markClosed(id);
         if (rows == 0) {
             throw new BusinessException("禁用失败：状态已被其他人变更，请刷新后重试");
         }
@@ -672,7 +674,7 @@ public class PrizePoolConfigService {
         if (pool.getStatus() == PrizePoolStatusEnum.OPEN) {
             throw new BusinessException("奖池「" + pool.getPoolName() + "」已经是开启状态");
         }
-        int rows = prizePoolConfigDao.updateStatus(id, PrizePoolStatusEnum.CLOSED, PrizePoolStatusEnum.OPEN);
+        int rows = prizePoolConfigDao.markOpen(id);
         if (rows == 0) {
             throw new BusinessException("启用失败：状态已被其他人变更，请刷新后重试");
         }

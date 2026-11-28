@@ -6,8 +6,6 @@ import solvela.draw.poolconfig.domain.dto.PrizePoolBoardResultDTO;
 import solvela.draw.poolconfig.service.PrizePoolBoardService;
 import solvela.admin.module.draw.poolconfig.domain.form.DrawWorkbenchSaveForm;
 import solvela.draw.poolconfig.domain.command.DrawWorkbenchSaveCommand;
-import solvela.admin.module.draw.poolconfig.domain.form.PrizePoolConfigAddForm;
-import solvela.draw.poolconfig.domain.command.PrizePoolConfigAddCommand;
 import solvela.admin.module.draw.poolconfig.domain.form.PrizePoolConfigQueryForm;
 import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
 import solvela.admin.module.draw.poolconfig.domain.form.PrizePoolConfigUpdateForm;

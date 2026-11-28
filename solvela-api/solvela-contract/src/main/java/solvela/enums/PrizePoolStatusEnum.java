@@ -27,4 +27,19 @@ public enum PrizePoolStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}：开启 ↔ 关闭。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code PrizePoolConfigMapper.xml} 的 {@code markOpen} / {@code markClosed} 带旧状态条件，
+     * 两个运营同时点只有一个生效。{@code PrizePoolStatusSqlTest} 断言那些 SQL 与这里一一对应。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(PrizePoolStatusEnum to) {
+        return switch (this) {
+            case CLOSED -> to == OPEN;
+            case OPEN -> to == CLOSED;
+        };
+    }
 }

@@ -7,7 +7,6 @@ import org.apache.ibatis.annotations.Param;
 import solvela.draw.PrizePoolConfig;
 import solvela.draw.poolconfig.domain.dto.PrizePoolConfigDTO;
 import solvela.draw.poolconfig.domain.query.PrizePoolConfigQuery;
-import solvela.enums.PrizePoolStatusEnum;
 
 import java.util.List;
 
@@ -39,13 +38,16 @@ public interface PrizePoolConfigDao extends BaseMapper<PrizePoolConfig> {
     List<PrizePoolConfigDTO> queryList(@Param("queryForm") PrizePoolConfigQuery queryForm);
 
     /**
-     * 条件更新奖池开关，返回影响行数。
+     * 开启奖池：关闭 → 开启，返回影响行数。
      *
-     * WHERE status = #{from} 是并发闸门，不是多余条件：两个运营同时点禁用，
+     * WHERE 里的旧状态是并发闸门，不是多余条件：两个运营同时点，
      * 第二个人拿到 rows=0 就知道状态已被别人改过，而不是两个人都以为自己成功了。
-     * 与 {@code LotteryConfigDao.updateStatus} 同构 —— 这类开关全项目一个形状。
+     * 迁移见 {@link solvela.enums.PrizePoolStatusEnum#canTransitTo}，与 {@code LotteryConfigDao.markOnline} 同构。
      */
-    int updateStatus(@Param("id") Long id, @Param("from") PrizePoolStatusEnum from, @Param("to") PrizePoolStatusEnum to);
+    int markOpen(@Param("id") Long id);
+
+    /** 禁用奖池：开启 → 关闭，返回影响行数 */
+    int markClosed(@Param("id") Long id);
 
             // ----- 物理删除 -----
                 /**

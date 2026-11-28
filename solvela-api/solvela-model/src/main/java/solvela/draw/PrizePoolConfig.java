@@ -3,7 +3,9 @@ package solvela.draw;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import solvela.enums.PrizePoolStatusEnum;
 
 import java.time.LocalDateTime;
@@ -62,7 +64,12 @@ public class PrizePoolConfig {
 
     /**
      * 0关闭，1开启
+     *
+     * <p>🔴 没有公开 setter：新建与复制经 {@link #startOpen} / {@link #startClosed} 定，开关只走
+     * {@code PrizePoolConfigDao.markOpen / markClosed}（状态机见 {@link PrizePoolStatusEnum#canTransitTo}）。
+     * MyBatis 读库时直接写字段，不需要 setter。
      */
+    @Setter(AccessLevel.NONE)
     private PrizePoolStatusEnum status;
 
     /**
@@ -85,4 +92,21 @@ public class PrizePoolConfig {
      */
     private LocalDateTime updateTime;
 
+    /** 落为<b>开启</b>：新建奖池的初始状态 */
+    public void startOpen() {
+        requireNew();
+        this.status = PrizePoolStatusEnum.OPEN;
+    }
+
+    /** 落为<b>关闭</b>：只用于复制活动时照抄一个关着的源奖池 */
+    public void startClosed() {
+        requireNew();
+        this.status = PrizePoolStatusEnum.CLOSED;
+    }
+
+    private void requireNew() {
+        if (status != null) {
+            throw new IllegalStateException("奖池 " + id + " 已是 " + status + "，不能再定初始状态");
+        }
+    }
 }

@@ -2,6 +2,7 @@ package solvela.draw.poolconfig.spi;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import solvela.enums.PrizePoolStatusEnum;
 import solvela.base.util.SolvelaBeanUtil;
 import solvela.base.util.SolvelaCodeUtil;
 import solvela.draw.PoolPrizeMapping;
@@ -117,6 +118,13 @@ public class DrawActivityRefProvider implements ActivityRefProvider {
             copy.setActivityCode(targetActivityCode);
             copy.setPoolCode(SolvelaCodeUtil.generateUniqueBizCode(
                     SolvelaCodeUtil.BizCodePrefix.POOL, this::existsByPoolCode));
+            // 开关照抄源奖池：被运营关掉的池（比如配错了）复制过去仍是关的。
+            // status 没有 setter，上面的拷贝会跳过它，不写这一句就会按 DDL 默认值落成开启
+            if (source.getStatus() == PrizePoolStatusEnum.CLOSED) {
+                copy.startClosed();
+            } else {
+                copy.startOpen();
+            }
             clearAudit(copy);
             prizePoolConfigManager.save(copy);
             poolCodeMap.put(source.getPoolCode(), copy.getPoolCode());
