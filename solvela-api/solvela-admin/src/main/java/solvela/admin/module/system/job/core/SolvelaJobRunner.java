@@ -179,8 +179,14 @@ public class SolvelaJobRunner {
         // fire_time 保持 NULL（抢占时已置空），终态记录不该再被扫描线程捞到
 
         SolvelaJobLogEntity retryEntity = this.buildRetryEntity(job, logEntity, handler, status);
-        jobRepository.finishAndScheduleRetry(update, retryEntity, job.getJobId(),
+        boolean finished = jobRepository.finishAndScheduleRetry(update, retryEntity, job.getJobId(),
                 status == SolvelaJobExecuteStatusEnum.SUCCESS ? 0 : 1, logEntity.getLogId());
+        if (!finished) {
+            // 跑得太久，已被僵尸扫描判成中断（并可能排了重试）。不覆盖它的结论，留一条日志供核对
+            log.warn("==== SolvelaJob ==== 执行完毕但记录已被僵尸扫描回收，本次结果未写入 job={} logId={} status={} cost={}ms",
+                    job.getJobName(), logEntity.getLogId(), status.getDesc(), costMillis);
+            return;
+        }
 
         log.info("==== SolvelaJob ==== 执行完毕 job={} status={} cost={}ms delay={}ms{}",
                 job.getJobName(), status.getDesc(), costMillis,

@@ -76,6 +76,12 @@ public interface SolvelaJobLogDao extends BaseMapper<SolvelaJobLogEntity> {
                                                @Param("limit") int limit);
 
     /**
+     * 落终态：只改「仍是执行中」的那一行，返回影响行数。0 表示终态已被别人写过
+     * （执行器与僵尸扫描先到先得），调用方不得再排重试、计失败。理由见 SolvelaJobLogMapper.xml。
+     */
+    int finishRunning(@Param("log") SolvelaJobLogEntity log);
+
+    /**
      * 清理 N 天前的执行日志
      */
     int deleteBeforeTime(@Param("beforeTime") LocalDateTime beforeTime, @Param("limit") int limit);

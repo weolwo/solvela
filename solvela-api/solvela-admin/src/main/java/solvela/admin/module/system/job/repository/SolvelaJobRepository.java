@@ -88,14 +88,19 @@ public class SolvelaJobRepository {
      *
      * @param retryEntity   为 null 表示不需要重试
      * @param failIncrement 1 = 累加连续失败计数，0 = 成功后清零
+     * @return false 表示这一行已不是执行中（终态被执行器或僵尸扫描先写了），本次什么都没做
      */
     @Transactional(rollbackFor = Throwable.class)
-    public void finishAndScheduleRetry(SolvelaJobLogEntity finishedLog,
-                                       SolvelaJobLogEntity retryEntity,
-                                       Integer jobId,
-                                       int failIncrement,
-                                       Long finishedLogId) {
-        jobLogDao.updateById(finishedLog);
+    public boolean finishAndScheduleRetry(SolvelaJobLogEntity finishedLog,
+                                          SolvelaJobLogEntity retryEntity,
+                                          Integer jobId,
+                                          int failIncrement,
+                                          Long finishedLogId) {
+        // 🔴 只认「仍是执行中」：执行器与僵尸扫描先到先得。晚到的一方什么都不做 ——
+        // 不排重试、不计失败、不改「最后一次执行」，否则成功的执行会被记成中断并多跑一次
+        if (jobLogDao.finishRunning(finishedLog) == 0) {
+            return false;
+        }
         if (null != retryEntity) {
             jobLogDao.insert(retryEntity);
         }
@@ -106,5 +111,6 @@ public class SolvelaJobRepository {
             updateJob.setLastExecuteLogId(finishedLogId);
             jobDao.updateById(updateJob);
         }
+        return true;
     }
 }

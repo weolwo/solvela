@@ -45,7 +45,7 @@
         SELECT *
         FROM t_solvela_job_log
         WHERE app_env = #{appEnv}
-          AND status = 0
+          AND status = ${@solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum@PENDING.value}
           AND fire_time IS NOT NULL
           AND fire_time &lt;= #{dbNow}
         ORDER BY fire_time
@@ -59,19 +59,19 @@
     -->
     <update id="preemptPendingLog">
         UPDATE t_solvela_job_log
-        SET status             = 1,
+        SET status             = ${@solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum@RUNNING.value},
             ip                 = #{ip},
             execute_start_time = #{startTime},
             fire_time          = NULL
         WHERE log_id = #{logId}
-          AND status = 0
+          AND status = ${@solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum@PENDING.value}
     </update>
 
     <select id="countRunning" resultType="int">
         SELECT COUNT(1)
         FROM t_solvela_job_log
         WHERE job_id = #{jobId}
-        AND status = 1
+        AND status = ${@solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum@RUNNING.value}
         AND execute_start_time &gt;= #{earliestStartTime}
         <!-- 🔴 排除本次自己：手动/重试路径先抢成 RUNNING 再判阻塞，不排除就会数到自己 -->
         <if test="excludeLogId != null">
@@ -82,11 +82,31 @@
     <select id="selectZombieList" resultType="solvela.admin.module.system.job.repository.domain.SolvelaJobLogEntity">
         SELECT *
         FROM t_solvela_job_log
-        WHERE status = 1
+        WHERE status = ${@solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum@RUNNING.value}
           AND execute_start_time &lt; #{beforeTime}
         ORDER BY log_id
         LIMIT #{limit}
     </select>
+
+    <!--
+      落终态：只认「仍是执行中」。🔴 执行器（本次执行的主人）与僵尸扫描（判断它已经死了）都会写这一行：
+      扫描读到执行中之后、写之前，执行器若恰好跑完写了成功，无条件写回会把它盖成「中断」并多排一次重试
+      —— 记录显示失败、幂等任务多跑一遍、连续失败数 +1 触发告警；反过来执行器晚到也会盖掉扫描的结论。
+      先到的那一方生效，晚到的影响 0 行，由调用方放弃排重试、不计失败。
+      状态值写成 ${@...@X.value}，SolvelaJobLogStatusSqlTest 断言。${} 里只放常量。
+    -->
+    <update id="finishRunning">
+        UPDATE t_solvela_job_log
+        <set>
+            status = #{log.status},
+            <if test="log.executeEndTime != null">execute_end_time = #{log.executeEndTime},</if>
+            <if test="log.executeTimeMillis != null">execute_time_millis = #{log.executeTimeMillis},</if>
+            <if test="log.resultSummary != null">result_summary = #{log.resultSummary},</if>
+            <if test="log.errorDetail != null">error_detail = #{log.errorDetail},</if>
+        </set>
+        WHERE log_id = #{log.logId}
+          AND status = ${@solvela.admin.module.system.job.constant.SolvelaJobExecuteStatusEnum@RUNNING.value}
+    </update>
 
     <!-- 分批删除：一次删几十万行会锁表并撑爆 binlog -->
     <delete id="deleteBeforeTime">

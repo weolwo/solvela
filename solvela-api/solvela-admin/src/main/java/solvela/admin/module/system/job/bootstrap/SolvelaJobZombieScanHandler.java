@@ -93,8 +93,10 @@ public class SolvelaJobZombieScanHandler implements SolvelaJob {
             update.setErrorDetail("疑似节点异常退出或进程被强杀，执行记录长期停留在「执行中」，由僵尸扫描回收");
 
             SolvelaJobLogEntity retry = this.buildRetry(job, zombie, ctx.dbNow());
-            jobRepository.finishAndScheduleRetry(update, retry,
-                    zombie.getJobId(), 1, zombie.getLogId());
+            if (!jobRepository.finishAndScheduleRetry(update, retry, zombie.getJobId(), 1, zombie.getLogId())) {
+                // 读到执行中之后它刚好跑完了：执行器已写了终态，不把成功盖成中断、也不多排一次重试
+                continue;
+            }
             recovered++;
             if (null != retry) {
                 retryScheduled++;
