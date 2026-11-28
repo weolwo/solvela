@@ -121,7 +121,7 @@ class FileAssetServiceTest {
         verify(fileRelationDao).deleteByBiz("ACTIVITY_DISPLAY", 20L);
         verify(fileRelationDao, org.mockito.Mockito.never()).insert(any(FileRelationEntity.class));
         // 空集合不该去查文件表
-        verify(fileDao, org.mockito.Mockito.never()).selectByIds(any());
+        verify(fileDao, org.mockito.Mockito.never()).lockLiveFiles(any());
     }
 
     @Test
@@ -416,7 +416,7 @@ class FileAssetServiceTest {
         assertThatThrownBy(() -> service.delete(5L, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("正被 1 处业务引用");
-        verify(fileDao, never()).updateById(any(FileEntity.class));
+        verify(fileDao, never()).softDeleteUnreferenced(any(), any());
     }
 
     @Test
@@ -426,9 +426,49 @@ class FileAssetServiceTest {
         StorageKey key = new StorageKey(saved.getStorageKey());
         when(fileDao.selectById(1001L)).thenReturn(saved);
         when(fileRelationDao.listByFileIds(any())).thenReturn(List.of());
+        when(fileDao.softDeleteUnreferenced(1001L, null)).thenReturn(1);
 
         service.delete(1001L, null);
         assertThat(storage.exists(key)).isFalse();
+    }
+
+    @Test
+    @DisplayName("🔴 检查时没有引用、标删除时已被业务引用：条件 UPDATE 影响 0 行，报错且字节不动")
+    void deleteLosesToConcurrentReference() {
+        FileEntity saved = service.upload(png("a.png"), "BANNER", null);
+        StorageKey key = new StorageKey(saved.getStorageKey());
+        when(fileDao.selectById(1001L)).thenReturn(saved);
+        when(fileRelationDao.listByFileIds(any())).thenReturn(List.of());
+        when(fileDao.softDeleteUnreferenced(1001L, null)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.delete(1001L, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("刚被业务引用");
+        assertThat(storage.exists(key)).isTrue();
+    }
+
+    @Test
+    @DisplayName("🔴 确认引用时有文件已被清理（锁不到）：整次拒绝，一个都不确认、关系也不建")
+    void confirmRejectsCleanedFile() {
+        when(fileDao.lockLiveFiles(any())).thenReturn(List.of(1L));
+
+        assertThatThrownBy(() -> service.confirm(List.of(1L, 2L), "ACTIVITY_DISPLAY", 20L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("已被清理");
+        verify(fileDao, never()).markConfirmed(any());
+        verify(fileRelationDao, never()).deleteByBiz(any(), any());
+    }
+
+    @Test
+    @DisplayName("确认引用：先锁行、再把临时改成已确认，重复的 id 只算一次")
+    void confirmLocksThenMarks() {
+        when(fileDao.lockLiveFiles(any())).thenReturn(List.of(1L, 2L));
+
+        service.confirm(List.of(1L, 2L, 2L), "ACTIVITY_DISPLAY", 20L);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(fileDao);
+        order.verify(fileDao).lockLiveFiles(java.util.Set.of(1L, 2L));
+        order.verify(fileDao).markConfirmed(java.util.Set.of(1L, 2L));
     }
 
     @Test
@@ -483,7 +523,7 @@ class FileAssetServiceTest {
     /** TEMP + 未删除的文件，给孤儿清理用 */
     private static FileEntity tempFile(Long id, String key) {
         FileEntity entity = file(id, key);
-        entity.setStatus(FileStatusEnum.TEMP);
+        entity.startTemp();
         entity.setDeletedFlag(false);
         return entity;
     }
@@ -494,14 +534,11 @@ class FileAssetServiceTest {
         seed("common/202609/01/orphan.png");
         when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9001L));
         when(fileDao.selectById(9001L)).thenReturn(tempFile(9001L, "common/202609/01/orphan.png"));
-        when(fileRelationDao.listByFileIds(List.of(9001L))).thenReturn(List.of());
+        when(fileDao.softDeleteOrphan(9001L)).thenReturn(1);
 
         assertThat(service.purgeOrphans(DEADLINE, 200)).isEqualTo(1);
 
-        org.mockito.ArgumentCaptor<FileEntity> captor =
-                org.mockito.ArgumentCaptor.forClass(FileEntity.class);
-        verify(fileDao).updateById(captor.capture());
-        assertThat(captor.getValue().getDeletedFlag()).isTrue();
+        verify(fileDao).softDeleteOrphan(9001L);
         // 只软删、不删字节的话，存储只增不减，而且没有任何机制会回来收它
         assertThat(storage.exists(new StorageKey("common/202609/01/orphan.png"))).isFalse();
     }
@@ -514,13 +551,11 @@ class FileAssetServiceTest {
         seed("common/202609/01/justused.png");
         when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9002L));
         when(fileDao.selectById(9002L)).thenReturn(tempFile(9002L, "common/202609/01/justused.png"));
-        FileRelationEntity relation = new FileRelationEntity();
-        relation.setFileId(9002L);
-        when(fileRelationDao.listByFileIds(List.of(9002L))).thenReturn(List.of(relation));
+        // 条件 UPDATE 里的 NOT EXISTS 看到了那条引用：影响 0 行
+        when(fileDao.softDeleteOrphan(9002L)).thenReturn(0);
 
         assertThat(service.purgeOrphans(DEADLINE, 200)).isZero();
 
-        verify(fileDao, never()).updateById(any(FileEntity.class));
         assertThat(storage.exists(new StorageKey("common/202609/01/justused.png"))).isTrue();
     }
 
@@ -530,7 +565,7 @@ class FileAssetServiceTest {
         // 业务确认过引用的文件，就算关系行被误删（或者查询条件哪天写漏了），
         // 也不该由清理任务来判死刑。状态是最后一道闸
         FileEntity confirmed = file(9003L, "common/202609/01/inuse.png");
-        confirmed.setStatus(FileStatusEnum.CONFIRMED);
+        org.apache.ibatis.reflection.SystemMetaObject.forObject(confirmed).setValue("status", FileStatusEnum.CONFIRMED);
         confirmed.setDeletedFlag(false);
         seed("common/202609/01/inuse.png");
         when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9003L));
@@ -538,7 +573,7 @@ class FileAssetServiceTest {
 
         assertThat(service.purgeOrphans(DEADLINE, 200)).isZero();
 
-        verify(fileDao, never()).updateById(any(FileEntity.class));
+        verify(fileDao, never()).softDeleteOrphan(any());
         assertThat(storage.exists(new StorageKey("common/202609/01/inuse.png"))).isTrue();
     }
 
@@ -551,7 +586,7 @@ class FileAssetServiceTest {
         when(fileDao.selectOrphanIds(DEADLINE, 200)).thenReturn(List.of(9004L, 9005L));
         when(fileDao.selectById(9004L)).thenThrow(new IllegalStateException("连接池炸了"));
         when(fileDao.selectById(9005L)).thenReturn(tempFile(9005L, "common/202609/01/b.png"));
-        when(fileRelationDao.listByFileIds(List.of(9005L))).thenReturn(List.of());
+        when(fileDao.softDeleteOrphan(9005L)).thenReturn(1);
 
         assertThat(service.purgeOrphans(DEADLINE, 200)).isEqualTo(1);
         assertThat(storage.exists(new StorageKey("common/202609/01/b.png"))).isFalse();

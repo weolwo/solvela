@@ -37,4 +37,19 @@ public enum FileStatusEnum implements BaseEnum {
     private final Integer value;
 
     private final String desc;
+
+    /**
+     * 本状态能否迁到 {@code to}：只有临时 → 已确认，已确认永不回退（清理任务只认临时）。
+     *
+     * <p>🔴 闸门在 SQL 里：{@code FileMapper.xml} 的 {@code markConfirmed} 只改仍是临时、未删除的行；
+     * 孤儿清理 {@code softDeleteOrphan} 也只认临时。{@code FileStatusSqlTest} 断言。
+     *
+     * <p>不写 default：新增一个状态时编译器会要求在这里表态。
+     */
+    public boolean canTransitTo(FileStatusEnum to) {
+        return switch (this) {
+            case TEMP -> to == CONFIRMED;
+            case CONFIRMED -> false;
+        };
+    }
 }

@@ -85,4 +85,20 @@ public interface FileDao extends BaseMapper<FileEntity> {
     /** 与 {@link #selectOrphanIds} 同一套条件的计数，给试运行用 */
     long countOrphans(@Param("deadline") LocalDateTime deadline);
 
+    /*
+     * 🔴 确认引用与删除的闸门：三处靠 t_file 的行锁串起来，理由见 FileMapper.xml 同一段的注释。
+     */
+
+    /** 锁住要确认的文件里还没被删的那些，返回它们的 id。须在 confirm 的事务内调用 */
+    List<Long> lockLiveFiles(@Param("fileIds") Collection<Long> fileIds);
+
+    /** 临时 → 已确认，只改仍是临时、未删除的行（已确认的不动） */
+    int markConfirmed(@Param("fileIds") Collection<Long> fileIds);
+
+    /** 孤儿清理：仍是临时、未删除、没有任何引用才标删除。返回 0 = 刚被业务引用了，跳过 */
+    int softDeleteOrphan(@Param("fileId") Long fileId);
+
+    /** 后台手动删除：未删除且没有任何引用才标删除。返回 0 = 刚被业务引用了或已被删 */
+    int softDeleteUnreferenced(@Param("fileId") Long fileId, @Param("operator") String operator);
+
 }

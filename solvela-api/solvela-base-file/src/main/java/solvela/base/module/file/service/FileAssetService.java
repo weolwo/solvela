@@ -49,6 +49,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -241,7 +242,7 @@ public class FileAssetService {
         entity.setExtension(extension);
         entity.setContentType(contentType);
         entity.setFileSize(size);
-        entity.setStatus(FileStatusEnum.TEMP);
+        entity.startTemp();
         entity.setDeletedFlag(false);
         entity.setCreateBy(operator);
         return entity;
@@ -531,11 +532,11 @@ public class FileAssetService {
         if (!references.isEmpty()) {
             throw new BusinessException("该文件正被 " + references.size() + " 处业务引用，不能删除");
         }
-        FileEntity update = new FileEntity();
-        update.setFileId(fileId);
-        update.setDeletedFlag(true);
-        update.setUpdateBy(operator);
-        fileDao.updateById(update);
+        // 上面的检查只为给出「被 N 处引用」这句人话；真正的判据在 UPDATE 的 WHERE 里，
+        // 检查之后才登记的引用也挡得住
+        if (fileDao.softDeleteUnreferenced(fileId, operator) == 0) {
+            throw new BusinessException("该文件刚被业务引用或已被删除，未删除，请刷新后重试");
+        }
         // 放在最后：DB 事务回滚得了，删掉的字节回滚不了
         objectStorage.delete(new StorageKey(existing.getStorageKey()));
     }
@@ -575,18 +576,15 @@ public class FileAssetService {
         // 3 张变 2 张是对的，1 张变 0 张是错的 —— 边界只差一个元素，行为完全相反。
         List<Long> ids = fileIds == null ? List.of() : fileIds;
         if (!ids.isEmpty()) {
-            List<FileEntity> files = fileDao.selectByIds(ids);
-            if (files.size() != ids.size()) {
-                throw new BusinessException("部分文件不存在，无法确认引用");
+            // 🔴 先锁行再确认：孤儿清理 / 手动删除要改的也是这些行，锁住之后它们只能等本事务提交，
+            // 提交后再判时已是已确认 / 已有引用。以前是先读后 updateById，清理恰好夹在中间就会删掉刚配好的图。
+            // 已被删的文件（deleted_flag=1）锁不到，数目对不上就拒绝 —— 以前这里查的行不排除已删的，
+            // 会把一个字节已经没了的文件确认成「在用」
+            Set<Long> distinct = new HashSet<>(ids);
+            if (fileDao.lockLiveFiles(distinct).size() != distinct.size()) {
+                throw new BusinessException("部分文件不存在或已被清理，无法确认引用，请重新上传");
             }
-            for (FileEntity file : files) {
-                if (file.getStatus() != FileStatusEnum.CONFIRMED) {
-                    FileEntity update = new FileEntity();
-                    update.setFileId(file.getFileId());
-                    update.setStatus(FileStatusEnum.CONFIRMED);
-                    fileDao.updateById(update);
-                }
-            }
+            fileDao.markConfirmed(distinct);
         }
         // 先清后建，让 confirm 幂等：同一个业务对象重复提交表单不会累积出重复关系，
         // 也能正确反映「这次去掉了某个附件」（包括去掉最后一个）
@@ -777,16 +775,12 @@ public class FileAssetService {
                     || file.getStatus() != FileStatusEnum.TEMP) {
                 return false;
             }
-            if (!fileRelationDao.listByFileIds(List.of(fileId)).isEmpty()) {
-                // 扫描之后、删除之前有人引用了它。这不是异常，是正常的并发
+            // 「仍是临时、没有引用」压在这条 UPDATE 的 WHERE 里，与业务 confirm 抢同一行锁。
+            // 扫描之后、删除之前有人引用了它，这里影响 0 行 —— 不是异常，是正常的并发
+            if (fileDao.softDeleteOrphan(fileId) == 0) {
                 log.info("[File] 孤儿 {} 在清理前被业务引用，跳过", fileId);
                 return false;
             }
-            FileEntity update = new FileEntity();
-            update.setFileId(fileId);
-            update.setDeletedFlag(true);
-            update.setUpdateBy("orphanClean");
-            fileDao.updateById(update);
             // 放在最后：DB 回滚得了，删掉的字节回滚不了（与 delete() 同一顺序）
             objectStorage.delete(new StorageKey(file.getStorageKey()));
             return true;

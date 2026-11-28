@@ -4,7 +4,9 @@ import solvela.base.module.file.constant.FileStatusEnum;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -92,6 +94,7 @@ public class FileEntity {
      * <p>没有它的话，"用户选了文件然后关掉页面没提交"产生的文件永远没人引用也永远不会被删，
      * 跑几年后存储里一半是垃圾，而且无法区分哪些是垃圾。
      */
+    @Setter(AccessLevel.NONE)
     private FileStatusEnum status;
 
     /**
@@ -113,4 +116,15 @@ public class FileEntity {
     private LocalDateTime updateTime;
 
     private LocalDateTime createTime;
+
+    /**
+     * 落为<b>临时</b>：刚上传、还没有业务登记引用。之后只走 {@code FileDao.markConfirmed}
+     * （状态机见 {@link FileStatusEnum#canTransitTo}）。status 没有公开 setter，MyBatis 读库时直接写字段。
+     */
+    public void startTemp() {
+        if (status != null) {
+            throw new IllegalStateException("文件 " + fileId + " 已是 " + status + "，不能再定初始状态");
+        }
+        this.status = FileStatusEnum.TEMP;
+    }
 }

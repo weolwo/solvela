@@ -123,7 +123,7 @@
       孤儿：上传了、过了保护期、至今没有任何业务登记引用的 TEMP 文件。给清理任务用。
 
       🔴 三个条件缺一不可，每一个都对应一种「删错」：
-        status = 1(TEMP)  —— CONFIRMED 的绝不碰。业务确认过引用的文件，
+        status = TEMP    —— CONFIRMED 的绝不碰。业务确认过引用的文件，
                              哪怕关系行被误删也不该由清理任务来判死刑
         create_time 早于  —— 保护期。用户正在填的表单里那些图还没提交，
                              此刻它们既是 TEMP 又无引用，删了就是删活人的东西
@@ -139,7 +139,7 @@
         SELECT f.file_id
         FROM t_file f
         WHERE f.deleted_flag = 0
-          AND f.status = 1
+          AND f.status = ${@solvela.base.module.file.constant.FileStatusEnum@TEMP.value}
           AND f.create_time &lt; #{deadline}
           AND NOT EXISTS (SELECT 1 FROM t_file_relation r WHERE r.file_id = f.file_id)
         ORDER BY f.file_id
@@ -151,9 +151,58 @@
         SELECT COUNT(*)
         FROM t_file f
         WHERE f.deleted_flag = 0
-          AND f.status = 1
+          AND f.status = ${@solvela.base.module.file.constant.FileStatusEnum@TEMP.value}
           AND f.create_time &lt; #{deadline}
           AND NOT EXISTS (SELECT 1 FROM t_file_relation r WHERE r.file_id = f.file_id)
     </select>
+
+    <!--
+      ==================== 确认引用与删除的闸门 ====================
+
+      🔴 业务保存时 confirm 与孤儿清理 / 手动删除会同时碰同一个文件：清理先读到「临时、无引用」，
+      业务随后确认并登记了引用，清理再无条件标删除、删字节 —— 刚配好的图就没了。
+      所以三处都用 t_file 这一行的行锁串起来：
+        · confirm 先 lockLiveFiles（SELECT ... FOR UPDATE）锁住要确认的行并核对都还没被删，再 markConfirmed；
+        · 清理 / 删除各是一条带条件的 UPDATE，判据压进 WHERE。它们抢同一行锁，confirm 没提交时只能等，
+          提交之后再判时已是已确认 / 已有引用，影响 0 行。
+      NOT EXISTS 子查询在 UPDATE 里是加锁读（读的是已提交的最新值），不是快照读。
+      状态值写成 ${@...@X.value}，FileStatusSqlTest 断言。${} 里只放常量。
+    -->
+    <select id="lockLiveFiles" resultType="java.lang.Long">
+        SELECT file_id
+        FROM t_file
+        WHERE deleted_flag = 0
+          AND file_id IN
+        <foreach collection="fileIds" open="(" close=")" separator="," item="id">#{id}</foreach>
+        FOR UPDATE
+    </select>
+
+    <update id="markConfirmed">
+        UPDATE t_file
+        SET status = ${@solvela.base.module.file.constant.FileStatusEnum@CONFIRMED.value}
+        WHERE status = ${@solvela.base.module.file.constant.FileStatusEnum@TEMP.value}
+          AND deleted_flag = 0
+          AND file_id IN
+        <foreach collection="fileIds" open="(" close=")" separator="," item="id">#{id}</foreach>
+    </update>
+
+    <update id="softDeleteOrphan">
+        UPDATE t_file f
+        SET f.deleted_flag = 1,
+            f.update_by = 'orphanClean'
+        WHERE f.file_id = #{fileId}
+          AND f.deleted_flag = 0
+          AND f.status = ${@solvela.base.module.file.constant.FileStatusEnum@TEMP.value}
+          AND NOT EXISTS (SELECT 1 FROM t_file_relation r WHERE r.file_id = #{fileId})
+    </update>
+
+    <update id="softDeleteUnreferenced">
+        UPDATE t_file f
+        SET f.deleted_flag = 1,
+            f.update_by = #{operator}
+        WHERE f.file_id = #{fileId}
+          AND f.deleted_flag = 0
+          AND NOT EXISTS (SELECT 1 FROM t_file_relation r WHERE r.file_id = #{fileId})
+    </update>
 
 </mapper>
